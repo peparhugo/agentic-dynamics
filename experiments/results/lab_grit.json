@@ -1,6 +1,6 @@
 {
   "experiment_id": "lab_grit",
-  "generated_at": "2026-08-26T21:44:08.305133",
+  "generated_at": "2026-08-27T02:54:13.836750",
   "metric_definition": "G(s) = P(test_executed_success | perturbation_strength = s)",
   "summary": {
     "cells": 144,
@@ -253,9 +253,9 @@
   "lab_contract": {
     "lab": "lab_grit.py",
     "input_dataset_id": "canonical_registry/finding+story",
-    "registry_identity_sha256": "2a622f891f138a6292f6bf1b9d0653fc9d57bd76dd97b180504d027bd3201b6b",
+    "registry_identity_sha256": "c74a0e02c22ac1425b85d6f7956a0e4e6e89911f6e2bbeaa049099e523e41d0a",
     "resolved_input_sha256": "b1fcca3b2db24fec574383affacae45c6699065a11b660a1c86b702caeb6826a",
-    "registry_version": "data-manifest/1.0+12152rows",
+    "registry_version": "data-manifest/1.0+12485rows",
     "metric_definition_version": "grit/v2",
     "metric_source_sha256": "efffc47f8bc8e92356489e96cc82a9b08bd6b07eb5196e5c0250b8baf04b1e91",
     "n_resolved_records": 279,
@@ -274,6 +274,6 @@
     "data_integrity_policy": "docs/data_integrity_findings.md",
     "requires_external_service": null,
     "contract_version": "lab-contract/v6",
-    "generated_at": "2026-08-26T19:44:08.305771+00:00"
+    "generated_at": "2026-08-27T00:54:13.837378+00:00"
   }
 }

@@ -2,7 +2,7 @@
 
 **Model:** deepseek/deepseek-v4-pro  |  **Task:** [inject_competing_goal_s0.5] task_manager...
 **Operator:** perturbed (objective_mutation, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-17T19:29:07
+**Repetitions:** 1  |  **Timestamp:** 2026-08-27T00:54:04
 
 ---
 
@@ -10,9 +10,9 @@
 
 ## Strategy [H]
 **Classification:** CONSERVATIVE
-**Score:** 0.846
+**Score:** 0.851
 
-**Verdict:** CONSERVATIVE — model maintained sound reasoning (correctness=100%, quality=0.67) with moderate resource use ($0.0267, ~8704J). Model absorbed the perturbation without divergence.
+**Verdict:** CONSERVATIVE — model maintained sound reasoning (correctness=100%, quality=0.68) with moderate resource use ($0.0267, ~8704J). Model absorbed the perturbation without divergence.
 
 **Recommendation:** Reliable but not novel. Good for production, not for exploration.
 
@@ -21,9 +21,9 @@
 ## Reasoning Dynamics
 | Metric | Value |
 |--------|-------|
-| Escape score [H] | 0.288 |
+| Escape score [H] | 0.285 |
 | Architecture div [H] | 0.200 |
-| Structure div [H] | 0.104 |
+| Structure div [H] | 0.060 |
 | Thinking ratio [C] | 31.0% |
 | Quality/$ [C] | 37 |
 | Quality/J [C] | 0.0001 |
@@ -39,8 +39,8 @@
 | Lines of code [M] | 1085 |
 | Cyclomatic complexity [C] | 171.0 |
 | Code quality [H] | 0.092 |
-| Novelty vs baseline [H] | 0.591 |
-| **Composite [H]** | **0.671** |
+| Novelty vs baseline [H] | 0.625 |
+| **Composite [H]** | **0.676** |
 
 ---
 
@@ -55,15 +55,15 @@
 | **Total tokens** | **32,754** |
 | Thinking ratio [C] | 31.0% |
 | Output efficiency [C] | 43.3% |
-| Input cost [M] | $0.003662 |
-| Output cost [M] | $0.012351 |
-| Reasoning cost [M] | $0.008821 |
-| Cache cost [M] | $0.001889 |
+| Input cost [M] | $0.002277 |
+| Output cost [M] | $0.011520 |
+| Reasoning cost [M] | $0.008227 |
+| Cache cost [M] | $0.004699 |
 | **Total cost** | **$0.026724** |
 | **Total energy [X]** | **~8704 J** |
 | Solution density [C] | 0.033126 LOC/tok |
-| Correctness/$ [C] | 37 |
-| Quality/J [C] | 0.000077 |
+| Correctness/$ [C] | 15 |
+| Quality/J [C] | 0.000078 |
 
 ---
 

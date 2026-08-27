@@ -2,7 +2,7 @@
 
 **Model:** deepseek/deepseek-v4-pro  |  **Task:** [remove_critical_constraint_s0.5] task_manager...
 **Operator:** perturbed (specification_corruption, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-17T19:29:06
+**Repetitions:** 1  |  **Timestamp:** 2026-08-27T00:53:59
 
 ---
 
@@ -55,14 +55,14 @@
 | **Total tokens** | **15,680** |
 | Thinking ratio [C] | 5.7% |
 | Output efficiency [C] | 39.5% |
-| Input cost [M] | $0.003736 |
-| Output cost [M] | $0.005390 |
-| Reasoning cost [M] | $0.000780 |
-| Cache cost [M] | $0.000799 |
+| Input cost [M] | $0.002471 |
+| Output cost [M] | $0.005347 |
+| Reasoning cost [M] | $0.000773 |
+| Cache cost [M] | $0.002114 |
 | **Total cost** | **$0.010704** |
 | **Total energy [X]** | **~2533 J** |
 | Solution density [C] | 0.028508 LOC/tok |
-| Correctness/$ [C] | 93 |
+| Correctness/$ [C] | 41 |
 | Quality/J [C] | 0.000236 |
 
 ---

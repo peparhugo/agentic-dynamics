@@ -2,7 +2,7 @@
 
 **Model:** openai/gpt-5.6-sol  |  **Task:** [inject_competing_goal_s0.5] task_manager...
 **Operator:** perturbed (objective_mutation, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-17T19:29:06
+**Repetitions:** 1  |  **Timestamp:** 2026-08-27T00:53:59
 
 ---
 
@@ -25,7 +25,7 @@
 | Architecture div [H] | 0.000 |
 | Structure div [H] | 0.068 |
 | Thinking ratio [C] | 1.7% |
-| Quality/$ [C] | 49 |
+| Quality/$ [C] | 26 |
 | Quality/J [C] | 0.0002 |
 | Converged back [H] | True |
 

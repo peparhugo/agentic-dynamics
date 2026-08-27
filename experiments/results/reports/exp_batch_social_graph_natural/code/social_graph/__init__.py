@@ -1,24 +1,47 @@
-from social_graph.types import NodeID, Edge, User
-from social_graph.bloom import BloomFilter
-from social_graph.union_find import UnionFind
-from social_graph.graph import SocialGraph
-from social_graph.shard import ShardingStrategy, Shard, ShardedGraph
-from social_graph.query import QueryEngine
-from social_graph.community import CommunityDetector
-from social_graph.cache import LRUCache, CacheLayer
+"""Social network graph data structures and infrastructure.
+
+A horizontally sharded, read-optimized social graph supporting users,
+connections, friend-of-friend suggestions, path finding, and community
+detection, designed for billion-node / trillion-edge scale.
+"""
+
+from .cache import CachedGraph, LRUCache
+from .community import (
+    communities_from_labels,
+    connected_components,
+    component_of,
+    label_propagation,
+)
+from .graph import SocialGraph
+from .models import Connection, FriendSuggestion, PathResult, User
+from .pathfinding import (
+    bfs_path,
+    bidirectional_bfs_path,
+    shortest_path,
+)
+from .sharding import ConsistentHash, ShardedGraph
+from .storage import ConnectionStore, Mutation, WriteAheadLog
+from .union_find import UnionFind
 
 __all__ = [
-    "NodeID",
-    "Edge",
-    "User",
-    "BloomFilter",
-    "UnionFind",
     "SocialGraph",
-    "ShardingStrategy",
-    "Shard",
     "ShardedGraph",
-    "QueryEngine",
-    "CommunityDetector",
+    "ConsistentHash",
+    "User",
+    "Connection",
+    "FriendSuggestion",
+    "PathResult",
+    "UnionFind",
+    "connected_components",
+    "component_of",
+    "label_propagation",
+    "communities_from_labels",
+    "bfs_path",
+    "bidirectional_bfs_path",
+    "shortest_path",
     "LRUCache",
-    "CacheLayer",
+    "CachedGraph",
+    "WriteAheadLog",
+    "ConnectionStore",
+    "Mutation",
 ]

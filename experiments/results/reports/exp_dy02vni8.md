@@ -2,7 +2,7 @@
 
 **Model:** deepseek/deepseek-v4-flash  |  **Task:** [inject_phantom_success_s0.5] task_manager...
 **Operator:** perturbed (specification_corruption, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-17T19:29:06
+**Repetitions:** 1  |  **Timestamp:** 2026-08-27T00:54:03
 
 ---
 
@@ -55,14 +55,14 @@
 | **Total tokens** | **36,033** |
 | Thinking ratio [C] | 15.7% |
 | Output efficiency [C] | 53.1% |
-| Input cost [M] | $0.001575 |
-| Output cost [M] | $0.005356 |
-| Reasoning cost [M] | $0.001583 |
-| Cache cost [M] | $0.002283 |
+| Input cost [M] | $0.001089 |
+| Output cost [M] | $0.005555 |
+| Reasoning cost [M] | $0.001642 |
+| Cache cost [M] | $0.002512 |
 | **Total cost** | **$0.010797** |
 | **Total energy [X]** | **~7956 J** |
 | Solution density [C] | 0.034774 LOC/tok |
-| Correctness/$ [C] | 93 |
+| Correctness/$ [C] | 41 |
 | Quality/J [C] | 0.000082 |
 
 ---

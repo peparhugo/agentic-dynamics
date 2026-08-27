@@ -2,7 +2,7 @@
 
 **Model:** openai/gpt-5.6-sol  |  **Task:** [shift_framing_s0.5] task_manager...
 **Operator:** perturbed (process_perturbation, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-17T19:29:06
+**Repetitions:** 1  |  **Timestamp:** 2026-08-27T00:53:59
 
 ---
 
@@ -25,7 +25,7 @@
 | Architecture div [H] | 0.000 |
 | Structure div [H] | 0.295 |
 | Thinking ratio [C] | 1.3% |
-| Quality/$ [C] | 56 |
+| Quality/$ [C] | 30 |
 | Quality/J [C] | 0.0003 |
 | Converged back [H] | False |
 

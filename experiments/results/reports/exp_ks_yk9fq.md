@@ -2,7 +2,7 @@
 
 **Model:** deepseek/deepseek-v4-pro  |  **Task:** [baseline] task_manager...
 **Operator:** baseline (baseline, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-17T19:29:07
+**Repetitions:** 1  |  **Timestamp:** 2026-08-27T00:54:04
 
 ---
 
@@ -55,14 +55,14 @@
 | **Total tokens** | **35,226** |
 | Thinking ratio [C] | 14.5% |
 | Output efficiency [C] | 41.4% |
-| Input cost [M] | $0.006766 |
-| Output cost [M] | $0.012672 |
-| Reasoning cost [M] | $0.004443 |
-| Cache cost [M] | $0.003597 |
+| Input cost [M] | $0.003970 |
+| Output cost [M] | $0.011154 |
+| Reasoning cost [M] | $0.003911 |
+| Cache cost [M] | $0.008443 |
 | **Total cost** | **$0.027478** |
 | **Total energy [X]** | **~6995 J** |
 | Solution density [C] | 0.027025 LOC/tok |
-| Correctness/$ [C] | 36 |
+| Correctness/$ [C] | 14 |
 | Quality/J [C] | 0.000101 |
 
 ---

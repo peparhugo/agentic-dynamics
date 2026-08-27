@@ -1,144 +1,142 @@
-import pytest
+def test_health(client):
+    resp = client.get("/api/health")
+    assert resp.status_code == 200
+    assert resp.get_json() == {"status": "ok"}
 
 
-class TestAuthRegister:
-    def test_register_success(self, client, db):
-        resp = client.post(
-            "/api/auth/register",
-            json={
-                "username": "newuser",
-                "email": "new@example.com",
-                "password": "password123",
-            },
-        )
-        assert resp.status_code == 201
-        data = resp.get_json()
-        assert "user" in data
-        assert "token" in data
-        assert data["user"]["username"] == "newuser"
-        assert data["user"]["email"] == "new@example.com"
-        assert "id" in data["user"]
-
-    def test_register_duplicate_username(self, client, db):
-        client.post(
-            "/api/auth/register",
-            json={
-                "username": "dupuser",
-                "email": "dup1@example.com",
-                "password": "password123",
-            },
-        )
-        resp = client.post(
-            "/api/auth/register",
-            json={
-                "username": "dupuser",
-                "email": "dup2@example.com",
-                "password": "password123",
-            },
-        )
-        assert resp.status_code == 409
-        assert "Username already taken" in resp.get_json()["error"]
-
-    def test_register_duplicate_email(self, client, db):
-        client.post(
-            "/api/auth/register",
-            json={
-                "username": "user1",
-                "email": "dup@example.com",
-                "password": "password123",
-            },
-        )
-        resp = client.post(
-            "/api/auth/register",
-            json={
-                "username": "user2",
-                "email": "dup@example.com",
-                "password": "password123",
-            },
-        )
-        assert resp.status_code == 409
-        assert "Email already registered" in resp.get_json()["error"]
-
-    def test_register_missing_fields(self, client):
-        resp = client.post("/api/auth/register", json={})
-        assert resp.status_code == 400
-
-        resp = client.post("/api/auth/register", json={"username": "x"})
-        assert resp.status_code == 400
-
-        resp = client.post("/api/auth/register", json={"username": "x", "email": "x@x.com"})
-        assert resp.status_code == 400
-
-    def test_register_short_password(self, client):
-        resp = client.post(
-            "/api/auth/register",
-            json={"username": "x", "email": "x@x.com", "password": "12345"},
-        )
-        assert resp.status_code == 400
-        assert "at least 6 characters" in resp.get_json()["error"].lower()
-
-    def test_register_no_json(self, client):
-        resp = client.post("/api/auth/register", data="not json")
-        assert resp.status_code == 400
+def test_register_success(client):
+    resp = client.post(
+        "/api/auth/register",
+        json={"username": "carol", "email": "carol@example.com", "password": "secret123"},
+    )
+    assert resp.status_code == 201
+    body = resp.get_json()
+    assert body["user"]["username"] == "carol"
+    assert body["user"]["email"] == "carol@example.com"
+    assert "password_hash" not in body["user"]
+    assert "access_token" in body
 
 
-class TestAuthLogin:
-    def test_login_with_username(self, client, user):
-        user_data, _ = user
-        resp = client.post(
-            "/api/auth/login",
-            json={"username": user_data["username"], "password": "password123"},
-        )
-        assert resp.status_code == 200
-        data = resp.get_json()
-        assert "token" in data
-
-    def test_login_with_email(self, client, user):
-        user_data, _ = user
-        resp = client.post(
-            "/api/auth/login",
-            json={"email": user_data["email"], "password": "password123"},
-        )
-        assert resp.status_code == 200
-        data = resp.get_json()
-        assert "token" in data
-
-    def test_login_invalid_credentials(self, client, user):
-        resp = client.post(
-            "/api/auth/login",
-            json={"username": "testuser", "password": "wrongpassword"},
-        )
-        assert resp.status_code == 401
-
-        resp = client.post(
-            "/api/auth/login",
-            json={"username": "nonexistent", "password": "password123"},
-        )
-        assert resp.status_code == 401
-
-    def test_login_missing_fields(self, client):
-        resp = client.post("/api/auth/login", json={})
-        assert resp.status_code == 400
-
-    def test_login_no_json(self, client):
-        resp = client.post("/api/auth/login", data="not json")
-        assert resp.status_code == 400
+def test_register_duplicate_username(client):
+    client.post(
+        "/api/auth/register",
+        json={"username": "dave", "email": "dave@example.com", "password": "secret123"},
+    )
+    resp = client.post(
+        "/api/auth/register",
+        json={"username": "dave", "email": "other@example.com", "password": "secret123"},
+    )
+    assert resp.status_code == 409
 
 
-class TestAuthMe:
-    def test_me_success(self, client, user, auth_header):
-        user_data, _ = user
-        resp = client.get("/api/auth/me", headers=auth_header)
-        assert resp.status_code == 200
-        data = resp.get_json()
-        assert data["user"]["username"] == user_data["username"]
+def test_register_duplicate_email(client):
+    client.post(
+        "/api/auth/register",
+        json={"username": "erin", "email": "erin@example.com", "password": "secret123"},
+    )
+    resp = client.post(
+        "/api/auth/register",
+        json={"username": "erin2", "email": "erin@example.com", "password": "secret123"},
+    )
+    assert resp.status_code == 409
 
-    def test_me_no_token(self, client):
-        resp = client.get("/api/auth/me")
-        assert resp.status_code == 401
 
-    def test_me_invalid_token(self, client):
-        resp = client.get(
-            "/api/auth/me", headers={"Authorization": "Bearer invalidtoken"}
-        )
-        assert resp.status_code == 401
+def test_register_missing_fields(client):
+    resp = client.post("/api/auth/register", json={"username": "frank"})
+    assert resp.status_code == 400
+
+
+def test_register_short_password(client):
+    resp = client.post(
+        "/api/auth/register",
+        json={"username": "frank", "email": "frank@example.com", "password": "123"},
+    )
+    assert resp.status_code == 400
+
+
+def test_register_invalid_email(client):
+    resp = client.post(
+        "/api/auth/register",
+        json={"username": "frank", "email": "not-an-email", "password": "secret123"},
+    )
+    assert resp.status_code == 400
+
+
+def test_login_with_username(client):
+    client.post(
+        "/api/auth/register",
+        json={"username": "grace", "email": "grace@example.com", "password": "secret123"},
+    )
+    resp = client.post(
+        "/api/auth/login", json={"username": "grace", "password": "secret123"}
+    )
+    assert resp.status_code == 200
+    assert "access_token" in resp.get_json()
+
+
+def test_login_with_email(client):
+    client.post(
+        "/api/auth/register",
+        json={"username": "heidi", "email": "heidi@example.com", "password": "secret123"},
+    )
+    resp = client.post(
+        "/api/auth/login", json={"email": "heidi@example.com", "password": "secret123"}
+    )
+    assert resp.status_code == 200
+    assert "access_token" in resp.get_json()
+
+
+def test_login_wrong_password(client):
+    client.post(
+        "/api/auth/register",
+        json={"username": "ivan", "email": "ivan@example.com", "password": "secret123"},
+    )
+    resp = client.post(
+        "/api/auth/login", json={"username": "ivan", "password": "wrongpass"}
+    )
+    assert resp.status_code == 401
+
+
+def test_login_unknown_user(client):
+    resp = client.post(
+        "/api/auth/login", json={"username": "nobody", "password": "secret123"}
+    )
+    assert resp.status_code == 401
+
+
+def test_missing_token(client):
+    resp = client.get("/api/tasks")
+    assert resp.status_code == 401
+
+
+def test_invalid_token(client):
+    resp = client.get("/api/tasks", headers={"Authorization": "Bearer not-a-token"})
+    assert resp.status_code == 401
+
+
+def test_malformed_header(client):
+    resp = client.get("/api/tasks", headers={"Authorization": "Basic abc"})
+    assert resp.status_code == 401
+
+
+def test_expired_token(app, client):
+    from datetime import datetime, timedelta, timezone
+
+    import jwt
+
+    client.post(
+        "/api/auth/register",
+        json={"username": "judy", "email": "judy@example.com", "password": "secret123"},
+    )
+    token = jwt.encode(
+        {
+            "sub": "1",
+            "username": "judy",
+            "exp": datetime.now(timezone.utc) - timedelta(minutes=1),
+        },
+        app.config["JWT_SECRET_KEY"],
+        algorithm="HS256",
+    )
+    resp = client.get("/api/tasks", headers={"Authorization": f"Bearer {token}"})
+    assert resp.status_code == 401
+    assert "expired" in resp.get_json()["error"].lower()

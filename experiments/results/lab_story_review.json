@@ -1,6 +1,6 @@
 {
   "experiment_id": "lab_story_review",
-  "generated_at": "2026-08-26T21:44:10.042384",
+  "generated_at": "2026-08-27T02:54:15.557977",
   "summary": {
     "cells": 215,
     "sessions": 1067,
@@ -83,7 +83,7 @@
       "total_cost": 0.056675180000000006,
       "total_tokens": 179957,
       "worktree": "/tmp/story_e68747301458",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/task_manager_api_deepseek_deepseek-v4-flash_clean_e68747301458.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/task_manager_api_deepseek_deepseek-v4-flash_clean_e68747301458.json"
     },
     {
       "story": "static_site_gen",
@@ -103,7 +103,7 @@
       "total_cost": 0.07596619,
       "total_tokens": 259781,
       "worktree": "/tmp/story_0da2381cdd0e",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/static_site_gen_deepseek_deepseek-v4-flash_clean_0da2381cdd0e.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/static_site_gen_deepseek_deepseek-v4-flash_clean_0da2381cdd0e.json"
     },
     {
       "story": "static_site_gen",
@@ -117,7 +117,7 @@
       "total_cost": 2.6557644999999996,
       "total_tokens": 121497,
       "worktree": "/tmp/story_90670037111f",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/static_site_gen_claude_haiku_4_5_early_degrade_90670037111f.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/static_site_gen_claude_haiku_4_5_early_degrade_90670037111f.json"
     },
     {
       "story": "notification_service",
@@ -137,7 +137,7 @@
       "total_cost": 0.0943136,
       "total_tokens": 30236,
       "worktree": "/tmp/story_4a6536132fb7",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/notification_service_openai_gpt-5.6-luna_clean_4a6536132fb7.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/notification_service_openai_gpt-5.6-luna_clean_4a6536132fb7.json"
     },
     {
       "story": "task_manager_api",
@@ -151,7 +151,7 @@
       "total_cost": 1.6439436,
       "total_tokens": 84985,
       "worktree": "/tmp/story_d219a57347d9",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/task_manager_api_anthropic_claude-haiku-4-5_clean_d219a57347d9.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/task_manager_api_anthropic_claude-haiku-4-5_clean_d219a57347d9.json"
     },
     {
       "story": "task_manager_api",
@@ -171,7 +171,7 @@
       "total_cost": 0.055256620000000006,
       "total_tokens": 186630,
       "worktree": "/tmp/story_ae20424b8713",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/task_manager_api_deepseek_deepseek-v4-flash_clean_ae20424b8713.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/task_manager_api_deepseek_deepseek-v4-flash_clean_ae20424b8713.json"
     },
     {
       "story": "notification_service",
@@ -191,7 +191,7 @@
       "total_cost": 0.07252096999999999,
       "total_tokens": 257897,
       "worktree": "/tmp/story_9a429aee734e",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/notification_service_deepseek_deepseek-v4-flash_early_degrade_9a429aee734e.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/notification_service_deepseek_deepseek-v4-flash_early_degrade_9a429aee734e.json"
     },
     {
       "story": "task_manager_api",
@@ -205,7 +205,7 @@
       "total_cost": 1.4442667,
       "total_tokens": 77088,
       "worktree": "/tmp/story_d1a27414d227",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/task_manager_api_claude_haiku_4_5_early_degrade_d1a27414d227.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/task_manager_api_claude_haiku_4_5_early_degrade_d1a27414d227.json"
     },
     {
       "story": "notification_service",
@@ -219,7 +219,7 @@
       "total_cost": 7.7748586,
       "total_tokens": 145725,
       "worktree": "/tmp/story_3dfe61707b6d",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/notification_service_anthropic_claude-sonnet-5_clean_3dfe61707b6d.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/notification_service_anthropic_claude-sonnet-5_clean_3dfe61707b6d.json"
     },
     {
       "story": "notification_service",
@@ -239,7 +239,7 @@
       "total_cost": 0.06741343999999999,
       "total_tokens": 237596,
       "worktree": "/tmp/story_0d78762ccd3b",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/notification_service_deepseek_v4_flash_early_degrade_0d78762ccd3b.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/notification_service_deepseek_v4_flash_early_degrade_0d78762ccd3b.json"
     },
     {
       "story": "task_manager_api",
@@ -259,7 +259,7 @@
       "total_cost": 0.04498108,
       "total_tokens": 160872,
       "worktree": "/tmp/story_adff7c436f49",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/task_manager_api_deepseek_deepseek-v4-flash_early_degrade_adff7c436f49.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/task_manager_api_deepseek_deepseek-v4-flash_early_degrade_adff7c436f49.json"
     },
     {
       "story": "task_manager_api",
@@ -279,7 +279,7 @@
       "total_cost": 2.10094568,
       "total_tokens": 170864,
       "worktree": "/tmp/story_c53814303cba",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/task_manager_api_gpt_5_6_sol_early_degrade_c53814303cba.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/task_manager_api_gpt_5_6_sol_early_degrade_c53814303cba.json"
     },
     {
       "story": "task_manager_api",
@@ -299,7 +299,7 @@
       "total_cost": 0.1042296,
       "total_tokens": 221684,
       "worktree": "/tmp/story_b6f6e3ff9c26",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/task_manager_api_gpt_5_6_luna_early_degrade_b6f6e3ff9c26.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/task_manager_api_gpt_5_6_luna_early_degrade_b6f6e3ff9c26.json"
     },
     {
       "story": "task_manager_api",
@@ -313,7 +313,7 @@
       "total_cost": 3.4235782,
       "total_tokens": 71048,
       "worktree": "/tmp/story_139c364d5ba5",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/task_manager_api_claude_sonnet_5_early_degrade_139c364d5ba5.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/task_manager_api_claude_sonnet_5_early_degrade_139c364d5ba5.json"
     },
     {
       "story": "static_site_gen",
@@ -327,7 +327,7 @@
       "total_cost": 9.56477,
       "total_tokens": 185723,
       "worktree": "/tmp/story_9b602fbb4e3c",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/static_site_gen_claude_sonnet_5_early_degrade_9b602fbb4e3c.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/static_site_gen_claude_sonnet_5_early_degrade_9b602fbb4e3c.json"
     },
     {
       "story": "static_site_gen",
@@ -341,7 +341,7 @@
       "total_cost": 0.09723920999999999,
       "total_tokens": 38917,
       "worktree": "/tmp/story_fe842562ab05",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/static_site_gen_openai_gpt-5.6-luna_clean_fe842562ab05.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/static_site_gen_openai_gpt-5.6-luna_clean_fe842562ab05.json"
     },
     {
       "story": "notification_service",
@@ -361,7 +361,7 @@
       "total_cost": 0.20963711000000002,
       "total_tokens": 274268,
       "worktree": "/tmp/story_f7b7d86b4434",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/notification_service_deepseek_v4_pro_early_degrade_f7b7d86b4434.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/notification_service_deepseek_v4_pro_early_degrade_f7b7d86b4434.json"
     },
     {
       "story": "notification_service",
@@ -381,7 +381,7 @@
       "total_cost": 1.26306797,
       "total_tokens": 165692,
       "worktree": "/tmp/story_23404c7acc7b",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/notification_service_gpt_5_6_terra_early_degrade_23404c7acc7b.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/notification_service_gpt_5_6_terra_early_degrade_23404c7acc7b.json"
     },
     {
       "story": "static_site_gen",
@@ -401,7 +401,7 @@
       "total_cost": 0.17511893,
       "total_tokens": 513217,
       "worktree": "/tmp/story_8bcc36000d48",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/static_site_gen_deepseek_v4_flash_early_degrade_8bcc36000d48.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/static_site_gen_deepseek_v4_flash_early_degrade_8bcc36000d48.json"
     },
     {
       "story": "static_site_gen",
@@ -421,7 +421,7 @@
       "total_cost": 0.16528134,
       "total_tokens": 217853,
       "worktree": "/tmp/story_ba5ddd74f014",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/static_site_gen_deepseek_v4_pro_early_degrade_ba5ddd74f014.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/static_site_gen_deepseek_v4_pro_early_degrade_ba5ddd74f014.json"
     },
     {
       "story": "notification_service",
@@ -435,7 +435,7 @@
       "total_cost": 1.5156607,
       "total_tokens": 84232,
       "worktree": "/tmp/story_e584b15c0ebe",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/notification_service_anthropic_claude-haiku-4-5_clean_e584b15c0ebe.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/notification_service_anthropic_claude-haiku-4-5_clean_e584b15c0ebe.json"
     },
     {
       "story": "task_manager_api",
@@ -454,7 +454,7 @@
       "total_cost": 0.07825048,
       "total_tokens": 167136,
       "worktree": "/tmp/story_6f62fada91ef",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/task_manager_api_gpt_5_6_luna_early_degrade_6f62fada91ef.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/task_manager_api_gpt_5_6_luna_early_degrade_6f62fada91ef.json"
     },
     {
       "story": "notification_service",
@@ -468,7 +468,7 @@
       "total_cost": 0.0,
       "total_tokens": 0,
       "worktree": "/tmp/story_f97c727f41d3",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/notification_service_claude_haiku_4_5_early_degrade_f97c727f41d3.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/notification_service_claude_haiku_4_5_early_degrade_f97c727f41d3.json"
     },
     {
       "story": "notification_service",
@@ -482,7 +482,7 @@
       "total_cost": 1.4112892,
       "total_tokens": 72067,
       "worktree": "/tmp/story_086d045101c8",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/notification_service_anthropic_claude-haiku-4-5_clean_086d045101c8.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/notification_service_anthropic_claude-haiku-4-5_clean_086d045101c8.json"
     },
     {
       "story": "notification_service",
@@ -502,7 +502,7 @@
       "total_cost": 0.0721092,
       "total_tokens": 273411,
       "worktree": "/tmp/story_24e52cb14f26",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/notification_service_deepseek_deepseek-v4-flash_clean_24e52cb14f26.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/notification_service_deepseek_deepseek-v4-flash_clean_24e52cb14f26.json"
     },
     {
       "story": "task_manager_api",
@@ -522,7 +522,7 @@
       "total_cost": 2.5857800500000003,
       "total_tokens": 181202,
       "worktree": "/tmp/story_fa31a241c96b",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/task_manager_api_openai_gpt-5.6-sol_clean_fa31a241c96b.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/task_manager_api_openai_gpt-5.6-sol_clean_fa31a241c96b.json"
     },
     {
       "story": "static_site_gen",
@@ -536,7 +536,7 @@
       "total_cost": 1.11533484,
       "total_tokens": 164370,
       "worktree": "/tmp/story_d083259c02f7",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/static_site_gen_openai_gpt-5.6-terra_bad_seed_d083259c02f7.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/static_site_gen_openai_gpt-5.6-terra_bad_seed_d083259c02f7.json"
     },
     {
       "story": "notification_service",
@@ -556,7 +556,7 @@
       "total_cost": 1.1943422200000002,
       "total_tokens": 193684,
       "worktree": "/tmp/story_9ec7a5968af0",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/notification_service_openai_gpt-5.6-terra_clean_9ec7a5968af0.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/notification_service_openai_gpt-5.6-terra_clean_9ec7a5968af0.json"
     },
     {
       "story": "notification_service",
@@ -576,7 +576,7 @@
       "total_cost": 0.11954323,
       "total_tokens": 35477,
       "worktree": "/tmp/story_9348ce0a2566",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/notification_service_openai_gpt-5.6-luna_clean_9348ce0a2566.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/notification_service_openai_gpt-5.6-luna_clean_9348ce0a2566.json"
     },
     {
       "story": "static_site_gen",
@@ -594,7 +594,7 @@
       "total_cost": 5.98266431,
       "total_tokens": 328778,
       "worktree": "/tmp/story_1521dc0d1ea5",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/static_site_gen_openai_gpt-5.6-sol_early_degrade_1521dc0d1ea5.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/static_site_gen_openai_gpt-5.6-sol_early_degrade_1521dc0d1ea5.json"
     },
     {
       "story": "task_manager_api",
@@ -614,7 +614,7 @@
       "total_cost": 0.08816595999999999,
       "total_tokens": 172397,
       "worktree": "/tmp/story_db9911d4e9c3",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/task_manager_api_gpt_5_6_luna_early_degrade_db9911d4e9c3.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/task_manager_api_gpt_5_6_luna_early_degrade_db9911d4e9c3.json"
     },
     {
       "story": "static_site_gen",
@@ -634,7 +634,7 @@
       "total_cost": 0.20651216,
       "total_tokens": 260369,
       "worktree": "/tmp/story_09aefd760c5e",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/static_site_gen_deepseek_v4_pro_early_degrade_09aefd760c5e.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/static_site_gen_deepseek_v4_pro_early_degrade_09aefd760c5e.json"
     },
     {
       "story": "notification_service",
@@ -654,7 +654,7 @@
       "total_cost": 2.92838189,
       "total_tokens": 198351,
       "worktree": "/tmp/story_e5cf95841c65",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/notification_service_openai_gpt-5.6-sol_clean_e5cf95841c65.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/notification_service_openai_gpt-5.6-sol_clean_e5cf95841c65.json"
     },
     {
       "story": "notification_service",
@@ -674,7 +674,7 @@
       "total_cost": 3.2623829,
       "total_tokens": 254131,
       "worktree": "/tmp/story_07b0f93f6f8c",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/notification_service_openai_gpt-5.6-sol_clean_07b0f93f6f8c.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/notification_service_openai_gpt-5.6-sol_clean_07b0f93f6f8c.json"
     },
     {
       "story": "notification_service",
@@ -694,7 +694,7 @@
       "total_cost": 1.1826499299999997,
       "total_tokens": 161772,
       "worktree": "/tmp/story_d2339001124f",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/notification_service_gpt_5_6_terra_early_degrade_d2339001124f.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/notification_service_gpt_5_6_terra_early_degrade_d2339001124f.json"
     },
     {
       "story": "task_manager_api",
@@ -708,7 +708,7 @@
       "total_cost": 2.1188152,
       "total_tokens": 101043,
       "worktree": "/tmp/story_8feddb1081cc",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/task_manager_api_anthropic_claude-haiku-4-5_clean_8feddb1081cc.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/task_manager_api_anthropic_claude-haiku-4-5_clean_8feddb1081cc.json"
     },
     {
       "story": "static_site_gen",
@@ -722,7 +722,7 @@
       "total_cost": 6.9076066,
       "total_tokens": 145135,
       "worktree": "/tmp/story_09a5ba798bd1",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/static_site_gen_anthropic_claude-sonnet-5_clean_09a5ba798bd1.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/static_site_gen_anthropic_claude-sonnet-5_clean_09a5ba798bd1.json"
     },
     {
       "story": "notification_service",
@@ -742,7 +742,7 @@
       "total_cost": 0.10212286,
       "total_tokens": 34507,
       "worktree": "/tmp/story_b06c6525b784",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/notification_service_openai_gpt-5.6-luna_clean_b06c6525b784.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/notification_service_openai_gpt-5.6-luna_clean_b06c6525b784.json"
     },
     {
       "story": "static_site_gen",
@@ -756,7 +756,7 @@
       "total_cost": 0.8277424,
       "total_tokens": 45492,
       "worktree": "/tmp/story_9f564b0e5cc2",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/static_site_gen_claude_haiku_4_5_early_degrade_9f564b0e5cc2.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/static_site_gen_claude_haiku_4_5_early_degrade_9f564b0e5cc2.json"
     },
     {
       "story": "static_site_gen",
@@ -776,7 +776,7 @@
       "total_cost": 0.38886005,
       "total_tokens": 416479,
       "worktree": "/tmp/story_0ab211aa1fa9",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/static_site_gen_deepseek_v4_pro_early_degrade_0ab211aa1fa9.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/static_site_gen_deepseek_v4_pro_early_degrade_0ab211aa1fa9.json"
     },
     {
       "story": "task_manager_api",
@@ -790,7 +790,7 @@
       "total_cost": 1.4293189000000002,
       "total_tokens": 77657,
       "worktree": "/tmp/story_67b7aa281954",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/task_manager_api_anthropic_claude-haiku-4-5_clean_67b7aa281954.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/task_manager_api_anthropic_claude-haiku-4-5_clean_67b7aa281954.json"
     },
     {
       "story": "task_manager_api",
@@ -810,7 +810,7 @@
       "total_cost": 2.34641514,
       "total_tokens": 188486,
       "worktree": "/tmp/story_90afb51a1d2e",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/task_manager_api_gpt_5_6_sol_early_degrade_90afb51a1d2e.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/task_manager_api_gpt_5_6_sol_early_degrade_90afb51a1d2e.json"
     },
     {
       "story": "task_manager_api",
@@ -830,7 +830,7 @@
       "total_cost": 2.4819945299999997,
       "total_tokens": 183760,
       "worktree": "/tmp/story_1cc273bdd71f",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/task_manager_api_gpt_5_6_sol_early_degrade_1cc273bdd71f.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/task_manager_api_gpt_5_6_sol_early_degrade_1cc273bdd71f.json"
     },
     {
       "story": "static_site_gen",
@@ -850,7 +850,7 @@
       "total_cost": 0.17871647000000002,
       "total_tokens": 239403,
       "worktree": "/tmp/story_1050e650b2f1",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/static_site_gen_deepseek_v4_pro_early_degrade_1050e650b2f1.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/static_site_gen_deepseek_v4_pro_early_degrade_1050e650b2f1.json"
     },
     {
       "story": "task_manager_api",
@@ -864,7 +864,7 @@
       "total_cost": 3.5201384,
       "total_tokens": 68628,
       "worktree": "/tmp/story_ac84ec94a587",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/task_manager_api_anthropic_claude-sonnet-5_clean_ac84ec94a587.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/task_manager_api_anthropic_claude-sonnet-5_clean_ac84ec94a587.json"
     },
     {
       "story": "static_site_gen",
@@ -878,7 +878,7 @@
       "total_cost": 0.09268956,
       "total_tokens": 177094,
       "worktree": "/tmp/story_b2e90bd19813",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/static_site_gen_gpt_5_6_luna_early_degrade_b2e90bd19813.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/static_site_gen_gpt_5_6_luna_early_degrade_b2e90bd19813.json"
     },
     {
       "story": "static_site_gen",
@@ -898,7 +898,7 @@
       "total_cost": 0.08966459,
       "total_tokens": 311318,
       "worktree": "/tmp/story_c1f6615093df",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/static_site_gen_deepseek_deepseek-v4-flash_bad_seed_c1f6615093df.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/static_site_gen_deepseek_deepseek-v4-flash_bad_seed_c1f6615093df.json"
     },
     {
       "story": "task_manager_api",
@@ -918,7 +918,7 @@
       "total_cost": 0.78512419,
       "total_tokens": 114656,
       "worktree": "/tmp/story_e91b0d961922",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/task_manager_api_gpt_5_6_terra_early_degrade_e91b0d961922.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/task_manager_api_gpt_5_6_terra_early_degrade_e91b0d961922.json"
     },
     {
       "story": "notification_service",
@@ -932,7 +932,7 @@
       "total_cost": 0.0,
       "total_tokens": 0,
       "worktree": "/tmp/story_e70c34ba8545",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/notification_service_claude_haiku_4_5_early_degrade_e70c34ba8545.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/notification_service_claude_haiku_4_5_early_degrade_e70c34ba8545.json"
     },
     {
       "story": "task_manager_api",
@@ -952,7 +952,7 @@
       "total_cost": 0.08813257999999999,
       "total_tokens": 30163,
       "worktree": "/tmp/story_add5e7cdc864",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/task_manager_api_openai_gpt-5.6-luna_clean_add5e7cdc864.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/task_manager_api_openai_gpt-5.6-luna_clean_add5e7cdc864.json"
     },
     {
       "story": "notification_service",
@@ -966,7 +966,7 @@
       "total_cost": 0.0,
       "total_tokens": 0,
       "worktree": "/tmp/story_2b6e48207bb2",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/notification_service_claude_haiku_4_5_early_degrade_2b6e48207bb2.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/notification_service_claude_haiku_4_5_early_degrade_2b6e48207bb2.json"
     },
     {
       "story": "static_site_gen",
@@ -980,7 +980,7 @@
       "total_cost": 1.29411808,
       "total_tokens": 197196,
       "worktree": "/tmp/story_45f0c9d4104a",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/static_site_gen_openai_gpt-5.6-terra_clean_45f0c9d4104a.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/static_site_gen_openai_gpt-5.6-terra_clean_45f0c9d4104a.json"
     },
     {
       "story": "task_manager_api",
@@ -1000,7 +1000,7 @@
       "total_cost": 0.11774659000000001,
       "total_tokens": 179479,
       "worktree": "/tmp/story_f1e988572174",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/task_manager_api_deepseek_deepseek-v4-pro_clean_f1e988572174.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/task_manager_api_deepseek_deepseek-v4-pro_clean_f1e988572174.json"
     },
     {
       "story": "static_site_gen",
@@ -1018,7 +1018,7 @@
       "total_cost": 6.8274630400000005,
       "total_tokens": 333872,
       "worktree": "/tmp/story_ea2e7bf3bb45",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/static_site_gen_openai_gpt-5.6-sol_bad_seed_ea2e7bf3bb45.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/static_site_gen_openai_gpt-5.6-sol_bad_seed_ea2e7bf3bb45.json"
     },
     {
       "story": "task_manager_api",
@@ -1032,7 +1032,7 @@
       "total_cost": 1.7517022999999998,
       "total_tokens": 93973,
       "worktree": "/tmp/story_b6a468517308",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/task_manager_api_claude_haiku_4_5_early_degrade_b6a468517308.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/task_manager_api_claude_haiku_4_5_early_degrade_b6a468517308.json"
     },
     {
       "story": "static_site_gen",
@@ -1046,7 +1046,7 @@
       "total_cost": 0.09600222,
       "total_tokens": 37746,
       "worktree": "/tmp/story_fcd25f23bcc9",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/static_site_gen_openai_gpt-5.6-luna_bad_seed_fcd25f23bcc9.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/static_site_gen_openai_gpt-5.6-luna_bad_seed_fcd25f23bcc9.json"
     },
     {
       "story": "static_site_gen",
@@ -1063,7 +1063,7 @@
       "total_cost": 6.17882536,
       "total_tokens": 295025,
       "worktree": "/tmp/story_663bc5087d17",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/static_site_gen_openai_gpt-5.6-sol_clean_663bc5087d17.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/static_site_gen_openai_gpt-5.6-sol_clean_663bc5087d17.json"
     },
     {
       "story": "task_manager_api",
@@ -1077,7 +1077,7 @@
       "total_cost": 3.2374460000000003,
       "total_tokens": 70960,
       "worktree": "/tmp/story_460827bf509e",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/task_manager_api_claude_sonnet_5_early_degrade_460827bf509e.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/task_manager_api_claude_sonnet_5_early_degrade_460827bf509e.json"
     },
     {
       "story": "static_site_gen",
@@ -1097,7 +1097,7 @@
       "total_cost": 0.15098089999999997,
       "total_tokens": 210592,
       "worktree": "/tmp/story_1b6f0b4967f2",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/static_site_gen_deepseek_deepseek-v4-pro_clean_1b6f0b4967f2.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/static_site_gen_deepseek_deepseek-v4-pro_clean_1b6f0b4967f2.json"
     },
     {
       "story": "task_manager_api",
@@ -1116,7 +1116,7 @@
       "total_cost": 0.09696640000000001,
       "total_tokens": 28548,
       "worktree": "/tmp/story_83e669c2a985",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/task_manager_api_openai_gpt-5.6-luna_bad_seed_83e669c2a985.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/task_manager_api_openai_gpt-5.6-luna_bad_seed_83e669c2a985.json"
     },
     {
       "story": "notification_service",
@@ -1136,7 +1136,7 @@
       "total_cost": 0.0910706,
       "total_tokens": 31353,
       "worktree": "/tmp/story_8ca582d68df1",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/notification_service_openai_gpt-5.6-luna_bad_seed_8ca582d68df1.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/notification_service_openai_gpt-5.6-luna_bad_seed_8ca582d68df1.json"
     },
     {
       "story": "static_site_gen",
@@ -1156,7 +1156,7 @@
       "total_cost": 0.08591163,
       "total_tokens": 291491,
       "worktree": "/tmp/story_6517c93d59da",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/static_site_gen_deepseek_deepseek-v4-flash_early_degrade_6517c93d59da.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/static_site_gen_deepseek_deepseek-v4-flash_early_degrade_6517c93d59da.json"
     },
     {
       "story": "notification_service",
@@ -1176,7 +1176,7 @@
       "total_cost": 0.1026058,
       "total_tokens": 337685,
       "worktree": "/tmp/story_a4b92684538b",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/notification_service_deepseek_deepseek-v4-flash_clean_a4b92684538b.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/notification_service_deepseek_deepseek-v4-flash_clean_a4b92684538b.json"
     },
     {
       "story": "task_manager_api",
@@ -1196,7 +1196,7 @@
       "total_cost": 0.07726244,
       "total_tokens": 24047,
       "worktree": "/tmp/story_39a8522e4ce3",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/task_manager_api_openai_gpt-5.6-luna_clean_39a8522e4ce3.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/task_manager_api_openai_gpt-5.6-luna_clean_39a8522e4ce3.json"
     },
     {
       "story": "task_manager_api",
@@ -1216,7 +1216,7 @@
       "total_cost": 0.04361959,
       "total_tokens": 151026,
       "worktree": "/tmp/story_68abe3a8ab43",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/task_manager_api_deepseek_deepseek-v4-flash_bad_seed_68abe3a8ab43.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/task_manager_api_deepseek_deepseek-v4-flash_bad_seed_68abe3a8ab43.json"
     },
     {
       "story": "static_site_gen",
@@ -1230,7 +1230,7 @@
       "total_cost": 3.9078541099999997,
       "total_tokens": 224449,
       "worktree": "/tmp/story_08b18958fe74",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/static_site_gen_openai_gpt-5.6-sol_bad_seed_08b18958fe74.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/static_site_gen_openai_gpt-5.6-sol_bad_seed_08b18958fe74.json"
     },
     {
       "story": "notification_service",
@@ -1250,7 +1250,7 @@
       "total_cost": 3.96247004,
       "total_tokens": 261200,
       "worktree": "/tmp/story_014e409167a7",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/notification_service_openai_gpt-5.6-sol_early_degrade_014e409167a7.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/notification_service_openai_gpt-5.6-sol_early_degrade_014e409167a7.json"
     },
     {
       "story": "task_manager_api",
@@ -1264,7 +1264,7 @@
       "total_cost": 4.7573826,
       "total_tokens": 91520,
       "worktree": "/tmp/story_d0e2075a6c59",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/task_manager_api_anthropic_claude-sonnet-5_clean_d0e2075a6c59.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/task_manager_api_anthropic_claude-sonnet-5_clean_d0e2075a6c59.json"
     },
     {
       "story": "notification_service",
@@ -1284,7 +1284,7 @@
       "total_cost": 0.16891662,
       "total_tokens": 239414,
       "worktree": "/tmp/story_7add6d50bddc",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/notification_service_deepseek_deepseek-v4-pro_bad_seed_7add6d50bddc.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/notification_service_deepseek_deepseek-v4-pro_bad_seed_7add6d50bddc.json"
     },
     {
       "story": "static_site_gen",
@@ -1304,7 +1304,7 @@
       "total_cost": 0.14611356,
       "total_tokens": 204380,
       "worktree": "/tmp/story_3befdab6020a",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/static_site_gen_deepseek_deepseek-v4-pro_clean_3befdab6020a.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/static_site_gen_deepseek_deepseek-v4-pro_clean_3befdab6020a.json"
     },
     {
       "story": "notification_service",
@@ -1324,7 +1324,7 @@
       "total_cost": 0.10912643999999999,
       "total_tokens": 235452,
       "worktree": "/tmp/story_49a3c87dabfe",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/notification_service_gpt_5_6_luna_early_degrade_49a3c87dabfe.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/notification_service_gpt_5_6_luna_early_degrade_49a3c87dabfe.json"
     },
     {
       "story": "task_manager_api",
@@ -1344,7 +1344,7 @@
       "total_cost": 0.041303809999999996,
       "total_tokens": 161977,
       "worktree": "/tmp/story_30e8c7036131",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/task_manager_api_deepseek_v4_flash_early_degrade_30e8c7036131.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/task_manager_api_deepseek_v4_flash_early_degrade_30e8c7036131.json"
     },
     {
       "story": "task_manager_api",
@@ -1364,7 +1364,7 @@
       "total_cost": 0.07544756999999999,
       "total_tokens": 26500,
       "worktree": "/tmp/story_c9e06c7b6b5c",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/task_manager_api_openai_gpt-5.6-luna_clean_c9e06c7b6b5c.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/task_manager_api_openai_gpt-5.6-luna_clean_c9e06c7b6b5c.json"
     },
     {
       "story": "task_manager_api",
@@ -1378,7 +1378,7 @@
       "total_cost": 2.8924079000000003,
       "total_tokens": 57875,
       "worktree": "/tmp/story_faa9c87608e1",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/task_manager_api_anthropic_claude-sonnet-5_bad_seed_faa9c87608e1.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/task_manager_api_anthropic_claude-sonnet-5_bad_seed_faa9c87608e1.json"
     },
     {
       "story": "static_site_gen",
@@ -1395,7 +1395,7 @@
       "total_cost": 5.4312333100000005,
       "total_tokens": 308514,
       "worktree": "/tmp/story_cc1e24b5c43d",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/static_site_gen_openai_gpt-5.6-sol_clean_cc1e24b5c43d.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/static_site_gen_openai_gpt-5.6-sol_clean_cc1e24b5c43d.json"
     },
     {
       "story": "static_site_gen",
@@ -1414,7 +1414,7 @@
       "total_cost": 7.39894907,
       "total_tokens": 332239,
       "worktree": "/tmp/story_b1e5762eadb0",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/static_site_gen_openai_gpt-5.6-sol_early_degrade_b1e5762eadb0.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/static_site_gen_openai_gpt-5.6-sol_early_degrade_b1e5762eadb0.json"
     },
     {
       "story": "task_manager_api",
@@ -1434,7 +1434,7 @@
       "total_cost": 1.6048701200000002,
       "total_tokens": 128136,
       "worktree": "/tmp/story_c1e5df33c78e",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/task_manager_api_openai_gpt-5.6-sol_bad_seed_c1e5df33c78e.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/task_manager_api_openai_gpt-5.6-sol_bad_seed_c1e5df33c78e.json"
     },
     {
       "story": "notification_service",
@@ -1454,7 +1454,7 @@
       "total_cost": 0.13123498,
       "total_tokens": 206716,
       "worktree": "/tmp/story_bb4e1d655f1c",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/notification_service_deepseek_deepseek-v4-pro_clean_bb4e1d655f1c.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/notification_service_deepseek_deepseek-v4-pro_clean_bb4e1d655f1c.json"
     },
     {
       "story": "notification_service",
@@ -1474,7 +1474,7 @@
       "total_cost": 0.15038649,
       "total_tokens": 206234,
       "worktree": "/tmp/story_a7bd48a35962",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/notification_service_deepseek_v4_pro_early_degrade_a7bd48a35962.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/notification_service_deepseek_v4_pro_early_degrade_a7bd48a35962.json"
     },
     {
       "story": "notification_service",
@@ -1494,7 +1494,7 @@
       "total_cost": 3.1534496699999996,
       "total_tokens": 226759,
       "worktree": "/tmp/story_8952927e4246",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/notification_service_openai_gpt-5.6-sol_early_degrade_8952927e4246.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/notification_service_openai_gpt-5.6-sol_early_degrade_8952927e4246.json"
     },
     {
       "story": "notification_service",
@@ -1508,7 +1508,7 @@
       "total_cost": 6.9185392,
       "total_tokens": 139897,
       "worktree": "/tmp/story_b6104529da02",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/notification_service_claude_sonnet_5_early_degrade_b6104529da02.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/notification_service_claude_sonnet_5_early_degrade_b6104529da02.json"
     },
     {
       "story": "notification_service",
@@ -1528,7 +1528,7 @@
       "total_cost": 1.3156848,
       "total_tokens": 172849,
       "worktree": "/tmp/story_f5c04c9f23a3",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/notification_service_gpt_5_6_terra_early_degrade_f5c04c9f23a3.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/notification_service_gpt_5_6_terra_early_degrade_f5c04c9f23a3.json"
     },
     {
       "story": "static_site_gen",
@@ -1548,7 +1548,7 @@
       "total_cost": 0.16820390999999998,
       "total_tokens": 225236,
       "worktree": "/tmp/story_93315c89d8cd",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/static_site_gen_deepseek_v4_pro_early_degrade_93315c89d8cd.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/static_site_gen_deepseek_v4_pro_early_degrade_93315c89d8cd.json"
     },
     {
       "story": "task_manager_api",
@@ -1568,7 +1568,7 @@
       "total_cost": 0.758725,
       "total_tokens": 127875,
       "worktree": "/tmp/story_6f8998e6eb7a",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/task_manager_api_openai_gpt-5.6-terra_clean_6f8998e6eb7a.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/task_manager_api_openai_gpt-5.6-terra_clean_6f8998e6eb7a.json"
     },
     {
       "story": "static_site_gen",
@@ -1582,7 +1582,7 @@
       "total_cost": 0.10901352,
       "total_tokens": 133635,
       "worktree": "/tmp/story_ffcde83c22ae",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/static_site_gen_deepseek_deepseek-v4-pro_bad_seed_ffcde83c22ae.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/static_site_gen_deepseek_deepseek-v4-pro_bad_seed_ffcde83c22ae.json"
     },
     {
       "story": "static_site_gen",
@@ -1602,7 +1602,7 @@
       "total_cost": 0.14595993,
       "total_tokens": 432785,
       "worktree": "/tmp/story_4fac7ebb38a0",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/static_site_gen_deepseek_v4_flash_early_degrade_4fac7ebb38a0.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/static_site_gen_deepseek_v4_flash_early_degrade_4fac7ebb38a0.json"
     },
     {
       "story": "task_manager_api",
@@ -1622,7 +1622,7 @@
       "total_cost": 2.48006299,
       "total_tokens": 172034,
       "worktree": "/tmp/story_18480f5a6fa8",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/task_manager_api_gpt_5_6_sol_early_degrade_18480f5a6fa8.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/task_manager_api_gpt_5_6_sol_early_degrade_18480f5a6fa8.json"
     },
     {
       "story": "notification_service",
@@ -1636,7 +1636,7 @@
       "total_cost": 7.0342813,
       "total_tokens": 154808,
       "worktree": "/tmp/story_c4c74c2492f8",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/notification_service_anthropic_claude-sonnet-5_clean_c4c74c2492f8.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/notification_service_anthropic_claude-sonnet-5_clean_c4c74c2492f8.json"
     },
     {
       "story": "task_manager_api",
@@ -1656,7 +1656,7 @@
       "total_cost": 0.08506124,
       "total_tokens": 148459,
       "worktree": "/tmp/story_192e125a6c89",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/task_manager_api_deepseek_deepseek-v4-pro_clean_192e125a6c89.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/task_manager_api_deepseek_deepseek-v4-pro_clean_192e125a6c89.json"
     },
     {
       "story": "notification_service",
@@ -1676,7 +1676,7 @@
       "total_cost": 3.62241658,
       "total_tokens": 239678,
       "worktree": "/tmp/story_9abb9af55864",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/notification_service_gpt_5_6_sol_early_degrade_9abb9af55864.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/notification_service_gpt_5_6_sol_early_degrade_9abb9af55864.json"
     },
     {
       "story": "static_site_gen",
@@ -1696,7 +1696,7 @@
       "total_cost": 0.19008377,
       "total_tokens": 247907,
       "worktree": "/tmp/story_8e1f9fc56390",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/static_site_gen_deepseek_v4_pro_early_degrade_8e1f9fc56390.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/static_site_gen_deepseek_v4_pro_early_degrade_8e1f9fc56390.json"
     },
     {
       "story": "notification_service",
@@ -1716,7 +1716,7 @@
       "total_cost": 0.09810400000000001,
       "total_tokens": 191748,
       "worktree": "/tmp/story_abb79e33598e",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/notification_service_gpt_5_6_luna_early_degrade_abb79e33598e.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/notification_service_gpt_5_6_luna_early_degrade_abb79e33598e.json"
     },
     {
       "story": "notification_service",
@@ -1736,7 +1736,7 @@
       "total_cost": 0.30315228000000005,
       "total_tokens": 350045,
       "worktree": "/tmp/story_2c380b289b9e",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/notification_service_deepseek_v4_pro_early_degrade_2c380b289b9e.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/notification_service_deepseek_v4_pro_early_degrade_2c380b289b9e.json"
     },
     {
       "story": "task_manager_api",
@@ -1756,7 +1756,7 @@
       "total_cost": 0.11271485,
       "total_tokens": 169292,
       "worktree": "/tmp/story_7aadf42df487",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/task_manager_api_deepseek_deepseek-v4-pro_bad_seed_7aadf42df487.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/task_manager_api_deepseek_deepseek-v4-pro_bad_seed_7aadf42df487.json"
     },
     {
       "story": "task_manager_api",
@@ -1776,7 +1776,7 @@
       "total_cost": 0.07688408,
       "total_tokens": 25625,
       "worktree": "/tmp/story_4d3aa8025ff3",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/task_manager_api_openai_gpt-5.6-luna_clean_4d3aa8025ff3.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/task_manager_api_openai_gpt-5.6-luna_clean_4d3aa8025ff3.json"
     },
     {
       "story": "notification_service",
@@ -1790,7 +1790,7 @@
       "total_cost": 0.37522869999999997,
       "total_tokens": 24944,
       "worktree": "/tmp/story_dd0a49e95ad6",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/notification_service_anthropic_claude-haiku-4-5_bad_seed_dd0a49e95ad6.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/notification_service_anthropic_claude-haiku-4-5_bad_seed_dd0a49e95ad6.json"
     },
     {
       "story": "static_site_gen",
@@ -1804,7 +1804,7 @@
       "total_cost": 0.0,
       "total_tokens": 0,
       "worktree": "/tmp/story_c46ad3251602",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/static_site_gen_claude_sonnet_5_early_degrade_c46ad3251602.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/static_site_gen_claude_sonnet_5_early_degrade_c46ad3251602.json"
     },
     {
       "story": "notification_service",
@@ -1824,7 +1824,7 @@
       "total_cost": 1.21923036,
       "total_tokens": 152161,
       "worktree": "/tmp/story_d7f544383e6d",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/notification_service_gpt_5_6_terra_early_degrade_d7f544383e6d.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/notification_service_gpt_5_6_terra_early_degrade_d7f544383e6d.json"
     },
     {
       "story": "task_manager_api",
@@ -1844,7 +1844,7 @@
       "total_cost": 1.90403658,
       "total_tokens": 156858,
       "worktree": "/tmp/story_0bfc7321a7ae",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/task_manager_api_openai_gpt-5.6-sol_clean_0bfc7321a7ae.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/task_manager_api_openai_gpt-5.6-sol_clean_0bfc7321a7ae.json"
     },
     {
       "story": "static_site_gen",
@@ -1858,7 +1858,7 @@
       "total_cost": 2.3183861,
       "total_tokens": 97520,
       "worktree": "/tmp/story_ca93b1a4f686",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/static_site_gen_claude_haiku_4_5_early_degrade_ca93b1a4f686.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/static_site_gen_claude_haiku_4_5_early_degrade_ca93b1a4f686.json"
     },
     {
       "story": "notification_service",
@@ -1878,7 +1878,7 @@
       "total_cost": 0.07543801,
       "total_tokens": 26970,
       "worktree": "/tmp/story_4182ba649c21",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/notification_service_openai_gpt-5.6-luna_clean_4182ba649c21.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/notification_service_openai_gpt-5.6-luna_clean_4182ba649c21.json"
     },
     {
       "story": "task_manager_api",
@@ -1898,7 +1898,7 @@
       "total_cost": 0.12217839999999999,
       "total_tokens": 177779,
       "worktree": "/tmp/story_f9b81f42ece3",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/task_manager_api_deepseek_deepseek-v4-pro_bad_seed_f9b81f42ece3.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/task_manager_api_deepseek_deepseek-v4-pro_bad_seed_f9b81f42ece3.json"
     },
     {
       "story": "task_manager_api",
@@ -1918,7 +1918,7 @@
       "total_cost": 2.02076242,
       "total_tokens": 177234,
       "worktree": "/tmp/story_55684386955c",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/task_manager_api_openai_gpt-5.6-sol_bad_seed_55684386955c.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/task_manager_api_openai_gpt-5.6-sol_bad_seed_55684386955c.json"
     },
     {
       "story": "static_site_gen",
@@ -1932,7 +1932,7 @@
       "total_cost": 1.03150833,
       "total_tokens": 146468,
       "worktree": "/tmp/story_9f266b805287",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/static_site_gen_openai_gpt-5.6-terra_bad_seed_9f266b805287.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/static_site_gen_openai_gpt-5.6-terra_bad_seed_9f266b805287.json"
     },
     {
       "story": "task_manager_api",
@@ -1952,7 +1952,7 @@
       "total_cost": 0.7027779999999999,
       "total_tokens": 116122,
       "worktree": "/tmp/story_2152d86e5ceb",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/task_manager_api_gpt_5_6_terra_early_degrade_2152d86e5ceb.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/task_manager_api_gpt_5_6_terra_early_degrade_2152d86e5ceb.json"
     },
     {
       "story": "notification_service",
@@ -1972,7 +1972,7 @@
       "total_cost": 0.11526776,
       "total_tokens": 244813,
       "worktree": "/tmp/story_e09e8403ed54",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/notification_service_gpt_5_6_luna_early_degrade_e09e8403ed54.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/notification_service_gpt_5_6_luna_early_degrade_e09e8403ed54.json"
     },
     {
       "story": "static_site_gen",
@@ -1992,7 +1992,7 @@
       "total_cost": 0.0880706,
       "total_tokens": 300856,
       "worktree": "/tmp/story_d472c2b99d4d",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/static_site_gen_deepseek_deepseek-v4-flash_bad_seed_d472c2b99d4d.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/static_site_gen_deepseek_deepseek-v4-flash_bad_seed_d472c2b99d4d.json"
     },
     {
       "story": "notification_service",
@@ -2006,7 +2006,7 @@
       "total_cost": 0.08552881,
       "total_tokens": 117038,
       "worktree": "/tmp/story_e4702df34e1e",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/notification_service_deepseek_deepseek-v4-pro_clean_e4702df34e1e.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/notification_service_deepseek_deepseek-v4-pro_clean_e4702df34e1e.json"
     },
     {
       "story": "notification_service",
@@ -2026,7 +2026,7 @@
       "total_cost": 0.07137550000000001,
       "total_tokens": 256938,
       "worktree": "/tmp/story_8cd85839c6e1",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/notification_service_deepseek_deepseek-v4-flash_bad_seed_8cd85839c6e1.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/notification_service_deepseek_deepseek-v4-flash_bad_seed_8cd85839c6e1.json"
     },
     {
       "story": "static_site_gen",
@@ -2046,7 +2046,7 @@
       "total_cost": 0.43699259,
       "total_tokens": 448875,
       "worktree": "/tmp/story_97751a9bf9bc",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/static_site_gen_deepseek_v4_pro_early_degrade_97751a9bf9bc.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/static_site_gen_deepseek_v4_pro_early_degrade_97751a9bf9bc.json"
     },
     {
       "story": "notification_service",
@@ -2060,7 +2060,7 @@
       "total_cost": 0.0,
       "total_tokens": 0,
       "worktree": "/tmp/story_717db4bfbeb1",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/notification_service_claude_haiku_4_5_early_degrade_717db4bfbeb1.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/notification_service_claude_haiku_4_5_early_degrade_717db4bfbeb1.json"
     },
     {
       "story": "task_manager_api",
@@ -2074,7 +2074,7 @@
       "total_cost": 1.7666842999999999,
       "total_tokens": 85937,
       "worktree": "/tmp/story_559bc0ab5251",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/task_manager_api_claude_haiku_4_5_early_degrade_559bc0ab5251.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/task_manager_api_claude_haiku_4_5_early_degrade_559bc0ab5251.json"
     },
     {
       "story": "notification_service",
@@ -2094,7 +2094,7 @@
       "total_cost": 0.13969073,
       "total_tokens": 191282,
       "worktree": "/tmp/story_448c77192639",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/notification_service_deepseek_v4_pro_early_degrade_448c77192639.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/notification_service_deepseek_v4_pro_early_degrade_448c77192639.json"
     },
     {
       "story": "static_site_gen",
@@ -2108,7 +2108,7 @@
       "total_cost": 1.08436711,
       "total_tokens": 151419,
       "worktree": "/tmp/story_e1422eb41243",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/static_site_gen_gpt_5_6_terra_early_degrade_e1422eb41243.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/static_site_gen_gpt_5_6_terra_early_degrade_e1422eb41243.json"
     },
     {
       "story": "notification_service",
@@ -2122,7 +2122,7 @@
       "total_cost": 6.1500911,
       "total_tokens": 122967,
       "worktree": "/tmp/story_96b0106428c3",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/notification_service_anthropic_claude-sonnet-5_clean_96b0106428c3.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/notification_service_anthropic_claude-sonnet-5_clean_96b0106428c3.json"
     },
     {
       "story": "static_site_gen",
@@ -2136,7 +2136,7 @@
       "total_cost": 0.10216039999999998,
       "total_tokens": 40323,
       "worktree": "/tmp/story_35b349c12c9c",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/static_site_gen_openai_gpt-5.6-luna_clean_35b349c12c9c.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/static_site_gen_openai_gpt-5.6-luna_clean_35b349c12c9c.json"
     },
     {
       "story": "task_manager_api",
@@ -2156,7 +2156,7 @@
       "total_cost": 0.0885899,
       "total_tokens": 133041,
       "worktree": "/tmp/story_8037c6f7ce5e",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/task_manager_api_deepseek_v4_pro_early_degrade_8037c6f7ce5e.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/task_manager_api_deepseek_v4_pro_early_degrade_8037c6f7ce5e.json"
     },
     {
       "story": "task_manager_api",
@@ -2176,7 +2176,7 @@
       "total_cost": 0.09993769,
       "total_tokens": 297285,
       "worktree": "/tmp/story_8e0315fe1e74",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/task_manager_api_deepseek_v4_flash_early_degrade_8e0315fe1e74.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/task_manager_api_deepseek_v4_flash_early_degrade_8e0315fe1e74.json"
     },
     {
       "story": "task_manager_api",
@@ -2196,7 +2196,7 @@
       "total_cost": 1.9177119,
       "total_tokens": 72840,
       "worktree": "/tmp/story_fee967220c08",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/task_manager_api_anthropic_claude-sonnet-5_clean_fee967220c08.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/task_manager_api_anthropic_claude-sonnet-5_clean_fee967220c08.json"
     },
     {
       "story": "notification_service",
@@ -2216,7 +2216,7 @@
       "total_cost": 1.1776145,
       "total_tokens": 210665,
       "worktree": "/tmp/story_e5102edf2444",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/notification_service_openai_gpt-5.6-terra_bad_seed_e5102edf2444.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/notification_service_openai_gpt-5.6-terra_bad_seed_e5102edf2444.json"
     },
     {
       "story": "notification_service",
@@ -2236,7 +2236,7 @@
       "total_cost": 0.08254445,
       "total_tokens": 29918,
       "worktree": "/tmp/story_39ec27baa134",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/notification_service_openai_gpt-5.6-luna_bad_seed_39ec27baa134.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/notification_service_openai_gpt-5.6-luna_bad_seed_39ec27baa134.json"
     },
     {
       "story": "task_manager_api",
@@ -2256,7 +2256,7 @@
       "total_cost": 2.04747594,
       "total_tokens": 173663,
       "worktree": "/tmp/story_01c77b354498",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/task_manager_api_openai_gpt-5.6-sol_clean_01c77b354498.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/task_manager_api_openai_gpt-5.6-sol_clean_01c77b354498.json"
     },
     {
       "story": "notification_service",
@@ -2276,7 +2276,7 @@
       "total_cost": 3.1188533200000004,
       "total_tokens": 209531,
       "worktree": "/tmp/story_6777e8b2f324",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/notification_service_openai_gpt-5.6-sol_bad_seed_6777e8b2f324.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/notification_service_openai_gpt-5.6-sol_bad_seed_6777e8b2f324.json"
     },
     {
       "story": "static_site_gen",
@@ -2296,7 +2296,7 @@
       "total_cost": 0.19497288000000002,
       "total_tokens": 278081,
       "worktree": "/tmp/story_a7a0b9259a17",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/static_site_gen_deepseek_deepseek-v4-pro_clean_a7a0b9259a17.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/static_site_gen_deepseek_deepseek-v4-pro_clean_a7a0b9259a17.json"
     },
     {
       "story": "task_manager_api",
@@ -2316,7 +2316,7 @@
       "total_cost": 0.13220335,
       "total_tokens": 188082,
       "worktree": "/tmp/story_f9e607e131ce",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/task_manager_api_deepseek_deepseek-v4-pro_clean_f9e607e131ce.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/task_manager_api_deepseek_deepseek-v4-pro_clean_f9e607e131ce.json"
     },
     {
       "story": "static_site_gen",
@@ -2336,7 +2336,7 @@
       "total_cost": 0.1720967,
       "total_tokens": 225972,
       "worktree": "/tmp/story_86122da06969",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/static_site_gen_deepseek_v4_pro_early_degrade_86122da06969.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/static_site_gen_deepseek_v4_pro_early_degrade_86122da06969.json"
     },
     {
       "story": "task_manager_api",
@@ -2356,7 +2356,7 @@
       "total_cost": 0.75975717,
       "total_tokens": 117488,
       "worktree": "/tmp/story_b2c749274a31",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/task_manager_api_openai_gpt-5.6-terra_early_degrade_b2c749274a31.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/task_manager_api_openai_gpt-5.6-terra_early_degrade_b2c749274a31.json"
     },
     {
       "story": "task_manager_api",
@@ -2370,7 +2370,7 @@
       "total_cost": 3.7524876999999996,
       "total_tokens": 63224,
       "worktree": "/tmp/story_0c04137a7c0c",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/task_manager_api_anthropic_claude-sonnet-5_bad_seed_0c04137a7c0c.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/task_manager_api_anthropic_claude-sonnet-5_bad_seed_0c04137a7c0c.json"
     },
     {
       "story": "task_manager_api",
@@ -2390,7 +2390,7 @@
       "total_cost": 0.94200587,
       "total_tokens": 175584,
       "worktree": "/tmp/story_725eabe36a79",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/task_manager_api_openai_gpt-5.6-terra_bad_seed_725eabe36a79.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/task_manager_api_openai_gpt-5.6-terra_bad_seed_725eabe36a79.json"
     },
     {
       "story": "task_manager_api",
@@ -2404,7 +2404,7 @@
       "total_cost": 1.3496645,
       "total_tokens": 74508,
       "worktree": "/tmp/story_52a900ddec3a",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/task_manager_api_anthropic_claude-haiku-4-5_bad_seed_52a900ddec3a.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/task_manager_api_anthropic_claude-haiku-4-5_bad_seed_52a900ddec3a.json"
     },
     {
       "story": "notification_service",
@@ -2418,7 +2418,7 @@
       "total_cost": 0.074723,
       "total_tokens": 918,
       "worktree": "/tmp/story_f7a6d454b18a",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/notification_service_anthropic_claude-sonnet-5_clean_f7a6d454b18a.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/notification_service_anthropic_claude-sonnet-5_clean_f7a6d454b18a.json"
     },
     {
       "story": "notification_service",
@@ -2438,7 +2438,7 @@
       "total_cost": 0.37321663,
       "total_tokens": 413870,
       "worktree": "/tmp/story_11f53fd41422",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/notification_service_deepseek_v4_pro_early_degrade_11f53fd41422.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/notification_service_deepseek_v4_pro_early_degrade_11f53fd41422.json"
     },
     {
       "story": "static_site_gen",
@@ -2457,7 +2457,7 @@
       "total_cost": 5.51386048,
       "total_tokens": 286555,
       "worktree": "/tmp/story_d2a028ff7cf7",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/static_site_gen_openai_gpt-5.6-sol_clean_d2a028ff7cf7.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/static_site_gen_openai_gpt-5.6-sol_clean_d2a028ff7cf7.json"
     },
     {
       "story": "notification_service",
@@ -2477,7 +2477,7 @@
       "total_cost": 0.10043743,
       "total_tokens": 33695,
       "worktree": "/tmp/story_867cfff06137",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/notification_service_openai_gpt-5.6-luna_clean_867cfff06137.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/notification_service_openai_gpt-5.6-luna_clean_867cfff06137.json"
     },
     {
       "story": "notification_service",
@@ -2491,7 +2491,7 @@
       "total_cost": 6.062014100000001,
       "total_tokens": 122904,
       "worktree": "/tmp/story_f1d02b522d32",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/notification_service_anthropic_claude-sonnet-5_bad_seed_f1d02b522d32.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/notification_service_anthropic_claude-sonnet-5_bad_seed_f1d02b522d32.json"
     },
     {
       "story": "static_site_gen",
@@ -2511,7 +2511,7 @@
       "total_cost": 0.16954786,
       "total_tokens": 228299,
       "worktree": "/tmp/story_ecb7095c6c25",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/static_site_gen_deepseek_deepseek-v4-pro_clean_ecb7095c6c25.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/static_site_gen_deepseek_deepseek-v4-pro_clean_ecb7095c6c25.json"
     },
     {
       "story": "task_manager_api",
@@ -2531,7 +2531,7 @@
       "total_cost": 0.08940366999999999,
       "total_tokens": 122781,
       "worktree": "/tmp/story_0dd1a6d5349d",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/task_manager_api_deepseek_v4_pro_early_degrade_0dd1a6d5349d.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/task_manager_api_deepseek_v4_pro_early_degrade_0dd1a6d5349d.json"
     },
     {
       "story": "static_site_gen",
@@ -2545,7 +2545,7 @@
       "total_cost": 1.1021589,
       "total_tokens": 155454,
       "worktree": "/tmp/story_c78545c34d51",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/static_site_gen_openai_gpt-5.6-terra_clean_c78545c34d51.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/static_site_gen_openai_gpt-5.6-terra_clean_c78545c34d51.json"
     },
     {
       "story": "static_site_gen",
@@ -2565,7 +2565,7 @@
       "total_cost": 0.0857796,
       "total_tokens": 267948,
       "worktree": "/tmp/story_5c16a442297c",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/static_site_gen_deepseek_deepseek-v4-flash_clean_5c16a442297c.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/static_site_gen_deepseek_deepseek-v4-flash_clean_5c16a442297c.json"
     },
     {
       "story": "static_site_gen",
@@ -2579,7 +2579,7 @@
       "total_cost": 0.08814786000000001,
       "total_tokens": 36097,
       "worktree": "/tmp/story_77bc6da48426",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/static_site_gen_openai_gpt-5.6-luna_bad_seed_77bc6da48426.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/static_site_gen_openai_gpt-5.6-luna_bad_seed_77bc6da48426.json"
     },
     {
       "story": "task_manager_api",
@@ -2599,7 +2599,7 @@
       "total_cost": 0.10948002000000001,
       "total_tokens": 146773,
       "worktree": "/tmp/story_b0aac58ff9c2",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/task_manager_api_deepseek_v4_pro_early_degrade_b0aac58ff9c2.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/task_manager_api_deepseek_v4_pro_early_degrade_b0aac58ff9c2.json"
     },
     {
       "story": "task_manager_api",
@@ -2618,7 +2618,7 @@
       "total_cost": 0.09591991999999999,
       "total_tokens": 178594,
       "worktree": "/tmp/story_06be5dd3e3d0",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/task_manager_api_gpt_5_6_luna_early_degrade_06be5dd3e3d0.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/task_manager_api_gpt_5_6_luna_early_degrade_06be5dd3e3d0.json"
     },
     {
       "story": "static_site_gen",
@@ -2632,7 +2632,7 @@
       "total_cost": 1.2192700699999999,
       "total_tokens": 166232,
       "worktree": "/tmp/story_9fb37b8f920a",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/static_site_gen_gpt_5_6_terra_early_degrade_9fb37b8f920a.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/static_site_gen_gpt_5_6_terra_early_degrade_9fb37b8f920a.json"
     },
     {
       "story": "notification_service",
@@ -2652,7 +2652,7 @@
       "total_cost": 0.08646176,
       "total_tokens": 272631,
       "worktree": "/tmp/story_8920ba23b0c1",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/notification_service_deepseek_deepseek-v4-flash_clean_8920ba23b0c1.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/notification_service_deepseek_deepseek-v4-flash_clean_8920ba23b0c1.json"
     },
     {
       "story": "task_manager_api",
@@ -2666,7 +2666,7 @@
       "total_cost": 3.8754811,
       "total_tokens": 77356,
       "worktree": "/tmp/story_df96c80a78d1",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/task_manager_api_claude_sonnet_5_early_degrade_df96c80a78d1.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/task_manager_api_claude_sonnet_5_early_degrade_df96c80a78d1.json"
     },
     {
       "story": "static_site_gen",
@@ -2680,7 +2680,7 @@
       "total_cost": 0.09544271,
       "total_tokens": 125839,
       "worktree": "/tmp/story_3b55ef98f7c9",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/static_site_gen_deepseek_deepseek-v4-pro_bad_seed_3b55ef98f7c9.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/static_site_gen_deepseek_deepseek-v4-pro_bad_seed_3b55ef98f7c9.json"
     },
     {
       "story": "notification_service",
@@ -2694,7 +2694,7 @@
       "total_cost": 1.6144178,
       "total_tokens": 93496,
       "worktree": "/tmp/story_3985b8e51ac2",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/notification_service_anthropic_claude-haiku-4-5_bad_seed_3985b8e51ac2.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/notification_service_anthropic_claude-haiku-4-5_bad_seed_3985b8e51ac2.json"
     },
     {
       "story": "task_manager_api",
@@ -2708,7 +2708,7 @@
       "total_cost": 0.02954007,
       "total_tokens": 47507,
       "worktree": "/tmp/story_1bf430da0328",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/task_manager_api_deepseek_deepseek-v4-pro_clean_1bf430da0328.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/task_manager_api_deepseek_deepseek-v4-pro_clean_1bf430da0328.json"
     },
     {
       "story": "notification_service",
@@ -2728,7 +2728,7 @@
       "total_cost": 0.18429738,
       "total_tokens": 267507,
       "worktree": "/tmp/story_1e002365da34",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/notification_service_deepseek_deepseek-v4-pro_bad_seed_1e002365da34.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/notification_service_deepseek_deepseek-v4-pro_bad_seed_1e002365da34.json"
     },
     {
       "story": "task_manager_api",
@@ -2742,7 +2742,7 @@
       "total_cost": 1.1251717,
       "total_tokens": 63929,
       "worktree": "/tmp/story_df89fb9868d9",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/task_manager_api_claude_haiku_4_5_early_degrade_df89fb9868d9.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/task_manager_api_claude_haiku_4_5_early_degrade_df89fb9868d9.json"
     },
     {
       "story": "static_site_gen",
@@ -2756,7 +2756,7 @@
       "total_cost": 1.1587633499999999,
       "total_tokens": 161986,
       "worktree": "/tmp/story_68d9810cb172",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/static_site_gen_gpt_5_6_terra_early_degrade_68d9810cb172.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/static_site_gen_gpt_5_6_terra_early_degrade_68d9810cb172.json"
     },
     {
       "story": "static_site_gen",
@@ -2770,7 +2770,7 @@
       "total_cost": 6.453074300000001,
       "total_tokens": 152723,
       "worktree": "/tmp/story_21dda1e92cf6",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/static_site_gen_anthropic_claude-sonnet-5_bad_seed_21dda1e92cf6.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/static_site_gen_anthropic_claude-sonnet-5_bad_seed_21dda1e92cf6.json"
     },
     {
       "story": "notification_service",
@@ -2790,7 +2790,7 @@
       "total_cost": 0.07141238,
       "total_tokens": 253880,
       "worktree": "/tmp/story_696b3a917978",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/notification_service_deepseek_v4_flash_early_degrade_696b3a917978.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/notification_service_deepseek_v4_flash_early_degrade_696b3a917978.json"
     },
     {
       "story": "static_site_gen",
@@ -2809,7 +2809,7 @@
       "total_cost": 6.199559809999999,
       "total_tokens": 284165,
       "worktree": "/tmp/story_d6204de8e6ca",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/static_site_gen_gpt_5_6_sol_early_degrade_d6204de8e6ca.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/static_site_gen_gpt_5_6_sol_early_degrade_d6204de8e6ca.json"
     },
     {
       "story": "task_manager_api",
@@ -2829,7 +2829,7 @@
       "total_cost": 0.12695605999999998,
       "total_tokens": 180609,
       "worktree": "/tmp/story_2158663abe9a",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/task_manager_api_deepseek_v4_pro_early_degrade_2158663abe9a.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/task_manager_api_deepseek_v4_pro_early_degrade_2158663abe9a.json"
     },
     {
       "story": "static_site_gen",
@@ -2843,7 +2843,7 @@
       "total_cost": 2.7286916,
       "total_tokens": 127731,
       "worktree": "/tmp/story_6a0db22e6426",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/static_site_gen_claude_haiku_4_5_early_degrade_6a0db22e6426.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/static_site_gen_claude_haiku_4_5_early_degrade_6a0db22e6426.json"
     },
     {
       "story": "notification_service",
@@ -2863,7 +2863,7 @@
       "total_cost": 3.59877516,
       "total_tokens": 210027,
       "worktree": "/tmp/story_196d35db144d",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/notification_service_gpt_5_6_sol_early_degrade_196d35db144d.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/notification_service_gpt_5_6_sol_early_degrade_196d35db144d.json"
     },
     {
       "story": "static_site_gen",
@@ -2877,7 +2877,7 @@
       "total_cost": 0.10008184,
       "total_tokens": 199404,
       "worktree": "/tmp/story_18905ec87f10",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/static_site_gen_gpt_5_6_luna_early_degrade_18905ec87f10.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/static_site_gen_gpt_5_6_luna_early_degrade_18905ec87f10.json"
     },
     {
       "story": "task_manager_api",
@@ -2891,7 +2891,7 @@
       "total_cost": 1.4399164999999998,
       "total_tokens": 71252,
       "worktree": "/tmp/story_19a61819097c",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/task_manager_api_anthropic_claude-haiku-4-5_bad_seed_19a61819097c.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/task_manager_api_anthropic_claude-haiku-4-5_bad_seed_19a61819097c.json"
     },
     {
       "story": "notification_service",
@@ -2911,7 +2911,7 @@
       "total_cost": 0.9866081299999999,
       "total_tokens": 172700,
       "worktree": "/tmp/story_4404c20a6b3f",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/notification_service_openai_gpt-5.6-terra_clean_4404c20a6b3f.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/notification_service_openai_gpt-5.6-terra_clean_4404c20a6b3f.json"
     },
     {
       "story": "static_site_gen",
@@ -2928,7 +2928,7 @@
       "total_cost": 6.816086069999999,
       "total_tokens": 319522,
       "worktree": "/tmp/story_657d6252d936",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/static_site_gen_openai_gpt-5.6-sol_clean_657d6252d936.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/static_site_gen_openai_gpt-5.6-sol_clean_657d6252d936.json"
     },
     {
       "story": "task_manager_api",
@@ -2948,7 +2948,7 @@
       "total_cost": 0.03861478,
       "total_tokens": 144674,
       "worktree": "/tmp/story_2d5d63ff4bb1",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/task_manager_api_deepseek_v4_flash_early_degrade_2d5d63ff4bb1.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/task_manager_api_deepseek_v4_flash_early_degrade_2d5d63ff4bb1.json"
     },
     {
       "story": "notification_service",
@@ -2968,7 +2968,7 @@
       "total_cost": 0.13560209,
       "total_tokens": 180980,
       "worktree": "/tmp/story_14eed8b54216",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/notification_service_deepseek_v4_pro_early_degrade_14eed8b54216.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/notification_service_deepseek_v4_pro_early_degrade_14eed8b54216.json"
     },
     {
       "story": "task_manager_api",
@@ -2982,7 +2982,7 @@
       "total_cost": 4.3111603,
       "total_tokens": 84636,
       "worktree": "/tmp/story_0799a58de870",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/task_manager_api_claude_sonnet_5_early_degrade_0799a58de870.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/task_manager_api_claude_sonnet_5_early_degrade_0799a58de870.json"
     },
     {
       "story": "notification_service",
@@ -3002,7 +3002,7 @@
       "total_cost": 0.04486615,
       "total_tokens": 169566,
       "worktree": "/tmp/story_c776b47bd3b2",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/notification_service_deepseek_deepseek-v4-flash_clean_c776b47bd3b2.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/notification_service_deepseek_deepseek-v4-flash_clean_c776b47bd3b2.json"
     },
     {
       "story": "static_site_gen",
@@ -3016,7 +3016,7 @@
       "total_cost": 1.33251268,
       "total_tokens": 182011,
       "worktree": "/tmp/story_da580fef90e6",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/static_site_gen_openai_gpt-5.6-terra_clean_da580fef90e6.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/static_site_gen_openai_gpt-5.6-terra_clean_da580fef90e6.json"
     },
     {
       "story": "notification_service",
@@ -3036,7 +3036,7 @@
       "total_cost": 0.09594787,
       "total_tokens": 293700,
       "worktree": "/tmp/story_c86c1a33fd5e",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/notification_service_deepseek_deepseek-v4-flash_bad_seed_c86c1a33fd5e.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/notification_service_deepseek_deepseek-v4-flash_bad_seed_c86c1a33fd5e.json"
     },
     {
       "story": "static_site_gen",
@@ -3050,7 +3050,7 @@
       "total_cost": 0.08834074,
       "total_tokens": 34968,
       "worktree": "/tmp/story_fdd24c10b8cb",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/static_site_gen_openai_gpt-5.6-luna_clean_fdd24c10b8cb.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/static_site_gen_openai_gpt-5.6-luna_clean_fdd24c10b8cb.json"
     },
     {
       "story": "static_site_gen",
@@ -3064,7 +3064,7 @@
       "total_cost": 8.5992041,
       "total_tokens": 181860,
       "worktree": "/tmp/story_41078e8d1f86",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/static_site_gen_claude_sonnet_5_early_degrade_41078e8d1f86.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/static_site_gen_claude_sonnet_5_early_degrade_41078e8d1f86.json"
     },
     {
       "story": "static_site_gen",
@@ -3078,7 +3078,7 @@
       "total_cost": 0.09021388,
       "total_tokens": 35570,
       "worktree": "/tmp/story_8c855cf745e8",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/static_site_gen_openai_gpt-5.6-luna_early_degrade_8c855cf745e8.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/static_site_gen_openai_gpt-5.6-luna_early_degrade_8c855cf745e8.json"
     },
     {
       "story": "task_manager_api",
@@ -3098,7 +3098,7 @@
       "total_cost": 2.7190426,
       "total_tokens": 100085,
       "worktree": "/tmp/story_09f8dec6aafe",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/task_manager_api_anthropic_claude-sonnet-5_clean_09f8dec6aafe.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/task_manager_api_anthropic_claude-sonnet-5_clean_09f8dec6aafe.json"
     },
     {
       "story": "static_site_gen",
@@ -3112,7 +3112,7 @@
       "total_cost": 0.10512854999999999,
       "total_tokens": 39859,
       "worktree": "/tmp/story_37286c435c79",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/static_site_gen_openai_gpt-5.6-luna_clean_37286c435c79.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/static_site_gen_openai_gpt-5.6-luna_clean_37286c435c79.json"
     },
     {
       "story": "static_site_gen",
@@ -3132,7 +3132,7 @@
       "total_cost": 0.09029794,
       "total_tokens": 296031,
       "worktree": "/tmp/story_9c8a5ee76ce2",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/static_site_gen_deepseek_deepseek-v4-flash_clean_9c8a5ee76ce2.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/static_site_gen_deepseek_deepseek-v4-flash_clean_9c8a5ee76ce2.json"
     },
     {
       "story": "task_manager_api",
@@ -3152,7 +3152,7 @@
       "total_cost": 0.85335852,
       "total_tokens": 141126,
       "worktree": "/tmp/story_f0859ddaa61d",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/task_manager_api_openai_gpt-5.6-terra_clean_f0859ddaa61d.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/task_manager_api_openai_gpt-5.6-terra_clean_f0859ddaa61d.json"
     },
     {
       "story": "static_site_gen",
@@ -3166,7 +3166,7 @@
       "total_cost": 0.10233679999999999,
       "total_tokens": 188632,
       "worktree": "/tmp/story_5affc18f4a47",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/static_site_gen_gpt_5_6_luna_early_degrade_5affc18f4a47.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/static_site_gen_gpt_5_6_luna_early_degrade_5affc18f4a47.json"
     },
     {
       "story": "notification_service",
@@ -3186,7 +3186,7 @@
       "total_cost": 1.03780597,
       "total_tokens": 173472,
       "worktree": "/tmp/story_2f4c02aa56af",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/notification_service_openai_gpt-5.6-terra_bad_seed_2f4c02aa56af.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/notification_service_openai_gpt-5.6-terra_bad_seed_2f4c02aa56af.json"
     },
     {
       "story": "task_manager_api",
@@ -3200,7 +3200,7 @@
       "total_cost": 4.386161700000001,
       "total_tokens": 80441,
       "worktree": "/tmp/story_b9c99b10e94e",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/task_manager_api_anthropic_claude-sonnet-5_clean_b9c99b10e94e.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/task_manager_api_anthropic_claude-sonnet-5_clean_b9c99b10e94e.json"
     },
     {
       "story": "task_manager_api",
@@ -3220,7 +3220,7 @@
       "total_cost": 0.07906842,
       "total_tokens": 27713,
       "worktree": "/tmp/story_4685b7bf0cff",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/task_manager_api_openai_gpt-5.6-luna_clean_4685b7bf0cff.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/task_manager_api_openai_gpt-5.6-luna_clean_4685b7bf0cff.json"
     },
     {
       "story": "notification_service",
@@ -3240,7 +3240,7 @@
       "total_cost": 1.07210107,
       "total_tokens": 177771,
       "worktree": "/tmp/story_42334149c4f1",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/notification_service_openai_gpt-5.6-terra_clean_42334149c4f1.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/notification_service_openai_gpt-5.6-terra_clean_42334149c4f1.json"
     },
     {
       "story": "notification_service",
@@ -3260,7 +3260,7 @@
       "total_cost": 0.15003545999999998,
       "total_tokens": 226881,
       "worktree": "/tmp/story_1ac39990faac",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/notification_service_deepseek_deepseek-v4-pro_clean_1ac39990faac.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/notification_service_deepseek_deepseek-v4-pro_clean_1ac39990faac.json"
     },
     {
       "story": "task_manager_api",
@@ -3280,7 +3280,7 @@
       "total_cost": 0.7072025700000001,
       "total_tokens": 114405,
       "worktree": "/tmp/story_59311a534ed9",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/task_manager_api_openai_gpt-5.6-terra_clean_59311a534ed9.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/task_manager_api_openai_gpt-5.6-terra_clean_59311a534ed9.json"
     },
     {
       "story": "task_manager_api",
@@ -3300,7 +3300,7 @@
       "total_cost": 0.03681961,
       "total_tokens": 147165,
       "worktree": "/tmp/story_dede7af49d68",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/task_manager_api_deepseek_deepseek-v4-flash_clean_dede7af49d68.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/task_manager_api_deepseek_deepseek-v4-flash_clean_dede7af49d68.json"
     },
     {
       "story": "task_manager_api",
@@ -3320,7 +3320,7 @@
       "total_cost": 0.13524483999999998,
       "total_tokens": 195924,
       "worktree": "/tmp/story_a318530e815a",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/task_manager_api_deepseek_deepseek-v4-pro_clean_a318530e815a.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/task_manager_api_deepseek_deepseek-v4-pro_clean_a318530e815a.json"
     },
     {
       "story": "notification_service",
@@ -3339,7 +3339,7 @@
       "total_cost": 2.08520547,
       "total_tokens": 218700,
       "worktree": "/tmp/story_75fe715d17cb",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/notification_service_openai_gpt-5.6-sol_clean_75fe715d17cb.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/notification_service_openai_gpt-5.6-sol_clean_75fe715d17cb.json"
     },
     {
       "story": "task_manager_api",
@@ -3359,7 +3359,7 @@
       "total_cost": 0.02957881,
       "total_tokens": 109197,
       "worktree": "/tmp/story_5be1efc7e493",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/task_manager_api_deepseek_deepseek-v4-flash_bad_seed_5be1efc7e493.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/task_manager_api_deepseek_deepseek-v4-flash_bad_seed_5be1efc7e493.json"
     },
     {
       "story": "notification_service",
@@ -3373,7 +3373,7 @@
       "total_cost": 7.7047625,
       "total_tokens": 153333,
       "worktree": "/tmp/story_cf0627a41a97",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/notification_service_anthropic_claude-sonnet-5_bad_seed_cf0627a41a97.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/notification_service_anthropic_claude-sonnet-5_bad_seed_cf0627a41a97.json"
     },
     {
       "story": "task_manager_api",
@@ -3393,7 +3393,7 @@
       "total_cost": 2.02221423,
       "total_tokens": 163474,
       "worktree": "/tmp/story_79cb40d965a0",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/task_manager_api_openai_gpt-5.6-sol_clean_79cb40d965a0.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/task_manager_api_openai_gpt-5.6-sol_clean_79cb40d965a0.json"
     },
     {
       "story": "static_site_gen",
@@ -3407,7 +3407,7 @@
       "total_cost": 1.09519753,
       "total_tokens": 167657,
       "worktree": "/tmp/story_3602d9014cf3",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/static_site_gen_gpt_5_6_terra_early_degrade_3602d9014cf3.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/static_site_gen_gpt_5_6_terra_early_degrade_3602d9014cf3.json"
     },
     {
       "story": "task_manager_api",
@@ -3427,7 +3427,7 @@
       "total_cost": 0.8937068499999999,
       "total_tokens": 153596,
       "worktree": "/tmp/story_249d84281af3",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/task_manager_api_openai_gpt-5.6-terra_early_degrade_249d84281af3.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/task_manager_api_openai_gpt-5.6-terra_early_degrade_249d84281af3.json"
     },
     {
       "story": "task_manager_api",
@@ -3441,7 +3441,7 @@
       "total_cost": 0.13245109,
       "total_tokens": 193894,
       "worktree": "/tmp/story_117533fe8f2f",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/task_manager_api_deepseek_deepseek-v4-pro_bad_seed_117533fe8f2f.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/task_manager_api_deepseek_deepseek-v4-pro_bad_seed_117533fe8f2f.json"
     },
     {
       "story": "task_manager_api",
@@ -3461,7 +3461,7 @@
       "total_cost": 0.046808,
       "total_tokens": 163833,
       "worktree": "/tmp/story_881e33d530a1",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/task_manager_api_deepseek_v4_flash_clean_881e33d530a1.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/task_manager_api_deepseek_v4_flash_clean_881e33d530a1.json"
     },
     {
       "story": "task_manager_api",
@@ -3481,7 +3481,7 @@
       "total_cost": 0.036953200000000005,
       "total_tokens": 131149,
       "worktree": "/tmp/story_5b7ea7521a15",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/task_manager_api_deepseek_deepseek-v4-flash_clean_5b7ea7521a15.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/task_manager_api_deepseek_deepseek-v4-flash_clean_5b7ea7521a15.json"
     },
     {
       "story": "notification_service",
@@ -3495,7 +3495,7 @@
       "total_cost": 0.0,
       "total_tokens": 0,
       "worktree": "/tmp/story_cfcbffa207dc",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/notification_service_claude_sonnet_5_early_degrade_cfcbffa207dc.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/notification_service_claude_sonnet_5_early_degrade_cfcbffa207dc.json"
     },
     {
       "story": "notification_service",
@@ -3515,7 +3515,7 @@
       "total_cost": 0.1080488,
       "total_tokens": 196923,
       "worktree": "/tmp/story_76c9cdf2e2bf",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/notification_service_gpt_5_6_luna_early_degrade_76c9cdf2e2bf.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/notification_service_gpt_5_6_luna_early_degrade_76c9cdf2e2bf.json"
     },
     {
       "story": "static_site_gen",
@@ -3535,7 +3535,7 @@
       "total_cost": 0.08679929,
       "total_tokens": 297581,
       "worktree": "/tmp/story_a70442cf72f7",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/static_site_gen_deepseek_deepseek-v4-flash_clean_a70442cf72f7.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/static_site_gen_deepseek_deepseek-v4-flash_clean_a70442cf72f7.json"
     },
     {
       "story": "task_manager_api",
@@ -3555,7 +3555,7 @@
       "total_cost": 1.20134511,
       "total_tokens": 167015,
       "worktree": "/tmp/story_77f5458fea59",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/task_manager_api_openai_gpt-5.6-terra_clean_77f5458fea59.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/task_manager_api_openai_gpt-5.6-terra_clean_77f5458fea59.json"
     },
     {
       "story": "task_manager_api",
@@ -3575,7 +3575,7 @@
       "total_cost": 0.6912185,
       "total_tokens": 129204,
       "worktree": "/tmp/story_50ba0f2cf2e1",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/task_manager_api_openai_gpt-5.6-terra_bad_seed_50ba0f2cf2e1.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/task_manager_api_openai_gpt-5.6-terra_bad_seed_50ba0f2cf2e1.json"
     },
     {
       "story": "static_site_gen",
@@ -3589,7 +3589,7 @@
       "total_cost": 0.882165,
       "total_tokens": 143822,
       "worktree": "/tmp/story_17cf595df590",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/static_site_gen_openai_gpt-5.6-terra_clean_17cf595df590.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/static_site_gen_openai_gpt-5.6-terra_clean_17cf595df590.json"
     },
     {
       "story": "task_manager_api",
@@ -3609,7 +3609,7 @@
       "total_cost": 0.07440564,
       "total_tokens": 25652,
       "worktree": "/tmp/story_15ebef34077e",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/task_manager_api_openai_gpt-5.6-luna_bad_seed_15ebef34077e.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/task_manager_api_openai_gpt-5.6-luna_bad_seed_15ebef34077e.json"
     },
     {
       "story": "notification_service",
@@ -3629,7 +3629,7 @@
       "total_cost": 1.27005907,
       "total_tokens": 196083,
       "worktree": "/tmp/story_d0008d374bc0",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/notification_service_openai_gpt-5.6-terra_clean_d0008d374bc0.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/notification_service_openai_gpt-5.6-terra_clean_d0008d374bc0.json"
     },
     {
       "story": "notification_service",
@@ -3649,7 +3649,7 @@
       "total_cost": 0.12907079,
       "total_tokens": 198966,
       "worktree": "/tmp/story_c55b0cf5d2e9",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/notification_service_deepseek_deepseek-v4-pro_clean_c55b0cf5d2e9.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/notification_service_deepseek_deepseek-v4-pro_clean_c55b0cf5d2e9.json"
     },
     {
       "story": "notification_service",
@@ -3669,7 +3669,7 @@
       "total_cost": 2.62445066,
       "total_tokens": 202888,
       "worktree": "/tmp/story_88d9858f3cab",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/notification_service_openai_gpt-5.6-sol_bad_seed_88d9858f3cab.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/notification_service_openai_gpt-5.6-sol_bad_seed_88d9858f3cab.json"
     },
     {
       "story": "notification_service",
@@ -3683,7 +3683,7 @@
       "total_cost": 1.551722,
       "total_tokens": 77340,
       "worktree": "/tmp/story_5840e9783c6a",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/notification_service_anthropic_claude-haiku-4-5_clean_5840e9783c6a.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/notification_service_anthropic_claude-haiku-4-5_clean_5840e9783c6a.json"
     },
     {
       "story": "notification_service",
@@ -3702,7 +3702,7 @@
       "total_cost": 0.07009003,
       "total_tokens": 260974,
       "worktree": "/tmp/story_70ee1983b41b",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/notification_service_deepseek_v4_flash_early_degrade_70ee1983b41b.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/notification_service_deepseek_v4_flash_early_degrade_70ee1983b41b.json"
     },
     {
       "story": "task_manager_api",
@@ -3716,7 +3716,7 @@
       "total_cost": 1.6407543000000002,
       "total_tokens": 87059,
       "worktree": "/tmp/story_8a0325cdbefc",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/task_manager_api_anthropic_claude-haiku-4-5_clean_8a0325cdbefc.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/task_manager_api_anthropic_claude-haiku-4-5_clean_8a0325cdbefc.json"
     },
     {
       "story": "static_site_gen",
@@ -3735,7 +3735,7 @@
       "total_cost": 6.75379326,
       "total_tokens": 344718,
       "worktree": "/tmp/story_00dca46b8d8e",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/static_site_gen_openai_gpt-5.6-sol_early_degrade_00dca46b8d8e.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/static_site_gen_openai_gpt-5.6-sol_early_degrade_00dca46b8d8e.json"
     },
     {
       "story": "static_site_gen",
@@ -3749,7 +3749,7 @@
       "total_cost": 1.907667,
       "total_tokens": 68016,
       "worktree": "/tmp/story_899bc4d979f9",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/static_site_gen_anthropic_claude-haiku-4-5_clean_899bc4d979f9.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/static_site_gen_anthropic_claude-haiku-4-5_clean_899bc4d979f9.json"
     },
     {
       "story": "notification_service",
@@ -3763,7 +3763,7 @@
       "total_cost": 0.0,
       "total_tokens": 0,
       "worktree": "/tmp/story_deda665d540d",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/notification_service_claude_sonnet_5_early_degrade_deda665d540d.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/notification_service_claude_sonnet_5_early_degrade_deda665d540d.json"
     },
     {
       "story": "task_manager_api",
@@ -3777,7 +3777,7 @@
       "total_cost": 0.09924495,
       "total_tokens": 145030,
       "worktree": "/tmp/story_159eeb8c388a",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/task_manager_api_deepseek_deepseek-v4-pro_clean_159eeb8c388a.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/task_manager_api_deepseek_deepseek-v4-pro_clean_159eeb8c388a.json"
     },
     {
       "story": "static_site_gen",
@@ -3797,7 +3797,7 @@
       "total_cost": 0.09937355999999999,
       "total_tokens": 336537,
       "worktree": "/tmp/story_90872217a453",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/static_site_gen_deepseek_v4_flash_early_degrade_90872217a453.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/static_site_gen_deepseek_v4_flash_early_degrade_90872217a453.json"
     },
     {
       "story": "task_manager_api",
@@ -3817,7 +3817,7 @@
       "total_cost": 0.08407251999999998,
       "total_tokens": 172257,
       "worktree": "/tmp/story_64d78c20a8ae",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/task_manager_api_gpt_5_6_luna_early_degrade_64d78c20a8ae.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/task_manager_api_gpt_5_6_luna_early_degrade_64d78c20a8ae.json"
     },
     {
       "story": "notification_service",
@@ -3831,7 +3831,7 @@
       "total_cost": 0.0,
       "total_tokens": 0,
       "worktree": "/tmp/story_b0605aea4868",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/notification_service_claude_sonnet_5_early_degrade_b0605aea4868.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/notification_service_claude_sonnet_5_early_degrade_b0605aea4868.json"
     },
     {
       "story": "static_site_gen",
@@ -3845,7 +3845,7 @@
       "total_cost": 6.857828,
       "total_tokens": 139951,
       "worktree": "/tmp/story_292f268b2415",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/static_site_gen_claude_sonnet_5_early_degrade_292f268b2415.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/static_site_gen_claude_sonnet_5_early_degrade_292f268b2415.json"
     },
     {
       "story": "notification_service",
@@ -3865,7 +3865,7 @@
       "total_cost": 0.10346899,
       "total_tokens": 32664,
       "worktree": "/tmp/story_3d249683eef3",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/notification_service_openai_gpt-5.6-luna_bad_seed_3d249683eef3.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/notification_service_openai_gpt-5.6-luna_bad_seed_3d249683eef3.json"
     },
     {
       "story": "notification_service",
@@ -3885,15 +3885,15 @@
       "total_cost": 3.56258824,
       "total_tokens": 243279,
       "worktree": "/tmp/story_e1b264c15e82",
-      "result_file": "/tmp/wt_stabilization/experiments/results/stories/notification_service_openai_gpt-5.6-sol_clean_e1b264c15e82.json"
+      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/notification_service_openai_gpt-5.6-sol_clean_e1b264c15e82.json"
     }
   ],
   "lab_contract": {
     "lab": "lab_story_review.py",
     "input_dataset_id": "canonical_registry/story",
-    "registry_identity_sha256": "2a622f891f138a6292f6bf1b9d0653fc9d57bd76dd97b180504d027bd3201b6b",
+    "registry_identity_sha256": "c74a0e02c22ac1425b85d6f7956a0e4e6e89911f6e2bbeaa049099e523e41d0a",
     "resolved_input_sha256": "7d2ab0fe4c18695fe26767d6e848f7a2e3f3a397d16b1e183594f70b9136c716",
-    "registry_version": "data-manifest/1.0+12152rows",
+    "registry_version": "data-manifest/1.0+12485rows",
     "metric_definition_version": "story_review/v2",
     "metric_source_sha256": "c98f05c058287d4baeb5d0300682624dcbb31f05c330b0782423771a25c90d5c",
     "n_resolved_records": 215,
@@ -3912,6 +3912,6 @@
     "data_integrity_policy": "docs/data_integrity_findings.md",
     "requires_external_service": null,
     "contract_version": "lab-contract/v6",
-    "generated_at": "2026-08-26T19:44:10.044031+00:00"
+    "generated_at": "2026-08-27T00:54:15.559658+00:00"
   }
 }

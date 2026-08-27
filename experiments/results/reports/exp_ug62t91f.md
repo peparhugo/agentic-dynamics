@@ -2,7 +2,7 @@
 
 **Model:** deepseek/deepseek-v4-pro  |  **Task:** [inject_alien_vocab_s0.5] process_perturbation_resample...
 **Operator:** perturbed (process_perturbation, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-17T19:29:09
+**Repetitions:** 1  |  **Timestamp:** 2026-08-27T00:54:05
 
 ---
 
@@ -55,14 +55,14 @@
 | **Total tokens** | **23,170** |
 | Thinking ratio [C] | 40.9% |
 | Output efficiency [C] | 15.4% |
-| Input cost [M] | $0.004406 |
-| Output cost [M] | $0.003103 |
-| Reasoning cost [M] | $0.008243 |
-| Cache cost [M] | $0.001015 |
+| Input cost [M] | $0.002899 |
+| Output cost [M] | $0.003063 |
+| Reasoning cost [M] | $0.008135 |
+| Cache cost [M] | $0.002671 |
 | **Total cost** | **$0.016767** |
 | **Total energy [X]** | **~6084 J** |
 | Solution density [C] | 0.007467 LOC/tok |
-| Correctness/$ [C] | 42 |
+| Correctness/$ [C] | 18 |
 | Quality/J [C] | 0.000078 |
 
 ---

@@ -2,7 +2,7 @@
 
 **Model:** deepseek/deepseek-v4-pro  |  **Task:** [reverse_causality_s0.5] process_perturbation_resample...
 **Operator:** perturbed (process_perturbation, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-17T19:29:09
+**Repetitions:** 1  |  **Timestamp:** 2026-08-27T00:54:06
 
 ---
 
@@ -55,14 +55,14 @@
 | **Total tokens** | **20,157** |
 | Thinking ratio [C] | 16.3% |
 | Output efficiency [C] | 43.1% |
-| Input cost [M] | $0.003557 |
-| Output cost [M] | $0.007558 |
-| Reasoning cost [M] | $0.002864 |
-| Cache cost [M] | $0.001225 |
+| Input cost [M] | $0.002245 |
+| Output cost [M] | $0.007155 |
+| Reasoning cost [M] | $0.002711 |
+| Cache cost [M] | $0.003094 |
 | **Total cost** | **$0.015205** |
 | **Total energy [X]** | **~4199 J** |
 | Solution density [C] | 0.026839 LOC/tok |
-| Correctness/$ [C] | 66 |
+| Correctness/$ [C] | 27 |
 | Quality/J [C] | 0.000151 |
 
 ---

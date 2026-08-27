@@ -1,18 +1,19 @@
 import pytest
 
 from app import create_app
-from config import TestConfig
-from models import db as _db
+from app.config import TestConfig
+from app.extensions import db
 
 
 @pytest.fixture
 def app():
     app = create_app(TestConfig)
     with app.app_context():
-        _db.create_all()
+        db.create_all()
     yield app
     with app.app_context():
-        _db.drop_all()
+        db.session.remove()
+        db.drop_all()
 
 
 @pytest.fixture
@@ -21,54 +22,38 @@ def client(app):
 
 
 @pytest.fixture
-def db(app):
-    with app.app_context():
-        yield _db
-
-
-@pytest.fixture
-def user(client):
-    resp = client.post(
+def auth_headers(client):
+    client.post(
         "/api/auth/register",
-        json={"username": "testuser", "email": "test@example.com", "password": "password123"},
+        json={"username": "alice", "email": "alice@example.com", "password": "secret123"},
     )
-    assert resp.status_code == 201
-    data = resp.get_json()
-    return data["user"], data["token"]
-
-
-@pytest.fixture
-def user2(client):
     resp = client.post(
-        "/api/auth/register",
-        json={"username": "otheruser", "email": "other@example.com", "password": "password123"},
+        "/api/auth/login",
+        json={"username": "alice", "password": "secret123"},
     )
-    assert resp.status_code == 201
-    data = resp.get_json()
-    return data["user"], data["token"]
-
-
-@pytest.fixture
-def auth_header(user):
-    _, token = user
+    token = resp.get_json()["access_token"]
     return {"Authorization": f"Bearer {token}"}
 
 
 @pytest.fixture
-def auth_header2(user2):
-    _, token = user2
+def other_user_headers(client):
+    client.post(
+        "/api/auth/register",
+        json={"username": "bob", "email": "bob@example.com", "password": "secret123"},
+    )
+    resp = client.post(
+        "/api/auth/login",
+        json={"username": "bob", "password": "secret123"},
+    )
+    token = resp.get_json()["access_token"]
     return {"Authorization": f"Bearer {token}"}
 
 
-def _make_task(client, auth_header, **kwargs):
-    defaults = {
-        "title": "Test Task",
-        "description": "A test task",
-        "status": "todo",
-        "priority": "medium",
-        "category": "testing",
-    }
-    defaults.update(kwargs)
-    resp = client.post("/api/tasks", json=defaults, headers=auth_header)
-    assert resp.status_code == 201
-    return resp.get_json()["task"]
+@pytest.fixture
+def category_id(client, auth_headers):
+    resp = client.post(
+        "/api/categories",
+        json={"name": "Work", "description": "Work related tasks"},
+        headers=auth_headers,
+    )
+    return resp.get_json()["id"]

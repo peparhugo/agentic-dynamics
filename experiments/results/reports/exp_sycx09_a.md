@@ -2,7 +2,7 @@
 
 **Model:** openai/gpt-5.6-terra  |  **Task:** [inject_alien_vocab_s0.5] task_manager...
 **Operator:** perturbed (process_perturbation, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-17T19:29:08
+**Repetitions:** 1  |  **Timestamp:** 2026-08-27T00:54:05
 
 ---
 

@@ -1,127 +1,87 @@
+"""Community detection for the social graph.
+
+Two complementary algorithms are provided:
+
+* ``connected_components`` — exact, using union-find. Cheap to maintain
+  incrementally and answers "are these users in the same component?".
+
+* ``label_propagation`` — approximate, near-linear, embarrassingly parallel.
+  This is the practical choice for overlapping/loose communities on graphs
+  with trillions of edges where exact methods (e.g. modularity maximization)
+  are intractable.
+"""
+
 from __future__ import annotations
 
-from collections import defaultdict
-from typing import Dict, Iterator, List, Optional, Set, Tuple, Union
+import random
+from typing import Dict, List, Optional, Set
 
-from social_graph.types import NodeID
-from social_graph.graph import SocialGraph
-from social_graph.shard import ShardedGraph
-from social_graph.union_find import UnionFind
-
-GraphLike = Union[SocialGraph, ShardedGraph]
+from .graph import SocialGraph
+from .union_find import UnionFind
 
 
-class CommunityDetector:
-    def __init__(self, graph: GraphLike) -> None:
-        self._graph = graph
+def connected_components(graph: SocialGraph) -> List[Set[str]]:
+    uf = UnionFind(graph.connections_view_keys())
+    for u in graph.connections_view_keys():
+        for v in graph.connections(u):
+            uf.union(u, v)
+    return uf.components()
 
-    def connected_components(self) -> Dict[int, List[NodeID]]:
-        uf = UnionFind()
-        for node in self._graph.nodes:
-            uf.make_set(node)
-        for node in self._graph.nodes:
-            for neighbor in self._graph.get_neighbors(node):
-                uf.union(node, neighbor)
-        return uf.components()
 
-    def label_propagation(self, max_iterations: int = 50) -> Dict[NodeID, int]:
-        labels: Dict[NodeID, int] = {}
-        for i, node in enumerate(self._graph.nodes):
-            labels[node] = node
+def component_of(graph: SocialGraph, user_id: str) -> Set[str]:
+    uf = UnionFind([user_id])
+    _seed_uf(graph, user_id, uf)
+    return set(uf.components()[0]) if uf.num_components() else set()
 
-        import random
-        rng = random.Random(42)
 
-        for iteration in range(max_iterations):
-            changed = False
-            nodes = list(self._graph.nodes)
-            rng.shuffle(nodes)
-
-            for node in nodes:
-                if not self._graph.get_neighbors(node):
-                    continue
-
-                label_counts: Dict[int, int] = defaultdict(int)
-                for neighbor in self._graph.get_neighbors(node):
-                    label_counts[labels[neighbor]] += 1
-
-                if not label_counts:
-                    continue
-
-                max_count = max(label_counts.values())
-                best_labels = [l for l, c in label_counts.items() if c == max_count]
-                best_label = best_labels[0]
-
-                if labels[node] != best_label:
-                    labels[node] = best_label
-                    changed = True
-
-            if not changed:
-                break
-
-        label_map: Dict[int, int] = {}
-        next_id = 0
-        remapped: Dict[NodeID, int] = {}
-        for node in self._graph.nodes:
-            raw = labels[node]
-            if raw not in label_map:
-                label_map[raw] = next_id
-                next_id += 1
-            remapped[node] = label_map[raw]
-
-        return remapped
-
-    def communities(self, method: str = "connected_components") -> Dict[int, List[NodeID]]:
-        if method == "connected_components":
-            return self.connected_components()
-        elif method == "label_propagation":
-            node_labels = self.label_propagation()
-            groups: Dict[int, List[NodeID]] = defaultdict(list)
-            for node, label in node_labels.items():
-                groups[label].append(node)
-            return dict(groups)
-        else:
-            raise ValueError(f"Unknown method: {method}")
-
-    def modularity(self, communities: Dict[int, List[NodeID]]) -> float:
-        node_to_community: Dict[NodeID, int] = {}
-        for comm_id, members in communities.items():
-            for node in members:
-                node_to_community[node] = comm_id
-
-        m = self._graph.edge_count
-        if m == 0:
-            return 0.0
-
-        degrees = {node: self._graph.get_degree(node) for node in self._graph.nodes}
-        q = 0.0
-
-        for node in self._graph.nodes:
-            ci = node_to_community.get(node)
-            if ci is None:
+def _seed_uf(graph: SocialGraph, root: str, uf: UnionFind) -> None:
+    stack = [root]
+    while stack:
+        cur = stack.pop()
+        for nxt in graph.connections(cur):
+            if nxt in uf._parent:
                 continue
-            for neighbor in self._graph.get_neighbors(node):
-                cj = node_to_community.get(neighbor)
-                if cj is None:
-                    continue
-                if ci == cj:
-                    q += 1.0 - (degrees[node] * degrees[neighbor]) / (2.0 * m)
+            uf.union(cur, nxt)
+            stack.append(nxt)
 
-        q /= (2.0 * m)
-        return q
 
-    def community_sizes(self, communities: Dict[int, List[NodeID]]) -> Dict[int, int]:
-        return {cid: len(members) for cid, members in communities.items()}
+def label_propagation(
+    graph: SocialGraph,
+    iterations: int = 5,
+    seed: Optional[int] = None,
+) -> Dict[str, str]:
+    """Label propagation community detection.
 
-    def giant_component_fraction(self) -> float:
-        if self._graph.node_count == 0:
-            return 0.0
-        comps = self.connected_components()
-        if not comps:
-            return 0.0
-        largest = max(len(members) for members in comps.values())
-        return largest / self._graph.node_count
+    Each node starts with its own id as its label and repeatedly adopts the
+    most frequent label among its neighbours. Runs in O(iterations * edges).
+    """
+    rng = random.Random(seed)
+    nodes = list(graph.connections_view_keys())
+    labels: Dict[str, str] = {n: n for n in nodes}
 
-    def num_connected_components(self) -> int:
-        comps = self.connected_components()
-        return len(comps)
+    for _ in range(iterations):
+        rng.shuffle(nodes)
+        changed = False
+        for node in nodes:
+            counter: Dict[str, int] = {}
+            for nxt in graph.connections(node):
+                l = labels[nxt]
+                counter[l] = counter.get(l, 0) + 1
+            if not counter:
+                continue
+            best = max(counter.values())
+            candidates = [l for l, c in counter.items() if c == best]
+            new_label = candidates[0] if len(candidates) == 1 else rng.choice(candidates)
+            if new_label != labels[node]:
+                labels[node] = new_label
+                changed = True
+        if not changed:
+            break
+    return labels
+
+
+def communities_from_labels(labels: Dict[str, str]) -> List[Set[str]]:
+    groups: Dict[str, Set[str]] = {}
+    for node, l in labels.items():
+        groups.setdefault(l, set()).add(node)
+    return list(groups.values())

@@ -2,7 +2,7 @@
 
 **Model:** deepseek/deepseek-v4-flash  |  **Task:** [inject_alien_vocab_s0.5] task_manager...
 **Operator:** perturbed (process_perturbation, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-17T19:29:08
+**Repetitions:** 1  |  **Timestamp:** 2026-08-27T00:54:05
 
 ---
 
@@ -55,14 +55,14 @@
 | **Total tokens** | **29,159** |
 | Thinking ratio [C] | 12.3% |
 | Output efficiency [C] | 56.6% |
-| Input cost [M] | $0.001267 |
-| Output cost [M] | $0.004624 |
-| Reasoning cost [M] | $0.001006 |
-| Cache cost [M] | $0.001299 |
+| Input cost [M] | $0.000882 |
+| Output cost [M] | $0.004827 |
+| Reasoning cost [M] | $0.001050 |
+| Cache cost [M] | $0.001438 |
 | **Total cost** | **$0.008197** |
 | **Total energy [X]** | **~6211 J** |
 | Solution density [C] | 0.046264 LOC/tok |
-| Correctness/$ [C] | 122 |
+| Correctness/$ [C] | 54 |
 | Quality/J [C] | 0.000105 |
 
 ---

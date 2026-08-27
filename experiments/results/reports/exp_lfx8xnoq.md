@@ -2,7 +2,7 @@
 
 **Model:** deepseek/deepseek-v4-pro  |  **Task:** [force_abandonment_s0.5] process_perturbation_resample...
 **Operator:** perturbed (process_perturbation, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-17T19:29:08
+**Repetitions:** 1  |  **Timestamp:** 2026-08-27T00:54:05
 
 ---
 
@@ -55,14 +55,14 @@
 | **Total tokens** | **21,419** |
 | Thinking ratio [C] | 59.3% |
 | Output efficiency [C] | 8.5% |
-| Input cost [M] | $0.003001 |
-| Output cost [M] | $0.001576 |
-| Reasoning cost [M] | $0.011055 |
-| Cache cost [M] | $0.000474 |
+| Input cost [M] | $0.002028 |
+| Output cost [M] | $0.001597 |
+| Reasoning cost [M] | $0.011202 |
+| Cache cost [M] | $0.001280 |
 | **Total cost** | **$0.016107** |
 | **Total energy [X]** | **~6941 J** |
 | Solution density [C] | 0.004809 LOC/tok |
-| Correctness/$ [C] | 62 |
+| Correctness/$ [C] | 28 |
 | Quality/J [C] | 0.000085 |
 
 ---

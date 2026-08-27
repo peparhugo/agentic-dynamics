@@ -2,7 +2,7 @@
 
 **Model:** deepseek/deepseek-v4-pro  |  **Task:** [inject_alien_vocab_s0.5] task_manager...
 **Operator:** perturbed (process_perturbation, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-17T19:29:07
+**Repetitions:** 1  |  **Timestamp:** 2026-08-27T00:54:04
 
 ---
 
@@ -10,7 +10,7 @@
 
 ## Strategy [H]
 **Classification:** EFFICIENT
-**Score:** 0.912
+**Score:** 0.914
 
 **Verdict:** EFFICIENT — model solved correctly (100%) with minimal resources ($0.0199, ~5005J, 9% thinking). Thermodynamically optimal.
 
@@ -21,9 +21,9 @@
 ## Reasoning Dynamics
 | Metric | Value |
 |--------|-------|
-| Escape score [H] | 0.329 |
+| Escape score [H] | 0.348 |
 | Architecture div [H] | 0.333 |
-| Structure div [H] | 0.051 |
+| Structure div [H] | 0.101 |
 | Thinking ratio [C] | 9.3% |
 | Quality/$ [C] | 50 |
 | Quality/J [C] | 0.0002 |
@@ -35,12 +35,12 @@
 | Metric | Value |
 |--------|-------|
 | Correctness | 100% (0/0 tests) [H] |
-| Constraint satisfaction [H] | 57% (4/7 constraints) |
+| Constraint satisfaction [H] | 71% (5/7 constraints) |
 | Lines of code [M] | 926 |
 | Cyclomatic complexity [C] | 115.0 |
 | Code quality [H] | 0.108 |
-| Novelty vs baseline [H] | 0.600 |
-| **Composite [H]** | **0.633** |
+| Novelty vs baseline [H] | 0.615 |
+| **Composite [H]** | **0.678** |
 
 ---
 
@@ -55,15 +55,15 @@
 | **Total tokens** | **25,929** |
 | Thinking ratio [C] | 9.3% |
 | Output efficiency [C] | 51.1% |
-| Input cost [M] | $0.004465 |
-| Output cost [M] | $0.011520 |
-| Reasoning cost [M] | $0.002108 |
-| Cache cost [M] | $0.001793 |
+| Input cost [M] | $0.002768 |
+| Output cost [M] | $0.010711 |
+| Reasoning cost [M] | $0.001960 |
+| Cache cost [M] | $0.004447 |
 | **Total cost** | **$0.019886** |
 | **Total energy [X]** | **~5005 J** |
 | Solution density [C] | 0.035713 LOC/tok |
-| Correctness/$ [C] | 50 |
-| Quality/J [C] | 0.000126 |
+| Correctness/$ [C] | 21 |
+| Quality/J [C] | 0.000135 |
 
 ---
 

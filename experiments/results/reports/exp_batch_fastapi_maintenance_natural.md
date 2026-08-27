@@ -1,20 +1,20 @@
 # Game Report: fastapi_maintenance-baseline
 
 **Model:** deepseek/deepseek-v4-pro  |  **Task:** [batch:fastapi_maintenance:baseline] ds_natural...
-**Operator:** baseline (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-09T18:29:14
+**Operator:** baseline (baseline, strength=0.0)
+**Repetitions:** 1  |  **Timestamp:** 2026-08-27T00:54:01
 
 ---
 
 > **Legend:** [M] measured &middot; [C] computed from measured &middot; [H] heuristic estimate &middot; [X] externally sourced
 
 ## Strategy [H]
-**Classification:** CONSERVATIVE
-**Score:** 0.759
+**Classification:** EFFICIENT
+**Score:** 0.923
 
-**Verdict:** CONSERVATIVE — model maintained sound reasoning (correctness=100%, quality=0.60) with moderate resource use ($0.0303, ~6524J). Attractor basin held. Perturbation was handled in-manifold.
+**Verdict:** EFFICIENT — model solved correctly (100%) with minimal resources ($0.0026, ~494J, 1% thinking). Thermodynamically optimal.
 
-**Recommendation:** Reliable but not novel. Good for production, not for exploration.
+**Recommendation:** This operator+model combination is production-ready.
 
 ---
 
@@ -24,7 +24,7 @@
 | Escape score [H] | nan |
 | Architecture div [H] | nan |
 | Structure div [H] | nan |
-| Thinking ratio [C] | 8.0% |
+| Thinking ratio [C] | 0.8% |
 | Quality/$ [C] | nan |
 | Quality/J [C] | nan |
 | Converged back [H] | None |
@@ -47,28 +47,28 @@
 ## Resource Efficiency
 | Metric | Value |
 |--------|-------|
-| Prompt tokens [M] | 43,352 |
-| Completion tokens [M] | 4,756 |
-| Reasoning tokens [M] | 4,174 |
-| Cache read tokens [M] | 1,013,888 |
+| Prompt tokens [M] | 5,657 |
+| Completion tokens [M] | 87 |
+| Reasoning tokens [M] | 45 |
+| Cache read tokens [M] | 1,920 |
 | Cache write tokens [M] | 0 |
-| **Total tokens** | **52,282** |
-| Thinking ratio [C] | 8.0% |
-| Output efficiency [C] | 9.1% |
-| Input cost [M] | $0.002224 |
-| Output cost [M] | $0.000994 |
-| Reasoning cost [M] | $0.000111 |
-| Cache cost [M] | $0.026973 |
-| **Total cost** | **$0.030303** |
-| **Total energy [X]** | **~6524 J** |
-| Solution density [C] | 0.057783 LOC/tok |
-| Correctness/$ [C] | 6 |
-| Quality/J [C] | 0.000092 |
+| **Total tokens** | **5,789** |
+| Thinking ratio [C] | 0.8% |
+| Output efficiency [C] | 1.5% |
+| Input cost [M] | $0.002388 |
+| Output cost [M] | $0.000110 |
+| Reasoning cost [M] | $0.000057 |
+| Cache cost [M] | $0.000027 |
+| **Total cost** | **$0.002583** |
+| **Total energy [X]** | **~494 J** |
+| Solution density [C] | 0.521852 LOC/tok |
+| Correctness/$ [C] | 248 |
+| Quality/J [C] | 0.001221 |
 
 ---
 
 ## Headline Metric
-**Strategy:** CONSERVATIVE  |  **Correctness:** 100%  |  **Cost:** $0.0303  |  **Energy:** ~6524J  |  **Thinking:** 8%
+**Strategy:** EFFICIENT  |  **Correctness:** 100%  |  **Cost:** $0.0026  |  **Energy:** ~494J  |  **Thinking:** 1%
 
 ---
 
@@ -84,11 +84,11 @@ Raw session transcript and generated source code for independent verification.
 
 | Metric | Value |
 |--------|-------|
-| Python files | 1136 |
+| Python files | 1138 |
 | JS files | 4 |
-| Total lines (Py) | 96299 |
-| Total lines (TS/TSX) | 528 |
-| Functions | 3986 |
+| Total lines (Py) | 96395 |
+| Total lines (TS/TSX) | 526 |
+| Functions | 3991 |
 | Classes | 692 |
 | Functions/file | 3.5 |
 | Classes/file | 0.6 |
@@ -96,8 +96,8 @@ Raw session transcript and generated source code for independent verification.
 | Type hints | 42% |
 | Docstrings | 3% |
 | Error handlers | 98 |
-| Imports | 3548 |
-| Decorators | 1456 |
-| Test files | 511 |
+| Imports | 3553 |
+| Decorators | 1457 |
+| Test files | 512 |
 | Test file rate | 45% |
 | Parse errors | 0 |

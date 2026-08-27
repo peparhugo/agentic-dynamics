@@ -2,7 +2,7 @@
 
 **Model:** openai/gpt-5.6-sol  |  **Task:** [reverse_causality_s0.5] process_perturbation_resample...
 **Operator:** perturbed (process_perturbation, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-17T19:29:05
+**Repetitions:** 1  |  **Timestamp:** 2026-08-27T00:53:58
 
 ---
 

@@ -2,7 +2,7 @@
 
 **Model:** deepseek/deepseek-v4-flash  |  **Task:** [shift_framing_s0.5] task_manager...
 **Operator:** perturbed (process_perturbation, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-17T19:29:05
+**Repetitions:** 1  |  **Timestamp:** 2026-08-27T00:53:58
 
 ---
 
@@ -55,14 +55,14 @@
 | **Total tokens** | **26,542** |
 | Thinking ratio [C] | 11.5% |
 | Output efficiency [C] | 54.4% |
-| Input cost [M] | $0.001264 |
-| Output cost [M] | $0.004045 |
-| Reasoning cost [M] | $0.000858 |
-| Cache cost [M] | $0.001412 |
+| Input cost [M] | $0.000882 |
+| Output cost [M] | $0.004232 |
+| Reasoning cost [M] | $0.000898 |
+| Cache cost [M] | $0.001567 |
 | **Total cost** | **$0.007580** |
 | **Total energy [X]** | **~5486 J** |
 | Solution density [C] | 0.035717 LOC/tok |
-| Correctness/$ [C] | 132 |
+| Correctness/$ [C] | 59 |
 | Quality/J [C] | 0.000116 |
 
 ---

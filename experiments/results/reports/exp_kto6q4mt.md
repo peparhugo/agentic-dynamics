@@ -2,7 +2,7 @@
 
 **Model:** deepseek/deepseek-v4-flash  |  **Task:** [baseline] url_shortener...
 **Operator:** baseline (baseline, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-17T19:29:08
+**Repetitions:** 1  |  **Timestamp:** 2026-08-27T00:54:04
 
 ---
 
@@ -55,14 +55,14 @@
 | **Total tokens** | **20,913** |
 | Thinking ratio [C] | 14.6% |
 | Output efficiency [C] | 41.9% |
-| Input cost [M] | $0.001272 |
-| Output cost [M] | $0.002455 |
-| Reasoning cost [M] | $0.000856 |
-| Cache cost [M] | $0.000986 |
+| Input cost [M] | $0.000908 |
+| Output cost [M] | $0.002627 |
+| Reasoning cost [M] | $0.000916 |
+| Cache cost [M] | $0.001119 |
 | **Total cost** | **$0.005569** |
 | **Total energy [X]** | **~4180 J** |
 | Solution density [C] | 0.022618 LOC/tok |
-| Correctness/$ [C] | 180 |
+| Correctness/$ [C] | 82 |
 | Quality/J [C] | 0.000172 |
 
 ---

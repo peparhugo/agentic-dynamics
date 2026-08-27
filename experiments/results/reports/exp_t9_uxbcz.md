@@ -2,7 +2,7 @@
 
 **Model:** deepseek/deepseek-v4-pro  |  **Task:** [inject_phantom_success_s0.5] task_manager...
 **Operator:** perturbed (specification_corruption, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-17T19:29:08
+**Repetitions:** 1  |  **Timestamp:** 2026-08-27T00:54:05
 
 ---
 
@@ -10,7 +10,7 @@
 
 ## Strategy [H]
 **Classification:** EFFICIENT
-**Score:** 0.887
+**Score:** 0.888
 
 **Verdict:** EFFICIENT — model solved correctly (100%) with minimal resources ($0.0188, ~4633J, 8% thinking). Thermodynamically optimal.
 
@@ -21,9 +21,9 @@
 ## Reasoning Dynamics
 | Metric | Value |
 |--------|-------|
-| Escape score [H] | 0.138 |
+| Escape score [H] | 0.140 |
 | Architecture div [H] | 0.000 |
-| Structure div [H] | 0.054 |
+| Structure div [H] | 0.056 |
 | Thinking ratio [C] | 7.8% |
 | Quality/$ [C] | 53 |
 | Quality/J [C] | 0.0002 |
@@ -39,8 +39,8 @@
 | Lines of code [M] | 1004 |
 | Cyclomatic complexity [C] | 143.0 |
 | Code quality [H] | 0.100 |
-| Novelty vs baseline [H] | 0.406 |
-| **Composite [H]** | **0.688** |
+| Novelty vs baseline [H] | 0.411 |
+| **Composite [H]** | **0.689** |
 
 ---
 
@@ -55,15 +55,15 @@
 | **Total tokens** | **25,007** |
 | Thinking ratio [C] | 7.8% |
 | Output efficiency [C] | 49.8% |
-| Input cost [M] | $0.004610 |
-| Output cost [M] | $0.010830 |
-| Reasoning cost [M] | $0.001706 |
-| Cache cost [M] | $0.001632 |
+| Input cost [M] | $0.002891 |
+| Output cost [M] | $0.010187 |
+| Reasoning cost [M] | $0.001605 |
+| Cache cost [M] | $0.004095 |
 | **Total cost** | **$0.018778** |
 | **Total energy [X]** | **~4633 J** |
 | Solution density [C] | 0.040149 LOC/tok |
-| Correctness/$ [C] | 53 |
-| Quality/J [C] | 0.000148 |
+| Correctness/$ [C] | 22 |
+| Quality/J [C] | 0.000149 |
 
 ---
 

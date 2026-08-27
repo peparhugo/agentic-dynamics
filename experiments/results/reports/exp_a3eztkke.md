@@ -2,7 +2,7 @@
 
 **Model:** deepseek/deepseek-v4-pro  |  **Task:** [invert_constraint_s0.5] task_manager...
 **Operator:** perturbed (objective_mutation, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-17T19:29:06
+**Repetitions:** 1  |  **Timestamp:** 2026-08-27T00:53:59
 
 ---
 
@@ -21,9 +21,9 @@
 ## Reasoning Dynamics
 | Metric | Value |
 |--------|-------|
-| Escape score [H] | 0.173 |
+| Escape score [H] | 0.189 |
 | Architecture div [H] | 0.000 |
-| Structure div [H] | 0.120 |
+| Structure div [H] | 0.169 |
 | Thinking ratio [C] | 26.4% |
 | Quality/$ [C] | 44 |
 | Quality/J [C] | 0.0001 |
@@ -39,8 +39,8 @@
 | Lines of code [M] | 892 |
 | Cyclomatic complexity [C] | 148.0 |
 | Code quality [H] | 0.112 |
-| Novelty vs baseline [H] | 0.458 |
-| **Composite [H]** | **0.741** |
+| Novelty vs baseline [H] | 0.461 |
+| **Composite [H]** | **0.742** |
 
 ---
 
@@ -55,14 +55,14 @@
 | **Total tokens** | **28,935** |
 | Thinking ratio [C] | 26.4% |
 | Output efficiency [C] | 39.1% |
-| Input cost [M] | $0.004348 |
-| Output cost [M] | $0.009839 |
-| Reasoning cost [M] | $0.006639 |
-| Cache cost [M] | $0.001917 |
+| Input cost [M] | $0.002692 |
+| Output cost [M] | $0.009138 |
+| Reasoning cost [M] | $0.006166 |
+| Cache cost [M] | $0.004747 |
 | **Total cost** | **$0.022742** |
 | **Total energy [X]** | **~6987 J** |
 | Solution density [C] | 0.030828 LOC/tok |
-| Correctness/$ [C] | 44 |
+| Correctness/$ [C] | 18 |
 | Quality/J [C] | 0.000106 |
 
 ---

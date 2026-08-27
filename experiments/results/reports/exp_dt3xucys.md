@@ -2,7 +2,7 @@
 
 **Model:** openai/gpt-5.6-sol  |  **Task:** [inject_phantom_success_s0.5] task_manager...
 **Operator:** perturbed (specification_corruption, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-17T19:29:06
+**Repetitions:** 1  |  **Timestamp:** 2026-08-27T00:54:03
 
 ---
 
@@ -25,7 +25,7 @@
 | Architecture div [H] | 0.000 |
 | Structure div [H] | 0.075 |
 | Thinking ratio [C] | 1.0% |
-| Quality/$ [C] | 42 |
+| Quality/$ [C] | 23 |
 | Quality/J [C] | 0.0002 |
 | Converged back [H] | True |
 

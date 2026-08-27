@@ -2,7 +2,7 @@
 
 **Model:** deepseek/deepseek-v4-flash  |  **Task:** [inject_competing_goal_s0.5] task_manager...
 **Operator:** perturbed (objective_mutation, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-17T19:29:08
+**Repetitions:** 1  |  **Timestamp:** 2026-08-27T00:54:05
 
 ---
 
@@ -55,14 +55,14 @@
 | **Total tokens** | **43,113** |
 | Thinking ratio [C] | 36.9% |
 | Output efficiency [C] | 41.7% |
-| Input cost [M] | $0.001296 |
-| Output cost [M] | $0.005031 |
-| Reasoning cost [M] | $0.004449 |
-| Cache cost [M] | $0.001737 |
+| Input cost [M] | $0.000887 |
+| Output cost [M] | $0.005166 |
+| Reasoning cost [M] | $0.004568 |
+| Cache cost [M] | $0.001891 |
 | **Total cost** | **$0.012513** |
 | **Total energy [X]** | **~12341 J** |
 | Solution density [C] | 0.027184 LOC/tok |
-| Correctness/$ [C] | 80 |
+| Correctness/$ [C] | 35 |
 | Quality/J [C] | 0.000057 |
 
 ---

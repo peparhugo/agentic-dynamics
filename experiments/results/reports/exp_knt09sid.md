@@ -2,7 +2,7 @@
 
 **Model:** openai/gpt-5.6-luna  |  **Task:** [invert_constraint_s0.5] task_manager...
 **Operator:** perturbed (objective_mutation, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-17T19:29:07
+**Repetitions:** 1  |  **Timestamp:** 2026-08-27T00:54:04
 
 ---
 
@@ -25,7 +25,7 @@
 | Architecture div [H] | 0.000 |
 | Structure div [H] | 0.091 |
 | Thinking ratio [C] | 2.9% |
-| Quality/$ [C] | 44 |
+| Quality/$ [C] | 24 |
 | Quality/J [C] | 0.0002 |
 | Converged back [H] | True |
 

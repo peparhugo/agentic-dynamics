@@ -2,7 +2,7 @@
 
 **Model:** openai/gpt-5.6-sol  |  **Task:** [inject_alien_vocab_s0.5] task_manager...
 **Operator:** perturbed (process_perturbation, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-17T19:29:06
+**Repetitions:** 1  |  **Timestamp:** 2026-08-27T00:53:59
 
 ---
 
@@ -35,12 +35,12 @@
 | Metric | Value |
 |--------|-------|
 | Correctness | 100% (0/0 tests) [H] |
-| Constraint satisfaction [H] | 43% (3/7 constraints) |
+| Constraint satisfaction [H] | 57% (4/7 constraints) |
 | Lines of code [M] | 444 |
 | Cyclomatic complexity [C] | 116.0 |
 | Code quality [H] | 0.225 |
 | Novelty vs baseline [H] | 0.500 |
-| **Composite [H]** | **0.599** |
+| **Composite [H]** | **0.641** |
 
 ---
 
@@ -63,7 +63,7 @@
 | **Total energy [X]** | **~2730 J** |
 | Solution density [C] | 0.021939 LOC/tok |
 | Correctness/$ [C] | 3 |
-| Quality/J [C] | 0.000219 |
+| Quality/J [C] | 0.000235 |
 
 ---
 

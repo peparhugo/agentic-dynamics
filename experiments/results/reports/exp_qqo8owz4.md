@@ -2,7 +2,7 @@
 
 **Model:** openai/gpt-5.6-terra  |  **Task:** [inject_phantom_success_s0.5] task_manager...
 **Operator:** perturbed (specification_corruption, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-17T19:29:08
+**Repetitions:** 1  |  **Timestamp:** 2026-08-27T00:54:05
 
 ---
 
@@ -25,7 +25,7 @@
 | Architecture div [H] | 0.000 |
 | Structure div [H] | 0.100 |
 | Thinking ratio [C] | 2.6% |
-| Quality/$ [C] | 50 |
+| Quality/$ [C] | 27 |
 | Quality/J [C] | 0.0002 |
 | Converged back [H] | True |
 

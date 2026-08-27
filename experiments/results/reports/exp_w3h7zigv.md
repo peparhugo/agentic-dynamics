@@ -2,7 +2,7 @@
 
 **Model:** deepseek/deepseek-v4-pro  |  **Task:** [shift_framing_s0.5] process_perturbation_resample...
 **Operator:** perturbed (process_perturbation, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-17T19:29:09
+**Repetitions:** 1  |  **Timestamp:** 2026-08-27T00:54:06
 
 ---
 
@@ -55,14 +55,14 @@
 | **Total tokens** | **14,034** |
 | Thinking ratio [C] | 9.6% |
 | Output efficiency [C] | 39.4% |
-| Input cost [M] | $0.003111 |
-| Output cost [M] | $0.004815 |
-| Reasoning cost [M] | $0.001172 |
-| Cache cost [M] | $0.000580 |
+| Input cost [M] | $0.002089 |
+| Output cost [M] | $0.004851 |
+| Reasoning cost [M] | $0.001180 |
+| Cache cost [M] | $0.001558 |
 | **Total cost** | **$0.009678** |
 | **Total energy [X]** | **~2478 J** |
 | Solution density [C] | 0.024726 LOC/tok |
-| Correctness/$ [C] | 103 |
+| Correctness/$ [C] | 46 |
 | Quality/J [C] | 0.000247 |
 
 ---

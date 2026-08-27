@@ -1,20 +1,20 @@
 # Game Report: social_graph-baseline
 
 **Model:** deepseek/deepseek-v4-pro  |  **Task:** [batch:social_graph:baseline] ds_natural...
-**Operator:** baseline (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-09T18:29:35
+**Operator:** baseline (baseline, strength=0.0)
+**Repetitions:** 1  |  **Timestamp:** 2026-08-27T00:54:03
 
 ---
 
 > **Legend:** [M] measured &middot; [C] computed from measured &middot; [H] heuristic estimate &middot; [X] externally sourced
 
 ## Strategy [H]
-**Classification:** CONSERVATIVE
-**Score:** 0.753
+**Classification:** EFFICIENT
+**Score:** 0.899
 
-**Verdict:** CONSERVATIVE — model maintained sound reasoning (correctness=100%, quality=0.44) with moderate resource use ($0.0130, ~3568J). Attractor basin held. Perturbation was handled in-manifold.
+**Verdict:** EFFICIENT — model solved correctly (100%) with minimal resources ($0.0119, ~3111J, 9% thinking). Thermodynamically optimal.
 
-**Recommendation:** Reliable but not novel. Good for production, not for exploration.
+**Recommendation:** This operator+model combination is production-ready.
 
 ---
 
@@ -24,7 +24,7 @@
 | Escape score [H] | nan |
 | Architecture div [H] | nan |
 | Structure div [H] | nan |
-| Thinking ratio [C] | 10.9% |
+| Thinking ratio [C] | 8.8% |
 | Quality/$ [C] | nan |
 | Quality/J [C] | nan |
 | Converged back [H] | None |
@@ -34,41 +34,41 @@
 ## Solution Quality
 | Metric | Value |
 |--------|-------|
-| Correctness | 98% (91/93 tests) [M] |
-| Constraint satisfaction [H] | 0% (0/7 constraints) |
-| Lines of code [M] | 1333 |
-| Cyclomatic complexity [C] | 260.0 |
-| Code quality [H] | 0.075 |
+| Correctness | 100% (0/0 tests) [H] |
+| Constraint satisfaction [H] | 14% (1/7 constraints) |
+| Lines of code [M] | 676 |
+| Cyclomatic complexity [C] | 188.0 |
+| Code quality [H] | 0.148 |
 | Novelty vs baseline [H] | 0.500 |
-| **Composite [H]** | **0.440** |
+| **Composite [H]** | **0.497** |
 
 ---
 
 ## Resource Efficiency
 | Metric | Value |
 |--------|-------|
-| Prompt tokens [M] | 7,775 |
-| Completion tokens [M] | 8,684 |
-| Reasoning tokens [M] | 2,019 |
-| Cache read tokens [M] | 87,168 |
+| Prompt tokens [M] | 6,752 |
+| Completion tokens [M] | 8,233 |
+| Reasoning tokens [M] | 1,442 |
+| Cache read tokens [M] | 145,920 |
 | Cache write tokens [M] | 0 |
-| **Total tokens** | **18,478** |
-| Thinking ratio [C] | 10.9% |
-| Output efficiency [C] | 47.0% |
-| Input cost [M] | $0.001131 |
-| Output cost [M] | $0.005149 |
-| Reasoning cost [M] | $0.000152 |
-| Cache cost [M] | $0.006577 |
-| **Total cost** | **$0.013010** |
-| **Total energy [X]** | **~3568 J** |
-| Solution density [C] | 0.072140 LOC/tok |
-| Correctness/$ [C] | 41 |
-| Quality/J [C] | 0.000123 |
+| **Total tokens** | **16,427** |
+| Thinking ratio [C] | 8.8% |
+| Output efficiency [C] | 50.1% |
+| Input cost [M] | $0.001974 |
+| Output cost [M] | $0.007222 |
+| Reasoning cost [M] | $0.001265 |
+| Cache cost [M] | $0.001422 |
+| **Total cost** | **$0.011883** |
+| **Total energy [X]** | **~3111 J** |
+| Solution density [C] | 0.041152 LOC/tok |
+| Correctness/$ [C] | 37 |
+| Quality/J [C] | 0.000160 |
 
 ---
 
 ## Headline Metric
-**Strategy:** CONSERVATIVE  |  **Correctness:** 98%  |  **Cost:** $0.0130  |  **Energy:** ~3568J  |  **Thinking:** 11%
+**Strategy:** EFFICIENT  |  **Correctness:** 100%  |  **Cost:** $0.0119  |  **Energy:** ~3111J  |  **Thinking:** 9%
 
 ---
 
@@ -84,32 +84,18 @@ Raw session transcript and generated source code for independent verification.
 
 | Metric | Value |
 |--------|-------|
-| Python files | 17 |
-| Total lines (Py) | 1333 |
-| Functions | 196 |
-| Classes | 22 |
-| Functions/file | 11.5 |
-| Classes/file | 1.3 |
-| Avg lines/file | 78 |
-| Type hints | 73% |
-| Docstrings | 0% |
-| Error handlers | 1 |
-| Imports | 68 |
-| Decorators | 20 |
-| Test files | 7 |
-| Test file rate | 41% |
+| Python files | 9 |
+| Total lines (Py) | 676 |
+| Functions | 92 |
+| Classes | 13 |
+| Functions/file | 10.2 |
+| Classes/file | 1.4 |
+| Avg lines/file | 75 |
+| Type hints | 107% |
+| Docstrings | 8% |
+| Error handlers | 0 |
+| Imports | 45 |
+| Decorators | 6 |
+| Test files | 0 |
+| Test file rate | 0% |
 | Parse errors | 0 |
-
-
----
-
-## Pytest Results
-
-| Metric | Value |
-|--------|-------|
-| Passed | 91 |
-| Failed | 2 |
-| Errors | 0 |
-| Total | 93 |
-| Pass rate | 98% |
-| Duration | 0.7s |

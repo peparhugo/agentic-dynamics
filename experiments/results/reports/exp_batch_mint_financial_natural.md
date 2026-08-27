@@ -1,20 +1,20 @@
 # Game Report: mint_financial-baseline
 
 **Model:** deepseek/deepseek-v4-pro  |  **Task:** [batch:mint_financial:baseline] ds_natural...
-**Operator:** baseline (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-09T18:29:28
+**Operator:** baseline (baseline, strength=0.0)
+**Repetitions:** 1  |  **Timestamp:** 2026-08-27T00:54:03
 
 ---
 
 > **Legend:** [M] measured &middot; [C] computed from measured &middot; [H] heuristic estimate &middot; [X] externally sourced
 
 ## Strategy [H]
-**Classification:** CONSERVATIVE
-**Score:** 0.766
+**Classification:** EFFICIENT
+**Score:** 0.887
 
-**Verdict:** CONSERVATIVE — model maintained sound reasoning (correctness=100%, quality=0.65) with moderate resource use ($0.0175, ~4502J). Attractor basin held. Perturbation was handled in-manifold.
+**Verdict:** EFFICIENT — model solved correctly (100%) with minimal resources ($0.0107, ~2955J, 13% thinking). Thermodynamically optimal.
 
-**Recommendation:** Reliable but not novel. Good for production, not for exploration.
+**Recommendation:** This operator+model combination is production-ready.
 
 ---
 
@@ -24,7 +24,7 @@
 | Escape score [H] | nan |
 | Architecture div [H] | nan |
 | Structure div [H] | nan |
-| Thinking ratio [C] | 4.3% |
+| Thinking ratio [C] | 12.7% |
 | Quality/$ [C] | nan |
 | Quality/J [C] | nan |
 | Converged back [H] | None |
@@ -35,40 +35,40 @@
 | Metric | Value |
 |--------|-------|
 | Correctness | 100% (0/0 tests) [H] |
-| Constraint satisfaction [H] | 71% (5/7 constraints) |
-| Lines of code [M] | 1530 |
-| Cyclomatic complexity [C] | 148.0 |
-| Code quality [H] | 0.065 |
+| Constraint satisfaction [H] | 29% (2/7 constraints) |
+| Lines of code [M] | 538 |
+| Cyclomatic complexity [C] | 105.0 |
+| Code quality [H] | 0.186 |
 | Novelty vs baseline [H] | 0.500 |
-| **Composite [H]** | **0.652** |
+| **Composite [H]** | **0.548** |
 
 ---
 
 ## Resource Efficiency
 | Metric | Value |
 |--------|-------|
-| Prompt tokens [M] | 7,663 |
-| Completion tokens [M] | 14,861 |
-| Reasoning tokens [M] | 1,001 |
-| Cache read tokens [M] | 101,632 |
+| Prompt tokens [M] | 6,593 |
+| Completion tokens [M] | 6,632 |
+| Reasoning tokens [M] | 1,920 |
+| Cache read tokens [M] | 103,680 |
 | Cache write tokens [M] | 0 |
-| **Total tokens** | **23,525** |
-| Thinking ratio [C] | 4.3% |
-| Output efficiency [C] | 63.2% |
-| Input cost [M] | $0.001105 |
-| Output cost [M] | $0.008727 |
-| Reasoning cost [M] | $0.000075 |
-| Cache cost [M] | $0.007596 |
-| **Total cost** | **$0.017502** |
-| **Total energy [X]** | **~4502 J** |
-| Solution density [C] | 0.065037 LOC/tok |
-| Correctness/$ [C] | 31 |
-| Quality/J [C] | 0.000145 |
+| **Total tokens** | **15,145** |
+| Thinking ratio [C] | 12.7% |
+| Output efficiency [C] | 43.8% |
+| Input cost [M] | $0.001973 |
+| Output cost [M] | $0.005953 |
+| Reasoning cost [M] | $0.001724 |
+| Cache cost [M] | $0.001034 |
+| **Total cost** | **$0.010684** |
+| **Total energy [X]** | **~2955 J** |
+| Solution density [C] | 0.035523 LOC/tok |
+| Correctness/$ [C] | 42 |
+| Quality/J [C] | 0.000185 |
 
 ---
 
 ## Headline Metric
-**Strategy:** CONSERVATIVE  |  **Correctness:** 100%  |  **Cost:** $0.0175  |  **Energy:** ~4502J  |  **Thinking:** 4%
+**Strategy:** EFFICIENT  |  **Correctness:** 100%  |  **Cost:** $0.0107  |  **Energy:** ~2955J  |  **Thinking:** 13%
 
 ---
 
@@ -84,18 +84,18 @@ Raw session transcript and generated source code for independent verification.
 
 | Metric | Value |
 |--------|-------|
-| Python files | 41 |
-| Total lines (Py) | 1530 |
-| Functions | 18 |
-| Classes | 53 |
-| Functions/file | 0.4 |
-| Classes/file | 1.3 |
-| Avg lines/file | 37 |
-| Type hints | 114% |
-| Docstrings | 0% |
-| Error handlers | 2 |
-| Imports | 205 |
-| Decorators | 0 |
+| Python files | 6 |
+| Total lines (Py) | 538 |
+| Functions | 64 |
+| Classes | 26 |
+| Functions/file | 10.7 |
+| Classes/file | 4.3 |
+| Avg lines/file | 90 |
+| Type hints | 92% |
+| Docstrings | 22% |
+| Error handlers | 10 |
+| Imports | 29 |
+| Decorators | 10 |
 | Test files | 0 |
 | Test file rate | 0% |
 | Parse errors | 0 |

@@ -2,7 +2,7 @@
 
 **Model:** deepseek/deepseek-v4-flash  |  **Task:** [inject_alien_vocab_s0.5] url_shortener...
 **Operator:** perturbed (process_perturbation, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-17T19:29:08
+**Repetitions:** 1  |  **Timestamp:** 2026-08-27T00:54:05
 
 ---
 
@@ -55,14 +55,14 @@
 | **Total tokens** | **13,884** |
 | Thinking ratio [C] | 9.9% |
 | Output efficiency [C] | 39.1% |
-| Input cost [M] | $0.000991 |
-| Output cost [M] | $0.001521 |
-| Reasoning cost [M] | $0.000385 |
-| Cache cost [M] | $0.000386 |
+| Input cost [M] | $0.000729 |
+| Output cost [M] | $0.001678 |
+| Reasoning cost [M] | $0.000424 |
+| Cache cost [M] | $0.000452 |
 | **Total cost** | **$0.003283** |
 | **Total energy [X]** | **~2461 J** |
 | Solution density [C] | 0.022544 LOC/tok |
-| Correctness/$ [C] | 305 |
+| Correctness/$ [C] | 143 |
 | Quality/J [C] | 0.000280 |
 
 ---

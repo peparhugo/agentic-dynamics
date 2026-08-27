@@ -1,8 +1,8 @@
 # Game Report: twitter_timeline-baseline
 
 **Model:** deepseek/deepseek-v4-pro  |  **Task:** [batch:twitter_timeline:baseline] ds_natural...
-**Operator:** baseline (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-09T18:29:39
+**Operator:** baseline (baseline, strength=0.0)
+**Repetitions:** 1  |  **Timestamp:** 2026-08-27T00:54:03
 
 ---
 
@@ -10,9 +10,9 @@
 
 ## Strategy [H]
 **Classification:** CONSERVATIVE
-**Score:** 0.767
+**Score:** 0.817
 
-**Verdict:** CONSERVATIVE — model maintained sound reasoning (correctness=100%, quality=0.51) with moderate resource use ($0.0095, ~2418J). Attractor basin held. Perturbation was handled in-manifold.
+**Verdict:** CONSERVATIVE — model maintained sound reasoning (correctness=100%, quality=0.50) with moderate resource use ($0.0117, ~4150J). Model absorbed the perturbation without divergence.
 
 **Recommendation:** Reliable but not novel. Good for production, not for exploration.
 
@@ -24,7 +24,7 @@
 | Escape score [H] | nan |
 | Architecture div [H] | nan |
 | Structure div [H] | nan |
-| Thinking ratio [C] | 7.6% |
+| Thinking ratio [C] | 36.0% |
 | Quality/$ [C] | nan |
 | Quality/J [C] | nan |
 | Converged back [H] | None |
@@ -34,41 +34,41 @@
 ## Solution Quality
 | Metric | Value |
 |--------|-------|
-| Correctness | 94% (17/18 tests) [M] |
-| Constraint satisfaction [H] | 14% (1/7 constraints) |
-| Lines of code [M] | 439 |
-| Cyclomatic complexity [C] | 42.0 |
-| Code quality [H] | 0.228 |
+| Correctness | 100% (0/0 tests) [H] |
+| Constraint satisfaction [H] | 0% (0/7 constraints) |
+| Lines of code [M] | 266 |
+| Cyclomatic complexity [C] | 68.0 |
+| Code quality [H] | 0.376 |
 | Novelty vs baseline [H] | 0.500 |
-| **Composite [H]** | **0.513** |
+| **Composite [H]** | **0.500** |
 
 ---
 
 ## Resource Efficiency
 | Metric | Value |
 |--------|-------|
-| Prompt tokens [M] | 8,434 |
-| Completion tokens [M] | 5,276 |
-| Reasoning tokens [M] | 1,128 |
-| Cache read tokens [M] | 75,904 |
+| Prompt tokens [M] | 6,444 |
+| Completion tokens [M] | 3,900 |
+| Reasoning tokens [M] | 5,824 |
+| Cache read tokens [M] | 131,200 |
 | Cache write tokens [M] | 0 |
-| **Total tokens** | **14,838** |
-| Thinking ratio [C] | 7.6% |
-| Output efficiency [C] | 35.6% |
-| Input cost [M] | $0.001149 |
-| Output cost [M] | $0.002927 |
-| Reasoning cost [M] | $0.000080 |
-| Cache cost [M] | $0.005360 |
-| **Total cost** | **$0.009515** |
-| **Total energy [X]** | **~2418 J** |
-| Solution density [C] | 0.029586 LOC/tok |
-| Correctness/$ [C] | 53 |
-| Quality/J [C] | 0.000212 |
+| **Total tokens** | **16,168** |
+| Thinking ratio [C] | 36.0% |
+| Output efficiency [C] | 24.1% |
+| Input cost [M] | $0.001892 |
+| Output cost [M] | $0.003434 |
+| Reasoning cost [M] | $0.005129 |
+| Cache cost [M] | $0.001284 |
+| **Total cost** | **$0.011739** |
+| **Total energy [X]** | **~4150 J** |
+| Solution density [C] | 0.016452 LOC/tok |
+| Correctness/$ [C] | 38 |
+| Quality/J [C] | 0.000121 |
 
 ---
 
 ## Headline Metric
-**Strategy:** CONSERVATIVE  |  **Correctness:** 94%  |  **Cost:** $0.0095  |  **Energy:** ~2418J  |  **Thinking:** 8%
+**Strategy:** CONSERVATIVE  |  **Correctness:** 100%  |  **Cost:** $0.0117  |  **Energy:** ~4150J  |  **Thinking:** 36%
 
 ---
 
@@ -84,32 +84,18 @@ Raw session transcript and generated source code for independent verification.
 
 | Metric | Value |
 |--------|-------|
-| Python files | 11 |
-| Total lines (Py) | 439 |
-| Functions | 77 |
-| Classes | 16 |
-| Functions/file | 7.0 |
-| Classes/file | 1.5 |
-| Avg lines/file | 40 |
-| Type hints | 86% |
+| Python files | 7 |
+| Total lines (Py) | 266 |
+| Functions | 29 |
+| Classes | 4 |
+| Functions/file | 4.1 |
+| Classes/file | 0.6 |
+| Avg lines/file | 38 |
+| Type hints | 69% |
 | Docstrings | 0% |
 | Error handlers | 0 |
-| Imports | 44 |
-| Decorators | 1 |
-| Test files | 1 |
-| Test file rate | 9% |
+| Imports | 19 |
+| Decorators | 0 |
+| Test files | 2 |
+| Test file rate | 29% |
 | Parse errors | 0 |
-
-
----
-
-## Pytest Results
-
-| Metric | Value |
-|--------|-------|
-| Passed | 17 |
-| Failed | 1 |
-| Errors | 0 |
-| Total | 18 |
-| Pass rate | 94% |
-| Duration | 0.5s |
