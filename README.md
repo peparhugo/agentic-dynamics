@@ -89,10 +89,10 @@ Efficiency (durable outcome value / total cost).
 
 | Metric | Value |
 |--------|-------|
-| Story sessions | 1,067 (3,370 DB sessions total) |
-| Game reports | 344 |
+| Story sessions | 1,067 (5,449 DB sessions total) |
+| Game reports | 348 |
 | Model variants | 7 (3 providers: DeepSeek, Anthropic, OpenAI) |
-| Experiment configs | 35 |
+| Experiment configs | 0 |
 | Experiment + workflow specs | 129 (11 experiments + 118 workflows) |
 | Perturbation operators | 10 (specification corruption, objective mutation, process perturbation) |
 | Lab books | 20 (8 canonical + 12 quarantined) |
