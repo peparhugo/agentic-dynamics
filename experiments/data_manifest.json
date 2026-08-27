@@ -1,14 +1,8 @@
 {
   "schema_version": "1.0",
-<<<<<<< HEAD
-  "generated_at": "2026-08-27T19:25:54.874989+00:00",
+  "generated_at": "2026-08-27T20:02:37.409797+00:00",
   "opencode_version": "unknown",
-  "git_commit": "0db475f1",
-=======
-  "generated_at": "2026-08-27T19:17:06.701716+00:00",
-  "opencode_version": "unknown",
-  "git_commit": "7bd1528e",
->>>>>>> feature/site-revamp4-diagrams
+  "git_commit": "9e0453cd",
   "files": {
     "canonical_inputs": {
       "inventory.json": {
@@ -22,13 +16,8 @@
     },
     "canonical_outputs": {
       "data.js": {
-<<<<<<< HEAD
-        "sha256": "814f4e7434d8faa41912a3633cf2c2a02ee4c4ee4e6a526899809dabdcf28bc4",
-        "size_bytes": 185537
-=======
-        "sha256": "b33d576a50b70dc865ed06b23f05f91a494f79967d0c1989f7c31bc6c924c826",
-        "size_bytes": 188969
->>>>>>> feature/site-revamp4-diagrams
+        "sha256": "11b5daa0cede1594143107cd39ea8d02988f48ebf07f38a35cb79af4a962fdbe",
+        "size_bytes": 131756
       }
     },
     "historical_artifacts": {
@@ -7413,7 +7402,6 @@
     },
     {
       "entity_id": "0658036c7cd09f57a283dddfb26e8ba9bd553df0b29dc4173c908695738a63e0",
-<<<<<<< HEAD
       "knowledge_id": "327bd097067956a6d19821537744a6ff1ac50d9014e692e26968c4bc66ede422",
       "source_type": "fact",
       "logical_locator": "workflow:wf_cap_site_revamp3_openai_gpt_5_6_terra#workflow_phases_completed",
@@ -7423,17 +7411,6 @@
       "supersedes": "3cddceda36f8b17b9e89d1c340552cca32cdda0f69aef23879141b494265faf8",
       "causes": null,
       "reason": "fact-content=27672329c9023861623cba052a7cd946afbdae8030b3421441217f1f1d6e902a",
-=======
-      "knowledge_id": "3cddceda36f8b17b9e89d1c340552cca32cdda0f69aef23879141b494265faf8",
-      "source_type": "fact",
-      "logical_locator": "workflow:wf_cap_site_revamp3_openai_gpt_5_6_terra#workflow_phases_completed",
-      "source_uri": "fact://workflow/wf_cap_site_revamp3_openai_gpt_5_6_terra/workflow_phases_completed",
-      "observed_at": "2026-08-27T15:24:12.678669+00:00",
-      "indexed_at": "2026-08-27T15:24:16.178142+00:00",
-      "supersedes": "a11f76fe704b154d54ed17a281057bb75debfef8c04cb6570d3ef90df70bdc67",
-      "causes": null,
-      "reason": "fact-content=1050399b7ee0e21f116412d9067cbe02a84eb2220cc8c99f798523ec7bfa47ea",
->>>>>>> feature/site-revamp4-diagrams
       "lifecycle_state": "current",
       "valid_to": null,
       "versions": [
@@ -7463,7 +7440,6 @@
         },
         {
           "knowledge_id": "3cddceda36f8b17b9e89d1c340552cca32cdda0f69aef23879141b494265faf8",
-<<<<<<< HEAD
           "lifecycle_state": "superseded",
           "valid_to": "2026-08-27T15:44:14.924359+00:00",
           "observed_at": "2026-08-27T15:24:12.678669+00:00",
@@ -7477,13 +7453,6 @@
           "observed_at": "2026-08-27T15:44:14.924359+00:00",
           "indexed_at": "2026-08-27T15:44:18.289486+00:00",
           "reason": "fact-content=27672329c9023861623cba052a7cd946afbdae8030b3421441217f1f1d6e902a"
-=======
-          "lifecycle_state": "current",
-          "valid_to": null,
-          "observed_at": "2026-08-27T15:24:12.678669+00:00",
-          "indexed_at": "2026-08-27T15:24:16.178142+00:00",
-          "reason": "fact-content=1050399b7ee0e21f116412d9067cbe02a84eb2220cc8c99f798523ec7bfa47ea"
->>>>>>> feature/site-revamp4-diagrams
         }
       ]
     },
@@ -23660,6 +23629,30 @@
           "observed_at": "2026-08-18T23:24:11.851786+00:00",
           "indexed_at": "2026-08-26T02:32:53.553361+00:00",
           "reason": "fact-content=d697c89f1da9e43ea6baaf8b3169f701d9d8d8eb867485f8aae2ce60ad1e9f05"
+        }
+      ]
+    },
+    {
+      "entity_id": "135f4b342920f8af30ea11e8bb67b7e791963d53e6b2c899cfecd632be57f3fb",
+      "knowledge_id": "7b3cc0e337de281d9cd06cde3a8467b01de7f2b5b9d7d779187606448d2c9d1a",
+      "source_type": "fact",
+      "logical_locator": "attempt:p5_adversarial#attempt_cache_hit_rate",
+      "source_uri": "fact://attempt/wf_cap_site_revamp4_diagrams_deepseek_deepseek_v4_flash:p5_adversarial:58ceb5b76dd28c9193c1d634d6927e2dee4381f2492656350786d6b8ba16fe80/attempt_cache_hit_rate",
+      "observed_at": "2026-08-27T19:57:07.871067+00:00",
+      "indexed_at": "2026-08-27T19:57:13.872973+00:00",
+      "supersedes": null,
+      "causes": null,
+      "reason": "fact-content=eb48fccaabf9935d126b5e86fa54ea2d37fc2ffe443c126a2dc49dc63f7dcdbb",
+      "lifecycle_state": "current",
+      "valid_to": null,
+      "versions": [
+        {
+          "knowledge_id": "7b3cc0e337de281d9cd06cde3a8467b01de7f2b5b9d7d779187606448d2c9d1a",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-27T19:57:07.871067+00:00",
+          "indexed_at": "2026-08-27T19:57:13.872973+00:00",
+          "reason": "fact-content=eb48fccaabf9935d126b5e86fa54ea2d37fc2ffe443c126a2dc49dc63f7dcdbb"
         }
       ]
     },
@@ -54896,6 +54889,30 @@
       ]
     },
     {
+      "entity_id": "2d0c0afc88f8fe5d0d9fe10800c18c1646e187b9ab3a25870ec8b7de37c23090",
+      "knowledge_id": "2b4e1dd8c59c40309e09598d7400e56a75735a0f3589cf66a898fcde0ab14c15",
+      "source_type": "fact",
+      "logical_locator": "attempt:p5_adversarial#phase_status",
+      "source_uri": "fact://attempt/wf_cap_site_revamp4_diagrams_deepseek_deepseek_v4_flash:p5_adversarial:58ceb5b76dd28c9193c1d634d6927e2dee4381f2492656350786d6b8ba16fe80/phase_status",
+      "observed_at": "2026-08-27T19:57:07.871067+00:00",
+      "indexed_at": "2026-08-27T19:57:13.032738+00:00",
+      "supersedes": null,
+      "causes": null,
+      "reason": "fact-content=6cfebb7de84e4950d23a594c0cabea1d8a9f386b63062856118b42f89ef4901c",
+      "lifecycle_state": "current",
+      "valid_to": null,
+      "versions": [
+        {
+          "knowledge_id": "2b4e1dd8c59c40309e09598d7400e56a75735a0f3589cf66a898fcde0ab14c15",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-27T19:57:07.871067+00:00",
+          "indexed_at": "2026-08-27T19:57:13.032738+00:00",
+          "reason": "fact-content=6cfebb7de84e4950d23a594c0cabea1d8a9f386b63062856118b42f89ef4901c"
+        }
+      ]
+    },
+    {
       "entity_id": "2d0e42362556329419124292eebf771f679c498186f6da19cd5471d90e5b7145",
       "knowledge_id": "4258a1ba8d823ca28b7c1a3895333bef4565462dd0387e3e8426c671e128d14a",
       "source_type": "fact",
@@ -65921,7 +65938,6 @@
     },
     {
       "entity_id": "36743f9a92cd43b441137d9f71d6729dbaa81911b92ef17a00444d0b3c1d728f",
-<<<<<<< HEAD
       "knowledge_id": "6ec4150c08fa304be090298e407f53bef61bfd05edf603d13df9ea9ee5e9ae00",
       "source_type": "fact",
       "logical_locator": "job:wf_cap_site_revamp3_openai_gpt_5_6_terra#job_status",
@@ -65931,17 +65947,6 @@
       "supersedes": "ac0fd22cced6b5b30b30eb9efe414d821dac8f10cf1e43a93bdfd67826e6bc2c",
       "causes": null,
       "reason": "fact-content=a56ecc385a83bbc10de9af305ba5e147e80bd48e5a755f5b7e7eac02dc7a6e0b",
-=======
-      "knowledge_id": "ac0fd22cced6b5b30b30eb9efe414d821dac8f10cf1e43a93bdfd67826e6bc2c",
-      "source_type": "fact",
-      "logical_locator": "job:wf_cap_site_revamp3_openai_gpt_5_6_terra#job_status",
-      "source_uri": "fact://job/wf_cap_site_revamp3_openai_gpt_5_6_terra/job_status",
-      "observed_at": "2026-08-27T15:16:47.199418+00:00",
-      "indexed_at": "2026-08-27T15:16:59.003603+00:00",
-      "supersedes": "b2c437c8d099af600cda33043b6ca2cd4a47743c66794a4cdca08f5206846be5",
-      "causes": null,
-      "reason": "fact-content=6fc77aa74b029ffa2a826371021f9598ad89550281d412fcf8e819e60539ae14",
->>>>>>> feature/site-revamp4-diagrams
       "lifecycle_state": "current",
       "valid_to": null,
       "versions": [
@@ -65963,7 +65968,6 @@
         },
         {
           "knowledge_id": "ac0fd22cced6b5b30b30eb9efe414d821dac8f10cf1e43a93bdfd67826e6bc2c",
-<<<<<<< HEAD
           "lifecycle_state": "superseded",
           "valid_to": "2026-08-27T15:44:11.077837+00:00",
           "observed_at": "2026-08-27T15:16:47.199418+00:00",
@@ -65977,13 +65981,6 @@
           "observed_at": "2026-08-27T15:44:11.077837+00:00",
           "indexed_at": "2026-08-27T15:44:17.277651+00:00",
           "reason": "fact-content=a56ecc385a83bbc10de9af305ba5e147e80bd48e5a755f5b7e7eac02dc7a6e0b"
-=======
-          "lifecycle_state": "current",
-          "valid_to": null,
-          "observed_at": "2026-08-27T15:16:47.199418+00:00",
-          "indexed_at": "2026-08-27T15:16:59.003603+00:00",
-          "reason": "fact-content=6fc77aa74b029ffa2a826371021f9598ad89550281d412fcf8e819e60539ae14"
->>>>>>> feature/site-revamp4-diagrams
         }
       ]
     },
@@ -76276,6 +76273,30 @@
       ]
     },
     {
+      "entity_id": "3f28cb3490d6476502c546988683975721529e21604a973d334d08bb2bb34150",
+      "knowledge_id": "2bd0ab4f9d6b5b72353a296e418275b157110fb58bd03f0f484c4014358185fa",
+      "source_type": "fact",
+      "logical_locator": "attempt:p5_adversarial#attempt_confidence",
+      "source_uri": "fact://attempt/wf_cap_site_revamp4_diagrams_deepseek_deepseek_v4_flash:p5_adversarial:58ceb5b76dd28c9193c1d634d6927e2dee4381f2492656350786d6b8ba16fe80/attempt_confidence",
+      "observed_at": "2026-08-27T19:57:07.871067+00:00",
+      "indexed_at": "2026-08-27T19:57:14.038712+00:00",
+      "supersedes": null,
+      "causes": null,
+      "reason": "fact-content=21050344565994cdbb4bf235b81bc41ca28aa8353607e537a47ace7dc533d737",
+      "lifecycle_state": "current",
+      "valid_to": null,
+      "versions": [
+        {
+          "knowledge_id": "2bd0ab4f9d6b5b72353a296e418275b157110fb58bd03f0f484c4014358185fa",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-27T19:57:07.871067+00:00",
+          "indexed_at": "2026-08-27T19:57:14.038712+00:00",
+          "reason": "fact-content=21050344565994cdbb4bf235b81bc41ca28aa8353607e537a47ace7dc533d737"
+        }
+      ]
+    },
+    {
       "entity_id": "3f2ac584498b7abe0ba15ce663e2b8ba41217ec2f1a1eab8d2ea9b57fb2119bf",
       "knowledge_id": "8a8f70a9f085b4e5feb8af164b1e33ed1c8ce29f7e0df191492050f06eb350f0",
       "source_type": "fact",
@@ -79656,6 +79677,30 @@
           "observed_at": "2026-08-13T05:31:57.766934+00:00",
           "indexed_at": "2026-08-26T02:32:51.402533+00:00",
           "reason": "fact-content=55833f43a8a950fdff7a874149b3b02b9e604101bacdf71dce77f6113ce7ad45"
+        }
+      ]
+    },
+    {
+      "entity_id": "4206a4760b36ce01f6eee40ab33984577a47c6e035b9f2787cdde031f502d796",
+      "knowledge_id": "7b4acf45fca11c7935481e7b2594c4bd3b33c020722241f742ffa92db2a23f97",
+      "source_type": "fact",
+      "logical_locator": "attempt:p5_adversarial#attempt_tokens_in",
+      "source_uri": "fact://attempt/wf_cap_site_revamp4_diagrams_deepseek_deepseek_v4_flash:p5_adversarial:58ceb5b76dd28c9193c1d634d6927e2dee4381f2492656350786d6b8ba16fe80/attempt_tokens_in",
+      "observed_at": "2026-08-27T19:57:07.871067+00:00",
+      "indexed_at": "2026-08-27T19:57:13.369348+00:00",
+      "supersedes": null,
+      "causes": null,
+      "reason": "fact-content=23fb81e1e653b284cf7304be14bd23ad4f23da30d9b29be4a6a0b514778c63c4",
+      "lifecycle_state": "current",
+      "valid_to": null,
+      "versions": [
+        {
+          "knowledge_id": "7b4acf45fca11c7935481e7b2594c4bd3b33c020722241f742ffa92db2a23f97",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-27T19:57:07.871067+00:00",
+          "indexed_at": "2026-08-27T19:57:13.369348+00:00",
+          "reason": "fact-content=23fb81e1e653b284cf7304be14bd23ad4f23da30d9b29be4a6a0b514778c63c4"
         }
       ]
     },
@@ -84460,7 +84505,6 @@
       ]
     },
     {
-<<<<<<< HEAD
       "entity_id": "4595dd5127b80675d8e8e77b2d1976f20d609654b164bdb7ad5963c7c3942861",
       "knowledge_id": "c0d4df25640b11299c09e9cff3d8edb29f6cc4862a959cd44d19742570123899",
       "source_type": "fact",
@@ -84493,8 +84537,6 @@
       ]
     },
     {
-=======
->>>>>>> feature/site-revamp4-diagrams
       "entity_id": "45a07322d228946a92a16dfa0fad4e8334fe8c4fac0e0ffb13c2c10168af25cb",
       "knowledge_id": "fd90abb908e947c94d015b8e9e63b8912a3ca157910d34708215984579babc6d",
       "source_type": "fact",
@@ -122320,7 +122362,6 @@
     },
     {
       "entity_id": "6438bdeaafcbb235a79afd14590cdb402a6e3c959ab33dd114bfc819614f959e",
-<<<<<<< HEAD
       "knowledge_id": "10aae046e32aebc36e328196671ea1c86fabedfd311c74c54ce50a2c75ceceba",
       "source_type": "fact",
       "logical_locator": "workflow:wf_cap_site_revamp3_openai_gpt_5_6_terra#workflow_health",
@@ -122330,17 +122371,6 @@
       "supersedes": "edc87599a90a063d9f6626c275fe2a5e3939d204ed428010012db7dcd5174adc",
       "causes": null,
       "reason": "fact-content=c7470951884d3c0d987d9f303e5bb0930e61d8009e0bd964c2c5757ab9825692",
-=======
-      "knowledge_id": "edc87599a90a063d9f6626c275fe2a5e3939d204ed428010012db7dcd5174adc",
-      "source_type": "fact",
-      "logical_locator": "workflow:wf_cap_site_revamp3_openai_gpt_5_6_terra#workflow_health",
-      "source_uri": "fact://workflow/wf_cap_site_revamp3_openai_gpt_5_6_terra/workflow_health",
-      "observed_at": "2026-08-27T15:16:51.154289+00:00",
-      "indexed_at": "2026-08-27T15:17:00.615522+00:00",
-      "supersedes": "a943145256af878819168cd96a8bf2483426171dc692e4bb752beb0dcacf69c7",
-      "causes": null,
-      "reason": "fact-content=175e063227cdab7323d981ef6c1f39e933bda2187040eb8441244929f9b1fc6a",
->>>>>>> feature/site-revamp4-diagrams
       "lifecycle_state": "current",
       "valid_to": null,
       "versions": [
@@ -122362,7 +122392,6 @@
         },
         {
           "knowledge_id": "edc87599a90a063d9f6626c275fe2a5e3939d204ed428010012db7dcd5174adc",
-<<<<<<< HEAD
           "lifecycle_state": "superseded",
           "valid_to": "2026-08-27T15:44:14.924359+00:00",
           "observed_at": "2026-08-27T15:16:51.154289+00:00",
@@ -122376,13 +122405,6 @@
           "observed_at": "2026-08-27T15:44:14.924359+00:00",
           "indexed_at": "2026-08-27T15:44:18.798039+00:00",
           "reason": "fact-content=c7470951884d3c0d987d9f303e5bb0930e61d8009e0bd964c2c5757ab9825692"
-=======
-          "lifecycle_state": "current",
-          "valid_to": null,
-          "observed_at": "2026-08-27T15:16:51.154289+00:00",
-          "indexed_at": "2026-08-27T15:17:00.615522+00:00",
-          "reason": "fact-content=175e063227cdab7323d981ef6c1f39e933bda2187040eb8441244929f9b1fc6a"
->>>>>>> feature/site-revamp4-diagrams
         }
       ]
     },
@@ -124075,7 +124097,6 @@
       ]
     },
     {
-<<<<<<< HEAD
       "entity_id": "6598a02f914a72870d212d1d4369bc42b49c6cbee5b89b4578acb149fe6fa3b8",
       "knowledge_id": "efa201ee0cd7a51d8e735bd78a354eef2b311d08ed7f81b0d2533c64a96185d3",
       "source_type": "fact",
@@ -124100,8 +124121,6 @@
       ]
     },
     {
-=======
->>>>>>> feature/site-revamp4-diagrams
       "entity_id": "659a7a1bb7c6689bea8deb491b5d3f944d5acb10360c55ddbb6e2f7b1bee711a",
       "knowledge_id": "036ee958518389cee8f8f2064b371cd25ae1f2fd0ec925e54927b4cb0d7acc27",
       "source_type": "story",
@@ -141150,6 +141169,30 @@
       ]
     },
     {
+      "entity_id": "74932ab7b8c571099f42015c227c26d8f9595c42f4abd11288d4191b77910936",
+      "knowledge_id": "1fe79f070eb533c07784797a31ef226b45494664f1ae6484bf319f50b2ed90c6",
+      "source_type": "fact",
+      "logical_locator": "attempt:p5_adversarial#attempt_model",
+      "source_uri": "fact://attempt/wf_cap_site_revamp4_diagrams_deepseek_deepseek_v4_flash:p5_adversarial:58ceb5b76dd28c9193c1d634d6927e2dee4381f2492656350786d6b8ba16fe80/attempt_model",
+      "observed_at": "2026-08-27T19:57:07.871067+00:00",
+      "indexed_at": "2026-08-27T19:57:13.199712+00:00",
+      "supersedes": null,
+      "causes": null,
+      "reason": "fact-content=869df0a64b672f3fc5bdae6ad1acd0efb73b36929052741f45fb414c2da36813",
+      "lifecycle_state": "current",
+      "valid_to": null,
+      "versions": [
+        {
+          "knowledge_id": "1fe79f070eb533c07784797a31ef226b45494664f1ae6484bf319f50b2ed90c6",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-27T19:57:07.871067+00:00",
+          "indexed_at": "2026-08-27T19:57:13.199712+00:00",
+          "reason": "fact-content=869df0a64b672f3fc5bdae6ad1acd0efb73b36929052741f45fb414c2da36813"
+        }
+      ]
+    },
+    {
       "entity_id": "749647cd2ad7112d6d393e4ab33e9040e96ba92edab8666996634f547516679a",
       "knowledge_id": "63cc00a1bc25ed4aa8ae4477f282310d85c47e66634cba937696aed1185f4740",
       "source_type": "fact",
@@ -145239,7 +145282,6 @@
     },
     {
       "entity_id": "77c8b013db532427cdfc99f7b93960a63a1fffb3a23f9e0589e2b71ccf01aa30",
-<<<<<<< HEAD
       "knowledge_id": "4befae45f344fee2b3a35215cd5943fa7395c988f86379e462276238f9c30e06",
       "source_type": "fact",
       "logical_locator": "workflow:wf_cap_site_revamp3_openai_gpt_5_6_terra#workflow_phases_remaining",
@@ -145249,17 +145291,6 @@
       "supersedes": "d47eb7794606dfa93f65a3c0c6d607c4237f1c1e507483a62d8ea30f36205ed3",
       "causes": null,
       "reason": "fact-content=4f7e113dfa4b27be9c3fbb7d20da6d45a3e1695d971fe3e91cfbb26d217809cf",
-=======
-      "knowledge_id": "d47eb7794606dfa93f65a3c0c6d607c4237f1c1e507483a62d8ea30f36205ed3",
-      "source_type": "fact",
-      "logical_locator": "workflow:wf_cap_site_revamp3_openai_gpt_5_6_terra#workflow_phases_remaining",
-      "source_uri": "fact://workflow/wf_cap_site_revamp3_openai_gpt_5_6_terra/workflow_phases_remaining",
-      "observed_at": "2026-08-27T15:16:51.154289+00:00",
-      "indexed_at": "2026-08-27T15:17:00.262277+00:00",
-      "supersedes": "5577bedbe8b9f87f343007df873d39a575f9084a920ef0eb6638385d5adf374d",
-      "causes": null,
-      "reason": "fact-content=c2e2ad17cff0e5e22fb321baed7e103f8474cb0f3956af93768ff6a0ff0e3195",
->>>>>>> feature/site-revamp4-diagrams
       "lifecycle_state": "current",
       "valid_to": null,
       "versions": [
@@ -145281,7 +145312,6 @@
         },
         {
           "knowledge_id": "d47eb7794606dfa93f65a3c0c6d607c4237f1c1e507483a62d8ea30f36205ed3",
-<<<<<<< HEAD
           "lifecycle_state": "superseded",
           "valid_to": "2026-08-27T15:44:14.924359+00:00",
           "observed_at": "2026-08-27T15:16:51.154289+00:00",
@@ -145295,13 +145325,6 @@
           "observed_at": "2026-08-27T15:44:14.924359+00:00",
           "indexed_at": "2026-08-27T15:44:18.460020+00:00",
           "reason": "fact-content=4f7e113dfa4b27be9c3fbb7d20da6d45a3e1695d971fe3e91cfbb26d217809cf"
-=======
-          "lifecycle_state": "current",
-          "valid_to": null,
-          "observed_at": "2026-08-27T15:16:51.154289+00:00",
-          "indexed_at": "2026-08-27T15:17:00.262277+00:00",
-          "reason": "fact-content=c2e2ad17cff0e5e22fb321baed7e103f8474cb0f3956af93768ff6a0ff0e3195"
->>>>>>> feature/site-revamp4-diagrams
         }
       ]
     },
@@ -145643,15 +145666,15 @@
     },
     {
       "entity_id": "782141adcc6e9df797e637fa5f712b08e01fb36c5e2067ec5e28c9945fb554c1",
-      "knowledge_id": "97982dcd90a5ca7eb01cc628a1ea5e627e42dd38b64eefb37b24304e73c3d1a8",
+      "knowledge_id": "2e389ce86817add5142bf2a808d98992666357e081cba124803e40b3156c365b",
       "source_type": "fact",
       "logical_locator": "workflow:wf_cap_site_revamp4_diagrams_deepseek_deepseek_v4_flash#workflow_phases_completed",
       "source_uri": "fact://workflow/wf_cap_site_revamp4_diagrams_deepseek_deepseek_v4_flash/workflow_phases_completed",
-      "observed_at": "2026-08-27T18:44:51.527713+00:00",
-      "indexed_at": "2026-08-27T18:44:56.338184+00:00",
-      "supersedes": "23cc663ff1c03f9cca094f12965911e531a293aaa52090adb94c74569c71c95b",
+      "observed_at": "2026-08-27T19:57:12.750659+00:00",
+      "indexed_at": "2026-08-27T19:57:16.124987+00:00",
+      "supersedes": "97982dcd90a5ca7eb01cc628a1ea5e627e42dd38b64eefb37b24304e73c3d1a8",
       "causes": null,
-      "reason": "fact-content=f479d36d28149428a6e652fe87418118f18a75ec0ea91c6b0ae147662a4d1094",
+      "reason": "fact-content=5e2baf9934a49b7fbc3bbfa58ee503430e3ab28c9ba27cc191435899d9fd843b",
       "lifecycle_state": "current",
       "valid_to": null,
       "versions": [
@@ -145665,11 +145688,19 @@
         },
         {
           "knowledge_id": "97982dcd90a5ca7eb01cc628a1ea5e627e42dd38b64eefb37b24304e73c3d1a8",
+          "lifecycle_state": "superseded",
+          "valid_to": "2026-08-27T19:57:12.750659+00:00",
+          "observed_at": "2026-08-27T18:44:51.527713+00:00",
+          "indexed_at": "2026-08-27T19:57:16.124987+00:00",
+          "reason": "fact-content=f479d36d28149428a6e652fe87418118f18a75ec0ea91c6b0ae147662a4d1094"
+        },
+        {
+          "knowledge_id": "2e389ce86817add5142bf2a808d98992666357e081cba124803e40b3156c365b",
           "lifecycle_state": "current",
           "valid_to": null,
-          "observed_at": "2026-08-27T18:44:51.527713+00:00",
-          "indexed_at": "2026-08-27T18:44:56.338184+00:00",
-          "reason": "fact-content=f479d36d28149428a6e652fe87418118f18a75ec0ea91c6b0ae147662a4d1094"
+          "observed_at": "2026-08-27T19:57:12.750659+00:00",
+          "indexed_at": "2026-08-27T19:57:16.124987+00:00",
+          "reason": "fact-content=5e2baf9934a49b7fbc3bbfa58ee503430e3ab28c9ba27cc191435899d9fd843b"
         }
       ]
     },
@@ -174366,6 +174397,30 @@
           "observed_at": "2026-08-26T02:07:36.685222+00:00",
           "indexed_at": "2026-08-26T02:32:55.690004+00:00",
           "reason": "fact-content=f99c9f83f677e7ed513924158c7ad085e737eb29ead950a1eed90cebeeff2a1f"
+        }
+      ]
+    },
+    {
+      "entity_id": "9000efde77cb4654ef75641474af89d06729d5331fba2125a3db5f084c710764",
+      "knowledge_id": "fd9f1adac5e930c77ab1334bdf25f2ecf23aadacc26ad2c47d6efffe80502691",
+      "source_type": "fact",
+      "logical_locator": "attempt:p5_adversarial#attempt_tokens_out",
+      "source_uri": "fact://attempt/wf_cap_site_revamp4_diagrams_deepseek_deepseek_v4_flash:p5_adversarial:58ceb5b76dd28c9193c1d634d6927e2dee4381f2492656350786d6b8ba16fe80/attempt_tokens_out",
+      "observed_at": "2026-08-27T19:57:07.871067+00:00",
+      "indexed_at": "2026-08-27T19:57:13.537870+00:00",
+      "supersedes": null,
+      "causes": null,
+      "reason": "fact-content=5ef584cbc982cc32f3efad1ddc2e0b8075903a9e64da7a5eda308ad8ab9a400a",
+      "lifecycle_state": "current",
+      "valid_to": null,
+      "versions": [
+        {
+          "knowledge_id": "fd9f1adac5e930c77ab1334bdf25f2ecf23aadacc26ad2c47d6efffe80502691",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-27T19:57:07.871067+00:00",
+          "indexed_at": "2026-08-27T19:57:13.537870+00:00",
+          "reason": "fact-content=5ef584cbc982cc32f3efad1ddc2e0b8075903a9e64da7a5eda308ad8ab9a400a"
         }
       ]
     },
@@ -208235,15 +208290,15 @@
     },
     {
       "entity_id": "aaf2fbb15892d2101e7e802b8210cf07b48a3358de562bc30c314b42e9c333f5",
-      "knowledge_id": "8daeae803760acd6e49ea2b4018f9b60be9a5ea3da4038079372c7725c2349d9",
+      "knowledge_id": "28fecbadf5878cee97b56633afe5a0df8ad448c92f3ab40c874aa5f13ce29f26",
       "source_type": "fact",
       "logical_locator": "job:wf_cap_site_revamp4_diagrams_deepseek_deepseek_v4_flash#job_n_phases",
       "source_uri": "fact://job/wf_cap_site_revamp4_diagrams_deepseek_deepseek_v4_flash/job_n_phases",
-      "observed_at": "2026-08-27T18:44:47.526019+00:00",
-      "indexed_at": "2026-08-27T18:44:55.459957+00:00",
-      "supersedes": "d52b36f7f7fbf148e470242e48f36d8aa87223d72983f36f9e130bc2112a1c51",
+      "observed_at": "2026-08-27T19:57:07.871067+00:00",
+      "indexed_at": "2026-08-27T19:57:15.253577+00:00",
+      "supersedes": "8daeae803760acd6e49ea2b4018f9b60be9a5ea3da4038079372c7725c2349d9",
       "causes": null,
-      "reason": "fact-content=8862db6676d71115d699948dd640ed3bb87a85bb2d1bc4631bb4a8b266d5c9ce",
+      "reason": "fact-content=e8baf86a0e1e498f67123572f747fa98ed5030f34a1b375c935c275d609d153c",
       "lifecycle_state": "current",
       "valid_to": null,
       "versions": [
@@ -208257,11 +208312,19 @@
         },
         {
           "knowledge_id": "8daeae803760acd6e49ea2b4018f9b60be9a5ea3da4038079372c7725c2349d9",
+          "lifecycle_state": "superseded",
+          "valid_to": "2026-08-27T19:57:07.871067+00:00",
+          "observed_at": "2026-08-27T18:44:47.526019+00:00",
+          "indexed_at": "2026-08-27T19:57:15.253577+00:00",
+          "reason": "fact-content=8862db6676d71115d699948dd640ed3bb87a85bb2d1bc4631bb4a8b266d5c9ce"
+        },
+        {
+          "knowledge_id": "28fecbadf5878cee97b56633afe5a0df8ad448c92f3ab40c874aa5f13ce29f26",
           "lifecycle_state": "current",
           "valid_to": null,
-          "observed_at": "2026-08-27T18:44:47.526019+00:00",
-          "indexed_at": "2026-08-27T18:44:55.459957+00:00",
-          "reason": "fact-content=8862db6676d71115d699948dd640ed3bb87a85bb2d1bc4631bb4a8b266d5c9ce"
+          "observed_at": "2026-08-27T19:57:07.871067+00:00",
+          "indexed_at": "2026-08-27T19:57:15.253577+00:00",
+          "reason": "fact-content=e8baf86a0e1e498f67123572f747fa98ed5030f34a1b375c935c275d609d153c"
         }
       ]
     },
@@ -212083,15 +212146,15 @@
     },
     {
       "entity_id": "adc866111e76a0b469387cda0f90e093d7e8cf721a61ab6e3bdc3c9d94ee78aa",
-      "knowledge_id": "383d0f390659139162d2f8fb0104d10d84c7682edceb5136daf6d8eb918928c5",
+      "knowledge_id": "e24e630ed72736922abf2cd8ecd49cb80cb15f4da1e4c062591e497aa46e7f9e",
       "source_type": "fact",
       "logical_locator": "job:wf_cap_site_revamp4_diagrams_deepseek_deepseek_v4_flash#job_accumulated_cost_usd",
       "source_uri": "fact://job/wf_cap_site_revamp4_diagrams_deepseek_deepseek_v4_flash/job_accumulated_cost_usd",
-      "observed_at": "2026-08-27T18:44:47.526019+00:00",
-      "indexed_at": "2026-08-27T18:44:55.117522+00:00",
-      "supersedes": "a76db27c0d207392a0f2e35ed51ff9ae9027049a6f83a3d414123990d8b8ae57",
+      "observed_at": "2026-08-27T19:57:07.871067+00:00",
+      "indexed_at": "2026-08-27T19:57:14.908311+00:00",
+      "supersedes": "383d0f390659139162d2f8fb0104d10d84c7682edceb5136daf6d8eb918928c5",
       "causes": null,
-      "reason": "fact-content=52848241a291ed227ed5973de0b907614e9c5d426c9a11f1ac06b4882216b2cf",
+      "reason": "fact-content=5b4f7eb2fe78e7146809136c9cda73d7ebf157a13b2b3a4e78bde2ad0410aac2",
       "lifecycle_state": "current",
       "valid_to": null,
       "versions": [
@@ -212105,11 +212168,19 @@
         },
         {
           "knowledge_id": "383d0f390659139162d2f8fb0104d10d84c7682edceb5136daf6d8eb918928c5",
+          "lifecycle_state": "superseded",
+          "valid_to": "2026-08-27T19:57:07.871067+00:00",
+          "observed_at": "2026-08-27T18:44:47.526019+00:00",
+          "indexed_at": "2026-08-27T19:57:14.908311+00:00",
+          "reason": "fact-content=52848241a291ed227ed5973de0b907614e9c5d426c9a11f1ac06b4882216b2cf"
+        },
+        {
+          "knowledge_id": "e24e630ed72736922abf2cd8ecd49cb80cb15f4da1e4c062591e497aa46e7f9e",
           "lifecycle_state": "current",
           "valid_to": null,
-          "observed_at": "2026-08-27T18:44:47.526019+00:00",
-          "indexed_at": "2026-08-27T18:44:55.117522+00:00",
-          "reason": "fact-content=52848241a291ed227ed5973de0b907614e9c5d426c9a11f1ac06b4882216b2cf"
+          "observed_at": "2026-08-27T19:57:07.871067+00:00",
+          "indexed_at": "2026-08-27T19:57:14.908311+00:00",
+          "reason": "fact-content=5b4f7eb2fe78e7146809136c9cda73d7ebf157a13b2b3a4e78bde2ad0410aac2"
         }
       ]
     },
@@ -223203,7 +223274,6 @@
     },
     {
       "entity_id": "b7d11a80f9428c50792bdc3cb51695336854c647accfe703553a7629c13533bd",
-<<<<<<< HEAD
       "knowledge_id": "8474b7a76523c212011430771e3a100d6284d71c1580227a7ac9d1a79a432640",
       "source_type": "fact",
       "logical_locator": "job:wf_cap_site_revamp3_openai_gpt_5_6_terra#current_commit",
@@ -223213,17 +223283,6 @@
       "supersedes": "fdd380ab2f668f68625a080e66e3d82eb9b7a8955c8080a57265ab1d75bb23e7",
       "causes": null,
       "reason": "fact-content=81d8ab39c9c9f36282adc773d562ec05db389fe9921cb12846996dd6643e5945",
-=======
-      "knowledge_id": "fdd380ab2f668f68625a080e66e3d82eb9b7a8955c8080a57265ab1d75bb23e7",
-      "source_type": "fact",
-      "logical_locator": "job:wf_cap_site_revamp3_openai_gpt_5_6_terra#current_commit",
-      "source_uri": "fact://job/wf_cap_site_revamp3_openai_gpt_5_6_terra/current_commit",
-      "observed_at": "2026-08-27T15:24:07.907394+00:00",
-      "indexed_at": "2026-08-27T15:24:14.756979+00:00",
-      "supersedes": "88fcdbaa1cfac3b3613d4b024326a0f4a71a526948e5860901bcdf88779af34c",
-      "causes": null,
-      "reason": "fact-content=1944fbeb63525ab96e9a41df8434e57909b32a6046883fa45c213d7643d4b6aa",
->>>>>>> feature/site-revamp4-diagrams
       "lifecycle_state": "current",
       "valid_to": null,
       "versions": [
@@ -223253,7 +223312,6 @@
         },
         {
           "knowledge_id": "fdd380ab2f668f68625a080e66e3d82eb9b7a8955c8080a57265ab1d75bb23e7",
-<<<<<<< HEAD
           "lifecycle_state": "superseded",
           "valid_to": "2026-08-27T15:44:11.077837+00:00",
           "observed_at": "2026-08-27T15:24:07.907394+00:00",
@@ -223267,13 +223325,6 @@
           "observed_at": "2026-08-27T15:44:11.077837+00:00",
           "indexed_at": "2026-08-27T15:44:16.936926+00:00",
           "reason": "fact-content=81d8ab39c9c9f36282adc773d562ec05db389fe9921cb12846996dd6643e5945"
-=======
-          "lifecycle_state": "current",
-          "valid_to": null,
-          "observed_at": "2026-08-27T15:24:07.907394+00:00",
-          "indexed_at": "2026-08-27T15:24:14.756979+00:00",
-          "reason": "fact-content=1944fbeb63525ab96e9a41df8434e57909b32a6046883fa45c213d7643d4b6aa"
->>>>>>> feature/site-revamp4-diagrams
         }
       ]
     },
@@ -242506,6 +242557,30 @@
           "observed_at": "2026-08-15T23:09:22.027530+00:00",
           "indexed_at": "2026-08-26T02:32:52.751455+00:00",
           "reason": "fact-content=4c2cb35d3648dc075a678a87bf8b9b3720484313b459c05e2ec2ceb99df4f6ed"
+        }
+      ]
+    },
+    {
+      "entity_id": "c79432838ecf27e2bdd8bf08ae19dbbb8fe3cfa1f435a6b6cd1fb577bae6bb69",
+      "knowledge_id": "ea96b2ba392b32aceb1a421b49b4565558a3c91c866fba98cdb94e1d51867c4f",
+      "source_type": "fact",
+      "logical_locator": "attempt:p5_adversarial#attempt_cost_usd",
+      "source_uri": "fact://attempt/wf_cap_site_revamp4_diagrams_deepseek_deepseek_v4_flash:p5_adversarial:58ceb5b76dd28c9193c1d634d6927e2dee4381f2492656350786d6b8ba16fe80/attempt_cost_usd",
+      "observed_at": "2026-08-27T19:57:07.871067+00:00",
+      "indexed_at": "2026-08-27T19:57:13.707727+00:00",
+      "supersedes": null,
+      "causes": null,
+      "reason": "fact-content=6596956e13f1175a2ae5dea1af29659b6f7dca42332e6c320b43174ac4224d99",
+      "lifecycle_state": "current",
+      "valid_to": null,
+      "versions": [
+        {
+          "knowledge_id": "ea96b2ba392b32aceb1a421b49b4565558a3c91c866fba98cdb94e1d51867c4f",
+          "lifecycle_state": "current",
+          "valid_to": null,
+          "observed_at": "2026-08-27T19:57:07.871067+00:00",
+          "indexed_at": "2026-08-27T19:57:13.707727+00:00",
+          "reason": "fact-content=6596956e13f1175a2ae5dea1af29659b6f7dca42332e6c320b43174ac4224d99"
         }
       ]
     },
@@ -270111,7 +270186,6 @@
     },
     {
       "entity_id": "e00804c4a41586d908dd1232c9b260ac5b7f18b0101ccc9e88030cdc6eee5888",
-<<<<<<< HEAD
       "knowledge_id": "a6a12f4717eff0d52d1d81b235fc36ca329472b76c18278dfff0ec2140b34e6f",
       "source_type": "fact",
       "logical_locator": "workflow:wf_cap_site_revamp3_openai_gpt_5_6_terra#workflow_status",
@@ -270121,17 +270195,6 @@
       "supersedes": "f17a308c6fc9efc0c6d047b3ca801d49d4ef626269e8c873f4fbc4fc91190eb2",
       "causes": null,
       "reason": "fact-content=819b8d0dd6d59bb469a5f0dff4dbd4a5f08d202fa03265321addac14e786561d",
-=======
-      "knowledge_id": "f17a308c6fc9efc0c6d047b3ca801d49d4ef626269e8c873f4fbc4fc91190eb2",
-      "source_type": "fact",
-      "logical_locator": "workflow:wf_cap_site_revamp3_openai_gpt_5_6_terra#workflow_status",
-      "source_uri": "fact://workflow/wf_cap_site_revamp3_openai_gpt_5_6_terra/workflow_status",
-      "observed_at": "2026-08-27T15:16:51.154289+00:00",
-      "indexed_at": "2026-08-27T15:17:00.438566+00:00",
-      "supersedes": "fde2f5a52a0108461e2e3bd1b86384192715e9732bbb83830a6b5d8299594433",
-      "causes": null,
-      "reason": "fact-content=a9c200812658815d80cda745c2fe3252996ba21e8d2bb18de7c39fda1564f9ed",
->>>>>>> feature/site-revamp4-diagrams
       "lifecycle_state": "current",
       "valid_to": null,
       "versions": [
@@ -270153,7 +270216,6 @@
         },
         {
           "knowledge_id": "f17a308c6fc9efc0c6d047b3ca801d49d4ef626269e8c873f4fbc4fc91190eb2",
-<<<<<<< HEAD
           "lifecycle_state": "superseded",
           "valid_to": "2026-08-27T15:44:14.924359+00:00",
           "observed_at": "2026-08-27T15:16:51.154289+00:00",
@@ -270167,13 +270229,6 @@
           "observed_at": "2026-08-27T15:44:14.924359+00:00",
           "indexed_at": "2026-08-27T15:44:18.628617+00:00",
           "reason": "fact-content=819b8d0dd6d59bb469a5f0dff4dbd4a5f08d202fa03265321addac14e786561d"
-=======
-          "lifecycle_state": "current",
-          "valid_to": null,
-          "observed_at": "2026-08-27T15:16:51.154289+00:00",
-          "indexed_at": "2026-08-27T15:17:00.438566+00:00",
-          "reason": "fact-content=a9c200812658815d80cda745c2fe3252996ba21e8d2bb18de7c39fda1564f9ed"
->>>>>>> feature/site-revamp4-diagrams
         }
       ]
     },
@@ -296723,7 +296778,6 @@
     },
     {
       "entity_id": "f56c9535c9fa2f44f439efcc9e12eba700f4d8967bf98003526924a9cbf958fd",
-<<<<<<< HEAD
       "knowledge_id": "106bb5f2be3e6a5f303d65b42f4951dfb905baaa171d1cb7c5a88809d53fcf5c",
       "source_type": "fact",
       "logical_locator": "job:wf_cap_site_revamp3_openai_gpt_5_6_terra#job_accumulated_cost_usd",
@@ -296733,17 +296787,6 @@
       "supersedes": "733e4fb5b47bcaa5357a829fe038701f68a2331ae4fa90dc8ec8fc59acb670fa",
       "causes": null,
       "reason": "fact-content=f7934fde58e203fcd0f2b69f46c83103ac7f33eb4f2d675a8bf6304c74460ec5",
-=======
-      "knowledge_id": "733e4fb5b47bcaa5357a829fe038701f68a2331ae4fa90dc8ec8fc59acb670fa",
-      "source_type": "fact",
-      "logical_locator": "job:wf_cap_site_revamp3_openai_gpt_5_6_terra#job_accumulated_cost_usd",
-      "source_uri": "fact://job/wf_cap_site_revamp3_openai_gpt_5_6_terra/job_accumulated_cost_usd",
-      "observed_at": "2026-08-27T15:24:07.907394+00:00",
-      "indexed_at": "2026-08-27T15:24:14.937855+00:00",
-      "supersedes": "847d6b141e6e3207c986cae396d241c41811fe350e8edd42b57aa109d551da9b",
-      "causes": null,
-      "reason": "fact-content=8868b8bbdd0ea4671fc3430c1d2aaf09fd8e86f135a9c968f4d7702ca1eb9ef3",
->>>>>>> feature/site-revamp4-diagrams
       "lifecycle_state": "current",
       "valid_to": null,
       "versions": [
@@ -296773,7 +296816,6 @@
         },
         {
           "knowledge_id": "733e4fb5b47bcaa5357a829fe038701f68a2331ae4fa90dc8ec8fc59acb670fa",
-<<<<<<< HEAD
           "lifecycle_state": "superseded",
           "valid_to": "2026-08-27T15:44:11.077837+00:00",
           "observed_at": "2026-08-27T15:24:07.907394+00:00",
@@ -296787,13 +296829,6 @@
           "observed_at": "2026-08-27T15:44:11.077837+00:00",
           "indexed_at": "2026-08-27T15:44:17.107385+00:00",
           "reason": "fact-content=f7934fde58e203fcd0f2b69f46c83103ac7f33eb4f2d675a8bf6304c74460ec5"
-=======
-          "lifecycle_state": "current",
-          "valid_to": null,
-          "observed_at": "2026-08-27T15:24:07.907394+00:00",
-          "indexed_at": "2026-08-27T15:24:14.937855+00:00",
-          "reason": "fact-content=8868b8bbdd0ea4671fc3430c1d2aaf09fd8e86f135a9c968f4d7702ca1eb9ef3"
->>>>>>> feature/site-revamp4-diagrams
         }
       ]
     },
@@ -306543,15 +306578,15 @@
     },
     {
       "entity_id": "fd9251e0c0312716cb782312d5e943b0e8a76fb869909389a5898df57bf338fa",
-      "knowledge_id": "9bcdcda3dc8db6c73372b8329e3a21352fcd3b93d4ff600f4dd8a115c55cc5e8",
+      "knowledge_id": "0463b7959052d4c63d835d3b1aa3d946e0953b922147f337a2da22064ac2f8b0",
       "source_type": "fact",
       "logical_locator": "job:wf_cap_site_revamp4_diagrams_deepseek_deepseek_v4_flash#current_commit",
       "source_uri": "fact://job/wf_cap_site_revamp4_diagrams_deepseek_deepseek_v4_flash/current_commit",
-      "observed_at": "2026-08-27T18:44:47.526019+00:00",
-      "indexed_at": "2026-08-27T18:44:54.940350+00:00",
-      "supersedes": "bd947665b46c7552a3c674bf286fc725121fc7fcc737f6e65b3614a85e368c37",
+      "observed_at": "2026-08-27T19:57:07.871067+00:00",
+      "indexed_at": "2026-08-27T19:57:14.727441+00:00",
+      "supersedes": "9bcdcda3dc8db6c73372b8329e3a21352fcd3b93d4ff600f4dd8a115c55cc5e8",
       "causes": null,
-      "reason": "fact-content=cb673b1ceb382549ddb95f14556ace7eea45dc4befdd1f64abe27178b2dc908e",
+      "reason": "fact-content=14f344dbfd46cc53436eec693503c0f2901d3947da8f03fc19f3f3080586978f",
       "lifecycle_state": "current",
       "valid_to": null,
       "versions": [
@@ -306565,11 +306600,19 @@
         },
         {
           "knowledge_id": "9bcdcda3dc8db6c73372b8329e3a21352fcd3b93d4ff600f4dd8a115c55cc5e8",
+          "lifecycle_state": "superseded",
+          "valid_to": "2026-08-27T19:57:07.871067+00:00",
+          "observed_at": "2026-08-27T18:44:47.526019+00:00",
+          "indexed_at": "2026-08-27T19:57:14.727441+00:00",
+          "reason": "fact-content=cb673b1ceb382549ddb95f14556ace7eea45dc4befdd1f64abe27178b2dc908e"
+        },
+        {
+          "knowledge_id": "0463b7959052d4c63d835d3b1aa3d946e0953b922147f337a2da22064ac2f8b0",
           "lifecycle_state": "current",
           "valid_to": null,
-          "observed_at": "2026-08-27T18:44:47.526019+00:00",
-          "indexed_at": "2026-08-27T18:44:54.940350+00:00",
-          "reason": "fact-content=cb673b1ceb382549ddb95f14556ace7eea45dc4befdd1f64abe27178b2dc908e"
+          "observed_at": "2026-08-27T19:57:07.871067+00:00",
+          "indexed_at": "2026-08-27T19:57:14.727441+00:00",
+          "reason": "fact-content=14f344dbfd46cc53436eec693503c0f2901d3947da8f03fc19f3f3080586978f"
         }
       ]
     },

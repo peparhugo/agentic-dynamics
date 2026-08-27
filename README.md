@@ -89,12 +89,12 @@ Efficiency (durable outcome value / total cost).
 
 | Metric | Value |
 |--------|-------|
-| Story sessions | 1,067 (5,449 DB sessions total) |
+| Story sessions | 1,067 (5,592 DB sessions total) |
 | Game reports | 348 |
 | Model variants | 7 (3 providers: DeepSeek, Anthropic, OpenAI) |
 | Experiment configs | 0 |
 <<<<<<< HEAD
-| Experiment + workflow specs | 133 (11 experiments + 122 workflows) |
+| Experiment + workflow specs | 137 (11 experiments + 126 workflows) |
 =======
 | Experiment + workflow specs | 135 (11 experiments + 124 workflows) |
 >>>>>>> feature/cap-adaptive-2c
