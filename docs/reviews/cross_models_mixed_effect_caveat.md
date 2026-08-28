@@ -42,6 +42,18 @@ The backend reliability defects (the bare-`python` PATH issue, the analyze timeo
 the fixed runner and the rates re-measured before any policy consumes them.** The lab-book
 aggregations derived from this corpus carry this caveat transitively until re-measured.
 
+**2026-08-28 follow-up (measured cleanup):** the caveat is now quantified. An audit found
+**13 silent-dead story records** in the corpus (7 sonnet + 6 haiku) — stories whose five
+sessions ALL died instantly (the Claude CLI command-not-found and OAuth-expired failures; a
+dead session is `duration_s ≈ 0`, `tokens == 0`, `exit_code < 0`), which `run_story` recorded
+as completed stories with zero cost and which the worker's old ok-check accepted. Those 13
+records were **removed** (they were not runs), the worker now validates that a cell is done
+only when its result is a REAL run (at least one session with duration > 1s or tokens > 0, or
+a positive measured cost, or the tests executed), and the **re-measurement campaign** (60
+cells: 30 haiku + 30 sonnet, `_remeasure` cell ids) is re-running the Claude models under the
+fixed runner with `CLAUDE_BIN` set. The corpus is 224 real stories (was 237 including the
+junk); the rates the caveat covers must be re-read from the re-measurement, not the old files.
+
 ## Guard
 
 This document is a human-recorded data-quality note (provenance [H] — operator observation at
