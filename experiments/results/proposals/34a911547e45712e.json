@@ -1,0 +1,36 @@
+{
+  "action": "continue",
+  "analyzed_revision": "21f31a1712244dd28bd46621d5f0562ad778dedf",
+  "applied": false,
+  "baseline_revision": "b73ce8a82b744676e6602f5cd4c4f41bc13e4113",
+  "cell_id": "cap2f_trivial_clean_status_quo_r2",
+  "confidence": 1.0,
+  "confidence_note": "MEASURED [H] per-attempt execution-confidence of the analyzed attempt (implement phase, AgenticResult.confidence); recorded BEFORE the outcome.",
+  "contract_version": "verify_code_change/v1",
+  "depth": 0,
+  "expected_effect": [
+    {
+      "direction": "unchanged",
+      "horizon": "next_phase",
+      "magnitude": null,
+      "predicate": "code_change_risk"
+    }
+  ],
+  "facts_used": [
+    "analysis_revision_matches",
+    "ast_parse_coverage",
+    "changed_symbol_count",
+    "changed_symbols_with_tests_ratio",
+    "code_change_risk",
+    "impacted_symbol_count",
+    "lsp_analysis_status",
+    "new_lsp_error_count",
+    "new_sonar_critical_count",
+    "sonar_analysis_status"
+  ],
+  "proposal_id": "34a911547e45712e",
+  "proposed_by": "policy_rule:verify_code_change",
+  "recorded_at": "2026-08-28T21:01:32.232600+00:00",
+  "schema_version": "verify_code_change_proposal/v1",
+  "scope": []
+}
