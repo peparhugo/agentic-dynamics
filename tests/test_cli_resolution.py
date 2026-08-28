@@ -60,6 +60,7 @@ DOCUMENTED_RESOLUTIONS: list[tuple[tuple[str, ...], str, tuple[str, ...]]] = [
     (("data", "sync"), "sync_data.py", ()),
     (("data", "manifest"), "generate_manifest.py", ()),
     (("data", "inventory"), "inventory.py", ()),
+    (("data", "bundle"), "bundle_artifacts.py", ()),
     # knowledge
     (("knowledge", "ingest"), "kb_produce.py", ()),
     (("knowledge", "sources"), "kb_produce_sources.py", ()),

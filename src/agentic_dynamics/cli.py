@@ -55,6 +55,7 @@ _COMMANDS: dict[tuple[str, ...], str] = {
     ("data", "sync"): "sync_data.py",
     ("data", "manifest"): "generate_manifest.py",
     ("data", "inventory"): "inventory.py",
+    ("data", "bundle"): "bundle_artifacts.py",
     # knowledge
     ("knowledge", "ingest"): "kb_produce.py",
     ("knowledge", "sources"): "kb_produce_sources.py",
@@ -109,7 +110,7 @@ Subcommands (each forwards to its backing script):
   workflow    run|discard-tree
   queue       enqueue|worker|monitor|reinterleave|analysis-enqueue|analysis-worker
   analyze     worktrees|trajectories|stories|session-routing|lab <name>
-  data        build|sync|manifest|inventory
+  data        build|sync|manifest|inventory|bundle
   knowledge   ingest|sources|facts|worker|context-report|shadow-report|arm-comparison
   registry    query|show|lineage
   review      all|stories|trigger|enqueue|finalize
