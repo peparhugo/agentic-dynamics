@@ -1,0 +1,76 @@
+{
+  "campaign": "cap_adaptive_2e",
+  "n_traces": 13,
+  "note": "every verdict number re-derived from the immutable per-cell record fields + the probe artifact; nothing imputed, nothing read from proposal text.",
+  "phase": "p3_validation",
+  "schema_version": "cap_adaptive_2e_validation/v1",
+  "score_artifact": "experiments/results/cap_adaptive_2e/cap_adaptive_2e_score_20260828T144818Z.json",
+  "score_sha256": "4564cb89fb2aa2fe6c500d9c53d24848c2d6c8ab0c82660b24d06bfe5a1ffbfc",
+  "traces": [
+    {
+      "label": "cap2e_unseen_family_abstention_r1.fingerprint",
+      "source": "facts: changed_symbols_with_tests_ratio=0.5, code_change_risk=0.18, impacted_symbol_count=4",
+      "value": "ratio=0.5 risk=0.18 expected=0.08 derived_terms=0.18"
+    },
+    {
+      "label": "cap2e_unseen_family_abstention_r2.fingerprint",
+      "source": "facts: changed_symbols_with_tests_ratio=0.5, code_change_risk=0.18, impacted_symbol_count=4",
+      "value": "ratio=0.5 risk=0.18 expected=0.08 derived_terms=0.18"
+    },
+    {
+      "label": "cap2e_unseen_family_status_quo_r1.fingerprint",
+      "source": "facts: changed_symbols_with_tests_ratio=0.5, code_change_risk=0.18, impacted_symbol_count=4",
+      "value": "ratio=0.5 risk=0.18 expected=0.08 derived_terms=0.18"
+    },
+    {
+      "label": "cap2e_unseen_family_status_quo_r2.fingerprint",
+      "source": "facts: changed_symbols_with_tests_ratio=0.5, code_change_risk=0.18, impacted_symbol_count=4",
+      "value": "ratio=0.5 risk=0.18 expected=0.08 derived_terms=0.18"
+    },
+    {
+      "label": "capture_rate",
+      "source": "abstention_decision field of the 3 low-information abstention-arm cells",
+      "value": "1/3"
+    },
+    {
+      "label": "escaped status_quo",
+      "source": "per_cell[].escaped_defect_count",
+      "value": 3
+    },
+    {
+      "label": "escaped abstention",
+      "source": "per_cell[].escaped_defect_count",
+      "value": 3
+    },
+    {
+      "label": "harm11 status_quo",
+      "source": "escaped*0.046109",
+      "value": 0.138327
+    },
+    {
+      "label": "harm11 abstention",
+      "source": "escaped*0.046109",
+      "value": 0.138327
+    },
+    {
+      "label": "harm28 status_quo",
+      "source": "escaped*0.112588",
+      "value": 0.337764
+    },
+    {
+      "label": "harm28 abstention",
+      "source": "escaped*0.112588",
+      "value": 0.337764
+    },
+    {
+      "label": "verdict",
+      "source": "condition_1.holds=False condition_2.holds=False divergences=['p1-probe', 'cap2e_unseen_family_abstention_r1', 'cap2e_unseen_family_abstention_r2', 'cap2e_unseen_family_status_quo_r1', 'cap2e_unseen_family_status_quo_r2'] capture=0.3333 floor=0.6667",
+      "value": "REFUTE \u2014 the fingerprint FAILED to construct (the third construction divergence measured in the p1 probe AND in every unseen-family cell): the Option A fingerprint is unconstructible under the specified construction, so leg-3 is refuted as a mechanism, not merely unmeasured. Capture is also below the floor (1/3)."
+    },
+    {
+      "label": "probe.fingerprint",
+      "source": "p1_unseen_family_probe.json fingerprint_check",
+      "value": "divergence=True"
+    }
+  ]
+}

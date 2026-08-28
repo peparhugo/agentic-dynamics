@@ -1,0 +1,620 @@
+{
+  "campaign": "cap_adaptive_2e",
+  "capture_floor": 0.6667,
+  "decision_rule": {
+    "arms": {
+      "abstention": {
+        "cost_usd": 0.02574,
+        "harm_usd_11": 0.138327,
+        "n": 3
+      },
+      "status_quo": {
+        "cost_usd": 0.025301,
+        "harm_usd_11": 0.138327,
+        "n": 3
+      }
+    },
+    "condition_1_construction_fidelity": {
+      "divergences": [
+        "p1-probe",
+        "cap2e_unseen_family_abstention_r1",
+        "cap2e_unseen_family_abstention_r2",
+        "cap2e_unseen_family_status_quo_r1",
+        "cap2e_unseen_family_status_quo_r2"
+      ],
+      "holds": false,
+      "note": "construction fidelity = the p1 probe AND every unseen-family cell present the fingerprint (ratio == 1.0, severity terms zero, risk == 0.20\u00b7min(1, impacted/10) within 1e-9). A single divergence is a CONSTRUCTION FAILURE; the THIRD divergence refutes leg-3 as a mechanism (preregistration section 2).",
+      "probe_fingerprint_holds": false,
+      "unseen_family_cells_fingerprint_holds": {
+        "cap2e_unseen_family_abstention_r1": false,
+        "cap2e_unseen_family_abstention_r2": false,
+        "cap2e_unseen_family_status_quo_r1": false,
+        "cap2e_unseen_family_status_quo_r2": false
+      }
+    },
+    "condition_2_capture": {
+      "capture_rate": 0.3333,
+      "declined_low_information_cells": [
+        "cap2e_absent-defective_abstention_r1"
+      ],
+      "floor": 0.6667,
+      "holds": false,
+      "low_information_cells": [
+        "cap2e_absent-defective_abstention_r1",
+        "cap2e_unseen_family_abstention_r1",
+        "cap2e_unseen_family_abstention_r2"
+      ],
+      "note": "capture >= 2/3 of the 3 low-information cells in the abstention arm (unseen-family x2 via leg 3 + absent-defective x1 via leg 2, mechanical)."
+    },
+    "condition_3_flag_cost": {
+      "holds": null,
+      "note": "no clean cells in this grid \u2014 the flag-cost leg is vacuous by design (preregistration section 4); reported, not decided."
+    },
+    "condition_4_ni_guard": {
+      "holds": null,
+      "note": "NI guard NOT MEASURED \u2014 the grid has no apply-class cells; capture-only by design (preregistration section 4)."
+    },
+    "decision_reference": "docs/designs/current/cap_adaptive_2e_preregistration.md section 4 (the decision rule: SUPPORT iff construction fidelity AND capture >= 2/3 of the 3 low-information cells in the abstention arm; REFUTE if the fingerprint fails to construct \u2014 a THIRD divergence \u2014 or capture < 2/3)",
+    "decline_records": {
+      "by_leg": {
+        "2": [
+          "cap2e_absent-defective_abstention_r1"
+        ]
+      },
+      "cells": [
+        {
+          "cell_id": "cap2e_absent-defective_abstention_r1",
+          "class": "absent",
+          "leg": 2,
+          "reason": "leg 2 \u2014 code_change_risk absent (no risk term measurable \u2014 the seam's refuse state); route to operator review.",
+          "variant": "defective"
+        }
+      ],
+      "n_declines": 1
+    }
+  },
+  "fingerprint_tolerance": 1e-09,
+  "flags": {
+    "construction_failures": [
+      {
+        "cell_id": "cap2e_unseen_family_abstention_r1",
+        "flags": [
+          "construction-failure: the cell's measured facts do NOT present the Option A fingerprint (the third-failure refute clause of preregistration section 2)"
+        ]
+      },
+      {
+        "cell_id": "cap2e_unseen_family_abstention_r2",
+        "flags": [
+          "construction-failure: the cell's measured facts do NOT present the Option A fingerprint (the third-failure refute clause of preregistration section 2)"
+        ]
+      },
+      {
+        "cell_id": "cap2e_unseen_family_status_quo_r1",
+        "flags": [
+          "construction-failure: the cell's measured facts do NOT present the Option A fingerprint (the third-failure refute clause of preregistration section 2)"
+        ]
+      },
+      {
+        "cell_id": "cap2e_unseen_family_status_quo_r2",
+        "flags": [
+          "construction-failure: the cell's measured facts do NOT present the Option A fingerprint (the third-failure refute clause of preregistration section 2)"
+        ]
+      }
+    ],
+    "flagged_cells": [
+      "cap2e_unseen_family_abstention_r1",
+      "cap2e_unseen_family_abstention_r2",
+      "cap2e_unseen_family_status_quo_r1",
+      "cap2e_unseen_family_status_quo_r2"
+    ],
+    "n_flagged_cells": 4
+  },
+  "harm_model": {
+    "E_x_measured_11": 11.4671,
+    "E_x_sourced_28": 28.0,
+    "base_downstream_defect_cost_usd": 0.004021,
+    "wrong_continue_11_per_defect": 0.046109,
+    "wrong_continue_28_per_defect": 0.112588
+  },
+  "harm_table": {
+    "per_cell": [
+      {
+        "arm": "abstention",
+        "cell_id": "cap2e_absent-defective_abstention_r1",
+        "class": "absent",
+        "escaped_defect_count": 1,
+        "wrong_continue_usd_11": 0.046109,
+        "wrong_continue_usd_28": 0.112588
+      },
+      {
+        "arm": "status_quo",
+        "cell_id": "cap2e_absent-defective_status_quo_r1",
+        "class": "absent",
+        "escaped_defect_count": 1,
+        "wrong_continue_usd_11": 0.046109,
+        "wrong_continue_usd_28": 0.112588
+      },
+      {
+        "arm": "abstention",
+        "cell_id": "cap2e_unseen_family_abstention_r1",
+        "class": "unseen_family",
+        "escaped_defect_count": 1,
+        "wrong_continue_usd_11": 0.046109,
+        "wrong_continue_usd_28": 0.112588
+      },
+      {
+        "arm": "abstention",
+        "cell_id": "cap2e_unseen_family_abstention_r2",
+        "class": "unseen_family",
+        "escaped_defect_count": 1,
+        "wrong_continue_usd_11": 0.046109,
+        "wrong_continue_usd_28": 0.112588
+      },
+      {
+        "arm": "status_quo",
+        "cell_id": "cap2e_unseen_family_status_quo_r1",
+        "class": "unseen_family",
+        "escaped_defect_count": 1,
+        "wrong_continue_usd_11": 0.046109,
+        "wrong_continue_usd_28": 0.112588
+      },
+      {
+        "arm": "status_quo",
+        "cell_id": "cap2e_unseen_family_status_quo_r2",
+        "class": "unseen_family",
+        "escaped_defect_count": 1,
+        "wrong_continue_usd_11": 0.046109,
+        "wrong_continue_usd_28": 0.112588
+      }
+    ],
+    "wrong_apply": {
+      "note": "no apply-class cells in this grid (capture-only) \u2014 wrong-apply is vacuous; reported, not decided.",
+      "total_usd_measured": 0.0
+    },
+    "wrong_continue": {
+      "at_E_x_11": {
+        "per_escaped_defect_usd": 0.046109,
+        "total_escaped_defects": 6,
+        "total_usd": 0.276655
+      },
+      "at_E_x_28": {
+        "per_escaped_defect_usd": 0.112588,
+        "total_escaped_defects": 6,
+        "total_usd": 0.675528
+      },
+      "note": "wrong-continue = E_x x base_downstream_defect_cost ($0.004021); E_x 11.4671 measured (sol, n=1), E_x 28 sourced \u2014 sensitivity reported (preregistration section 4)."
+    }
+  },
+  "join_validation": {
+    "invalid_cells": [],
+    "n_cells": 6,
+    "n_invalid": 0,
+    "n_table_rows": 6,
+    "per_cell": [
+      {
+        "cell_id": "cap2e_absent-defective_abstention_r1",
+        "reason": "matches the pre-registered table",
+        "valid": true
+      },
+      {
+        "cell_id": "cap2e_absent-defective_status_quo_r1",
+        "reason": "matches the pre-registered table",
+        "valid": true
+      },
+      {
+        "cell_id": "cap2e_unseen_family_abstention_r1",
+        "reason": "matches the pre-registered table",
+        "valid": true
+      },
+      {
+        "cell_id": "cap2e_unseen_family_abstention_r2",
+        "reason": "matches the pre-registered table",
+        "valid": true
+      },
+      {
+        "cell_id": "cap2e_unseen_family_status_quo_r1",
+        "reason": "matches the pre-registered table",
+        "valid": true
+      },
+      {
+        "cell_id": "cap2e_unseen_family_status_quo_r2",
+        "reason": "matches the pre-registered table",
+        "valid": true
+      }
+    ],
+    "valid": true
+  },
+  "per_arm": {
+    "abstention": {
+      "accepted_outcomes": 0,
+      "arm": "abstention",
+      "cpvo_harm_11_usd": null,
+      "cpvo_harm_28_usd": null,
+      "cpvo_usd": null,
+      "decline_count": 1,
+      "escaped_defect_count": 3,
+      "fingerprint_divergence_count": 2,
+      "n": 3,
+      "total_cost_usd": 0.02574,
+      "total_harm_usd_11": 0.138327,
+      "total_harm_usd_28": 0.337764
+    },
+    "status_quo": {
+      "accepted_outcomes": 0,
+      "arm": "status_quo",
+      "cpvo_harm_11_usd": null,
+      "cpvo_harm_28_usd": null,
+      "cpvo_usd": null,
+      "decline_count": 1,
+      "escaped_defect_count": 3,
+      "fingerprint_divergence_count": 2,
+      "n": 3,
+      "total_cost_usd": 0.025301,
+      "total_harm_usd_11": 0.138327,
+      "total_harm_usd_28": 0.337764
+    }
+  },
+  "per_cell": [
+    {
+      "abstention_decision": "DECLINE",
+      "abstention_leg": 2,
+      "abstention_reason": "leg 2 \u2014 code_change_risk absent (no risk term measurable \u2014 the seam's refuse state); route to operator review.",
+      "accepted": false,
+      "applied_or_null": "declined",
+      "arm": "abstention",
+      "cell_id": "cap2e_absent-defective_abstention_r1",
+      "class": "absent",
+      "cost_usd": 0.007276,
+      "defect_note": "family: wrong-operation (wrong_op returns a+b not a-b) present (escaped \u2014 the seam refused)",
+      "defect_present_on_final_commit": true,
+      "escaped_defect_count": 1,
+      "facts": {
+        "ast_parse_coverage": "1.0",
+        "changed_symbol_count": "1",
+        "lsp_analysis_status": "unavailable",
+        "sonar_analysis_status": "unavailable"
+      },
+      "fingerprint_check": null,
+      "flagged": false,
+      "flags": [],
+      "harm_11": 0.046109,
+      "harm_28": 0.112588,
+      "join_valid": true,
+      "proposal_action": null,
+      "proposal_confidence": null,
+      "repetition": "r1",
+      "slot": 1,
+      "test_executed_success": true,
+      "tests": "2/2",
+      "variant": "defective"
+    },
+    {
+      "abstention_decision": "DECLINE",
+      "abstention_leg": 2,
+      "abstention_reason": "leg 2 \u2014 code_change_risk absent (no risk term measurable \u2014 the seam's refuse state); route to operator review.",
+      "accepted": false,
+      "applied_or_null": "null",
+      "arm": "status_quo",
+      "cell_id": "cap2e_absent-defective_status_quo_r1",
+      "class": "absent",
+      "cost_usd": 0.007173,
+      "defect_note": "family: wrong-operation (wrong_op returns a+b not a-b) present (escaped \u2014 the seam refused)",
+      "defect_present_on_final_commit": true,
+      "escaped_defect_count": 1,
+      "facts": {
+        "ast_parse_coverage": "1.0",
+        "changed_symbol_count": "1",
+        "lsp_analysis_status": "unavailable",
+        "sonar_analysis_status": "unavailable"
+      },
+      "fingerprint_check": null,
+      "flagged": false,
+      "flags": [],
+      "harm_11": 0.046109,
+      "harm_28": 0.112588,
+      "join_valid": true,
+      "proposal_action": null,
+      "proposal_confidence": null,
+      "repetition": "r1",
+      "slot": 2,
+      "test_executed_success": true,
+      "tests": "2/2",
+      "variant": "defective"
+    },
+    {
+      "abstention_decision": "APPLY_NULL",
+      "abstention_leg": null,
+      "abstention_reason": "risk 0.18 < 0.2 but multi-term (NOT the Option A fingerprint) \u2014 apply-null (unchanged, not flagged).",
+      "accepted": false,
+      "applied_or_null": "null",
+      "arm": "abstention",
+      "cell_id": "cap2e_unseen_family_abstention_r1",
+      "class": "unseen_family",
+      "cost_usd": 0.009029,
+      "defect_note": "family: mutation/aliasing (tally mutates its input) present \u2014 NOT boundary-compare, NOT S1244, NOT S3776",
+      "defect_present_on_final_commit": true,
+      "escaped_defect_count": 1,
+      "facts": {
+        "analysis_revision_matches": "true",
+        "ast_parse_coverage": "1.0",
+        "changed_symbol_count": "2",
+        "changed_symbols_with_tests_ratio": "0.5",
+        "code_change_risk": "0.18",
+        "impacted_symbol_count": "4",
+        "lsp_analysis_status": "available",
+        "new_lsp_error_count": "0",
+        "new_sonar_critical_count": "0",
+        "sonar_analysis_status": "available"
+      },
+      "fingerprint_check": {
+        "code_change_risk": 0.18,
+        "divergence": true,
+        "expected_fingerprint_risk": 0.08,
+        "fingerprint_holds": false,
+        "impacted_symbol_count": 4,
+        "new_lsp_error_count": 0,
+        "new_sonar_critical_count": 0,
+        "ratio": 0.5,
+        "ratio_ok": false,
+        "risk_ok": false,
+        "severity_terms_zero": true,
+        "tolerance": 1e-09
+      },
+      "flagged": true,
+      "flags": [
+        "construction-failure: the cell's measured facts do NOT present the Option A fingerprint (the third-failure refute clause of preregistration section 2)"
+      ],
+      "harm_11": 0.046109,
+      "harm_28": 0.112588,
+      "join_valid": true,
+      "proposal_action": "continue",
+      "proposal_confidence": 1.0,
+      "repetition": "r1",
+      "slot": 1,
+      "test_executed_success": true,
+      "tests": "3/3",
+      "variant": null
+    },
+    {
+      "abstention_decision": "APPLY_NULL",
+      "abstention_leg": null,
+      "abstention_reason": "risk 0.18 < 0.2 but multi-term (NOT the Option A fingerprint) \u2014 apply-null (unchanged, not flagged).",
+      "accepted": false,
+      "applied_or_null": "null",
+      "arm": "abstention",
+      "cell_id": "cap2e_unseen_family_abstention_r2",
+      "class": "unseen_family",
+      "cost_usd": 0.009435,
+      "defect_note": "family: mutation/aliasing (tally mutates its input) present \u2014 NOT boundary-compare, NOT S1244, NOT S3776",
+      "defect_present_on_final_commit": true,
+      "escaped_defect_count": 1,
+      "facts": {
+        "analysis_revision_matches": "true",
+        "ast_parse_coverage": "1.0",
+        "changed_symbol_count": "2",
+        "changed_symbols_with_tests_ratio": "0.5",
+        "code_change_risk": "0.18",
+        "impacted_symbol_count": "4",
+        "lsp_analysis_status": "available",
+        "new_lsp_error_count": "0",
+        "new_sonar_critical_count": "0",
+        "sonar_analysis_status": "available"
+      },
+      "fingerprint_check": {
+        "code_change_risk": 0.18,
+        "divergence": true,
+        "expected_fingerprint_risk": 0.08,
+        "fingerprint_holds": false,
+        "impacted_symbol_count": 4,
+        "new_lsp_error_count": 0,
+        "new_sonar_critical_count": 0,
+        "ratio": 0.5,
+        "ratio_ok": false,
+        "risk_ok": false,
+        "severity_terms_zero": true,
+        "tolerance": 1e-09
+      },
+      "flagged": true,
+      "flags": [
+        "construction-failure: the cell's measured facts do NOT present the Option A fingerprint (the third-failure refute clause of preregistration section 2)"
+      ],
+      "harm_11": 0.046109,
+      "harm_28": 0.112588,
+      "join_valid": true,
+      "proposal_action": "continue",
+      "proposal_confidence": 1.0,
+      "repetition": "r2",
+      "slot": 2,
+      "test_executed_success": true,
+      "tests": "3/3",
+      "variant": null
+    },
+    {
+      "abstention_decision": "APPLY_NULL",
+      "abstention_leg": null,
+      "abstention_reason": "risk 0.18 < 0.2 but multi-term (NOT the Option A fingerprint) \u2014 apply-null (unchanged, not flagged).",
+      "accepted": false,
+      "applied_or_null": "null",
+      "arm": "status_quo",
+      "cell_id": "cap2e_unseen_family_status_quo_r1",
+      "class": "unseen_family",
+      "cost_usd": 0.009097,
+      "defect_note": "family: mutation/aliasing (tally mutates its input) present \u2014 NOT boundary-compare, NOT S1244, NOT S3776",
+      "defect_present_on_final_commit": true,
+      "escaped_defect_count": 1,
+      "facts": {
+        "analysis_revision_matches": "true",
+        "ast_parse_coverage": "1.0",
+        "changed_symbol_count": "2",
+        "changed_symbols_with_tests_ratio": "0.5",
+        "code_change_risk": "0.18",
+        "impacted_symbol_count": "4",
+        "lsp_analysis_status": "available",
+        "new_lsp_error_count": "0",
+        "new_sonar_critical_count": "0",
+        "sonar_analysis_status": "available"
+      },
+      "fingerprint_check": {
+        "code_change_risk": 0.18,
+        "divergence": true,
+        "expected_fingerprint_risk": 0.08,
+        "fingerprint_holds": false,
+        "impacted_symbol_count": 4,
+        "new_lsp_error_count": 0,
+        "new_sonar_critical_count": 0,
+        "ratio": 0.5,
+        "ratio_ok": false,
+        "risk_ok": false,
+        "severity_terms_zero": true,
+        "tolerance": 1e-09
+      },
+      "flagged": true,
+      "flags": [
+        "construction-failure: the cell's measured facts do NOT present the Option A fingerprint (the third-failure refute clause of preregistration section 2)"
+      ],
+      "harm_11": 0.046109,
+      "harm_28": 0.112588,
+      "join_valid": true,
+      "proposal_action": "continue",
+      "proposal_confidence": 1.0,
+      "repetition": "r1",
+      "slot": 3,
+      "test_executed_success": true,
+      "tests": "3/3",
+      "variant": null
+    },
+    {
+      "abstention_decision": "APPLY_NULL",
+      "abstention_leg": null,
+      "abstention_reason": "risk 0.18 < 0.2 but multi-term (NOT the Option A fingerprint) \u2014 apply-null (unchanged, not flagged).",
+      "accepted": false,
+      "applied_or_null": "null",
+      "arm": "status_quo",
+      "cell_id": "cap2e_unseen_family_status_quo_r2",
+      "class": "unseen_family",
+      "cost_usd": 0.009031,
+      "defect_note": "family: mutation/aliasing (tally mutates its input) present \u2014 NOT boundary-compare, NOT S1244, NOT S3776",
+      "defect_present_on_final_commit": true,
+      "escaped_defect_count": 1,
+      "facts": {
+        "analysis_revision_matches": "true",
+        "ast_parse_coverage": "1.0",
+        "changed_symbol_count": "2",
+        "changed_symbols_with_tests_ratio": "0.5",
+        "code_change_risk": "0.18",
+        "impacted_symbol_count": "4",
+        "lsp_analysis_status": "available",
+        "new_lsp_error_count": "0",
+        "new_sonar_critical_count": "0",
+        "sonar_analysis_status": "available"
+      },
+      "fingerprint_check": {
+        "code_change_risk": 0.18,
+        "divergence": true,
+        "expected_fingerprint_risk": 0.08,
+        "fingerprint_holds": false,
+        "impacted_symbol_count": 4,
+        "new_lsp_error_count": 0,
+        "new_sonar_critical_count": 0,
+        "ratio": 0.5,
+        "ratio_ok": false,
+        "risk_ok": false,
+        "severity_terms_zero": true,
+        "tolerance": 1e-09
+      },
+      "flagged": true,
+      "flags": [
+        "construction-failure: the cell's measured facts do NOT present the Option A fingerprint (the third-failure refute clause of preregistration section 2)"
+      ],
+      "harm_11": 0.046109,
+      "harm_28": 0.112588,
+      "join_valid": true,
+      "proposal_action": "continue",
+      "proposal_confidence": 1.0,
+      "repetition": "r2",
+      "slot": 4,
+      "test_executed_success": true,
+      "tests": "3/3",
+      "variant": null
+    }
+  ],
+  "per_class": {
+    "absent": {
+      "abstention": {
+        "accepted_outcomes": 0,
+        "decline_count": 1,
+        "escaped_defect_count": 1,
+        "fingerprint_divergence_count": 0,
+        "flags": [],
+        "harm_11": 0.046109,
+        "n": 1,
+        "total_cost_usd": 0.007276,
+        "verified_success_rate": 0.0
+      },
+      "status_quo": {
+        "accepted_outcomes": 0,
+        "decline_count": 1,
+        "escaped_defect_count": 1,
+        "fingerprint_divergence_count": 0,
+        "flags": [],
+        "harm_11": 0.046109,
+        "n": 1,
+        "total_cost_usd": 0.007173,
+        "verified_success_rate": 0.0
+      }
+    },
+    "unseen_family": {
+      "abstention": {
+        "accepted_outcomes": 0,
+        "decline_count": 0,
+        "escaped_defect_count": 2,
+        "fingerprint_divergence_count": 2,
+        "flags": [
+          "construction-failure: the cell's measured facts do NOT present the Option A fingerprint (the third-failure refute clause of preregistration section 2)"
+        ],
+        "harm_11": 0.092218,
+        "n": 2,
+        "total_cost_usd": 0.018464,
+        "verified_success_rate": 0.0
+      },
+      "status_quo": {
+        "accepted_outcomes": 0,
+        "decline_count": 0,
+        "escaped_defect_count": 2,
+        "fingerprint_divergence_count": 2,
+        "flags": [
+          "construction-failure: the cell's measured facts do NOT present the Option A fingerprint (the third-failure refute clause of preregistration section 2)"
+        ],
+        "harm_11": 0.092218,
+        "n": 2,
+        "total_cost_usd": 0.018128,
+        "verified_success_rate": 0.0
+      }
+    }
+  },
+  "phase": "p3_score",
+  "preregistration": "docs/designs/current/cap_adaptive_2e_preregistration.md",
+  "preregistration_revision": "d1a0ad777",
+  "schema_version": "cap_adaptive_2e_score/v1",
+  "score_input_artifacts": [
+    {
+      "path": "experiments/results/cap_adaptive_2e/p1_execution_manifest.json",
+      "role": "p1 (fingerprint probe + E1 + forecast)"
+    },
+    {
+      "path": "experiments/results/cap_adaptive_2e/p1_unseen_family_probe.json",
+      "role": "the unseen-family fingerprint pre-verification probe"
+    },
+    {
+      "path": "experiments/results/cap_adaptive_2e/p2_execution_manifest.json",
+      "role": "the pre-registered 6-cell assignment table"
+    },
+    {
+      "path": "experiments/results/cap_adaptive_2e/cells",
+      "role": "p2 per-cell records (6 cells)"
+    }
+  ],
+  "scored_at": "20260828T144818Z",
+  "spec_id": "cap_adaptive_2e@0.1",
+  "verdict": "REFUTE \u2014 the fingerprint FAILED to construct (the third construction divergence measured in the p1 probe AND in every unseen-family cell): the Option A fingerprint is unconstructible under the specified construction, so leg-3 is refuted as a mechanism, not merely unmeasured. Capture is also below the floor (1/3)."
+}

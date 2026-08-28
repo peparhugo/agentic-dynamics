@@ -730,7 +730,10 @@ def main() -> None:
         "seed_mismatch": SEED_COMMITTED_HASH != SEED_MEASURED_HASH,
         "preregistration": "docs/designs/current/cap_adaptive_2e_preregistration.md",
         "preregistration_revision": "d1a0ad777",
-        "cells": CELLS,
+        "cells": [
+            {**c, "repetition": c["rep"]}
+            for c in CELLS
+        ],
         "totals": {"cells": len(CELLS), "status_quo": sum(1 for c in CELLS if c["arm"] == "status_quo"),
                    "abstention": sum(1 for c in CELLS if c["arm"] == "abstention")},
     }
