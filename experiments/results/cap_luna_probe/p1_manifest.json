@@ -1,0 +1,83 @@
+{
+  "backend": "opencode (the OAuth subscription path \u2014 auth.json openai type=oauth)",
+  "billing_path": "ChatGPT subscription window (OAuth); API-key fallback is a FAILED finding",
+  "budget_guard_usd": 30.0,
+  "campaign": "cap_luna_probe",
+  "cells": [
+    {
+      "backend": "opencode",
+      "cell_id": "luna_probe_luna_task_manager_api_clean_r1",
+      "condition": "clean",
+      "model": "openai/gpt-5.6-luna",
+      "purpose": "the baseline re-check under the fixed runner",
+      "story": "task_manager_api"
+    },
+    {
+      "backend": "opencode",
+      "cell_id": "luna_probe_luna_static_site_gen_clean_r1",
+      "condition": "clean",
+      "model": "openai/gpt-5.6-luna",
+      "purpose": "same",
+      "story": "static_site_gen"
+    },
+    {
+      "backend": "opencode",
+      "cell_id": "luna_probe_luna_notification_service_clean_r1",
+      "condition": "clean",
+      "model": "openai/gpt-5.6-luna",
+      "purpose": "same",
+      "story": "notification_service"
+    },
+    {
+      "backend": "opencode",
+      "cell_id": "luna_probe_luna_task_manager_api_late_degrade_r1",
+      "condition": "late_degrade",
+      "model": "openai/gpt-5.6-luna",
+      "purpose": "the unmeasured condition \u2014 THE probe",
+      "story": "task_manager_api"
+    },
+    {
+      "backend": "opencode",
+      "cell_id": "luna_probe_luna_static_site_gen_late_degrade_r1",
+      "condition": "late_degrade",
+      "model": "openai/gpt-5.6-luna",
+      "purpose": "the unmeasured condition, story 2",
+      "story": "static_site_gen"
+    },
+    {
+      "backend": "opencode",
+      "cell_id": "luna_probe_luna_notification_service_late_degrade_r1",
+      "condition": "late_degrade",
+      "model": "openai/gpt-5.6-luna",
+      "purpose": "the unmeasured condition, story 3",
+      "story": "notification_service"
+    },
+    {
+      "backend": "opencode",
+      "cell_id": "luna_probe_sol_task_manager_api_late_degrade_r1",
+      "condition": "late_degrade",
+      "model": "openai/gpt-5.6-sol",
+      "purpose": "the matched Sol comparison on the stress axis",
+      "story": "task_manager_api"
+    },
+    {
+      "backend": "opencode",
+      "cell_id": "luna_probe_sol_static_site_gen_late_degrade_r1",
+      "condition": "late_degrade",
+      "model": "openai/gpt-5.6-sol",
+      "purpose": "the matched Sol comparison, story 2",
+      "story": "static_site_gen"
+    }
+  ],
+  "concurrency": 4,
+  "created_at": "2026-08-28T20:46:40.824458+00:00",
+  "design_authority": "docs/designs/current/cap_luna_probe_preregistration.md (committed BEFORE any cell runs)",
+  "manifest_sha256": "98ae01e2f5ba632a8df2e1761ac1d41224d76783c5cb3378ed718bc142b3fde2",
+  "message_definition": "per-cell MESSAGE count = sum over the cell's 5 session transcripts (worktree/.instrument/session_{n}.jsonl) of step-finish events (completed assistant model turns \u2014 the session.jsonl step events, the subscription's scarce unit). MEASURED from the transcripts, never estimated from tokens. A session transcript missing or unparseable is flagged, never imputed.",
+  "outcome_definition": "success = test_executed_success on the final commit (independent runtime.test_runner) AND all_successful (5 sessions completed, exit_code 0)",
+  "preregistration": "docs/designs/current/cap_luna_probe_preregistration.md",
+  "preregistration_sha256": "44a83312def7011e008dea382e21f8b52cc83d880f70433bc2a613d0ce83565a",
+  "schema": "cap_luna_probe_p1_manifest/v1",
+  "spec": "workflows/repository/cap_luna_probe.yaml",
+  "spec_sha256": "e7220621d318a86d8be681a55fab3220a3a5e0f14c7f442c7b9ab1a1b9af1f54"
+}
