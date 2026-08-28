@@ -1,8 +1,8 @@
-/* Generated 2026-08-27 20:34:04 UTC by build_data.py */
+/* Generated 2026-08-28 12:51:23 UTC by build_data.py */
 /* DO NOT EDIT — regenerate with: python scripts/build_data.py */
 window.DYNAMICS_DATA = {
   "_meta": {
-    "generated_at": "2026-08-27T20:34:01.709854+00:00",
+    "generated_at": "2026-08-28T12:51:20.085930+00:00",
     "provenance_note": "All values tagged [M]easured, [C]omputed, [H]euristic, or e[X]ternal. See methodology.html."
   },
   "summary": {
@@ -61,8 +61,8 @@ window.DYNAMICS_DATA = {
     "waivers": []
   },
   "publication_contract": {
-    "registry_identity": "8cda2e428a34e1717701bd51e9029ae2812f294dcdaae6e1997569a52d6ee8cc",
-    "resolved_input_identity": "077f95acc9fdb7e40a132aa89c5c27c4d48eba4ba3582dc2028234723ecf7534",
+    "registry_identity": "6b49081ca09d6c1e3639a89edfc6324bb2d41d47010a29c1c41c43b08fabf5fc",
+    "resolved_input_identity": "fc6e4fe38938362698a0c04238d0b04ce2c24f3335ecb1c521ddf5182b2afab5",
     "data_integrity_policy_version": "data-integrity/v1",
     "normalization_version": "canonical-projection/v2",
     "waiver_digest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
@@ -78,7 +78,7 @@ window.DYNAMICS_DATA = {
     "providers": 3,
     "experiment_configs": 0,
     "experiment_specs": 11,
-    "workflow_specs": 126,
+    "workflow_specs": 127,
     "perturbation_operators": 10,
     "lab_books": 20,
     "lab_books_canonical": 8,
@@ -138,8 +138,8 @@ window.DYNAMICS_DATA = {
       "avg_energy_j_per_loc": 54.89,
       "narration_rate": null,
       "avg_narration_penalty": null,
-      "strategy_cons": 0,
-      "strategy_expl": 22,
+      "strategy_cons": 1,
+      "strategy_expl": 30,
       "strategy_waste": 0,
       "strategy_efficient": 0,
       "reports": 31,
@@ -180,7 +180,7 @@ window.DYNAMICS_DATA = {
       "narration_rate": null,
       "avg_narration_penalty": null,
       "strategy_cons": 0,
-      "strategy_expl": 24,
+      "strategy_expl": 34,
       "strategy_waste": 0,
       "strategy_efficient": 0,
       "reports": 34,
@@ -221,7 +221,7 @@ window.DYNAMICS_DATA = {
       "narration_rate": null,
       "avg_narration_penalty": null,
       "strategy_cons": 0,
-      "strategy_expl": 37,
+      "strategy_expl": 39,
       "strategy_waste": 0,
       "strategy_efficient": 0,
       "reports": 39,
@@ -262,7 +262,7 @@ window.DYNAMICS_DATA = {
       "narration_rate": null,
       "avg_narration_penalty": null,
       "strategy_cons": 0,
-      "strategy_expl": 20,
+      "strategy_expl": 30,
       "strategy_waste": 0,
       "strategy_efficient": 0,
       "reports": 30,
@@ -302,8 +302,8 @@ window.DYNAMICS_DATA = {
       "avg_energy_j_per_loc": 10.4,
       "narration_rate": null,
       "avg_narration_penalty": null,
-      "strategy_cons": 2,
-      "strategy_expl": 12,
+      "strategy_cons": 7,
+      "strategy_expl": 17,
       "strategy_waste": 0,
       "strategy_efficient": 0,
       "reports": 24,
@@ -344,7 +344,7 @@ window.DYNAMICS_DATA = {
       "narration_rate": null,
       "avg_narration_penalty": null,
       "strategy_cons": 0,
-      "strategy_expl": 23,
+      "strategy_expl": 30,
       "strategy_waste": 0,
       "strategy_efficient": 0,
       "reports": 30,
@@ -384,8 +384,8 @@ window.DYNAMICS_DATA = {
       "avg_energy_j_per_loc": 11.98,
       "narration_rate": null,
       "avg_narration_penalty": null,
-      "strategy_cons": 2,
-      "strategy_expl": 14,
+      "strategy_cons": 7,
+      "strategy_expl": 20,
       "strategy_waste": 0,
       "strategy_efficient": 0,
       "reports": 27,
@@ -3993,7 +3993,7 @@ window.DYNAMICS_DATA = {
       "successful": 1007,
       "failed": 60
     },
-    "generated_at": "2026-08-27T20:34:01.882429+00:00"
+    "generated_at": "2026-08-28T12:51:20.284787+00:00"
   },
   "reviews": {
     "models": [
@@ -4035,11 +4035,11 @@ window.DYNAMICS_DATA = {
         "label": "gpt-5.6-sol",
         "stories": 23,
         "overall_coherence": 0.899,
-        "architectural_fit": 0.738,
-        "convention_adherence": 0.665,
-        "better_pct": 73.9,
-        "worse_pct": 8.7,
-        "neutral_pct": 13.9,
+        "architectural_fit": 0.737,
+        "convention_adherence": 0.664,
+        "better_pct": 73.7,
+        "worse_pct": 8.8,
+        "neutral_pct": 14.0,
         "top_issues": [
           {
             "theme": "other",
@@ -4066,8 +4066,8 @@ window.DYNAMICS_DATA = {
       {
         "model": "gpt-5.6-luna",
         "label": "GPT-5.6 Luna",
-        "stories": 22,
-        "overall_coherence": 0.897,
+        "stories": 24,
+        "overall_coherence": 0.898,
         "architectural_fit": 0.749,
         "convention_adherence": 0.696,
         "better_pct": 74.2,
@@ -4076,15 +4076,15 @@ window.DYNAMICS_DATA = {
         "top_issues": [
           {
             "theme": "other",
-            "count": 32
+            "count": 33
           },
           {
             "theme": "security",
-            "count": 18
+            "count": 21
           },
           {
             "theme": "incomplete refactor",
-            "count": 18
+            "count": 21
           },
           {
             "theme": "test gaps",
@@ -4101,11 +4101,11 @@ window.DYNAMICS_DATA = {
         "label": "DeepSeek v4 Flash",
         "stories": 21,
         "overall_coherence": 0.892,
-        "architectural_fit": 0.754,
-        "convention_adherence": 0.673,
-        "better_pct": 65.7,
-        "worse_pct": 7.6,
-        "neutral_pct": 18.1,
+        "architectural_fit": 0.751,
+        "convention_adherence": 0.67,
+        "better_pct": 64.7,
+        "worse_pct": 7.8,
+        "neutral_pct": 18.6,
         "top_issues": [
           {
             "theme": "other",
@@ -4135,10 +4135,10 @@ window.DYNAMICS_DATA = {
         "stories": 14,
         "overall_coherence": 0.881,
         "architectural_fit": 0.756,
-        "convention_adherence": 0.769,
-        "better_pct": 67.1,
+        "convention_adherence": 0.767,
+        "better_pct": 68.1,
         "worse_pct": 4.3,
-        "neutral_pct": 25.7,
+        "neutral_pct": 24.6,
         "top_issues": [
           {
             "theme": "other",
@@ -4167,11 +4167,11 @@ window.DYNAMICS_DATA = {
         "label": "DeepSeek v4 Pro",
         "stories": 37,
         "overall_coherence": 0.876,
-        "architectural_fit": 0.745,
+        "architectural_fit": 0.746,
         "convention_adherence": 0.705,
-        "better_pct": 64.4,
-        "worse_pct": 13.0,
-        "neutral_pct": 18.1,
+        "better_pct": 64.8,
+        "worse_pct": 12.8,
+        "neutral_pct": 17.9,
         "top_issues": [
           {
             "theme": "other",
@@ -4229,8 +4229,8 @@ window.DYNAMICS_DATA = {
         ]
       }
     ],
-    "commit_reviews": 767,
-    "story_reviews": 153,
+    "commit_reviews": 764,
+    "story_reviews": 155,
     "reviewer": "deepseek/deepseek-v4-flash"
   },
   "analysis": {
@@ -4238,359 +4238,291 @@ window.DYNAMICS_DATA = {
       {
         "model": "deepseek-v4-pro",
         "label": "DeepSeek v4 Pro",
-        "commits": 179,
-        "lines_added": 121407,
-        "lines_removed": 9090,
-        "functions_added": 1410,
-        "classes_added": 198,
-        "imports_added": 1703,
-        "sonar_available": 72,
-        "sonar_bugs_delta": 6,
-        "sonar_smells_delta": 114,
-        "sonar_complexity_delta": 2152,
-        "avg_convention": 0.712,
-        "deep_cells": 37,
+        "commits": 189,
+        "lines_added": 125134,
+        "lines_removed": 9526,
+        "functions_added": 3286,
+        "classes_added": 269,
+        "imports_added": 9274,
+        "sonar_available": 189,
+        "sonar_bugs_delta": 12,
+        "sonar_smells_delta": 321,
+        "sonar_complexity_delta": 4731,
+        "avg_convention": 0.717,
+        "deep_cells": 39,
         "lsp_available": 0,
         "lsp_errors_per_cell": {
           "value": null,
           "n_available": 0,
-          "n_total": 37,
+          "n_total": 39,
           "coverage": 0.0
         },
         "lsp_warnings_per_cell": {
           "value": null,
           "n_available": 0,
-          "n_total": 37,
+          "n_total": 39,
           "coverage": 0.0
         },
         "solution_correctness": {
           "value": 1.0,
-          "n_available": 37,
-          "n_total": 37,
+          "n_available": 39,
+          "n_total": 39,
           "coverage": 1.0
         },
         "solution_constraints": {
           "value": 1.0,
-          "n_available": 37,
-          "n_total": 37,
+          "n_available": 39,
+          "n_total": 39,
           "coverage": 1.0
         },
         "solution_quality": {
-          "value": 0.045,
-          "n_available": 37,
-          "n_total": 37,
+          "value": 0.044,
+          "n_available": 39,
+          "n_total": 39,
           "coverage": 1.0
         },
         "solution_novelty": {
           "value": 0.845,
-          "n_available": 37,
-          "n_total": 37,
+          "n_available": 39,
+          "n_total": 39,
           "coverage": 1.0
         },
         "solution_composite": {
           "value": 0.786,
-          "n_available": 37,
-          "n_total": 37,
+          "n_available": 39,
+          "n_total": 39,
           "coverage": 1.0
         },
         "basin_escape": {
-          "value": 0.712,
-          "n_available": 37,
-          "n_total": 37,
+          "value": 0.713,
+          "n_available": 39,
+          "n_total": 39,
           "coverage": 1.0
         },
         "strategies": {
-          "exploratory": 37
+          "exploratory": 39
         }
       },
       {
         "model": "deepseek-v4-flash",
         "label": "DeepSeek v4 Flash",
-        "commits": 110,
-        "lines_added": 79561,
-        "lines_removed": 5859,
-        "functions_added": 1363,
-        "classes_added": 81,
-        "imports_added": 1364,
-        "sonar_available": 4,
-        "sonar_bugs_delta": 0,
-        "sonar_smells_delta": 1,
-        "sonar_complexity_delta": 51,
-        "avg_convention": 0.686,
-        "deep_cells": 22,
+        "commits": 152,
+        "lines_added": 112407,
+        "lines_removed": 8761,
+        "functions_added": 3554,
+        "classes_added": 167,
+        "imports_added": 9850,
+        "sonar_available": 152,
+        "sonar_bugs_delta": 27,
+        "sonar_smells_delta": 207,
+        "sonar_complexity_delta": 4927,
+        "avg_convention": 0.687,
+        "deep_cells": 31,
         "lsp_available": 0,
         "lsp_errors_per_cell": {
           "value": null,
           "n_available": 0,
-          "n_total": 22,
+          "n_total": 31,
           "coverage": 0.0
         },
         "lsp_warnings_per_cell": {
           "value": null,
           "n_available": 0,
-          "n_total": 22,
+          "n_total": 31,
           "coverage": 0.0
         },
         "solution_correctness": {
-          "value": 1.0,
-          "n_available": 22,
-          "n_total": 22,
+          "value": 0.968,
+          "n_available": 31,
+          "n_total": 31,
           "coverage": 1.0
         },
         "solution_constraints": {
-          "value": 1.0,
-          "n_available": 22,
-          "n_total": 22,
+          "value": 0.989,
+          "n_available": 31,
+          "n_total": 31,
           "coverage": 1.0
         },
         "solution_quality": {
-          "value": 0.037,
-          "n_available": 22,
-          "n_total": 22,
+          "value": 0.038,
+          "n_available": 31,
+          "n_total": 31,
           "coverage": 1.0
         },
         "solution_novelty": {
-          "value": 0.87,
-          "n_available": 22,
-          "n_total": 22,
+          "value": 0.88,
+          "n_available": 31,
+          "n_total": 31,
           "coverage": 1.0
         },
         "solution_composite": {
-          "value": 0.788,
-          "n_available": 22,
-          "n_total": 22,
+          "value": 0.775,
+          "n_available": 31,
+          "n_total": 31,
           "coverage": 1.0
         },
         "basin_escape": {
-          "value": 0.733,
-          "n_available": 22,
-          "n_total": 22,
+          "value": 0.743,
+          "n_available": 31,
+          "n_total": 31,
           "coverage": 1.0
         },
         "strategies": {
-          "exploratory": 22
+          "exploratory": 30,
+          "conservative": 1
         }
       },
       {
         "model": "gpt-5.6-sol",
         "label": "gpt-5.6-sol",
-        "commits": 114,
-        "lines_added": 64264,
-        "lines_removed": 9317,
-        "functions_added": 789,
-        "classes_added": 76,
-        "imports_added": 1017,
-        "sonar_available": 0,
-        "sonar_bugs_delta": 0,
-        "sonar_smells_delta": 0,
-        "sonar_complexity_delta": 0,
-        "avg_convention": 0.674,
-        "deep_cells": 23,
+        "commits": 149,
+        "lines_added": 77716,
+        "lines_removed": 12012,
+        "functions_added": 2196,
+        "classes_added": 150,
+        "imports_added": 6877,
+        "sonar_available": 149,
+        "sonar_bugs_delta": 3,
+        "sonar_smells_delta": 97,
+        "sonar_complexity_delta": 3648,
+        "avg_convention": 0.68,
+        "deep_cells": 30,
         "lsp_available": 0,
         "lsp_errors_per_cell": {
           "value": null,
           "n_available": 0,
-          "n_total": 23,
+          "n_total": 30,
           "coverage": 0.0
         },
         "lsp_warnings_per_cell": {
           "value": null,
           "n_available": 0,
-          "n_total": 23,
+          "n_total": 30,
           "coverage": 0.0
         },
         "solution_correctness": {
           "value": 1.0,
-          "n_available": 23,
-          "n_total": 23,
+          "n_available": 30,
+          "n_total": 30,
           "coverage": 1.0
         },
         "solution_constraints": {
           "value": 1.0,
-          "n_available": 23,
-          "n_total": 23,
+          "n_available": 30,
+          "n_total": 30,
           "coverage": 1.0
         },
         "solution_quality": {
           "value": 0.054,
-          "n_available": 23,
-          "n_total": 23,
+          "n_available": 30,
+          "n_total": 30,
           "coverage": 1.0
         },
         "solution_novelty": {
-          "value": 0.917,
-          "n_available": 23,
-          "n_total": 23,
+          "value": 0.916,
+          "n_available": 30,
+          "n_total": 30,
           "coverage": 1.0
         },
         "solution_composite": {
           "value": 0.798,
-          "n_available": 23,
-          "n_total": 23,
+          "n_available": 30,
+          "n_total": 30,
           "coverage": 1.0
         },
         "basin_escape": {
-          "value": 0.783,
-          "n_available": 23,
-          "n_total": 23,
+          "value": 0.786,
+          "n_available": 30,
+          "n_total": 30,
           "coverage": 1.0
         },
         "strategies": {
-          "exploratory": 23
+          "exploratory": 30
         }
       },
       {
         "model": "claude-sonnet-5",
         "label": "Claude Sonnet 5",
-        "commits": 80,
-        "lines_added": 36187,
-        "lines_removed": 2266,
-        "functions_added": 1267,
-        "classes_added": 86,
-        "imports_added": 839,
-        "sonar_available": 4,
-        "sonar_bugs_delta": 0,
-        "sonar_smells_delta": 2,
-        "sonar_complexity_delta": 43,
-        "avg_convention": 0.732,
-        "deep_cells": 16,
+        "commits": 135,
+        "lines_added": 62819,
+        "lines_removed": 4128,
+        "functions_added": 2591,
+        "classes_added": 116,
+        "imports_added": 4731,
+        "sonar_available": 135,
+        "sonar_bugs_delta": 11,
+        "sonar_smells_delta": 124,
+        "sonar_complexity_delta": 2214,
+        "avg_convention": 0.731,
+        "deep_cells": 27,
         "lsp_available": 0,
         "lsp_errors_per_cell": {
           "value": null,
           "n_available": 0,
-          "n_total": 16,
+          "n_total": 27,
           "coverage": 0.0
         },
         "lsp_warnings_per_cell": {
           "value": null,
           "n_available": 0,
-          "n_total": 16,
+          "n_total": 27,
           "coverage": 0.0
         },
         "solution_correctness": {
-          "value": 0.875,
-          "n_available": 16,
-          "n_total": 16,
+          "value": 0.741,
+          "n_available": 27,
+          "n_total": 27,
           "coverage": 1.0
         },
         "solution_constraints": {
-          "value": 0.958,
-          "n_available": 16,
-          "n_total": 16,
+          "value": 0.889,
+          "n_available": 27,
+          "n_total": 27,
           "coverage": 1.0
         },
         "solution_quality": {
-          "value": 0.052,
-          "n_available": 16,
-          "n_total": 16,
+          "value": 0.097,
+          "n_available": 27,
+          "n_total": 27,
           "coverage": 1.0
         },
         "solution_novelty": {
-          "value": 0.789,
-          "n_available": 16,
-          "n_total": 16,
+          "value": 0.69,
+          "n_available": 27,
+          "n_total": 27,
           "coverage": 1.0
         },
         "solution_composite": {
-          "value": 0.722,
-          "n_available": 16,
-          "n_total": 16,
+          "value": 0.649,
+          "n_available": 27,
+          "n_total": 27,
           "coverage": 1.0
         },
         "basin_escape": {
-          "value": 0.641,
-          "n_available": 16,
-          "n_total": 16,
+          "value": 0.566,
+          "n_available": 27,
+          "n_total": 27,
           "coverage": 1.0
         },
         "strategies": {
-          "exploratory": 14,
-          "conservative": 2
+          "exploratory": 20,
+          "conservative": 7
         }
       },
       {
         "model": "claude-haiku-4-5",
         "label": "claude-haiku-4-5",
-        "commits": 71,
-        "lines_added": 33618,
-        "lines_removed": 2496,
-        "functions_added": 332,
-        "classes_added": 188,
-        "imports_added": 422,
-        "sonar_available": 10,
-        "sonar_bugs_delta": 0,
-        "sonar_smells_delta": 18,
-        "sonar_complexity_delta": 133,
-        "avg_convention": 0.754,
-        "deep_cells": 14,
-        "lsp_available": 0,
-        "lsp_errors_per_cell": {
-          "value": null,
-          "n_available": 0,
-          "n_total": 14,
-          "coverage": 0.0
-        },
-        "lsp_warnings_per_cell": {
-          "value": null,
-          "n_available": 0,
-          "n_total": 14,
-          "coverage": 0.0
-        },
-        "solution_correctness": {
-          "value": 0.857,
-          "n_available": 14,
-          "n_total": 14,
-          "coverage": 1.0
-        },
-        "solution_constraints": {
-          "value": 0.976,
-          "n_available": 14,
-          "n_total": 14,
-          "coverage": 1.0
-        },
-        "solution_quality": {
-          "value": 0.037,
-          "n_available": 14,
-          "n_total": 14,
-          "coverage": 1.0
-        },
-        "solution_novelty": {
-          "value": 0.842,
-          "n_available": 14,
-          "n_total": 14,
-          "coverage": 1.0
-        },
-        "solution_composite": {
-          "value": 0.726,
-          "n_available": 14,
-          "n_total": 14,
-          "coverage": 1.0
-        },
-        "basin_escape": {
-          "value": 0.706,
-          "n_available": 14,
-          "n_total": 14,
-          "coverage": 1.0
-        },
-        "strategies": {
-          "exploratory": 12,
-          "conservative": 2
-        }
-      },
-      {
-        "model": "gpt-5.6-luna",
-        "label": "GPT-5.6 Luna",
-        "commits": 120,
-        "lines_added": 19442,
-        "lines_removed": 6657,
-        "functions_added": 620,
-        "classes_added": 67,
-        "imports_added": 759,
-        "sonar_available": 8,
-        "sonar_bugs_delta": 0,
-        "sonar_smells_delta": 11,
-        "sonar_complexity_delta": 87,
-        "avg_convention": 0.693,
+        "commits": 119,
+        "lines_added": 62391,
+        "lines_removed": 4321,
+        "functions_added": 1690,
+        "classes_added": 206,
+        "imports_added": 2896,
+        "sonar_available": 119,
+        "sonar_bugs_delta": 3,
+        "sonar_smells_delta": 200,
+        "sonar_complexity_delta": 1797,
+        "avg_convention": 0.728,
         "deep_cells": 24,
         "lsp_available": 0,
         "lsp_errors_per_cell": {
@@ -4606,122 +4538,191 @@ window.DYNAMICS_DATA = {
           "coverage": 0.0
         },
         "solution_correctness": {
-          "value": 1.0,
+          "value": 0.708,
           "n_available": 24,
           "n_total": 24,
           "coverage": 1.0
         },
         "solution_constraints": {
-          "value": 0.986,
+          "value": 0.875,
           "n_available": 24,
           "n_total": 24,
           "coverage": 1.0
         },
         "solution_quality": {
-          "value": 0.087,
+          "value": 0.091,
           "n_available": 24,
           "n_total": 24,
           "coverage": 1.0
         },
         "solution_novelty": {
-          "value": 0.876,
+          "value": 0.717,
           "n_available": 24,
           "n_total": 24,
           "coverage": 1.0
         },
         "solution_composite": {
-          "value": 0.795,
+          "value": 0.636,
           "n_available": 24,
           "n_total": 24,
           "coverage": 1.0
         },
         "basin_escape": {
-          "value": 0.694,
+          "value": 0.611,
           "n_available": 24,
           "n_total": 24,
           "coverage": 1.0
         },
         "strategies": {
-          "exploratory": 24
+          "exploratory": 17,
+          "conservative": 7
         }
       },
       {
-        "model": "gpt-5.6-terra",
-        "label": "gpt-5.6-terra",
-        "commits": 100,
-        "lines_added": 17263,
-        "lines_removed": 6550,
-        "functions_added": 582,
-        "classes_added": 69,
-        "imports_added": 722,
-        "sonar_available": 0,
-        "sonar_bugs_delta": 0,
-        "sonar_smells_delta": 0,
-        "sonar_complexity_delta": 0,
-        "avg_convention": 0.695,
-        "deep_cells": 20,
+        "model": "gpt-5.6-luna",
+        "label": "GPT-5.6 Luna",
+        "commits": 170,
+        "lines_added": 27729,
+        "lines_removed": 9605,
+        "functions_added": 1730,
+        "classes_added": 115,
+        "imports_added": 4817,
+        "sonar_available": 170,
+        "sonar_bugs_delta": 15,
+        "sonar_smells_delta": 180,
+        "sonar_complexity_delta": 3559,
+        "avg_convention": 0.694,
+        "deep_cells": 34,
         "lsp_available": 0,
         "lsp_errors_per_cell": {
           "value": null,
           "n_available": 0,
-          "n_total": 20,
+          "n_total": 34,
           "coverage": 0.0
         },
         "lsp_warnings_per_cell": {
           "value": null,
           "n_available": 0,
-          "n_total": 20,
+          "n_total": 34,
           "coverage": 0.0
         },
         "solution_correctness": {
           "value": 1.0,
-          "n_available": 20,
-          "n_total": 20,
+          "n_available": 34,
+          "n_total": 34,
           "coverage": 1.0
         },
         "solution_constraints": {
-          "value": 0.983,
-          "n_available": 20,
-          "n_total": 20,
+          "value": 0.99,
+          "n_available": 34,
+          "n_total": 34,
           "coverage": 1.0
         },
         "solution_quality": {
-          "value": 0.088,
-          "n_available": 20,
-          "n_total": 20,
+          "value": 0.087,
+          "n_available": 34,
+          "n_total": 34,
           "coverage": 1.0
         },
         "solution_novelty": {
-          "value": 0.901,
-          "n_available": 20,
-          "n_total": 20,
+          "value": 0.88,
+          "n_available": 34,
+          "n_total": 34,
           "coverage": 1.0
         },
         "solution_composite": {
-          "value": 0.798,
-          "n_available": 20,
-          "n_total": 20,
+          "value": 0.796,
+          "n_available": 34,
+          "n_total": 34,
           "coverage": 1.0
         },
         "basin_escape": {
-          "value": 0.741,
-          "n_available": 20,
-          "n_total": 20,
+          "value": 0.7,
+          "n_available": 34,
+          "n_total": 34,
           "coverage": 1.0
         },
         "strategies": {
-          "exploratory": 20
+          "exploratory": 34
+        }
+      },
+      {
+        "model": "gpt-5.6-terra",
+        "label": "gpt-5.6-terra",
+        "commits": 150,
+        "lines_added": 26281,
+        "lines_removed": 9714,
+        "functions_added": 1718,
+        "classes_added": 115,
+        "imports_added": 5110,
+        "sonar_available": 150,
+        "sonar_bugs_delta": 13,
+        "sonar_smells_delta": 109,
+        "sonar_complexity_delta": 2840,
+        "avg_convention": 0.689,
+        "deep_cells": 30,
+        "lsp_available": 0,
+        "lsp_errors_per_cell": {
+          "value": null,
+          "n_available": 0,
+          "n_total": 30,
+          "coverage": 0.0
+        },
+        "lsp_warnings_per_cell": {
+          "value": null,
+          "n_available": 0,
+          "n_total": 30,
+          "coverage": 0.0
+        },
+        "solution_correctness": {
+          "value": 1.0,
+          "n_available": 30,
+          "n_total": 30,
+          "coverage": 1.0
+        },
+        "solution_constraints": {
+          "value": 0.989,
+          "n_available": 30,
+          "n_total": 30,
+          "coverage": 1.0
+        },
+        "solution_quality": {
+          "value": 0.086,
+          "n_available": 30,
+          "n_total": 30,
+          "coverage": 1.0
+        },
+        "solution_novelty": {
+          "value": 0.91,
+          "n_available": 30,
+          "n_total": 30,
+          "coverage": 1.0
+        },
+        "solution_composite": {
+          "value": 0.8,
+          "n_available": 30,
+          "n_total": 30,
+          "coverage": 1.0
+        },
+        "basin_escape": {
+          "value": 0.752,
+          "n_available": 30,
+          "n_total": 30,
+          "coverage": 1.0
+        },
+        "strategies": {
+          "exploratory": 30
         }
       }
     ],
-    "stories_analyzed": 156,
-    "commits_analyzed": 774,
-    "sonar_commits_available": 98
+    "stories_analyzed": 215,
+    "commits_analyzed": 1064,
+    "sonar_commits_available": 1064
   },
   "labs": {
     "cache_economics": {
       "experiment_id": "lab_cache_economics",
-      "generated_at": "2026-08-27T22:33:56.528178",
+      "generated_at": "2026-08-28T14:50:24.691566",
       "summary": {
         "models": 7,
         "stories": 215
@@ -4969,9 +4970,9 @@ window.DYNAMICS_DATA = {
       "lab_contract": {
         "lab": "lab_cache_economics.py",
         "input_dataset_id": "canonical_registry/story",
-        "registry_identity_sha256": "8cda2e428a34e1717701bd51e9029ae2812f294dcdaae6e1997569a52d6ee8cc",
+        "registry_identity_sha256": "6b49081ca09d6c1e3639a89edfc6324bb2d41d47010a29c1c41c43b08fabf5fc",
         "resolved_input_sha256": "7d2ab0fe4c18695fe26767d6e848f7a2e3f3a397d16b1e183594f70b9136c716",
-        "registry_version": "data-manifest/1.0+12808rows",
+        "registry_version": "data-manifest/1.0+12829rows",
         "metric_definition_version": "cache_economics/v2",
         "metric_source_sha256": "c3c4ea9e7f5875b281d24905d28cdaacd4e9cb3be779327c77e856f486f47d5a",
         "n_resolved_records": 215,
@@ -4990,12 +4991,12 @@ window.DYNAMICS_DATA = {
         "data_integrity_policy": "docs/data_integrity_findings.md",
         "requires_external_service": null,
         "contract_version": "lab-contract/v6",
-        "generated_at": "2026-08-27T20:33:56.528747+00:00"
+        "generated_at": "2026-08-28T12:50:24.692117+00:00"
       }
     },
     "condition_effects": {
       "experiment_id": "lab_condition_effects",
-      "generated_at": "2026-08-27T22:33:57.120227",
+      "generated_at": "2026-08-28T14:50:25.919421",
       "summary": {
         "conditions": 2,
         "stories": 215,
@@ -5038,9 +5039,9 @@ window.DYNAMICS_DATA = {
       "lab_contract": {
         "lab": "lab_condition_effects.py",
         "input_dataset_id": "canonical_registry/story+review",
-        "registry_identity_sha256": "8cda2e428a34e1717701bd51e9029ae2812f294dcdaae6e1997569a52d6ee8cc",
-        "resolved_input_sha256": "14648fd46fb445d31cd703e5734554043045b466936a968dd0bbc0a31df6b379",
-        "registry_version": "data-manifest/1.0+12808rows",
+        "registry_identity_sha256": "6b49081ca09d6c1e3639a89edfc6324bb2d41d47010a29c1c41c43b08fabf5fc",
+        "resolved_input_sha256": "4e8601fda77af04c2cbc167ec8f8beca495165fcdffbd4f2cb0ce58323535be8",
+        "registry_version": "data-manifest/1.0+12829rows",
         "metric_definition_version": "condition_effects/v2",
         "metric_source_sha256": "c7023d1bd40fa57e38cc738cca8a9a71780532be3f60898f74954fb6c80f7b32",
         "n_resolved_records": 457,
@@ -5059,12 +5060,12 @@ window.DYNAMICS_DATA = {
         "data_integrity_policy": "docs/data_integrity_findings.md",
         "requires_external_service": null,
         "contract_version": "lab-contract/v6",
-        "generated_at": "2026-08-27T20:33:57.120983+00:00"
+        "generated_at": "2026-08-28T12:50:25.920173+00:00"
       }
     },
     "grit": {
       "experiment_id": "lab_grit",
-      "generated_at": "2026-08-27T22:33:57.793130",
+      "generated_at": "2026-08-28T14:50:25.346109",
       "metric_definition": "G(s) = P(test_executed_success | perturbation_strength = s)",
       "summary": {
         "cells": 144,
@@ -5317,9 +5318,9 @@ window.DYNAMICS_DATA = {
       "lab_contract": {
         "lab": "lab_grit.py",
         "input_dataset_id": "canonical_registry/finding+story",
-        "registry_identity_sha256": "8cda2e428a34e1717701bd51e9029ae2812f294dcdaae6e1997569a52d6ee8cc",
+        "registry_identity_sha256": "6b49081ca09d6c1e3639a89edfc6324bb2d41d47010a29c1c41c43b08fabf5fc",
         "resolved_input_sha256": "b1fcca3b2db24fec574383affacae45c6699065a11b660a1c86b702caeb6826a",
-        "registry_version": "data-manifest/1.0+12808rows",
+        "registry_version": "data-manifest/1.0+12829rows",
         "metric_definition_version": "grit/v2",
         "metric_source_sha256": "efffc47f8bc8e92356489e96cc82a9b08bd6b07eb5196e5c0250b8baf04b1e91",
         "n_resolved_records": 279,
@@ -5338,247 +5339,247 @@ window.DYNAMICS_DATA = {
         "data_integrity_policy": "docs/data_integrity_findings.md",
         "requires_external_service": null,
         "contract_version": "lab-contract/v6",
-        "generated_at": "2026-08-27T20:33:57.793791+00:00"
+        "generated_at": "2026-08-28T12:50:25.346721+00:00"
       }
     },
     "quality_frontier": {
       "experiment_id": "lab_quality_frontier",
-      "generated_at": "2026-08-27T22:33:58.350242",
+      "generated_at": "2026-08-28T14:50:26.519649",
       "summary": {
         "models": 7,
         "stories": 215,
-        "analyses": 156,
+        "analyses": 215,
         "lsp_available_cells": 0
       },
       "models": [
         {
           "model": "deepseek-v4-flash",
-          "cells": 22,
-          "avg_cost": 0.06814,
-          "avg_captured_cost": 0.06814,
-          "total_captured_cost": 1.499069,
-          "cost_captured_records": 22,
-          "total_records": 22,
+          "cells": 31,
+          "avg_cost": 0.074461,
+          "avg_captured_cost": 0.074461,
+          "total_captured_cost": 2.308294,
+          "cost_captured_records": 31,
+          "total_records": 31,
           "cost_coverage": 1.0,
           "lsp_errors_per_cell": null,
           "lsp_cells": 0,
-          "code_quality_score": 0.037,
+          "code_quality_score": 0.038,
           "code_quality_score_coverage": {
-            "value": 0.037,
-            "n_available": 22,
-            "n_total": 22,
+            "value": 0.038,
+            "n_available": 31,
+            "n_total": 31,
             "coverage": 1.0
           },
-          "cyclomatic_complexity": 475.455,
+          "cyclomatic_complexity": 485.323,
           "cyclomatic_complexity_coverage": {
-            "value": 475.455,
-            "n_available": 22,
-            "n_total": 22,
+            "value": 485.323,
+            "n_available": 31,
+            "n_total": 31,
             "coverage": 1.0
           },
-          "novelty_score": 0.87,
+          "novelty_score": 0.88,
           "novelty_score_coverage": {
-            "value": 0.87,
-            "n_available": 22,
-            "n_total": 22,
+            "value": 0.88,
+            "n_available": 31,
+            "n_total": 31,
             "coverage": 1.0
           }
         },
         {
           "model": "gpt-5.6-luna",
-          "cells": 24,
-          "avg_cost": 0.091854,
-          "avg_captured_cost": 0.091854,
-          "total_captured_cost": 2.204489,
-          "cost_captured_records": 24,
-          "total_records": 24,
+          "cells": 34,
+          "avg_cost": 0.093548,
+          "avg_captured_cost": 0.093548,
+          "total_captured_cost": 3.180633,
+          "cost_captured_records": 34,
+          "total_records": 34,
           "cost_coverage": 1.0,
           "lsp_errors_per_cell": null,
           "lsp_cells": 0,
           "code_quality_score": 0.087,
           "code_quality_score_coverage": {
             "value": 0.087,
-            "n_available": 24,
-            "n_total": 24,
+            "n_available": 34,
+            "n_total": 34,
             "coverage": 1.0
           },
-          "cyclomatic_complexity": 262.583,
+          "cyclomatic_complexity": 261.765,
           "cyclomatic_complexity_coverage": {
-            "value": 262.583,
-            "n_available": 24,
-            "n_total": 24,
+            "value": 261.765,
+            "n_available": 34,
+            "n_total": 34,
             "coverage": 1.0
           },
-          "novelty_score": 0.876,
+          "novelty_score": 0.88,
           "novelty_score_coverage": {
-            "value": 0.876,
-            "n_available": 24,
-            "n_total": 24,
+            "value": 0.88,
+            "n_available": 34,
+            "n_total": 34,
             "coverage": 1.0
           }
         },
         {
           "model": "deepseek-v4-pro",
-          "cells": 37,
-          "avg_cost": 0.158801,
-          "avg_captured_cost": 0.158801,
-          "total_captured_cost": 5.875648,
-          "cost_captured_records": 37,
-          "total_records": 37,
+          "cells": 39,
+          "avg_cost": 0.161908,
+          "avg_captured_cost": 0.161908,
+          "total_captured_cost": 6.314403,
+          "cost_captured_records": 39,
+          "total_records": 39,
           "cost_coverage": 1.0,
           "lsp_errors_per_cell": null,
           "lsp_cells": 0,
-          "code_quality_score": 0.045,
+          "code_quality_score": 0.044,
           "code_quality_score_coverage": {
-            "value": 0.045,
-            "n_available": 37,
-            "n_total": 37,
+            "value": 0.044,
+            "n_available": 39,
+            "n_total": 39,
             "coverage": 1.0
           },
-          "cyclomatic_complexity": 309.378,
+          "cyclomatic_complexity": 315.359,
           "cyclomatic_complexity_coverage": {
-            "value": 309.378,
-            "n_available": 37,
-            "n_total": 37,
+            "value": 315.359,
+            "n_available": 39,
+            "n_total": 39,
             "coverage": 1.0
           },
           "novelty_score": 0.845,
           "novelty_score_coverage": {
             "value": 0.845,
-            "n_available": 37,
-            "n_total": 37,
+            "n_available": 39,
+            "n_total": 39,
             "coverage": 1.0
           }
         },
         {
           "model": "gpt-5.6-terra",
-          "cells": 20,
-          "avg_cost": 1.015182,
-          "avg_captured_cost": 1.015182,
-          "total_captured_cost": 20.303648,
-          "cost_captured_records": 20,
-          "total_records": 20,
+          "cells": 30,
+          "avg_cost": 1.044326,
+          "avg_captured_cost": 1.044326,
+          "total_captured_cost": 31.329782,
+          "cost_captured_records": 30,
+          "total_records": 30,
           "cost_coverage": 1.0,
           "lsp_errors_per_cell": null,
           "lsp_cells": 0,
-          "code_quality_score": 0.088,
+          "code_quality_score": 0.086,
           "code_quality_score_coverage": {
-            "value": 0.088,
-            "n_available": 20,
-            "n_total": 20,
+            "value": 0.086,
+            "n_available": 30,
+            "n_total": 30,
             "coverage": 1.0
           },
-          "cyclomatic_complexity": 233.8,
+          "cyclomatic_complexity": 245.6,
           "cyclomatic_complexity_coverage": {
-            "value": 233.8,
-            "n_available": 20,
-            "n_total": 20,
+            "value": 245.6,
+            "n_available": 30,
+            "n_total": 30,
             "coverage": 1.0
           },
-          "novelty_score": 0.901,
+          "novelty_score": 0.91,
           "novelty_score_coverage": {
-            "value": 0.901,
-            "n_available": 20,
-            "n_total": 20,
+            "value": 0.91,
+            "n_available": 30,
+            "n_total": 30,
             "coverage": 1.0
           }
         },
         {
           "model": "claude-haiku-4-5",
-          "cells": 14,
-          "avg_cost": 1.536913,
-          "avg_captured_cost": 1.536913,
-          "total_captured_cost": 21.516785,
-          "cost_captured_records": 14,
-          "total_records": 14,
-          "cost_coverage": 1.0,
+          "cells": 24,
+          "avg_cost": 1.63084,
+          "avg_captured_cost": 1.63084,
+          "total_captured_cost": 32.616808,
+          "cost_captured_records": 20,
+          "total_records": 24,
+          "cost_coverage": 0.8333,
           "lsp_errors_per_cell": null,
           "lsp_cells": 0,
-          "code_quality_score": 0.037,
+          "code_quality_score": 0.091,
           "code_quality_score_coverage": {
-            "value": 0.037,
-            "n_available": 14,
-            "n_total": 14,
+            "value": 0.091,
+            "n_available": 24,
+            "n_total": 24,
             "coverage": 1.0
           },
-          "cyclomatic_complexity": 381.571,
+          "cyclomatic_complexity": 303.5,
           "cyclomatic_complexity_coverage": {
-            "value": 381.571,
-            "n_available": 14,
-            "n_total": 14,
+            "value": 303.5,
+            "n_available": 24,
+            "n_total": 24,
             "coverage": 1.0
           },
-          "novelty_score": 0.842,
+          "novelty_score": 0.717,
           "novelty_score_coverage": {
-            "value": 0.842,
-            "n_available": 14,
-            "n_total": 14,
+            "value": 0.717,
+            "n_available": 24,
+            "n_total": 24,
             "coverage": 1.0
           }
         },
         {
           "model": "gpt-5.6-sol",
-          "cells": 23,
-          "avg_cost": 3.98668,
-          "avg_captured_cost": 3.98668,
-          "total_captured_cost": 91.693651,
-          "cost_captured_records": 23,
-          "total_records": 23,
+          "cells": 30,
+          "avg_cost": 3.817461,
+          "avg_captured_cost": 3.817461,
+          "total_captured_cost": 114.52382,
+          "cost_captured_records": 30,
+          "total_records": 30,
           "cost_coverage": 1.0,
           "lsp_errors_per_cell": null,
           "lsp_cells": 0,
           "code_quality_score": 0.054,
           "code_quality_score_coverage": {
             "value": 0.054,
-            "n_available": 23,
-            "n_total": 23,
+            "n_available": 30,
+            "n_total": 30,
             "coverage": 1.0
           },
-          "cyclomatic_complexity": 297.348,
+          "cyclomatic_complexity": 303.333,
           "cyclomatic_complexity_coverage": {
-            "value": 297.348,
-            "n_available": 23,
-            "n_total": 23,
+            "value": 303.333,
+            "n_available": 30,
+            "n_total": 30,
             "coverage": 1.0
           },
-          "novelty_score": 0.917,
+          "novelty_score": 0.916,
           "novelty_score_coverage": {
-            "value": 0.917,
-            "n_available": 23,
-            "n_total": 23,
+            "value": 0.916,
+            "n_available": 30,
+            "n_total": 30,
             "coverage": 1.0
           }
         },
         {
           "model": "claude-sonnet-5",
-          "cells": 16,
-          "avg_cost": 4.776119,
-          "avg_captured_cost": 4.776119,
-          "total_captured_cost": 76.417905,
-          "cost_captured_records": 16,
-          "total_records": 16,
-          "cost_coverage": 1.0,
+          "cells": 27,
+          "avg_cost": 5.169337,
+          "avg_captured_cost": 5.169337,
+          "total_captured_cost": 118.894751,
+          "cost_captured_records": 23,
+          "total_records": 27,
+          "cost_coverage": 0.8519,
           "lsp_errors_per_cell": null,
           "lsp_cells": 0,
-          "code_quality_score": 0.052,
+          "code_quality_score": 0.097,
           "code_quality_score_coverage": {
-            "value": 0.052,
-            "n_available": 16,
-            "n_total": 16,
+            "value": 0.097,
+            "n_available": 27,
+            "n_total": 27,
             "coverage": 1.0
           },
-          "cyclomatic_complexity": 375.375,
+          "cyclomatic_complexity": 326.333,
           "cyclomatic_complexity_coverage": {
-            "value": 375.375,
-            "n_available": 16,
-            "n_total": 16,
+            "value": 326.333,
+            "n_available": 27,
+            "n_total": 27,
             "coverage": 1.0
           },
-          "novelty_score": 0.789,
+          "novelty_score": 0.69,
           "novelty_score_coverage": {
-            "value": 0.789,
-            "n_available": 16,
-            "n_total": 16,
+            "value": 0.69,
+            "n_available": 27,
+            "n_total": 27,
             "coverage": 1.0
           }
         }
@@ -5586,33 +5587,33 @@ window.DYNAMICS_DATA = {
       "lab_contract": {
         "lab": "lab_quality_frontier.py",
         "input_dataset_id": "canonical_registry/story+analysis",
-        "registry_identity_sha256": "8cda2e428a34e1717701bd51e9029ae2812f294dcdaae6e1997569a52d6ee8cc",
-        "resolved_input_sha256": "58e642e6b38d847304d7f3dc8e649f53fd1126cb2222ed86c52393c0bd9c7c8f",
-        "registry_version": "data-manifest/1.0+12808rows",
+        "registry_identity_sha256": "6b49081ca09d6c1e3639a89edfc6324bb2d41d47010a29c1c41c43b08fabf5fc",
+        "resolved_input_sha256": "fd358eb3b21cde22c85da69134886548bc32378b3cccb46d9fa424a8a22d682b",
+        "registry_version": "data-manifest/1.0+12829rows",
         "metric_definition_version": "quality_frontier/v2",
         "metric_source_sha256": "4bf5e2c7953d5ffe68ed0499541f12143991be7b4ebbf25dd8622f1cadcf4d1c",
-        "n_resolved_records": 371,
-        "n_eligible_records": 312,
-        "n_used_records": 312,
-        "n_excluded_records": 59,
+        "n_resolved_records": 430,
+        "n_eligible_records": 430,
+        "n_used_records": 430,
+        "n_excluded_records": 0,
         "n_unused_eligible_records": 0,
-        "used_record_refs_sha256": "fecf45e2c5ece4a52c66e8c350765428e382b7f0d0e0d765768cceaf564a3dbe",
-        "excluded_record_refs_sha256": "2fa0d763603e714429cc4911c447fbb8a954f97b8f4cc648953e27d8b25e140c",
-        "used_unique_records": 312,
-        "used_contributions": 312,
+        "used_record_refs_sha256": "31785b832063193909b0c5679a70711ba35b1e60cb5e1ff2d997691a2ad48369",
+        "excluded_record_refs_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "used_unique_records": 430,
+        "used_contributions": 430,
         "review_without_current_story": 0,
         "story_without_review": 0,
         "missing_required_field": 0,
-        "outside_analysis_population": 59,
+        "outside_analysis_population": 0,
         "data_integrity_policy": "docs/data_integrity_findings.md",
         "requires_external_service": null,
         "contract_version": "lab-contract/v6",
-        "generated_at": "2026-08-27T20:33:58.350941+00:00"
+        "generated_at": "2026-08-28T12:50:26.520364+00:00"
       }
     },
     "story_arc": {
       "experiment_id": "lab_story_arc",
-      "generated_at": "2026-08-27T22:33:58.865698",
+      "generated_at": "2026-08-28T14:50:27.042924",
       "summary": {
         "snowball_factor": 2.32,
         "session1_cost": 0.173207,
@@ -5752,9 +5753,9 @@ window.DYNAMICS_DATA = {
       "lab_contract": {
         "lab": "lab_story_arc.py",
         "input_dataset_id": "canonical_registry/story",
-        "registry_identity_sha256": "8cda2e428a34e1717701bd51e9029ae2812f294dcdaae6e1997569a52d6ee8cc",
+        "registry_identity_sha256": "6b49081ca09d6c1e3639a89edfc6324bb2d41d47010a29c1c41c43b08fabf5fc",
         "resolved_input_sha256": "7d2ab0fe4c18695fe26767d6e848f7a2e3f3a397d16b1e183594f70b9136c716",
-        "registry_version": "data-manifest/1.0+12808rows",
+        "registry_version": "data-manifest/1.0+12829rows",
         "metric_definition_version": "story_arc/v2",
         "metric_source_sha256": "1e10f13a3df8657c2e75ca2045a1bb8835fb3880b6c475f5d2da6747b40a7c95",
         "n_resolved_records": 215,
@@ -5773,12 +5774,12 @@ window.DYNAMICS_DATA = {
         "data_integrity_policy": "docs/data_integrity_findings.md",
         "requires_external_service": null,
         "contract_version": "lab-contract/v6",
-        "generated_at": "2026-08-27T20:33:58.866330+00:00"
+        "generated_at": "2026-08-28T12:50:27.043558+00:00"
       }
     },
     "verification_frontier": {
       "experiment_id": "lab_verification_frontier",
-      "generated_at": "2026-08-27T22:34:00.004298",
+      "generated_at": "2026-08-28T14:50:28.207614",
       "summary": {
         "models": 7,
         "stories": 215,
@@ -5892,9 +5893,9 @@ window.DYNAMICS_DATA = {
       "lab_contract": {
         "lab": "lab_verification_frontier.py",
         "input_dataset_id": "canonical_registry/story",
-        "registry_identity_sha256": "8cda2e428a34e1717701bd51e9029ae2812f294dcdaae6e1997569a52d6ee8cc",
+        "registry_identity_sha256": "6b49081ca09d6c1e3639a89edfc6324bb2d41d47010a29c1c41c43b08fabf5fc",
         "resolved_input_sha256": "7d2ab0fe4c18695fe26767d6e848f7a2e3f3a397d16b1e183594f70b9136c716",
-        "registry_version": "data-manifest/1.0+12808rows",
+        "registry_version": "data-manifest/1.0+12829rows",
         "metric_definition_version": "verification_frontier/v2",
         "metric_source_sha256": "3c9ec2ce0be32ac9c6ae3e3ba3e3cdb4e2930a11d87dbb07c0933472b356457c",
         "n_resolved_records": 215,
@@ -5913,14 +5914,14 @@ window.DYNAMICS_DATA = {
         "data_integrity_policy": "docs/data_integrity_findings.md",
         "requires_external_service": null,
         "contract_version": "lab-contract/v6",
-        "generated_at": "2026-08-27T20:34:00.004880+00:00"
+        "generated_at": "2026-08-28T12:50:28.208168+00:00"
       }
     },
     "verification_value": {
       "experiment_id": "lab_verification_value",
-      "generated_at": "2026-08-27T22:34:00.525014",
+      "generated_at": "2026-08-28T14:50:28.748420",
       "summary": {
-        "correlation_tests_vs_worse_rate": -0.154,
+        "correlation_tests_vs_worse_rate": -0.161,
         "cells": 105,
         "stories": 215,
         "reviews": 242,
@@ -6008,15 +6009,15 @@ window.DYNAMICS_DATA = {
         {
           "model": "claude-haiku-4-5",
           "tests": 248,
-          "reviews": 5,
-          "better_rate": 0.4,
-          "worse_rate": 0.2
+          "reviews": 6,
+          "better_rate": 0.5,
+          "worse_rate": 0.167
         },
         {
           "model": "claude-haiku-4-5",
           "tests": 294,
-          "reviews": 5,
-          "better_rate": 0.6,
+          "reviews": 3,
+          "better_rate": 0.667,
           "worse_rate": 0.0
         },
         {
@@ -6211,15 +6212,15 @@ window.DYNAMICS_DATA = {
         {
           "model": "deepseek-v4-flash",
           "tests": 67,
-          "reviews": 5,
-          "better_rate": 0.8,
+          "reviews": 2,
+          "better_rate": 0.5,
           "worse_rate": 0.0
         },
         {
           "model": "deepseek-v4-pro",
           "tests": 0,
-          "reviews": 6,
-          "better_rate": 0.333,
+          "reviews": 7,
+          "better_rate": 0.429,
           "worse_rate": 0.0
         },
         {
@@ -6323,8 +6324,8 @@ window.DYNAMICS_DATA = {
         {
           "model": "deepseek-v4-pro",
           "tests": 47,
-          "reviews": 10,
-          "better_rate": 0.9,
+          "reviews": 11,
+          "better_rate": 0.909,
           "worse_rate": 0.0
         },
         {
@@ -6561,8 +6562,8 @@ window.DYNAMICS_DATA = {
         {
           "model": "gpt-5.6-sol",
           "tests": 15,
-          "reviews": 5,
-          "better_rate": 0.8,
+          "reviews": 4,
+          "better_rate": 0.75,
           "worse_rate": 0.0
         },
         {
@@ -6667,9 +6668,9 @@ window.DYNAMICS_DATA = {
       "lab_contract": {
         "lab": "lab_verification_value.py",
         "input_dataset_id": "canonical_registry/story+review",
-        "registry_identity_sha256": "8cda2e428a34e1717701bd51e9029ae2812f294dcdaae6e1997569a52d6ee8cc",
-        "resolved_input_sha256": "14648fd46fb445d31cd703e5734554043045b466936a968dd0bbc0a31df6b379",
-        "registry_version": "data-manifest/1.0+12808rows",
+        "registry_identity_sha256": "6b49081ca09d6c1e3639a89edfc6324bb2d41d47010a29c1c41c43b08fabf5fc",
+        "resolved_input_sha256": "4e8601fda77af04c2cbc167ec8f8beca495165fcdffbd4f2cb0ce58323535be8",
+        "registry_version": "data-manifest/1.0+12829rows",
         "metric_definition_version": "verification_value/v2",
         "metric_source_sha256": "f8331d35688c569a39b7247378995514661aa372eef25b879a4536ce544e339a",
         "n_resolved_records": 457,
@@ -6688,7 +6689,7 @@ window.DYNAMICS_DATA = {
         "data_integrity_policy": "docs/data_integrity_findings.md",
         "requires_external_service": null,
         "contract_version": "lab-contract/v6",
-        "generated_at": "2026-08-27T20:34:00.525767+00:00"
+        "generated_at": "2026-08-28T12:50:28.749178+00:00"
       }
     }
   },

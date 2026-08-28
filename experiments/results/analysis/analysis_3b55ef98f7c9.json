@@ -18,20 +18,21 @@
         "files_added": 12,
         "files_modified": 0,
         "files_deleted": 0,
-        "functions_added": 4,
+        "functions_added": 9,
         "functions_removed": 0,
         "classes_added": 0,
         "classes_removed": 0,
-        "imports_added": 21,
+        "imports_added": 132,
         "imports_removed": 0,
         "lines_added": 4555,
-        "lines_removed": 0
+        "lines_removed": 0,
+        "parse_coverage": 0.4444
       },
       "sonar": {
-        "available": false,
+        "available": true,
         "bugs_delta": 0,
-        "smells_delta": 0,
-        "complexity_delta": 0,
+        "smells_delta": 6,
+        "complexity_delta": 22,
         "duplications_delta": 0.0
       },
       "convention": {
@@ -97,21 +98,22 @@
         "files_added": 7,
         "files_modified": 7,
         "files_deleted": 0,
-        "functions_added": 1,
+        "functions_added": 5,
         "functions_removed": 0,
-        "classes_added": 0,
+        "classes_added": 1,
         "classes_removed": 0,
-        "imports_added": 13,
+        "imports_added": 130,
         "imports_removed": 0,
         "lines_added": 615,
-        "lines_removed": 12
+        "lines_removed": 12,
+        "parse_coverage": 0.899
       },
       "sonar": {
-        "available": false,
+        "available": true,
         "bugs_delta": 0,
-        "smells_delta": 0,
-        "complexity_delta": 0,
-        "duplications_delta": 0.0
+        "smells_delta": 9,
+        "complexity_delta": 42,
+        "duplications_delta": 6.1
       },
       "convention": {
         "score": 0.564,
@@ -176,21 +178,22 @@
         "files_added": 2,
         "files_modified": 3,
         "files_deleted": 0,
-        "functions_added": 4,
+        "functions_added": 8,
         "functions_removed": 0,
         "classes_added": 0,
         "classes_removed": 0,
-        "imports_added": 12,
+        "imports_added": 122,
         "imports_removed": 0,
         "lines_added": 618,
-        "lines_removed": 10
+        "lines_removed": 10,
+        "parse_coverage": 0.9161
       },
       "sonar": {
-        "available": false,
+        "available": true,
         "bugs_delta": 0,
-        "smells_delta": 0,
-        "complexity_delta": 0,
-        "duplications_delta": 0.0
+        "smells_delta": 1,
+        "complexity_delta": 60,
+        "duplications_delta": 0.5
       },
       "convention": {
         "score": 0.564,
@@ -259,17 +262,18 @@
         "functions_removed": 0,
         "classes_added": 0,
         "classes_removed": 0,
-        "imports_added": 0,
-        "imports_removed": 0,
+        "imports_added": 3,
+        "imports_removed": 1,
         "lines_added": 26,
-        "lines_removed": 16
+        "lines_removed": 16,
+        "parse_coverage": 0.9231
       },
       "sonar": {
-        "available": false,
+        "available": true,
         "bugs_delta": 0,
         "smells_delta": 0,
-        "complexity_delta": 0,
-        "duplications_delta": 0.0
+        "complexity_delta": 1,
+        "duplications_delta": -0.09999999999999964
       },
       "convention": {
         "score": 0.564,
@@ -378,8 +382,8 @@
       "constraints_met": 3,
       "constraints_total": 3,
       "lines_of_code": 1747,
-      "quality_per_dollar": 1000000.0,
-      "quality_per_joule": 100.0,
+      "quality_per_dollar": null,
+      "quality_per_joule": null,
       "sonar_analyzed": false,
       "sonar_bugs_delta": 0,
       "sonar_vulnerabilities_delta": 0,
@@ -404,7 +408,7 @@
       "strategy": "exploratory",
       "strategy_score": 0.9759,
       "exploration_premium": 8.7914,
-      "thermal_efficiency": 0.0,
+      "thermal_efficiency": null,
       "verdict": "EXPLORATORY \u2014 model escaped attractor (escape=0.68) and found a novel correct solution (novelty=0.84, correctness=100%). Cost: $0.0954, ~0J.",
       "recommendation": "Promote this operator. The perturbation succeeded.",
       "operator": "",
@@ -428,8 +432,8 @@
         "constraints_met": 3,
         "constraints_total": 3,
         "lines_of_code": 1747,
-        "quality_per_dollar": 1000000.0,
-        "quality_per_joule": 100.0,
+        "quality_per_dollar": null,
+        "quality_per_joule": null,
         "sonar_analyzed": false,
         "sonar_bugs_delta": 0,
         "sonar_vulnerabilities_delta": 0,
@@ -496,10 +500,10 @@
         "energy_output_j": 0.0,
         "energy_reasoning_j": 0.0,
         "total_energy_j": 0.0,
-        "solution_density": 0.0,
-        "correctness_per_dollar": 0.0,
-        "quality_per_joule": 0.0,
-        "efficiency_score": 0.0
+        "solution_density": null,
+        "correctness_per_dollar": null,
+        "quality_per_joule": null,
+        "efficiency_score": null
       }
     }
   }

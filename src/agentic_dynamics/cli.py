@@ -57,6 +57,7 @@ _COMMANDS: dict[tuple[str, ...], str] = {
     ("data", "sync"): "sync_data.py",
     ("data", "manifest"): "generate_manifest.py",
     ("data", "inventory"): "inventory.py",
+    ("data", "bundle"): "bundle_artifacts.py",
     # knowledge
     ("knowledge", "ingest"): "kb_produce.py",
     ("knowledge", "sources"): "kb_produce_sources.py",
@@ -86,6 +87,9 @@ _COMMANDS: dict[tuple[str, ...], str] = {
     ("supervise", "orphans"): "orphan_sweep.py",
     # release
     ("release", "check-protection"): "check_branch_protection.py",
+    # surfaces (the self-maintenance command — design: system_knowledge_abstraction)
+    ("surfaces", "sync"): "sync_surfaces.py",
+    ("surfaces", "snapshot"): "system_snapshot.py",
 }
 
 #: ``_COMMANDS`` keys ordered longest-first. ``_resolve`` iterates THIS list rather than
@@ -111,7 +115,7 @@ Subcommands (each forwards to its backing script):
   workflow    run|discard-tree
   queue       enqueue|worker|monitor|reinterleave|analysis-enqueue|analysis-worker
   analyze     worktrees|trajectories|stories|session-routing|lab <name>
-  data        build|sync|manifest|inventory
+  data        build|sync|manifest|inventory|bundle
   knowledge   ingest|sources|facts|worker|context-report|shadow-report|arm-comparison
   registry    query|show|lineage
   review      all|stories|trigger|enqueue|finalize
@@ -119,6 +123,7 @@ Subcommands (each forwards to its backing script):
   validate    session|tests|prereq
   supervise   [claude-agents|orphans]
   release     check-protection
+  surfaces    sync|snapshot
 
 Run `agentic-dynamics <subcommand> --help` for the backing script's own options.
 

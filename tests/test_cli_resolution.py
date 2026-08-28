@@ -62,6 +62,7 @@ DOCUMENTED_RESOLUTIONS: list[tuple[tuple[str, ...], str, tuple[str, ...]]] = [
     (("data", "sync"), "sync_data.py", ()),
     (("data", "manifest"), "generate_manifest.py", ()),
     (("data", "inventory"), "inventory.py", ()),
+    (("data", "bundle"), "bundle_artifacts.py", ()),
     # knowledge
     (("knowledge", "ingest"), "kb_produce.py", ()),
     (("knowledge", "sources"), "kb_produce_sources.py", ()),
@@ -93,6 +94,9 @@ DOCUMENTED_RESOLUTIONS: list[tuple[tuple[str, ...], str, tuple[str, ...]]] = [
     (("supervise", "orphans"), "orphan_sweep.py", ()),
     # release
     (("release", "check-protection"), "check_branch_protection.py", ()),
+    # surfaces — the self-maintenance command (design: system_knowledge_abstraction)
+    (("surfaces", "sync"), "sync_surfaces.py", ()),
+    (("surfaces", "snapshot"), "system_snapshot.py", ()),
 ]
 
 

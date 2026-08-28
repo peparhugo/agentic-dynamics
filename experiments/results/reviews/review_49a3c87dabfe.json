@@ -1,0 +1,212 @@
+{
+  "story_name": "notification_service",
+  "story_id": "49a3c87dabfe",
+  "model": "deepseek/deepseek-v4-flash",
+  "commit_reviews": [
+    {
+      "commit_hash": "7833bba8a7d3784f17c4f8fb2012c48398c747e9",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.85,
+      "convention_adherence": 0.83,
+      "introduces_technical_debt": false,
+      "respects_existing_patterns": true,
+      "better_or_worse": "neutral",
+      "problems": [
+        {
+          "category": "convention",
+          "severity": "minor",
+          "description": "test_notification_server.py (and app.py per SonarQube) contain classes that should use PascalCase \u2014 violations flagged by the measured convention score of 0.83."
+        },
+        {
+          "category": "convention",
+          "severity": "minor",
+          "description": "test_notification_server.py has module-level constants that should be UPPER_CASE (measured violation), unlike MESSAGE_TYPES which is correctly named in notification_server.py."
+        },
+        {
+          "category": "security",
+          "severity": "minor",
+          "description": "MESSAGE_TYPES includes \"system\" and _handle_message broadcasts it on behalf of any client, letting a connected client spoof system messages to all peers."
+        },
+        {
+          "category": "maintainability",
+          "severity": "minor",
+          "description": "_send swallows all exceptions silently (no logging), and _broadcast removes dead clients from the registry without closing their connections, leaving sockets potentially open."
+        },
+        {
+          "category": "other",
+          "severity": "info",
+          "description": "Direct messages to an offline target are silently dropped with no error or delivery confirmation \u2014 acceptable for greenfield Session 1, but worth a defined contract later."
+        }
+      ],
+      "strengths": [
+        "Clean async design with well-separated lifecycle (start/stop), graceful shutdown that closes all client connections.",
+        "Comprehensive tests covering unique client IDs, health-check count, broadcast fan-out, and direct-message targeting using unused_tcp_port + pytest-asyncio fixtures.",
+        "Integrated /health HTTP endpoint via process_request, type hints, docstrings, and from __future__ import annotations throughout.",
+        "Robust handling of client disconnects during broadcast via asyncio.gather with return_exceptions=True."
+      ],
+      "summary": "A well-structured, well-tested greenfield async WebSocket notification server (Session 1 baseline) whose only weaknesses are minor convention violations in test files/app.py (matching the measured 0.83) and a system-message spoofing surface \u2014 no meaningful technical debt introduced.",
+      "session_number": 1
+    },
+    {
+      "commit_hash": "142fea288e3ff429322cad742f17fca78cff7749",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.9,
+      "convention_adherence": 0.83,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": true,
+      "better_or_worse": "better",
+      "problems": [
+        {
+          "category": "maintainability",
+          "severity": "major",
+          "description": "Subscription-cleanup logic (discard client from _subscriptions, prune empty channels, remove from _client_channels) is duplicated verbatim in both _handle's finally block and _broadcast's send-failure path \u2014 extract a helper to keep both paths consistent as the schema evolves."
+        },
+        {
+          "category": "maintainability",
+          "severity": "minor",
+          "description": "Cognitive complexity +43 is driven by _handle_message's channel-resolution chain (message.channel -> payload.channel -> fallback None) mixed with the message-type dispatch; consider early-returning or splitting resolution from routing."
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "The 4 measured convention violations live in app.py/test_integration.py/test_notification_server.py (PascalCase, UPPER_CASE) \u2014 none are introduced by this diff's own additions, which follow snake_case + type-hint conventions; flagging so the 0.83 is read as repo-baseline, not commit-introduced."
+        }
+      ],
+      "strengths": [
+        "Clean subscription bookkeeping with leak-free cleanup on both disconnect and send-failure paths \u2014 no stale subscribers survive a client drop.",
+        "New /channels and /channels/{name}/subscribers endpoints slot neatly into the existing _process_request routing pattern, and channel routing extends the existing message-type dispatch rather than forking it.",
+        "Defensive message handling: payload coerced to dict, channel validated/stripped, and tests added for the new subscribe/unsubscribe flow."
+      ],
+      "summary": "A well-integrated channel-subscription feature that follows existing server patterns and includes solid cleanup + tests, with the main debt being duplicated subscription-teardown logic (and a +43 complexity bump) across two code paths.",
+      "session_number": 2
+    },
+    {
+      "commit_hash": "d840e821812972b9872cbf58af7fe9abadf4eb36",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.85,
+      "convention_adherence": 0.83,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": true,
+      "better_or_worse": "better",
+      "problems": [
+        {
+          "category": "maintainability",
+          "severity": "major",
+          "description": "Cognitive complexity +33 (SonarQube) concentrated in _deliver/_consume_redis/_process_request; the delivery fan-out and Redis fallback branches could be decomposed into smaller single-purpose helpers."
+        },
+        {
+          "category": "reliability",
+          "severity": "minor",
+          "description": "Broad `except Exception: return` in _consume_redis silently swallows all broker errors with no logging or retry, masking persistent outages behind the live fallback path."
+        },
+        {
+          "category": "performance",
+          "severity": "minor",
+          "description": "sqlite3.connect() is opened per operation (_init_database, _persist_message); a long-lived connection would avoid per-write connection setup under load."
+        },
+        {
+          "category": "convention",
+          "severity": "minor",
+          "description": "Four convention violations flagged: PascalCase class names (app.py, test_notification_server.py) and UPPER_CASE module constants (test_integration.py, test_notification_server.py) \u2014 matches the 0.83 score."
+        },
+        {
+          "category": "maintainability",
+          "severity": "info",
+          "description": "_persist_message is defined but has no visible call site in the diff \u2014 either dead code or wired up in truncated/untouched sections; worth confirming it is actually exercised."
+        }
+      ],
+      "strengths": [
+        "Graceful degradation: a Redis outage cannot take down existing WebSocket clients, and _publish falls back to direct delivery when the broker is absent.",
+        "Respects the existing pattern: extends the NotificationServer constructor with optional redis_url/database_url plus env fallbacks rather than restructuring the class or its async lifecycle.",
+        "Proper resource hygiene: start() tears down a failed Redis connection and close() cancels the consume task, closes pubsub, and closes the client.",
+        "The /messages endpoint is defensively parsed (limit clamped to 1000, offset/limit ValueError guarded) and follows the existing _process_request routing style."
+      ],
+      "summary": "A solid, pattern-respecting integration commit (Redis broker + SQLite persistence) whose only real cost is +33 cognitive complexity and swallowed exceptions in the broker-consume path.",
+      "session_number": 3
+    },
+    {
+      "commit_hash": "7894d9c846710dfcc55a1932078f509d7a864f45",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.5,
+      "convention_adherence": 0.5,
+      "introduces_technical_debt": false,
+      "respects_existing_patterns": true,
+      "better_or_worse": "unclear",
+      "problems": [],
+      "strengths": [],
+      "summary": "Review unavailable.",
+      "session_number": 4
+    },
+    {
+      "commit_hash": "ad9ed206b3ad2a02b18394e9de9c7f48e4b455ba",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.85,
+      "convention_adherence": 0.83,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": true,
+      "better_or_worse": "better",
+      "problems": [
+        {
+          "category": "maintainability",
+          "severity": "minor",
+          "description": "_cleanup_expired_messages/_cleanup_loop have no tests, unlike the rate-limit and history features; the new DELETE FROM messages TTL behavior is the most destructive change in the commit and is unverified."
+        },
+        {
+          "category": "maintainability",
+          "severity": "minor",
+          "description": "The cleanup loop interval (3600s) is a hardcoded magic number while message_ttl_days/rate_limit are env-driven via _env_int \u2014 inconsistent configuration plumbing for the same feature set."
+        },
+        {
+          "category": "testing",
+          "severity": "minor",
+          "description": "Test name test_rate_limit_returns_error_without_dropping_message is misleading: on limit exceeded the message is rejected (handler returns before broadcast); an error is echoed to the sender instead of a silent drop, which is a valid policy but the title overstates the guarantee and no test asserts delivery semantics."
+        },
+        {
+          "category": "security",
+          "severity": "info",
+          "description": "_rate_limited is fail-open: any Redis exception returns False (no limit), and with no Redis the limit is entirely disabled \u2014 acceptable given Redis is optional, but the feature silently deactivates under load/errors."
+        },
+        {
+          "category": "architecture",
+          "severity": "info",
+          "description": "_cleanup_expired_messages() runs synchronously (blocking sqlite3) on the event-loop thread inside start() before serving; fine at this scale but couples startup latency to table size."
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "Reported convention score 0.83 with 4 violations (app.py, test_notification_server.py PascalCase, module-level constants) \u2014 but app.py and test_notification_server.py are untouched by this diff and the additions to test_integration.py (FakeRedis, tests) introduce no module constants; these violations appear pre-existing, not introduced by this commit."
+        }
+      ],
+      "strengths": [
+        "Session-appropriate cross-cutting scope (retention, rate limiting, history) that slots cleanly into the existing NotificationServer: the /history branch mirrors the /messages handler, _cleanup_task cancellation mirrors the _redis_task lifecycle in stop(), and config uses the existing _env_int pattern.",
+        "/history is robust: parameter validation, bounded limit (1-1000), ISO 'since' normalization via the new _iso_timestamp helper (consistent with _timestamp), and correct has_more pagination using a limit+1 probe.",
+        "Rate limiting reuses the existing Redis connection with per-client keys and a 60s TTL, failing closed to no-limit rather than crashing when Redis is absent.",
+        "Tests cover the two major new behaviors (rate limit error path, history channel/since/has_more filtering) using the existing connect/receive_json helpers.",
+        "Cleanup task is properly cancelled and awaited in stop(), matching the established teardown discipline."
+      ],
+      "summary": "A well-scoped cross-cutting session that adds rate limiting, message retention, and a paginated history endpoint that respect the server's existing handler/config/lifecycle patterns, though the untested TTL-deletion loop, a magic-number interval, and a mildly misleading rate-limit test title leave minor debt (and the reported convention violations are pre-existing in files outside this diff).",
+      "session_number": 5
+    }
+  ],
+  "story_review": {
+    "story_name": "notification_service",
+    "reviewer_model": "deepseek/deepseek-v4-flash",
+    "overall_coherence": 0.85,
+    "compounding_issues": [
+      "Seed codebase (app.py, a Flask Auth API) was abandoned at session 1 and never integrated or removed \u2014 orphaned dead code persists through all 5 commits",
+      "Binary/compiled artifacts committed to git: __pycache__/*.pyc from session 2 onward, and notification_messages.db (SQLite runtime data) in session 5",
+      "Rate limiting silently no-ops without Redis (_rate_limited returns False when Redis is absent), making the headline session-5 control best-effort rather than enforced",
+      "Session 2's _broadcast() was reduced to a trivial passthrough to _deliver() in session 3, leaving an unused channel parameter and a redundant routing layer in the final code"
+    ],
+    "key_decisions": [
+      "Greenfield async architecture: built a WebSocket server on the websockets library instead of building on the seeded Flask app, choosing asyncio concurrency from the start",
+      "Channel-based routing as first-class semantics (session 2) with dual subscription maps (channel->clients and client->channels) for clean cleanup",
+      "Optional Redis pub/sub backbone with graceful in-process fallback delivery (session 3), so the server works without a broker",
+      "SQLite message persistence plus HTTP read endpoints (/messages, /history) for replay/history (sessions 3 and 5)",
+      "Pluggable transport abstraction (BaseTransport/WebSocketTransport) extracted in session 4, decoupling routing from the wire protocol",
+      "Cross-cutting hardening in session 5: Redis-counter rate limiting, hourly TTL cleanup loop, and paginated history with since-timestamp filtering"
+    ],
+    "trajectory_description": "Quality improved steadily across the five sessions. The arc is textbook: a clean greenfield async core, then feature layering (channels), then infrastructure integration (Redis + persistence), then a genuine structural refactor (pluggable transport) that the later session exploited rather than fought, and finally operational hardening (rate limits, history, TTL). Tests grew monotonically from 4 to 9 passing tests and 102 to 313 test lines while staying green at every commit, and the codebase grew from 392 to 818 LOC without bloat \u2014 session 4's refactor reduced routing redundancy even as the transport abstraction added surface. Cost and token usage stayed remarkably flat (all sessions ~$0.015-0.03), with the refactor session the most expensive as the largest rewrite. Notably this ran under the early_degrade perturbation at strength 0.5 yet produced all-green, all-successful sessions with no cascade.",
+    "summary": "A coherent, monotonically improving 5-session build of an async WebSocket notification server whose only blemishes are the abandoned seed codebase and committed binary artifacts, with every session passing tests and no early decision materially constraining later work."
+  }
+}

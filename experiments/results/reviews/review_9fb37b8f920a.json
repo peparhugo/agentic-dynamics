@@ -1,0 +1,222 @@
+{
+  "story_name": "static_site_gen",
+  "story_id": "9fb37b8f920a",
+  "model": "deepseek/deepseek-v4-flash",
+  "commit_reviews": [
+    {
+      "commit_hash": "b8230be84f6e7fa5d71747cf0c2e11df8b4ac38e",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.72,
+      "convention_adherence": 0.48,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": false,
+      "better_or_worse": "neutral",
+      "problems": [
+        {
+          "category": "convention",
+          "severity": "major",
+          "description": "30 measured naming violations (snake_case functions, non-PascalCase classes/interfaces, non-UPPER_CASE constants) in cli.ts and plugin.ts; measured convention score is only 0.51 on a 230-line greenfield scaffold."
+        },
+        {
+          "category": "maintainability",
+          "severity": "major",
+          "description": "src/site.ts hand-rolls a regex-based YAML frontmatter parser (parseYamlFrontmatter) even though gray-matter \u2014 the library that does exactly this \u2014 is a declared dependency; the fragile regex duplicates the dependency's job and will break on quoted colons or array/list YAML."
+        },
+        {
+          "category": "maintainability",
+          "severity": "minor",
+          "description": "SonarQube delta on a minimal session-1 scaffold: +2 bugs, +6 smells, +33 cognitive complexity \u2014 complexity is already accumulating at greenfield."
+        },
+        {
+          "category": "architecture",
+          "severity": "info",
+          "description": "The entire 93-line Express seed (index.ts, designed with 'good seams') is deleted rather than adapted; defensible for a greenfield SSG story but it discards the baseline's seam structure entirely."
+        },
+        {
+          "category": "testing",
+          "severity": "info",
+          "description": "Tests cover only src/site.ts; the CLI path (arg parsing, unknown-option errors, exit-code handling in src/cli.ts) is untested."
+        }
+      ],
+      "strengths": [
+        "Clean one-directional split between src/cli.ts (interface) and src/site.ts (core logic), with a colocated test file per module.",
+        "Tests exercise real temp-dir filesystem fixtures and assert generated HTML and index output rather than mocking away the behavior.",
+        "CLI main() handles errors explicitly with a non-zero process exit code and rejects unknown options loudly.",
+        "Modern idiomatic TypeScript: node:fs/promises, async/await, and typed public interfaces."
+      ],
+      "summary": "A tested, cleanly-split SSG skeleton replaces the mismatched Todo-API seed, but the measured convention score of 0.51 (30 naming violations) and a hand-rolled YAML parser that duplicates the gray-matter dependency make this a debt-accreting greenfield commit.",
+      "session_number": 1
+    },
+    {
+      "commit_hash": "c11fe58d801635e2097d605d43872b5e63e7e589",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.78,
+      "convention_adherence": 0.51,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": true,
+      "better_or_worse": "better",
+      "problems": [
+        {
+          "category": "convention",
+          "severity": "major",
+          "description": "Static analysis reports 30 convention violations across the touched files (cli.ts, plugin.ts \u2014 classes/interfaces/constants/function naming), driving the convention score to 0.51."
+        },
+        {
+          "category": "maintainability",
+          "severity": "major",
+          "description": "Templating (filesIn, templatePath, readTemplate, createTemplates, render logic) is inlined into site.ts, which already owns frontmatter parsing, markdown rendering, and index generation \u2014 one module now concentrates three rendering concerns."
+        },
+        {
+          "category": "maintainability",
+          "severity": "minor",
+          "description": "Added cognitive complexity of +21 (per SonarQube) and +1 smell; the page/layout/default-template selection logic could be simplified or extracted."
+        },
+        {
+          "category": "maintainability",
+          "severity": "minor",
+          "description": "Page.frontmatter typed as Record<string, unknown> is an untyped passthrough that weakens the type safety the rest of the Page interface maintains."
+        },
+        {
+          "category": "dependency",
+          "severity": "info",
+          "description": "New handlebars dependency (^4.7.8) is added for one feature \u2014 justified, but it widens the dependency surface; Handlebars.create() is used correctly to avoid global-template pollution."
+        }
+      ],
+      "strengths": [
+        "Feature follows the existing option-dir pattern: templateDir mirrors contentDir/outputDir end-to-end (usage string, parseArguments, BuildOptions, buildSite) with no regressions to existing behavior.",
+        "Well-tested: new tests cover layout+partials rendering, default template fallback, and assert template is undefined when frontmatter omits it.",
+        "Path-traversal guard on template resolution is a sound security practice.",
+        "Backward compatible \u2014 defaultPage is preserved for pages without a template, and prior tests still pass unchanged (only one new assertion added).",
+        "Commit message matches the [story] session convention."
+      ],
+      "summary": "A clean, backward-compatible, well-tested feature addition that fits the existing content/output-dir architecture slot, slightly outweighed by a 0.51 convention score and 30 naming violations in the new files plus templating logic inlined into the growing site.ts monolith.",
+      "session_number": 2
+    },
+    {
+      "commit_hash": "c0a2997b67e2bc26c01c4fec881782d23c3ae1c0",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.8,
+      "convention_adherence": 0.55,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": true,
+      "better_or_worse": "neutral",
+      "problems": [
+        {
+          "category": "testing",
+          "severity": "major",
+          "description": "Session 3 (integration) adds 114 lines of new server logic (src/server.ts: live-reload HTTP server, WebSocket push, chokidar watcher, rebuild coalescing) with no accompanying tests \u2014 the integration is not verified."
+        },
+        {
+          "category": "maintainability",
+          "severity": "minor",
+          "description": "package.json bin path was changed from dist/cli.js to lib/cli.js with no visible tsconfig outDir change in this diff; if tsc still emits to dist the published CLI breaks \u2014 a silent regression risk."
+        },
+        {
+          "category": "convention",
+          "severity": "minor",
+          "description": "New module-level constants in src/server.ts \u2014 liveReloadScript and contentTypes \u2014 use lowerCamelCase instead of the repo's UPPER_CASE constant rule, consistent with the +3 SonarQube smells."
+        },
+        {
+          "category": "maintainability",
+          "severity": "minor",
+          "description": "Cognitive complexity +40 for only +5 functions (SonarQube): the building/rebuildQueued two-flag rebuild coordinator in startDevServer and the layered serveFile error-handling are the main drivers; a single debounce/chain helper would flatten it."
+        },
+        {
+          "category": "architecture",
+          "severity": "minor",
+          "description": "Live-reload WebSocket connects to location.host with no pathname; pages served under a subpath/base-href (common for SSG deployments) will fail to reach the reload socket."
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "Discrepancy with measurements: the reported cli.ts violations (Classes/Interfaces should use PascalCase, Functions should not use snake_case) do not appear in this diff \u2014 CliOptions, usage, parseArguments, and main all comply; plugin.ts is untouched by this commit, so the 0.51 score and 30 violations largely reflect pre-existing or spurious state, not this change."
+        }
+      ],
+      "strengths": [
+        "Clean module separation \u2014 the dev server is isolated in src/server.ts and reuses buildSite, extending the existing BuildOptions type (DevServerOptions extends BuildOptions) rather than forking the pipeline.",
+        "CLI dispatch extends the existing pattern naturally: parseArguments gains typed --port handling with integer/range validation and a clear error message.",
+        "Security-conscious defaults: path-traversal protection via relative(outputDir, file).startsWith('..') and loopback-only bind (127.0.0.1).",
+        "Graceful shutdown: SIGINT/SIGTERM handlers close the watcher, terminate sockets, and close the WS server; rebuild coalescing prevents overlapping concurrent builds.",
+        "TypeScript hygiene: explicit interfaces, full type hints on new signatures, and no reliance on implicit any."
+      ],
+      "summary": "A solid, pattern-respecting additive dev-server feature that reuses the existing build pipeline and extends BuildOptions cleanly, but ships 114 untested lines, a risky dist\u2192lib bin-path switch, and new constant-naming smells \u2014 while the reported cli.ts/plugin.ts convention violations are largely pre-existing or spurious rather than introduced by this commit.",
+      "session_number": 3
+    },
+    {
+      "commit_hash": "a03da6f5c8a4a08c56be986a3757eab94ec2c49b",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.68,
+      "convention_adherence": 0.51,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": false,
+      "better_or_worse": "neutral",
+      "problems": [
+        {
+          "category": "convention",
+          "severity": "major",
+          "description": "Systematic naming violations in a TypeScript codebase (30 measured): snake_case functions in plugin.ts/dev-server.ts/markdown.ts (injectLiveReload, serveFile, parseYamlFrontmatter, stringValue, tagValues), non-PascalCase classes/interfaces flagged in cli.ts, and module-level constants (liveReloadScript, contentTypes, markdown) not UPPER_CASE \u2014 matching the measured convention score of 0.51."
+        },
+        {
+          "category": "maintainability",
+          "severity": "major",
+          "description": "markdown.ts parses YAML frontmatter twice: it runs gray-matter (parsed = matter(source)) and then merges in a hand-rolled regex-based parseYamlFrontmatter on the same source. The two parsers can diverge on lists/quoted values, and the manual parser is unnecessary given gray-matter is already a dependency."
+        },
+        {
+          "category": "architecture",
+          "severity": "major",
+          "description": "DevServerPlugin calls buildSite directly inside onStart and again inside its internal rebuild loop, coupling the plugin to build orchestration and duplicating the build invocation (with error/retry handling) that the host pipeline presumably owns. A plugin should expose hooks for the host to call, not drive builds itself."
+        },
+        {
+          "category": "maintainability",
+          "severity": "minor",
+          "description": "Cognitive complexity +25 (measured): the onStart rebuild/coalescing logic (building/rebuildQueued flags, watcher lifecycle, socket shutdown sequencing) is a single dense method; extractable into smaller named steps with a proper debounce."
+        },
+        {
+          "category": "architecture",
+          "severity": "minor",
+          "description": "In the truncated onFile hook, context.page.slug is overwritten after parsePage already computed it (slug: basename(filename, '.md')), meaning the slug assignment lives in two places with inconsistent logic \u2014 the plugin mutates shared context state in a way that makes hook ordering matter."
+        }
+      ],
+      "strengths": [
+        "The plugin abstraction is coherent: a single Plugin interface with well-named lifecycle hooks (onStart/beforeBuild/afterBuild/onFile/onEnd) plus a typed BuildContext, which is the right shape for a plugin architecture.",
+        "Dev-server implementation shows care for correctness: path-traversal guard (403 on escaping outputDir), proper 404s, graceful close() draining sockets/server/watcher, and binding to 127.0.0.1.",
+        "Devices are organized into a plugins/ directory, keeping the plugin system separable from core site.ts logic."
+      ],
+      "summary": "A reasonable plugin-architecture refactor (sound lifecycle interface, solid dev-server ergonomics) dragged down by a measured 0.51 convention score \u2014 snake_case in TS plus non-UPPER_CASE constants \u2014 and redundancy where markdown.ts parses frontmatter twice and the dev server re-implements build orchestration.",
+      "session_number": 4
+    },
+    {
+      "commit_hash": "b2c1c44eed4adb02ff62a08eb0f129eddf3747c9",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.5,
+      "convention_adherence": 0.5,
+      "introduces_technical_debt": false,
+      "respects_existing_patterns": true,
+      "better_or_worse": "unclear",
+      "problems": [],
+      "strengths": [],
+      "summary": "Review unavailable.",
+      "session_number": 5
+    }
+  ],
+  "story_review": {
+    "story_name": "static_site_gen",
+    "reviewer_model": "deepseek/deepseek-v4-flash",
+    "overall_coherence": 0.92,
+    "compounding_issues": [
+      "Duplicate frontmatter parsing (gray-matter plus a hand-rolled regex parser) persisted from session 1 into session 4's markdown plugin \u2014 a latent inconsistency never consolidated.",
+      "site.ts accumulated markdown + templating + rendering (~185 lines) until session 4, forcing one large 324-deletion refactor instead of incremental decomposition.",
+      "No node/npm/pytest existed in the sandbox, so the Jest suite never actually executed in any of the 5 sessions \u2014 unverified code shipped every time, most riskily in session 5's cache-invalidation logic.",
+      "Session 4's ssg.config.ts loader monkeypatches require.extensions and pulls typescript (a devDependency) into the runtime path \u2014 a portability/consumption hazard for the packaged tool."
+    ],
+    "key_decisions": [
+      "Discarded the Express/Todo seed codebase and built a TypeScript/Jest static site generator from scratch (true greenfield).",
+      "Adopted Handlebars for templates/layouts/partials with traversal-guarded template resolution (session 2).",
+      "Integrated a dev server using chokidar + WebSocket live reload with path-traversal protection on file serving (session 3).",
+      "Refactored into a plugin architecture \u2014 typed BuildContext, lifecycle hooks (onStart/beforeBuild/onFile/afterBuild/onEnd) \u2014 moving markdown/template/dev-server into plugins (session 4).",
+      "Added a content-addressed incremental build cache (.ssg-cache.json with sha256 source hashes + template-hash invalidation + stats), disabled when custom plugins are present (session 5)."
+    ],
+    "trajectory_description": "Quality rose steadily across all five sessions. Session 1 delivered a clean, tested greenfield core (recursive content scan, frontmatter, index generation); session 2 extended it cleanly with Handlebars templating, layouts, and partials; session 3 integrated a dev server with unusually strong edge-case handling (path-traversal guards, decodeURIComponent error handling, rebuild debouncing); session 4 was the most ambitious \u2014 a genuine architectural refactor that shrank site.ts from ~185 to 69 lines and unified everything behind the plugin seam, though the new code was noticeably denser; session 5 crowned it with a sophisticated incremental cache and build statistics that thread cleanly through the session-4 plugin contract. The only consistent blemish is that no test suite ever ran in the environment, so all of this shipped statically verified rather than executed, and later sessions trended toward terse one-liner expressions that trade readability for compactness.",
+    "summary": "A near-textbook, highly coherent 5-session arc \u2014 greenfield SSG \u2192 templating \u2192 dev server \u2192 plugin refactor \u2192 incremental caching \u2014 where each session builds directly on the prior one and quality improves throughout, tempered only by never-executed tests and increasingly dense code."
+  }
+}

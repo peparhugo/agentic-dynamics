@@ -18,20 +18,21 @@
         "files_added": 17,
         "files_modified": 0,
         "files_deleted": 0,
-        "functions_added": 9,
+        "functions_added": 17,
         "functions_removed": 0,
         "classes_added": 0,
         "classes_removed": 0,
-        "imports_added": 21,
+        "imports_added": 140,
         "imports_removed": 0,
         "lines_added": 4784,
-        "lines_removed": 0
+        "lines_removed": 0,
+        "parse_coverage": 0.45
       },
       "sonar": {
-        "available": false,
-        "bugs_delta": 0,
-        "smells_delta": 0,
-        "complexity_delta": 0,
+        "available": true,
+        "bugs_delta": 1,
+        "smells_delta": 2,
+        "complexity_delta": 45,
         "duplications_delta": 0.0
       },
       "convention": {
@@ -104,20 +105,21 @@
         "files_added": 9,
         "files_modified": 10,
         "files_deleted": 0,
-        "functions_added": 7,
-        "functions_removed": 1,
-        "classes_added": 0,
+        "functions_added": 16,
+        "functions_removed": 2,
+        "classes_added": 1,
         "classes_removed": 0,
-        "imports_added": 12,
-        "imports_removed": 0,
+        "imports_added": 71,
+        "imports_removed": 3,
         "lines_added": 451,
-        "lines_removed": 66
+        "lines_removed": 66,
+        "parse_coverage": 0.9083
       },
       "sonar": {
-        "available": false,
+        "available": true,
         "bugs_delta": 0,
-        "smells_delta": 0,
-        "complexity_delta": 0,
+        "smells_delta": 6,
+        "complexity_delta": 20,
         "duplications_delta": 0.0
       },
       "convention": {
@@ -190,20 +192,21 @@
         "files_added": 2,
         "files_modified": 5,
         "files_deleted": 0,
-        "functions_added": 5,
+        "functions_added": 12,
         "functions_removed": 0,
         "classes_added": 0,
         "classes_removed": 0,
-        "imports_added": 15,
+        "imports_added": 144,
         "imports_removed": 0,
         "lines_added": 457,
-        "lines_removed": 15
+        "lines_removed": 15,
+        "parse_coverage": 0.9226
       },
       "sonar": {
-        "available": false,
+        "available": true,
         "bugs_delta": 0,
-        "smells_delta": 0,
-        "complexity_delta": 0,
+        "smells_delta": 3,
+        "complexity_delta": 50,
         "duplications_delta": 0.0
       },
       "convention": {
@@ -280,13 +283,14 @@
         "functions_removed": 0,
         "classes_added": 0,
         "classes_removed": 0,
-        "imports_added": 1,
+        "imports_added": 2,
         "imports_removed": 0,
         "lines_added": 25,
-        "lines_removed": 0
+        "lines_removed": 0,
+        "parse_coverage": 0.931
       },
       "sonar": {
-        "available": false,
+        "available": true,
         "bugs_delta": 0,
         "smells_delta": 0,
         "complexity_delta": 0,
@@ -369,10 +373,11 @@
         "imports_added": 0,
         "imports_removed": 0,
         "lines_added": 0,
-        "lines_removed": 0
+        "lines_removed": 0,
+        "parse_coverage": 0.9333
       },
       "sonar": {
-        "available": false,
+        "available": true,
         "bugs_delta": 0,
         "smells_delta": 0,
         "complexity_delta": 0,
@@ -492,8 +497,8 @@
       "constraints_met": 3,
       "constraints_total": 3,
       "lines_of_code": 1465,
-      "quality_per_dollar": 0.0,
-      "quality_per_joule": 0.0,
+      "quality_per_dollar": null,
+      "quality_per_joule": null,
       "sonar_analyzed": false,
       "sonar_bugs_delta": 0,
       "sonar_vulnerabilities_delta": 0,
@@ -517,8 +522,8 @@
     "strategy": {
       "strategy": "conservative",
       "strategy_score": 0.431,
-      "exploration_premium": 0.0,
-      "thermal_efficiency": 0.0,
+      "exploration_premium": null,
+      "thermal_efficiency": null,
       "verdict": "CONSERVATIVE \u2014 model maintained sound reasoning (correctness=0%, quality=0.44) with moderate resource use ($6.4531, ~0J). Model absorbed the perturbation without divergence.",
       "recommendation": "Reliable but not novel. Good for production, not for exploration.",
       "operator": "",
@@ -542,8 +547,8 @@
         "constraints_met": 3,
         "constraints_total": 3,
         "lines_of_code": 1465,
-        "quality_per_dollar": 0.0,
-        "quality_per_joule": 0.0,
+        "quality_per_dollar": null,
+        "quality_per_joule": null,
         "sonar_analyzed": false,
         "sonar_bugs_delta": 0,
         "sonar_vulnerabilities_delta": 0,
@@ -610,10 +615,10 @@
         "energy_output_j": 0.0,
         "energy_reasoning_j": 0.0,
         "total_energy_j": 0.0,
-        "solution_density": 0.0,
-        "correctness_per_dollar": 0.0,
-        "quality_per_joule": 0.0,
-        "efficiency_score": 0.0
+        "solution_density": null,
+        "correctness_per_dollar": null,
+        "quality_per_joule": null,
+        "efficiency_score": null
       }
     }
   }

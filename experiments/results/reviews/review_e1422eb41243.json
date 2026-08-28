@@ -1,0 +1,217 @@
+{
+  "story_name": "static_site_gen",
+  "story_id": "e1422eb41243",
+  "model": "deepseek/deepseek-v4-flash",
+  "commit_reviews": [
+    {
+      "commit_hash": "48b501a17107001f38cc352b0e9b8351370a9ce6",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.45,
+      "convention_adherence": 0.53,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": false,
+      "better_or_worse": "neutral",
+      "problems": [
+        {
+          "category": "architecture",
+          "severity": "major",
+          "description": "Session 1 deletes the entire 200-LOC seeded auth API (index.ts) wholesale and starts a greenfield static site generator, discarding the seed's working baseline, tests, and package scaffolding. This removes the measured anchor that test_executed_success, mutation survival, and basin-escape measurement depend on for the story's later sessions."
+        },
+        {
+          "category": "convention",
+          "severity": "major",
+          "description": "40 convention violations (measured convention score 0.53): naming rule breaches in DevServerPlugin.ts, MarkdownPlugin.ts, and TemplatePlugin.ts (Classes/Interfaces should be PascalCase, Constants should be UPPER_CASE)."
+        },
+        {
+          "category": "maintainability",
+          "severity": "minor",
+          "description": "+89 imports and +10 cognitive complexity for a small static site generator suggest plugin/factoring overhead disproportionate to the task, inflating the module surface the story's later sessions must maintain."
+        },
+        {
+          "category": "dependency",
+          "severity": "minor",
+          "description": "package.json declares a new 'ssg' identity and a fresh gray-matter/marked dependency set while abandoning the seed's existing dependencies, silently rewriting the project contract rather than layering onto it."
+        }
+      ],
+      "strengths": [
+        "Modular multi-file layout (src/cli.ts + generator + plugins) is a reasonable separation of concerns for a CLI tool.",
+        "package.json bin/build/test/prepare wiring is complete and idiomatic for a TypeScript project.",
+        "CLI option parsing validates flag arity and prints a usage error on malformed input."
+      ],
+      "summary": "Grounding in the mechanical measurements: this greenfield Session 1 builds a clean but heavier-than-needed SSG with a low 0.53 convention score and 40 naming violations, at the cost of deleting the entire working seed baseline (architectural fit ~0.45).",
+      "session_number": 1
+    },
+    {
+      "commit_hash": "afb028b2f89774d344ff6a26b0571561a6385b08",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.78,
+      "convention_adherence": 0.65,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": true,
+      "better_or_worse": "better",
+      "problems": [
+        {
+          "category": "maintainability",
+          "severity": "minor",
+          "description": "renderTemplatedPage couples template and layout resolution with nested fallback conditionals (if existsSync \u2192 if not page.template \u2192 return renderPage / else throw), the main driver of the measured +16 cognitive complexity; the two-layer fallback/render flow could be split into small helpers."
+        },
+        {
+          "category": "maintainability",
+          "severity": "minor",
+          "description": "Muddled render context contract: renderTemplate injects both 'body' and 'content' into the same context, and the layout render passes 'content: page.html' even though layouts consume '{{body}}'; the Page & {body?, content?} typing makes the template/layout data contract ambiguous."
+        },
+        {
+          "category": "testing",
+          "severity": "minor",
+          "description": "No tests cover the error paths introduced (explicit frontmatter template/layout that does not exist \u2192 throw) or the default-template-absent fallback to renderPage; only the happy paths are tested."
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "DISCREPANCY: the measured 0.53 convention score / 40 violations are attributed to DevServerPlugin.ts, MarkdownPlugin.ts, TemplatePlugin.ts \u2014 files NOT in this diff (different codebase artifacts). The commit's own additions are conventional (camelCase functions, PascalCase interface Page, consistent node:fs/node:path imports), so the low score does not reflect this commit."
+        },
+        {
+          "category": "maintainability",
+          "severity": "info",
+          "description": "All new templating logic (5 functions, ~70 lines) is concentrated in generator.ts, which is growing into a kitchen-sink module; a dedicated template module would be cleaner, though it respects the existing single-file pattern."
+        }
+      ],
+      "strengths": [
+        "Backward compatible: defaults ('./templates', template: 'default') preserve the existing renderPage behavior, and a missing default template silently falls back while an explicitly requested missing template throws a clear error.",
+        "Well tested: covers both the default template + layout + partials path and frontmatter-selected template/layout rendering, mirroring the existing test structure.",
+        "Consistent integration: the --templates CLI flag is threaded through cli.ts \u2192 BuildOptions \u2192 buildSite and the usage string is updated in the same commit.",
+        "Global Handlebars.partials state is reset on each build, avoiding stale-partial leakage across repeated builds in one process.",
+        "Clear, specific error messages for missing template/layout paths aid debuggability."
+      ],
+      "summary": "A coherent, backward-compatible Handlebars templating feature (templates/layouts/partials with frontmatter selection) that fits the existing SSG architecture and is well tested, with only minor debt from a complex nested render flow and an ambiguous template context contract \u2014 while the measured low convention score is driven by files outside this diff.",
+      "session_number": 2
+    },
+    {
+      "commit_hash": "3f0147c18c2702e81d3529374b1c17253ea94930",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.85,
+      "convention_adherence": 0.6,
+      "introduces_technical_debt": false,
+      "respects_existing_patterns": true,
+      "better_or_worse": "better",
+      "problems": [
+        {
+          "category": "testing",
+          "severity": "major",
+          "description": "The entire point of this session \u2014 the dev server \u2014 is behaviorally untested: serveFile's path-traversal guard, 403/404 responses, MIME/directory-to-index handling, the debounced rebuild, the WebSocket reload broadcast, and close() have no tests; only the pure injectLiveReload function is covered."
+        },
+        {
+          "category": "testing",
+          "severity": "minor",
+          "description": "tests/server.test.ts asserts the exact full live-reload script string; any change to the injected HTML breaks the assertion (brittle golden-string test)."
+        },
+        {
+          "category": "maintainability",
+          "severity": "minor",
+          "description": "serveFile + startServer concentrate the measured +29 cognitive complexity; also buildSite() rmSyncs outputDir on every watch-triggered rebuild, which can race in-flight browser requests and cause transient 404s during a rebuild."
+        },
+        {
+          "category": "dependency",
+          "severity": "info",
+          "description": "Two new runtime deps (chokidar ^4.0.3, ws ^8.18.0) for the dev server; defensible (established libs) but heavier than native fs.watch/http alternatives."
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "Discrepancy: the measured convention score (0.53) cites violations in DevServerPlugin.ts/MarkdownPlugin.ts/TemplatePlugin.ts, none of which exist in this commit's tree (this cell has only generator.ts/cli.ts/server.ts) \u2014 the scan appears to have run against a different/broader tree, so the score under-represents this commit's own conventions."
+        }
+      ],
+      "strengths": [
+        "Reuses the existing generator API via ServeOptions extends BuildOptions instead of duplicating build logic",
+        "Path-traversal protection (resolve + root prefix check) with explicit 403/404 handling in serveFile",
+        "injectLiveReload extracted as a pure, exported function and unit-tested; output dir stays clean (injection only at serve time)",
+        "CLI stays consistent with the codebase's throw-on-invalid-usage pattern, adds validated --port, and updates the usage message",
+        "Debounced rebuild and a graceful close() that tears down the timer, watcher, sockets, and HTTP server"
+      ],
+      "summary": "A well-structured integration session that follows the existing generator/CLI patterns and includes proper security handling, though the mechanical 0.53 convention score is a misattribution (it cites files absent from this diff) and the new server core itself lacks behavioral tests.",
+      "session_number": 3
+    },
+    {
+      "commit_hash": "37de3b3dc68915e4f39e3ad0f194202293f2dc5b",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.5,
+      "convention_adherence": 0.5,
+      "introduces_technical_debt": false,
+      "respects_existing_patterns": true,
+      "better_or_worse": "unclear",
+      "problems": [],
+      "strengths": [],
+      "summary": "Review unavailable.",
+      "session_number": 4
+    },
+    {
+      "commit_hash": "46cd5be1bb682ed976fb05b87ba39f908ea3451a",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.65,
+      "convention_adherence": 0.55,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": true,
+      "better_or_worse": "better",
+      "problems": [
+        {
+          "category": "maintainability",
+          "severity": "major",
+          "description": "Module-level mutable `parsedPages` Map in MarkdownPlugin.ts is unbounded global state that persists across builds in the same process; the defensive `tags: [...cached.tags]` clone on both the read and write paths signals the cache must defend against downstream mutation, i.e. shared-mutable-state hazard."
+        },
+        {
+          "category": "architecture",
+          "severity": "major",
+          "description": "Incremental mode never removes the output directory and skips writing cache-hit pages, so a markdown page deleted from content leaves an orphaned HTML file in outputDir (stale-output correctness gap not covered by the diff)."
+        },
+        {
+          "category": "performance",
+          "severity": "minor",
+          "description": "Cache keys embed the full page source text (`${filePath}\\0${source}`) rather than a hash, duplicating content in memory per page; the same source is also independently hashed in generator.ts."
+        },
+        {
+          "category": "maintainability",
+          "severity": "minor",
+          "description": "Cache-hit validity checks only sourceHash + templateHash, not plugin or config changes, so cache entries can silently go stale; `parsedPages` re-parses are redundant with the file-based .ssg-cache.json approach."
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "Build function grew by +26 cognitive complexity and +1 smell as the cache/clean/incremental logic was inlined into build(); `parsedPages` is a lowercase module-level name, matching the pre-existing 'constants should be UPPER_CASE' violation pattern."
+        },
+        {
+          "category": "testing",
+          "severity": "minor",
+          "description": "No tests added for the new --incremental/--clean cache-hit, template-hash-invalidation, or deleted-page paths; the AST diff shows no new test files."
+        }
+      ],
+      "strengths": [
+        "Extends the existing BuildPipeline/PluginContext seams (context.file.cacheHit, context.stats) instead of forking a second build path \u2014 the caching slots into the plugin architecture cleanly.",
+        "Cache-hit pages skip re-render AND re-write, correctly relying on the untouched outputDir state rather than re-emitting files.",
+        "Graceful degradation: a missing/corrupt cache or --clean downgrades to a full build, and template hashing over sorted .hbs files is deterministic."
+      ],
+      "summary": "A reasonable incremental-build feature that rides the existing pipeline/plugin seams, but it ships real technical debt (unbounded module-level parse cache, stale-output risk on deleted pages, +26 cognitive complexity) and its 0.53 convention score is largely inherited from pre-existing violations in untouched files like DevServerPlugin.ts rather than new ones.",
+      "session_number": 5
+    }
+  ],
+  "story_review": {
+    "story_name": "static_site_gen",
+    "reviewer_model": "deepseek/deepseek-v4-flash",
+    "overall_coherence": 0.92,
+    "compounding_issues": [
+      "Seed codebase mismatch: Session 1 discarded the entire Express auth-API seed (200 LOC, irrelevant to a static site generator) and rebuilt greenfield, so the baseline was burned rather than built upon",
+      "Unverifiable tests throughout: the runtime lacks node/npm/jest/tsc, so every session's `npm test`/`jest`/`tsc` attempts failed and the agent wrote ~11 tests it could never execute (top-level result: test_executed_success=False, test_count=0) \u2014 the Session 4 plugin refactor and Session 5 incremental cache were shipped blind",
+      "Incremental build never prunes deleted pages: stale .html files linger in outputDir unless --clean is passed, so the cache can serve removed content",
+      "Unbounded module-level parsePage memo Map (keyed by path+source) grows forever across rebuilds in a long `serve` session \u2014 a memory leak"
+    ],
+    "key_decisions": [
+      "Discard the irrelevant auth-API seed and build the SSG greenfield in Session 1",
+      "Adopt gray-matter + marked for parsing/rendering and a deliberately hand-rolled YAML subset, avoiding a heavyweight YAML dependency",
+      "Choose Handlebars for templates with frontmatter-selected template/layout plus partials (Session 2)",
+      "Dev-server integration via chokidar file watching + WebSocket live reload with a hand-injected reload script (Session 3)",
+      "Restructure everything into a plugin architecture with lifecycle hooks (onStart/beforeBuild/onFile/afterBuild/onEnd) and a ssg.config.ts loaded through a require.extensions TypeScript loader (Session 4) \u2014 the most consequential choice, and the heaviest session (42.6k tokens, $0.41)",
+      "Add incremental builds keyed by sha256 source+template hashes into .ssg-cache.json with skip/time-saved stats and per-page memoization (Session 5)"
+    ],
+    "trajectory_description": "Quality improved steadily across the five sessions. Sessions 1-2 produced a clean, well-tested core (markdown parsing, templating, CLI); Session 3 added a polished integration layer (watch + live reload); Session 4 was the ambitious, risky pivot \u2014 a full plugin-architecture refactor that reshaped every file and slimmed the server from ~94 to ~40 lines while growing the test surface; Session 5 delivered genuine cross-cutting value (incremental caching, build statistics, parse memoization) layered cleanly on the Session 4 pipeline. The test suite grew from 3 to ~11 cases and the architecture matured from a flat script into a lifecycle-driven, configurable pipeline. The persistent weakness is that the environment could never execute TypeScript tooling, so the entire arc \u2014 including the two largest changes \u2014 was built and committed without a single green test run.",
+    "summary": "A textbook greenfield\u2192feature\u2192integration\u2192refactor\u2192cross-cutting arc with strong session-to-session carryover and steadily improving structure, marred only by an environment that made the growing test suite unverifiable and a seed baseline that was wholly discarded."
+  }
+}

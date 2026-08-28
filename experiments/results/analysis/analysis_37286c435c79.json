@@ -18,20 +18,21 @@
         "files_added": 6,
         "files_modified": 0,
         "files_deleted": 1,
-        "functions_added": 2,
-        "functions_removed": 4,
+        "functions_added": 4,
+        "functions_removed": 0,
         "classes_added": 0,
         "classes_removed": 0,
-        "imports_added": 9,
-        "imports_removed": 2,
+        "imports_added": 90,
+        "imports_removed": 0,
         "lines_added": 232,
-        "lines_removed": 93
+        "lines_removed": 93,
+        "parse_coverage": 0.5
       },
       "sonar": {
-        "available": false,
-        "bugs_delta": 0,
-        "smells_delta": 0,
-        "complexity_delta": 0,
+        "available": true,
+        "bugs_delta": 1,
+        "smells_delta": 3,
+        "complexity_delta": 38,
         "duplications_delta": 0.0
       },
       "convention": {
@@ -84,20 +85,21 @@
         "files_added": 0,
         "files_modified": 3,
         "files_deleted": 0,
-        "functions_added": 3,
-        "functions_removed": 1,
+        "functions_added": 0,
+        "functions_removed": 2,
         "classes_added": 0,
         "classes_removed": 0,
-        "imports_added": 0,
-        "imports_removed": 0,
+        "imports_added": 3,
+        "imports_removed": 57,
         "lines_added": 150,
-        "lines_removed": 8
+        "lines_removed": 8,
+        "parse_coverage": 0.8333
       },
       "sonar": {
-        "available": false,
+        "available": true,
         "bugs_delta": 0,
         "smells_delta": 0,
-        "complexity_delta": 0,
+        "complexity_delta": 41,
         "duplications_delta": 0.0
       },
       "convention": {
@@ -151,19 +153,20 @@
         "files_modified": 2,
         "files_deleted": 0,
         "functions_added": 1,
-        "functions_removed": 1,
+        "functions_removed": 0,
         "classes_added": 0,
         "classes_removed": 0,
-        "imports_added": 8,
-        "imports_removed": 0,
+        "imports_added": 78,
+        "imports_removed": 1,
         "lines_added": 153,
-        "lines_removed": 8
+        "lines_removed": 8,
+        "parse_coverage": 0.7083
       },
       "sonar": {
-        "available": false,
+        "available": true,
         "bugs_delta": 0,
-        "smells_delta": 0,
-        "complexity_delta": 0,
+        "smells_delta": 2,
+        "complexity_delta": 40,
         "duplications_delta": 0.0
       },
       "convention": {
@@ -216,20 +219,21 @@
         "files_added": 4,
         "files_modified": 3,
         "files_deleted": 0,
-        "functions_added": 2,
-        "functions_removed": 2,
+        "functions_added": 5,
+        "functions_removed": 0,
         "classes_added": 0,
         "classes_removed": 0,
-        "imports_added": 18,
-        "imports_removed": 1,
+        "imports_added": 113,
+        "imports_removed": 8,
         "lines_added": 254,
-        "lines_removed": 196
+        "lines_removed": 196,
+        "parse_coverage": 0.8125
       },
       "sonar": {
-        "available": false,
+        "available": true,
         "bugs_delta": 0,
-        "smells_delta": 0,
-        "complexity_delta": 0,
+        "smells_delta": 2,
+        "complexity_delta": 33,
         "duplications_delta": 0.0
       },
       "convention": {
@@ -282,20 +286,21 @@
         "files_added": 0,
         "files_modified": 6,
         "files_deleted": 0,
-        "functions_added": 2,
-        "functions_removed": 0,
+        "functions_added": 0,
+        "functions_removed": 3,
         "classes_added": 0,
         "classes_removed": 0,
-        "imports_added": 2,
-        "imports_removed": 1,
+        "imports_added": 13,
+        "imports_removed": 52,
         "lines_added": 161,
-        "lines_removed": 13
+        "lines_removed": 13,
+        "parse_coverage": 0.8125
       },
       "sonar": {
-        "available": false,
+        "available": true,
         "bugs_delta": 0,
-        "smells_delta": 0,
-        "complexity_delta": 0,
+        "smells_delta": 3,
+        "complexity_delta": 44,
         "duplications_delta": 0.0
       },
       "convention": {
@@ -392,8 +397,8 @@
       "constraints_met": 2,
       "constraints_total": 3,
       "lines_of_code": 690,
-      "quality_per_dollar": 1000000.0,
-      "quality_per_joule": 100.0,
+      "quality_per_dollar": null,
+      "quality_per_joule": null,
       "sonar_analyzed": false,
       "sonar_bugs_delta": 0,
       "sonar_vulnerabilities_delta": 0,
@@ -418,7 +423,7 @@
       "strategy": "exploratory",
       "strategy_score": 0.9934,
       "exploration_premium": 9.0947,
-      "thermal_efficiency": 0.0,
+      "thermal_efficiency": null,
       "verdict": "EXPLORATORY \u2014 model escaped attractor (escape=0.85) and found a novel correct solution (novelty=0.96, correctness=100%). Cost: $0.1051, ~0J.",
       "recommendation": "Promote this operator. The perturbation succeeded.",
       "operator": "",
@@ -442,8 +447,8 @@
         "constraints_met": 2,
         "constraints_total": 3,
         "lines_of_code": 690,
-        "quality_per_dollar": 1000000.0,
-        "quality_per_joule": 100.0,
+        "quality_per_dollar": null,
+        "quality_per_joule": null,
         "sonar_analyzed": false,
         "sonar_bugs_delta": 0,
         "sonar_vulnerabilities_delta": 0,
@@ -510,10 +515,10 @@
         "energy_output_j": 0.0,
         "energy_reasoning_j": 0.0,
         "total_energy_j": 0.0,
-        "solution_density": 0.0,
-        "correctness_per_dollar": 0.0,
-        "quality_per_joule": 0.0,
-        "efficiency_score": 0.0
+        "solution_density": null,
+        "correctness_per_dollar": null,
+        "quality_per_joule": null,
+        "efficiency_score": null
       }
     }
   }
