@@ -1,0 +1,181 @@
+name: cap_luna_probe
+question: >-
+  The Luna probe (operator-directed): is GPT-5.6 Luna a good choice for the machine's
+  story-cell volume, measured on the two unknowns the corpus never covered — (1) Luna's
+  success under late_degrade (the condition with ZERO corpus coverage, with the matched Sol
+  cells as the stress-parity comparison) and (2) the per-cell MESSAGE consumption (the
+  ChatGPT subscription's scarce unit — the 5-hour window math for the story-grid volume).
+  8 cells: 6 Luna (3 clean + 3 late_degrade across the 3 stories) + 2 Sol late_degrade
+  (matched). The subscription is OAuth-wired into opencode (auth.json: type=oauth); the cells
+  bill to the ChatGPT window. The decision rule: SUPPORT iff Luna late-degrade success >= Sol's
+  (or both at ceiling) AND median per-cell messages x 30 fits the operator's plan tier's Luna
+  window AND the clean baseline holds. Design authority:
+  docs/designs/current/cap_luna_probe_preregistration.md (committed BEFORE any cell runs).
+version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: true
+repeatable: false
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: true
+    context:
+      domain_context: >-
+        PROVISIONAL DomainProfile. domain: software_delivery / cross-model routing.
+        canonical_sources: [docs/designs/current/cap_luna_probe_preregistration.md (the
+        committed pre-registration — the 8-cell table, the three-leg decision rule, the
+        window-fit math), the cross-models caveat (docs/reviews/cross_models_mixed_effect_caveat.md
+        — the openai family's earlier runs stand; the Claude artifacts are excluded),
+        experiments/results/stories/*.json (the corpus — Luna 100% @ 34 cells, $0.094/story),
+        the ChatGPT pricing page's window table (Plus 250-2,000 / Pro 5x 1,250-10,000 /
+        Pro 20x 5,000-40,000 Luna per 5h), src/agentic_dynamics/adapters/opencode.py (the
+        OAuth backend)].
+        policies: [preregister_before_data, messages_are_measured_never_estimated,
+        re_measure_before_policy]
+      challenge_context: >-
+        PROVISIONAL ChallengeProfile. challenge: research (the Luna-first hypothesis on the
+        unmeasured axes). deliberation: [verify preregistration, run the 8 cells 4-wide
+        recording per-cell message counts, score the three legs + the window fit for all
+        three tiers, verdict, adversarial]. session_policy: {default: fork_per_phase}
+      current_state: >-
+        The ChatGPT subscription is OAuth-wired (opencode auth.json: openai type=oauth).
+        Luna measured 100% @ 34 corpus cells at $0.094/story — but the corpus is
+        ceiling-heavy, has zero late_degrade runs, and the subscription counts MESSAGES
+        (per-cell consumption never measured). The probe measures both. The fixed runner
+        (worktree hook, DOC_CONTRACT gate, real-run validation) is live on main; the openai
+        envelope is free (anthropic owns the re-measurement drain; deepseek owns 2f).
+      hard_rules: >-
+        (1) Every phase commits '[workflow] <phase>' (the worktree hook enforces it).
+        (2) PREREGISTRATION BEFORE DATA: the committed preregistration fixes the 8-cell
+        table, the three-leg decision rule, and the window-fit math — a deviation is a
+        FAILED finding. (3) MESSAGES ARE MEASURED: the run phase records each cell's
+        session-turn count from the transcripts into the cell record (a cell without the
+        count is flagged, never imputed); the score phase re-derives from the recorded
+        field, never from tokens. (4) THE GRID IS THE TABLE: exactly the 8 specified
+        cells — no unlisted cells, no substitution. (4b) PINNED SEMANTICS: success =
+        test_executed_success on the final commit (independent test_runner) AND the 5
+        sessions completed; the stress-parity pairing is task_manager_api + static_site_gen
+        (matched stories), notification_service is the third-story check.
+        (5) OUTCOMES INDEPENDENT: test_runner + the post-hoc evaluator; never the agent's
+        narrative. (6) Flagged, never dropped. (7) Every verdict number cites a produced
+        JSON + SHA256. (8) The treatment is code-unchanged; the cells run on the OAuth
+        subscription path (the window is the billing). (9) No generated-surface edits, no
+        secrets, no external actuation. (10) p4 adversarial mandatory. (11) Resumable only
+        when spec version, goal hash, source revision, and candidate-manifest hash match.
+      read_first: >-
+        docs/designs/current/cap_luna_probe_preregistration.md,
+        docs/reviews/cross_models_mixed_effect_caveat.md,
+        src/agentic_dynamics/adapters/opencode.py,
+        scripts/run_story.py (the cell machinery)
+      run_shape: >-
+        SINGLE wrapper: deepseek/deepseek-v4-flash. Cells: openai/gpt-5.6-luna + sol via
+        opencode (the OAuth subscription path). One branch (feature/cap-luna-probe); each
+        phase commits [workflow] <phase>; each cell in a fresh disposable worktree with a
+        unique FINOPS_CELL_ID. p1 runs the 8 cells at 4-wide. The data chain stays
+        single-writer.
+    phases:
+      - name: p0_pin_spec
+        kind: agent
+        timeout: 3600
+        prompt: |
+          GOAL: {goal}
+          ROLE: verification — the preregistration is committed (cap_luna_probe_preregistration.md,
+          BEFORE any cell ran). Append this spec's SHA256 to its header (the ONLY edit
+          allowed). Verify the 8-cell table, the three-leg decision rule, the window-fit
+          math (the tier table cited), the message-count recording requirement, the $30
+          stop. A deviation is a FAILED finding.
+          DELIVER: the pinned header + verification; committed.
+          LOG: PASS/FAIL; commit.
+      - name: p1_run_probe
+        kind: agent
+        timeout: 21600
+        prompt: |
+          GOAL: {goal}
+          SHAPE: run EXACTLY the 8 cells of the preregistration table (execution manifest
+          FIRST — no unlisted cells). 4-wide, fresh worktree + unique FINOPS_CELL_ID per
+          cell, opencode backend, the OAuth subscription path (do NOT fall back to an API
+          key; a billing-path failure is a FAILED finding). For EVERY cell RECORD the
+          per-cell MESSAGE count — the session-turn count from the cell's transcript
+          (session.jsonl step events — the subscription's scarce unit) — into the cell
+          record (a cell without the count is flagged, never imputed). Outcomes
+          INDEPENDENT (test_runner on the final commit). The late_degrade cells must run
+          the late-degrade stimulus (the corpus's unmeasured condition) — verify the
+          condition in the cell record. Budget guard: the $30 stop; a subscription-window
+          cap mid-run (usage-cap errors) records the affected cells as failed, never done.
+          DELIVER: immutable p1 manifest, per-cell records (facts, message counts,
+          outcomes, flags) + artifact SHA index; committed.
+          LOG: per-cell table (model, story, condition, messages, success); PASS/FAIL;
+          commit.
+      - name: p2_score
+        kind: agent
+        timeout: 14400
+        prompt: |
+          GOAL: {goal}
+          SHAPE: score ONLY immutable p1 artifacts; join-validate against the
+          preregistration table. Emit experiments/results/cap_luna_probe/cap_luna_probe_score_<ts>.json
+          (schema cap_luna_probe_score/v1): per-cell rows (model, story, condition,
+          messages, test_executed_success, all_successful, cost, tokens, duration) + the
+          THREE decision-rule legs:
+          (1) STRESS PARITY: Luna late_degrade success vs Sol late_degrade success on the
+          matched cells (task_manager_api + static_site_gen);
+          (2) WINDOW FIT: median per-cell messages x 30 (a full grid) vs the tier table
+          (Plus 250 / Pro 5x 1,250 / Pro 20x 5,000 Luna-window lower bounds) — the fit
+          reported for all three tiers;
+          (3) BASELINE: the clean cells' success (the fixed-runner re-check).
+          GUARD: the message counts re-derived from the recorded field (never from tokens);
+          the pairing checked against the preregistration table.
+          DELIVER: score + validation JSON; committed.
+          LOG: per-cell table + the three legs + the tier fit table; PASS/FAIL; commit.
+      - name: p3_verdict
+        kind: agent
+        timeout: 10800
+        prompt: |
+          GOAL: {goal}
+          DELIVER exactly one file: docs/designs/current/cap_luna_probe.md
+          SHAPE: source revision, spec version, manifest hash, SHA256s; the per-cell table;
+          the three legs with n + the tier fit table. VERDICT per the preregistration:
+          SUPPORT iff stress parity (Luna >= Sol on the matched late_degrade cells, or both
+          at ceiling) AND the window fit on the operator's tier AND the clean baseline
+          holds. REFUTE otherwise. Report: (1) the late_degrade result — Luna under the
+          unmeasured condition, vs Sol; (2) the measured per-cell messages + the grid-fit
+          math for all three tiers (the operator's subscription tier decides the fit);
+          (3) the clean baseline; (4) the routing recommendation: Luna-first for the
+          story-cell volume iff SUPPORT — and which tier makes the full grid viable.
+          GUARD: every number cites the p2 JSON; no post-hoc redefinition of the legs.
+          LOG: PASS/FAIL; commit.
+      - name: p4_adversarial
+        kind: agent
+        timeout: 14400
+        prompt: |
+          GOAL: {goal}
+          ROLE: adversarial verifier — falsify the probe: (1) preregistration adherence;
+          (2) the message counts (re-derived from the transcripts, never estimated);
+          (3) the success determinations (independent — the test_runner evidence in the
+          commit trails); (4) the pairing (the matched cells really are the same stories);
+          (5) the billing path (the cells ran on the OAuth subscription — a fallback to an
+          API key is a FAILED finding); (6) the window-fit arithmetic (median x 30 vs the
+          cited tier table); (7) the usual suite. Deliver TWO outputs:
+          docs/reviews/cap_luna_probe_adversary.md + docs/reviews/cap_luna_probe_known_safe.md
+          (BOTH with status: accepted frontmatter — the DOC_CONTRACT gate enforces it).
+          LOG: finding table + known-safe list; PASS/FAIL; commit.
+factors:
+  - {name: model, levels: [openai/gpt-5.6-luna, openai/gpt-5.6-sol]}
+design: factorial
+rules:
+  - {name: luna_probe_preregistered, plane: measurement, evidence_class: "[M]", requires: [], produces: [grid_pinned, legs_pinned]}
+  - {name: luna_probe_cells_run, plane: measurement, evidence_class: "[M]", requires: [grid_pinned], produces: [cells_run, message_counts_measured]}
+  - {name: luna_probe_scoring, plane: measurement, evidence_class: "[C]", requires: [cells_run, message_counts_measured], produces: [stress_parity, window_fit, decision_rule]}
+metrics:
+  - {name: success_rate, agg: mean, over: cell}
+  - {name: messages_per_cell, agg: mean, over: cell}
+  - {name: window_fit, agg: mean, over: cell}
+comparison: {kind: effect_size, arm_factor: model, loss: {cost: 1.0, quality: -5.0, value: -10.0}}
+writeup:
+  format: lab_book
+  sections: [question, p0_pin_spec, p1_run_probe, p2_score, p3_verdict, p4_adversarial]
+stop: {budget_usd: 30.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}
