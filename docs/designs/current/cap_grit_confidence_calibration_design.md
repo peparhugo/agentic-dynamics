@@ -1,5 +1,5 @@
 ---
-status: proposed
+status: accepted
 ---
 
 # cap_grit_calibration — design: the retry-threshold × verify-gate calibration (does a retry on a failing attempt pay, and where does it stop?)
