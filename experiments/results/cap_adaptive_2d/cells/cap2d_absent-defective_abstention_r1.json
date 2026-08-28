@@ -1,0 +1,131 @@
+{
+  "abstention_decision": {
+    "decision": "DECLINE",
+    "leg": 2,
+    "reason": "leg 2 \u2014 code_change_risk absent (no risk term measurable \u2014 the seam's refuse state); route to operator review."
+  },
+  "analyzer_status": {
+    "graph": "unavailable (designed)",
+    "lsp": "unavailable (designed)",
+    "sonar": "unavailable (designed)"
+  },
+  "application": {
+    "action": null,
+    "applied_or_null": "declined",
+    "decline_leg": 2,
+    "note": "abstention DECLINE (leg 2) \u2014 the apply pass is SKIPPED; routed to operator review (pilot flag-only, no activation).",
+    "proof": "abstention-decline:leg-2 (no apply pass \u2014 provable in the commit trail)"
+  },
+  "arm": "abstention",
+  "backend": "opencode",
+  "cell_id": "cap2d_absent-defective_abstention_r1",
+  "class": "absent",
+  "cost": {
+    "application_usd": 0.0,
+    "run_workflow_usd": 0.007229,
+    "total_usd": 0.007229
+  },
+  "facts": {},
+  "facts_present": [
+    "ast_parse_coverage",
+    "changed_symbol_count",
+    "lsp_analysis_status",
+    "sonar_analysis_status"
+  ],
+  "finops_cell_id": "cap2d_absent-defective_abstention_r1",
+  "flags": [],
+  "forecast_usd": 0.02604,
+  "goal": "add wrong_op(a, b) to a NEW module widgets.py (no test file, not imported anywhere): documented to return a - b, implemented to return a + b (the single real defect)",
+  "goal_sha256": "c7e8a7e4851f89b208f632ddb2b0c24aeb320109c09975a229fb55f5530edb97",
+  "impl": {
+    "commit_hash": "326c1d2",
+    "confidence": 1.0,
+    "cost_usd": 0.0032328039999999997,
+    "duration_s": 14.37
+  },
+  "model": "deepseek/deepseek-v4-pro",
+  "outcome": {
+    "accepted": false,
+    "defect_note": "family: wrong-operation (wrong_op returns a+b not a-b) present (escaped \u2014 the seam refused)",
+    "defect_present_on_final_commit": true,
+    "final_revision": "326c1d2ca7b059686f9ae2d43343163728ae52da",
+    "test_executed_success": true,
+    "test_runner": "independent pytest (runtime test execution) on the immutable final commit",
+    "tests_passed": 2,
+    "tests_total": 2
+  },
+  "proposal": null,
+  "repetition": "r1",
+  "run_ledger": "/tmp/wt_adaptive_2d/experiments/results/workflows/cap_2c_cell_absent/20260828T005327Z.json",
+  "run_ledger_ok": true,
+  "run_ledger_sha256": "957df1e374cf93204352abb831d228a54a5590f2b3d9529b2f26eb96456dbc34",
+  "schema_version": "cap_adaptive_2d_cell/v1",
+  "seam": {
+    "error": "cannot propose verify_code_change: required fact 'code_change_risk' not measured (contract on_missing: halt) \u2014 refusing rather than guessing",
+    "facts": [
+      {
+        "evidence_ids": [
+          "delta:self-cap2d_absent-defective_abstention_r1:implement:326c1d2ca7b059686f9ae2d43343163728ae52da",
+          "sonar:self-cap2d_absent-defective_abstention_r1:implement:326c1d2ca7b059686f9ae2d43343163728ae52da",
+          "lsp:self-cap2d_absent-defective_abstention_r1:implement:326c1d2ca7b059686f9ae2d43343163728ae52da"
+        ],
+        "predicate": "sonar_analysis_status",
+        "value": "unavailable",
+        "value_type": "enum"
+      },
+      {
+        "evidence_ids": [
+          "delta:self-cap2d_absent-defective_abstention_r1:implement:326c1d2ca7b059686f9ae2d43343163728ae52da",
+          "sonar:self-cap2d_absent-defective_abstention_r1:implement:326c1d2ca7b059686f9ae2d43343163728ae52da",
+          "lsp:self-cap2d_absent-defective_abstention_r1:implement:326c1d2ca7b059686f9ae2d43343163728ae52da"
+        ],
+        "predicate": "lsp_analysis_status",
+        "value": "unavailable",
+        "value_type": "enum"
+      },
+      {
+        "evidence_ids": [
+          "delta:self-cap2d_absent-defective_abstention_r1:implement:326c1d2ca7b059686f9ae2d43343163728ae52da",
+          "sonar:self-cap2d_absent-defective_abstention_r1:implement:326c1d2ca7b059686f9ae2d43343163728ae52da",
+          "lsp:self-cap2d_absent-defective_abstention_r1:implement:326c1d2ca7b059686f9ae2d43343163728ae52da"
+        ],
+        "predicate": "ast_parse_coverage",
+        "value": "1.0",
+        "value_type": "float"
+      },
+      {
+        "evidence_ids": [
+          "delta:self-cap2d_absent-defective_abstention_r1:implement:326c1d2ca7b059686f9ae2d43343163728ae52da",
+          "sonar:self-cap2d_absent-defective_abstention_r1:implement:326c1d2ca7b059686f9ae2d43343163728ae52da",
+          "lsp:self-cap2d_absent-defective_abstention_r1:implement:326c1d2ca7b059686f9ae2d43343163728ae52da"
+        ],
+        "predicate": "changed_symbol_count",
+        "value": "1",
+        "value_type": "int"
+      }
+    ],
+    "facts_present": [
+      "ast_parse_coverage",
+      "changed_symbol_count",
+      "lsp_analysis_status",
+      "sonar_analysis_status"
+    ],
+    "graph_status": "not_requested",
+    "impacted_count": null,
+    "neighborhood": [
+      "wrong_op"
+    ],
+    "note": "designed degraded state: sonar + lsp unavailable + graph unavailable -> code_change_risk unmeasurable -> the seam refuses (never a hand-authored proposal).",
+    "proposal": null,
+    "refused": true
+  },
+  "seeded_app_seed_revision": "cd8d7de4d3cbd11c488ddcad50c6a748c8e6ceb6",
+  "seeded_app_worktree": "/tmp/cap2d_absent-defective_abstention_r1",
+  "slot": 1,
+  "spec_id": "cap_2c_cell_absent@0.1",
+  "status": "ok",
+  "variant": "defective",
+  "wall_s": 27.6,
+  "within_forecast": true,
+  "written_at": "2026-08-28T00:53:28.167135+00:00"
+}

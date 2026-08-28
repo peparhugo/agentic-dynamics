@@ -1,0 +1,252 @@
+{
+  "abstention_decision": {
+    "decision": "APPLY_NULL",
+    "leg": null,
+    "reason": "risk 0.18 < 0.2 but multi-term (NOT the Option A fingerprint) \u2014 apply-null (unchanged, not flagged)."
+  },
+  "analyzer_status": {
+    "graph": "available",
+    "lsp": "available",
+    "sonar": "available"
+  },
+  "application": {
+    "action": "continue",
+    "applied_or_null": "null",
+    "note": "continue proposal -> provable null application (no extra pass).",
+    "proof": "provable-null:commit-trail",
+    "rework_passes": 0
+  },
+  "arm": "status_quo",
+  "backend": "opencode",
+  "cell_id": "cap2d_irrelevant_status_quo_r2",
+  "class": "irrelevant",
+  "cost": {
+    "application_usd": 0.0,
+    "run_workflow_usd": 0.009047,
+    "total_usd": 0.009047
+  },
+  "facts": {
+    "analysis_revision_matches": "true",
+    "ast_parse_coverage": "1.0",
+    "changed_symbol_count": "2",
+    "changed_symbols_with_tests_ratio": "0.5",
+    "code_change_risk": "0.18",
+    "impacted_symbol_count": "4",
+    "lsp_analysis_status": "available",
+    "new_lsp_error_count": "0",
+    "new_sonar_critical_count": "0",
+    "sonar_analysis_status": "available"
+  },
+  "facts_present": [
+    "analysis_revision_matches",
+    "ast_parse_coverage",
+    "changed_symbol_count",
+    "changed_symbols_with_tests_ratio",
+    "code_change_risk",
+    "impacted_symbol_count",
+    "lsp_analysis_status",
+    "new_lsp_error_count",
+    "new_sonar_critical_count",
+    "sonar_analysis_status"
+  ],
+  "finops_cell_id": "cap2d_irrelevant_status_quo_r2",
+  "flags": [],
+  "forecast_usd": 0.02604,
+  "goal": "add a product function to the calc app (with a test), leaving add/subtract unchanged",
+  "goal_sha256": "c99a4b140373960a4babfdba5059e745426eb0a8a8b80f777f0fcc6dcbd52900",
+  "impl": {
+    "commit_hash": "fb86b10",
+    "confidence": 1.0,
+    "cost_usd": 0.0036403119999999997,
+    "duration_s": 16.79
+  },
+  "model": "deepseek/deepseek-v4-pro",
+  "outcome": {
+    "accepted": true,
+    "defect_note": "clean change \u2014 no defect (trivial, fully-tested change)",
+    "defect_present_on_final_commit": false,
+    "final_revision": "06bdfea9601903ee910789bc3d38df76cee7d3c5",
+    "test_executed_success": true,
+    "test_runner": "independent pytest (runtime test execution) on the immutable final commit",
+    "tests_passed": 3,
+    "tests_total": 3
+  },
+  "proposal": {
+    "action": "continue",
+    "analyzed_revision": "fb86b10c7cd7ab6f9adfe73f5a6cf8fc1e0e2245",
+    "applied": false,
+    "artifact": "experiments/results/proposals/b172f656dd273aef.json",
+    "artifact_sha256": "1f398c2a0766e67b8cced1dbd3f8cd7bf5ac24253ec951c87dfd14f5e154d26a",
+    "baseline_revision": "c3792e701599c6dab1766a8d4ba90f3815f4cc13",
+    "confidence": 1.0,
+    "contract_version": "verify_code_change/v1",
+    "depth": 0,
+    "facts_used": [
+      "analysis_revision_matches",
+      "ast_parse_coverage",
+      "changed_symbol_count",
+      "changed_symbols_with_tests_ratio",
+      "code_change_risk",
+      "impacted_symbol_count",
+      "lsp_analysis_status",
+      "new_lsp_error_count",
+      "new_sonar_critical_count",
+      "sonar_analysis_status"
+    ],
+    "proposal_id": "b172f656dd273aef",
+    "schema_version": "verify_code_change_proposal/v1",
+    "scope": []
+  },
+  "repetition": "r2",
+  "run_ledger": "/tmp/wt_adaptive_2d/experiments/results/workflows/cap_2a_cell_clean/20260828T005051Z.json",
+  "run_ledger_ok": true,
+  "run_ledger_sha256": "b3f28f87056ab49eae20a7982b73a784e86f6a325c1e4dddc94d2fbc4b728e13",
+  "schema_version": "cap_adaptive_2d_cell/v1",
+  "seam": {
+    "error": "",
+    "facts": [
+      {
+        "evidence_ids": [
+          "delta:self-cap2d_irrelevant_status_quo_r2:implement:fb86b10c7cd7ab6f9adfe73f5a6cf8fc1e0e2245",
+          "sonar:self-cap2d_irrelevant_status_quo_r2:implement:fb86b10c7cd7ab6f9adfe73f5a6cf8fc1e0e2245",
+          "lsp:self-cap2d_irrelevant_status_quo_r2:implement:fb86b10c7cd7ab6f9adfe73f5a6cf8fc1e0e2245",
+          "impacted:self-cap2d_irrelevant_status_quo_r2:implement:fb86b10c7cd7ab6f9adfe73f5a6cf8fc1e0e2245"
+        ],
+        "predicate": "sonar_analysis_status",
+        "value": "available",
+        "value_type": "enum"
+      },
+      {
+        "evidence_ids": [
+          "delta:self-cap2d_irrelevant_status_quo_r2:implement:fb86b10c7cd7ab6f9adfe73f5a6cf8fc1e0e2245",
+          "sonar:self-cap2d_irrelevant_status_quo_r2:implement:fb86b10c7cd7ab6f9adfe73f5a6cf8fc1e0e2245",
+          "lsp:self-cap2d_irrelevant_status_quo_r2:implement:fb86b10c7cd7ab6f9adfe73f5a6cf8fc1e0e2245",
+          "impacted:self-cap2d_irrelevant_status_quo_r2:implement:fb86b10c7cd7ab6f9adfe73f5a6cf8fc1e0e2245"
+        ],
+        "predicate": "lsp_analysis_status",
+        "value": "available",
+        "value_type": "enum"
+      },
+      {
+        "evidence_ids": [
+          "delta:self-cap2d_irrelevant_status_quo_r2:implement:fb86b10c7cd7ab6f9adfe73f5a6cf8fc1e0e2245",
+          "sonar:self-cap2d_irrelevant_status_quo_r2:implement:fb86b10c7cd7ab6f9adfe73f5a6cf8fc1e0e2245",
+          "lsp:self-cap2d_irrelevant_status_quo_r2:implement:fb86b10c7cd7ab6f9adfe73f5a6cf8fc1e0e2245",
+          "impacted:self-cap2d_irrelevant_status_quo_r2:implement:fb86b10c7cd7ab6f9adfe73f5a6cf8fc1e0e2245"
+        ],
+        "predicate": "analysis_revision_matches",
+        "value": "true",
+        "value_type": "bool"
+      },
+      {
+        "evidence_ids": [
+          "delta:self-cap2d_irrelevant_status_quo_r2:implement:fb86b10c7cd7ab6f9adfe73f5a6cf8fc1e0e2245",
+          "sonar:self-cap2d_irrelevant_status_quo_r2:implement:fb86b10c7cd7ab6f9adfe73f5a6cf8fc1e0e2245",
+          "lsp:self-cap2d_irrelevant_status_quo_r2:implement:fb86b10c7cd7ab6f9adfe73f5a6cf8fc1e0e2245",
+          "impacted:self-cap2d_irrelevant_status_quo_r2:implement:fb86b10c7cd7ab6f9adfe73f5a6cf8fc1e0e2245"
+        ],
+        "predicate": "ast_parse_coverage",
+        "value": "1.0",
+        "value_type": "float"
+      },
+      {
+        "evidence_ids": [
+          "delta:self-cap2d_irrelevant_status_quo_r2:implement:fb86b10c7cd7ab6f9adfe73f5a6cf8fc1e0e2245",
+          "sonar:self-cap2d_irrelevant_status_quo_r2:implement:fb86b10c7cd7ab6f9adfe73f5a6cf8fc1e0e2245",
+          "lsp:self-cap2d_irrelevant_status_quo_r2:implement:fb86b10c7cd7ab6f9adfe73f5a6cf8fc1e0e2245",
+          "impacted:self-cap2d_irrelevant_status_quo_r2:implement:fb86b10c7cd7ab6f9adfe73f5a6cf8fc1e0e2245"
+        ],
+        "predicate": "changed_symbol_count",
+        "value": "2",
+        "value_type": "int"
+      },
+      {
+        "evidence_ids": [
+          "delta:self-cap2d_irrelevant_status_quo_r2:implement:fb86b10c7cd7ab6f9adfe73f5a6cf8fc1e0e2245",
+          "sonar:self-cap2d_irrelevant_status_quo_r2:implement:fb86b10c7cd7ab6f9adfe73f5a6cf8fc1e0e2245",
+          "lsp:self-cap2d_irrelevant_status_quo_r2:implement:fb86b10c7cd7ab6f9adfe73f5a6cf8fc1e0e2245",
+          "impacted:self-cap2d_irrelevant_status_quo_r2:implement:fb86b10c7cd7ab6f9adfe73f5a6cf8fc1e0e2245"
+        ],
+        "predicate": "impacted_symbol_count",
+        "value": "4",
+        "value_type": "int"
+      },
+      {
+        "evidence_ids": [
+          "delta:self-cap2d_irrelevant_status_quo_r2:implement:fb86b10c7cd7ab6f9adfe73f5a6cf8fc1e0e2245",
+          "sonar:self-cap2d_irrelevant_status_quo_r2:implement:fb86b10c7cd7ab6f9adfe73f5a6cf8fc1e0e2245",
+          "lsp:self-cap2d_irrelevant_status_quo_r2:implement:fb86b10c7cd7ab6f9adfe73f5a6cf8fc1e0e2245",
+          "impacted:self-cap2d_irrelevant_status_quo_r2:implement:fb86b10c7cd7ab6f9adfe73f5a6cf8fc1e0e2245"
+        ],
+        "predicate": "new_lsp_error_count",
+        "value": "0",
+        "value_type": "int"
+      },
+      {
+        "evidence_ids": [
+          "delta:self-cap2d_irrelevant_status_quo_r2:implement:fb86b10c7cd7ab6f9adfe73f5a6cf8fc1e0e2245",
+          "sonar:self-cap2d_irrelevant_status_quo_r2:implement:fb86b10c7cd7ab6f9adfe73f5a6cf8fc1e0e2245",
+          "lsp:self-cap2d_irrelevant_status_quo_r2:implement:fb86b10c7cd7ab6f9adfe73f5a6cf8fc1e0e2245",
+          "impacted:self-cap2d_irrelevant_status_quo_r2:implement:fb86b10c7cd7ab6f9adfe73f5a6cf8fc1e0e2245"
+        ],
+        "predicate": "new_sonar_critical_count",
+        "value": "0",
+        "value_type": "int"
+      },
+      {
+        "evidence_ids": [
+          "delta:self-cap2d_irrelevant_status_quo_r2:implement:fb86b10c7cd7ab6f9adfe73f5a6cf8fc1e0e2245",
+          "sonar:self-cap2d_irrelevant_status_quo_r2:implement:fb86b10c7cd7ab6f9adfe73f5a6cf8fc1e0e2245",
+          "lsp:self-cap2d_irrelevant_status_quo_r2:implement:fb86b10c7cd7ab6f9adfe73f5a6cf8fc1e0e2245",
+          "impacted:self-cap2d_irrelevant_status_quo_r2:implement:fb86b10c7cd7ab6f9adfe73f5a6cf8fc1e0e2245"
+        ],
+        "predicate": "changed_symbols_with_tests_ratio",
+        "value": "0.5",
+        "value_type": "float"
+      },
+      {
+        "evidence_ids": [
+          "delta:self-cap2d_irrelevant_status_quo_r2:implement:fb86b10c7cd7ab6f9adfe73f5a6cf8fc1e0e2245",
+          "sonar:self-cap2d_irrelevant_status_quo_r2:implement:fb86b10c7cd7ab6f9adfe73f5a6cf8fc1e0e2245",
+          "lsp:self-cap2d_irrelevant_status_quo_r2:implement:fb86b10c7cd7ab6f9adfe73f5a6cf8fc1e0e2245",
+          "impacted:self-cap2d_irrelevant_status_quo_r2:implement:fb86b10c7cd7ab6f9adfe73f5a6cf8fc1e0e2245"
+        ],
+        "predicate": "code_change_risk",
+        "value": "0.18",
+        "value_type": "float"
+      }
+    ],
+    "facts_present": [
+      "analysis_revision_matches",
+      "ast_parse_coverage",
+      "changed_symbol_count",
+      "changed_symbols_with_tests_ratio",
+      "code_change_risk",
+      "impacted_symbol_count",
+      "lsp_analysis_status",
+      "new_lsp_error_count",
+      "new_sonar_critical_count",
+      "sonar_analysis_status"
+    ],
+    "graph_status": "available",
+    "impacted_count": 4,
+    "neighborhood": [
+      "add",
+      "product",
+      "subtract",
+      "test_add",
+      "test_product",
+      "test_subtract"
+    ],
+    "refused": false
+  },
+  "seeded_app_seed_revision": "c3792e701599c6dab1766a8d4ba90f3815f4cc13",
+  "seeded_app_worktree": "/tmp/cap2d_irrelevant_status_quo_r2",
+  "slot": 3,
+  "spec_id": "cap_2a_cell_clean@0.1",
+  "status": "ok",
+  "variant": null,
+  "wall_s": 190.4,
+  "within_forecast": true,
+  "written_at": "2026-08-28T00:50:52.090379+00:00"
+}
