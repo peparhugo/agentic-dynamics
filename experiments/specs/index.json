@@ -1,6 +1,6 @@
 {
   "schema_version": "spec-status/v2",
-  "generated_at": "2026-08-28T15:13:57.026524+00:00",
+  "generated_at": "2026-08-28T17:06:47.902527+00:00",
   "n_specs": 144,
   "specs": [
     {
@@ -703,24 +703,6 @@
       "latest_cost_usd": 0.0,
       "latest_git_sha": "d5f85126b",
       "results_pointer": "experiments/results/workflows/design_sessions/20260814T065812Z.json",
-      "n_runs": 1
-    },
-    {
-      "name": "i10_typed_checkpoint",
-      "version": "0.1",
-      "status": "failed",
-      "spec_path": "workflows/repository/i10_typed_checkpoint.yaml",
-      "artifact_kind": "workflow",
-      "repeatable": false,
-      "supersedes": [],
-      "superseded_by": null,
-      "completed_at": null,
-      "last_run_at": "2026-08-28T15:06:02.464047+00:00",
-      "latest_ok": false,
-      "latest_model": "deepseek/deepseek-v4-flash",
-      "latest_cost_usd": 0.014979,
-      "latest_git_sha": "7b59a7aee",
-      "results_pointer": "experiments/results/workflows/i10_typed_checkpoint/20260828T150602Z.json",
       "n_runs": 1
     },
     {
@@ -1960,6 +1942,24 @@
       "latest_git_sha": "810a3532a",
       "results_pointer": "experiments/results/workflows/grit_calibration_design/20260828T150551Z.json",
       "n_runs": 1
+    },
+    {
+      "name": "i10_typed_checkpoint",
+      "version": "0.1",
+      "status": "completed",
+      "spec_path": "workflows/repository/i10_typed_checkpoint.yaml",
+      "artifact_kind": "workflow",
+      "repeatable": false,
+      "supersedes": [],
+      "superseded_by": null,
+      "completed_at": null,
+      "last_run_at": "2026-08-28T17:00:11.083105+00:00",
+      "latest_ok": true,
+      "latest_model": "deepseek/deepseek-v4-flash",
+      "latest_cost_usd": 0.008492,
+      "latest_git_sha": "d510794b3",
+      "results_pointer": "experiments/results/workflows/i10_typed_checkpoint/20260828T170011Z.json",
+      "n_runs": 3
     },
     {
       "name": "investing_domain_audit",
