@@ -1,0 +1,86 @@
+name: cap_2f_cell_trivial_clean
+question: >-
+  cap_adaptive_2f trivial_clean calibration cell (the flag-cost leg, Option B): a TRIVIAL fully
+  test-linked clean change — a private-variable rename inside a tested function — so severity
+  signals stay zero, changed_symbols_with_tests_ratio == 1.0, and code_change_risk < 0.2: the B
+  trigger (risk < 0.2 AND ratio >= 1.0) must FIRE on it. The preregistration
+  (docs/designs/current/cap_adaptive_2f_preregistration.md §2) fixes the construction: a
+  behavior-preserving edit to tested symbols, severity zero, ratio 1.0, risk < 0.2 — the decline
+  on a change that needed nothing (the flag-cost leg, the PRIMARY outcome).
+version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: true
+repeatable: true
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: true
+    context:
+      seeded_app: >-
+        A fresh disposable worktree seeded with a tiny calc package: calc.py (add with a private
+        variable `_result`, subtract) and test_calc.py (test_add, test_subtract). The implement
+        phase renames the private variable inside add() — a behavior-preserving, fully
+        test-linked clean change (ratio == 1.0, severity zero, risk < 0.2 — the B trigger fires).
+    phases:
+      - name: implement
+        kind: agent
+        timeout: 1800
+        prompt: |
+          Implement the trivial behavior-preserving rename described in the GOAL.
+
+          GOAL:
+          {goal}
+
+          READ FIRST:
+          - calc.py        (the existing add / subtract functions; add contains the private
+                            variable `_result`)
+          - test_calc.py   (the existing test_add / test_subtract)
+
+          DO:
+          - In calc.py, rename the private variable `_result` inside `add` to `_total`.
+          - Do NOT change add's behavior, do NOT change subtract, do NOT change the tests, do NOT
+            add any new function or file. The change is a behavior-preserving rename of a LOCAL
+            variable inside a tested function ONLY.
+          - The tests MUST stay green (test_add / test_subtract pass unchanged).
+
+          VERIFY: `python -m pytest test_calc.py -q` PASSES (all tests green).
+
+          DELIVER the changed calc.py.
+      - name: test
+        kind: test
+        timeout: 600
+      - name: verify
+        kind: agent
+        timeout: 1800
+        prompt: |
+          Verify the trivial rename landed as specified.
+
+          GOAL:
+          {goal}
+
+          PRIOR PHASES:
+          {prior_phases}
+
+          DO:
+          - Confirm calc.py's `add` now uses `_total` (renamed from `_result`) and its behavior is
+            unchanged.
+          - Confirm subtract, the tests, and the file set are otherwise unchanged.
+          - Confirm `python -m pytest test_calc.py -q` PASSES.
+
+          DELIVER a short verification note.
+factors:
+  - {name: model, levels: [deepseek/deepseek-v4-pro]}
+design: factorial
+rules: []
+metrics:
+  - {name: feature_implemented, agg: mean, over: cell}
+comparison: null
+writeup:
+  format: lab_book
+  sections: [question, implement, test, verify]
+stop: {budget_usd: 2.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}
