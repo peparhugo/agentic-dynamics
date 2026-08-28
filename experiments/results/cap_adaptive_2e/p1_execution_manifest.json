@@ -1,0 +1,72 @@
+{
+  "campaign": "cap_adaptive_2e",
+  "cells": [
+    "cap2e_unseen_family_abstention_r1",
+    "cap2e_unseen_family_abstention_r2",
+    "cap2e_unseen_family_status_quo_r1",
+    "cap2e_unseen_family_status_quo_r2",
+    "cap2e_absent-defective_abstention_r1",
+    "cap2e_absent-defective_status_quo_r1"
+  ],
+  "e1_cell": "cap2e_absent-defective_abstention_r1",
+  "e1_status": "ok",
+  "e1_total_cost_usd": 0.007276,
+  "forecast_per_cell_usd": 0.014552,
+  "phase": "p1_probe_and_e1",
+  "preregistration": "docs/designs/current/cap_adaptive_2e_preregistration.md",
+  "preregistration_revision": "d1a0ad777",
+  "probe": {
+    "construction": "tally(scores) mutation (sorts in place) + REQUIRED test_tally addition (asserts only the return-value contract \u2014 the aliasing defect is invisible)",
+    "construction_failure": true,
+    "facts": {
+      "analysis_revision_matches": "true",
+      "ast_parse_coverage": "1.0",
+      "changed_symbol_count": "2",
+      "changed_symbols_with_tests_ratio": "0.5",
+      "code_change_risk": "0.18",
+      "impacted_symbol_count": "4",
+      "lsp_analysis_status": "available",
+      "new_lsp_error_count": "0",
+      "new_sonar_critical_count": "0",
+      "sonar_analysis_status": "available"
+    },
+    "final_revision": "61c0a26f6c7f0682ab6d38448e6809bb7f6a8929",
+    "fingerprint_check": {
+      "code_change_risk": 0.18,
+      "divergence": true,
+      "expected_fingerprint_risk": 0.08,
+      "impacted_symbol_count": 4,
+      "new_lsp_error_count": 0,
+      "new_sonar_critical_count": 0,
+      "note": "DIVERGENCE \u2014 the measured facts do not present the Option A fingerprint. measured: ratio=0.5, new_sonar_critical=0, new_lsp_error=0, impacted=4, risk=0.18, expected_fingerprint_risk=0.08. This is a CONSTRUCTION FAILURE (the third-failure refute clause of preregistration section 2).",
+      "ratio": 0.5,
+      "ratio_ok": false,
+      "risk_ok": false,
+      "severity_terms_zero": true
+    },
+    "graph_status": "available",
+    "impacted_symbol_count": 4,
+    "neighborhood": [
+      "add",
+      "subtract",
+      "tally",
+      "test_add",
+      "test_subtract",
+      "test_tally"
+    ],
+    "note": "A divergence is a CONSTRUCTION FAILURE \u2014 the THIRD construction divergence (2c + 2d measured ratio 0.5; this probe reproduces the same construction with the REQUIRED test_tally in place). Per preregistration section 2, a third divergence refutes the Option A fingerprint as a mechanism (leg-3 refuted, not merely unmeasured). The divergence cause is mechanistic: the TESTED_BY rule links only module symbols (a new test-file function is itself a changed symbol but is never test-linked), so the REQUIRED test_tally addition forces changed_symbol_count = 2 while only tally is test-linked -> ratio 0.5 -> multi-term risk 0.10 + 0.20\u00b7min(1, impacted/10), never the fingerprint.",
+    "probe": "unseen-family-fingerprint",
+    "seed_revision": "d3c60ba1d3902f6061f0de765abf98de03d83f65"
+  },
+  "schema_version": "cap_adaptive_2e_p1_manifest/v1",
+  "seed_committed_hash": "0f3e7c1b9a4d5e8f6c2a1b9d4e7f8a1c3b5d7e9f2a4c6b8d0e1f3a5c7b9d2e4f6",
+  "seed_measured_sha256": "d8f9bb19a2f9c67003946c89037558a3e8cf6cdcf50c97b20fe80072ccf824af",
+  "seed_mismatch": true,
+  "seed_string": "cap_2e|reconstruct-unseen-family|fingerprint|20260828",
+  "totals": {
+    "abstention": 3,
+    "cells": 6,
+    "status_quo": 3
+  },
+  "written_at": "2026-08-28T14:42:47.924486+00:00"
+}

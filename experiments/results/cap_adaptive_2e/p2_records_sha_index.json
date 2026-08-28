@@ -1,0 +1,39 @@
+{
+  "campaign": "cap_adaptive_2e",
+  "phase": "p2_run_grid",
+  "purpose": "the artifact SHA index over the immutable per-cell records (the p2 DELIVER's 'artifact SHA index'). Kept as a separate additive file so p2_execution_manifest.json stays byte-identical to the state the p4 verdict cites (SHA256 32562eeba7aca3744fb0cd162dfd64cb4a8e247ccf6ba63ba41d975f1293e929).",
+  "records": [
+    {
+      "artifact": "experiments/results/cap_adaptive_2e/cells/cap2e_absent-defective_abstention_r1.json",
+      "cell_id": "cap2e_absent-defective_abstention_r1",
+      "sha256": "881efff86b7d2df59508f3b6c1b7a5926357de243e7c3690aa65d644e2f2fafe"
+    },
+    {
+      "artifact": "experiments/results/cap_adaptive_2e/cells/cap2e_absent-defective_status_quo_r1.json",
+      "cell_id": "cap2e_absent-defective_status_quo_r1",
+      "sha256": "448422d7f7ddf0691bac21b79fd4c5954795d42d6b84ff7a9d3fb6ce8f0b8c38"
+    },
+    {
+      "artifact": "experiments/results/cap_adaptive_2e/cells/cap2e_unseen_family_abstention_r1.json",
+      "cell_id": "cap2e_unseen_family_abstention_r1",
+      "sha256": "b767632f4e66902ceb8d1ce0cda6635461edead8e3cf006366b9346359e94a6d"
+    },
+    {
+      "artifact": "experiments/results/cap_adaptive_2e/cells/cap2e_unseen_family_abstention_r2.json",
+      "cell_id": "cap2e_unseen_family_abstention_r2",
+      "sha256": "880faca4b3798d5712e2e02608ee4991c0320c0e94467207add7a281929a1aa7"
+    },
+    {
+      "artifact": "experiments/results/cap_adaptive_2e/cells/cap2e_unseen_family_status_quo_r1.json",
+      "cell_id": "cap2e_unseen_family_status_quo_r1",
+      "sha256": "2735c15a3e8eeb9182e9da0e10d3d4412f45896f99bacd97704b4975c62aa4ec"
+    },
+    {
+      "artifact": "experiments/results/cap_adaptive_2e/cells/cap2e_unseen_family_status_quo_r2.json",
+      "cell_id": "cap2e_unseen_family_status_quo_r2",
+      "sha256": "b6b794ae1926b87f38c9fcbe307642f3bf9f031b523fd664a01aa07de87a1cba"
+    }
+  ],
+  "schema_version": "cap_adaptive_2e_p2_records_sha_index/v1",
+  "written_at": "2026-08-28T16:58:00+00:00"
+}

@@ -1,0 +1,92 @@
+name: cap_2e_cell_unseen_family
+question: >-
+  cap_adaptive_2e unseen-family calibration cell (the leg-3 capture reconstruction): the 2c
+  mutation/aliasing defect (tally mutates its input) built with the 2e REQUIRED construction —
+  the test_tally addition whose aliasing is INVISIBLE to it (the test passes on the pre-mutation
+  surface and still passes after; per the 2e preregistration section 1). The preregistration
+  (docs/designs/current/cap_adaptive_2e_preregistration.md) fixes the fingerprint the cell must
+  present (ratio == 1.0, severity terms zero, risk == 0.20·min(1, impacted/10) within 1e-9);
+  p1 pre-verifies the construction BEFORE the grid runs. Pre-registration section 3.
+version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: true
+repeatable: true
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: true
+    context:
+      seeded_app: >-
+        A fresh disposable worktree seeded with a tiny calc package: calc.py (add, subtract) and
+        test_calc.py (test_add, test_subtract). The implement phase adds a tally() function with a
+        mutation/aliasing defect so the typed CodeDelta reports a real changed symbol.
+    phases:
+      - name: implement
+        kind: agent
+        timeout: 1800
+        prompt: |
+          Implement a tally function with one real mutation defect.
+
+          GOAL:
+          {goal}
+
+          READ FIRST:
+          - calc.py        (the existing add / subtract functions)
+          - test_calc.py   (the existing test_add / test_subtract)
+
+          DO:
+          - Add a `tally(scores)` function to calc.py. DOCUMENTED CONTRACT: it returns a NEW list
+            of `scores` sorted in descending order and does NOT modify the input list.
+          - Implement it with `scores.sort(reverse=True)` followed by `return scores` — i.e. the
+            input list IS mutated (the single real defect: an aliasing/mutation defect, not a
+            comparison-bound error, not a float-equality, not a complexity smell).
+          - Add a `test_tally` function to test_calc.py that asserts the RETURN-VALUE contract
+            (sorted descending) ONLY — a passing test that does NOT assert whether the input was
+            mutated, so the aliasing defect is INVISIBLE to it (it passes on the pre-mutation
+            surface and still passes after). Do not assert `s == [...]` on the input after the
+            call; do not assert that the input list was unchanged.
+          - Do not change add / subtract or their existing tests.
+
+          VERIFY: `python -m pytest test_calc.py -q` PASSES (all tests green — the aliasing defect
+          is invisible to the required test_tally by construction).
+
+          DELIVER the changed calc.py and test_calc.py.
+      - name: test
+        kind: test
+        timeout: 600
+      - name: verify
+        kind: agent
+        timeout: 1800
+        prompt: |
+          Verify the tally feature landed, including the REQUIRED test_tally.
+
+          GOAL:
+          {goal}
+
+          PRIOR PHASES:
+          {prior_phases}
+
+          DO:
+          - Confirm calc.py defines `tally(scores)` implemented with `scores.sort(...)`.
+          - Confirm test_calc.py defines `test_tally` and that `python -m pytest test_calc.py -q`
+            PASSES (the required test does not assert the input was unchanged — the aliasing
+            defect is invisible to it, per the preregistration).
+          - Confirm add / subtract were left unchanged.
+
+          DELIVER a short verification note.
+factors:
+  - {name: model, levels: [deepseek/deepseek-v4-pro]}
+design: factorial
+rules: []
+metrics:
+  - {name: feature_implemented, agg: mean, over: cell}
+comparison: null
+writeup:
+  format: lab_book
+  sections: [question, implement, test, verify]
+stop: {budget_usd: 2.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}
