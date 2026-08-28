@@ -39,6 +39,29 @@ runtime.workflow_runner ── executes an agent_task workflow's phases inside a
 runtime.test_runner ── independent pytest/jest/go-test/cargo-test runner; sole source of truth for test_executed_success
 ```
 
+## The game board and the permanence gate (L0 — see `docs/designs/proposed/system_knowledge_abstraction.md`)
+
+The system shapes the agent and the agent reshapes the system: every boundary changes the
+derived surfaces (agent files, mental model, tools, skills, mds), and the machine re-renders
+them itself. **`agentic-dynamics surfaces sync`** regenerates every derived surface from its
+sources (game board → agent surfaces → spec lifecycle → data chain; `--full` forces the data
+chain, `--verify` appends the guard suite). **`agentic-dynamics surfaces snapshot`** writes
+`agent_config/system_snapshot.md` — the **game board (L0)**: main HEAD + the last 12 commits of
+chronological history, spec lifecycle counts, registry + corpus counts, live machine state
+(Redis/queue/pipeline), campaigns in flight, and the worktrees awaiting the permanence
+decision. The snapshot is rendered into both agent surfaces (`.opencode/instructions/` +
+`.claude/rules/`) and read by every actor: workers for orientation, the supervisor as its
+assessment baseline (on-task/safety/budget/loops — `scripts/supervise.py`'s `MONITOR_ROLE`),
+the controller instead of chat triage.
+
+**The permanence gate.** Worktree branches (`feature/*`, `wt_*`) are EPHEMERAL proposals; the
+chronological history of the system is `main` plus the merges the controller signs. The
+machine proposes (campaign phases, workflow commits, merge-ready branches); the controller
+decides what becomes permanent. The snapshot's "awaiting permanence" section is the board for
+that decision. The contract layer (frontmatter/status/markers) is the state; the formatter is
+the render — derivation runs contract → render, never backwards (guards verify both
+directions).
+
 ## Package planes (Stage 1 — the modular monorepo)
 
 The former flat `instrument` package is re-homed as `src/agentic_dynamics/` with eight
