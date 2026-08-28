@@ -227,7 +227,8 @@ def main() -> None:
                                 real_run = (
                                     (s.get("total_cost") or 0) > 0
                                     or any(
-                                        (x.get("duration_s") or 0) > 1 or (x.get("tokens") or 0) > 0
+                                        ((x.get("tokens") or {}).get("out") or 0) > 0
+                                        or ((x.get("tokens") or {}).get("in") or 0) > 0
                                         for x in sessions
                                     )
                                     or s.get("all_successful") is True

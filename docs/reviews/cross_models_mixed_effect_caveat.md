@@ -59,3 +59,29 @@ junk); the rates the caveat covers must be re-read from the re-measurement, not 
 This document is a human-recorded data-quality note (provenance [H] — operator observation at
 review of the campaign results; the execution artifacts are [M]). It does not alter the
 measured artifacts; it restricts their interpretation until clean re-runs exist.
+
+## 2026-08-28 — the re-measurement results (measured closure)
+
+The 60-cell re-measurement drained under the fixed runner with `CLAUDE_BIN` set and the
+subscription re-authenticated. **Haiku's clean rates are in; sonnet's re-measurement was
+blocked by the subscription's session limit — not by the treatment.**
+
+| model | old (mixed-effect) | re-measured (clean) | verdict |
+|---|---|---|---|
+| claude-haiku-4-5 overall | 71% (17/24) | **77% (23/30)** | haiku remains the weakest Claude model, but the rates were mildly depressed by the artifacts |
+| haiku clean | 88% (7/8, n=8) | 67% (8/12) | the clean rate is lower at larger n — the "fails even on clean" reading stands, at a modest level |
+| haiku early_degrade | 58% (7/12) | **83% (10/12)** | the mixed-effect WAS depressing the stress conditions — the caveat's hypothesis confirmed |
+| haiku bad_seed | 75% (3/4, n=4) | 83% (5/6) | consistent |
+| claude-sonnet-5 overall | 81% (29/36) | **unmeasured** | the re-measurement's 30 sonnet cells ALL died at the subscription's session limit ("You've hit your session limit · resets 2am") — 0 tokens, 0 cost, ~1.7s sessions, exit 1, no error; NOT treatment failures |
+
+**What the analysis means:** (1) the mixed-effect caveat is now quantified for haiku — its
+stress-condition rates were depressed ~25 points by the artifacts; (2) sonnet's rates remain
+caveated — the re-measurement must re-run after the session-limit reset (the 30 dead files
+were removed; the worker's real-run validation was hardened to require cost > 0 or tokens > 0
+— the 1s-duration loophole that let dead runs through is closed); (3) no policy consumes the
+sonnet rates until the clean re-run exists.
+
+**Worker validation hardening (the re-measurement's second lesson):** the earlier fix
+required "a session with duration > 1s or tokens > 0" — the session-limit deaths run ~1.7s
+sessions with zero tokens, which slipped through. The bar is now **cost > 0 or tokens > 0**
+(the strongest signals; a 0-cost/0-token story is dead by definition).
