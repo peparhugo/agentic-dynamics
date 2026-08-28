@@ -5,8 +5,8 @@ status: accepted
 # cap_adaptive_2e — pre-registration: the leg-3 capture reconstruction (does the Option A fingerprint fire when the cells actually present it?)
 
 **Status: accepted · PRE-REGISTERED — committed BEFORE any cell runs.**
-**Campaign:** `cap_adaptive_2e` (`workflows/repository/cap_adaptive_2e.yaml` — the spec is
-authored as the next artifact; its SHA256 is appended to this header on that commit).
+**Campaign:** `cap_adaptive_2e` (`workflows/repository/cap_adaptive_2e.yaml` SHA256
+`b0ad1c4fe65d364478db4c508e694b58a09c2377a8063efe514796a1d853e4ad`; `cap_adaptive_2e@0.1`).
 **Predecessor:** `cap_adaptive_2d` (merged 2026-08-28, verdict **REFUTE** — but the refute's
 leg B failed on a construction divergence: the unseen-family cells measured multi-term risk
 0.18 (ratio 0.5), NOT the Option A fingerprint (`risk == 0.20·min(1, impacted/10)` exactly), so

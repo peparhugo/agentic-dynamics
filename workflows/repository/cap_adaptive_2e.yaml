@@ -1,0 +1,199 @@
+name: cap_adaptive_2e
+question: >-
+  The leg-3 capture reconstruction: does the abstention rule's Option A fingerprint
+  (risk == 0.20·min(1, impacted/10) exactly — the impacted term alone) fire and capture the
+  unseen-family escapes when the cells actually present the fingerprint? 2d (merged, verdict
+  REFUTE) failed its capture leg because the agent-built unseen-family cells measured
+  multi-term risk 0.18 (ratio 0.5) — the construction's test requirement was missed, so leg 3
+  never fired and the rule was never tested where it matters. 2e rebuilds the cells with the
+  test requirement enforced + p1 pre-verification (the incorrect_rebuilt lesson) and re-runs
+  the capture leg only: 6 cells, 2 arms x 3 low-information cells (unseen-family x2 +
+  absent-defective x1 per arm). The falsifiability: a third construction divergence (measured
+  risk != the fingerprint) refutes leg-3 as a mechanism; capture >= 2/3 in the abstention arm
+  supports the design's leg-3. Design authority: the accepted 2d design (Option A) + the 2e
+  preregistration (docs/designs/current/cap_adaptive_2e_preregistration.md, committed BEFORE
+  any cell runs) + the 2d verdict.
+version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: true
+repeatable: false
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: true
+    context:
+      domain_context: >-
+        PROVISIONAL DomainProfile. domain: software_delivery / CAP adaptive control
+        boundary — the informational-abstention leg-3 capture question. canonical_sources:
+        [docs/designs/current/cap_adaptive_2e_preregistration.md (the committed
+        pre-registration — the 6-cell table, the fingerprint tolerance, the decision rule),
+        docs/designs/current/cap_adaptive_2d.md (the REFUTE verdict — leg B failed on the
+        construction divergence, ratio 0.5), the 2d design (the Option A fingerprint),
+        the 2c verdict + score (the unseen-family construction verbatim), the 2d score JSON
+        (the per-cell facts showing ratio 0.5), src/agentic_dynamics/control/verify_proposal.py
+        + reducers/code_change_facts.py (the treatment — code-unchanged)].
+        policies: [preregister_before_data, fingerprint_must_be_measured_not_assumed,
+        abstain_only_via_the_pinned_rule, shadow_flag_only]
+      challenge_context: >-
+        PROVISIONAL ChallengeProfile. challenge: research (the leg-3 capture measurement).
+        deliberation: [verify preregistration, probe + E1, run the 6-cell grid 4-wide, score
+        the fingerprint + capture + harm, verdict, adversarial].
+        session_policy: {default: fork_per_phase}
+      current_state: >-
+        2d measured the abstention question but its capture leg never fired: the
+        unseen-family cells' measured ratio was 0.5 (multi-term risk 0.18), not the
+        fingerprint's ratio 1.0, so the Option A condition was absent by construction.
+        2e's unseen-family cells REQUIRE the test_tally addition (a passing test that misses
+        the aliasing defect) and p1 pre-verifies the fingerprint (ratio == 1.0, severity
+        terms zero, risk == 0.20·min(1, impacted/10) within 1e-9) BEFORE the grid runs. The
+        runner (worktree-safe commit hook + rewrite, checkpoint, deploy gate) is live on
+        main; the campaign machinery is the 2d harness (run_cap_2e_grid.py, 6 cells, 4-wide).
+      hard_rules: >-
+        (1) Every phase commits '[workflow] <phase>' — the worktree commit-msg hook enforces
+        it. (2) PREREGISTRATION BEFORE DATA: the committed 2e preregistration fixes the
+        grid, the fingerprint tolerance, the capture floor, and the decision rule — a
+        deviation is a FAILED finding. (3) ARMS: status_quo applies proposals exactly;
+        abstention shadow-evaluates the pinned decision table (leg 2 = risk absent;
+        leg 3 = the fingerprint exactly) — DECLINE skips the apply and records the leg.
+        (4) THE FINGERPRINT IS MEASURED: every unseen-family cell's facts are checked
+        against the fingerprint condition in p3; a divergence is a construction failure,
+        and a THIRD divergence refutes leg-3 as a mechanism (reported, never re-labelled).
+        (4b) PINNED SEMANTICS: one-of-two = the 2d semantics (not used in this grid);
+        confidence recorded at emission, exploratory; no new cells beyond the 6-cell table.
+        (5) HARM MEASURED: wrong-continue = E_x x $0.004021 per escaped defect at 11.47/28;
+        the flag-cost leg is vacuous (no clean cells) — reported, not decided.
+        (6) THE DECISION RULE: SUPPORT iff construction fidelity AND capture >= 2/3 of the
+        3 low-information cells in the abstention arm. (7) Outcomes INDEPENDENT
+        (test_runner + post-hoc evaluator on the immutable commits). (8) Flagged, never
+        dropped. (9) Every verdict number cites a produced JSON + SHA256. (10) Treatment
+        code-unchanged; abstention shadow-only. (11) No generated-surface edits, no
+        secrets, no external actuation. (12) p5 adversarial mandatory. (13) Resumable only
+        when spec version, goal hash, source revision, and candidate-manifest hash match.
+      read_first: >-
+        docs/designs/current/cap_adaptive_2e_preregistration.md,
+        docs/designs/current/cap_adaptive_2d.md (the REFUTE + leg-B divergence),
+        docs/designs/current/cap_adaptive_2d_design.md (§2 Option A),
+        docs/designs/current/cap_adaptive_2c.md + the 2c score (the unseen-family
+        construction verbatim), src/agentic_dynamics/control/verify_proposal.py,
+        src/agentic_dynamics/control/reducers/code_change_facts.py
+      run_shape: >-
+        SINGLE wrapper: deepseek/deepseek-v4-flash. Cells: deepseek/deepseek-v4-pro. One
+        branch (feature/cap-adaptive-2e); each phase commits [workflow] <phase>; each cell
+        in a fresh disposable worktree with a unique FINOPS_CELL_ID. p2 runs the 6-cell
+        grid at 4-wide. The data chain stays single-writer.
+    phases:
+      - name: p0_pin_spec
+        kind: agent
+        timeout: 3600
+        prompt: |
+          GOAL: {goal}
+          ROLE: verification — the preregistration is committed (cap_adaptive_2e_preregistration.md,
+          BEFORE any cell ran). Append this spec's SHA256 to its header (the ONLY edit
+          allowed). Verify the 6-cell table, the seed, the fingerprint tolerance (1e-9),
+          the capture floor 2/3, the $30 stop. A deviation is a FAILED finding.
+          DELIVER: the pinned header + verification; committed.
+          LOG: PASS/FAIL; commit.
+      - name: p1_probe_and_e1
+        kind: agent
+        timeout: 10800
+        prompt: |
+          GOAL: {goal}
+          SHAPE: (1) PROBE the unseen-family construction (tally(scores) mutation +
+          REQUIRED test_tally — a passing test that misses the aliasing defect) in a scratch
+          worktree and MEASURE its facts: changed_symbols_with_tests_ratio MUST be 1.0,
+          severity terms zero, and code_change_risk == 0.20·min(1, impacted/10) within 1e-9.
+          A divergence is a CONSTRUCTION FAILURE — report it (the third-failure clause of
+          prereg §2), never fix silently. (2) E1 = cap2e_absent-defective_abstention_r1 per
+          the preregistration table (the leg-2 mechanical check: the seam refuses, the
+          abstention arm records DECLINE leg 2). RECORD facts/proposal/decision/outcome.
+          DELIVER: probe result + E1 record + forecast; committed.
+          LOG: PASS/FAIL; commit.
+      - name: p2_run_grid
+        kind: agent
+        timeout: 21600
+        prompt: |
+          GOAL: {goal}
+          SHAPE: run the remaining 5 cells EXACTLY per the preregistration table (execution
+          manifest FIRST — no unlisted cells). 4-wide concurrency, fresh worktree + unique
+          FINOPS_CELL_ID per cell. The unseen-family stimulus REQUIRES the test_tally
+          addition (ratio 1.0) — the prompt is explicit; do not accept a cell whose change
+          lacks it (record the facts; a divergence is a construction failure, flagged).
+          status_quo: apply exactly per the proposal (continue — wrong). abstention: the
+          pinned table (DECLINE leg 3 when the fingerprint holds exactly; DECLINE leg 2 on
+          the absent cell; APPLY otherwise). Outcomes INDEPENDENT. Absent cells record the
+          refusal + facts. Budget guard: the $30 stop.
+          DELIVER: immutable p2 manifest, per-cell records + abstention decisions + flags +
+          artifact SHA index; committed.
+          LOG: per-cell table; PASS/FAIL; commit.
+      - name: p3_score
+        kind: agent
+        timeout: 14400
+        prompt: |
+          GOAL: {goal}
+          SHAPE: score ONLY immutable p1/p2 artifacts; join-validate against the
+          preregistration table. Emit experiments/results/cap_adaptive_2e/cap_adaptive_2e_score_<ts>.json
+          (schema cap_adaptive_2e_score/v1): per-cell rows (class, arm, facts, fingerprint
+          check with the 1e-9 tolerance, proposal, abstention decision + leg, cost, accepted,
+          outcome) + the CAPTURE table (declined/total per arm per class) + the HARM table
+          (escaped defects x E_x at 11.47/28) + the DECISION-RULE computation (construction
+          fidelity; capture >= 2/3 in the abstention arm; flag-cost vacuous-reported; NI
+          guard NOT MEASURED — capture-only grid) + a validation JSON tracing every number.
+          GUARD: the fingerprint arithmetic re-derived from the recorded facts, never from
+          the proposal text.
+          DELIVER: score + validation; committed.
+          LOG: fingerprint table, capture table, harm table, decision rule; PASS/FAIL; commit.
+      - name: p4_verdict
+        kind: agent
+        timeout: 10800
+        prompt: |
+          GOAL: {goal}
+          DELIVER exactly one file: docs/designs/current/cap_adaptive_2d_e.md
+          SHAPE: source revision, spec version, manifest hash, SHA256s; the fingerprint
+          table; the capture table; the harm table at 11.47/28; the decision rule.
+          VERDICT per the preregistration: SUPPORT iff construction fidelity AND capture
+          >= 2/3 of the low-information cells in the abstention arm. REFUTE if the
+          fingerprint failed to construct (a THIRD divergence — leg-3 refuted as a
+          mechanism) or capture < 2/3. Report: (1) did the cells present the fingerprint?,
+          (2) did leg 3 fire on the unseen-family cells?, (3) the escapes captured vs
+          standing (status_quo baseline vs abstention declines), (4) the boundary restated:
+          does the abstention rule know when not to intervene, measured at the exposure
+          the design assumed?
+          GUARD: every number cites the p3 JSON; no post-hoc redefinition.
+          LOG: PASS/FAIL; commit.
+      - name: p5_adversarial
+        kind: agent
+        timeout: 14400
+        prompt: |
+          GOAL: {goal}
+          ROLE: adversarial verifier — falsify the campaign: (1) preregistration adherence;
+          (2) construction fidelity (the test_tally presence in every unseen-family cell's
+          commit trail + the fingerprint arithmetic re-derived from the facts); (3) arm
+          integrity (status_quo applied exactly; abstention DECLINEs fired ONLY on the
+          pinned legs — provable in the commit trails); (4) the abstention rule (shadow
+          only, Option A applied exactly); (5) the harm model (E_x cited, sensitivity);
+          (6) the decision rule (computed from recorded fields, nothing imputed); (7) the
+          usual suite. Deliver TWO outputs:
+          docs/reviews/cap_adaptive_2e_adversary.md + docs/reviews/cap_adaptive_2e_known_safe.md.
+          LOG: finding table + known-safe list; PASS/FAIL; commit.
+factors:
+  - {name: model, levels: [deepseek/deepseek-v4-pro]}
+  - {name: arm, levels: [status_quo, abstention]}
+design: factorial
+rules:
+  - {name: cap_2e_preregistered, plane: measurement, evidence_class: "[M]", requires: [], produces: [grid_pinned, fingerprint_tolerance]}
+  - {name: cap_2e_cells_run, plane: measurement, evidence_class: "[M]", requires: [grid_pinned], produces: [cells_run, fingerprint_measured]}
+  - {name: cap_2e_scoring, plane: measurement, evidence_class: "[C]", requires: [cells_run, fingerprint_measured], produces: [capture_table, harm_table, decision_rule]}
+metrics:
+  - {name: capture_rate, agg: mean, over: cell}
+  - {name: fingerprint_fidelity, agg: mean, over: cell}
+  - {name: escaped_defects, agg: mean, over: cell}
+comparison: {kind: effect_size, arm_factor: arm, loss: {cost: 1.0, quality: -5.0, value: -10.0}}
+writeup:
+  format: lab_book
+  sections: [question, p0_pin_spec, p1_probe_and_e1, p2_run_grid, p3_score, p4_verdict, p5_adversarial]
+stop: {budget_usd: 30.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}
