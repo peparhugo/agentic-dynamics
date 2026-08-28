@@ -5,8 +5,10 @@ status: accepted
 # cap_luna_probe — pre-registration: is Luna a good choice for the machine's story-cell volume?
 
 **Status: accepted · PRE-REGISTERED — committed BEFORE any cell runs.**
-**Campaign:** `cap_luna_probe` (the spec `workflows/repository/cap_luna_probe.yaml` is authored
-as the next artifact; its SHA256 is appended to this header on that commit). **Motivation
+**Spec SHA256 (pinned):** `e7220621d318a86d8be681a55fab3220a3a5e0f14c7f442c7b9ab1a1b9af1f54`
+— `workflows/repository/cap_luna_probe.yaml`, pinned on its commit
+`1395a4e4e7abfd697a8c9b0488a865d79651db7d`. This is the ONLY post-hoc edit to this document.
+**Campaign:** `cap_luna_probe` (the spec `workflows/repository/cap_luna_probe.yaml`). **Motivation
 (operator-directed, 2026-08-28):** the ChatGPT subscription is OAuth-wired into opencode, and
 Luna is the pricing-page-designated high-volume workhorse ("routing, classification, support,
 background automation, focused coding tasks" — the machine's story-cell shape) with a

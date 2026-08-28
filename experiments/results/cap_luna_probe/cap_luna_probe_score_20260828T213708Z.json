@@ -1,0 +1,267 @@
+{
+  "campaign": "cap_luna_probe",
+  "decision_rule": "SUPPORT iff all three legs pass",
+  "legs": {
+    "1_stress_parity": {
+      "both_at_ceiling": false,
+      "luna_late_degrade_n": 2,
+      "luna_late_degrade_success": 1,
+      "passed": false,
+      "rule": "Luna late_degrade success >= Sol late_degrade success on matched cells, OR both at ceiling",
+      "sol_late_degrade_n": 2,
+      "sol_late_degrade_success": 2
+    },
+    "2_window_fit": {
+      "grid_message_need": 2385,
+      "grid_volume_cells": 30,
+      "median_per_cell_messages": 79.5,
+      "rule": "median per-cell messages x 30 fits the plan tier's Luna window lower bound",
+      "tier_fit": {
+        "Plus": {
+          "fits_lower": false,
+          "grid_need": 2385,
+          "window_lower_bound": 250,
+          "window_upper_bound": 2000
+        },
+        "Pro 20x": {
+          "fits_lower": true,
+          "grid_need": 2385,
+          "window_lower_bound": 5000,
+          "window_upper_bound": 40000
+        },
+        "Pro 5x": {
+          "fits_lower": false,
+          "grid_need": 2385,
+          "window_lower_bound": 1250,
+          "window_upper_bound": 10000
+        }
+      }
+    },
+    "3_baseline_intact": {
+      "clean_n": 3,
+      "clean_success_all_successful_only": [
+        true,
+        true,
+        true
+      ],
+      "clean_success_pinned_semantics": [
+        true,
+        false,
+        true
+      ],
+      "corpus_measure_note": "the corpus's '100% (34 cells)' was measured on all_successful (5 sessions completed); test_executed_success was None/False for most luna cells (esp. TypeScript) \u2014 the fixed-runner re-check is the stricter, preregistered measure",
+      "passed": false,
+      "rule": "clean cells' success matches the corpus expectation (100%)"
+    }
+  },
+  "p1_manifest_sha256": "53e530c55b13af9d2816af1349bd7d6c5304ae83b70d24e61a5fe65f15bef0a2",
+  "per_cell": [
+    {
+      "all_successful": true,
+      "cache_hit_rate": 0.882,
+      "cell_id": "luna_probe_luna_task_manager_api_clean_r1",
+      "condition": "clean",
+      "cost_usd": 0.08285848,
+      "messages": 77,
+      "model": "gpt-5.6-luna",
+      "story": "task_manager_api",
+      "story_result_sha256": "0070018812fba4f30d89e7e8e99d2eb1eab08c38cbe54c4eb27964a3097c5dcc",
+      "success": true,
+      "test_executed_success": true,
+      "total_duration_s": 647.7,
+      "total_tokens": 162490
+    },
+    {
+      "all_successful": true,
+      "cache_hit_rate": 0.839,
+      "cell_id": "luna_probe_luna_static_site_gen_clean_r1",
+      "condition": "clean",
+      "cost_usd": 0.09431384,
+      "messages": 72,
+      "model": "gpt-5.6-luna",
+      "story": "static_site_gen",
+      "story_result_sha256": "9acce8a60f7f72bc0a558c99267ead6bb043ce8e4504d36d99e620bcd2dc1579",
+      "success": false,
+      "test_executed_success": false,
+      "total_duration_s": 818.1,
+      "total_tokens": 190864
+    },
+    {
+      "all_successful": true,
+      "cache_hit_rate": 0.875,
+      "cell_id": "luna_probe_luna_notification_service_clean_r1",
+      "condition": "clean",
+      "cost_usd": 0.098455,
+      "messages": 104,
+      "model": "gpt-5.6-luna",
+      "story": "notification_service",
+      "story_result_sha256": "7a85b5cec4262676a6289d898ae84875e692d101ca4c4b4ee125b67d56d7135c",
+      "success": true,
+      "test_executed_success": true,
+      "total_duration_s": 1222.5,
+      "total_tokens": 197680
+    },
+    {
+      "all_successful": true,
+      "cache_hit_rate": 0.872,
+      "cell_id": "luna_probe_luna_task_manager_api_late_degrade_r1",
+      "condition": "late_degrade",
+      "cost_usd": 0.06935908,
+      "messages": 79,
+      "model": "gpt-5.6-luna",
+      "story": "task_manager_api",
+      "story_result_sha256": "6a11e73e9ceb0d406684ba3a5ae059ab80ac59f9f4194a94dc9fe30f6e75c029",
+      "success": true,
+      "test_executed_success": true,
+      "total_duration_s": 601.9,
+      "total_tokens": 135202
+    },
+    {
+      "all_successful": true,
+      "cache_hit_rate": 0.861,
+      "cell_id": "luna_probe_luna_static_site_gen_late_degrade_r1",
+      "condition": "late_degrade",
+      "cost_usd": 0.09938168,
+      "messages": 80,
+      "model": "gpt-5.6-luna",
+      "story": "static_site_gen",
+      "story_result_sha256": "6d3490e02418ce344deb9d79831397b8e4c1220f27f352f62706f543b685573c",
+      "success": false,
+      "test_executed_success": false,
+      "total_duration_s": 790.3,
+      "total_tokens": 197063
+    },
+    {
+      "all_successful": true,
+      "cache_hit_rate": 0.873,
+      "cell_id": "luna_probe_luna_notification_service_late_degrade_r1",
+      "condition": "late_degrade",
+      "cost_usd": 0.09774684,
+      "messages": 99,
+      "model": "gpt-5.6-luna",
+      "story": "notification_service",
+      "story_result_sha256": "7fdfd681c3556e5eb860edbb88ee0bad599e32ff28b66a5d7ae00620197d0362",
+      "success": true,
+      "test_executed_success": true,
+      "total_duration_s": 796.9,
+      "total_tokens": 196034
+    },
+    {
+      "all_successful": true,
+      "cache_hit_rate": 0.826,
+      "cell_id": "luna_probe_sol_task_manager_api_late_degrade_r1",
+      "condition": "late_degrade",
+      "cost_usd": 2.52135898,
+      "messages": 76,
+      "model": "gpt-5.6-sol",
+      "story": "task_manager_api",
+      "story_result_sha256": "9317bbd45640bd0f03c064525c19ca0ff224f060e946f6cfe49d7a8d815fa362",
+      "success": true,
+      "test_executed_success": true,
+      "total_duration_s": 765.2,
+      "total_tokens": 202293
+    },
+    {
+      "all_successful": true,
+      "cache_hit_rate": 0.89,
+      "cell_id": "luna_probe_sol_static_site_gen_late_degrade_r1",
+      "condition": "late_degrade",
+      "cost_usd": 7.01187886,
+      "messages": 120,
+      "model": "gpt-5.6-sol",
+      "story": "static_site_gen",
+      "story_result_sha256": "b6e82276ff3c6b852136ed8010236c545d7aea70d13addf9603198272ab02a10",
+      "success": true,
+      "test_executed_success": true,
+      "total_duration_s": 1486.4,
+      "total_tokens": 342168
+    }
+  ],
+  "schema": "cap_luna_probe_score/v1",
+  "scored_at": "20260828T213708Z",
+  "scored_from": "immutable p1 artifacts only",
+  "spec_sha256": "e7220621d318a86d8be681a55fab3220a3a5e0f14c7f442c7b9ab1a1b9af1f54",
+  "validation": [
+    {
+      "cell_id": "luna_probe_luna_task_manager_api_clean_r1",
+      "condition_ok": true,
+      "flags": [],
+      "messages_measured": true,
+      "model_ok": true,
+      "ok": true,
+      "reason": "",
+      "story_ok": true
+    },
+    {
+      "cell_id": "luna_probe_luna_static_site_gen_clean_r1",
+      "condition_ok": true,
+      "flags": [],
+      "messages_measured": true,
+      "model_ok": true,
+      "ok": true,
+      "reason": "",
+      "story_ok": true
+    },
+    {
+      "cell_id": "luna_probe_luna_notification_service_clean_r1",
+      "condition_ok": true,
+      "flags": [],
+      "messages_measured": true,
+      "model_ok": true,
+      "ok": true,
+      "reason": "",
+      "story_ok": true
+    },
+    {
+      "cell_id": "luna_probe_luna_task_manager_api_late_degrade_r1",
+      "condition_ok": true,
+      "flags": [],
+      "messages_measured": true,
+      "model_ok": true,
+      "ok": true,
+      "reason": "",
+      "story_ok": true
+    },
+    {
+      "cell_id": "luna_probe_luna_static_site_gen_late_degrade_r1",
+      "condition_ok": true,
+      "flags": [],
+      "messages_measured": true,
+      "model_ok": true,
+      "ok": true,
+      "reason": "",
+      "story_ok": true
+    },
+    {
+      "cell_id": "luna_probe_luna_notification_service_late_degrade_r1",
+      "condition_ok": true,
+      "flags": [],
+      "messages_measured": true,
+      "model_ok": true,
+      "ok": true,
+      "reason": "",
+      "story_ok": true
+    },
+    {
+      "cell_id": "luna_probe_sol_task_manager_api_late_degrade_r1",
+      "condition_ok": true,
+      "flags": [],
+      "messages_measured": true,
+      "model_ok": true,
+      "ok": true,
+      "reason": "",
+      "story_ok": true
+    },
+    {
+      "cell_id": "luna_probe_sol_static_site_gen_late_degrade_r1",
+      "condition_ok": true,
+      "flags": [],
+      "messages_measured": true,
+      "model_ok": true,
+      "ok": true,
+      "reason": "",
+      "story_ok": true
+    }
+  ],
+  "verdict_ready": true
+}

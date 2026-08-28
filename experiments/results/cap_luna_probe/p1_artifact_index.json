@@ -1,0 +1,57 @@
+{
+  "artifacts": {
+    "luna_probe_luna_notification_service_clean_r1.json": {
+      "sha256": "fc8355fc27715fec7b71dd4ee56706765c097fe492e569dec74ab33a1d5f83b6"
+    },
+    "luna_probe_luna_notification_service_late_degrade_r1.json": {
+      "sha256": "486ca4d66dc805ce12627dca4e01a709fcbeb852a536a969b84e31b0a641802e"
+    },
+    "luna_probe_luna_static_site_gen_clean_r1.json": {
+      "sha256": "08184bd0c824dc5d52340b21e9c930a6649235562b646bc2865e4e6a7197d9e3"
+    },
+    "luna_probe_luna_static_site_gen_late_degrade_r1.json": {
+      "sha256": "6af24da34ab8767d23001522f0bb630e6874c1df696f9b4abdf5f6e8e553c9f0"
+    },
+    "luna_probe_luna_task_manager_api_clean_r1.json": {
+      "sha256": "11886bbcff93933b22ef2d2c4c94d6d2e9fb70e65f5afb12c6432f094b2445e3"
+    },
+    "luna_probe_luna_task_manager_api_late_degrade_r1.json": {
+      "sha256": "0def5aaf8d6e2136810bc382e3feb060fc70c051e3c03133bfd0033abcb234da"
+    },
+    "luna_probe_sol_static_site_gen_late_degrade_r1.json": {
+      "sha256": "525bb7530cc9cb54f30fe339048a6475ef0312d15635d6adfc11cf99a3e4ae29"
+    },
+    "luna_probe_sol_task_manager_api_late_degrade_r1.json": {
+      "sha256": "f4f81b041279a736dadfef1aa56e13c73d0c31bfc267f519787b3bd5c15dd8e4"
+    },
+    "notification_service_gpt_5_6_luna_clean_b4ca31071603.json": {
+      "sha256": "7a85b5cec4262676a6289d898ae84875e692d101ca4c4b4ee125b67d56d7135c"
+    },
+    "notification_service_gpt_5_6_luna_late_degrade_0a38de2a9f9b.json": {
+      "sha256": "7fdfd681c3556e5eb860edbb88ee0bad599e32ff28b66a5d7ae00620197d0362"
+    },
+    "p1_manifest.json": {
+      "sha256": "53e530c55b13af9d2816af1349bd7d6c5304ae83b70d24e61a5fe65f15bef0a2"
+    },
+    "static_site_gen_gpt_5_6_luna_clean_3d1a2179c2e9.json": {
+      "sha256": "9acce8a60f7f72bc0a558c99267ead6bb043ce8e4504d36d99e620bcd2dc1579"
+    },
+    "static_site_gen_gpt_5_6_luna_late_degrade_a33e62acc04f.json": {
+      "sha256": "6d3490e02418ce344deb9d79831397b8e4c1220f27f352f62706f543b685573c"
+    },
+    "static_site_gen_gpt_5_6_sol_late_degrade_45c22b4ad9f8.json": {
+      "sha256": "b6e82276ff3c6b852136ed8010236c545d7aea70d13addf9603198272ab02a10"
+    },
+    "task_manager_api_gpt_5_6_luna_clean_bf6140661d7d.json": {
+      "sha256": "0070018812fba4f30d89e7e8e99d2eb1eab08c38cbe54c4eb27964a3097c5dcc"
+    },
+    "task_manager_api_gpt_5_6_luna_late_degrade_098ccef9f404.json": {
+      "sha256": "6a11e73e9ceb0d406684ba3a5ae059ab80ac59f9f4194a94dc9fe30f6e75c029"
+    },
+    "task_manager_api_gpt_5_6_sol_late_degrade_fd5a0576b2fc.json": {
+      "sha256": "9317bbd45640bd0f03c064525c19ca0ff224f060e946f6cfe49d7a8d815fa362"
+    }
+  },
+  "campaign": "cap_luna_probe",
+  "schema": "cap_luna_probe_p1_artifact_index/v1"
+}
