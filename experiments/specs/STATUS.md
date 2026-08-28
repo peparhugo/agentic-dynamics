@@ -3,8 +3,8 @@
 **Generated — do not edit by hand.** Regenerate with `python scripts/spec_status.py`;
 `scripts/run_workflow.py` also refreshes it at the end of every run.
 
-Generated at: `2026-08-28T14:29:38.573395+00:00`  ·  140 spec(s)
-**Work remaining:** 38 open · 102 completed/retired
+Generated at: `2026-08-28T14:55:32.789109+00:00`  ·  141 spec(s)
+**Work remaining:** 38 open · 103 completed/retired
 
 | name | kind | repeatable | status | version | supersedes | last_run | ok | model | cost | n_runs |
 |---|---|---|---|---|---|---|---|---|---|---|
@@ -57,6 +57,7 @@ Generated at: `2026-08-28T14:29:38.573395+00:00`  ·  140 spec(s)
 | `cap_2a_shadow_calibration` | workflow | no | completed | 0.2 | — | 2026-08-25 22:36 | ok | deepseek/deepseek-v4-pro | $0.8251 | 1 |
 | `cap_2b` | workflow | no | completed | 0.1 | cap_2a_rerun3 | 2026-08-26 16:04 | ok | deepseek/deepseek-v4-flash | $0.2303 | 1 |
 | `cap_adaptive_2c` | workflow | no | completed | 0.1 | — | 2026-08-27 18:18 | ok | deepseek/deepseek-v4-flash | $0.2420 | 2 |
+| `cap_adaptive_2e` | workflow | no | completed | 0.1 | — | 2026-08-28 14:55 | ok | deepseek/deepseek-v4-flash | $0.1989 | 1 |
 | `cap_addendum_design` | workflow | no | completed | 0.1 | — | 2026-08-22 18:15 | ok | deepseek/deepseek-v4-pro | $0.4667 | 1 |
 | `cap_addendum_implement` | workflow | no | completed | 0.1 | — | 2026-08-24 14:07 | ok | anthropic/claude-sonnet-5 | $27.9867 | 2 |
 | `cap_e2_cascade_run` | workflow | no | completed | 0.1 | — | 2026-08-24 23:55 | ok | deepseek/deepseek-v4-flash | $0.1075 | 1 |
