@@ -1,14 +1,14 @@
 {
   "schema_version": "sync-identity/v2",
-  "generated_at": "2026-08-27T20:33:40.982039+00:00",
-  "registry_identity_sha256": "8cda2e428a34e1717701bd51e9029ae2812f294dcdaae6e1997569a52d6ee8cc",
-  "resolved_input_sha256": "58e642e6b38d847304d7f3dc8e649f53fd1126cb2222ed86c52393c0bd9c7c8f",
+  "generated_at": "2026-08-28T12:49:32.541636+00:00",
+  "registry_identity_sha256": "6b49081ca09d6c1e3639a89edfc6324bb2d41d47010a29c1c41c43b08fabf5fc",
+  "resolved_input_sha256": "fd358eb3b21cde22c85da69134886548bc32378b3cccb46d9fa424a8a22d682b",
   "rows": {
     "sessions": 1067,
     "stories": 215
   },
   "sessions_rows_sha256": "82dd220ccd4f762fcc56423b65dccaac05c5c41fc8c73062933421f62155829a",
-  "stories_rows_sha256": "6a4e2a6670f50210c46c05350da7701d352da1b7095d6fcc8679bcc57b91d68b",
+  "stories_rows_sha256": "6247a2f002825e29f0ddc4d98181797f0b535f29fa531dfe8ad480799b51114e",
   "sync_transform_sha256": "61c47ca1dd960996d1ceff88e24b19ea5b3f80780189a03bd3629b987b64c2fb",
   "schema_sha256": "8bac678e802e14f87b1d7a18cafd2c6b47a636d7760895967ada63f43836778f"
 }

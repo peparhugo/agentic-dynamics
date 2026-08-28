@@ -1,6 +1,6 @@
 {
   "experiment_id": "lab_cache_economics",
-  "generated_at": "2026-08-27T22:33:56.528178",
+  "generated_at": "2026-08-28T14:50:24.691566",
   "summary": {
     "models": 7,
     "stories": 215
@@ -248,9 +248,9 @@
   "lab_contract": {
     "lab": "lab_cache_economics.py",
     "input_dataset_id": "canonical_registry/story",
-    "registry_identity_sha256": "8cda2e428a34e1717701bd51e9029ae2812f294dcdaae6e1997569a52d6ee8cc",
+    "registry_identity_sha256": "6b49081ca09d6c1e3639a89edfc6324bb2d41d47010a29c1c41c43b08fabf5fc",
     "resolved_input_sha256": "7d2ab0fe4c18695fe26767d6e848f7a2e3f3a397d16b1e183594f70b9136c716",
-    "registry_version": "data-manifest/1.0+12808rows",
+    "registry_version": "data-manifest/1.0+12829rows",
     "metric_definition_version": "cache_economics/v2",
     "metric_source_sha256": "c3c4ea9e7f5875b281d24905d28cdaacd4e9cb3be779327c77e856f486f47d5a",
     "n_resolved_records": 215,
@@ -269,6 +269,6 @@
     "data_integrity_policy": "docs/data_integrity_findings.md",
     "requires_external_service": null,
     "contract_version": "lab-contract/v6",
-    "generated_at": "2026-08-27T20:33:56.528747+00:00"
+    "generated_at": "2026-08-28T12:50:24.692117+00:00"
   }
 }

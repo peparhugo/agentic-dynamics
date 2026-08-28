@@ -108,8 +108,9 @@ plans:
       depends_on:
       - reviews
       steps:
-      - - python3
-        - scripts/archive/backfill_costs.py
+      - - bash
+        - -c
+        - PYTHONPATH=. python3 scripts/archive/backfill_costs.py
       - - python3
         - scripts/sync_data.py
       - - python3
@@ -189,8 +190,9 @@ plans:
       depends_on:
       - reviews
       steps:
-      - - python3
-        - scripts/archive/backfill_costs.py
+      - - bash
+        - -c
+        - PYTHONPATH=. python3 scripts/archive/backfill_costs.py
       - - python3
         - scripts/sync_data.py
       - - python3
