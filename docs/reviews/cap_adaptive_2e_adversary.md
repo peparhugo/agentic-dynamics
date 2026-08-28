@@ -1,3 +1,7 @@
+---
+status: accepted
+---
+
 # cap_adaptive_2e — adversarial review
 
 **Role:** adversarial verifier — falsify the campaign. Campaign `cap_adaptive_2e` (`cap_adaptive_2e@0.1`,
