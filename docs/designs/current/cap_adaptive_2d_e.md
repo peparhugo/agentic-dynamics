@@ -135,3 +135,24 @@ pre-registered deviations reported as FAILED findings, not re-labelled.
 **LOG:** probe divergence measured (ratio 0.5, risk 0.18 ≠ 0.08) → all 4 grid cells reproduce it →
 leg 3 never fired → capture 1/3 → harm symmetric $0.138327 @11 per arm → verdict REFUTE (third
 construction divergence refutes leg-3 as a mechanism). **PASS — verdict committed.**
+
+---
+
+## Follow-up (operator decision, 2026-08-28)
+
+**Option B is the queued follow-up.** The Option A fingerprint is refuted as a mechanism (the
+construction and the fingerprint are mutually exclusive under the real measurement rule), so the
+abstention rule's leg-3 needs either a wider trigger or a new signal. The recorded boundary:
+Option B (decline on any risk < 0.2 with `changed_symbols_with_tests_ratio >= 1.0`) flags the
+irrelevant class too — the flag-cost leg becomes the measured question (the falsifiability
+contract's cost-vs-saved-harm tradeoff). A follow-up campaign would pre-register Option B's
+fingerprint (or a candidate new signal) with the flag-cost ceiling as the PRIMARY outcome. No
+production activation until then — the abstention rule stays shadow-only.
+
+**The session's measured arc (recorded):** 2c NON-INFERIOR (ratio 0.6537, the informational
+boundary) → 2d REFUTE (capture leg unmeasured: the cells didn't present the fingerprint) → 2e
+REFUTE (the fingerprint cannot construct on its own target — leg 3 refuted as a mechanism).
+The abstention question's honest state: decline-on-no-information (legs 1-2: stale/unmeasurable
+facts) is mechanically sound; decline-on-signal-free-fully-tested (leg 3) is unconstructible
+with the current signals. The controller knows when NOT to intervene only for the refusal
+states, not for the invisible-defect states — a measurement frontier.
