@@ -3,7 +3,7 @@
 **Generated — do not edit by hand.** Regenerate with `python scripts/spec_status.py`;
 `scripts/run_workflow.py` also refreshes it at the end of every run.
 
-Generated at: `2026-08-28T04:35:22.320965+00:00`  ·  138 spec(s)
+Generated at: `2026-08-28T13:13:16.797484+00:00`  ·  138 spec(s)
 **Work remaining:** 36 open · 102 completed/retired
 
 | name | kind | repeatable | status | version | supersedes | last_run | ok | model | cost | n_runs |
@@ -39,7 +39,7 @@ Generated at: `2026-08-28T04:35:22.320965+00:00`  ·  138 spec(s)
 | `routing_regret_under_degradation` | experiment | yes | runnable | 0.2 | — | — | — | — | — | 0 |
 | `self_recommending_experiment` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `agentic_dynamics_rebrand` | workflow | no | failed | 0.1 | — | 2026-08-14 22:02 | fail | openai/gpt-5.6-sol | $7.7341 | 2 |
-| `cap_adaptive_2d` | workflow | no | failed | 0.1 | — | 2026-08-28 04:35 | fail | deepseek/deepseek-v4-flash | $0.0919 | 2 |
+| `cap_adaptive_2d` | workflow | no | failed | 0.1 | — | 2026-08-28 13:02 | fail | deepseek/deepseek-v4-flash | $0.0496 | 3 |
 | `cap_site_revamp4_diagrams` | workflow | no | failed | 0.1 | — | 2026-08-27 19:57 | fail | deepseek/deepseek-v4-flash | $0.0897 | 3 |
 | `claude_background_sessions` | workflow | no | failed | 0.1 | — | 2026-08-14 17:38 | fail | anthropic/claude-fable-5 | $15.4471 | 1 |
 | `control_room_portal` | workflow | no | failed | 0.2 | — | 2026-08-14 03:36 | fail | openai/gpt-5.6-sol | $0.0000 | 3 |

@@ -24,6 +24,14 @@ plans:
   deploy:
     description: Refresh inventory → sync parquet → build data.js → firebase deploy
     phases:
+    - id: surfaces
+      kind: shell
+      cmd:
+      - python3
+      - scripts/sync_surfaces.py
+      deps:
+      - none
+      timeout: 1200
     - id: refresh
       kind: shell
       cmd:

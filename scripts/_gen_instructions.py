@@ -45,7 +45,7 @@ ROOT = Path(__file__).resolve().parent.parent
 AGENT_CONFIG = ROOT / "agent_config"
 
 #: Instruction documents (plain markdown, no frontmatter) mapped to both surfaces.
-INSTRUCTIONS = ("mental-model.md", "rules.md", "conventions.md")
+INSTRUCTIONS = ("mental-model.md", "rules.md", "conventions.md", "system_snapshot.md")
 
 #: The seven skills (name/description frontmatter — the schema is SHARED by both platforms).
 SKILLS = ("analyze", "control-room", "instrument", "lab-books", "queue", "review", "run-workflow")
