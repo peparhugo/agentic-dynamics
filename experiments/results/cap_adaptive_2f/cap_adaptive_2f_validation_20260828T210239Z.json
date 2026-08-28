@@ -1,0 +1,159 @@
+{
+  "campaign": "cap_adaptive_2f",
+  "note": "Every number in the score JSON is traced above to an immutable record field (or the pre-registered constants); the ratio and the B trigger are re-derived from the recorded facts, never from the proposal text.",
+  "phase": "p3_score",
+  "preregistration": "docs/designs/current/cap_adaptive_2f_preregistration.md",
+  "preregistration_revision": "d199c50b6",
+  "schema_version": "cap_adaptive_2f_validation/v1",
+  "score_artifact": "experiments/results/cap_adaptive_2f/cap_adaptive_2f_score_20260828T210239Z.json",
+  "score_sha256": "fa6bc16b5c32773c31d7274d29633a3f1d1b482ec2edfad5a9eb238216d591f2",
+  "traces": [
+    {
+      "b_trigger_fires_traced_to": "re-derived from recorded facts: risk < 0.2 AND ratio >= 1.0 AND severity zero -> N/A (absent class)",
+      "cell_id": "cap2f_absent-defective_abstention_r1",
+      "cost_traced_to": "cell record cost.total_usd = 0.007078",
+      "decision_traced_to": "abstention_decision DECLINE/leg2",
+      "escaped_defect_traced_to": "outcome.defect_present_on_final_commit = True",
+      "harm_traced_to": "escaped_defect_count x 0.046109 (E_x 11.4671 x 0.004021)",
+      "ratio_traced_to": "cell record facts.changed_symbols_with_tests_ratio = None",
+      "record_sha256": "5bcb194667caa2a14a7c16b1a547ccf3f1284f81fbc4f04c5f2f4a13d191057f",
+      "risk_traced_to": "cell record facts.code_change_risk = None"
+    },
+    {
+      "b_trigger_fires_traced_to": "re-derived from recorded facts: risk < 0.2 AND ratio >= 1.0 AND severity zero -> N/A (absent class)",
+      "cell_id": "cap2f_absent-defective_status_quo_r1",
+      "cost_traced_to": "cell record cost.total_usd = 0.007416",
+      "decision_traced_to": "abstention_decision DECLINE/leg2",
+      "escaped_defect_traced_to": "outcome.defect_present_on_final_commit = True",
+      "harm_traced_to": "escaped_defect_count x 0.046109 (E_x 11.4671 x 0.004021)",
+      "ratio_traced_to": "cell record facts.changed_symbols_with_tests_ratio = None",
+      "record_sha256": "374e500c5951fd01a38481a297baac768c648151e7d3cc13b10e7e7aeab0e1e2",
+      "risk_traced_to": "cell record facts.code_change_risk = None"
+    },
+    {
+      "b_trigger_fires_traced_to": "re-derived from recorded facts: risk < 0.2 AND ratio >= 1.0 AND severity zero -> True",
+      "cell_id": "cap2f_trivial_clean_abstention_r1",
+      "cost_traced_to": "cell record cost.total_usd = 0.008873",
+      "decision_traced_to": "abstention_decision DECLINE/leg3",
+      "escaped_defect_traced_to": "outcome.defect_present_on_final_commit = False",
+      "harm_traced_to": "escaped_defect_count x 0.046109 (E_x 11.4671 x 0.004021)",
+      "ratio_traced_to": "cell record facts.changed_symbols_with_tests_ratio = 1.0",
+      "record_sha256": "a24c505d4ac169e6b5bd5802a0f383153b69c70abb56f94a17ad65cbbdaaa34f",
+      "risk_traced_to": "cell record facts.code_change_risk = 0.06"
+    },
+    {
+      "b_trigger_fires_traced_to": "re-derived from recorded facts: risk < 0.2 AND ratio >= 1.0 AND severity zero -> True",
+      "cell_id": "cap2f_trivial_clean_abstention_r2",
+      "cost_traced_to": "cell record cost.total_usd = 0.008383",
+      "decision_traced_to": "abstention_decision DECLINE/leg3",
+      "escaped_defect_traced_to": "outcome.defect_present_on_final_commit = False",
+      "harm_traced_to": "escaped_defect_count x 0.046109 (E_x 11.4671 x 0.004021)",
+      "ratio_traced_to": "cell record facts.changed_symbols_with_tests_ratio = 1.0",
+      "record_sha256": "cb9ca799276fb8406041999492630f3032b746e1dea74ef95e95b78ea3990453",
+      "risk_traced_to": "cell record facts.code_change_risk = 0.06"
+    },
+    {
+      "b_trigger_fires_traced_to": "re-derived from recorded facts: risk < 0.2 AND ratio >= 1.0 AND severity zero -> True",
+      "cell_id": "cap2f_trivial_clean_status_quo_r1",
+      "cost_traced_to": "cell record cost.total_usd = 0.008156",
+      "decision_traced_to": "abstention_decision DECLINE/leg3",
+      "escaped_defect_traced_to": "outcome.defect_present_on_final_commit = False",
+      "harm_traced_to": "escaped_defect_count x 0.046109 (E_x 11.4671 x 0.004021)",
+      "ratio_traced_to": "cell record facts.changed_symbols_with_tests_ratio = 1.0",
+      "record_sha256": "053e2180c234376013b57b3c1d5d005a6258315b8ffed96adbef1093e58f91f9",
+      "risk_traced_to": "cell record facts.code_change_risk = 0.06"
+    },
+    {
+      "b_trigger_fires_traced_to": "re-derived from recorded facts: risk < 0.2 AND ratio >= 1.0 AND severity zero -> True",
+      "cell_id": "cap2f_trivial_clean_status_quo_r2",
+      "cost_traced_to": "cell record cost.total_usd = 0.008466",
+      "decision_traced_to": "abstention_decision DECLINE/leg3",
+      "escaped_defect_traced_to": "outcome.defect_present_on_final_commit = False",
+      "harm_traced_to": "escaped_defect_count x 0.046109 (E_x 11.4671 x 0.004021)",
+      "ratio_traced_to": "cell record facts.changed_symbols_with_tests_ratio = 1.0",
+      "record_sha256": "75d64012b090b5e00dafba24d397977dd84d92fc184b13e900c8a5e8bc2c1856",
+      "risk_traced_to": "cell record facts.code_change_risk = 0.06"
+    },
+    {
+      "b_trigger_fires_traced_to": "re-derived from recorded facts: risk < 0.2 AND ratio >= 1.0 AND severity zero -> False",
+      "cell_id": "cap2f_unseen_family_abstention_r1",
+      "cost_traced_to": "cell record cost.total_usd = 0.009381",
+      "decision_traced_to": "abstention_decision APPLY_NULL/legNone",
+      "escaped_defect_traced_to": "outcome.defect_present_on_final_commit = True",
+      "harm_traced_to": "escaped_defect_count x 0.046109 (E_x 11.4671 x 0.004021)",
+      "ratio_traced_to": "cell record facts.changed_symbols_with_tests_ratio = 0.5",
+      "record_sha256": "2aaccd72d1926f2435f0362fdc77c7419e1b37892f551554b3adbed2d7566cb8",
+      "risk_traced_to": "cell record facts.code_change_risk = 0.18"
+    },
+    {
+      "b_trigger_fires_traced_to": "re-derived from recorded facts: risk < 0.2 AND ratio >= 1.0 AND severity zero -> False",
+      "cell_id": "cap2f_unseen_family_abstention_r2",
+      "cost_traced_to": "cell record cost.total_usd = 0.009296",
+      "decision_traced_to": "abstention_decision APPLY_NULL/legNone",
+      "escaped_defect_traced_to": "outcome.defect_present_on_final_commit = True",
+      "harm_traced_to": "escaped_defect_count x 0.046109 (E_x 11.4671 x 0.004021)",
+      "ratio_traced_to": "cell record facts.changed_symbols_with_tests_ratio = 0.5",
+      "record_sha256": "3bc5415cd5b46c9282c6f3b5019b0122bd7757d295b221e47d8a5183fd369d9e",
+      "risk_traced_to": "cell record facts.code_change_risk = 0.18"
+    },
+    {
+      "b_trigger_fires_traced_to": "re-derived from recorded facts: risk < 0.2 AND ratio >= 1.0 AND severity zero -> False",
+      "cell_id": "cap2f_unseen_family_status_quo_r1",
+      "cost_traced_to": "cell record cost.total_usd = 0.009364",
+      "decision_traced_to": "abstention_decision APPLY_NULL/legNone",
+      "escaped_defect_traced_to": "outcome.defect_present_on_final_commit = True",
+      "harm_traced_to": "escaped_defect_count x 0.046109 (E_x 11.4671 x 0.004021)",
+      "ratio_traced_to": "cell record facts.changed_symbols_with_tests_ratio = 0.5",
+      "record_sha256": "1a61273964bc590dfc37ebdf1ad797bbbd06de67786718991b358abfb9f20642",
+      "risk_traced_to": "cell record facts.code_change_risk = 0.18"
+    },
+    {
+      "b_trigger_fires_traced_to": "re-derived from recorded facts: risk < 0.2 AND ratio >= 1.0 AND severity zero -> False",
+      "cell_id": "cap2f_unseen_family_status_quo_r2",
+      "cost_traced_to": "cell record cost.total_usd = 0.009345",
+      "decision_traced_to": "abstention_decision APPLY_NULL/legNone",
+      "escaped_defect_traced_to": "outcome.defect_present_on_final_commit = True",
+      "harm_traced_to": "escaped_defect_count x 0.046109 (E_x 11.4671 x 0.004021)",
+      "ratio_traced_to": "cell record facts.changed_symbols_with_tests_ratio = 0.5",
+      "record_sha256": "d12f0b59f2632839fc005e966562e2f1b1a115b98ed8a6c33070200dd34ab3d5",
+      "risk_traced_to": "cell record facts.code_change_risk = 0.18"
+    },
+    {
+      "capture_rate": 0.3333,
+      "table": "capture",
+      "trace": "declined on cap2f_absent-defective_abstention_r1 of 3 low-information cells (unseen-family abstention x2 + absent-defective abstention x1); denominator per preregistration section 3."
+    },
+    {
+      "abstention_trivial_clean_total": 0.017256,
+      "flag_cost_usd": 0.000634,
+      "saved_escape_harm_usd": 0.0,
+      "status_quo_trivial_clean_total": 0.016622,
+      "table": "flag_cost",
+      "trace": "flag_cost = abstention trivial-clean cell costs minus status_quo trivial-clean cell costs (decline overhead + operator review routing on changes that needed nothing).",
+      "trace_saved": "saved_escape_harm = captured escapes x 0.046109; captured escapes = 0 (no abstention DECLINE prevented an escape; the unseen-family escapes stand in both arms - the wall) -> vacuous.",
+      "vacuous": true
+    },
+    {
+      "escaped_defects_total": 6,
+      "harm_11_total": 0.276655,
+      "harm_28_total": 0.675528,
+      "table": "harm",
+      "trace": "wrong-continue = E_x x base_downstream_defect_cost (0.004021); E_x 11.4671 measured (sol, n=1) -> 0.046109/defect; E_x 28 sourced -> 0.112588/defect. 3 escaped defects per arm (unseen-family x2 + absent-defective x1)."
+    },
+    {
+      "condition_a_capture_holds": false,
+      "condition_a_capture_rate": 0.3333,
+      "condition_b_flag_cost_holds": false,
+      "condition_b_vacuous": true,
+      "support": false,
+      "table": "decision_rule",
+      "trace": "SUPPORT iff capture >= 2/3 AND flag-cost ceiling holds non-vacuous. REFUTE if capture < 2/3 OR ceiling vacuous/violated."
+    },
+    {
+      "table": "pre_registered_expectations",
+      "trace": "probe + cells re-derived from recorded facts; the wall (ratio 0.5) and the B-trigger construction (ratio 1.0) both confirmed.",
+      "trivial_clean_b_trigger_confirmed": true,
+      "unseen_family_ratio_wall_confirmed": true
+    }
+  ]
+}

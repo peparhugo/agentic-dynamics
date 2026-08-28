@@ -1,0 +1,911 @@
+{
+  "campaign": "cap_adaptive_2f",
+  "capture_floor": 0.6667,
+  "capture_table": {
+    "capture_rate": 0.3333,
+    "declined_cells": [
+      "cap2f_absent-defective_abstention_r1"
+    ],
+    "floor": 0.6667,
+    "low_information_cells": [
+      "cap2f_absent-defective_abstention_r1",
+      "cap2f_unseen_family_abstention_r1",
+      "cap2f_unseen_family_abstention_r2"
+    ],
+    "n_declined": 1,
+    "n_low_information": 3,
+    "per_cell": [
+      {
+        "abstention_decision": "DECLINE",
+        "b_trigger_fires": null,
+        "cell_id": "cap2f_absent-defective_abstention_r1",
+        "class": "absent",
+        "leg": 2,
+        "ratio": null,
+        "risk": null
+      },
+      {
+        "abstention_decision": "APPLY_NULL",
+        "b_trigger_fires": false,
+        "cell_id": "cap2f_unseen_family_abstention_r1",
+        "class": "unseen_family",
+        "leg": null,
+        "ratio": 0.5,
+        "risk": 0.18
+      },
+      {
+        "abstention_decision": "APPLY_NULL",
+        "b_trigger_fires": false,
+        "cell_id": "cap2f_unseen_family_abstention_r2",
+        "class": "unseen_family",
+        "leg": null,
+        "ratio": 0.5,
+        "risk": 0.18
+      }
+    ]
+  },
+  "decision_rule": {
+    "arms": {
+      "abstention": {
+        "cost_usd": 0.043011,
+        "harm_usd_11": 0.138327,
+        "n": 5
+      },
+      "status_quo": {
+        "cost_usd": 0.042747,
+        "harm_usd_11": 0.138327,
+        "n": 5
+      }
+    },
+    "condition_a_capture": {
+      "capture_rate": 0.3333,
+      "declined_low_information_cells": [
+        "cap2f_absent-defective_abstention_r1"
+      ],
+      "floor": 0.6667,
+      "holds": false,
+      "n_low_information_cells": 3,
+      "note": "capture >= 2/3 of the 3 low-information cells in the abstention arm (unseen-family x2 via the B trigger + absent-defective x1 via leg 2)."
+    },
+    "condition_b_flag_cost_ceiling": {
+      "flag_cost_usd": 0.000634,
+      "holds": false,
+      "note": "flag cost (the abstention arm's trivial-clean costs minus the status-quo arm's) < saved escape harm, non-vacuous. Vacuous when no escape was captured (saved_escape_harm = 0).",
+      "saved_escape_harm_usd": 0.0,
+      "vacuous": true
+    },
+    "decision_reference": "docs/designs/current/cap_adaptive_2f_preregistration.md section 3 (the decision rule: SUPPORT iff (a) capture >= 2/3 of the 3 low-information cells in the abstention arm AND (b) the flag-cost ceiling holds non-vacuous; REFUTE if capture < 2/3 OR the flag-cost ceiling is violated or vacuous)",
+    "decline_records": {
+      "by_leg": {
+        "2": [
+          "cap2f_absent-defective_abstention_r1"
+        ],
+        "3": [
+          "cap2f_trivial_clean_abstention_r1",
+          "cap2f_trivial_clean_abstention_r2"
+        ]
+      },
+      "cells": [
+        {
+          "cell_id": "cap2f_absent-defective_abstention_r1",
+          "class": "absent",
+          "leg": 2,
+          "reason": "leg 2 \u2014 code_change_risk absent (no risk term measurable \u2014 the seam's refuse state); route to operator review.",
+          "variant": "defective"
+        },
+        {
+          "cell_id": "cap2f_trivial_clean_abstention_r1",
+          "class": "trivial_clean",
+          "leg": 3,
+          "reason": "B trigger \u2014 risk 0.06 < 0.2 AND changed_symbols_with_tests_ratio 1.0 >= 1.0 (fully test-linked, zero severity signals); route to operator review (the flag-cost leg \u2014 the wider net's price).",
+          "variant": null
+        },
+        {
+          "cell_id": "cap2f_trivial_clean_abstention_r2",
+          "class": "trivial_clean",
+          "leg": 3,
+          "reason": "B trigger \u2014 risk 0.06 < 0.2 AND changed_symbols_with_tests_ratio 1.0 >= 1.0 (fully test-linked, zero severity signals); route to operator review (the flag-cost leg \u2014 the wider net's price).",
+          "variant": null
+        }
+      ],
+      "n_declines": 3
+    },
+    "support": false,
+    "support_note": "SUPPORT iff (a) capture >= 2/3 AND (b) the flag-cost ceiling holds non-vacuous. Both are pre-registered to fail; the flag-cost magnitude is the new information either way."
+  },
+  "flag_cost_table": {
+    "abstention_total_cost_usd": 0.017256,
+    "abstention_trivial_clean_cells": [
+      {
+        "abstention_decision": "DECLINE",
+        "cell_id": "cap2f_trivial_clean_abstention_r1",
+        "cost_usd": 0.008873,
+        "leg": 3
+      },
+      {
+        "abstention_decision": "DECLINE",
+        "cell_id": "cap2f_trivial_clean_abstention_r2",
+        "cost_usd": 0.008383,
+        "leg": 3
+      }
+    ],
+    "captured_cells": [],
+    "captured_escapes": 0,
+    "ceiling_holds": false,
+    "class": "trivial_clean",
+    "flag_cost_note": "the abstention arm's trivial-clean costs MINUS the status-quo arm's \u2014 the decline overhead + operator-review routing on changes that needed nothing (the wider net's price; the PRIMARY).",
+    "flag_cost_usd": 0.000634,
+    "saved_escape_harm_note": "captured escapes x $0.046109 (E_x 11.47). The pilot is flag-only (declines never fix), and the unseen-family escapes stand in both arms (the wall).",
+    "saved_escape_harm_usd": 0.0,
+    "status_quo_total_cost_usd": 0.016622,
+    "status_quo_trivial_clean_cells": [
+      {
+        "abstention_decision": "DECLINE",
+        "cell_id": "cap2f_trivial_clean_status_quo_r1",
+        "cost_usd": 0.008156
+      },
+      {
+        "abstention_decision": "DECLINE",
+        "cell_id": "cap2f_trivial_clean_status_quo_r2",
+        "cost_usd": 0.008466
+      }
+    ],
+    "vacuous": true
+  },
+  "flags": {
+    "flagged_cells": [],
+    "n_flagged_cells": 0
+  },
+  "harm_model": {
+    "E_x_measured_11": 11.4671,
+    "E_x_sourced_28": 28.0,
+    "base_downstream_defect_cost_usd": 0.004021,
+    "wrong_continue_11_per_defect": 0.046109,
+    "wrong_continue_28_per_defect": 0.112588
+  },
+  "harm_table": {
+    "per_cell": [
+      {
+        "arm": "abstention",
+        "cell_id": "cap2f_absent-defective_abstention_r1",
+        "class": "absent",
+        "escaped_defect_count": 1,
+        "wrong_continue_usd_11": 0.046109,
+        "wrong_continue_usd_28": 0.112588
+      },
+      {
+        "arm": "status_quo",
+        "cell_id": "cap2f_absent-defective_status_quo_r1",
+        "class": "absent",
+        "escaped_defect_count": 1,
+        "wrong_continue_usd_11": 0.046109,
+        "wrong_continue_usd_28": 0.112588
+      },
+      {
+        "arm": "abstention",
+        "cell_id": "cap2f_trivial_clean_abstention_r1",
+        "class": "trivial_clean",
+        "escaped_defect_count": 0,
+        "wrong_continue_usd_11": 0.0,
+        "wrong_continue_usd_28": 0.0
+      },
+      {
+        "arm": "abstention",
+        "cell_id": "cap2f_trivial_clean_abstention_r2",
+        "class": "trivial_clean",
+        "escaped_defect_count": 0,
+        "wrong_continue_usd_11": 0.0,
+        "wrong_continue_usd_28": 0.0
+      },
+      {
+        "arm": "status_quo",
+        "cell_id": "cap2f_trivial_clean_status_quo_r1",
+        "class": "trivial_clean",
+        "escaped_defect_count": 0,
+        "wrong_continue_usd_11": 0.0,
+        "wrong_continue_usd_28": 0.0
+      },
+      {
+        "arm": "status_quo",
+        "cell_id": "cap2f_trivial_clean_status_quo_r2",
+        "class": "trivial_clean",
+        "escaped_defect_count": 0,
+        "wrong_continue_usd_11": 0.0,
+        "wrong_continue_usd_28": 0.0
+      },
+      {
+        "arm": "abstention",
+        "cell_id": "cap2f_unseen_family_abstention_r1",
+        "class": "unseen_family",
+        "escaped_defect_count": 1,
+        "wrong_continue_usd_11": 0.046109,
+        "wrong_continue_usd_28": 0.112588
+      },
+      {
+        "arm": "abstention",
+        "cell_id": "cap2f_unseen_family_abstention_r2",
+        "class": "unseen_family",
+        "escaped_defect_count": 1,
+        "wrong_continue_usd_11": 0.046109,
+        "wrong_continue_usd_28": 0.112588
+      },
+      {
+        "arm": "status_quo",
+        "cell_id": "cap2f_unseen_family_status_quo_r1",
+        "class": "unseen_family",
+        "escaped_defect_count": 1,
+        "wrong_continue_usd_11": 0.046109,
+        "wrong_continue_usd_28": 0.112588
+      },
+      {
+        "arm": "status_quo",
+        "cell_id": "cap2f_unseen_family_status_quo_r2",
+        "class": "unseen_family",
+        "escaped_defect_count": 1,
+        "wrong_continue_usd_11": 0.046109,
+        "wrong_continue_usd_28": 0.112588
+      }
+    ],
+    "wrong_apply": {
+      "note": "no apply-class cells in this grid (capture + flag-cost only) \u2014 wrong-apply is vacuous; reported, not decided.",
+      "total_usd_measured": 0.0
+    },
+    "wrong_continue": {
+      "at_E_x_11": {
+        "per_escaped_defect_usd": 0.046109,
+        "total_escaped_defects": 6,
+        "total_usd": 0.276655
+      },
+      "at_E_x_28": {
+        "per_escaped_defect_usd": 0.112588,
+        "total_escaped_defects": 6,
+        "total_usd": 0.675528
+      },
+      "note": "wrong-continue = E_x x base_downstream_defect_cost ($0.004021); E_x 11.4671 measured (sol, n=1), E_x 28 sourced \u2014 sensitivity reported (preregistration section 4)."
+    }
+  },
+  "join_validation": {
+    "invalid_cells": [],
+    "n_cells": 10,
+    "n_invalid": 0,
+    "n_table_rows": 10,
+    "per_cell": [
+      {
+        "cell_id": "cap2f_absent-defective_abstention_r1",
+        "reason": "matches the pre-registered table",
+        "valid": true
+      },
+      {
+        "cell_id": "cap2f_absent-defective_status_quo_r1",
+        "reason": "matches the pre-registered table",
+        "valid": true
+      },
+      {
+        "cell_id": "cap2f_trivial_clean_abstention_r1",
+        "reason": "matches the pre-registered table",
+        "valid": true
+      },
+      {
+        "cell_id": "cap2f_trivial_clean_abstention_r2",
+        "reason": "matches the pre-registered table",
+        "valid": true
+      },
+      {
+        "cell_id": "cap2f_trivial_clean_status_quo_r1",
+        "reason": "matches the pre-registered table",
+        "valid": true
+      },
+      {
+        "cell_id": "cap2f_trivial_clean_status_quo_r2",
+        "reason": "matches the pre-registered table",
+        "valid": true
+      },
+      {
+        "cell_id": "cap2f_unseen_family_abstention_r1",
+        "reason": "matches the pre-registered table",
+        "valid": true
+      },
+      {
+        "cell_id": "cap2f_unseen_family_abstention_r2",
+        "reason": "matches the pre-registered table",
+        "valid": true
+      },
+      {
+        "cell_id": "cap2f_unseen_family_status_quo_r1",
+        "reason": "matches the pre-registered table",
+        "valid": true
+      },
+      {
+        "cell_id": "cap2f_unseen_family_status_quo_r2",
+        "reason": "matches the pre-registered table",
+        "valid": true
+      }
+    ],
+    "valid": true
+  },
+  "per_arm": {
+    "abstention": {
+      "accepted_outcomes": 2,
+      "arm": "abstention",
+      "b_trigger_fire_count": 2,
+      "decline_count": 3,
+      "escaped_defect_count": 3,
+      "n": 5,
+      "total_cost_usd": 0.043011,
+      "total_harm_usd_11": 0.138327,
+      "total_harm_usd_28": 0.337764
+    },
+    "status_quo": {
+      "accepted_outcomes": 2,
+      "arm": "status_quo",
+      "b_trigger_fire_count": 2,
+      "decline_count": 3,
+      "escaped_defect_count": 3,
+      "n": 5,
+      "total_cost_usd": 0.042747,
+      "total_harm_usd_11": 0.138327,
+      "total_harm_usd_28": 0.337764
+    }
+  },
+  "per_cell": [
+    {
+      "abstention_decision": "DECLINE",
+      "abstention_leg": 2,
+      "abstention_reason": "leg 2 \u2014 code_change_risk absent (no risk term measurable \u2014 the seam's refuse state); route to operator review.",
+      "accepted": false,
+      "applied_or_null": "declined",
+      "arm": "abstention",
+      "b_trigger_check": null,
+      "cell_id": "cap2f_absent-defective_abstention_r1",
+      "class": "absent",
+      "cost_usd": 0.007078,
+      "defect_note": "family: wrong-operation (wrong_op returns a+b not a-b) present (escaped \u2014 the seam refused)",
+      "defect_present_on_final_commit": true,
+      "escaped_defect_count": 1,
+      "facts": {
+        "ast_parse_coverage": "1.0",
+        "changed_symbol_count": "1",
+        "lsp_analysis_status": "unavailable",
+        "sonar_analysis_status": "unavailable"
+      },
+      "flagged": false,
+      "flags": [],
+      "harm_11": 0.046109,
+      "harm_28": 0.112588,
+      "join_valid": true,
+      "proposal_action": null,
+      "proposal_confidence": null,
+      "repetition": "r1",
+      "slot": 1,
+      "test_executed_success": true,
+      "tests": "2/2",
+      "variant": "defective"
+    },
+    {
+      "abstention_decision": "DECLINE",
+      "abstention_leg": 2,
+      "abstention_reason": "leg 2 \u2014 code_change_risk absent (no risk term measurable \u2014 the seam's refuse state); route to operator review.",
+      "accepted": false,
+      "applied_or_null": "null",
+      "arm": "status_quo",
+      "b_trigger_check": null,
+      "cell_id": "cap2f_absent-defective_status_quo_r1",
+      "class": "absent",
+      "cost_usd": 0.007416,
+      "defect_note": "family: wrong-operation (wrong_op returns a+b not a-b) present (escaped \u2014 the seam refused)",
+      "defect_present_on_final_commit": true,
+      "escaped_defect_count": 1,
+      "facts": {
+        "ast_parse_coverage": "1.0",
+        "changed_symbol_count": "1",
+        "lsp_analysis_status": "unavailable",
+        "sonar_analysis_status": "unavailable"
+      },
+      "flagged": false,
+      "flags": [],
+      "harm_11": 0.046109,
+      "harm_28": 0.112588,
+      "join_valid": true,
+      "proposal_action": null,
+      "proposal_confidence": null,
+      "repetition": "r1",
+      "slot": 2,
+      "test_executed_success": true,
+      "tests": "2/2",
+      "variant": "defective"
+    },
+    {
+      "abstention_decision": "DECLINE",
+      "abstention_leg": 3,
+      "abstention_reason": "B trigger \u2014 risk 0.06 < 0.2 AND changed_symbols_with_tests_ratio 1.0 >= 1.0 (fully test-linked, zero severity signals); route to operator review (the flag-cost leg \u2014 the wider net's price).",
+      "accepted": true,
+      "applied_or_null": "declined",
+      "arm": "abstention",
+      "b_trigger_check": {
+        "fires": true,
+        "new_lsp_error_count": 0,
+        "new_sonar_critical_count": 0,
+        "ratio": 1.0,
+        "ratio_ok": true,
+        "risk": 0.06,
+        "risk_ok": true,
+        "severity_terms_zero": true
+      },
+      "cell_id": "cap2f_trivial_clean_abstention_r1",
+      "class": "trivial_clean",
+      "cost_usd": 0.008873,
+      "defect_note": "trivial_clean: behavior-preserving rename \u2014 no defect (clean change)",
+      "defect_present_on_final_commit": false,
+      "escaped_defect_count": 0,
+      "facts": {
+        "analysis_revision_matches": "true",
+        "ast_parse_coverage": "1.0",
+        "changed_symbol_count": "1",
+        "changed_symbols_with_tests_ratio": "1.0",
+        "code_change_risk": "0.06",
+        "impacted_symbol_count": "3",
+        "lsp_analysis_status": "available",
+        "new_lsp_error_count": "0",
+        "new_sonar_critical_count": "0",
+        "sonar_analysis_status": "available"
+      },
+      "flagged": false,
+      "flags": [],
+      "harm_11": 0.0,
+      "harm_28": 0.0,
+      "join_valid": true,
+      "proposal_action": "continue",
+      "proposal_confidence": 1.0,
+      "repetition": "r1",
+      "slot": 1,
+      "test_executed_success": true,
+      "tests": "2/2",
+      "variant": null
+    },
+    {
+      "abstention_decision": "DECLINE",
+      "abstention_leg": 3,
+      "abstention_reason": "B trigger \u2014 risk 0.06 < 0.2 AND changed_symbols_with_tests_ratio 1.0 >= 1.0 (fully test-linked, zero severity signals); route to operator review (the flag-cost leg \u2014 the wider net's price).",
+      "accepted": true,
+      "applied_or_null": "declined",
+      "arm": "abstention",
+      "b_trigger_check": {
+        "fires": true,
+        "new_lsp_error_count": 0,
+        "new_sonar_critical_count": 0,
+        "ratio": 1.0,
+        "ratio_ok": true,
+        "risk": 0.06,
+        "risk_ok": true,
+        "severity_terms_zero": true
+      },
+      "cell_id": "cap2f_trivial_clean_abstention_r2",
+      "class": "trivial_clean",
+      "cost_usd": 0.008383,
+      "defect_note": "trivial_clean: behavior-preserving rename \u2014 no defect (clean change)",
+      "defect_present_on_final_commit": false,
+      "escaped_defect_count": 0,
+      "facts": {
+        "analysis_revision_matches": "true",
+        "ast_parse_coverage": "1.0",
+        "changed_symbol_count": "1",
+        "changed_symbols_with_tests_ratio": "1.0",
+        "code_change_risk": "0.06",
+        "impacted_symbol_count": "3",
+        "lsp_analysis_status": "available",
+        "new_lsp_error_count": "0",
+        "new_sonar_critical_count": "0",
+        "sonar_analysis_status": "available"
+      },
+      "flagged": false,
+      "flags": [],
+      "harm_11": 0.0,
+      "harm_28": 0.0,
+      "join_valid": true,
+      "proposal_action": "continue",
+      "proposal_confidence": 1.0,
+      "repetition": "r2",
+      "slot": 2,
+      "test_executed_success": true,
+      "tests": "2/2",
+      "variant": null
+    },
+    {
+      "abstention_decision": "DECLINE",
+      "abstention_leg": 3,
+      "abstention_reason": "B trigger \u2014 risk 0.06 < 0.2 AND changed_symbols_with_tests_ratio 1.0 >= 1.0 (fully test-linked, zero severity signals); route to operator review (the flag-cost leg \u2014 the wider net's price).",
+      "accepted": true,
+      "applied_or_null": "null",
+      "arm": "status_quo",
+      "b_trigger_check": {
+        "fires": true,
+        "new_lsp_error_count": 0,
+        "new_sonar_critical_count": 0,
+        "ratio": 1.0,
+        "ratio_ok": true,
+        "risk": 0.06,
+        "risk_ok": true,
+        "severity_terms_zero": true
+      },
+      "cell_id": "cap2f_trivial_clean_status_quo_r1",
+      "class": "trivial_clean",
+      "cost_usd": 0.008156,
+      "defect_note": "trivial_clean: behavior-preserving rename \u2014 no defect (clean change)",
+      "defect_present_on_final_commit": false,
+      "escaped_defect_count": 0,
+      "facts": {
+        "analysis_revision_matches": "true",
+        "ast_parse_coverage": "1.0",
+        "changed_symbol_count": "1",
+        "changed_symbols_with_tests_ratio": "1.0",
+        "code_change_risk": "0.06",
+        "impacted_symbol_count": "3",
+        "lsp_analysis_status": "available",
+        "new_lsp_error_count": "0",
+        "new_sonar_critical_count": "0",
+        "sonar_analysis_status": "available"
+      },
+      "flagged": false,
+      "flags": [],
+      "harm_11": 0.0,
+      "harm_28": 0.0,
+      "join_valid": true,
+      "proposal_action": "continue",
+      "proposal_confidence": 1.0,
+      "repetition": "r1",
+      "slot": 3,
+      "test_executed_success": true,
+      "tests": "2/2",
+      "variant": null
+    },
+    {
+      "abstention_decision": "DECLINE",
+      "abstention_leg": 3,
+      "abstention_reason": "B trigger \u2014 risk 0.06 < 0.2 AND changed_symbols_with_tests_ratio 1.0 >= 1.0 (fully test-linked, zero severity signals); route to operator review (the flag-cost leg \u2014 the wider net's price).",
+      "accepted": true,
+      "applied_or_null": "null",
+      "arm": "status_quo",
+      "b_trigger_check": {
+        "fires": true,
+        "new_lsp_error_count": 0,
+        "new_sonar_critical_count": 0,
+        "ratio": 1.0,
+        "ratio_ok": true,
+        "risk": 0.06,
+        "risk_ok": true,
+        "severity_terms_zero": true
+      },
+      "cell_id": "cap2f_trivial_clean_status_quo_r2",
+      "class": "trivial_clean",
+      "cost_usd": 0.008466,
+      "defect_note": "trivial_clean: behavior-preserving rename \u2014 no defect (clean change)",
+      "defect_present_on_final_commit": false,
+      "escaped_defect_count": 0,
+      "facts": {
+        "analysis_revision_matches": "true",
+        "ast_parse_coverage": "1.0",
+        "changed_symbol_count": "1",
+        "changed_symbols_with_tests_ratio": "1.0",
+        "code_change_risk": "0.06",
+        "impacted_symbol_count": "3",
+        "lsp_analysis_status": "available",
+        "new_lsp_error_count": "0",
+        "new_sonar_critical_count": "0",
+        "sonar_analysis_status": "available"
+      },
+      "flagged": false,
+      "flags": [],
+      "harm_11": 0.0,
+      "harm_28": 0.0,
+      "join_valid": true,
+      "proposal_action": "continue",
+      "proposal_confidence": 1.0,
+      "repetition": "r2",
+      "slot": 4,
+      "test_executed_success": true,
+      "tests": "2/2",
+      "variant": null
+    },
+    {
+      "abstention_decision": "APPLY_NULL",
+      "abstention_leg": null,
+      "abstention_reason": "risk 0.18 < 0.2 but ratio 0.5 < 1.0 (NOT the B trigger \u2014 the unseen-family wall); apply-null (unchanged, not flagged).",
+      "accepted": false,
+      "applied_or_null": "null",
+      "arm": "abstention",
+      "b_trigger_check": {
+        "fires": false,
+        "new_lsp_error_count": 0,
+        "new_sonar_critical_count": 0,
+        "ratio": 0.5,
+        "ratio_ok": false,
+        "risk": 0.18,
+        "risk_ok": true,
+        "severity_terms_zero": true
+      },
+      "cell_id": "cap2f_unseen_family_abstention_r1",
+      "class": "unseen_family",
+      "cost_usd": 0.009381,
+      "defect_note": "family: mutation/aliasing (tally mutates its input) present \u2014 NOT boundary-compare, NOT S1244, NOT S3776",
+      "defect_present_on_final_commit": true,
+      "escaped_defect_count": 1,
+      "facts": {
+        "analysis_revision_matches": "true",
+        "ast_parse_coverage": "1.0",
+        "changed_symbol_count": "2",
+        "changed_symbols_with_tests_ratio": "0.5",
+        "code_change_risk": "0.18",
+        "impacted_symbol_count": "4",
+        "lsp_analysis_status": "available",
+        "new_lsp_error_count": "0",
+        "new_sonar_critical_count": "0",
+        "sonar_analysis_status": "available"
+      },
+      "flagged": false,
+      "flags": [],
+      "harm_11": 0.046109,
+      "harm_28": 0.112588,
+      "join_valid": true,
+      "proposal_action": "continue",
+      "proposal_confidence": 1.0,
+      "repetition": "r1",
+      "slot": 1,
+      "test_executed_success": true,
+      "tests": "3/3",
+      "variant": null
+    },
+    {
+      "abstention_decision": "APPLY_NULL",
+      "abstention_leg": null,
+      "abstention_reason": "risk 0.18 < 0.2 but ratio 0.5 < 1.0 (NOT the B trigger \u2014 the unseen-family wall); apply-null (unchanged, not flagged).",
+      "accepted": false,
+      "applied_or_null": "null",
+      "arm": "abstention",
+      "b_trigger_check": {
+        "fires": false,
+        "new_lsp_error_count": 0,
+        "new_sonar_critical_count": 0,
+        "ratio": 0.5,
+        "ratio_ok": false,
+        "risk": 0.18,
+        "risk_ok": true,
+        "severity_terms_zero": true
+      },
+      "cell_id": "cap2f_unseen_family_abstention_r2",
+      "class": "unseen_family",
+      "cost_usd": 0.009296,
+      "defect_note": "family: mutation/aliasing (tally mutates its input) present \u2014 NOT boundary-compare, NOT S1244, NOT S3776",
+      "defect_present_on_final_commit": true,
+      "escaped_defect_count": 1,
+      "facts": {
+        "analysis_revision_matches": "true",
+        "ast_parse_coverage": "1.0",
+        "changed_symbol_count": "2",
+        "changed_symbols_with_tests_ratio": "0.5",
+        "code_change_risk": "0.18",
+        "impacted_symbol_count": "4",
+        "lsp_analysis_status": "available",
+        "new_lsp_error_count": "0",
+        "new_sonar_critical_count": "0",
+        "sonar_analysis_status": "available"
+      },
+      "flagged": false,
+      "flags": [],
+      "harm_11": 0.046109,
+      "harm_28": 0.112588,
+      "join_valid": true,
+      "proposal_action": "continue",
+      "proposal_confidence": 1.0,
+      "repetition": "r2",
+      "slot": 2,
+      "test_executed_success": true,
+      "tests": "3/3",
+      "variant": null
+    },
+    {
+      "abstention_decision": "APPLY_NULL",
+      "abstention_leg": null,
+      "abstention_reason": "risk 0.18 < 0.2 but ratio 0.5 < 1.0 (NOT the B trigger \u2014 the unseen-family wall); apply-null (unchanged, not flagged).",
+      "accepted": false,
+      "applied_or_null": "null",
+      "arm": "status_quo",
+      "b_trigger_check": {
+        "fires": false,
+        "new_lsp_error_count": 0,
+        "new_sonar_critical_count": 0,
+        "ratio": 0.5,
+        "ratio_ok": false,
+        "risk": 0.18,
+        "risk_ok": true,
+        "severity_terms_zero": true
+      },
+      "cell_id": "cap2f_unseen_family_status_quo_r1",
+      "class": "unseen_family",
+      "cost_usd": 0.009364,
+      "defect_note": "family: mutation/aliasing (tally mutates its input) present \u2014 NOT boundary-compare, NOT S1244, NOT S3776",
+      "defect_present_on_final_commit": true,
+      "escaped_defect_count": 1,
+      "facts": {
+        "analysis_revision_matches": "true",
+        "ast_parse_coverage": "1.0",
+        "changed_symbol_count": "2",
+        "changed_symbols_with_tests_ratio": "0.5",
+        "code_change_risk": "0.18",
+        "impacted_symbol_count": "4",
+        "lsp_analysis_status": "available",
+        "new_lsp_error_count": "0",
+        "new_sonar_critical_count": "0",
+        "sonar_analysis_status": "available"
+      },
+      "flagged": false,
+      "flags": [],
+      "harm_11": 0.046109,
+      "harm_28": 0.112588,
+      "join_valid": true,
+      "proposal_action": "continue",
+      "proposal_confidence": 1.0,
+      "repetition": "r1",
+      "slot": 3,
+      "test_executed_success": true,
+      "tests": "3/3",
+      "variant": null
+    },
+    {
+      "abstention_decision": "APPLY_NULL",
+      "abstention_leg": null,
+      "abstention_reason": "risk 0.18 < 0.2 but ratio 0.5 < 1.0 (NOT the B trigger \u2014 the unseen-family wall); apply-null (unchanged, not flagged).",
+      "accepted": false,
+      "applied_or_null": "null",
+      "arm": "status_quo",
+      "b_trigger_check": {
+        "fires": false,
+        "new_lsp_error_count": 0,
+        "new_sonar_critical_count": 0,
+        "ratio": 0.5,
+        "ratio_ok": false,
+        "risk": 0.18,
+        "risk_ok": true,
+        "severity_terms_zero": true
+      },
+      "cell_id": "cap2f_unseen_family_status_quo_r2",
+      "class": "unseen_family",
+      "cost_usd": 0.009345,
+      "defect_note": "family: mutation/aliasing (tally mutates its input) present \u2014 NOT boundary-compare, NOT S1244, NOT S3776",
+      "defect_present_on_final_commit": true,
+      "escaped_defect_count": 1,
+      "facts": {
+        "analysis_revision_matches": "true",
+        "ast_parse_coverage": "1.0",
+        "changed_symbol_count": "2",
+        "changed_symbols_with_tests_ratio": "0.5",
+        "code_change_risk": "0.18",
+        "impacted_symbol_count": "4",
+        "lsp_analysis_status": "available",
+        "new_lsp_error_count": "0",
+        "new_sonar_critical_count": "0",
+        "sonar_analysis_status": "available"
+      },
+      "flagged": false,
+      "flags": [],
+      "harm_11": 0.046109,
+      "harm_28": 0.112588,
+      "join_valid": true,
+      "proposal_action": "continue",
+      "proposal_confidence": 1.0,
+      "repetition": "r2",
+      "slot": 4,
+      "test_executed_success": true,
+      "tests": "3/3",
+      "variant": null
+    }
+  ],
+  "per_class": {
+    "absent": {
+      "abstention": {
+        "accepted_outcomes": 0,
+        "b_trigger_fire_count": 0,
+        "decline_count": 1,
+        "escaped_defect_count": 1,
+        "flags": [],
+        "harm_11": 0.046109,
+        "n": 1,
+        "total_cost_usd": 0.007078,
+        "verified_success_rate": 0.0
+      },
+      "status_quo": {
+        "accepted_outcomes": 0,
+        "b_trigger_fire_count": 0,
+        "decline_count": 1,
+        "escaped_defect_count": 1,
+        "flags": [],
+        "harm_11": 0.046109,
+        "n": 1,
+        "total_cost_usd": 0.007416,
+        "verified_success_rate": 0.0
+      }
+    },
+    "trivial_clean": {
+      "abstention": {
+        "accepted_outcomes": 2,
+        "b_trigger_fire_count": 2,
+        "decline_count": 2,
+        "escaped_defect_count": 0,
+        "flags": [],
+        "harm_11": 0.0,
+        "n": 2,
+        "total_cost_usd": 0.017256,
+        "verified_success_rate": 1.0
+      },
+      "status_quo": {
+        "accepted_outcomes": 2,
+        "b_trigger_fire_count": 2,
+        "decline_count": 2,
+        "escaped_defect_count": 0,
+        "flags": [],
+        "harm_11": 0.0,
+        "n": 2,
+        "total_cost_usd": 0.016622,
+        "verified_success_rate": 1.0
+      }
+    },
+    "unseen_family": {
+      "abstention": {
+        "accepted_outcomes": 0,
+        "b_trigger_fire_count": 0,
+        "decline_count": 0,
+        "escaped_defect_count": 2,
+        "flags": [],
+        "harm_11": 0.092218,
+        "n": 2,
+        "total_cost_usd": 0.018677,
+        "verified_success_rate": 0.0
+      },
+      "status_quo": {
+        "accepted_outcomes": 0,
+        "b_trigger_fire_count": 0,
+        "decline_count": 0,
+        "escaped_defect_count": 2,
+        "flags": [],
+        "harm_11": 0.092218,
+        "n": 2,
+        "total_cost_usd": 0.018709,
+        "verified_success_rate": 0.0
+      }
+    }
+  },
+  "phase": "p3_score",
+  "pre_registered_expectations": {
+    "trivial_clean_b_trigger_confirmed": true,
+    "trivial_clean_note": "probe + all 4 grid cells measure ratio 1.0, risk < 0.2, severity zero \u2014 the B trigger fires (the flag-cost leg).",
+    "unseen_family_note": "probe + all 4 grid cells measure ratio 0.5, B trigger never fires (the wall \u2014 the fourth divergence).",
+    "unseen_family_ratio_wall_confirmed": true
+  },
+  "preregistration": "docs/designs/current/cap_adaptive_2f_preregistration.md",
+  "preregistration_revision": "d199c50b6",
+  "schema_version": "cap_adaptive_2f_score/v1",
+  "score_input_artifacts": [
+    {
+      "path": "experiments/results/cap_adaptive_2f/p1_execution_manifest.json",
+      "role": "p1 (probes + E1 + forecast)"
+    },
+    {
+      "path": "experiments/results/cap_adaptive_2f/p1_unseen_family_probe.json",
+      "role": "the unseen-family ratio wall probe"
+    },
+    {
+      "path": "experiments/results/cap_adaptive_2f/p1_trivial_clean_probe.json",
+      "role": "the trivial_clean B-trigger probe"
+    },
+    {
+      "path": "experiments/results/cap_adaptive_2f/p2_execution_manifest.json",
+      "role": "the pre-registered 10-cell assignment table"
+    },
+    {
+      "path": "experiments/results/cap_adaptive_2f/cells",
+      "role": "p2 per-cell records (10 cells)"
+    }
+  ],
+  "scored_at": "20260828T210239Z",
+  "spec_id": "cap_adaptive_2f@0.1",
+  "verdict": "REFUTE \u2014 capture 0.3333 < 2/3 (the expected wall \u2014 the unseen-family ratio wall, the fourth divergence); the flag-cost ceiling is vacuous or violated"
+}
