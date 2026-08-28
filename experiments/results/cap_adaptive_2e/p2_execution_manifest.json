@@ -60,40 +60,6 @@
   "phase": "p2_run_grid",
   "preregistration": "docs/designs/current/cap_adaptive_2e_preregistration.md",
   "preregistration_revision": "d1a0ad777",
-  "records": [
-    {
-      "artifact": "experiments/results/cap_adaptive_2e/cells/cap2e_absent-defective_abstention_r1.json",
-      "cell_id": "cap2e_absent-defective_abstention_r1",
-      "sha256": "881efff86b7d2df59508f3b6c1b7a5926357de243e7c3690aa65d644e2f2fafe"
-    },
-    {
-      "artifact": "experiments/results/cap_adaptive_2e/cells/cap2e_absent-defective_status_quo_r1.json",
-      "cell_id": "cap2e_absent-defective_status_quo_r1",
-      "sha256": "448422d7f7ddf0691bac21b79fd4c5954795d42d6b84ff7a9d3fb6ce8f0b8c38"
-    },
-    {
-      "artifact": "experiments/results/cap_adaptive_2e/cells/cap2e_unseen_family_abstention_r1.json",
-      "cell_id": "cap2e_unseen_family_abstention_r1",
-      "sha256": "b767632f4e66902ceb8d1ce0cda6635461edead8e3cf006366b9346359e94a6d"
-    },
-    {
-      "artifact": "experiments/results/cap_adaptive_2e/cells/cap2e_unseen_family_abstention_r2.json",
-      "cell_id": "cap2e_unseen_family_abstention_r2",
-      "sha256": "880faca4b3798d5712e2e02608ee4991c0320c0e94467207add7a281929a1aa7"
-    },
-    {
-      "artifact": "experiments/results/cap_adaptive_2e/cells/cap2e_unseen_family_status_quo_r1.json",
-      "cell_id": "cap2e_unseen_family_status_quo_r1",
-      "sha256": "2735c15a3e8eeb9182e9da0e10d3d4412f45896f99bacd97704b4975c62aa4ec"
-    },
-    {
-      "artifact": "experiments/results/cap_adaptive_2e/cells/cap2e_unseen_family_status_quo_r2.json",
-      "cell_id": "cap2e_unseen_family_status_quo_r2",
-      "sha256": "b6b794ae1926b87f38c9fcbe307642f3bf9f031b523fd664a01aa07de87a1cba"
-    }
-  ],
-  "records_note": "artifact SHA index over the immutable per-cell records (all 6 cells of the pre-registered table; E1 ran in p1).",
-  "records_sha256": "d49b0e54fa20514177f436fb521b11fe71baee0d87c2abad556c53e96faf8582",
   "schema_version": "cap_adaptive_2e_p2_manifest/v1",
   "seed_committed_hash": "0f3e7c1b9a4d5e8f6c2a1b9d4e7f8a1c3b5d7e9f2a4c6b8d0e1f3a5c7b9d2e4f6",
   "seed_measured_sha256": "d8f9bb19a2f9c67003946c89037558a3e8cf6cdcf50c97b20fe80072ccf824af",
