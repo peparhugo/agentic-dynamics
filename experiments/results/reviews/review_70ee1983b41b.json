@@ -1,0 +1,214 @@
+{
+  "story_name": "notification_service",
+  "story_id": "70ee1983b41b",
+  "model": "deepseek/deepseek-v4-flash",
+  "commit_reviews": [
+    {
+      "commit_hash": "a1da9aff70a4ce2dad942e99c26d020056a31e5e",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.7,
+      "convention_adherence": 0.6,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": false,
+      "better_or_worse": "worse",
+      "problems": [
+        {
+          "category": "convention",
+          "severity": "major",
+          "description": "13 naming violations across 4 files: classes not PascalCase and module-level constants not UPPER_CASE in app.py, conftest.py, test_channels.py, test_notification_server.py; functions not snake_case in conftest.py \u2014 basic Python style flouted throughout the greenfield code"
+        },
+        {
+          "category": "maintainability",
+          "severity": "minor",
+          "description": "Cognitive complexity +23 per SonarQube \u2014 functions are more convoluted than a greenfield server of this size warrants"
+        },
+        {
+          "category": "architecture",
+          "severity": "minor",
+          "description": "42 functions for a ~500-line notification server suggests fragmented decomposition; a leaner design would likely hold complexity down"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "Greenfield rewrite discards the seed's established structure (Flask blueprints/JWT/sqlite) wholesale; a fresh architecture is permitted for a greenfield session, but no conventions were carried forward"
+        }
+      ],
+      "strengths": [
+        "Zero bugs and zero duplication introduced (SonarQube delta bugs +0, duplications +0.0%)",
+        "Code smells reduced by 4 versus the seed baseline",
+        "Story-aligned architecture: asyncio WebSocket notification server with a clean entry-point module and separate source + test files (5 files)",
+        "Reasonable module split (entry point, support modules, conftest, per-feature tests)"
+      ],
+      "summary": "The greenfield commit delivers a story-aligned asyncio WebSocket notification server with zero bugs, zero duplication, and improved smells, but it regresses on conventions (score 0.69, 13 naming violations) and adds +23 cognitive complexity \u2014 a net quality regression versus the convention-clean seed it replaced.",
+      "session_number": 1
+    },
+    {
+      "commit_hash": "3ae6e4b973fd4a1a50c7c95f5cc4774755210eb4",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.85,
+      "convention_adherence": 0.7,
+      "introduces_technical_debt": false,
+      "respects_existing_patterns": true,
+      "better_or_worse": "better",
+      "problems": [
+        {
+          "category": "maintainability",
+          "severity": "minor",
+          "description": "REST channel routing in do_GET uses manual string parsing (path.startswith('/channels/') + endswith('/subscribers') + unquote slicing) instead of a small route table or path matching; fragile against trailing-slash and query-param edge cases."
+        },
+        {
+          "category": "maintainability",
+          "severity": "minor",
+          "description": "Channeled broadcast writes the channel field to both the message top level and the payload (outbound['channel'] and outbound['payload']['channel']), duplicating state and inviting drift between the two copies."
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "Convention score 0.69 (13 violations) is dominated by test-file scaffolding \u2014 conftest.py and test_notification_server.py were not touched by this diff, and newly added test_channels.py inherits the same class/constant naming style as the existing test suite; the modified source (notification_server.py) itself is cleanly snake_case with docstrings and noqa comments."
+        }
+      ],
+      "strengths": [
+        "Feature extends the existing single-event-loop design correctly \u2014 channel state lives beside the client registry with the same no-locking justification, and remove() cleans up channel memberships on disconnect.",
+        "New registry methods (subscribe/unsubscribe/channel_subscribers/channels), handler routes, and send_to_channel all mirror the existing add/remove/get/items, do_GET/_send_json, and broadcast patterns.",
+        "Idempotent subscribe/unsubscribe plus error handling for missing 'channel' (reusing _send_error) keeps the message contract explicit; tests were added for the new behavior."
+      ],
+      "summary": "A well-scoped, pattern-consistent feature addition (channel subscriptions) that respects the existing architecture, with a convention score dragged down largely by pre-existing test-scaffolding naming rather than the code this commit introduces.",
+      "session_number": 2
+    },
+    {
+      "commit_hash": "2647515bf531b4e71b9f66ba1907c2c63e2c2fd5",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.85,
+      "convention_adherence": 0.7,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": true,
+      "better_or_worse": "better",
+      "problems": [
+        {
+          "category": "maintainability",
+          "severity": "major",
+          "description": "Cognitive complexity +91 for a single session commit; the lazy singleton (_redis_client/_redis_failed/_redis_lock module globals) plus the fallback-to-in-process branch add substantial branching and hidden state to a module previously described as 'plain dict reads/writes, no locking'."
+        },
+        {
+          "category": "convention",
+          "severity": "minor",
+          "description": "13 convention violations measured (convention score 0.69), concentrated in the new test files (test_channels.py, test_notification_server.py, conftest.py: PascalCase classes, module-level constants not UPPER_CASE) and app.py module constants; the flagger also trips on the intentionally-lowercase private globals _redis_client/_redis_failed."
+        },
+        {
+          "category": "maintainability",
+          "severity": "minor",
+          "description": "Docstring claims connection state 'is mirrored into Redis so it survives a server restart', but the in-memory ClientRegistry still must be rebuilt on restart \u2014 the persistence guarantee is partial and easy to over-trust."
+        },
+        {
+          "category": "reliability",
+          "severity": "info",
+          "description": "Silent graceful degradation to in-process delivery when Redis is unreachable can mask cross-instance delivery failures in production; a log/warning on fallback would help distinguish degraded from full operation."
+        }
+      ],
+      "strengths": [
+        "Graceful degradation: the server falls back to in-process delivery when the Redis broker is unreachable instead of crashing.",
+        "Thread-safety reasoning is explicit and sound \u2014 Redis subscriber runs in its own thread and only schedules coroutines back onto the single event loop.",
+        "SQLite persistence uses parametrized queries throughout (no injection surface) and is exposed with paginated /messages (limit/offset).",
+        "New REST surface (GET /messages) and Redis backbone are documented in the module docstring and matched by added test files.",
+        "New code follows the repo's established conventions (PascalCase classes, snake_case functions, UPPER_CASE constants, type hints, docstrings)."
+      ],
+      "summary": "A solid 'integration' session that adds Redis pub/sub + SQLite persistence with graceful degradation and tests, though it carries notable complexity (+91 cognitive) and a 0.69 convention score dragged down mostly by the new test files.",
+      "session_number": 3
+    },
+    {
+      "commit_hash": "22cf908d5737fe9c4011f144cf4cea055e1e362c",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.6,
+      "convention_adherence": 0.7,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": true,
+      "better_or_worse": "worse",
+      "problems": [
+        {
+          "category": "architecture",
+          "severity": "major",
+          "description": "The rewritten module docstring advertises a pluggable 'BaseTransport' abstraction with TRANSPORT env-var selection, but the diff adds zero classes and zero functions (+0 classes, +0 functions) \u2014 the abstraction is documented, not delivered. Docs are ahead of implementation."
+        },
+        {
+          "category": "maintainability",
+          "severity": "major",
+          "description": "Type safety is regressed: ClientRegistry._clients goes from dict[str, websockets.ServerConnection] to dict[str, object], erasing the connection type across the whole registry API (get/items) to prepare for a transport that does not yet exist. This degrades static-analysis value now for a hypothetical benefit later."
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "Measured convention score is 0.69 with 13 violations, but all are in app.py, conftest.py, test_channels.py, and test_notification_server.py \u2014 none in the touched file. Pre-existing and untouched by this commit, yet the refactor is a natural point to have cleaned them."
+        }
+      ],
+      "strengths": [
+        "The transport-agnostic direction is architecturally sound and the module docstring clearly states the intent, which will help future sessions complete the abstraction.",
+        "SonarQube delta is clean: +0 bugs, +0 smells, +0 cognitive complexity, +0 duplications.",
+        "The registry's public API surface (get/count/ids/items/subscribe) is preserved, so the refactor is non-breaking to existing callers.",
+        "Small, focused diff (+18/-7 lines) confined to one module."
+      ],
+      "summary": "The commit widens the registry to object-typed connections and documents a BaseTransport abstraction that the diff does not implement, trading away type safety for a not-yet-existing pluggable-transport layer.",
+      "session_number": 4
+    },
+    {
+      "commit_hash": "b65f24b10507de6bbf9d6f59f97e232e3486167d",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.8,
+      "convention_adherence": 0.69,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": true,
+      "better_or_worse": "better",
+      "problems": [
+        {
+          "category": "convention",
+          "severity": "major",
+          "description": "Convention score 0.69 (13 violations): new test files (conftest.py, test_channels.py, test_notification_server.py) and app.py use PascalCase classes and non-UPPER_CASE module-level constants, breaking the repo's snake_case/UPPER_CASE conventions."
+        },
+        {
+          "category": "maintainability",
+          "severity": "minor",
+          "description": "RateLimiter._local dict is mutated without a lock while the server runs ThreadingHTTPServer; the in-process fallback path (Redis unreachable) races across threads and can under/over-count."
+        },
+        {
+          "category": "performance",
+          "severity": "minor",
+          "description": "history() and purge() scan the messages table with ORDER BY timestamp and no index on (timestamp); LIMIT/OFFSET pagination over a table being concurrently purged can skip or duplicate rows."
+        },
+        {
+          "category": "maintainability",
+          "severity": "minor",
+          "description": "Cognitive complexity +34 and +1 smell concentrate in the new RateLimiter (dual Redis/local state machines) and history() dynamic WHERE/param assembly, per SonarQube delta."
+        }
+      ],
+      "strengths": [
+        "New features (history query, TTL purge, rate limit) are genuine cross-cutting concerns that fit the service, not scope creep",
+        "history() mirrors the existing MessageStore.list() connection lifecycle and payload-json.loads pattern",
+        "/history endpoint reuses the established handler/parse_qs/_send_json shape with a clean limit+1 has_more pagination probe",
+        "Config-driven RATE_LIMIT/MESSAGE_TTL_DAYS and injected constructor params match the existing REDIS_URL/DATABASE_URL and registry/store/server_id conventions",
+        "RateLimiter degrades gracefully to an in-process counter when Redis is unreachable, keeping limits enforced"
+      ],
+      "summary": "A well-shaped cross-cutting session that adds history, retention, and rate limiting while closely mirroring existing MessageStore/Redis/handler patterns, held back only by sub-threshold naming conventions in the new test files and minor concurrency/indexing sharp edges.",
+      "session_number": 5
+    }
+  ],
+  "story_review": {
+    "story_name": "notification_service",
+    "reviewer_model": "deepseek/deepseek-v4-flash",
+    "overall_coherence": 0.82,
+    "compounding_issues": [
+      "Session 4's 'pluggable transport' refactor is phantom: the module docstring advertises a BaseTransport/WebSocketTransport abstraction and a TRANSPORT env var, but no such class or env read was ever implemented \u2014 only the docstring was rewritten and websockets.ServerConnection annotations loosened to object, so the claimed seam does not exist for later sessions to build on",
+      "Session 4 ran no tests at all (session transcript contains only `find` and `git log`), leaving its unverified refactor to silently ride into session 5",
+      "The hardcoded `websockets.serve` in NotificationServer.start() (dating to session 1) was never actually abstracted, so the advertised multi-transport capability would still require deep surgery",
+      "Session 5's history feature shipped with 4 initially-failing tests (chronological ordering, since-filter, wire-message history), requiring in-session debugging to reach green"
+    ],
+    "key_decisions": [
+      "Session 1: greenfield replacement of the auth-API seed with an asyncio `websockets` server running a single event loop (no locking by construction) plus a background ThreadingHTTPServer for REST endpoints",
+      "Standardized JSON wire format {type, payload, timestamp} with broadcast/direct/system message types as the stable contract across all sessions",
+      "Session 2: channel-based pub/sub subscriptions added to ClientRegistry with routing of messages carrying a channel field, plus /channels and /channels/{name}/subscribers REST endpoints",
+      "Session 3: Redis pub/sub backbone for multi-instance message sharing with graceful in-process degradation when Redis is unreachable, and SQLite MessageStore persistence exposed via GET /messages",
+      "Session 4: attempt at a pluggable-transport architecture (aspirational only \u2014 docstring/type-level, no concrete abstraction)",
+      "Session 5: in-memory sliding-window RateLimiter per client, message history with since/limit/pagination, and a background TTL purge cleanup task (MESSAGE_TTL_DAYS)"
+    ],
+    "trajectory_description": "Quality improved steadily across the arc. Session 1 delivered a clean, well-documented greenfield WebSocket server (14 passing tests); session 2 extended it cleanly with channel subscriptions and new REST endpoints (25 passing); session 3 was the substantive integration step \u2014 Redis pub/sub backbone, SQLite persistence, connection-state mirroring \u2014 all 35 tests green, though the ~90s Redis-integration runs hint at flakiness. Session 4 marks a flat dip: a mostly cosmetic refactor that advertises a transport abstraction it never implements and ships without any test run, carrying misleading documentation forward. Session 5 recovers and lands the capstone cross-cutting features (rate limiting, history, TTL cleanup), climbing to 47 passing tests after debugging four initial history-test failures. Net trajectory: a strong monotonic build-out of core server \u2192 channels \u2192 integration \u2192 cross-cutting concerns, with a weak, unverified middle link that does not undermine the finished system.",
+    "summary": "A logically coherent five-session build of a WebSocket notification service that grows cleanly through channels, Redis integration, and persistence into rate-limited history with TTL cleanup, marred only by a session-4 refactor that claimed a transport abstraction it never implemented and never verified with tests."
+  }
+}

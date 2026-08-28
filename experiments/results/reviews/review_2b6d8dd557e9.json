@@ -1,0 +1,216 @@
+{
+  "story_name": "task_manager_api",
+  "story_id": "2b6d8dd557e9",
+  "model": "deepseek/deepseek-v4-flash",
+  "commit_reviews": [
+    {
+      "commit_hash": "a01eb8bbbecca8008dacca9643e97db5d8ed318e",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.5,
+      "convention_adherence": 0.5,
+      "introduces_technical_debt": false,
+      "respects_existing_patterns": true,
+      "better_or_worse": "unclear",
+      "problems": [],
+      "strengths": [],
+      "summary": "Review unavailable.",
+      "session_number": 1
+    },
+    {
+      "commit_hash": "7412dfce128f5bb527c39c2ecc784087cd61d8ff",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.85,
+      "convention_adherence": 0.88,
+      "introduces_technical_debt": false,
+      "respects_existing_patterns": true,
+      "better_or_worse": "better",
+      "problems": [
+        {
+          "category": "security",
+          "severity": "minor",
+          "description": "JWT_SECRET_KEY falls back to a hardcoded dev secret when the env var is unset; if the app is deployed without configuration the auth is trivially forgeable."
+        },
+        {
+          "category": "maintainability",
+          "severity": "minor",
+          "description": "dataclass-esque use of datetime.utcnow() (deprecated in Python 3.12) appears in generate_token and create_task; datetime.now(timezone.utc) is the forward-compatible form."
+        },
+        {
+          "category": "architecture",
+          "severity": "info",
+          "description": "The PRAGMA table_info + ALTER TABLE migration is embedded in init_db rather than a versioned migration; acceptable for a single-file baseline but scales poorly if schema evolution continues."
+        },
+        {
+          "category": "security",
+          "severity": "info",
+          "description": "No rate limiting or lockout on /auth/login, leaving the endpoint open to brute-force password guessing."
+        }
+      ],
+      "strengths": [
+        "Per-user data isolation is implemented correctly: owner_id is threaded through every model call and scoping predicates (AND owner_id = ?) are applied to reads, updates, and ownership checks, so users cannot see or mutate others' tasks.",
+        "Idiomatic Flask auth: functools.wraps-based @login_required decorator, g.user_id context storage, and consistent {\"error\": ...} response shape matching the existing route conventions.",
+        "Solid security baseline: werkzeug generate_password_hash/check_password_hash and JWT with expiry rather than storing plaintext credentials.",
+        "Non-destructive migration (PRAGMA inspection + ALTER TABLE) preserves data in pre-existing tasks tables.",
+        "Follows the established single-file structure with section banners (Models, Auth helpers, Routes) and consistent naming (snake_case functions, UPPER_CASE module constants)."
+      ],
+      "summary": "A clean, idiomatic feature addition that fits the app's architecture and patterns well, though the measured 0.73 convention score reflects pre-existing violations in untouched files (celery_config.py, celery_tasks.py, repositories.py, test_app.py) rather than this diff, which is itself convention-clean.",
+      "session_number": 2
+    },
+    {
+      "commit_hash": "cdfad3904a5928ff6a1e7c36146217f47e382560",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.85,
+      "convention_adherence": 0.8,
+      "introduces_technical_debt": false,
+      "respects_existing_patterns": true,
+      "better_or_worse": "better",
+      "problems": [
+        {
+          "category": "architecture",
+          "severity": "minor",
+          "description": "The complete-task detection (reading `previous` task state and firing the notification) lives inline in the `edit_task` route handler rather than in a small service function, mixing HTTP-transport logic with domain logic; SonarQube agrees (cognitive complexity +8, +1 smell)."
+        },
+        {
+          "category": "architecture",
+          "severity": "minor",
+          "description": "init_db now performs an out-of-band ALTER TABLE migration for pre-existing users tables; for fresh installs the CREATE TABLE still omits `email` and relies on the PRAGMA/ALTER path, so the schema definition and migration are split \u2014 a pragmatic but slightly fragile pattern that grows with each story session."
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "The 8 flagged violations are largely false positives: lowercase `broker_url`/`result_backend` in celery_config.py follow Celery's documented configuration convention (not a snake_case-UPPER_CASE breach), and the 'Classes should use PascalCase' hits are pre-existing Flask/test-client module objects, not new code in this commit."
+        },
+        {
+          "category": "maintainability",
+          "severity": "info",
+          "description": "`celery_app` is instantiated but the named task is the only surface consumed; the eager-mode env toggle (`CELERY_TASK_ALWAYS_EAGER`) is a good testing seam but means prod-vs-test behavior diverges via environment, worth documenting."
+        },
+        {
+          "category": "security",
+          "severity": "info",
+          "description": "Email falls back to `{username}@example.com`, which is fine for the mock transport but could silently misroute if a real provider is ever swapped in; mock-only scope noted, not a defect."
+        }
+      ],
+      "strengths": [
+        "Clean separation of concerns: Celery app + config extracted into their own modules so the Flask request/response cycle never blocks on task execution, and env-driven broker URLs keep dev/test/prod decoupled.",
+        "Solid edge-case handling: notifications fire only on a genuine pending\u2192completed transition, guarded against re-trigger on already-completed tasks and non-status edits \u2014 covered by four focused monkeypatched tests.",
+        "Good testing story: `task_always_eager`/`task_eager_propagates` env toggle plus monkeypatched `.delay` lets the suite run without a broker while still asserting the exact task args.",
+        "Migration preserves existing user rows rather than dropping/rebuilding the users table, showing data-aware thinking."
+      ],
+      "summary": "A well-scoped async-notification integration that follows the app's existing module/helper patterns and is well-tested, with only minor maintainability nits (inline trigger logic, split schema/migration); the measured 0.73 convention score is dragged down mostly by Celery-config-lowercase and pre-existing PascalCase false positives, so effective convention fit is better than the raw score.",
+      "session_number": 3
+    },
+    {
+      "commit_hash": "1b510af1330b0ef6b1baa243a187431d26f4ef7a",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.85,
+      "convention_adherence": 0.75,
+      "introduces_technical_debt": false,
+      "respects_existing_patterns": true,
+      "better_or_worse": "better",
+      "problems": [
+        {
+          "category": "maintainability",
+          "severity": "minor",
+          "description": "BaseRepository builds SQL via f-string interpolation of table_name (find_by_id/find_all/insert); safe today since table_name is a hardcoded class constant, but it is a latent injection-by-construction pattern and matches the +1 SonarQube smell."
+        },
+        {
+          "category": "architecture",
+          "severity": "minor",
+          "description": "BaseRepository(ABC) declares itself abstract but defines no abstract methods, so it is instantiable \u2014 the 'abstract' contract is not enforced."
+        },
+        {
+          "category": "other",
+          "severity": "info",
+          "description": "Module-level singletons (user_repo/task_repo) are constructed at import time from get_db; works here but couples repository wiring to import order rather than an explicit composition point."
+        },
+        {
+          "category": "maintainability",
+          "severity": "info",
+          "description": "In edit_task, update_for_owner could return None if the row changes between the find and the update; task['status'] would then raise instead of 404 (narrow TOCTOU edge, behavior otherwise preserved)."
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "repositories.py triggers a module-level constant naming violation per the checker; the other 7 measured violations live in untouched files (celery_config.py, celery_tasks.py, test_app.py) and predate this commit \u2014 the 0.73 score is largely pre-existing, not introduced here."
+        }
+      ],
+      "strengths": [
+        "Reuses the existing get_db/context-manager and dict(row) conversion idioms, so the new layer slots in without new transport or dependency machinery."
+      ],
+      "summary": "A clean, net-debt-reducing repository-layer refactor (-87 lines, +1 file) that fits the Flask app's structure and preserves behavior, with only a minor SQL-interpolation smell and an unenforced abstract base; the measured 0.73 convention score is dragged down mainly by pre-existing violations in untouched files, not by this commit's own code.",
+      "session_number": 4
+    },
+    {
+      "commit_hash": "c34f1a1ff99ff1d6f220e724271c7501289880ec",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.85,
+      "convention_adherence": 0.73,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": true,
+      "better_or_worse": "better",
+      "problems": [
+        {
+          "category": "maintainability",
+          "severity": "minor",
+          "description": "Three test fixtures (client, high_volume_client, low_rate_limit_client) duplicate ~30 lines of identical setup (tempfile DB, env vars, importlib.reload, flushdb); should be factored into a shared helper or a parametrized fixture."
+        },
+        {
+          "category": "dependency",
+          "severity": "minor",
+          "description": "The test suite now hard-requires a live Redis at redis://localhost:6379/15 \u2014 every fixture calls flushdb() and tests fail if Redis is down; DB 15 isolation is correct, but a skip-if-unavailable guard would harden the suite."
+        },
+        {
+          "category": "performance",
+          "severity": "minor",
+          "description": "find_page_for_owner runs SELECT COUNT(*) on every page request; fine at task-manager scale but grows unboundedly with the table."
+        },
+        {
+          "category": "maintainability",
+          "severity": "info",
+          "description": "next_cursor is emitted whenever a full page is returned, so an exact multiple of limit yields one trailing empty-page request (data[-1].id check can't distinguish a full page from the last page)."
+        },
+        {
+          "category": "security",
+          "severity": "info",
+          "description": "The 429 error handler omits a Retry-After header, which throttled clients would otherwise honor."
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "The mechanical 0.73 convention score reflects 8 violations, but all are pre-existing in code this commit does not add or touch (celery_config.py/celery_tasks.py constants and class naming, repositories.py module constants, no classes added anywhere \u2014 +0 classes in the AST diff); the commit's own additions are convention-clean."
+        }
+      ],
+      "strengths": [
+        "Rate limiting is keyed by authenticated user id with IP fallback for /auth endpoints \u2014 a correct security posture, not a naive IP-only limit.",
+        "Clean cursor pagination lives at the repository layer (find_page_for_owner) with type hints and a docstring explaining the id<->created_at ordering equivalence.",
+        "New code follows conventions: snake_case functions, UPPER_CASE constants, env-var config matching the existing JWT pattern.",
+        "Comprehensive test coverage \u2014 dedicated low-rate-limit and high-volume fixtures exercise 429 and the pagination cap, and all list assertions were updated to the new envelope shape."
+      ],
+      "summary": "A well-scoped Session 5 that adds Redis-backed rate limiting and cursor pagination while respecting existing repository/config/test patterns; the 0.73 convention score is a discrepancy with the commit's own clean additions since all 8 flagged violations are pre-existing in files this commit barely touches, and the real debt is the triplicated test-fixture setup plus a hard Redis requirement in the suite.",
+      "session_number": 5
+    }
+  ],
+  "story_review": {
+    "story_name": "task_manager_api",
+    "reviewer_model": "deepseek/deepseek-v4-flash",
+    "overall_coherence": 0.9,
+    "compounding_issues": [
+      "Bad-seed bugs (injected at s=0.8: datetime.now vs utcnow, ORDER BY id LIMIT 50 dropping created_at ordering, and a removed empty-updates guard) were remediated in Session 1, so no latent harm \u2014 but the seed's ordering quirk shaped Session 5's decision to replace created_at DESC with id-cursor pagination.",
+      "Single-file app.py grew monolithically through Sessions 1-3 (greenfield + JWT retrofit + Celery wiring all in one module), so Session 4's Repository-pattern refactor had to unwind 87 lines of raw SQL-in-routes rather than decomposing incrementally.",
+      "Session 2 retrofitted user-ownership via nullable ALTER TABLE (owner_id on tasks), forcing every later read/write path (notifications in S3, pagination in S5) to thread owner-scoping and handle legacy/unowned rows.",
+      "Security smell persisted to the end: JWT_SECRET_KEY default 'dev-secret-change-in-production-please' was never hardened, and Flask-Limiter keys off a JWT signed with that same dev secret.",
+      "Feature stacking drove cyclomatic complexity to 229 (code_quality_score 0.065); only the DB layer was extracted in S4, leaving app.py as a kitchen sink of routes + auth + rate limiting + schema migrations.",
+      "Instrumentation discrepancy: Session 5 records files_changed:1 while AST shows 4 files modified (app.py, repositories.py, requirements.txt, test_app.py)."
+    ],
+    "key_decisions": [
+      "Session 4's Repository pattern (BaseRepository/UserRepository/TaskRepository) centralizing all SQLite access behind typed classes \u2014 the pivotal architecture decision that enabled clean owner-scoped cursor pagination and rate limiting in Session 5.",
+      "Session 2's JWT auth + owner_id data model made every task user-scoped, establishing the security posture that later sessions (notifications, pagination) built on.",
+      "Session 3's Celery integration kept the async notification app decoupled from Flask (separate celery_app, config_from_object, dedicated 'notifications' queue, eager-mode toggle for tests).",
+      "Session 5's cursor-based pagination keyed on the monotonically increasing id, explicitly documented as a stable substitute for the seed's created_at DESC ordering.",
+      "Session 5's rate limit keyed on the authenticated JWT subject (falling back to IP) with 100/min default and a 429 handler \u2014 wiring cross-cutting concerns onto the existing auth layer."
+    ],
+    "trajectory_description": "Quality improved across the arc with an accumulation-of-competence signature: confidence rose from 0.75 (S1) through a dip at 0.59 during the hardest session (S2, JWT retrofit, 5 retries) to 0.79, 0.80, and 0.90 by Session 5, while retries fell monotonically after S2 (5\u21922\u21921\u21920) even as each session added more code and tests (14\u219227\u219232\u219232\u219245 tests, 133\u2192423 code lines, 1.29 test/code ratio, all sessions green, 150 tests total). The model also self-corrected the injected seed bugs in Session 1 and its own Session 2 complexity via the Session 4 refactor. The one counter-trend is structural: feature stacking drove cyclomatic complexity to 229 and a low maintainability score (0.065), so correctness, coverage, and confidence improved while long-term maintainability degraded as app.py became a kitchen-sink module.",
+    "summary": "A highly coherent greenfield\u2192feature\u2192integration\u2192refactor\u2192cross-cutting arc that self-remediated its bad-seed start and ended at peak confidence and test coverage, though feature stacking left a complex, single-module core."
+  }
+}

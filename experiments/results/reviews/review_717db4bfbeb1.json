@@ -1,0 +1,89 @@
+{
+  "story_name": "notification_service",
+  "story_id": "717db4bfbeb1",
+  "model": "deepseek/deepseek-v4-flash",
+  "commit_reviews": [
+    {
+      "commit_hash": "9c3a7278dde5adcd2d349259c8e33b09d45461d8",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 1.0,
+      "convention_adherence": 1.0,
+      "introduces_technical_debt": false,
+      "respects_existing_patterns": true,
+      "better_or_worse": "neutral",
+      "problems": [],
+      "strengths": [],
+      "summary": "No changes in this commit.",
+      "session_number": 1
+    },
+    {
+      "commit_hash": "facbe832ed8a4543fceff1f9731c6809f914e8c2",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 1.0,
+      "convention_adherence": 1.0,
+      "introduces_technical_debt": false,
+      "respects_existing_patterns": true,
+      "better_or_worse": "neutral",
+      "problems": [],
+      "strengths": [],
+      "summary": "No changes in this commit.",
+      "session_number": 2
+    },
+    {
+      "commit_hash": "9338024aae21d5e113cf74a9870220efb08a3856",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 1.0,
+      "convention_adherence": 1.0,
+      "introduces_technical_debt": false,
+      "respects_existing_patterns": true,
+      "better_or_worse": "neutral",
+      "problems": [],
+      "strengths": [],
+      "summary": "No changes in this commit.",
+      "session_number": 3
+    },
+    {
+      "commit_hash": "2593d202ced6479ebb8268c141db979a5d3dbab0",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 1.0,
+      "convention_adherence": 1.0,
+      "introduces_technical_debt": false,
+      "respects_existing_patterns": true,
+      "better_or_worse": "neutral",
+      "problems": [],
+      "strengths": [],
+      "summary": "No changes in this commit.",
+      "session_number": 4
+    },
+    {
+      "commit_hash": "c9e5a6bc4b7496224434a6c5f88a05bd12c7be95",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 1.0,
+      "convention_adherence": 1.0,
+      "introduces_technical_debt": false,
+      "respects_existing_patterns": true,
+      "better_or_worse": "neutral",
+      "problems": [],
+      "strengths": [],
+      "summary": "No changes in this commit.",
+      "session_number": 5
+    }
+  ],
+  "story_review": {
+    "story_name": "notification_service",
+    "reviewer_model": "deepseek/deepseek-v4-flash",
+    "overall_coherence": 0.05,
+    "compounding_issues": [
+      "Every session (1-5) ended immediately on the rate-limit wall ('You've hit your session limit \u00b7 resets 2:10am') at 0 input/0 output tokens, so no session ever executed work \u2014 the nominal greenfield\u2192feature\u2192integration\u2192refactor\u2192cross_cutting arc is purely cosmetic labels",
+      "The run was launched at 23:09 while the model's quota was exhausted (reset 2:10am), so all five sessions were dead on arrival with no recovery window; the entire story consumed 8.4 seconds",
+      "The harness committed each failed session as a 3-line placeholder transcript (.instrument/session_N.jsonl), so the git log presents five 'story' commits containing zero code \u2014 empty commits misrepresented as completed increments",
+      "test_executed_success=False and zero tests were produced; the final tree is byte-identical to the seed app.py (a Flask todo API, unrelated to the WebSocket notification server the story was meant to build) plus the placeholder transcripts"
+    ],
+    "key_decisions": [
+      "No agent decisions exist \u2014 the model never executed a token in any session, so no architectural choice was made",
+      "Infra-level decision (harness): the story was scheduled during a rate-limit window and continued to commit placeholder transcripts instead of aborting or waiting for the 2:10am reset"
+    ],
+    "trajectory_description": "There is no quality arc to describe: quality neither improved nor degraded because no work occurred. All five sessions terminated instantly on the session-limit message (0 tokens, 0 cost), the run finished in 8.4 seconds with all_successful=False, and the final tree differs from the seed only by six 3-line placeholder JSONL files. The trajectory is flat at 'nothing produced,' and the commit sequence reads as an intended progression only because of its titles, not its content.",
+    "summary": "This is a failed/empty run \u2014 all five sessions hit the model rate limit before doing any work, so the '5-session story' is only commit titles over an untouched seed codebase."
+  }
+}

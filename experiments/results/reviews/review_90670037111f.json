@@ -1,0 +1,186 @@
+{
+  "story_name": "static_site_gen",
+  "story_id": "90670037111f",
+  "model": "deepseek/deepseek-v4-flash",
+  "commit_reviews": [
+    {
+      "commit_hash": "08e874bfff6bfdb992250748c40b3439f33ec617",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.7,
+      "convention_adherence": 0.52,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": true,
+      "better_or_worse": "neutral",
+      "problems": [
+        {
+          "category": "convention",
+          "severity": "major",
+          "description": "71 naming-convention violations (convention score 0.52) in brand-new code: interfaces/classes not PascalCase, functions not camelCase, non-uppercase constants \u2014 inconsistent naming conventions bootstrapped at greenfield time in index.ts, cache.ts, cache.test.ts and elsewhere."
+        },
+        {
+          "category": "maintainability",
+          "severity": "major",
+          "description": "11.4% code duplication introduced in greenfield code that had no reason to duplicate \u2014 duplication should be near-zero in a fresh scaffold and will compound across the remaining 4 story sessions."
+        },
+        {
+          "category": "maintainability",
+          "severity": "minor",
+          "description": "+4 code smells and +35 cognitive complexity across only +9 functions (~3.9 complexity/function) \u2014 moderately convoluted control flow in new code that will be hard to extend in later sessions."
+        }
+      ],
+      "strengths": [
+        "Domain-appropriate dependency selection for a static site generator: gray-matter for frontmatter parsing and marked for Markdown rendering.",
+        "Standard, complete TS scaffold: dedicated jest.config.js with ts-jest ESM handling (moduleNameMapper + extensionsToTreatAsEsm), coverage config excluding tests, and clean src/ vs __tests__ separation.",
+        "Zero bugs introduced and no correctness/runtime issues; the scaffold compiles cleanly with 9 functions across 11 files."
+      ],
+      "summary": "Greenfield session 1 is an architecturally sound, domain-appropriate TS scaffold with zero bugs, but it bootstraps genuine technical debt at birth \u2014 71 naming violations (0.52 convention score, with the constant-uppercase flags partly TS false positives but class/interface PascalCase breaks real) and 11.4% duplication in code that had no prior state \u2014 hence neutral vs the empty baseline, and the naming debt should be cleaned before later sessions.",
+      "session_number": 1
+    },
+    {
+      "commit_hash": "cc07fbe32f5f320a5a03f1af85e37bfecf2b486a",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 1.0,
+      "convention_adherence": 1.0,
+      "introduces_technical_debt": false,
+      "respects_existing_patterns": true,
+      "better_or_worse": "neutral",
+      "problems": [],
+      "strengths": [],
+      "summary": "No changes in this commit.",
+      "session_number": 2
+    },
+    {
+      "commit_hash": "b8877c116da51fa6548cfef208d40c8a4b9c7eb7",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.65,
+      "convention_adherence": 0.5,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": true,
+      "better_or_worse": "neutral",
+      "problems": [
+        {
+          "category": "security",
+          "severity": "major",
+          "description": "Directory traversal in serve.ts's HTTP handler: filePath = path.join(outputDir, req.url) with no sanitization \u2014 a request like /../package.json resolves outside outputDir and is read and served (fs.existsSync + fs.readFileSync), leaking arbitrary files over HTTP."
+        },
+        {
+          "category": "dependency",
+          "severity": "minor",
+          "description": "chokidar and ws added to package.json dependencies but package-lock.json was not updated in the same commit \u2014 npm ci will fail to install the new deps, breaking reproducible installs."
+        },
+        {
+          "category": "maintainability",
+          "severity": "minor",
+          "description": "ServeOptions and its default-path resolution (./templates, ./templates/layouts, ./templates/partials, port 3000) duplicate generator.ts's GeneratorOptions defaults instead of sharing/extracting them \u2014 flagged by the +1.0% SonarQube duplication delta."
+        },
+        {
+          "category": "convention",
+          "severity": "minor",
+          "description": "serve(options, test?: boolean) uses a positional test-only boolean on the public API to suppress logging; a silent/quiet option inside ServeOptions would match the existing options-object convention."
+        },
+        {
+          "category": "maintainability",
+          "severity": "minor",
+          "description": "SonarQube delta for this commit: +11 smells and +32 cognitive complexity, concentrated in serve.ts's deeply nested http/ws/watcher async closures; the rebuild-gating and error handling could be flattened."
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "clients: Set<any> bypasses the ws WebSocket type (tsconfig strict:true), and args.port! in serve.test.ts uses a non-null assertion."
+        },
+        {
+          "category": "testing",
+          "severity": "info",
+          "description": "serve.test.ts picks random ports in 9000-9999, which can collide and flake; binding to ephemeral port 0 would be deterministic."
+        }
+      ],
+      "strengths": [
+        "Reuses the existing generate() for rebuilds instead of reimplementing generation \u2014 good composition over duplication.",
+        "CLI extension follows the established hand-rolled parseArgs pattern and index.ts command dispatch with consistent option precedence.",
+        "Solid integration tests: real HTTP requests, temp dirs, cleanup in finally, and new parseArgs cases including non-numeric port handling.",
+        "Live-reload wiring (chokidar + ws + script injection) is idiomatic for a dev server and SIGINT shutdown is handled.",
+        "Feature documented in LIVE_RELOAD.md with a consistent commit message."
+      ],
+      "summary": "A functional, well-tested dev-server integration that slots into the existing CLI and reuses the generator, but ships a directory-traversal hole, duplicated option defaults, an unsynced lockfile, and +11 smells/+32 cognitive complexity \u2014 net-neutral progression.",
+      "session_number": 3
+    },
+    {
+      "commit_hash": "0575328add1fcec559408166670afb8ca9625b26",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.55,
+      "convention_adherence": 0.52,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": false,
+      "better_or_worse": "worse",
+      "problems": [
+        {
+          "category": "dependency",
+          "severity": "major",
+          "description": "Adds the deprecated stub package @types/chokidar (^2.1.7), which npm itself flags as unnecessary since chokidar ships its own type definitions."
+        },
+        {
+          "category": "dependency",
+          "severity": "major",
+          "description": "Promotes devDependencies to runtime dependencies (handlebars, ws, chokidar and transitive deps like anymatch/braces/glob-parent/fsevents lose their `dev: true` markers), enlarging the production dependency footprint for what is labeled a refactor."
+        },
+        {
+          "category": "convention",
+          "severity": "major",
+          "description": "71 convention violations (score 0.52): Classes/Interfaces not PascalCase, Functions not camelCase, Constants not UPPER_CASE across index.ts, cache.ts, cache.test.ts."
+        },
+        {
+          "category": "maintainability",
+          "severity": "minor",
+          "description": "SonarQube delta shows +2 code smells and +22 cognitive complexity added in this commit."
+        },
+        {
+          "category": "other",
+          "severity": "info",
+          "description": "Commit message 'refactor' understates the change: +6 files, +880/-357 lines, +19 functions, +4 classes, +161 imports is feature-scale surface, not a pure refactor."
+        }
+      ],
+      "strengths": [
+        "ts-jest transform block is correctly configured for ESM TypeScript (useESM + esnext module) to make existing tests pass.",
+        "package-lock.json updated consistently with the new package.json dependencies.",
+        "Duplication reduced by 1.0% per SonarQube."
+      ],
+      "summary": "A scope-crept 'refactor' that adds runtime dependencies (including a deprecated stub types package), promotes dev deps to production, and accrues 71 convention violations and +22 cognitive complexity, landing below the repo's conventions bar.",
+      "session_number": 4
+    },
+    {
+      "commit_hash": "b5ab8ba907865f08630b122bc6ef3a668fbcf01f",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 1.0,
+      "convention_adherence": 1.0,
+      "introduces_technical_debt": false,
+      "respects_existing_patterns": true,
+      "better_or_worse": "neutral",
+      "problems": [],
+      "strengths": [],
+      "summary": "No changes in this commit.",
+      "session_number": 5
+    }
+  ],
+  "story_review": {
+    "story_name": "static_site_gen",
+    "reviewer_model": "deepseek/deepseek-v4-flash",
+    "overall_coherence": 0.9,
+    "compounding_issues": [
+      "EARLY_DEGRADE false premise (inject_false_premise, s=0.5) landed in Session 1 and was never corrected: the agent internalized 'gray-matter only supports JSON frontmatter' and hand-rolled a brittle regex/colon-split YAML parser (src/parser.ts parseYamlFrontmatter) that remains the sole parse path through all 5 sessions \u2014 a permanent architectural wart instead of a transient slip.",
+      "Session 1 committed node_modules/ and compiled dist/ (JS + sourcemaps) into git; every later session re-committed hundreds of generated files (S1 alone = 5393 files / 4619 lines), inflating diff noise and repo size.",
+      "Incremental builds (S5) drop unchanged pages from context.pages in MarkdownPlugin.beforeBuild, so TemplatePlugin.afterBuild regenerates index.html from only the changed subset \u2014 a no-op `--incremental` build would emit an index listing zero pages. A dual cache-key scheme (.md keys read in markdown plugin, .html keys written in template plugin and never read) adds redundancy without fixing it.",
+      "The seed codebase (an unrelated Express auth API) was correctly ignored but never cleaned up \u2014 a dead 200-line root index.ts sits unused in the final tree.",
+      "Independent harness verification ran zero tests (test_count 0 / test_lines 0) across all sessions, so correctness rests solely on the agent's self-run jest suites despite test_executed_success=True."
+    ],
+    "key_decisions": [
+      "Plugin architecture (S4): a Plugin interface with lifecycle hooks (onStart/beforeBuild/onFile/afterBuild/onEnd) + PluginManager became the load-bearing spine that re-homes the markdown parser, template engine, and dev server as plugins and hosts S5's caching \u2014 measurably cutting complexity (+32\u2192+22) and duplication (11.4%\u2192down).",
+      "Handlebars template engine with frontmatter-selected layouts/partials plus on-disk auto-generated default templates (S2) \u2014 enabled zero-config builds and gave S5 a template-hash invalidation target.",
+      "Custom YAML frontmatter parser (S1) adopted from the injected false premise about gray-matter \u2014 the most consequential bad decision, cementing a fragile parser into the data path.",
+      "Dev server as chokidar watcher + WebSocket live-reload with a re-entrant rebuild guard (S3), later promoted to DevServerPlugin (S4).",
+      "Content-hash cache manifest (.ssg-cache.json) with layout-hash invalidation and --clean support (S5), integrated into the plugin BuildContext.",
+      "Consistent jest discipline: every session ran the suite and fixed failures before committing (35 \u2192 56 \u2192 93 passing tests, all green at each session end)."
+    ],
+    "trajectory_description": "Quality improved across the arc. Session 1 delivered a complete greenfield core with 35 passing tests, though it accepted the injected false premise and a brittle hand-rolled YAML parser, and checked in node_modules/dist. Sessions 2-3 grew features (templates, live-reload server) with test counts climbing to 56 and 17-suite runs and only modest complexity growth (+32), but the monolith generator.ts was carrying everything. Session 4 was the turning point: the plugin refactor split the monolith into a plugin manager plus markdown/template/dev-server plugins, reduced Sonar complexity and duplication, and kept 6 suites green \u2014 confidence dipped (0.76) but the outcome was a net quality gain. Session 5 added content-hash incremental caching cleanly on top of the plugin pipeline (93 tests passing), though with an index-regeneration edge case. The only persistent defect is the S1 false-premise parser, which the agent's test discipline contained but never excised.",
+    "summary": "A textbook incremental build \u2014 greenfield core, feature additions, integration, a genuinely quality-improving plugin refactor, and a cross-cutting caching layer \u2014 marred only by an EARLY_DEGRADE false premise that took root in session 1's parser and survived every session, but with test discipline strong enough to keep all five sessions green and growing (35\u219293 tests)."
+  }
+}

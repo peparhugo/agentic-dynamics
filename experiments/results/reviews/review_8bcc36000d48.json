@@ -1,0 +1,229 @@
+{
+  "story_name": "static_site_gen",
+  "story_id": "8bcc36000d48",
+  "model": "deepseek/deepseek-v4-flash",
+  "commit_reviews": [
+    {
+      "commit_hash": "acd6e55763dcb689aa5838a343dbcd6851807d45",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.85,
+      "convention_adherence": 0.62,
+      "introduces_technical_debt": false,
+      "respects_existing_patterns": true,
+      "better_or_worse": "better",
+      "problems": [
+        {
+          "category": "testing",
+          "severity": "minor",
+          "description": "CLI integration tests shell out to `npx tsc` via ensureBuilt() and depend on a stale-or-built dist/cli.js, making the suite environment-dependent and slow (no build step wired into test lifecycle)."
+        },
+        {
+          "category": "maintainability",
+          "severity": "minor",
+          "description": "SonarQube delta reports +4 smells and +91 cognitive complexity for 4838 new lines across 26 functions; some core functions (frontmatter/generator parsing) are above comfortable complexity thresholds."
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "74 convention violations per SonarQube (convention score 0.62), concentrated in test files (snake_case functions, non-PascalCase classes/interfaces); many appear to be analyzer false positives on jest describe/it scaffolding, but any genuine snake_case helpers (e.g. in dev-server.test.ts) should be camelCased."
+        }
+      ],
+      "strengths": [
+        "Comprehensive two-layer test strategy: pure unit tests (parseArgs, parseFrontmatter) plus end-to-end CLI binary tests via spawnSync that assert real exit codes and on-disk output."
+      ],
+      "summary": "A well-architected, well-tested greenfield static-site-generator foundation (architectural fit strong, no debt), rated 0.62 on convention adherence per SonarQube largely due to apparent test-file analyzer false positives that don't match the clean visible code style \u2014 flagged discrepancy.",
+      "session_number": 1
+    },
+    {
+      "commit_hash": "60ef705164118d0a6cac6848abafeb32bc9a98dd",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.82,
+      "convention_adherence": 0.62,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": true,
+      "better_or_worse": "better",
+      "problems": [
+        {
+          "category": "maintainability",
+          "severity": "major",
+          "description": "Cognitive complexity +62 and test helper duplication (+1.6% duplications): helpers like makeTempDir/writeContent/makePage are re-implemented inline per test file instead of being extracted to a shared fixture module, so the pattern will keep copy-pasting across future test suites."
+        },
+        {
+          "category": "maintainability",
+          "severity": "minor",
+          "description": "SonarQube delta of +12 smells and +3 bugs lands in test code \u2014 largely long multi-purpose helpers (buildWithTemplates, defaultTemplateDir) that bundle fixture setup with assertions, increasing maintenance surface."
+        },
+        {
+          "category": "convention",
+          "severity": "minor",
+          "description": "Touched test files carry naming violations (snake_case functions, non-PascalCase classes/interfaces in cli.test.ts, dev-server.test.ts, frontmatter.test.ts); the agent did not align them with the project's camelCase/PascalCase rules while editing those files."
+        }
+      ],
+      "strengths": [
+        "Comprehensive behavioral coverage of TemplateEngine: directory structure, default template/layout resolution, frontmatter-selected templates and layouts, partials, HTML escaping, and explicit error paths for missing templates/layouts.",
+        "Tests exercise real end-to-end rendering via buildSite with temp-dir fixtures rather than mocking, matching the existing __tests__ integration pattern.",
+        "Correctly imports the module surface (cli.parseArgs, generator.buildSite, templates.TemplateEngine) so the suite guards the intended seams."
+      ],
+      "summary": "A solid, integration-style test commit that faithfully exercises the template engine's render/layout/partial behavior and matches existing __tests__ patterns, but accumulates real maintainability debt via duplicated test helpers and rising cognitive complexity (Convention score 0.62 aligns with the observed naming violations in the touched test files).",
+      "session_number": 2
+    },
+    {
+      "commit_hash": "6bac3ebb5f55759a8c05e126e839e81c97053c3a",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.78,
+      "convention_adherence": 0.6,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": true,
+      "better_or_worse": "better",
+      "problems": [
+        {
+          "category": "convention",
+          "severity": "minor",
+          "description": "dev-server.test.ts introduces naming-convention violations (snake_case functions, non-PascalCase classes/interfaces) per SonarQube, consistent with the measured convention score of 0.62."
+        },
+        {
+          "category": "maintainability",
+          "severity": "minor",
+          "description": "Cognitive complexity +56 and +7 smells come almost entirely from hand-rolled http.get promise wrappers (fetchText/fetchStatus) and poll-based waitFor/waitForWsMessage helpers \u2014 Node's built-in fetch and a shared test-utils module would reduce this."
+        },
+        {
+          "category": "testing",
+          "severity": "minor",
+          "description": "Test helpers duplicate identical timeout patterns (8000ms timeout, 50ms poll) across waitFor, waitForWsMessage, and the HTTP helpers; the 50ms polling interval also creates a slow-fail latency in the failure path."
+        },
+        {
+          "category": "maintainability",
+          "severity": "info",
+          "description": "Duplications +0.8% \u2014 helper logic (temp-dir fixture setup, HTTP fetch/status) likely overlaps patterns already present in cli.test.ts/frontmatter.test.ts and would benefit from extraction."
+        }
+      ],
+      "strengths": [
+        "Integration tests exercise the real public API surface (startDevServer, injectLiveReload, liveReloadScript, parseArgs serve) rather than mocking internals, giving genuine behavioral coverage of the live-reload feature.",
+        "Strong edge-case coverage: idempotent script injection (no double-inject), no-body-tag fallback, 404 on missing files, non-HTML passthrough, and root/index handling.",
+        "Proper resource hygiene: ephemeral port 0 avoids CI port conflicts and try/finally guarantees devServer.close() on every path.",
+        "Lives in the established __tests__/ directory alongside cli.test.ts and frontmatter.test.ts, mirroring the repo's jest conventions."
+      ],
+      "summary": "A solid, pattern-respecting integration test suite for the dev-server feature (architectural fit 0.78, better than before), with convention adherence held down by naming violations and avoidable test-helper complexity (smells +7, complexity +56) \u2014 noting the measured 0.62 score is partly diluted by pre-existing violations in cli.test.ts and frontmatter.test.ts that this diff did not touch.",
+      "session_number": 3
+    },
+    {
+      "commit_hash": "7381d1d294d379e026dc2cb0332593dc832fbb38",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.78,
+      "convention_adherence": 0.62,
+      "introduces_technical_debt": false,
+      "respects_existing_patterns": true,
+      "better_or_worse": "better",
+      "problems": [
+        {
+          "category": "maintainability",
+          "severity": "minor",
+          "description": "Both build-success log lines print `opts.outputDir` instead of the merged `dirs.outputDir`, so the reported directory is wrong whenever ssg.config.ts overrides the CLI default (serveSite and main)."
+        },
+        {
+          "category": "maintainability",
+          "severity": "minor",
+          "description": "The `rebuild()` promise-vs-boolean juggling (`(result as Promise<boolean>).then`) reloads the client immediately while the async rebuild may still be running, and a rejected promise is unhandled \u2014 a race/latent-error path."
+        },
+        {
+          "category": "convention",
+          "severity": "minor",
+          "description": "74 convention violations (PascalCase classes/interfaces, snake_case functions) in cli.test.ts, dev-server.test.ts, and frontmatter.test.ts drag the measured convention score to 0.62."
+        },
+        {
+          "category": "maintainability",
+          "severity": "info",
+          "description": "Cognitive complexity +75 \u2014 the applyConfig ternary chains and rebuild handling add measurable complexity (SonarQube smell +1)."
+        },
+        {
+          "category": "architecture",
+          "severity": "info",
+          "description": "Four parallel `*Set` boolean flags on CliOptions duplicate state that could be derived (e.g. undefined sentinels); note `portSet` is set but never consumed."
+        }
+      ],
+      "strengths": [
+        "applyConfig centralizes precedence (CLI > config > defaults) into a single, documented path shared by both serveSite and main",
+        "Dev server decoupled from full-site builds via an injectable `rebuild` callback \u2014 improves testability and reuses existing Plugin/PluginFactory types",
+        "loadConfig errors handled with clear messages in both entry points; no new bugs (SonarQube bugs +0)",
+        "Duplication reduced (-0.5%) and the refactor is a net architectural improvement",
+        "Config + plugin support integrated consistently across build and serve paths, following existing src/engine, src/generator, and src/plugins/types patterns"
+      ],
+      "summary": "A coherent config+plugin refactor that centralizes directory precedence and decouples the dev server from full-site builds, held back by a misreported output dir in logs, convoluted promise handling in the rebuild path, and a modest measured convention score (0.62) driven mostly by test-file naming violations.",
+      "session_number": 4
+    },
+    {
+      "commit_hash": "5fdbd8f780c29e7b1a7a38d8e5377bc1f46890d0",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.78,
+      "convention_adherence": 0.62,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": true,
+      "better_or_worse": "better",
+      "problems": [
+        {
+          "category": "maintainability",
+          "severity": "major",
+          "description": "collectIncremental and collectIncrementalSync (engine.ts:259/302) are ~40 lines of near-identical logic each, plus finalizeCache/prepareCache/pruneStaleEntries \u2014 matches SonarQube's +1.1% duplications and +77 cognitive complexity delta. It mirrors the codebase's pre-existing sync/async split but doubles the maintenance surface of the pipeline."
+        },
+        {
+          "category": "architecture",
+          "severity": "minor",
+          "description": "Cache invalidation hashes only content files and *.hbs templates; changes to ssg.config.ts, plugin options, or the plugin set don't invalidate entries, so an incremental rebuild can serve stale HTML after a config change."
+        },
+        {
+          "category": "maintainability",
+          "severity": "minor",
+          "description": "renderedHtml is stored redundantly on both Page (types.ts) and CacheEntry, leaking a render output field into the content-domain Page type; finalizeCache relies on that field being non-empty to persist it."
+        },
+        {
+          "category": "architecture",
+          "severity": "minor",
+          "description": "engine.stats is declared readonly but is a mutable object mutated throughout the engine (engine.ts:67); the public 'readonly' contract is misleading for a stats accumulator."
+        },
+        {
+          "category": "testing",
+          "severity": "minor",
+          "description": "Coverage exercises only the sync path (buildSiteWithResult/runSync); the async collectIncremental path (engine.build) and the engine's incremental behavior when invoked directly are untested."
+        },
+        {
+          "category": "testing",
+          "severity": "info",
+          "description": "incremental.test.ts (301 lines) mixes unit tests against buildSiteWithResult with CLI integration tests via spawnSync against the compiled dist/cli.js, coupling test correctness to a prior tsc build (ensureBuilt)."
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "Measured convention score 0.62 / 74 violations are repo-wide and concentrated in cli.test.ts, dev-server.test.ts, frontmatter.test.ts \u2014 files untouched by this commit; the new incremental.test.ts and cache.ts are convention-clean (camelCase helpers, no classes/interfaces), so the delta contribution is near zero."
+        }
+      ],
+      "strengths": [
+        "Cleanly separated src/cache.ts module with well-documented pure helpers (hashString/hashFile/hashTemplateDir), versioned manifest, and atomic write via tmp+rename with graceful fallback to an empty cache on corruption or version mismatch.",
+        "Backward-compatible API: buildSite is preserved and buildSiteWithResult adds stats alongside it, following the existing generator.ts export pattern.",
+        "Thorough feature test matrix: first build, no-op skip, partial rebuild, template invalidation, deleted-file pruning, --clean, corrupt/versioned-cache fallback, cache identity vs clean build, and CLI flag end-to-end.",
+        "Feature is fully opt-in (incremental defaults off) and non-invasive to the plugin pipeline contract; caching logic is engine-orchestrated rather than spread through plugins."
+      ],
+      "summary": "A well-scoped, well-tested, backward-compatible incremental-build feature that fits the plugin-based engine and cache-module conventions, though it adds measurable sync/async duplication and cognitive complexity in the engine and its invalidation scope excludes config/plugin changes.",
+      "session_number": 5
+    }
+  ],
+  "story_review": {
+    "story_name": "static_site_gen",
+    "reviewer_model": "deepseek/deepseek-v4-flash",
+    "overall_coherence": 0.92,
+    "compounding_issues": [
+      "Seed `index.ts` (an Express Todo API) is never reconciled with the actual task \u2014 it sits dead at the repo root through all 5 sessions, unrelated to the SSG",
+      "Frontmatter uses a dual-parser design (hand-rolled simple YAML splitter merged on top of gray-matter, 'YAML keys win') that undersupports nested YAML and adds merge-priority complexity",
+      "The S4/S5 engine duplicates the full page-collection and incremental-cache logic in sync and async variants (collectPages/collectPagesSync, collectIncremental/collectIncrementalSync), a maintenance surface for drift",
+      "The dev server's default rebuild path (LiveReloadDevServer.defaultRebuild) still calls buildSite() directly while the plugin path uses engine.buildSync(), a mild layering inconsistency"
+    ],
+    "key_decisions": [
+      "Treating the mismatched Express seed as irrelevant and greenfielding a clean SSG module structure (cli/frontmatter/generator/markdown/types) in session 1",
+      "Adopting Handlebars as the template engine with layouts, partials, and per-page frontmatter template/layout selection (session 2)",
+      "Building a live-reload dev server with chokidar file watching + WebSocket reload-script injection behind a `serve` command (session 3)",
+      "Refactoring to a plugin architecture \u2014 Plugin interface with onStart/beforeBuild/afterBuild/onFile/onEnd lifecycle hooks, a central SsgEngine, and runtime ssg.config.ts loading via transpileModule (session 4)",
+      "Implementing incremental builds keyed on content-file and template-dir sha256 hashes with an atomic .ssg-cache.json manifest and build stats (session 5)"
+    ],
+    "trajectory_description": "Quality improved steadily across the arc, following a textbook add-features-then-refactor rhythm. Session 2's feature addition accumulated the most technical debt (3 sonar bugs, 12 smells); session 3 fixed the bugs while adding a substantial integrated dev server; the session 4 plugin-system refactor was the high point, collapsing smells from 7 to 1 and decomposing the 199-line monolithic generator into an engine plus small single-purpose plugins; session 5 then built a well-tested cross-cutting incremental cache cleanly on that new seam (16 new tests, smells unchanged at 1). Test coverage grew monotonically from 32 to 48 to 48 to 67 to 83 tests, all passing at every commit, with final production code clean and modular.",
+    "summary": "A highly coherent, well-sequenced five-session build (CLI \u2192 templates \u2192 dev server \u2192 plugin refactor \u2192 caching) in which a timely architecture refactor enabled a clean cross-cutting addition and the project finished substantially cleaner and better-tested than it started."
+  }
+}

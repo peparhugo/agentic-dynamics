@@ -34,11 +34,13 @@ the commits made during the phase (``git log pre-head..HEAD``) and every one mus
 plain-message commit fails the phase with reason ``COMMIT_PREFIX`` + the offending subjects as
 evidence, even if the phase otherwise succeeded (the campaign stops for the operator), recorded
 on ``PhaseResult.commit_gate`` and the ledger. The runner's own ``_git_commit`` writes the
-correct message; the enforcement catches MANUAL agent commits. Message-only violations are
-self-healing ONLY in the single-offender-at-HEAD shape (the P0 safe rule — ``git commit
---amend`` rewrites HEAD and HEAD alone, so a multi-commit range is never amended; see
-``_enforce_commit_prefix``): one bad commit AT HEAD is amended with a checked return code and
-re-read, anything else fails strict with every offender's sha + subject.
+correct message; the enforcement catches MANUAL agent commits. Two-line defense (the
+drawing-board fix, 2026-08-28): a commit-msg hook installed before each agent phase rewrites
+any non-conforming subject to the canonical pattern AT COMMIT TIME (the agent cannot deviate),
+and the gate backstops pre-hook commits with a proper noninteractive history rewrite —
+``git filter-branch`` + a deterministic msg-filter over the phase range, exact-SHA scoped,
+tree-preserving, re-read + fail-strict on any remainder. ``FINOPS_COMMIT_GATE=strict``
+restores the fail-with-evidence mode (no hook, no rewrite); see ``_enforce_commit_prefix``.
 
 Relabel tree-identity gate (cap_runner_hardening2 §Gap 2): after each agent phase (kind !=
 ``test``), the runner compares the phase's committed tree against the discarded-trees ledger
@@ -110,6 +112,7 @@ import os
 import re
 import shutil
 import subprocess
+import sys
 import tempfile
 import time
 from collections.abc import Callable
@@ -1292,6 +1295,105 @@ def _git_log_subjects(workdir: Path, rev_range: str) -> list[tuple[str, str]]:
 RUNNER_INIT_AUTHOR_EMAIL = "experiment@instrument.local"
 
 
+def _install_commit_msg_hook(wd: Path, phase_name: str, goal: str) -> None:
+    """Commit-time prefix enforcement (the drawing-board fix, 2026-08-28).
+
+    A ``.git/hooks/commit-msg`` hook in the worktree rewrites any non-conforming subject to
+    ``[workflow] <phase> — <goal-prefix>`` AT COMMIT TIME — deterministic, no model involved,
+    the agent CANNOT produce a violating commit. The post-phase gate (``_enforce_commit_prefix``)
+    then becomes a backstop for pre-hook commits instead of a failure point. Installed per
+    phase in canonicalize mode only (``FINOPS_COMMIT_GATE`` unset or ``canonicalize``);
+    strict mode installs no hook — violations stay visible so the gate can fail with evidence.
+    ``FINOPS_COMMIT_HOOK=0`` disables the hook for a run (tests of the gate's own rewrite path,
+    or a caller that wants raw commits). The adapter's ``Initial`` commit is preserved by
+    explicit passthrough (its subject is exempt by author identity at the gate).
+    Best-effort: an unwritable .git degrades to "no hook" (the gate still catches violations).
+    """
+    if os.environ.get("FINOPS_COMMIT_GATE", "canonicalize") == "strict":
+        return
+    if os.environ.get("FINOPS_COMMIT_HOOK", "1") == "0":
+        return
+    expected = f"[workflow] {phase_name} — {goal[:40]}"
+    script = (
+        "#!/usr/bin/env python3\n"
+        "import sys\n"
+        "path = sys.argv[1]\n"
+        "expected = " + repr(expected) + "\n"
+        "with open(path, encoding='utf-8') as f:\n"
+        "    msg = f.read()\n"
+        "first, sep, rest = msg.partition('\\n')\n"
+        "if first == 'Initial' or first.startswith(expected):\n"
+        "    sys.exit(0)\n"
+        "with open(path, 'w', encoding='utf-8') as f:\n"
+        "    f.write(expected + (sep + rest if sep else ''))\n"
+    )
+    try:
+        hook = wd / ".git" / "hooks" / "commit-msg"
+        hook.write_text(script, encoding="utf-8")
+        hook.chmod(0o755)
+    except Exception:  # noqa: BLE001 — an unwritable hook degrades to the post-phase gate
+        pass
+
+
+def _canonicalize_commit_range(
+    wd: Path, pre_head: str | None, expected: str, offenders: list[tuple[str, str]]
+) -> str | None:
+    """Proper noninteractive history rewrite (the drawing-board fix, 2026-08-28).
+
+    Rewrites EVERY offending commit's subject in the phase range to the canonical pattern via
+    ``git filter-branch`` with a deterministic msg-filter — exact-SHA scoped (the range is
+    ``pre_head..HEAD`` — the phase's own commits and nothing else), checked return code,
+    tree-preserving (only messages change; the final tree hash is untouched, so the relabel
+    gate and the phase's deliverable tree are unaffected). ``Initial`` subjects pass through
+    unchanged (the adapter's exemption, same as the gate). This replaces the P0 single-amend
+    rule: ``git commit --amend`` rewrites HEAD alone, so multi-commit ranges (and a single
+    offender buried under good commits) were previously refused; the filter-branch rewrite
+    handles every shape. Returns the rewritten HEAD sha, or None on any failure — the caller
+    then falls through to the strict COMMIT_PREFIX record with the fresh evidence. The
+    deterministic rewrite is deliberately NOT an agent session: the expected prefix is known
+    to the runner (no judgment needed), so an LLM doing git surgery would add failure modes
+    to a mechanical fix.
+    """
+    script = (wd / ".git" / "commit_prefix_filter.py").resolve()
+    body = (
+        "import sys\n"
+        "expected = " + repr(expected) + "\n"
+        "msg = sys.stdin.read()\n"
+        "first, sep, rest = msg.partition('\\n')\n"
+        "if first == 'Initial' or first.startswith(expected):\n"
+        "    sys.stdout.write(msg)\n"
+        "else:\n"
+        "    sys.stdout.write(expected + (sep + rest if sep else ''))\n"
+    )
+    try:
+        script.write_text(body, encoding="utf-8")
+        env = {**os.environ, "FILTER_BRANCH_SQUELCH_WARNING": "1"}
+        rng = f"{pre_head}..HEAD" if pre_head else "HEAD"
+        run = subprocess.run(
+            ["git", "filter-branch", "--msg-filter", f"{sys.executable} {script}", "--", rng],
+            cwd=wd, capture_output=True, text=True, timeout=300, env=env,
+        )
+        if run.returncode != 0:
+            return None
+        # Best-effort: drop filter-branch's refs/original backup ref (a stale one would
+        # confuse a later relabel-tree comparison).
+        try:
+            branch = subprocess.run(
+                ["git", "rev-parse", "--abbrev-ref", "HEAD"], cwd=wd,
+                capture_output=True, text=True, timeout=15,
+            ).stdout.strip()
+            if branch and branch != "HEAD":
+                subprocess.run(
+                    ["git", "update-ref", "-d", f"refs/original/refs/heads/{branch}"],
+                    cwd=wd, capture_output=True, text=True, timeout=15,
+                )
+        except Exception:  # noqa: BLE001 — the backup-ref cleanup is best-effort
+            pass
+        return _git_full_sha(wd, "HEAD")
+    except Exception:  # noqa: BLE001 — any rewrite failure degrades to the strict path
+        return None
+
+
 def _enforce_commit_prefix(
     pr: PhaseResult, wd: Path, phase_name: str, goal: str, pre_head: str
 ) -> None:
@@ -1308,18 +1410,18 @@ def _enforce_commit_prefix(
     identity (``RUNNER_INIT_AUTHOR_EMAIL``) — the enforcement catches MANUAL agent commits.
     Best-effort: an unreadable git state degrades to "no commits to check".
 
-    **The safe canonicalize rule (P0 fix — ``git commit --amend`` rewrites HEAD only).** In
-    canonicalize mode (``FINOPS_COMMIT_GATE`` unset or ``canonicalize``), a message-only
-    violation is self-healing ONLY when there is exactly ONE offending commit AND that commit
-    IS HEAD (verified by ``git rev-parse HEAD`` equalling the offender's sha). In that single
-    case the runner amends the subject to the canonical pattern (tree + content intact, the
-    author's work preserved) with a CHECKED return code, re-reads the whole range, and fails
-    strict if even one violation remains. ANY other case — multiple offenders (e.g. the
-    revamp2 seven-commit shape), or a single offender that is NOT HEAD (a good commit sits on
-    top of a bad one) — is NEVER amended: amend would silently rewrite a *different* commit
-    (HEAD), so the run fails strict with ``COMMIT_PREFIX`` + every offender's sha + original
-    subject. ``FINOPS_COMMIT_GATE=strict`` restores the fail-with-evidence mode outright.
-    TREE violations (the relabel — a discarded tree re-presented) are NEVER canonicalized.
+    **Commit-prefix enforcement (the drawing-board fix, 2026-08-28).** In canonicalize mode
+    (``FINOPS_COMMIT_GATE`` unset or ``canonicalize``) the FIRST line of defense is
+    ``_install_commit_msg_hook`` — a commit-msg hook installed before the phase rewrites any
+    non-conforming subject to ``[workflow] <phase> — <goal-prefix>`` at commit time, so the
+    agent cannot produce a violation. The gate itself is the backstop for pre-hook commits:
+    it rewrites EVERY offender's subject in the phase range via a proper noninteractive
+    history rewrite (``git filter-branch`` + deterministic msg-filter — exact-SHA scoped,
+    tree-preserving, checked return code), re-reads the whole range, and fails strict if even
+    one violation remains. This supersedes the P0 single-amend rule (``git commit --amend``
+    rewrites HEAD only — multi-commit ranges were refused). ``FINOPS_COMMIT_GATE=strict``
+    restores the fail-with-evidence mode outright (no hook, no rewrite). TREE violations (the
+    relabel — a discarded tree re-presented) are NEVER canonicalized.
     """
     goal_prefix = goal[:40]
     commits = (
@@ -1396,66 +1498,51 @@ def _enforce_commit_prefix(
     if not bad:
         return
     expected = f"[workflow] {phase_name} — {goal_prefix}"
-    # CANONICALIZE-WITH-EVIDENCE (cap_runner_hardening2 p1 lesson — the measured pattern:
-    # four operator re-tags on one phase because agents commit real work with natural
-    # "fix:" messages; the byte-exact gate turned excellent work into busywork). A
-    # MESSAGE-only violation is self-healing by default — BUT ONLY for the single
-    # offender-at-HEAD shape (P0 fix): ``git commit --amend`` rewrites HEAD and HEAD alone,
-    # so with offenders A, B, C in the range the old loop amended C repeatedly and reported
-    # A and B canonicalized while they stayed untouched. The safe rule: canonicalize ONLY
-    # when there is exactly ONE offender AND that offender IS HEAD (``git rev-parse HEAD``
-    # verified); amend with a CHECKED return code; re-read the whole range and fail strict
-    # if even one violation remains. ANY other case — multiple offenders, or the single
-    # offender not at HEAD (a good commit sits on top) — is never amended: the run fails
-    # strict with COMMIT_PREFIX + every offender's sha + original subject. No silent
-    # partial rewrite. FINOPS_COMMIT_GATE=strict restores the fail-with-evidence mode.
-    # TREE violations (the relabel — a discarded tree re-presented) are NEVER canonicalized:
-    # they stay strict failures (cap_runner_hardening2 p2).
-    if os.environ.get("FINOPS_COMMIT_GATE", "canonicalize") != "strict" and len(bad) == 1:
-        offender_sha, offender_subject = bad[0]
-        # The single offender must BE HEAD — amend rewrites HEAD, never the offender's own
-        # commit when a good commit sits on top of it.
-        head_sha = _git_full_sha(wd, "HEAD")
-        if head_sha and head_sha == offender_sha:
-            try:
-                amend = subprocess.run(
-                    ["git", "commit", "--amend", "--only", "-m", expected],
-                    cwd=wd, capture_output=True, text=True, timeout=30,
+    # CANONICALIZE-WITH-EVIDENCE (cap_runner_hardening2 p1 lesson + the drawing-board fix,
+    # 2026-08-28): a MESSAGE-only violation is self-healing by default via the PROPER history
+    # rewrite — ``_canonicalize_commit_range`` rewrites EVERY offender's subject in the phase
+    # range (``pre_head..HEAD``) with ``git filter-branch`` + a deterministic msg-filter,
+    # exact-SHA scoped, tree-preserving, checked return code — then the whole range is
+    # re-read and the run fails strict if even one violation remains. This supersedes the P0
+    # single-amend rule (``git commit --amend`` rewrites HEAD alone, so multi-commit ranges
+    # and a buried single offender were refused): the rewrite handles every shape. Commit-time
+    # prevention is the FIRST line of defense (``_install_commit_msg_hook`` — the agent cannot
+    # produce a violating commit); this gate path is the backstop for pre-hook commits and
+    # for ``FINOPS_COMMIT_HOOK=0`` runs. ``FINOPS_COMMIT_GATE=strict`` restores the
+    # fail-with-evidence mode outright. TREE violations (the relabel — a discarded tree
+    # re-presented) are NEVER canonicalized: they stay strict failures (cap_runner_hardening2
+    # p2).
+    if os.environ.get("FINOPS_COMMIT_GATE", "canonicalize") != "strict" and bad:
+        rewritten_sha = _canonicalize_commit_range(wd, pre_head, expected, bad)
+        if rewritten_sha:
+            # Re-read the WHOLE range: a successful rewrite must leave zero violations.
+            recheck = (
+                _git_log_commits(wd, f"{pre_head}..HEAD")
+                if pre_head
+                else _git_log_commits(wd, "HEAD")
+            )
+            remaining = [
+                (sha, subject)
+                for sha, subject, author in recheck
+                if not (author == RUNNER_INIT_AUTHOR_EMAIL and subject == "Initial")
+                and not _commit_subject_matches(subject, phase_name, goal_prefix)
+            ]
+            if not remaining:
+                pr.commit_gate = {
+                    "reason": "COMMIT_PREFIX_CANONICALIZED",
+                    "original_subjects": [subject for _, subject in bad],
+                    "expected_prefix": expected,
+                    "rewritten_sha": rewritten_sha,
+                }
+                pr.error = (
+                    f"commit messages canonicalized to '{expected}' (originals: "
+                    f"{[s for _, s in bad]!r}) — the work was preserved, only the subjects "
+                    f"changed; see commit_gate"
                 )
-                amend_ok = amend.returncode == 0
-            except Exception:  # noqa: BLE001 — a failed amend degrades to the strict path
-                amend_ok = False
-            if amend_ok:
-                # Re-read the WHOLE range: a successful amend must leave zero violations.
-                recheck = (
-                    _git_log_commits(wd, f"{pre_head}..HEAD")
-                    if pre_head
-                    else _git_log_commits(wd, "HEAD")
-                )
-                remaining = [
-                    (sha, subject)
-                    for sha, subject, author in recheck
-                    if not (author == RUNNER_INIT_AUTHOR_EMAIL and subject == "Initial")
-                    and not _commit_subject_matches(subject, phase_name, goal_prefix)
-                ]
-                if not remaining:
-                    rewritten_sha = _git_full_sha(wd, "HEAD") or _git_head(wd)
-                    if rewritten_sha:
-                        pr.commit_gate = {
-                            "reason": "COMMIT_PREFIX_CANONICALIZED",
-                            "original_subjects": [offender_subject],
-                            "expected_prefix": expected,
-                            "rewritten_sha": rewritten_sha,
-                        }
-                        pr.error = (
-                            f"commit message canonicalized to '{expected}' (original: "
-                            f"{offender_subject!r}) — the work was preserved; see commit_gate"
-                        )
-                        return
-                # A re-read that still shows violations (or an unresolvable HEAD) is NOT
-                # canonicalized — fall through to the strict record with the fresh evidence.
-                if remaining:
-                    bad = remaining
+                return
+            # A re-read that still shows violations is NOT canonicalized — fall through to the
+            # strict record with the fresh evidence.
+            bad = remaining
     pr.commit_gate = {
         "reason": "COMMIT_PREFIX",
         "subjects": [subject for _, subject in bad],
@@ -2362,6 +2449,14 @@ def run_workflow(
                     # HEAD before the agent runs, so after the phase the runner can list exactly
                     # the commits the agent made during it (git log pre-head..HEAD).
                     pre_head = _git_head(wd)
+
+                    # Commit-time prefix prevention (the drawing-board fix, 2026-08-28): a
+                    # commit-msg hook installed before the phase rewrites any non-conforming
+                    # subject to '[workflow] <phase> — <goal-prefix>' AT COMMIT TIME, so the
+                    # agent cannot produce a violating commit — the post-phase gate becomes a
+                    # backstop instead of a failure point. Canonicalize mode only; strict mode
+                    # installs no hook (violations must stay visible for the evidence).
+                    _install_commit_msg_hook(wd, name, goal)
 
                     # Phase watchdog (cap_runner_hardening p1) — wrap the agent invocation in a
                     # stall monitor. The monitor polls the session transcript's last-step age
