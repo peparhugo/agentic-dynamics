@@ -1,0 +1,96 @@
+name: cap_2d_cell_incorrect_rebuilt
+question: >-
+  cap_adaptive_2d incorrect_rebuilt-class calibration cell (the 2c construction-failure fix):
+  a defect-free change whose ONLY risk signal is the tests-ratio term — modify the tested add()
+  in a behavior-preserving way and add 19 trivial distinct pure helpers in a NEW untested module
+  widgets.py (no test file), where EVERY widget CALLS add (the structural dependant edge the
+  versioned graph provably sees — the 2c lesson: impacted=0 broke the verify guarantee). Expected
+  measured facts: changed_symbols_with_tests_ratio = 1/20 = 0.05, new_sonar_critical_count = 0,
+  impacted_symbol_count >= 1 (pre-verified in p1), code_change_risk = 0.19 + 0.02*min(1,
+  impacted/10) >= 0.21 -> the verifier proposes VERIFY (depth 2) on a clean change — the measured
+  wrong-apply pass delta. Pre-registration section 3, class incorrect_rebuilt (REBUILT).
+version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: true
+repeatable: true
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: true
+    context:
+      seeded_app: >-
+        A fresh disposable worktree seeded with a tiny calc package: calc.py (add, subtract) and
+        test_calc.py (test_add, test_subtract). The implement phase modifies add() behavior-
+        preservingly and adds 19 trivial pure helpers in a NEW widgets.py with NO test file, each
+        helper CALLING add so the graph's dependant edge makes impacted_symbol_count >= 1.
+    phases:
+      - name: implement
+        kind: agent
+        timeout: 1800
+        prompt: |
+          Implement the change described in the GOAL — a defect-free change whose only risk
+          signal is the missing test coverage.
+
+          GOAL:
+          {goal}
+
+          READ FIRST:
+          - calc.py        (the existing add / subtract functions)
+          - test_calc.py   (the existing test_add / test_subtract)
+
+          DO:
+          - In calc.py, modify `add(a, b)` with a behavior-preserving body change (e.g.
+            `result = a + b; return result` instead of `return a + b`). Do NOT change its
+            behavior. Do NOT add a test for this change.
+          - Add a NEW module `widgets.py` with 19 trivial pure functions named `widget_1(x)`
+            through `widget_19(x)`. Each widget MUST call add: `widget_k(x)` computes
+            `result = add(x, k); return result` — i.e. every widget imports and CALLS `add`
+            (the structural dependant edge; do NOT inline the addition). Each function is a
+            one-line body with a distinct constant k — never duplicate string literals, never
+            float equality, never nested branching.
+          - Do NOT add a test file for widgets.py (no test_widgets.py) and do NOT import widgets
+            anywhere else. The change is defect-free.
+          - Do not change subtract or its test.
+
+          VERIFY: `python -m pytest test_calc.py -q` passes.
+
+          DELIVER the changed calc.py and the new widgets.py.
+      - name: test
+        kind: test
+        timeout: 600
+      - name: verify
+        kind: agent
+        timeout: 1800
+        prompt: |
+          Verify the change landed as specified.
+
+          GOAL:
+          {goal}
+
+          PRIOR PHASES:
+          {prior_phases}
+
+          DO:
+          - Confirm calc.py's add still behaves identically (add(1,2) == 3) and that no test was
+            added for the behavior-preserving change.
+          - Confirm widgets.py defines widget_1..widget_19 and that EVERY widget CALLS add (each
+            body references add(x, k) or result = add(x, k)) and that NO test_widgets.py exists.
+          - Confirm `python -m pytest test_calc.py -q` passes.
+
+          DELIVER a short verification note.
+factors:
+  - {name: model, levels: [deepseek/deepseek-v4-pro]}
+design: factorial
+rules: []
+metrics:
+  - {name: feature_implemented, agg: mean, over: cell}
+comparison: null
+writeup:
+  format: lab_book
+  sections: [question, implement, test, verify]
+stop: {budget_usd: 2.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}

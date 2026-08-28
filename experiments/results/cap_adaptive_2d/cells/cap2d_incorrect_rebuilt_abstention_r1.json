@@ -1,0 +1,268 @@
+{
+  "abstention_decision": {
+    "decision": "APPLY_NULL",
+    "leg": null,
+    "reason": "risk 0.19 < 0.2 but multi-term (NOT the Option A fingerprint) \u2014 apply-null (unchanged, not flagged)."
+  },
+  "analyzer_status": {
+    "graph": "available",
+    "lsp": "available",
+    "sonar": "available"
+  },
+  "application": {
+    "action": "continue",
+    "applied_or_null": "null",
+    "note": "continue proposal -> provable null application (no extra pass).",
+    "proof": "provable-null:commit-trail",
+    "rework_passes": 0
+  },
+  "arm": "abstention",
+  "backend": "opencode",
+  "cell_id": "cap2d_incorrect_rebuilt_abstention_r1",
+  "class": "incorrect_rebuilt",
+  "cost": {
+    "application_usd": 0.0,
+    "run_workflow_usd": 0.006163,
+    "total_usd": 0.006163
+  },
+  "facts": {
+    "analysis_revision_matches": "true",
+    "ast_parse_coverage": "1.0",
+    "changed_symbol_count": "20",
+    "changed_symbols_with_tests_ratio": "0.05",
+    "code_change_risk": "0.19",
+    "impacted_symbol_count": "0",
+    "lsp_analysis_status": "available",
+    "new_lsp_error_count": "0",
+    "new_sonar_critical_count": "0",
+    "sonar_analysis_status": "available"
+  },
+  "facts_present": [
+    "analysis_revision_matches",
+    "ast_parse_coverage",
+    "changed_symbol_count",
+    "changed_symbols_with_tests_ratio",
+    "code_change_risk",
+    "impacted_symbol_count",
+    "lsp_analysis_status",
+    "new_lsp_error_count",
+    "new_sonar_critical_count",
+    "sonar_analysis_status"
+  ],
+  "finops_cell_id": "cap2d_incorrect_rebuilt_abstention_r1",
+  "flags": [
+    "construction-failure: expected proposal verify, got continue"
+  ],
+  "forecast_usd": 0.02604,
+  "goal": "modify add(a, b) in calc.py with a behavior-preserving body change (result = a + b; return result) AND add 19 trivial distinct pure helpers widget_1(x)..widget_19(x) in a NEW module widgets.py with NO test file, where EVERY widget_k(x) CALLS add (result = add(x, k); return result) \u2014 the structural dependant edge; the change is defect-free; do not change add's behavior, do not change subtract or its test",
+  "goal_sha256": "09b9dd5b94e50a81842f1b66679e6e735ef0bc2e23a496aeffd6aff0c2a30269",
+  "impl": {
+    "commit_hash": "4498eed",
+    "confidence": 1.0,
+    "cost_usd": 0.001197758,
+    "duration_s": 19.38
+  },
+  "model": "deepseek/deepseek-v4-pro",
+  "outcome": {
+    "accepted": true,
+    "defect_note": "clean change \u2014 no defect (the false-positive VERIFY is on a clean change)",
+    "defect_present_on_final_commit": false,
+    "final_revision": "fde0232ae2cdc82256d3a7300652636903d5a889",
+    "test_executed_success": true,
+    "test_runner": "independent pytest (runtime test execution) on the immutable final commit",
+    "tests_passed": 2,
+    "tests_total": 2
+  },
+  "proposal": {
+    "action": "continue",
+    "analyzed_revision": "4498eed867c63ff3b797cbba81875ea699a210ae",
+    "applied": false,
+    "artifact": "experiments/results/proposals/bc1021bba29da03f.json",
+    "artifact_sha256": "472fbbad97b22bf3120d29e8b3ab95be0912df68f255eda5852d845a840ff129",
+    "baseline_revision": "a6fc64127527f608264be241e98135b19e3f4669",
+    "confidence": 1.0,
+    "contract_version": "verify_code_change/v1",
+    "depth": 0,
+    "facts_used": [
+      "analysis_revision_matches",
+      "ast_parse_coverage",
+      "changed_symbol_count",
+      "changed_symbols_with_tests_ratio",
+      "code_change_risk",
+      "impacted_symbol_count",
+      "lsp_analysis_status",
+      "new_lsp_error_count",
+      "new_sonar_critical_count",
+      "sonar_analysis_status"
+    ],
+    "proposal_id": "bc1021bba29da03f",
+    "schema_version": "verify_code_change_proposal/v1",
+    "scope": []
+  },
+  "repetition": "r1",
+  "run_ledger": "/tmp/wt_adaptive_2d/experiments/results/workflows/cap_2d_cell_incorrect_rebuilt/20260828T004020Z.json",
+  "run_ledger_ok": true,
+  "run_ledger_sha256": "ffaf29b039b4f404f48e1269bed7bcdae4907e986a69d97183eb7c9a8e12f58a",
+  "schema_version": "cap_adaptive_2d_cell/v1",
+  "seam": {
+    "error": "",
+    "facts": [
+      {
+        "evidence_ids": [
+          "delta:self-cap2d_incorrect_rebuilt_abstention_r1:implement:4498eed867c63ff3b797cbba81875ea699a210ae",
+          "sonar:self-cap2d_incorrect_rebuilt_abstention_r1:implement:4498eed867c63ff3b797cbba81875ea699a210ae",
+          "lsp:self-cap2d_incorrect_rebuilt_abstention_r1:implement:4498eed867c63ff3b797cbba81875ea699a210ae",
+          "impacted:self-cap2d_incorrect_rebuilt_abstention_r1:implement:4498eed867c63ff3b797cbba81875ea699a210ae"
+        ],
+        "predicate": "sonar_analysis_status",
+        "value": "available",
+        "value_type": "enum"
+      },
+      {
+        "evidence_ids": [
+          "delta:self-cap2d_incorrect_rebuilt_abstention_r1:implement:4498eed867c63ff3b797cbba81875ea699a210ae",
+          "sonar:self-cap2d_incorrect_rebuilt_abstention_r1:implement:4498eed867c63ff3b797cbba81875ea699a210ae",
+          "lsp:self-cap2d_incorrect_rebuilt_abstention_r1:implement:4498eed867c63ff3b797cbba81875ea699a210ae",
+          "impacted:self-cap2d_incorrect_rebuilt_abstention_r1:implement:4498eed867c63ff3b797cbba81875ea699a210ae"
+        ],
+        "predicate": "lsp_analysis_status",
+        "value": "available",
+        "value_type": "enum"
+      },
+      {
+        "evidence_ids": [
+          "delta:self-cap2d_incorrect_rebuilt_abstention_r1:implement:4498eed867c63ff3b797cbba81875ea699a210ae",
+          "sonar:self-cap2d_incorrect_rebuilt_abstention_r1:implement:4498eed867c63ff3b797cbba81875ea699a210ae",
+          "lsp:self-cap2d_incorrect_rebuilt_abstention_r1:implement:4498eed867c63ff3b797cbba81875ea699a210ae",
+          "impacted:self-cap2d_incorrect_rebuilt_abstention_r1:implement:4498eed867c63ff3b797cbba81875ea699a210ae"
+        ],
+        "predicate": "analysis_revision_matches",
+        "value": "true",
+        "value_type": "bool"
+      },
+      {
+        "evidence_ids": [
+          "delta:self-cap2d_incorrect_rebuilt_abstention_r1:implement:4498eed867c63ff3b797cbba81875ea699a210ae",
+          "sonar:self-cap2d_incorrect_rebuilt_abstention_r1:implement:4498eed867c63ff3b797cbba81875ea699a210ae",
+          "lsp:self-cap2d_incorrect_rebuilt_abstention_r1:implement:4498eed867c63ff3b797cbba81875ea699a210ae",
+          "impacted:self-cap2d_incorrect_rebuilt_abstention_r1:implement:4498eed867c63ff3b797cbba81875ea699a210ae"
+        ],
+        "predicate": "ast_parse_coverage",
+        "value": "1.0",
+        "value_type": "float"
+      },
+      {
+        "evidence_ids": [
+          "delta:self-cap2d_incorrect_rebuilt_abstention_r1:implement:4498eed867c63ff3b797cbba81875ea699a210ae",
+          "sonar:self-cap2d_incorrect_rebuilt_abstention_r1:implement:4498eed867c63ff3b797cbba81875ea699a210ae",
+          "lsp:self-cap2d_incorrect_rebuilt_abstention_r1:implement:4498eed867c63ff3b797cbba81875ea699a210ae",
+          "impacted:self-cap2d_incorrect_rebuilt_abstention_r1:implement:4498eed867c63ff3b797cbba81875ea699a210ae"
+        ],
+        "predicate": "changed_symbol_count",
+        "value": "20",
+        "value_type": "int"
+      },
+      {
+        "evidence_ids": [
+          "delta:self-cap2d_incorrect_rebuilt_abstention_r1:implement:4498eed867c63ff3b797cbba81875ea699a210ae",
+          "sonar:self-cap2d_incorrect_rebuilt_abstention_r1:implement:4498eed867c63ff3b797cbba81875ea699a210ae",
+          "lsp:self-cap2d_incorrect_rebuilt_abstention_r1:implement:4498eed867c63ff3b797cbba81875ea699a210ae",
+          "impacted:self-cap2d_incorrect_rebuilt_abstention_r1:implement:4498eed867c63ff3b797cbba81875ea699a210ae"
+        ],
+        "predicate": "impacted_symbol_count",
+        "value": "0",
+        "value_type": "int"
+      },
+      {
+        "evidence_ids": [
+          "delta:self-cap2d_incorrect_rebuilt_abstention_r1:implement:4498eed867c63ff3b797cbba81875ea699a210ae",
+          "sonar:self-cap2d_incorrect_rebuilt_abstention_r1:implement:4498eed867c63ff3b797cbba81875ea699a210ae",
+          "lsp:self-cap2d_incorrect_rebuilt_abstention_r1:implement:4498eed867c63ff3b797cbba81875ea699a210ae",
+          "impacted:self-cap2d_incorrect_rebuilt_abstention_r1:implement:4498eed867c63ff3b797cbba81875ea699a210ae"
+        ],
+        "predicate": "new_lsp_error_count",
+        "value": "0",
+        "value_type": "int"
+      },
+      {
+        "evidence_ids": [
+          "delta:self-cap2d_incorrect_rebuilt_abstention_r1:implement:4498eed867c63ff3b797cbba81875ea699a210ae",
+          "sonar:self-cap2d_incorrect_rebuilt_abstention_r1:implement:4498eed867c63ff3b797cbba81875ea699a210ae",
+          "lsp:self-cap2d_incorrect_rebuilt_abstention_r1:implement:4498eed867c63ff3b797cbba81875ea699a210ae",
+          "impacted:self-cap2d_incorrect_rebuilt_abstention_r1:implement:4498eed867c63ff3b797cbba81875ea699a210ae"
+        ],
+        "predicate": "new_sonar_critical_count",
+        "value": "0",
+        "value_type": "int"
+      },
+      {
+        "evidence_ids": [
+          "delta:self-cap2d_incorrect_rebuilt_abstention_r1:implement:4498eed867c63ff3b797cbba81875ea699a210ae",
+          "sonar:self-cap2d_incorrect_rebuilt_abstention_r1:implement:4498eed867c63ff3b797cbba81875ea699a210ae",
+          "lsp:self-cap2d_incorrect_rebuilt_abstention_r1:implement:4498eed867c63ff3b797cbba81875ea699a210ae",
+          "impacted:self-cap2d_incorrect_rebuilt_abstention_r1:implement:4498eed867c63ff3b797cbba81875ea699a210ae"
+        ],
+        "predicate": "changed_symbols_with_tests_ratio",
+        "value": "0.05",
+        "value_type": "float"
+      },
+      {
+        "evidence_ids": [
+          "delta:self-cap2d_incorrect_rebuilt_abstention_r1:implement:4498eed867c63ff3b797cbba81875ea699a210ae",
+          "sonar:self-cap2d_incorrect_rebuilt_abstention_r1:implement:4498eed867c63ff3b797cbba81875ea699a210ae",
+          "lsp:self-cap2d_incorrect_rebuilt_abstention_r1:implement:4498eed867c63ff3b797cbba81875ea699a210ae",
+          "impacted:self-cap2d_incorrect_rebuilt_abstention_r1:implement:4498eed867c63ff3b797cbba81875ea699a210ae"
+        ],
+        "predicate": "code_change_risk",
+        "value": "0.19",
+        "value_type": "float"
+      }
+    ],
+    "facts_present": [
+      "analysis_revision_matches",
+      "ast_parse_coverage",
+      "changed_symbol_count",
+      "changed_symbols_with_tests_ratio",
+      "code_change_risk",
+      "impacted_symbol_count",
+      "lsp_analysis_status",
+      "new_lsp_error_count",
+      "new_sonar_critical_count",
+      "sonar_analysis_status"
+    ],
+    "graph_status": "available",
+    "impacted_count": 0,
+    "neighborhood": [
+      "add",
+      "widget_1",
+      "widget_10",
+      "widget_11",
+      "widget_12",
+      "widget_13",
+      "widget_14",
+      "widget_15",
+      "widget_16",
+      "widget_17",
+      "widget_18",
+      "widget_19",
+      "widget_2",
+      "widget_3",
+      "widget_4",
+      "widget_5",
+      "widget_6",
+      "widget_7",
+      "widget_8",
+      "widget_9"
+    ],
+    "refused": false
+  },
+  "seeded_app_seed_revision": "a6fc64127527f608264be241e98135b19e3f4669",
+  "seeded_app_worktree": "/tmp/cap2d_incorrect_rebuilt_abstention_r1",
+  "slot": 1,
+  "spec_id": "cap_2d_cell_incorrect_rebuilt@0.1",
+  "status": "ok",
+  "variant": null,
+  "wall_s": 263.7,
+  "within_forecast": true,
+  "written_at": "2026-08-28T00:40:21.124812+00:00"
+}

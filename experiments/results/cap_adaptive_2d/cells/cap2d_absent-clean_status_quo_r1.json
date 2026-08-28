@@ -1,0 +1,129 @@
+{
+  "abstention_decision": {
+    "decision": "DECLINE",
+    "leg": 2,
+    "reason": "leg 2 \u2014 code_change_risk absent (no risk term measurable \u2014 the seam's refuse state); route to operator review."
+  },
+  "analyzer_status": {
+    "graph": "unavailable (designed)",
+    "lsp": "unavailable (designed)",
+    "sonar": "unavailable (designed)"
+  },
+  "application": {
+    "action": null,
+    "applied_or_null": "null",
+    "note": "no proposal emitted (seam refused) -> provable null application; status_quo passes through the refusal (the 2c pass-through behavior)."
+  },
+  "arm": "status_quo",
+  "backend": "opencode",
+  "cell_id": "cap2d_absent-clean_status_quo_r1",
+  "class": "absent",
+  "cost": {
+    "application_usd": 0.0,
+    "run_workflow_usd": 0.007148,
+    "total_usd": 0.007148
+  },
+  "facts": {},
+  "facts_present": [
+    "ast_parse_coverage",
+    "changed_symbol_count",
+    "lsp_analysis_status",
+    "sonar_analysis_status"
+  ],
+  "finops_cell_id": "cap2d_absent-clean_status_quo_r1",
+  "flags": [],
+  "forecast_usd": 0.02604,
+  "goal": "add a trivial pure helper widget(x) that returns x, in a NEW module widgets.py (no test file, not imported anywhere)",
+  "goal_sha256": "353971837448d2dbd8b85eb766751a8bef4ac9694405a620a450a913167fd977",
+  "impl": {
+    "commit_hash": "7e89f53",
+    "confidence": 1.0,
+    "cost_usd": 0.0031996859999999998,
+    "duration_s": 14.86
+  },
+  "model": "deepseek/deepseek-v4-pro",
+  "outcome": {
+    "accepted": true,
+    "defect_note": "clean change \u2014 no defect (the refusal is value-preserving)",
+    "defect_present_on_final_commit": false,
+    "final_revision": "7e89f53b83983366cfb7ae0d0d6528e2de23a2ca",
+    "test_executed_success": true,
+    "test_runner": "independent pytest (runtime test execution) on the immutable final commit",
+    "tests_passed": 2,
+    "tests_total": 2
+  },
+  "proposal": null,
+  "repetition": "r1",
+  "run_ledger": "/tmp/wt_adaptive_2d/experiments/results/workflows/cap_2c_cell_absent/20260828T005323Z.json",
+  "run_ledger_ok": true,
+  "run_ledger_sha256": "cd00929e8ee831445e91f5e36717b8569217a7dc2ba4070d5001dde4bdc329f5",
+  "schema_version": "cap_adaptive_2d_cell/v1",
+  "seam": {
+    "error": "cannot propose verify_code_change: required fact 'code_change_risk' not measured (contract on_missing: halt) \u2014 refusing rather than guessing",
+    "facts": [
+      {
+        "evidence_ids": [
+          "delta:self-cap2d_absent-clean_status_quo_r1:implement:7e89f53b83983366cfb7ae0d0d6528e2de23a2ca",
+          "sonar:self-cap2d_absent-clean_status_quo_r1:implement:7e89f53b83983366cfb7ae0d0d6528e2de23a2ca",
+          "lsp:self-cap2d_absent-clean_status_quo_r1:implement:7e89f53b83983366cfb7ae0d0d6528e2de23a2ca"
+        ],
+        "predicate": "sonar_analysis_status",
+        "value": "unavailable",
+        "value_type": "enum"
+      },
+      {
+        "evidence_ids": [
+          "delta:self-cap2d_absent-clean_status_quo_r1:implement:7e89f53b83983366cfb7ae0d0d6528e2de23a2ca",
+          "sonar:self-cap2d_absent-clean_status_quo_r1:implement:7e89f53b83983366cfb7ae0d0d6528e2de23a2ca",
+          "lsp:self-cap2d_absent-clean_status_quo_r1:implement:7e89f53b83983366cfb7ae0d0d6528e2de23a2ca"
+        ],
+        "predicate": "lsp_analysis_status",
+        "value": "unavailable",
+        "value_type": "enum"
+      },
+      {
+        "evidence_ids": [
+          "delta:self-cap2d_absent-clean_status_quo_r1:implement:7e89f53b83983366cfb7ae0d0d6528e2de23a2ca",
+          "sonar:self-cap2d_absent-clean_status_quo_r1:implement:7e89f53b83983366cfb7ae0d0d6528e2de23a2ca",
+          "lsp:self-cap2d_absent-clean_status_quo_r1:implement:7e89f53b83983366cfb7ae0d0d6528e2de23a2ca"
+        ],
+        "predicate": "ast_parse_coverage",
+        "value": "1.0",
+        "value_type": "float"
+      },
+      {
+        "evidence_ids": [
+          "delta:self-cap2d_absent-clean_status_quo_r1:implement:7e89f53b83983366cfb7ae0d0d6528e2de23a2ca",
+          "sonar:self-cap2d_absent-clean_status_quo_r1:implement:7e89f53b83983366cfb7ae0d0d6528e2de23a2ca",
+          "lsp:self-cap2d_absent-clean_status_quo_r1:implement:7e89f53b83983366cfb7ae0d0d6528e2de23a2ca"
+        ],
+        "predicate": "changed_symbol_count",
+        "value": "1",
+        "value_type": "int"
+      }
+    ],
+    "facts_present": [
+      "ast_parse_coverage",
+      "changed_symbol_count",
+      "lsp_analysis_status",
+      "sonar_analysis_status"
+    ],
+    "graph_status": "not_requested",
+    "impacted_count": null,
+    "neighborhood": [
+      "widget"
+    ],
+    "note": "designed degraded state: sonar + lsp unavailable + graph unavailable -> code_change_risk unmeasurable -> the seam refuses (never a hand-authored proposal).",
+    "proposal": null,
+    "refused": true
+  },
+  "seeded_app_seed_revision": "28cd148759ad05365611e675955fb1a4e12652fb",
+  "seeded_app_worktree": "/tmp/cap2d_absent-clean_status_quo_r1",
+  "slot": 2,
+  "spec_id": "cap_2c_cell_absent@0.1",
+  "status": "ok",
+  "variant": "clean",
+  "wall_s": 27.0,
+  "within_forecast": true,
+  "written_at": "2026-08-28T00:53:24.733481+00:00"
+}

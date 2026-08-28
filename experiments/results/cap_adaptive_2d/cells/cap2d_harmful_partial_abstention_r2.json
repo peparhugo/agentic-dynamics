@@ -1,0 +1,273 @@
+{
+  "abstention_decision": {
+    "decision": "APPLY",
+    "leg": null,
+    "reason": "risk 0.215 >= 0.2 \u2014 apply per the proposal action tree (unchanged)."
+  },
+  "analyzer_status": {
+    "graph": "available",
+    "lsp": "available",
+    "sonar": "available"
+  },
+  "application": {
+    "action": "rework",
+    "agent_result": {
+      "confidence": 1.0,
+      "cost_usd": 0.025135430999999996,
+      "duration_s": 318.644,
+      "error": "",
+      "exit_code": 0,
+      "ok": true,
+      "tests_passed": 3,
+      "tests_total": 3,
+      "tool_calls": 10
+    },
+    "applied_or_null": "applied",
+    "depth": 3,
+    "proof": "rework proposal APPLIED as ONE bounded pass over the proposal scope; [workflow] rework commit 23bc1ba19d7453b9d1450b68adc72733c0f07f3c",
+    "rework_commit": "23bc1ba19d7453b9d1450b68adc72733c0f07f3c",
+    "rework_duration_s": 318.644,
+    "rework_pass_cost_usd": 0.025135430999999996,
+    "rework_passes": 1
+  },
+  "arm": "abstention",
+  "backend": "opencode",
+  "cell_id": "cap2d_harmful_partial_abstention_r2",
+  "class": "harmful_partial",
+  "cost": {
+    "application_usd": 0.025135430999999996,
+    "run_workflow_usd": 0.00467,
+    "total_usd": 0.029805
+  },
+  "facts": {
+    "analysis_revision_matches": "true",
+    "ast_parse_coverage": "1.0",
+    "changed_symbol_count": "2",
+    "changed_symbols_with_tests_ratio": "0.5",
+    "code_change_risk": "0.215",
+    "impacted_symbol_count": "4",
+    "lsp_analysis_status": "available",
+    "new_lsp_error_count": "0",
+    "new_sonar_critical_count": "1",
+    "sonar_analysis_status": "available"
+  },
+  "facts_present": [
+    "analysis_revision_matches",
+    "ast_parse_coverage",
+    "changed_symbol_count",
+    "changed_symbols_with_tests_ratio",
+    "code_change_risk",
+    "impacted_symbol_count",
+    "lsp_analysis_status",
+    "new_lsp_error_count",
+    "new_sonar_critical_count",
+    "sonar_analysis_status"
+  ],
+  "finops_cell_id": "cap2d_harmful_partial_abstention_r2",
+  "flags": [],
+  "forecast_usd": 0.02604,
+  "goal": "add a classifier function with a deep nested decision tree containing TWO real boundary defects far apart (the [10, 20) boundary uses > instead of >= so classify(10.0) is wrong, AND the [80, 90) boundary uses > instead of >= so classify(80.0) is wrong \u2014 far apart so one bounded rework pass plausibly fixes one and misses the other)",
+  "goal_sha256": "fd45b4b16399bd8d4a54c15722282780275717fce6e8f9b1676f45b689d3aa10",
+  "impl": {
+    "commit_hash": "d50b2d2",
+    "confidence": 0.6667,
+    "cost_usd": 0.004669899,
+    "duration_s": 31.74
+  },
+  "model": "deepseek/deepseek-v4-pro",
+  "outcome": {
+    "accepted": true,
+    "defect_note": "both far-apart boundary-compare defects absent",
+    "defect_present_on_final_commit": false,
+    "final_revision": "23bc1ba19d7453b9d1450b68adc72733c0f07f3c",
+    "test_executed_success": true,
+    "test_runner": "independent pytest (runtime test execution) on the immutable final commit",
+    "tests_passed": 3,
+    "tests_total": 3
+  },
+  "proposal": {
+    "action": "rework",
+    "analyzed_revision": "d50b2d20472d8169ab2aa7059100641599b1f146",
+    "applied": false,
+    "artifact": "experiments/results/proposals/4dd3fba013565f65.json",
+    "artifact_sha256": "b07075cbc11008348017d709827c6baec84d7b8d233444f4977c476fc08573ef",
+    "baseline_revision": "30f118730b4588933ca5dff9b1a04847d04329d8",
+    "confidence": 0.6667,
+    "contract_version": "verify_code_change/v1",
+    "depth": 3,
+    "facts_used": [
+      "analysis_revision_matches",
+      "ast_parse_coverage",
+      "changed_symbol_count",
+      "changed_symbols_with_tests_ratio",
+      "code_change_risk",
+      "impacted_symbol_count",
+      "lsp_analysis_status",
+      "new_lsp_error_count",
+      "new_sonar_critical_count",
+      "sonar_analysis_status"
+    ],
+    "proposal_id": "4dd3fba013565f65",
+    "schema_version": "verify_code_change_proposal/v1",
+    "scope": [
+      "add",
+      "classify",
+      "subtract",
+      "test_add",
+      "test_classify",
+      "test_subtract"
+    ]
+  },
+  "repetition": "r2",
+  "run_ledger": "/tmp/wt_adaptive_2d/experiments/results/workflows/cap_2d_cell_harmful_partial/20260828T004438Z.json",
+  "run_ledger_ok": false,
+  "run_ledger_sha256": "4d3564c88ce3cb03514558277758d1f3fe94ca877cd445cfb69c4dd6d1407a5e",
+  "schema_version": "cap_adaptive_2d_cell/v1",
+  "seam": {
+    "error": "",
+    "facts": [
+      {
+        "evidence_ids": [
+          "delta:self-cap2d_harmful_partial_abstention_r2:implement:d50b2d20472d8169ab2aa7059100641599b1f146",
+          "sonar:self-cap2d_harmful_partial_abstention_r2:implement:d50b2d20472d8169ab2aa7059100641599b1f146",
+          "lsp:self-cap2d_harmful_partial_abstention_r2:implement:d50b2d20472d8169ab2aa7059100641599b1f146",
+          "impacted:self-cap2d_harmful_partial_abstention_r2:implement:d50b2d20472d8169ab2aa7059100641599b1f146"
+        ],
+        "predicate": "sonar_analysis_status",
+        "value": "available",
+        "value_type": "enum"
+      },
+      {
+        "evidence_ids": [
+          "delta:self-cap2d_harmful_partial_abstention_r2:implement:d50b2d20472d8169ab2aa7059100641599b1f146",
+          "sonar:self-cap2d_harmful_partial_abstention_r2:implement:d50b2d20472d8169ab2aa7059100641599b1f146",
+          "lsp:self-cap2d_harmful_partial_abstention_r2:implement:d50b2d20472d8169ab2aa7059100641599b1f146",
+          "impacted:self-cap2d_harmful_partial_abstention_r2:implement:d50b2d20472d8169ab2aa7059100641599b1f146"
+        ],
+        "predicate": "lsp_analysis_status",
+        "value": "available",
+        "value_type": "enum"
+      },
+      {
+        "evidence_ids": [
+          "delta:self-cap2d_harmful_partial_abstention_r2:implement:d50b2d20472d8169ab2aa7059100641599b1f146",
+          "sonar:self-cap2d_harmful_partial_abstention_r2:implement:d50b2d20472d8169ab2aa7059100641599b1f146",
+          "lsp:self-cap2d_harmful_partial_abstention_r2:implement:d50b2d20472d8169ab2aa7059100641599b1f146",
+          "impacted:self-cap2d_harmful_partial_abstention_r2:implement:d50b2d20472d8169ab2aa7059100641599b1f146"
+        ],
+        "predicate": "analysis_revision_matches",
+        "value": "true",
+        "value_type": "bool"
+      },
+      {
+        "evidence_ids": [
+          "delta:self-cap2d_harmful_partial_abstention_r2:implement:d50b2d20472d8169ab2aa7059100641599b1f146",
+          "sonar:self-cap2d_harmful_partial_abstention_r2:implement:d50b2d20472d8169ab2aa7059100641599b1f146",
+          "lsp:self-cap2d_harmful_partial_abstention_r2:implement:d50b2d20472d8169ab2aa7059100641599b1f146",
+          "impacted:self-cap2d_harmful_partial_abstention_r2:implement:d50b2d20472d8169ab2aa7059100641599b1f146"
+        ],
+        "predicate": "ast_parse_coverage",
+        "value": "1.0",
+        "value_type": "float"
+      },
+      {
+        "evidence_ids": [
+          "delta:self-cap2d_harmful_partial_abstention_r2:implement:d50b2d20472d8169ab2aa7059100641599b1f146",
+          "sonar:self-cap2d_harmful_partial_abstention_r2:implement:d50b2d20472d8169ab2aa7059100641599b1f146",
+          "lsp:self-cap2d_harmful_partial_abstention_r2:implement:d50b2d20472d8169ab2aa7059100641599b1f146",
+          "impacted:self-cap2d_harmful_partial_abstention_r2:implement:d50b2d20472d8169ab2aa7059100641599b1f146"
+        ],
+        "predicate": "changed_symbol_count",
+        "value": "2",
+        "value_type": "int"
+      },
+      {
+        "evidence_ids": [
+          "delta:self-cap2d_harmful_partial_abstention_r2:implement:d50b2d20472d8169ab2aa7059100641599b1f146",
+          "sonar:self-cap2d_harmful_partial_abstention_r2:implement:d50b2d20472d8169ab2aa7059100641599b1f146",
+          "lsp:self-cap2d_harmful_partial_abstention_r2:implement:d50b2d20472d8169ab2aa7059100641599b1f146",
+          "impacted:self-cap2d_harmful_partial_abstention_r2:implement:d50b2d20472d8169ab2aa7059100641599b1f146"
+        ],
+        "predicate": "impacted_symbol_count",
+        "value": "4",
+        "value_type": "int"
+      },
+      {
+        "evidence_ids": [
+          "delta:self-cap2d_harmful_partial_abstention_r2:implement:d50b2d20472d8169ab2aa7059100641599b1f146",
+          "sonar:self-cap2d_harmful_partial_abstention_r2:implement:d50b2d20472d8169ab2aa7059100641599b1f146",
+          "lsp:self-cap2d_harmful_partial_abstention_r2:implement:d50b2d20472d8169ab2aa7059100641599b1f146",
+          "impacted:self-cap2d_harmful_partial_abstention_r2:implement:d50b2d20472d8169ab2aa7059100641599b1f146"
+        ],
+        "predicate": "new_lsp_error_count",
+        "value": "0",
+        "value_type": "int"
+      },
+      {
+        "evidence_ids": [
+          "delta:self-cap2d_harmful_partial_abstention_r2:implement:d50b2d20472d8169ab2aa7059100641599b1f146",
+          "sonar:self-cap2d_harmful_partial_abstention_r2:implement:d50b2d20472d8169ab2aa7059100641599b1f146",
+          "lsp:self-cap2d_harmful_partial_abstention_r2:implement:d50b2d20472d8169ab2aa7059100641599b1f146",
+          "impacted:self-cap2d_harmful_partial_abstention_r2:implement:d50b2d20472d8169ab2aa7059100641599b1f146"
+        ],
+        "predicate": "new_sonar_critical_count",
+        "value": "1",
+        "value_type": "int"
+      },
+      {
+        "evidence_ids": [
+          "delta:self-cap2d_harmful_partial_abstention_r2:implement:d50b2d20472d8169ab2aa7059100641599b1f146",
+          "sonar:self-cap2d_harmful_partial_abstention_r2:implement:d50b2d20472d8169ab2aa7059100641599b1f146",
+          "lsp:self-cap2d_harmful_partial_abstention_r2:implement:d50b2d20472d8169ab2aa7059100641599b1f146",
+          "impacted:self-cap2d_harmful_partial_abstention_r2:implement:d50b2d20472d8169ab2aa7059100641599b1f146"
+        ],
+        "predicate": "changed_symbols_with_tests_ratio",
+        "value": "0.5",
+        "value_type": "float"
+      },
+      {
+        "evidence_ids": [
+          "delta:self-cap2d_harmful_partial_abstention_r2:implement:d50b2d20472d8169ab2aa7059100641599b1f146",
+          "sonar:self-cap2d_harmful_partial_abstention_r2:implement:d50b2d20472d8169ab2aa7059100641599b1f146",
+          "lsp:self-cap2d_harmful_partial_abstention_r2:implement:d50b2d20472d8169ab2aa7059100641599b1f146",
+          "impacted:self-cap2d_harmful_partial_abstention_r2:implement:d50b2d20472d8169ab2aa7059100641599b1f146"
+        ],
+        "predicate": "code_change_risk",
+        "value": "0.215",
+        "value_type": "float"
+      }
+    ],
+    "facts_present": [
+      "analysis_revision_matches",
+      "ast_parse_coverage",
+      "changed_symbol_count",
+      "changed_symbols_with_tests_ratio",
+      "code_change_risk",
+      "impacted_symbol_count",
+      "lsp_analysis_status",
+      "new_lsp_error_count",
+      "new_sonar_critical_count",
+      "sonar_analysis_status"
+    ],
+    "graph_status": "available",
+    "impacted_count": 4,
+    "neighborhood": [
+      "add",
+      "classify",
+      "subtract",
+      "test_add",
+      "test_classify",
+      "test_subtract"
+    ],
+    "refused": false
+  },
+  "seeded_app_seed_revision": "30f118730b4588933ca5dff9b1a04847d04329d8",
+  "seeded_app_worktree": "/tmp/cap2d_harmful_partial_abstention_r2",
+  "slot": 3,
+  "spec_id": "cap_2d_cell_harmful_partial@0.1",
+  "status": "ok",
+  "variant": null,
+  "wall_s": 417.4,
+  "within_forecast": true,
+  "written_at": "2026-08-28T00:49:58.129370+00:00"
+}

@@ -1,0 +1,273 @@
+{
+  "abstention_decision": {
+    "decision": "APPLY",
+    "leg": null,
+    "reason": "risk 0.25 >= 0.2 \u2014 apply per the proposal action tree (unchanged)."
+  },
+  "analyzer_status": {
+    "graph": "available",
+    "lsp": "available",
+    "sonar": "available"
+  },
+  "application": {
+    "action": "rework",
+    "agent_result": {
+      "confidence": 1.0,
+      "cost_usd": 0.007000687,
+      "duration_s": 59.786,
+      "error": "",
+      "exit_code": 0,
+      "ok": true,
+      "tests_passed": 3,
+      "tests_total": 3,
+      "tool_calls": 6
+    },
+    "applied_or_null": "applied",
+    "depth": 3,
+    "proof": "rework proposal APPLIED as ONE bounded pass over the proposal scope; [workflow] rework commit db6508b892c1f2772ccfa6a11123dc418f380352",
+    "rework_commit": "db6508b892c1f2772ccfa6a11123dc418f380352",
+    "rework_duration_s": 59.786,
+    "rework_pass_cost_usd": 0.007000687,
+    "rework_passes": 1
+  },
+  "arm": "status_quo",
+  "backend": "opencode",
+  "cell_id": "cap2d_harmful_partial_status_quo_r1",
+  "class": "harmful_partial",
+  "cost": {
+    "application_usd": 0.007000687,
+    "run_workflow_usd": 0.011222,
+    "total_usd": 0.018223
+  },
+  "facts": {
+    "analysis_revision_matches": "true",
+    "ast_parse_coverage": "1.0",
+    "changed_symbol_count": "2",
+    "changed_symbols_with_tests_ratio": "0.5",
+    "code_change_risk": "0.25",
+    "impacted_symbol_count": "4",
+    "lsp_analysis_status": "available",
+    "new_lsp_error_count": "0",
+    "new_sonar_critical_count": "2",
+    "sonar_analysis_status": "available"
+  },
+  "facts_present": [
+    "analysis_revision_matches",
+    "ast_parse_coverage",
+    "changed_symbol_count",
+    "changed_symbols_with_tests_ratio",
+    "code_change_risk",
+    "impacted_symbol_count",
+    "lsp_analysis_status",
+    "new_lsp_error_count",
+    "new_sonar_critical_count",
+    "sonar_analysis_status"
+  ],
+  "finops_cell_id": "cap2d_harmful_partial_status_quo_r1",
+  "flags": [],
+  "forecast_usd": 0.02604,
+  "goal": "add a classifier function with a deep nested decision tree containing TWO real boundary defects far apart (the [10, 20) boundary uses > instead of >= so classify(10.0) is wrong, AND the [80, 90) boundary uses > instead of >= so classify(80.0) is wrong \u2014 far apart so one bounded rework pass plausibly fixes one and misses the other)",
+  "goal_sha256": "fd45b4b16399bd8d4a54c15722282780275717fce6e8f9b1676f45b689d3aa10",
+  "impl": {
+    "commit_hash": "1945492",
+    "confidence": 0.6667,
+    "cost_usd": 0.011221782000000003,
+    "duration_s": 115.3
+  },
+  "model": "deepseek/deepseek-v4-pro",
+  "outcome": {
+    "accepted": true,
+    "defect_note": "both far-apart boundary-compare defects absent",
+    "defect_present_on_final_commit": false,
+    "final_revision": "db6508b892c1f2772ccfa6a11123dc418f380352",
+    "test_executed_success": true,
+    "test_runner": "independent pytest (runtime test execution) on the immutable final commit",
+    "tests_passed": 3,
+    "tests_total": 3
+  },
+  "proposal": {
+    "action": "rework",
+    "analyzed_revision": "194549294a7e8c810d5ed687419c54801c0bd480",
+    "applied": false,
+    "artifact": "experiments/results/proposals/cd4c3725e17f8fb3.json",
+    "artifact_sha256": "08de22d7b066e1433d853f44820eec9903f5143b3aff05b6a14a2853dcc451b0",
+    "baseline_revision": "46c44bd553755b61533a165f33464c29284404f9",
+    "confidence": 0.6667,
+    "contract_version": "verify_code_change/v1",
+    "depth": 3,
+    "facts_used": [
+      "analysis_revision_matches",
+      "ast_parse_coverage",
+      "changed_symbol_count",
+      "changed_symbols_with_tests_ratio",
+      "code_change_risk",
+      "impacted_symbol_count",
+      "lsp_analysis_status",
+      "new_lsp_error_count",
+      "new_sonar_critical_count",
+      "sonar_analysis_status"
+    ],
+    "proposal_id": "cd4c3725e17f8fb3",
+    "schema_version": "verify_code_change_proposal/v1",
+    "scope": [
+      "add",
+      "classify",
+      "subtract",
+      "test_add",
+      "test_classify",
+      "test_subtract"
+    ]
+  },
+  "repetition": "r1",
+  "run_ledger": "/tmp/wt_adaptive_2d/experiments/results/workflows/cap_2d_cell_harmful_partial/20260828T004600Z.json",
+  "run_ledger_ok": false,
+  "run_ledger_sha256": "a2d0c7825ccb5d21c913edbda14dad221881933373bf771e1262bcf676dacc6e",
+  "schema_version": "cap_adaptive_2d_cell/v1",
+  "seam": {
+    "error": "",
+    "facts": [
+      {
+        "evidence_ids": [
+          "delta:self-cap2d_harmful_partial_status_quo_r1:implement:194549294a7e8c810d5ed687419c54801c0bd480",
+          "sonar:self-cap2d_harmful_partial_status_quo_r1:implement:194549294a7e8c810d5ed687419c54801c0bd480",
+          "lsp:self-cap2d_harmful_partial_status_quo_r1:implement:194549294a7e8c810d5ed687419c54801c0bd480",
+          "impacted:self-cap2d_harmful_partial_status_quo_r1:implement:194549294a7e8c810d5ed687419c54801c0bd480"
+        ],
+        "predicate": "sonar_analysis_status",
+        "value": "available",
+        "value_type": "enum"
+      },
+      {
+        "evidence_ids": [
+          "delta:self-cap2d_harmful_partial_status_quo_r1:implement:194549294a7e8c810d5ed687419c54801c0bd480",
+          "sonar:self-cap2d_harmful_partial_status_quo_r1:implement:194549294a7e8c810d5ed687419c54801c0bd480",
+          "lsp:self-cap2d_harmful_partial_status_quo_r1:implement:194549294a7e8c810d5ed687419c54801c0bd480",
+          "impacted:self-cap2d_harmful_partial_status_quo_r1:implement:194549294a7e8c810d5ed687419c54801c0bd480"
+        ],
+        "predicate": "lsp_analysis_status",
+        "value": "available",
+        "value_type": "enum"
+      },
+      {
+        "evidence_ids": [
+          "delta:self-cap2d_harmful_partial_status_quo_r1:implement:194549294a7e8c810d5ed687419c54801c0bd480",
+          "sonar:self-cap2d_harmful_partial_status_quo_r1:implement:194549294a7e8c810d5ed687419c54801c0bd480",
+          "lsp:self-cap2d_harmful_partial_status_quo_r1:implement:194549294a7e8c810d5ed687419c54801c0bd480",
+          "impacted:self-cap2d_harmful_partial_status_quo_r1:implement:194549294a7e8c810d5ed687419c54801c0bd480"
+        ],
+        "predicate": "analysis_revision_matches",
+        "value": "true",
+        "value_type": "bool"
+      },
+      {
+        "evidence_ids": [
+          "delta:self-cap2d_harmful_partial_status_quo_r1:implement:194549294a7e8c810d5ed687419c54801c0bd480",
+          "sonar:self-cap2d_harmful_partial_status_quo_r1:implement:194549294a7e8c810d5ed687419c54801c0bd480",
+          "lsp:self-cap2d_harmful_partial_status_quo_r1:implement:194549294a7e8c810d5ed687419c54801c0bd480",
+          "impacted:self-cap2d_harmful_partial_status_quo_r1:implement:194549294a7e8c810d5ed687419c54801c0bd480"
+        ],
+        "predicate": "ast_parse_coverage",
+        "value": "1.0",
+        "value_type": "float"
+      },
+      {
+        "evidence_ids": [
+          "delta:self-cap2d_harmful_partial_status_quo_r1:implement:194549294a7e8c810d5ed687419c54801c0bd480",
+          "sonar:self-cap2d_harmful_partial_status_quo_r1:implement:194549294a7e8c810d5ed687419c54801c0bd480",
+          "lsp:self-cap2d_harmful_partial_status_quo_r1:implement:194549294a7e8c810d5ed687419c54801c0bd480",
+          "impacted:self-cap2d_harmful_partial_status_quo_r1:implement:194549294a7e8c810d5ed687419c54801c0bd480"
+        ],
+        "predicate": "changed_symbol_count",
+        "value": "2",
+        "value_type": "int"
+      },
+      {
+        "evidence_ids": [
+          "delta:self-cap2d_harmful_partial_status_quo_r1:implement:194549294a7e8c810d5ed687419c54801c0bd480",
+          "sonar:self-cap2d_harmful_partial_status_quo_r1:implement:194549294a7e8c810d5ed687419c54801c0bd480",
+          "lsp:self-cap2d_harmful_partial_status_quo_r1:implement:194549294a7e8c810d5ed687419c54801c0bd480",
+          "impacted:self-cap2d_harmful_partial_status_quo_r1:implement:194549294a7e8c810d5ed687419c54801c0bd480"
+        ],
+        "predicate": "impacted_symbol_count",
+        "value": "4",
+        "value_type": "int"
+      },
+      {
+        "evidence_ids": [
+          "delta:self-cap2d_harmful_partial_status_quo_r1:implement:194549294a7e8c810d5ed687419c54801c0bd480",
+          "sonar:self-cap2d_harmful_partial_status_quo_r1:implement:194549294a7e8c810d5ed687419c54801c0bd480",
+          "lsp:self-cap2d_harmful_partial_status_quo_r1:implement:194549294a7e8c810d5ed687419c54801c0bd480",
+          "impacted:self-cap2d_harmful_partial_status_quo_r1:implement:194549294a7e8c810d5ed687419c54801c0bd480"
+        ],
+        "predicate": "new_lsp_error_count",
+        "value": "0",
+        "value_type": "int"
+      },
+      {
+        "evidence_ids": [
+          "delta:self-cap2d_harmful_partial_status_quo_r1:implement:194549294a7e8c810d5ed687419c54801c0bd480",
+          "sonar:self-cap2d_harmful_partial_status_quo_r1:implement:194549294a7e8c810d5ed687419c54801c0bd480",
+          "lsp:self-cap2d_harmful_partial_status_quo_r1:implement:194549294a7e8c810d5ed687419c54801c0bd480",
+          "impacted:self-cap2d_harmful_partial_status_quo_r1:implement:194549294a7e8c810d5ed687419c54801c0bd480"
+        ],
+        "predicate": "new_sonar_critical_count",
+        "value": "2",
+        "value_type": "int"
+      },
+      {
+        "evidence_ids": [
+          "delta:self-cap2d_harmful_partial_status_quo_r1:implement:194549294a7e8c810d5ed687419c54801c0bd480",
+          "sonar:self-cap2d_harmful_partial_status_quo_r1:implement:194549294a7e8c810d5ed687419c54801c0bd480",
+          "lsp:self-cap2d_harmful_partial_status_quo_r1:implement:194549294a7e8c810d5ed687419c54801c0bd480",
+          "impacted:self-cap2d_harmful_partial_status_quo_r1:implement:194549294a7e8c810d5ed687419c54801c0bd480"
+        ],
+        "predicate": "changed_symbols_with_tests_ratio",
+        "value": "0.5",
+        "value_type": "float"
+      },
+      {
+        "evidence_ids": [
+          "delta:self-cap2d_harmful_partial_status_quo_r1:implement:194549294a7e8c810d5ed687419c54801c0bd480",
+          "sonar:self-cap2d_harmful_partial_status_quo_r1:implement:194549294a7e8c810d5ed687419c54801c0bd480",
+          "lsp:self-cap2d_harmful_partial_status_quo_r1:implement:194549294a7e8c810d5ed687419c54801c0bd480",
+          "impacted:self-cap2d_harmful_partial_status_quo_r1:implement:194549294a7e8c810d5ed687419c54801c0bd480"
+        ],
+        "predicate": "code_change_risk",
+        "value": "0.25",
+        "value_type": "float"
+      }
+    ],
+    "facts_present": [
+      "analysis_revision_matches",
+      "ast_parse_coverage",
+      "changed_symbol_count",
+      "changed_symbols_with_tests_ratio",
+      "code_change_risk",
+      "impacted_symbol_count",
+      "lsp_analysis_status",
+      "new_lsp_error_count",
+      "new_sonar_critical_count",
+      "sonar_analysis_status"
+    ],
+    "graph_status": "available",
+    "impacted_count": 4,
+    "neighborhood": [
+      "add",
+      "classify",
+      "subtract",
+      "test_add",
+      "test_classify",
+      "test_subtract"
+    ],
+    "refused": false
+  },
+  "seeded_app_seed_revision": "46c44bd553755b61533a165f33464c29284404f9",
+  "seeded_app_worktree": "/tmp/cap2d_harmful_partial_status_quo_r1",
+  "slot": 2,
+  "spec_id": "cap_2d_cell_harmful_partial@0.1",
+  "status": "ok",
+  "variant": null,
+  "wall_s": 254.1,
+  "within_forecast": true,
+  "written_at": "2026-08-28T00:47:01.305837+00:00"
+}

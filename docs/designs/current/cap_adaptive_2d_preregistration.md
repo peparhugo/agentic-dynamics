@@ -436,3 +436,22 @@ PRIMARY; the authorization boundary (pilot flag-only, no activation) + the paral
 plan (cross-models on other envelopes, mechanical workstreams concurrent, data chain
 single-writer); the confidence-recording requirement restated; the 4-wide execution plan.
 **PASS — committing before any cell runs.**
+
+## LOG — p0_pin_spec (2026-08-28, verification phase)
+
+Spec pinned: `workflows/repository/cap_adaptive_2d.yaml` SHA256
+`1258280d44f608c7fcccf91ef514cc5a39994a9fd352852d96fb35c919f2ea0c` (`cap_adaptive_2d@0.1`),
+verified against `git rev-parse HEAD:workflows/repository/cap_adaptive_2d.yaml`
+(blob `4ab83398d674839f705a9df06f27e3e1d757334a`) — the pinned header matches the committed
+file exactly. Pre-registration verification (no deviations — nothing redefined): (1) the
+28-cell assignment table reproduces exactly from the committed seed
+`617e6763fcd238dc93a59ba1f41e01ba5f281c4748ef3867dbebeeca344c7dfb` via the §4 reproducibility
+key (28 cells, 14/arm, 9 defect-bearing/arm, 5 clean/arm; zero mismatches across cell_id,
+class, variant, arm, repetition, slot); (2) E1 = `cap2d_correct_abstention_r1` confirmed as
+the p1 measurement cell (§4 slot 3 in the correct block); (3) the Option A leg-3 fingerprint
+pinned (§0 table row: risk < 0.2, severity terms zero, tests term zero, risk ==
+0.20·min(1, impacted/10) EXACTLY); (4) the four decision-rule legs pinned (§1–§2: primary
+cpvo_harm comparison at E_x = 11.4671, capture ≥ 2/3 of the low-information cells, flag-cost
+ceiling, the NI guard — all four must hold for SUPPORT); (5) the $30 stop confirmed in the
+spec (`stop.budget_usd: 30.0`). **PASS — the pin is the only edit; the campaign proceeds to
+p1.

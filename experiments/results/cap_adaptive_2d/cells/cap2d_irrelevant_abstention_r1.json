@@ -1,0 +1,252 @@
+{
+  "abstention_decision": {
+    "decision": "APPLY_NULL",
+    "leg": null,
+    "reason": "risk 0.18 < 0.2 but multi-term (NOT the Option A fingerprint) \u2014 apply-null (unchanged, not flagged)."
+  },
+  "analyzer_status": {
+    "graph": "available",
+    "lsp": "available",
+    "sonar": "available"
+  },
+  "application": {
+    "action": "continue",
+    "applied_or_null": "null",
+    "note": "continue proposal -> provable null application (no extra pass).",
+    "proof": "provable-null:commit-trail",
+    "rework_passes": 0
+  },
+  "arm": "abstention",
+  "backend": "opencode",
+  "cell_id": "cap2d_irrelevant_abstention_r1",
+  "class": "irrelevant",
+  "cost": {
+    "application_usd": 0.0,
+    "run_workflow_usd": 0.008819,
+    "total_usd": 0.008819
+  },
+  "facts": {
+    "analysis_revision_matches": "true",
+    "ast_parse_coverage": "1.0",
+    "changed_symbol_count": "2",
+    "changed_symbols_with_tests_ratio": "0.5",
+    "code_change_risk": "0.18",
+    "impacted_symbol_count": "4",
+    "lsp_analysis_status": "available",
+    "new_lsp_error_count": "0",
+    "new_sonar_critical_count": "0",
+    "sonar_analysis_status": "available"
+  },
+  "facts_present": [
+    "analysis_revision_matches",
+    "ast_parse_coverage",
+    "changed_symbol_count",
+    "changed_symbols_with_tests_ratio",
+    "code_change_risk",
+    "impacted_symbol_count",
+    "lsp_analysis_status",
+    "new_lsp_error_count",
+    "new_sonar_critical_count",
+    "sonar_analysis_status"
+  ],
+  "finops_cell_id": "cap2d_irrelevant_abstention_r1",
+  "flags": [],
+  "forecast_usd": 0.02604,
+  "goal": "add a product function to the calc app (with a test), leaving add/subtract unchanged",
+  "goal_sha256": "c99a4b140373960a4babfdba5059e745426eb0a8a8b80f777f0fcc6dcbd52900",
+  "impl": {
+    "commit_hash": "53696be",
+    "confidence": 1.0,
+    "cost_usd": 0.0036040619999999995,
+    "duration_s": 18.65
+  },
+  "model": "deepseek/deepseek-v4-pro",
+  "outcome": {
+    "accepted": true,
+    "defect_note": "clean change \u2014 no defect (trivial, fully-tested change)",
+    "defect_present_on_final_commit": false,
+    "final_revision": "e649ae7af4a57cae122f37c63fd7daf6592f4541",
+    "test_executed_success": true,
+    "test_runner": "independent pytest (runtime test execution) on the immutable final commit",
+    "tests_passed": 3,
+    "tests_total": 3
+  },
+  "proposal": {
+    "action": "continue",
+    "analyzed_revision": "53696be52f78e008504d34f54344414c8738f6d9",
+    "applied": false,
+    "artifact": "experiments/results/proposals/ca6c940489392833.json",
+    "artifact_sha256": "ddab58ff9b1b32434591fefb20b17640ee30b8de5eb639996b6e72966315cab6",
+    "baseline_revision": "6fe7fa6cc3bf6835e8105f253a24ca40aafc839a",
+    "confidence": 1.0,
+    "contract_version": "verify_code_change/v1",
+    "depth": 0,
+    "facts_used": [
+      "analysis_revision_matches",
+      "ast_parse_coverage",
+      "changed_symbol_count",
+      "changed_symbols_with_tests_ratio",
+      "code_change_risk",
+      "impacted_symbol_count",
+      "lsp_analysis_status",
+      "new_lsp_error_count",
+      "new_sonar_critical_count",
+      "sonar_analysis_status"
+    ],
+    "proposal_id": "ca6c940489392833",
+    "schema_version": "verify_code_change_proposal/v1",
+    "scope": []
+  },
+  "repetition": "r1",
+  "run_ledger": "/tmp/wt_adaptive_2d/experiments/results/workflows/cap_2a_cell_clean/20260828T004741Z.json",
+  "run_ledger_ok": true,
+  "run_ledger_sha256": "cf2a018a47ed83ae3fd8fb40005d23367d27edbee5a94f7263b6f521dad79e41",
+  "schema_version": "cap_adaptive_2d_cell/v1",
+  "seam": {
+    "error": "",
+    "facts": [
+      {
+        "evidence_ids": [
+          "delta:self-cap2d_irrelevant_abstention_r1:implement:53696be52f78e008504d34f54344414c8738f6d9",
+          "sonar:self-cap2d_irrelevant_abstention_r1:implement:53696be52f78e008504d34f54344414c8738f6d9",
+          "lsp:self-cap2d_irrelevant_abstention_r1:implement:53696be52f78e008504d34f54344414c8738f6d9",
+          "impacted:self-cap2d_irrelevant_abstention_r1:implement:53696be52f78e008504d34f54344414c8738f6d9"
+        ],
+        "predicate": "sonar_analysis_status",
+        "value": "available",
+        "value_type": "enum"
+      },
+      {
+        "evidence_ids": [
+          "delta:self-cap2d_irrelevant_abstention_r1:implement:53696be52f78e008504d34f54344414c8738f6d9",
+          "sonar:self-cap2d_irrelevant_abstention_r1:implement:53696be52f78e008504d34f54344414c8738f6d9",
+          "lsp:self-cap2d_irrelevant_abstention_r1:implement:53696be52f78e008504d34f54344414c8738f6d9",
+          "impacted:self-cap2d_irrelevant_abstention_r1:implement:53696be52f78e008504d34f54344414c8738f6d9"
+        ],
+        "predicate": "lsp_analysis_status",
+        "value": "available",
+        "value_type": "enum"
+      },
+      {
+        "evidence_ids": [
+          "delta:self-cap2d_irrelevant_abstention_r1:implement:53696be52f78e008504d34f54344414c8738f6d9",
+          "sonar:self-cap2d_irrelevant_abstention_r1:implement:53696be52f78e008504d34f54344414c8738f6d9",
+          "lsp:self-cap2d_irrelevant_abstention_r1:implement:53696be52f78e008504d34f54344414c8738f6d9",
+          "impacted:self-cap2d_irrelevant_abstention_r1:implement:53696be52f78e008504d34f54344414c8738f6d9"
+        ],
+        "predicate": "analysis_revision_matches",
+        "value": "true",
+        "value_type": "bool"
+      },
+      {
+        "evidence_ids": [
+          "delta:self-cap2d_irrelevant_abstention_r1:implement:53696be52f78e008504d34f54344414c8738f6d9",
+          "sonar:self-cap2d_irrelevant_abstention_r1:implement:53696be52f78e008504d34f54344414c8738f6d9",
+          "lsp:self-cap2d_irrelevant_abstention_r1:implement:53696be52f78e008504d34f54344414c8738f6d9",
+          "impacted:self-cap2d_irrelevant_abstention_r1:implement:53696be52f78e008504d34f54344414c8738f6d9"
+        ],
+        "predicate": "ast_parse_coverage",
+        "value": "1.0",
+        "value_type": "float"
+      },
+      {
+        "evidence_ids": [
+          "delta:self-cap2d_irrelevant_abstention_r1:implement:53696be52f78e008504d34f54344414c8738f6d9",
+          "sonar:self-cap2d_irrelevant_abstention_r1:implement:53696be52f78e008504d34f54344414c8738f6d9",
+          "lsp:self-cap2d_irrelevant_abstention_r1:implement:53696be52f78e008504d34f54344414c8738f6d9",
+          "impacted:self-cap2d_irrelevant_abstention_r1:implement:53696be52f78e008504d34f54344414c8738f6d9"
+        ],
+        "predicate": "changed_symbol_count",
+        "value": "2",
+        "value_type": "int"
+      },
+      {
+        "evidence_ids": [
+          "delta:self-cap2d_irrelevant_abstention_r1:implement:53696be52f78e008504d34f54344414c8738f6d9",
+          "sonar:self-cap2d_irrelevant_abstention_r1:implement:53696be52f78e008504d34f54344414c8738f6d9",
+          "lsp:self-cap2d_irrelevant_abstention_r1:implement:53696be52f78e008504d34f54344414c8738f6d9",
+          "impacted:self-cap2d_irrelevant_abstention_r1:implement:53696be52f78e008504d34f54344414c8738f6d9"
+        ],
+        "predicate": "impacted_symbol_count",
+        "value": "4",
+        "value_type": "int"
+      },
+      {
+        "evidence_ids": [
+          "delta:self-cap2d_irrelevant_abstention_r1:implement:53696be52f78e008504d34f54344414c8738f6d9",
+          "sonar:self-cap2d_irrelevant_abstention_r1:implement:53696be52f78e008504d34f54344414c8738f6d9",
+          "lsp:self-cap2d_irrelevant_abstention_r1:implement:53696be52f78e008504d34f54344414c8738f6d9",
+          "impacted:self-cap2d_irrelevant_abstention_r1:implement:53696be52f78e008504d34f54344414c8738f6d9"
+        ],
+        "predicate": "new_lsp_error_count",
+        "value": "0",
+        "value_type": "int"
+      },
+      {
+        "evidence_ids": [
+          "delta:self-cap2d_irrelevant_abstention_r1:implement:53696be52f78e008504d34f54344414c8738f6d9",
+          "sonar:self-cap2d_irrelevant_abstention_r1:implement:53696be52f78e008504d34f54344414c8738f6d9",
+          "lsp:self-cap2d_irrelevant_abstention_r1:implement:53696be52f78e008504d34f54344414c8738f6d9",
+          "impacted:self-cap2d_irrelevant_abstention_r1:implement:53696be52f78e008504d34f54344414c8738f6d9"
+        ],
+        "predicate": "new_sonar_critical_count",
+        "value": "0",
+        "value_type": "int"
+      },
+      {
+        "evidence_ids": [
+          "delta:self-cap2d_irrelevant_abstention_r1:implement:53696be52f78e008504d34f54344414c8738f6d9",
+          "sonar:self-cap2d_irrelevant_abstention_r1:implement:53696be52f78e008504d34f54344414c8738f6d9",
+          "lsp:self-cap2d_irrelevant_abstention_r1:implement:53696be52f78e008504d34f54344414c8738f6d9",
+          "impacted:self-cap2d_irrelevant_abstention_r1:implement:53696be52f78e008504d34f54344414c8738f6d9"
+        ],
+        "predicate": "changed_symbols_with_tests_ratio",
+        "value": "0.5",
+        "value_type": "float"
+      },
+      {
+        "evidence_ids": [
+          "delta:self-cap2d_irrelevant_abstention_r1:implement:53696be52f78e008504d34f54344414c8738f6d9",
+          "sonar:self-cap2d_irrelevant_abstention_r1:implement:53696be52f78e008504d34f54344414c8738f6d9",
+          "lsp:self-cap2d_irrelevant_abstention_r1:implement:53696be52f78e008504d34f54344414c8738f6d9",
+          "impacted:self-cap2d_irrelevant_abstention_r1:implement:53696be52f78e008504d34f54344414c8738f6d9"
+        ],
+        "predicate": "code_change_risk",
+        "value": "0.18",
+        "value_type": "float"
+      }
+    ],
+    "facts_present": [
+      "analysis_revision_matches",
+      "ast_parse_coverage",
+      "changed_symbol_count",
+      "changed_symbols_with_tests_ratio",
+      "code_change_risk",
+      "impacted_symbol_count",
+      "lsp_analysis_status",
+      "new_lsp_error_count",
+      "new_sonar_critical_count",
+      "sonar_analysis_status"
+    ],
+    "graph_status": "available",
+    "impacted_count": 4,
+    "neighborhood": [
+      "add",
+      "product",
+      "subtract",
+      "test_add",
+      "test_product",
+      "test_subtract"
+    ],
+    "refused": false
+  },
+  "seeded_app_seed_revision": "6fe7fa6cc3bf6835e8105f253a24ca40aafc839a",
+  "seeded_app_worktree": "/tmp/cap2d_irrelevant_abstention_r1",
+  "slot": 1,
+  "spec_id": "cap_2a_cell_clean@0.1",
+  "status": "ok",
+  "variant": null,
+  "wall_s": 171.8,
+  "within_forecast": true,
+  "written_at": "2026-08-28T00:47:41.723003+00:00"
+}
