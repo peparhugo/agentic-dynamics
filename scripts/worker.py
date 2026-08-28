@@ -207,6 +207,42 @@ def main() -> None:
 
             ok = proc.returncode == 0 and "ERROR" not in proc.stdout
             if ok:
+                # The re-measurement lesson (2026-08-28): a story whose sessions ALL died
+                # silently (the Claude CLI auth failure ran 5 sessions of 0.0s each, exit
+                # code -2/1, zero tokens, zero cost) still made run_story exit 0, and the
+                # old check marked it done — 60 junk zero-cost results polluted the corpus.
+                # A cell is done ONLY when the result it wrote is a REAL run: at least one
+                # session with real activity (duration > 1s or tokens > 0) or a positive
+                # measured cost, or the story's tests actually executed.
+                real_run = False
+                try:
+                    import json as _json
+                    for line in proc.stdout.splitlines():
+                        if '"result_path"' in line:
+                            rp = _json.loads(line).get("result_path")
+                            if rp and Path(rp).exists():
+                                result = _json.loads(Path(rp).read_text())
+                                s = result.get("summary") or {}
+                                sessions = result.get("sessions") or []
+                                real_run = (
+                                    (s.get("total_cost") or 0) > 0
+                                    or any(
+                                        (x.get("duration_s") or 0) > 1 or (x.get("tokens") or 0) > 0
+                                        for x in sessions
+                                    )
+                                    or s.get("all_successful") is True
+                                )
+                            break
+                except Exception:  # noqa: BLE001 — an unreadable result is NOT a real run
+                    real_run = False
+                if not real_run:
+                    log(f"[{cell_id}] NOT A REAL RUN (silent dead sessions) ret={proc.returncode}")
+                    _safe_hset(r, STATUS_KEY, cell_id, "failed")
+                    publisher.publish_status("failed")
+                    error_log = log_dir / f"{cell_id}.error.log"
+                    error_log.write_text(proc.stderr or proc.stdout)
+                    failed += 1
+                    continue
                 log(f"[{cell_id}] OK ({elapsed:.0f}s)")
                 _safe_hset(r, STATUS_KEY, cell_id, "done")
                 publisher.publish_status("done")
