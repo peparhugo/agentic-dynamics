@@ -109,7 +109,7 @@ plans:
       - reviews
       steps:
       - - python3
-        - scripts/backfill_costs.py
+        - scripts/archive/backfill_costs.py
       - - python3
         - scripts/sync_data.py
       - - python3
@@ -190,7 +190,7 @@ plans:
       - reviews
       steps:
       - - python3
-        - scripts/backfill_costs.py
+        - scripts/archive/backfill_costs.py
       - - python3
         - scripts/sync_data.py
       - - python3
