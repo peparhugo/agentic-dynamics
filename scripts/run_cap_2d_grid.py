@@ -842,8 +842,10 @@ def main() -> None:
     if p1_manifest_path.exists():
         forecast = json.loads(p1_manifest_path.read_text()).get("forecast_per_cell_usd", forecast)
     print(f"[p2] {len(pending)} cells at {args.workers}-wide concurrency, forecast=${forecast}", flush=True)
-    # block order = slot order; run in slot order, 4 at a time
-    pending.sort(key=lambda c: (list({c2["class"] for c2 in CELLS}).index(c["class"]), c["slot"]))
+    # block order = the canonical CELLS order (slot numbering within each block); the harness
+    # CELLS list IS the pre-registered table order, so preserve it exactly.
+    order = {c["cell_id"]: i for i, c in enumerate(CELLS)}
+    pending.sort(key=lambda c: order[c["cell_id"]])
     results: dict[str, dict] = {}
     with ThreadPoolExecutor(max_workers=args.workers) as ex:
         futs = {ex.submit(run_one_cell, c, forecast): c["cell_id"] for c in pending}
