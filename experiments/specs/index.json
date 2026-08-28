@@ -1,7 +1,7 @@
 {
   "schema_version": "spec-status/v2",
-  "generated_at": "2026-08-28T14:55:32.789109+00:00",
-  "n_specs": 141,
+  "generated_at": "2026-08-28T15:13:57.026524+00:00",
+  "n_specs": 144,
   "specs": [
     {
       "name": "auto_posthoc_wiring",
@@ -170,6 +170,24 @@
       "version": "0.1",
       "status": "runnable",
       "spec_path": "workflows/operations/cap_2d_cell_incorrect_rebuilt.yaml",
+      "artifact_kind": "workflow",
+      "repeatable": true,
+      "supersedes": [],
+      "superseded_by": null,
+      "completed_at": null,
+      "last_run_at": null,
+      "latest_ok": null,
+      "latest_model": null,
+      "latest_cost_usd": null,
+      "latest_git_sha": null,
+      "results_pointer": null,
+      "n_runs": 0
+    },
+    {
+      "name": "cap_2e_cell_unseen_family",
+      "version": "0.1",
+      "status": "runnable",
+      "spec_path": "workflows/operations/cap_2e_cell_unseen_family.yaml",
       "artifact_kind": "workflow",
       "repeatable": true,
       "supersedes": [],
@@ -685,6 +703,24 @@
       "latest_cost_usd": 0.0,
       "latest_git_sha": "d5f85126b",
       "results_pointer": "experiments/results/workflows/design_sessions/20260814T065812Z.json",
+      "n_runs": 1
+    },
+    {
+      "name": "i10_typed_checkpoint",
+      "version": "0.1",
+      "status": "failed",
+      "spec_path": "workflows/repository/i10_typed_checkpoint.yaml",
+      "artifact_kind": "workflow",
+      "repeatable": false,
+      "supersedes": [],
+      "superseded_by": null,
+      "completed_at": null,
+      "last_run_at": "2026-08-28T15:06:02.464047+00:00",
+      "latest_ok": false,
+      "latest_model": "deepseek/deepseek-v4-flash",
+      "latest_cost_usd": 0.014979,
+      "latest_git_sha": "7b59a7aee",
+      "results_pointer": "experiments/results/workflows/i10_typed_checkpoint/20260828T150602Z.json",
       "n_runs": 1
     },
     {
@@ -1905,6 +1941,24 @@
       "latest_cost_usd": 0.0,
       "latest_git_sha": "69182e561",
       "results_pointer": "experiments/results/workflows/framework_facelift/20260814T151812Z.json",
+      "n_runs": 1
+    },
+    {
+      "name": "grit_calibration_design",
+      "version": "0.1",
+      "status": "completed",
+      "spec_path": "workflows/repository/grit_calibration_design.yaml",
+      "artifact_kind": "workflow",
+      "repeatable": false,
+      "supersedes": [],
+      "superseded_by": null,
+      "completed_at": null,
+      "last_run_at": "2026-08-28T15:05:51.239748+00:00",
+      "latest_ok": true,
+      "latest_model": "deepseek/deepseek-v4-flash",
+      "latest_cost_usd": 0.024953,
+      "latest_git_sha": "810a3532a",
+      "results_pointer": "experiments/results/workflows/grit_calibration_design/20260828T150551Z.json",
       "n_runs": 1
     },
     {

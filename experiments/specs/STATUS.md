@@ -3,8 +3,8 @@
 **Generated — do not edit by hand.** Regenerate with `python scripts/spec_status.py`;
 `scripts/run_workflow.py` also refreshes it at the end of every run.
 
-Generated at: `2026-08-28T14:55:32.789109+00:00`  ·  141 spec(s)
-**Work remaining:** 38 open · 103 completed/retired
+Generated at: `2026-08-28T15:13:57.026524+00:00`  ·  144 spec(s)
+**Work remaining:** 40 open · 104 completed/retired
 
 | name | kind | repeatable | status | version | supersedes | last_run | ok | model | cost | n_runs |
 |---|---|---|---|---|---|---|---|---|---|---|
@@ -18,6 +18,7 @@ Generated at: `2026-08-28T14:55:32.789109+00:00`  ·  141 spec(s)
 | `cap_2c_cell_unseen_family` | workflow | yes | runnable | 0.1 | — | — | — | — | — | 0 |
 | `cap_2d_cell_harmful_partial` | workflow | yes | runnable | 0.1 | — | — | — | — | — | 0 |
 | `cap_2d_cell_incorrect_rebuilt` | workflow | yes | runnable | 0.1 | — | — | — | — | — | 0 |
+| `cap_2e_cell_unseen_family` | workflow | yes | runnable | 0.1 | — | — | — | — | — | 0 |
 | `cap_confidence_cascade` | experiment | yes | runnable | 0.1 | — | — | — | — | — | 0 |
 | `cap_coverage_routing_impact` | experiment | yes | runnable | 0.1 | — | — | — | — | — | 0 |
 | `cap_escalation_fix` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
@@ -46,6 +47,7 @@ Generated at: `2026-08-28T14:55:32.789109+00:00`  ·  141 spec(s)
 | `claude_background_sessions` | workflow | no | failed | 0.1 | — | 2026-08-14 17:38 | fail | anthropic/claude-fable-5 | $15.4471 | 1 |
 | `control_room_portal` | workflow | no | failed | 0.2 | — | 2026-08-14 03:36 | fail | openai/gpt-5.6-sol | $0.0000 | 3 |
 | `design_sessions` | workflow | no | failed | 0.1 | — | 2026-08-14 06:58 | fail | openai/gpt-5.6-sol | $0.0000 | 1 |
+| `i10_typed_checkpoint` | workflow | no | failed | 0.1 | — | 2026-08-28 15:06 | fail | deepseek/deepseek-v4-flash | $0.0150 | 1 |
 | `canonical_publication_closure` | workflow | no | completed | 0.1 | — | 2026-08-21 17:06 | ok | deepseek/deepseek-v4-pro | $1.4475 | 1 |
 | `canonical_state_design` | workflow | no | completed | 0.1 | — | 2026-08-18 15:48 | fail | openai/gpt-5.6-sol | $0.0798 | 5 |
 | `canonical_state_finalize` | workflow | no | completed | 0.1 | — | 2026-08-18 20:38 | ok | anthropic/claude-fable-5 | $14.5891 | 1 |
@@ -113,6 +115,7 @@ Generated at: `2026-08-28T14:55:32.789109+00:00`  ·  141 spec(s)
 | `evidence_redesign` | workflow | no | completed | 0.1 | — | 2026-08-14 19:18 | ok | openai/gpt-5.6-sol | $5.9008 | 3 |
 | `fix_review_findings` | workflow | no | completed | 0.1 | — | 2026-08-14 13:48 | ok | deepseek/deepseek-v4-pro | $0.1504 | 1 |
 | `framework_facelift` | workflow | no | completed | 0.2 | — | 2026-08-14 15:18 | ok | openai/gpt-5.6-sol | $0.0000 | 1 |
+| `grit_calibration_design` | workflow | no | completed | 0.1 | — | 2026-08-28 15:05 | ok | deepseek/deepseek-v4-flash | $0.0250 | 1 |
 | `investing_domain_audit` | workflow | no | completed | 0.1 | — | 2026-08-22 18:09 | ok | deepseek/deepseek-v4-pro | $0.2010 | 1 |
 | `kb_event_typing` | workflow | no | completed | 0.1 | — | 2026-08-19 00:38 | ok | deepseek/deepseek-v4-pro | $0.2661 | 1 |
 | `kb_lineage_reconcile` | workflow | no | completed | 0.1 | — | 2026-08-19 00:31 | ok | deepseek/deepseek-v4-pro | $0.3715 | 1 |
