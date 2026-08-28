@@ -1819,6 +1819,82 @@ def test_commit_prefix_rewrites_a_single_bad_commit_not_at_head(tmp_path, monkey
 # ── Adversarial verification (cap_runner_hardening p5) ──────────
 
 
+def test_commit_msg_hook_works_in_a_worktree_shape(tmp_path):
+    """(The 2d p5 lesson) Campaigns run in git WORKTREES, where ``.git`` is a file
+    pointing at the shared git dir — the hook must install via ``git rev-parse --git-path``
+    (shared hooks dir + per-worktree prefix file), or it silently fails and the wrapper's
+    commit lands unprefixed (the exact shape that failed the 2d run's ledger)."""
+    from agentic_dynamics.runtime import workflow_runner as wr
+
+    main = tmp_path / "main"
+    main.mkdir()
+    subprocess.run(["git", "init", "-q"], cwd=main, check=True)
+    subprocess.run(["git", "config", "user.email", "t@t"], cwd=main, check=True)
+    subprocess.run(["git", "config", "user.name", "t"], cwd=main, check=True)
+    (main / "seed.md").write_text("seed")
+    subprocess.run(["git", "add", "-A"], cwd=main, check=True)
+    subprocess.run(["git", "commit", "-q", "-m", "Initial"], cwd=main, check=True)
+    wt = main / "wt"
+    subprocess.run(["git", "worktree", "add", str(wt), "-b", "feature/x"], cwd=main, check=True)
+    assert (wt / ".git").is_file()  # the worktree shape: .git is a FILE
+
+    wr._install_commit_msg_hook(wt, "scope", "g")
+    (wt / "f.md").write_text("f")
+    subprocess.run(["git", "add", "-A"], cwd=wt, check=True)
+    subprocess.run(["git", "commit", "-q", "-m", "site: add things"], cwd=wt, check=True)
+    subjects = subprocess.run(
+        ["git", "log", "--format=%s"], cwd=wt, capture_output=True, text=True
+    ).stdout.splitlines()
+    assert subjects[0] == "[workflow] scope — g"  # the hook fired in the worktree
+    # a second worktree gets its own prefix without clobbering the first
+    wt2 = main / "wt2"
+    subprocess.run(["git", "worktree", "add", str(wt2), "-b", "feature/y"], cwd=main, check=True)
+    wr._install_commit_msg_hook(wt2, "other", "g")
+    (wt2 / "g.md").write_text("g")
+    subprocess.run(["git", "add", "-A"], cwd=wt2, check=True)
+    subprocess.run(["git", "commit", "-q", "-m", "plain message"], cwd=wt2, check=True)
+    subjects2 = subprocess.run(
+        ["git", "log", "--format=%s"], cwd=wt2, capture_output=True, text=True
+    ).stdout.splitlines()
+    assert subjects2[0] == "[workflow] other — g"
+    # the first worktree's hook still prefixes with ITS prefix (per-worktree file)
+    (wt / "h.md").write_text("h")
+    subprocess.run(["git", "add", "-A"], cwd=wt, check=True)
+    subprocess.run(["git", "commit", "-q", "-m", "another plain"], cwd=wt, check=True)
+    subjects1 = subprocess.run(
+        ["git", "log", "--format=%s"], cwd=wt, capture_output=True, text=True
+    ).stdout.splitlines()
+    assert subjects1[0] == "[workflow] scope — g"
+
+
+def test_commit_prefix_rewrites_in_a_worktree_shape(tmp_path, monkeypatch):
+    """(The 2d p5 lesson, part 2) The gate's history rewrite must also resolve its filter
+    script via ``git rev-parse --git-path`` — in a worktree ``wd/.git/`` does not exist."""
+    monkeypatch.setenv("FINOPS_COMMIT_HOOK", "0")
+    from agentic_dynamics.runtime import workflow_runner as wr
+
+    main = tmp_path / "main"
+    main.mkdir()
+    subprocess.run(["git", "init", "-q"], cwd=main, check=True)
+    subprocess.run(["git", "config", "user.email", "t@t"], cwd=main, check=True)
+    subprocess.run(["git", "config", "user.name", "t"], cwd=main, check=True)
+    (main / "seed.md").write_text("seed")
+    subprocess.run(["git", "add", "-A"], cwd=main, check=True)
+    subprocess.run(["git", "commit", "-q", "-m", "Initial"], cwd=main, check=True)
+    wt = main / "wt"
+    subprocess.run(["git", "worktree", "add", str(wt), "-b", "feature/x"], cwd=main, check=True)
+    pre = wr._git_head(wt)  # the worktree branch's Initial commit — BEFORE the bad commits
+    subprocess.run(["git", "commit", "-q", "--allow-empty", "-m", "bad one"], cwd=wt, check=True)
+    subprocess.run(["git", "commit", "-q", "--allow-empty", "-m", "bad two"], cwd=wt, check=True)
+    res = wr._canonicalize_commit_range(wt, pre, "[workflow] scope — g", [])
+    assert res is not None
+    subjects = subprocess.run(
+        ["git", "log", "--format=%s"], cwd=wt, capture_output=True, text=True
+    ).stdout.splitlines()
+    assert subjects == ["[workflow] scope — g", "[workflow] scope — g", "Initial"]
+
+
+
 def test_watchdog_sees_through_a_junk_heartbeat(tmp_path):
     """(p5-1) A stalled agent that touches the session file with junk heartbeats — non-JSON
     lines AND valid-JSON-but-not-a-step dicts — is STILL caught: the stall clock advances only

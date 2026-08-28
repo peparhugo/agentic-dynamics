@@ -1314,11 +1314,45 @@ def _install_commit_msg_hook(wd: Path, phase_name: str, goal: str) -> None:
     if os.environ.get("FINOPS_COMMIT_HOOK", "1") == "0":
         return
     expected = f"[workflow] {phase_name} — {goal[:40]}"
+    # A campaign worktree's ``.git`` is a FILE (pointing at the shared git dir), not a
+    # directory — writing to ``wd/.git/hooks/`` fails silently (the 2d run's p5 lesson:
+    # the hook never installed, the wrapper's commit landed unprefixed, the gate failed
+    # the run at the finish line). Resolve the real paths via git: the hook lives in the
+    # COMMON hooks dir (shared), the expected prefix lives in a PER-WORKTREE file
+    # (``git rev-parse --git-path`` returns the worktree's own git dir), so concurrent
+    # worktrees can never clobber each other's prefix.
+    def _git_path(kind: str) -> Path | None:
+        try:
+            r = subprocess.run(
+                ["git", "rev-parse", "--git-path", kind], cwd=wd,
+                capture_output=True, text=True, timeout=15,
+            )
+            raw = r.stdout.strip()
+            if r.returncode != 0 or not raw:
+                return None
+            p = Path(raw)
+            return p if p.is_absolute() else (wd / p).resolve()
+        except Exception:  # noqa: BLE001
+            return None
+
+    hooks_dir = _git_path("hooks")
+    prefix_file = _git_path("commit_msg_prefix")
+    if hooks_dir is None or prefix_file is None:
+        return
+    hook = hooks_dir / "commit-msg"
     script = (
         "#!/usr/bin/env python3\n"
-        "import sys\n"
+        "import os, subprocess, sys\n"
         "path = sys.argv[1]\n"
-        "expected = " + repr(expected) + "\n"
+        "# The expected prefix lives in the PER-WORKTREE git dir (never shared):\n"
+        "p = subprocess.run(['git', 'rev-parse', '--git-path', 'commit_msg_prefix'],\n"
+        "                   capture_output=True, text=True)\n"
+        "pf = p.stdout.strip() if p.returncode == 0 else ''\n"
+        "try:\n"
+        "    with open(pf, encoding='utf-8') as f:\n"
+        "        expected = f.read().strip()\n"
+        "except Exception:\n"
+        "    sys.exit(0)\n"
         "with open(path, encoding='utf-8') as f:\n"
         "    msg = f.read()\n"
         "first, sep, rest = msg.partition('\\n')\n"
@@ -1328,9 +1362,9 @@ def _install_commit_msg_hook(wd: Path, phase_name: str, goal: str) -> None:
         "    f.write(expected + (sep + rest if sep else ''))\n"
     )
     try:
-        hook = wd / ".git" / "hooks" / "commit-msg"
         hook.write_text(script, encoding="utf-8")
         hook.chmod(0o755)
+        prefix_file.write_text(expected, encoding="utf-8")
     except Exception:  # noqa: BLE001 — an unwritable hook degrades to the post-phase gate
         pass
 
@@ -1354,7 +1388,25 @@ def _canonicalize_commit_range(
     to the runner (no judgment needed), so an LLM doing git surgery would add failure modes
     to a mechanical fix.
     """
-    script = (wd / ".git" / "commit_prefix_filter.py").resolve()
+    # A campaign worktree's ``.git`` is a FILE — the filter script must live in the
+    # PER-WORKTREE git dir (``git rev-parse --git-path``), like the commit-msg prefix
+    # file, so concurrent worktrees never clobber each other and the path survives
+    # filter-branch's temp-checkout cwd.
+    try:
+        gp = subprocess.run(
+            ["git", "rev-parse", "--git-path", "commit_prefix_filter.py"], cwd=wd,
+            capture_output=True, text=True, timeout=15,
+        )
+        raw = gp.stdout.strip()
+        if gp.returncode == 0 and raw:
+            p = Path(raw)
+            script = p if p.is_absolute() else (wd / p).resolve()
+        else:
+            script = None
+    except Exception:  # noqa: BLE001
+        script = None
+    if script is None:
+        return None
     body = (
         "import sys\n"
         "expected = " + repr(expected) + "\n"
