@@ -318,6 +318,14 @@ class WorkflowRunResult:
     awaiting: bool = False
     awaiting_phase: str = ""
     awaiting_reason: str = ""
+    #: I10 — typed checkpoint capture (the session-routing v2 prerequisite). Every checkpoint
+    #: event this run produced, in chronological order: the mechanical stop (a ``checkpoint:
+    #: true`` phase completing → awaiting_operator_approval) and every resume-decided contract
+    #: read (approved/rejected) for a completed checkpoint phase. A run that never touched a
+    #: checkpoint carries an empty list — additive, never a re-shape of the per-phase ledger.
+    #: The record is written BEFORE the run exits so the resume machinery (and the spec index
+    #: / ``checkpoint/v1`` reducer) can read the last checkpoint state.
+    checkpoints: list[CheckpointRecord] = field(default_factory=list)
 
     @property
     def total_cost_usd(self) -> float:
@@ -371,6 +379,12 @@ class WorkflowRunResult:
             "awaiting": self.awaiting,
             "awaiting_phase": self.awaiting_phase,
             "awaiting_reason": self.awaiting_reason,
+            # ADDED key (I10 — never renames an existing key): the typed checkpoint ledger,
+            # one record per checkpoint event (mechanical stop + resume-decided contract
+            # reads). Old ledgers lack the key; consumers read it via ``.get("checkpoints",
+            # [])`` so the 2d/2c-era ledgers + spec_status + this module's own tests parse
+            # unchanged.
+            "checkpoints": [c.to_dict() for c in self.checkpoints],
             # ADDED key (P1 — never renames an existing key): the lossless terminal state,
             # so a checkpoint-paused run is distinguishable from a genuine failure on the
             # ledger without breaking consumers that read ``ok``/``awaiting``.
@@ -2058,6 +2072,71 @@ CHECKPOINT_MARKER = "checkpoint"
 #: stop, never an error; the operator's tools read "waiting", not "failed".
 AWAITING_STATUS = "awaiting"
 
+# ── I10 — typed checkpoint vocabulary ────────────────────────────────────────────────────────
+#
+# The session-routing v2 handoff needs a checkpoint as a TYPED, QUERYABLE event, not just a
+# status string on the run. Every record below carries the fields session-routing v2 consumes:
+# the phase + its index, the reason the checkpoint was recorded, the approval contract path,
+# the decision outcome, the reached/decided timestamps (their delta IS the operator-await
+# latency), and the phase's token/cost summary at the stop point. The vocabulary is a closed
+# set — a record's ``reason``/``decision`` are always one of these four strings, so a
+# downstream reducer never has to guess.
+
+#: Why the record was written: the phase itself reached its designed stop (a ``checkpoint:
+#: true`` phase completed → awaiting_operator_approval), or a resume re-read the approval
+#: contract of an already-completed checkpoint phase.
+CHECKPOINT_REASON_REACHED = "checkpoint_reached"
+CHECKPOINT_REASON_APPROVAL_REQUIRED = "approval_required"
+#: The decision outcome: the run is waiting for the operator (mechanical stop), the operator's
+#: approval contract validated (resume proceeds), or the contract failed (resume refuses).
+CHECKPOINT_DECISION_AWAITING = "awaiting"
+CHECKPOINT_DECISION_APPROVED = "approved"
+CHECKPOINT_DECISION_REJECTED = "rejected"
+
+
+@dataclass
+class CheckpointRecord:
+    """Typed, ledgered record of one checkpoint event (I10 — session-routing v2 prerequisite).
+
+    One record per checkpoint event, appended to ``WorkflowRunResult.checkpoints`` in
+    chronological order. The mechanical stop path writes a ``checkpoint_reached``/``awaiting``
+    record the moment the phase completes; the resume path writes an ``approval_required``
+    record with decision ``approved`` or ``rejected`` for EVERY completed checkpoint phase
+    whose contract it re-reads (the first rejected one is also where the resume stops).
+    ``reached_at``/``decided_at`` are ISO-8601 UTC; on the resume path ``reached_at`` is
+    carried over from the previous run's typed record (best-effort) so the operator-await
+    latency (``decided_at - reached_at``) survives the ledger boundary. ``approval_evidence``
+    is the ``_checkpoint_approval_valid`` evidence dict (contract checks + failed_checks +
+    operator/date) — present on resume-decided records, ``None`` on a fresh mechanical stop.
+    """
+
+    phase: str
+    phase_index: int  # 1-based index in the spec's phases list (0 = unresolved on resume)
+    reason: str  # checkpoint_reached | approval_required
+    approval_path: str  # the approval contract path (approvals/<spec>/<phase>_approval.md)
+    decision: str  # awaiting | approved | rejected
+    reached_at: str  # ISO-8601 UTC — when the phase reached its designed stop
+    decided_at: str  # ISO-8601 UTC — when the decision was recorded
+    cost_usd: float = 0.0  # the phase's cost at the stop point (resume: previous run's record)
+    tokens: dict[str, int] = field(default_factory=dict)  # the phase's token summary at the stop
+    commit_hash: str = ""  # the checkpoint phase's own commit ("" when unresolvable)
+    approval_evidence: dict[str, Any] | None = None  # the contract-read evidence (resume path)
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "phase": self.phase,
+            "phase_index": self.phase_index,
+            "reason": self.reason,
+            "approval_path": self.approval_path,
+            "decision": self.decision,
+            "reached_at": self.reached_at,
+            "decided_at": self.decided_at,
+            "cost_usd": self.cost_usd,
+            "tokens": dict(self.tokens),
+            "commit_hash": self.commit_hash,
+            "approval_evidence": self.approval_evidence,
+        }
+
 
 def _checkpoint_approval_path(wd: Path, spec_name: str, phase_name: str) -> Path:
     """``approvals/<spec>/<phase>_approval.md`` inside the worktree."""
@@ -2179,6 +2258,73 @@ def _checkpoint_approval_valid(
     return evidence["valid"], evidence
 
 
+def _phase_index(phases: list[dict[str, Any]], phase_name: str) -> int:
+    """1-based index of ``phase_name`` in the phases list (0 when not found)."""
+    for i, phase_def in enumerate(phases, start=1):
+        if str(phase_def.get("name", "?")) == phase_name:
+            return i
+    return 0
+
+
+def _previous_checkpoint_state(spec: ExperimentSpec, phase: str) -> dict[str, Any] | None:
+    """Best-effort: the previous run ledger's typed checkpoint record for ``phase`` (I10).
+
+    The resume machinery reads the last checkpoint state from the spec index's latest run
+    ledger (the same source ``_completed_phases_from_index`` uses). The typed record carries
+    the phase's cost/token summary at the original stop plus its ``reached_at``, so a resume
+    that re-reads the contract reproduces the operator-await latency (``decided_at -
+    reached_at``) and the stop-point cost WITHOUT re-running the phase. Any failure — an
+    unreadable ledger, a legacy checkpoint with no typed record, a spec outside the index —
+    returns ``None`` and the caller falls back to the current time + a zeroed summary.
+    """
+    try:
+        from agentic_dynamics.experiment.spec_status import index_entry
+
+        entry = index_entry(spec.name)
+        if entry is None or not entry.results_pointer:
+            return None
+        payload = json.loads((PROJECT_ROOT / entry.results_pointer).read_text())
+        for cp in payload.get("checkpoints", []) or []:
+            if isinstance(cp, dict) and cp.get("phase") == phase:
+                return cp
+    except Exception:
+        return None
+    return None
+
+
+def _checkpoint_contract_decisions(
+    wd: Path,
+    spec: ExperimentSpec,
+    phases: list[dict[str, Any]],
+    completed: set[str],
+    goal: str,
+) -> tuple[list[tuple[str, bool, dict[str, Any]]], tuple[str, dict[str, Any]] | None]:
+    """Evaluate every completed checkpoint phase's approval contract, in phase order.
+
+    Returns ``(decisions, first_unsatisfied)``. ``decisions`` is one ``(phase_name, valid,
+    evidence)`` triple per completed ``checkpoint: true`` phase — the I10 typed-capture
+    input for the resume-decided path, which mints an approved/rejected record for every
+    contract read whether or not the run then stops. ``first_unsatisfied`` is the first
+    ``(phase_name, evidence)`` whose contract failed (in phase order), or ``None`` when
+    every contract holds — the resume gate's refusal point. Identical semantics to the
+    pre-I10 ``_first_unsatisfied_checkpoint``, which now delegates here.
+    """
+    decisions: list[tuple[str, bool, dict[str, Any]]] = []
+    first_unsatisfied: tuple[str, dict[str, Any]] | None = None
+    for phase_def in phases:
+        if not phase_def.get(CHECKPOINT_MARKER):
+            continue
+        name = str(phase_def.get("name", "?"))
+        if name not in completed:
+            continue
+        commit_sha = _phase_commit_sha(wd, name, goal)
+        valid, evidence = _checkpoint_approval_valid(wd, spec.name, name, commit_sha)
+        decisions.append((name, valid, evidence))
+        if not valid and first_unsatisfied is None:
+            first_unsatisfied = (name, evidence)
+    return decisions, first_unsatisfied
+
+
 def _first_unsatisfied_checkpoint(
     wd: Path,
     spec: ExperimentSpec,
@@ -2192,18 +2338,11 @@ def _first_unsatisfied_checkpoint(
     operator approval BEFORE the run proceeds past it. Returns ``(phase_name, evidence)`` for
     the first violation (in phase order), so a resume stops at the earliest unsatisfied
     checkpoint — the revamp3 "ran p3-p6 past an unsigned template" shape is refused up front.
+    Delegates to :func:`_checkpoint_contract_decisions` (I10) so the typed-capture and the
+    gate read the contracts exactly once each.
     """
-    for phase_def in phases:
-        if not phase_def.get(CHECKPOINT_MARKER):
-            continue
-        name = str(phase_def.get("name", "?"))
-        if name not in completed:
-            continue
-        commit_sha = _phase_commit_sha(wd, name, goal)
-        valid, evidence = _checkpoint_approval_valid(wd, spec.name, name, commit_sha)
-        if not valid:
-            return (name, evidence)
-    return None
+    _, unsatisfied = _checkpoint_contract_decisions(wd, spec, phases, completed, goal)
+    return unsatisfied
 
 
 def run_workflow(
@@ -2422,7 +2561,36 @@ def run_workflow(
     # to proceed). The revamp3 violation — p3-p6 ran past an unsigned approval template — is
     # refused here up front, deterministically.
     if resume:
-        unsatisfied = _first_unsatisfied_checkpoint(wd, spec, phases, completed, goal)
+        # I10 — typed checkpoint capture, the resume-decided path. Every completed checkpoint
+        # phase whose contract this run re-reads mints an ``approval_required`` record with
+        # decision ``approved``/``rejected`` + the contract evidence, BEFORE the gate acts on
+        # the first refusal — so the resume machinery (and the spec index / checkpoint/v1
+        # reducer) sees the full decision trace even when the run stops again. The reached_at
+        # + cost/token summary ride over from the previous run's typed record (best-effort)
+        # so the operator-await latency survives the ledger boundary.
+        decisions, unsatisfied = _checkpoint_contract_decisions(wd, spec, phases, completed, goal)
+        for cphase, valid, evidence in decisions:
+            prev = _previous_checkpoint_state(spec, cphase)
+            now = _now()
+            record = CheckpointRecord(
+                phase=cphase,
+                phase_index=_phase_index(phases, cphase),
+                reason=CHECKPOINT_REASON_APPROVAL_REQUIRED,
+                approval_path=str(_checkpoint_approval_path(wd, spec.name, cphase)),
+                decision=CHECKPOINT_DECISION_APPROVED if valid else CHECKPOINT_DECISION_REJECTED,
+                reached_at=str((prev or {}).get("reached_at") or now),
+                decided_at=now,
+                cost_usd=float((prev or {}).get("cost_usd") or 0.0),
+                tokens=dict((prev or {}).get("tokens") or {}),
+                commit_hash=_phase_commit_sha(wd, cphase, goal),
+                approval_evidence=evidence,
+            )
+            result.checkpoints.append(record)
+            if publisher is not None and publisher.enabled:
+                publisher.publish_event({
+                    "type": "checkpoint", "sessionID": cell_id,
+                    "part": record.to_dict(),
+                })
         if unsatisfied is not None:
             phase_name, evidence = unsatisfied
             result.awaiting = True
@@ -2761,6 +2929,32 @@ def run_workflow(
             result.awaiting = True
             result.awaiting_phase = name
             result.awaiting_reason = "checkpoint"
+            # I10 — typed checkpoint capture, the mechanical stop. Record the designed stop
+            # BEFORE the run exits so the resume machinery (and the spec index / checkpoint/v1
+            # reducer) can read the last checkpoint state as a typed, queryable event: the
+            # phase + index, the approval contract path, decision ``awaiting``, the reached/
+            # decided timestamps (identical here — the run exits the instant it stops), and
+            # the phase's token/cost summary at the stop point.
+            now = _now()
+            result.checkpoints.append(
+                CheckpointRecord(
+                    phase=name,
+                    phase_index=phase_idx + 1,
+                    reason=CHECKPOINT_REASON_REACHED,
+                    approval_path=str(_checkpoint_approval_path(wd, spec.name, name)),
+                    decision=CHECKPOINT_DECISION_AWAITING,
+                    reached_at=now,
+                    decided_at=now,
+                    cost_usd=pr.cost_usd,
+                    tokens=dict(pr.tokens),
+                    commit_hash=pr.commit_hash,
+                )
+            )
+            if publisher is not None and publisher.enabled:
+                publisher.publish_event({
+                    "type": "checkpoint", "sessionID": cell_id,
+                    "part": result.checkpoints[-1].to_dict(),
+                })
             break
 
     result.ended_at = _now()

@@ -2197,3 +2197,280 @@ def test_agent_phase_without_the_flag_tolerates_no_change(tmp_path):
 
     result = run_workflow(spec, goal="g", model="m", workdir=tmp_path, run_agentic_fn=agent)
     assert all(p.status == "ok" for p in result.phases)
+
+
+# ── I10 — typed checkpoint capture (the session-routing v2 prerequisite) ─────────
+#
+# Every checkpoint event must be a TYPED, LEDGERED record, not just a status string: the
+# mechanical stop (a ``checkpoint: true`` phase completing → awaiting_operator_approval) and
+# the resume-decided contract reads (approved/rejected) both append a CheckpointRecord to
+# ``WorkflowRunResult.checkpoints`` BEFORE the run exits, carrying phase + index, reason,
+# the approval contract path, the decision, reached/decided timestamps, and the stop-point
+# cost/token summary. The fixture mirrors test_checkpoint_mechanism.py's harness (the
+# checkpoint stop semantics live there); these tests pin the typed capture itself.
+
+CHECKPOINT_SPEC_YAML = """\
+name: checkpoint_test
+question: checkpoint fixture
+version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: false
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    phases:
+      - name: design
+        kind: agent
+        checkpoint: true
+        timeout: 120
+        prompt: |
+          {goal}
+      - name: implement
+        kind: agent
+        timeout: 120
+        prompt: |
+          {goal}
+factors:
+  - {name: model, levels: [deepseek/deepseek-v4-flash]}
+design: factorial
+rules: []
+metrics: []
+comparison: null
+"""
+
+
+def _checkpoint_spec(tmp_path):
+    spec_path = tmp_path / "spec.yaml"
+    spec_path.write_text(CHECKPOINT_SPEC_YAML)
+    return load_spec(spec_path)
+
+
+def _completed_checkpoint_wd(workdir):
+    """A worktree whose checkpoint phase (``design``) is already committed — the state a
+    resume sees after the first run stopped awaiting."""
+    Path(workdir).mkdir(parents=True)
+    _git_init(workdir)
+    _commit_file(workdir, "[workflow] design — g", 1)
+    return workdir
+
+
+def test_checkpoint_phase_records_a_typed_checkpoint_record(tmp_path, monkeypatch):
+    """(a) A ``checkpoint: true`` phase that completes successfully stops the run awaiting
+    AND appends a typed CheckpointRecord to the run ledger BEFORE the run exits: phase +
+    1-based index, reason ``checkpoint_reached``, the approval contract path, decision
+    ``awaiting``, reached/decided timestamps, and the phase's cost/token summary at the
+    stop point. The record rides the ledger JSON (additive ``checkpoints`` key) and the
+    telemetry event log."""
+    published = []
+
+    class FakePublisher:
+        def __init__(self, cell_id):
+            self.cell_id = cell_id
+            self.enabled = True
+
+        def set_status(self, status):
+            pass
+
+        def set_phase(self, phase):
+            pass
+
+        def publish_event(self, event):
+            published.append(event)
+
+    monkeypatch.delenv("FINOPS_CELL_ID", raising=False)
+
+    spec = _checkpoint_spec(tmp_path)
+    _git_init(tmp_path)
+
+    def agent(prompt, *, model, backend, workdir, **kwargs):
+        (Path(workdir) / "docs").mkdir(exist_ok=True)
+        (Path(workdir) / "docs" / "design.md").write_text("delta preview")
+        return _fake_agent()
+
+    result = run_workflow(spec, goal="g", model="m", workdir=tmp_path,
+                          run_agentic_fn=agent, publisher_factory=FakePublisher)
+    assert result.awaiting is True
+    assert result.awaiting_phase == "design"
+    assert result.awaiting_reason == "checkpoint"
+    assert len(result.phases) == 1  # implement did NOT run
+    p = result.phases[0]
+    assert p.status == "awaiting"
+    assert p.commit_hash
+
+    # the typed record — one, for the design phase, at its designed stop
+    assert len(result.checkpoints) == 1
+    rec = result.checkpoints[0]
+    assert isinstance(rec, workflow_runner.CheckpointRecord)
+    assert rec.phase == "design"
+    assert rec.phase_index == 1
+    assert rec.reason == workflow_runner.CHECKPOINT_REASON_REACHED
+    assert rec.approval_path.endswith("approvals/checkpoint_test/design_approval.md")
+    assert rec.decision == workflow_runner.CHECKPOINT_DECISION_AWAITING
+    assert rec.commit_hash == p.commit_hash
+    # timestamps present and parseable
+    from datetime import datetime
+
+    assert datetime.fromisoformat(rec.reached_at.replace("Z", "+00:00"))
+    assert datetime.fromisoformat(rec.decided_at.replace("Z", "+00:00"))
+    # the phase's token/cost summary at the stop point
+    assert rec.cost_usd == p.cost_usd == 0.001
+    assert rec.tokens["total"] == p.tokens["total"] == 35
+
+    # the record rides the ledger JSON (additive key) — round-trips byte-for-byte
+    payload = result.to_dict()
+    assert payload["awaiting"] is True
+    assert len(payload["checkpoints"]) == 1
+    cp = payload["checkpoints"][0]
+    assert cp["phase"] == "design" and cp["phase_index"] == 1
+    assert cp["reason"] == "checkpoint_reached"
+    assert cp["decision"] == "awaiting"
+    assert cp["approval_path"] == rec.approval_path
+    assert cp["reached_at"] == rec.reached_at and cp["decided_at"] == rec.decided_at
+    assert cp["cost_usd"] == 0.001 and cp["tokens"]["total"] == 35
+    assert cp["commit_hash"] == p.commit_hash
+
+    # the telemetry event log carries the same typed payload
+    checkpoint_events = [e for e in published if e.get("type") == "checkpoint"]
+    assert len(checkpoint_events) == 1
+    assert checkpoint_events[0]["part"] == cp
+
+
+def test_resume_refusal_records_rejected_checkpoint_decision(tmp_path, monkeypatch):
+    """(b) A resume that refuses past an unsatisfied checkpoint (no approval artifact)
+    appends an ``approval_required``/``rejected`` record with the contract-read evidence —
+    the resume machinery can read the last checkpoint state even when the run stops again."""
+    monkeypatch.delenv("FINOPS_CELL_ID", raising=False)
+    spec = _checkpoint_spec(tmp_path)
+    wd = _completed_checkpoint_wd(tmp_path / "wd")
+    calls = []
+
+    def agent(prompt, *, model, backend, workdir, **kwargs):
+        calls.append(1)
+        return _fake_agent()
+
+    result = run_workflow(spec, goal="g", model="m", workdir=wd,
+                          run_agentic_fn=agent, resume=True)
+    assert calls == []  # nothing ran
+    assert result.awaiting is True
+    assert result.awaiting_reason == "approval_refused"
+    assert result.phases == []
+
+    assert len(result.checkpoints) == 1
+    rec = result.checkpoints[0]
+    assert rec.phase == "design"
+    assert rec.reason == workflow_runner.CHECKPOINT_REASON_APPROVAL_REQUIRED
+    assert rec.decision == workflow_runner.CHECKPOINT_DECISION_REJECTED
+    assert rec.approval_path.endswith("approvals/checkpoint_test/design_approval.md")
+    assert rec.commit_hash  # the checkpoint phase's own commit resolved from git
+    from datetime import datetime
+
+    assert datetime.fromisoformat(rec.reached_at.replace("Z", "+00:00"))
+    assert datetime.fromisoformat(rec.decided_at.replace("Z", "+00:00"))
+    # the contract-read evidence names the refusal reason
+    assert rec.approval_evidence is not None
+    assert rec.approval_evidence["valid"] is False
+    assert "no_artifact" in rec.approval_evidence["failed_checks"]
+
+
+def test_resume_with_approval_records_approved_checkpoint_decision(tmp_path, monkeypatch):
+    """(c) A resume that PROCEEDS past a validly-approved checkpoint (signed artifact
+    committed after the checkpoint commit) appends an ``approved`` record carrying the
+    contract evidence — the run keeps going, and the ledger shows why it could."""
+    monkeypatch.delenv("FINOPS_CELL_ID", raising=False)
+    spec = _checkpoint_spec(tmp_path)
+    wd = _completed_checkpoint_wd(tmp_path / "wd")
+    ap = wd / "approvals" / spec.name
+    ap.mkdir(parents=True)
+    (ap / "design_approval.md").write_text(
+        "# Operator approval\n\n- operator: jane@example.com\n- date: 2026-08-27\n"
+    )
+    _commit_file(wd, "operator approval (descendant of the checkpoint)", 2)
+
+    def agent(prompt, *, model, backend, workdir, **kwargs):
+        (Path(workdir) / "docs").mkdir(exist_ok=True)
+        (Path(workdir) / "docs" / "impl.md").write_text("implemented")
+        return _fake_agent()
+
+    result = run_workflow(spec, goal="g", model="m", workdir=wd,
+                          run_agentic_fn=agent, resume=True)
+    assert result.awaiting is False
+    assert [p.phase for p in result.phases] == ["implement"]
+    assert result.ok is True
+
+    assert len(result.checkpoints) == 1
+    rec = result.checkpoints[0]
+    assert rec.phase == "design"
+    assert rec.reason == workflow_runner.CHECKPOINT_REASON_APPROVAL_REQUIRED
+    assert rec.decision == workflow_runner.CHECKPOINT_DECISION_APPROVED
+    assert rec.approval_evidence is not None
+    assert rec.approval_evidence["valid"] is True
+    assert rec.approval_evidence["operator"] == "jane@example.com"
+    assert rec.approval_evidence["date"] == "2026-08-27"
+
+
+def test_checkpoint_ledger_round_trips_spec_status_style(tmp_path):
+    """The ledger round-trip: a spec_status-style loader reads the NEW ``checkpoints`` key
+    without breaking OLD ledgers (the 2d/2c era — no such key), and the
+    retro_session_routing-style phase consumption is unaffected. A run with no checkpoint
+    events emits an empty array, never a missing/renamed key."""
+    spec_dir = tmp_path / "cap_site_revamp3"
+    spec_dir.mkdir()
+
+    # legacy 2d/2c-era ledger — no checkpoints key at all
+    legacy = {
+        "spec_name": "cap_site_revamp3",
+        "model": "m",
+        "ok": False,
+        "awaiting": True,
+        "total_cost_usd": 0.012,
+        "started_at": "2026-08-19T14:25:30.123456+00:00",
+        "ended_at": "2026-08-19T14:26:30.123456+00:00",
+        "phases": [
+            {"phase": "design", "status": "awaiting", "cost_usd": 0.012,
+             "tokens": {"in": 1, "out": 2}},
+        ],
+    }
+    (spec_dir / "legacy.json").write_text(json.dumps(legacy))
+
+    # new I10 ledger — checkpoints present (one typed record)
+    new = dict(legacy)
+    new["ended_at"] = "2026-08-19T14:27:30.123456+00:00"
+    new["checkpoints"] = [{
+        "phase": "design", "phase_index": 1, "reason": "checkpoint_reached",
+        "approval_path": str(spec_dir / "approvals" / "cap_site_revamp3" / "design_approval.md"),
+        "decision": "awaiting", "reached_at": "2026-08-19T14:26:30.123456+00:00",
+        "decided_at": "2026-08-19T14:26:30.123456+00:00", "cost_usd": 0.012,
+        "tokens": {"in": 1, "out": 2}, "commit_hash": "abc123", "approval_evidence": None,
+    }]
+    (spec_dir / "new.json").write_text(json.dumps(new))
+
+    # spec_status-style loader: both ledgers project; the new key never changes the projection
+    runs = spec_status.load_runs("cap_site_revamp3", results_dir=tmp_path, root=tmp_path)
+    assert len(runs) == 2
+    assert runs[-1].awaiting is True  # the latest (new) run still reads the awaiting flag
+    assert runs[-1].ok is False
+    assert runs[0].path.endswith("legacy.json")
+    assert runs[1].path.endswith("new.json")
+
+    # retro_session_routing-style consumption (the phases list) unaffected by the new key
+    payload = json.loads((spec_dir / "legacy.json").read_text())
+    assert "checkpoints" not in payload
+    assert [p["phase"] for p in payload.get("phases", [])] == ["design"]
+    payload = json.loads((spec_dir / "new.json").read_text())
+    cp = payload["checkpoints"][0]
+    assert cp["phase"] == "design" and cp["reason"] == "checkpoint_reached"
+    assert cp["decision"] == "awaiting" and cp["cost_usd"] == 0.012
+    assert [p["phase"] for p in payload.get("phases", [])] == ["design"]
+
+    # a run with no checkpoint events emits an empty array — additive, never a missing key
+    plain_yaml = CHECKPOINT_SPEC_YAML.replace("        checkpoint: true\n", "")
+    plain_path = tmp_path / "plain.yaml"
+    plain_path.write_text(plain_yaml)
+    plain = run_workflow(load_spec(plain_path), goal="g", model="m", workdir=tmp_path,
+                         commit=False, run_agentic_fn=lambda *a, **k: _fake_agent())
+    assert plain.checkpoints == []
+    assert plain.to_dict()["checkpoints"] == []

@@ -153,6 +153,14 @@ LEDGER_FIELDS: frozenset[str] = frozenset(
         "actual_cost",
         "deadline_slack",
         "status",
+        # I10 — the workflow-run ledger's typed checkpoint array (one CheckpointRecord per
+        # checkpoint event: mechanical stop + resume-decided contract reads, with reason,
+        # decision, approval_path, reached_at/decided_at, and the stop-point cost/token
+        # summary). Additive: the run ledger emits it since I10; a rule may require it once a
+        # measurement rule turns the records into derived signals (e.g. operator-await
+        # latency for session-routing v2). Old ledgers lack the key — consumers read it via
+        # ``.get("checkpoints", [])``.
+        "checkpoints",
         # factor levels
         "model",
         "condition",
