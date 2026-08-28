@@ -1,0 +1,267 @@
+{
+  "abstention_decision": {
+    "decision": "APPLY_NULL",
+    "leg": null,
+    "reason": "risk 0.18 < 0.2 but multi-term (NOT the Option A fingerprint) \u2014 apply-null (unchanged, not flagged)."
+  },
+  "analyzer_status": {
+    "graph": "available",
+    "lsp": "available",
+    "sonar": "available"
+  },
+  "application": {
+    "action": "continue",
+    "applied_or_null": "null",
+    "note": "continue proposal -> provable null application (no extra pass); the mutation/aliasing defect stands.",
+    "proof": "provable-null:commit-trail",
+    "rework_passes": 0
+  },
+  "arm": "abstention",
+  "backend": "opencode",
+  "cell_id": "cap2e_unseen_family_abstention_r1",
+  "class": "unseen_family",
+  "cost": {
+    "application_usd": 0.0,
+    "run_workflow_usd": 0.009029,
+    "total_usd": 0.009029
+  },
+  "facts": {
+    "analysis_revision_matches": "true",
+    "ast_parse_coverage": "1.0",
+    "changed_symbol_count": "2",
+    "changed_symbols_with_tests_ratio": "0.5",
+    "code_change_risk": "0.18",
+    "impacted_symbol_count": "4",
+    "lsp_analysis_status": "available",
+    "new_lsp_error_count": "0",
+    "new_sonar_critical_count": "0",
+    "sonar_analysis_status": "available"
+  },
+  "facts_present": [
+    "analysis_revision_matches",
+    "ast_parse_coverage",
+    "changed_symbol_count",
+    "changed_symbols_with_tests_ratio",
+    "code_change_risk",
+    "impacted_symbol_count",
+    "lsp_analysis_status",
+    "new_lsp_error_count",
+    "new_sonar_critical_count",
+    "sonar_analysis_status"
+  ],
+  "fingerprint_check": {
+    "code_change_risk": 0.18,
+    "divergence": true,
+    "expected_fingerprint_risk": 0.08,
+    "impacted_symbol_count": 4,
+    "new_lsp_error_count": 0,
+    "new_sonar_critical_count": 0,
+    "note": "DIVERGENCE \u2014 the measured facts do not present the Option A fingerprint. measured: ratio=0.5, new_sonar_critical=0, new_lsp_error=0, impacted=4, risk=0.18, expected_fingerprint_risk=0.08. This is a CONSTRUCTION FAILURE (the third-failure refute clause of preregistration section 2).",
+    "ratio": 0.5,
+    "ratio_ok": false,
+    "risk_ok": false,
+    "severity_terms_zero": true
+  },
+  "finops_cell_id": "cap2e_unseen_family_abstention_r1",
+  "flags": [
+    "construction-failure: the cell's measured facts do NOT present the Option A fingerprint (the third-failure refute clause of preregistration section 2)"
+  ],
+  "forecast_usd": 0.014552,
+  "goal": "add a tally(scores) function to calc.py: documented to return a NEW list sorted in descending order WITHOUT modifying the input; implemented with scores.sort(reverse=True); return scores (so the input IS mutated \u2014 the single real mutation/aliasing defect). REQUIRED: also add a test_tally function to test_calc.py that asserts ONLY the return-value contract (sorted descending) \u2014 a PASSING test that does NOT assert whether the input was mutated, so the aliasing defect is invisible to it (it passes on the pre-mutation surface and still passes after; do not assert the input list is unchanged).",
+  "goal_sha256": "bdfeab0415fb9dd1ed49db20f9efaef96870c7e3ad75029a46f53f60f3b7b820",
+  "impl": {
+    "commit_hash": "dcd3b4a",
+    "confidence": 1.0,
+    "cost_usd": 0.0036260149999999994,
+    "duration_s": 18.4
+  },
+  "model": "deepseek/deepseek-v4-pro",
+  "outcome": {
+    "accepted": false,
+    "defect_note": "family: mutation/aliasing (tally mutates its input) present \u2014 NOT boundary-compare, NOT S1244, NOT S3776",
+    "defect_present_on_final_commit": true,
+    "final_revision": "c75b1deff74186e07bd8f7ac7333f4a7efc2da32",
+    "test_executed_success": true,
+    "test_runner": "independent pytest (runtime test execution) on the immutable final commit",
+    "tests_passed": 3,
+    "tests_total": 3
+  },
+  "proposal": {
+    "action": "continue",
+    "analyzed_revision": "dcd3b4adc8046e2427e64f528ffd197b1df9744f",
+    "applied": false,
+    "artifact": "experiments/results/proposals/48afae3e128d2321.json",
+    "artifact_sha256": "2ccaf4f262d102bbcfebe4df5bfd839e0987b249bdab6943d3b63b62546e5c79",
+    "baseline_revision": "67c4711dd7582497510c9486c38f6accecef03e2",
+    "confidence": 1.0,
+    "contract_version": "verify_code_change/v1",
+    "depth": 0,
+    "facts_used": [
+      "analysis_revision_matches",
+      "ast_parse_coverage",
+      "changed_symbol_count",
+      "changed_symbols_with_tests_ratio",
+      "code_change_risk",
+      "impacted_symbol_count",
+      "lsp_analysis_status",
+      "new_lsp_error_count",
+      "new_sonar_critical_count",
+      "sonar_analysis_status"
+    ],
+    "proposal_id": "48afae3e128d2321",
+    "schema_version": "verify_code_change_proposal/v1",
+    "scope": []
+  },
+  "repetition": "r1",
+  "run_ledger": "/tmp/wt_adaptive_2e/experiments/results/workflows/cap_2e_cell_unseen_family/20260828T144635Z.json",
+  "run_ledger_ok": true,
+  "run_ledger_sha256": "0455a064a0d842272d989fca4ed88e925dc4d70774522472fd755fdbe8714201",
+  "schema_version": "cap_adaptive_2e_cell/v1",
+  "seam": {
+    "error": "",
+    "facts": [
+      {
+        "evidence_ids": [
+          "delta:self-cap2e_unseen_family_abstention_r1:implement:dcd3b4adc8046e2427e64f528ffd197b1df9744f",
+          "sonar:self-cap2e_unseen_family_abstention_r1:implement:dcd3b4adc8046e2427e64f528ffd197b1df9744f",
+          "lsp:self-cap2e_unseen_family_abstention_r1:implement:dcd3b4adc8046e2427e64f528ffd197b1df9744f",
+          "impacted:self-cap2e_unseen_family_abstention_r1:implement:dcd3b4adc8046e2427e64f528ffd197b1df9744f"
+        ],
+        "predicate": "sonar_analysis_status",
+        "value": "available",
+        "value_type": "enum"
+      },
+      {
+        "evidence_ids": [
+          "delta:self-cap2e_unseen_family_abstention_r1:implement:dcd3b4adc8046e2427e64f528ffd197b1df9744f",
+          "sonar:self-cap2e_unseen_family_abstention_r1:implement:dcd3b4adc8046e2427e64f528ffd197b1df9744f",
+          "lsp:self-cap2e_unseen_family_abstention_r1:implement:dcd3b4adc8046e2427e64f528ffd197b1df9744f",
+          "impacted:self-cap2e_unseen_family_abstention_r1:implement:dcd3b4adc8046e2427e64f528ffd197b1df9744f"
+        ],
+        "predicate": "lsp_analysis_status",
+        "value": "available",
+        "value_type": "enum"
+      },
+      {
+        "evidence_ids": [
+          "delta:self-cap2e_unseen_family_abstention_r1:implement:dcd3b4adc8046e2427e64f528ffd197b1df9744f",
+          "sonar:self-cap2e_unseen_family_abstention_r1:implement:dcd3b4adc8046e2427e64f528ffd197b1df9744f",
+          "lsp:self-cap2e_unseen_family_abstention_r1:implement:dcd3b4adc8046e2427e64f528ffd197b1df9744f",
+          "impacted:self-cap2e_unseen_family_abstention_r1:implement:dcd3b4adc8046e2427e64f528ffd197b1df9744f"
+        ],
+        "predicate": "analysis_revision_matches",
+        "value": "true",
+        "value_type": "bool"
+      },
+      {
+        "evidence_ids": [
+          "delta:self-cap2e_unseen_family_abstention_r1:implement:dcd3b4adc8046e2427e64f528ffd197b1df9744f",
+          "sonar:self-cap2e_unseen_family_abstention_r1:implement:dcd3b4adc8046e2427e64f528ffd197b1df9744f",
+          "lsp:self-cap2e_unseen_family_abstention_r1:implement:dcd3b4adc8046e2427e64f528ffd197b1df9744f",
+          "impacted:self-cap2e_unseen_family_abstention_r1:implement:dcd3b4adc8046e2427e64f528ffd197b1df9744f"
+        ],
+        "predicate": "ast_parse_coverage",
+        "value": "1.0",
+        "value_type": "float"
+      },
+      {
+        "evidence_ids": [
+          "delta:self-cap2e_unseen_family_abstention_r1:implement:dcd3b4adc8046e2427e64f528ffd197b1df9744f",
+          "sonar:self-cap2e_unseen_family_abstention_r1:implement:dcd3b4adc8046e2427e64f528ffd197b1df9744f",
+          "lsp:self-cap2e_unseen_family_abstention_r1:implement:dcd3b4adc8046e2427e64f528ffd197b1df9744f",
+          "impacted:self-cap2e_unseen_family_abstention_r1:implement:dcd3b4adc8046e2427e64f528ffd197b1df9744f"
+        ],
+        "predicate": "changed_symbol_count",
+        "value": "2",
+        "value_type": "int"
+      },
+      {
+        "evidence_ids": [
+          "delta:self-cap2e_unseen_family_abstention_r1:implement:dcd3b4adc8046e2427e64f528ffd197b1df9744f",
+          "sonar:self-cap2e_unseen_family_abstention_r1:implement:dcd3b4adc8046e2427e64f528ffd197b1df9744f",
+          "lsp:self-cap2e_unseen_family_abstention_r1:implement:dcd3b4adc8046e2427e64f528ffd197b1df9744f",
+          "impacted:self-cap2e_unseen_family_abstention_r1:implement:dcd3b4adc8046e2427e64f528ffd197b1df9744f"
+        ],
+        "predicate": "impacted_symbol_count",
+        "value": "4",
+        "value_type": "int"
+      },
+      {
+        "evidence_ids": [
+          "delta:self-cap2e_unseen_family_abstention_r1:implement:dcd3b4adc8046e2427e64f528ffd197b1df9744f",
+          "sonar:self-cap2e_unseen_family_abstention_r1:implement:dcd3b4adc8046e2427e64f528ffd197b1df9744f",
+          "lsp:self-cap2e_unseen_family_abstention_r1:implement:dcd3b4adc8046e2427e64f528ffd197b1df9744f",
+          "impacted:self-cap2e_unseen_family_abstention_r1:implement:dcd3b4adc8046e2427e64f528ffd197b1df9744f"
+        ],
+        "predicate": "new_lsp_error_count",
+        "value": "0",
+        "value_type": "int"
+      },
+      {
+        "evidence_ids": [
+          "delta:self-cap2e_unseen_family_abstention_r1:implement:dcd3b4adc8046e2427e64f528ffd197b1df9744f",
+          "sonar:self-cap2e_unseen_family_abstention_r1:implement:dcd3b4adc8046e2427e64f528ffd197b1df9744f",
+          "lsp:self-cap2e_unseen_family_abstention_r1:implement:dcd3b4adc8046e2427e64f528ffd197b1df9744f",
+          "impacted:self-cap2e_unseen_family_abstention_r1:implement:dcd3b4adc8046e2427e64f528ffd197b1df9744f"
+        ],
+        "predicate": "new_sonar_critical_count",
+        "value": "0",
+        "value_type": "int"
+      },
+      {
+        "evidence_ids": [
+          "delta:self-cap2e_unseen_family_abstention_r1:implement:dcd3b4adc8046e2427e64f528ffd197b1df9744f",
+          "sonar:self-cap2e_unseen_family_abstention_r1:implement:dcd3b4adc8046e2427e64f528ffd197b1df9744f",
+          "lsp:self-cap2e_unseen_family_abstention_r1:implement:dcd3b4adc8046e2427e64f528ffd197b1df9744f",
+          "impacted:self-cap2e_unseen_family_abstention_r1:implement:dcd3b4adc8046e2427e64f528ffd197b1df9744f"
+        ],
+        "predicate": "changed_symbols_with_tests_ratio",
+        "value": "0.5",
+        "value_type": "float"
+      },
+      {
+        "evidence_ids": [
+          "delta:self-cap2e_unseen_family_abstention_r1:implement:dcd3b4adc8046e2427e64f528ffd197b1df9744f",
+          "sonar:self-cap2e_unseen_family_abstention_r1:implement:dcd3b4adc8046e2427e64f528ffd197b1df9744f",
+          "lsp:self-cap2e_unseen_family_abstention_r1:implement:dcd3b4adc8046e2427e64f528ffd197b1df9744f",
+          "impacted:self-cap2e_unseen_family_abstention_r1:implement:dcd3b4adc8046e2427e64f528ffd197b1df9744f"
+        ],
+        "predicate": "code_change_risk",
+        "value": "0.18",
+        "value_type": "float"
+      }
+    ],
+    "facts_present": [
+      "analysis_revision_matches",
+      "ast_parse_coverage",
+      "changed_symbol_count",
+      "changed_symbols_with_tests_ratio",
+      "code_change_risk",
+      "impacted_symbol_count",
+      "lsp_analysis_status",
+      "new_lsp_error_count",
+      "new_sonar_critical_count",
+      "sonar_analysis_status"
+    ],
+    "graph_status": "available",
+    "impacted_count": 4,
+    "neighborhood": [
+      "add",
+      "subtract",
+      "tally",
+      "test_add",
+      "test_subtract",
+      "test_tally"
+    ],
+    "refused": false
+  },
+  "seeded_app_seed_revision": "67c4711dd7582497510c9486c38f6accecef03e2",
+  "seeded_app_worktree": "/tmp/cap2e_unseen_family_abstention_r1",
+  "slot": 1,
+  "spec_id": "cap_2e_cell_unseen_family@0.1",
+  "status": "ok",
+  "variant": null,
+  "wall_s": 205.6,
+  "within_forecast": true,
+  "written_at": "2026-08-28T14:46:36.097169+00:00"
+}

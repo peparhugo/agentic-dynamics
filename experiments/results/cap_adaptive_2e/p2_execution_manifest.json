@@ -1,0 +1,68 @@
+{
+  "campaign": "cap_adaptive_2e",
+  "cells": [
+    {
+      "arm": "abstention",
+      "cell_id": "cap2e_unseen_family_abstention_r1",
+      "class": "unseen_family",
+      "rep": "r1",
+      "slot": 1,
+      "variant": null
+    },
+    {
+      "arm": "abstention",
+      "cell_id": "cap2e_unseen_family_abstention_r2",
+      "class": "unseen_family",
+      "rep": "r2",
+      "slot": 2,
+      "variant": null
+    },
+    {
+      "arm": "status_quo",
+      "cell_id": "cap2e_unseen_family_status_quo_r1",
+      "class": "unseen_family",
+      "rep": "r1",
+      "slot": 3,
+      "variant": null
+    },
+    {
+      "arm": "status_quo",
+      "cell_id": "cap2e_unseen_family_status_quo_r2",
+      "class": "unseen_family",
+      "rep": "r2",
+      "slot": 4,
+      "variant": null
+    },
+    {
+      "arm": "abstention",
+      "cell_id": "cap2e_absent-defective_abstention_r1",
+      "class": "absent",
+      "done_p1": true,
+      "rep": "r1",
+      "slot": 1,
+      "variant": "defective"
+    },
+    {
+      "arm": "status_quo",
+      "cell_id": "cap2e_absent-defective_status_quo_r1",
+      "class": "absent",
+      "rep": "r1",
+      "slot": 2,
+      "variant": "defective"
+    }
+  ],
+  "phase": "p2_run_grid",
+  "preregistration": "docs/designs/current/cap_adaptive_2e_preregistration.md",
+  "preregistration_revision": "d1a0ad777",
+  "schema_version": "cap_adaptive_2e_p2_manifest/v1",
+  "seed_committed_hash": "0f3e7c1b9a4d5e8f6c2a1b9d4e7f8a1c3b5d7e9f2a4c6b8d0e1f3a5c7b9d2e4f6",
+  "seed_measured_sha256": "d8f9bb19a2f9c67003946c89037558a3e8cf6cdcf50c97b20fe80072ccf824af",
+  "seed_mismatch": true,
+  "seed_string": "cap_2e|reconstruct-unseen-family|fingerprint|20260828",
+  "totals": {
+    "abstention": 3,
+    "cells": 6,
+    "status_quo": 3
+  },
+  "written_at": "2026-08-28T14:43:10.449350+00:00"
+}
