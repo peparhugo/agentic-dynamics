@@ -1,7 +1,7 @@
 {
   "schema_version": "spec-status/v2",
-  "generated_at": "2026-08-27T22:52:11.148258+00:00",
-  "n_specs": 137,
+  "generated_at": "2026-08-28T00:56:00.426981+00:00",
+  "n_specs": 138,
   "specs": [
     {
       "name": "auto_posthoc_wiring",
@@ -560,6 +560,24 @@
       "latest_git_sha": "2f3cbbbbc",
       "results_pointer": "experiments/results/workflows/agentic_dynamics_rebrand/20260814T220247Z.json",
       "n_runs": 2
+    },
+    {
+      "name": "cap_adaptive_2d",
+      "version": "0.1",
+      "status": "failed",
+      "spec_path": "workflows/repository/cap_adaptive_2d.yaml",
+      "artifact_kind": "workflow",
+      "repeatable": false,
+      "supersedes": [],
+      "superseded_by": null,
+      "completed_at": null,
+      "last_run_at": "2026-08-28T00:56:00.413235+00:00",
+      "latest_ok": false,
+      "latest_model": "deepseek/deepseek-v4-flash",
+      "latest_cost_usd": 0.0,
+      "latest_git_sha": "9f12ab9ad",
+      "results_pointer": "experiments/results/workflows/cap_adaptive_2d/20260828T005600Z.json",
+      "n_runs": 1
     },
     {
       "name": "cap_site_revamp4_diagrams",
