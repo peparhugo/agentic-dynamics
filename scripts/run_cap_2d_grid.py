@@ -547,9 +547,18 @@ def _defect_determination(cell: dict, workdir: Path) -> tuple[bool, str]:
         return p.returncode == 0
 
     if cls in ("correct", "competing", "harmful_partial"):
-        ok10 = run_check("from calc import classify; assert classify(10.0) == 'ten_to_twenty', classify(10.0)")
+        # Label-agnostic boundary check (the 2d constructions' band labels are model-chosen,
+        # never hardcoded): the defect is a `>`-for-`>=` at the lower edge, so the boundary value
+        # must fall in the SAME band as a value just inside [lo, hi) and a DIFFERENT band than a
+        # value just below lo. The 2c harness hardcoded 'ten_to_twenty'; 2d must not.
+        def _band_ok(lo: float) -> bool:
+            inside = run_check(f"from calc import classify; assert classify({lo}) == classify({lo + 5.0}), classify({lo})")
+            below = run_check(f"from calc import classify; assert classify({lo}) != classify({lo - 0.1}), classify({lo})")
+            return inside and below
+
+        ok10 = _band_ok(10.0)
         if cls == "competing":
-            ok20 = run_check("from calc import classify; assert classify(20.0) == 'twenty_to_thirty', classify(20.0)")
+            ok20 = _band_ok(20.0)
             present = not (ok10 and ok20)
             which = []
             if not ok10:
@@ -558,7 +567,7 @@ def _defect_determination(cell: dict, workdir: Path) -> tuple[bool, str]:
                 which.append("[20,30) inverted boundary")
             return present, f"family: boundary-compare x{len(which)} ({', '.join(which)}) present on the final commit" if present else "both boundary-compare defects absent"
         if cls == "harmful_partial":
-            ok80 = run_check("from calc import classify; assert classify(80.0) == 'eighty_to_ninety', classify(80.0)")
+            ok80 = _band_ok(80.0)
             present = not (ok10 and ok80)
             which = []
             if not ok10:
