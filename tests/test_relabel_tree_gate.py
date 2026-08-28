@@ -334,7 +334,7 @@ def test_genuine_resume_of_never_discarded_work_never_fires(tmp_path):
 
     def agent(prompt, *, model, backend, workdir, **kwargs):
         (Path(workdir) / "docs").mkdir(exist_ok=True)
-        (Path(workdir) / "docs" / "scope.md").write_text("genuine fresh work")
+        (Path(workdir) / "docs" / "scope.md").write_text("---\nstatus: accepted\n---\n\ngenuine fresh work")
         subprocess.run(["git", "add", "-A"], cwd=workdir, check=True)
         subprocess.run(
             ["git", "commit", "-q", "-m", "[workflow] scope — g"], cwd=workdir, check=True,

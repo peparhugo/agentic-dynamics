@@ -1446,6 +1446,74 @@ def _canonicalize_commit_range(
         return None
 
 
+#: The doc-lifecycle status vocabulary (the contract — must stay in lockstep with
+#: tests/test_doc_lifecycle.py's STATUS_VOCABULARY).
+DOC_STATUS_VOCABULARY = {
+    "proposed", "accepted", "implementing", "implemented", "superseded", "abandoned",
+}
+
+
+def _enforce_doc_contract(pr: PhaseResult, wd: Path, pre_head: str | None) -> None:
+    """Post-phase doc-contract enforcement (the 2e merge lesson, 2026-08-28).
+
+    Every ``docs/**/*.md`` file the phase committed or modified must carry a valid
+    ``status:`` frontmatter field (the doc-lifecycle vocabulary). A doc without one — or with
+    an unknown status — fails the phase with ``DOC_CONTRACT`` + the offending paths, even if
+    the phase otherwise succeeded. Agent phases only; strict, never canonicalized (the
+    contract layer is state, not render — the wrapper must fix the doc). Mirrors
+    ``tests/test_doc_lifecycle.py``'s check (lockstep: the vocabulary above).
+    Best-effort: an unreadable git state degrades to "no docs to check".
+    """
+    if pr.status != "ok":
+        return
+    try:
+        if pre_head:
+            r = subprocess.run(
+                ["git", "diff", "--name-only", f"{pre_head}..HEAD", "--", "docs/"],
+                cwd=wd, capture_output=True, text=True, timeout=30,
+            )
+        else:
+            r = subprocess.run(
+                ["git", "ls-files", "docs/"], cwd=wd, capture_output=True, text=True, timeout=30,
+            )
+        paths = [ln for ln in r.stdout.splitlines() if ln.strip().endswith(".md")]
+    except Exception:  # noqa: BLE001 — an unreadable git state degrades to "no check"
+        return
+    bad: list[str] = []
+    for rel in paths:
+        p = wd / rel
+        try:
+            text = p.read_text(encoding="utf-8")
+        except Exception:  # noqa: BLE001
+            continue
+        m = re.match(r"^---\s*\n(.*?)\n---", text, re.S)
+        status = None
+        if m:
+            fm = m.group(1)
+            sm = re.search(r"^status:\s*(\S+)", fm, re.M)
+            if sm:
+                status = sm.group(1)
+        if status not in DOC_STATUS_VOCABULARY:
+            bad.append(rel)
+    if not bad:
+        return
+    pr.commit_gate = {
+        "reason": "DOC_CONTRACT",
+        "docs": bad,
+        "expected": "status frontmatter in " + ", ".join(sorted(DOC_STATUS_VOCABULARY)),
+    }
+    msg = (
+        f"DOC_CONTRACT — {len(bad)} committed doc(s) lack a valid status frontmatter "
+        f"(one of {sorted(DOC_STATUS_VOCABULARY)}): {', '.join(bad)} — the doc-lifecycle "
+        f"contract (test_doc_lifecycle) would reject them at merge time"
+    )
+    if pr.status == "ok":
+        pr.status = "failed"
+        pr.error = msg
+    else:
+        pr.error = f"{pr.error}\n{msg}"
+
+
 def _enforce_commit_prefix(
     pr: PhaseResult, wd: Path, phase_name: str, goal: str, pre_head: str
 ) -> None:
@@ -2595,6 +2663,18 @@ def run_workflow(
         # — this catches MANUAL agent commits.
         if kind != "test":
             _enforce_commit_prefix(pr, wd, name, goal, pre_head)
+
+        # Doc-contract enforcement (the 2e merge lesson, 2026-08-28): an agent phase whose
+        # range COMMITS or MODIFIES docs/**/*.md must deliver every such doc with a valid
+        # status frontmatter (the doc-lifecycle contract vocabulary). The 2e p5 wrapper
+        # authored two review docs without frontmatter; the merge went out red and the
+        # controller patched after. A safety requirement in prose is advisory — this makes
+        # the contract enforceable at phase time: a doc without (or with an unknown) status
+        # field fails the phase with DOC_CONTRACT + the offending files, so a doc-writing
+        # phase can never deliver an invalid doc. Strict, never canonicalized (the contract
+        # layer is state, not render). The runner's own _git_commit never touches docs.
+        if kind != "test":
+            _enforce_doc_contract(pr, wd, pre_head)
 
         pr.duration_s = round(time.time() - t0, 2)
         if commit and pr.status == "ok":

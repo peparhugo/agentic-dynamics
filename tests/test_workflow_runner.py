@@ -432,7 +432,7 @@ def test_run_workflow_excludes_instrument_from_commit(tmp_path):
         (Path(workdir) / ".instrument").mkdir(exist_ok=True)
         (Path(workdir) / ".instrument" / "session.jsonl").write_text("transcript")
         (Path(workdir) / "docs").mkdir(exist_ok=True)
-        (Path(workdir) / "docs" / "scope.md").write_text("scope")
+        (Path(workdir) / "docs" / "scope.md").write_text("---\nstatus: accepted\n---\n\nscope")
         return _fake_agent()
 
     result = run_workflow(spec, goal="g", model="m", workdir=tmp_path, run_agentic_fn=agent)
@@ -1366,7 +1366,7 @@ def _git_init(tmp_path):
 def _commit_file(workdir, subject, n):
     """Write a distinct file, commit it with ``subject``, return the full commit sha."""
     (Path(workdir) / "docs").mkdir(exist_ok=True)
-    (Path(workdir) / "docs" / f"f{n}.md").write_text(f"{subject} {n}")
+    (Path(workdir) / "docs" / f"f{n}.md").write_text(f"---\nstatus: accepted\n---\n\n{subject} {n}")
     subprocess.run(["git", "add", "-A"], cwd=workdir, check=True)
     subprocess.run(["git", "commit", "-q", "-m", subject], cwd=workdir, check=True)
     return subprocess.run(
@@ -1385,7 +1385,7 @@ def test_commit_prefix_canonicalizes_a_plain_message_commit(tmp_path):
 
     def agent(prompt, *, model, backend, workdir, **kwargs):
         (Path(workdir) / "docs").mkdir(exist_ok=True)
-        (Path(workdir) / "docs" / "scope.md").write_text("scope")
+        (Path(workdir) / "docs" / "scope.md").write_text("---\nstatus: accepted\n---\n\nscope")
         subprocess.run(["git", "add", "-A"], cwd=workdir, check=True)
         subprocess.run(["git", "commit", "-q", "-m", "site: add things"], cwd=workdir, check=True)
         return _fake_agent()
@@ -1412,7 +1412,7 @@ def test_commit_prefix_gate_rewrites_a_plain_message_commit_with_hook_disabled(t
 
     def agent(prompt, *, model, backend, workdir, **kwargs):
         (Path(workdir) / "docs").mkdir(exist_ok=True)
-        (Path(workdir) / "docs" / "scope.md").write_text("scope")
+        (Path(workdir) / "docs" / "scope.md").write_text("---\nstatus: accepted\n---\n\nscope")
         subprocess.run(["git", "add", "-A"], cwd=workdir, check=True)
         subprocess.run(["git", "commit", "-q", "-m", "site: add things"], cwd=workdir, check=True)
         return _fake_agent()
@@ -1468,7 +1468,7 @@ def test_commit_prefix_strict_mode_fails_a_plain_message_commit(tmp_path, monkey
 
     def agent(prompt, *, model, backend, workdir, **kwargs):
         (Path(workdir) / "docs").mkdir(exist_ok=True)
-        (Path(workdir) / "docs" / "scope.md").write_text("scope")
+        (Path(workdir) / "docs" / "scope.md").write_text("---\nstatus: accepted\n---\n\nscope")
         subprocess.run(["git", "add", "-A"], cwd=workdir, check=True)
         subprocess.run(["git", "commit", "-q", "-m", "site: add things"], cwd=workdir, check=True)
         return _fake_agent()
@@ -1498,7 +1498,7 @@ def test_commit_prefix_passes_a_matching_commit(tmp_path):
         calls.append(n)
         if n == 0:  # only the scope phase commits — with the correct pattern
             (Path(workdir) / "docs").mkdir(exist_ok=True)
-            (Path(workdir) / "docs" / "scope.md").write_text("scope")
+            (Path(workdir) / "docs" / "scope.md").write_text("---\nstatus: accepted\n---\n\nscope")
             subprocess.run(["git", "add", "-A"], cwd=workdir, check=True)
             subprocess.run(["git", "commit", "-q", "-m", "[workflow] scope — g done"], cwd=workdir, check=True)
         return _fake_agent()
@@ -1519,7 +1519,7 @@ def test_commit_prefix_fires_even_when_the_phase_already_failed(tmp_path, monkey
 
     def agent(prompt, *, model, backend, workdir, **kwargs):
         (Path(workdir) / "docs").mkdir(exist_ok=True)
-        (Path(workdir) / "docs" / "scope.md").write_text("scope")
+        (Path(workdir) / "docs" / "scope.md").write_text("---\nstatus: accepted\n---\n\nscope")
         subprocess.run(["git", "add", "-A"], cwd=workdir, check=True)
         subprocess.run(["git", "commit", "-q", "-m", "site: add things"], cwd=workdir, check=True)
         return _fake_agent(ok=False, error="boom")
@@ -1817,6 +1817,72 @@ def test_commit_prefix_rewrites_a_single_bad_commit_not_at_head(tmp_path, monkey
 
 
 # ── Adversarial verification (cap_runner_hardening p5) ──────────
+
+
+def test_doc_contract_fails_a_phase_that_commits_a_doc_without_frontmatter(tmp_path):
+    """(The 2e merge lesson) An agent phase that commits a docs/ file without a valid
+    status frontmatter fails DOC_CONTRACT at phase time — the merge-time guard became a
+    runner gate (the 2e p5 authored review docs without frontmatter and the merge went out
+    red)."""
+    spec = load_spec(SPEC)
+    _git_init(tmp_path)
+
+    def agent(prompt, *, model, backend, workdir, **kwargs):
+        (Path(workdir) / "docs" / "reviews").mkdir(parents=True, exist_ok=True)
+        (Path(workdir) / "docs" / "reviews" / "x_adversary.md").write_text(
+            "# x — adversarial review\n\nNo frontmatter here.\n"
+        )
+        subprocess.run(["git", "add", "-A"], cwd=workdir, check=True)
+        subprocess.run(["git", "commit", "-q", "-m", "site: add things"], cwd=workdir, check=True)
+        return _fake_agent()
+
+    result = run_workflow(spec, goal="g", model="m", workdir=tmp_path, run_agentic_fn=agent)
+    p = result.phases[0]
+    assert p.status == "failed"
+    assert p.commit_gate is not None
+    assert p.commit_gate["reason"] == "DOC_CONTRACT"
+    assert any(path.endswith("x_adversary.md") for path in p.commit_gate["docs"])
+    assert "DOC_CONTRACT" in p.error
+
+
+def test_doc_contract_passes_a_doc_with_valid_status_frontmatter(tmp_path):
+    """A docs/ file carrying a valid status field passes; a non-docs commit passes."""
+    spec = load_spec(SPEC)
+    _git_init(tmp_path)
+
+    def agent(prompt, *, model, backend, workdir, **kwargs):
+        (Path(workdir) / "docs" / "reviews").mkdir(parents=True, exist_ok=True)
+        (Path(workdir) / "docs" / "reviews" / "x_adversary.md").write_text(
+            "---\nstatus: accepted\n---\n\n# x — adversarial review\n"
+        )
+        (Path(workdir) / "docs" / "scope.md").write_text("---\nstatus: accepted\n---\n\nscope")
+        subprocess.run(["git", "add", "-A"], cwd=workdir, check=True)
+        subprocess.run(["git", "commit", "-q", "-m", "[workflow] scope — g done"], cwd=workdir, check=True)
+        return _fake_agent()
+
+    result = run_workflow(spec, goal="g", model="m", workdir=tmp_path, run_agentic_fn=agent)
+    p = result.phases[0]
+    assert p.status == "ok"
+    assert p.commit_gate is None
+
+
+def test_doc_contract_ignores_unknown_status_values(tmp_path):
+    """An unknown status value is ALSO a violation (the contract vocabulary is closed)."""
+    spec = load_spec(SPEC)
+    _git_init(tmp_path)
+
+    def agent(prompt, *, model, backend, workdir, **kwargs):
+        (Path(workdir) / "docs").mkdir(parents=True, exist_ok=True)
+        (Path(workdir) / "docs" / "scope.md").write_text("---\nstatus: draft\n---\n\nscope")
+        subprocess.run(["git", "add", "-A"], cwd=workdir, check=True)
+        subprocess.run(["git", "commit", "-q", "-m", "[workflow] scope — g done"], cwd=workdir, check=True)
+        return _fake_agent()
+
+    result = run_workflow(spec, goal="g", model="m", workdir=tmp_path, run_agentic_fn=agent)
+    p = result.phases[0]
+    assert p.status == "failed"
+    assert p.commit_gate["reason"] == "DOC_CONTRACT"
+
 
 
 def test_commit_msg_hook_works_in_a_worktree_shape(tmp_path):

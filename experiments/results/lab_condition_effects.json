@@ -1,6 +1,6 @@
 {
   "experiment_id": "lab_condition_effects",
-  "generated_at": "2026-08-28T14:50:25.919421",
+  "generated_at": "2026-08-28T17:55:11.540180",
   "summary": {
     "conditions": 2,
     "stories": 215,
@@ -43,9 +43,9 @@
   "lab_contract": {
     "lab": "lab_condition_effects.py",
     "input_dataset_id": "canonical_registry/story+review",
-    "registry_identity_sha256": "6b49081ca09d6c1e3639a89edfc6324bb2d41d47010a29c1c41c43b08fabf5fc",
+    "registry_identity_sha256": "de2de65a2c250d14fd18589660ccf3736df2fba402bb9bdc69f7c6dd20317201",
     "resolved_input_sha256": "4e8601fda77af04c2cbc167ec8f8beca495165fcdffbd4f2cb0ce58323535be8",
-    "registry_version": "data-manifest/1.0+12829rows",
+    "registry_version": "data-manifest/1.0+12925rows",
     "metric_definition_version": "condition_effects/v2",
     "metric_source_sha256": "c7023d1bd40fa57e38cc738cca8a9a71780532be3f60898f74954fb6c80f7b32",
     "n_resolved_records": 457,
@@ -64,6 +64,6 @@
     "data_integrity_policy": "docs/data_integrity_findings.md",
     "requires_external_service": null,
     "contract_version": "lab-contract/v6",
-    "generated_at": "2026-08-28T12:50:25.920173+00:00"
+    "generated_at": "2026-08-28T15:55:11.540924+00:00"
   }
 }
