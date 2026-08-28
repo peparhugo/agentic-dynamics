@@ -403,7 +403,14 @@ def _refresh_index(spec_name: str) -> None:
     already written, so an index problem — an unreadable spec YAML, a read-only
     ``experiments/specs/``, anything — must degrade to a printed warning. It may never
     fail the run or change its exit status.
+
+    The literal env ``FINOPS_SKIP_SPEC_INDEX=1`` skips the refresh entirely — the
+    cap_adaptive_2d 4-wide grid sets it on the cell subprocesses so 4 concurrent
+    ``refresh_spec_status`` writers never race ``experiments/specs/index.json``; the
+    campaign's post-grid phase regenerates the index once (``spec_status.py``).
     """
+    if os.environ.get("FINOPS_SKIP_SPEC_INDEX") == "1":
+        return
     try:
         report = refresh_spec_status(spec_name, root=ROOT)
         print(f"spec index: {report.index_path} ({report.n_specs} specs)", file=sys.stderr)
