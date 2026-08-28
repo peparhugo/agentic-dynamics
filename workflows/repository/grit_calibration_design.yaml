@@ -1,0 +1,99 @@
+name: grit_calibration_design
+question: >-
+  Verification backfill — the grit/confidence calibration design (the handoff queue item:
+  full strength-response curves + independent outcome calibration + held-out policy
+  thresholds, engaging the 2d abstention null without conflating retry-threshold with
+  verify-gate). The design doc was authored at
+  docs/designs/proposed/cap_grit_confidence_calibration_design.md (status: proposed). This
+  workflow VERIFIES the delivered design (the doc exists, the five required parts are
+  present, every number cites its artifact), records the run's own ledger/cost so the
+  machine's board shows the work, and commits the design doc onto a review branch. The
+  operator reviews the design; the preregistration + campaign follow only after acceptance.
+version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: false
+repeatable: false
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: true
+    context:
+      domain_context: >-
+        PROVISIONAL DomainProfile. domain: research design / policy calibration.
+        canonical_sources: [docs/designs/proposed/cap_grit_confidence_calibration_design.md
+        (the deliverable), experiments/results/cap_grit_grid_ledger.json +
+        cap_grit_grid_metrics.json (the measured E4 state the design cites),
+        experiments/results/cap_adaptive_2c/cap_adaptive_2c_score_20260827T180241Z.json
+        (the abstention decile curve), the 2d verdict (the confidence-null)].
+        policies: [verify_not_redo, numbers_cite_artifacts, proposed_status]
+      challenge_context: >-
+        PROVISIONAL ChallengeProfile. challenge: verification (the design is authored —
+        verify it, never re-author). deliberation: [check the doc, check the citations,
+        record, commit]. session_policy: {default: fork_per_phase}
+      current_state: >-
+        docs/designs/proposed/cap_grit_confidence_calibration_design.md exists (373 lines,
+        status: proposed): the measured state (E4 G(s) curve, the 2c decile null, the
+        confidence definition), the two-decisions separation (retry-threshold vs
+        verify-gate), the calibration design (2 models x 7 strengths, held-out thresholds,
+        cpvo_harm decision rule, seed/table deferred to the preregistration), the
+        relationship to the running campaigns (2e owns the deepseek envelope), and the
+        falsifiability contract. Every number cites its artifact + field.
+      hard_rules: >-
+        (1) Commit '[workflow] <phase>' (the hook enforces it). (2) VERIFY, NEVER REDO: the
+        design is authored — this phase checks it and records; re-authoring is a deviation.
+        (3) The five required parts must be present (measured state / two-decisions
+        separation / calibration design / campaign relationship / falsifiability contract)
+        with artifact-cited numbers. (4) The doc keeps status: proposed (frontmatter is the
+        contract — the operator accepts it, never the phase). (5) No edits beyond the doc's
+        frontmatter if it lacks the status field. (6) Every recorded number cites its source.
+      read_first: >-
+        docs/designs/proposed/cap_grit_confidence_calibration_design.md,
+        experiments/results/cap_grit_grid_metrics.json,
+        experiments/results/cap_adaptive_2c/cap_adaptive_2c_score_20260827T180241Z.json
+      run_shape: >-
+        SINGLE wrapper: deepseek/deepseek-v4-flash. One verification phase on a review
+        branch (feature/grit-calibration-design).
+    phases:
+      - name: p0_verify
+        kind: agent
+        timeout: 10800
+        prompt: |
+          GOAL: {goal}
+          ROLE: verification backfill — the grit/confidence calibration design is DONE at
+          docs/designs/proposed/cap_grit_confidence_calibration_design.md. Do NOT
+          re-author it. Verify and record:
+          (1) The doc exists with status: proposed in frontmatter (the contract layer — the
+          operator accepts it, never you).
+          (2) The five required parts are present: (a) the measured state (the E4 G(s)
+          curve from cap_grit_grid_metrics.json, the 2c abstention decile curve, the [H]
+          confidence definition), (b) the two-decisions separation (retry-threshold vs
+          verify-gate — and why the 2c null does NOT constrain grit), (c) the calibration
+          design (models x strengths with held-out thresholds, cpvo_harm @ E_x 11.47
+          decision rule), (d) the relationship to the running campaigns (2e owns the
+          deepseek envelope), (e) the falsifiability contract.
+          (3) The numbers cite their artifacts: spot-check at least 3 citations resolve to
+          the cited JSON files' fields (e.g. the G(s) values in cap_grit_grid_metrics.json,
+          the decile curve in the 2c score JSON).
+          RECORD the measurements in your commit message + phase response: doc path,
+          status, the five parts checklist, the spot-checked citations. A missing part or
+          an unresolvable citation is a FAILED finding — report, do not fix.
+          DELIVER: the verification record; committed (including the design doc itself —
+          it is uncommitted in the parent tree).
+          LOG: PASS/FAIL; commit.
+factors:
+  - {name: model, levels: [deepseek/deepseek-v4-flash]}
+design: factorial
+rules:
+  - {name: design_verified, plane: measurement, evidence_class: "[M]", requires: [], produces: [calibration_design_verified]}
+metrics:
+  - {name: verification_pass, agg: mean, over: cell}
+comparison: {kind: effect_size, arm_factor: model, loss: {cost: 1.0, quality: 0.0, value: 0.0}}
+writeup:
+  format: lab_book
+  sections: [question, p0_verify]
+stop: {budget_usd: 30.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}

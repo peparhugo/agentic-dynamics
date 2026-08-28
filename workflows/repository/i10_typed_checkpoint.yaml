@@ -1,0 +1,103 @@
+name: i10_typed_checkpoint
+question: >-
+  Verification backfill — the I10 typed-checkpoint capture implementation (the session-routing
+  v2 prerequisite). The implementation was completed on feature/i10-typed-checkpoint
+  (@968e7d816: 3 files, +491/-12): the run ledger gains an ADDITIVE "checkpoints" array
+  (typed CheckpointRecord: phase, phase_index, reason, approval_path, decision, reached_at,
+  decided_at, cost_usd, tokens, commit_hash, approval_evidence), captured at BOTH checkpoint
+  paths (the mechanical stop + the resume-decided contract reads) and published as typed
+  telemetry. This workflow VERIFIES the delivered state (the work is done — the phase must not
+  redo it), records the run's own ledger/cost so the machine's board shows the work, and
+  confirms the tests prove the capture. The verification commits land on the same branch; the
+  operator merges when the running cap_adaptive_2e campaign's cell phase ends.
+version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: false
+repeatable: false
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: true
+    context:
+      domain_context: >-
+        PROVISIONAL DomainProfile. domain: software_delivery / runtime instrumentation.
+        canonical_sources: [src/agentic_dynamics/runtime/workflow_runner.py (the
+        CheckpointRecord + capture points), src/agentic_dynamics/experiment/experiment_spec.py
+        (LEDGER_FIELDS "checkpoints"), tests/test_workflow_runner.py (the four I10 tests),
+        the session-routing v2 design note in the I10 report].
+        policies: [verify_not_redo, additive_schema_only, branch_is_ephemeral]
+      challenge_context: >-
+        PROVISIONAL ChallengeProfile. challenge: verification (the delivered implementation
+        is committed on the branch — verify it, never re-implement). deliberation: [check
+        the diff, check the fields, run the tests, record, commit].
+        session_policy: {default: fork_per_phase}
+      current_state: >-
+        feature/i10-typed-checkpoint @ 968e7d816 carries the implementation (3 files,
+        +491/-12): workflow_runner.py (CheckpointRecord dataclass + the two capture points +
+        the resume-decided contract reads), experiment_spec.py (LEDGER_FIELDS gains
+        "checkpoints"), tests/test_workflow_runner.py (4 new tests — the mechanical stop
+        record, the refused-resume rejected decision, the approved-resume decision, the
+        legacy-ledger round-trip). The runner's gates (commit-prefix hook, checkpoint
+        approval semantics, RunState) are UNCHANGED by design. The branch is pushed; main is
+        untouched; the running cap_adaptive_2e campaign is unaffected.
+      hard_rules: >-
+        (1) Commit '[workflow] <phase>' (the hook enforces it). (2) VERIFY, NEVER REDO: the
+        implementation is committed — this phase checks the branch state and records
+        measurements; re-implementing is a deviation. (3) The schema is ADDITIVE: no renamed
+        keys; legacy ledgers must still parse (the round-trip test proves it). (4) The gates
+        are unchanged: the commit-prefix hook, the checkpoint approval semantics, RunState —
+        verifying that they are unchanged is part of the phase. (5) No main edits, no pushes
+        beyond this branch. (6) Every recorded number cites its source (diff stat, test
+        counts, ledger field names).
+      read_first: >-
+        src/agentic_dynamics/runtime/workflow_runner.py (the checkpoints field + capture
+        points), tests/test_workflow_runner.py (the I10 tests), the git log of
+        feature/i10-typed-checkpoint
+      run_shape: >-
+        SINGLE wrapper: deepseek/deepseek-v4-flash. One verification phase on the
+        feature/i10-typed-checkpoint branch.
+    phases:
+      - name: p0_verify
+        kind: agent
+        timeout: 10800
+        prompt: |
+          GOAL: {goal}
+          ROLE: verification backfill — the I10 typed-checkpoint implementation is DONE on
+          this branch. Do NOT re-implement. Verify and record:
+          (1) The branch diff: `git diff main...HEAD --stat` shows the 3 files
+          (workflow_runner.py, experiment_spec.py, tests/test_workflow_runner.py) — the
+          implementation commits are present.
+          (2) The typed capture: the ledger to_dict carries the "checkpoints" array and the
+          CheckpointRecord fields (phase, phase_index, reason, approval_path, decision,
+          reached_at, decided_at, cost_usd, tokens, commit_hash, approval_evidence); both
+          capture points exist in workflow_runner.py (the mechanical stop + the
+          resume-decided path); LEDGER_FIELDS admits "checkpoints".
+          (3) The tests: run `python3 -m pytest tests/test_workflow_runner.py -m "not
+          external" --timeout=600 -q -k "checkpoint"` — the I10 tests (the mechanical-stop
+          record, the refused-resume rejected decision, the approved-resume decision, the
+          legacy round-trip) pass.
+          (4) The gates are unchanged: the commit-prefix hook + rewrite, the checkpoint
+          approval semantics (a resume still refuses past an unsatisfied checkpoint), and
+          the RunState enum are byte-identical to main's (diff check) — additive only.
+          RECORD the measurements in your commit message + the phase response: branch tip,
+          diff stat, test counts, the field list. A deviation from any check is a FAILED
+          finding — report, do not fix.
+          DELIVER: the verification record; committed.
+          LOG: PASS/FAIL; commit.
+factors:
+  - {name: model, levels: [deepseek/deepseek-v4-flash]}
+design: factorial
+rules:
+  - {name: i10_verified, plane: measurement, evidence_class: "[M]", requires: [], produces: [typed_checkpoint_capture_verified]}
+metrics:
+  - {name: verification_pass, agg: mean, over: cell}
+comparison: {kind: effect_size, arm_factor: model, loss: {cost: 1.0, quality: 0.0, value: 0.0}}
+writeup:
+  format: lab_book
+  sections: [question, p0_verify]
+stop: {budget_usd: 30.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}
