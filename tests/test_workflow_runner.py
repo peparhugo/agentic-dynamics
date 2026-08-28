@@ -1816,7 +1816,33 @@ def test_commit_prefix_rewrites_a_single_bad_commit_not_at_head(tmp_path, monkey
     assert result.ok
 
 
-# ── Adversarial verification (cap_runner_hardening p5) ──────────
+def test_commit_prefix_handles_a_goal_whose_40th_char_is_a_space(tmp_path):
+    """(The i10 backfill lesson) A goal whose ``goal[:40]`` ends with a space: the hook
+    writes the prefix, git strips the trailing whitespace on commit, and the gate compares
+    the TRIMMED prefix (``_goal_prefix``) — otherwise the run fails COMMIT_PREFIX on its
+    own prefix. The backfill goal "Verify the I10 typed-checkpoint capture implementation
+    ..." hit exactly this."""
+    spec = load_spec(SPEC)
+    _git_init(tmp_path)
+    goal = "Verify the I10 typed-checkpoint capture implementation on this branch"
+
+    def agent(prompt, *, model, backend, workdir, **kwargs):
+        (Path(workdir) / "docs").mkdir(exist_ok=True)
+        (Path(workdir) / "docs" / "scope.md").write_text("---\nstatus: accepted\n---\n\nscope")
+        subprocess.run(["git", "add", "-A"], cwd=workdir, check=True)
+        subprocess.run(["git", "commit", "-q", "-m", "plain message"], cwd=workdir, check=True)
+        return _fake_agent()
+
+    result = run_workflow(spec, goal=goal, model="m", workdir=tmp_path, run_agentic_fn=agent)
+    p = result.phases[0]
+    assert p.status == "ok"  # the hook prefixed, git trimmed, the gate matched the trim
+    subjects = subprocess.run(
+        ["git", "log", "--format=%s"], cwd=tmp_path, capture_output=True, text=True
+    ).stdout.splitlines()
+    assert subjects[0].startswith("[workflow] scope — Verify the I10 typed-checkpoint capture")
+
+
+
 
 
 def test_doc_contract_fails_a_phase_that_commits_a_doc_without_frontmatter(tmp_path):

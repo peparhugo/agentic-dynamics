@@ -710,7 +710,7 @@ def _completed_phases(workdir: Path, phase_names: list[str], goal: str) -> set[s
         )
     except Exception:
         return set()
-    goal_prefix = goal[:40]
+    goal_prefix = _goal_prefix(goal)
     completed: set[str] = set()
     for line in log.stdout.splitlines():
         m = re.search(r"\[workflow\]\s+(\S+)\s+—\s+(.+)", line)
@@ -801,7 +801,7 @@ def _completed_phases_from_index(
             return set()
         ledger_path = PROJECT_ROOT / entry.results_pointer
         payload = json.loads(ledger_path.read_text())
-        if str(payload.get("goal", ""))[:40] != goal[:40]:
+        if str(payload.get("goal", ""))[:40].rstrip() != _goal_prefix(goal):
             return set()
         return {
             str(ph.get("phase"))
@@ -1313,7 +1313,7 @@ def _install_commit_msg_hook(wd: Path, phase_name: str, goal: str) -> None:
         return
     if os.environ.get("FINOPS_COMMIT_HOOK", "1") == "0":
         return
-    expected = f"[workflow] {phase_name} — {goal[:40]}"
+    expected = f"[workflow] {phase_name} — {_goal_prefix(goal)}"
     # A campaign worktree's ``.git`` is a FILE (pointing at the shared git dir), not a
     # directory — writing to ``wd/.git/hooks/`` fails silently (the 2d run's p5 lesson:
     # the hook never installed, the wrapper's commit landed unprefixed, the gate failed
@@ -1514,6 +1514,15 @@ def _enforce_doc_contract(pr: PhaseResult, wd: Path, pre_head: str | None) -> No
         pr.error = f"{pr.error}\n{msg}"
 
 
+def _goal_prefix(goal: str) -> str:
+    """The goal prefix the commit contract matches — ``goal[:40]`` TRIMMED of trailing
+    whitespace. The commit-msg hook writes the prefix into the subject and git strips
+    trailing whitespace on commit, so a goal whose 40th character is a space (the i10
+    backfill's ``"...capture "`` lesson) would otherwise never match its own prefix.
+    Every site that compares or expects the prefix uses this helper."""
+    return goal[:40].rstrip()
+
+
 def _enforce_commit_prefix(
     pr: PhaseResult, wd: Path, phase_name: str, goal: str, pre_head: str
 ) -> None:
@@ -1543,7 +1552,7 @@ def _enforce_commit_prefix(
     restores the fail-with-evidence mode outright (no hook, no rewrite). TREE violations (the
     relabel — a discarded tree re-presented) are NEVER canonicalized.
     """
-    goal_prefix = goal[:40]
+    goal_prefix = _goal_prefix(goal)
     commits = (
         _git_log_commits(wd, f"{pre_head}..HEAD")
         if pre_head
@@ -2091,7 +2100,7 @@ def _phase_commit_sha(workdir: Path, phase_name: str, goal: str) -> str:
         return ""
     if log.returncode != 0:
         return ""
-    goal_prefix = goal[:40]
+    goal_prefix = _goal_prefix(goal)
     for line in log.stdout.splitlines():
         sha, _, subject = line.partition(" ")
         m = COMMIT_SUBJECT_RE.search(subject)
