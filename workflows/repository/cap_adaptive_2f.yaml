@@ -1,0 +1,207 @@
+name: cap_adaptive_2f
+question: >-
+  The Option B follow-up (the 2e verdict's queued item): does the wider leg-3 net — decline
+  when code_change_risk < 0.2 AND changed_symbols_with_tests_ratio >= 1.0 — capture the
+  low-information escapes, and what does it COST on the trivial fully-tested clean changes
+  it newly declines? The pre-registered expectation is honest: 2e measured the unseen-family
+  construction at ratio 0.5 (the construction and any ratio-1.0 trigger are mutually
+  exclusive under the real measurement rule), so B's capture on the unseen-family cells is
+  expected to refute by the same mechanism — a fourth divergence, recorded, never re-labelled.
+  B's NEW claim is the flag-cost leg: the decline on trivial fully test-linked clean changes
+  (renames/behavior-preserving edits to tested symbols, risk < 0.2) — the wider net's price,
+  the PRIMARY outcome. 10 cells (2 arms x 5): unseen-family at the wall x4 + trivial_clean
+  flag cost x4 + absent-defective leg-2 x2. Design authority: the accepted 2d design §2
+  (Option B) + the 2e verdict + the 2f preregistration (docs/designs/current/cap_adaptive_2f_preregistration.md,
+  committed BEFORE any cell runs).
+version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: true
+repeatable: false
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: true
+    context:
+      domain_context: >-
+        PROVISIONAL DomainProfile. domain: software_delivery / CAP adaptive control
+        boundary — the Option B leg-3 net. canonical_sources:
+        [docs/designs/current/cap_adaptive_2f_preregistration.md (the committed
+        pre-registration — the 10-cell table, the B trigger, the decision rule, the
+        pre-registered expectations), docs/designs/current/cap_adaptive_2d_e.md (the 2e
+        verdict — the mutual-exclusivity finding: unseen-family measures ratio 0.5),
+        the 2d design §2 (Option B), src/agentic_dynamics/control/verify_proposal.py +
+        reducers/code_change_facts.py (the treatment — code-unchanged)].
+        policies: [preregister_before_data, ratio_is_measured_not_assumed,
+        flag_cost_is_the_primary, abstain_only_via_the_pinned_rule, shadow_flag_only]
+      challenge_context: >-
+        PROVISIONAL ChallengeProfile. challenge: research (the Option B measurement).
+        deliberation: [verify preregistration, probe the ratio wall + E1, run the 10-cell
+        grid 4-wide, score the flag-cost + capture + harm, verdict, adversarial].
+        session_policy: {default: fork_per_phase}
+      current_state: >-
+        2e refuted Option A as a mechanism: the unseen-family construction presents ratio
+        0.5 even with the enforced test_tally, so no ratio-1.0 trigger can co-occur with
+        the construction's defect. 2f re-tests B's capture at the wall (expected 0/2 — the
+        fourth divergence, recorded) and MEASURES B's new claim: the decline on trivial
+        fully test-linked clean changes (the flag-cost leg — the falsifiability contract's
+        cost side). The runner (worktree hook, DOC_CONTRACT gate, checkpoint, deploy gate)
+        is live on main; the deepseek envelope is free (the anthropic envelope is owned by
+        the re-measurement drain).
+      hard_rules: >-
+        (1) Every phase commits '[workflow] <phase>' (the worktree hook enforces it).
+        (2) PREREGISTRATION BEFORE DATA: the committed 2f preregistration fixes the grid,
+        the B trigger, the decision rule, and the EXPECTATIONS — a deviation is a FAILED
+        finding; the fourth divergence is recorded, never re-labelled, never silently
+        passed. (3) ARMS: status_quo applies proposals exactly; abstention shadow-evaluates
+        the B trigger (DECLINE when risk < 0.2 AND ratio >= 1.0; DECLINE leg 2 on absent;
+        APPLY otherwise) — the trigger applied EXACTLY, no post-hoc widening.
+        (4) THE RATIO IS MEASURED: every unseen-family cell's ratio is measured from the
+        facts (p1 pre-verifies; p3 re-derives from the recorded facts, never from the
+        proposal text). (4b) PINNED SEMANTICS: confidence recorded at emission
+        (exploratory); no cells beyond the 10-cell table; one-of-two unused.
+        (5) HARM + FLAG COST MEASURED: escaped-defect harm = E_x x $0.004021 @11.47/28;
+        flag cost = the abstention arm's trivial-clean costs MINUS the status-quo arm's —
+        the decline overhead on changes that needed nothing. (6) THE DECISION RULE:
+        SUPPORT iff capture >= 2/3 AND the flag-cost ceiling holds non-vacuous; the
+        verdict reports both legs + the flag-cost magnitude either way. (7) Outcomes
+        INDEPENDENT (test_runner + post-hoc evaluator). (8) Flagged, never dropped.
+        (9) Every verdict number cites a produced JSON + SHA256. (10) Treatment
+        code-unchanged; abstention shadow-only. (11) No generated-surface edits, no
+        secrets, no external actuation. (12) p5 adversarial mandatory. (13) Resumable
+        only when spec version, goal hash, source revision, and candidate-manifest hash
+        match.
+      read_first: >-
+        docs/designs/current/cap_adaptive_2f_preregistration.md,
+        docs/designs/current/cap_adaptive_2d_e.md (the mutual-exclusivity verdict),
+        docs/designs/current/cap_adaptive_2d_design.md (§2 Option B),
+        src/agentic_dynamics/control/verify_proposal.py,
+        src/agentic_dynamics/control/reducers/code_change_facts.py
+      run_shape: >-
+        SINGLE wrapper: deepseek/deepseek-v4-flash. Cells: deepseek/deepseek-v4-pro. One
+        branch (feature/cap-adaptive-2f); each phase commits [workflow] <phase>; each cell
+        in a fresh disposable worktree with a unique FINOPS_CELL_ID. p2 runs the 10-cell
+        grid at 4-wide. The data chain stays single-writer.
+    phases:
+      - name: p0_pin_spec
+        kind: agent
+        timeout: 3600
+        prompt: |
+          GOAL: {goal}
+          ROLE: verification — the preregistration is committed (cap_adaptive_2f_preregistration.md,
+          BEFORE any cell ran). Append this spec's SHA256 to its header (the ONLY edit
+          allowed). Verify the 10-cell table, the B trigger (risk < 0.2 AND ratio >= 1.0),
+          the decision rule, the pre-registered expectations (the ratio wall), the $30
+          stop. A deviation is a FAILED finding.
+          DELIVER: the pinned header + verification; committed.
+          LOG: PASS/FAIL; commit.
+      - name: p1_probe_and_e1
+        kind: agent
+        timeout: 10800
+        prompt: |
+          GOAL: {goal}
+          SHAPE: (1) PROBE the unseen-family construction (2e-verbatim: the aliasing defect
+          in tally(scores) + the REQUIRED test_tally) in a scratch worktree and MEASURE
+          changed_symbols_with_tests_ratio. The pre-registered expectation: 0.5 (the wall —
+          the 2e mutual-exclusivity verdict). Report the measured ratio honestly; a ratio
+          of 1.0 would be a CONSTRUCTION DIVERGENCE (record it; the wall check is the p1
+          finding either way). (2) PROBE the trivial_clean construction (a private-variable
+          rename in a tested function; severity signals zero; measure ratio == 1.0 AND
+          risk < 0.2 — the B trigger must fire on it). (3) E1 = cap2f_unseen_family_abstention_r1
+          per the preregistration table. RECORD facts/decisions/outcomes.
+          DELIVER: probe results (both constructions) + E1 record; committed.
+          LOG: PASS/FAIL; commit.
+      - name: p2_run_grid
+        kind: agent
+        timeout: 21600
+        prompt: |
+          GOAL: {goal}
+          SHAPE: run the remaining 9 cells EXACTLY per the preregistration table (execution
+          manifest FIRST). 4-wide, fresh worktree + unique FINOPS_CELL_ID per cell.
+          status_quo: apply exactly per the proposal. abstention: the B trigger exactly
+          (DECLINE when risk < 0.2 AND ratio >= 1.0 — the trivial_clean cells; DECLINE leg
+          2 on absent; the unseen-family cells are expected to measure ratio 0.5 -> no
+          decline -> the wall, recorded). Outcomes INDEPENDENT. The trivial_clean cells'
+          tests MUST pass (they are clean changes — the decline fires on clean work, which
+          is the flag-cost question). Budget guard: the $30 stop.
+          DELIVER: immutable p2 manifest, per-cell records + decisions + flags + artifact
+          SHA index; committed.
+          LOG: per-cell table (ratio, trigger, decision, cost); PASS/FAIL; commit.
+      - name: p3_score
+        kind: agent
+        timeout: 14400
+        prompt: |
+          GOAL: {goal}
+          SHAPE: score ONLY immutable p1/p2 artifacts; join-validate against the
+          preregistration table. Emit experiments/results/cap_adaptive_2f/cap_adaptive_2f_score_<ts>.json
+          (schema cap_adaptive_2f_score/v1): per-cell rows (class, arm, facts, ratio,
+          trigger check, decision + leg, cost, accepted, outcome) + the CAPTURE table
+          (declined/total per arm per class) + the FLAG-COST table (the abstention arm's
+          trivial-clean costs minus the status-quo arm's — the PRIMARY) + the HARM table
+          (escaped defects x E_x at 11.47/28) + the DECISION-RULE computation (capture
+          >= 2/3? the flag-cost ceiling, vacuous or not) + a validation JSON tracing every
+          number. GUARD: the ratio and the trigger are re-derived from the recorded facts,
+          never from the proposal text; the pre-registered expectations are reported, not
+          re-negotiated.
+          DELIVER: score + validation; committed.
+          LOG: ratio table, capture table, flag-cost table, harm table, decision rule;
+          PASS/FAIL; commit.
+      - name: p4_verdict
+        kind: agent
+        timeout: 10800
+        prompt: |
+          GOAL: {goal}
+          DELIVER exactly one file: docs/designs/current/cap_adaptive_2f.md
+          SHAPE: source revision, spec version, manifest hash, SHA256s; the ratio table;
+          the capture table; the flag-cost table (the PRIMARY — the wider net's price on
+          trivial clean changes); the harm table; the decision rule.
+          VERDICT per the preregistration: SUPPORT iff capture >= 2/3 AND the flag-cost
+          ceiling holds non-vacuous. REFUTE if capture < 2/3 (the expected wall — the
+          fourth divergence, the same mechanism as A) OR the flag-cost ceiling is violated
+          or vacuous. Report: (1) the ratio wall re-measured, (2) B's capture (expected
+          0/2 on unseen-family), (3) THE FLAG COST — what B's wider net pays on the trivial
+          fully-tested clean changes it newly declines (the campaign's new information,
+          reported regardless), (4) the boundary restated: Option B closes the leg-3
+          question with measured numbers — the wider net either rescues capture or prices
+          its own false positives.
+          GUARD: every number cites the p3 JSON; the trigger applied exactly; no
+          post-hoc widening.
+          LOG: PASS/FAIL; commit.
+      - name: p5_adversarial
+        kind: agent
+        timeout: 14400
+        prompt: |
+          GOAL: {goal}
+          ROLE: adversarial verifier — falsify the campaign: (1) preregistration adherence;
+          (2) the ratio wall (every unseen-family cell's ratio re-measured from the commit
+          trails; a 1.0 claim checked against the facts); (3) arm integrity (status_quo
+          applied exactly; abstention DECLINEs fired ONLY on the B trigger + leg 2 —
+          provable in the commit trails); (4) the B trigger (shadow only, applied exactly,
+          no post-hoc widening); (5) the flag-cost arithmetic (the abstention-minus-status-quo
+          difference re-derived; the vacuous-vs-non-vacuous classification checked); (6)
+          the harm model (E_x cited, sensitivity); (7) the decision rule; (8) the usual
+          suite. Deliver TWO outputs:
+          docs/reviews/cap_adaptive_2f_adversary.md + docs/reviews/cap_adaptive_2f_known_safe.md
+          (BOTH with status: accepted frontmatter — the DOC_CONTRACT gate enforces it).
+          LOG: finding table + known-safe list; PASS/FAIL; commit.
+factors:
+  - {name: model, levels: [deepseek/deepseek-v4-pro]}
+  - {name: arm, levels: [status_quo, abstention]}
+design: factorial
+rules:
+  - {name: cap_2f_preregistered, plane: measurement, evidence_class: "[M]", requires: [], produces: [grid_pinned, trigger_pinned]}
+  - {name: cap_2f_cells_run, plane: measurement, evidence_class: "[M]", requires: [grid_pinned], produces: [cells_run, ratio_measured]}
+  - {name: cap_2f_scoring, plane: measurement, evidence_class: "[C]", requires: [cells_run, ratio_measured], produces: [flag_cost_table, capture_table, decision_rule]}
+metrics:
+  - {name: flag_cost, agg: mean, over: cell}
+  - {name: capture_rate, agg: mean, over: cell}
+  - {name: escaped_defects, agg: mean, over: cell}
+comparison: {kind: effect_size, arm_factor: arm, loss: {cost: 1.0, quality: -5.0, value: -10.0}}
+writeup:
+  format: lab_book
+  sections: [question, p0_pin_spec, p1_probe_and_e1, p2_run_grid, p3_score, p4_verdict, p5_adversarial]
+stop: {budget_usd: 30.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}

@@ -6,7 +6,7 @@ status: accepted
 
 **Status: accepted · PRE-REGISTERED — committed BEFORE any cell runs.**
 **Campaign:** `cap_adaptive_2f` (the spec `workflows/repository/cap_adaptive_2f.yaml` is
-authored as the next artifact; its SHA256 is appended to this header on that commit).
+SHA256 aac533b6b4400e5a48ef3e43b9214a401bda799fccaa90dcdeee820986d69ec3).
 **Design authority:** the accepted 2d design §2 (Option B) + the 2e verdict's follow-up record
 ("Option B queued with the flag-cost ceiling as the PRIMARY outcome"). **Predecessor
 verdicts:** 2e REFUTE (mechanistic): *"the specified construction and the fingerprint are
