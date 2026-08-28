@@ -3,8 +3,8 @@
 **Generated — do not edit by hand.** Regenerate with `python scripts/spec_status.py`;
 `scripts/run_workflow.py` also refreshes it at the end of every run.
 
-Generated at: `2026-08-28T14:22:58.367525+00:00`  ·  138 spec(s)
-**Work remaining:** 36 open · 102 completed/retired
+Generated at: `2026-08-28T14:29:38.573395+00:00`  ·  140 spec(s)
+**Work remaining:** 38 open · 102 completed/retired
 
 | name | kind | repeatable | status | version | supersedes | last_run | ok | model | cost | n_runs |
 |---|---|---|---|---|---|---|---|---|---|---|
@@ -16,6 +16,8 @@ Generated at: `2026-08-28T14:22:58.367525+00:00`  ·  138 spec(s)
 | `cap_2c_cell_competing` | workflow | yes | runnable | 0.1 | — | — | — | — | — | 0 |
 | `cap_2c_cell_incorrect` | workflow | yes | runnable | 0.1 | — | — | — | — | — | 0 |
 | `cap_2c_cell_unseen_family` | workflow | yes | runnable | 0.1 | — | — | — | — | — | 0 |
+| `cap_2d_cell_harmful_partial` | workflow | yes | runnable | 0.1 | — | — | — | — | — | 0 |
+| `cap_2d_cell_incorrect_rebuilt` | workflow | yes | runnable | 0.1 | — | — | — | — | — | 0 |
 | `cap_confidence_cascade` | experiment | yes | runnable | 0.1 | — | — | — | — | — | 0 |
 | `cap_coverage_routing_impact` | experiment | yes | runnable | 0.1 | — | — | — | — | — | 0 |
 | `cap_escalation_fix` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
