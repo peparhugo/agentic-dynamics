@@ -1,7 +1,7 @@
 {
   "schema_version": "spec-status/v2",
-  "generated_at": "2026-08-28T17:06:47.902527+00:00",
-  "n_specs": 144,
+  "generated_at": "2026-08-28T21:42:24.248889+00:00",
+  "n_specs": 146,
   "specs": [
     {
       "name": "auto_posthoc_wiring",
@@ -930,6 +930,24 @@
       "n_runs": 1
     },
     {
+      "name": "cap_adaptive_2f",
+      "version": "0.1",
+      "status": "completed",
+      "spec_path": "workflows/repository/cap_adaptive_2f.yaml",
+      "artifact_kind": "workflow",
+      "repeatable": false,
+      "supersedes": [],
+      "superseded_by": null,
+      "completed_at": null,
+      "last_run_at": "2026-08-28T21:08:38.536726+00:00",
+      "latest_ok": true,
+      "latest_model": "deepseek/deepseek-v4-flash",
+      "latest_cost_usd": 0.23238,
+      "latest_git_sha": "c3946886b",
+      "results_pointer": "experiments/results/workflows/cap_adaptive_2f/20260828T210838Z.json",
+      "n_runs": 1
+    },
+    {
       "name": "cap_addendum_design",
       "version": "0.1",
       "status": "completed",
@@ -1161,6 +1179,24 @@
       "latest_cost_usd": 0.265181,
       "latest_git_sha": "297cd31c7",
       "results_pointer": "experiments/results/workflows/cap_implement_repair/20260822T181655Z.json",
+      "n_runs": 1
+    },
+    {
+      "name": "cap_luna_probe",
+      "version": "0.1",
+      "status": "completed",
+      "spec_path": "workflows/repository/cap_luna_probe.yaml",
+      "artifact_kind": "workflow",
+      "repeatable": false,
+      "supersedes": [],
+      "superseded_by": null,
+      "completed_at": null,
+      "last_run_at": "2026-08-28T21:42:23.990039+00:00",
+      "latest_ok": true,
+      "latest_model": "deepseek/deepseek-v4-flash",
+      "latest_cost_usd": 0.147027,
+      "latest_git_sha": "8a7f06516",
+      "results_pointer": "experiments/results/workflows/cap_luna_probe/20260828T214224Z.json",
       "n_runs": 1
     },
     {

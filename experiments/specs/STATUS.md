@@ -3,8 +3,8 @@
 **Generated — do not edit by hand.** Regenerate with `python scripts/spec_status.py`;
 `scripts/run_workflow.py` also refreshes it at the end of every run.
 
-Generated at: `2026-08-28T17:06:47.902527+00:00`  ·  144 spec(s)
-**Work remaining:** 39 open · 105 completed/retired
+Generated at: `2026-08-28T21:42:24.248889+00:00`  ·  146 spec(s)
+**Work remaining:** 39 open · 107 completed/retired
 
 | name | kind | repeatable | status | version | supersedes | last_run | ok | model | cost | n_runs |
 |---|---|---|---|---|---|---|---|---|---|---|
@@ -59,6 +59,7 @@ Generated at: `2026-08-28T17:06:47.902527+00:00`  ·  144 spec(s)
 | `cap_2b` | workflow | no | completed | 0.1 | cap_2a_rerun3 | 2026-08-26 16:04 | ok | deepseek/deepseek-v4-flash | $0.2303 | 1 |
 | `cap_adaptive_2c` | workflow | no | completed | 0.1 | — | 2026-08-27 18:18 | ok | deepseek/deepseek-v4-flash | $0.2420 | 2 |
 | `cap_adaptive_2e` | workflow | no | completed | 0.1 | — | 2026-08-28 14:55 | ok | deepseek/deepseek-v4-flash | $0.1989 | 1 |
+| `cap_adaptive_2f` | workflow | no | completed | 0.1 | — | 2026-08-28 21:08 | ok | deepseek/deepseek-v4-flash | $0.2324 | 1 |
 | `cap_addendum_design` | workflow | no | completed | 0.1 | — | 2026-08-22 18:15 | ok | deepseek/deepseek-v4-pro | $0.4667 | 1 |
 | `cap_addendum_implement` | workflow | no | completed | 0.1 | — | 2026-08-24 14:07 | ok | anthropic/claude-sonnet-5 | $27.9867 | 2 |
 | `cap_e2_cascade_run` | workflow | no | completed | 0.1 | — | 2026-08-24 23:55 | ok | deepseek/deepseek-v4-flash | $0.1075 | 1 |
@@ -72,6 +73,7 @@ Generated at: `2026-08-28T17:06:47.902527+00:00`  ·  144 spec(s)
 | `cap_grit_grid_execute` | workflow | no | completed | 0.1 | — | 2026-08-24 15:54 | ok | deepseek/deepseek-v4-flash | $0.1330 | 1 |
 | `cap_i0_i3_remediation` | workflow | no | completed | 0.1 | — | 2026-08-23 15:45 | ok | anthropic/claude-sonnet-5 | $32.7888 | 2 |
 | `cap_implement_repair` | workflow | no | completed | 0.1 | — | 2026-08-22 18:16 | ok | deepseek/deepseek-v4-pro | $0.2652 | 1 |
+| `cap_luna_probe` | workflow | no | completed | 0.1 | — | 2026-08-28 21:42 | ok | deepseek/deepseek-v4-flash | $0.1470 | 1 |
 | `cap_pattern_minting` | workflow | no | completed | 0.1 | — | 2026-08-24 23:57 | ok | deepseek/deepseek-v4-flash | $0.1690 | 1 |
 | `cap_routing_evidence_specs` | workflow | no | completed | 0.1 | — | 2026-08-24 00:35 | ok | anthropic/claude-sonnet-5 | $13.6310 | 1 |
 | `cap_runner_hardening` | workflow | no | completed | 0.1 | — | 2026-08-27 00:37 | ok | deepseek/deepseek-v4-flash | $0.2474 | 1 |
