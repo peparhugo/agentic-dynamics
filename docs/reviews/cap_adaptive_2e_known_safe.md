@@ -1,3 +1,7 @@
+---
+status: accepted
+---
+
 # cap_adaptive_2e — known-safe list
 
 **Campaign:** `cap_adaptive_2e` (`cap_adaptive_2e@0.1`). **Adversarial phase p5.**
