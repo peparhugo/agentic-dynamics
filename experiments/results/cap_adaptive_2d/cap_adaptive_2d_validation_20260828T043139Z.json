@@ -1,0 +1,23 @@
+{
+  "audit_note": "incorrect_rebuilt: the p2 cells emitted continue (risk 0.19, impacted=0 under the pinned analyzer), not verify \u2014 a SECOND construction failure (matches the p1 probe); the design is refuted per prereg section 4 / design section 4, and the wrong-apply leg is unverifiable. unseen_family: the measured facts are multi-term risk 0.18 (ratio 0.5 + impacted 4) \u2014 NOT the Option A leg-3 fingerprint (ratio 1.0, risk == 0.20*min(1,impacted/10) exactly) \u2014 so leg 3 never fired and the unseen-family escapes were not captured; the class did not instantiate the pre-registered fingerprint.",
+  "campaign": "cap_adaptive_2d",
+  "guard": "class labels match the pre-registered table exactly (join_validation.valid); the abstention legs are applied exactly as pinned (no post-hoc leg widening); the confidence analysis is labeled exploratory.",
+  "phase": "p3_score",
+  "schema_version": "cap_adaptive_2d_validation/v1",
+  "score_json": "experiments/results/cap_adaptive_2d/cap_adaptive_2d_score_20260828T043139Z.json",
+  "score_json_sha256": "9c6abb55a1261cec1826e55519411744e6867c5246ba6e1488be42b1db6400ce",
+  "scored_at": "20260828T043139Z",
+  "traces": {
+    "capture_rate": "abstention_decision_rule.leg_b_capture <- declined low-information cells (absent-defective leg 2 + unseen_family x2 leg 3) / 3",
+    "confidence_curve": "abstention_analysis.threshold_curve[].cpvo_gated_usd <- (sum cost + sum harm under the gated regime) / sum accepted; EXPLORATORY \u2014 no threshold fixed, the rule stays confidence-free",
+    "cpvo_harm_abstention": "abstention_decision_rule.leg_a_primary.cpvo_harm_abstention_usd <- (sum per_cell[].cost_usd + sum per_cell[].harm_11 for abstention) / sum per_cell[].accepted for abstention",
+    "cpvo_harm_status_quo": "abstention_decision_rule.leg_a_primary.cpvo_harm_status_quo_usd <- (sum per_cell[].cost_usd + sum per_cell[].harm_11 for status_quo) / sum per_cell[].accepted for status_quo",
+    "escaped_defect_count": "per_cell[].escaped_defect_count <- post-hoc evaluator defect_note per class (competing x2 / harmful_partial x1 / unseen-family 1 / absent-defective 1 / clean 0)",
+    "flag_cost": "abstention_decision_rule.leg_c_flag_cost <- sum(declined clean cells' cost_usd - matched status_quo cost_usd); saved harm <- prevented escaped defects x 0.046109",
+    "ni_cpvo_ratio": "abstention_decision_rule.leg_d_ni_guard.cpvo_ratio = cpvo_abstention / cpvo_status_quo (harm-free)",
+    "success_gap": "abstention_decision_rule.leg_d_ni_guard.success_gap_status_quo_minus_abstention = success_status_quo - success_abstention",
+    "wrong_apply": "harm_table.wrong_apply.total_usd_measured <- constructible false-positive verify passes applied (incorrect_rebuilt class); NONE applied (construction failed -> continue) so $0 measured; wrong-apply unverifiable (second construction failure)",
+    "wrong_continue_11": "harm_table.wrong_continue.at_E_x_11 <- escaped_defect_count x 0.046109 (E_x 11.4671 x $0.004021)",
+    "wrong_continue_28": "harm_table.wrong_continue.at_E_x_28 <- escaped_defect_count x 0.112588 (E_x 28 x $0.004021)"
+  }
+}

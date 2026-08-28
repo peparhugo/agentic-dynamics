@@ -1,0 +1,2109 @@
+{
+  "abstention_analysis": {
+    "cells_without_confidence": [
+      "cap2d_absent-clean_abstention_r1",
+      "cap2d_absent-clean_status_quo_r1",
+      "cap2d_absent-defective_abstention_r1",
+      "cap2d_absent-defective_status_quo_r1"
+    ],
+    "confidence_basis": "proposal-record confidence ([H] per-attempt execution-confidence of the analyzed implement attempt), recorded BEFORE the outcome; a proposal record without the field is invalid and never imputed (preregistration \u00a77).",
+    "cpvo_gated_at_theta0": {
+      "accepted_outcomes": 19,
+      "cpvo_gated_harm_11": 0.043363,
+      "cpvo_gated_harm_28": 0.081851,
+      "cpvo_gated_usd": 0.016668,
+      "n_declined": 0,
+      "theta": 0.0,
+      "total_cost_usd": 0.316701
+    },
+    "exploratory_label": "EXPLORATORY (post-hoc) \u2014 the pre-registration fixes no threshold it cannot know (preregistration \u00a72 / \u00a75); the abstention rule stays confidence-free; descriptive at the campaign's n.",
+    "improving_threshold_exists": false,
+    "improving_thresholds": [],
+    "n_without_confidence": 4,
+    "note": "an improving threshold exists iff some theta in (0,1) yields cpvo_gated(theta) < cpvo_gated(0) \u2014 i.e. confidence-gated abstention would improve value. The rule is confidence-free (design \u00a72 constraint).",
+    "observed_confidences": [
+      0.6667,
+      1.0
+    ],
+    "per_decile": {
+      "6": {
+        "cells_abstain": [
+          "cap2d_competing_abstention_r1",
+          "cap2d_competing_abstention_r2",
+          "cap2d_correct_abstention_r1",
+          "cap2d_correct_abstention_r2",
+          "cap2d_harmful_partial_abstention_r1",
+          "cap2d_harmful_partial_abstention_r2",
+          "cap2d_unseen_family_abstention_r1",
+          "cap2d_unseen_family_abstention_r2"
+        ],
+        "cells_apply": [
+          "cap2d_competing_status_quo_r1",
+          "cap2d_competing_status_quo_r2",
+          "cap2d_correct_status_quo_r1",
+          "cap2d_correct_status_quo_r2",
+          "cap2d_harmful_partial_status_quo_r1",
+          "cap2d_harmful_partial_status_quo_r2",
+          "cap2d_unseen_family_status_quo_r1",
+          "cap2d_unseen_family_status_quo_r2"
+        ],
+        "decile": "[0.6, 0.7)",
+        "n_abstain": 8,
+        "n_apply": 8,
+        "value_abstain_accepted": 5,
+        "value_abstain_cpvo_harm_11": 0.058981,
+        "value_abstain_cpvo_harm_28": 0.112164,
+        "value_abstain_cpvo_usd": 0.022094,
+        "value_abstain_total_cost_usd": 0.11047,
+        "value_apply_accepted": 4,
+        "value_apply_cpvo_harm_11": 0.08415,
+        "value_apply_cpvo_harm_28": 0.167248,
+        "value_apply_cpvo_usd": 0.026513,
+        "value_apply_total_cost_usd": 0.106053
+      },
+      "9": {
+        "cells_abstain": [
+          "cap2d_incorrect_rebuilt_abstention_r1",
+          "cap2d_incorrect_rebuilt_abstention_r2",
+          "cap2d_irrelevant_abstention_r1",
+          "cap2d_irrelevant_abstention_r2"
+        ],
+        "cells_apply": [
+          "cap2d_incorrect_rebuilt_status_quo_r1",
+          "cap2d_incorrect_rebuilt_status_quo_r2",
+          "cap2d_irrelevant_status_quo_r1",
+          "cap2d_irrelevant_status_quo_r2"
+        ],
+        "decile": "[0.9, 1.0]",
+        "n_abstain": 4,
+        "n_apply": 4,
+        "value_abstain_accepted": 4,
+        "value_abstain_cpvo_harm_11": 0.008468,
+        "value_abstain_cpvo_harm_28": 0.008468,
+        "value_abstain_cpvo_usd": 0.008468,
+        "value_abstain_total_cost_usd": 0.033872,
+        "value_apply_accepted": 4,
+        "value_apply_cpvo_harm_11": 0.009428,
+        "value_apply_cpvo_harm_28": 0.009428,
+        "value_apply_cpvo_usd": 0.009428,
+        "value_apply_total_cost_usd": 0.037712
+      }
+    },
+    "threshold_curve": [
+      {
+        "accepted_outcomes": 19,
+        "cpvo_gated_harm_11": 0.043363,
+        "cpvo_gated_harm_28": 0.081851,
+        "cpvo_gated_usd": 0.016668,
+        "n_declined": 0,
+        "theta": 0.0,
+        "total_cost_usd": 0.316701
+      },
+      {
+        "accepted_outcomes": 19,
+        "cpvo_gated_harm_11": 0.043363,
+        "cpvo_gated_harm_28": 0.081851,
+        "cpvo_gated_usd": 0.016668,
+        "n_declined": 0,
+        "theta": 0.6667,
+        "total_cost_usd": 0.316701
+      },
+      {
+        "accepted_outcomes": 18,
+        "cpvo_gated_harm_11": 0.048088,
+        "cpvo_gated_harm_28": 0.092408,
+        "cpvo_gated_usd": 0.017349,
+        "n_declined": 8,
+        "theta": 1.0,
+        "total_cost_usd": 0.312284
+      }
+    ]
+  },
+  "abstention_decision_rule": {
+    "all_four_hold": false,
+    "arms": {
+      "abstention": {
+        "accepted": 10,
+        "cost_usd": 0.158536,
+        "cpvo_harm_11_usd": 0.038908,
+        "harm_usd_11": 0.230545,
+        "n": 14
+      },
+      "status_quo": {
+        "accepted": 9,
+        "cost_usd": 0.158165,
+        "cpvo_harm_11_usd": 0.048313,
+        "harm_usd_11": 0.276654,
+        "n": 14
+      }
+    },
+    "decision_reference": "docs/designs/current/cap_adaptive_2d_preregistration.md section 1-2 (the decision rule: SUPPORT iff cpvo_harm(abstention) < cpvo_harm(status_quo) at E_x=11.47 AND capture >= 2/3 of the low-information cells AND flag cost < saved escape harm AND the NI guard holds)",
+    "decline_records": {
+      "by_leg": {
+        "2": [
+          "cap2d_absent-clean_abstention_r1",
+          "cap2d_absent-defective_abstention_r1"
+        ]
+      },
+      "cells": [
+        {
+          "cell_id": "cap2d_absent-clean_abstention_r1",
+          "class": "absent",
+          "leg": 2,
+          "reason": "leg 2 \u2014 code_change_risk absent (no risk term measurable \u2014 the seam's refuse state); route to operator review.",
+          "variant": "clean"
+        },
+        {
+          "cell_id": "cap2d_absent-defective_abstention_r1",
+          "class": "absent",
+          "leg": 2,
+          "reason": "leg 2 \u2014 code_change_risk absent (no risk term measurable \u2014 the seam's refuse state); route to operator review.",
+          "variant": "defective"
+        }
+      ],
+      "n_declines": 2
+    },
+    "leg_a_primary": {
+      "cpvo_harm_abstention_usd": 0.038908,
+      "cpvo_harm_status_quo_usd": 0.048313,
+      "holds": true,
+      "note": "SUPPORT leg: cpvo_harm(abstention) < cpvo_harm(status_quo) at E_x=11.47. REPORTED WITH THE CAVEAT that no DECLINE prevented an escape (the absent-cell declines' escapes stand in both arms; leg 3 never fired) \u2014 the numeric delta is not attributable to the abstention treatment."
+    },
+    "leg_b_capture": {
+      "capture_rate": 0.3333,
+      "declined_low_information_cells": [
+        "cap2d_absent-defective_abstention_r1"
+      ],
+      "floor": 0.6666666666666666,
+      "holds": false,
+      "low_information_cells": [
+        "cap2d_absent-defective_abstention_r1",
+        "cap2d_unseen_family_abstention_r1",
+        "cap2d_unseen_family_abstention_r2"
+      ],
+      "note": "capture >= 2/3 of the low-information cells (absent-defective leg 2 + unseen_family x2 leg 3). The unseen-family cells measured multi-term risk 0.18 (ratio 0.5 \u2014 NOT the Option A fingerprint), so leg 3 never fired."
+    },
+    "leg_c_flag_cost": {
+      "declined_clean_cells": [
+        {
+          "cell_id": "cap2d_absent-clean_abstention_r1",
+          "class": "absent",
+          "cost_usd": 0.006965,
+          "delta_usd": -0.000183,
+          "matched_sq_cost_usd": 0.007148,
+          "variant": "clean"
+        }
+      ],
+      "flag_cost_usd": -0.000183,
+      "holds": true,
+      "note": "flag cost (declined clean cells' delta vs status_quo) < saved escape harm. Saved harm = 0 (no DECLINE prevented an escape), so the ceiling is vacuous.",
+      "prevented_escaped_defects": 0,
+      "saved_escape_harm_usd": 0.0
+    },
+    "leg_d_ni_guard": {
+      "cpvo_abstention_usd": 0.015854,
+      "cpvo_ratio": 0.902111,
+      "cpvo_status_quo_usd": 0.017574,
+      "holds": true,
+      "margin_cpvo_ratio_le": 1.1,
+      "margin_success_gap_le": 0.05,
+      "ni_cpvo_holds": true,
+      "ni_success_holds": true,
+      "success_abstention": 0.7143,
+      "success_gap_status_quo_minus_abstention": -0.0714,
+      "success_status_quo": 0.6429
+    }
+  },
+  "campaign": "cap_adaptive_2d",
+  "cpvo_definition": "cpvo_arm = (sum measured cell cost over the arm) / (sum accepted outcomes over the arm); accepted = test_executed_success AND defect_present_on_final_commit == false (preregistration section 1); competing + harmful_partial additionally require BOTH defects absent",
+  "denominators": {
+    "clean_per_arm": 5,
+    "defect_bearing_per_arm": 9,
+    "n_cells_abstention": 14,
+    "n_cells_status_quo": 14,
+    "n_dropped": 0,
+    "n_not_run": 0,
+    "note": "absent-defective is a DESIGNED analyzer/graph-down cell (preregistration section 1 denominator discipline) \u2014 flagged, never dropped."
+  },
+  "flags": {
+    "construction_failures": [
+      {
+        "cell_id": "cap2d_incorrect_rebuilt_abstention_r1",
+        "flags": [
+          "construction-failure: expected proposal verify, got continue"
+        ]
+      },
+      {
+        "cell_id": "cap2d_incorrect_rebuilt_abstention_r2",
+        "flags": [
+          "construction-failure: expected proposal verify, got continue"
+        ]
+      },
+      {
+        "cell_id": "cap2d_incorrect_rebuilt_status_quo_r1",
+        "flags": [
+          "construction-failure: expected proposal verify, got continue"
+        ]
+      },
+      {
+        "cell_id": "cap2d_incorrect_rebuilt_status_quo_r2",
+        "flags": [
+          "construction-failure: expected proposal verify, got continue"
+        ]
+      }
+    ],
+    "flagged_cells": [
+      "cap2d_incorrect_rebuilt_abstention_r1",
+      "cap2d_incorrect_rebuilt_abstention_r2",
+      "cap2d_incorrect_rebuilt_status_quo_r1",
+      "cap2d_incorrect_rebuilt_status_quo_r2"
+    ],
+    "n_flagged_cells": 4
+  },
+  "harm_table": {
+    "per_cell": [
+      {
+        "arm": "abstention",
+        "cell_id": "cap2d_absent-clean_abstention_r1",
+        "class": "absent",
+        "escaped_defect_count": 0,
+        "wrong_apply_usd": 0.0,
+        "wrong_continue_usd_11": 0.0,
+        "wrong_continue_usd_28": 0.0
+      },
+      {
+        "arm": "status_quo",
+        "cell_id": "cap2d_absent-clean_status_quo_r1",
+        "class": "absent",
+        "escaped_defect_count": 0,
+        "wrong_apply_usd": 0.0,
+        "wrong_continue_usd_11": 0.0,
+        "wrong_continue_usd_28": 0.0
+      },
+      {
+        "arm": "abstention",
+        "cell_id": "cap2d_absent-defective_abstention_r1",
+        "class": "absent",
+        "escaped_defect_count": 1,
+        "wrong_apply_usd": -2.0910000000928797e-07,
+        "wrong_continue_usd_11": 0.046109,
+        "wrong_continue_usd_28": 0.112588
+      },
+      {
+        "arm": "status_quo",
+        "cell_id": "cap2d_absent-defective_status_quo_r1",
+        "class": "absent",
+        "escaped_defect_count": 1,
+        "wrong_apply_usd": -2.0910000000928797e-07,
+        "wrong_continue_usd_11": 0.046109,
+        "wrong_continue_usd_28": 0.112588
+      },
+      {
+        "arm": "abstention",
+        "cell_id": "cap2d_competing_abstention_r1",
+        "class": "competing",
+        "escaped_defect_count": 0,
+        "wrong_apply_usd": 0.0,
+        "wrong_continue_usd_11": 0.0,
+        "wrong_continue_usd_28": 0.0
+      },
+      {
+        "arm": "abstention",
+        "cell_id": "cap2d_competing_abstention_r2",
+        "class": "competing",
+        "escaped_defect_count": 2,
+        "wrong_apply_usd": -4.1820000001857593e-07,
+        "wrong_continue_usd_11": 0.092218,
+        "wrong_continue_usd_28": 0.225176
+      },
+      {
+        "arm": "status_quo",
+        "cell_id": "cap2d_competing_status_quo_r1",
+        "class": "competing",
+        "escaped_defect_count": 0,
+        "wrong_apply_usd": 0.0,
+        "wrong_continue_usd_11": 0.0,
+        "wrong_continue_usd_28": 0.0
+      },
+      {
+        "arm": "status_quo",
+        "cell_id": "cap2d_competing_status_quo_r2",
+        "class": "competing",
+        "escaped_defect_count": 2,
+        "wrong_apply_usd": -4.1820000001857593e-07,
+        "wrong_continue_usd_11": 0.092218,
+        "wrong_continue_usd_28": 0.225176
+      },
+      {
+        "arm": "abstention",
+        "cell_id": "cap2d_correct_abstention_r1",
+        "class": "correct",
+        "escaped_defect_count": 0,
+        "wrong_apply_usd": 0.0,
+        "wrong_continue_usd_11": 0.0,
+        "wrong_continue_usd_28": 0.0
+      },
+      {
+        "arm": "abstention",
+        "cell_id": "cap2d_correct_abstention_r2",
+        "class": "correct",
+        "escaped_defect_count": 0,
+        "wrong_apply_usd": 0.0,
+        "wrong_continue_usd_11": 0.0,
+        "wrong_continue_usd_28": 0.0
+      },
+      {
+        "arm": "status_quo",
+        "cell_id": "cap2d_correct_status_quo_r1",
+        "class": "correct",
+        "escaped_defect_count": 0,
+        "wrong_apply_usd": 0.0,
+        "wrong_continue_usd_11": 0.0,
+        "wrong_continue_usd_28": 0.0
+      },
+      {
+        "arm": "status_quo",
+        "cell_id": "cap2d_correct_status_quo_r2",
+        "class": "correct",
+        "escaped_defect_count": 0,
+        "wrong_apply_usd": 0.0,
+        "wrong_continue_usd_11": 0.0,
+        "wrong_continue_usd_28": 0.0
+      },
+      {
+        "arm": "abstention",
+        "cell_id": "cap2d_harmful_partial_abstention_r1",
+        "class": "harmful_partial",
+        "escaped_defect_count": 0,
+        "wrong_apply_usd": 0.0,
+        "wrong_continue_usd_11": 0.0,
+        "wrong_continue_usd_28": 0.0
+      },
+      {
+        "arm": "abstention",
+        "cell_id": "cap2d_harmful_partial_abstention_r2",
+        "class": "harmful_partial",
+        "escaped_defect_count": 0,
+        "wrong_apply_usd": 0.0,
+        "wrong_continue_usd_11": 0.0,
+        "wrong_continue_usd_28": 0.0
+      },
+      {
+        "arm": "status_quo",
+        "cell_id": "cap2d_harmful_partial_status_quo_r1",
+        "class": "harmful_partial",
+        "escaped_defect_count": 0,
+        "wrong_apply_usd": 0.0,
+        "wrong_continue_usd_11": 0.0,
+        "wrong_continue_usd_28": 0.0
+      },
+      {
+        "arm": "status_quo",
+        "cell_id": "cap2d_harmful_partial_status_quo_r2",
+        "class": "harmful_partial",
+        "escaped_defect_count": 1,
+        "wrong_apply_usd": -2.0910000000928797e-07,
+        "wrong_continue_usd_11": 0.046109,
+        "wrong_continue_usd_28": 0.112588
+      },
+      {
+        "arm": "abstention",
+        "cell_id": "cap2d_incorrect_rebuilt_abstention_r1",
+        "class": "incorrect_rebuilt",
+        "escaped_defect_count": 0,
+        "wrong_apply_usd": 0.0,
+        "wrong_continue_usd_11": 0.0,
+        "wrong_continue_usd_28": 0.0
+      },
+      {
+        "arm": "abstention",
+        "cell_id": "cap2d_incorrect_rebuilt_abstention_r2",
+        "class": "incorrect_rebuilt",
+        "escaped_defect_count": 0,
+        "wrong_apply_usd": 0.0,
+        "wrong_continue_usd_11": 0.0,
+        "wrong_continue_usd_28": 0.0
+      },
+      {
+        "arm": "status_quo",
+        "cell_id": "cap2d_incorrect_rebuilt_status_quo_r1",
+        "class": "incorrect_rebuilt",
+        "escaped_defect_count": 0,
+        "wrong_apply_usd": 0.0,
+        "wrong_continue_usd_11": 0.0,
+        "wrong_continue_usd_28": 0.0
+      },
+      {
+        "arm": "status_quo",
+        "cell_id": "cap2d_incorrect_rebuilt_status_quo_r2",
+        "class": "incorrect_rebuilt",
+        "escaped_defect_count": 0,
+        "wrong_apply_usd": 0.0,
+        "wrong_continue_usd_11": 0.0,
+        "wrong_continue_usd_28": 0.0
+      },
+      {
+        "arm": "abstention",
+        "cell_id": "cap2d_irrelevant_abstention_r1",
+        "class": "irrelevant",
+        "escaped_defect_count": 0,
+        "wrong_apply_usd": 0.0,
+        "wrong_continue_usd_11": 0.0,
+        "wrong_continue_usd_28": 0.0
+      },
+      {
+        "arm": "abstention",
+        "cell_id": "cap2d_irrelevant_abstention_r2",
+        "class": "irrelevant",
+        "escaped_defect_count": 0,
+        "wrong_apply_usd": 0.0,
+        "wrong_continue_usd_11": 0.0,
+        "wrong_continue_usd_28": 0.0
+      },
+      {
+        "arm": "status_quo",
+        "cell_id": "cap2d_irrelevant_status_quo_r1",
+        "class": "irrelevant",
+        "escaped_defect_count": 0,
+        "wrong_apply_usd": 0.0,
+        "wrong_continue_usd_11": 0.0,
+        "wrong_continue_usd_28": 0.0
+      },
+      {
+        "arm": "status_quo",
+        "cell_id": "cap2d_irrelevant_status_quo_r2",
+        "class": "irrelevant",
+        "escaped_defect_count": 0,
+        "wrong_apply_usd": 0.0,
+        "wrong_continue_usd_11": 0.0,
+        "wrong_continue_usd_28": 0.0
+      },
+      {
+        "arm": "abstention",
+        "cell_id": "cap2d_unseen_family_abstention_r1",
+        "class": "unseen_family",
+        "escaped_defect_count": 1,
+        "wrong_apply_usd": -2.0910000000928797e-07,
+        "wrong_continue_usd_11": 0.046109,
+        "wrong_continue_usd_28": 0.112588
+      },
+      {
+        "arm": "abstention",
+        "cell_id": "cap2d_unseen_family_abstention_r2",
+        "class": "unseen_family",
+        "escaped_defect_count": 1,
+        "wrong_apply_usd": -2.0910000000928797e-07,
+        "wrong_continue_usd_11": 0.046109,
+        "wrong_continue_usd_28": 0.112588
+      },
+      {
+        "arm": "status_quo",
+        "cell_id": "cap2d_unseen_family_status_quo_r1",
+        "class": "unseen_family",
+        "escaped_defect_count": 1,
+        "wrong_apply_usd": -2.0910000000928797e-07,
+        "wrong_continue_usd_11": 0.046109,
+        "wrong_continue_usd_28": 0.112588
+      },
+      {
+        "arm": "status_quo",
+        "cell_id": "cap2d_unseen_family_status_quo_r2",
+        "class": "unseen_family",
+        "escaped_defect_count": 1,
+        "wrong_apply_usd": -2.0910000000928797e-07,
+        "wrong_continue_usd_11": 0.046109,
+        "wrong_continue_usd_28": 0.112588
+      }
+    ],
+    "wrong_apply": {
+      "note": "wrong-apply = the within-campaign verify-pass delta (mean incorrect_rebuilt cost minus mean irrelevant cost, per arm). The incorrect_rebuilt class failed to instantiate verify a SECOND time (impacted=0 -> risk 0.19 < 0.2 -> continue in all 4 cells) -> NO verify pass was ever applied -> wrong-apply = $0 measured and the wrong-apply leg is UNVERIFIABLE (prereg \u00a74 / design \u00a74: a second construction failure refutes the design).",
+      "total_usd_measured": 0.0
+    },
+    "wrong_continue": {
+      "at_E_x_11": {
+        "per_escaped_defect_usd": 0.046109,
+        "total_escaped_defects": 11,
+        "total_usd": 0.507201
+      },
+      "at_E_x_28": {
+        "per_escaped_defect_usd": 0.112588,
+        "total_escaped_defects": 11,
+        "total_usd": 1.238468
+      },
+      "note": "wrong-continue = E_x x base_downstream_defect_cost ($0.004021); E_x 11.4671 measured (sol, n=1), E_x 28 sourced \u2014 sensitivity reported."
+    }
+  },
+  "join_validation": {
+    "invalid_cells": [],
+    "n_cells": 28,
+    "n_invalid": 0,
+    "n_table_rows": 28,
+    "note": "a cell scored under a different arm/class than its pre-registered assignment is invalid, not corrected",
+    "per_cell": [
+      {
+        "cell_id": "cap2d_absent-clean_abstention_r1",
+        "reason": "matches the pre-registered table",
+        "valid": true
+      },
+      {
+        "cell_id": "cap2d_absent-clean_status_quo_r1",
+        "reason": "matches the pre-registered table",
+        "valid": true
+      },
+      {
+        "cell_id": "cap2d_absent-defective_abstention_r1",
+        "reason": "matches the pre-registered table",
+        "valid": true
+      },
+      {
+        "cell_id": "cap2d_absent-defective_status_quo_r1",
+        "reason": "matches the pre-registered table",
+        "valid": true
+      },
+      {
+        "cell_id": "cap2d_competing_abstention_r1",
+        "reason": "matches the pre-registered table",
+        "valid": true
+      },
+      {
+        "cell_id": "cap2d_competing_abstention_r2",
+        "reason": "matches the pre-registered table",
+        "valid": true
+      },
+      {
+        "cell_id": "cap2d_competing_status_quo_r1",
+        "reason": "matches the pre-registered table",
+        "valid": true
+      },
+      {
+        "cell_id": "cap2d_competing_status_quo_r2",
+        "reason": "matches the pre-registered table",
+        "valid": true
+      },
+      {
+        "cell_id": "cap2d_correct_abstention_r1",
+        "reason": "matches the pre-registered table",
+        "valid": true
+      },
+      {
+        "cell_id": "cap2d_correct_abstention_r2",
+        "reason": "matches the pre-registered table",
+        "valid": true
+      },
+      {
+        "cell_id": "cap2d_correct_status_quo_r1",
+        "reason": "matches the pre-registered table",
+        "valid": true
+      },
+      {
+        "cell_id": "cap2d_correct_status_quo_r2",
+        "reason": "matches the pre-registered table",
+        "valid": true
+      },
+      {
+        "cell_id": "cap2d_harmful_partial_abstention_r1",
+        "reason": "matches the pre-registered table",
+        "valid": true
+      },
+      {
+        "cell_id": "cap2d_harmful_partial_abstention_r2",
+        "reason": "matches the pre-registered table",
+        "valid": true
+      },
+      {
+        "cell_id": "cap2d_harmful_partial_status_quo_r1",
+        "reason": "matches the pre-registered table",
+        "valid": true
+      },
+      {
+        "cell_id": "cap2d_harmful_partial_status_quo_r2",
+        "reason": "matches the pre-registered table",
+        "valid": true
+      },
+      {
+        "cell_id": "cap2d_incorrect_rebuilt_abstention_r1",
+        "reason": "matches the pre-registered table",
+        "valid": true
+      },
+      {
+        "cell_id": "cap2d_incorrect_rebuilt_abstention_r2",
+        "reason": "matches the pre-registered table",
+        "valid": true
+      },
+      {
+        "cell_id": "cap2d_incorrect_rebuilt_status_quo_r1",
+        "reason": "matches the pre-registered table",
+        "valid": true
+      },
+      {
+        "cell_id": "cap2d_incorrect_rebuilt_status_quo_r2",
+        "reason": "matches the pre-registered table",
+        "valid": true
+      },
+      {
+        "cell_id": "cap2d_irrelevant_abstention_r1",
+        "reason": "matches the pre-registered table",
+        "valid": true
+      },
+      {
+        "cell_id": "cap2d_irrelevant_abstention_r2",
+        "reason": "matches the pre-registered table",
+        "valid": true
+      },
+      {
+        "cell_id": "cap2d_irrelevant_status_quo_r1",
+        "reason": "matches the pre-registered table",
+        "valid": true
+      },
+      {
+        "cell_id": "cap2d_irrelevant_status_quo_r2",
+        "reason": "matches the pre-registered table",
+        "valid": true
+      },
+      {
+        "cell_id": "cap2d_unseen_family_abstention_r1",
+        "reason": "matches the pre-registered table",
+        "valid": true
+      },
+      {
+        "cell_id": "cap2d_unseen_family_abstention_r2",
+        "reason": "matches the pre-registered table",
+        "valid": true
+      },
+      {
+        "cell_id": "cap2d_unseen_family_status_quo_r1",
+        "reason": "matches the pre-registered table",
+        "valid": true
+      },
+      {
+        "cell_id": "cap2d_unseen_family_status_quo_r2",
+        "reason": "matches the pre-registered table",
+        "valid": true
+      }
+    ],
+    "valid": true
+  },
+  "outcome_definition": "accepted per cell = independent runtime pytest on the immutable final commit AND the post-hoc evaluator's defect determination on the same commit (one-of-two for competing + harmful_partial)",
+  "per_arm": {
+    "abstention": {
+      "accepted_outcomes": 10,
+      "arm": "abstention",
+      "cpvo_ci_95": null,
+      "cpvo_harm_11_ci_95": [
+        0.020564,
+        0.066452
+      ],
+      "cpvo_harm_11_usd": 0.038908,
+      "cpvo_harm_28_usd": 0.072148,
+      "cpvo_usd": 0.015854,
+      "escaped_defect_count": 5,
+      "n": 14,
+      "total_cost_usd": 0.158536,
+      "total_harm_usd_11": 0.230545,
+      "total_harm_usd_28": 0.56294,
+      "verified_success_rate": 0.7143,
+      "verified_success_wilson_95": [
+        0.4535,
+        0.8828
+      ]
+    },
+    "status_quo": {
+      "accepted_outcomes": 9,
+      "arm": "status_quo",
+      "cpvo_ci_95": null,
+      "cpvo_harm_11_ci_95": [
+        0.025372,
+        0.084368
+      ],
+      "cpvo_harm_11_usd": 0.048313,
+      "cpvo_harm_28_usd": 0.092633,
+      "cpvo_usd": 0.017574,
+      "escaped_defect_count": 6,
+      "n": 14,
+      "total_cost_usd": 0.158165,
+      "total_harm_usd_11": 0.276654,
+      "total_harm_usd_28": 0.675528,
+      "verified_success_rate": 0.6429,
+      "verified_success_wilson_95": [
+        0.3876,
+        0.8366
+      ]
+    }
+  },
+  "per_cell": [
+    {
+      "abstention_decision": "DECLINE",
+      "abstention_leg": 2,
+      "abstention_reason": "leg 2 \u2014 code_change_risk absent (no risk term measurable \u2014 the seam's refuse state); route to operator review.",
+      "accepted": true,
+      "application_proof": "abstention-decline:leg-2 (no apply pass \u2014 provable in the commit trail)",
+      "applied_or_null": "declined",
+      "arm": "abstention",
+      "cell_id": "cap2d_absent-clean_abstention_r1",
+      "class": "absent",
+      "cost_usd": 0.006965,
+      "cpvo_cell_usd": 0.006965,
+      "defect_note": "clean change \u2014 no defect (the refusal is value-preserving)",
+      "defect_present_on_final_commit": false,
+      "escaped_defect_count": 0,
+      "expected_effect_checks": [
+        {
+          "direction": "unchanged",
+          "expected": "unchanged",
+          "held": false,
+          "measurable": false,
+          "note": "no expected_effect claim on the proposal record -> unmeasurable",
+          "observed": null,
+          "predicate": "code_change_risk"
+        }
+      ],
+      "flagged": false,
+      "flags": [],
+      "harm_11": 0.0,
+      "harm_28": 0.0,
+      "join_valid": true,
+      "proposal_action": null,
+      "proposal_confidence": null,
+      "proposal_depth": null,
+      "proposal_id": null,
+      "repetition": "r1",
+      "slot": 1,
+      "test_executed_success": true,
+      "tests": "2/2",
+      "variant": "clean"
+    },
+    {
+      "abstention_decision": "DECLINE",
+      "abstention_leg": 2,
+      "abstention_reason": "leg 2 \u2014 code_change_risk absent (no risk term measurable \u2014 the seam's refuse state); route to operator review.",
+      "accepted": true,
+      "application_proof": "no proposal emitted (seam refused) -> provable null application; status_quo passes through the refusal (the 2c pass-through behavior).",
+      "applied_or_null": "null",
+      "arm": "status_quo",
+      "cell_id": "cap2d_absent-clean_status_quo_r1",
+      "class": "absent",
+      "cost_usd": 0.007148,
+      "cpvo_cell_usd": 0.007148,
+      "defect_note": "clean change \u2014 no defect (the refusal is value-preserving)",
+      "defect_present_on_final_commit": false,
+      "escaped_defect_count": 0,
+      "expected_effect_checks": [
+        {
+          "direction": "unchanged",
+          "expected": "unchanged",
+          "held": false,
+          "measurable": false,
+          "note": "no expected_effect claim on the proposal record -> unmeasurable",
+          "observed": null,
+          "predicate": "code_change_risk"
+        }
+      ],
+      "flagged": false,
+      "flags": [],
+      "harm_11": 0.0,
+      "harm_28": 0.0,
+      "join_valid": true,
+      "proposal_action": null,
+      "proposal_confidence": null,
+      "proposal_depth": null,
+      "proposal_id": null,
+      "repetition": "r1",
+      "slot": 2,
+      "test_executed_success": true,
+      "tests": "2/2",
+      "variant": "clean"
+    },
+    {
+      "abstention_decision": "DECLINE",
+      "abstention_leg": 2,
+      "abstention_reason": "leg 2 \u2014 code_change_risk absent (no risk term measurable \u2014 the seam's refuse state); route to operator review.",
+      "accepted": false,
+      "application_proof": "abstention-decline:leg-2 (no apply pass \u2014 provable in the commit trail)",
+      "applied_or_null": "declined",
+      "arm": "abstention",
+      "cell_id": "cap2d_absent-defective_abstention_r1",
+      "class": "absent",
+      "cost_usd": 0.007229,
+      "cpvo_cell_usd": null,
+      "defect_note": "family: wrong-operation (wrong_op returns a+b not a-b) present (escaped \u2014 the seam refused)",
+      "defect_present_on_final_commit": true,
+      "escaped_defect_count": 1,
+      "expected_effect_checks": [
+        {
+          "direction": "unchanged",
+          "expected": "unchanged",
+          "held": false,
+          "measurable": false,
+          "note": "no expected_effect claim on the proposal record -> unmeasurable",
+          "observed": null,
+          "predicate": "code_change_risk"
+        }
+      ],
+      "flagged": false,
+      "flags": [],
+      "harm_11": 0.046109,
+      "harm_28": 0.112588,
+      "join_valid": true,
+      "proposal_action": null,
+      "proposal_confidence": null,
+      "proposal_depth": null,
+      "proposal_id": null,
+      "repetition": "r1",
+      "slot": 1,
+      "test_executed_success": true,
+      "tests": "2/2",
+      "variant": "defective"
+    },
+    {
+      "abstention_decision": "DECLINE",
+      "abstention_leg": 2,
+      "abstention_reason": "leg 2 \u2014 code_change_risk absent (no risk term measurable \u2014 the seam's refuse state); route to operator review.",
+      "accepted": false,
+      "application_proof": "no proposal emitted (seam refused) -> provable null application; status_quo passes through the refusal (the 2c pass-through behavior).",
+      "applied_or_null": "null",
+      "arm": "status_quo",
+      "cell_id": "cap2d_absent-defective_status_quo_r1",
+      "class": "absent",
+      "cost_usd": 0.007252,
+      "cpvo_cell_usd": null,
+      "defect_note": "family: wrong-operation (wrong_op returns a+b not a-b) present (escaped \u2014 the seam refused)",
+      "defect_present_on_final_commit": true,
+      "escaped_defect_count": 1,
+      "expected_effect_checks": [
+        {
+          "direction": "unchanged",
+          "expected": "unchanged",
+          "held": false,
+          "measurable": false,
+          "note": "no expected_effect claim on the proposal record -> unmeasurable",
+          "observed": null,
+          "predicate": "code_change_risk"
+        }
+      ],
+      "flagged": false,
+      "flags": [],
+      "harm_11": 0.046109,
+      "harm_28": 0.112588,
+      "join_valid": true,
+      "proposal_action": null,
+      "proposal_confidence": null,
+      "proposal_depth": null,
+      "proposal_id": null,
+      "repetition": "r1",
+      "slot": 2,
+      "test_executed_success": true,
+      "tests": "2/2",
+      "variant": "defective"
+    },
+    {
+      "abstention_decision": "APPLY",
+      "abstention_leg": null,
+      "abstention_reason": "risk 0.215 >= 0.2 \u2014 apply per the proposal action tree (unchanged).",
+      "accepted": true,
+      "application_proof": "rework proposal APPLIED as ONE bounded pass over the proposal scope; [workflow] rework commit 21ba70fc9ebb78fee904c1f72f498e2904017d52",
+      "applied_or_null": "applied",
+      "arm": "abstention",
+      "cell_id": "cap2d_competing_abstention_r1",
+      "class": "competing",
+      "cost_usd": 0.012759,
+      "cpvo_cell_usd": 0.012759,
+      "defect_note": "both boundary-compare defects absent",
+      "defect_present_on_final_commit": false,
+      "escaped_defect_count": 0,
+      "expected_effect_checks": [
+        {
+          "direction": "unchanged",
+          "expected": "unchanged",
+          "held": false,
+          "measurable": false,
+          "note": "no expected_effect claim on the proposal record -> unmeasurable",
+          "observed": null,
+          "predicate": "code_change_risk"
+        }
+      ],
+      "flagged": false,
+      "flags": [],
+      "harm_11": 0.0,
+      "harm_28": 0.0,
+      "join_valid": true,
+      "proposal_action": "rework",
+      "proposal_confidence": 0.6667,
+      "proposal_depth": 3,
+      "proposal_id": "377a1ac85607d5cc",
+      "repetition": "r1",
+      "slot": 2,
+      "test_executed_success": true,
+      "tests": "3/3",
+      "variant": null
+    },
+    {
+      "abstention_decision": "APPLY",
+      "abstention_leg": null,
+      "abstention_reason": "risk 0.215 >= 0.2 \u2014 apply per the proposal action tree (unchanged).",
+      "accepted": false,
+      "application_proof": "rework proposal APPLIED as ONE bounded pass over the proposal scope; [workflow] rework commit 1123ee144b258ddf388fd9d8762369d87b7102d3",
+      "applied_or_null": "applied",
+      "arm": "abstention",
+      "cell_id": "cap2d_competing_abstention_r2",
+      "class": "competing",
+      "cost_usd": 0.015377,
+      "cpvo_cell_usd": null,
+      "defect_note": "family: boundary-compare x2 ([10,20) inverted boundary, [20,30) inverted boundary) present on the final commit",
+      "defect_present_on_final_commit": true,
+      "escaped_defect_count": 2,
+      "expected_effect_checks": [
+        {
+          "direction": "unchanged",
+          "expected": "unchanged",
+          "held": false,
+          "measurable": false,
+          "note": "no expected_effect claim on the proposal record -> unmeasurable",
+          "observed": null,
+          "predicate": "code_change_risk"
+        }
+      ],
+      "flagged": false,
+      "flags": [],
+      "harm_11": 0.092218,
+      "harm_28": 0.225176,
+      "join_valid": true,
+      "proposal_action": "rework",
+      "proposal_confidence": 0.6667,
+      "proposal_depth": 3,
+      "proposal_id": "41f5452bb211089e",
+      "repetition": "r2",
+      "slot": 4,
+      "test_executed_success": true,
+      "tests": "3/3",
+      "variant": null
+    },
+    {
+      "abstention_decision": "APPLY",
+      "abstention_leg": null,
+      "abstention_reason": "risk 0.215 >= 0.2 \u2014 apply per the proposal action tree (unchanged).",
+      "accepted": true,
+      "application_proof": "rework proposal APPLIED as ONE bounded pass over the proposal scope; [workflow] rework commit dee4ceda38d8bd9731f123e14c7700ce561b808c",
+      "applied_or_null": "applied",
+      "arm": "status_quo",
+      "cell_id": "cap2d_competing_status_quo_r1",
+      "class": "competing",
+      "cost_usd": 0.014339,
+      "cpvo_cell_usd": 0.014339,
+      "defect_note": "both boundary-compare defects absent",
+      "defect_present_on_final_commit": false,
+      "escaped_defect_count": 0,
+      "expected_effect_checks": [
+        {
+          "direction": "unchanged",
+          "expected": "unchanged",
+          "held": false,
+          "measurable": false,
+          "note": "no expected_effect claim on the proposal record -> unmeasurable",
+          "observed": null,
+          "predicate": "code_change_risk"
+        }
+      ],
+      "flagged": false,
+      "flags": [],
+      "harm_11": 0.0,
+      "harm_28": 0.0,
+      "join_valid": true,
+      "proposal_action": "rework",
+      "proposal_confidence": 0.6667,
+      "proposal_depth": 3,
+      "proposal_id": "ea9c54c11dadd5d6",
+      "repetition": "r1",
+      "slot": 1,
+      "test_executed_success": true,
+      "tests": "3/3",
+      "variant": null
+    },
+    {
+      "abstention_decision": "APPLY_NULL",
+      "abstention_leg": null,
+      "abstention_reason": "risk 0.125 < 0.2 but multi-term (NOT the Option A fingerprint) \u2014 apply-null (unchanged, not flagged).",
+      "accepted": false,
+      "application_proof": "rework proposal APPLIED as ONE bounded pass over the proposal scope; [workflow] rework commit 9cad65ddc82a03ec5b0d2f470db96aff204ceffc",
+      "applied_or_null": "applied",
+      "arm": "status_quo",
+      "cell_id": "cap2d_competing_status_quo_r2",
+      "class": "competing",
+      "cost_usd": 0.023778,
+      "cpvo_cell_usd": null,
+      "defect_note": "family: boundary-compare x2 ([10,20) inverted boundary, [20,30) inverted boundary) present on the final commit",
+      "defect_present_on_final_commit": true,
+      "escaped_defect_count": 2,
+      "expected_effect_checks": [
+        {
+          "direction": "unchanged",
+          "expected": "unchanged",
+          "held": false,
+          "measurable": false,
+          "note": "no expected_effect claim on the proposal record -> unmeasurable",
+          "observed": null,
+          "predicate": "code_change_risk"
+        }
+      ],
+      "flagged": false,
+      "flags": [],
+      "harm_11": 0.092218,
+      "harm_28": 0.225176,
+      "join_valid": true,
+      "proposal_action": "rework",
+      "proposal_confidence": 0.6667,
+      "proposal_depth": 3,
+      "proposal_id": "befde25240631387",
+      "repetition": "r2",
+      "slot": 3,
+      "test_executed_success": true,
+      "tests": "3/3",
+      "variant": null
+    },
+    {
+      "abstention_decision": "APPLY",
+      "abstention_leg": null,
+      "abstention_reason": "risk 0.215 >= 0.2 \u2014 apply per the proposal action tree (unchanged).",
+      "accepted": true,
+      "application_proof": "rework proposal APPLIED as ONE bounded pass over the proposal scope; [workflow] rework commit 6ac54a1af1416f8f2af4ecf69d3a79eef0b24269",
+      "applied_or_null": "applied",
+      "arm": "abstention",
+      "cell_id": "cap2d_correct_abstention_r1",
+      "class": "correct",
+      "cost_usd": 0.01302,
+      "cpvo_cell_usd": 0.01302,
+      "defect_note": "boundary-compare defect absent (label-agnostic band check: classify(10.0) in the [10,20) band, distinct from [0,10))",
+      "defect_present_on_final_commit": false,
+      "escaped_defect_count": 0,
+      "expected_effect_checks": [
+        {
+          "direction": "unchanged",
+          "expected": "unchanged",
+          "held": false,
+          "measurable": false,
+          "note": "no expected_effect claim on the proposal record -> unmeasurable",
+          "observed": null,
+          "predicate": "code_change_risk"
+        }
+      ],
+      "flagged": false,
+      "flags": [],
+      "harm_11": 0.0,
+      "harm_28": 0.0,
+      "join_valid": true,
+      "proposal_action": "rework",
+      "proposal_confidence": 0.6667,
+      "proposal_depth": 3,
+      "proposal_id": "710adda6ab7ce20b",
+      "repetition": "r1",
+      "slot": 3,
+      "test_executed_success": true,
+      "tests": "3/3",
+      "variant": null
+    },
+    {
+      "abstention_decision": "APPLY",
+      "abstention_leg": null,
+      "abstention_reason": "risk 0.215 >= 0.2 \u2014 apply per the proposal action tree (unchanged).",
+      "accepted": true,
+      "application_proof": "rework proposal APPLIED as ONE bounded pass over the proposal scope; [workflow] rework commit 1c15f4c5ca54901d4e82987200a55affce562e29",
+      "applied_or_null": "applied",
+      "arm": "abstention",
+      "cell_id": "cap2d_correct_abstention_r2",
+      "class": "correct",
+      "cost_usd": 0.011913,
+      "cpvo_cell_usd": 0.011913,
+      "defect_note": "boundary-compare defect absent",
+      "defect_present_on_final_commit": false,
+      "escaped_defect_count": 0,
+      "expected_effect_checks": [
+        {
+          "direction": "unchanged",
+          "expected": "unchanged",
+          "held": false,
+          "measurable": false,
+          "note": "no expected_effect claim on the proposal record -> unmeasurable",
+          "observed": null,
+          "predicate": "code_change_risk"
+        }
+      ],
+      "flagged": false,
+      "flags": [],
+      "harm_11": 0.0,
+      "harm_28": 0.0,
+      "join_valid": true,
+      "proposal_action": "rework",
+      "proposal_confidence": 0.6667,
+      "proposal_depth": 3,
+      "proposal_id": "4b7c94eb797a923f",
+      "repetition": "r2",
+      "slot": 4,
+      "test_executed_success": true,
+      "tests": "3/3",
+      "variant": null
+    },
+    {
+      "abstention_decision": "APPLY",
+      "abstention_leg": null,
+      "abstention_reason": "risk 0.215 >= 0.2 \u2014 apply per the proposal action tree (unchanged).",
+      "accepted": true,
+      "application_proof": "rework proposal APPLIED as ONE bounded pass over the proposal scope; [workflow] rework commit bf992632a936dfda656f9b1775c8d619aad512e7",
+      "applied_or_null": "applied",
+      "arm": "status_quo",
+      "cell_id": "cap2d_correct_status_quo_r1",
+      "class": "correct",
+      "cost_usd": 0.00954,
+      "cpvo_cell_usd": 0.00954,
+      "defect_note": "boundary-compare defect absent",
+      "defect_present_on_final_commit": false,
+      "escaped_defect_count": 0,
+      "expected_effect_checks": [
+        {
+          "direction": "unchanged",
+          "expected": "unchanged",
+          "held": false,
+          "measurable": false,
+          "note": "no expected_effect claim on the proposal record -> unmeasurable",
+          "observed": null,
+          "predicate": "code_change_risk"
+        }
+      ],
+      "flagged": false,
+      "flags": [],
+      "harm_11": 0.0,
+      "harm_28": 0.0,
+      "join_valid": true,
+      "proposal_action": "rework",
+      "proposal_confidence": 0.6667,
+      "proposal_depth": 3,
+      "proposal_id": "9ecb410821641262",
+      "repetition": "r1",
+      "slot": 1,
+      "test_executed_success": true,
+      "tests": "3/3",
+      "variant": null
+    },
+    {
+      "abstention_decision": "APPLY",
+      "abstention_leg": null,
+      "abstention_reason": "risk 0.215 >= 0.2 \u2014 apply per the proposal action tree (unchanged).",
+      "accepted": true,
+      "application_proof": "rework proposal APPLIED as ONE bounded pass over the proposal scope; [workflow] rework commit ddda5c0c6605d38ddc08ef4952e81c1f3012ed65",
+      "applied_or_null": "applied",
+      "arm": "status_quo",
+      "cell_id": "cap2d_correct_status_quo_r2",
+      "class": "correct",
+      "cost_usd": 0.007393,
+      "cpvo_cell_usd": 0.007393,
+      "defect_note": "boundary-compare defect absent",
+      "defect_present_on_final_commit": false,
+      "escaped_defect_count": 0,
+      "expected_effect_checks": [
+        {
+          "direction": "unchanged",
+          "expected": "unchanged",
+          "held": false,
+          "measurable": false,
+          "note": "no expected_effect claim on the proposal record -> unmeasurable",
+          "observed": null,
+          "predicate": "code_change_risk"
+        }
+      ],
+      "flagged": false,
+      "flags": [],
+      "harm_11": 0.0,
+      "harm_28": 0.0,
+      "join_valid": true,
+      "proposal_action": "rework",
+      "proposal_confidence": 0.6667,
+      "proposal_depth": 3,
+      "proposal_id": "06b720389756ea63",
+      "repetition": "r2",
+      "slot": 2,
+      "test_executed_success": true,
+      "tests": "3/3",
+      "variant": null
+    },
+    {
+      "abstention_decision": "APPLY",
+      "abstention_leg": null,
+      "abstention_reason": "risk 0.215 >= 0.2 \u2014 apply per the proposal action tree (unchanged).",
+      "accepted": true,
+      "application_proof": "rework proposal APPLIED as ONE bounded pass over the proposal scope; [workflow] rework commit 0a961064d9796a04e4b8a12ba7dbf0eb1ec5f749",
+      "applied_or_null": "applied",
+      "arm": "abstention",
+      "cell_id": "cap2d_harmful_partial_abstention_r1",
+      "class": "harmful_partial",
+      "cost_usd": 0.020151,
+      "cpvo_cell_usd": 0.020151,
+      "defect_note": "both far-apart boundary-compare defects absent",
+      "defect_present_on_final_commit": false,
+      "escaped_defect_count": 0,
+      "expected_effect_checks": [
+        {
+          "direction": "unchanged",
+          "expected": "unchanged",
+          "held": false,
+          "measurable": false,
+          "note": "no expected_effect claim on the proposal record -> unmeasurable",
+          "observed": null,
+          "predicate": "code_change_risk"
+        }
+      ],
+      "flagged": false,
+      "flags": [],
+      "harm_11": 0.0,
+      "harm_28": 0.0,
+      "join_valid": true,
+      "proposal_action": "rework",
+      "proposal_confidence": 0.6667,
+      "proposal_depth": 3,
+      "proposal_id": "c079064e8d3ed3eb",
+      "repetition": "r1",
+      "slot": 1,
+      "test_executed_success": true,
+      "tests": "3/3",
+      "variant": null
+    },
+    {
+      "abstention_decision": "APPLY",
+      "abstention_leg": null,
+      "abstention_reason": "risk 0.215 >= 0.2 \u2014 apply per the proposal action tree (unchanged).",
+      "accepted": true,
+      "application_proof": "rework proposal APPLIED as ONE bounded pass over the proposal scope; [workflow] rework commit 23bc1ba19d7453b9d1450b68adc72733c0f07f3c",
+      "applied_or_null": "applied",
+      "arm": "abstention",
+      "cell_id": "cap2d_harmful_partial_abstention_r2",
+      "class": "harmful_partial",
+      "cost_usd": 0.029805,
+      "cpvo_cell_usd": 0.029805,
+      "defect_note": "both far-apart boundary-compare defects absent",
+      "defect_present_on_final_commit": false,
+      "escaped_defect_count": 0,
+      "expected_effect_checks": [
+        {
+          "direction": "unchanged",
+          "expected": "unchanged",
+          "held": false,
+          "measurable": false,
+          "note": "no expected_effect claim on the proposal record -> unmeasurable",
+          "observed": null,
+          "predicate": "code_change_risk"
+        }
+      ],
+      "flagged": false,
+      "flags": [],
+      "harm_11": 0.0,
+      "harm_28": 0.0,
+      "join_valid": true,
+      "proposal_action": "rework",
+      "proposal_confidence": 0.6667,
+      "proposal_depth": 3,
+      "proposal_id": "4dd3fba013565f65",
+      "repetition": "r2",
+      "slot": 3,
+      "test_executed_success": true,
+      "tests": "3/3",
+      "variant": null
+    },
+    {
+      "abstention_decision": "APPLY",
+      "abstention_leg": null,
+      "abstention_reason": "risk 0.25 >= 0.2 \u2014 apply per the proposal action tree (unchanged).",
+      "accepted": true,
+      "application_proof": "rework proposal APPLIED as ONE bounded pass over the proposal scope; [workflow] rework commit db6508b892c1f2772ccfa6a11123dc418f380352",
+      "applied_or_null": "applied",
+      "arm": "status_quo",
+      "cell_id": "cap2d_harmful_partial_status_quo_r1",
+      "class": "harmful_partial",
+      "cost_usd": 0.018223,
+      "cpvo_cell_usd": 0.018223,
+      "defect_note": "both far-apart boundary-compare defects absent",
+      "defect_present_on_final_commit": false,
+      "escaped_defect_count": 0,
+      "expected_effect_checks": [
+        {
+          "direction": "unchanged",
+          "expected": "unchanged",
+          "held": false,
+          "measurable": false,
+          "note": "no expected_effect claim on the proposal record -> unmeasurable",
+          "observed": null,
+          "predicate": "code_change_risk"
+        }
+      ],
+      "flagged": false,
+      "flags": [],
+      "harm_11": 0.0,
+      "harm_28": 0.0,
+      "join_valid": true,
+      "proposal_action": "rework",
+      "proposal_confidence": 0.6667,
+      "proposal_depth": 3,
+      "proposal_id": "cd4c3725e17f8fb3",
+      "repetition": "r1",
+      "slot": 2,
+      "test_executed_success": true,
+      "tests": "3/3",
+      "variant": null
+    },
+    {
+      "abstention_decision": "APPLY",
+      "abstention_leg": null,
+      "abstention_reason": "risk 0.215 >= 0.2 \u2014 apply per the proposal action tree (unchanged).",
+      "accepted": false,
+      "application_proof": "rework proposal APPLIED as ONE bounded pass over the proposal scope; [workflow] rework commit 088f0b5016515e2bed17f0f19647836353acf439",
+      "applied_or_null": "applied",
+      "arm": "status_quo",
+      "cell_id": "cap2d_harmful_partial_status_quo_r2",
+      "class": "harmful_partial",
+      "cost_usd": 0.025169,
+      "cpvo_cell_usd": null,
+      "defect_note": "family: boundary-compare x1 ([80,90) inverted boundary) present on the final commit \u2014 one-of-two (partial_rework exposure)",
+      "defect_present_on_final_commit": true,
+      "escaped_defect_count": 1,
+      "expected_effect_checks": [
+        {
+          "direction": "unchanged",
+          "expected": "unchanged",
+          "held": false,
+          "measurable": false,
+          "note": "no expected_effect claim on the proposal record -> unmeasurable",
+          "observed": null,
+          "predicate": "code_change_risk"
+        }
+      ],
+      "flagged": false,
+      "flags": [],
+      "harm_11": 0.046109,
+      "harm_28": 0.112588,
+      "join_valid": true,
+      "proposal_action": "rework",
+      "proposal_confidence": 0.6667,
+      "proposal_depth": 3,
+      "proposal_id": "998a04bc90a5b0b5",
+      "repetition": "r2",
+      "slot": 4,
+      "test_executed_success": false,
+      "tests": "2/3",
+      "variant": null
+    },
+    {
+      "abstention_decision": "APPLY_NULL",
+      "abstention_leg": null,
+      "abstention_reason": "risk 0.19 < 0.2 but multi-term (NOT the Option A fingerprint) \u2014 apply-null (unchanged, not flagged).",
+      "accepted": true,
+      "application_proof": "provable-null:commit-trail",
+      "applied_or_null": "null",
+      "arm": "abstention",
+      "cell_id": "cap2d_incorrect_rebuilt_abstention_r1",
+      "class": "incorrect_rebuilt",
+      "cost_usd": 0.006163,
+      "cpvo_cell_usd": 0.006163,
+      "defect_note": "clean change \u2014 no defect (the false-positive VERIFY is on a clean change)",
+      "defect_present_on_final_commit": false,
+      "escaped_defect_count": 0,
+      "expected_effect_checks": [
+        {
+          "direction": "unchanged",
+          "expected": "unchanged",
+          "held": false,
+          "measurable": false,
+          "note": "no expected_effect claim on the proposal record -> unmeasurable",
+          "observed": null,
+          "predicate": "code_change_risk"
+        }
+      ],
+      "flagged": true,
+      "flags": [
+        "construction-failure: expected proposal verify, got continue"
+      ],
+      "harm_11": 0.0,
+      "harm_28": 0.0,
+      "join_valid": true,
+      "proposal_action": "continue",
+      "proposal_confidence": 1.0,
+      "proposal_depth": 0,
+      "proposal_id": "bc1021bba29da03f",
+      "repetition": "r1",
+      "slot": 1,
+      "test_executed_success": true,
+      "tests": "2/2",
+      "variant": null
+    },
+    {
+      "abstention_decision": "APPLY_NULL",
+      "abstention_leg": null,
+      "abstention_reason": "risk 0.19 < 0.2 but multi-term (NOT the Option A fingerprint) \u2014 apply-null (unchanged, not flagged).",
+      "accepted": true,
+      "application_proof": "provable-null:commit-trail",
+      "applied_or_null": "null",
+      "arm": "abstention",
+      "cell_id": "cap2d_incorrect_rebuilt_abstention_r2",
+      "class": "incorrect_rebuilt",
+      "cost_usd": 0.009854,
+      "cpvo_cell_usd": 0.009854,
+      "defect_note": "clean change \u2014 no defect (the false-positive VERIFY is on a clean change)",
+      "defect_present_on_final_commit": false,
+      "escaped_defect_count": 0,
+      "expected_effect_checks": [
+        {
+          "direction": "unchanged",
+          "expected": "unchanged",
+          "held": false,
+          "measurable": false,
+          "note": "no expected_effect claim on the proposal record -> unmeasurable",
+          "observed": null,
+          "predicate": "code_change_risk"
+        }
+      ],
+      "flagged": true,
+      "flags": [
+        "construction-failure: expected proposal verify, got continue"
+      ],
+      "harm_11": 0.0,
+      "harm_28": 0.0,
+      "join_valid": true,
+      "proposal_action": "continue",
+      "proposal_confidence": 1.0,
+      "proposal_depth": 0,
+      "proposal_id": "27ca98604f711e19",
+      "repetition": "r2",
+      "slot": 2,
+      "test_executed_success": true,
+      "tests": "2/2",
+      "variant": null
+    },
+    {
+      "abstention_decision": "APPLY_NULL",
+      "abstention_leg": null,
+      "abstention_reason": "risk 0.19 < 0.2 but multi-term (NOT the Option A fingerprint) \u2014 apply-null (unchanged, not flagged).",
+      "accepted": true,
+      "application_proof": "provable-null:commit-trail",
+      "applied_or_null": "null",
+      "arm": "status_quo",
+      "cell_id": "cap2d_incorrect_rebuilt_status_quo_r1",
+      "class": "incorrect_rebuilt",
+      "cost_usd": 0.010332,
+      "cpvo_cell_usd": 0.010332,
+      "defect_note": "clean change \u2014 no defect (the false-positive VERIFY is on a clean change)",
+      "defect_present_on_final_commit": false,
+      "escaped_defect_count": 0,
+      "expected_effect_checks": [
+        {
+          "direction": "unchanged",
+          "expected": "unchanged",
+          "held": false,
+          "measurable": false,
+          "note": "no expected_effect claim on the proposal record -> unmeasurable",
+          "observed": null,
+          "predicate": "code_change_risk"
+        }
+      ],
+      "flagged": true,
+      "flags": [
+        "construction-failure: expected proposal verify, got continue"
+      ],
+      "harm_11": 0.0,
+      "harm_28": 0.0,
+      "join_valid": true,
+      "proposal_action": "continue",
+      "proposal_confidence": 1.0,
+      "proposal_depth": 0,
+      "proposal_id": "d0a64c6fb5ee0d96",
+      "repetition": "r1",
+      "slot": 3,
+      "test_executed_success": true,
+      "tests": "2/2",
+      "variant": null
+    },
+    {
+      "abstention_decision": "APPLY_NULL",
+      "abstention_leg": null,
+      "abstention_reason": "risk 0.19 < 0.2 but multi-term (NOT the Option A fingerprint) \u2014 apply-null (unchanged, not flagged).",
+      "accepted": true,
+      "application_proof": "provable-null:commit-trail",
+      "applied_or_null": "null",
+      "arm": "status_quo",
+      "cell_id": "cap2d_incorrect_rebuilt_status_quo_r2",
+      "class": "incorrect_rebuilt",
+      "cost_usd": 0.00935,
+      "cpvo_cell_usd": 0.00935,
+      "defect_note": "clean change \u2014 no defect (the false-positive VERIFY is on a clean change)",
+      "defect_present_on_final_commit": false,
+      "escaped_defect_count": 0,
+      "expected_effect_checks": [
+        {
+          "direction": "unchanged",
+          "expected": "unchanged",
+          "held": false,
+          "measurable": false,
+          "note": "no expected_effect claim on the proposal record -> unmeasurable",
+          "observed": null,
+          "predicate": "code_change_risk"
+        }
+      ],
+      "flagged": true,
+      "flags": [
+        "construction-failure: expected proposal verify, got continue"
+      ],
+      "harm_11": 0.0,
+      "harm_28": 0.0,
+      "join_valid": true,
+      "proposal_action": "continue",
+      "proposal_confidence": 1.0,
+      "proposal_depth": 0,
+      "proposal_id": "f2aa4bb85af9e4bd",
+      "repetition": "r2",
+      "slot": 4,
+      "test_executed_success": true,
+      "tests": "2/2",
+      "variant": null
+    },
+    {
+      "abstention_decision": "APPLY_NULL",
+      "abstention_leg": null,
+      "abstention_reason": "risk 0.18 < 0.2 but multi-term (NOT the Option A fingerprint) \u2014 apply-null (unchanged, not flagged).",
+      "accepted": true,
+      "application_proof": "provable-null:commit-trail",
+      "applied_or_null": "null",
+      "arm": "abstention",
+      "cell_id": "cap2d_irrelevant_abstention_r1",
+      "class": "irrelevant",
+      "cost_usd": 0.008819,
+      "cpvo_cell_usd": 0.008819,
+      "defect_note": "clean change \u2014 no defect (trivial, fully-tested change)",
+      "defect_present_on_final_commit": false,
+      "escaped_defect_count": 0,
+      "expected_effect_checks": [
+        {
+          "direction": "unchanged",
+          "expected": "unchanged",
+          "held": false,
+          "measurable": false,
+          "note": "no expected_effect claim on the proposal record -> unmeasurable",
+          "observed": null,
+          "predicate": "code_change_risk"
+        }
+      ],
+      "flagged": false,
+      "flags": [],
+      "harm_11": 0.0,
+      "harm_28": 0.0,
+      "join_valid": true,
+      "proposal_action": "continue",
+      "proposal_confidence": 1.0,
+      "proposal_depth": 0,
+      "proposal_id": "ca6c940489392833",
+      "repetition": "r1",
+      "slot": 1,
+      "test_executed_success": true,
+      "tests": "3/3",
+      "variant": null
+    },
+    {
+      "abstention_decision": "APPLY_NULL",
+      "abstention_leg": null,
+      "abstention_reason": "risk 0.18 < 0.2 but multi-term (NOT the Option A fingerprint) \u2014 apply-null (unchanged, not flagged).",
+      "accepted": true,
+      "application_proof": "provable-null:commit-trail",
+      "applied_or_null": "null",
+      "arm": "abstention",
+      "cell_id": "cap2d_irrelevant_abstention_r2",
+      "class": "irrelevant",
+      "cost_usd": 0.009036,
+      "cpvo_cell_usd": 0.009036,
+      "defect_note": "clean change \u2014 no defect (trivial, fully-tested change)",
+      "defect_present_on_final_commit": false,
+      "escaped_defect_count": 0,
+      "expected_effect_checks": [
+        {
+          "direction": "unchanged",
+          "expected": "unchanged",
+          "held": false,
+          "measurable": false,
+          "note": "no expected_effect claim on the proposal record -> unmeasurable",
+          "observed": null,
+          "predicate": "code_change_risk"
+        }
+      ],
+      "flagged": false,
+      "flags": [],
+      "harm_11": 0.0,
+      "harm_28": 0.0,
+      "join_valid": true,
+      "proposal_action": "continue",
+      "proposal_confidence": 1.0,
+      "proposal_depth": 0,
+      "proposal_id": "74766b3ad2b59cfc",
+      "repetition": "r2",
+      "slot": 4,
+      "test_executed_success": true,
+      "tests": "3/3",
+      "variant": null
+    },
+    {
+      "abstention_decision": "APPLY_NULL",
+      "abstention_leg": null,
+      "abstention_reason": "risk 0.18 < 0.2 but multi-term (NOT the Option A fingerprint) \u2014 apply-null (unchanged, not flagged).",
+      "accepted": true,
+      "application_proof": "provable-null:commit-trail",
+      "applied_or_null": "null",
+      "arm": "status_quo",
+      "cell_id": "cap2d_irrelevant_status_quo_r1",
+      "class": "irrelevant",
+      "cost_usd": 0.008983,
+      "cpvo_cell_usd": 0.008983,
+      "defect_note": "clean change \u2014 no defect (trivial, fully-tested change)",
+      "defect_present_on_final_commit": false,
+      "escaped_defect_count": 0,
+      "expected_effect_checks": [
+        {
+          "direction": "unchanged",
+          "expected": "unchanged",
+          "held": false,
+          "measurable": false,
+          "note": "no expected_effect claim on the proposal record -> unmeasurable",
+          "observed": null,
+          "predicate": "code_change_risk"
+        }
+      ],
+      "flagged": false,
+      "flags": [],
+      "harm_11": 0.0,
+      "harm_28": 0.0,
+      "join_valid": true,
+      "proposal_action": "continue",
+      "proposal_confidence": 1.0,
+      "proposal_depth": 0,
+      "proposal_id": "a73d3444f0ab9452",
+      "repetition": "r1",
+      "slot": 2,
+      "test_executed_success": true,
+      "tests": "3/3",
+      "variant": null
+    },
+    {
+      "abstention_decision": "APPLY_NULL",
+      "abstention_leg": null,
+      "abstention_reason": "risk 0.18 < 0.2 but multi-term (NOT the Option A fingerprint) \u2014 apply-null (unchanged, not flagged).",
+      "accepted": true,
+      "application_proof": "provable-null:commit-trail",
+      "applied_or_null": "null",
+      "arm": "status_quo",
+      "cell_id": "cap2d_irrelevant_status_quo_r2",
+      "class": "irrelevant",
+      "cost_usd": 0.009047,
+      "cpvo_cell_usd": 0.009047,
+      "defect_note": "clean change \u2014 no defect (trivial, fully-tested change)",
+      "defect_present_on_final_commit": false,
+      "escaped_defect_count": 0,
+      "expected_effect_checks": [
+        {
+          "direction": "unchanged",
+          "expected": "unchanged",
+          "held": false,
+          "measurable": false,
+          "note": "no expected_effect claim on the proposal record -> unmeasurable",
+          "observed": null,
+          "predicate": "code_change_risk"
+        }
+      ],
+      "flagged": false,
+      "flags": [],
+      "harm_11": 0.0,
+      "harm_28": 0.0,
+      "join_valid": true,
+      "proposal_action": "continue",
+      "proposal_confidence": 1.0,
+      "proposal_depth": 0,
+      "proposal_id": "b172f656dd273aef",
+      "repetition": "r2",
+      "slot": 3,
+      "test_executed_success": true,
+      "tests": "3/3",
+      "variant": null
+    },
+    {
+      "abstention_decision": "APPLY_NULL",
+      "abstention_leg": null,
+      "abstention_reason": "risk 0.18 < 0.2 but multi-term (NOT the Option A fingerprint) \u2014 apply-null (unchanged, not flagged).",
+      "accepted": false,
+      "application_proof": "provable-null:commit-trail",
+      "applied_or_null": "null",
+      "arm": "abstention",
+      "cell_id": "cap2d_unseen_family_abstention_r1",
+      "class": "unseen_family",
+      "cost_usd": 0.003693,
+      "cpvo_cell_usd": null,
+      "defect_note": "family: mutation/aliasing (tally mutates its input) present \u2014 NOT boundary-compare, NOT S1244, NOT S3776",
+      "defect_present_on_final_commit": true,
+      "escaped_defect_count": 1,
+      "expected_effect_checks": [
+        {
+          "direction": "unchanged",
+          "expected": "unchanged",
+          "held": false,
+          "measurable": false,
+          "note": "no expected_effect claim on the proposal record -> unmeasurable",
+          "observed": null,
+          "predicate": "code_change_risk"
+        }
+      ],
+      "flagged": false,
+      "flags": [],
+      "harm_11": 0.046109,
+      "harm_28": 0.112588,
+      "join_valid": true,
+      "proposal_action": "continue",
+      "proposal_confidence": 0.6667,
+      "proposal_depth": 0,
+      "proposal_id": "2b6d0cd47fd1bc49",
+      "repetition": "r1",
+      "slot": 1,
+      "test_executed_success": false,
+      "tests": "2/3",
+      "variant": null
+    },
+    {
+      "abstention_decision": "APPLY_NULL",
+      "abstention_leg": null,
+      "abstention_reason": "risk 0.18 < 0.2 but multi-term (NOT the Option A fingerprint) \u2014 apply-null (unchanged, not flagged).",
+      "accepted": false,
+      "application_proof": "provable-null:commit-trail",
+      "applied_or_null": "null",
+      "arm": "abstention",
+      "cell_id": "cap2d_unseen_family_abstention_r2",
+      "class": "unseen_family",
+      "cost_usd": 0.003752,
+      "cpvo_cell_usd": null,
+      "defect_note": "family: mutation/aliasing (tally mutates its input) present \u2014 NOT boundary-compare, NOT S1244, NOT S3776",
+      "defect_present_on_final_commit": true,
+      "escaped_defect_count": 1,
+      "expected_effect_checks": [
+        {
+          "direction": "unchanged",
+          "expected": "unchanged",
+          "held": false,
+          "measurable": false,
+          "note": "no expected_effect claim on the proposal record -> unmeasurable",
+          "observed": null,
+          "predicate": "code_change_risk"
+        }
+      ],
+      "flagged": false,
+      "flags": [],
+      "harm_11": 0.046109,
+      "harm_28": 0.112588,
+      "join_valid": true,
+      "proposal_action": "continue",
+      "proposal_confidence": 0.6667,
+      "proposal_depth": 0,
+      "proposal_id": "d7a772c442d8010a",
+      "repetition": "r2",
+      "slot": 4,
+      "test_executed_success": false,
+      "tests": "2/3",
+      "variant": null
+    },
+    {
+      "abstention_decision": "APPLY_NULL",
+      "abstention_leg": null,
+      "abstention_reason": "risk 0.18 < 0.2 but multi-term (NOT the Option A fingerprint) \u2014 apply-null (unchanged, not flagged).",
+      "accepted": false,
+      "application_proof": "provable-null:commit-trail",
+      "applied_or_null": "null",
+      "arm": "status_quo",
+      "cell_id": "cap2d_unseen_family_status_quo_r1",
+      "class": "unseen_family",
+      "cost_usd": 0.003819,
+      "cpvo_cell_usd": null,
+      "defect_note": "family: mutation/aliasing (tally mutates its input) present \u2014 NOT boundary-compare, NOT S1244, NOT S3776",
+      "defect_present_on_final_commit": true,
+      "escaped_defect_count": 1,
+      "expected_effect_checks": [
+        {
+          "direction": "unchanged",
+          "expected": "unchanged",
+          "held": false,
+          "measurable": false,
+          "note": "no expected_effect claim on the proposal record -> unmeasurable",
+          "observed": null,
+          "predicate": "code_change_risk"
+        }
+      ],
+      "flagged": false,
+      "flags": [],
+      "harm_11": 0.046109,
+      "harm_28": 0.112588,
+      "join_valid": true,
+      "proposal_action": "continue",
+      "proposal_confidence": 0.6667,
+      "proposal_depth": 0,
+      "proposal_id": "355e072059d7a57b",
+      "repetition": "r1",
+      "slot": 2,
+      "test_executed_success": false,
+      "tests": "2/3",
+      "variant": null
+    },
+    {
+      "abstention_decision": "APPLY_NULL",
+      "abstention_leg": null,
+      "abstention_reason": "risk 0.18 < 0.2 but multi-term (NOT the Option A fingerprint) \u2014 apply-null (unchanged, not flagged).",
+      "accepted": false,
+      "application_proof": "provable-null:commit-trail",
+      "applied_or_null": "null",
+      "arm": "status_quo",
+      "cell_id": "cap2d_unseen_family_status_quo_r2",
+      "class": "unseen_family",
+      "cost_usd": 0.003792,
+      "cpvo_cell_usd": null,
+      "defect_note": "family: mutation/aliasing (tally mutates its input) present \u2014 NOT boundary-compare, NOT S1244, NOT S3776",
+      "defect_present_on_final_commit": true,
+      "escaped_defect_count": 1,
+      "expected_effect_checks": [
+        {
+          "direction": "unchanged",
+          "expected": "unchanged",
+          "held": false,
+          "measurable": false,
+          "note": "no expected_effect claim on the proposal record -> unmeasurable",
+          "observed": null,
+          "predicate": "code_change_risk"
+        }
+      ],
+      "flagged": false,
+      "flags": [],
+      "harm_11": 0.046109,
+      "harm_28": 0.112588,
+      "join_valid": true,
+      "proposal_action": "continue",
+      "proposal_confidence": 0.6667,
+      "proposal_depth": 0,
+      "proposal_id": "f7259bad648b7412",
+      "repetition": "r2",
+      "slot": 3,
+      "test_executed_success": false,
+      "tests": "2/3",
+      "variant": null
+    }
+  ],
+  "per_class": {
+    "absent": {
+      "abstention": {
+        "accepted_outcomes": 1,
+        "cpvo_usd": 0.014194,
+        "decline_count": 2,
+        "escaped_defect_count": 1,
+        "flags": [],
+        "harm_11": 0.046109,
+        "harm_28": 0.112588,
+        "n": 2,
+        "total_cost_usd": 0.014194,
+        "verified_success_rate": 0.5
+      },
+      "status_quo": {
+        "accepted_outcomes": 1,
+        "cpvo_usd": 0.0144,
+        "decline_count": 2,
+        "escaped_defect_count": 1,
+        "flags": [],
+        "harm_11": 0.046109,
+        "harm_28": 0.112588,
+        "n": 2,
+        "total_cost_usd": 0.0144,
+        "verified_success_rate": 0.5
+      }
+    },
+    "competing": {
+      "abstention": {
+        "accepted_outcomes": 1,
+        "cpvo_usd": 0.028136,
+        "decline_count": 0,
+        "escaped_defect_count": 2,
+        "flags": [],
+        "harm_11": 0.092218,
+        "harm_28": 0.225176,
+        "n": 2,
+        "total_cost_usd": 0.028136,
+        "verified_success_rate": 0.5
+      },
+      "status_quo": {
+        "accepted_outcomes": 1,
+        "cpvo_usd": 0.038117,
+        "decline_count": 0,
+        "escaped_defect_count": 2,
+        "flags": [],
+        "harm_11": 0.092218,
+        "harm_28": 0.225176,
+        "n": 2,
+        "total_cost_usd": 0.038117,
+        "verified_success_rate": 0.5
+      }
+    },
+    "correct": {
+      "abstention": {
+        "accepted_outcomes": 2,
+        "cpvo_usd": 0.012467,
+        "decline_count": 0,
+        "escaped_defect_count": 0,
+        "flags": [],
+        "harm_11": 0.0,
+        "harm_28": 0.0,
+        "n": 2,
+        "total_cost_usd": 0.024933,
+        "verified_success_rate": 1.0
+      },
+      "status_quo": {
+        "accepted_outcomes": 2,
+        "cpvo_usd": 0.008467,
+        "decline_count": 0,
+        "escaped_defect_count": 0,
+        "flags": [],
+        "harm_11": 0.0,
+        "harm_28": 0.0,
+        "n": 2,
+        "total_cost_usd": 0.016933,
+        "verified_success_rate": 1.0
+      }
+    },
+    "harmful_partial": {
+      "abstention": {
+        "accepted_outcomes": 2,
+        "cpvo_usd": 0.024978,
+        "decline_count": 0,
+        "escaped_defect_count": 0,
+        "flags": [],
+        "harm_11": 0.0,
+        "harm_28": 0.0,
+        "n": 2,
+        "total_cost_usd": 0.049956,
+        "verified_success_rate": 1.0
+      },
+      "status_quo": {
+        "accepted_outcomes": 1,
+        "cpvo_usd": 0.043392,
+        "decline_count": 0,
+        "escaped_defect_count": 1,
+        "flags": [],
+        "harm_11": 0.046109,
+        "harm_28": 0.112588,
+        "n": 2,
+        "total_cost_usd": 0.043392,
+        "verified_success_rate": 0.5
+      }
+    },
+    "incorrect_rebuilt": {
+      "abstention": {
+        "accepted_outcomes": 2,
+        "cpvo_usd": 0.008008,
+        "decline_count": 0,
+        "escaped_defect_count": 0,
+        "flags": [
+          "construction-failure: expected proposal verify, got continue"
+        ],
+        "harm_11": 0.0,
+        "harm_28": 0.0,
+        "n": 2,
+        "total_cost_usd": 0.016017,
+        "verified_success_rate": 1.0
+      },
+      "status_quo": {
+        "accepted_outcomes": 2,
+        "cpvo_usd": 0.009841,
+        "decline_count": 0,
+        "escaped_defect_count": 0,
+        "flags": [
+          "construction-failure: expected proposal verify, got continue"
+        ],
+        "harm_11": 0.0,
+        "harm_28": 0.0,
+        "n": 2,
+        "total_cost_usd": 0.019682,
+        "verified_success_rate": 1.0
+      }
+    },
+    "irrelevant": {
+      "abstention": {
+        "accepted_outcomes": 2,
+        "cpvo_usd": 0.008928,
+        "decline_count": 0,
+        "escaped_defect_count": 0,
+        "flags": [],
+        "harm_11": 0.0,
+        "harm_28": 0.0,
+        "n": 2,
+        "total_cost_usd": 0.017855,
+        "verified_success_rate": 1.0
+      },
+      "status_quo": {
+        "accepted_outcomes": 2,
+        "cpvo_usd": 0.009015,
+        "decline_count": 0,
+        "escaped_defect_count": 0,
+        "flags": [],
+        "harm_11": 0.0,
+        "harm_28": 0.0,
+        "n": 2,
+        "total_cost_usd": 0.01803,
+        "verified_success_rate": 1.0
+      }
+    },
+    "unseen_family": {
+      "abstention": {
+        "accepted_outcomes": 0,
+        "cpvo_usd": null,
+        "decline_count": 0,
+        "escaped_defect_count": 2,
+        "flags": [],
+        "harm_11": 0.092218,
+        "harm_28": 0.225176,
+        "n": 2,
+        "total_cost_usd": 0.007445,
+        "verified_success_rate": 0.0
+      },
+      "status_quo": {
+        "accepted_outcomes": 0,
+        "cpvo_usd": null,
+        "decline_count": 0,
+        "escaped_defect_count": 2,
+        "flags": [],
+        "harm_11": 0.092218,
+        "harm_28": 0.225176,
+        "n": 2,
+        "total_cost_usd": 0.007611,
+        "verified_success_rate": 0.0
+      }
+    }
+  },
+  "phase": "p3_score",
+  "preregistration": "docs/designs/current/cap_adaptive_2d_preregistration.md",
+  "preregistration_revision": "9dc0b4a63",
+  "schema_version": "cap_adaptive_2d_score/v1",
+  "score_input_artifacts": [
+    {
+      "path": "experiments/results/cap_adaptive_2d/p2_execution_manifest.json",
+      "role": "the pre-registered assignment table (section 4)"
+    },
+    {
+      "path": "experiments/results/cap_adaptive_2d/p1_execution_manifest.json",
+      "role": "p1 (E1 measurement + incorrect_rebuilt probe)"
+    },
+    {
+      "path": "experiments/results/cap_adaptive_2d/p1_incorrect_rebuilt_probe.json",
+      "role": "the incorrect_rebuilt impacted pre-verification probe"
+    },
+    {
+      "path": "experiments/results/cap_adaptive_2d/cells",
+      "role": "p2 per-cell records (28 cells)"
+    },
+    {
+      "path": "experiments/results/proposals",
+      "role": "durable proposal records (confidence-carrying)"
+    }
+  ],
+  "scored_at": "20260828T043139Z",
+  "seed": "617e6763fcd238dc93a59ba1f41e01ba5f281c4748ef3867dbebeeca344c7dfb",
+  "spec_id": "cap_adaptive_2d@0.1",
+  "spec_sha256": "1258280d44f608c7fcccf91ef514cc5a39994a9fd352852d96fb35c919f2ea0c"
+}
