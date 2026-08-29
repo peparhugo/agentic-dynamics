@@ -1,0 +1,191 @@
+name: qualitative_routing_analysis
+question: >-
+  Turn the qualitative review corpus into real findings for ROUTING (the operator's
+  direction): what do the per-commit reviews' problems/strengths/scores say about which
+  model should be routed to which task type? The quantitative campaigns (2c/2d/2e/2f) hit
+  their measurement walls; the qualitative texture (1,680+ flash commit reviews + the
+  analyzed non-flash stories) is the untapped signal. This workflow COMPUTES the per-model
+  qualitative profiles from the review corpus (experiments/results/reviews/*.json +
+  analysis/*.json + stories/*.json), writes the FINDINGS doc (the routing-recommendation
+  implications, cited, with the methodology + the honest limits), and the adversarial
+  verifies the findings' honesty (the theme-matching methodology, the reviewer-model bias,
+  the corpus coverage, the routing claims' scope). The findings are the deliverable — the
+  routing code changes follow only after the operator's sign-off.
+version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: false
+repeatable: false
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: true
+    context:
+      domain_context: >-
+        PROVISIONAL DomainProfile. domain: cross-model routing / qualitative review
+        mining. canonical_sources:
+        [experiments/results/reviews/review_*.json (the commit reviews: problems,
+        strengths, summary, architectural_fit, convention_adherence,
+        introduces_technical_debt, better_or_worse), experiments/results/analysis/*.json
+        (the story analyses), experiments/results/stories/*.json (the story results:
+        model, condition, all_successful, cost), scripts/control/routing.py
+        (recommend_route — the quantitative entries it consumes today),
+        docs/reviews/cross_models_mixed_effect_caveat.md (the corpus's data-quality
+        caveats), the campaigns' verdicts (2d/2e/2f — the quantitative walls)].
+        policies: [findings_cited_not_asserted, methodology_disclosed, coverage_honest,
+        routing_implications_scoped]
+      challenge_context: >-
+        PROVISIONAL ChallengeProfile. challenge: research findings (the qualitative
+        routing signal). deliberation: [compute the corpus profiles, write the findings,
+        adversarial]. session_policy: {default: fork_per_phase}
+      current_state: >-
+        The review corpus: 340 review files (339 flash + 1 unknown-model), the analyzed
+        stories 351 (the flash corpus 1,680 commit reviews; the non-flash stories'
+        analyses exist — the haiku re-measurement 12/12 analyzed — but their REVIEWS
+        never ran (the review pipeline's enumeration gap: 13 old '?'-model stories lack
+        reviews — a coverage tail, recorded honestly). The per-model qualitative
+        COMPARISON is therefore partial: flash is fully textured; the other models'
+        review coverage is thin or absent — the findings must state exactly what the
+        corpus supports and what it does not. The reviewer model is flash (a judgment
+        bias to weight). The quantitative campaigns: 2c NON-INFERIOR (the informational
+        boundary), 2d/2e/2f REFUTE (the abstention walls), cross-models measured the
+        cost-per-success frontier — the qualitative signal is the new input the routing
+        recommendation does not yet consume.
+      hard_rules: >-
+        (1) Every phase commits '[workflow] <phase>' (the worktree hook enforces it);
+        every docs/ file carries status frontmatter (the DOC_CONTRACT gate).
+        (2) FINDINGS CITED, NOT ASSERTED: every finding cites its corpus rows (the review
+        file + the commit hash or the story id); an uncited claim is a FAILED finding.
+        (3) METHODOLOGY DISCLOSED: the theme-matching rules (the keyword patterns + their
+        limits), the numeric fields' semantics, and the reviewer-model bias are stated in
+        the findings — a hidden methodology is a FAILED finding.
+        (4) COVERAGE HONEST: the findings report the per-model coverage exactly (the
+        review counts per model, the 13 uncovered stories, the '?'-model files) and
+        scope every claim to its coverage — a claim beyond the coverage is a FAILED
+        finding.
+        (5) ROUTING IMPLICATIONS SCOPED: the findings recommend routing changes ONLY where
+        the corpus supports them (n >= a stated floor, the model's texture distinct); a
+        recommendation beyond the evidence is a FAILED finding. The status-quo routing
+        stands unless the findings justify its change.
+        (6) THE QUANTITATIVE WALLS RESPECTED: the findings do not contradict the
+        campaigns' verdicts (2d/2e/2f REFUTE — the abstention walls stand); the
+        qualitative signal complements, never re-opens.
+        (7) The corpus is READ-ONLY: this workflow never edits the review/analysis/story
+        files; the 13-story coverage tail is reported, not fixed here (the
+        fleet-ladder D-12 discipline is the systemic fix).
+        (8) BOUNDED PHASES: p1 computes, p2 writes the findings, p3 adversarial-verifies.
+        (9) Every number cites its source. (10) No routing-code changes — the findings
+        doc is the deliverable; the code follows the operator's sign-off. (11) p3
+        adversarial mandatory. (12) Resumable only when spec version, goal hash, source
+        revision, and candidate-manifest hash match.
+      read_first: >-
+        experiments/results/reviews/review_*.json (sample 3-4 files first: the field
+        semantics), experiments/results/stories/*.json (the model/condition fields),
+        scripts/control/routing.py (recommend_route's inputs today),
+        docs/reviews/cross_models_mixed_effect_caveat.md (the corpus caveats)
+      run_shape: >-
+        SINGLE wrapper: deepseek/deepseek-v4-pro (the interpretation is the value — the
+        operator's escalation pattern for the judgment-heavy phases). One branch
+        (feature/qualitative-routing-analysis); each phase commits [workflow] <phase>;
+        the findings land under docs/reviews/ in the branch. No cells, no grid. The data
+        chain stays single-writer.
+    phases:
+      - name: p1_compute
+        kind: agent
+        timeout: 21600
+        prompt: |
+          GOAL: {goal}
+          ROLE: the corpus computation — BOUNDED to computing the per-model qualitative
+          profiles. Do not interpret beyond the numbers; do not write the findings. Run
+          the computation over the corpus (a script under scripts/archive/ or a
+          committed analysis in the worktree — the computation must be reproducible):
+          (1) PER MODEL: the review-file counts + the commit-review counts; the numeric
+          texture (mean architectural_fit, mean convention_adherence, the debt rate, the
+          better/worse distribution); the problem-theme distribution (a disclosed keyword
+          pattern set over the problems lists: hygiene/cleanup/scope/no-op/timeout/
+          spec-drift/tests/wrong-approach — the patterns printed in the computation
+          output); the strengths' themes; the summary-text themes (a sample-read of the
+          top summaries per model).
+          (2) THE COVERAGE TABLE: per model: stories | analyzed | reviewed | uncovered —
+          exactly, including the 13 uncovered stories + the '?'-model files.
+          (3) THE CORRELATIONS that are computable: review scores vs the story outcomes
+          (test_executed_success / all_successful), the debt rate vs the condition, the
+          wrong-approach rate vs the condition.
+          DELIVER: the computation script + its output (a committed JSON/CSV under
+          experiments/results/qualitative_routing/) + the summary numbers in the commit
+          message. Commit it.
+          LOG: the per-model table + the coverage table; PASS/FAIL; commit.
+      - name: p2_findings
+        kind: agent
+        timeout: 21600
+        prompt: |
+          GOAL: {goal}
+          ROLE: the findings — write the routing-findings doc from p1's computed output.
+          Do NOT re-compute; cite p1's numbers. Produce docs/reviews/qualitative_routing_findings.md
+          (status: accepted frontmatter) containing:
+          (1) THE METHODOLOGY: the corpus (the review/analysis/story files + the counts),
+          the theme-matching patterns (quoted from p1's script), the numeric fields'
+          semantics, the reviewer-model bias (flash reviews flash), the coverage limits.
+          (2) THE PER-MODEL QUALITATIVE PROFILES: what the corpus supports per model —
+          with the coverage floor stated per claim (a profile claim requires n >= 10
+          commit reviews; below that, the model is "insufficiently covered").
+          (3) THE ROUTING IMPLICATIONS: per task type (volume cells, frontier reasoning,
+          the review layer, the wrapper phases), what the qualitative texture suggests —
+          SCOPED to the evidence: e.g., flash's texture (hygiene/cleanup-heavy, a
+          minority wrong-approach, a correctness-praise floor) vs the quantitative
+          frontier; a routing change is proposed ONLY where the corpus supports it and
+          the status quo is the baseline (the recommendation: keep / shift / gate).
+          (4) THE HONEST LIMITS: the 13-story coverage tail, the '?' files, the thin
+          non-flash review coverage, the reviewer bias — each stated where it bounds a
+          claim.
+          (5) THE FINDINGS SUMMARY: the 3-5 real findings (cited), the recommended
+          routing posture, and what measurement would firm each finding (the next
+          analysis needed).
+          DELIVER: the findings doc; commit it.
+          LOG: the findings list; PASS/FAIL; commit.
+      - name: p3_adversarial
+        kind: agent
+        timeout: 14400
+        prompt: |
+          GOAL: {goal}
+          ROLE: adversarial verifier — falsify the findings. Attack in order:
+          (1) CITATION HONESTY: every finding's citations resolve to real corpus rows;
+          an uncited or mis-cited claim is a FAILED finding.
+          (2) METHODOLOGY HONESTY: the theme patterns are quoted and their limits
+          disclosed (the keyword matching's false positives/negatives); the reviewer bias
+          is weighted; a hidden methodology is a FAILED finding.
+          (3) COVERAGE HONESTY: the per-model claims respect the coverage floors; the 13
+          uncovered stories + the '?' files bound the claims; a claim beyond the coverage
+          is a FAILED finding.
+          (4) ROUTING SCOPING: the routing recommendations are evidence-grounded and the
+          status quo is the baseline; a recommendation beyond the evidence is a FAILED
+          finding.
+          (5) THE QUANTITATIVE WALLS: the findings do not contradict the campaigns'
+          verdicts (2d/2e/2f REFUTE stand).
+          (6) REPRODUCIBILITY: p1's computation re-runs from the committed script +
+          the corpus and reproduces the cited numbers (re-run the script and compare at
+          least the headline numbers).
+          Deliver TWO outputs:
+          docs/reviews/qualitative_routing_findings_adversary.md +
+          docs/reviews/qualitative_routing_findings_known_safe.md (BOTH with status:
+          accepted frontmatter).
+          LOG: finding table + known-safe list; PASS/FAIL; commit.
+factors:
+  - {name: model, levels: [deepseek/deepseek-v4-pro]}
+design: factorial
+rules:
+  - {name: corpus_computed, plane: measurement, evidence_class: "[C]", requires: [], produces: [per_model_profiles, coverage_table]}
+  - {name: findings_written, plane: measurement, evidence_class: "[C]", requires: [per_model_profiles, coverage_table], produces: [routing_findings]}
+  - {name: findings_verified, plane: measurement, evidence_class: "[C]", requires: [routing_findings], produces: [findings_known_safe]}
+metrics:
+  - {name: findings_cited, agg: mean, over: cell}
+  - {name: coverage_honesty, agg: mean, over: cell}
+comparison: {kind: effect_size, arm_factor: model, loss: {cost: 1.0, quality: 0.0, value: 0.0}}
+writeup:
+  format: lab_book
+  sections: [question, p1_compute, p2_findings, p3_adversarial]
+stop: {budget_usd: 30.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}
