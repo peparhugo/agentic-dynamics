@@ -1,0 +1,8 @@
+model,review_files,commit_reviews,mean_architectural_fit,mean_convention_adherence,debt_rate,better,neutral,worse,unclear
+deepseek/deepseek-v4-flash,40,197,0.7597,0.6882,0.5787,138,29,19,11
+deepseek/deepseek-v4-pro,88,421,0.7466,0.7126,0.6888,283,79,49,10
+openai/gpt-5.6-luna,80,387,0.758,0.7233,0.6512,284,54,35,14
+openai/gpt-5.6-sol,37,184,0.7364,0.6776,0.5924,134,23,17,10
+openai/gpt-5.6-terra,40,200,0.7472,0.6937,0.6,145,27,20,8
+anthropic/claude-haiku-4-5,61,305,0.7646,0.7478,0.6033,152,105,36,12
+anthropic/claude-sonnet-5,46,230,0.8303,0.7694,0.3348,155,55,9,11

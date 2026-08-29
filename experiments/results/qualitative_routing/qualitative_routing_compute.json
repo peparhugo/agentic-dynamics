@@ -1,0 +1,826 @@
+{
+  "workflow": "qualitative_routing_analysis",
+  "phase": "p1_compute",
+  "generated_at": "2026-08-29T17:27:30.776536+00:00",
+  "corpus": {
+    "story_files": 321,
+    "analysis_files": 243,
+    "flash_review_files": 339,
+    "blind_review_files": 69,
+    "question_model_files": [
+      "review_3d249683eef3.json",
+      "review_b366ecdc6f88.json"
+    ],
+    "orphan_reviews": [
+      "2b6e48207bb2",
+      "4e7abddc43f1",
+      "4f80a9ea38aa",
+      "5196e779c1ca",
+      "5b87673f0d7a",
+      "5be412dd5b87",
+      "5d7640124ed4",
+      "6bc71fa28f35",
+      "7005f70e2fd6",
+      "717db4bfbeb1",
+      "890584be7186",
+      "98507441e613",
+      "b0605aea4868",
+      "c46ad3251602",
+      "cfcbffa207dc",
+      "deda665d540d",
+      "e70c34ba8545",
+      "f97c727f41d3"
+    ],
+    "total_commit_reviews": 2014
+  },
+  "methodology": {
+    "subject_model_join": "review.story_id -> story.model; the review file's 'model' field is the REVIEWER (always deepseek/deepseek-v4-flash), not the subject.",
+    "theme_patterns": {
+      "hygiene/cleanup": [
+        "\\.gitignore",
+        "node_modules",
+        "\\bdist\\b",
+        "cleanup",
+        "hygiene",
+        "unused",
+        "dead code",
+        "duplication",
+        "duplicated",
+        "smell",
+        "deprecated",
+        "lockfile",
+        "committed\\b",
+        "leftover",
+        "stale"
+      ],
+      "scope": [
+        "scope creep",
+        "out of scope",
+        "beyond the scope",
+        "scope",
+        "greenfield",
+        "wholesale",
+        "unrelated",
+        "throwaway",
+        "dead-end",
+        "rewrite",
+        "bloat"
+      ],
+      "no-op": [
+        "no changes",
+        "no-op",
+        "noop",
+        "empty commit",
+        "nothing changed",
+        "does nothing",
+        "no effect"
+      ],
+      "timeout": [
+        "timeout",
+        "timed out",
+        "hang",
+        "stall",
+        "deadlock",
+        "blocking the event loop"
+      ],
+      "spec-drift": [
+        "off-spec",
+        "spec drift",
+        "drift",
+        "deviate",
+        "does not match the spec",
+        "missing requirement",
+        "not in the spec",
+        "contradicts the spec",
+        "unrequested",
+        "requirement\\b"
+      ],
+      "tests": [
+        "test",
+        "coverage",
+        "untested",
+        "pytest",
+        "jest",
+        "assertion",
+        "no test",
+        "test suite"
+      ],
+      "wrong-approach": [
+        "wrong approach",
+        "wrong-approach",
+        "incorrect approach",
+        "misguided",
+        "misconceiv",
+        "should instead",
+        "rethink",
+        "replaced the",
+        "discards the",
+        "wholesale-replaced",
+        "anti-pattern",
+        "mis-",
+        "misapply"
+      ]
+    },
+    "theme_pattern_limits": [
+      "keyword substring matching \u2014 false positives/negatives possible; heuristic, not taxonomy.",
+      "a problem may match multiple themes; per-theme rates are non-exclusive.",
+      "blind reviews' problems are plain strings (no category/severity); flash reviews' are dicts."
+    ]
+  },
+  "profiles": {
+    "anthropic/claude-sonnet-5": {
+      "review_files": 46,
+      "commit_reviews": 230,
+      "mean_architectural_fit": 0.8303,
+      "mean_convention_adherence": 0.7694,
+      "debt_rate": 0.3348,
+      "better_or_worse": {
+        "neutral": 55,
+        "better": 155,
+        "worse": 9,
+        "unclear": 11
+      },
+      "problem_themes": {
+        "tests": 181,
+        "wrong-approach": 2,
+        "spec-drift": 21,
+        "timeout": 68,
+        "scope": 40,
+        "hygiene/cleanup": 97,
+        "no-op": 3
+      },
+      "problem_categories": {
+        "convention": 159,
+        "testing": 73,
+        "maintainability": 227,
+        "security": 52,
+        "architecture": 133,
+        "dependency": 41,
+        "performance": 45,
+        "other": 24,
+        "complexity": 1
+      },
+      "strength_themes": {
+        "timeout": 37,
+        "tests": 162,
+        "hygiene/cleanup": 107,
+        "scope": 30,
+        "no-op": 3,
+        "spec-drift": 6
+      },
+      "reviewer_models": {
+        "deepseek/deepseek-v4-flash": 230
+      }
+    },
+    "openai/gpt-5.6-luna": {
+      "review_files": 80,
+      "commit_reviews": 387,
+      "mean_architectural_fit": 0.758,
+      "mean_convention_adherence": 0.7233,
+      "debt_rate": 0.6512,
+      "better_or_worse": {
+        "better": 284,
+        "neutral": 54,
+        "worse": 35,
+        "unclear": 14
+      },
+      "problem_themes": {
+        "tests": 259,
+        "wrong-approach": 11,
+        "scope": 42,
+        "hygiene/cleanup": 188,
+        "no-op": 9,
+        "spec-drift": 30,
+        "timeout": 114
+      },
+      "problem_categories": {
+        "convention": 197,
+        "architecture": 202,
+        "maintainability": 333,
+        "performance": 67,
+        "testing": 79,
+        "security": 56,
+        "dependency": 39,
+        "other": 18,
+        "reliability": 2,
+        "correctness": 3,
+        "concurrency": 1
+      },
+      "strength_themes": {
+        "hygiene/cleanup": 165,
+        "scope": 33,
+        "tests": 107,
+        "timeout": 38,
+        "spec-drift": 4,
+        "wrong-approach": 1,
+        "no-op": 1
+      },
+      "reviewer_models": {
+        "deepseek/deepseek-v4-flash": 387
+      }
+    },
+    "openai/gpt-5.6-sol": {
+      "review_files": 37,
+      "commit_reviews": 184,
+      "mean_architectural_fit": 0.7364,
+      "mean_convention_adherence": 0.6776,
+      "debt_rate": 0.5924,
+      "better_or_worse": {
+        "worse": 17,
+        "better": 134,
+        "neutral": 23,
+        "unclear": 10
+      },
+      "problem_themes": {
+        "hygiene/cleanup": 99,
+        "scope": 58,
+        "tests": 167,
+        "spec-drift": 16,
+        "timeout": 62,
+        "wrong-approach": 8,
+        "no-op": 6
+      },
+      "problem_categories": {
+        "architecture": 167,
+        "dependency": 43,
+        "convention": 170,
+        "maintainability": 243,
+        "testing": 47,
+        "other": 16,
+        "security": 33,
+        "performance": 53,
+        "concurrency": 1,
+        "reliability": 1
+      },
+      "strength_themes": {
+        "tests": 103,
+        "timeout": 28,
+        "hygiene/cleanup": 124,
+        "scope": 24,
+        "spec-drift": 4
+      },
+      "reviewer_models": {
+        "deepseek/deepseek-v4-flash": 184
+      }
+    },
+    "anthropic/claude-haiku-4-5": {
+      "review_files": 61,
+      "commit_reviews": 305,
+      "mean_architectural_fit": 0.7646,
+      "mean_convention_adherence": 0.7478,
+      "debt_rate": 0.6033,
+      "better_or_worse": {
+        "worse": 36,
+        "neutral": 105,
+        "better": 152,
+        "unclear": 12
+      },
+      "problem_themes": {
+        "hygiene/cleanup": 238,
+        "scope": 75,
+        "timeout": 114,
+        "spec-drift": 27,
+        "no-op": 14,
+        "tests": 299,
+        "wrong-approach": 8
+      },
+      "problem_categories": {
+        "architecture": 242,
+        "convention": 213,
+        "maintainability": 381,
+        "dependency": 68,
+        "other": 24,
+        "testing": 98,
+        "security": 76,
+        "performance": 49,
+        "robustness": 1,
+        "correctness": 1,
+        "maintenance": 1,
+        "reliability": 1
+      },
+      "strength_themes": {
+        "tests": 211,
+        "wrong-approach": 2,
+        "hygiene/cleanup": 159,
+        "scope": 47,
+        "timeout": 56,
+        "spec-drift": 6,
+        "no-op": 3
+      },
+      "reviewer_models": {
+        "deepseek/deepseek-v4-flash": 305
+      }
+    },
+    "deepseek/deepseek-v4-pro": {
+      "review_files": 88,
+      "commit_reviews": 421,
+      "mean_architectural_fit": 0.7466,
+      "mean_convention_adherence": 0.7126,
+      "debt_rate": 0.6888,
+      "better_or_worse": {
+        "neutral": 79,
+        "worse": 49,
+        "better": 283,
+        "unclear": 10
+      },
+      "problem_themes": {
+        "spec-drift": 26,
+        "scope": 65,
+        "hygiene/cleanup": 282,
+        "tests": 345,
+        "timeout": 120,
+        "no-op": 13,
+        "wrong-approach": 5
+      },
+      "problem_categories": {
+        "maintainability": 400,
+        "convention": 216,
+        "testing": 96,
+        "architecture": 209,
+        "dependency": 56,
+        "performance": 50,
+        "other": 23,
+        "security": 54,
+        "api": 1,
+        "info": 1,
+        "concurrency": 1
+      },
+      "strength_themes": {
+        "hygiene/cleanup": 194,
+        "scope": 45,
+        "tests": 203,
+        "timeout": 49,
+        "spec-drift": 3,
+        "no-op": 3
+      },
+      "reviewer_models": {
+        "deepseek/deepseek-v4-flash": 421
+      }
+    },
+    "deepseek/deepseek-v4-flash": {
+      "review_files": 40,
+      "commit_reviews": 197,
+      "mean_architectural_fit": 0.7597,
+      "mean_convention_adherence": 0.6882,
+      "debt_rate": 0.5787,
+      "better_or_worse": {
+        "worse": 19,
+        "better": 138,
+        "unclear": 11,
+        "neutral": 29
+      },
+      "problem_themes": {
+        "scope": 54,
+        "tests": 242,
+        "hygiene/cleanup": 134,
+        "timeout": 52,
+        "spec-drift": 19,
+        "no-op": 2,
+        "wrong-approach": 14
+      },
+      "problem_categories": {
+        "architecture": 150,
+        "security": 32,
+        "convention": 174,
+        "maintainability": 254,
+        "testing": 69,
+        "performance": 49,
+        "other": 19,
+        "dependency": 34,
+        "reliability": 3,
+        "quality": 1
+      },
+      "strength_themes": {
+        "tests": 156,
+        "hygiene/cleanup": 127,
+        "timeout": 34,
+        "scope": 36,
+        "no-op": 7,
+        "spec-drift": 3,
+        "wrong-approach": 1
+      },
+      "reviewer_models": {
+        "deepseek/deepseek-v4-flash": 197
+      }
+    },
+    "openai/gpt-5.6-terra": {
+      "review_files": 40,
+      "commit_reviews": 200,
+      "mean_architectural_fit": 0.7472,
+      "mean_convention_adherence": 0.6937,
+      "debt_rate": 0.6,
+      "better_or_worse": {
+        "better": 145,
+        "neutral": 27,
+        "worse": 20,
+        "unclear": 8
+      },
+      "problem_themes": {
+        "wrong-approach": 13,
+        "scope": 50,
+        "tests": 180,
+        "hygiene/cleanup": 133,
+        "timeout": 72,
+        "no-op": 8,
+        "spec-drift": 17
+      },
+      "problem_categories": {
+        "architecture": 170,
+        "convention": 181,
+        "performance": 60,
+        "maintainability": 296,
+        "security": 41,
+        "dependency": 35,
+        "testing": 78,
+        "other": 23,
+        "concurrency": 1,
+        "robustness": 1
+      },
+      "strength_themes": {
+        "hygiene/cleanup": 120,
+        "tests": 127,
+        "timeout": 27,
+        "scope": 33,
+        "wrong-approach": 2
+      },
+      "reviewer_models": {
+        "deepseek/deepseek-v4-flash": 200
+      }
+    },
+    "unknown": {
+      "review_files": 18,
+      "commit_reviews": 90,
+      "mean_architectural_fit": 1.0,
+      "mean_convention_adherence": 1.0,
+      "debt_rate": 0.0,
+      "better_or_worse": {
+        "neutral": 90
+      },
+      "problem_themes": {},
+      "problem_categories": {},
+      "strength_themes": {},
+      "reviewer_models": {
+        "deepseek/deepseek-v4-flash": 90
+      }
+    }
+  },
+  "top_summaries": {
+    "anthropic/claude-sonnet-5": {
+      "commit_summaries": [
+        "A security-conscious feature addition (hashed auth + per-owner scoping) that fits the app's existing structure and genuinely improves it, though it ships modest debt \u2014 request.user instead of flask.g, deprecated utcnow, an unversioned legacy alias signature, and no tests \u2014 and its clean diff sits inside a repo that already measures 0.68 convention compliance, with most listed violations (celery_app.py, celery_config.py, __init__.py) in files this commit never touches, so the 0.68 overstates this change's own deviation.",
+        "Cleanly engineered integration commit (Redis pub/sub backbone + SQLite history + Redis presence) with strong DI/testability seams and good tests; convention analyzer's 0.78 reads pessimistic \u2014 the listed violations (UPPER_CASE constants, PascalCase classes, files outside this commit like app.py/registry.py) are largely false positives against code that actually follows the conventions, so I rate adherence ~0.85 with the only real gap being broker resilience (unhandled background-task failures, no reconnect).",
+        "A well-architected, opt-in incremental cache that fits the SSG's engine/plugin boundary and ships a strong unit-test suite, but adds real complexity (+33, +1 bug/+1 smell per SonarQube), skips the whole plugin pipeline on hits without an integration test, and the 0.60 convention score is a repo-wide measurement driven by pre-existing violations in index.ts/dev-server-plugin.ts \u2014 files this commit does not touch \u2014 while the commit's own code is convention-clean.",
+        "A clean, pattern-following extension adding channel subscriptions to the notification server, consistent with the existing registry/broadcast design and improving HTTP response handling, though shipped without tests and with some duplicated broadcast logic. Note: the measured 0.81 convention score and listed violations come from files this commit never touched (app.py, __init__.py, store.py, transport.py) \u2014 the commit's own code adheres to codebase conventions.",
+        "A well-engineered commit that cleanly adds pagination and user-aware rate limiting while respecting the repository pattern and JWT conventions, but it introduces real technical debt via a hard Redis dependency for the app and test suite \u2014 and its own code is convention-clean (\u22480.85), so the measured 0.71 codebase convention score reflects pre-existing violations in untouched files (celery_config.py, notifications.py) rather than anything this diff adds."
+      ],
+      "story_summaries": [
+        "A textbook-incremental, high-coherence five-session story \u2014 greenfield base, auth, async integration, repository refactor, and cross-cutting rate-limiting/pagination \u2014 where each session builds directly on the prior one and quality improved monotonically (16 to 61 passing tests), marred only by the persistent single-lock flat-file storage choice and the orphaning of pre-auth tasks.",
+        "A highly coherent five-session arc (greenfield \u2192 auth feature \u2192 async integration \u2192 repository refactor \u2192 cross-cutting pagination/rate-limiting) where each session builds naturally on its predecessors with strong test discipline, marred only by an abandoned SQLite seed left in the repo and a lingering Celery/Redis runtime coupling introduced at the integration step.",
+        "A logically progressive, architecturally ambitious five-session build that degrades at the finish: Sessions 1-3 add clean, tested features, but the Session 4 plugin refactor introduces TypeScript compile errors that cascade into Session 5, leaving the final commit's substantial incremental-cache feature completely unverified."
+      ]
+    },
+    "openai/gpt-5.6-luna": {
+      "commit_summaries": [
+        "Discrepancy flagged: the 8 convention violations reference files outside this diff (celery_config.py, repositories.py, tasks.py, test_app.py) and the app.py class/PascalCase items appear spurious for a file that defines only snake_case functions, so the 0.71 score reflects pre-existing codebase state rather than this commit; the commit adds a coherent, owner-scoped auth feature but introduces real technical debt via hand-rolled JWT, an insecure default secret, dropped type hints, and no test coverage, making it a net-neutral change.",
+        "Adds secure, idiomatic auth \u2014 password hashing, per-user ownership scoping, and a careful constant-time JWT verify \u2014 to the single-file Flask app, but hand-rolled JWT and a weak default secret introduce modest debt; the 0.70 convention score is dragged by pre-existing violations in files outside this diff (celery_config.py, repositories.py, tasks.py, test_app.py), not by this commit, which follows snake_case/UPPER_CASE conventions cleanly (0 new classes, +10 imports).",
+        "A clean, well-tested integration that adds async completion notifications with correct transition semantics and graceful broker failure handling; the measured convention score of 0.67 is misleading because 8 of the 9 flagged violations are analyzer false positives (repositories.py is not even in this diff, no classes or functions were added where claimed), so my qualitative convention judgment of ~0.85 deliberately departs from the mechanical score.",
+        "Coherent, well-scoped auth feature that fits the existing Flask/DB architecture, but ships a hardcoded JWT secret, hand-rolled token crypto, and a legacy unowned lookup path; note the 8 listed convention violations reference files (celery_config.py, repositories.py, tasks.py, test_app.py) outside the shown diff portion, so they may be pre-existing rather than introduced here, and the convention score 0.71 is treated as ground truth regardless.",
+        "Sound keyset pagination and correctly-scoped rate limiting that respect the existing repository layering and ship with good tests, but the breaking GET /tasks response-shape change, a brittle boundary-coupled rate-limit test, and the lowercase module-level `limiter` constant add modest debt \u2014 overall better than the prior state, with the 0.70 convention score mostly reflecting pre-existing violations in files this commit never touched."
+      ],
+      "story_summaries": [
+        "A highly coherent five-session story that progressed logically from greenfield WebSocket server through channels, Redis/SQLite integration, and a transport refactor to rate limiting and message history, with tests passing at every step and quality rising throughout \u2014 marred only by early hand-rolled HTTP/threading choices that accumulated into a growing monolith server class.",
+        "A highly coherent five-session progression from a bare task API to a production-flavored multi-user service with auth, ownership isolation, async notifications, a repository layer, rate limiting, and pagination \u2014 quality rising with each session despite minor long-lived warts like an incomplete requirements.txt and a fragile SQL-field reconstruction in the update path.",
+        "A highly coherent five-session arc that follows greenfield \u2192 feature \u2192 integration \u2192 refactor \u2192 cross-cutting, culminating in a strong incremental-build session that was only possible because Session 4's plugin refactor created the right seams \u2014 the primary compounding cost was Session 1/2's monolith and hand-rolled template engine, which Session 4 had to dismantle."
+      ]
+    },
+    "openai/gpt-5.6-sol": {
+      "commit_summaries": [
+        "Greenfield rewrite replaces the seeded auth API with a modular task/notification service using durable atomic JSON persistence, but carries convention debt (0.67, 10 naming violations), higher cognitive complexity, and a single-file store guarded only by an in-process lock in place of the seed's SQLite schema \u2014 a reasonable strategy for a greenfield session, though it abandons the seeded patterns and functionality (note: the listed 'app.py: Classes should use PascalCase' violation looks like a possible false positive since the new code's primary class is PascalCase).",
+        "Solid refactor that preserves the API contract, fixes the status bug, and cleans up dead code, with the mechanical 0.67 convention score being misleading for this commit \u2014 its app.py 'violations' are false positives (the lowercase `app` Flask instance is idiomatic, and no module-level constants remain) and the other violations live in untouched files (celery_config.py, notification_tasks.py, repositories.py), so the commit's own code is cleaner than the repo baseline. ",
+        "A well-structured greenfield rebuild that trades away the seed's single-file Express pattern (and accrues 35 naming violations, convention 0.52) for a genuinely modular TypeScript CLI \u2014 a net architectural improvement with weak convention adherence. Note: mechanical measurements conflict \u2014 SonarQube flags classes/interfaces in cli.ts/config.ts/engine.ts while the AST diff reports +0 classes and only +2 functions, which I could not fully reconcile.",
+        "The refactor hits the architectural target (a real plugin system in the right direction for Session 5), but net-net it's worse: it shipped 46 naming-convention violations in new files, raised cognitive complexity (+13) and duplication (+2.7%), and demoted typescript into production deps \u2014 all counterproductive for a refactor commit, though the 0.51 convention score is consistent with the measured violations rather than a false negative.",
+        "The agent correctly pivoted from a mismatched auth-API seed to the right SSG architecture with a sane modular layout, but convention adherence is poor (0.51, 50 naming violations) and the full-baseline deletion trades traceability for a fresh start \u2014 note the discrepancy that AST counts +0 classes while the linter flags PascalCase class violations, indicating those flags target interfaces/type aliases rather than real structural debt."
+      ],
+      "story_summaries": [
+        "A textbook, highly coherent five-session arc \u2014 greenfield \u2192 auth \u2192 async integration \u2192 repository refactor \u2192 cross-cutting \u2014 that stayed green and improved in surgical precision throughout, though Session 1's unforced abandonment of the mandated SQLite/seed architecture silently rippled into requirement mismatches in later sessions (notably the SQL-flavored Session 4 refactor prompt).",
+        "A textbook-clear five-session arc \u2014 greenfield \u2192 auth \u2192 async integration \u2192 repository refactor \u2192 cross-cutting hardening \u2014 where each session built on its predecessor with a growing, consistently-green test suite, hampered only by a few early shortcuts (hand-rolled JWT, single-process flat-file storage under Celery, username-as-email) that were never repaid.",
+        "A highly coherent, well-sequenced story that progressed from a greenfield WebSocket server through channels, multi-instance Redis/SQLite integration, a transport abstraction, and operational hardening, improving in quality each session while accumulating modest-but-real refactoring debt in the form of dead legacy code and duplicated registry state."
+      ]
+    },
+    "anthropic/claude-haiku-4-5": {
+      "commit_summaries": [
+        "Solid cross-cutting addition of per-user rate limiting and cursor pagination with good test coverage, but the pagination bypasses the repository layer (O(n) in-memory slicing) and pairs an id-based cursor with created_at-based ordering, introducing correctness and maintainability debt. Flag: the mechanical convention score of 0.71 counts violations in files untouched by this commit (celery_config.py, celery_tasks.py, repositories.py); the code actually introduced here is cleaner than the repo baseline.",
+        "Solid cross-cutting addition (rate limiting + cursor pagination) that fits the app's repository/route architecture and is well-tested; the measured 0.71 convention score is dragged down mostly by pre-existing violations in untouched files (celery_config.py, tasks.py), with only one new minor violation introduced (snake_case constant), offset by minor debt from a bare except, the TESTING-flag limiter subclass, and an O(n) total count that undercuts cursor-pagination's scalability.",
+        "A solid, natural story progression that adds JWT auth and correct per-user task scoping with hashed passwords and new tests \u2014 but introduces real technical debt via a hardcoded JWT secret fallback and a schema change with no migration for pre-existing databases, and the measured 0.77 convention score is polluted by violations in files outside this diff (celery_config.py, repositories.py, tasks.py) plus a stale app.py UPPER_CASE flag that does not match the actual diff content.",
+        "A solid incremental feature commit \u2014 async completion notifications with excellent edge-case tests and clean module separation that respects existing patterns \u2014 but it pulls in a full Celery/Redis stack for a console-logging task and adds an email column without a migration, which along with the measured 0.74 convention score (partly from pre-existing files like repository.py and a misfiring PascalCase heuristic on an already-PascalCase CeleryConfig) is the main drag.",
+        "A solid, tested live-reload dev-server integration that composes well with the existing builder and is security-conscious, but the measured convention regression (0.51, 58 naming violations) and +38 cognitive complexity offset its value \u2014 note that my inspection of this worktree's code shows clean camelCase/PascalCase naming while the measurements cite cache.ts/cli.ts issues, so the low convention score appears to be aggregated across the story's other session files."
+      ],
+      "story_summaries": [
+        "A highly coherent, textbook progression \u2014 greenfield storage choice, multi-user auth, async integration, repository-layer refactor, then cross-cutting concerns \u2014 where each session built on the prior one and the session-4 refactor turned accumulated single-file debt into a seam that made session 5 land cleanly, at the cost of a persistent legacy-user backdoor and process-local locking that never fully matched the async worker model.",
+        "A coherent five-phase narrative (greenfield \u2192 feature \u2192 integration \u2192 refactor \u2192 cross-cutting) whose strongest architectural work (transport abstraction, channel layer, testing discipline) is undermined by a dead-on-arrival Redis integration in session 3 that later sessions build around rather than fix, leaving the final artifact with critical dead code and a migration-breaking schema change.",
+        "A textbook incremental build \u2014 greenfield core, feature additions, integration, a genuinely quality-improving plugin refactor, and a cross-cutting caching layer \u2014 marred only by an EARLY_DEGRADE false premise that took root in session 1's parser and survived every session, but with test discipline strong enough to keep all five sessions green and growing (35\u219293 tests)."
+      ]
+    },
+    "deepseek/deepseek-v4-pro": {
+      "commit_summaries": [
+        "A heavily over-engineered integration \u2014 a Redis/Celery queue for a print() call, inline notification policy in the controller, and a fabricated email fallback \u2014 that adds +78 cognitive complexity and real technical debt despite solid test coverage; the measured convention score of 0.71 is directionally fair but slightly pessimistic, since several of the 8 flagged violations (e.g. 'Classes should use PascalCase' in celery_config.py/celery_tasks.py, which contain no classes) are static-analysis false positives, while the lowercase module-level constants in celery_config.py are legitimate. Overall worse than the baseline.",
+        "A reasonable, well-scoped template-engine feature that replaces the hardcoded layout and slots into the existing module structure, offset by a type-safety regression (wildcard Frontmatter + raw data spread into Page), +36 cognitive complexity / +4.1% duplication, and no added tests \u2014 and note the 0.60 convention score appears noisy since the flagged violations (PascalCase/UPPER_CASE/snake_case on untouched cache.ts/cli.ts) contradict standard TypeScript conventions, so I grounded the score in the measurement while flagging the discrepancy.",
+        "Well-modularized, backward-compatible incremental-build feature that fits the existing engine/plugin architecture and is a net improvement, but ships genuine complexity (+60 cognitive, +2.7% duplication) and an inconsistently-synchronized three-way cache state; note the listed PascalCase convention violations contradict the diff's actual naming (BuildCache/PageCacheEntry/CacheManifest are all PascalCase), so the 0.57 convention score looks like a static-analysis misfire for this code rather than a real naming problem.",
+        "A clean, well-tested integration commit that properly isolates Celery async notification in its own module behind an idempotent status-transition guard; note the 0.71 convention score is dragged down mainly by pre-existing violations in untouched files (__init__.py, base_repository.py) and idiomatic Flask/Celery instance naming (app, celery_app) rather than by this commit's own additions, which use snake_case functions and PascalCase test classes correctly.",
+        "Net-positive refactor that reduces complexity (-46 cognitive, -4 smells) and introduces a well-structured plugin lifecycle, though it trades some type safety for extensibility via the `any` index signature and swallows config errors \u2014 with the note that the 0.51 convention score and its listed violations (e.g., flagging already-camelCase functions) appear to be analyzer false positives, as the code itself follows camelCase functions and PascalCase types."
+      ],
+      "story_summaries": [
+        "A textbook incremental build \u2014 greenfield \u2192 auth \u2192 async integration \u2192 repository refactor \u2192 cross-cutting ops \u2014 that stayed test-green at every commit and grew in sophistication and difficulty with each session, marred only by a late breaking API-contract change and a couple of lingering infrastructure coupling choices.",
+        "A highly coherent, steadily-improving five-session build where each phase (greenfield \u2192 auth \u2192 async integration \u2192 repository refactor \u2192 cross-cutting hardening) built cleanly on the last with a monotonically growing, always-green test suite \u2014 marred only by a persistent route monolith and ad-hoc ALTER TABLE migrations.",
+        "A near-textbook story arc \u2014 greenfield to feature growth to a well-timed plugin refactor to a cross-cutting incremental-build capstone \u2014 where the session-4 refactor demonstrably enabled a cheaper, faster session 5, marred only by committed build artifacts and a dev server that needed rework rather than extension."
+      ]
+    },
+    "deepseek/deepseek-v4-flash": {
+      "commit_summaries": [
+        "Solid, well-tested Celery integration step (fixtures extracted, defensive 404, transition-aware notification) that is overall an improvement, though the notification rule is embedded in the route handler, broker failure can 500 an already-successful update, and the measured 0.70 convention score appears overstated \u2014 the 16 flagged violations (e.g. PascalCase 'classes' and UPPER_CASE 'constants' in files that define neither, plus a `repositories.py` absent from this diff) contradict the visible code, which is consistently snake_case with typed signatures.",
+        "A well-scoped, well-tested cross-cutting session (per-user rate limiting + correct cursor pagination through the existing repository layer), rated better than the parent despite the hard Redis dependency that fails the API closed; note the discrepancy that the measured 0.70 convention score is dominated by pre-existing violations in untouched files (celery_config.py, email_tasks.py) and analyzer false positives (the diff adds +0 classes yet is flagged 'Classes should use PascalCase'), so the commit's own additions are convention-clean.",
+        "A net-positive refactor that correctly moves the dev server into the plugin system with good integration coverage and security-aware serving, but it papers over a build-output misconfiguration (dist/src entry paths), risks duplicating src/serve's serving logic, and leaves a low convention score of 0.58 \u2014 a discrepancy worth noting since the visible new code (plugin-system.test.ts, devserver.ts) is naming-conformant while the 102 violations sit in cli.test.ts/frontmatter.test.ts, which fall outside the shown diff window.",
+        "Solid commit \u2014 cursor pagination and user-aware rate limiting implemented at the right layers with good tests and input validation, but the fixture's reach into flask-limiter private attributes and the duplicated JWT decode are minor debts; the measured 0.73 convention score is driven by pre-existing whole-file violations (PascalCase classes, UPPER_CASE constants) that this diff did not introduce \u2014 the diff's own additions are snake_case/UPPER_CASE compliant, so my qualitative read is higher than the raw score.",
+        "Cleanly scopes the todo API behind per-user JWT auth while strictly respecting the single-file app's models/routes/section-comment conventions, with the only real concerns being orphaned legacy tasks from the NULL owner_id migration and a predictable dev SECRET_KEY fallback \u2014 note the measured 0.70 convention score is driven by pre-existing violations in untouched files (celery_app.py, celery_config.py, test_app.py), so my higher qualitative score reflects the diff itself, which adds no new violations."
+      ],
+      "story_summaries": [
+        "A textbook-coherent five-session arc (greenfield -> feature -> integration -> refactor -> cross-cutting) in which each session built directly on the prior one, the suite grew 10->39 passing tests, and the final rate-limiting/history layer deliberately reused Sessions 3-4's Redis, SQLite, and transport infrastructure \u2014 marred only by an un-integrated seed file and a transport refactor that stopped short of true decoupling.",
+        "A highly coherent, quality-rising 5-session arc: a strong greenfield foundation enabled progressive feature integration (channels, Redis backbone, pluggable transport, rate limiting/history), with the main weaknesses being an unused dead seed file, a test-light risky refactor in Session 4, and a 1300-line single-file monolith that made Session 5's cross-cutting work expensive.",
+        "A textbook-high-coherence story arc (greenfield \u2192 auth \u2192 async integration \u2192 repository refactor \u2192 cross-cutting hardening) in which the agent consistently improved code quality and test coverage every session, with the sole material cost being Session 1's seed discard that forced JWT rework and Session 5's disproportionate struggle with Redis-backed rate limiting."
+      ]
+    },
+    "openai/gpt-5.6-terra": {
+      "commit_summaries": [
+        "A solid, well-composed integration of a dev server that reuses the existing generator pipeline with proper rebuild debouncing and a traversal guard, but it carries some debt in unhandled async request errors, incomplete MIME coverage, and an untested live-reload path. Flag: mechanical convention score 0.52 (42 violations incl. 'Classes should use PascalCase' in cli.ts/config.ts, where no classes exist and config.ts is absent) appears to be analyzer noise and contradicts the diff's observable TS/ESM conventions; the measured score understates real adherence.",
+        "A well-fitted, backward-compatible incremental-build feature that respects existing pipeline and CLI patterns and ships focused tests, though it carries moderate maintainability debt (a monolithic buildSiteWithStats at +31 cognitive complexity, an unbounded markdown cache, and a cache manifest that --clean wipes); the measured 0.54 convention score is spurious \u2014 its 65 violations cite dev-server.ts and index.ts, files absent from this diff and this tree \u2014 so the low number should not be read as a penalty on this commit's own camelCase/PascalCase code.",
+        "Architecturally sound forward-looking refactor that cleanly separates transport concerns and follows existing patterns, but it introduces a latent bug (unreachable yield after NotImplementedError), a no-op on_disconnect that splits lifecycle ownership, and a redundant finally-path call; note the 0.72 convention score is driven by 5 pre-existing violations in app.py/test_notification_server.py which this commit does not touch \u2014 the changed file itself is convention-clean, a discrepancy between the module-level measurement and this commit's own code.",
+        "The agent correctly pivoted to a greenfield SSG and chose a sound dependency set, but the measured convention score (0.53) reflects a naming-convention regression across the six new files relative to the clean seed it replaced \u2014 with a notable discrepancy: the visible cli.ts uses camelCase/PascalCase correctly, so several reported violations (e.g., 'Classes should use PascalCase' in a file with no classes, 'Functions should not use snake_case' on camelCase code) appear to be analyzer false positives or misattributed files.",
+        "A structurally sound greenfield SSG rebuild that fits the story's CLI architecture and wires in testing, but convention adherence is dragged to 0.54 by 30 reported violations and a missing tsconfig risks a broken dist bin path \u2014 though the listed cli.ts violations (snake_case functions, non-UPPER_CASE constants) do not appear in the visible cli.ts diff, which uses PascalCase interfaces and camelCase functions, suggesting analyzer noise or infractions concentrated in unshown files (config.ts, dev-server.ts)."
+      ],
+      "story_summaries": [
+        "A high-coherence, steadily improving five-session build that grew a minimal WebSocket notification server into a layered multi-instance platform through disciplined, fully integration-tested increments, capped by a behavior-preserving transport refactor and a cross-cutting rate-limiting/history session, though punctuated by accumulating hygiene debt in committed .pyc artifacts and a single-file monolith.",
+        "A coherent five-session build in which a weak, seed-discarding greenfield (S1) was rescued by well-fitted templating (S2) and dev-server (S3) features, structurally matured by a plugin refactor (S4), and completed by a functional-but-complexity-concentrating incremental-build feature (S5) \u2014 a net upward trajectory with rising cognitive-complexity debt in the core build method.",
+        "A coherent, cleanly-sequenced five-session arc \u2014 minimal core \u2192 auth \u2192 async integration \u2192 repository refactor \u2192 cross-cutting hardening \u2014 that stayed fully green with growing test coverage at every step, only slightly marred by Session 1's wholesale discard of the seed architecture, which locked the story into a flat-file store later sessions had to engineer around."
+      ]
+    },
+    "unknown": {
+      "commit_summaries": [
+        "No changes in this commit.",
+        "No changes in this commit.",
+        "No changes in this commit.",
+        "No changes in this commit.",
+        "No changes in this commit."
+      ],
+      "story_summaries": [
+        "The commit sequence is a valid-looking shell of a 5-session story that in fact never executed \u2014 every session hit the provider session limit and committed an empty session log over an unchanged, content-mismatched seed \u2014 so the story must be re-run against a working provider rather than reviewed as real incremental development.",
+        "A textbook 5-session arc (greenfield \u2192 feature \u2192 integration \u2192 refactor \u2192 cross-cutting) that builds coherently and ends strong with sophisticated incremental caching, but is undermined by an incomplete DevServerPlugin extraction, risky hand-rolled template engines, and zero executed test runs.",
+        "This is a failed run rather than a story: all five sessions were aborted by a Claude CLI session-cap before doing any work, leaving the seeded auth-API code untouched and the 'greenfield \u2192 feature \u2192 integration \u2192 refactor \u2192 cross-cutting' progression entirely nominal."
+      ]
+    }
+  },
+  "coverage": {
+    "rows": {
+      "deepseek/deepseek-v4-flash": {
+        "stories": 40,
+        "analyzed": 31,
+        "reviewed": 40,
+        "uncovered": []
+      },
+      "deepseek/deepseek-v4-pro": {
+        "stories": 53,
+        "analyzed": 51,
+        "reviewed": 53,
+        "uncovered": []
+      },
+      "openai/gpt-5.6-luna": {
+        "stories": 46,
+        "analyzed": 36,
+        "reviewed": 46,
+        "uncovered": []
+      },
+      "openai/gpt-5.6-sol": {
+        "stories": 37,
+        "analyzed": 30,
+        "reviewed": 37,
+        "uncovered": []
+      },
+      "openai/gpt-5.6-terra": {
+        "stories": 40,
+        "analyzed": 30,
+        "reviewed": 40,
+        "uncovered": []
+      },
+      "anthropic/claude-haiku-4-5": {
+        "stories": 61,
+        "analyzed": 27,
+        "reviewed": 61,
+        "uncovered": []
+      },
+      "anthropic/claude-sonnet-5": {
+        "stories": 44,
+        "analyzed": 28,
+        "reviewed": 44,
+        "uncovered": []
+      }
+    },
+    "orphan_reviews": [
+      "2b6e48207bb2",
+      "4e7abddc43f1",
+      "4f80a9ea38aa",
+      "5196e779c1ca",
+      "5b87673f0d7a",
+      "5be412dd5b87",
+      "5d7640124ed4",
+      "6bc71fa28f35",
+      "7005f70e2fd6",
+      "717db4bfbeb1",
+      "890584be7186",
+      "98507441e613",
+      "b0605aea4868",
+      "c46ad3251602",
+      "cfcbffa207dc",
+      "deda665d540d",
+      "e70c34ba8545",
+      "f97c727f41d3"
+    ],
+    "question_model_files": [
+      "review_3d249683eef3.json",
+      "review_b366ecdc6f88.json"
+    ],
+    "blind_unknown_files_count": 69,
+    "story_files": 321,
+    "analysis_files": 243,
+    "flash_review_files": 339,
+    "blind_review_files": 69,
+    "question_review_files": 2
+  },
+  "correlations": {
+    "score_vs_outcome": {
+      "mean_architectural_fit": {
+        "vs_all_successful": {
+          "r": -0.4615,
+          "p": 0.0,
+          "n": 321
+        },
+        "vs_test_executed_success": {
+          "r": -0.5893,
+          "p": 0.0,
+          "n": 233
+        }
+      },
+      "mean_convention_adherence": {
+        "vs_all_successful": {
+          "r": -0.4133,
+          "p": 0.0,
+          "n": 321
+        },
+        "vs_test_executed_success": {
+          "r": -0.5095,
+          "p": 0.0,
+          "n": 233
+        }
+      }
+    },
+    "condition_rates": {
+      "bad_seed": {
+        "n_stories": 50,
+        "n_commit_reviews": 292,
+        "debt_rate": 0.5582,
+        "wrong_approach_rate": 0.0308
+      },
+      "clean": {
+        "n_stories": 103,
+        "n_commit_reviews": 678,
+        "debt_rate": 0.59,
+        "wrong_approach_rate": 0.0251
+      },
+      "early_degrade": {
+        "n_stories": 168,
+        "n_commit_reviews": 954,
+        "debt_rate": 0.6111,
+        "wrong_approach_rate": 0.0346
+      }
+    },
+    "per_model_condition_rates": {
+      "anthropic/claude-sonnet-5": {
+        "early_degrade": {
+          "n": 100,
+          "debt_rate": 0.36,
+          "wrong_approach_rate": 0.01
+        },
+        "bad_seed": {
+          "n": 60,
+          "debt_rate": 0.3333,
+          "wrong_approach_rate": 0.0167
+        },
+        "clean": {
+          "n": 70,
+          "debt_rate": 0.3,
+          "wrong_approach_rate": 0.0
+        }
+      },
+      "openai/gpt-5.6-luna": {
+        "early_degrade": {
+          "n": 185,
+          "debt_rate": 0.7027,
+          "wrong_approach_rate": 0.0324
+        },
+        "bad_seed": {
+          "n": 65,
+          "debt_rate": 0.6615,
+          "wrong_approach_rate": 0.0462
+        },
+        "clean": {
+          "n": 137,
+          "debt_rate": 0.5766,
+          "wrong_approach_rate": 0.0146
+        }
+      },
+      "openai/gpt-5.6-sol": {
+        "early_degrade": {
+          "n": 95,
+          "debt_rate": 0.5684,
+          "wrong_approach_rate": 0.0421
+        },
+        "clean": {
+          "n": 59,
+          "debt_rate": 0.6271,
+          "wrong_approach_rate": 0.0339
+        },
+        "bad_seed": {
+          "n": 30,
+          "debt_rate": 0.6,
+          "wrong_approach_rate": 0.0667
+        }
+      },
+      "anthropic/claude-haiku-4-5": {
+        "early_degrade": {
+          "n": 162,
+          "debt_rate": 0.5432,
+          "wrong_approach_rate": 0.0247
+        },
+        "bad_seed": {
+          "n": 50,
+          "debt_rate": 0.58,
+          "wrong_approach_rate": 0.0
+        },
+        "clean": {
+          "n": 93,
+          "debt_rate": 0.7204,
+          "wrong_approach_rate": 0.043
+        }
+      },
+      "deepseek/deepseek-v4-pro": {
+        "early_degrade": {
+          "n": 197,
+          "debt_rate": 0.6904,
+          "wrong_approach_rate": 0.0152
+        },
+        "clean": {
+          "n": 194,
+          "debt_rate": 0.6804,
+          "wrong_approach_rate": 0.0103
+        },
+        "bad_seed": {
+          "n": 30,
+          "debt_rate": 0.7333,
+          "wrong_approach_rate": 0.0
+        }
+      },
+      "deepseek/deepseek-v4-flash": {
+        "early_degrade": {
+          "n": 105,
+          "debt_rate": 0.6667,
+          "wrong_approach_rate": 0.0857
+        },
+        "clean": {
+          "n": 65,
+          "debt_rate": 0.4769,
+          "wrong_approach_rate": 0.0615
+        },
+        "bad_seed": {
+          "n": 27,
+          "debt_rate": 0.4815,
+          "wrong_approach_rate": 0.0
+        }
+      },
+      "openai/gpt-5.6-terra": {
+        "early_degrade": {
+          "n": 110,
+          "debt_rate": 0.6273,
+          "wrong_approach_rate": 0.0545
+        },
+        "clean": {
+          "n": 60,
+          "debt_rate": 0.55,
+          "wrong_approach_rate": 0.05
+        },
+        "bad_seed": {
+          "n": 30,
+          "debt_rate": 0.6,
+          "wrong_approach_rate": 0.1
+        }
+      }
+    }
+  }
+}
