@@ -14,19 +14,32 @@ decision resolves a prior-phase finding. **Nothing implements — the operator s
 **REVISED (2026-08-29, p0_revise of `fleet_ladder_revision`, escalated to deepseek-v4-pro):** the
 p5 adversarial returned 7 FAILED findings (F-A1…F-A7 — `docs/reviews/fleet_ladder_proposal_adversary.md`).
 This revision closes all 7, each by editing the mapping itself (not prose). See the REVISION
-LOG (§7). The guards (G1-G6), the four constraints, the 14 known-safe protections, and the neo4j
+LOG (§9). The guards (G1-G6), the four constraints, the 14 known-safe protections, and the neo4j
 bridge are unchanged in strength.
+
+**REVISED AGAIN (2026-08-29, p0_revise — round 2 of `fleet_ladder_revision` — the operator's
+design review, three refinements, escalated to deepseek-v4-pro):** the operator's design review returned three
+refinements, each edited INTO the mapping (not prose): **(1) the per-step scope model** (D-16 — a
+closed five-scope vocabulary resolving to declared configs; the `scope:` field on workflow phases;
+the spawn-wrapper validates scope membership + authorization before the socket call), **(2) the
+network policy per tier** (D-17 — the cell network contains only the queue redis 6380 + chroma 8000
++ neo4j 7687 + sonar 9000-9003; the portal / opencode server / 6379 / host are structurally
+unreachable; the egress proxy is the internet policy point), and **(3) the binary-attach
+refinement of D-2** (D-18 — the image carries the generic toolchain only; the CLIs attach via the
+auth mounts; slice 4 gains a binary-resolution probe). The existing 7 findings (F-A1…F-A7) stay
+closed; the guards (G1-G6), the four constraints, and the neo4j bridge are unchanged in strength.
+See the REVISION LOG (§9).
 
 The proposal is complete only if every one of the **37** KB touches (31 mapped + F-1…F-6) is
 placed on a tier with a read/write classification and its guards intact.
 
-## 0. Decisions that resolve the review's findings
+## 0. Decisions that resolve the review's findings (p3/p5) + the operator's design review
 
 | # | finding (p3/p5) | decision |
 |---|---|---|
-| D-1 | mount-contract gap: `~/.opencode/bin` (opencode binary) + `~/.local/share/claude` (the claude symlink's target) outside §3's list | **D-1:** the auth row becomes a bounded five-dir set (D-2), keeping the four *categories* (worktree/results/repo/auth) unchanged — no new mount category, the "no other host path, ever" rule holds |
+| D-1 | mount-contract gap: `~/.opencode/bin` (opencode binary) + `~/.local/share/claude` (the claude symlink's target) outside the design's §3 auth-dir list | **D-1:** the auth row becomes a bounded five-dir set (D-2), keeping the four *categories* (worktree/results/repo/auth) unchanged — no new mount category, the "no other host path, ever" rule holds |
 | D-2 | — | **D-2 (the auth set):** `~/.claude` ro · `~/.local/share/opencode` ro · `~/.local/bin` ro · `~/.local/share/claude` ro · `~/.opencode/bin` ro. CLIs get working binaries + credentials; `credentials.json` (0700) stays ro |
-| D-3 | socket §2-vs-§4 inconsistency | **D-3 (the socket):** the docker socket mounts in the **orchestrator tier ONLY** (hard-rule 6). The supervisor does NOT mount it; routine restarts are docker's own `restart: on-failure` policies declared in the supervisor-owned compose configs; fleet-level spawn/drain is executed by the orchestrator (the socket-holder) on the supervisor's command. The supervisor's §2 "restart authority" = the compose policies it owns + the orchestrator as its hands |
+| D-3 | the design's socket §2-vs-§4 inconsistency | **D-3 (the socket):** the docker socket mounts in the **orchestrator tier ONLY** (hard-rule 6). The supervisor does NOT mount it; routine restarts are docker's own `restart: on-failure` policies declared in the supervisor-owned compose configs; fleet-level spawn/drain is executed by the orchestrator (the socket-holder) on the supervisor's command. The supervisor's design-§2 "restart authority" = the compose policies it owns + the orchestrator as its hands |
 | D-4 | F-1 spec refresh (`spec_ingestion.py:560`), F-2 context_snapshot (`context_compiler.py:918`) | **D-4:** both are orchestrator-tier producers (they fire inside `run_workflow`), using the same code-side temp-write authorization as P11 — `_authorized_kb_write()` for F-1, the `authorized=` param for F-2 (neither needs the env — see D-15) |
 | D-5 | F-3 analyze_trajectories, F-4 lab_basin_topology | **D-5:** cell-tier (analysis) read-only store consumers |
 | D-6 | F-5 cap_2e grid graph probe | **D-6:** orchestrator-tier (the grid harness) graph read |
@@ -39,8 +52,11 @@ placed on a tier with a read/write classification and its guards intact.
 | D-13 | F-A3 — supervisor mount-contract breach | **D-13 (the supervisor mounts):** the supervisor is the fleet manager, not an execution container. Its two out-of-contract mounts are absorbed into the four: the "fleet configs" are the repo's own compose files (already on `repo ro`), and the "logs" become a docker **named volume** (`fleet-logs` — docker-managed, not a host path). The supervisor mounts a subset of the four (results rw · repo ro · auth ro) + that named volume. No tier mounts a host path beyond the four categories + the D-2 auth five-dir set |
 | D-14 | F-A4 — socket/watcher mechanism | **D-14 (the socket + the watcher):** the pools are **static** (compose `--scale` counts) + docker's own `restart: on-failure` — no socket for restart. The **watcher is read-only** (queue depth + worker heartbeats + DLQ counts → the board; it never spawns). A fleet-level resize/drain is the supervisor **commanding the orchestrator** (the socket-holder) over a declared channel — Redis `fleet:commands` (db1, 6380) — and the orchestrator's **spawn-wrapper** validates every request against the compose allowlist + the mount contract before the socket call. The audit surface is named: the compose files + the spawn-wrapper's validation log + the slice-4 guard test |
 | D-15 | F-A7 — orchestrator env ambiguity | **D-15 (the orchestrator env):** the orchestrator **never carries `FINOPS_KB_WRITE=1`** at the container level. Its F-1/F-2/P11 writes authorize in code — `_authorized_kb_write()` (`knowledge_ingestion.py:439-440`, sets the flag for the emit then restores it) for F-1/P11, the `authorized=` param for F-2. "Temporary" cannot be expressed in compose env; the code-side context manager is the mechanism |
+| D-16 | operator design review (R-1) — the per-step scope model | **D-16 (the per-step scope model):** every workflow phase declares a `scope:` from a **closed five-scope vocabulary** (`research_readonly` / `implementation` / `review_readonly` / `proposal_write` / `adversarial_readonly`), each resolving to a declared config `{mounts, network, env, capabilities}` (§5). The orchestrator spawns each phase as a sibling cell container with that scope's config; the spawn-wrapper validates scope ∈ the vocabulary AND phase-authorized-for-scope **before the socket call** — a phase requesting an undeclared scope fails before the socket call |
+| D-17 | operator design review (R-2) — the network policy per tier | **D-17 (the network policy per tier):** the cell network **`fleet-net`** contains ONLY the queue redis (6380) + chroma (8000) + neo4j (7687) + sonar (9000-9003) + the egress proxy. The portal (8001), the opencode server (4096), `finops-redis` (6379), and the host are **structurally unreachable** (network membership, not a port convention). The **egress proxy** is the single internet policy point (`HTTP(S)_PROXY` allowlisting the model endpoints) (§3) |
+| D-18 | operator design review (R-3) — the binary-attach refinement of D-2 | **D-18 (the binary-attach refinement of D-2):** the base image carries the **generic toolchain only** (python/node/git/sonar client) — the model CLIs are NOT baked. The CLIs (`opencode` at `~/.opencode/bin/opencode`; `claude` via the `~/.local/bin/claude` symlink → `~/.local/share/claude/versions/<v>`) attach through the auth mounts, and the auth set is complete for the symlink chain (D-2 already carries the symlink dir `~/.local/bin` AND its target `~/.local/share/claude`; the opencode binary rides `~/.opencode/bin`). Slice 4 gains a **binary-resolution probe** — resolve the CLI chain at container start, **fail loudly** on a broken chain |
 
-**Risk dispositions (p3 R1-R12 → decision/section):** R1 live workload → slice 1's additive/cut-over rollbacks; R2 single-writer → G4 + the per-store single consumer; R3 auth mounts → D-2; R4 image maintenance → §3; R5 socket trust boundary → D-3/D-14; R6 neo4j dual-write → §4 MERGE + D-12; R7 consumer replay storm → D-12; R8 `rag_augment` OFF → slice 3 product gate; R9 opencode server → D-9; **R10 review-worker revival → D-10**; R11 port discipline → D-8 + §2 by-name reachability (chroma 8000 / portal 8001, no collisions); R12 kb_worker exception → D-11. All 12 disposed.
+**Risk dispositions (p3 R1-R12 → decision/section):** R1 live workload → slice 1's additive/cut-over rollbacks; R2 single-writer → G4 + the per-store single consumer; R3 auth mounts → D-2 + D-18; R4 image maintenance → §4; R5 socket trust boundary → D-3/D-14; R6 neo4j dual-write → §6 MERGE + D-12; R7 consumer replay storm → D-12; R8 `rag_augment` OFF → slice 3 product gate; R9 opencode server → D-9; **R10 review-worker revival → D-10**; R11 port discipline → D-8 + §2/§3 by-name reachability (chroma 8000 / portal 8001, no collisions; the portal is now structurally unreachable from the cells); R12 kb_worker exception → D-11. All 12 disposed.
 
 ## 1. The container topology per tier + the KB access matrix (the centerpiece)
 
@@ -51,7 +67,7 @@ Every unit from p1's inventory placed; every one of the **37** KB touches assign
 | p1 unit | tier | notes |
 |---|---|---|
 | story worker (`worker.py`), analysis worker (`analysis_worker.py`), review unit (`review_all` containerized), kb consumers ×4 (`kb_worker --group …`), batch producers (`kb_produce`, `kb_produce_sources`, `kb_produce_facts`, `kb_produce_campaign_evidence`), `run.py` single-runner, `supervise` (flag monitor), orphan sweep, `analyze_trajectories` (F-3), `lab_basin_topology` (F-4) | **cell** | mount contract, no socket, one job at a time |
-| campaign wrapper / grid harness (`run_cap_*_grid` p2 phase), `run_workflow` runner, the cap_2e graph probe (F-5) | **orchestrator** | mount contract + **the socket (ro)** — guarded by the spawn-wrapper (D-14) |
+| campaign wrapper / grid harness (`run_cap_*_grid` p2 phase), `run_workflow` runner, the cap_2e graph probe (F-5) | **orchestrator** | mount contract + **the socket (ro)** — guarded by the spawn-wrapper (D-14); spawns each workflow phase as a sibling container with its scope (D-16) |
 | fleet manager (pools, watcher, heartbeats, DLQ, live logs, drain), Control Room portal, game-board snapshot, `trigger_reviews`, read tools: registry CLI, `bundle_artifacts` reference check (R10), `context_snapshot_report`/`shadow_decision_report` (F-6) | **supervisor** | no socket (D-3/D-14); mounts results rw · repo ro (the compose files) · auth ro + the `fleet-logs` named volume (D-13) |
 | the operator chat (master control) | **operator** | the game board + the permanence gate + the CLI; never a daemon |
 | the opencode web server (4096) + its 62 GB db | **operator-side master control** (D-9) — outside the ladder | the operator's own chat server; not a ladder unit |
@@ -74,9 +90,10 @@ paths (C1-C4) + 14 reads (R1-R10, F-3…F-6) + 6 guards (G1-G6). No unmapped tou
 One ladder compose file set under `infrastructure/` (the existing `docker-compose*.yml` stay
 the data plane — unchanged per the design's §4 "data plane | docker (unchanged)"):
 
-**`infrastructure/docker-compose.ladder.yml`** — three service groups, one `fleet-net`
-(bridge) attached to the existing `ai-infra` network so the data plane (neo4j/chroma/redis/
-sonar) is reachable **by container name**:
+**`infrastructure/docker-compose.ladder.yml`** — three service groups, one **`fleet-net`**
+(bridge) attached to the **allowed data-plane services by name** (queue redis 6380, chroma
+8000, neo4j 7687, sonar 9000-9003) + the egress proxy — **not** the whole `ai-infra` network
+(which carries `finops-redis` 6379; see §3, the network policy):
 
 - **fleet/cell** (`--scale story-worker=4 --scale analysis-worker=4 --scale review-unit=2`):
   `story-worker`, `analysis-worker`, `review-unit`, `kb-chroma`, `kb-ledger`, `kb-registry`,
@@ -120,22 +137,104 @@ tier — the orchestrator).
 fleet-manager`, `Restart=always` (~3 lines). The opencode web server (4096) is operator-side
 (D-9) — not ours, not on the ladder.
 
-## 3. The image hierarchy
+## 3. The network policy per tier (D-17)
+
+The isolation claim ("a cell can `rm -rf /` and kills only its own cell") extends to the
+**network**: a cell's reachability is fixed by network membership, not by a port convention.
+Two namespaces matter, one internet policy point:
+
+**`fleet-net` (bridge) — the cell network.** Attached to ONLY: the cell containers, the queue
+redis (`finops-queue`, 6380), chroma (`chromadb`, 8000), neo4j (7687), the four sonar instances
+(9000-9003), and the **egress proxy** (below). This is the complete address space a cell can
+resolve.
+
+**Structurally unreachable from `fleet-net`** (not attached, so a cell CANNOT resolve them —
+isolation by network membership, not by "don't use port N"):
+- **`finops-redis` (6379)** — the story-agents' redis. It stays on the story-agent network (the
+  sandbox `flushdb()`/`flushall()` target) and is **not** attached to `fleet-net`. The
+  queue-isolation invariant (KS-14) is now structural: the ladder's cells hold no network path
+  to 6379.
+- **the Control Room portal (8001)** — host-native, not on `fleet-net`.
+- **the opencode web server (4096)** — operator-side master control (D-9), not on `fleet-net`.
+- **the host** — no `network_mode: host`, no host bind-mount for sockets; the cells run in the
+  bridge namespace only.
+
+**The egress proxy — the single internet policy point.** A proxy container on `fleet-net` is the
+only route to the internet. The cell/orchestrator scopes set `HTTP_PROXY` / `HTTPS_PROXY` to it
+(the scope env, §5), and it allowlists ONLY the model endpoints (the opencode + claude API
+hosts). No other egress: a cell cannot reach arbitrary hosts, and the model CLIs' traffic is the
+only traffic the proxy forwards. The supervisor and orchestrator ride the same proxy.
+
+**Per-tier summary:** cell = `fleet-net` + the egress proxy; orchestrator = `fleet-net` + the
+egress proxy + the docker socket (a mount, §2, not a network path); supervisor = `fleet-net` +
+the egress proxy. The data plane's other networks (the `ai-infra` story-agent network) are
+simply never attached to the ladder's `fleet-net` — the two-channel rule (KB db2 vs control db1,
+6379 vs 6380) becomes a topology rule.
+
+## 4. The image hierarchy
 
 Built from the repo (a versioned `Dockerfile.fleet` — the image is a controlled experiment
 variable, rebuildable at any commit, per the design §6):
 
 - **`fleet/base`** — python deps (`pyproject.toml` + the `[neo4j]` extra), node, git, the
   **sonar client baked** (it lives in `/tmp/sonar-scanner-6.2.1.4610` — ephemeral, must not
-  be a mount), the auth-aware CLI entrypoints; the mount contract as declared **in the
-  compose**, not the image (design §6).
+  be a mount); the mount contract as declared **in the compose**, not the image (design §6).
 - **`fleet/orchestrator`** — `fleet/base` + the docker CLI + **the sibling-spawn wrapper**
-  (validates every spawn request against the mount contract before the socket call — the
-  "policy wrapper for sibling spawn, the only escalation", design §6).
+  (validates every spawn request against the mount contract + the scope vocabulary before the
+  socket call — the "policy wrapper for sibling spawn, the only escalation", design §6; D-16).
 - **`fleet/supervisor`** — `fleet/orchestrator` + the fleet manager (pools, restart-with-backoff,
   live logs, heartbeats, drain) + the compose configs (ro) + the logs volume (design §6).
 
-## 4. The neo4j bridge — the kb-neo4j-v1 consumer specification (the resurrected leg)
+**The binary attach (D-18):** the image carries the **generic toolchain only** — python deps,
+node, git, the sonar client. The model CLIs (`opencode` at `~/.opencode/bin/opencode`; `claude`
+via the `~/.local/bin/claude` symlink → `~/.local/share/claude/versions/<v>`) are **NOT baked**
+into the image — they attach through the **auth mounts**, so the auth set must be complete for
+the symlink chain (D-2 already carries the symlink dir `~/.local/bin` AND its target
+`~/.local/share/claude`, and the opencode binary's dir `~/.opencode/bin`). The R1 canonical-env
+guarantee becomes a **boot-time assertion, not a runtime surprise**: a binary-resolution probe
+(slice 4) resolves each CLI at container start and **fails loudly** on a broken chain.
+
+## 5. The per-step scope model (D-16)
+
+Every workflow phase is a sibling container with a declared **scope** — a closed vocabulary of
+five, each resolving to a declared config `{mounts, network, env, capabilities}`. The scope
+field rides the workflow's phase spec (`scope:`), the orchestrator spawns each phase as a
+sibling cell container with that scope's config (through the spawn-wrapper, §2/D-14), and the
+spawn-wrapper validates scope membership + authorization **before the socket call**.
+
+**The closed scope vocabulary** (five, no others — an undeclared scope is rejected):
+
+| scope | mounts (⊆ the four + D-2 auth) | network | env | capabilities |
+|---|---|---|---|---|
+| `research_readonly` | worktree rw · results **ro** · repo ro · auth ro (D-2) | retrieval stores (chroma 8000, neo4j 7687) + queue redis 6380 (read) + sonar 9000-9003 | no write flags | KB reads R1-R10; no stream write; no code/infra mutation |
+| `implementation` | worktree rw · results **rw** · repo ro · auth ro (D-2) — the four | `fleet-net` + the egress proxy | `FINOPS_KB_WRITE=1` **only if** the phase emits (P1-P11) | run code + tests, git commit, emit findings |
+| `review_readonly` | worktree rw · results **rw** · repo ro · auth ro (D-2) | `fleet-net` | no write flag (P3 self-gates, §2) | read commits/stories + artifacts, emit review records via P3 |
+| `proposal_write` | worktree rw · results **rw** · repo ro · auth ro (D-2) | `fleet-net` + the egress proxy | no write flag | assemble + commit the proposal/review docs (no re-research) |
+| `adversarial_readonly` | worktree rw · results **ro** · repo ro · auth ro (D-2) | `fleet-net` | no write flag | attack the proposal read-only; write its verdict docs; never fixes |
+
+The mounts stay **within the four-mount contract**: every scope is a subset of `{worktree rw,
+results rw/ro, repo ro, auth ro}` — the doc-writing scopes write into their **worktree** (the
+forked repo checkout, `worktree rw`), never a fifth host path. The scope differences are the
+results mode (ro vs rw), the network, the env, and the capabilities — all closed and declared.
+
+**The `scope:` field + the authorization.** Each workflow phase declares its allowed scope (the
+fleet_ladder_plan phases, for example: `p1_research_infra`/`p2_research_kb_access` →
+`research_readonly`, `p3_review` → `review_readonly`, `p4_proposal` → `proposal_write`,
+`p5_adversarial` → `adversarial_readonly`; the future execution slices → `implementation`).
+The spawn-wrapper's validation, in order, **before the socket call**:
+
+1. the requested scope ∈ the closed five-scope vocabulary — else **fail**;
+2. the phase is authorized for that scope (its declared allowed scope) — else **fail**;
+3. the mounts ⊆ the scope's declared mount set (and ⊆ the four + D-2) — else **fail**;
+4. the network = the scope's network (no extra network attachment) — else **fail**;
+5. the env = the scope's env (no write flag where not declared) — else **fail**.
+
+A phase requesting an undeclared scope fails at step 1 or 2 — **before the socket call**, so a
+compromised phase cannot mint a container with privileges it was never authorized for. The
+audit surface (§2/D-14) grows one column: the workflow's phase→scope table, checked by the
+slice-4 guard test.
+
+## 6. The neo4j bridge — the kb-neo4j-v1 consumer specification (the resurrected leg)
 
 Per the design §5: the retrieval RRF fusion is coded (`retrieval.py:47-52,276-283,891-899`),
 the graph client's fulltext is coded (`graph.py:97-100,1271-1285`), the handler is written
@@ -159,16 +258,16 @@ the graph client's fulltext is coded (`graph.py:97-100,1271-1285`), the handler 
 - **Slice-3 preconditions:** the D-12 catch-up (head start point, DLQ triage) and the
   direct-producer reconciliation (MERGE idempotency verified on the 33,517 existing nodes).
 
-## 5. The migration slices (each bounded, each with a rollback)
+## 7. The migration slices (each bounded, each with a rollback)
 
 | slice | scope | deliverables | rollback |
 |---|---|---|---|
 | **1 — base image + supervisor + the worker pools** (design §7.1) | build `fleet/base` + `fleet/supervisor`; story/analysis workers as cell containers (the ad-hoc workers replaced — **additive**: BRPOP is atomic, so old + new workers drain the same queue without double-processing); the **read-only queue watcher** live (queue depth + heartbeats → the board, fixes the "no watcher" R3); heartbeats + the job **DLQ** live (fixes R4 — the 70-dead-jobs class); the **review path as a sequenced cut-over** (F-A6): stop the host `trigger_reviews` + drain its in-flight `review_all` FIRST, then start the containerized `review-unit` + the supervisor `trigger-reviews`; the portal + daemons as supervisor-tier containers (fixes the SPOF F-3-in-p1) | the images, `docker-compose.ladder.yml` §cell/§supervisor, the fleet manager, the heartbeats/DLQ, the board surfaces | **story/analysis: additive** (the old `setsid nohup` workers still run; stop the supervisor, re-launch the ad-hoc workers); **review: cut-over** (stop the container path, restart the host `trigger_reviews` — never both live) |
-| **2 — the orchestrator migration** (design §7.2) | the campaign wrapper + grid harness run as orchestrator containers (the socket mount); sibling cell spawning container-to-container; the 4-wide shape unchanged (`run_cap_*_grid` p2) | `fleet/orchestrator` image, the sibling-spawn wrapper (the socket policy check), the grid wave plumbing | the wrappers still run host-native — the orchestrator is a thin layer |
+| **2 — the orchestrator migration** (design §7.2) | the campaign wrapper + grid harness run as orchestrator containers (the socket mount); sibling cell spawning container-to-container — now **scope-driven** (each workflow phase spawns as a sibling with its `scope:` config, D-16); the 4-wide shape unchanged (`run_cap_*_grid` p2) | `fleet/orchestrator` image, the sibling-spawn wrapper (the socket policy check + the scope validation), the grid wave plumbing | the wrappers still run host-native — the orchestrator is a thin layer |
 | **3 — the neo4j consumer + the RRF leg live** (design §7.3) | the `kb-neo4j` cell container live + supervised; the D-12 group catch-up + DLQ triage; the direct-producer reconciliation; `rag_augment` enabled for the orchestrator workflows as a **measured product gate** (D-Q8) — the two-leg RRF verified | the `kb-neo4j` service, the catch-up/DLQ disposition, the RRF verification report | stop the consumer; `rag_augment` back OFF; the graph stays (MERGE is additive) |
-| **4 — the audit guards** (design §7.4) | the compose-contract guard test (the mount contract holds — no unexpected mount), the fleet-health guard (heartbeats + DLQ counts on the board), the neo4j index guard (the fulltext index populated ↔ the group's `pending = 0`), the single-write-back audit (D-11) | the three guard tests + the D-11 audit | read-only tests — nothing to roll back |
+| **4 — the audit guards** (design §7.4) | the compose-contract guard test (the mount contract holds — no unexpected mount), the fleet-health guard (heartbeats + DLQ counts on the board), the neo4j index guard (the fulltext index populated ↔ the group's `pending = 0`), the single-write-back audit (D-11), the **binary-resolution probe** (each CLI resolves at container start — the symlink chain to a live executable — a broken chain fails the container loudly, D-18), the **scope-vocabulary guard** (every phase's `scope:` ∈ the five-scope vocabulary and is phase-authorized, D-16), and the **network-policy guard** (each tier attaches to exactly `fleet-net` + the egress proxy; 6379/8001/4096/host absent from the cells' networks, D-17) | the guard tests + the D-11 audit + the D-16/D-17/D-18 probes | read-only tests — nothing to roll back |
 
-## 6. The guard-placement table (unchanged in strength)
+## 8. The guard-placement table (unchanged in strength)
 
 | guard | code home | placement per tier |
 |---|---|---|
@@ -183,21 +282,31 @@ the graph client's fulltext is coded (`graph.py:97-100,1271-1285`), the handler 
 KB-read-only; the operators are the only writers beyond the cell producers; nothing in the
 ladder self-activates — the proposal awaits the operator's sign-off before slice 1 begins.
 
-## 7. REVISION LOG (p0_revise — the p5 adversarial FAIL, F-A1…F-A7)
+## 9. REVISION LOG
 
 Each finding → the resolution → the section edited. The mechanism is closed by the mapping
 itself, not by prose. The guards (G1-G6), the four constraints, the 14 known-safe protections
 (`fleet_ladder_proposal_known_safe.md`), and the neo4j bridge are unchanged in strength.
 
+### 9a. p0_revise — the p5 adversarial FAIL (F-A1…F-A7)
+
 | finding | resolution | section edited |
 |---|---|---|
 | **F-A1** R10 unmapped + the 37-touch miscount | the p2 read **R10** (`bundle_artifacts.py:53,116` — the registry reference check over `registry_index.jsonl` + `data_manifest.json`) is placed on the **supervisor** tier (read-only, over the results mount); the p3 **risk R10** (review-worker revival) is disposed by D-10. The completeness line is corrected to **14 reads (R1-R10, F-3…F-6) → 13 + 4 + 14 + 6 = 37** | §0 (risk dispositions), §1a (R10 in the read tools), §1b (supervisor reads + the arithmetic) |
-| **F-A2** G6-vs-D11 dead (the flag auto-clear never fires) | **the guard wins**: D-11 now grants the **kb-registry consumer `FINOPS_KB_WRITE=1`** — the flag auto-clear's env gate (`kb_worker.py:198`) AND the code `authorized=True` (`:212`) both pass, so the tombstone write-back fires. G6 is restated to the guard's actual code (read-only by default; the ONE write-back is env-gated), and the slice-4 guard test asserts exactly one consumer carries the env | §0 (D-11), §2 (the cell env line), §4 (the neo4j guard note), §6 (G6) |
+| **F-A2** G6-vs-D11 dead (the flag auto-clear never fires) | **the guard wins**: D-11 now grants the **kb-registry consumer `FINOPS_KB_WRITE=1`** — the flag auto-clear's env gate (`kb_worker.py:198`) AND the code `authorized=True` (`:212`) both pass, so the tombstone write-back fires. G6 is restated to the guard's actual code (read-only by default; the ONE write-back is env-gated), and the slice-4 guard test asserts exactly one consumer carries the env | §0 (D-11), §2 (the cell env line), §6 (the neo4j guard note), §8 (G6) |
 | **F-A3** supervisor mount-contract breach | **D-13**: the supervisor's two out-of-contract mounts are absorbed — the "fleet configs" are the repo's own compose files (already `repo ro`), and the "logs" become a docker **named volume** (`fleet-logs`, not a host path). The supervisor mounts a subset of the four + that named volume; no tier mounts a host path beyond the four + the D-2 auth set | §0 (D-13), §1a (supervisor row), §1b (supervisor mounts), §2 (the supervisor service) |
-| **F-A4** socket/watcher unspecified | **D-14**: static pools + `restart: on-failure` (no socket for restart); the watcher is **read-only** (depth/heartbeats/DLQ → the board, never spawns); a resize/drain is the supervisor→orchestrator command over Redis `fleet:commands` (db1, 6380), validated by the orchestrator's **spawn-wrapper** (compose allowlist + mount contract) before the socket call. The audit surface is named: compose files + the spawn-wrapper log + the slice-4 guard test | §0 (D-14), §2 (the socket + watcher mechanism paragraph), §5 (slice 1's "watcher" restated) |
-| **F-A5** host-footprint D-9 | **D-9 reclassified**: the opencode web server (4096) + 62 GB db are **operator-side master control** (the operator's own chat server), **outside the ladder** — not a ladder unit, not supervisor-managed. The host's footprint of ours stays the bootstrap unit only | §0 (D-9), §1a (the opencode row), §2 (the host-footprint note), §5 (slice 1) |
-| **F-A6** double-review window | **D-10 sequenced**: the review migration is a **cut-over, not additive** — stop the host `trigger_reviews` + drain its in-flight `review_all` BEFORE the containerized `review-unit`/`trigger-reviews` starts. The slice-1 rollback is split: story/analysis additive (BRPOP atomic), review cut-over | §0 (D-10), §5 (slice 1 scope + rollback) |
-| **F-A7** orchestrator env ambiguity | **D-15**: the orchestrator **never carries `FINOPS_KB_WRITE=1`** at the container level; F-1/F-2/P11 authorize in code (`_authorized_kb_write()` at `knowledge_ingestion.py:439-440` for F-1/P11, the `authorized=` param for F-2) — "temporary" cannot live in compose env | §0 (D-15), §2 (the orchestrator service env), §6 (G1) |
+| **F-A4** socket/watcher unspecified | **D-14**: static pools + `restart: on-failure` (no socket for restart); the watcher is **read-only** (depth/heartbeats/DLQ → the board, never spawns); a resize/drain is the supervisor→orchestrator command over Redis `fleet:commands` (db1, 6380), validated by the orchestrator's **spawn-wrapper** (compose allowlist + mount contract) before the socket call. The audit surface is named: compose files + the spawn-wrapper log + the slice-4 guard test | §0 (D-14), §2 (the socket + watcher mechanism paragraph), §7 (slice 1's "watcher" restated) |
+| **F-A5** host-footprint D-9 | **D-9 reclassified**: the opencode web server (4096) + 62 GB db are **operator-side master control** (the operator's own chat server), **outside the ladder** — not a ladder unit, not supervisor-managed. The host's footprint of ours stays the bootstrap unit only | §0 (D-9), §1a (the opencode row), §2 (the host-footprint note), §7 (slice 1) |
+| **F-A6** double-review window | **D-10 sequenced**: the review migration is a **cut-over, not additive** — stop the host `trigger_reviews` + drain its in-flight `review_all` BEFORE the containerized `review-unit`/`trigger-reviews` starts. The slice-1 rollback is split: story/analysis additive (BRPOP atomic), review cut-over | §0 (D-10), §7 (slice 1 scope + rollback) |
+| **F-A7** orchestrator env ambiguity | **D-15**: the orchestrator **never carries `FINOPS_KB_WRITE=1`** at the container level; F-1/F-2/P11 authorize in code (`_authorized_kb_write()` at `knowledge_ingestion.py:439-440` for F-1/P11, the `authorized=` param for F-2) — "temporary" cannot live in compose env | §0 (D-15), §2 (the orchestrator service env), §8 (G1) |
+
+### 9b. p0_revise (round 2) — the operator's design review (three refinements)
+
+| refinement | resolution | section edited |
+|---|---|---|
+| **R-1** the per-step scope model | a **closed five-scope vocabulary** (`research_readonly` / `implementation` / `review_readonly` / `proposal_write` / `adversarial_readonly`), each resolving to a declared config `{mounts, network, env, capabilities}`; the `scope:` field on workflow phases; the orchestrator spawns each phase as a sibling cell container with its scope; the spawn-wrapper validates scope ∈ vocabulary AND phase-authorized **before the socket call** (a phase requesting an undeclared scope fails before the socket call) | §0 (D-16), §5 (new), §2 (the spawn-wrapper), §4 (the sibling-spawn wrapper), §7 (slice 2/4) |
+| **R-2** the network policy per tier | the cell network **`fleet-net`** contains ONLY the queue redis (6380) + chroma (8000) + neo4j (7687) + sonar (9000-9003) + the egress proxy; the portal (8001), the opencode server (4096), `finops-redis` (6379), and the host are **structurally unreachable** (network membership, not a port convention); the egress proxy is the single internet policy point (`HTTP(S)_PROXY` allowlisting the model endpoints) | §0 (D-17), §3 (new), §2 (the network line) |
+| **R-3** the binary-attach refinement of D-2 | the base image carries the **generic toolchain only** (python/node/git/sonar client) — the model CLIs attach via the auth mounts; the auth set is complete for the symlink chain (the `~/.local/bin/claude` symlink AND its `~/.local/share/claude` target, the `~/.opencode/bin` binary); slice 4 gains a **binary-resolution probe** (resolve the CLI chain at start, fail loudly on a broken chain) | §0 (D-18 + D-2), §4 (the binary attach), §7 (slice 4) |
 
 **LOG (p4):** topology = cell (16 units) / orchestrator (3) / supervisor (6) / operator +
 2 retired + the opencode server reclassified operator-side; access matrix = **37/37 touches
@@ -205,7 +314,7 @@ placed** (13 writes, 4 consumer store-write paths, 14 reads, 6 guards); compose 
 `docker-compose.ladder.yml` with the D-2 auth set + the socket in the orchestrator tier only
 (D-3); images = base → orchestrator → supervisor; neo4j bridge = the supervised `kb-neo4j` cell
 container (idempotent MERGE, no write-back, `pending=0` measure); slices = 4 with rollbacks;
-guards = G1-G6 placed unchanged. 12 risks from p3 carried with mitigations in §0/§5.
+guards = G1-G6 placed unchanged. 12 risks from p3 carried with mitigations in §0/§7.
 **PASS** — proposal assembled and committed; **awaiting the operator's sign-off** (nothing
 implements).
 
@@ -217,3 +326,17 @@ as operator-side, D-10 sequences the review cut-over, D-15 removes the orchestra
 Guards G1-G6 unchanged in strength; the four constraints hold; the 14 known-safe protections
 survive; the neo4j bridge intact. **PASS — revision committed; awaiting the operator's
 sign-off.**
+
+**LOG (p0_revise round 2, deepseek-v4-pro):** the operator's three design-review refinements edited INTO
+the mapping (D-16 scope model, D-17 network policy, D-18 binary-attach). Re-verified: **(1) the
+scope vocabulary's closedness** — five scopes, each a declared config, all mounts ⊆ the four +
+D-2, a phase requesting an undeclared scope fails before the socket call (step 1/2 of the
+spawn-wrapper validation); **(2) the spawn-wrapper's validation completeness** — five ordered
+checks (scope ∈ vocab → phase-authorized → mounts ⊆ declared → network = declared → env =
+declared), no path to the socket past them; **(3) the network policy's structural soundness** —
+`fleet-net` membership (not a port convention) excludes 6379/8001/4096/host, and the egress proxy
+is the single internet point. The original surface re-attacked: F-A1…F-A7 stay CLOSED (the
+renumbered §0/§1/§2/§6/§7/§8 carry the same resolutions), G1-G6 unchanged in strength, the four
+constraints hold (bootstrap-only, no self-activation, socket-orchestrator-only, four-mount
+contract — every scope is a subset of the four + D-2), the neo4j bridge intact, no new finding.
+**PASS — revision committed; awaiting the operator's sign-off.**
