@@ -1,0 +1,110 @@
+{
+  "campaign": "cap_adaptive_2f",
+  "cells": [
+    {
+      "arm": "abstention",
+      "cell_id": "cap2f_unseen_family_abstention_r1",
+      "class": "unseen_family",
+      "done_p1": true,
+      "rep": "r1",
+      "repetition": "r1",
+      "slot": 1,
+      "variant": null
+    },
+    {
+      "arm": "abstention",
+      "cell_id": "cap2f_unseen_family_abstention_r2",
+      "class": "unseen_family",
+      "rep": "r2",
+      "repetition": "r2",
+      "slot": 2,
+      "variant": null
+    },
+    {
+      "arm": "status_quo",
+      "cell_id": "cap2f_unseen_family_status_quo_r1",
+      "class": "unseen_family",
+      "rep": "r1",
+      "repetition": "r1",
+      "slot": 3,
+      "variant": null
+    },
+    {
+      "arm": "status_quo",
+      "cell_id": "cap2f_unseen_family_status_quo_r2",
+      "class": "unseen_family",
+      "rep": "r2",
+      "repetition": "r2",
+      "slot": 4,
+      "variant": null
+    },
+    {
+      "arm": "abstention",
+      "cell_id": "cap2f_trivial_clean_abstention_r1",
+      "class": "trivial_clean",
+      "rep": "r1",
+      "repetition": "r1",
+      "slot": 1,
+      "variant": null
+    },
+    {
+      "arm": "abstention",
+      "cell_id": "cap2f_trivial_clean_abstention_r2",
+      "class": "trivial_clean",
+      "rep": "r2",
+      "repetition": "r2",
+      "slot": 2,
+      "variant": null
+    },
+    {
+      "arm": "status_quo",
+      "cell_id": "cap2f_trivial_clean_status_quo_r1",
+      "class": "trivial_clean",
+      "rep": "r1",
+      "repetition": "r1",
+      "slot": 3,
+      "variant": null
+    },
+    {
+      "arm": "status_quo",
+      "cell_id": "cap2f_trivial_clean_status_quo_r2",
+      "class": "trivial_clean",
+      "rep": "r2",
+      "repetition": "r2",
+      "slot": 4,
+      "variant": null
+    },
+    {
+      "arm": "abstention",
+      "cell_id": "cap2f_absent-defective_abstention_r1",
+      "class": "absent",
+      "rep": "r1",
+      "repetition": "r1",
+      "slot": 1,
+      "variant": "defective"
+    },
+    {
+      "arm": "status_quo",
+      "cell_id": "cap2f_absent-defective_status_quo_r1",
+      "class": "absent",
+      "rep": "r1",
+      "repetition": "r1",
+      "slot": 2,
+      "variant": "defective"
+    }
+  ],
+  "phase": "p2_run_grid",
+  "preregistration": "docs/designs/current/cap_adaptive_2f_preregistration.md",
+  "preregistration_revision": "d199c50b6",
+  "schema_version": "cap_adaptive_2f_p2_manifest/v1",
+  "seed_committed_hash": "e4f9c1a7b3d5e8f2a6c4b9d1e7f3a5c8b0d2e4f6a8c1b3d5e7f9a2c4b6d8e0f1a3",
+  "seed_measured_sha256": "4d5ed42e5610c8ea2394479050cd2db71b1c760a84fa69062483269ca613a02b",
+  "seed_mismatch": true,
+  "seed_string": "cap_2f|option-B|flag-cost-primary|20260828",
+  "totals": {
+    "abstention": 5,
+    "cells": 10,
+    "status_quo": 5
+  },
+  "written_at": "2026-08-28T20:54:51.381835+00:00"
+}

@@ -1,0 +1,261 @@
+{
+  "abstention_decision": {
+    "decision": "DECLINE",
+    "leg": 3,
+    "reason": "B trigger \u2014 risk 0.06 < 0.2 AND changed_symbols_with_tests_ratio 1.0 >= 1.0 (fully test-linked, zero severity signals); route to operator review (the flag-cost leg \u2014 the wider net's price)."
+  },
+  "analyzer_status": {
+    "graph": "available",
+    "lsp": "available",
+    "sonar": "available"
+  },
+  "application": {
+    "action": "continue",
+    "applied_or_null": "null",
+    "note": "continue proposal -> provable null application (no extra pass); the change stands exactly as implemented.",
+    "proof": "provable-null:commit-trail",
+    "rework_passes": 0
+  },
+  "arm": "status_quo",
+  "b_trigger_check": {
+    "fires": true,
+    "new_lsp_error_count": 0,
+    "new_sonar_critical_count": 0,
+    "note": "B trigger fires: risk < 0.2 AND ratio >= 1.0 AND severity terms zero \u2014 the wider net declines (the flag-cost leg).",
+    "ratio": 1.0,
+    "ratio_ok": true,
+    "risk": 0.06,
+    "risk_ok": true,
+    "severity_terms_zero": true
+  },
+  "backend": "opencode",
+  "cell_id": "cap2f_trivial_clean_status_quo_r1",
+  "class": "trivial_clean",
+  "cost": {
+    "application_usd": 0.0,
+    "run_workflow_usd": 0.008156,
+    "total_usd": 0.008156
+  },
+  "facts": {
+    "analysis_revision_matches": "true",
+    "ast_parse_coverage": "1.0",
+    "changed_symbol_count": "1",
+    "changed_symbols_with_tests_ratio": "1.0",
+    "code_change_risk": "0.06",
+    "impacted_symbol_count": "3",
+    "lsp_analysis_status": "available",
+    "new_lsp_error_count": "0",
+    "new_sonar_critical_count": "0",
+    "sonar_analysis_status": "available"
+  },
+  "facts_present": [
+    "analysis_revision_matches",
+    "ast_parse_coverage",
+    "changed_symbol_count",
+    "changed_symbols_with_tests_ratio",
+    "code_change_risk",
+    "impacted_symbol_count",
+    "lsp_analysis_status",
+    "new_lsp_error_count",
+    "new_sonar_critical_count",
+    "sonar_analysis_status"
+  ],
+  "finops_cell_id": "cap2f_trivial_clean_status_quo_r1",
+  "flags": [],
+  "forecast_usd": 0.018762,
+  "goal": "rename the private variable `_result` inside add(a, b) in calc.py to `_total` \u2014 a behavior-preserving rename of a LOCAL variable inside a TESTED function (severity signals zero, changed_symbols_with_tests_ratio == 1.0, code_change_risk < 0.2 \u2014 the B trigger must fire). Do NOT change add's behavior, do NOT change subtract, do NOT change the tests, do NOT add any new function or file.",
+  "goal_sha256": "66cb32a5544bb1c69a0718a9bad365ccfa012a3fceafb8c9eae2a8f886ffa4e7",
+  "impl": {
+    "commit_hash": "25a0bd5",
+    "confidence": 1.0,
+    "cost_usd": 0.003250726,
+    "duration_s": 17.51
+  },
+  "model": "deepseek/deepseek-v4-pro",
+  "outcome": {
+    "accepted": true,
+    "defect_note": "trivial_clean: behavior-preserving rename \u2014 no defect (clean change)",
+    "defect_present_on_final_commit": false,
+    "final_revision": "003c05456b60e00e59a3d55071ec01beaea4dd41",
+    "test_executed_success": true,
+    "test_runner": "independent pytest (runtime test execution) on the immutable final commit",
+    "tests_passed": 2,
+    "tests_total": 2
+  },
+  "proposal": {
+    "action": "continue",
+    "analyzed_revision": "25a0bd5492e76c231c3622173ee11d51a405e10f",
+    "applied": false,
+    "artifact": "experiments/results/proposals/bf85c27902b85582.json",
+    "artifact_sha256": "d114d894f80eb443c315c02102251c25724d9eb8973b3e5bffe655a71a0149e8",
+    "baseline_revision": "e45cf69e26533938783d52880f0f0b8155e57285",
+    "confidence": 1.0,
+    "contract_version": "verify_code_change/v1",
+    "depth": 0,
+    "facts_used": [
+      "analysis_revision_matches",
+      "ast_parse_coverage",
+      "changed_symbol_count",
+      "changed_symbols_with_tests_ratio",
+      "code_change_risk",
+      "impacted_symbol_count",
+      "lsp_analysis_status",
+      "new_lsp_error_count",
+      "new_sonar_critical_count",
+      "sonar_analysis_status"
+    ],
+    "proposal_id": "bf85c27902b85582",
+    "schema_version": "verify_code_change_proposal/v1",
+    "scope": []
+  },
+  "repetition": "r1",
+  "run_ledger": "/tmp/wt_adaptive_2f/experiments/results/workflows/cap_2f_cell_trivial_clean/20260828T210120Z.json",
+  "run_ledger_ok": true,
+  "run_ledger_sha256": "90195cb57dcd5a9a4eda711c97715efc4ad638c477af70f2d1bf30f17dbf5b52",
+  "schema_version": "cap_adaptive_2f_cell/v1",
+  "seam": {
+    "error": "",
+    "facts": [
+      {
+        "evidence_ids": [
+          "delta:self-cap2f_trivial_clean_status_quo_r1:implement:25a0bd5492e76c231c3622173ee11d51a405e10f",
+          "sonar:self-cap2f_trivial_clean_status_quo_r1:implement:25a0bd5492e76c231c3622173ee11d51a405e10f",
+          "lsp:self-cap2f_trivial_clean_status_quo_r1:implement:25a0bd5492e76c231c3622173ee11d51a405e10f",
+          "impacted:self-cap2f_trivial_clean_status_quo_r1:implement:25a0bd5492e76c231c3622173ee11d51a405e10f"
+        ],
+        "predicate": "sonar_analysis_status",
+        "value": "available",
+        "value_type": "enum"
+      },
+      {
+        "evidence_ids": [
+          "delta:self-cap2f_trivial_clean_status_quo_r1:implement:25a0bd5492e76c231c3622173ee11d51a405e10f",
+          "sonar:self-cap2f_trivial_clean_status_quo_r1:implement:25a0bd5492e76c231c3622173ee11d51a405e10f",
+          "lsp:self-cap2f_trivial_clean_status_quo_r1:implement:25a0bd5492e76c231c3622173ee11d51a405e10f",
+          "impacted:self-cap2f_trivial_clean_status_quo_r1:implement:25a0bd5492e76c231c3622173ee11d51a405e10f"
+        ],
+        "predicate": "lsp_analysis_status",
+        "value": "available",
+        "value_type": "enum"
+      },
+      {
+        "evidence_ids": [
+          "delta:self-cap2f_trivial_clean_status_quo_r1:implement:25a0bd5492e76c231c3622173ee11d51a405e10f",
+          "sonar:self-cap2f_trivial_clean_status_quo_r1:implement:25a0bd5492e76c231c3622173ee11d51a405e10f",
+          "lsp:self-cap2f_trivial_clean_status_quo_r1:implement:25a0bd5492e76c231c3622173ee11d51a405e10f",
+          "impacted:self-cap2f_trivial_clean_status_quo_r1:implement:25a0bd5492e76c231c3622173ee11d51a405e10f"
+        ],
+        "predicate": "analysis_revision_matches",
+        "value": "true",
+        "value_type": "bool"
+      },
+      {
+        "evidence_ids": [
+          "delta:self-cap2f_trivial_clean_status_quo_r1:implement:25a0bd5492e76c231c3622173ee11d51a405e10f",
+          "sonar:self-cap2f_trivial_clean_status_quo_r1:implement:25a0bd5492e76c231c3622173ee11d51a405e10f",
+          "lsp:self-cap2f_trivial_clean_status_quo_r1:implement:25a0bd5492e76c231c3622173ee11d51a405e10f",
+          "impacted:self-cap2f_trivial_clean_status_quo_r1:implement:25a0bd5492e76c231c3622173ee11d51a405e10f"
+        ],
+        "predicate": "ast_parse_coverage",
+        "value": "1.0",
+        "value_type": "float"
+      },
+      {
+        "evidence_ids": [
+          "delta:self-cap2f_trivial_clean_status_quo_r1:implement:25a0bd5492e76c231c3622173ee11d51a405e10f",
+          "sonar:self-cap2f_trivial_clean_status_quo_r1:implement:25a0bd5492e76c231c3622173ee11d51a405e10f",
+          "lsp:self-cap2f_trivial_clean_status_quo_r1:implement:25a0bd5492e76c231c3622173ee11d51a405e10f",
+          "impacted:self-cap2f_trivial_clean_status_quo_r1:implement:25a0bd5492e76c231c3622173ee11d51a405e10f"
+        ],
+        "predicate": "changed_symbol_count",
+        "value": "1",
+        "value_type": "int"
+      },
+      {
+        "evidence_ids": [
+          "delta:self-cap2f_trivial_clean_status_quo_r1:implement:25a0bd5492e76c231c3622173ee11d51a405e10f",
+          "sonar:self-cap2f_trivial_clean_status_quo_r1:implement:25a0bd5492e76c231c3622173ee11d51a405e10f",
+          "lsp:self-cap2f_trivial_clean_status_quo_r1:implement:25a0bd5492e76c231c3622173ee11d51a405e10f",
+          "impacted:self-cap2f_trivial_clean_status_quo_r1:implement:25a0bd5492e76c231c3622173ee11d51a405e10f"
+        ],
+        "predicate": "impacted_symbol_count",
+        "value": "3",
+        "value_type": "int"
+      },
+      {
+        "evidence_ids": [
+          "delta:self-cap2f_trivial_clean_status_quo_r1:implement:25a0bd5492e76c231c3622173ee11d51a405e10f",
+          "sonar:self-cap2f_trivial_clean_status_quo_r1:implement:25a0bd5492e76c231c3622173ee11d51a405e10f",
+          "lsp:self-cap2f_trivial_clean_status_quo_r1:implement:25a0bd5492e76c231c3622173ee11d51a405e10f",
+          "impacted:self-cap2f_trivial_clean_status_quo_r1:implement:25a0bd5492e76c231c3622173ee11d51a405e10f"
+        ],
+        "predicate": "new_lsp_error_count",
+        "value": "0",
+        "value_type": "int"
+      },
+      {
+        "evidence_ids": [
+          "delta:self-cap2f_trivial_clean_status_quo_r1:implement:25a0bd5492e76c231c3622173ee11d51a405e10f",
+          "sonar:self-cap2f_trivial_clean_status_quo_r1:implement:25a0bd5492e76c231c3622173ee11d51a405e10f",
+          "lsp:self-cap2f_trivial_clean_status_quo_r1:implement:25a0bd5492e76c231c3622173ee11d51a405e10f",
+          "impacted:self-cap2f_trivial_clean_status_quo_r1:implement:25a0bd5492e76c231c3622173ee11d51a405e10f"
+        ],
+        "predicate": "new_sonar_critical_count",
+        "value": "0",
+        "value_type": "int"
+      },
+      {
+        "evidence_ids": [
+          "delta:self-cap2f_trivial_clean_status_quo_r1:implement:25a0bd5492e76c231c3622173ee11d51a405e10f",
+          "sonar:self-cap2f_trivial_clean_status_quo_r1:implement:25a0bd5492e76c231c3622173ee11d51a405e10f",
+          "lsp:self-cap2f_trivial_clean_status_quo_r1:implement:25a0bd5492e76c231c3622173ee11d51a405e10f",
+          "impacted:self-cap2f_trivial_clean_status_quo_r1:implement:25a0bd5492e76c231c3622173ee11d51a405e10f"
+        ],
+        "predicate": "changed_symbols_with_tests_ratio",
+        "value": "1.0",
+        "value_type": "float"
+      },
+      {
+        "evidence_ids": [
+          "delta:self-cap2f_trivial_clean_status_quo_r1:implement:25a0bd5492e76c231c3622173ee11d51a405e10f",
+          "sonar:self-cap2f_trivial_clean_status_quo_r1:implement:25a0bd5492e76c231c3622173ee11d51a405e10f",
+          "lsp:self-cap2f_trivial_clean_status_quo_r1:implement:25a0bd5492e76c231c3622173ee11d51a405e10f",
+          "impacted:self-cap2f_trivial_clean_status_quo_r1:implement:25a0bd5492e76c231c3622173ee11d51a405e10f"
+        ],
+        "predicate": "code_change_risk",
+        "value": "0.06",
+        "value_type": "float"
+      }
+    ],
+    "facts_present": [
+      "analysis_revision_matches",
+      "ast_parse_coverage",
+      "changed_symbol_count",
+      "changed_symbols_with_tests_ratio",
+      "code_change_risk",
+      "impacted_symbol_count",
+      "lsp_analysis_status",
+      "new_lsp_error_count",
+      "new_sonar_critical_count",
+      "sonar_analysis_status"
+    ],
+    "graph_status": "available",
+    "impacted_count": 3,
+    "neighborhood": [
+      "add",
+      "subtract",
+      "test_add",
+      "test_subtract"
+    ],
+    "refused": false
+  },
+  "seeded_app_seed_revision": "e45cf69e26533938783d52880f0f0b8155e57285",
+  "seeded_app_worktree": "/tmp/cap2f_trivial_clean_status_quo_r1",
+  "slot": 3,
+  "spec_id": "cap_2f_cell_trivial_clean@0.1",
+  "status": "ok",
+  "variant": null,
+  "wall_s": 172.7,
+  "within_forecast": true,
+  "written_at": "2026-08-28T21:01:20.663513+00:00"
+}
