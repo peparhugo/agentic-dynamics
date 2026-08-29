@@ -1,0 +1,166 @@
+name: fleet_ladder_revision
+question: >-
+  The fleet-ladder proposal revision round (operator-directed escalation): the p5
+  adversarial review of docs/fleet/00_proposal.md returned VERDICT FAIL with 7 findings
+  (F-A1..F-A7) + 14 known-safe attacks. THIS workflow revises the proposal to address ALL
+  7 findings and re-verifies. The operator escalated the execution model to
+  deepseek-v4-pro (the revision is the hardest reasoning the mapping has hit — the
+  adversarial's own standard). The mandate: a finding is closed ONLY when the proposal
+  doc carries the resolution (a revision log: finding → resolution → the edited section),
+  the resolution does not weaken any guard, and the operator's constraints hold (host
+  bootstrap only, master control = the operator chat, the socket as the ONE escalation,
+  the mount contract as the isolation constant). The re-verify re-attacks the original
+  surface AND the revision: SUPPORT only when all 7 are closed + the known-safe list
+  survives. The revised proposal is the deliverable; nothing implements until the
+  operator signs off.
+version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: false
+repeatable: false
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: true
+    context:
+      domain_context: >-
+        PROVISIONAL DomainProfile. domain: infrastructure / the fleet ladder (the proposal
+        revision). canonical_sources:
+        [docs/fleet/00_proposal.md (the proposal to revise), docs/reviews/fleet_ladder_proposal_adversary.md
+        (the FAIL verdict — the 7 findings F-A1..F-A7, the authoritative revision list),
+        docs/reviews/fleet_ladder_proposal_known_safe.md (the 14 known-safe attacks that
+        must survive), docs/fleet/03_review.md (the risks + open questions the proposal
+        resolves), docs/designs/proposed/fleet_ladder_architecture.md (the design)].
+        policies: [all_findings_closed_or_fail, resolution_in_the_doc, guards_never_weakened,
+        escalation_model_pro]
+      challenge_context: >-
+        PROVISIONAL ChallengeProfile. challenge: revision (the 7 findings are the work
+        list — close each with a resolution in the doc, then re-verify). deliberation:
+        [revise, reverify]. session_policy: {default: fork_per_phase}
+      current_state: >-
+        The proposal (docs/fleet/00_proposal.md, p4) passed the access-matrix completeness
+        (37/37) but FAILED the p5 adversarial with 7 findings: F-A1 R10 unmapped (a p3 risk
+        never resolved); F-A2 G6-vs-D11 dead (a flag-auto-clear decision contradicts a
+        guard); F-A3 the supervisor tier breaches the mount contract; F-A4 the
+        orchestrator socket/watcher mechanism unspecified; F-A5 host-footprint D-9
+        conflicts with the host-runs-only-a-bootstrap constraint; F-A6 a double-review
+        window in the migration; F-A7 the orchestrator env placement ambiguous. The
+        wrapper ran on flash; the operator escalated this round to deepseek-v4-pro.
+      hard_rules: >-
+        (1) Every phase commits '[workflow] <phase>' (the worktree hook enforces it);
+        every docs/ file carries status frontmatter (the DOC_CONTRACT gate).
+        (2) ALL FINDINGS CLOSED OR FAIL: the revision addresses EVERY finding F-A1..F-A7 —
+        each with a resolution entry in the proposal's REVISION LOG (finding → resolution →
+        the section edited). A finding without a resolution is a FAILED finding; the
+        re-verify checks each.
+        (3) RESOLUTIONS ARE IN THE DOC: a resolution is not a comment — the proposal's
+        text must change (the compose layout, the decisions table, the migration slices)
+        so the finding's mechanism is closed by the mapping itself.
+        (4) GUARDS NEVER WEAKENED: the write guard, the actuation gate, the lineage, the
+        registry discipline — a revision that weakens any guard is a FAILED finding.
+        (5) THE CONSTRAINTS HOLD: host bootstrap only; master control = the operator chat;
+        the socket = the ONE escalation, orchestrator tier only; the mount contract
+        (worktree rw / results rw / repo ro / auth ro) is the isolation constant — the
+        supervisor tier's own mounts included.
+        (6) THE KNOWN-SAFE SURVIVES: the 14 known-safe attacks' protections are not
+        regressed by the revision.
+        (7) THE NEO4J BRIDGE STAYS: the kb-neo4j-v1 consumer specification (the resurrected
+        leg) is not damaged by the revision.
+        (8) BOUNDED PHASES: the revise phase closes the 7 findings; the re-verify phase
+        re-attacks. A new finding discovered during revision is recorded in the revision
+        log and closed in the same pass if bounded, else listed for the next round.
+        (9) Every number cites its source. (10) No external actuation, no infra changes —
+        this workflow revises the PLAN only. (11) The re-verify delivers a SUPPORT/FAIL
+        verdict. (12) Resumable only when spec version, goal hash, source revision, and
+        candidate-manifest hash match.
+      read_first: >-
+        docs/reviews/fleet_ladder_proposal_adversary.md (THE work list — the 7 findings),
+        docs/fleet/00_proposal.md (the doc to revise), docs/reviews/fleet_ladder_proposal_known_safe.md,
+        docs/fleet/03_review.md, docs/designs/proposed/fleet_ladder_architecture.md
+      run_shape: >-
+        SINGLE wrapper on the ESCALATED model: deepseek/deepseek-v4-pro (the operator's
+        escalation — the revision is the hardest reasoning of the mapping). The same
+        branch (feature/fleet-ladder-plan) — the revision commits on top of the p5 FAIL.
+        No cells, no grid. The data chain stays single-writer.
+    phases:
+      - name: p0_revise
+        kind: agent
+        timeout: 21600
+        prompt: |
+          GOAL: {goal}
+          ROLE: the revision — close ALL 7 adversarial findings (F-A1..F-A7) in
+          docs/fleet/00_proposal.md. Read the adversary doc FIRST — it is the work list.
+          For EACH finding: (a) state the resolution, (b) EDIT the proposal so the
+          finding's mechanism is closed by the mapping itself (the compose layout, the
+          decisions table, the migration slices, the access matrix — wherever the finding
+          lives), (c) append the resolution to the proposal's REVISION LOG (finding →
+          resolution → the section edited). A finding addressed only in prose comments is
+          NOT closed. The findings, restated:
+          F-A1 R10 unmapped — the p3 risk R10 must appear in the proposal's risk
+          dispositions.
+          F-A2 G6-vs-D11 dead — decision D-11's flag-auto-clear must not contradict guard
+          G6; reconcile the two (the guard's strength wins).
+          F-A3 supervisor mount-contract violation — the supervisor tier's mounts must
+          satisfy the contract (or a declared, justified exception in the contract).
+          F-A4 socket/watcher mechanism — specify HOW the orchestrator's socket is
+          guarded and watched (who can spawn what, the audit surface).
+          F-A5 host-footprint D-9 — decision D-9 must not expand the host footprint
+          beyond the bootstrap; align it with the constraint.
+          F-A6 double-review window — the migration slices' review windows must not
+          overlap; sequence them.
+          F-A7 orchestrator env ambiguity — the env placement for the orchestrator tier
+          must be explicit (which env vars, where they come from, the write-guard env
+          included).
+          The guards (write guard, actuation gate, lineage, registry discipline) are NEVER
+          weakened; the constraints hold; the known-safe list's protections survive; the
+          neo4j bridge stays intact. A finding discovered during the revision is recorded
+          in the revision log and closed in this pass if bounded.
+          DELIVER: the revised docs/fleet/00_proposal.md (with the REVISION LOG section)
+          + commit it.
+          LOG: the finding-by-finding closure table (F-Ax → resolution → section);
+          PASS/FAIL; commit.
+      - name: p1_reverify
+        kind: agent
+        timeout: 21600
+        prompt: |
+          GOAL: {goal}
+          ROLE: the re-verify — adversarial re-attack of the REVISED proposal. Re-run the
+          original attack surface AND the revision:
+          (1) EVERY FINDING F-A1..F-A7: re-check each — the resolution exists in the doc,
+          the mechanism is closed by the mapping (not prose), and the original attack
+          fails. An unclosed finding is a FAILED finding.
+          (2) THE GUARDS: the write guard, the actuation gate, the lineage, the registry
+          discipline — re-trace each from the code through the revised placement; a
+          weakened guard is a FAILED finding.
+          (3) THE CONSTRAINTS: host bootstrap only, master control = the operator chat,
+          the socket as the ONE escalation (orchestrator tier only), the mount contract
+          incl. the supervisor tier.
+          (4) THE KNOWN-SAFE: the 14 known-safe attacks' protections survive the revision.
+          (5) THE NEW SURFACE: the revision's changes (the compose layout, the decisions,
+          the migration slices) — re-attack them.
+          Deliver TWO outputs (the re-verify's own):
+          docs/reviews/fleet_ladder_proposal_reverify.md (the verdict: SUPPORT iff all 7
+          closed + no new finding + the known-safe survives; FAIL otherwise, with the
+          remaining findings listed) + docs/reviews/fleet_ladder_proposal_known_safe.md
+          (REPLACED with the re-verify's known-safe list — both with status: accepted
+          frontmatter).
+          LOG: the re-verify table (finding → status); PASS/FAIL; commit.
+factors:
+  - {name: model, levels: [deepseek/deepseek-v4-pro]}
+design: factorial
+rules:
+  - {name: revision_preregistered, plane: measurement, evidence_class: "[M]", requires: [], produces: [findings_listed]}
+  - {name: revision_done, plane: measurement, evidence_class: "[C]", requires: [findings_listed], produces: [all_findings_closed]}
+  - {name: reverify_done, plane: measurement, evidence_class: "[C]", requires: [all_findings_closed], produces: [revision_verified]}
+metrics:
+  - {name: findings_closed, agg: mean, over: cell}
+  - {name: guards_preserved, agg: mean, over: cell}
+comparison: {kind: effect_size, arm_factor: model, loss: {cost: 1.0, quality: 0.0, value: 0.0}}
+writeup:
+  format: lab_book
+  sections: [question, p0_revise, p1_reverify]
+stop: {budget_usd: 30.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}
