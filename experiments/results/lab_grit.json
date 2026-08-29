@@ -1,17 +1,17 @@
 {
   "experiment_id": "lab_grit",
-  "generated_at": "2026-08-28T17:55:10.978423",
+  "generated_at": "2026-08-29T03:19:04.000478",
   "metric_definition": "G(s) = P(test_executed_success | perturbation_strength = s)",
   "summary": {
-    "cells": 144,
+    "cells": 136,
     "successes": 108,
-    "grit_overall": 0.75,
+    "grit_overall": 0.7941,
     "strength_levels": [
       0.0,
       0.5
     ],
     "findings": 64,
-    "stories": 215,
+    "stories": 207,
     "controlled_delta_grit": 0.0037,
     "excluded": 135,
     "exclusions": {
@@ -34,15 +34,15 @@
     },
     {
       "strength": 0.5,
-      "n": 134,
+      "n": 126,
       "successes": 101,
-      "grit": 0.7537,
-      "ci95_lo": 0.6744,
-      "ci95_hi": 0.8189,
+      "grit": 0.8016,
+      "ci95_lo": 0.7235,
+      "ci95_hi": 0.8618,
       "insufficient_support": false,
       "sources": {
         "finding": 54,
-        "story": 80
+        "story": 72
       }
     }
   ],
@@ -68,6 +68,15 @@
   ],
   "by_model_perturbed": [
     {
+      "model": "claude-sonnet-5",
+      "n": 18,
+      "successes": 16,
+      "grit": 0.8889,
+      "ci95_lo": 0.672,
+      "ci95_hi": 0.969,
+      "insufficient_support": false
+    },
+    {
       "model": "deepseek-v4-flash",
       "n": 15,
       "successes": 13,
@@ -86,21 +95,21 @@
       "insufficient_support": false
     },
     {
+      "model": "claude-haiku-4-5",
+      "n": 14,
+      "successes": 11,
+      "grit": 0.7857,
+      "ci95_lo": 0.5241,
+      "ci95_hi": 0.9243,
+      "insufficient_support": false
+    },
+    {
       "model": "gpt-5.6-luna",
       "n": 18,
       "successes": 14,
       "grit": 0.7778,
       "ci95_lo": 0.5478,
       "ci95_hi": 0.91,
-      "insufficient_support": false
-    },
-    {
-      "model": "claude-sonnet-5",
-      "n": 22,
-      "successes": 16,
-      "grit": 0.7273,
-      "ci95_lo": 0.5185,
-      "ci95_hi": 0.8685,
       "insufficient_support": false
     },
     {
@@ -119,15 +128,6 @@
       "grit": 0.6875,
       "ci95_lo": 0.444,
       "ci95_hi": 0.8584,
-      "insufficient_support": false
-    },
-    {
-      "model": "claude-haiku-4-5",
-      "n": 18,
-      "successes": 11,
-      "grit": 0.6111,
-      "ci95_lo": 0.3862,
-      "ci95_hi": 0.797,
       "insufficient_support": false
     }
   ],
@@ -161,11 +161,11 @@
     },
     {
       "perturbation_class": "story:early_degrade",
-      "n": 80,
+      "n": 72,
       "successes": 63,
-      "grit": 0.7875,
-      "ci95_lo": 0.6858,
-      "ci95_hi": 0.8629,
+      "grit": 0.875,
+      "ci95_lo": 0.7792,
+      "ci95_hi": 0.9328,
       "insufficient_support": false
     }
   ],
@@ -253,20 +253,20 @@
   "lab_contract": {
     "lab": "lab_grit.py",
     "input_dataset_id": "canonical_registry/finding+story",
-    "registry_identity_sha256": "de2de65a2c250d14fd18589660ccf3736df2fba402bb9bdc69f7c6dd20317201",
-    "resolved_input_sha256": "b1fcca3b2db24fec574383affacae45c6699065a11b660a1c86b702caeb6826a",
-    "registry_version": "data-manifest/1.0+12925rows",
+    "registry_identity_sha256": "d9bcb7f360841a25ebbd2797c383bd9cc98a22810479a17443488148a5e7938e",
+    "resolved_input_sha256": "66cb2de70d47e50269d54829a673734d7b7acc5768004a2e112623d5c811837d",
+    "registry_version": "data-manifest/1.0+13031rows",
     "metric_definition_version": "grit/v2",
     "metric_source_sha256": "efffc47f8bc8e92356489e96cc82a9b08bd6b07eb5196e5c0250b8baf04b1e91",
-    "n_resolved_records": 279,
-    "n_eligible_records": 144,
-    "n_used_records": 144,
+    "n_resolved_records": 271,
+    "n_eligible_records": 136,
+    "n_used_records": 136,
     "n_excluded_records": 135,
     "n_unused_eligible_records": 0,
-    "used_record_refs_sha256": "d598c97bb58d32e5ca9c90b63502a713d113fca52f53d60413922a43457fb8aa",
+    "used_record_refs_sha256": "e5754e8893e767ad81ed56ced90e2b7841c5ab3e0e3b9993c01406279bf53e19",
     "excluded_record_refs_sha256": "406e4dcfb0de6257038bf88643c3577caf680c24ba5dd5009f64e7bc119b4edf",
-    "used_unique_records": 144,
-    "used_contributions": 144,
+    "used_unique_records": 136,
+    "used_contributions": 136,
     "review_without_current_story": 0,
     "story_without_review": 0,
     "missing_required_field": 135,
@@ -274,6 +274,6 @@
     "data_integrity_policy": "docs/data_integrity_findings.md",
     "requires_external_service": null,
     "contract_version": "lab-contract/v6",
-    "generated_at": "2026-08-28T15:55:10.979068+00:00"
+    "generated_at": "2026-08-29T01:19:04.001121+00:00"
   }
 }

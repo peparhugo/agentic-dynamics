@@ -1,0 +1,74 @@
+{
+  "schema_version": "cap_2a_p3_summary/v1",
+  "campaign": "cap_2a_rerun",
+  "phase": "p3_run_shadow_cells",
+  "written_at": "2026-08-26T00:06:30Z",
+  "duration_note": "duration_s is the sum of per-phase durations (agent + test time); the phase runner records it BEFORE the change-analysis legs (sonar ~24s, graph) run, so the true wall-clock per cell is ~51-55s. Cost is unaffected.",
+  "forecast_vs_actual_cost": {
+    "basis": "p2 measured target-model cost $0.008578 x 2 headroom = $0.017156 per cell (FORECAST). p2 cell actual = $0.008578.",
+    "rows": [
+      {"cell_id": "cap2a_p2_bespoke", "forecast_usd": 0.017156, "actual_usd": 0.008578, "within_forecast": true},
+      {"cell_id": "cap2a_p3a", "forecast_usd": 0.017156, "actual_usd": 0.007816, "within_forecast": true},
+      {"cell_id": "cap2a_p3b", "forecast_usd": 0.017156, "actual_usd": 0.008232, "within_forecast": true}
+    ],
+    "cumulative_actual_usd": 0.024626,
+    "forecast_envelope_usd": 0.051468,
+    "campaign_stop_budget_usd": 20.0,
+    "stopped_cells": [],
+    "note": "Cumulative actual ($0.024626) is under both the forecast envelope ($0.051468) and the campaign stop budget ($20); no cell was stopped."
+  },
+  "cells": [
+    {
+      "cell_id": "cap2a_p3a",
+      "spec": "cap_2a_calibration_cell@0.1",
+      "cost_usd": 0.007816,
+      "duration_s": 23.68,
+      "proposal_id": "fa79270a11fec8e6",
+      "proposal_action": "verify",
+      "proposal_depth": 2,
+      "proposal_applied": false,
+      "outcome": "no_rework",
+      "realized_depth": 0,
+      "test_executed_success": true,
+      "graph_status": "available",
+      "sonar_status": "available",
+      "lsp_status": "unavailable",
+      "hit": false,
+      "hit_note": "verify does not hit no_rework (verify hits verification_only only)"
+    },
+    {
+      "cell_id": "cap2a_p3b",
+      "spec": "cap_2a_calibration_cell_divide@0.1",
+      "cost_usd": 0.008232,
+      "duration_s": 27.43,
+      "proposal_id": "f9727f3a92a4e6c3",
+      "proposal_action": "rework",
+      "proposal_depth": 3,
+      "proposal_applied": false,
+      "outcome": "no_rework",
+      "realized_depth": 0,
+      "test_executed_success": true,
+      "graph_status": "available",
+      "sonar_status": "available",
+      "lsp_status": "unavailable",
+      "hit": false,
+      "hit_note": "rework does not hit no_rework (the sonar critical flag was S1244, a minor test-style finding — a false-positive rework signal)"
+    }
+  ],
+  "status_flags": {
+    "graph_down_cells": [],
+    "analyzer_down_cells": ["cap2a_p3a (lsp unavailable — pyright not installed)", "cap2a_p3b (lsp unavailable — pyright not installed)"],
+    "note": "No graph-down cells. lsp is unavailable on this machine for all cells (new_lsp_error_count omitted, never fabricated); the impacted term (graph) and tests_ratio term remain measurable, so code_change_risk was minted for every symbol-changing commit."
+  },
+  "artifact_index": [
+    {"path": "experiments/results/cap_2a_rerun/p3_execution_manifest.json", "sha256": "2cf106b6f563db3c2f9314201a2b63566460f7b09ed45a6f87f021c6d819c518"},
+    {"path": "experiments/results/cap_2a_rerun/cap2a_p3a_cell_manifest.json", "sha256": "dbbb7c7fa67c90ecf3b3fa934dd845f5fa6ee9ea3bcdb629bbcffe0d6abf9cb9"},
+    {"path": "experiments/results/cap_2a_rerun/cap2a_p3a_outcome.json", "sha256": "15b921d1237a826df523c1560d7857a9d2f619da1ca17024189e74f5e5a6e69c"},
+    {"path": "experiments/results/cap_2a_rerun/cap2a_p3a_phase_ledger.json", "sha256": "0a910c21144475d671835ce11e4d71edc7d8c611d957d1c6e63d66d96842943e"},
+    {"path": "experiments/results/cap_2a_rerun/proposals/fa79270a11fec8e6.json", "sha256": "d8c2d9a2a1c6ddfc870fb7fdfae5b566516eee1f10b964821f07944d6912efde"},
+    {"path": "experiments/results/cap_2a_rerun/cap2a_p3b_cell_manifest.json", "sha256": "b11555bef50ffad9d1258cb9ccfa84561ad33238731e784a23ba48d5160731c4"},
+    {"path": "experiments/results/cap_2a_rerun/cap2a_p3b_outcome.json", "sha256": "160ba0401b95d4b0436e30bb7604aa7b4852c175ff52f536b96eb9ab441f19ee"},
+    {"path": "experiments/results/cap_2a_rerun/cap2a_p3b_phase_ledger.json", "sha256": "383c7a1e3c4832f15c256b392570acd4b5b4b4535fa07d242f7e7ab162ee5caa"},
+    {"path": "experiments/results/cap_2a_rerun/proposals/f9727f3a92a4e6c3.json", "sha256": "4f75b4dfd98cc84ce6336495c9012e89edd57affb6cc1555a971e2ae710144f3"}
+  ]
+}

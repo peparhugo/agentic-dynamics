@@ -1,0 +1,18 @@
+{
+  "schema_version": "cap_2a_outcome/v1",
+  "campaign": "cap_2a_rerun",
+  "cell_id": "cap2a_p2_bespoke",
+  "proposal_id": "3566dc62cd388656",
+  "baseline_revision": "4c9d852509a25dab191bff3c2792a7cc92684013",
+  "analyzed_revision": "f5547d56720e8a6c1b03f05973b0767b7febb86f",
+  "outcome": "no_rework",
+  "realized_depth": 0,
+  "realized_symbol_set": [],
+  "test_executed_success": true,
+  "tests_passed": 3,
+  "tests_total": 3,
+  "graph_status": "available",
+  "sonar_status": "available",
+  "lsp_status": "unavailable",
+  "adjudication_note": "Adjudicated for p4 scoring from the immutable p2 artifacts (p2_phase_ledger.json + the implement commit f5547d5): multiply() returns a*b correctly, test_multiply asserts multiply(2,3)==6, and the independent kind:test phase recorded test_executed_success=True (3/3). No rework and no further verification were needed -> no_rework."
+}

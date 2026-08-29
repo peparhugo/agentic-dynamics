@@ -1,0 +1,69 @@
+{
+  "backend": "opencode",
+  "campaign": "cap_2a_rerun",
+  "cell_id": "cap2a_p3a",
+  "model": "deepseek/deepseek-v4-pro",
+  "ok": true,
+  "phase": "p3_run_shadow_cells",
+  "phases": [
+    {
+      "commit_hash": "790eb68",
+      "cost_usd": 0.0034148080000000005,
+      "duration_s": 14.86,
+      "facts": {
+        "analysis_revision_matches": "true",
+        "ast_parse_coverage": "1.0",
+        "changed_symbol_count": "2",
+        "changed_symbols_with_tests_ratio": "0.5",
+        "code_change_risk": "0.24",
+        "impacted_symbol_count": "4",
+        "lsp_analysis_status": "unavailable",
+        "new_sonar_critical_count": "0",
+        "sonar_analysis_status": "available"
+      },
+      "graph_status": "available",
+      "impacted_count": 4,
+      "kind": "agent",
+      "phase": "implement",
+      "status": "ok",
+      "test_executed_success": null,
+      "tests_passed": 0,
+      "tests_total": 0
+    },
+    {
+      "commit_hash": "",
+      "cost_usd": 0.0,
+      "duration_s": 0.33,
+      "facts": {},
+      "graph_status": null,
+      "impacted_count": null,
+      "kind": "test",
+      "phase": "test",
+      "status": "ok",
+      "test_executed_success": true,
+      "tests_passed": 3,
+      "tests_total": 3
+    },
+    {
+      "commit_hash": "",
+      "cost_usd": 0.004401678,
+      "duration_s": 8.49,
+      "facts": {},
+      "graph_status": null,
+      "impacted_count": null,
+      "kind": "agent",
+      "phase": "verify",
+      "status": "ok",
+      "test_executed_success": null,
+      "tests_passed": 0,
+      "tests_total": 0
+    }
+  ],
+  "proposal_artifact_sha256": "d8c2d9a2a1c6ddfc870fb7fdfae5b566516eee1f10b964821f07944d6912efde",
+  "proposal_id": "fa79270a11fec8e6",
+  "run_ledger": "experiments/results/workflows/cap_2a_calibration_cell/20260826T000314Z.json",
+  "run_ledger_sha256": "bf60b5465caa65fd23e23d25025d3ceecb636716dc1af040c08c329146479855",
+  "schema_version": "cap_2a_p3_phase_ledger/v1",
+  "spec_id": "cap_2a_calibration_cell@0.1",
+  "total_cost_usd": 0.007816
+}

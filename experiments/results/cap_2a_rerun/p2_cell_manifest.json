@@ -1,0 +1,22 @@
+{
+  "schema_version": "cap_2a_cell_manifest/v1",
+  "campaign": "cap_2a_rerun",
+  "phase": "p2_measure_one_cell",
+  "written_at": "2026-08-25T23:50:27Z",
+  "candidate_id": "c5_bespoke_calibration_cell",
+  "spec_path": "workflows/operations/cap_2a_calibration_cell.yaml",
+  "spec_path_sha256": "68d0d3e97b70e72528bcd62e146f9956f29e0c6d63778e01becfaaebaf455adf",
+  "spec_id": "cap_2a_calibration_cell@0.1",
+  "goal": "add a multiply function to the calc app (with a test), leaving add/subtract unchanged",
+  "model": "deepseek/deepseek-v4-pro",
+  "backend": "opencode",
+  "source_baseline_revision": "ec9f1b8a6216ca14bcb886f743eebb614225218e",
+  "seeded_app_worktree": "/tmp/cap2a_cell_vG65cy",
+  "seeded_app_seed_revision": "4c9d852509a25dab191bff3c2792a7cc92684013",
+  "finops_cell_id": "cap2a_p2_bespoke",
+  "graph_mode": "bolt://localhost:7687 (--change-analysis --change-analysis-graph)",
+  "change_analysis": true,
+  "historical_cost_usd": null,
+  "forecast": "FORECAST — no historical cost exists for the bespoke cell; the measured cost is the first measurement and the p3 budget is its 2x headroom.",
+  "selection_reason": "Purpose-built per hard rule 14: guarantees a real symbol change (multiply) + independent test evidence (kind:test phase). Small self-contained app keeps graph/sonar/tree-sitter legs fast; no destructive side effects."
+}

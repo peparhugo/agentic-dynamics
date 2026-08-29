@@ -1,0 +1,15 @@
+{
+  "analyzed_revision": "790eb68b074a5f59274db1c2ab04e219f5e6de3c",
+  "backend": "opencode",
+  "baseline_revision": "e8339c0508170990c02dae68c01accbec17f2866",
+  "campaign": "cap_2a_rerun",
+  "cell_id": "cap2a_p3a",
+  "goal": "add a multiply function to the calc app (with a test), leaving add/subtract unchanged",
+  "goal_sha256": "9443d5f5af593d3ac496b0c30e7a12fa4e8a3f96fb01cf56939d68df7ec35c1e",
+  "graph_mode": "bolt://localhost:7687 (--change-analysis --change-analysis-graph)",
+  "model": "deepseek/deepseek-v4-pro",
+  "phase": "p3_run_shadow_cells",
+  "proposal_id": "fa79270a11fec8e6",
+  "schema_version": "cap_2a_cell_manifest/v1",
+  "spec_id": "cap_2a_calibration_cell@0.1"
+}

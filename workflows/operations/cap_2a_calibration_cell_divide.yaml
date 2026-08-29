@@ -1,0 +1,82 @@
+name: cap_2a_calibration_cell_divide
+question: >-
+  p3 calibration cell for the cap_2a_rerun campaign: a symbol-level `divide` feature (with a
+  divide-by-zero guard) implemented against the seeded calc app, with an independent kind:test
+  phase. The edge case gives the model a real chance to get it subtly wrong, so the realized
+  outcome (no_rework vs targeted_rework vs verification_only) is a genuine measurement — not
+  guaranteed correct by construction.
+version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: true
+repeatable: true
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: true
+    context:
+      seeded_app: >-
+        A fresh disposable worktree seeded with a tiny calc package: calc.py (add, subtract)
+        and test_calc.py (test_add, test_subtract). The implement phase adds a divide symbol with
+        a divide-by-zero guard, so the typed CodeDelta reports a real changed symbol.
+    phases:
+      - name: implement
+        kind: agent
+        timeout: 1800
+        prompt: |
+          Implement a divide function with a divide-by-zero guard in the seeded calc app.
+
+          GOAL:
+          {goal}
+
+          READ FIRST:
+          - calc.py        (the existing add / subtract functions)
+          - test_calc.py   (the existing test_add / test_subtract)
+
+          DO:
+          - Add a `divide(a, b)` function to calc.py that raises `ValueError("division by zero")`
+            when b == 0, and returns a / b otherwise.
+          - Add `test_divide` and `test_divide_by_zero` to test_calc.py (assert divide(6, 3) == 2.0
+            and that divide(1, 0) raises ValueError).
+          - Do not change the existing add / subtract functions or their tests.
+
+          VERIFY: `python -m pytest test_calc.py -q` passes.
+
+          DELIVER the changed calc.py and test_calc.py.
+      - name: test
+        kind: test
+        timeout: 600
+      - name: verify
+        kind: agent
+        timeout: 1800
+        prompt: |
+          Verify the divide feature landed correctly, including the zero guard.
+
+          GOAL:
+          {goal}
+
+          PRIOR PHASES:
+          {prior_phases}
+
+          DO:
+          - Confirm calc.py defines `divide(a, b)` with a ValueError guard for b == 0.
+          - Confirm test_calc.py defines test_divide and test_divide_by_zero, and that
+            `python -m pytest test_calc.py -q` passes.
+          - Confirm add / subtract were left unchanged.
+
+          DELIVER a short verification note.
+factors:
+  - {name: model, levels: [deepseek/deepseek-v4-pro]}
+design: factorial
+rules: []
+metrics:
+  - {name: feature_implemented, agg: mean, over: cell}
+comparison: null
+writeup:
+  format: lab_book
+  sections: [question, implement, test, verify]
+stop: {budget_usd: 2.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}

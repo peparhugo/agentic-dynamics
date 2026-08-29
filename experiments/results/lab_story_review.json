@@ -1,15 +1,15 @@
 {
   "experiment_id": "lab_story_review",
-  "generated_at": "2026-08-28T17:55:13.321791",
+  "generated_at": "2026-08-29T03:19:06.501806",
   "summary": {
-    "cells": 215,
-    "sessions": 1067,
+    "cells": 207,
+    "sessions": 1027,
     "total_cost": 309.168491,
     "avg_captured_cost": 1.493568,
     "total_captured_cost": 309.168491,
     "cost_captured_records": 207,
-    "total_records": 215,
-    "cost_coverage": 0.9628,
+    "total_records": 207,
+    "cost_coverage": 1.0,
     "total_tokens": 35075991,
     "by_condition": {
       "clean": {
@@ -22,13 +22,13 @@
         "cost_coverage": 1.0
       },
       "early_degrade": {
-        "count": 80,
-        "success_rate": 0.86,
+        "count": 72,
+        "success_rate": 0.96,
         "avg_cost": 1.401126,
         "avg_captured_cost": 1.401126,
         "cost_captured_records": 72,
-        "total_records": 80,
-        "cost_coverage": 0.9
+        "total_records": 72,
+        "cost_coverage": 1.0
       }
     },
     "by_story": {
@@ -43,24 +43,24 @@
         "cost_coverage": 1.0
       },
       "static_site_gen": {
-        "count": 65,
-        "success_rate": 0.92,
+        "count": 64,
+        "success_rate": 0.94,
         "avg_correctness": 1.0,
         "avg_cost": 1.967258,
         "avg_captured_cost": 1.967258,
         "cost_captured_records": 64,
-        "total_records": 65,
-        "cost_coverage": 0.9846
+        "total_records": 64,
+        "cost_coverage": 1.0
       },
       "notification_service": {
-        "count": 73,
-        "success_rate": 0.86,
+        "count": 66,
+        "success_rate": 0.95,
         "avg_correctness": 1.0,
         "avg_cost": 1.453648,
         "avg_captured_cost": 1.453648,
         "cost_captured_records": 66,
-        "total_records": 73,
-        "cost_coverage": 0.9041
+        "total_records": 66,
+        "cost_coverage": 1.0
       }
     }
   },
@@ -455,20 +455,6 @@
       "total_tokens": 167136,
       "worktree": "/tmp/story_6f62fada91ef",
       "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/task_manager_api_gpt_5_6_luna_early_degrade_6f62fada91ef.json"
-    },
-    {
-      "story": "notification_service",
-      "condition": "early_degrade",
-      "sessions": 5,
-      "correctness": null,
-      "correctness_values": [],
-      "all_successful": false,
-      "cascade_recovery": false,
-      "timeouts": [],
-      "total_cost": 0.0,
-      "total_tokens": 0,
-      "worktree": "/tmp/story_f97c727f41d3",
-      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/notification_service_claude_haiku_4_5_early_degrade_f97c727f41d3.json"
     },
     {
       "story": "notification_service",
@@ -921,20 +907,6 @@
       "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/task_manager_api_gpt_5_6_terra_early_degrade_e91b0d961922.json"
     },
     {
-      "story": "notification_service",
-      "condition": "early_degrade",
-      "sessions": 5,
-      "correctness": null,
-      "correctness_values": [],
-      "all_successful": false,
-      "cascade_recovery": false,
-      "timeouts": [],
-      "total_cost": 0.0,
-      "total_tokens": 0,
-      "worktree": "/tmp/story_e70c34ba8545",
-      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/notification_service_claude_haiku_4_5_early_degrade_e70c34ba8545.json"
-    },
-    {
       "story": "task_manager_api",
       "condition": "clean",
       "sessions": 5,
@@ -953,20 +925,6 @@
       "total_tokens": 30163,
       "worktree": "/tmp/story_add5e7cdc864",
       "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/task_manager_api_openai_gpt-5.6-luna_clean_add5e7cdc864.json"
-    },
-    {
-      "story": "notification_service",
-      "condition": "early_degrade",
-      "sessions": 5,
-      "correctness": null,
-      "correctness_values": [],
-      "all_successful": false,
-      "cascade_recovery": false,
-      "timeouts": [],
-      "total_cost": 0.0,
-      "total_tokens": 0,
-      "worktree": "/tmp/story_2b6e48207bb2",
-      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/notification_service_claude_haiku_4_5_early_degrade_2b6e48207bb2.json"
     },
     {
       "story": "static_site_gen",
@@ -1793,20 +1751,6 @@
       "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/notification_service_anthropic_claude-haiku-4-5_bad_seed_dd0a49e95ad6.json"
     },
     {
-      "story": "static_site_gen",
-      "condition": "early_degrade",
-      "sessions": 5,
-      "correctness": null,
-      "correctness_values": [],
-      "all_successful": false,
-      "cascade_recovery": false,
-      "timeouts": [],
-      "total_cost": 0.0,
-      "total_tokens": 0,
-      "worktree": "/tmp/story_c46ad3251602",
-      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/static_site_gen_claude_sonnet_5_early_degrade_c46ad3251602.json"
-    },
-    {
       "story": "notification_service",
       "condition": "early_degrade",
       "sessions": 5,
@@ -2047,20 +1991,6 @@
       "total_tokens": 448875,
       "worktree": "/tmp/story_97751a9bf9bc",
       "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/static_site_gen_deepseek_v4_pro_early_degrade_97751a9bf9bc.json"
-    },
-    {
-      "story": "notification_service",
-      "condition": "early_degrade",
-      "sessions": 5,
-      "correctness": null,
-      "correctness_values": [],
-      "all_successful": false,
-      "cascade_recovery": false,
-      "timeouts": [],
-      "total_cost": 0.0,
-      "total_tokens": 0,
-      "worktree": "/tmp/story_717db4bfbeb1",
-      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/notification_service_claude_haiku_4_5_early_degrade_717db4bfbeb1.json"
     },
     {
       "story": "task_manager_api",
@@ -3487,20 +3417,6 @@
       "story": "notification_service",
       "condition": "early_degrade",
       "sessions": 5,
-      "correctness": null,
-      "correctness_values": [],
-      "all_successful": false,
-      "cascade_recovery": false,
-      "timeouts": [],
-      "total_cost": 0.0,
-      "total_tokens": 0,
-      "worktree": "/tmp/story_cfcbffa207dc",
-      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/notification_service_claude_sonnet_5_early_degrade_cfcbffa207dc.json"
-    },
-    {
-      "story": "notification_service",
-      "condition": "early_degrade",
-      "sessions": 5,
       "correctness": 1.0,
       "correctness_values": [
         1.0,
@@ -3752,20 +3668,6 @@
       "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/static_site_gen_anthropic_claude-haiku-4-5_clean_899bc4d979f9.json"
     },
     {
-      "story": "notification_service",
-      "condition": "early_degrade",
-      "sessions": 5,
-      "correctness": null,
-      "correctness_values": [],
-      "all_successful": false,
-      "cascade_recovery": false,
-      "timeouts": [],
-      "total_cost": 0.0,
-      "total_tokens": 0,
-      "worktree": "/tmp/story_deda665d540d",
-      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/notification_service_claude_sonnet_5_early_degrade_deda665d540d.json"
-    },
-    {
       "story": "task_manager_api",
       "condition": "clean",
       "sessions": 5,
@@ -3818,20 +3720,6 @@
       "total_tokens": 172257,
       "worktree": "/tmp/story_64d78c20a8ae",
       "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/task_manager_api_gpt_5_6_luna_early_degrade_64d78c20a8ae.json"
-    },
-    {
-      "story": "notification_service",
-      "condition": "early_degrade",
-      "sessions": 5,
-      "correctness": null,
-      "correctness_values": [],
-      "all_successful": false,
-      "cascade_recovery": false,
-      "timeouts": [],
-      "total_cost": 0.0,
-      "total_tokens": 0,
-      "worktree": "/tmp/story_b0605aea4868",
-      "result_file": "/home/drseuss/ai-finops-framework/experiments/results/stories/notification_service_claude_sonnet_5_early_degrade_b0605aea4868.json"
     },
     {
       "story": "static_site_gen",
@@ -3891,20 +3779,20 @@
   "lab_contract": {
     "lab": "lab_story_review.py",
     "input_dataset_id": "canonical_registry/story",
-    "registry_identity_sha256": "de2de65a2c250d14fd18589660ccf3736df2fba402bb9bdc69f7c6dd20317201",
-    "resolved_input_sha256": "7d2ab0fe4c18695fe26767d6e848f7a2e3f3a397d16b1e183594f70b9136c716",
-    "registry_version": "data-manifest/1.0+12925rows",
+    "registry_identity_sha256": "d9bcb7f360841a25ebbd2797c383bd9cc98a22810479a17443488148a5e7938e",
+    "resolved_input_sha256": "38a1f5dbe586890f453f846aa185f75e150bed7de0d3de007b8c66e3811b1be6",
+    "registry_version": "data-manifest/1.0+13031rows",
     "metric_definition_version": "story_review/v2",
     "metric_source_sha256": "c98f05c058287d4baeb5d0300682624dcbb31f05c330b0782423771a25c90d5c",
-    "n_resolved_records": 215,
-    "n_eligible_records": 215,
-    "n_used_records": 215,
+    "n_resolved_records": 207,
+    "n_eligible_records": 207,
+    "n_used_records": 207,
     "n_excluded_records": 0,
     "n_unused_eligible_records": 0,
-    "used_record_refs_sha256": "c2ae7384c02aade36e913e183d17b5e3d9b4fc0973faa27c49a4c13c0ca88d85",
+    "used_record_refs_sha256": "7d0b943104c02063bd3726e99b4e4a5777ec6ddfca03bd089a49ed1932127254",
     "excluded_record_refs_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-    "used_unique_records": 215,
-    "used_contributions": 215,
+    "used_unique_records": 207,
+    "used_contributions": 207,
     "review_without_current_story": 0,
     "story_without_review": 0,
     "missing_required_field": 0,
@@ -3912,6 +3800,6 @@
     "data_integrity_policy": "docs/data_integrity_findings.md",
     "requires_external_service": null,
     "contract_version": "lab-contract/v6",
-    "generated_at": "2026-08-28T15:55:13.323400+00:00"
+    "generated_at": "2026-08-29T01:19:06.503411+00:00"
   }
 }

@@ -1,0 +1,86 @@
+{
+  "schema_version": "cap_2a_p4_validation/v1",
+  "campaign": "cap_2a_rerun",
+  "phase": "p4_score_hit_rate",
+  "scoring_artifact": "experiments/results/cap_2a_rerun_score_20260826T001107Z.json",
+  "scoring_artifact_sha256": "59bd15d8b70d11e106aa5569735f9371a5476e1c89b6061fcc39fa55e3225497",
+  "trace": {
+    "n_scored": {
+      "value": 3,
+      "definition": "count of per-cell rows with hit in {0, 1}",
+      "source": "cells[*].hit"
+    },
+    "n_hits": {
+      "value": 0,
+      "definition": "sum of cells[*].hit",
+      "source": "cells[*].hit"
+    },
+    "hit_rate": {
+      "value": 0.0,
+      "definition": "n_hits / n_scored = 0 / 3",
+      "source": "aggregates.n_hits / aggregates.n_scored"
+    },
+    "wilson_95_ci": {
+      "value": [0.0, 0.5615],
+      "definition": "Wilson score interval for proportion 0/3 at z=1.96",
+      "source": "derived from aggregates.n_hits and aggregates.n_scored"
+    },
+    "n_unknown_outcome": {
+      "value": 0,
+      "definition": "count of cells with outcome == 'unknown'",
+      "source": "cells[*].outcome"
+    },
+    "n_invalid_join": {
+      "value": 0,
+      "definition": "count of cells with valid_join == false",
+      "source": "cells[*].valid_join"
+    },
+    "n_not_run": {
+      "value": 0,
+      "definition": "cells listed in the manifest but not run",
+      "source": "p3_execution_manifest.cells minus scored cells (empty)"
+    },
+    "risk_mint_rate": {
+      "value": 1.0,
+      "definition": "cells with non-None code_change_risk / n_ran = 3 / 3",
+      "source": "cells[*].code_change_risk"
+    },
+    "blast_radius_error_mean": {
+      "value": 4.0,
+      "definition": "mean of cells[*].blast_radius_error over available predictions = (4+4+4)/3",
+      "source": "cells[*].blast_radius_error"
+    },
+    "blast_radius_error_median": {
+      "value": 4,
+      "definition": "median of cells[*].blast_radius_error over available predictions",
+      "source": "cells[*].blast_radius_error"
+    },
+    "n_blast_radius_available": {
+      "value": 3,
+      "definition": "cells with blast_radius_error != null",
+      "source": "cells[*].blast_radius_error"
+    },
+    "graph_unavailable_rate": {
+      "value": 0.0,
+      "definition": "cells with graph_status != 'available' / n_ran = 0 / 3",
+      "source": "cells[*].graph_status"
+    },
+    "outcome_recorded_rate": {
+      "value": 1.0,
+      "definition": "(n_ran - n_unknown_outcome) / n_ran = 3 / 3",
+      "source": "aggregates.n_ran, aggregates.n_unknown_outcome"
+    },
+    "proposal_validation_rate": {
+      "value": 1.0,
+      "definition": "n_scored / n_ran = 3 / 3 (every proposal validated applied=false and joined)",
+      "source": "aggregates.n_scored, aggregates.n_ran"
+    }
+  },
+  "per_cell_hit_trace": {
+    "cap2a_p2_bespoke": {"proposal_action": "verify", "outcome": "no_rework", "hit": 0, "reason": "verify does not hit no_rework (verify hits verification_only only)"},
+    "cap2a_p3a": {"proposal_action": "verify", "outcome": "no_rework", "hit": 0, "reason": "verify does not hit no_rework"},
+    "cap2a_p3b": {"proposal_action": "rework", "outcome": "no_rework", "hit": 0, "reason": "rework does not hit no_rework (the sonar critical was S1244, a test-style false positive)"}
+  },
+  "conservation": "n_scored(3) + n_unknown_outcome(0) + n_invalid_join(0) + n_not_run(0) == n_ran(3).",
+  "note": "No 2b recommendation is made in p4. The scoring proves (a) the blocker chain is fixed (risk_mint_rate=1.0 vs the first campaign's 0.0) and (b) the verifier over-predicts intervention (hit-rate 0/3) on trivial, correctly-tested symbol changes."
+}

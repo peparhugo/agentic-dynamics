@@ -1,0 +1,61 @@
+{
+  "schema_version": "cap_2a_p1_verification/v1",
+  "phase": "p1_wire_analyzers",
+  "spec": "workflows/repository/cap_2a_rerun.yaml",
+  "spec_version": "0.1",
+  "source_revision": "21ea701ed6b5634a35ab8b5371e52dfbaae57baa",
+  "status": "PASS",
+  "capabilities": {
+    "sonar_wired": true,
+    "lsp_wired": true,
+    "risk_mintable": true,
+    "hard_deadline_enforced": true,
+    "byte_identical_without_change_analysis": true,
+    "no_credentials_in_artifacts": true
+  },
+  "seam": {
+    "sonar": "run_sonar_analysis(wd, revision=<full analyzed sha>) — fetch-first, revision-scoped project key, stale-refused honored; payload {status, revision_matches|None, new_critical_count|None, analyzed_sha}",
+    "lsp": "run_diagnostics(wd, profile) at the phase commit's tree state; payload {status, new_error_count|None, tool}",
+    "deadline": "ANALYZER_LEG_TIMEOUT_SECONDS = 360.0, same ThreadPoolExecutor hard-deadline discipline as the graph leg; a non-returning analyzer degrades to its measured unavailable status (terms omitted, never a fabricated zero, never a hung phase)",
+    "new_critical_count_semantics": "bugs + vulnerabilities (reliability + security defects) — the release-blocking classes, NOT maintainability code smells",
+    "revision_matches_semantics": "true iff status==available (analysis confirmed to cover revision), false iff stale-refused, null iff unavailable (omitted)"
+  },
+  "test_suite": {
+    "command": "python3 -m pytest tests/test_change_analyzer.py tests/test_workflow_runner.py tests/test_run_workflow_graph_cli.py tests/test_code_change_facts.py tests/test_versioned_graph.py tests/test_graph.py tests/test_dependency_direction.py tests/test_evidence_prereq_gate.py",
+    "passed": 145,
+    "failed": 0,
+    "hermetic_verifications": {
+      "a_available_mints_counts_and_risk": "test_change_analysis_wires_sonar_lsp_into_risk — new_sonar_critical_count=3, new_lsp_error_count=3, code_change_risk=0.3",
+      "b_unavailable_stale_refused_omit_terms": "test_change_analysis_unavailable_analyzers_omit_counts (risk None) + test_change_analysis_risk_renormalizes_over_surviving_term (risk 0.2)",
+      "c_hanging_analyzer_degrades_within_deadline": "test_change_analysis_hanging_analyzer_degrades_within_deadline — 1s deadline over a 10s hang, both statuses unavailable",
+      "d_refusal_contract_holds": "test_proposal_schema_validation_with_applied_false + test_proposal_emit_refuses_when_unvalidatable (malformed proposal still refused)"
+    }
+  },
+  "live_probe": {
+    "artifact": "experiments/results/cap_2a_rerun/p1_live_probe_ledger.json",
+    "agent_note": "Deterministic stand-in performs the real file edit; every seam leg AFTER the commit is real (git, tree-sitter, sonar-scanner, LSP probe, Neo4j graph, reducer)",
+    "commit_hash_short": "5407029",
+    "analyzed_revision": "540702953a647ed984e3aba31112e03b189a6e56",
+    "graph_status": "available",
+    "graph_updated": true,
+    "impacted_count": 3,
+    "sonar_analysis_status": "available",
+    "lsp_analysis_status": "unavailable",
+    "new_sonar_critical_count": "0",
+    "changed_symbol_count": "1",
+    "code_change_risk": "0.08",
+    "risk_non_none": true,
+    "blocker_chain_broken": true
+  },
+  "guards": {
+    "no_flag_byte_identical": true,
+    "sonar_project_properties_never_committed": true,
+    "credentials_not_in_artifacts": true
+  },
+  "files_touched": [
+    "src/agentic_dynamics/runtime/workflow_runner.py",
+    "tests/test_workflow_runner.py",
+    "experiments/results/cap_2a_rerun/p1_live_probe_ledger.json",
+    "experiments/results/cap_2a_rerun_p1_verification.json"
+  ]
+}

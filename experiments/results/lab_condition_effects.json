@@ -1,9 +1,9 @@
 {
   "experiment_id": "lab_condition_effects",
-  "generated_at": "2026-08-28T17:55:11.540180",
+  "generated_at": "2026-08-29T03:19:04.647291",
   "summary": {
     "conditions": 2,
-    "stories": 215,
+    "stories": 207,
     "reviews": 242,
     "joined_reviews": 155,
     "reviews_without_current_story": 87
@@ -26,16 +26,16 @@
     },
     {
       "condition": "early_degrade",
-      "cells": 80,
-      "success_rate": 0.863,
-      "cascade_rate": 0.025,
+      "cells": 72,
+      "success_rate": 0.958,
+      "cascade_rate": 0.028,
       "avg_cost": 1.401126,
       "total_cost": 100.8811,
       "avg_captured_cost": 1.401126,
       "total_captured_cost": 100.8811,
       "cost_captured_records": 72,
-      "total_records": 80,
-      "cost_coverage": 0.9,
+      "total_records": 72,
+      "cost_coverage": 1.0,
       "reviews": 21,
       "worse_rate": 0.0
     }
@@ -43,20 +43,20 @@
   "lab_contract": {
     "lab": "lab_condition_effects.py",
     "input_dataset_id": "canonical_registry/story+review",
-    "registry_identity_sha256": "de2de65a2c250d14fd18589660ccf3736df2fba402bb9bdc69f7c6dd20317201",
-    "resolved_input_sha256": "4e8601fda77af04c2cbc167ec8f8beca495165fcdffbd4f2cb0ce58323535be8",
-    "registry_version": "data-manifest/1.0+12925rows",
+    "registry_identity_sha256": "d9bcb7f360841a25ebbd2797c383bd9cc98a22810479a17443488148a5e7938e",
+    "resolved_input_sha256": "44da8aa829d4288b7652248a884275c1ed71be5c74b7b92cc7aacb9fa10d2d7e",
+    "registry_version": "data-manifest/1.0+13031rows",
     "metric_definition_version": "condition_effects/v2",
     "metric_source_sha256": "c7023d1bd40fa57e38cc738cca8a9a71780532be3f60898f74954fb6c80f7b32",
-    "n_resolved_records": 457,
-    "n_eligible_records": 370,
-    "n_used_records": 370,
+    "n_resolved_records": 449,
+    "n_eligible_records": 362,
+    "n_used_records": 362,
     "n_excluded_records": 87,
     "n_unused_eligible_records": 0,
-    "used_record_refs_sha256": "72d08bac0f77c258736be8cef849c1df1b560211cc17f8deccfe5a26ce6195bf",
+    "used_record_refs_sha256": "47d98b8cd543f705e025bdfcf24a773b60499081a608bec700ac783a3a7002b3",
     "excluded_record_refs_sha256": "b9f23e41d491fb219bd9ef35f71b785a6adba1b092bb77d337183067b8b13a86",
-    "used_unique_records": 370,
-    "used_contributions": 370,
+    "used_unique_records": 362,
+    "used_contributions": 362,
     "review_without_current_story": 87,
     "story_without_review": 0,
     "missing_required_field": 0,
@@ -64,6 +64,6 @@
     "data_integrity_policy": "docs/data_integrity_findings.md",
     "requires_external_service": null,
     "contract_version": "lab-contract/v6",
-    "generated_at": "2026-08-28T15:55:11.540924+00:00"
+    "generated_at": "2026-08-29T01:19:04.648051+00:00"
   }
 }

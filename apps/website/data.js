@@ -1,32 +1,32 @@
-/* Generated 2026-08-28 15:55:18 UTC by build_data.py */
+/* Generated 2026-08-29 01:19:12 UTC by build_data.py */
 /* DO NOT EDIT — regenerate with: python scripts/build_data.py */
 window.DYNAMICS_DATA = {
   "_meta": {
-    "generated_at": "2026-08-28T15:55:15.518253+00:00",
+    "generated_at": "2026-08-29T01:19:08.816242+00:00",
     "provenance_note": "All values tagged [M]easured, [C]omputed, [H]euristic, or e[X]ternal. See methodology.html."
   },
   "summary": {
     "worktrees_total": 1771,
-    "sessions_total": 1067,
+    "sessions_total": 1027,
     "game_reports": 348,
     "total_cost": 309.1685,
     "architectures": 3,
     "variants": 7,
-    "stories_total": 215,
-    "stories_unique": 150,
+    "stories_total": 207,
+    "stories_unique": 142,
     "stories_re_runs": 65,
-    "story_sessions": 1067,
+    "story_sessions": 1027,
     "story_total_cost": 309.1685,
     "configs": 0,
-    "registry_current_records": 215,
-    "resolved_measurement_payloads": 215,
-    "eligible_records": 215,
-    "records_used": 215,
+    "registry_current_records": 207,
+    "resolved_measurement_payloads": 207,
+    "eligible_records": 207,
+    "records_used": 207,
     "unresolved_waivered": 0,
     "canonical_findings": 64,
     "contaminated_tombstones": 77,
-    "no_measurement_tombstones": 10,
-    "tombstones_total": 87,
+    "no_measurement_tombstones": 0,
+    "tombstones_total": 95,
     "_provenance": {
       "worktrees_total": "M",
       "sessions_total": "M",
@@ -52,8 +52,8 @@ window.DYNAMICS_DATA = {
     }
   },
   "resolution_report": {
-    "expected_current": 521,
-    "resolved": 521,
+    "expected_current": 513,
+    "resolved": 513,
     "missing": 0,
     "unreadable": 0,
     "ambiguous": 0,
@@ -61,16 +61,16 @@ window.DYNAMICS_DATA = {
     "waivers": []
   },
   "publication_contract": {
-    "registry_identity": "de2de65a2c250d14fd18589660ccf3736df2fba402bb9bdc69f7c6dd20317201",
-    "resolved_input_identity": "fc6e4fe38938362698a0c04238d0b04ce2c24f3335ecb1c521ddf5182b2afab5",
+    "registry_identity": "d9bcb7f360841a25ebbd2797c383bd9cc98a22810479a17443488148a5e7938e",
+    "resolved_input_identity": "074d4435598f7b320433dcb160699c4266c99a3282c5adc6da6bba2647dce060",
     "data_integrity_policy_version": "data-integrity/v1",
     "normalization_version": "canonical-projection/v2",
     "waiver_digest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
     "generator_source_tree_identity": "b8826a24af1c2c10f266bd660b60755b0f89100b708e6f733bfff36f32e4a65b"
   },
   "public_statistics": {
-    "story_sessions": 1067,
-    "stories_total": 215,
+    "story_sessions": 1027,
+    "stories_total": 207,
     "story_total_cost": 309.1685,
     "db_sessions_total": 5593,
     "game_reports": 348,
@@ -78,7 +78,7 @@ window.DYNAMICS_DATA = {
     "providers": 3,
     "experiment_configs": 0,
     "experiment_specs": 11,
-    "workflow_specs": 133,
+    "workflow_specs": 137,
     "perturbation_operators": 10,
     "lab_books": 20,
     "lab_books_canonical": 8,
@@ -273,41 +273,41 @@ window.DYNAMICS_DATA = {
       "id": "anthropic/claude-haiku-4-5",
       "label": "anthropic/claude-haiku-4-5",
       "provider": "anthropic",
-      "cells": 24,
-      "unique_cells": 20,
+      "cells": 20,
+      "unique_cells": 16,
       "re_runs": 4,
-      "sessions": 120,
+      "sessions": 100,
       "total_cost": 32.616808,
       "avg_cost": 1.63084,
       "cost_cells": 20,
       "avg_captured_cost": 1.63084,
       "cost_captured_records": 20,
-      "total_records": 24,
+      "total_records": 20,
       "total_captured_cost": 32.616808,
-      "cost_coverage": 0.8333,
-      "avg_cache_hit": 0.824,
-      "avg_tests": 127.9,
-      "avg_test_code_ratio": 1.221,
-      "avg_tok_per_session": 13581.0,
-      "avg_duration_s": 862.0,
-      "avg_code_lines": 1484.0,
+      "cost_coverage": 1.0,
+      "avg_cache_hit": 0.989,
+      "avg_tests": 153.4,
+      "avg_test_code_ratio": 1.465,
+      "avg_tok_per_session": 16298.0,
+      "avg_duration_s": 1032.0,
+      "avg_code_lines": 1584.0,
       "final_tests_discovered": 3069,
       "test_executions_passed": 0,
       "test_executions_run": 0,
       "pass_rate": "unknown",
       "pass_rate_scope": "weighted over repeated session-level test executions (each session re-runs the suite; the count is summed across sessions)",
       "avg_cost_per_session": 0.326168,
-      "avg_loc": 1484.0,
-      "avg_energy_j": 15438.9,
-      "avg_energy_j_per_loc": 10.4,
+      "avg_loc": 1584.0,
+      "avg_energy_j": 18526.7,
+      "avg_energy_j_per_loc": 11.7,
       "narration_rate": null,
       "avg_narration_penalty": null,
-      "strategy_cons": 7,
+      "strategy_cons": 3,
       "strategy_expl": 17,
       "strategy_waste": 0,
       "strategy_efficient": 0,
-      "reports": 24,
-      "reports_valid": 24,
+      "reports": 20,
+      "reports_valid": 20,
       "reports_narrated": 0
     },
     {
@@ -355,41 +355,41 @@ window.DYNAMICS_DATA = {
       "id": "anthropic/claude-sonnet-5",
       "label": "Claude Sonnet 5",
       "provider": "anthropic",
-      "cells": 27,
-      "unique_cells": 21,
+      "cells": 23,
+      "unique_cells": 17,
       "re_runs": 6,
-      "sessions": 135,
+      "sessions": 115,
       "total_cost": 118.894751,
       "avg_cost": 5.169337,
       "cost_cells": 23,
       "avg_captured_cost": 5.169337,
       "cost_captured_records": 23,
-      "total_records": 27,
+      "total_records": 23,
       "total_captured_cost": 118.894751,
-      "cost_coverage": 0.8519,
-      "avg_cache_hit": 0.84,
-      "avg_tests": 117.1,
-      "avg_test_code_ratio": 0.695,
-      "avg_tok_per_session": 18404.0,
-      "avg_duration_s": 1062.0,
-      "avg_code_lines": 1761.0,
+      "cost_coverage": 1.0,
+      "avg_cache_hit": 0.986,
+      "avg_tests": 137.5,
+      "avg_test_code_ratio": 0.815,
+      "avg_tok_per_session": 21605.0,
+      "avg_duration_s": 1245.0,
+      "avg_code_lines": 1954.0,
       "final_tests_discovered": 3163,
       "test_executions_passed": 455,
       "test_executions_run": 455,
       "pass_rate": "100% (455/455)",
       "pass_rate_scope": "weighted over repeated session-level test executions (each session re-runs the suite; the count is summed across sessions)",
       "avg_cost_per_session": 1.033867,
-      "avg_loc": 1761.0,
-      "avg_energy_j": 21095.0,
-      "avg_energy_j_per_loc": 11.98,
+      "avg_loc": 1954.0,
+      "avg_energy_j": 24763.6,
+      "avg_energy_j_per_loc": 12.67,
       "narration_rate": null,
       "avg_narration_penalty": null,
-      "strategy_cons": 7,
+      "strategy_cons": 3,
       "strategy_expl": 20,
       "strategy_waste": 0,
       "strategy_efficient": 0,
-      "reports": 27,
-      "reports_valid": 27,
+      "reports": 23,
+      "reports_valid": 23,
       "reports_narrated": 0
     }
   ],
@@ -1397,9 +1397,9 @@ window.DYNAMICS_DATA = {
       697.0,
       879.0,
       566.0,
-      1484.0,
+      1584.0,
       739.0,
-      1761.0
+      1954.0
     ],
     "costY": [
       0.074461,
@@ -1415,9 +1415,9 @@ window.DYNAMICS_DATA = {
       34,
       39,
       30,
-      24,
+      20,
       30,
-      27
+      23
     ]
   },
   "calculator": {
@@ -1501,8 +1501,8 @@ window.DYNAMICS_DATA = {
     "total_cost_deepseek": 8.6227,
     "total_cost_claude": 151.5116,
     "total_narrated": 0,
-    "total_valid_reports": 215,
-    "total_reports_analyzed": 215,
+    "total_valid_reports": 207,
+    "total_reports_analyzed": 207,
     "_provenance": {
       "cost_gap": "C",
       "overall_pass_rate": "C",
@@ -3431,18 +3431,18 @@ window.DYNAMICS_DATA = {
     {
       "id": "anthropic/claude-haiku-4-5",
       "label": "anthropic/claude-haiku-4-5",
-      "avg_energy_j": 15438.9,
-      "avg_energy_j_per_loc": 10.4,
+      "avg_energy_j": 18526.7,
+      "avg_energy_j_per_loc": 11.7,
       "avg_cost": 1.63084,
-      "avg_loc": 1484.0
+      "avg_loc": 1584.0
     },
     {
       "id": "anthropic/claude-sonnet-5",
       "label": "Claude Sonnet 5",
-      "avg_energy_j": 21095.0,
-      "avg_energy_j_per_loc": 11.98,
+      "avg_energy_j": 24763.6,
+      "avg_energy_j_per_loc": 12.67,
       "avg_cost": 5.169337,
-      "avg_loc": 1761.0
+      "avg_loc": 1954.0
     },
     {
       "id": "openai/gpt-5.6-luna",
@@ -3814,17 +3814,17 @@ window.DYNAMICS_DATA = {
       },
       {
         "model": "anthropic/claude-haiku-4-5",
-        "cells": 24,
+        "cells": 20,
         "total_cost": 32.616808,
         "avg_cost": 1.63084,
         "avg_captured_cost": 1.63084,
         "cost_captured_records": 20,
-        "total_records": 24,
+        "total_records": 20,
         "total_captured_cost": 32.616808,
-        "cost_coverage": 0.8333,
+        "cost_coverage": 1.0,
         "total_tokens": 1629766,
-        "avg_cache_hit": 0.824,
-        "avg_duration_s": 862.0
+        "avg_cache_hit": 0.989,
+        "avg_duration_s": 1032.0
       },
       {
         "model": "openai/gpt-5.6-sol",
@@ -3842,17 +3842,17 @@ window.DYNAMICS_DATA = {
       },
       {
         "model": "anthropic/claude-sonnet-5",
-        "cells": 27,
+        "cells": 23,
         "total_cost": 118.894751,
         "avg_cost": 5.169337,
         "avg_captured_cost": 5.169337,
         "cost_captured_records": 23,
-        "total_records": 27,
+        "total_records": 23,
         "total_captured_cost": 118.894751,
-        "cost_coverage": 0.8519,
+        "cost_coverage": 1.0,
         "total_tokens": 2484557,
-        "avg_cache_hit": 0.84,
-        "avg_duration_s": 1062.0
+        "avg_cache_hit": 0.986,
+        "avg_duration_s": 1245.0
       }
     ],
     "conditions": [
@@ -3872,17 +3872,17 @@ window.DYNAMICS_DATA = {
       },
       {
         "condition": "early_degrade",
-        "cells": 80,
+        "cells": 72,
         "variants": 12,
         "total_cost": 100.8811,
         "avg_cost": 1.401126,
         "avg_captured_cost": 1.401126,
         "cost_captured_records": 72,
-        "total_records": 80,
+        "total_records": 72,
         "total_captured_cost": 100.8811,
-        "cost_coverage": 0.9,
+        "cost_coverage": 1.0,
         "success": 69,
-        "fail": 11
+        "fail": 3
       }
     ],
     "stories": [
@@ -3902,98 +3902,98 @@ window.DYNAMICS_DATA = {
       },
       {
         "story": "notification_service",
-        "cells": 73,
+        "cells": 66,
         "total_cost": 95.940785,
         "avg_cost": 1.453648,
         "avg_captured_cost": 1.453648,
         "cost_captured_records": 66,
-        "total_records": 73,
+        "total_records": 66,
         "total_captured_cost": 95.940785,
-        "cost_coverage": 0.9041,
-        "sessions": 363,
-        "avg_duration_s": 1143.0,
-        "avg_tokens_per_session": 32065.0
+        "cost_coverage": 1.0,
+        "sessions": 328,
+        "avg_duration_s": 1263.0,
+        "avg_tokens_per_session": 35466.0
       },
       {
         "story": "static_site_gen",
-        "cells": 65,
+        "cells": 64,
         "total_cost": 125.904521,
         "avg_cost": 1.967258,
         "avg_captured_cost": 1.967258,
         "cost_captured_records": 64,
-        "total_records": 65,
+        "total_records": 64,
         "total_captured_cost": 125.904521,
-        "cost_coverage": 0.9846,
-        "sessions": 321,
-        "avg_duration_s": 1401.0,
-        "avg_tokens_per_session": 40992.0
+        "cost_coverage": 1.0,
+        "sessions": 316,
+        "avg_duration_s": 1423.0,
+        "avg_tokens_per_session": 41632.0
       }
     ],
     "tiers": [
       {
         "tier": "tier1_minimal",
         "quality": "bad",
-        "cells": 43,
+        "cells": 41,
         "avg_cost": 1.549339,
         "avg_captured_cost": 1.549339,
         "cost_captured_records": 41,
-        "total_records": 43,
+        "total_records": 41,
         "total_captured_cost": 63.522913,
-        "cost_coverage": 0.9535,
-        "avg_tokens_per_session": 32400.0,
-        "avg_session_duration_s": 234.0
+        "cost_coverage": 1.0,
+        "avg_tokens_per_session": 33980.0,
+        "avg_session_duration_s": 245.0
       },
       {
         "tier": "tier1_minimal",
         "quality": "good",
-        "cells": 70,
+        "cells": 68,
         "avg_cost": 1.551765,
         "avg_captured_cost": 1.551765,
         "cost_captured_records": 68,
-        "total_records": 70,
+        "total_records": 68,
         "total_captured_cost": 105.520049,
-        "cost_coverage": 0.9714,
-        "avg_tokens_per_session": 31413.0,
-        "avg_session_duration_s": 238.0
+        "cost_coverage": 1.0,
+        "avg_tokens_per_session": 32337.0,
+        "avg_session_duration_s": 245.0
       },
       {
         "tier": "tier2_small",
         "quality": "bad",
-        "cells": 41,
+        "cells": 39,
         "avg_cost": 1.292634,
         "avg_captured_cost": 1.292634,
         "cost_captured_records": 39,
-        "total_records": 41,
+        "total_records": 39,
         "total_captured_cost": 50.412727,
-        "cost_coverage": 0.9512,
-        "avg_tokens_per_session": 30951.0,
-        "avg_session_duration_s": 220.0
+        "cost_coverage": 1.0,
+        "avg_tokens_per_session": 32538.0,
+        "avg_session_duration_s": 231.0
       },
       {
         "tier": "tier2_small",
         "quality": "good",
-        "cells": 61,
+        "cells": 59,
         "avg_cost": 1.520556,
         "avg_captured_cost": 1.520556,
         "cost_captured_records": 59,
-        "total_records": 61,
+        "total_records": 59,
         "total_captured_cost": 89.712802,
-        "cost_coverage": 0.9672,
-        "avg_tokens_per_session": 32521.0,
-        "avg_session_duration_s": 219.0
+        "cost_coverage": 1.0,
+        "avg_tokens_per_session": 33624.0,
+        "avg_session_duration_s": 227.0
       }
     ],
     "sessions": {
-      "total": 1067,
+      "total": 1027,
       "total_cost": 309.16849071000047,
       "total_tokens": 33518193,
       "total_cache_reads": 823919043,
       "cache_hit_rate": 0.977,
-      "duration_s": 241966.7735237789,
+      "duration_s": 241893.54902822094,
       "successful": 1007,
-      "failed": 60
+      "failed": 20
     },
-    "generated_at": "2026-08-28T15:55:15.699360+00:00"
+    "generated_at": "2026-08-29T01:19:08.992153+00:00"
   },
   "reviews": {
     "models": [
@@ -4443,139 +4443,139 @@ window.DYNAMICS_DATA = {
       {
         "model": "claude-sonnet-5",
         "label": "Claude Sonnet 5",
-        "commits": 135,
+        "commits": 115,
         "lines_added": 62819,
         "lines_removed": 4128,
         "functions_added": 2591,
         "classes_added": 116,
         "imports_added": 4731,
-        "sonar_available": 135,
+        "sonar_available": 115,
         "sonar_bugs_delta": 11,
         "sonar_smells_delta": 124,
         "sonar_complexity_delta": 2214,
-        "avg_convention": 0.731,
-        "deep_cells": 27,
+        "avg_convention": 0.717,
+        "deep_cells": 23,
         "lsp_available": 0,
         "lsp_errors_per_cell": {
           "value": null,
           "n_available": 0,
-          "n_total": 27,
+          "n_total": 23,
           "coverage": 0.0
         },
         "lsp_warnings_per_cell": {
           "value": null,
           "n_available": 0,
-          "n_total": 27,
+          "n_total": 23,
           "coverage": 0.0
         },
         "solution_correctness": {
-          "value": 0.741,
-          "n_available": 27,
-          "n_total": 27,
+          "value": 0.87,
+          "n_available": 23,
+          "n_total": 23,
           "coverage": 1.0
         },
         "solution_constraints": {
-          "value": 0.889,
-          "n_available": 27,
-          "n_total": 27,
+          "value": 0.971,
+          "n_available": 23,
+          "n_total": 23,
           "coverage": 1.0
         },
         "solution_quality": {
-          "value": 0.097,
-          "n_available": 27,
-          "n_total": 27,
+          "value": 0.048,
+          "n_available": 23,
+          "n_total": 23,
           "coverage": 1.0
         },
         "solution_novelty": {
-          "value": 0.69,
-          "n_available": 27,
-          "n_total": 27,
+          "value": 0.81,
+          "n_available": 23,
+          "n_total": 23,
           "coverage": 1.0
         },
         "solution_composite": {
-          "value": 0.649,
-          "n_available": 27,
-          "n_total": 27,
+          "value": 0.727,
+          "n_available": 23,
+          "n_total": 23,
           "coverage": 1.0
         },
         "basin_escape": {
-          "value": 0.566,
-          "n_available": 27,
-          "n_total": 27,
+          "value": 0.664,
+          "n_available": 23,
+          "n_total": 23,
           "coverage": 1.0
         },
         "strategies": {
           "exploratory": 20,
-          "conservative": 7
+          "conservative": 3
         }
       },
       {
         "model": "claude-haiku-4-5",
         "label": "claude-haiku-4-5",
-        "commits": 119,
+        "commits": 99,
         "lines_added": 62391,
         "lines_removed": 4321,
         "functions_added": 1690,
         "classes_added": 206,
         "imports_added": 2896,
-        "sonar_available": 119,
+        "sonar_available": 99,
         "sonar_bugs_delta": 3,
         "sonar_smells_delta": 200,
         "sonar_complexity_delta": 1797,
-        "avg_convention": 0.728,
-        "deep_cells": 24,
+        "avg_convention": 0.707,
+        "deep_cells": 20,
         "lsp_available": 0,
         "lsp_errors_per_cell": {
           "value": null,
           "n_available": 0,
-          "n_total": 24,
+          "n_total": 20,
           "coverage": 0.0
         },
         "lsp_warnings_per_cell": {
           "value": null,
           "n_available": 0,
-          "n_total": 24,
+          "n_total": 20,
           "coverage": 0.0
         },
         "solution_correctness": {
-          "value": 0.708,
-          "n_available": 24,
-          "n_total": 24,
+          "value": 0.85,
+          "n_available": 20,
+          "n_total": 20,
           "coverage": 1.0
         },
         "solution_constraints": {
-          "value": 0.875,
-          "n_available": 24,
-          "n_total": 24,
+          "value": 0.983,
+          "n_available": 20,
+          "n_total": 20,
           "coverage": 1.0
         },
         "solution_quality": {
-          "value": 0.091,
-          "n_available": 24,
-          "n_total": 24,
+          "value": 0.036,
+          "n_available": 20,
+          "n_total": 20,
           "coverage": 1.0
         },
         "solution_novelty": {
-          "value": 0.717,
-          "n_available": 24,
-          "n_total": 24,
+          "value": 0.86,
+          "n_available": 20,
+          "n_total": 20,
           "coverage": 1.0
         },
         "solution_composite": {
-          "value": 0.636,
-          "n_available": 24,
-          "n_total": 24,
+          "value": 0.729,
+          "n_available": 20,
+          "n_total": 20,
           "coverage": 1.0
         },
         "basin_escape": {
-          "value": 0.611,
-          "n_available": 24,
-          "n_total": 24,
+          "value": 0.733,
+          "n_available": 20,
+          "n_total": 20,
           "coverage": 1.0
         },
         "strategies": {
           "exploratory": 17,
-          "conservative": 7
+          "conservative": 3
         }
       },
       {
@@ -4715,17 +4715,17 @@ window.DYNAMICS_DATA = {
         }
       }
     ],
-    "stories_analyzed": 215,
-    "commits_analyzed": 1064,
-    "sonar_commits_available": 1064
+    "stories_analyzed": 207,
+    "commits_analyzed": 1024,
+    "sonar_commits_available": 1024
   },
   "labs": {
     "cache_economics": {
       "experiment_id": "lab_cache_economics",
-      "generated_at": "2026-08-28T17:55:10.320555",
+      "generated_at": "2026-08-29T03:19:03.294165",
       "summary": {
         "models": 7,
-        "stories": 215
+        "stories": 207
       },
       "models": [
         {
@@ -4866,35 +4866,35 @@ window.DYNAMICS_DATA = {
         },
         {
           "model": "claude-haiku-4-5",
-          "cells": 24,
+          "cells": 20,
           "avg_cost": 1.63084,
           "avg_captured_cost": 1.63084,
           "total_captured_cost": 32.616808,
           "cost_captured_records": 20,
-          "total_records": 24,
-          "cost_coverage": 0.8333,
-          "avg_cache_hit": 0.824,
+          "total_records": 20,
+          "cost_coverage": 1.0,
+          "avg_cache_hit": 0.989,
           "cache_hit_coverage": {
-            "value": 0.824,
-            "n_available": 24,
-            "n_total": 24,
+            "value": 0.989,
+            "n_available": 20,
+            "n_total": 20,
             "coverage": 1.0
           },
           "cache_reads": 163588556,
           "cache_writes": 3922476,
           "read_write_ratio": 41.7,
-          "avg_context_per_cell": 6884097.0,
+          "avg_context_per_cell": 8260916.0,
           "context_coverage": {
-            "value": 6884097.0,
-            "n_available": 24,
-            "n_total": 24,
+            "value": 8260916.0,
+            "n_available": 20,
+            "n_total": 20,
             "coverage": 1.0
           },
-          "avg_tokens_per_cell": 67907.0,
+          "avg_tokens_per_cell": 81488.0,
           "tokens_coverage": {
-            "value": 67907.0,
-            "n_available": 24,
-            "n_total": 24,
+            "value": 81488.0,
+            "n_available": 20,
+            "n_total": 20,
             "coverage": 1.0
           }
         },
@@ -4934,35 +4934,35 @@ window.DYNAMICS_DATA = {
         },
         {
           "model": "claude-sonnet-5",
-          "cells": 27,
+          "cells": 23,
           "avg_cost": 5.169337,
           "avg_captured_cost": 5.169337,
           "total_captured_cost": 118.894751,
           "cost_captured_records": 23,
-          "total_records": 27,
-          "cost_coverage": 0.8519,
-          "avg_cache_hit": 0.84,
+          "total_records": 23,
+          "cost_coverage": 1.0,
+          "avg_cache_hit": 0.986,
           "cache_hit_coverage": {
-            "value": 0.84,
-            "n_available": 27,
-            "n_total": 27,
+            "value": 0.986,
+            "n_available": 23,
+            "n_total": 23,
             "coverage": 1.0
           },
           "cache_reads": 177814999,
           "cache_writes": 5250530,
           "read_write_ratio": 33.9,
-          "avg_context_per_cell": 6677761.0,
+          "avg_context_per_cell": 7839111.0,
           "context_coverage": {
-            "value": 6677761.0,
-            "n_available": 27,
-            "n_total": 27,
+            "value": 7839111.0,
+            "n_available": 23,
+            "n_total": 23,
             "coverage": 1.0
           },
-          "avg_tokens_per_cell": 92021.0,
+          "avg_tokens_per_cell": 108024.0,
           "tokens_coverage": {
-            "value": 92021.0,
-            "n_available": 27,
-            "n_total": 27,
+            "value": 108024.0,
+            "n_available": 23,
+            "n_total": 23,
             "coverage": 1.0
           }
         }
@@ -4970,20 +4970,20 @@ window.DYNAMICS_DATA = {
       "lab_contract": {
         "lab": "lab_cache_economics.py",
         "input_dataset_id": "canonical_registry/story",
-        "registry_identity_sha256": "de2de65a2c250d14fd18589660ccf3736df2fba402bb9bdc69f7c6dd20317201",
-        "resolved_input_sha256": "7d2ab0fe4c18695fe26767d6e848f7a2e3f3a397d16b1e183594f70b9136c716",
-        "registry_version": "data-manifest/1.0+12925rows",
+        "registry_identity_sha256": "d9bcb7f360841a25ebbd2797c383bd9cc98a22810479a17443488148a5e7938e",
+        "resolved_input_sha256": "38a1f5dbe586890f453f846aa185f75e150bed7de0d3de007b8c66e3811b1be6",
+        "registry_version": "data-manifest/1.0+13031rows",
         "metric_definition_version": "cache_economics/v2",
         "metric_source_sha256": "c3c4ea9e7f5875b281d24905d28cdaacd4e9cb3be779327c77e856f486f47d5a",
-        "n_resolved_records": 215,
-        "n_eligible_records": 215,
-        "n_used_records": 215,
+        "n_resolved_records": 207,
+        "n_eligible_records": 207,
+        "n_used_records": 207,
         "n_excluded_records": 0,
         "n_unused_eligible_records": 0,
-        "used_record_refs_sha256": "c2ae7384c02aade36e913e183d17b5e3d9b4fc0973faa27c49a4c13c0ca88d85",
+        "used_record_refs_sha256": "7d0b943104c02063bd3726e99b4e4a5777ec6ddfca03bd089a49ed1932127254",
         "excluded_record_refs_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-        "used_unique_records": 215,
-        "used_contributions": 215,
+        "used_unique_records": 207,
+        "used_contributions": 207,
         "review_without_current_story": 0,
         "story_without_review": 0,
         "missing_required_field": 0,
@@ -4991,15 +4991,15 @@ window.DYNAMICS_DATA = {
         "data_integrity_policy": "docs/data_integrity_findings.md",
         "requires_external_service": null,
         "contract_version": "lab-contract/v6",
-        "generated_at": "2026-08-28T15:55:10.321112+00:00"
+        "generated_at": "2026-08-29T01:19:03.295206+00:00"
       }
     },
     "condition_effects": {
       "experiment_id": "lab_condition_effects",
-      "generated_at": "2026-08-28T17:55:11.540180",
+      "generated_at": "2026-08-29T03:19:04.647291",
       "summary": {
         "conditions": 2,
-        "stories": 215,
+        "stories": 207,
         "reviews": 242,
         "joined_reviews": 155,
         "reviews_without_current_story": 87
@@ -5022,16 +5022,16 @@ window.DYNAMICS_DATA = {
         },
         {
           "condition": "early_degrade",
-          "cells": 80,
-          "success_rate": 0.863,
-          "cascade_rate": 0.025,
+          "cells": 72,
+          "success_rate": 0.958,
+          "cascade_rate": 0.028,
           "avg_cost": 1.401126,
           "total_cost": 100.8811,
           "avg_captured_cost": 1.401126,
           "total_captured_cost": 100.8811,
           "cost_captured_records": 72,
-          "total_records": 80,
-          "cost_coverage": 0.9,
+          "total_records": 72,
+          "cost_coverage": 1.0,
           "reviews": 21,
           "worse_rate": 0.0
         }
@@ -5039,20 +5039,20 @@ window.DYNAMICS_DATA = {
       "lab_contract": {
         "lab": "lab_condition_effects.py",
         "input_dataset_id": "canonical_registry/story+review",
-        "registry_identity_sha256": "de2de65a2c250d14fd18589660ccf3736df2fba402bb9bdc69f7c6dd20317201",
-        "resolved_input_sha256": "4e8601fda77af04c2cbc167ec8f8beca495165fcdffbd4f2cb0ce58323535be8",
-        "registry_version": "data-manifest/1.0+12925rows",
+        "registry_identity_sha256": "d9bcb7f360841a25ebbd2797c383bd9cc98a22810479a17443488148a5e7938e",
+        "resolved_input_sha256": "44da8aa829d4288b7652248a884275c1ed71be5c74b7b92cc7aacb9fa10d2d7e",
+        "registry_version": "data-manifest/1.0+13031rows",
         "metric_definition_version": "condition_effects/v2",
         "metric_source_sha256": "c7023d1bd40fa57e38cc738cca8a9a71780532be3f60898f74954fb6c80f7b32",
-        "n_resolved_records": 457,
-        "n_eligible_records": 370,
-        "n_used_records": 370,
+        "n_resolved_records": 449,
+        "n_eligible_records": 362,
+        "n_used_records": 362,
         "n_excluded_records": 87,
         "n_unused_eligible_records": 0,
-        "used_record_refs_sha256": "72d08bac0f77c258736be8cef849c1df1b560211cc17f8deccfe5a26ce6195bf",
+        "used_record_refs_sha256": "47d98b8cd543f705e025bdfcf24a773b60499081a608bec700ac783a3a7002b3",
         "excluded_record_refs_sha256": "b9f23e41d491fb219bd9ef35f71b785a6adba1b092bb77d337183067b8b13a86",
-        "used_unique_records": 370,
-        "used_contributions": 370,
+        "used_unique_records": 362,
+        "used_contributions": 362,
         "review_without_current_story": 87,
         "story_without_review": 0,
         "missing_required_field": 0,
@@ -5060,23 +5060,23 @@ window.DYNAMICS_DATA = {
         "data_integrity_policy": "docs/data_integrity_findings.md",
         "requires_external_service": null,
         "contract_version": "lab-contract/v6",
-        "generated_at": "2026-08-28T15:55:11.540924+00:00"
+        "generated_at": "2026-08-29T01:19:04.648051+00:00"
       }
     },
     "grit": {
       "experiment_id": "lab_grit",
-      "generated_at": "2026-08-28T17:55:10.978423",
+      "generated_at": "2026-08-29T03:19:04.000478",
       "metric_definition": "G(s) = P(test_executed_success | perturbation_strength = s)",
       "summary": {
-        "cells": 144,
+        "cells": 136,
         "successes": 108,
-        "grit_overall": 0.75,
+        "grit_overall": 0.7941,
         "strength_levels": [
           0.0,
           0.5
         ],
         "findings": 64,
-        "stories": 215,
+        "stories": 207,
         "controlled_delta_grit": 0.0037,
         "excluded": 135,
         "exclusions": {
@@ -5099,15 +5099,15 @@ window.DYNAMICS_DATA = {
         },
         {
           "strength": 0.5,
-          "n": 134,
+          "n": 126,
           "successes": 101,
-          "grit": 0.7537,
-          "ci95_lo": 0.6744,
-          "ci95_hi": 0.8189,
+          "grit": 0.8016,
+          "ci95_lo": 0.7235,
+          "ci95_hi": 0.8618,
           "insufficient_support": false,
           "sources": {
             "finding": 54,
-            "story": 80
+            "story": 72
           }
         }
       ],
@@ -5133,6 +5133,15 @@ window.DYNAMICS_DATA = {
       ],
       "by_model_perturbed": [
         {
+          "model": "claude-sonnet-5",
+          "n": 18,
+          "successes": 16,
+          "grit": 0.8889,
+          "ci95_lo": 0.672,
+          "ci95_hi": 0.969,
+          "insufficient_support": false
+        },
+        {
           "model": "deepseek-v4-flash",
           "n": 15,
           "successes": 13,
@@ -5151,21 +5160,21 @@ window.DYNAMICS_DATA = {
           "insufficient_support": false
         },
         {
+          "model": "claude-haiku-4-5",
+          "n": 14,
+          "successes": 11,
+          "grit": 0.7857,
+          "ci95_lo": 0.5241,
+          "ci95_hi": 0.9243,
+          "insufficient_support": false
+        },
+        {
           "model": "gpt-5.6-luna",
           "n": 18,
           "successes": 14,
           "grit": 0.7778,
           "ci95_lo": 0.5478,
           "ci95_hi": 0.91,
-          "insufficient_support": false
-        },
-        {
-          "model": "claude-sonnet-5",
-          "n": 22,
-          "successes": 16,
-          "grit": 0.7273,
-          "ci95_lo": 0.5185,
-          "ci95_hi": 0.8685,
           "insufficient_support": false
         },
         {
@@ -5184,15 +5193,6 @@ window.DYNAMICS_DATA = {
           "grit": 0.6875,
           "ci95_lo": 0.444,
           "ci95_hi": 0.8584,
-          "insufficient_support": false
-        },
-        {
-          "model": "claude-haiku-4-5",
-          "n": 18,
-          "successes": 11,
-          "grit": 0.6111,
-          "ci95_lo": 0.3862,
-          "ci95_hi": 0.797,
           "insufficient_support": false
         }
       ],
@@ -5226,11 +5226,11 @@ window.DYNAMICS_DATA = {
         },
         {
           "perturbation_class": "story:early_degrade",
-          "n": 80,
+          "n": 72,
           "successes": 63,
-          "grit": 0.7875,
-          "ci95_lo": 0.6858,
-          "ci95_hi": 0.8629,
+          "grit": 0.875,
+          "ci95_lo": 0.7792,
+          "ci95_hi": 0.9328,
           "insufficient_support": false
         }
       ],
@@ -5318,20 +5318,20 @@ window.DYNAMICS_DATA = {
       "lab_contract": {
         "lab": "lab_grit.py",
         "input_dataset_id": "canonical_registry/finding+story",
-        "registry_identity_sha256": "de2de65a2c250d14fd18589660ccf3736df2fba402bb9bdc69f7c6dd20317201",
-        "resolved_input_sha256": "b1fcca3b2db24fec574383affacae45c6699065a11b660a1c86b702caeb6826a",
-        "registry_version": "data-manifest/1.0+12925rows",
+        "registry_identity_sha256": "d9bcb7f360841a25ebbd2797c383bd9cc98a22810479a17443488148a5e7938e",
+        "resolved_input_sha256": "66cb2de70d47e50269d54829a673734d7b7acc5768004a2e112623d5c811837d",
+        "registry_version": "data-manifest/1.0+13031rows",
         "metric_definition_version": "grit/v2",
         "metric_source_sha256": "efffc47f8bc8e92356489e96cc82a9b08bd6b07eb5196e5c0250b8baf04b1e91",
-        "n_resolved_records": 279,
-        "n_eligible_records": 144,
-        "n_used_records": 144,
+        "n_resolved_records": 271,
+        "n_eligible_records": 136,
+        "n_used_records": 136,
         "n_excluded_records": 135,
         "n_unused_eligible_records": 0,
-        "used_record_refs_sha256": "d598c97bb58d32e5ca9c90b63502a713d113fca52f53d60413922a43457fb8aa",
+        "used_record_refs_sha256": "e5754e8893e767ad81ed56ced90e2b7841c5ab3e0e3b9993c01406279bf53e19",
         "excluded_record_refs_sha256": "406e4dcfb0de6257038bf88643c3577caf680c24ba5dd5009f64e7bc119b4edf",
-        "used_unique_records": 144,
-        "used_contributions": 144,
+        "used_unique_records": 136,
+        "used_contributions": 136,
         "review_without_current_story": 0,
         "story_without_review": 0,
         "missing_required_field": 135,
@@ -5339,16 +5339,16 @@ window.DYNAMICS_DATA = {
         "data_integrity_policy": "docs/data_integrity_findings.md",
         "requires_external_service": null,
         "contract_version": "lab-contract/v6",
-        "generated_at": "2026-08-28T15:55:10.979068+00:00"
+        "generated_at": "2026-08-29T01:19:04.001121+00:00"
       }
     },
     "quality_frontier": {
       "experiment_id": "lab_quality_frontier",
-      "generated_at": "2026-08-28T17:55:12.133031",
+      "generated_at": "2026-08-29T03:19:05.283196",
       "summary": {
         "models": 7,
-        "stories": 215,
-        "analyses": 215,
+        "stories": 207,
+        "analyses": 207,
         "lsp_available_cells": 0
       },
       "models": [
@@ -5486,34 +5486,34 @@ window.DYNAMICS_DATA = {
         },
         {
           "model": "claude-haiku-4-5",
-          "cells": 24,
+          "cells": 20,
           "avg_cost": 1.63084,
           "avg_captured_cost": 1.63084,
           "total_captured_cost": 32.616808,
           "cost_captured_records": 20,
-          "total_records": 24,
-          "cost_coverage": 0.8333,
+          "total_records": 20,
+          "cost_coverage": 1.0,
           "lsp_errors_per_cell": null,
           "lsp_cells": 0,
-          "code_quality_score": 0.091,
+          "code_quality_score": 0.036,
           "code_quality_score_coverage": {
-            "value": 0.091,
-            "n_available": 24,
-            "n_total": 24,
+            "value": 0.036,
+            "n_available": 20,
+            "n_total": 20,
             "coverage": 1.0
           },
-          "cyclomatic_complexity": 303.5,
+          "cyclomatic_complexity": 354.4,
           "cyclomatic_complexity_coverage": {
-            "value": 303.5,
-            "n_available": 24,
-            "n_total": 24,
+            "value": 354.4,
+            "n_available": 20,
+            "n_total": 20,
             "coverage": 1.0
           },
-          "novelty_score": 0.717,
+          "novelty_score": 0.86,
           "novelty_score_coverage": {
-            "value": 0.717,
-            "n_available": 24,
-            "n_total": 24,
+            "value": 0.86,
+            "n_available": 20,
+            "n_total": 20,
             "coverage": 1.0
           }
         },
@@ -5552,34 +5552,34 @@ window.DYNAMICS_DATA = {
         },
         {
           "model": "claude-sonnet-5",
-          "cells": 27,
+          "cells": 23,
           "avg_cost": 5.169337,
           "avg_captured_cost": 5.169337,
           "total_captured_cost": 118.894751,
           "cost_captured_records": 23,
-          "total_records": 27,
-          "cost_coverage": 0.8519,
+          "total_records": 23,
+          "cost_coverage": 1.0,
           "lsp_errors_per_cell": null,
           "lsp_cells": 0,
-          "code_quality_score": 0.097,
+          "code_quality_score": 0.048,
           "code_quality_score_coverage": {
-            "value": 0.097,
-            "n_available": 27,
-            "n_total": 27,
+            "value": 0.048,
+            "n_available": 23,
+            "n_total": 23,
             "coverage": 1.0
           },
-          "cyclomatic_complexity": 326.333,
+          "cyclomatic_complexity": 374.478,
           "cyclomatic_complexity_coverage": {
-            "value": 326.333,
-            "n_available": 27,
-            "n_total": 27,
+            "value": 374.478,
+            "n_available": 23,
+            "n_total": 23,
             "coverage": 1.0
           },
-          "novelty_score": 0.69,
+          "novelty_score": 0.81,
           "novelty_score_coverage": {
-            "value": 0.69,
-            "n_available": 27,
-            "n_total": 27,
+            "value": 0.81,
+            "n_available": 23,
+            "n_total": 23,
             "coverage": 1.0
           }
         }
@@ -5587,20 +5587,20 @@ window.DYNAMICS_DATA = {
       "lab_contract": {
         "lab": "lab_quality_frontier.py",
         "input_dataset_id": "canonical_registry/story+analysis",
-        "registry_identity_sha256": "de2de65a2c250d14fd18589660ccf3736df2fba402bb9bdc69f7c6dd20317201",
-        "resolved_input_sha256": "fd358eb3b21cde22c85da69134886548bc32378b3cccb46d9fa424a8a22d682b",
-        "registry_version": "data-manifest/1.0+12925rows",
+        "registry_identity_sha256": "d9bcb7f360841a25ebbd2797c383bd9cc98a22810479a17443488148a5e7938e",
+        "resolved_input_sha256": "00753f57e1b20017872d1cf16f347439a54a568b26c3b6d69d0a28cf5901cad6",
+        "registry_version": "data-manifest/1.0+13031rows",
         "metric_definition_version": "quality_frontier/v2",
         "metric_source_sha256": "4bf5e2c7953d5ffe68ed0499541f12143991be7b4ebbf25dd8622f1cadcf4d1c",
-        "n_resolved_records": 430,
-        "n_eligible_records": 430,
-        "n_used_records": 430,
+        "n_resolved_records": 414,
+        "n_eligible_records": 414,
+        "n_used_records": 414,
         "n_excluded_records": 0,
         "n_unused_eligible_records": 0,
-        "used_record_refs_sha256": "31785b832063193909b0c5679a70711ba35b1e60cb5e1ff2d997691a2ad48369",
+        "used_record_refs_sha256": "e90ae84768acb701e9615a20335480cf5f8a8710392826184a9cf8dc6a221f7b",
         "excluded_record_refs_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-        "used_unique_records": 430,
-        "used_contributions": 430,
+        "used_unique_records": 414,
+        "used_contributions": 414,
         "review_without_current_story": 0,
         "story_without_review": 0,
         "missing_required_field": 0,
@@ -5608,83 +5608,83 @@ window.DYNAMICS_DATA = {
         "data_integrity_policy": "docs/data_integrity_findings.md",
         "requires_external_service": null,
         "contract_version": "lab-contract/v6",
-        "generated_at": "2026-08-28T15:55:12.133742+00:00"
+        "generated_at": "2026-08-29T01:19:05.283936+00:00"
       }
     },
     "story_arc": {
       "experiment_id": "lab_story_arc",
-      "generated_at": "2026-08-28T17:55:12.668380",
+      "generated_at": "2026-08-29T03:19:05.825087",
       "summary": {
         "snowball_factor": 2.32,
         "session1_cost": 0.173207,
         "session5_cost": 0.402034,
-        "stories": 215
+        "stories": 207
       },
       "sessions": [
         {
           "session_number": 1,
           "task_type": "greenfield",
-          "n": 215,
+          "n": 207,
           "avg_cost": 0.173207,
           "avg_captured_cost": 0.173207,
           "total_captured_cost": 35.853902,
           "cost_captured_records": 207,
-          "total_records": 215,
-          "cost_coverage": 0.9628,
-          "avg_tokens": 21663.0,
-          "avg_tests": 4.5
+          "total_records": 207,
+          "cost_coverage": 1.0,
+          "avg_tokens": 22501.0,
+          "avg_tests": 4.7
         },
         {
           "session_number": 2,
           "task_type": "feature",
-          "n": 215,
+          "n": 207,
           "avg_cost": 0.242173,
           "avg_captured_cost": 0.242173,
           "total_captured_cost": 49.88772,
           "cost_captured_records": 206,
-          "total_records": 215,
-          "cost_coverage": 0.9581,
-          "avg_tokens": 28432.0,
-          "avg_tests": 8.6
+          "total_records": 207,
+          "cost_coverage": 0.9952,
+          "avg_tokens": 29531.0,
+          "avg_tests": 8.9
         },
         {
           "session_number": 3,
           "task_type": "integration",
-          "n": 215,
+          "n": 207,
           "avg_cost": 0.35613,
           "avg_captured_cost": 0.35613,
           "total_captured_cost": 72.294344,
           "cost_captured_records": 203,
-          "total_records": 215,
-          "cost_coverage": 0.9442,
-          "avg_tokens": 34852.0,
-          "avg_tests": 11.5
+          "total_records": 207,
+          "cost_coverage": 0.9807,
+          "avg_tokens": 36199.0,
+          "avg_tests": 12.0
         },
         {
           "session_number": 4,
           "task_type": "refactor",
-          "n": 211,
+          "n": 203,
           "avg_cost": 0.359446,
           "avg_captured_cost": 0.359446,
           "total_captured_cost": 71.529731,
           "cost_captured_records": 199,
-          "total_records": 211,
-          "cost_coverage": 0.9431,
-          "avg_tokens": 35257.0,
-          "avg_tests": 11.0
+          "total_records": 203,
+          "cost_coverage": 0.9803,
+          "avg_tokens": 36646.0,
+          "avg_tests": 11.5
         },
         {
           "session_number": 5,
           "task_type": "cross_cutting",
-          "n": 211,
+          "n": 203,
           "avg_cost": 0.402034,
           "avg_captured_cost": 0.402034,
           "total_captured_cost": 79.602794,
           "cost_captured_records": 198,
-          "total_records": 211,
-          "cost_coverage": 0.9384,
-          "avg_tokens": 40655.0,
-          "avg_tests": 14.9
+          "total_records": 203,
+          "cost_coverage": 0.9754,
+          "avg_tokens": 42257.0,
+          "avg_tests": 15.5
         }
       ],
       "by_condition": {
@@ -5753,20 +5753,20 @@ window.DYNAMICS_DATA = {
       "lab_contract": {
         "lab": "lab_story_arc.py",
         "input_dataset_id": "canonical_registry/story",
-        "registry_identity_sha256": "de2de65a2c250d14fd18589660ccf3736df2fba402bb9bdc69f7c6dd20317201",
-        "resolved_input_sha256": "7d2ab0fe4c18695fe26767d6e848f7a2e3f3a397d16b1e183594f70b9136c716",
-        "registry_version": "data-manifest/1.0+12925rows",
+        "registry_identity_sha256": "d9bcb7f360841a25ebbd2797c383bd9cc98a22810479a17443488148a5e7938e",
+        "resolved_input_sha256": "38a1f5dbe586890f453f846aa185f75e150bed7de0d3de007b8c66e3811b1be6",
+        "registry_version": "data-manifest/1.0+13031rows",
         "metric_definition_version": "story_arc/v2",
         "metric_source_sha256": "1e10f13a3df8657c2e75ca2045a1bb8835fb3880b6c475f5d2da6747b40a7c95",
-        "n_resolved_records": 215,
-        "n_eligible_records": 215,
-        "n_used_records": 215,
+        "n_resolved_records": 207,
+        "n_eligible_records": 207,
+        "n_used_records": 207,
         "n_excluded_records": 0,
         "n_unused_eligible_records": 0,
-        "used_record_refs_sha256": "c2ae7384c02aade36e913e183d17b5e3d9b4fc0973faa27c49a4c13c0ca88d85",
+        "used_record_refs_sha256": "7d0b943104c02063bd3726e99b4e4a5777ec6ddfca03bd089a49ed1932127254",
         "excluded_record_refs_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-        "used_unique_records": 215,
-        "used_contributions": 215,
+        "used_unique_records": 207,
+        "used_contributions": 207,
         "review_without_current_story": 0,
         "story_without_review": 0,
         "missing_required_field": 0,
@@ -5774,15 +5774,15 @@ window.DYNAMICS_DATA = {
         "data_integrity_policy": "docs/data_integrity_findings.md",
         "requires_external_service": null,
         "contract_version": "lab-contract/v6",
-        "generated_at": "2026-08-28T15:55:12.669018+00:00"
+        "generated_at": "2026-08-29T01:19:05.825711+00:00"
       }
     },
     "verification_frontier": {
       "experiment_id": "lab_verification_frontier",
-      "generated_at": "2026-08-28T17:55:13.839121",
+      "generated_at": "2026-08-29T03:19:07.043203",
       "summary": {
         "models": 7,
-        "stories": 215,
+        "stories": 207,
         "cheapest": "deepseek-v4-flash",
         "most_verified": "claude-haiku-4-5",
         "pareto_frontier": [
@@ -5849,15 +5849,15 @@ window.DYNAMICS_DATA = {
         },
         {
           "model": "claude-haiku-4-5",
-          "cells": 24,
+          "cells": 20,
           "cost_cells": 20,
           "avg_cost": 1.63084,
           "avg_captured_cost": 1.63084,
           "total_captured_cost": 32.616808,
           "cost_captured_records": 20,
-          "total_records": 24,
-          "cost_coverage": 0.8333,
-          "avg_tests": 127.875,
+          "total_records": 20,
+          "cost_coverage": 1.0,
+          "avg_tests": 153.45,
           "total_cost": 32.616808,
           "total_tests": 3069
         },
@@ -5877,15 +5877,15 @@ window.DYNAMICS_DATA = {
         },
         {
           "model": "claude-sonnet-5",
-          "cells": 27,
+          "cells": 23,
           "cost_cells": 23,
           "avg_cost": 5.169337,
           "avg_captured_cost": 5.169337,
           "total_captured_cost": 118.894751,
           "cost_captured_records": 23,
-          "total_records": 27,
-          "cost_coverage": 0.8519,
-          "avg_tests": 117.148,
+          "total_records": 23,
+          "cost_coverage": 1.0,
+          "avg_tests": 137.522,
           "total_cost": 118.894751,
           "total_tests": 3163
         }
@@ -5893,20 +5893,20 @@ window.DYNAMICS_DATA = {
       "lab_contract": {
         "lab": "lab_verification_frontier.py",
         "input_dataset_id": "canonical_registry/story",
-        "registry_identity_sha256": "de2de65a2c250d14fd18589660ccf3736df2fba402bb9bdc69f7c6dd20317201",
-        "resolved_input_sha256": "7d2ab0fe4c18695fe26767d6e848f7a2e3f3a397d16b1e183594f70b9136c716",
-        "registry_version": "data-manifest/1.0+12925rows",
+        "registry_identity_sha256": "d9bcb7f360841a25ebbd2797c383bd9cc98a22810479a17443488148a5e7938e",
+        "resolved_input_sha256": "38a1f5dbe586890f453f846aa185f75e150bed7de0d3de007b8c66e3811b1be6",
+        "registry_version": "data-manifest/1.0+13031rows",
         "metric_definition_version": "verification_frontier/v2",
         "metric_source_sha256": "3c9ec2ce0be32ac9c6ae3e3ba3e3cdb4e2930a11d87dbb07c0933472b356457c",
-        "n_resolved_records": 215,
-        "n_eligible_records": 215,
-        "n_used_records": 215,
+        "n_resolved_records": 207,
+        "n_eligible_records": 207,
+        "n_used_records": 207,
         "n_excluded_records": 0,
         "n_unused_eligible_records": 0,
-        "used_record_refs_sha256": "c2ae7384c02aade36e913e183d17b5e3d9b4fc0973faa27c49a4c13c0ca88d85",
+        "used_record_refs_sha256": "7d0b943104c02063bd3726e99b4e4a5777ec6ddfca03bd089a49ed1932127254",
         "excluded_record_refs_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-        "used_unique_records": 215,
-        "used_contributions": 215,
+        "used_unique_records": 207,
+        "used_contributions": 207,
         "review_without_current_story": 0,
         "story_without_review": 0,
         "missing_required_field": 0,
@@ -5914,19 +5914,19 @@ window.DYNAMICS_DATA = {
         "data_integrity_policy": "docs/data_integrity_findings.md",
         "requires_external_service": null,
         "contract_version": "lab-contract/v6",
-        "generated_at": "2026-08-28T15:55:13.839678+00:00"
+        "generated_at": "2026-08-29T01:19:07.043779+00:00"
       }
     },
     "verification_value": {
       "experiment_id": "lab_verification_value",
-      "generated_at": "2026-08-28T17:55:14.365440",
+      "generated_at": "2026-08-29T03:19:07.616895",
       "summary": {
         "correlation_tests_vs_worse_rate": -0.161,
         "cells": 105,
-        "stories": 215,
+        "stories": 207,
         "reviews": 242,
         "review_without_current_story": 87,
-        "story_without_review": 60
+        "story_without_review": 52
       },
       "rows": [
         {
@@ -6668,28 +6668,28 @@ window.DYNAMICS_DATA = {
       "lab_contract": {
         "lab": "lab_verification_value.py",
         "input_dataset_id": "canonical_registry/story+review",
-        "registry_identity_sha256": "de2de65a2c250d14fd18589660ccf3736df2fba402bb9bdc69f7c6dd20317201",
-        "resolved_input_sha256": "4e8601fda77af04c2cbc167ec8f8beca495165fcdffbd4f2cb0ce58323535be8",
-        "registry_version": "data-manifest/1.0+12925rows",
+        "registry_identity_sha256": "d9bcb7f360841a25ebbd2797c383bd9cc98a22810479a17443488148a5e7938e",
+        "resolved_input_sha256": "44da8aa829d4288b7652248a884275c1ed71be5c74b7b92cc7aacb9fa10d2d7e",
+        "registry_version": "data-manifest/1.0+13031rows",
         "metric_definition_version": "verification_value/v2",
         "metric_source_sha256": "f8331d35688c569a39b7247378995514661aa372eef25b879a4536ce544e339a",
-        "n_resolved_records": 457,
+        "n_resolved_records": 449,
         "n_eligible_records": 310,
         "n_used_records": 310,
-        "n_excluded_records": 147,
+        "n_excluded_records": 139,
         "n_unused_eligible_records": 0,
         "used_record_refs_sha256": "d97d3c41fa0c6b75296d300bb5e33079444ca39a59795f6893b2860af9f2d357",
-        "excluded_record_refs_sha256": "b5b9866ea3fa813f15b095db5d63b3dc7456190b82dbfe14ea76d58de1642111",
+        "excluded_record_refs_sha256": "4fef61c240f7496476b8dced22dfb15d28a32cd0c93ec44b798410a71ad70ec4",
         "used_unique_records": 310,
         "used_contributions": 310,
         "review_without_current_story": 87,
-        "story_without_review": 60,
+        "story_without_review": 52,
         "missing_required_field": 0,
         "outside_analysis_population": 0,
         "data_integrity_policy": "docs/data_integrity_findings.md",
         "requires_external_service": null,
         "contract_version": "lab-contract/v6",
-        "generated_at": "2026-08-28T15:55:14.366195+00:00"
+        "generated_at": "2026-08-29T01:19:07.617665+00:00"
       }
     }
   },

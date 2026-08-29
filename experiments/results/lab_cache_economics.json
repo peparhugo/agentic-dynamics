@@ -1,9 +1,9 @@
 {
   "experiment_id": "lab_cache_economics",
-  "generated_at": "2026-08-28T17:55:10.320555",
+  "generated_at": "2026-08-29T03:19:03.294165",
   "summary": {
     "models": 7,
-    "stories": 215
+    "stories": 207
   },
   "models": [
     {
@@ -144,35 +144,35 @@
     },
     {
       "model": "claude-haiku-4-5",
-      "cells": 24,
+      "cells": 20,
       "avg_cost": 1.63084,
       "avg_captured_cost": 1.63084,
       "total_captured_cost": 32.616808,
       "cost_captured_records": 20,
-      "total_records": 24,
-      "cost_coverage": 0.8333,
-      "avg_cache_hit": 0.824,
+      "total_records": 20,
+      "cost_coverage": 1.0,
+      "avg_cache_hit": 0.989,
       "cache_hit_coverage": {
-        "value": 0.824,
-        "n_available": 24,
-        "n_total": 24,
+        "value": 0.989,
+        "n_available": 20,
+        "n_total": 20,
         "coverage": 1.0
       },
       "cache_reads": 163588556,
       "cache_writes": 3922476,
       "read_write_ratio": 41.7,
-      "avg_context_per_cell": 6884097.0,
+      "avg_context_per_cell": 8260916.0,
       "context_coverage": {
-        "value": 6884097.0,
-        "n_available": 24,
-        "n_total": 24,
+        "value": 8260916.0,
+        "n_available": 20,
+        "n_total": 20,
         "coverage": 1.0
       },
-      "avg_tokens_per_cell": 67907.0,
+      "avg_tokens_per_cell": 81488.0,
       "tokens_coverage": {
-        "value": 67907.0,
-        "n_available": 24,
-        "n_total": 24,
+        "value": 81488.0,
+        "n_available": 20,
+        "n_total": 20,
         "coverage": 1.0
       }
     },
@@ -212,35 +212,35 @@
     },
     {
       "model": "claude-sonnet-5",
-      "cells": 27,
+      "cells": 23,
       "avg_cost": 5.169337,
       "avg_captured_cost": 5.169337,
       "total_captured_cost": 118.894751,
       "cost_captured_records": 23,
-      "total_records": 27,
-      "cost_coverage": 0.8519,
-      "avg_cache_hit": 0.84,
+      "total_records": 23,
+      "cost_coverage": 1.0,
+      "avg_cache_hit": 0.986,
       "cache_hit_coverage": {
-        "value": 0.84,
-        "n_available": 27,
-        "n_total": 27,
+        "value": 0.986,
+        "n_available": 23,
+        "n_total": 23,
         "coverage": 1.0
       },
       "cache_reads": 177814999,
       "cache_writes": 5250530,
       "read_write_ratio": 33.9,
-      "avg_context_per_cell": 6677761.0,
+      "avg_context_per_cell": 7839111.0,
       "context_coverage": {
-        "value": 6677761.0,
-        "n_available": 27,
-        "n_total": 27,
+        "value": 7839111.0,
+        "n_available": 23,
+        "n_total": 23,
         "coverage": 1.0
       },
-      "avg_tokens_per_cell": 92021.0,
+      "avg_tokens_per_cell": 108024.0,
       "tokens_coverage": {
-        "value": 92021.0,
-        "n_available": 27,
-        "n_total": 27,
+        "value": 108024.0,
+        "n_available": 23,
+        "n_total": 23,
         "coverage": 1.0
       }
     }
@@ -248,20 +248,20 @@
   "lab_contract": {
     "lab": "lab_cache_economics.py",
     "input_dataset_id": "canonical_registry/story",
-    "registry_identity_sha256": "de2de65a2c250d14fd18589660ccf3736df2fba402bb9bdc69f7c6dd20317201",
-    "resolved_input_sha256": "7d2ab0fe4c18695fe26767d6e848f7a2e3f3a397d16b1e183594f70b9136c716",
-    "registry_version": "data-manifest/1.0+12925rows",
+    "registry_identity_sha256": "d9bcb7f360841a25ebbd2797c383bd9cc98a22810479a17443488148a5e7938e",
+    "resolved_input_sha256": "38a1f5dbe586890f453f846aa185f75e150bed7de0d3de007b8c66e3811b1be6",
+    "registry_version": "data-manifest/1.0+13031rows",
     "metric_definition_version": "cache_economics/v2",
     "metric_source_sha256": "c3c4ea9e7f5875b281d24905d28cdaacd4e9cb3be779327c77e856f486f47d5a",
-    "n_resolved_records": 215,
-    "n_eligible_records": 215,
-    "n_used_records": 215,
+    "n_resolved_records": 207,
+    "n_eligible_records": 207,
+    "n_used_records": 207,
     "n_excluded_records": 0,
     "n_unused_eligible_records": 0,
-    "used_record_refs_sha256": "c2ae7384c02aade36e913e183d17b5e3d9b4fc0973faa27c49a4c13c0ca88d85",
+    "used_record_refs_sha256": "7d0b943104c02063bd3726e99b4e4a5777ec6ddfca03bd089a49ed1932127254",
     "excluded_record_refs_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-    "used_unique_records": 215,
-    "used_contributions": 215,
+    "used_unique_records": 207,
+    "used_contributions": 207,
     "review_without_current_story": 0,
     "story_without_review": 0,
     "missing_required_field": 0,
@@ -269,6 +269,6 @@
     "data_integrity_policy": "docs/data_integrity_findings.md",
     "requires_external_service": null,
     "contract_version": "lab-contract/v6",
-    "generated_at": "2026-08-28T15:55:10.321112+00:00"
+    "generated_at": "2026-08-29T01:19:03.295206+00:00"
   }
 }

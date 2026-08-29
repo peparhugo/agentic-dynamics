@@ -1,0 +1,18 @@
+{
+  "adjudication_note": "Outcome adjudicated from the baseline's immutable implement commit + the runtime.test_runner verdict (test phase), independently of the proposal. outcome=no_rework: divide() correctly guards b==0 (raises ValueError) and returns a/b otherwise; the independent test suite passed 4/4 including test_divide_by_zero. The single sonar critical flag (new_sonar_critical_count=1) is rule python:S1244 'do not perform equality checks with floating point values' on test_calc.py:18 (assert divide(6,3)==2.0) — a minor test-style finding, NOT a defect in the implementation; it does not constitute a rework need. The verifier's rework proposal therefore over-predicts (a miss).",
+  "analyzed_revision": "e136ce25dbfa88f58c3b7fd9d955d411a6867101",
+  "baseline_revision": "171429235840d4bd74aeb44ab48aca513f1d48f9",
+  "campaign": "cap_2a_rerun",
+  "cell_id": "cap2a_p3b",
+  "graph_status": "available",
+  "lsp_status": "unavailable",
+  "outcome": "no_rework",
+  "proposal_id": "f9727f3a92a4e6c3",
+  "realized_depth": 0,
+  "realized_symbol_set": [],
+  "schema_version": "cap_2a_outcome/v1",
+  "sonar_status": "available",
+  "test_executed_success": true,
+  "tests_passed": 4,
+  "tests_total": 4
+}

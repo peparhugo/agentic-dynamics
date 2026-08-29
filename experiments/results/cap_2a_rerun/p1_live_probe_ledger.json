@@ -1,0 +1,47 @@
+{
+  "schema_version": "cap_2a_rerun_p1_live_probe_ledger/v1",
+  "campaign": "cap_2a_rerun",
+  "phase": "p1_wire_analyzers",
+  "probe": "p1_live_probe",
+  "spec": "cap_2a_probe (ephemeral — one implement agent phase over a seeded symbol-level app)",
+  "cell_id": "wf_cap_2a_rerun_deepseek_deepseek_v4_pro",
+  "model": "deepseek/deepseek-v4-pro",
+  "backend": "opencode",
+  "source_baseline_revision": "21ea701ed6b5634a35ab8b5371e52dfbaae57baa",
+  "worktree": "/tmp/cap2a_probe_f9pkka9h",
+  "agent_note": "The agent is a deterministic stand-in that performs the real file edit (add() body a+b -> a*b); every seam leg AFTER the commit is real: real git, real tree-sitter delta, real sonar-scanner, real LSP probe, real Neo4j versioned graph, real code_change_facts/v1 reducer.",
+  "phases": [
+    {
+      "phase": "implement",
+      "status": "ok",
+      "commit_hash_short": "5407029",
+      "analyzed_revision": "540702953a647ed984e3aba31112e03b189a6e56",
+      "graph_status": "available",
+      "graph_updated": true,
+      "impacted_count": 3,
+      "sonar_analysis_status": "available",
+      "lsp_analysis_status": "unavailable",
+      "facts_emitted": [
+        {"predicate": "sonar_analysis_status", "value": "available", "value_type": "enum"},
+        {"predicate": "lsp_analysis_status", "value": "unavailable", "value_type": "enum"},
+        {"predicate": "analysis_revision_matches", "value": "true", "value_type": "bool"},
+        {"predicate": "ast_parse_coverage", "value": "1.0", "value_type": "float"},
+        {"predicate": "changed_symbol_count", "value": "1", "value_type": "int"},
+        {"predicate": "impacted_symbol_count", "value": "3", "value_type": "int"},
+        {"predicate": "new_sonar_critical_count", "value": "0", "value_type": "int"},
+        {"predicate": "changed_symbols_with_tests_ratio", "value": "1.0", "value_type": "float"},
+        {"predicate": "code_change_risk", "value": "0.08", "value_type": "float"}
+      ],
+      "facts_omitted": [
+        {"predicate": "new_lsp_error_count", "reason": "pyright/mypy not installed — lsp_analysis_status=unavailable, count omitted (never a fabricated zero)"}
+      ],
+      "code_change_risk": "0.08",
+      "risk_terms": "renormalized over sonar (0.35, term 0.0) + tests_ratio (0.20, term 0.0) + impacted (0.20, term 0.3): (0.35*0.0 + 0.20*0.0 + 0.20*0.3) / 0.75 = 0.08"
+    }
+  ],
+  "blocker_chain": {
+    "was": "code_change_risk never minted — _run_change_analysis injected no sonar/lsp into ChangeInput, and the first campaign's cells changed no symbols",
+    "now": "code_change_risk = 0.08 (non-None) is minted by the seam for a real symbol-changing commit: sonar (available, real scan), lsp (unavailable — measured), impacted (graph, 3 symbols), tests_ratio (1.0)"
+  },
+  "verdict": "PASS — the blocker chain is broken; code_change_risk is non-None for a symbol-changing commit."
+}

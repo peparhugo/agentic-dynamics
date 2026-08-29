@@ -26,7 +26,7 @@ not a single tool. The perturbation instrument is **one** of the six.
 > **AI agents don't have a price — they have dynamics.** Cost, reliability, and debt are
 > properties of how the agent behaves under change, and we measured them.
 
-1,067 story sessions, 10 perturbation operators, 7 model variants across 3 providers. $309.17
+1,027 story sessions, 10 perturbation operators, 7 model variants across 3 providers. $309.17
 story-corpus measured spend.
 
 ---
@@ -89,11 +89,11 @@ Efficiency (durable outcome value / total cost).
 
 | Metric | Value |
 |--------|-------|
-| Story sessions | 1,067 (5,593 DB sessions total) |
+| Story sessions | 1,027 (5,593 DB sessions total) |
 | Game reports | 348 |
 | Model variants | 7 (3 providers: DeepSeek, Anthropic, OpenAI) |
 | Experiment configs | 0 |
-| Experiment + workflow specs | 146 (11 experiments + 135 workflows) |
+| Experiment + workflow specs | 148 (11 experiments + 137 workflows) |
 | Perturbation operators | 10 (specification corruption, objective mutation, process perturbation) |
 | Lab books | 20 (8 canonical + 12 quarantined) |
 | Story-corpus measured spend | $309.17 |
@@ -105,7 +105,7 @@ corpus's total measured cost). The spend figure is **story-corpus scoped**: work
 ledger spend is not published (the run ledgers under `experiments/results/workflows/` are
 gitignored, local-transient), so it must never be read as the whole-repo total. The DB
 session total (5,593) is the broader raw session count from the opencode database, reported
-separately from the 1,067 canonical story sessions.
+separately from the 1,027 canonical story sessions.
 
 ---
 

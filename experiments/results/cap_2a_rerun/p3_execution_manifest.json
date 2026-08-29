@@ -1,0 +1,44 @@
+{
+  "schema_version": "cap_2a_p3_execution_manifest/v1",
+  "campaign": "cap_2a_rerun",
+  "phase": "p3_run_shadow_cells",
+  "written_at": "2026-08-25T23:57:00Z",
+  "source_baseline_revision": "1adb6458844678729f67c6f5bcf461c5c99e9ac0",
+  "model": "deepseek/deepseek-v4-pro",
+  "backend": "opencode",
+  "graph_mode": "bolt://localhost:7687 (--change-analysis --change-analysis-graph)",
+  "p2_measured_cost_usd": 0.008578,
+  "forecast_per_cell_usd": 0.017156,
+  "forecast_envelope_usd": 0.051468,
+  "campaign_stop_budget_usd": 20.0,
+  "stop_condition": "Stop before the next cell if cumulative actual cost would exceed the p2-derived forecast envelope ($0.051468 for 3 cells) or the campaign stop budget ($20). A stopped cell is recorded as not-run, never silently omitted.",
+  "selection_note": "All four listed candidates were ineligible (no kind:test; plus non-repeatable/destructive/no-symbol-change). The p2 candidate manifest selected the bespoke calibration cell (c5), which is repeatable. p3 runs two more independent trials of the bespoke cell: one multiply (the p2 feature, re-run fresh) and one divide (a variant spec with a divide-by-zero guard, so the realized outcome is a genuine measurement).",
+  "cells": [
+    {
+      "cell_id": "cap2a_p3a",
+      "spec_path": "workflows/operations/cap_2a_calibration_cell.yaml",
+      "spec_path_sha256": "68d0d3e97b70e72528bcd62e146f9956f29e0c6d63778e01becfaaebaf455adf",
+      "goal": "add a multiply function to the calc app (with a test), leaving add/subtract unchanged",
+      "goal_sha256": "9443d5f5af593d3ac496b0c30e7a12fa4e8a3f96fb01cf56939d68df7ec35c1e",
+      "model": "deepseek/deepseek-v4-pro",
+      "backend": "opencode",
+      "worktree": "/tmp/cap2a_cell_p3a",
+      "finops_cell_id": "cap2a_p3a",
+      "graph_mode": "bolt://localhost:7687",
+      "forecast_cost_usd": 0.017156
+    },
+    {
+      "cell_id": "cap2a_p3b",
+      "spec_path": "workflows/operations/cap_2a_calibration_cell_divide.yaml",
+      "spec_path_sha256": "79cab6f6f0ed8f515b5099c06495fcca594d3f6dad7ecdb65703897a9f87e821",
+      "goal": "add a divide function to the calc app (with a divide-by-zero guard and tests), leaving add/subtract unchanged",
+      "goal_sha256": "3122d54b9e53808feea3978e94e3955312913854925411177aab4a146613d06d",
+      "model": "deepseek/deepseek-v4-pro",
+      "backend": "opencode",
+      "worktree": "/tmp/cap2a_cell_p3b",
+      "finops_cell_id": "cap2a_p3b",
+      "graph_mode": "bolt://localhost:7687",
+      "forecast_cost_usd": 0.017156
+    }
+  ]
+}

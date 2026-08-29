@@ -1,10 +1,10 @@
 {
   "experiment_id": "lab_quality_frontier",
-  "generated_at": "2026-08-28T17:55:12.133031",
+  "generated_at": "2026-08-29T03:19:05.283196",
   "summary": {
     "models": 7,
-    "stories": 215,
-    "analyses": 215,
+    "stories": 207,
+    "analyses": 207,
     "lsp_available_cells": 0
   },
   "models": [
@@ -142,34 +142,34 @@
     },
     {
       "model": "claude-haiku-4-5",
-      "cells": 24,
+      "cells": 20,
       "avg_cost": 1.63084,
       "avg_captured_cost": 1.63084,
       "total_captured_cost": 32.616808,
       "cost_captured_records": 20,
-      "total_records": 24,
-      "cost_coverage": 0.8333,
+      "total_records": 20,
+      "cost_coverage": 1.0,
       "lsp_errors_per_cell": null,
       "lsp_cells": 0,
-      "code_quality_score": 0.091,
+      "code_quality_score": 0.036,
       "code_quality_score_coverage": {
-        "value": 0.091,
-        "n_available": 24,
-        "n_total": 24,
+        "value": 0.036,
+        "n_available": 20,
+        "n_total": 20,
         "coverage": 1.0
       },
-      "cyclomatic_complexity": 303.5,
+      "cyclomatic_complexity": 354.4,
       "cyclomatic_complexity_coverage": {
-        "value": 303.5,
-        "n_available": 24,
-        "n_total": 24,
+        "value": 354.4,
+        "n_available": 20,
+        "n_total": 20,
         "coverage": 1.0
       },
-      "novelty_score": 0.717,
+      "novelty_score": 0.86,
       "novelty_score_coverage": {
-        "value": 0.717,
-        "n_available": 24,
-        "n_total": 24,
+        "value": 0.86,
+        "n_available": 20,
+        "n_total": 20,
         "coverage": 1.0
       }
     },
@@ -208,34 +208,34 @@
     },
     {
       "model": "claude-sonnet-5",
-      "cells": 27,
+      "cells": 23,
       "avg_cost": 5.169337,
       "avg_captured_cost": 5.169337,
       "total_captured_cost": 118.894751,
       "cost_captured_records": 23,
-      "total_records": 27,
-      "cost_coverage": 0.8519,
+      "total_records": 23,
+      "cost_coverage": 1.0,
       "lsp_errors_per_cell": null,
       "lsp_cells": 0,
-      "code_quality_score": 0.097,
+      "code_quality_score": 0.048,
       "code_quality_score_coverage": {
-        "value": 0.097,
-        "n_available": 27,
-        "n_total": 27,
+        "value": 0.048,
+        "n_available": 23,
+        "n_total": 23,
         "coverage": 1.0
       },
-      "cyclomatic_complexity": 326.333,
+      "cyclomatic_complexity": 374.478,
       "cyclomatic_complexity_coverage": {
-        "value": 326.333,
-        "n_available": 27,
-        "n_total": 27,
+        "value": 374.478,
+        "n_available": 23,
+        "n_total": 23,
         "coverage": 1.0
       },
-      "novelty_score": 0.69,
+      "novelty_score": 0.81,
       "novelty_score_coverage": {
-        "value": 0.69,
-        "n_available": 27,
-        "n_total": 27,
+        "value": 0.81,
+        "n_available": 23,
+        "n_total": 23,
         "coverage": 1.0
       }
     }
@@ -243,20 +243,20 @@
   "lab_contract": {
     "lab": "lab_quality_frontier.py",
     "input_dataset_id": "canonical_registry/story+analysis",
-    "registry_identity_sha256": "de2de65a2c250d14fd18589660ccf3736df2fba402bb9bdc69f7c6dd20317201",
-    "resolved_input_sha256": "fd358eb3b21cde22c85da69134886548bc32378b3cccb46d9fa424a8a22d682b",
-    "registry_version": "data-manifest/1.0+12925rows",
+    "registry_identity_sha256": "d9bcb7f360841a25ebbd2797c383bd9cc98a22810479a17443488148a5e7938e",
+    "resolved_input_sha256": "00753f57e1b20017872d1cf16f347439a54a568b26c3b6d69d0a28cf5901cad6",
+    "registry_version": "data-manifest/1.0+13031rows",
     "metric_definition_version": "quality_frontier/v2",
     "metric_source_sha256": "4bf5e2c7953d5ffe68ed0499541f12143991be7b4ebbf25dd8622f1cadcf4d1c",
-    "n_resolved_records": 430,
-    "n_eligible_records": 430,
-    "n_used_records": 430,
+    "n_resolved_records": 414,
+    "n_eligible_records": 414,
+    "n_used_records": 414,
     "n_excluded_records": 0,
     "n_unused_eligible_records": 0,
-    "used_record_refs_sha256": "31785b832063193909b0c5679a70711ba35b1e60cb5e1ff2d997691a2ad48369",
+    "used_record_refs_sha256": "e90ae84768acb701e9615a20335480cf5f8a8710392826184a9cf8dc6a221f7b",
     "excluded_record_refs_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-    "used_unique_records": 430,
-    "used_contributions": 430,
+    "used_unique_records": 414,
+    "used_contributions": 414,
     "review_without_current_story": 0,
     "story_without_review": 0,
     "missing_required_field": 0,
@@ -264,6 +264,6 @@
     "data_integrity_policy": "docs/data_integrity_findings.md",
     "requires_external_service": null,
     "contract_version": "lab-contract/v6",
-    "generated_at": "2026-08-28T15:55:12.133742+00:00"
+    "generated_at": "2026-08-29T01:19:05.283936+00:00"
   }
 }

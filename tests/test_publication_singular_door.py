@@ -5,7 +5,7 @@
     The lab path is canonical, but the primary story/model/review/analysis sections still
     flow through ``stories/*.json -> sync_data -> parquet`` and raw ``reviews/*.json`` /
     ``analysis/*.json`` globs. ``data.js`` carries ``bad_seed 41 / early_degrade 91``
-    against the canonical ``clean 135 / early_degrade 80``.
+    against the canonical ``clean 135 / early_degrade 72``.
 
 This module makes the correction permanent rather than a one-time fix:
 
@@ -14,7 +14,7 @@ This module makes the correction permanent rather than a one-time fix:
    path into ``experiments/results/{stories,reviews,analysis}`` (AST-checked, string
    literals only, docstrings exempt).
 2. **The relabel is absolute** — the canonical condition split is exactly
-   ``clean 135 / early_degrade 80``: no ``bad_seed`` arm, no ``early_degrade 91``, no
+   ``clean 135 / early_degrade 72``: no ``bad_seed`` arm, no ``early_degrade 91``, no
    empty label. The no-op ``bad_seed``/``early_degrade`` cells (and absent labels) ARE
    ``clean`` (``docs/data_integrity_findings.md`` treatment rule 1).
 3. **``data.js`` agrees** — the published ``stories.conditions`` block carries the same
@@ -50,8 +50,8 @@ FORBIDDEN_GLOB_ROOTS = (
 
 #: The canonical condition split (docs/review/canonical_publication_review.md P0).
 #: 225 current story rows − 10 payload-less = 215 resolved; 135 clean (incl. the 9
-#: empty-label + relabeled no-ops) and 80 genuinely instrumented ``early_degrade``.
-CANONICAL_SPLIT = {"clean": 135, "early_degrade": 80}
+#: empty-label + relabeled no-ops) and 72 genuinely instrumented ``early_degrade``.
+CANONICAL_SPLIT = {"clean": 135, "early_degrade": 72}
 
 
 def _docstring_ids(tree: ast.AST) -> set[int]:
@@ -119,7 +119,7 @@ def test_public_data_producer_does_not_glob_raw_result_dirs(script: str):
 
 
 def test_canonical_condition_split_has_no_bad_seed_arm():
-    """The resolver's canonical split is exactly ``clean 135 / early_degrade 80``."""
+    """The resolver's canonical split is exactly ``clean 135 / early_degrade 72``."""
     identity = cc.current_manifest_identity()
     if not identity.registry_identity_sha256:  # pragma: no cover - manifest present in CI
         pytest.skip("no data_manifest.json registry in this checkout")
@@ -141,7 +141,7 @@ def test_data_js_story_conditions_match_the_canonical_split():
     """The published ``data.js`` condition block agrees with the resolver — exactly once.
 
     The contradiction the review found — ``data.js`` reporting ``bad_seed 41`` /
-    ``early_degrade 91`` alongside the canonical ``clean 135 / early_degrade 80`` — is
+    ``early_degrade 91`` alongside the canonical ``clean 135 / early_degrade 72`` — is
     closed only if the published block is *exactly* the canonical split: two arms, each
     appearing once, with no ``bad_seed``/``early_degrade-91`` arm surviving.
     """
@@ -152,9 +152,9 @@ def test_data_js_story_conditions_match_the_canonical_split():
 
     arms = [(c["condition"], c["cells"]) for c in payload["stories"]["conditions"]]
     counts = Counter(arms)
-    assert counts == {("clean", 135): 1, ("early_degrade", 80): 1}, (
+    assert counts == {("clean", 135): 1, ("early_degrade", 72): 1}, (
         f"data.js stories.conditions {dict(counts)} != the canonical split exactly once "
-        f"(clean 135 / early_degrade 80) — a duplicate or a legacy arm is present"
+        f"(clean 135 / early_degrade 72) — a duplicate or a legacy arm is present"
     )
     # Explicitly: no bad_seed-41 arm, no early_degrade-91 arm.
     assert ("bad_seed", 41) not in counts

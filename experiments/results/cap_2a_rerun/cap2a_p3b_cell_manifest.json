@@ -1,0 +1,15 @@
+{
+  "analyzed_revision": "e136ce25dbfa88f58c3b7fd9d955d411a6867101",
+  "backend": "opencode",
+  "baseline_revision": "171429235840d4bd74aeb44ab48aca513f1d48f9",
+  "campaign": "cap_2a_rerun",
+  "cell_id": "cap2a_p3b",
+  "goal": "add a divide function to the calc app (with a divide-by-zero guard and tests), leaving add/subtract unchanged",
+  "goal_sha256": "3122d54b9e53808feea3978e94e3955312913854925411177aab4a146613d06d",
+  "graph_mode": "bolt://localhost:7687 (--change-analysis --change-analysis-graph)",
+  "model": "deepseek/deepseek-v4-pro",
+  "phase": "p3_run_shadow_cells",
+  "proposal_id": "f9727f3a92a4e6c3",
+  "schema_version": "cap_2a_cell_manifest/v1",
+  "spec_id": "cap_2a_calibration_cell_divide@0.1"
+}
