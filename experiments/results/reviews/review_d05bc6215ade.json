@@ -1,0 +1,238 @@
+{
+  "story_name": "static_site_gen",
+  "story_id": "d05bc6215ade",
+  "model": "deepseek/deepseek-v4-flash",
+  "commit_reviews": [
+    {
+      "commit_hash": "25d9bd9cfbfaf5c416aa8a26d7429846fd3f3b94",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.78,
+      "convention_adherence": 0.53,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": false,
+      "better_or_worse": "neutral",
+      "problems": [
+        {
+          "category": "convention",
+          "severity": "major",
+          "description": "94 naming-convention violations (Functions camelCase, Classes/Interfaces PascalCase, Constants UPPER_CASE) across test files including build-stats.test.ts and cache-manager.test.ts \u2014 matches the mechanical convention score of 0.53."
+        },
+        {
+          "category": "maintainability",
+          "severity": "major",
+          "description": "Test duplication at 34.7%: repeated markdown fixtures and identical mkdtemp/setup-teardown scaffolding across cli.test.ts, generator.test.ts and other suites instead of shared helpers."
+        },
+        {
+          "category": "maintainability",
+          "severity": "minor",
+          "description": "New code adds +16 cognitive complexity and 3 code smells (SonarQube) for what is primarily test code \u2014 suggests over-wired helper/setup logic."
+        },
+        {
+          "category": "architecture",
+          "severity": "minor",
+          "description": "A 'greenfield' Session 1 commit lands 11 files with +134 imports \u2014 a large initial surface; test modules (build-stats, cache-manager) imply the generator surface sprawled before a minimal vertical slice was proven."
+        }
+      ],
+      "strengths": [
+        "Test suites are properly isolated: mkdtemp temp dirs with reliable rmSync teardown in every suite.",
+        "Broad behavioral coverage: frontmatter parsing, markdown rendering, custom content/output dirs, relative paths, empty-content edge case, index structure.",
+        "Clear module layout \u2014 __tests__/ mirrors src/ modules (cli.test.ts \u2192 generator.js) making the test surface navigable."
+      ],
+      "summary": "Session 1 greenfield delivers a well-isolated and behaviorally broad test suite for the static site generator, but 34.7% test duplication, 94 naming-convention violations (convention score 0.53), and +16 cognitive complexity add avoidable technical debt from the first commit.",
+      "session_number": 1
+    },
+    {
+      "commit_hash": "c590dcfa1878c057062cfe71792726d5b1ed996a",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.7,
+      "convention_adherence": 0.53,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": true,
+      "better_or_worse": "neutral",
+      "problems": [
+        {
+          "category": "convention",
+          "severity": "major",
+          "description": "94 naming-convention violations across test files (Functions should use camelCase, Classes/Interfaces PascalCase, Constants UPPER_CASE), driving convention score to 0.53"
+        },
+        {
+          "category": "maintainability",
+          "severity": "major",
+          "description": "+10 SonarQube code smells and +29 cognitive complexity added by the change"
+        },
+        {
+          "category": "maintainability",
+          "severity": "minor",
+          "description": "3.8% duplication introduced; single test file templates.test.ts is 575 lines with many near-identical setup fixtures"
+        },
+        {
+          "category": "dependency",
+          "severity": "minor",
+          "description": "+69 imports across 9 new files is a large surface for one feature commit, worth verifying no redundant/over-broad imports"
+        }
+      ],
+      "strengths": [
+        "Template engine support is a natural architectural fit for a static site generator and follows the existing generator interface (StaticSiteGenerator options, generate())",
+        "Test lifecycle is well-structured: isolated mkdtemp directories with afterEach cleanup",
+        "Comprehensive coverage of the feature space: layouts, frontmatter-selected templates, partials, and custom frontmatter data passing"
+      ],
+      "summary": "A solid feature addition (template engine with thorough tests) that fits the SSG architecture, but convention adherence is weak (0.53) driven almost entirely by test-file naming violations, and it carries real maintainability debt (+10 smells, +29 complexity, 3.8% duplication).",
+      "session_number": 2
+    },
+    {
+      "commit_hash": "cbb11cc2696d2dfc7371cd682e8f9101dc04f276",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.6,
+      "convention_adherence": 0.53,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": false,
+      "better_or_worse": "worse",
+      "problems": [
+        {
+          "category": "testing",
+          "severity": "major",
+          "description": "For an 'integration' session commit, there are no real integration tests \u2014 no HTTP request is ever made. The 'should handle 404 responses' test only asserts `devServer` is defined (a no-op placeholder), and the serve-HTML test checks the file on disk rather than a served response."
+        },
+        {
+          "category": "testing",
+          "severity": "major",
+          "description": "Tests reach into private implementation via bracket access (`devServer['initialBuild']()`, `devServer['injectLiveReloadScript']()`), coupling the tests to private members instead of exercising public behavior."
+        },
+        {
+          "category": "maintainability",
+          "severity": "major",
+          "description": "The diff (AST: +2 files) contains only the new test file and package-lock.json \u2014 `src/dev-server.ts` is not in this commit even though `__tests__/dev-server.test.ts` imports `../src/dev-server.js`. If the source is new, the commit is incomplete and its tests reference uncommitted code (diff truncated, so uncertainty flagged)."
+        },
+        {
+          "category": "convention",
+          "severity": "minor",
+          "description": "Convention score 0.53 with 94 violations \u2014 but the listed violations (build-stats.test.ts, cache-manager.test.ts) are in files NOT touched by this diff, so the low score reflects pre-existing repo state rather than violations this commit introduces. The commit's own new test file is consistent with that existing (poor) style, and the measurement is kept as ground truth."
+        },
+        {
+          "category": "dependency",
+          "severity": "info",
+          "description": "chokidar (file watching) and ws (WebSocket live reload) are appropriate runtime deps for a dev server; @types/ws correctly lands in devDependencies. No issue, noted for completeness."
+        }
+      ],
+      "strengths": [
+        "Dedicated DevServer test suite with proper temp-dir setup and cleanup (mkdtempSync + afterEach stop/rm), and stop() invoked on teardown",
+        "Live-reload behavior (WebSocket script injection) and initial-build index.html creation are exercised",
+        "Dependency additions (chokidar, ws) fit the dev-server feature; package-lock dev flags updated correctly when chokidar promotes anymatch/braces/fsevents to production deps"
+      ],
+      "summary": "Session-3 'integration' commit adds a DevServer test suite plus chokidar/ws deps, but the tests are not integration tests \u2014 they stub private methods and include a no-op 404 test \u2014 and the 0.53 convention score reflects pre-existing violations in files outside this diff, so the commit adds tech debt without meaningfully integrating.",
+      "session_number": 3
+    },
+    {
+      "commit_hash": "64ff9d0a06f50381fa4505e07391656b47a71522",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.75,
+      "convention_adherence": 0.5,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": true,
+      "better_or_worse": "worse",
+      "problems": [
+        {
+          "category": "convention",
+          "severity": "major",
+          "description": "94 naming-convention violations (camelCase/PascalCase/UPPER_CASE) concentrated in the test files (build-stats.test.ts, cache-manager.test.ts) \u2014 convention score is only 0.53 on a commit labeled a refactor."
+        },
+        {
+          "category": "maintainability",
+          "severity": "major",
+          "description": "Cognitive complexity increased by +66 and SonarQube smells by +6; a refactor should lower complexity, and the new example plugins (sitemap/social-meta) lean on string concatenation and imperative HTML/XML assembly that drives that complexity."
+        },
+        {
+          "category": "testing",
+          "severity": "minor",
+          "description": "New functionality (sitemap generation, OG meta injection) is demonstrated only via commented-out examples in usage-example.ts \u2014 no unit tests accompany the new plugin code."
+        },
+        {
+          "category": "convention",
+          "severity": "minor",
+          "description": "usage-example.ts example4 uses untyped `any` for context/pages, bypassing the typed Plugin/PluginContext contract the other examples respect."
+        },
+        {
+          "category": "security",
+          "severity": "minor",
+          "description": "social-meta-plugin.ts and sitemap-plugin.ts inject frontmatter values directly into HTML/XML without escaping, risking attribute-injection/malformed output for untrusted content."
+        },
+        {
+          "category": "performance",
+          "severity": "minor",
+          "description": "sitemap-plugin.ts uses synchronous fs.writeFileSync inside an async afterBuild hook, blocking the event loop during the build."
+        },
+        {
+          "category": "architecture",
+          "severity": "info",
+          "description": "Diff truncated \u2014 src/generator.ts refactor cannot be fully reviewed; imports of marked and TemplateEngine were removed, so the magnitude of the architectural change is partially unverified against the +1056/-77 line delta."
+        }
+      ],
+      "strengths": [
+        "Respects the existing plugin contract (Plugin/PluginContext/Page types from src/plugin.js and src/types.js) in both new example plugins.",
+        "Reduces code duplication by 7.3% per SonarQube, and adds zero new bugs.",
+        "Examples directory gives good API coverage of the plugin lifecycle (onStart/beforeBuild/afterBuild/onEnd/onFile) and documents realistic usage patterns."
+      ],
+      "summary": "A plugin-system refactor that correctly follows the existing plugin interface and cuts duplication, but regresses maintainability \u2014 convention score drops to 0.53 with 94 naming violations in test files and cognitive complexity rises +66 \u2014 making it net worse for a refactor commit.",
+      "session_number": 4
+    },
+    {
+      "commit_hash": "1cbd94c3f83b9982fb07ad0cb4f99cd3271fed50",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.85,
+      "convention_adherence": 0.6,
+      "introduces_technical_debt": false,
+      "respects_existing_patterns": true,
+      "better_or_worse": "better",
+      "problems": [
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "Measured convention score is 0.53 with 94 flagged violations (camelCase/PascalCase/UPPER_CASE), but the listed violations appear to be static-analyzer false positives on TypeScript/Jest test files \u2014 the visible code uses idiomatic camelCase methods, PascalCase classes (BuildStatsTracker, CacheManager), and standard jest describe/it/expect patterns."
+        },
+        {
+          "category": "maintainability",
+          "severity": "minor",
+          "description": "SonarQube delta shows +6 smells and +29 cognitive complexity introduced across the 7-file change (mostly in the src modules truncated from the diff); worth a review pass over build-stats.ts/cache-manager.ts implementations."
+        },
+        {
+          "category": "testing",
+          "severity": "minor",
+          "description": "The 'Time saved:' assertion in build-stats.test.ts is conditional on `stats.timeSaved > 0`, making it a no-op assertion when timeSaved is 0 \u2014 the incremental time-saved behavior is not actually verified."
+        },
+        {
+          "category": "dependency",
+          "severity": "info",
+          "description": "+201 imports across only 7 files is a large surface for a cross-cutting commit; suggests possibly heavy module fan-in in the new src modules (not visible in the truncated diff)."
+        }
+      ],
+      "strengths": [
+        "Well-structured unit tests with proper isolation (mkdtemp per test, afterEach cleanup) for CacheManager.",
+        "Good edge-case coverage: zero pages, incremental vs full mode, content-changed vs frontmatter-changed rebuild paths.",
+        "BuildStatsTracker tests cover the full lifecycle (start, record, getStats, formatStats) including the incremental timeSaved path.",
+        "Net reduction in duplication (-3.8%) and zero new bugs."
+      ],
+      "summary": "A solid cross-cutting commit adding real test coverage for the build-stats and cache-manager infrastructure \u2014 the low 0.53 convention score appears dominated by static-analyzer false positives on TypeScript test files rather than actual style violations.",
+      "session_number": 5
+    }
+  ],
+  "story_review": {
+    "story_name": "static_site_gen",
+    "reviewer_model": "deepseek/deepseek-v4-flash",
+    "overall_coherence": 0.88,
+    "compounding_issues": [
+      "Seed mismatch: the seeded codebase was an unrelated auth-API index.ts, so session 1 discarded it entirely and greenfielded the SSG from scratch \u2014 a full rewrite instead of incremental work on a seed (which also incidentally erased the early_degrade perturbation)",
+      "Session 3's standalone DevServer class was superseded by the session 4 dev-server-plugin (index.ts serve path uses the plugin) but was never removed \u2014 dead code left in the tree, still tested, from an incomplete refactor consolidation",
+      "Session 5 incremental-build correctness bug: on a rebuild, unchanged pages are skipped by the markdown/template plugins but writePages() re-renders their raw markdown body, so output HTML for skipped pages contains unconverted markdown \u2014 verified empirically (alpha.html showed '**bold** and *italic* text' after a second build); CacheManager.getCachedHtml() stores rendered HTML but is never called, and tests assert only stats/cache-manifest, not skipped-page output",
+      "Incremental mode is not wired into the serve path, and renderPage() carries two near-identical inline HTML templates (DRY violation a refactor session didn't clean up)"
+    ],
+    "key_decisions": [
+      "Throwing away the mismatched auth-API seed and building a clean modular TypeScript SSG from scratch in session 1 (single index.ts \u2192 src/ modules, jest suite, strict tsconfig)",
+      "Handlebars template engine with layouts, partials, and per-page frontmatter template selection in session 2",
+      "WebSocket + chokidar live-reload dev server in session 3, keeping the CLI surface (build/serve) stable",
+      "The session 4 plugin-system refactor (onStart/beforeBuild/onFile/afterBuild/onEnd lifecycle, PluginManager orchestration) which re-homed the markdown converter, template renderer, and dev server as plugins with a default-plugin fallback for backward compatibility",
+      "Session 5 hash-based incremental caching (.ssg-cache.json manifest keyed by source+frontmatter sha256, plugin-skip on unchanged pages) \u2014 a sound optimization design marred by the skip-then-render bug"
+    ],
+    "trajectory_description": "Quality improved steadily across the five sessions. Session 1 laid a clean modular foundation with a real test suite; session 2 added a complete template engine with examples; session 3 integrated a genuine live-reload dev server; session 4 was the hardest (5 retries, 0.78 confidence) but delivered a backward-compatible plugin architecture with documentation and example plugins; session 5 rounded out the pipeline with incremental builds and caching. The final state compiles cleanly under strict TypeScript and passes all 93 tests across 9 suites. The arc rises overall, with a modest dip during the integration/refactor middle sessions and a confident recovery in session 5 \u2014 though the final feature carries a latent correctness defect (unchanged pages re-rendered as raw markdown) that the test suite does not cover.",
+    "summary": "A textbook, high-coherence progression (core \u2192 templates \u2192 dev-server \u2192 plugin refactor \u2192 caching) that ended in a clean, tested, well-documented SSG, undercut only by an incomplete refactor cleanup and a real bug in the final incremental-build feature."
+  }
+}

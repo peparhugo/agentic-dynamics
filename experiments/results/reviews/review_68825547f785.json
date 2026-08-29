@@ -1,0 +1,206 @@
+{
+  "story_name": "static_site_gen",
+  "story_id": "68825547f785",
+  "model": "deepseek/deepseek-v4-flash",
+  "commit_reviews": [
+    {
+      "commit_hash": "8fe1d385f90cdc36bbee1684ebf0ca95f9ad0eb5",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.55,
+      "convention_adherence": 0.4,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": false,
+      "better_or_worse": "worse",
+      "problems": [
+        {
+          "category": "convention",
+          "severity": "major",
+          "description": "67 naming-convention violations (Functions/Classes/Interfaces should use camelCase/PascalCase, Constants UPPER_CASE) concentrated in cache-manager.ts and cache-manager.test.ts; SonarQube convention score is 0.46."
+        },
+        {
+          "category": "architecture",
+          "severity": "major",
+          "description": "Premature cache-manager module in Session 1: the story's Session 1 is Markdown parsing + HTML rendering, while caching is the Session 5 feature (per static_site_gen_story in src/agentic_dynamics/runtime/story/builtins.py). Forward-engineering the session-5 concern inflates the diff to +4637 lines / +106 imports / +10 functions beyond the session's scope."
+        },
+        {
+          "category": "maintainability",
+          "severity": "major",
+          "description": "SonarQube delta shows 30.3% duplications and cognitive complexity +26 with 6 new smells \u2014 the +4637 LOC landed with substantial copy-paste and high-complexity structure rather than a clean decomposition."
+        },
+        {
+          "category": "architecture",
+          "severity": "minor",
+          "description": "Wholesale deletion of the entire 200-line seed baseline (index.ts). Defensible for a greenfield session against an unrelated auth-API seed, but the diff preserves none of the existing structure and the seed's only file is removed outright."
+        }
+      ],
+      "strengths": [
+        "Session-1 prompt fidelity on the core stack: marked + gray-matter dependencies, `ssg` CLI naming, dist output, and jest tests all present per the static_site_gen Session 1 spec.",
+        "Solid test infrastructure: jest.config.js with roots/testMatch/collectCoverageFrom and a committed package-lock.json for reproducible installs.",
+        "Zero new SonarQube bugs (bugs +0)."
+      ],
+      "summary": "The greenfield SSG scaffold matches the session's tech stack (marked/gray-matter/jest) but introduces real debt \u2014 67 naming violations, 30.3% duplication, and a premature cache-manager module that belongs to Session 5 \u2014 while wiping the entire 200-line seed baseline.",
+      "session_number": 1
+    },
+    {
+      "commit_hash": "34370e44327768be3f15c30a7cd8c2e7a578efe3",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.7,
+      "convention_adherence": 0.45,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": false,
+      "better_or_worse": "worse",
+      "problems": [
+        {
+          "category": "convention",
+          "severity": "major",
+          "description": "67 naming-convention violations (functions/classes/interfaces should be camelCase/PascalCase, constants UPPER_CASE) concentrated in cache-manager.ts and cache-manager.test.ts; measured convention score 0.46."
+        },
+        {
+          "category": "maintainability",
+          "severity": "minor",
+          "description": "SonarQube delta: +7 code smells, +8 cognitive complexity, +7.5% duplication introduced across the change."
+        },
+        {
+          "category": "architecture",
+          "severity": "minor",
+          "description": "Commit scope spans +12 files for a single feature addition (templatesDir); the cache-manager surface appears unrelated to the handlebars templating feature, suggesting scope creep within the story session."
+        },
+        {
+          "category": "dependency",
+          "severity": "info",
+          "description": "handlebars promoted from transitive devDependency to a direct runtime dependency; correct for a templating feature, but it pulls minimist/neo-async/source-map/uglify-js/wordwrap into the runtime graph \u2014 fine, just note the larger install surface."
+        }
+      ],
+      "strengths": [
+        "Templating (handlebars) is an architecturally appropriate addition for a static site generator, exposed via a config-driven templatesDir option consistent with the existing contentDir/outputDir design.",
+        "All existing constructor call sites in ssg.test.ts were updated consistently to pass templatesDir, preserving the test pattern rather than breaking callers.",
+        "package-lock.json changes are consistent with the package.json edit, correctly un-marking handlebars and its transitive deps as dev-only."
+      ],
+      "summary": "The handlebars templating feature is architecturally sound and pattern-consistent in the visible diff, but the mechanical measurements reveal heavy convention debt (67 naming violations, convention score 0.46) and increased complexity/duplication that make the commit worse than the pre-existing state; note that the visible diff alone looks cleaner than the measurements indicate, since the bulk of the violations live in cache-manager files not shown in the excerpt.",
+      "session_number": 2
+    },
+    {
+      "commit_hash": "8e98490adfef6fb25a0274378cc53bd3326f118f",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.5,
+      "convention_adherence": 0.5,
+      "introduces_technical_debt": false,
+      "respects_existing_patterns": true,
+      "better_or_worse": "unclear",
+      "problems": [],
+      "strengths": [],
+      "summary": "Review unavailable.",
+      "session_number": 3
+    },
+    {
+      "commit_hash": "f37cda771bd70565e8358a1c5b2112da9708104c",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.75,
+      "convention_adherence": 0.5,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": true,
+      "better_or_worse": "better",
+      "problems": [
+        {
+          "category": "maintainability",
+          "severity": "minor",
+          "description": "`notifyClients(message: any)` and `enableLiveReload((message: any) => void)` erase type safety \u2014 a `LiveReloadMessage`/`PluginMessage` type would preserve the payload contract through the callback bridge."
+        },
+        {
+          "category": "maintainability",
+          "severity": "minor",
+          "description": "Mechanical convention score is 0.46 with 67 violations, but every listed violation is attributed to cache-manager.ts / cache-manager.test.ts \u2014 files not visible in this diff. Either they are pre-existing and unrelated to this commit, or the diff is truncated to hide changes there; the new plugin files (plugin.ts, plugin-manager.ts, dev-server.plugin.ts) are convention-compliant by inspection. Flagged discrepancy between qualitative review and the measurement."
+        },
+        {
+          "category": "maintainability",
+          "severity": "minor",
+          "description": "SonarQube delta shows +10 smells and +23 cognitive complexity from the new plugin machinery; the ad-hoc enableLiveReload bridge (DevServer injects its notifier into the generator's plugin) couples the lifecycle to WebSocket concerns rather than emitting through the PluginContext."
+        },
+        {
+          "category": "maintainability",
+          "severity": "info",
+          "description": "Barrel re-export `PluginContext as PluginConfig` is a confusing naming alias for the public API surface."
+        }
+      ],
+      "strengths": [
+        "Extracts the cohesive live-reload concern (script injection + client notification) into a dedicated plugin, shrinking dev-server.ts to HTTP/WebSocket orchestration.",
+        "Reduces duplication 3.2% by removing the inline injectLiveReloadScript from the server and delegating to the plugin.",
+        "Adds a clean extension seam \u2014 onStart/beforeBuild/onFile/afterBuild/onEnd lifecycle hooks \u2014 consistent with the existing markdown/template plugin naming.",
+        "Introduces a barrel export (src/index.ts) giving consumers a single public API surface.",
+        "PluginManager iteration pattern is simple and reads cleanly."
+      ],
+      "summary": "Solid modularity refactor that extracts live reload into a plugin system and cuts duplication, though the convention violations measured by static analysis appear to live in cache-manager files outside this diff \u2014 a discrepancy from the visible (compliant) new files \u2014 and the `any`-typed callback bridge plus +10 smells/+23 cognitive complexity add minor follow-up debt.",
+      "session_number": 4
+    },
+    {
+      "commit_hash": "e8d067432f6fb5753c4fb58af28b7138503db595",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.6,
+      "convention_adherence": 0.5,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": true,
+      "better_or_worse": "better",
+      "problems": [
+        {
+          "category": "architecture",
+          "severity": "major",
+          "description": "CacheManager is a generic cross-cutting cache but hardcodes SSG template-engine conventions: it builds template paths as `${templateName}.hbs` and `layouts/${layoutName}.hbs` (shouldRebuildDueToTemplate/updateEntry, cache-manager.ts:83-84,94-95). A cache layer should not know the template engine's file naming \u2014 this couples a supposedly generic concern to the template engine and degrades silently (hash mismatch \u2192 rebuild) if that convention changes."
+        },
+        {
+          "category": "architecture",
+          "severity": "minor",
+          "description": "Caching is hardwired into the generator core (new CacheManager(...) in the StaticSiteGenerator constructor, ssg.ts) as a mandatory collaborator instead of being composed via the existing plugin system or dependency injection \u2014 it cannot be swapped or disabled independently of core."
+        },
+        {
+          "category": "testing",
+          "severity": "minor",
+          "description": "'should not rebuild if file hash matches cache' passes vacuously: the source path (test/fixtures/content/hello-world.md) does not exist, so getFileHash returns '' on both update and re-check and '' === '' yields false rebuild without ever exercising a real file hash."
+        },
+        {
+          "category": "maintainability",
+          "severity": "minor",
+          "description": "New module is not re-exported in src/index.ts while every other collaborator is (StaticSiteGenerator, DevServer, Plugin, PluginManager, plugins) \u2014 inconsistent public surface for the new export."
+        },
+        {
+          "category": "architecture",
+          "severity": "minor",
+          "description": "Cache manifest (.ssg-cache.json) is persisted into the output dir alongside build artifacts, and save(stats?) overloads stats bookkeeping into a persistence method, mixing responsibilities in one class."
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "Mechanical analyzer reports 67 naming-convention violations and convention score 0.46 (camelCase/PascalCase/UPPER_CASE), but the visible code is consistently camelCase methods, PascalCase classes/interfaces, and camelCase consts \u2014 matching existing modules (ssg.ts, plugin.ts, ssg.test.ts). The low convention score appears to be an analyzer false positive / mismatched profile; flagged per instructions as a discrepancy between measurement and qualitative judgment."
+        }
+      ],
+      "strengths": [
+        "Comprehensive test coverage (218 lines) for a small module: corrupt-manifest fallback, source/template/layout change detection, persistence, clear, and stats are all exercised.",
+        "Well-scoped cross-cutting feature with cohesive integration: wired through the generator build flow and exposed via a CLI --incremental flag.",
+        "Follows existing codebase patterns closely \u2014 same import style, constructor-injected collaborator (mirrors PluginManager/MarkdownPlugin), and the same __dirname-based fixture + beforeEach/afterEach cleanup test shape as ssg.test.ts.",
+        "Graceful degradation on corrupted cache (falls back to an empty manifest rather than crashing)."
+      ],
+      "summary": "A solid, well-tested incremental-build cache with reasonable integration, but it couples a generic cache to template-engine path conventions and hardwires into core rather than the plugin surface \u2014 and the reported 0.46 convention score contradicts the visibly convention-clean diff (discrepancy flagged).",
+      "session_number": 5
+    }
+  ],
+  "story_review": {
+    "story_name": "static_site_gen",
+    "reviewer_model": "deepseek/deepseek-v4-flash",
+    "overall_coherence": 0.92,
+    "compounding_issues": [
+      "Session 2's hand-rolled regex Handlebars/EJS renderer (chosen over the handlebars/ejs packages) only emulates a subset of the syntax \u2014 no else/unless, @index, or nested #if/#each (non-greedy `[\\s\\S]*?` block regex breaks on nesting) \u2014 and this limited engine became the load-bearing template layer that Session 4 had to extract and Session 5 must hash",
+      "Session 5's incremental cache couples to arbitrary plugins: cached pages skip the onFile hook entirely, so a custom plugin with per-file side effects would silently not re-run on cache hits",
+      "The cache manifest (.ssg-cache.json) is written inside the output directory, so `--clean` wipes the very cache it needs \u2014 a deliberate but surprising coupling that survives to the final commit",
+      "The seeded baseline was discarded wholesale in Session 1 (greenfield by design), but the SSG inherited no error-handling conventions from it \u2014 malformed frontmatter/templates simply throw uncaught errors into the CLI's generic catch"
+    ],
+    "key_decisions": [
+      "Session 1 greenfield replaced the Express/Todo seed with a markdown\u2192HTML SSG core (gray-matter + marked), a build CLI, and a Jest/ts-jest scaffold in a single commit",
+      "Frontmatter-driven template/layout selection: pages declare `template` and `layout`, with default fallbacks and a partials directory (Session 2)",
+      "Hand-rolled regex Handlebars/EJS renderer to avoid template-engine dependencies (Session 2)",
+      "Live-reload dev server built on chokidar + ws with serialized rebuilds (promise chaining), live-reload script injection, and a path-traversal guard on static serving (Session 3)",
+      "Full plugin architecture with onStart/beforeBuild/onFile/afterBuild/onEnd lifecycle hooks \u2014 markdown, template, and the dev server all become plugins, loaded via ssg.config.ts (Session 4)",
+      "Incremental builds via per-source SHA-256 hashing, whole-template-tree hash invalidation, and a .ssg-cache.json manifest (Session 5)"
+    ],
+    "trajectory_description": "Quality improved monotonically across the five sessions. Session 1 establishes a clean, typed core with a working test; Session 2 layers templating on top without breaking the pipeline; Session 3 integrates a full dev server with rebuild serialization and security-aware static serving (its 3 retries show integration friction, but it lands 2/2 tests passing); Session 4 is the pivotal re-architecture, shrinking ssg.ts from ~256 lines to a thin lifecycle orchestrator by extracting markdown, template, and dev-server behavior into plugins while keeping 2/2 tests green; Session 5 adds content-hashed incremental builds and cache invalidation with 3/3 passing tests. Test coverage grew 1\u21921\u21922\u21922\u21923 with zero failures across all five sessions, exit codes were 0 throughout, and per-session cost rose (\u22480.012\u21920.053) in step with the growing context \u2014 a signal of increasingly careful, context-heavy work rather than degradation. The one soft spot is that the S2 template engine's known limitations were carried forward rather than fixed during the S4 refactor.",
+    "summary": "A coherent, well-sequenced story in which the agent built a markdown SSG core, templating, a live-reload dev server, and finally a plugin architecture with incremental caching \u2014 each session extending rather than reworking its predecessors, with tests passing and quality improving at every step."
+  }
+}

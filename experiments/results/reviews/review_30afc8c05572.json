@@ -1,0 +1,229 @@
+{
+  "story_name": "static_site_gen",
+  "story_id": "30afc8c05572",
+  "model": "deepseek/deepseek-v4-flash",
+  "commit_reviews": [
+    {
+      "commit_hash": "e025241a4cea8359e9d52a7c3beae9bc39eef280",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.8,
+      "convention_adherence": 0.4,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": false,
+      "better_or_worse": "neutral",
+      "problems": [
+        {
+          "category": "convention",
+          "severity": "major",
+          "description": "84 naming violations (convention score 0.49): classes/interfaces not PascalCase, snake_case functions, constants not UPPER_CASE across custom-plugin.example.ts, index.ts, and cli.test.ts \u2014 debt baked into the greenfield foundation where it will propagate"
+        },
+        {
+          "category": "maintainability",
+          "severity": "minor",
+          "description": "15.1% code duplication introduced in a scaffold of only 9 functions and 4613 lines \u2014 duplication seeded at the start will compound across subsequent sessions"
+        },
+        {
+          "category": "maintainability",
+          "severity": "minor",
+          "description": "+46 cognitive complexity across 9 functions for a greenfield setup suggests oversized or nested initial modules rather than incremental structure"
+        },
+        {
+          "category": "convention",
+          "severity": "minor",
+          "description": "Test function names in cli.test.ts use snake_case instead of camelCase, inconsistent with the rest of the ts-jest/TypeScript setup"
+        },
+        {
+          "category": "testing",
+          "severity": "info",
+          "description": "cli.ts excluded from collectCoverageFrom \u2014 reasonable for an entry point, but leaves the CLI surface unmeasured in the story's test_executed_success signal"
+        }
+      ],
+      "strengths": [
+        "Correct, self-consistent scaffolding: ts-jest preset, node testEnvironment, roots/testMatch scoped to src, matching devDependencies and TypeScript 5 peer set",
+        "package-lock.json (lockfileVersion 3) committed for reproducible installs",
+        "Sensible dependency selection for an SSG: gray-matter for frontmatter parsing and marked for markdown rendering",
+        "SonarQube reports zero bugs and zero smells \u2014 no outright correctness defects introduced"
+      ],
+      "summary": "A well-structured greenfield scaffold with appropriate SSG dependencies and a clean test harness, but 84 naming-convention violations and 15.1% duplication plant avoidable debt in the foundation (convention score 0.49 vs. otherwise solid architecture).",
+      "session_number": 1
+    },
+    {
+      "commit_hash": "051241a06765b3344d75fdf4cd4297b39aa3dfef",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.82,
+      "convention_adherence": 0.49,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": false,
+      "better_or_worse": "neutral",
+      "problems": [
+        {
+          "category": "dependency",
+          "severity": "major",
+          "description": "@types/handlebars is a deprecated stub package (handlebars 4.7.9 ships its own types) and is installed into 'dependencies' \u2014 type packages belong in devDependencies; this adds a redundant, deprecated prod dependency."
+        },
+        {
+          "category": "dependency",
+          "severity": "minor",
+          "description": "handlebars plus its transitive deps (minimist, neo-async, source-map, uglify-js, wordwrap) were moved from devDependencies into the production dependency tree, widening the runtime surface of the published CLI; if handlebars is only used at build/generate time this misclassification should be reverted."
+        },
+        {
+          "category": "convention",
+          "severity": "major",
+          "description": "Mechanical convention score is 0.49 with casing violations (snake_case functions, non-PascalCase classes, non-UPPER_CASE constants). Discrepancy flagged: the named offending files (custom-plugin.example.ts, index.ts, cli.test.ts) are not part of this diff, so the score likely reflects pre-existing worktree state \u2014 but the new +11 functions/+112 imports should be checked for the same conventions."
+        },
+        {
+          "category": "maintainability",
+          "severity": "minor",
+          "description": "New test code adds +8 smells, +23 cognitive complexity, and +4.0% duplication \u2014 the repeated mkdir/writeFileSync/rmSync scaffolding in each test could be extracted into shared helpers."
+        }
+      ],
+      "strengths": [
+        "On-domain feature: adding Handlebars templating to a static site generator fits the project's purpose.",
+        "Comprehensive test coverage for the new feature (template dir, custom template, custom layout cases) with proper beforeEach/afterEach cleanup so tests don't leak files.",
+        "New tests follow the existing test file's filesystem-based pattern rather than introducing a new testing approach."
+      ],
+      "summary": "A useful, well-tested templating feature that is dragged down by dependency-hygiene errors (a deprecated stub types package in prod deps, dev deps promoted to production) and a poor mechanical convention score that appears partly attributable to pre-existing files outside this diff.",
+      "session_number": 2
+    },
+    {
+      "commit_hash": "456664ea0c78bebf7b6143c453e3af1206e45f82",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.7,
+      "convention_adherence": 0.4,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": false,
+      "better_or_worse": "worse",
+      "problems": [
+        {
+          "category": "convention",
+          "severity": "major",
+          "description": "84 naming violations (convention score 0.49): snake_case functions, non-PascalCase classes/interfaces, non-UPPER_CASE constants across custom-plugin.example.ts, index.ts, cli.test.ts"
+        },
+        {
+          "category": "maintainability",
+          "severity": "major",
+          "description": "+28 cognitive complexity and +9 new smells added in the watch/WebSocket integration wiring"
+        },
+        {
+          "category": "testing",
+          "severity": "minor",
+          "description": "No test delta measured for the new chokidar watcher or ws server behavior despite +371/-21 lines and +9 functions"
+        },
+        {
+          "category": "dependency",
+          "severity": "info",
+          "description": "Two new runtime dependencies (chokidar, ws) for the live-reload dev-server feature; idiomatic choices but add dependency surface"
+        }
+      ],
+      "strengths": [
+        "Architecturally coherent integration step \u2014 file-watching (chokidar) + WebSockets (ws) are the correct, idiomatic primitives for a static-site dev server with live reload",
+        "Dependency management follows npm norms: package-lock.json consistent with package.json, @types/ws correctly dev-only, no type-hack pins",
+        "Bugs +0 and duplications -2.3% \u2014 no correctness regression"
+      ],
+      "summary": "The integration session adds an appropriate live-reload/watch feature with clean dependency management, but ships 84 naming violations, +9 smells, and +28 cognitive complexity with no test coverage for the new behavior.",
+      "session_number": 3
+    },
+    {
+      "commit_hash": "49b7a6992f98269a17168169946e0f33639c78bf",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.6,
+      "convention_adherence": 0.45,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": true,
+      "better_or_worse": "neutral",
+      "problems": [
+        {
+          "category": "convention",
+          "severity": "major",
+          "description": "84 convention violations and a 0.49 convention score per static analysis \u2014 new code fails PascalCase classes/interfaces, UPPER_CASE constants, and camelCase function naming"
+        },
+        {
+          "category": "maintainability",
+          "severity": "minor",
+          "description": "TableOfContents plugin generates anchors like #heading-text but never adds matching id attributes to <h2>/<h3> tags, so the generated TOC links are dead"
+        },
+        {
+          "category": "security",
+          "severity": "minor",
+          "description": "Social-sharing and SEO examples interpolate page.title and page.path into URLs without URL-encoding, producing broken/injection-prone links in copy-pasted example code"
+        },
+        {
+          "category": "maintainability",
+          "severity": "minor",
+          "description": "SonarQube shows +6 smells and +46 cognitive complexity, largely from seven near-identical example plugin objects (181-line example file) plus regex-heavy HTML rewriting"
+        },
+        {
+          "category": "testing",
+          "severity": "minor",
+          "description": "Statistics plugin reports title-word counts as 'total words', a misleading metric that users may copy into production reporting"
+        },
+        {
+          "category": "testing",
+          "severity": "info",
+          "description": "Test suite creates plugin-test-content/plugin-test-output dirs inside __tests__ and could collide under parallel jest workers, though cleanup is handled"
+        }
+      ],
+      "strengths": [
+        "Adds lifecycle-hook test coverage for PluginManager (onStart/beforeBuild/onFile/afterBuild ordering and invocation)",
+        "Examples document the plugin API surface well, easing adoption of the plugin system",
+        "No new bugs (bugs +0) and duplications improved (-4.1%) per SonarQube"
+      ],
+      "summary": "Session 4's plugin-system examples and lifecycle tests fit the existing architecture (bugs +0, duplications -4.1%) but ship with broken TOC anchors, unencoded URL interpolation, and heavy convention drift (84 violations, score 0.49) \u2014 though the flagged snake_case violation on custom-plugin.example.ts is dubious since the visible methods are camelCase, a discrepancy worth noting against the measurement.",
+      "session_number": 4
+    },
+    {
+      "commit_hash": "4aef76539969c3ccee6269f5c83968d20efef77e",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.8,
+      "convention_adherence": 0.49,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": true,
+      "better_or_worse": "better",
+      "problems": [
+        {
+          "category": "convention",
+          "severity": "major",
+          "description": "Convention score 0.49 with 84 violations across the commit (custom-plugin.example.ts, index.ts, cli.test.ts): classes/interfaces not PascalCase, constants not UPPER_CASE, functions using snake_case instead of camelCase."
+        },
+        {
+          "category": "maintainability",
+          "severity": "minor",
+          "description": "Test body is heavily repetitive \u2014 every case re-declares the same temp dirs, file writes, and SiteGenerator construction instead of using helpers or parameterized setup; SonarQube flags +14 smells and +44 cognitive complexity, mostly from this duplication."
+        },
+        {
+          "category": "testing",
+          "severity": "minor",
+          "description": "Tests create/remove fixtures under __dirname (incremental-test-content/output). Cleanup is present in beforeEach/afterEach, but a crash mid-run leaves stale state that could mask or contaminate later runs."
+        }
+      ],
+      "strengths": [
+        "Comprehensive behavioral coverage of the incremental build feature: first run, cache manifest, unchanged/changed/mixed files, --clean, deleted files, and new-file handling.",
+        "Verifies behavior strictly through the public API (generate(), getBuildStats(), fs output assertions) rather than internal implementation details.",
+        "bugs +0 and duplication -2.3% \u2014 the change is functionally sound and reduces overall duplication.",
+        "Uses standard jest describe/it + beforeEach/afterEach structure consistent with typical repo test patterns."
+      ],
+      "summary": "A functionally complete, API-driven test suite for incremental builds that lands cleanly (bugs 0, duplication down) but drags the convention score to 0.49 via 84 naming violations and accumulates test duplication that SonarQube flags as +14 smells / +44 cognitive complexity.",
+      "session_number": 5
+    }
+  ],
+  "story_review": {
+    "story_name": "static_site_gen",
+    "reviewer_model": "deepseek/deepseek-v4-flash",
+    "overall_coherence": 0.9,
+    "compounding_issues": [
+      "Session 1 committed node_modules (5152 files, ~969k insertions) and dist/ with no .gitignore; none was ever added, so every later commit diff is polluted with dependency and build-artifact noise.",
+      "The bad_seed (0.5) delivered a mismatched Express/JWT auth-API seed (200-line index.ts) unrelated to the SSG story, so session 1 had to build effectively greenfield and the seed never informed the architecture.",
+      "EJS template support promised in the session-2 prompt was never implemented \u2014 the template engine and per-page `template` field are Handlebars/.hbs-only, so the stated scope was only half met.",
+      "The session-4 plugin refactor left coupling seams: DevServer reaches into SiteGenerator private fields via bracket access (this.generator['contentDir']), and SiteGenerator shares internal state with plugins (storeFrontmatter, markdownPlugin.getParsedContent) that bypasses the plugin's own onFile pipeline, making part of the plugin boundary cosmetic."
+    ],
+    "key_decisions": [
+      "Discard the irrelevant auth-API seed and build the SSG cleanly greenfield in session 1 \u2014 the correct call under a mismatched bad_seed, resulting in clean modular types.ts / markdown-parser.ts / site-generator.ts / cli.ts.",
+      "Adopt Handlebars with layouts, partials, and compiled-template caching (session 2) as the template strategy.",
+      "Implement the live-reload dev server with ws + chokidar and wire `ssg serve` into the CLI (session 3).",
+      "Extract a lifecycle-hook plugin architecture (onStart/beforeBuild/onFile/afterBuild/onEnd via PluginManager) and re-home markdown, template, and the dev server as plugins, with PLUGIN_SYSTEM.md and an example plugin (session 4).",
+      "Add incremental builds via a sha256 .ssg-cache.json manifest (CacheManager) exposed as --incremental/--clean CLI flags (session 5)."
+    ],
+    "trajectory_description": "Quality arcs upward across the five sessions. Session 1 laid a strong, well-tested foundation (7 source files, 610 test lines) and stayed disciplined by ignoring the mismatched seed. Session 2 cleanly extended with a cached template engine plus 237 new test lines. Session 3 added the dev server but was the weakest point \u2014 the lowest confidence (0.74), a monolithic 204-line module, and the smallest test delta. Session 4 was the pivotal, riskiest commit: a genuine refactor (844 insertions / 280 deletions) that split the generator into plugins and swapped the 204-line dev server for a plugin, backed by 329 test lines and docs, though it introduced the private-field and shared-state hacks that linger to the end. Session 5 closed strong with incremental builds/caching and 377 test lines integrated through the refactored pipeline. Tests were extended in every session and exit codes were clean throughout, so capability and coverage grew monotonically even as the session-4 restructuring temporarily thinned some seams.",
+    "summary": "A coherent, well-paced feature\u2192refactor\u2192optimization arc that steadily improved \u2014 despite a mismatched bad seed, committed node_modules, and a partial EJS scope gap \u2014 culminating in a plugin-based SSG with templates, live reload, and incremental builds."
+  }
+}

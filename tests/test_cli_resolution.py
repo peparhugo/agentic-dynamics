@@ -41,6 +41,8 @@ DOCUMENTED_RESOLUTIONS: list[tuple[tuple[str, ...], str, tuple[str, ...]]] = [
     (("experiment", "cap-2d-score"), "score_cap_2d.py", ()),
     (("experiment", "cap-2e-grid"), "run_cap_2e_grid.py", ()),
     (("experiment", "cap-2e-score"), "score_cap_2e.py", ()),
+    (("experiment", "cap-2f-grid"), "run_cap_2f_grid.py", ()),
+    (("experiment", "cap-2f-score"), "score_cap_2f.py", ()),
     # story
     (("story", "run"), "run_story.py", ()),
     (("story", "batch"), "batch_stories.py", ()),

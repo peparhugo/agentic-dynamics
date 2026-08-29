@@ -1,0 +1,254 @@
+{
+  "story_name": "static_site_gen",
+  "story_id": "2b3e9121b5e1",
+  "model": "deepseek/deepseek-v4-flash",
+  "commit_reviews": [
+    {
+      "commit_hash": "5a168360721c2cffbb3f74f5978f4045cd617d04",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.55,
+      "convention_adherence": 0.51,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": false,
+      "better_or_worse": "worse",
+      "problems": [
+        {
+          "category": "convention",
+          "severity": "major",
+          "description": "58 convention violations across new files \u2014 cache.ts and cli.ts use snake_case functions, non-PascalCase classes/interfaces, non-camelCase functions, and non-UPPER_CASE constants; mechanical convention score 0.51."
+        },
+        {
+          "category": "maintainability",
+          "severity": "major",
+          "description": "SonarQube duplications +26.9% \u2014 significant copy-paste structure in the greenfield build."
+        },
+        {
+          "category": "maintainability",
+          "severity": "minor",
+          "description": "+3 code smells and +9 cognitive complexity introduced, indicating tangled control flow in the new code."
+        },
+        {
+          "category": "architecture",
+          "severity": "minor",
+          "description": "The entire tier-2 seed (index.ts, -200 lines) was deleted and replaced wholesale in one greenfield session; acceptable for a greenfield story, but it discards the baseline without staged migration."
+        }
+      ],
+      "strengths": [
+        "Zero new bugs introduced (SonarQube bugs +0).",
+        "Coherent greenfield rebuild with a real project shape: jest.config.ts (ts-jest ESM), tests/ root, and a dist/cli.js bin for the ssg tool.",
+        "Proper test scaffolding wired in from session 1 rather than deferred."
+      ],
+      "summary": "A coherent greenfield static-site-generator rebuild with clean test scaffolding and no new bugs, but dragged down by 58 naming-convention violations, 26.9% duplication, and 3 new smells \u2014 worse on quality than the clean seed it replaced.",
+      "session_number": 1
+    },
+    {
+      "commit_hash": "f324e8b931af6990d6965c7d6db3025f16ca574b",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.8,
+      "convention_adherence": 0.51,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": true,
+      "better_or_worse": "neutral",
+      "problems": [
+        {
+          "category": "dependency",
+          "severity": "major",
+          "description": "Added @types/handlebars (^4.1.0) to devDependencies even though the lockfile shows it is a deprecated stub \u2014 handlebars ships its own type definitions. The dependency is unnecessary and pulls in a deprecated package."
+        },
+        {
+          "category": "maintainability",
+          "severity": "minor",
+          "description": "The feature is sizable for a single addition: +535/-26 lines, +82 imports, +7 functions, with +28 cognitive complexity, +10 smells and +5.0% duplication per SonarQube \u2014 the template logic could likely be trimmed."
+        },
+        {
+          "category": "convention",
+          "severity": "minor",
+          "description": "Convention score is low (0.51, 58 violations). Note: the flagged violations are concentrated in pre-existing files (cache.ts, cli.ts camelCase/PascalCase/UPPER_CASE noise), so much of this appears inherited rather than introduced by this commit."
+        },
+        {
+          "category": "maintainability",
+          "severity": "info",
+          "description": "generatePageHTML became async while writes still use synchronous fs.writeFileSync inside it \u2014 minor sync/async style inconsistency in the generator."
+        }
+      ],
+      "strengths": [
+        "Cohesive, on-architecture feature: a dedicated TemplateEngine module injected via SiteGenerator constructor options, matching the existing DI pattern.",
+        "CLI extension follows the established flag-parsing pattern (--templates parallels --content/--output, usage text updated).",
+        "Frontmatter-driven template/layout selection composes cleanly with the existing PageMetadata model.",
+        "TemplatesDir default is sensible and defensive (process.cwd()/templates fallback)."
+      ],
+      "summary": "A reasonable, pattern-respecting feature addition (Handlebars templating wired through CLI + generator), dragged to neutral by an unnecessary deprecated stub types dependency and high added complexity.",
+      "session_number": 2
+    },
+    {
+      "commit_hash": "89fb30c5ade43e05a7f8d2e7cd8406056003bcbf",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.75,
+      "convention_adherence": 0.55,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": true,
+      "better_or_worse": "neutral",
+      "problems": [
+        {
+          "category": "maintainability",
+          "severity": "major",
+          "description": "startServer() is a single closure-heavy function (+38 cognitive complexity, +11 smells) packing the HTTP handler, WS upgrade, chokidar watcher, debounced rebuild, and a convoluted teardown (nested close promises, setTimeout(0) flush, optional-chained closeAllConnections) \u2014 the close()/teardown path is fragile and hard to reason about; extract handlers."
+        },
+        {
+          "category": "convention",
+          "severity": "major",
+          "description": "Measured convention score 0.51 with 58 violations (camelCase functions, PascalCase classes/interfaces, UPPER_CASE constants, snake_case functions in cli.ts/cache.ts) \u2014 naming debt that lowers the adherence score."
+        },
+        {
+          "category": "dependency",
+          "severity": "info",
+          "description": "Adds two runtime dependencies (ws, chokidar) plus @types/ws for a dev-server feature; appropriate for the live-reload goal but grows the runtime surface of an otherwise minimal CLI tool."
+        },
+        {
+          "category": "testing",
+          "severity": "minor",
+          "description": "Tests cover serving, 404s, and script injection but not the path-traversal 403 guard or the WS upgrade/reload broadcast path \u2014 the two security/realtime behaviors most likely to regress."
+        },
+        {
+          "category": "security",
+          "severity": "minor",
+          "description": "isInside() returns false when the request resolves to the output dir itself (rel === '') producing a 403 for '/', and the WS endpoint has no handshake timeout or payload cap; minor hardening gaps, not exploitable paths."
+        }
+      ],
+      "strengths": [
+        "Server module composes with the existing build() pipeline instead of duplicating site generation \u2014 clean architectural seam (server.ts imports from builder.ts).",
+        "Security-aware request handling: path-traversal guard (403 via isInside) and decodeURIComponent errors caught as 400.",
+        "Added integration tests (tests/server.test.ts, tests/cli.test.ts) covering serving, 404s, and live-reload injection; bugs +0 and duplications -2.3%.",
+        "CLI wiring follows existing parseArgs/printHelp patterns with the new 'serve' command and --port flag, plus index.ts exports."
+      ],
+      "summary": "A solid, tested live-reload dev-server integration that composes well with the existing builder and is security-conscious, but the measured convention regression (0.51, 58 naming violations) and +38 cognitive complexity offset its value \u2014 note that my inspection of this worktree's code shows clean camelCase/PascalCase naming while the measurements cite cache.ts/cli.ts issues, so the low convention score appears to be aggregated across the story's other session files.",
+      "session_number": 3
+    },
+    {
+      "commit_hash": "89ec6a130beba45f3aa9f8a5e883af5204bf69e3",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.7,
+      "convention_adherence": 0.6,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": true,
+      "better_or_worse": "better",
+      "problems": [
+        {
+          "category": "architecture",
+          "severity": "major",
+          "description": "The core SiteGenerator is coupled to a concrete plugin via `plugins.find((p) => p instanceof TemplatePlugin)` and throws if absent. The core should depend on a contract/interface, not a specific plugin class being registered in config."
+        },
+        {
+          "category": "dependency",
+          "severity": "major",
+          "description": "Circular module dependency: `plugin.ts` imports `PageMetadata` from `generator.js` while `generator.ts` imports `Plugin`/`PluginManager` from `plugin.js`. PageMetadata should be a type-only import or extracted to a shared types module."
+        },
+        {
+          "category": "maintainability",
+          "severity": "minor",
+          "description": "`executeHook` erases hook typing with `(hook as Function).apply(plugin, args)`, losing compile-time validation that hook args match each plugin's declared signatures."
+        },
+        {
+          "category": "maintainability",
+          "severity": "minor",
+          "description": "`onFile` fires after `fs.writeFileSync`, so plugins cannot transform the generated file content; post-write hooks invite read-back/re-write patterns or silently only observe."
+        },
+        {
+          "category": "maintainability",
+          "severity": "minor",
+          "description": "`abstract class Plugin implements PluginHooks` redundantly re-declares all five hooks as optional abstract signatures (`async onStart?(): Promise<void>;`); implementing `PluginHooks` alone is sufficient."
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "DISCREPANCY: measured convention score is 0.51 with 58 violations, but the cited violations are in cache.ts/cli.ts \u2014 files NOT touched by this commit's diff. The commit's own code (generator.ts, plugin.ts, plugins/) appears convention-clean (PascalCase classes, camelCase functions); the low score likely reflects pre-existing project state."
+        },
+        {
+          "category": "maintainability",
+          "severity": "info",
+          "description": "SonarQube delta +19 smells and +17 cognitive complexity \u2014 the hook-dispatch indirection and dev-server handler add complexity, though duplications improved -4.6%."
+        }
+      ],
+      "strengths": [
+        "Coherent plugin lifecycle (onStart/beforeBuild/onFile/afterBuild/onEnd) that genuinely improves extensibility of the generator.",
+        "Dev server extracted into a plugin, decoupling a large side concern (HTTP + WebSocket + file watching) from the core generation path.",
+        "Centralized default config via `createDefaultConfig` keeps construction explicit.",
+        "Public API barrel in `src/index.ts` gives library consumers a stable entry point.",
+        "Duplications reduced by 4.6% and zero new bugs."
+      ],
+      "summary": "A directionally sound plugin-system refactor that decouples the dev server and standardizes lifecycle hooks, but couples the core to a concrete plugin via an instanceof lookup and adds a circular import between generator and plugin modules.",
+      "session_number": 4
+    },
+    {
+      "commit_hash": "83c6844e425f398f597450c7d83ee28e99dac8f4",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.8,
+      "convention_adherence": 0.51,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": true,
+      "better_or_worse": "better",
+      "problems": [
+        {
+          "category": "maintainability",
+          "severity": "major",
+          "description": "CacheEntry.hash is assigned crypto.randomBytes(...) \u2014 a random nonce mislabeled as a hash that is never compared in isPageCached (only contentHash/templateHash/layoutHash are); it's a dead field adding noise to the persisted manifest."
+        },
+        {
+          "category": "architecture",
+          "severity": "minor",
+          "description": "BuildCache stores its manifest inside outputDir (.ssg-cache.json), coupling cache state to build output; --clean deletes it and serve/regenerate touches the same dir, so the cache lifecycle is entangled with the output directory."
+        },
+        {
+          "category": "performance",
+          "severity": "minor",
+          "description": "hashFile uses synchronous existsSync/readFileSync inside an otherwise async class, blocking the event loop on every page hash during an incremental build."
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "SonarQube reports convention score 0.51 with 58 violations (Functions camelCase, Classes/Interfaces PascalCase, Constants UPPER_CASE) \u2014 but the visible code adheres to exactly those TypeScript conventions; the measurement appears to be an artifact (possibly cross-language rules or wholesale file flagging) rather than a real adherence regression."
+        },
+        {
+          "category": "other",
+          "severity": "info",
+          "description": "BuildStats.timeSaved is a heuristic estimate (avg build time \u00d7 skipped pages), not a measured value; fine as UX, but it reads as an empirical stat."
+        },
+        {
+          "category": "architecture",
+          "severity": "info",
+          "description": "Version gate silently falls back to a full rebuild when cache version mismatches without logging \u2014 acceptable but opaque for diagnosis."
+        }
+      ],
+      "strengths": [
+        "Well-scoped feature that follows the existing module layout and option-threading pattern (GenerateOptions extended, parseArgs updated, usage string kept in sync).",
+        "Cache invalidation is keyed on content/template/layout content hashes \u2014 the correct approach for incremental builds.",
+        "Composition is correct: incremental is only honored when not --clean, so clean and incremental modes don't conflict.",
+        "Preserves the plugin hook lifecycle (onStart/onEnd still fired) and doesn't bypass PluginManager.",
+        "Typed interfaces (CacheEntry, CacheManifest, BuildStats) keep the surface explicit."
+      ],
+      "summary": "Solid incremental-cache feature that fits the existing generator architecture and option flow, but carries minor debt (mislabeled random 'hash' field, cache-in-output-dir coupling, sync I/O) and a convention score of 0.51 that visibly contradicts the camelCase/PascalCase-conformant code \u2014 likely a static-analysis artifact.",
+      "session_number": 5
+    }
+  ],
+  "story_review": {
+    "story_name": "static_site_gen",
+    "reviewer_model": "deepseek/deepseek-v4-flash",
+    "overall_coherence": 0.85,
+    "compounding_issues": [
+      "Session 5 hit the session limit mid-work: the incremental cache was implemented and committed but no tests were ever run \u2014 the final commit is unverified and its correctness unproven",
+      "Session 1 discarded the entire seed codebase (the Express auth API) yet the orphaned 200-line index.ts was left at repo root unchanged \u2014 dead weight whose name is misleading in a TypeScript project",
+      "The cache's whole-templates-dir hashing deliberately invalidates every cached page on any .hbs edit (acknowledged in the code comment) \u2014 a coarse invalidation ceiling that grows more costly with template count",
+      "src/cache.ts was committed with a stray NUL byte, so git recorded it as a binary blob rather than text, hurting diffability and review",
+      "The S4 decision to keep the plugin pipeline intentionally synchronous forces long-lived work like the dev server to be split into explicit listen()/close() calls outside the hook lifecycle \u2014 a workable but real constraint on future plugin types"
+    ],
+    "key_decisions": [
+      "Full greenfield rewrite that abandoned the seed codebase rather than building on it, replacing the auth API with a purpose-built SSG core (CLI + frontmatter parser + markdown renderer + site builder)",
+      "Handlebars-based template engine with layouts, partials, and built-in fallback templates so a project without a ./templates directory still builds (zero-config by design)",
+      "Refactor into a plugin-pipeline architecture \u2014 SSGEngine orchestrating onStart/beforeBuild/onFile/afterBuild/onEnd hooks \u2014 which dissolved the monolithic site.ts/serve.ts and made markdown, templating, and the dev server all first-class plugins",
+      "WebSocket live-reload dev server with debounced rebuilds, MIME-typed static serving, and a path-traversal guard on file resolution",
+      "Incremental build cache keyed on per-source SHA1 plus a whole-templates-dir digest, exposed as --incremental/--clean CLI flags with BuildStats reporting"
+    ],
+    "trajectory_description": "Quality improved steadily and the architecture matured with every session: Session 1 built a clean monolithic SSG (20 tests green), Session 2 layered Handlebars templating on top (32 tests, one mid-session regression fixed), Session 3 integrated a live-reload dev server (39 tests, a leaked-worker test failure fixed), and Session 4 was the strongest step \u2014 a disciplined refactor that decomposed the growing site.ts/serve.ts monoliths into a plugin pipeline with config loading, nearly doubling test files (12) while keeping 55 tests green. Test coverage grew monotonically and each session closed its own failures. The arc degrades at the very end: Session 5 added a reasonable cross-cutting incremental cache but was truncated by a session limit before any test could run, leaving the final commit unverified and carrying a minor binary-encoding artifact \u2014 the first commit in the story that was not proven green at commit time.",
+    "summary": "A textbook five-session arc \u2014 greenfield \u2192 feature \u2192 integration \u2192 refactor \u2192 cross-cutting \u2014 whose quality and architectural sophistication rose through Session 4's plugin refactor but whose final cache session was cut short before verification, leaving the last commit unproven."
+  }
+}

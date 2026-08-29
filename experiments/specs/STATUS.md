@@ -3,8 +3,8 @@
 **Generated — do not edit by hand.** Regenerate with `python scripts/spec_status.py`;
 `scripts/run_workflow.py` also refreshes it at the end of every run.
 
-Generated at: `2026-08-29T14:37:03.534144+00:00`  ·  148 spec(s)
-**Work remaining:** 41 open · 107 completed/retired
+Generated at: `2026-08-29T15:56:37.526325+00:00`  ·  151 spec(s)
+**Work remaining:** 42 open · 109 completed/retired
 
 | name | kind | repeatable | status | version | supersedes | last_run | ok | model | cost | n_runs |
 |---|---|---|---|---|---|---|---|---|---|---|
@@ -21,6 +21,7 @@ Generated at: `2026-08-29T14:37:03.534144+00:00`  ·  148 spec(s)
 | `cap_2d_cell_harmful_partial` | workflow | yes | runnable | 0.1 | — | — | — | — | — | 0 |
 | `cap_2d_cell_incorrect_rebuilt` | workflow | yes | runnable | 0.1 | — | — | — | — | — | 0 |
 | `cap_2e_cell_unseen_family` | workflow | yes | runnable | 0.1 | — | — | — | — | — | 0 |
+| `cap_2f_cell_trivial_clean` | workflow | yes | runnable | 0.1 | — | — | — | — | — | 0 |
 | `cap_confidence_cascade` | experiment | yes | runnable | 0.1 | — | — | — | — | — | 0 |
 | `cap_coverage_routing_impact` | experiment | yes | runnable | 0.1 | — | — | — | — | — | 0 |
 | `cap_escalation_fix` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
@@ -117,6 +118,8 @@ Generated at: `2026-08-29T14:37:03.534144+00:00`  ·  148 spec(s)
 | `evidence_narrative` | workflow | no | completed | 0.1 | — | 2026-08-14 15:04 | ok | openai/gpt-5.6-sol | $0.0000 | 2 |
 | `evidence_redesign` | workflow | no | completed | 0.1 | — | 2026-08-14 19:18 | ok | openai/gpt-5.6-sol | $5.9008 | 3 |
 | `fix_review_findings` | workflow | no | completed | 0.1 | — | 2026-08-14 13:48 | ok | deepseek/deepseek-v4-pro | $0.1504 | 1 |
+| `fleet_ladder_plan` | workflow | no | completed | 0.1 | — | 2026-08-29 15:33 | ok | deepseek/deepseek-v4-flash | $0.0836 | 1 |
+| `fleet_ladder_revision` | workflow | no | completed | 0.1 | — | 2026-08-29 15:56 | ok | deepseek/deepseek-v4-pro | $0.1872 | 1 |
 | `framework_facelift` | workflow | no | completed | 0.2 | — | 2026-08-14 15:18 | ok | openai/gpt-5.6-sol | $0.0000 | 1 |
 | `grit_calibration_design` | workflow | no | completed | 0.1 | — | 2026-08-28 15:05 | ok | deepseek/deepseek-v4-flash | $0.0250 | 1 |
 | `i10_typed_checkpoint` | workflow | no | completed | 0.1 | — | 2026-08-28 17:00 | ok | deepseek/deepseek-v4-flash | $0.0085 | 3 |
