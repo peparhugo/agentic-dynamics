@@ -1,0 +1,261 @@
+name: fleet_ladder_plan
+question: >-
+  Map out the fleet-ladder implementation (docs/designs/proposed/fleet_ladder_architecture.md):
+  research the current infrastructure + the knowledge base's access needs, review, and
+  propose the full mapping — the container topology per tier WITH the KB access levels
+  (read vs write per tier, the write-guard and actuation-armed gates preserved), the compose
+  layout, the image hierarchy, the migration slices, and the audit guards. The operator's
+  constraints hold: the host runs only the docker daemon + a 3-line bootstrap; master
+  control is the operator chat; the docker socket is the ONE escalation (orchestrator tier);
+  the mount contract is the isolation constant; the KB write-guard discipline is never
+  weakened. The phases are BOUNDED to what a flash session can do in one step — the research
+  is split (infra inventory, then the KB-access map), the review validates the research, the
+  proposal ASSEMBLES the prior phases' outputs into the mapping (it does not re-research),
+  and the adversarial verifies the proposal's completeness. The deliverable is the mapped-out
+  plan (committed docs), NOT the implementation — the implementation follows in slice
+  workflows after the operator's sign-off.
+version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: false
+repeatable: false
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: true
+    context:
+      domain_context: >-
+        PROVISIONAL DomainProfile. domain: infrastructure / the fleet ladder (containerized
+        execution, supervised fleet, master control). canonical_sources:
+        [docs/designs/proposed/fleet_ladder_architecture.md (the design — the ladder, the
+        mount contract, the KB wiring incl. the resurrected neo4j leg, the migration slices),
+        docs/designs/proposed/system_knowledge_abstraction.md (the game board + the
+        contract-vs-formatter principle), src/agentic_dynamics/knowledge/* (knowledge_stream,
+        retrieval, graph, kb_worker, knowledge_ingestion, the write guard + the
+        actuation-armed gate), scripts/{worker,analysis_worker,trigger_reviews,kb_worker,run_workflow}.py,
+        the session's failure ledger (docs/reviews/cross_models_mixed_effect_caveat.md + the
+        commits' messages — the worker fragility evidence)].
+        policies: [research_then_review_then_propose, bounded_phases, access_matrix_complete,
+        guards_never_weakened, mount_contract_is_constant]
+      challenge_context: >-
+        PROVISIONAL ChallengeProfile. challenge: research + review + proposal (the mapping of
+        the fleet-ladder implementation). deliberation: [inventory the infra, map the KB
+        access, review, propose, adversarial]. session_policy: {default: fork_per_phase}
+      current_state: >-
+        The design (proposed) is committed. The infra: 9 docker containers (redis 6380 /
+        chroma 8000 / sonar 9000-9003 / neo4j empty / 3 redis) + ad-hoc host workers
+        (story/analysis/review/kb/wrappers) with the session's fragility ledger. The KB:
+        the stream (redis db2) with four declared consumer groups — chroma (live, 812 +
+        2,215 records), ledger (live), registry (live, 13k entities), neo4j (DECLARED BUT
+        UNCONSUMED — the graph is empty; the retrieval RRF fusion is coded, the consumer was
+        never built). The write guard (FINOPS_KB_WRITE) + the actuation-armed gate +
+        lineage are the KB's write discipline — the proposal must preserve them per tier.
+        The master control boundary: this workflow's operator reviews the proposal; nothing
+        implements until the sign-off.
+      hard_rules: >-
+        (1) Every phase commits '[workflow] <phase>' (the worktree hook enforces it); every
+        docs/ file the phases write carries status frontmatter (the DOC_CONTRACT gate).
+        (2) BOUNDED PHASES: each phase's scope is EXACTLY its deliverable list — no
+        mega-tasks; a phase that finds a larger question records it in its LOG for a later
+        slice, never expands its own scope.
+        (3) RESEARCH BEFORE PROPOSAL: p1 inventories the infra, p2 maps the KB access; p3
+        reviews BOTH against the design + the operator's constraints; p4 ASSEMBLES the
+        prior phases' outputs into the mapping — it does not re-research, re-inventory, or
+        re-derive anything not in the prior phases' docs.
+        (4) THE ACCESS MATRIX IS COMPLETE (the proposal's core claim): every KB touch —
+        every producer call site, every consumer group, the retrieval (dense/lexical/RRF),
+        the registry, the Control Room reads, the supervisor's fleet state — is mapped to a
+        container tier AND a read/write classification. An unmapped touch is a FAILED
+        finding.
+        (5) THE GUARDS ARE NEVER WEAKENED: the write guard (FINOPS_KB_WRITE), the
+        actuation-armed gate (FINOPS_ACTUATION_ARMED), the lineage requirement, and the
+        registry append discipline survive the mapping — the proposal places them in the
+        tiers, never removes them.
+        (6) THE OPERATOR'S CONSTRAINTS HOLD: the host runs the docker daemon + one 3-line
+        bootstrap; master control = the operator chat (the proposal is signed off by the
+        operator, never self-activated); the docker socket is the ONE escalation and it
+        lives ONLY in the orchestrator tier; the mount contract (worktree rw / results rw /
+        repo ro / auth ro) is the isolation constant.
+        (7) THE NEO4J LEG IS RESURRECTED IN THE MAPPING: the kb-neo4j-v1 consumer (the
+        missing bridge) is specified — its tier, its access, its guards.
+        (8) Flash-bounded: every phase's prompt scope is enumerable; a phase's output is
+        committed docs with the frontmatter, never an uncommitted monolith.
+        (9) Every number cites its source (the docker ps output, the queue counters, the
+        registry counts, the code paths). (10) No external actuation, no container
+        management, no infra changes — this workflow PLANS, it does not implement.
+        (11) p5 adversarial mandatory. (12) Resumable only when spec version, goal hash,
+        source revision, and candidate-manifest hash match.
+      read_first: >-
+        docs/designs/proposed/fleet_ladder_architecture.md (the design being mapped),
+        docs/designs/proposed/system_knowledge_abstraction.md (the board + contract
+        principle), src/agentic_dynamics/knowledge/knowledge_stream.py (the consumer
+        groups + the write guard), src/agentic_dynamics/knowledge/retrieval.py +
+        graph.py (the coded RRF fusion), scripts/kb_worker.py (the consumers' state),
+        scripts/worker.py + analysis_worker.py (the worker loops being containerized)
+      run_shape: >-
+        SINGLE wrapper: deepseek/deepseek-v4-flash (the phases are flash sessions — the
+        bounded-step requirement). One branch (feature/fleet-ladder-plan); each phase
+        commits [workflow] <phase>; the docs land under docs/fleet/ in the branch. No
+        cells, no grid, no parallel workers. The data chain stays single-writer; the
+        running campaigns (2f, the analysis/review drain) are untouched — this workflow
+        only reads.
+    phases:
+      - name: p0_pin_spec
+        kind: agent
+        timeout: 3600
+        prompt: |
+          GOAL: {goal}
+          ROLE: verification — the design is committed (docs/designs/proposed/fleet_ladder_architecture.md).
+          Append this spec's SHA256 to the design's header (the ONLY edit allowed). Verify
+          the design still matches the operator's constraints: the ladder (cell →
+          orchestrator → supervisor), the mount contract, the host bootstrap, master
+          control = the operator chat, the socket as the ONE escalation, the KB wiring with
+          the resurrected neo4j leg. A deviation is a FAILED finding.
+          DELIVER: the pinned header + verification; committed.
+          LOG: PASS/FAIL; commit.
+      - name: p1_research_infra
+        kind: agent
+        timeout: 10800
+        prompt: |
+          GOAL: {goal}
+          ROLE: the infrastructure research phase — BOUNDED to this inventory. Do not
+          design, do not propose, do not touch any infra. Inventory and record:
+          (1) THE CONTAINER FLEET: run `docker ps` and record every container (name, image,
+          ports, status) — the data plane as it is TODAY (redis 6380 / chroma 8000 / sonar
+          9000-9003 / neo4j / the redis extras).
+          (2) THE HOST WORKERS: every ad-hoc process (story/analysis/review workers, the
+          kb consumers, the campaign wrappers, the portal, the daemons) + the queue state
+          (story_jobs / analysis_jobs / review jobs / the kb stream groups' pending).
+          (3) THE CODE SURFACES: the worker loops (worker.py, analysis_worker.py,
+          trigger_reviews.py, kb_worker.py), the stream + the four consumer groups
+          (knowledge_stream.py), the write guard + the actuation gate (their env + call
+          sites), the retrieval's two legs + the RRF (retrieval.py), the graph client's
+          fulltext search (graph.py), the registry write path.
+          (4) THE FAILURE LEDGER: the session's fragility evidence (the caveat doc + the
+          commits' messages) — enumerated as the requirements the ladder must fix.
+          DELIVER: docs/fleet/01_infra_inventory.md (status: proposed frontmatter) — a
+          factual inventory with cited commands/counts. Commit it.
+          LOG: the inventory summary; PASS/FAIL; commit.
+      - name: p2_research_kb_access
+        kind: agent
+        timeout: 10800
+        prompt: |
+          GOAL: {goal}
+          ROLE: the knowledge-base access research phase — BOUNDED to the access map. Do
+          not propose the topology; map the touches. Produce:
+          (1) EVERY KB PRODUCER: every call site that writes to the stream (the story/run/
+          review/supervise call sites + the kb_produce* scripts + the opt-in emit path) —
+          for each: what it writes, WHEN (the write guard's env requirement), and whether
+          it needs KB READ at the same time.
+          (2) EVERY KB CONSUMER: the four groups (kb-chroma-v1 live, kb-ledger-v1 live,
+          kb-registry-v1 live, kb-neo4j-v1 DEAD — the missing bridge) — for each: what it
+          writes, to which store, and what guards apply.
+          (3) EVERY KB READ: the retrieval (dense Chroma + lexical Neo4j fulltext + the
+          RRF), the augment seam, the registry queries (scripts/registry.py + the Control
+          Room), the game board's counts — who reads what.
+          (4) THE GUARDRAILS: the write guard, the actuation-armed gate, the lineage
+          requirement, the registry append discipline — their exact conditions, so the
+          proposal can place them per tier without weakening them.
+          DELIVER: docs/fleet/02_kb_access_map.md (status: proposed frontmatter) — the
+          touch-by-touch table: touch | read/write | store | guard | current home | tier
+          candidate. Commit it.
+          LOG: the touch count + the unmapped list (should be empty); PASS/FAIL; commit.
+      - name: p3_review
+        kind: agent
+        timeout: 10800
+        prompt: |
+          GOAL: {goal}
+          ROLE: the review phase — BOUNDED to validating p1 + p2 against the design + the
+          operator's constraints. Do not re-inventory, do not re-map. Produce:
+          (1) THE ACCESS-MATRIX COMPLETENESS CHECK: cross-check the p2 map against the
+          code (the call sites, the consumer groups, the retrieval) — every touch mapped;
+          an unmapped touch is a FAILED finding (report it, do not fix it).
+          (2) THE CONSTRAINT CHECK: the design's claims (ladder, mount contract, host
+          bootstrap, socket-as-one-escalation, master control) vs p1's inventory — any
+          container/process the design's ladder does not place?
+          (3) THE GUARD-PRESERVATION CHECK: the write guard + the actuation gate + the
+          lineage survive the mapping (their conditions in p2 are complete and
+          preservable).
+          (4) THE RISK LIST + THE OPEN QUESTIONS: the risks of the migration (the running
+          campaigns, the data chain, the auth mounts, the image maintenance) + the
+          questions the proposal must answer.
+          DELIVER: docs/fleet/03_review.md (status: proposed frontmatter). Commit it.
+          LOG: the check results + the risk count; PASS/FAIL; commit.
+      - name: p4_proposal
+        kind: agent
+        timeout: 21600
+        prompt: |
+          GOAL: {goal}
+          ROLE: the proposal phase — ASSEMBLE the mapping from the prior phases' docs
+          (docs/fleet/01, 02, 03). Do NOT re-research: everything derives from the prior
+          phases' outputs + the design doc. Produce the full mapping:
+          (1) THE CONTAINER TOPOLOGY PER TIER with the KB access levels: every unit from
+          p1's inventory placed on the ladder (cell / orchestrator / supervisor) AND every
+          KB touch from p2's map assigned read/write per tier — the access matrix as the
+          proposal's centerpiece (a table: tier | units | KB reads | KB writes | guards |
+          mounts).
+          (2) THE COMPOSE LAYOUT: the per-tier compose configs — the mount contract (worktree
+          rw / results rw / repo ro / auth ro — nothing else), the network (the data plane
+          reachable), the env per tier (the write-guard env, FINOPS_*, the canonical
+          CLAUDE_BIN/PATH), the restart policies, the per-queue pool counts.
+          (3) THE IMAGE HIERARCHY: base → orchestrator → supervisor (what each image adds;
+          the socket mount lives in the orchestrator/supervisor tiers ONLY).
+          (4) THE NEO4J BRIDGE: the kb-neo4j-v1 consumer's specification — its tier, its
+          access (the fulltext-index write), its guards, its supervision — per the design's
+          resurrected-leg section.
+          (5) THE MIGRATION SLICES: slice 1 (base image + supervisor + the worker pools),
+          slice 2 (the orchestrator migration), slice 3 (the neo4j consumer + the RRF leg
+          live), slice 4 (the audit guards) — each with its bounded scope, its
+          deliverables, and its rollback.
+          (6) THE GUARD-PLACEMENT TABLE: the write guard, the actuation gate, the lineage
+          requirement, the registry discipline — where each lives per tier, unchanged in
+          strength.
+          DELIVER: docs/fleet/00_proposal.md (status: proposed frontmatter) + commit it.
+          LOG: the mapping summary; PASS/FAIL; commit.
+      - name: p5_adversarial
+        kind: agent
+        timeout: 14400
+        prompt: |
+          GOAL: {goal}
+          ROLE: adversarial verifier — falsify the proposal. Attack in order:
+          (1) ACCESS-MATRIX COMPLETENESS: cross-check p4's matrix against p2's map — every
+          touch mapped to a tier + read/write; an unmapped touch is a FAILED finding.
+          (2) GUARD PRESERVATION: the write guard, the actuation gate, the lineage, the
+          registry discipline — each traceable from the code through p2 to p4's placement;
+          a weakened guard is a FAILED finding.
+          (3) THE CONSTRAINTS: the host bootstrap only, master control = the operator chat
+          (the proposal must not self-activate), the socket in the orchestrator tier ONLY,
+          the mount contract (nothing beyond the four mounts — check the compose layout's
+          completeness against the contract).
+          (4) THE NEO4J BRIDGE: the kb-neo4j-v1 consumer's specification is buildable from
+          the proposal alone (the tier, the access, the guards) — the resurrected leg
+          actually closes.
+          (5) THE MIGRATION FEASIBILITY: each slice's scope is bounded (the flash-sized
+          step rule), the running campaigns + the data chain are not interrupted, the
+          rollback exists.
+          Deliver TWO outputs:
+          docs/reviews/fleet_ladder_proposal_adversary.md +
+          docs/reviews/fleet_ladder_proposal_known_safe.md (BOTH with status: accepted
+          frontmatter — the DOC_CONTRACT gate enforces it).
+          LOG: finding table + known-safe list; PASS/FAIL; commit.
+factors:
+  - {name: model, levels: [deepseek/deepseek-v4-flash]}
+design: factorial
+rules:
+  - {name: fleet_plan_preregistered, plane: measurement, evidence_class: "[M]", requires: [], produces: [design_pinned]}
+  - {name: fleet_research_done, plane: measurement, evidence_class: "[M]", requires: [design_pinned], produces: [infra_inventoried, kb_access_mapped]}
+  - {name: fleet_review_done, plane: measurement, evidence_class: "[C]", requires: [infra_inventoried, kb_access_mapped], produces: [matrix_validated, risks_listed]}
+  - {name: fleet_proposal_done, plane: measurement, evidence_class: "[C]", requires: [matrix_validated, risks_listed], produces: [access_matrix, compose_layout, migration_slices]}
+  - {name: fleet_proposal_verified, plane: measurement, evidence_class: "[C]", requires: [access_matrix, compose_layout, migration_slices], produces: [proposal_known_safe]}
+metrics:
+  - {name: access_matrix_completeness, agg: mean, over: cell}
+  - {name: guard_preservation, agg: mean, over: cell}
+comparison: {kind: effect_size, arm_factor: model, loss: {cost: 1.0, quality: 0.0, value: 0.0}}
+writeup:
+  format: lab_book
+  sections: [question, p0_pin_spec, p1_research_infra, p2_research_kb_access, p3_review, p4_proposal, p5_adversarial]
+stop: {budget_usd: 30.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}
