@@ -1,6 +1,6 @@
 {
   "schema_version": "spec-status/v2",
-  "generated_at": "2026-08-29T00:59:31.900974+00:00",
+  "generated_at": "2026-08-29T14:37:03.534144+00:00",
   "n_specs": 148,
   "specs": [
     {
@@ -975,13 +975,13 @@
       "supersedes": [],
       "superseded_by": null,
       "completed_at": null,
-      "last_run_at": "2026-08-28T21:08:38.536726+00:00",
+      "last_run_at": "2026-08-29T14:37:03.275637+00:00",
       "latest_ok": true,
       "latest_model": "deepseek/deepseek-v4-flash",
-      "latest_cost_usd": 0.23238,
+      "latest_cost_usd": 0.07743,
       "latest_git_sha": "c3946886b",
-      "results_pointer": "experiments/results/workflows/cap_adaptive_2f/20260828T210838Z.json",
-      "n_runs": 1
+      "results_pointer": "experiments/results/workflows/cap_adaptive_2f/20260829T143703Z.json",
+      "n_runs": 2
     },
     {
       "name": "cap_addendum_design",

@@ -142,6 +142,25 @@ def main() -> int:
         n = sum(1 for p in workers.splitlines() if p and proc in p)
         if n:
             add(f"- {proc}: {n} running")
+    # Chroma (the KB's dense store — a Docker container publishing 8000; the Control
+    # Room's DEFAULT port collides with it, which is why the portal lives on 8001 —
+    # the run script's FINOPS_PORT=8001). Best-effort: the container + collection counts.
+    chroma_rows = _sh(["docker", "ps", "--filter", "name=chromadb", "--format", "{{.Names}} up {{.Status}}"])
+    if chroma_rows:
+        add(f"- chromadb (docker): {chroma_rows}")
+        try:
+            import chromadb  # noqa: PLC0415 — optional; a missing client degrades the row
+
+            cc = chromadb.HttpClient(host="127.0.0.1", port=8000)
+            counts = [
+                f"{getattr(x, 'name', '?')}={x.count()}"
+                for x in cc.list_collections()
+                if getattr(x, "name", "") in ("session_embeddings", "knowledge_chunks_v1")
+            ]
+            if counts:
+                add(f"- chroma collections: {', '.join(counts)}")
+        except Exception:  # noqa: BLE001 — a down store degrades gracefully
+            add("- chroma collections: unavailable")
     add("")
 
     # ── campaigns in flight (worktrees with live sessions) ───────────────────
