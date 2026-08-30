@@ -1,0 +1,284 @@
+{
+  "schema": "retry_lookup/v1",
+  "phase": "p2_compute_lookup",
+  "rescue_rate_by_signal": {
+    "overall": {
+      "retried": 1,
+      "rescued": 1,
+      "rescue_rate": 1.0,
+      "wilson_95_lo": 0.2065,
+      "wilson_95_hi": 1.0
+    },
+    "by_confidence_decile": [
+      {
+        "bin": "[0.8, 0.9)",
+        "retried": 1,
+        "rescued": 1,
+        "rescue_rate": 1.0,
+        "wilson_95_lo": 0.2065,
+        "wilson_95_hi": 1.0
+      }
+    ],
+    "by_strength": [
+      {
+        "bin": "0.8",
+        "retried": 1,
+        "rescued": 1,
+        "rescue_rate": 1.0,
+        "wilson_95_lo": 0.2065,
+        "wilson_95_hi": 1.0
+      }
+    ],
+    "by_cost_so_far": [
+      {
+        "bin": "[$3.6]",
+        "retried": 1,
+        "rescued": 1,
+        "rescue_rate": 1.0,
+        "wilson_95_lo": 0.2065,
+        "wilson_95_hi": 1.0
+      }
+    ]
+  },
+  "measured_r_and_woc": {
+    "framework_r_scenario": 0.115,
+    "framework_woc_scenario": 0.8969,
+    "measured_r_e4_grid_cells": 0.125,
+    "measured_woc_e4_grid": 0.8889,
+    "measured_r_attempt_plane": 0.0909,
+    "measured_woc_attempt_plane": 0.9167,
+    "measured_r_story_corpus": 0.0,
+    "measured_woc_story_corpus": 1.0,
+    "real_retry_events": 1,
+    "e4_retries": 1,
+    "e4_total_attempts": 9
+  },
+  "retry_economics": {
+    "p_rescue_observed": 1.0,
+    "p_rescue_wilson_95": [
+      0.2065,
+      1.0
+    ],
+    "retry_cost_usd_measured": 3.186571,
+    "retry_source": "cap_grit_strength_grid_condition_strength_bad_seed_high_policy_arm_grit_retry_model_anthropic_claude_sonnet_5",
+    "base_defect_cost_usd": 0.004021,
+    "per_anchor": [
+      {
+        "E_x": 11.4671,
+        "label": "measured sol (cap_escalation_measurement)",
+        "rescue_value_usd": 0.046109,
+        "retry_cost_usd": 3.186571,
+        "net_ev_usd_at_p_rescue_1": -3.140462,
+        "retry_cost_over_rescue_value": 69.11
+      },
+      {
+        "E_x": 12.5134,
+        "label": "measured sonnet (cap_escalation_measurement)",
+        "rescue_value_usd": 0.050316,
+        "retry_cost_usd": 3.186571,
+        "net_ev_usd_at_p_rescue_1": -3.136254,
+        "retry_cost_over_rescue_value": 63.33
+      },
+      {
+        "E_x": 28.0,
+        "label": "sourced pricing ratio (site economics)",
+        "rescue_value_usd": 0.112588,
+        "retry_cost_usd": 3.186571,
+        "net_ev_usd_at_p_rescue_1": -3.073983,
+        "retry_cost_over_rescue_value": 28.3
+      }
+    ],
+    "break_even_E_x_at_p_rescue_1": 792.48
+  },
+  "no_retry_was_worse": {
+    "failed_without_retry_attempt_ledger": 1,
+    "failed_without_retry_story_corpus": 24,
+    "retried_and_rescued": 1,
+    "escaped_harm_per_defect_usd": {
+      "11.4671": 0.046109,
+      "12.5134": 0.050316,
+      "28.0": 0.112588
+    },
+    "no_retry_example_cost_usd": 3.5575,
+    "no_retry_example_cell": "cap_grit_strength_grid_condition_strength_clean_policy_arm_baseline_model_anthropic_claude_sonnet_5",
+    "retried_chain_cost_usd": 6.8195,
+    "verdict": "not-identifiable \u2014 1 retry, counterfactual, confounded by failure mode (genuine vs injected)"
+  },
+  "confidence_at_failure_distribution": {
+    "wired_failed": {
+      "n_total": 24,
+      "n_non_null": 17,
+      "min": 0.0,
+      "max": 0.8696,
+      "mean": 0.6454,
+      "median": 0.7551
+    },
+    "wired_passed": {
+      "n_total": 96,
+      "n_non_null": 96,
+      "min": 0.6515,
+      "max": 1.0,
+      "mean": 0.9094,
+      "median": 1.0
+    },
+    "failed_confidence_series": [
+      {
+        "confidence": 0.6471,
+        "condition": "clean",
+        "strength": 0.0,
+        "model": "anthropic/claude-haiku-4-5"
+      },
+      {
+        "confidence": 0.7222,
+        "condition": "early_degrade",
+        "strength": 0.5,
+        "model": "anthropic/claude-haiku-4-5"
+      },
+      {
+        "confidence": 0.8696,
+        "condition": "early_degrade",
+        "strength": 0.5,
+        "model": "anthropic/claude-haiku-4-5"
+      },
+      {
+        "confidence": 0.84,
+        "condition": "early_degrade",
+        "strength": 0.5,
+        "model": "openai/gpt-5.6-luna"
+      },
+      {
+        "confidence": 0.8478,
+        "condition": "early_degrade",
+        "strength": 0.5,
+        "model": "openai/gpt-5.6-luna"
+      },
+      {
+        "confidence": 0.8611,
+        "condition": "early_degrade",
+        "strength": 0.5,
+        "model": "openai/gpt-5.6-luna"
+      },
+      {
+        "confidence": 0.7308,
+        "condition": "early_degrade",
+        "strength": 0.5,
+        "model": "openai/gpt-5.6-terra"
+      },
+      {
+        "confidence": 0.8,
+        "condition": "early_degrade",
+        "strength": 0.5,
+        "model": "openai/gpt-5.6-terra"
+      },
+      {
+        "confidence": 0.72,
+        "condition": "early_degrade",
+        "strength": 0.5,
+        "model": "openai/gpt-5.6-terra"
+      },
+      {
+        "confidence": 0.8462,
+        "condition": "early_degrade",
+        "strength": 0.5,
+        "model": "openai/gpt-5.6-terra"
+      },
+      {
+        "confidence": 0.68,
+        "condition": "bad_seed",
+        "strength": 0.5,
+        "model": "anthropic/claude-haiku-4-5"
+      },
+      {
+        "confidence": 0.0,
+        "condition": "clean",
+        "strength": 0.0,
+        "model": "anthropic/claude-haiku-4-5"
+      },
+      {
+        "confidence": 0.7551,
+        "condition": "early_degrade",
+        "strength": 0.5,
+        "model": "anthropic/claude-haiku-4-5"
+      },
+      {
+        "confidence": 0.8462,
+        "condition": "bad_seed",
+        "strength": 0.8,
+        "model": "anthropic/claude-sonnet-5"
+      },
+      {
+        "confidence": null,
+        "condition": "bad_seed",
+        "strength": 0.5,
+        "model": "anthropic/claude-sonnet-5"
+      },
+      {
+        "confidence": null,
+        "condition": "clean",
+        "strength": 0.0,
+        "model": "anthropic/claude-sonnet-5"
+      },
+      {
+        "confidence": 0.8049,
+        "condition": "clean",
+        "strength": 0.0,
+        "model": "anthropic/claude-sonnet-5"
+      },
+      {
+        "confidence": null,
+        "condition": "early_degrade",
+        "strength": 0.5,
+        "model": "anthropic/claude-sonnet-5"
+      },
+      {
+        "confidence": null,
+        "condition": "early_degrade",
+        "strength": 0.5,
+        "model": "anthropic/claude-sonnet-5"
+      },
+      {
+        "confidence": null,
+        "condition": "clean",
+        "strength": 0.0,
+        "model": "deepseek/deepseek-v4-pro"
+      },
+      {
+        "confidence": null,
+        "condition": "clean",
+        "strength": 0.0,
+        "model": "deepseek/deepseek-v4-pro"
+      },
+      {
+        "confidence": null,
+        "condition": "clean",
+        "strength": 0.0,
+        "model": "deepseek/deepseek-v4-pro"
+      },
+      {
+        "confidence": 0.0,
+        "condition": "clean",
+        "strength": 0.0,
+        "model": "deepseek/deepseek-v4-pro"
+      },
+      {
+        "confidence": 0.0,
+        "condition": "clean",
+        "strength": 0.0,
+        "model": "deepseek/deepseek-v4-pro"
+      }
+    ]
+  },
+  "coverage": {
+    "attempt_ledger_records": 11,
+    "attempt_ledger_failed_first_attempts": 2,
+    "attempt_ledger_retries": 1,
+    "attempt_ledger_complete_chains": 2,
+    "attempt_ledger_coverage_complete_over_failed": "2/2",
+    "attempt_ledger_coverage_complete_over_total": "2/11",
+    "story_files_total": 255,
+    "story_files_wired": 120,
+    "story_files_wired_failed": 24,
+    "story_files_with_retry_linkage": 0,
+    "real_retry_events": 1
+  }
+}
