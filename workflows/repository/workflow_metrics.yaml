@@ -1,0 +1,210 @@
+name: workflow_metrics
+question: >-
+  The third unblocked thread-1 instrument (the operator-directed measurement surface): the
+  AUTONOMOUS-WORKFLOW METRICS aggregator — consolidate the machine's own ledgers into the
+  framework's Rules 6-10 operating metrics (the website framework.html's autonomous
+  workloads): per campaign / per period — the retry rate r, the first-call-resolution WOC
+  (1/(1+r)), the escalation rate + the measured E_x multiplier, the batch fraction b, the
+  workload volume W + the throughput, the cost-per-accepted, the SLA/limit behavior, and
+  the checkpoint behavior (the I10 typed records: reached_at, decided_at, the approval
+  outcomes — the approval-flow metrics the machine just lived through). The ledgers carry
+  every field; nothing consolidates them. The deliverable: the aggregator instrument
+  (committed, tested), the computed operating-metrics tables over the corpus's workflows,
+  the findings doc (cited, with the methodology + the honest limits — the framework's
+  "workload input until the attempt ledger measures it directly" claims get their measured
+  values), and the adversarial verification. The WFM-planning implications (T_max = Budget /
+  C_job, the batch scheduling, the escalation design) are scoped to the evidence.
+version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: false
+repeatable: false
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: true
+    context:
+      domain_context: >-
+        PROVISIONAL DomainProfile. domain: measurement (the autonomous-workflow operating
+        metrics). canonical_sources:
+        [the ledgers (experiments/results/workflows/*/*.json — the attempts: attempt_count,
+        retry_reason, first_pass, accepted, cost; the checkpoints: the I10 typed records
+        reached_at/decided_at/decision; the phases: the wrapper vs cell costs), the
+        framework's autonomous-workload equations (C_job = C0 x EPM x (1-b x 0.5) x
+        (1+r x E_x), T_max = Budget/C_job, WOC = 1/(1+r)), the measured E_x (the escalation
+        measurement campaign: 28.2x DS->GPT, 68.7x DS->Claude), the 2b-style campaign
+        records, scripts/retro_session_routing.py + the I10 checkpoint capture
+        (workflow_runner.py — the typed checkpoint records)].
+        policies: [measured_not_estimated, cited_not_asserted, coverage_honest,
+        wfm_implications_scoped]
+      challenge_context: >-
+        PROVISIONAL ChallengeProfile. challenge: implement + measure (the aggregator, the
+        corpus computation, the findings, the adversarial). deliberation:
+        [implement, compute, findings, adversarial]. session_policy:
+        {default: fork_per_phase}
+      current_state: >-
+        The ledgers carry the attempt fields (attempt_count, retry_reason, first_pass,
+        accepted, cost), the I10 typed checkpoint records (reached_at, decided_at, the
+        approval decisions — the operator just lived through the approval flow), and the
+        per-phase costs (the wrapper vs the cells). Nothing consolidates them into the
+        framework's Rules 6-10 metrics: r, WOC, the escalation rate + E_x, b, W, the
+        cost-per-accepted, the SLA/limit behavior, the checkpoint latencies. The website
+        still says retry rate is a "workload input until the attempt ledger measures it
+        directly" — it now IS measured; this workflow produces the measured values.
+      hard_rules: >-
+        (1) Every phase commits '[workflow] <phase>' (the worktree hook enforces it);
+        every docs/ file carries status frontmatter (the DOC_CONTRACT gate).
+        (2) MEASURED, NOT ESTIMATED: every metric derives from the ledger fields; an
+        imputed figure is a FAILED finding. The coverage (which workflows have complete
+        ledgers) is recorded exactly.
+        (3) THE METRIC DEFINITIONS PINNED: r = attempts with attempt_count > 1 / total
+        attempts (per campaign); WOC = first_pass / total; escalation rate = the
+        escalations / total; b = batch-mode jobs / total; throughput = cells or phases
+        per hour per campaign; cost-per-accepted = the accepted outcomes' cost; the
+        checkpoint latency = decided_at - reached_at per approval; SLA = the
+        timeouts/deadline breaches / total. A deviating definition is a FAILED finding.
+        (4) THE FRAMEWORK'S CLAIMS ARE CORRECTED OR CONFIRMED: the website's "retry rate
+        is a workload input until the attempt ledger measures it directly" now gets its
+        measured value — the findings state the measured r and whether the framework's
+        11.5% scenario holds.
+        (5) FINDINGS CITED: every finding cites its ledger rows; an uncited claim is a
+        FAILED finding.
+        (6) THE WFM IMPLICATIONS ARE SCOPED: T_max / the batch scheduling / the escalation
+        design recommendations derive from the measured metrics, and the status quo is
+        the baseline.
+        (7) BOUNDED PHASES: p1 implements the aggregator + the unit tests; p2 computes
+        over the corpus; p3 writes the findings; p4 adversarial-verifies.
+        (8) The instrument is a committed script (scripts/aggregate_workflow_metrics.py)
+        with the outputs under experiments/results/workflow_metrics/ — reproducible.
+        (9) Every number cites its source. (10) No infra changes, no campaign runs — the
+        instrument measures what exists. (11) p4 adversarial mandatory. (12) Resumable
+        only when spec version, goal hash, source revision, and candidate-manifest hash
+        match.
+      read_first: >-
+        the ledgers (experiments/results/workflows/cap_adaptive_2b/*.json — the 2b
+        campaign), src/agentic_dynamics/runtime/workflow_runner.py (the I10 checkpoint
+        records), the framework's autonomous-workload equations, the escalation-measurement
+        score (the E_x values)
+      run_shape: >-
+        SINGLE wrapper: deepseek/deepseek-v4-pro. One branch
+        (feature/workflow-metrics); each phase commits [workflow] <phase>; the aggregator +
+        outputs land under scripts/ + experiments/results/workflow_metrics/. No cells, no
+        grid. The data chain stays single-writer.
+    phases:
+      - name: p0_pin_mandate
+        kind: agent
+        timeout: 3600
+        prompt: |
+          GOAL: {goal}
+          ROLE: verification — the framework's autonomous-workload rules (Rules 6-10) +
+          the ledger's fields are the mandate. Append this spec's SHA256 to the
+          workflow_metrics design... (the spec's own header in the spec index). Verify the
+          metric definitions (the hard rules' §3) are complete. A deviation is a FAILED
+          finding.
+          DELIVER: the pinned header + verification; committed.
+          LOG: PASS/FAIL; commit.
+      - name: p1_implement
+        kind: agent
+        timeout: 28800
+        prompt: |
+          GOAL: {goal}
+          ROLE: implement the aggregator — scripts/aggregate_workflow_metrics.py. The
+          metric definitions are pinned (the hard rules §3); no deviation. The instrument:
+          (1) reads every ledger (experiments/results/workflows/*/*.json), extracting the
+          attempt fields (attempt_count, retry_reason, first_pass, accepted, cost), the
+          I10 checkpoint records (reached_at, decided_at, the decision, the approval
+          evidence), the phase costs (the wrapper vs the cells), the timeouts/SLA fields;
+          (2) computes the per-campaign and the aggregate metrics: r, WOC, the escalation
+          rate, b, W + the throughput, the cost-per-accepted, the checkpoint counts + the
+          approval latencies + the decisions' distribution, the SLA/limit behavior;
+          (3) emits the rows + the aggregate tables under experiments/results/
+          workflow_metrics/ (JSON + CSV).
+          TEST: the unit tests — the metric arithmetic on a synthetic ledger (known r/WOC/
+          escalation/throughput/checkpoint-latency), the missing-field handling (a ledger
+          without the I10 records is covered, not imputed). A test failure is a FAILED
+          finding.
+          DELIVER: the aggregator + the tests; committed.
+          LOG: the test results; PASS/FAIL; commit.
+      - name: p2_compute
+        kind: agent
+        timeout: 28800
+        prompt: |
+          GOAL: {goal}
+          ROLE: run the aggregator over the corpus — BOUNDED to the computation. Do:
+          (1) The per-campaign metrics for every workflow with a complete ledger (the
+          coverage table: campaigns with ledgers / total — exactly, never imputed).
+          (2) The aggregate metrics over the corpus (the pooled r, WOC, escalation rate,
+          cost-per-accepted, the checkpoint behavior).
+          (3) The framework comparison: the measured r vs the 11.5% scenario; the
+          measured escalation behavior vs the <1%-to-human design; the measured E_x values
+          (28.2x / 68.7x) cited alongside.
+          Commit the outputs.
+          LOG: the per-campaign table + the aggregates + the framework comparison;
+          PASS/FAIL; commit.
+      - name: p3_findings
+        kind: agent
+        timeout: 21600
+        prompt: |
+          GOAL: {goal}
+          ROLE: the findings — write docs/reviews/workflow_metrics_findings.md (status:
+          accepted frontmatter) from p2's computed outputs. Do NOT re-compute; cite p2's
+          numbers. The doc contains:
+          (1) THE METHODOLOGY: the metric definitions (the pinned §3), the coverage (the
+          complete-ledger campaigns — exactly), the limits.
+          (2) THE MEASURED OPERATING METRICS: the pooled r, WOC, the escalation rate, the
+          batch fraction, the throughput, the cost-per-accepted, the checkpoint behavior
+          (the counts, the approval latencies, the decisions' distribution — including
+          the awaited-approval runs).
+          (3) THE FRAMEWORK CORRECTION/CONFIRMATION: the measured r vs the 11.5% scenario,
+          the escalation vs the <1% design, the E_x values — the website's "workload input
+          until the attempt ledger measures it" claims now have their measured values.
+          (4) THE WFM IMPLICATIONS (scoped): T_max = Budget / C_job from the measured
+          cost-per-accepted, the batch scheduling from the measured b + the peak/off-peak
+          windows, the escalation design from the measured escalation rate — the status
+          quo as the baseline.
+          (5) THE HONEST LIMITS: the coverage gaps, the small-n caveats, the fields
+          missing from the older ledgers.
+          DELIVER: the findings doc; commit it.
+          LOG: the findings list; PASS/FAIL; commit.
+      - name: p4_adversarial
+        kind: agent
+        timeout: 21600
+        prompt: |
+          GOAL: {goal}
+          ROLE: adversarial verifier — falsify the findings. Attack in order:
+          (1) THE METRIC DEFINITIONS: the pinned §3 definitions applied exactly — a
+          deviating computation is a FAILED finding.
+          (2) THE ARITHMETIC: re-derive r, WOC, the escalation rate, and the checkpoint
+          latency for at least one campaign from the ledger's raw fields; a mismatch is a
+          FAILED finding.
+          (3) THE MEASURED-NOT-ESTIMATED RULE: every figure traces to a ledger field; an
+          imputed value is a FAILED finding.
+          (4) THE COVERAGE: the complete-ledger table is exact.
+          (5) THE CITATIONS: every finding resolves to its rows.
+          (6) THE WFM SCOPING: the implications derive from the measured metrics, the
+          status quo is the baseline.
+          Deliver TWO outputs:
+          docs/reviews/workflow_metrics_findings_adversary.md +
+          docs/reviews/workflow_metrics_findings_known_safe.md (BOTH with status:
+          accepted frontmatter).
+          LOG: finding table + known-safe list; PASS/FAIL; commit.
+factors:
+  - {name: model, levels: [deepseek/deepseek-v4-pro]}
+design: factorial
+rules:
+  - {name: aggregator_implemented, plane: measurement, evidence_class: "[C]", requires: [], produces: [workflow_metrics_aggregator]}
+  - {name: corpus_computed, plane: measurement, evidence_class: "[C]", requires: [workflow_metrics_aggregator], produces: [operating_metrics, framework_comparison]}
+  - {name: findings_written, plane: measurement, evidence_class: "[C]", requires: [operating_metrics, framework_comparison], produces: [workflow_metrics_findings]}
+  - {name: findings_verified, plane: measurement, evidence_class: "[C]", requires: [workflow_metrics_findings], produces: [findings_known_safe]}
+metrics:
+  - {name: metric_definition_fidelity, agg: mean, over: cell}
+  - {name: measured_not_estimated, agg: mean, over: cell}
+comparison: {kind: effect_size, arm_factor: model, loss: {cost: 1.0, quality: 0.0, value: 0.0}}
+writeup:
+  format: lab_book
+  sections: [question, p0_pin_mandate, p1_implement, p2_compute, p3_findings, p4_adversarial]
+stop: {budget_usd: 30.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}
