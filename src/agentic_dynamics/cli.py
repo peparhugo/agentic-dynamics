@@ -31,6 +31,8 @@ _COMMANDS: dict[tuple[str, ...], str] = {
     ("experiment", "cap-2e-score"): "score_cap_2e.py",
     ("experiment", "cap-2f-grid"): "run_cap_2f_grid.py",
     ("experiment", "cap-2f-score"): "score_cap_2f.py",
+    ("experiment", "delta-entropy"): "measure_delta_entropy.py",
+    ("experiment", "coordination-overhead"): "compute_coordination_overhead.py",
     ("experiment", "sweep-parallel"): "sweep_parallel.py",
     ("experiment", "sweep-silent"): "sweep_silent_mode.py",
     ("experiment", "batch"): "batch_run.py",
@@ -114,7 +116,7 @@ agentic-dynamics — one entry point over the maintained scripts/ surface.
 
 Subcommands (each forwards to its backing script):
 
-  experiment run|sweep-parallel|sweep-silent|batch|remaining|multi-phase|cap-grit-grid|cap-grit-measure|cap-2c-grid|cap-2c-score|cap-2d-grid|cap-2d-score|cap-2e-grid|cap-2e-score|cap-2f-grid|cap-2f-score
+  experiment run|sweep-parallel|sweep-silent|batch|remaining|multi-phase|cap-grit-grid|cap-grit-measure|cap-2c-grid|cap-2c-score|cap-2d-grid|cap-2d-score|cap-2e-grid|cap-2e-score|cap-2f-grid|cap-2f-score|delta-entropy|coordination-overhead
   story       run|batch
   workflow    run|discard-tree
   queue       enqueue|worker|monitor|reinterleave|analysis-enqueue|analysis-worker
