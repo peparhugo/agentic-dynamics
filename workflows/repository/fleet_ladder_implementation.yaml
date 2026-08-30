@@ -6,7 +6,8 @@ question: >-
   closes its slice; the guards (G1-G6) are never weakened; the four constraints hold (host
   bootstrap only, master control = the operator chat, the socket as the ONE escalation in
   the orchestrator tier, the mount contract as the isolation constant). The runtime pieces
-  (the image builds, the compose, the probes) are TESTED on the host's docker daemon by the
+  (the image builds, the compose, the probes) are TESTED on the host's container runtime — PODMAN (rootless, daemonless, docker-compatible, the
+  operator's runtime choice) — by the
   phases themselves — a phase that writes a Dockerfile builds it; a phase that writes
   compose brings it up; the binary-resolution + network-policy probes run for real. The
   operator's gate: after the phases, the operator runs the end-of-implementation smoke test
@@ -33,7 +34,8 @@ workflow:
         docs/fleet/01_infra_inventory.md + 02_kb_access_map.md + 03_review.md (the
         research the proposal assembles), docs/reviews/fleet_ladder_proposal_reverify.md
         + fleet_ladder_proposal_known_safe.md (the verified state), the current
-        infrastructure (docker ps: redis 6380 / chroma 8000 / sonar 9000-9003 / neo4j),
+        infrastructure (podman ps + docker ps: redis 6380 / chroma 8000 / sonar 9000-9003 / neo4j — the
+        data plane stays docker side-by-side until a later migration slice),
         src/agentic_dynamics/* (the code being containerized), scripts/{worker,
         analysis_worker, trigger_reviews, review_all, kb_worker, run_workflow}.py].
         policies: [proposal_is_the_mandate, runtime_tested_not_assumed,
@@ -57,8 +59,8 @@ workflow:
         deviation from the mapping (a mount, a guard, a scope, a network) is a FAILED
         finding. The proposal's decisions (D-1..D-18) are implemented as written.
         (3) RUNTIME TESTED, NOT ASSUMED: a phase that writes a Dockerfile builds it
-        (docker build — the host daemon); a phase that writes compose brings it up
-        (docker compose up + the service health); the binary-resolution probe and the
+        (podman build — the host runtime); a phase that writes compose brings it up
+        (podman-compose up + the service health); the binary-resolution probe and the
         network-policy probe RUN (a broken symlink chain or an unexpected network
         attachment is a FAILED finding). The runtime tests are committed with the code.
         (4) THE GUARDS ARE NEVER WEAKENED: G1-G6 as placed (§8 of the proposal) — a
@@ -92,8 +94,9 @@ workflow:
       run_shape: >-
         SINGLE wrapper: deepseek/deepseek-v4-pro. One branch
         (feature/fleet-ladder-implementation); each phase commits [workflow] <phase>;
-        the infrastructure lands under infrastructure/ + Dockerfile.fleet + the fleet
-        manager app under scripts/fleet/. The phases test on the host docker daemon. The
+        the infrastructure lands under infrastructure/ + Containerfile.fleet (podman-native) + the fleet
+        manager app under scripts/fleet/. The phases test on the host podman runtime (rootless,
+        keep-id for the D-2 auth mounts; the data plane stays docker side-by-side). The
         operator's smoke test at the end. The data chain stays single-writer.
     phases:
       - name: p0_pin_mandate
@@ -110,17 +113,27 @@ workflow:
           LOG: PASS/FAIL; commit.
       - name: p1_slice1_base_supervisor
         kind: agent
+        checkpoint: true
         timeout: 28800
         prompt: |
           GOAL: {goal}
           ROLE: slice 1 — the base image + the supervisor + the worker pools
-          (proposal §7 slice 1, §2, §4). Build:
-          (1) Dockerfile.fleet — `fleet/base`: python deps (pyproject + the [neo4j]
+          (proposal §7 slice 1, §2, §4), PODMAN-NATIVE (the operator's runtime choice —
+          rootless, daemonless, docker-compatible; the data plane stays docker side-by-side).
+          FIRST STEP — THE RUNTIME: check `podman --version`. If absent, install it
+          (`sudo apt-get install -y podman podman-compose`). If sudo needs a password or
+          the install fails, STOP and hand off the exact install command to the operator
+          (the phase waits at this gate — the runtime must exist before any build). After
+          the install, verify rootless operation (`podman info` shows the rootless storage)
+          and the keep-id user mapping (`podman run --userns=keep-id` resolves the host
+          uid). Build:
+          (1) Containerfile.fleet (podman-native) — `fleet/base` (rootless; the D-2 auth mounts use
+          --userns=keep-id so the host UID matches the container user — the binary attach works): python deps (pyproject + the [neo4j]
           extra), node, git, the sonar client baked (from /tmp/sonar-scanner-6.2.1.4610);
           the CLIs NOT baked (the binary attach — the D-2 auth mounts carry them, D-18);
           the binary-resolution probe script (resolves opencode + claude at start, fails
           loudly on a broken chain).
-          (2) infrastructure/docker-compose.ladder.yml — the fleet-net bridge attached
+          (2) infrastructure/compose.ladder.yml (podman-compose) — the fleet-net bridge attached
           to ONLY the queue redis (6380), chroma (8000), neo4j (7687), sonar
           (9000-9003), + the egress proxy; the cell service group (story-worker x4,
           analysis-worker x4, review-unit x2, kb-* consumers x4, the batch producers
@@ -137,9 +150,10 @@ workflow:
           NO socket).
           (4) The review cut-over (D-10): the sequencing script (stop the host
           trigger_reviews + drain review_all, then start the containerized path).
-          (5) The systemd bootstrap unit (~3 lines: docker compose up -d fleet-manager,
-          Restart=always).
-          TEST: docker build fleet/base succeeds; docker compose config validates; the
+          (5) The systemd bootstrap unit — PODMAN-GENERATED (podman generate systemd --new for the
+          fleet-manager unit, Restart=always) — the daemonless host footprint.
+          TEST: podman build fleet/base succeeds (rootless, the keep-id user mapping);
+          podman-compose config validates; the
           binary-resolution probe runs (resolves the host's CLIs); the egress proxy
           starts. A failed build/probe is a FAILED finding — fix and re-run within the
           phase.
@@ -153,7 +167,7 @@ workflow:
           GOAL: {goal}
           ROLE: slice 1 live — the worker pools + the portal/daemons as supervisor-tier
           containers, the ADDITIVE cut-over (proposal §7 slice 1, D-10). Do:
-          (1) docker compose up the cell + supervisor groups; verify the services start
+          (1) podman-compose up the cell + supervisor groups; verify the services start
           (the story/analysis workers pop the queues — the ADDITIVE discipline: the old
           host workers still run, BRPOP is atomic — verify no double-processing by
           watching the queue counters).
@@ -164,7 +178,7 @@ workflow:
           board surfaces them.
           (4) The portal + daemons as supervisor-tier containers (the SPOF fix) — the
           host's ad-hoc portal process is stopped after its container starts.
-          TEST: the services' health (docker compose ps), the queue counters move
+          TEST: the services' health (podman-compose ps), the queue counters move
           without double-processing, the heartbeats appear. A sequencing violation or a
           double-process is a FAILED finding.
           DELIVER: the live compose state + the test evidence; committed.
@@ -176,7 +190,7 @@ workflow:
           GOAL: {goal}
           ROLE: slice 2 — the orchestrator tier + the per-step scope model
           (proposal §7 slice 2, §2 D-14, §4, §5 D-16). Build:
-          (1) Dockerfile.fleet orchestrator stage: fleet/base + the docker CLI + the
+          (1) Containerfile.fleet orchestrator stage: fleet/base + the podman CLI (docker-compat) + the
           sibling-spawn wrapper.
           (2) The spawn-wrapper (scripts/fleet/spawn_wrapper.py): validates every spawn
           request — scope ∈ the closed five-scope vocabulary, the phase authorized for
@@ -284,7 +298,7 @@ workflow:
           ROLE: the operator's gate — the smoke-test HANDOFF. Do NOT run the production
           smoke test yourself; prepare it:
           (1) The run instructions: how the operator runs a REAL cell through the
-          container path (the exact commands: docker compose run the cell service with a
+          container path (the exact commands: podman-compose run the cell service with a
           test cell id, the expected result path, the expected heartbeats), the binary
           probe's expected output, the review cut-over's re-run instructions.
           (2) The verification checklist for the operator: the container cell's result

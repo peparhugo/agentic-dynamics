@@ -173,6 +173,15 @@ simply never attached to the ladder's `fleet-net` — the two-channel rule (KB d
 
 ## 4. The image hierarchy
 
+**RUNTIME DECISION (operator, 2026-08-29): PODMAN** — rootless, daemonless,
+docker-compatible. The ladder builds podman-native: `Containerfile.fleet` (the keep-id user
+mapping for the D-2 auth mounts), `podman-compose`, the `podman.socket` as the orchestrator's
+socket mount, and a **podman-generated systemd unit** as the bootstrap. The data plane
+(redis/chroma/sonar/neo4j) stays docker side-by-side until a later migration slice. The
+design is runtime-agnostic; this section records the chosen runtime.
+
+
+
 Built from the repo (a versioned `Dockerfile.fleet` — the image is a controlled experiment
 variable, rebuildable at any commit, per the design §6):
 
