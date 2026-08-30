@@ -12,6 +12,8 @@ from __future__ import annotations
 
 import json
 import os
+import socket
+import sys
 import time
 from datetime import datetime
 from pathlib import Path
@@ -25,6 +27,13 @@ except ImportError:  # imported as scripts.<name> — repo root is on sys.path
 
 
 import contextlib
+
+# The fleet heartbeat + dead-letter helpers (redis-only) live in scripts/fleet/ (a dir, not a
+# package) — add it to sys.path so they import beside the other scripts (fleet_manager.py's
+# convention).
+sys.path.insert(0, str(Path(__file__).resolve().parent / "fleet"))
+import heartbeat  # noqa: E402  (worker:<type>:<id> liveness -> fleet:board, slice 1)
+import dlq  # noqa: E402       (job dead-letter surface, R4)
 
 from agentic_dynamics.measurement.commit_analysis import (
     agentic_token_dicts,
@@ -100,6 +109,15 @@ def main() -> None:
     completed = 0
     failed = 0
 
+    # Worker liveness (slice 1): a daemon heartbeat thread beats every 10s so the fleet
+    # manager's read-only watcher can surface this worker on the board. The thread owns its
+    # own Redis connection (the main loop reconnects after long SonarQube runs).
+    worker_id = f"{socket.gethostname()}:{os.getpid()}"
+    heartbeat.HeartbeatThread(
+        "analysis", worker_id, jobs_counter=lambda: completed + failed,
+    ).start()
+    log(f"heartbeat: worker:analysis:{worker_id}")
+
     while True:
         try:
             result = r.brpop(QUEUE_KEY, timeout=BLOCK_TIMEOUT)
@@ -161,6 +179,11 @@ def main() -> None:
             _safe_hset(r, STATUS_KEY, story_id, "failed")
             failed += 1
             log(f"[{story_id}] FAILED ({time.monotonic() - t0:.0f}s): {e}")
+            # R4 — a terminal failure (notably the "worktree missing" class) is recorded to
+            # the job-queue dead-letter surface so it no longer silently sits in the status
+            # hash as a bare ``failed`` row.
+            with contextlib.suppress(Exception):
+                dlq.record_dead(r, QUEUE_KEY, job, str(e))
             err_log = ANALYSIS_DIR / f"analysis_{story_id}.error.txt"
             with contextlib.suppress(Exception):
                 err_log.write_text(str(e))

@@ -32,8 +32,11 @@ REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 COMPOSE_FILE="$REPO_ROOT/infrastructure/docker-compose.ladder.yml"
 COMPOSE="${DOCKER_COMPOSE:-docker-compose}"
 
-TRIGGER_PATTERN="scripts/trigger_reviews.py"
-REVIEW_PATTERN="scripts/review_all.py"
+# Match the actual host worker PROCESSES (launched as `python3 scripts/<name>.py`), not any
+# wrapper whose command line merely *contains* the path — `pgrep -f` self-matches a `bash -c`
+# shell that carries the pattern in its own argv, which would make `stop` kill the caller.
+TRIGGER_PATTERN="python3 .*trigger_reviews\.py"
+REVIEW_PATTERN="python3 .*review_all\.py"
 
 log() { echo "[review-cutover] $*"; }
 

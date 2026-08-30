@@ -23,11 +23,18 @@ x-ladder-env: &ladder-env
   # By-name reachability (D-17/R-11): the data-plane services resolve by container name on
   # fleet-net. 127.0.0.1 inside a container is the container itself, never the host.
   FINOPS_REDIS_HOST: finops-queue
-  FINOPS_REDIS_PORT: "6380"
+  # finops-queue publishes 127.0.0.1:6380 -> container 6379 on the HOST; on fleet-net the
+  # ladder reaches it on its INTERNAL port 6379 (finops-redis on host 6379 is never attached
+  # to fleet-net, so the in-network 6379 has no sandbox counterpart — the two-channel rule
+  # holds topologically).
+  FINOPS_REDIS_PORT: "6379"
   FINOPS_REDIS_DB: "1"
   FINOPS_KB_DB: "2"
-  # The worktree root mount (host /tmp -> /wt) is where story/workflow worktrees land.
-  FINOPS_WORKTREE_ROOT: /wt
+  # The worktree root mount (host /tmp -> /tmp) is where story/workflow worktrees land. It is
+  # mapped to the SAME absolute path as the host so existing story results (whose ``worktree``
+  # field is a host /tmp/... path) resolve unchanged inside the container — the additive
+  # cut-over (old host workers + new container workers) shares the same path namespace.
+  FINOPS_WORKTREE_ROOT: /tmp
   # The container auth home == the host user's home, so the claude symlink chain
   # (~/.local/bin/claude -> ~/.local/share/claude/versions/<v>) resolves unchanged (D-18).
   HOME: /home/drseuss
@@ -37,7 +44,7 @@ x-ladder-env: &ladder-env
 # The four-mount contract (the isolation constant, §3) + the D-2 auth set (D-18). Every
 # scope (§5) is a subset of these — nothing outside them is ever mounted.
 x-ladder-mounts: &ladder-mounts
-  - ${FINOPS_WORKTREE_ROOT:-/tmp}:/wt:rw
+  - ${FINOPS_WORKTREE_ROOT:-/tmp}:/tmp:rw
   - ${FINOPS_RESULTS_DIR:-../experiments/results}:/app/experiments/results:rw
   - ${FINOPS_REPO_DIR:-..}:/repo:ro
   - ${AUTH_HOME:-/home/drseuss}/.claude:/home/drseuss/.claude:ro
@@ -94,7 +101,7 @@ services:
 
   review-unit:
     <<: *cell-base
-    command: ["python3", "scripts/review_all.py"]
+    command: ["python3", "scripts/fleet/review_unit.py"]
     restart: "no"                 # run-to-completion; triggered by the supervisor's trigger-reviews
     environment:
       <<: *ladder-env
@@ -225,12 +232,17 @@ services:
 
   game-board:
     <<: *supervisor-base
-    command: ["python3", "scripts/system_snapshot.py"]
+    # The snapshot writes to the writable results mount (the repo + /app are read-only under
+    # the non-root user; the canonical L0 agent_config/system_snapshot.md remains host-generated
+    # by `agentic-dynamics surfaces snapshot`).
+    command: ["python3", "scripts/system_snapshot.py", "--out", "/app/experiments/results/system_snapshot.md"]
     restart: on-failure
 
   trigger-reviews:
     <<: *supervisor-base
-    command: ["python3", "scripts/trigger_reviews.py"]
+    # D-10: the supervisor never runs review_all itself — --trigger-only enqueues reviews and
+    # signals the cell-tier review-unit over fleet:review_trigger (exactly one review runner).
+    command: ["python3", "scripts/trigger_reviews.py", "--trigger-only"]
     restart: on-failure
 
   # Read-only supervisor tools (run-to-completion; the read tools, §1a/§1b).

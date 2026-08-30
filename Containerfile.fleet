@@ -55,11 +55,11 @@ WORKDIR /app
 COPY .build/sonar-scanner/ /opt/sonar-scanner/
 
 # Python deps — the repo's base dependencies + the [neo4j] extra (the resurrected consumer's
-# driver). Editable install so the baked /app/src stays the import source (matches the
-# reproduction Dockerfile).
+# driver) + the [admin] extra (flask — the supervisor-tier Control Room portal). Editable
+# install so the baked /app/src stays the import source (matches the reproduction Dockerfile).
 COPY pyproject.toml ./
 COPY src/ ./src/
-RUN pip install --no-cache-dir -e ".[neo4j]"
+RUN pip install --no-cache-dir -e ".[neo4j,admin]"
 
 # The runtime code surface (the mount contract declares the WRITABLE paths — worktree,
 # results — in the compose, NOT the image; design §6). `experiments/results` is created empty
