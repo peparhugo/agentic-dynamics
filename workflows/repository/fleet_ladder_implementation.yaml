@@ -127,8 +127,10 @@ workflow:
           the install, verify rootless operation (`podman info` shows the rootless storage)
           and the keep-id user mapping (`podman run --userns=keep-id` resolves the host
           uid). Build:
-          (1) Containerfile.fleet (podman-native) — `fleet/base` (rootless; the D-2 auth mounts use
-          --userns=keep-id so the host UID matches the container user — the binary attach works): python deps (pyproject + the [neo4j]
+          (1) Containerfile.fleet (podman-native) — `fleet/base` (rootless; the keep-id user mapping (--userns=keep-id) applies to ALL the rw mounts — the
+          worktree + results + the D-2 auth dirs — so the container user IS the host user
+          (uid 1001): the binary attach works AND the rw mounts have the right ownership
+          (the DeepSeek migration review's #2 — the volume-ownership headache, adopted)): python deps (pyproject + the [neo4j]
           extra), node, git, the sonar client baked (from /tmp/sonar-scanner-6.2.1.4610);
           the CLIs NOT baked (the binary attach — the D-2 auth mounts carry them, D-18);
           the binary-resolution probe script (resolves opencode + claude at start, fails
@@ -151,10 +153,13 @@ workflow:
           (4) The review cut-over (D-10): the sequencing script (stop the host
           trigger_reviews + drain review_all, then start the containerized path).
           (5) The systemd bootstrap unit — PODMAN-GENERATED (podman generate systemd --new for the
-          fleet-manager unit, Restart=always) — the daemonless host footprint.
+          fleet-manager unit, Restart=always) — the daemonless host footprint (the DeepSeek
+          review's #5, adopted as written).
           TEST: podman build fleet/base succeeds (rootless, the keep-id user mapping);
           podman-compose config validates; the
-          binary-resolution probe runs (resolves the host's CLIs); the egress proxy
+          binary-resolution probe runs (resolves the host's CLIs); the egress proxy (the pasta
+          networking backend — the model API calls are the cells' dominant outbound, and
+          slirp4netns would slow them — the DeepSeek review's #4, adopted)
           starts. A failed build/probe is a FAILED finding — fix and re-run within the
           phase.
           DELIVER: the image + compose + fleet manager + probes + the test evidence;
