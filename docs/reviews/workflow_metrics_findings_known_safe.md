@@ -61,5 +61,21 @@ and why each did not falsify the findings.
   *correction/confirmation*, not an accusation, and cite the exact lines.
 - **Why safe:** every correction is scoped and line-cited; nothing is asserted beyond the ledger.
 
-**LOG: PASS** — none of the attacks falsified a finding; the known-safe list records six attempted
+### A7. "The SLA reads as a measured '0 breaches' when the breach fields were never written" — not supported
+- **Tried:** treating the SLA/limit behavior as "0 breaches" over the 123 committed phases.
+- **Evidence:** all 123 committed phases predate the runner hardening and carry NONE of the breach
+  keys (`stall_evidence`/`deploy_gate`/`commit_gate`/`relabel_gate`); the instrument keys
+  measurability on `breach_fields_recorded` and reports `not_measurable` when no phase records the
+  fields. Locked by `test_sla_behavior_not_measurable_when_breach_fields_absent`.
+- **Why safe:** "absent key" is not read as "no breach"; a pre-hardening ledger never gets an
+  imputed clean SLA record.
+
+### A8. "The framework comparison conflates the measured E_x with the 28.2×/68.7× price ratios" — not supported
+- **Tried:** reading the `framework_comparison` block for a single fused E_x number.
+- **Evidence:** `measured_ex` (11.4671 / 12.5134, read from the escalation-measurement score file)
+  and `framework_ex_price_ratios` (28.2 / 68.7, `framework.html:748` constants) are separate keys,
+  each with its own source string; the findings reproduce both and label the price ratios `[X]`.
+- **Why safe:** the measured multiplier and the price ratio are never merged into one figure.
+
+**LOG: PASS** — none of the attacks falsified a finding; the known-safe list records eight attempted
 and non-falsifying attacks.

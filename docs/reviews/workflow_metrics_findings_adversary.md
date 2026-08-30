@@ -7,7 +7,9 @@ status: accepted
 **Role:** adversarial verifier (p4). **Source revision:** `workflows/repository/workflow_metrics.yaml`
 SHA256 `2cd4bb1105c915f3b9ae5e4e835c4277eddb6ba6da58ac7b7d8efd31498768d1`. **Findings:**
 `docs/reviews/workflow_metrics_findings.md`. **Aggregator:** `scripts/aggregate_workflow_metrics.py`
-(+ `tests/test_aggregate_workflow_metrics.py`, 18 passing).
+(+ `tests/test_aggregate_workflow_metrics.py`, 24 passing). **Outputs:** `experiments/results/
+workflow_metrics/aggregate.json` (per-campaign, pooled `aggregate`, `framework_comparison`,
+`run_ledger_coverage`).
 
 ## Findings table
 
@@ -55,6 +57,13 @@ Re-derived `r` and cost-per-accepted for `cap_grit_strength_grid` from
   from **all 123 committed phases** (they predate the runner hardening), so a naive "0 breaches"
   would have imputed a clean record onto ledgers that never recorded one. The instrument reports
   `not_measurable` over `breach_fields_recorded` — the "absent key ≠ no breach" distinction. **Correct.**
+- Framework comparison (the new p2 stage): `measured_r=0.125` vs `framework_scenario=0.115` — both
+  match the raw ledger (1/8) and the framework constant. `measured_ex` (11.4671 / 12.5134) is read
+  from `cap_escalation_measurement_score_20260826T125726Z.json` (`per_model[].E_x`), and the
+  28.2 / 68.7 price ratios are hard-coded as `framework.html:748` constants — the two are kept in
+  separate keys (`measured_ex` vs `framework_ex_price_ratios`), never conflated. **Correct.**
+- Workload volume W (= 8 jobs) and the phase-cost structure (pooled agent $0.5047 / test $0.00 /
+  untyped $0.2024) trace to `cells`/`phases[].kind`/`cost_usd` respectively. **Correct.**
 
 ### (3) Measured-not-estimated rule — **PASS**
 
