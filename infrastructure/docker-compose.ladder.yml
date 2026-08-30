@@ -91,6 +91,7 @@ x-cell-base: &cell-base
 x-supervisor-base: &supervisor-base
   image: fleet/base
   networks: [fleet-net]
+  working_dir: /repo          # the mounted repo, not the image's stale /app copy
   environment:
     <<: *ladder-env
     FLEET_SKIP_PROBE: "1"         # the supervisor services invoke no CLI
@@ -295,7 +296,7 @@ services:
     # The snapshot writes to the writable results mount (the repo + /app are read-only under
     # the non-root user; the canonical L0 agent_config/system_snapshot.md remains host-generated
     # by `agentic-dynamics surfaces snapshot`).
-    command: ["python3", "scripts/system_snapshot.py", "--out", "/app/experiments/results/system_snapshot.md"]
+    command: ["python3", "scripts/system_snapshot.py", "--out", "/repo/experiments/results/system_snapshot.md"]
     restart: on-failure
 
   trigger-reviews:
