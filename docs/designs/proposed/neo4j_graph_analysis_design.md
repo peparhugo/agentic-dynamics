@@ -4,6 +4,9 @@ status: proposed
 
 # Neo4j graph analysis — beyond the retrieval bridge (the persistent code graph, the Δ-entropy instrument, the lineage walks)
 
+**Spec:** `entropy_beta_instruments` (`workflows/repository/entropy_beta_instruments.yaml` SHA256
+`eb20ac83051740873efec942f92761470546b811003648c651c23ea37458ace6`; `entropy_beta_instruments@0.1`).
+
 **Status: PROPOSED (2026-08-29, operator-directed).** Slice 3 of the fleet ladder wires neo4j
 for RETRIEVAL (the RRF lexical leg — the Knowledge nodes + the fulltext index + the lineage
 edges). This design is the SECOND phase — what the graph carries beyond retrieval: the

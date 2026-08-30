@@ -43,6 +43,8 @@ DOCUMENTED_RESOLUTIONS: list[tuple[tuple[str, ...], str, tuple[str, ...]]] = [
     (("experiment", "cap-2e-score"), "score_cap_2e.py", ()),
     (("experiment", "cap-2f-grid"), "run_cap_2f_grid.py", ()),
     (("experiment", "cap-2f-score"), "score_cap_2f.py", ()),
+    (("experiment", "delta-entropy"), "measure_delta_entropy.py", ()),
+    (("experiment", "coordination-overhead"), "compute_coordination_overhead.py", ()),
     # story
     (("story", "run"), "run_story.py", ()),
     (("story", "batch"), "batch_stories.py", ()),

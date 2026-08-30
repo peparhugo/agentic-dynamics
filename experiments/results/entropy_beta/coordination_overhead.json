@@ -1,0 +1,149 @@
+{
+  "schema": "coordination_overhead/v1",
+  "generated_at": "2026-08-30T18:52:05Z",
+  "formula": "coordination_overhead = (wrapper + merge + chain + review) / cell",
+  "cell_phase_keys": [
+    "implement",
+    "rework"
+  ],
+  "note": "wrapper/cell are measured USD from phase-ledger total_measured_cost_breakdown; merge/chain/review are event counts (a different unit), reported separately, never blended into the cost ratio (design \u00a76: measured, never blended).",
+  "b2b_prior": {
+    "wrapper_share": 0.63,
+    "wrapper_usd": 0.17,
+    "total_usd": 0.27
+  },
+  "b2b_rederivation": {
+    "campaign": "cap_2b",
+    "wrapper_share_measured": 0.590645,
+    "coordination_overhead_beta": 1.442868,
+    "breakdown": {
+      "implement": 0.003594637,
+      "test": 0.0,
+      "verify": 0.005186592
+    },
+    "verdict": "directionally_confirmed_not_numerically_reproduced"
+  },
+  "campaigns": [
+    {
+      "campaign": "cap_2a_rerun",
+      "cell_cost": 0.00355972,
+      "wrapper_cost": 0.00501877,
+      "merge_events": 3,
+      "chain_events": 1,
+      "review_rounds": 6,
+      "cell_source": "phase-ledger total_measured_cost_breakdown (CELL_PHASE_KEYS = implement + rework)",
+      "wrapper_source": "phase-ledger total_measured_cost_breakdown (non-cell keys)",
+      "merge_source": "git log --merges (subject contains campaign marker)",
+      "chain_source": "git log (data-chain commits naming campaign)",
+      "review_source": "docs/reviews/*cap_2a_rerun*.md",
+      "breakdown": {
+        "implement": 0.003559721,
+        "test": 0.0,
+        "verify": 0.005018769
+      },
+      "coordination_overhead_beta": 1.409878,
+      "wrapper_share": 0.585041
+    },
+    {
+      "campaign": "cap_2a_rerun2",
+      "cell_cost": 0.00631081,
+      "wrapper_cost": 0.00656464,
+      "merge_events": 1,
+      "chain_events": 0,
+      "review_rounds": 2,
+      "cell_source": "phase-ledger total_measured_cost_breakdown (CELL_PHASE_KEYS = implement + rework)",
+      "wrapper_source": "phase-ledger total_measured_cost_breakdown (non-cell keys)",
+      "merge_source": "git log --merges (subject contains campaign marker)",
+      "chain_source": "git log (data-chain commits naming campaign)",
+      "review_source": "docs/reviews/*cap_2a_rerun2*.md",
+      "breakdown": {
+        "implement": 0.0063108059999999995,
+        "test": 0.0,
+        "verify": 0.006564642999999999
+      },
+      "coordination_overhead_beta": 1.040221,
+      "wrapper_share": 0.509857
+    },
+    {
+      "campaign": "cap_2a_rerun3",
+      "cell_cost": 0.00745457,
+      "wrapper_cost": 0.009504,
+      "merge_events": 1,
+      "chain_events": 1,
+      "review_rounds": 2,
+      "cell_source": "phase-ledger total_measured_cost_breakdown (CELL_PHASE_KEYS = implement + rework)",
+      "wrapper_source": "phase-ledger total_measured_cost_breakdown (non-cell keys)",
+      "merge_source": "git log --merges (subject contains campaign marker)",
+      "chain_source": "git log (data-chain commits naming campaign)",
+      "review_source": "docs/reviews/*cap_2a_rerun3*.md",
+      "breakdown": {
+        "implement": 0.007454566,
+        "test": 0.0,
+        "verify": 0.009503996
+      },
+      "coordination_overhead_beta": 1.274923,
+      "wrapper_share": 0.560425
+    },
+    {
+      "campaign": "cap_2a_shadow_calibration",
+      "cell_cost": 0.001164,
+      "wrapper_cost": 0.201238,
+      "merge_events": 1,
+      "chain_events": 0,
+      "review_rounds": 2,
+      "cell_source": "phase-ledger total_measured_cost_breakdown (CELL_PHASE_KEYS = implement + rework)",
+      "wrapper_source": "phase-ledger total_measured_cost_breakdown (non-cell keys)",
+      "merge_source": "git log --merges (subject contains campaign marker)",
+      "chain_source": "git log (data-chain commits naming campaign)",
+      "review_source": "docs/reviews/*cap_2a_shadow_calibration*.md",
+      "breakdown": {
+        "implement": 0.001164,
+        "test": 0.062071,
+        "verify": 0.139167
+      },
+      "coordination_overhead_beta": 172.88488,
+      "wrapper_share": 0.994249
+    },
+    {
+      "campaign": "cap_2b",
+      "cell_cost": 0.00359464,
+      "wrapper_cost": 0.00518659,
+      "merge_events": 1,
+      "chain_events": 1,
+      "review_rounds": 2,
+      "cell_source": "phase-ledger total_measured_cost_breakdown (CELL_PHASE_KEYS = implement + rework)",
+      "wrapper_source": "phase-ledger total_measured_cost_breakdown (non-cell keys)",
+      "merge_source": "git log --merges (subject contains campaign marker)",
+      "chain_source": "git log (data-chain commits naming campaign)",
+      "review_source": "docs/reviews/*cap_2b*.md",
+      "breakdown": {
+        "implement": 0.003594637,
+        "test": 0.0,
+        "verify": 0.005186592
+      },
+      "coordination_overhead_beta": 1.442868,
+      "wrapper_share": 0.590645
+    },
+    {
+      "campaign": "cap_adaptive_2c",
+      "cell_cost": 0.01585328,
+      "wrapper_cost": 0.0,
+      "merge_events": 1,
+      "chain_events": 1,
+      "review_rounds": 2,
+      "cell_source": "phase-ledger total_measured_cost_breakdown (CELL_PHASE_KEYS = implement + rework)",
+      "wrapper_source": "phase-ledger total_measured_cost_breakdown (non-cell keys)",
+      "merge_source": "git log --merges (subject contains campaign marker)",
+      "chain_source": "git log (data-chain commits naming campaign)",
+      "review_source": "docs/reviews/*cap_adaptive_2c*.md",
+      "breakdown": {
+        "implement": 0.0120147,
+        "test": 0.0,
+        "verify": null,
+        "rework": 0.003838585
+      },
+      "coordination_overhead_beta": 0.0,
+      "wrapper_share": 0.0
+    }
+  ]
+}
