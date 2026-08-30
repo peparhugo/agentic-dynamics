@@ -339,3 +339,42 @@ def test_end_to_end_emits_and_aggregates(tmp_path):
 
     # Coverage table is exact and per-campaign.
     assert {r["campaign"] for r in doc["coverage"]} == {"cap_demo", "demo"}
+
+
+# ── Framework comparison (p2) ─────────────────────────────────────────────────
+
+
+def test_measured_ex_values_reads_score_file(tmp_path):
+    """The measured E_x is cited from the escalation-measurement score file, not re-derived."""
+    score_dir = tmp_path / "experiments" / "results" / "cap_escalation_measurement"
+    score_dir.mkdir(parents=True)
+    (score_dir / "cap_escalation_measurement_score.json").write_text(
+        '{"per_model":[{"escalation_model":"openai/gpt-5.6-sol","E_x":11.4671},'
+        '{"escalation_model":"anthropic/claude-sonnet-5","E_x":12.5134}],'
+        '"conclusion":{"measured_ex_range":[11.4671,12.5134]}}'
+    )
+    ex = agg._measured_ex_values(tmp_path)
+    assert ex["values"][0]["E_x"] == pytest.approx(11.4671)
+    assert ex["values"][1]["escalation_model"] == "anthropic/claude-sonnet-5"
+    assert ex["measured_ex_range"] == [11.4671, 12.5134]
+
+
+def test_framework_comparison_places_measured_beside_constants(tmp_path):
+    """The comparison stage places the measured r beside the 11.5% scenario and the E_x values
+    beside the 28.2×/68.7× price ratios — labelled as different quantities."""
+    pooled = {
+        "retry_rate": {"values": [{"value": 0.125}]},
+        "escalation_rate": {"values": []},
+    }
+    comp = agg.framework_comparison(tmp_path, pooled)
+    assert comp["retry_rate"]["measured_r"] == pytest.approx(0.125)
+    assert comp["retry_rate"]["framework_scenario"] == pytest.approx(0.115)
+    assert comp["escalation"]["measured_escalation_rate"] is None  # no escalation marker -> None
+    assert comp["escalation"]["framework_ex_price_ratios"]["deepseek_to_gpt56"] == pytest.approx(
+        28.2
+    )
+    assert comp["escalation"]["framework_ex_price_ratios"]["deepseek_to_claude"] == pytest.approx(
+        68.7
+    )
+    # The E_x values are price ratios [X], not the measured multiplier — the two are kept apart.
+    assert comp["escalation"]["measured_ex"]["values"] == []  # no score file in this tree

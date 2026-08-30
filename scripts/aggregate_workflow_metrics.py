@@ -95,6 +95,16 @@ KIND_OTHER = "other"
 #: them entirely. The sla_behavior metric is only measurable over phases that actually carry them.
 BREACH_FIELDS = ("stall_evidence", "deploy_gate", "commit_gate", "relabel_gate")
 
+#: The framework's own scenario/design constants, cited verbatim from ``apps/website/framework.html``
+#: for the framework-comparison stage. These are the values the website uses for the Rules 6-9
+#: levers; the comparison stage places the *measured* values beside them, never conflating the two.
+FRAMEWORK_RETRY_SCENARIO = 0.115  # "11.5% scenario" — framework.html:747,819 ("r")
+FRAMEWORK_ESCALATION_DESIGN = "design for <1% escalation to human"  # framework.html:748,959
+FRAMEWORK_EX_PRICE_RATIOS = {  # framework.html:748 — PRICE RATIOS [X], not measured E_x
+    "deepseek_to_gpt56": 28.2,
+    "deepseek_to_claude": 68.7,
+}
+
 
 @dataclass
 class Attempt:
@@ -891,6 +901,80 @@ def run_ledger_coverage(root: Path) -> dict[str, Any]:
     return {"referenced": len(referenced), "present": len(present), "absent": len(absent)}
 
 
+def _measured_ex_values(root: Path) -> dict[str, Any]:
+    """Read the measured escalation multiplier (E_x) from the escalation-measurement score file.
+
+    The E_x values are NOT re-derived here — they are the escalation campaign's own measured
+    output (``cap_escalation_measurement_score_*.json``, ``per_model[].E_x``). This instrument
+    cites them with their source path + the per-model values, so the framework comparison below
+    can place the measured multiplier beside the website's price-ratio constants.
+    """
+    score_dir = root / "experiments" / "results" / "cap_escalation_measurement"
+    if not score_dir.is_dir():
+        return {"source": None, "values": [], "note": "no escalation-measurement score present"}
+    candidates = sorted(score_dir.glob("*score*.json"))
+    if not candidates:
+        return {"source": None, "values": [], "note": "no escalation-measurement score present"}
+    path = candidates[-1]  # newest score JSON
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {"source": str(path), "values": [], "note": "unreadable score file"}
+    values = [
+        {"escalation_model": m.get("escalation_model"), "E_x": m.get("E_x")}
+        for m in payload.get("per_model", []) or []
+        if isinstance(m, dict)
+    ]
+    return {
+        "source": _relative_to(path, root),
+        "values": values,
+        "measured_ex_range": payload.get("conclusion", {}).get("measured_ex_range"),
+    }
+
+
+def framework_comparison(root: Path, pooled: dict[str, Any]) -> dict[str, Any]:
+    """The p2 framework comparison: the measured metrics placed beside the framework's constants.
+
+    Three comparisons, each cited to its source:
+    (1) the measured retry rate vs the framework's 11.5% scenario;
+    (2) the measured escalation behavior vs the "<1% escalation to human" design;
+    (3) the measured E_x values (from the escalation-measurement score) beside the website's
+    28.2×/68.7× *price ratios* — the two are different quantities and are labelled as such.
+    """
+    measured_r = (
+        pooled["retry_rate"]["values"][0]["value"] if pooled["retry_rate"]["values"] else None
+    )
+    escalation_values = pooled["escalation_rate"]["values"]
+    ex = _measured_ex_values(root)
+    return {
+        "retry_rate": {
+            "measured_r": measured_r,
+            "measured_r_source": "cap_grit_strength_grid (the only committed attempt ledger, n=8)",
+            "framework_scenario": FRAMEWORK_RETRY_SCENARIO,
+            "framework_scenario_source": "framework.html:747,819 (the 11.5% scenario)",
+            "note": (
+                "the measured r is from the grit STORY grid (Rules 1-5 perturbation corpus), "
+                "not an autonomous-workload ledger; the autonomous attempt ledger is absent "
+                "(see run_ledger_coverage)"
+            ),
+        },
+        "escalation": {
+            "measured_escalation_rate": (
+                escalation_values[0]["value"] if escalation_values else None
+            ),
+            "measured_escalation_rate_source": (
+                "no committed ledger carries an escalation marker "
+                "(escalation_from/escalation_to declared-not-written)"
+            ),
+            "framework_design": FRAMEWORK_ESCALATION_DESIGN,
+            "framework_design_source": "framework.html:748,959 (a policy target, not a measured rate)",
+            "measured_ex": ex,
+            "framework_ex_price_ratios": FRAMEWORK_EX_PRICE_RATIOS,
+            "framework_ex_price_ratios_source": "framework.html:748 (price ratios [X], not measured E_x)",
+        },
+    }
+
+
 def emit(root: Path, dry_run: bool = False) -> dict[str, Any]:
     """Run the full pipeline and write ``experiments/results/workflow_metrics/`` outputs.
 
@@ -911,6 +995,7 @@ def emit(root: Path, dry_run: bool = False) -> dict[str, Any]:
         "run_ledger_coverage": run_ledger_coverage(root),
         "campaigns": campaign_rows,
         "aggregate": aggregate(campaign_rows),
+        "framework_comparison": framework_comparison(root, aggregate(campaign_rows)["pooled"]),
         "coverage": coverage_table(campaign_rows),
     }
 

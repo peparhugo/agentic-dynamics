@@ -1,6 +1,6 @@
 {
   "schema": "workflow_metrics/v1",
-  "generated_at": "2026-08-30T17:58:36.836958+00:00",
+  "generated_at": "2026-08-30T18:02:58.738365+00:00",
   "pinned_definitions": {
     "retry_rate": "r = attempts with attempt_count > 1 / total attempts (per campaign)",
     "first_call_resolution": "WOC = first_pass / total",
@@ -1236,6 +1236,43 @@
         "campaigns_total": 9,
         "values": []
       }
+    }
+  },
+  "framework_comparison": {
+    "retry_rate": {
+      "measured_r": 0.125,
+      "measured_r_source": "cap_grit_strength_grid (the only committed attempt ledger, n=8)",
+      "framework_scenario": 0.115,
+      "framework_scenario_source": "framework.html:747,819 (the 11.5% scenario)",
+      "note": "the measured r is from the grit STORY grid (Rules 1-5 perturbation corpus), not an autonomous-workload ledger; the autonomous attempt ledger is absent (see run_ledger_coverage)"
+    },
+    "escalation": {
+      "measured_escalation_rate": null,
+      "measured_escalation_rate_source": "no committed ledger carries an escalation marker (escalation_from/escalation_to declared-not-written)",
+      "framework_design": "design for <1% escalation to human",
+      "framework_design_source": "framework.html:748,959 (a policy target, not a measured rate)",
+      "measured_ex": {
+        "source": "experiments/results/cap_escalation_measurement/cap_escalation_measurement_score_20260826T125726Z.json",
+        "values": [
+          {
+            "escalation_model": "openai/gpt-5.6-sol",
+            "E_x": 11.4671
+          },
+          {
+            "escalation_model": "anthropic/claude-sonnet-5",
+            "E_x": 12.5134
+          }
+        ],
+        "measured_ex_range": [
+          11.4671,
+          12.5134
+        ]
+      },
+      "framework_ex_price_ratios": {
+        "deepseek_to_gpt56": 28.2,
+        "deepseek_to_claude": 68.7
+      },
+      "framework_ex_price_ratios_source": "framework.html:748 (price ratios [X], not measured E_x)"
     }
   },
   "coverage": [
