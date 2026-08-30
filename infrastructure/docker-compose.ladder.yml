@@ -103,13 +103,15 @@ x-supervisor-base: &supervisor-base
 # carries the write flag at the container level; its F-1/F-2/P11 writes authorize in code.
 x-orchestrator-mounts: &orchestrator-mounts
   - ${FINOPS_WORKTREE_ROOT:-/tmp}:/tmp:rw
-  - ${FINOPS_RESULTS_DIR:-../experiments/results}:/app/experiments/results:rw
   - ${FINOPS_REPO_DIR:-..}:/repo:ro
-  - ${AUTH_HOME:-/home/drseuss}/.claude:/home/drseuss/.claude:ro
-  - ${AUTH_HOME:-/home/drseuss}/.local/share/opencode:/home/drseuss/.local/share/opencode:ro
-  - ${AUTH_HOME:-/home/drseuss}/.local/bin:/home/drseuss/.local/bin:ro
+  - ${FINOPS_REPO_DIR:-..}/experiments/results:/repo/experiments/results:rw
+  - ${FINOPS_WORKTREE_ROOT:-/tmp}/opencode_state:/home/drseuss/.local/share/opencode:rw
+  - ${AUTH_HOME:-/home/drseuss}/.local/share/opencode/auth.json:/auth/opencode_auth.json:ro
   - ${AUTH_HOME:-/home/drseuss}/.local/share/claude:/home/drseuss/.local/share/claude:ro
-  - ${AUTH_HOME:-/home/drseuss}/.opencode/bin:/home/drseuss/.opencode/bin:ro
+  - ${AUTH_HOME:-/home/drseuss}/.claude:/home/drseuss/.claude:ro
+  - ${AUTH_HOME:-/home/drseuss}/.config:/home/drseuss/.config:ro
+  - ${AUTH_HOME:-/home/drseuss}/.local/bin:/home/drseuss/.local/bin:ro
+  - ${AUTH_HOME:-/home/drseuss}/.opencode:/home/drseuss/.opencode:ro
   - /var/run/docker.sock:/var/run/docker.sock:ro
 
 x-orchestrator-base: &orchestrator-base
