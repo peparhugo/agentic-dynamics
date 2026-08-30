@@ -17,7 +17,6 @@ trigger; non-zero = the ``review_all`` subprocess failed to launch.
 
 from __future__ import annotations
 
-import json
 import os
 import subprocess
 import sys
@@ -66,10 +65,11 @@ def main() -> int:
         return 0
 
     _key, raw = result
-    print(f"[review-unit] got trigger {raw} — running review_all.py ...", flush=True)
+    print(f"[review-unit] got trigger {raw} — running review_all.py --only-missing ...",
+          flush=True)
     try:
         proc = subprocess.run(
-            [sys.executable, "scripts/review_all.py"],
+            [sys.executable, "scripts/review_all.py", "--only-missing"],
             check=False,
         )
     except OSError as exc:

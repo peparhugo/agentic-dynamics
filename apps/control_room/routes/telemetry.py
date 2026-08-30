@@ -20,7 +20,7 @@ from agentic_dynamics.control.live import (
     STATUS_CHANNEL,
     STATUS_KEY,
 )
-from agentic_dynamics.control.pipeline_status import stage_summary
+from agentic_dynamics.control.pipeline_status import review_stage_summary, stage_summary
 from agentic_dynamics.control.queue_reinterleave import (
     provider_summary,
     read_queue,
@@ -42,7 +42,7 @@ def api_matrix() -> Response:
         r = _services.redis()
         execute = stage_summary(r, _services.queue_key, STATUS_KEY, _services.results_key)
         analyze = stage_summary(r, _services.analysis_queue_key, _services.analysis_status_key)
-        review = stage_summary(r, _services.review_queue_key, _services.review_status_key)
+        review = review_stage_summary(r)
         phase_payloads = r.hgetall(PHASE_KEY)
     except Exception:
         return jsonify({"error": "redis_unavailable", "cells": {}}), 503

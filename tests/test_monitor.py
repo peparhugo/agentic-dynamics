@@ -1,13 +1,17 @@
 """Tests for monitor.py — the three-stage pipeline view (--json + human output).
 
-The post-hoc stages (analysis_jobs/analysis_status, review_jobs/review_status)
-are now surfaced alongside the story stage. These tests lock down that the
-legacy flat fields remain, the ``stages`` block is correct, and ``--clear``
-drops every stage's keys.
+The post-hoc stages are surfaced alongside the story stage: analyze from
+(analysis_jobs/analysis_status), and review from the review FILES (the trigger →
+review_all cut-over retired the legacy review_jobs/review_status Redis state from the
+display — see pipeline_status.review_stage_summary). These tests lock down that the
+legacy flat fields remain, the ``stages`` block is correct, and ``--clear`` drops every
+stage's keys.
 """
 
+import json
 import sys
 
+from agentic_dynamics.control import pipeline_status
 from scripts import monitor
 
 
@@ -51,6 +55,25 @@ def _redis(
     )
 
 
+def _review_fixture(tmp_path, monkeypatch):
+    """Seed a review-files fixture and point the file-derived review stage at it."""
+    reviews = tmp_path / "reviews"
+    results = tmp_path / "stories"
+    reviews.mkdir()
+    results.mkdir()
+    complete = {"story_review": {"ok": True}, "commit_reviews": [{"session_number": 1}]}
+    incomplete = {"story_review": None, "commit_reviews": []}
+    (results / "s1_abc123456789.json").write_text("{}")
+    (results / "s1_def456789012.json").write_text("{}")
+    (results / "s1_111222333444.json").write_text("{}")
+    (reviews / "review_abc123456789.json").write_text(json.dumps(complete))
+    (reviews / "review_def456789012.json").write_text(json.dumps(incomplete))
+    (reviews / "review_111222333444.error").write_text(json.dumps({"error": "no session commits"}))
+    monkeypatch.setattr(pipeline_status, "REVIEWS_DIR", reviews)
+    monkeypatch.setattr(pipeline_status, "RESULTS_DIR", results)
+    return reviews, results
+
+
 def test_get_status_exposes_three_stages_and_legacy_fields():
     """The ``stages`` block is additive; legacy flat fields are unchanged."""
     r = _redis(
@@ -76,23 +99,47 @@ def test_get_status_exposes_three_stages_and_legacy_fields():
     assert stages["analyze"]["done"] == 1
     assert stages["analyze"]["remaining_in_queue"] == 1
     assert stages["analyze"]["results_saved"] is None
-    assert stages["review"]["retry"] == 1
-    assert stages["review"]["running"] == 1
+    # The review stage ignores the legacy hash (file-derived since the cut-over).
+    assert stages["review"]["retry"] == 0
+    assert stages["review"]["running"] == 0
+    assert stages["review"]["remaining_in_queue"] == 0
+
+
+def test_review_stage_is_file_derived(tmp_path, monkeypatch):
+    """The review stage counts complete aggregates + error markers from the files."""
+    _review_fixture(tmp_path, monkeypatch)
+    r = _redis({}, {}, {})
+
+    review = monitor.get_status(r)["stages"]["review"]
+
+    assert review["total"] == 3          # the corpus
+    assert review["done"] == 1           # the complete aggregate only
+    assert review["failed"] == 1         # the error marker (unreviewable story)
+    assert review["queued"] == 0
+    assert review["running"] == 0
+    assert review["retry"] == 0
+    assert review["remaining_in_queue"] == 0
 
 
 def test_get_status_retry_folds_into_running():
     """Every retry_N status folds into ``running`` and is counted in ``retry``."""
-    r = _redis({}, {}, {"a": "running", "b": "retry_1", "c": "retry_2"})
+    r = _redis({}, {"a": "running", "b": "retry_1", "c": "retry_2"}, {})
 
-    review = monitor.get_status(r)["stages"]["review"]
+    analyze = monitor.get_status(r)["stages"]["analyze"]
 
-    assert review["retry"] == 2
-    assert review["running"] == 3  # 1 running + 2 retries, still in flight
-    assert review["total"] == 3
+    assert analyze["retry"] == 2
+    assert analyze["running"] == 3  # 1 running + 2 retries, still in flight
+    assert analyze["total"] == 3
 
 
-def test_get_status_empty_posthoc_stages_are_zeroed():
+def test_get_status_empty_posthoc_stages_are_zeroed(tmp_path, monkeypatch):
     """Absent post-hoc data yields zero counts, never a missing key."""
+    reviews = tmp_path / "reviews"
+    results = tmp_path / "stories"
+    reviews.mkdir()
+    results.mkdir()
+    monkeypatch.setattr(pipeline_status, "REVIEWS_DIR", reviews)
+    monkeypatch.setattr(pipeline_status, "RESULTS_DIR", results)
     r = _redis({"a": "done"}, {}, {})
 
     stages = monitor.get_status(r)["stages"]
@@ -101,10 +148,13 @@ def test_get_status_empty_posthoc_stages_are_zeroed():
     assert stages["analyze"]["remaining_in_queue"] == 0
     assert stages["analyze"]["cells"] == {}
     assert stages["review"]["total"] == 0
+    assert stages["review"]["done"] == 0
+    assert stages["review"]["failed"] == 0
 
 
-def test_print_status_lists_each_stage(capsys):
+def test_print_status_lists_each_stage(capsys, tmp_path, monkeypatch):
     """The human-readable output names all three pipeline stages."""
+    _review_fixture(tmp_path, monkeypatch)
     r = _redis(
         {"a": "done"},
         {"a": "done"},
@@ -119,14 +169,17 @@ def test_print_status_lists_each_stage(capsys):
         assert label in out
 
 
-def test_print_status_surfaces_retry_count(capsys):
-    """A review backlog in retry is visible to the human reader."""
-    r = _redis({"a": "done"}, {}, {"a_S1": "retry_1"})
+def test_print_status_surfaces_review_counts(capsys, tmp_path, monkeypatch):
+    """The review stage's file-derived counts are visible to the human reader."""
+    _review_fixture(tmp_path, monkeypatch)
+    r = _redis({"a": "done"}, {}, {})
 
     monitor.print_status(monitor.get_status(r), clear_screen=False)
     out = capsys.readouterr().out
 
-    assert "retry 1" in out
+    assert "REVIEW" in out
+    assert "done 1" in out
+    assert "failed 1" in out
 
 
 def test_clear_removes_all_three_stage_keys(monkeypatch, capsys):

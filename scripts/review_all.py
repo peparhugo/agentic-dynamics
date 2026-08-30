@@ -8,6 +8,7 @@ ThreadPoolExecutor pattern that analyze_stories.py uses reliably.
 
 Usage:
   python3 scripts/review_all.py              # review all stories
+  python3 scripts/review_all.py --only-missing  # skip fully-reviewed stories
   python3 scripts/review_all.py --workers 6  # parallel
   python3 scripts/review_all.py --story notification_service  # subset
   python3 scripts/review_all.py --dry-run    # list what would run
@@ -17,6 +18,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import subprocess
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
@@ -32,7 +34,41 @@ from agentic_dynamics.runtime.story import load_story_result
 
 RESULTS_DIR = Path(__file__).resolve().parent.parent / "experiments" / "results" / "stories"
 REVIEWS_DIR = Path(__file__).resolve().parent.parent / "experiments" / "results" / "reviews"
+ANALYSIS_DIR = Path(__file__).resolve().parent.parent / "experiments" / "results" / "analysis"
 MODEL = "deepseek/deepseek-v4-flash"
+
+AGGREGATE_RE = re.compile(r"^review_[0-9a-f]{12}\.json$")
+
+
+def _needs_review(story_id: str) -> bool:
+    """True when the story's review is missing, incomplete, or stale.
+
+    --only-missing skips a story when: an error marker exists (the attempt already
+    failed — the worktree is gone; the marker records the error visibly), or the review
+    file is complete (story_review + at least one commit review) AND no newer analysis
+    has landed since the review (the review grounds in the analysis — a fresher
+    analysis file re-opens the story).
+    """
+    if (REVIEWS_DIR / f"review_{story_id}.error").exists():
+        return False
+    review_path = REVIEWS_DIR / f"review_{story_id}.json"
+    if not review_path.exists():
+        return True
+    try:
+        data = json.loads(review_path.read_text())
+    except (json.JSONDecodeError, OSError):
+        return True
+    complete = bool(data.get("story_review")) and len(data.get("commit_reviews") or []) > 0
+    if not complete:
+        return True
+    analysis_path = ANALYSIS_DIR / f"analysis_{story_id}.json"
+    if analysis_path.exists():
+        try:
+            if analysis_path.stat().st_mtime > review_path.stat().st_mtime:
+                return True
+        except OSError:
+            pass
+    return False
 
 
 def _get_story_commits(worktree: Path) -> list[tuple[str, str, int]]:
@@ -63,14 +99,17 @@ def _review_one_story(result_file: Path) -> tuple[str, str]:
     try:
         story = load_story_result(result_file)
     except Exception as e:
+        _write_error_marker("", name, f"load: {e}")
         return name, f"load: {e}"
 
     worktree = Path(story.worktree) if story.worktree else None
     if not worktree or not worktree.exists():
+        _write_error_marker(story.story_id, name, "worktree missing")
         return name, "worktree missing"
 
     commits = _get_story_commits(worktree)
     if not commits:
+        _write_error_marker(story.story_id, name, "no session commits")
         return name, "no session commits"
 
     review_path = REVIEWS_DIR / f"review_{story.story_id}.json"
@@ -115,13 +154,33 @@ def _review_one_story(result_file: Path) -> tuple[str, str]:
     }
     REVIEWS_DIR.mkdir(parents=True, exist_ok=True)
     review_path.write_text(json.dumps(data, indent=2))
+    _write_error_marker(story.story_id, name, "", clear=True)
     return name, ""
+
+
+def _write_error_marker(
+    story_id: str, name: str, error: str, *, clear: bool = False,
+) -> None:
+    """Record an unreviewable story visibly (or clear the marker on success)."""
+    marker = REVIEWS_DIR / f"review_{story_id}.error"
+    if clear:
+        marker.unlink(missing_ok=True)
+        return
+    REVIEWS_DIR.mkdir(parents=True, exist_ok=True)
+    marker.write_text(json.dumps({
+        "story_id": story_id or "",
+        "result_file": name,
+        "error": error,
+        "ts": __import__("time").time(),
+    }, indent=2))
 
 
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--workers", type=int, default=6)
     parser.add_argument("--story", default="", help="Substring filter on story name")
+    parser.add_argument("--only-missing", action="store_true",
+                        help="Skip stories with a complete review (and no newer analysis)")
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
 
@@ -132,7 +191,22 @@ def main() -> None:
     if args.story:
         result_files = [f for f in result_files if args.story in f.name]
 
-    print(f"Reviewing {len(result_files)} stories with {args.workers} workers")
+    if args.only_missing:
+        skipped = 0
+        kept = []
+        for f in result_files:
+            # Strip the ".json" suffix properly — model names like gpt-5.6-luna contain
+            # dots, so a dot-split would truncate before the story id.
+            story_id = f.name[:-len(".json")].rsplit("_", 1)[-1]
+            if _needs_review(story_id):
+                kept.append(f)
+            else:
+                skipped += 1
+        result_files = kept
+        print(f"Reviewing {len(result_files)} stories (skipped {skipped} already "
+              f"reviewed) with {args.workers} workers")
+    else:
+        print(f"Reviewing {len(result_files)} stories with {args.workers} workers")
 
     if args.dry_run:
         for f in result_files:

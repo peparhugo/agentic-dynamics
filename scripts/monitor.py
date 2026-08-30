@@ -20,7 +20,7 @@ try:
 except ImportError:  # imported as scripts.<name> — repo root is on sys.path
     from scripts import _bootstrap  # noqa: E402,F401
 
-from agentic_dynamics.control.pipeline_status import stage_summary
+from agentic_dynamics.control.pipeline_status import review_stage_summary, stage_summary
 
 REDIS_HOST = os.environ.get("FINOPS_REDIS_HOST", "127.0.0.1")
 REDIS_PORT = int(os.environ.get("FINOPS_REDIS_PORT", "6380"))
@@ -28,10 +28,11 @@ REDIS_DB = int(os.environ.get("FINOPS_REDIS_DB", "1"))
 QUEUE_KEY = "story_jobs"
 STATUS_KEY = "story_status"
 RESULTS_KEY = "story_results"
-# Post-hoc pipeline stages (execute → analyze → review). Each is a Redis
-# list (queue) + hash (status) on the same framework Redis, written by the
-# analysis/review workers. None of them publish to a pub/sub channel, so they
-# are only visible through the poll-driven snapshot, never the SSE stream.
+# Post-hoc pipeline stages (execute → analyze → review). The execute/analyze stages are
+# Redis list (queue) + hash (status) on the same framework Redis, written by the workers.
+# The REVIEW stage is FILE-derived since 2026-08-31 (the trigger → review_all cut-over
+# never consumes the legacy queue — see pipeline_status.review_stage_summary); the review
+# queue keys are retained only for the reset path below.
 ANALYSIS_QUEUE_KEY = "analysis_jobs"
 ANALYSIS_STATUS_KEY = "analysis_status"
 REVIEW_QUEUE_KEY = "review_jobs"
@@ -58,7 +59,7 @@ def get_status(r: redis.Redis) -> dict:
     """Get current experiment status across all three pipeline stages."""
     execute = stage_summary(r, QUEUE_KEY, STATUS_KEY, RESULTS_KEY)
     analyze = stage_summary(r, ANALYSIS_QUEUE_KEY, ANALYSIS_STATUS_KEY)
-    review = stage_summary(r, REVIEW_QUEUE_KEY, REVIEW_STATUS_KEY)
+    review = review_stage_summary(r)
 
     # Keep the legacy flat fields + story breakdowns so existing consumers of
     # ``--json`` keep working; the ``stages`` block is purely additive.
