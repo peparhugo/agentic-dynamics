@@ -1,0 +1,215 @@
+name: persistent_code_graph
+question: >-
+  The graph-family Part A (the design docs/designs/proposed/neo4j_graph_analysis_design.md
+  §2/§5 — the persistent code graph + the graph-first change-analysis). The 2d/2e campaigns
+  hit a wall: the incorrect_rebuilt cells' impacted_symbol_count read **0 despite the
+  structural dependant edges** (the widgets-call-add graph edges EXIST, the counter read 0),
+  and the construction's risk flips with the analyzer state (0.475 analyzers-down vs 0.19
+  analyzers-up) — undiagnosable because the per-change AST graph is discarded after each
+  cell. This workflow answers: **does a persistent, queryable code graph make the wall's
+  semantics inspectable — the behavioral-vs-structural impacted definitions checkable BEFORE
+  a campaign runs?** The deliverables: (1) the persistent code graph built from the corpus
+  (the code records + the neo4j nodes/edges, cross-commit evolution per story session), (2)
+  the 2e-wall reproduction as a graph query (the edges exist + the counter's 0-impact
+  definition checkable side-by-side), (3) the campaign-time p1 pre-verification ("does the
+  construction's changed symbol have structural dependants?") as a graph query, (4) the
+  graph-first change-analysis seam wired with the rollback (any graph failure falls back to
+  the in-process AST walk — additive, never a gate). The neo4j is LIVE (the ladder's slice 3
+  ran the kb-neo4j consumer — lag 0); this workflow is bounded, flash-sized phases with the
+  rollback posture.
+version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: true
+repeatable: false
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: true
+    model_pool: [deepseek/deepseek-v4-pro, deepseek/deepseek-v4-flash]
+    context:
+      domain_context: >-
+        PROVISIONAL DomainProfile. domain: measurement (the persistent code graph + the
+        graph-first change-analysis). canonical_sources: [the design
+        (docs/designs/proposed/neo4j_graph_analysis_design.md §2/§5 — the impacted
+        semantics + the 2e fixture), the code ingestion (code_ingestion.py's
+        derive_code_records + graph.load_codebase_graph — the wiring exists), the
+        change-analysis seam (code_change_facts.py — the in-process AST walk today), the
+        wall's artifacts (cap_adaptive_2d/p1_incorrect_rebuilt_probe.json +
+        p2_records_sha_index.json — the impacted 0 + the risk flip; the 2e verdict
+        cap_adaptive_2d_e.md — the 0.5-never-1.0 ratio)].
+        policies: [graph_additive_with_rollback, semantics_pinned, wall_reproduced_first,
+        flash_mechanical_pro_interpretation]
+      challenge_context: >-
+        PROVISIONAL ChallengeProfile. challenge: measurement (the persistent graph + the
+        seam). deliberation: [build the graph, reproduce the wall, pre-verify, wire the
+        seam, findings, adversarial]. session_policy: {default: fork_per_phase}
+      current_state: >-
+        The neo4j is LIVE (the ladder's slice 3 — the kb-neo4j consumer, lag 0, 204 jobs
+        processed). The KB code records exist (one per function/class, authority SOURCE).
+        The change-analysis seam computes the impacted set in-process on a per-change AST
+        graph discarded after each cell — the 2d/2e wall undiagnosable. The graph-first
+        change-analysis is PROPOSED (the design committed); this workflow implements Part A.
+      hard_rules: >-
+        (1) Every phase commits '[workflow] <phase>' (the worktree hook); docs carry
+        status frontmatter (DOC_CONTRACT).
+        (2) THE WALL IS THE FIXTURE: the 2e reproduction must reproduce the wall's facts —
+        the structural edges EXIST in the persistent graph AND the impacted counter read 0;
+        a reproduction that cannot show BOTH side-by-side is a FAILED finding.
+        (3) THE SEMANTICS PINNED: the impacted definition (behavioral vs structural — the
+        2e lesson) is a DECLARED choice in the seam, queryable + auditable; an implicit
+        definition is a FAILED finding.
+        (4) GRAPH-ADDITIVE WITH ROLLBACK: the seam falls back to the in-process AST walk on
+        ANY graph failure (down / empty / timeout) — the graph never gates a run; a seam
+        that blocks on the graph is a FAILED finding.
+        (5) THE PRE-VERIFICATION IS A QUERY: "does the construction's changed symbol have
+        structural dependants?" asked against the persistent graph BEFORE any grid — the
+        answer visible + recorded.
+        (6) BOUNDED PHASES: p1 builds the graph; p2 reproduces the wall; p3 runs the
+        pre-verification; p4 wires the seam (+ tests); p5 the findings; p6 the adversarial.
+        (7) Every number cites its source. (8) The seam's tests run independently
+        (test_executed_success via the test runner — never the model's self-report).
+        (9) p6 adversarial mandatory. (10) Resumable per the match checks.
+      read_first: >-
+        the design (neo4j_graph_analysis_design.md §2/§5), the wall's artifacts
+        (cap_adaptive_2d/p1_incorrect_rebuilt_probe.json + the 2e verdict), the code
+        ingestion + the change-analysis seam sources
+      run_shape: >-
+        SINGLE wrapper: the per-phase model split (the handoff standard) — the mechanical
+        phases (p1 build, p2 wall, p3 pre-verification, p4 seam) run
+        deepseek/deepseek-v4-flash, the interpretation phases (p0 mandate, p5 findings, p6
+        adversarial) run deepseek/deepseek-v4-pro, via the workflow's model_pool + the
+        per-phase pins. One branch (feature/persistent-code-graph); each phase commits
+        [workflow] <phase>; the outputs under experiments/results/graph_family/. The
+        neo4j (bolt://localhost:7687 — FINOPS_NEO4J_URI) is the graph service.
+    phases:
+      - name: p0_pin_mandate
+        kind: agent
+        model: deepseek/deepseek-v4-pro
+        timeout: 3600
+        prompt: |
+          GOAL: {goal}
+          ROLE: verification — the design §2/§5 mandate. Append this spec's SHA256 to the
+          design's header (docs/designs/proposed/neo4j_graph_analysis_design.md — the ONLY
+          edit allowed). Verify the pins: the wall-is-the-fixture rule, the semantics
+          (behavioral vs structural) declared, the graph-additive-with-rollback rule, the
+          pre-verification-as-a-query rule. A deviation is a FAILED finding.
+          DELIVER: the pinned header + verification; committed.
+          LOG: PASS/FAIL; commit.
+      - name: p1_build_graph
+        kind: agent
+        model: deepseek/deepseek-v4-flash
+        timeout: 28800
+        prompt: |
+          GOAL: {goal}
+          ROLE: build the persistent code graph — BOUNDED to the build. Use the existing
+          wiring (code_ingestion.py's ingest_codebase_graph / graph.load_codebase_graph)
+          to load the codebase graph into the live neo4j: the framework's own src/ + the
+          story worktrees' generated code (the corpus's cells — at least the 2d/2e fixture
+          cells' codebases, found via the p1_incorrect_rebuilt_probe.json's paths). Also
+          record the cross-commit evolution shape: the story sessions' commits produce
+          graph snapshots (the structural delta per commit — added/removed symbols, the
+          coupling drift, the new hub nodes) — capture the shape for at least one story's
+          5-session arc. Record under experiments/results/graph_family/: the node/edge
+          counts, the sample structural edges (INCLUDING the widgets->add dependants — the
+          wall's edges), the snapshot deltas.
+          LOG: the node/edge counts + the sample edges; PASS/FAIL; commit.
+      - name: p2_wall_reproduction
+        kind: agent
+        model: deepseek/deepseek-v4-flash
+        timeout: 21600
+        prompt: |
+          GOAL: {goal}
+          ROLE: reproduce the 2e wall ON the persistent graph — BOUNDED to the query. The
+          fixture: the incorrect_rebuilt cells' changed symbols (the widgets-call-add
+          dependants). Run the graph query: do the structural dependant edges EXIST for the
+          changed symbols? Show the edges side-by-side with the impacted counter's recorded
+          0 (from cap_adaptive_2d/p1_incorrect_rebuilt_probe.json + the cell records) and
+          the counter's definition (behavioral — a behavior-preserving change has zero
+          behavioral impact) — the semantics' inspectability: BOTH facts visible in one
+          artifact. Commit under experiments/results/graph_family/wall_reproduction.json +
+          .md.
+          LOG: the edges found + the counter's 0; PASS/FAIL; commit.
+      - name: p3_pre_verification
+        kind: agent
+        model: deepseek/deepseek-v4-flash
+        timeout: 21600
+        prompt: |
+          GOAL: {goal}
+          ROLE: the campaign-time pre-verification — BOUNDED to the query. Ask the pinned
+          question against the persistent graph: "does this construction's changed symbol
+          have structural dependants?" — for the 2d/2e cells' changed symbols AND a
+          control symbol (a leaf with no dependants). The answer visible + recorded (the
+          dependant sets, per symbol). Commit under
+          experiments/results/graph_family/pre_verification.json + .md.
+          LOG: the dependant sets; PASS/FAIL; commit.
+      - name: p4_seam_wiring
+        kind: agent
+        model: deepseek/deepseek-v4-flash
+        timeout: 28800
+        prompt: |
+          GOAL: {goal}
+          ROLE: wire the graph-first change-analysis seam — BOUNDED to the implementation.
+          Modify code_change_facts.py (or its seam) so the impacted computation queries the
+          PERSISTENT graph instead of the in-process AST walk — with the semantics DECLARED
+          (the behavioral vs structural definition pinned as a documented, queryable
+          choice) and the ROLLBACK: any graph failure (down / empty / timeout) falls back
+          to the in-process walk. ADDITIVE ONLY — the graph never gates a run; the
+          rollback is the default posture. Run the independent tests on the affected
+          modules (pytest — the test runner's test_executed_success is the only source of
+          truth) + a controlled graph-unavailable check (the seam falls back, not blocks).
+          Commit the implementation + the tests.
+          LOG: the seam's change + the test outcome + the fallback check; PASS/FAIL; commit.
+      - name: p5_findings
+        kind: agent
+        model: deepseek/deepseek-v4-pro
+        timeout: 21600
+        prompt: |
+          GOAL: {goal}
+          ROLE: the findings — write docs/reviews/persistent_code_graph_findings.md
+          (status: accepted) from p1-p4. The methodology (the graph build, the wall
+          reproduction, the pre-verification, the seam + the rollback), the wall diagnosed
+          (the behavioral counter vs the structural edges — side-by-side, the 2e lesson
+          restated as a graph fact), the pre-verification's answer (which constructions
+          would have been caught BEFORE the grid), the seam's posture (the rollback, the
+          additive guarantee), the honest limits (the graph's coverage — which codebases
+          landed, the snapshot depth).
+          DELIVER: the findings doc; commit.
+          LOG: the findings list; PASS/FAIL; commit.
+      - name: p6_adversarial
+        kind: agent
+        model: deepseek/deepseek-v4-pro
+        timeout: 21600
+        prompt: |
+          GOAL: {goal}
+          ROLE: adversarial — falsify the findings. (1) The wall reproduction (re-query the
+          raw graph: the structural edges + the recorded 0 — both facts present); (2) the
+          semantics (the behavioral-vs-structural definition declared + cited in the seam —
+          no implicit definition); (3) the rollback (a controlled graph-unavailable run
+          falls back to the in-process walk — never blocks); (4) the pre-verification (the
+          dependant sets re-derived); (5) the citations resolve. Deliver
+          docs/reviews/persistent_code_graph_findings_adversary.md + _known_safe.md
+          (status: accepted).
+          LOG: finding table + known-safe; PASS/FAIL; commit.
+factors:
+  - {name: model, levels: [deepseek/deepseek-v4-pro]}
+design: factorial
+rules:
+  - {name: graph_built, plane: measurement, evidence_class: "[M]", requires: [], produces: [persistent_code_graph]}
+  - {name: wall_reproduced, plane: measurement, evidence_class: "[C]", requires: [persistent_code_graph], produces: [wall_reproduction_facts]}
+  - {name: pre_verification_run, plane: measurement, evidence_class: "[C]", requires: [persistent_code_graph], produces: [pre_verification_answer]}
+  - {name: seam_wired, plane: measurement, evidence_class: "[C]", requires: [wall_reproduction_facts], produces: [graph_first_change_analysis]}
+  - {name: findings_written, plane: measurement, evidence_class: "[C]", requires: [wall_reproduction_facts, pre_verification_answer, graph_first_change_analysis], produces: [graph_findings]}
+  - {name: findings_verified, plane: measurement, evidence_class: "[C]", requires: [graph_findings], produces: [graph_findings_known_safe]}
+metrics:
+  - {name: graph_fidelity, agg: mean, over: cell}
+  - {name: semantics_pinned, agg: mean, over: cell}
+comparison: {kind: effect_size, arm_factor: model, loss: {cost: 1.0, quality: 0.0, value: 0.0}}
+writeup:
+  format: lab_book
+  sections: [question, p0_pin_mandate, p1_build_graph, p2_wall_reproduction, p3_pre_verification, p4_seam_wiring, p5_findings, p6_adversarial]
+stop: {budget_usd: 30.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}
