@@ -33,6 +33,14 @@ See the REVISION LOG (§9).
 The proposal is complete only if every one of the **37** KB touches (31 mapped + F-1…F-6) is
 placed on a tier with a read/write classification and its guards intact.
 
+**PINNED (2026-08-30, `fleet_ladder_implementation` p0_pin_mandate):** this proposal is the
+mandate for `workflows/repository/fleet_ladder_implementation.yaml` (spec_sha256
+`1e6e2d71c5f05fea6bdc1ad21384ae7c70bd8bbebf1d8864ae039440288379f4`). Mandate verified
+complete — the four migration slices (§7), the scope model (D-16, §5), the network policy
+(D-17, §3), the binary attach (D-18, §4), the neo4j bridge (§6), the guard placement (G1-G6,
+§8), and the four constraints (bootstrap-only / no self-activation / socket-orchestrator-only
+/ four-mount contract). No deviation.
+
 ## 0. Decisions that resolve the review's findings (p3/p5) + the operator's design review
 
 | # | finding (p3/p5) | decision |
