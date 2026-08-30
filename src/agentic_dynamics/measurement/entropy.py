@@ -19,7 +19,7 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 from agentic_dynamics.core.language import (
     LanguageProfile,
@@ -80,12 +80,21 @@ class EntropyProfile:
 def compute_entropy(
     codebase_path: Path,
     profile: LanguageProfile | None = None,
+    *,
+    file_filter: Callable[[Path], bool] | None = None,
 ) -> EntropyProfile:
     """Compute architectural entropy for a codebase.
 
     Args:
         codebase_path: Root directory of the codebase.
         profile: Language profile. Auto-detected if None.
+        file_filter: Optional predicate over each source file. When supplied, only files
+            for which it returns True contribute to every dimension (a file it rejects is
+            treated as if it were skipped). This is the Δ-entropy instrument's
+            solution/test split seam (design ``neo4j_graph_analysis_design.md`` §3): the
+            caller passes ``lambda p: not is_test_file(p, profile)`` to measure the
+            production-only tree, or ``lambda p: is_test_file(p, profile)`` for the test
+            tree. ``None`` keeps the original whole-tree behavior (backward-compatible).
 
     Returns:
         EntropyProfile with all five dimensions populated.
@@ -99,12 +108,20 @@ def compute_entropy(
     if ast is None:
         return EntropyProfile()
 
+    def _include(file_path: Path) -> bool:
+        """The shared walk gate: skip dirs + optional caller filter."""
+        if _should_skip(file_path):
+            return False
+        if file_filter is not None and not file_filter(file_path):
+            return False
+        return True
+
     ep = EntropyProfile()
 
     # ── Dimension 1: Function length distribution ──
     func_lengths: list[int] = []
     for file_path in codebase_path.rglob("*"):
-        if _should_skip(file_path):
+        if not _include(file_path):
             continue
         if file_path.suffix in profile.extensions and file_path.is_file():
             try:
@@ -126,7 +143,7 @@ def compute_entropy(
     # ── Dimension 2: Module size distribution ──
     file_sizes: list[int] = []
     for file_path in codebase_path.rglob("*"):
-        if _should_skip(file_path):
+        if not _include(file_path):
             continue
         if file_path.suffix in profile.extensions and file_path.is_file():
             try:
@@ -142,7 +159,7 @@ def compute_entropy(
     import_counts: list[int] = []
     file_imports: dict[str, int] = {}
     for file_path in codebase_path.rglob("*"):
-        if _should_skip(file_path):
+        if not _include(file_path):
             continue
         if file_path.suffix in profile.extensions and file_path.is_file():
             try:
@@ -166,7 +183,7 @@ def compute_entropy(
     # ── Dimension 4: Naming convention consistency ──
     naming_counts: dict[str, int] = {}
     for file_path in codebase_path.rglob("*"):
-        if _should_skip(file_path):
+        if not _include(file_path):
             continue
         if file_path.suffix in profile.extensions and file_path.is_file():
             try:
@@ -189,7 +206,7 @@ def compute_entropy(
     # ── Dimension 5: File-to-responsibility mapping ──
     file_classes: dict[str, int] = {}
     for file_path in codebase_path.rglob("*"):
-        if _should_skip(file_path):
+        if not _include(file_path):
             continue
         if file_path.suffix in profile.extensions and file_path.is_file():
             try:
