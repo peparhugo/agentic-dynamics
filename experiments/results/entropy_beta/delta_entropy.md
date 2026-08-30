@@ -1,15 +1,14 @@
 # Δ-entropy instrument — corpus measurement
 
-schema `delta_entropy/v1` · generated 2026-08-30T18:25:33Z
+schema `delta_entropy/v1` · generated 2026-08-30T19:04:30Z
 ΔH threshold: `0.0` ([P] sign-of-delta (design leaves the cut unspecified))
 
 ## Coverage (exact — never imputed)
 
 - story cells measured: 235
 - campaign cells measured: 86
-- total measured: 321
 - test-join complete: 126
-- test-join incomplete (ΔH measured, quadrant = FAILED finding): 195
+- test-join incomplete (ΔH measured, quadrant FAILED-finding): 195
 - clean-but-wrong count (the 2d/2e wall): 1
 
 ## Quadrant distribution (joined cells only)

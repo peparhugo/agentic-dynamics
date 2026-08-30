@@ -1,6 +1,6 @@
 {
   "schema": "delta_entropy/v1",
-  "generated_at": "2026-08-30T18:25:33Z",
+  "generated_at": "2026-08-30T19:04:30Z",
   "delta_h_threshold": 0.0,
   "delta_h_threshold_provenance": "[P] sign-of-delta (design leaves the cut unspecified)",
   "coverage": {

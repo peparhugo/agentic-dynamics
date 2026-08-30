@@ -1,6 +1,6 @@
 # β coordination-tax instrument — corpus measurement
 
-schema `coordination_overhead/v1` · generated 2026-08-30T18:25:54Z
+schema `coordination_overhead/v1` · generated 2026-08-30T18:52:05Z
 
 formula: `coordination_overhead = (wrapper + merge + chain + review) / cell`
 
