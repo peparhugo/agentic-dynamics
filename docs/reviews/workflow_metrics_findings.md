@@ -139,3 +139,60 @@ not prose re-derivations: `measured_r=0.125` vs `framework_scenario=0.115`, `mea
 **data is not there**. The framework's autonomous-workload metrics (`r`, `WOC`, `b`, escalation
 rate, `C_job`) require the workflow-run attempt ledger to be *committed* before any of them can be
 measured — today they are machine-local and gitignored.
+
+---
+
+## 6. Post-instrumentation (the ledger data-integrity fixes — `ledger_instrumentation` p1–p3)
+
+**This section is an UPDATE, not a re-measurement.** Every "not measurable" row above (§2, §3, §5)
+describes the committed corpus's PAST state — the pre-instrumentation ledgers, which still lack the
+fields. That historical state stands honestly. What follows is the post-fix state, cited to the
+fresh run the `ledger_instrumentation` phase produced.
+
+**The fields are now emitted** (`src/agentic_dynamics/runtime/workflow_runner.py`, the runner):
+- attempt fields — `attempt_count` (run level) + per-attempt `retry_reason` / `first_pass` /
+  `accepted` / `escalation_from` / `escalation_to` (the new `AttemptRecord`, one per agent phase);
+- breach fields — `stall_evidence` / `deploy_gate` / `commit_gate` / `relabel_gate` (already on
+  `PhaseResult.to_dict`; now confirmed present on committed phase ledgers);
+- the checkpoints array — now committed: the `.gitignore` run-ledger exclusion was refined so the
+  run-ledger JSONs are tracked provenance, while the machine-local gate state
+  (`discarded_trees.jsonl`) stays ignored.
+
+**The proof — a fresh run.** `ledger_instrumentation` p2 drove the committed probe spec
+`workflows/repository/ledger_instrumentation_probe.yaml` (a `scope` agent phase + a `gate` agent
+phase with `checkpoint: true`) through the modified runner in a scratch worktree and committed the
+ledger `experiments/results/workflows/ledger_instrumentation_probe/20260830T190548Z.json`. That
+ledger carries `attempt_count=2`, two attempt records (each `attempt_number=1`, `retry_reason=""`,
+`first_pass`/`accepted` recorded, `escalation_from`/`escalation_to=null`), the four breach fields on
+both phase ledgers (all null), and one committed `checkpoint_reached` record (`decision=awaiting`,
+`reached_at==decided_at`). See `docs/reviews/ledger_instrumentation_fresh_run.md` for the
+fields-present table.
+
+**The metrics are now measurable** (aggregator re-run, pinned §3 definitions byte-unchanged —
+`experiments/results/workflow_metrics/aggregate.json`, 46 ledgers / 10 campaigns):
+
+| metric | pre-instrumentation | post-instrumentation (fresh run) |
+|---|---|---|
+| `r` (retry rate) | 0.125 (grit story grid only) | **0.0** — 0/2 jobs with >1 attempt |
+| `WOC` (first-call resolution) | not measurable | **1.0** — 2/2 attempts first-pass |
+| escalation rate | not measurable | **0.0** — 0/2 attempts escalated |
+| checkpoint latency | not measurable (0 records) | **0.0 s** — 1 record, both timestamps |
+| `b` (batch fraction) | not measurable | not measurable (no batch-mode field — still out of scope) |
+
+The `r=0.0` / `WOC=1.0` / escalation `0.0` figures are the HONEST result for the workflow runner:
+it makes exactly one attempt per phase (never retries, never escalates a model), so the attempt
+fields now record "no retry happened" instead of being absent.
+
+**The website's retry-rate claim is now SUPPORTED.** The lead's "retry rate … it now IS measured
+(the attempt ledger)" (`framework.html:726`) — flagged in §3.1 above as unsupported because no
+committed autonomous-workload ledger produced the fields — is now backed: the attempt ledger emits
+`attempt_count`/`retry_reason`/`first_pass`/`accepted`, verified by the committed fresh-run ledger.
+The `r=0.115` in the Rule 7 source note (`framework.html:904`) remains the 11.5% SCENARIO (a
+modeling input), not a measurement — and the "r" lever (`framework.html:747`) already says "replace
+it with your attempt-ledger rate", which is now measurable.
+
+The single load-bearing finding above — "the instrument is correct, the data is not there" — is
+**resolved for the forward path**: the data layer now emits and commits the fields. The 118
+historical ledgers remain absent (they were machine-local and are lost); the historical
+"not measurable" rows therefore stand as an honest description of the pre-instrumentation corpus,
+not of the current runner.
