@@ -1,8 +1,8 @@
-/* Generated 2026-08-29 16:02:19 UTC by build_data.py */
+/* Generated 2026-08-30 05:12:43 UTC by build_data.py */
 /* DO NOT EDIT — regenerate with: python scripts/build_data.py */
 window.DYNAMICS_DATA = {
   "_meta": {
-    "generated_at": "2026-08-29T16:02:15.937443+00:00",
+    "generated_at": "2026-08-30T05:12:40.320851+00:00",
     "provenance_note": "All values tagged [M]easured, [C]omputed, [H]euristic, or e[X]ternal. See methodology.html."
   },
   "summary": {
@@ -61,8 +61,8 @@ window.DYNAMICS_DATA = {
     "waivers": []
   },
   "publication_contract": {
-    "registry_identity": "f52bb2c81c1d417a0cf4334bb1e147c24e2bf6b823793f27c3b557390a59d8b8",
-    "resolved_input_identity": "074d4435598f7b320433dcb160699c4266c99a3282c5adc6da6bba2647dce060",
+    "registry_identity": "3777a8ec9106eabb6a17ebe86ce777220164372cbbd694b877cf3eb34fc6d4d9",
+    "resolved_input_identity": "7203d92753f36925e487e4d52718b606f7961777e065e503520066e6ab2e0132",
     "data_integrity_policy_version": "data-integrity/v1",
     "normalization_version": "canonical-projection/v2",
     "waiver_digest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
@@ -78,7 +78,7 @@ window.DYNAMICS_DATA = {
     "providers": 3,
     "experiment_configs": 0,
     "experiment_specs": 11,
-    "workflow_specs": 140,
+    "workflow_specs": 141,
     "perturbation_operators": 10,
     "lab_books": 20,
     "lab_books_canonical": 8,
@@ -3993,7 +3993,7 @@ window.DYNAMICS_DATA = {
       "successful": 1007,
       "failed": 20
     },
-    "generated_at": "2026-08-29T16:02:16.131598+00:00"
+    "generated_at": "2026-08-30T05:12:40.496127+00:00"
   },
   "reviews": {
     "models": [
@@ -4035,11 +4035,11 @@ window.DYNAMICS_DATA = {
         "label": "gpt-5.6-sol",
         "stories": 23,
         "overall_coherence": 0.899,
-        "architectural_fit": 0.737,
-        "convention_adherence": 0.664,
-        "better_pct": 73.7,
-        "worse_pct": 8.8,
-        "neutral_pct": 14.0,
+        "architectural_fit": 0.738,
+        "convention_adherence": 0.665,
+        "better_pct": 73.9,
+        "worse_pct": 8.7,
+        "neutral_pct": 13.9,
         "top_issues": [
           {
             "theme": "other",
@@ -4076,19 +4076,19 @@ window.DYNAMICS_DATA = {
         "top_issues": [
           {
             "theme": "other",
-            "count": 33
+            "count": 34
           },
           {
             "theme": "security",
-            "count": 21
+            "count": 22
           },
           {
             "theme": "incomplete refactor",
-            "count": 21
+            "count": 22
           },
           {
             "theme": "test gaps",
-            "count": 13
+            "count": 14
           },
           {
             "theme": "coupling",
@@ -4101,11 +4101,11 @@ window.DYNAMICS_DATA = {
         "label": "DeepSeek v4 Flash",
         "stories": 21,
         "overall_coherence": 0.892,
-        "architectural_fit": 0.751,
-        "convention_adherence": 0.67,
-        "better_pct": 64.7,
-        "worse_pct": 7.8,
-        "neutral_pct": 18.6,
+        "architectural_fit": 0.754,
+        "convention_adherence": 0.673,
+        "better_pct": 65.7,
+        "worse_pct": 7.6,
+        "neutral_pct": 18.1,
         "top_issues": [
           {
             "theme": "other",
@@ -4135,10 +4135,10 @@ window.DYNAMICS_DATA = {
         "stories": 14,
         "overall_coherence": 0.881,
         "architectural_fit": 0.756,
-        "convention_adherence": 0.767,
-        "better_pct": 68.1,
+        "convention_adherence": 0.769,
+        "better_pct": 67.1,
         "worse_pct": 4.3,
-        "neutral_pct": 24.6,
+        "neutral_pct": 25.7,
         "top_issues": [
           {
             "theme": "other",
@@ -4167,11 +4167,11 @@ window.DYNAMICS_DATA = {
         "label": "DeepSeek v4 Pro",
         "stories": 37,
         "overall_coherence": 0.876,
-        "architectural_fit": 0.746,
+        "architectural_fit": 0.745,
         "convention_adherence": 0.705,
-        "better_pct": 64.8,
-        "worse_pct": 12.8,
-        "neutral_pct": 17.9,
+        "better_pct": 64.4,
+        "worse_pct": 13.0,
+        "neutral_pct": 18.1,
         "top_issues": [
           {
             "theme": "other",
@@ -4229,7 +4229,7 @@ window.DYNAMICS_DATA = {
         ]
       }
     ],
-    "commit_reviews": 764,
+    "commit_reviews": 767,
     "story_reviews": 155,
     "reviewer": "deepseek/deepseek-v4-flash"
   },
@@ -4722,7 +4722,7 @@ window.DYNAMICS_DATA = {
   "labs": {
     "cache_economics": {
       "experiment_id": "lab_cache_economics",
-      "generated_at": "2026-08-29T18:00:51.266541",
+      "generated_at": "2026-08-30T07:12:34.772500",
       "summary": {
         "models": 7,
         "stories": 207
@@ -4970,9 +4970,9 @@ window.DYNAMICS_DATA = {
       "lab_contract": {
         "lab": "lab_cache_economics.py",
         "input_dataset_id": "canonical_registry/story",
-        "registry_identity_sha256": "f52bb2c81c1d417a0cf4334bb1e147c24e2bf6b823793f27c3b557390a59d8b8",
+        "registry_identity_sha256": "3777a8ec9106eabb6a17ebe86ce777220164372cbbd694b877cf3eb34fc6d4d9",
         "resolved_input_sha256": "38a1f5dbe586890f453f846aa185f75e150bed7de0d3de007b8c66e3811b1be6",
-        "registry_version": "data-manifest/1.0+13144rows",
+        "registry_version": "data-manifest/1.0+14545rows",
         "metric_definition_version": "cache_economics/v2",
         "metric_source_sha256": "c3c4ea9e7f5875b281d24905d28cdaacd4e9cb3be779327c77e856f486f47d5a",
         "n_resolved_records": 207,
@@ -4991,12 +4991,12 @@ window.DYNAMICS_DATA = {
         "data_integrity_policy": "docs/data_integrity_findings.md",
         "requires_external_service": null,
         "contract_version": "lab-contract/v6",
-        "generated_at": "2026-08-29T16:00:51.267105+00:00"
+        "generated_at": "2026-08-30T05:12:34.773058+00:00"
       }
     },
     "condition_effects": {
       "experiment_id": "lab_condition_effects",
-      "generated_at": "2026-08-29T18:00:52.557553",
+      "generated_at": "2026-08-30T07:12:36.018600",
       "summary": {
         "conditions": 2,
         "stories": 207,
@@ -5039,9 +5039,9 @@ window.DYNAMICS_DATA = {
       "lab_contract": {
         "lab": "lab_condition_effects.py",
         "input_dataset_id": "canonical_registry/story+review",
-        "registry_identity_sha256": "f52bb2c81c1d417a0cf4334bb1e147c24e2bf6b823793f27c3b557390a59d8b8",
-        "resolved_input_sha256": "44da8aa829d4288b7652248a884275c1ed71be5c74b7b92cc7aacb9fa10d2d7e",
-        "registry_version": "data-manifest/1.0+13144rows",
+        "registry_identity_sha256": "3777a8ec9106eabb6a17ebe86ce777220164372cbbd694b877cf3eb34fc6d4d9",
+        "resolved_input_sha256": "2c07ba3daefec7d3daf95897fc6ccd98adda9039c6e13fb27b9c3b07dfed3b2e",
+        "registry_version": "data-manifest/1.0+14545rows",
         "metric_definition_version": "condition_effects/v2",
         "metric_source_sha256": "c7023d1bd40fa57e38cc738cca8a9a71780532be3f60898f74954fb6c80f7b32",
         "n_resolved_records": 449,
@@ -5060,12 +5060,12 @@ window.DYNAMICS_DATA = {
         "data_integrity_policy": "docs/data_integrity_findings.md",
         "requires_external_service": null,
         "contract_version": "lab-contract/v6",
-        "generated_at": "2026-08-29T16:00:52.558360+00:00"
+        "generated_at": "2026-08-30T05:12:36.019364+00:00"
       }
     },
     "grit": {
       "experiment_id": "lab_grit",
-      "generated_at": "2026-08-29T18:00:51.972685",
+      "generated_at": "2026-08-30T07:12:35.436808",
       "metric_definition": "G(s) = P(test_executed_success | perturbation_strength = s)",
       "summary": {
         "cells": 136,
@@ -5318,9 +5318,9 @@ window.DYNAMICS_DATA = {
       "lab_contract": {
         "lab": "lab_grit.py",
         "input_dataset_id": "canonical_registry/finding+story",
-        "registry_identity_sha256": "f52bb2c81c1d417a0cf4334bb1e147c24e2bf6b823793f27c3b557390a59d8b8",
+        "registry_identity_sha256": "3777a8ec9106eabb6a17ebe86ce777220164372cbbd694b877cf3eb34fc6d4d9",
         "resolved_input_sha256": "66cb2de70d47e50269d54829a673734d7b7acc5768004a2e112623d5c811837d",
-        "registry_version": "data-manifest/1.0+13144rows",
+        "registry_version": "data-manifest/1.0+14545rows",
         "metric_definition_version": "grit/v2",
         "metric_source_sha256": "efffc47f8bc8e92356489e96cc82a9b08bd6b07eb5196e5c0250b8baf04b1e91",
         "n_resolved_records": 271,
@@ -5339,12 +5339,12 @@ window.DYNAMICS_DATA = {
         "data_integrity_policy": "docs/data_integrity_findings.md",
         "requires_external_service": null,
         "contract_version": "lab-contract/v6",
-        "generated_at": "2026-08-29T16:00:51.973371+00:00"
+        "generated_at": "2026-08-30T05:12:35.437421+00:00"
       }
     },
     "quality_frontier": {
       "experiment_id": "lab_quality_frontier",
-      "generated_at": "2026-08-29T18:00:53.161751",
+      "generated_at": "2026-08-30T07:12:36.712801",
       "summary": {
         "models": 7,
         "stories": 207,
@@ -5587,9 +5587,9 @@ window.DYNAMICS_DATA = {
       "lab_contract": {
         "lab": "lab_quality_frontier.py",
         "input_dataset_id": "canonical_registry/story+analysis",
-        "registry_identity_sha256": "f52bb2c81c1d417a0cf4334bb1e147c24e2bf6b823793f27c3b557390a59d8b8",
+        "registry_identity_sha256": "3777a8ec9106eabb6a17ebe86ce777220164372cbbd694b877cf3eb34fc6d4d9",
         "resolved_input_sha256": "00753f57e1b20017872d1cf16f347439a54a568b26c3b6d69d0a28cf5901cad6",
-        "registry_version": "data-manifest/1.0+13144rows",
+        "registry_version": "data-manifest/1.0+14545rows",
         "metric_definition_version": "quality_frontier/v2",
         "metric_source_sha256": "4bf5e2c7953d5ffe68ed0499541f12143991be7b4ebbf25dd8622f1cadcf4d1c",
         "n_resolved_records": 414,
@@ -5608,12 +5608,12 @@ window.DYNAMICS_DATA = {
         "data_integrity_policy": "docs/data_integrity_findings.md",
         "requires_external_service": null,
         "contract_version": "lab-contract/v6",
-        "generated_at": "2026-08-29T16:00:53.162546+00:00"
+        "generated_at": "2026-08-30T05:12:36.713533+00:00"
       }
     },
     "story_arc": {
       "experiment_id": "lab_story_arc",
-      "generated_at": "2026-08-29T18:00:53.724126",
+      "generated_at": "2026-08-30T07:12:37.285431",
       "summary": {
         "snowball_factor": 2.32,
         "session1_cost": 0.173207,
@@ -5753,9 +5753,9 @@ window.DYNAMICS_DATA = {
       "lab_contract": {
         "lab": "lab_story_arc.py",
         "input_dataset_id": "canonical_registry/story",
-        "registry_identity_sha256": "f52bb2c81c1d417a0cf4334bb1e147c24e2bf6b823793f27c3b557390a59d8b8",
+        "registry_identity_sha256": "3777a8ec9106eabb6a17ebe86ce777220164372cbbd694b877cf3eb34fc6d4d9",
         "resolved_input_sha256": "38a1f5dbe586890f453f846aa185f75e150bed7de0d3de007b8c66e3811b1be6",
-        "registry_version": "data-manifest/1.0+13144rows",
+        "registry_version": "data-manifest/1.0+14545rows",
         "metric_definition_version": "story_arc/v2",
         "metric_source_sha256": "1e10f13a3df8657c2e75ca2045a1bb8835fb3880b6c475f5d2da6747b40a7c95",
         "n_resolved_records": 207,
@@ -5774,12 +5774,12 @@ window.DYNAMICS_DATA = {
         "data_integrity_policy": "docs/data_integrity_findings.md",
         "requires_external_service": null,
         "contract_version": "lab-contract/v6",
-        "generated_at": "2026-08-29T16:00:53.724747+00:00"
+        "generated_at": "2026-08-30T05:12:37.286066+00:00"
       }
     },
     "verification_frontier": {
       "experiment_id": "lab_verification_frontier",
-      "generated_at": "2026-08-29T18:00:54.952276",
+      "generated_at": "2026-08-30T07:12:38.555880",
       "summary": {
         "models": 7,
         "stories": 207,
@@ -5893,9 +5893,9 @@ window.DYNAMICS_DATA = {
       "lab_contract": {
         "lab": "lab_verification_frontier.py",
         "input_dataset_id": "canonical_registry/story",
-        "registry_identity_sha256": "f52bb2c81c1d417a0cf4334bb1e147c24e2bf6b823793f27c3b557390a59d8b8",
+        "registry_identity_sha256": "3777a8ec9106eabb6a17ebe86ce777220164372cbbd694b877cf3eb34fc6d4d9",
         "resolved_input_sha256": "38a1f5dbe586890f453f846aa185f75e150bed7de0d3de007b8c66e3811b1be6",
-        "registry_version": "data-manifest/1.0+13144rows",
+        "registry_version": "data-manifest/1.0+14545rows",
         "metric_definition_version": "verification_frontier/v2",
         "metric_source_sha256": "3c9ec2ce0be32ac9c6ae3e3ba3e3cdb4e2930a11d87dbb07c0933472b356457c",
         "n_resolved_records": 207,
@@ -5914,14 +5914,14 @@ window.DYNAMICS_DATA = {
         "data_integrity_policy": "docs/data_integrity_findings.md",
         "requires_external_service": null,
         "contract_version": "lab-contract/v6",
-        "generated_at": "2026-08-29T16:00:54.952826+00:00"
+        "generated_at": "2026-08-30T05:12:38.556474+00:00"
       }
     },
     "verification_value": {
       "experiment_id": "lab_verification_value",
-      "generated_at": "2026-08-29T18:00:55.507910",
+      "generated_at": "2026-08-30T07:12:39.104998",
       "summary": {
-        "correlation_tests_vs_worse_rate": -0.161,
+        "correlation_tests_vs_worse_rate": -0.154,
         "cells": 105,
         "stories": 207,
         "reviews": 242,
@@ -6009,15 +6009,15 @@ window.DYNAMICS_DATA = {
         {
           "model": "claude-haiku-4-5",
           "tests": 248,
-          "reviews": 6,
-          "better_rate": 0.5,
-          "worse_rate": 0.167
+          "reviews": 5,
+          "better_rate": 0.4,
+          "worse_rate": 0.2
         },
         {
           "model": "claude-haiku-4-5",
           "tests": 294,
-          "reviews": 3,
-          "better_rate": 0.667,
+          "reviews": 5,
+          "better_rate": 0.6,
           "worse_rate": 0.0
         },
         {
@@ -6212,15 +6212,15 @@ window.DYNAMICS_DATA = {
         {
           "model": "deepseek-v4-flash",
           "tests": 67,
-          "reviews": 2,
-          "better_rate": 0.5,
+          "reviews": 5,
+          "better_rate": 0.8,
           "worse_rate": 0.0
         },
         {
           "model": "deepseek-v4-pro",
           "tests": 0,
-          "reviews": 7,
-          "better_rate": 0.429,
+          "reviews": 6,
+          "better_rate": 0.333,
           "worse_rate": 0.0
         },
         {
@@ -6324,8 +6324,8 @@ window.DYNAMICS_DATA = {
         {
           "model": "deepseek-v4-pro",
           "tests": 47,
-          "reviews": 11,
-          "better_rate": 0.909,
+          "reviews": 10,
+          "better_rate": 0.9,
           "worse_rate": 0.0
         },
         {
@@ -6562,8 +6562,8 @@ window.DYNAMICS_DATA = {
         {
           "model": "gpt-5.6-sol",
           "tests": 15,
-          "reviews": 4,
-          "better_rate": 0.75,
+          "reviews": 5,
+          "better_rate": 0.8,
           "worse_rate": 0.0
         },
         {
@@ -6668,9 +6668,9 @@ window.DYNAMICS_DATA = {
       "lab_contract": {
         "lab": "lab_verification_value.py",
         "input_dataset_id": "canonical_registry/story+review",
-        "registry_identity_sha256": "f52bb2c81c1d417a0cf4334bb1e147c24e2bf6b823793f27c3b557390a59d8b8",
-        "resolved_input_sha256": "44da8aa829d4288b7652248a884275c1ed71be5c74b7b92cc7aacb9fa10d2d7e",
-        "registry_version": "data-manifest/1.0+13144rows",
+        "registry_identity_sha256": "3777a8ec9106eabb6a17ebe86ce777220164372cbbd694b877cf3eb34fc6d4d9",
+        "resolved_input_sha256": "2c07ba3daefec7d3daf95897fc6ccd98adda9039c6e13fb27b9c3b07dfed3b2e",
+        "registry_version": "data-manifest/1.0+14545rows",
         "metric_definition_version": "verification_value/v2",
         "metric_source_sha256": "f8331d35688c569a39b7247378995514661aa372eef25b879a4536ce544e339a",
         "n_resolved_records": 449,
@@ -6689,7 +6689,7 @@ window.DYNAMICS_DATA = {
         "data_integrity_policy": "docs/data_integrity_findings.md",
         "requires_external_service": null,
         "contract_version": "lab-contract/v6",
-        "generated_at": "2026-08-29T16:00:55.508723+00:00"
+        "generated_at": "2026-08-30T05:12:39.105741+00:00"
       }
     }
   },

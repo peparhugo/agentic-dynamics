@@ -1,8 +1,8 @@
 {
   "experiment_id": "lab_verification_value",
-  "generated_at": "2026-08-29T18:00:55.507910",
+  "generated_at": "2026-08-30T07:12:39.104998",
   "summary": {
-    "correlation_tests_vs_worse_rate": -0.161,
+    "correlation_tests_vs_worse_rate": -0.154,
     "cells": 105,
     "stories": 207,
     "reviews": 242,
@@ -90,15 +90,15 @@
     {
       "model": "claude-haiku-4-5",
       "tests": 248,
-      "reviews": 6,
-      "better_rate": 0.5,
-      "worse_rate": 0.167
+      "reviews": 5,
+      "better_rate": 0.4,
+      "worse_rate": 0.2
     },
     {
       "model": "claude-haiku-4-5",
       "tests": 294,
-      "reviews": 3,
-      "better_rate": 0.667,
+      "reviews": 5,
+      "better_rate": 0.6,
       "worse_rate": 0.0
     },
     {
@@ -293,15 +293,15 @@
     {
       "model": "deepseek-v4-flash",
       "tests": 67,
-      "reviews": 2,
-      "better_rate": 0.5,
+      "reviews": 5,
+      "better_rate": 0.8,
       "worse_rate": 0.0
     },
     {
       "model": "deepseek-v4-pro",
       "tests": 0,
-      "reviews": 7,
-      "better_rate": 0.429,
+      "reviews": 6,
+      "better_rate": 0.333,
       "worse_rate": 0.0
     },
     {
@@ -405,8 +405,8 @@
     {
       "model": "deepseek-v4-pro",
       "tests": 47,
-      "reviews": 11,
-      "better_rate": 0.909,
+      "reviews": 10,
+      "better_rate": 0.9,
       "worse_rate": 0.0
     },
     {
@@ -643,8 +643,8 @@
     {
       "model": "gpt-5.6-sol",
       "tests": 15,
-      "reviews": 4,
-      "better_rate": 0.75,
+      "reviews": 5,
+      "better_rate": 0.8,
       "worse_rate": 0.0
     },
     {
@@ -749,9 +749,9 @@
   "lab_contract": {
     "lab": "lab_verification_value.py",
     "input_dataset_id": "canonical_registry/story+review",
-    "registry_identity_sha256": "f52bb2c81c1d417a0cf4334bb1e147c24e2bf6b823793f27c3b557390a59d8b8",
-    "resolved_input_sha256": "44da8aa829d4288b7652248a884275c1ed71be5c74b7b92cc7aacb9fa10d2d7e",
-    "registry_version": "data-manifest/1.0+13144rows",
+    "registry_identity_sha256": "3777a8ec9106eabb6a17ebe86ce777220164372cbbd694b877cf3eb34fc6d4d9",
+    "resolved_input_sha256": "2c07ba3daefec7d3daf95897fc6ccd98adda9039c6e13fb27b9c3b07dfed3b2e",
+    "registry_version": "data-manifest/1.0+14545rows",
     "metric_definition_version": "verification_value/v2",
     "metric_source_sha256": "f8331d35688c569a39b7247378995514661aa372eef25b879a4536ce544e339a",
     "n_resolved_records": 449,
@@ -770,6 +770,6 @@
     "data_integrity_policy": "docs/data_integrity_findings.md",
     "requires_external_service": null,
     "contract_version": "lab-contract/v6",
-    "generated_at": "2026-08-29T16:00:55.508723+00:00"
+    "generated_at": "2026-08-30T05:12:39.105741+00:00"
   }
 }

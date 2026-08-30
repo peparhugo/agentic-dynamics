@@ -190,22 +190,23 @@
   "story_review": {
     "story_name": "task_manager_api",
     "reviewer_model": "deepseek/deepseek-v4-flash",
-    "overall_coherence": 0.9,
+    "overall_coherence": 0.92,
     "compounding_issues": [
-      "Hand-rolled JWT (manual HS256 HMAC in app.py) persists through all sessions instead of a vetted library \u2014 works but lacks alg verification and iss/aud claims",
-      "Hand-rolled SQLite migrations run at import time with growing special-case complexity: S1 inline CHECK, S2 ALTER TABLE + legacy backfill user, S3 RENAME/recreate-table dance gated on sqlite_master string inspection",
-      "VALID_STATUSES is duplicated between app.py and repositories.py after the S4 refactor \u2014 a drift risk the later CHECK constraint and validation both depend on",
-      "S4 refactor instantiates a fresh repository (new sqlite connection) per call, invoked multiple times per request via user_repository()/task_repository() factories",
-      "Hardcoded JWT_SECRET default ('development-secret-change-me') and module-level init_db() at import time remain as latent footguns"
+      "Schema evolution relied on guarded ALTER TABLE ADD COLUMN (owner_id in S2, email in S3) instead of a migration system, so later sessions had to bolt columns onto the S1 tasks table at runtime",
+      "Inline get_db()/sqlite connection handling persisted through S1-S3, so the S4 repository extraction required touching every route at once rather than a localized change",
+      "The S3 Celery 'email notification' is a print() mock (tasks.py), leaving the async integration layer non-functional beyond logging and giving S4/S5 little real infrastructure to build on",
+      "Auth was spread across sessions: owner_id and JWT gating in S2, email column in S3, per-user rate limiting only hardened in S5",
+      "S1's greenfield rewrite traded the seed's modular Blueprint architecture for a flat single-module app (0.70 convention score), flattening structure that S2-S4 then had to re-layer",
+      "S5 shipped an undeclared flask_limiter dependency, a hardcoded redis://localhost:6379/0 storage default, and a breaking list_tasks contract change (bare array -> {data, next_cursor, total} envelope)"
     ],
     "key_decisions": [
-      "S2: per-user multi-tenancy via owner_id with a legacy-user backfill migration \u2014 the scoping invariant every later session builds on",
-      "S2: hand-rolled JWT auth (encode_token/current_user/auth_required) instead of a JWT library",
-      "S3: edge-triggered Celery notification on the pending->completed transition, with a RENAME/recreate-table migration to widen the status CHECK constraint",
-      "S4: repository-pattern extraction (BaseRepository ABC + UserRepository/TaskRepository) that made S5's pagination a pure repository change",
-      "S5: cursor-based pagination (fetch limit+1 to derive next_cursor) and per-user Flask-Limiter rate limiting keyed off the authenticated user"
+      "Choosing Flask + SQLite with a single tasks table and an inline connection factory in S1, which fixed the persistence approach for the whole story",
+      "Adding JWT auth with a token_required decorator plus owner_id-scoped access control in S2, giving every task route per-user isolation",
+      "Integrating Celery + Redis as an async notification broker in S3 (celery_config.py, tasks.py) with a conftest.py seam that mocks .delay for deterministic tests",
+      "Extracting a BaseRepository/TaskRepository/UserRepository abstraction in S4 to isolate all DB access from route handlers, cutting app.py by ~45% while keeping tests unchanged",
+      "Adding Flask-Limiter rate limiting with a JWT-aware key_func and cursor/keyset pagination in S5, built inside the repository layer via find_paginated_by_owner"
     ],
-    "trajectory_description": "Quality improved steadily across all five sessions. The test suite grew monotonically (8 -> 11 -> 13 -> 13 -> 17 test functions) and stayed green at every checkpoint I verified (13 passed at S4, 20 collected/20 passed at S5). The codebase evolved from a single 128-line seed file into a cleanly modular layout (app.py + repositories.py + celery_config.py + notifications.py + requirements.txt), with S4 a disciplined behavior-preserving refactor (flat test count, no regressions) and S5 adding two well-tested cross-cutting concerns (pagination + rate limiting) on top of the S2 tenancy model. The only real friction was S2's auth addition \u2014 the largest diff \u2014 which recorded the only error artifacts in the whole run yet still landed fully tested; sessions 3-5 were otherwise friction-free.",
-    "summary": "A textbook 5-phase story \u2014 harden, authenticate/tenant, integrate asynchronously, refactor, cross-cut \u2014 with monotonically growing green test coverage and a clean architecture arc, marred only by a hand-rolled JWT and increasingly ad-hoc import-time migrations that were never revisited."
+    "trajectory_description": "Quality improved steadily and deliberately across the five sessions. Session 1 delivered a minimal but clean single-file CRUD API; Session 2 layered in user auth and per-owner data scoping with pragmatic ALTER migrations; Session 3 added a Celery async integration seam; Session 4 was a genuine refactor that extracted a repository layer and slimmed app.py by roughly half with all tests passing unmodified; Session 5 added rate limiting, cursor pagination, and final hardening. The test suite grew from 13 to 46 passing tests (180 to 815 lines), tool calls rose from 17 to 40, and every session exited green, so the build compounded positively rather than degrading; the only dips were a flat-structure convention score that persisted at 0.70 and S5's late introduction of an undeclared dependency and a breaking API contract.",
+    "summary": "A well-orchestrated, textbook incremental build where each session added a distinct architectural layer on top of the last \u2014 greenfield CRUD to a feature-complete, hardened, test-verified API \u2014 with the main frictions being late-arriving schema migrations, a non-functional email mock, and an S5 dependency/contract slip."
   }
 }

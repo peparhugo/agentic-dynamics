@@ -1,6 +1,6 @@
 {
   "experiment_id": "lab_verification_frontier",
-  "generated_at": "2026-08-29T18:00:54.952276",
+  "generated_at": "2026-08-30T07:12:38.555880",
   "summary": {
     "models": 7,
     "stories": 207,
@@ -114,9 +114,9 @@
   "lab_contract": {
     "lab": "lab_verification_frontier.py",
     "input_dataset_id": "canonical_registry/story",
-    "registry_identity_sha256": "f52bb2c81c1d417a0cf4334bb1e147c24e2bf6b823793f27c3b557390a59d8b8",
+    "registry_identity_sha256": "3777a8ec9106eabb6a17ebe86ce777220164372cbbd694b877cf3eb34fc6d4d9",
     "resolved_input_sha256": "38a1f5dbe586890f453f846aa185f75e150bed7de0d3de007b8c66e3811b1be6",
-    "registry_version": "data-manifest/1.0+13144rows",
+    "registry_version": "data-manifest/1.0+14545rows",
     "metric_definition_version": "verification_frontier/v2",
     "metric_source_sha256": "3c9ec2ce0be32ac9c6ae3e3ba3e3cdb4e2930a11d87dbb07c0933472b356457c",
     "n_resolved_records": 207,
@@ -135,6 +135,6 @@
     "data_integrity_policy": "docs/data_integrity_findings.md",
     "requires_external_service": null,
     "contract_version": "lab-contract/v6",
-    "generated_at": "2026-08-29T16:00:54.952826+00:00"
+    "generated_at": "2026-08-30T05:12:38.556474+00:00"
   }
 }

@@ -3,8 +3,8 @@
 **Generated — do not edit by hand.** Regenerate with `python scripts/spec_status.py`;
 `scripts/run_workflow.py` also refreshes it at the end of every run.
 
-Generated at: `2026-08-29T15:56:37.526325+00:00`  ·  151 spec(s)
-**Work remaining:** 42 open · 109 completed/retired
+Generated at: `2026-08-29T17:40:01.960354+00:00`  ·  152 spec(s)
+**Work remaining:** 42 open · 110 completed/retired
 
 | name | kind | repeatable | status | version | supersedes | last_run | ok | model | cost | n_runs |
 |---|---|---|---|---|---|---|---|---|---|---|
@@ -119,7 +119,7 @@ Generated at: `2026-08-29T15:56:37.526325+00:00`  ·  151 spec(s)
 | `evidence_redesign` | workflow | no | completed | 0.1 | — | 2026-08-14 19:18 | ok | openai/gpt-5.6-sol | $5.9008 | 3 |
 | `fix_review_findings` | workflow | no | completed | 0.1 | — | 2026-08-14 13:48 | ok | deepseek/deepseek-v4-pro | $0.1504 | 1 |
 | `fleet_ladder_plan` | workflow | no | completed | 0.1 | — | 2026-08-29 15:33 | ok | deepseek/deepseek-v4-flash | $0.0836 | 1 |
-| `fleet_ladder_revision` | workflow | no | completed | 0.1 | — | 2026-08-29 15:56 | ok | deepseek/deepseek-v4-pro | $0.1872 | 1 |
+| `fleet_ladder_revision` | workflow | no | completed | 0.1 | — | 2026-08-29 17:02 | ok | deepseek/deepseek-v4-pro | $0.1724 | 2 |
 | `framework_facelift` | workflow | no | completed | 0.2 | — | 2026-08-14 15:18 | ok | openai/gpt-5.6-sol | $0.0000 | 1 |
 | `grit_calibration_design` | workflow | no | completed | 0.1 | — | 2026-08-28 15:05 | ok | deepseek/deepseek-v4-flash | $0.0250 | 1 |
 | `i10_typed_checkpoint` | workflow | no | completed | 0.1 | — | 2026-08-28 17:00 | ok | deepseek/deepseek-v4-flash | $0.0085 | 3 |
@@ -133,6 +133,7 @@ Generated at: `2026-08-29T15:56:37.526325+00:00`  ·  151 spec(s)
 | `measurement_contribution_closure` | workflow | no | completed | 0.1 | — | 2026-08-22 01:23 | ok | deepseek/deepseek-v4-pro | $1.9018 | 1 |
 | `opencode_docs_refresh` | workflow | no | completed | 0.1 | — | 2026-08-14 21:33 | ok | anthropic/claude-fable-5 | $23.1829 | 1 |
 | `perturbation_operators_fix` | workflow | no | completed | 0.1 | — | 2026-08-15 16:32 | ok | deepseek/deepseek-v4-pro | $0.1822 | 1 |
+| `qualitative_routing_analysis` | workflow | no | completed | 0.1 | — | 2026-08-29 17:40 | ok | deepseek/deepseek-v4-pro | $0.3308 | 1 |
 | `rag_knowledge_base` | workflow | no | completed | 0.1 | — | 2026-08-14 23:37 | ok | openai/gpt-5.6-sol | $5.4215 | 4 |
 | `rag_knowledge_base_build` | workflow | no | completed | 0.1 | — | 2026-08-15 00:58 | ok | deepseek/deepseek-v4-pro | $0.7587 | 1 |
 | `rag_knowledge_base_reconcile` | workflow | no | completed | 0.1 | — | 2026-08-15 19:31 | ok | deepseek/deepseek-v4-pro | $0.3449 | 1 |
