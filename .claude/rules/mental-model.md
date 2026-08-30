@@ -426,7 +426,7 @@ agentic-dynamics
 ├─ analyze     worktrees|trajectories|stories|lab <name>
 ├─ data        build|sync|manifest|inventory
 ├─ knowledge   ingest|sources|worker
-├─ graph       build
+├─ graph       build|wall
 ├─ registry    query|show|lineage
 ├─ review      all|stories|trigger|enqueue|finalize
 ├─ spec        status|pipeline

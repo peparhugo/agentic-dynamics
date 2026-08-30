@@ -1,0 +1,734 @@
+{
+  "phase": "p2_wall_reproduction",
+  "spec": "persistent_code_graph@0.1",
+  "fixture": "the 2e wall \u2014 the incorrect_rebuilt cells' changed symbols (the widgets\u2192add dependants)",
+  "wall_facts_recorded": {
+    "impacted_symbol_count": 0,
+    "changed_symbol_count": "20",
+    "neighborhood": [
+      "add",
+      "widget_1",
+      "widget_10",
+      "widget_11",
+      "widget_12",
+      "widget_13",
+      "widget_14",
+      "widget_15",
+      "widget_16",
+      "widget_17",
+      "widget_18",
+      "widget_19",
+      "widget_2",
+      "widget_3",
+      "widget_4",
+      "widget_5",
+      "widget_6",
+      "widget_7",
+      "widget_8",
+      "widget_9"
+    ],
+    "probe_source": "experiments/results/cap_adaptive_2d/p1_incorrect_rebuilt_probe.json",
+    "probe_root_cause": "impacted_symbol_count = 0 under the pinned analyzer. The 19 widgets are THEMSELVES changed symbols (added symbols -> seeds), so the analyzer's _neighborhood excludes them from the impacted count (evidence_analyzer.py:235-247: 'the seeds themselves are not the impacted set'). The ONLY non-seed dependants are test_add/test_subtract/subtract, but the analyzer's hard timeout_ms=300 on the 20-seed BFS (evidence_analyzer.py:225-234) truncates before reaching them. With a 10s deadline the same expansion returns 3 non-seed dependants, so the edge EXISTS \u2014 the widgets-call-add guarantee fails on the analyzer's deadline, not the graph. risk = 0.19 + 0.02*min(1, 0/10) = 0.19 < 0.2 -> the class proposes continue, NOT verify -> the wrong-apply leg is unmeasurable.",
+    "probe_10s": {
+      "impacted": 3,
+      "non_seed_dependants": [
+        "subtract",
+        "test_add",
+        "test_subtract"
+      ]
+    }
+  },
+  "counter_definition": {
+    "semantics": "behavioral \u2014 a behavior-preserving change has zero behavioral impact on its callers (the design \u00a71 lesson); the construction assumed STRUCTURAL reach (the callers' edges).",
+    "mechanism": "evidence_analyzer._neighborhood: the changed symbols are the SEEDS; the seeds themselves are excluded from the impacted set (evidence_analyzer.py:235-247) and the BFS runs under a hard timeout_ms=300 (evidence_analyzer.py:225-234) \u2014 the 20-seed expansion truncates before the non-seed dependants.",
+    "citations": [
+      "docs/designs/proposed/neo4j_graph_analysis_design.md \u00a71 (the lesson)",
+      "src/agentic_dynamics/control/evidence_analyzer.py:225-247 (the mechanism)",
+      "experiments/results/cap_adaptive_2d/p1_incorrect_rebuilt_probe.json (the record)"
+    ]
+  },
+  "cells": {
+    "cap2d_incorrect_rebuilt_abstention_r1": {
+      "worktree": "/tmp/cap2d_incorrect_rebuilt_abstention_r1",
+      "revision": "fde0232ae2cdc82256d3a7300652636903d5a889",
+      "changed": {
+        "seed": "a6fc64127527f608264be241e98135b19e3f4669",
+        "final": "fde0232ae2cdc82256d3a7300652636903d5a889",
+        "added_symbols": [
+          "widget_1",
+          "widget_10",
+          "widget_11",
+          "widget_12",
+          "widget_13",
+          "widget_14",
+          "widget_15",
+          "widget_16",
+          "widget_17",
+          "widget_18",
+          "widget_19",
+          "widget_2",
+          "widget_3",
+          "widget_4",
+          "widget_5",
+          "widget_6",
+          "widget_7",
+          "widget_8",
+          "widget_9"
+        ],
+        "removed_symbols": [],
+        "changed_symbols": [
+          "add"
+        ],
+        "changed_symbol_count": 20
+      },
+      "recorded_facts": {
+        "impacted_symbol_count": "0",
+        "changed_symbol_count": "20",
+        "changed_symbols_with_tests_ratio": "0.05"
+      },
+      "structural_dependants": {
+        "widget_1": {
+          "dependant_count": 0,
+          "dependants": []
+        },
+        "widget_10": {
+          "dependant_count": 0,
+          "dependants": []
+        },
+        "widget_11": {
+          "dependant_count": 0,
+          "dependants": []
+        },
+        "widget_12": {
+          "dependant_count": 0,
+          "dependants": []
+        },
+        "widget_13": {
+          "dependant_count": 0,
+          "dependants": []
+        },
+        "widget_14": {
+          "dependant_count": 0,
+          "dependants": []
+        },
+        "widget_15": {
+          "dependant_count": 0,
+          "dependants": []
+        },
+        "widget_16": {
+          "dependant_count": 0,
+          "dependants": []
+        },
+        "widget_17": {
+          "dependant_count": 0,
+          "dependants": []
+        },
+        "widget_18": {
+          "dependant_count": 0,
+          "dependants": []
+        },
+        "widget_19": {
+          "dependant_count": 0,
+          "dependants": []
+        },
+        "widget_2": {
+          "dependant_count": 0,
+          "dependants": []
+        },
+        "widget_3": {
+          "dependant_count": 0,
+          "dependants": []
+        },
+        "widget_4": {
+          "dependant_count": 0,
+          "dependants": []
+        },
+        "widget_5": {
+          "dependant_count": 0,
+          "dependants": []
+        },
+        "widget_6": {
+          "dependant_count": 0,
+          "dependants": []
+        },
+        "widget_7": {
+          "dependant_count": 0,
+          "dependants": []
+        },
+        "widget_8": {
+          "dependant_count": 0,
+          "dependants": []
+        },
+        "widget_9": {
+          "dependant_count": 0,
+          "dependants": []
+        },
+        "add": {
+          "dependant_count": 20,
+          "dependants": [
+            "test_add",
+            "widget_1",
+            "widget_10",
+            "widget_11",
+            "widget_12",
+            "widget_13",
+            "widget_14",
+            "widget_15",
+            "widget_16",
+            "widget_17",
+            "widget_18",
+            "widget_19",
+            "widget_2",
+            "widget_3",
+            "widget_4",
+            "widget_5",
+            "widget_6",
+            "widget_7",
+            "widget_8",
+            "widget_9"
+          ]
+        }
+      },
+      "seeds": [
+        "4866386889cfd3e446e006d467382ff3be29410ff9f4d4cca0e7a61738d2314d",
+        "0240bab9175050fac2fbc99890661bd020f0abcba0a1a2aacb1bb684c6ba11d4",
+        "a21af4d5709342ea60cbc7178a12976bf8e123ed9a182dfd30b0b6dc7e62460e",
+        "87a2225223bc86e3cc86c6f09b85ad9642bd6229c9f1ca9bc146c97b33fa687e",
+        "12e91ecb0e172ec4277f31aac61deb9f791547779f95af678df573b90e21088d",
+        "5506586122814f24a1efebcd1576d3ba5d133d98bced033ec7ae20e44d1f92f5",
+        "a82af1a47f3f5a1f1d9be53fec1685ccc55097e3db0334d5136987ad0ad6f7ea",
+        "babf2adbb3ae5d5763bcedd9f1571353ae46deda5074d2c9509c71896a90ae56",
+        "6e35989202c285ddee324949ec7e4a1463289777f3147398e35f9baf879737a8",
+        "6f6abf45c17a2e2fbabfac47fbfbaddbe67cb547f12b0d015d74ad0a1372686a",
+        "2f83440329250fdd8764cceed86099f4e6a052f2f447e2bfe25990911885c18e",
+        "302406c6cce4a123b69dc08e649d3b06e9392d499117f44d10a4a90963e53137",
+        "fa20ee8f7f0cf70fa9ddac135ec6f70dcd6154de28127e91497f5744118ac5dc",
+        "3929c3f74441c4b61e6510832ef813b89930e6414fc6d5bd29b17118dad5c41c",
+        "6a4dd62e1dd1348c547015aa5b38b0364bf77ada5d22e2b15369c9cf1dc8c2a4",
+        "fe533c7f0710872028cdb72e12f60cd100bd2302b790f3ed8ca4eec829bea552",
+        "d8dbfa3841fce1ead58429ead3670911a45f2318007fb14dcd2fbcc09093c6d3",
+        "f4fd23690100f29c43891798391cd153349bb51405356c9918c80fba605149fc",
+        "9283de95967eaa80e38e97f06fac5b90b5fff91a696d1bab5fe657f8713b7a2d",
+        "ade28b965ace3080695ffc652981f502e45dc63d7cb0ce873f7f0dcf85478082"
+      ]
+    },
+    "cap2d_incorrect_rebuilt_abstention_r2": {
+      "worktree": "/tmp/cap2d_incorrect_rebuilt_abstention_r2",
+      "revision": "6961ed7b26df083a6d5631b572e680e8a4592146",
+      "changed": {
+        "seed": "8d693929f24ddd457eb31af98fdc372bc6224454",
+        "final": "6961ed7b26df083a6d5631b572e680e8a4592146",
+        "added_symbols": [
+          "widget_1",
+          "widget_10",
+          "widget_11",
+          "widget_12",
+          "widget_13",
+          "widget_14",
+          "widget_15",
+          "widget_16",
+          "widget_17",
+          "widget_18",
+          "widget_19",
+          "widget_2",
+          "widget_3",
+          "widget_4",
+          "widget_5",
+          "widget_6",
+          "widget_7",
+          "widget_8",
+          "widget_9"
+        ],
+        "removed_symbols": [],
+        "changed_symbols": [
+          "add"
+        ],
+        "changed_symbol_count": 20
+      },
+      "recorded_facts": {
+        "impacted_symbol_count": "0",
+        "changed_symbol_count": "20",
+        "changed_symbols_with_tests_ratio": "0.05"
+      },
+      "structural_dependants": {
+        "widget_1": {
+          "dependant_count": 0,
+          "dependants": []
+        },
+        "widget_10": {
+          "dependant_count": 0,
+          "dependants": []
+        },
+        "widget_11": {
+          "dependant_count": 0,
+          "dependants": []
+        },
+        "widget_12": {
+          "dependant_count": 0,
+          "dependants": []
+        },
+        "widget_13": {
+          "dependant_count": 0,
+          "dependants": []
+        },
+        "widget_14": {
+          "dependant_count": 0,
+          "dependants": []
+        },
+        "widget_15": {
+          "dependant_count": 0,
+          "dependants": []
+        },
+        "widget_16": {
+          "dependant_count": 0,
+          "dependants": []
+        },
+        "widget_17": {
+          "dependant_count": 0,
+          "dependants": []
+        },
+        "widget_18": {
+          "dependant_count": 0,
+          "dependants": []
+        },
+        "widget_19": {
+          "dependant_count": 0,
+          "dependants": []
+        },
+        "widget_2": {
+          "dependant_count": 0,
+          "dependants": []
+        },
+        "widget_3": {
+          "dependant_count": 0,
+          "dependants": []
+        },
+        "widget_4": {
+          "dependant_count": 0,
+          "dependants": []
+        },
+        "widget_5": {
+          "dependant_count": 0,
+          "dependants": []
+        },
+        "widget_6": {
+          "dependant_count": 0,
+          "dependants": []
+        },
+        "widget_7": {
+          "dependant_count": 0,
+          "dependants": []
+        },
+        "widget_8": {
+          "dependant_count": 0,
+          "dependants": []
+        },
+        "widget_9": {
+          "dependant_count": 0,
+          "dependants": []
+        },
+        "add": {
+          "dependant_count": 20,
+          "dependants": [
+            "test_add",
+            "widget_1",
+            "widget_10",
+            "widget_11",
+            "widget_12",
+            "widget_13",
+            "widget_14",
+            "widget_15",
+            "widget_16",
+            "widget_17",
+            "widget_18",
+            "widget_19",
+            "widget_2",
+            "widget_3",
+            "widget_4",
+            "widget_5",
+            "widget_6",
+            "widget_7",
+            "widget_8",
+            "widget_9"
+          ]
+        }
+      },
+      "seeds": [
+        "71172f9a55980ae0287d407cccceff54ec842a0589d1faab6fcc2b3722ce5d77",
+        "3db410efcdaf5f57250e2bdec7d73cd359ad08d8062f6958af5d76de7fd939f5",
+        "90ee7392984d1626da9185acbc23af63b0f74cd90112d9ed386c3f0710f8c98e",
+        "f738b66be661ce99110fc95fa773e1f621bb5b0ff8abc3dfa8c2cc99a57fd683",
+        "0a7c49cc5a36cdbe2bd4cc8015ac07d74889cf334293ac51510477676043aa06",
+        "8ed2f45fce4de3db6d05e9c1ce522eafe05a9aabf006ae03925f4d495424dbb7",
+        "811691fd7f212c4c5037c6d5c9cf5abfbfcd50f232216fbe551d68da9a2071e9",
+        "9b2af08b5c9199d59c7ff285118dd806595328788b7fe03aaeabe32e5be2c305",
+        "c2b4499bb9321328542f436a89176cf18a41d83fcfdee064dc8b16418ceaaae5",
+        "62237e66bd2ad43caa3ae92578eecc7118bbbed352e62a452167f538b59db491",
+        "c320b9be00a4f04625f91b37c12991a3ca666d8c76fbb805a355d386d9025263",
+        "7edbd5f1a94245e5405a99cde61c52a357b6372cf0e2d15da49ffbfb7565cbf6",
+        "cce764ac56202938bf93d4d0b810664cace590e111126c1217f9370a10d3c2df",
+        "285a0d991c012e55ba7822d93f55f8c50d0784437008ef72d25c69bf7cc4e54d",
+        "ac63c6740b86c2ca52ed1de52ae4f478cf99a630450aeca3f53033066ce947c2",
+        "4b80e8a4bd552c56d45d865617ee7638fa21d65a53afbd841ffbdd545b4d9f70",
+        "f7edb8f0631181850c70e302d64db9d056541bd94362b08bf4ffb71c032b7ebd",
+        "f791301aec97543d79264c9985cd6d932ce5e4e2a004db48b9bbecdfb1077d6a",
+        "c771a8a881e00a1290aac2ba7f32b74232bdaabe55cbed4b1da8fb61d795f5e7",
+        "9291f21a089508d064cad18545e83efe8609b409cb973c94cdf3e994bf3e2dd7"
+      ]
+    },
+    "cap2d_incorrect_rebuilt_status_quo_r1": {
+      "worktree": "/tmp/cap2d_incorrect_rebuilt_status_quo_r1",
+      "revision": "e6603608a31a99afc98d260124004fbcd360c776",
+      "changed": {
+        "seed": "8f8d3f6da06cf87e7416b327093b6fcccf29fd79",
+        "final": "e6603608a31a99afc98d260124004fbcd360c776",
+        "added_symbols": [
+          "widget_1",
+          "widget_10",
+          "widget_11",
+          "widget_12",
+          "widget_13",
+          "widget_14",
+          "widget_15",
+          "widget_16",
+          "widget_17",
+          "widget_18",
+          "widget_19",
+          "widget_2",
+          "widget_3",
+          "widget_4",
+          "widget_5",
+          "widget_6",
+          "widget_7",
+          "widget_8",
+          "widget_9"
+        ],
+        "removed_symbols": [],
+        "changed_symbols": [
+          "add"
+        ],
+        "changed_symbol_count": 20
+      },
+      "recorded_facts": {
+        "impacted_symbol_count": "0",
+        "changed_symbol_count": "20",
+        "changed_symbols_with_tests_ratio": "0.05"
+      },
+      "structural_dependants": {
+        "widget_1": {
+          "dependant_count": 0,
+          "dependants": []
+        },
+        "widget_10": {
+          "dependant_count": 0,
+          "dependants": []
+        },
+        "widget_11": {
+          "dependant_count": 0,
+          "dependants": []
+        },
+        "widget_12": {
+          "dependant_count": 0,
+          "dependants": []
+        },
+        "widget_13": {
+          "dependant_count": 0,
+          "dependants": []
+        },
+        "widget_14": {
+          "dependant_count": 0,
+          "dependants": []
+        },
+        "widget_15": {
+          "dependant_count": 0,
+          "dependants": []
+        },
+        "widget_16": {
+          "dependant_count": 0,
+          "dependants": []
+        },
+        "widget_17": {
+          "dependant_count": 0,
+          "dependants": []
+        },
+        "widget_18": {
+          "dependant_count": 0,
+          "dependants": []
+        },
+        "widget_19": {
+          "dependant_count": 0,
+          "dependants": []
+        },
+        "widget_2": {
+          "dependant_count": 0,
+          "dependants": []
+        },
+        "widget_3": {
+          "dependant_count": 0,
+          "dependants": []
+        },
+        "widget_4": {
+          "dependant_count": 0,
+          "dependants": []
+        },
+        "widget_5": {
+          "dependant_count": 0,
+          "dependants": []
+        },
+        "widget_6": {
+          "dependant_count": 0,
+          "dependants": []
+        },
+        "widget_7": {
+          "dependant_count": 0,
+          "dependants": []
+        },
+        "widget_8": {
+          "dependant_count": 0,
+          "dependants": []
+        },
+        "widget_9": {
+          "dependant_count": 0,
+          "dependants": []
+        },
+        "add": {
+          "dependant_count": 20,
+          "dependants": [
+            "test_add",
+            "widget_1",
+            "widget_10",
+            "widget_11",
+            "widget_12",
+            "widget_13",
+            "widget_14",
+            "widget_15",
+            "widget_16",
+            "widget_17",
+            "widget_18",
+            "widget_19",
+            "widget_2",
+            "widget_3",
+            "widget_4",
+            "widget_5",
+            "widget_6",
+            "widget_7",
+            "widget_8",
+            "widget_9"
+          ]
+        }
+      },
+      "seeds": [
+        "3ce5a0137f5456d8cd9f0441625ea140cf978034349835fdf6875f42830e0119",
+        "c50a5f97a78c5c4f8fa4278b75f7404f16f3afbe73f8ce86fce902b4cebf388d",
+        "732ceac2c055af9a523d3b0a974a7e275e79035167e63e484e10c47a996caf26",
+        "0366c22e86dda16d878e345848120a0c0dce58e2701406d219e72c150ef5685f",
+        "79c4084ef5d5443a73cd5c0b7bcbcc44147d3b9e8d85905ff0849f18dd801839",
+        "952ce7da6bd0ff1e93bdb9be817ff4f626330098fb4dc78af5859708babaafad",
+        "7c396b0c0afd2ce9d80be90e56b25e9436e99ffa1eede192e2fb26c3edd70ad3",
+        "cd28c50c8a89ad0b08496d781b7068360b05abdd3ec20c83a3e2e7afe89601e1",
+        "1254b9de18b9d47515ffb473abf65b816986e24596f877341ebcce71515cdf19",
+        "4199df629faf01485a4c5295b5be22240e7b2d2ee0f32df7dd4aa26b9e803b0f",
+        "05175a9af49bd6adf757e3179ccd01e8ad941eba0c8748f3513db7f8c9568f07",
+        "00c30b42f466104e50ed174ba8e5b5d15458b076b4b786c422252423c82caeae",
+        "fcf5141bd261f7e314a66c5a79ea1e48711e9819c757522289c26722d2f5bbc1",
+        "96efddd9e045d273aecf8bfa8c6dc6ec4c953f3ba4ae198c200149cfe64e9eb1",
+        "b8064f768595401cb1d6be7b6193d8e74331f956674bde727e109b2459e15b46",
+        "810e2658e759e0bcbada1b4df9b280b6dabc4a1f6e9d6d0c4d398be5d99e252a",
+        "569f67a08b323923265e7b522b95d6d4ef619975713cb8fabcb0574386b30b63",
+        "ce63fa03c0841d260ab4f7a0e866f9441cd1b8b9e3d49e592eaf7a6707e2c40c",
+        "ef412e1743b3a08a2aed6ac718e9f89bfa83be99e773f94208d10da1e0c0c7d3",
+        "16fccb1cfd4049c10cddb85f0db252682e03fe004cd4dfa53ad5047a42c71478"
+      ]
+    },
+    "cap2d_incorrect_rebuilt_status_quo_r2": {
+      "worktree": "/tmp/cap2d_incorrect_rebuilt_status_quo_r2",
+      "revision": "6290d1aabe6f5eccfe3c0bc045c6341f3c6ad8dd",
+      "changed": {
+        "seed": "3954be18cb646b4ab38bd10eb2fecb13ddd8b0eb",
+        "final": "6290d1aabe6f5eccfe3c0bc045c6341f3c6ad8dd",
+        "added_symbols": [
+          "widget_1",
+          "widget_10",
+          "widget_11",
+          "widget_12",
+          "widget_13",
+          "widget_14",
+          "widget_15",
+          "widget_16",
+          "widget_17",
+          "widget_18",
+          "widget_19",
+          "widget_2",
+          "widget_3",
+          "widget_4",
+          "widget_5",
+          "widget_6",
+          "widget_7",
+          "widget_8",
+          "widget_9"
+        ],
+        "removed_symbols": [],
+        "changed_symbols": [
+          "add"
+        ],
+        "changed_symbol_count": 20
+      },
+      "recorded_facts": {
+        "impacted_symbol_count": "0",
+        "changed_symbol_count": "20",
+        "changed_symbols_with_tests_ratio": "0.05"
+      },
+      "structural_dependants": {
+        "widget_1": {
+          "dependant_count": 0,
+          "dependants": []
+        },
+        "widget_10": {
+          "dependant_count": 0,
+          "dependants": []
+        },
+        "widget_11": {
+          "dependant_count": 0,
+          "dependants": []
+        },
+        "widget_12": {
+          "dependant_count": 0,
+          "dependants": []
+        },
+        "widget_13": {
+          "dependant_count": 0,
+          "dependants": []
+        },
+        "widget_14": {
+          "dependant_count": 0,
+          "dependants": []
+        },
+        "widget_15": {
+          "dependant_count": 0,
+          "dependants": []
+        },
+        "widget_16": {
+          "dependant_count": 0,
+          "dependants": []
+        },
+        "widget_17": {
+          "dependant_count": 0,
+          "dependants": []
+        },
+        "widget_18": {
+          "dependant_count": 0,
+          "dependants": []
+        },
+        "widget_19": {
+          "dependant_count": 0,
+          "dependants": []
+        },
+        "widget_2": {
+          "dependant_count": 0,
+          "dependants": []
+        },
+        "widget_3": {
+          "dependant_count": 0,
+          "dependants": []
+        },
+        "widget_4": {
+          "dependant_count": 0,
+          "dependants": []
+        },
+        "widget_5": {
+          "dependant_count": 0,
+          "dependants": []
+        },
+        "widget_6": {
+          "dependant_count": 0,
+          "dependants": []
+        },
+        "widget_7": {
+          "dependant_count": 0,
+          "dependants": []
+        },
+        "widget_8": {
+          "dependant_count": 0,
+          "dependants": []
+        },
+        "widget_9": {
+          "dependant_count": 0,
+          "dependants": []
+        },
+        "add": {
+          "dependant_count": 20,
+          "dependants": [
+            "test_add",
+            "widget_1",
+            "widget_10",
+            "widget_11",
+            "widget_12",
+            "widget_13",
+            "widget_14",
+            "widget_15",
+            "widget_16",
+            "widget_17",
+            "widget_18",
+            "widget_19",
+            "widget_2",
+            "widget_3",
+            "widget_4",
+            "widget_5",
+            "widget_6",
+            "widget_7",
+            "widget_8",
+            "widget_9"
+          ]
+        }
+      },
+      "seeds": [
+        "065ae550acc421ee7c82b9d9ed52e9ac870e20929e3e4d030126a0d01c38d458",
+        "6c948c861fad750e320774c03f3ff2866a259aeb948e0241a2439e394b6e7791",
+        "62aadffb5f8e2eb99eabe55c891761d59938f93e924c64339282cc2d14a0c6a2",
+        "4d716c800823eeee8266ffda1cd971de697ee91b4142020d8fa890083d216533",
+        "1ccb584671a9a644c260270ab5bc948721a638ee54cf4cf7c45207ddbc09e29c",
+        "393ae76d96c9eb304f4d89cfdc27ad187a4b341c2c8fa26305280c44407a6eb7",
+        "ebe0c9f13f8625ce43338ea77d42cb1b173561cbad6b597cb83bc4ffe862992f",
+        "be7a9a06796d887bec7097f57884f0cb7e16216a034f2df44a56f2b1a05af4d2",
+        "b3d35f554514152d452c3b66bdd48fbded9cec2f8ab5067ba0e8cceb3f6e0b79",
+        "4abac136a0b3f7fef218c8e9bf67234df135b2ad4d9af09994cdcd0fd168e6c6",
+        "ed30e684c0ee42d32dd989a3a3e66fcc39f98a5611e01d6b4a3ce696ad9a7212",
+        "38207170b9cb0c374c8bea7694275e31461f577c9277f2dd0edfae09a9b67aaa",
+        "816d106f3f2604813da7b965bf5dcba16e6338ad56a6f709642b46a881b0cca8",
+        "d19256a03b180900ccdc43c91b776c669d25b9430a6123b1291e5ed3ab6104cc",
+        "24b93321c19eb56d2bc5fd32bf98ac3467aaf40dc4cede5567d070fe23e17e18",
+        "33eb8157d84add2e05d9c0518798fd3ede4191cbc54f254a5c8bbc71b4f96c13",
+        "01113dfea703991d655a56101dbdb3af0abea84999fd9e8e23b4224334565c71",
+        "61395d2ab18a880d527b9d4259dfc822fb9f72ad6bdf66a6d367a52db53d12b9",
+        "b1b8a8626f797d23e2cb240ac3b8c0784a2ece59702255a57fd7169af628afe5",
+        "1d21da0a0bfd00dc58c964d29325c12ccab932fe2a221b4e2ff05707f4574ed6"
+      ]
+    }
+  },
+  "analyzer_trace": {
+    "seeds_count": 20,
+    "traces": {
+      "recorded_300ms": {
+        "seeds": 20,
+        "expansion_nodes": 20,
+        "impacted_count": 0,
+        "non_seed_dependants": []
+      },
+      "generous_10s": {
+        "seeds": 20,
+        "expansion_nodes": 26,
+        "impacted_count": 3,
+        "non_seed_dependants": [
+          "subtract",
+          "test_add",
+          "test_subtract"
+        ]
+      }
+    }
+  },
+  "verdict": {
+    "edges_exist": true,
+    "counter_recorded_0": true,
+    "finding": "the structural edges EXIST (20 widgets\u2192add dependants per cell) AND the impacted counter read 0 \u2014 BOTH wall facts reproduced side-by-side; the divergence is the counter's behavioral definition (seeds-exclusion + the 300ms deadline), now inspectable against the persistent graph."
+  }
+}

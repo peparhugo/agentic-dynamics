@@ -75,8 +75,9 @@ _COMMANDS: dict[tuple[str, ...], str] = {
     ("knowledge", "context-report"): "context_snapshot_report.py",
     ("knowledge", "shadow-report"): "shadow_decision_report.py",
     ("knowledge", "arm-comparison"): "decision_arm_comparison.py",
-    # graph (the persistent-code-graph build — graph-family Part A)
+    # graph (the persistent-code-graph build + the wall reproduction — graph-family Part A)
     ("graph", "build"): "graph_family_build.py",
+    ("graph", "wall"): "graph_family_wall.py",
     # review
     ("review", "all"): "review_all.py",
     ("review", "stories"): "review_stories.py",
