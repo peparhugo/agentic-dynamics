@@ -46,34 +46,44 @@ x-ladder-env: &ladder-env
   CHROMA_HOST: chromadb
   FINOPS_NEO4J_URI: bolt://neo4j:7687
 
-# The four-mount contract (the isolation constant, §3) + the D-2 auth set (D-18). Every
-# scope (§5) is a subset of these — nothing outside them is ever mounted.
+# The four-mount contract (the isolation constant, §3) + the D-2 auth set (D-18), REVISED
+# by the smoke test (2026-08-30 — the five findings): the results OVERLAY at
+# /repo/experiments/results (the worker's relative paths resolve from /repo), the CLI STATE
+# dirs rw + ISOLATED per worker (the host's live opencode.db must never enter a cell — the
+# WAL crash), the CREDENTIAL files ro (the auth.json mounted as a file), the provider
+# config (~/.config) ro, and the workdir /repo on the cell base. Every scope (§5) is a
+# subset of these — nothing outside them is ever mounted.
 x-ladder-mounts: &ladder-mounts
   - ${FINOPS_WORKTREE_ROOT:-/tmp}:/tmp:rw
-  - ${FINOPS_RESULTS_DIR:-../experiments/results}:/app/experiments/results:rw
   - ${FINOPS_REPO_DIR:-..}:/repo:ro
-  - ${AUTH_HOME:-/home/drseuss}/.claude:/home/drseuss/.claude:ro
-  - ${AUTH_HOME:-/home/drseuss}/.local/share/opencode:/home/drseuss/.local/share/opencode:ro
-  - ${AUTH_HOME:-/home/drseuss}/.local/bin:/home/drseuss/.local/bin:ro
+  - ${FINOPS_REPO_DIR:-..}/experiments/results:/repo/experiments/results:rw
+  - ${FINOPS_WORKTREE_ROOT:-/tmp}/opencode_state:/home/drseuss/.local/share/opencode:rw
+  - ${AUTH_HOME:-/home/drseuss}/.local/share/opencode/auth.json:/auth/opencode_auth.json:ro
   - ${AUTH_HOME:-/home/drseuss}/.local/share/claude:/home/drseuss/.local/share/claude:ro
-  - ${AUTH_HOME:-/home/drseuss}/.opencode/bin:/home/drseuss/.opencode/bin:ro
+  # (the claude binary's symlink target rides here — an isolated claude STATE dir is the
+  # recorded open item: the smoke test proved the binary chain needs this ro mount; the
+  # claude CLI's own write-state isolation is a follow-up for the claude-model cells)
+  - ${AUTH_HOME:-/home/drseuss}/.claude:/home/drseuss/.claude:ro
+  - ${AUTH_HOME:-/home/drseuss}/.config:/home/drseuss/.config:ro
+  - ${AUTH_HOME:-/home/drseuss}/.local/bin:/home/drseuss/.local/bin:ro
+  - ${AUTH_HOME:-/home/drseuss}/.opencode:/home/drseuss/.opencode:ro
 
 # The supervisor tier's mount set (D-13): results rw / repo ro / auth ro + the fleet-logs
 # NAMED volume. NO worktree mount (the supervisor holds no worktree), NO socket.
 x-supervisor-mounts: &supervisor-mounts
-  - ${FINOPS_RESULTS_DIR:-../experiments/results}:/app/experiments/results:rw
   - ${FINOPS_REPO_DIR:-..}:/repo:ro
+  - ${FINOPS_REPO_DIR:-..}/experiments/results:/repo/experiments/results:rw
   - ${AUTH_HOME:-/home/drseuss}/.claude:/home/drseuss/.claude:ro
-  - ${AUTH_HOME:-/home/drseuss}/.local/share/opencode:/home/drseuss/.local/share/opencode:ro
+  - ${AUTH_HOME:-/home/drseuss}/.config:/home/drseuss/.config:ro
   - ${AUTH_HOME:-/home/drseuss}/.local/bin:/home/drseuss/.local/bin:ro
-  - ${AUTH_HOME:-/home/drseuss}/.local/share/claude:/home/drseuss/.local/share/claude:ro
-  - ${AUTH_HOME:-/home/drseuss}/.opencode/bin:/home/drseuss/.opencode/bin:ro
+  - ${AUTH_HOME:-/home/drseuss}/.opencode:/home/drseuss/.opencode:ro
   - fleet-logs:/var/log/fleet
 
 x-cell-base: &cell-base
   image: fleet/base
   restart: on-failure
   networks: [fleet-net]
+  working_dir: /repo
   environment:
     <<: *ladder-env
   volumes: *ladder-mounts
