@@ -1,0 +1,30 @@
+# fleet-bootstrap.service — the host's ONE bootstrap unit (proposal §2/§4, D-9).
+#
+# The host's footprint of ours is the docker daemon + this unit: it brings up the
+# supervisor (fleet-manager) container and nothing else. Everything else is a container on
+# the ladder, or the operator's chat. Restart=always keeps the supervisor's own liveness —
+# the one "always" in the fleet.
+#
+# Install (as root):
+#   cp infrastructure/fleet-bootstrap.service /etc/systemd/system/
+#   systemctl daemon-reload && systemctl enable --now fleet-bootstrap
+
+[Unit]
+Description=Fleet ladder supervisor (fleet-manager) — the host's one bootstrap unit
+Requires=docker.service
+After=docker.service network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+# The compose file lives in the deployed repo (update REPO to the checkout path).
+Environment=REPO=/home/drseuss/ai-finops-framework
+# fleet-net is external (D-17): create it if absent, then bring up the supervisor.
+ExecStartPre=-/usr/bin/docker network create fleet-net
+ExecStart=/usr/bin/docker-compose -f ${REPO}/infrastructure/docker-compose.ladder.yml up -d fleet-manager
+ExecStop=/usr/bin/docker-compose -f ${REPO}/infrastructure/docker-compose.ladder.yml stop fleet-manager
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

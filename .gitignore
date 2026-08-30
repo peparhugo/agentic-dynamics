@@ -60,3 +60,6 @@ audit.md
 
 # SonarQube scanner workspace (transient analysis state; never provenance)
 .scannerwork/
+
+# Fleet image build context (the staged sonar client — a build artifact, not provenance)
+.build/
