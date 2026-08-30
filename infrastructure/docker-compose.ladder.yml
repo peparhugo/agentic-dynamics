@@ -40,6 +40,11 @@ x-ladder-env: &ladder-env
   HOME: /home/drseuss
   OPENCODE_BIN: /home/drseuss/.opencode/bin/opencode
   CLAUDE_BIN: /home/drseuss/.local/bin/claude
+  # RAG retrieval store endpoints (slice 3, D-17 by-name reachability): the two-leg fusion's
+  # dense (chroma 8000) + lexical (neo4j 7687) stores. Consulted only by rag_augment-enabled
+  # workflows (and the kb-* consumers) — inert for the plain worker cells.
+  CHROMA_HOST: chromadb
+  FINOPS_NEO4J_URI: bolt://neo4j:7687
 
 # The four-mount contract (the isolation constant, §3) + the D-2 auth set (D-18). Every
 # scope (§5) is a subset of these — nothing outside them is ever mounted.
@@ -155,6 +160,11 @@ services:
     <<: *cell-base
     command: ["python3", "scripts/kb_worker.py", "--group", "kb-neo4j-v1"]
     # NO FINOPS_KB_WRITE — a read-only consumer (G6); the resurrected leg (slice 3, §6).
+    environment:
+      <<: *ladder-env
+      # The graph client reaches neo4j BY NAME on fleet-net (its internal port 7687, not the
+      # host's localhost); credentials are the data-plane container's own (neo4j/password123).
+      FINOPS_NEO4J_URI: bolt://neo4j:7687
 
   # The batch producers (run-to-completion; the `batch` profile keeps them out of `up -d`).
   kb-produce:

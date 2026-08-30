@@ -9,6 +9,7 @@ from __future__ import annotations
 import contextlib
 import hashlib
 import json
+import os
 import re
 import sys
 import time
@@ -175,11 +176,27 @@ class Neo4jClient:
     """Manage Neo4j graph population and queries."""
 
     def __init__(
-        self, uri: str = "bolt://localhost:7687", user: str = "neo4j", password: str = "password123"
-    ):  # local dev only — override via ENV for prod
+        self,
+        uri: str | None = None,
+        user: str | None = None,
+        password: str | None = None,
+    ):
+        # local dev default is bolt://localhost:7687 / neo4j / password123; in a container the
+        # data plane resolves by NAME (bolt://neo4j:7687), so the constructor reads the
+        # FINOPS_NEO4J_URI / FINOPS_NEO4J_USER / FINOPS_NEO4J_PASSWORD env vars as the
+        # production override — exactly the "override via ENV for prod" the comment always
+        # promised but never wired. An explicit arg still wins (the run_workflow.py composition
+        # root passes a resolved URI in directly).
+        resolved_uri = uri or os.environ.get("FINOPS_NEO4J_URI") or os.environ.get(
+            "FINOPS_NEO4J_URL"
+        ) or "bolt://localhost:7687"
+        resolved_user = user or os.environ.get("FINOPS_NEO4J_USER") or "neo4j"
+        resolved_password = password or os.environ.get("FINOPS_NEO4J_PASSWORD") or "password123"
         from neo4j import GraphDatabase
 
-        self._driver = GraphDatabase.driver(uri, auth=(user, password))
+        self._driver = GraphDatabase.driver(
+            resolved_uri, auth=(resolved_user, resolved_password)
+        )
 
     def close(self):
         self._driver.close()

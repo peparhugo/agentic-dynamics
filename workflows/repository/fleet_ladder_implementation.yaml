@@ -25,6 +25,11 @@ workflow:
   params:
     language: python
     fork: true
+    # slice 3 (proposal §7 slice 3, D-Q8/R8) — the measured product gate: rag_augment goes ON
+    # now that the RRF two-leg fusion is verified live (docs/fleet/06_slice3_rrf_report.md:
+    # both legs contribute, fallback_mode "full"). The dense leg reads chroma (CHROMA_HOST) and
+    # the lexical leg reads neo4j (FINOPS_NEO4J_URI) by name on fleet-net (the compose env).
+    rag_augment: true
     context:
       domain_context: >-
         PROVISIONAL DomainProfile. domain: infrastructure implementation (the fleet
