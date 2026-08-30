@@ -15,7 +15,7 @@ issue a POST to any control route (`/api/flags/<id>/steer`, `/api/flags/<id>/int
 `/api/design-sessions/<id>/interrupt`, or the `/api/claude-agents` create/stop/respawn/rm/steer
 routes) — those are the human-operator control surface, and exposing them as an agent-callable
 action would let a session steer or interrupt itself or a peer session through the one channel
-the architecture deliberately keeps flag-only. See `docs/designs/current/supervisor_design.md`
+the architecture deliberately keeps flag-only. See `docs/architecture/current/supervisor_design.md`
 for the full design.
 
 ## `apps/control_room/server.py` — GET endpoints

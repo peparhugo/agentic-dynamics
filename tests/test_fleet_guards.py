@@ -78,15 +78,21 @@ def _fleet_module(name: str):
 
 # The four-mount contract + the D-2 auth set + the D-13 named volume + the D-3 socket
 # (container-side TARGETS — the fixed paths, not the env-substituted host sources).
+# The four-mount contract + the D-2 auth set (REVISED by the smoke test — the credential-
+# file-ro / state-rw split: the results OVERLAY at /repo/experiments/results, the ISOLATED
+# CLI state dirs rw, the credential files ro at /auth, the provider config ro) + the D-13
+# named volume + the D-3 socket (container-side TARGETS — the fixed paths).
 ALLOWED_MOUNT_TARGETS = {
     "/tmp",                                  # worktree (rw)
-    "/app/experiments/results",              # results (rw)
     "/repo",                                 # repo (ro)
+    "/repo/experiments/results",             # results OVERLAY (rw — the worker's relative paths)
+    "/home/drseuss/.local/share/opencode",   # the ISOLATED opencode state (rw, per worker)
+    "/auth/opencode_auth.json",              # the credential FILE (ro) — seeded by the entrypoint
+    "/home/drseuss/.local/share/claude",     # the claude binary chain (ro, D-18 symlink target)
     "/home/drseuss/.claude",                 # D-2 auth (ro)
-    "/home/drseuss/.local/share/opencode",
-    "/home/drseuss/.local/bin",
-    "/home/drseuss/.local/share/claude",
-    "/home/drseuss/.opencode/bin",
+    "/home/drseuss/.config",                 # the provider config (ro — smoke finding #4)
+    "/home/drseuss/.local/bin",              # D-2 auth (ro)
+    "/home/drseuss/.opencode",               # the opencode config + bin (ro)
     "/var/log/fleet",                        # the fleet-logs NAMED volume (D-13, not a host path)
     "/var/run/docker.sock",                  # the socket (orchestrator only, D-3)
 }

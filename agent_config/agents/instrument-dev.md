@@ -37,7 +37,7 @@ spec (ExperimentSpec) ──compile──▶ DAG ──▶ cells ──▶ jobs 
       └──── adapt (tweak one factor) ◀── compare ◀── information ◀── measure ◀─┘
 ```
 
-Design: `docs/designs/current/2026-08-14_experiment-spec-and-compiler-design.md`.
+Design: `docs/architecture/current/2026-08-14_experiment-spec-and-compiler-design.md`.
 
 ## Module map (plane-qualified — see `agent_config/mental-model.md` for signatures)
 
@@ -121,4 +121,4 @@ token split). Query with `get()`, `is_measured()`, `measured_signals()`, `reserv
 2. Use `explore` subagents to find all call sites before refactoring.
 3. Update `__init__.py` exports after adding a public symbol.
 4. Run `pytest tests/test_<module>.py -v` after changes.
-5. For spec/compiler work, read `docs/designs/current/2026-08-14_experiment-spec-and-compiler-design.md`.
+5. For spec/compiler work, read `docs/architecture/current/2026-08-14_experiment-spec-and-compiler-design.md`.

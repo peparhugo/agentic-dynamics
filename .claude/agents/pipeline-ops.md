@@ -74,7 +74,7 @@ Plans (`experiments/definitions/configs/plans.yaml`): `ci`, `deploy`, `full_matr
 a DAG (`validate → cells → execute → measure → compare → writeup → adapt`). Reuse map:
 `experiment_matrix` generalizes `_gen_matrix_cells`; `compare_arms` generalizes
 `control.routing.simulate_strategies`; `evaluate_rules` = the lab books; `adapt` = the campaign
-loop. Design: `docs/designs/current/2026-08-14_experiment-spec-and-compiler-design.md`.
+loop. Design: `docs/architecture/current/2026-08-14_experiment-spec-and-compiler-design.md`.
 
 ## Working directory map
 

@@ -28,7 +28,7 @@ Key files you'll modify (plane-qualified): `scripts/run.py`,
 The repo is an **information-acquisition machine**: `instrument → derive (measurement rules →
 information) → write policy (control rules consuming that information) → grid (policy as an arm)
 → campaign (tweak one variable, repeat)`. Design:
-`docs/designs/current/2026-08-14_experiment-spec-and-compiler-design.md`.
+`docs/architecture/current/2026-08-14_experiment-spec-and-compiler-design.md`.
 
 Two modules, both written:
 

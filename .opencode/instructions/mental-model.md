@@ -3,7 +3,7 @@
 This repo is an **information-acquisition machine for AI economics**: controlled
 trials (cells) → raw events → information (measurement rules) → policies (control
 rules) → policy arms → grid → campaign → repeat. Everything below is one stage in
-that chain. Design of the spec/compiler: `docs/designs/current/2026-08-14_experiment-spec-and-compiler-design.md`.
+that chain. Design of the spec/compiler: `docs/architecture/current/2026-08-14_experiment-spec-and-compiler-design.md`.
 
 ## Architecture
 
@@ -34,7 +34,7 @@ control.live ──── Redis pub/sub telemetry (feeds the Control Room portal
 ```
 
 ```
-control.supervisor ── Redis flag/session↔cell mapping contracts (no OpenCode client dep — observe only, see docs/designs/current/supervisor_design.md)
+control.supervisor ── Redis flag/session↔cell mapping contracts (no OpenCode client dep — observe only, see docs/architecture/current/supervisor_design.md)
 runtime.workflow_runner ── executes an agent_task workflow's phases inside a git worktree, committing + ledgering each
 runtime.test_runner ── independent pytest/jest/go-test/cargo-test runner; sole source of truth for test_executed_success
 ```
@@ -443,5 +443,5 @@ Task: lab books       → Load skill: lab-books
 Task: pipeline        → Read scripts/CONTEXT.md
 Task: website         → Read apps/website/CONTEXT.md
 Task: configs         → Read experiments/CONTEXT.md
-Task: spec/compiler   → Read docs/designs/current/2026-08-14_experiment-spec-and-compiler-design.md
+Task: spec/compiler   → Read docs/architecture/current/2026-08-14_experiment-spec-and-compiler-design.md
 ```

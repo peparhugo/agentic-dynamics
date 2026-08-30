@@ -9,7 +9,7 @@ argument-hint: ""
 # Run Workflow Skill — Spec Validation + Execution
 
 This skill wraps the *execute* half of the spec→DAG pipeline described in
-`docs/designs/current/2026-08-14_experiment-spec-and-compiler-design.md`: validate/compile an
+`docs/architecture/current/2026-08-14_experiment-spec-and-compiler-design.md`: validate/compile an
 `ExperimentSpec` YAML, then run it as a phased `agent_task` workflow inside a git worktree.
 
 ## When to use this

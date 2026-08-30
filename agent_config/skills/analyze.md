@@ -188,7 +188,7 @@ Today's scripts map onto the future phases:
 
 The load-bearing rule applies: a control rule's `requires` must be produced by a measurement
 rule before the compiler admits it. Design:
-`docs/designs/current/2026-08-14_experiment-spec-and-compiler-design.md`.
+`docs/architecture/current/2026-08-14_experiment-spec-and-compiler-design.md`.
 
 ## Common Gotchas
 

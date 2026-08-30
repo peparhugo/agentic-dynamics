@@ -24,4 +24,4 @@ Use `--model $2` if a second argument is provided (e.g. `/run-exp task_manager c
 Spec direction: `agentic_dynamics.experiment.compile_experiment` is written and can compile an
 `ExperimentSpec` from `experiments/definitions/*.yaml` + `workflows/**/*.yaml` into cells; policy
 is a factor level and its control rules consume measured information (`confidence` is now
-measured). See `docs/designs/current/2026-08-14_experiment-spec-and-compiler-design.md`.
+measured). See `docs/architecture/current/2026-08-14_experiment-spec-and-compiler-design.md`.

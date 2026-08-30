@@ -10,7 +10,7 @@
 - No bare excepts — always catch specific exceptions.
 - Dataclasses preferred over dicts for structured data.
 
-## Spec/Compiler Conventions (written — see docs/designs/current/2026-08-14_experiment-spec-and-compiler-design.md)
+## Spec/Compiler Conventions (written — see docs/architecture/current/2026-08-14_experiment-spec-and-compiler-design.md)
 
 - **Measure before policy.** `RuleSpec` declares `requires` (information it consumes) and
   `produces` (information it emits). `plane` is `"measurement"` (produces) or `"control"`

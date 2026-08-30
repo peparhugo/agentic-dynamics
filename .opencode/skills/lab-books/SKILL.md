@@ -56,7 +56,7 @@ whose embedded `input_manifest_sha256` is stale (logged by lab name), so a lab m
 after the corpus changes. `metric_definition_version` is declared in `scripts/lab_manifest.json`,
 not in the lab source.
 
-Source: `docs/review/semantic_integrity_review.md` P0. The manifest is authoritative.
+Source: `docs/reviews/semantic_integrity_review.md` P0. The manifest is authoritative.
 
 ## Lab Books (canonical + quarantined + deprecated — `scripts/lab_manifest.json` is authoritative)
 
@@ -114,7 +114,7 @@ consumes ledger/attempt fields and produces information. `compile_experiment.py`
 `evaluate_rules` phase will drive these from `spec.rules` instead of one-off scripts. A control
 rule (e.g. `model_cascade`) can only be authored after its `requires` (e.g. `confidence`) are
 produced by a measurement rule — instrument before policy. Design:
-`docs/designs/current/2026-08-14_experiment-spec-and-compiler-design.md`.
+`docs/architecture/current/2026-08-14_experiment-spec-and-compiler-design.md`.
 
 ## Common Gotchas
 

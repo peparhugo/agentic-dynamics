@@ -21,4 +21,4 @@ Report each step's output and any errors encountered.
 Spec direction: `compile_experiment.py` is written and can add a compile/validate phase
 (`validate → cells → execute → measure → compare → writeup → adapt`) ahead of this chain; this
 command's manual chain still runs the transport-only path directly. See
-`docs/designs/current/2026-08-14_experiment-spec-and-compiler-design.md`.
+`docs/architecture/current/2026-08-14_experiment-spec-and-compiler-design.md`.

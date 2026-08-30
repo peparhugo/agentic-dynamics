@@ -25,7 +25,7 @@ canonical registry + inventory.json ──▶ build_data.py ──▶ apps/websi
 ```
 
 The retired `experiments/results/_results_summary.json` is **not** a live publication source
-(`docs/data_integrity_findings.md`). Publication labs consume the canonical registry resolver
+(`docs/verification/data_integrity_findings.md`). Publication labs consume the canonical registry resolver
 (`agentic_dynamics.reporting.canonical_corpus.load_canonical_tables()`), never the retired
 summary.
 
@@ -72,7 +72,7 @@ Run a lab: `agentic-dynamics analyze lab <name>` (dispatches to `scripts/lab_<na
 `validate → cells → execute → measure → compare → writeup → adapt`. Your scripts map onto
 `evaluate_rules` (measurement rules over the ledger), `compare_arms` (regret over the arm
 factor), `writeup` (lab-book from `spec.question` + metrics). Design:
-`docs/designs/current/2026-08-14_experiment-spec-and-compiler-design.md`.
+`docs/architecture/current/2026-08-14_experiment-spec-and-compiler-design.md`.
 
 ## Common workflows
 
