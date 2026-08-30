@@ -1,0 +1,835 @@
+{
+  "phase": "p3_pre_verification",
+  "spec": "persistent_code_graph@0.1",
+  "question": "does this construction's changed symbol have structural dependants? (asked against the persistent graph, BEFORE any grid)",
+  "cells": {
+    "cap2d_incorrect_rebuilt_abstention_r1": {
+      "class": "incorrect_rebuilt",
+      "seed": "a6fc64127527f608264be241e98135b19e3f4669",
+      "final": "fde0232ae2cdc82256d3a7300652636903d5a889",
+      "changed_symbol_count": 20,
+      "changed_symbols": [
+        "add",
+        "widget_1",
+        "widget_10",
+        "widget_11",
+        "widget_12",
+        "widget_13",
+        "widget_14",
+        "widget_15",
+        "widget_16",
+        "widget_17",
+        "widget_18",
+        "widget_19",
+        "widget_2",
+        "widget_3",
+        "widget_4",
+        "widget_5",
+        "widget_6",
+        "widget_7",
+        "widget_8",
+        "widget_9"
+      ],
+      "has_structural_dependants": true,
+      "hub_symbol": "add",
+      "dependant_sets": {
+        "add": {
+          "dependant_count": 20,
+          "dependants": [
+            "test_add",
+            "widget_1",
+            "widget_10",
+            "widget_11",
+            "widget_12",
+            "widget_13",
+            "widget_14",
+            "widget_15",
+            "widget_16",
+            "widget_17",
+            "widget_18",
+            "widget_19",
+            "widget_2",
+            "widget_3",
+            "widget_4",
+            "widget_5",
+            "widget_6",
+            "widget_7",
+            "widget_8",
+            "widget_9"
+          ]
+        },
+        "widget_1": {
+          "dependant_count": 0,
+          "dependants": []
+        },
+        "widget_10": {
+          "dependant_count": 0,
+          "dependants": []
+        },
+        "widget_11": {
+          "dependant_count": 0,
+          "dependants": []
+        },
+        "widget_12": {
+          "dependant_count": 0,
+          "dependants": []
+        },
+        "widget_13": {
+          "dependant_count": 0,
+          "dependants": []
+        },
+        "widget_14": {
+          "dependant_count": 0,
+          "dependants": []
+        },
+        "widget_15": {
+          "dependant_count": 0,
+          "dependants": []
+        },
+        "widget_16": {
+          "dependant_count": 0,
+          "dependants": []
+        },
+        "widget_17": {
+          "dependant_count": 0,
+          "dependants": []
+        },
+        "widget_18": {
+          "dependant_count": 0,
+          "dependants": []
+        },
+        "widget_19": {
+          "dependant_count": 0,
+          "dependants": []
+        },
+        "widget_2": {
+          "dependant_count": 0,
+          "dependants": []
+        },
+        "widget_3": {
+          "dependant_count": 0,
+          "dependants": []
+        },
+        "widget_4": {
+          "dependant_count": 0,
+          "dependants": []
+        },
+        "widget_5": {
+          "dependant_count": 0,
+          "dependants": []
+        },
+        "widget_6": {
+          "dependant_count": 0,
+          "dependants": []
+        },
+        "widget_7": {
+          "dependant_count": 0,
+          "dependants": []
+        },
+        "widget_8": {
+          "dependant_count": 0,
+          "dependants": []
+        },
+        "widget_9": {
+          "dependant_count": 0,
+          "dependants": []
+        }
+      }
+    },
+    "cap2d_incorrect_rebuilt_abstention_r2": {
+      "class": "incorrect_rebuilt",
+      "seed": "8d693929f24ddd457eb31af98fdc372bc6224454",
+      "final": "6961ed7b26df083a6d5631b572e680e8a4592146",
+      "changed_symbol_count": 20,
+      "changed_symbols": [
+        "add",
+        "widget_1",
+        "widget_10",
+        "widget_11",
+        "widget_12",
+        "widget_13",
+        "widget_14",
+        "widget_15",
+        "widget_16",
+        "widget_17",
+        "widget_18",
+        "widget_19",
+        "widget_2",
+        "widget_3",
+        "widget_4",
+        "widget_5",
+        "widget_6",
+        "widget_7",
+        "widget_8",
+        "widget_9"
+      ],
+      "has_structural_dependants": true,
+      "hub_symbol": "add",
+      "dependant_sets": {
+        "add": {
+          "dependant_count": 20,
+          "dependants": [
+            "test_add",
+            "widget_1",
+            "widget_10",
+            "widget_11",
+            "widget_12",
+            "widget_13",
+            "widget_14",
+            "widget_15",
+            "widget_16",
+            "widget_17",
+            "widget_18",
+            "widget_19",
+            "widget_2",
+            "widget_3",
+            "widget_4",
+            "widget_5",
+            "widget_6",
+            "widget_7",
+            "widget_8",
+            "widget_9"
+          ]
+        },
+        "widget_1": {
+          "dependant_count": 0,
+          "dependants": []
+        },
+        "widget_10": {
+          "dependant_count": 0,
+          "dependants": []
+        },
+        "widget_11": {
+          "dependant_count": 0,
+          "dependants": []
+        },
+        "widget_12": {
+          "dependant_count": 0,
+          "dependants": []
+        },
+        "widget_13": {
+          "dependant_count": 0,
+          "dependants": []
+        },
+        "widget_14": {
+          "dependant_count": 0,
+          "dependants": []
+        },
+        "widget_15": {
+          "dependant_count": 0,
+          "dependants": []
+        },
+        "widget_16": {
+          "dependant_count": 0,
+          "dependants": []
+        },
+        "widget_17": {
+          "dependant_count": 0,
+          "dependants": []
+        },
+        "widget_18": {
+          "dependant_count": 0,
+          "dependants": []
+        },
+        "widget_19": {
+          "dependant_count": 0,
+          "dependants": []
+        },
+        "widget_2": {
+          "dependant_count": 0,
+          "dependants": []
+        },
+        "widget_3": {
+          "dependant_count": 0,
+          "dependants": []
+        },
+        "widget_4": {
+          "dependant_count": 0,
+          "dependants": []
+        },
+        "widget_5": {
+          "dependant_count": 0,
+          "dependants": []
+        },
+        "widget_6": {
+          "dependant_count": 0,
+          "dependants": []
+        },
+        "widget_7": {
+          "dependant_count": 0,
+          "dependants": []
+        },
+        "widget_8": {
+          "dependant_count": 0,
+          "dependants": []
+        },
+        "widget_9": {
+          "dependant_count": 0,
+          "dependants": []
+        }
+      }
+    },
+    "cap2d_incorrect_rebuilt_status_quo_r1": {
+      "class": "incorrect_rebuilt",
+      "seed": "8f8d3f6da06cf87e7416b327093b6fcccf29fd79",
+      "final": "e6603608a31a99afc98d260124004fbcd360c776",
+      "changed_symbol_count": 20,
+      "changed_symbols": [
+        "add",
+        "widget_1",
+        "widget_10",
+        "widget_11",
+        "widget_12",
+        "widget_13",
+        "widget_14",
+        "widget_15",
+        "widget_16",
+        "widget_17",
+        "widget_18",
+        "widget_19",
+        "widget_2",
+        "widget_3",
+        "widget_4",
+        "widget_5",
+        "widget_6",
+        "widget_7",
+        "widget_8",
+        "widget_9"
+      ],
+      "has_structural_dependants": true,
+      "hub_symbol": "add",
+      "dependant_sets": {
+        "add": {
+          "dependant_count": 20,
+          "dependants": [
+            "test_add",
+            "widget_1",
+            "widget_10",
+            "widget_11",
+            "widget_12",
+            "widget_13",
+            "widget_14",
+            "widget_15",
+            "widget_16",
+            "widget_17",
+            "widget_18",
+            "widget_19",
+            "widget_2",
+            "widget_3",
+            "widget_4",
+            "widget_5",
+            "widget_6",
+            "widget_7",
+            "widget_8",
+            "widget_9"
+          ]
+        },
+        "widget_1": {
+          "dependant_count": 0,
+          "dependants": []
+        },
+        "widget_10": {
+          "dependant_count": 0,
+          "dependants": []
+        },
+        "widget_11": {
+          "dependant_count": 0,
+          "dependants": []
+        },
+        "widget_12": {
+          "dependant_count": 0,
+          "dependants": []
+        },
+        "widget_13": {
+          "dependant_count": 0,
+          "dependants": []
+        },
+        "widget_14": {
+          "dependant_count": 0,
+          "dependants": []
+        },
+        "widget_15": {
+          "dependant_count": 0,
+          "dependants": []
+        },
+        "widget_16": {
+          "dependant_count": 0,
+          "dependants": []
+        },
+        "widget_17": {
+          "dependant_count": 0,
+          "dependants": []
+        },
+        "widget_18": {
+          "dependant_count": 0,
+          "dependants": []
+        },
+        "widget_19": {
+          "dependant_count": 0,
+          "dependants": []
+        },
+        "widget_2": {
+          "dependant_count": 0,
+          "dependants": []
+        },
+        "widget_3": {
+          "dependant_count": 0,
+          "dependants": []
+        },
+        "widget_4": {
+          "dependant_count": 0,
+          "dependants": []
+        },
+        "widget_5": {
+          "dependant_count": 0,
+          "dependants": []
+        },
+        "widget_6": {
+          "dependant_count": 0,
+          "dependants": []
+        },
+        "widget_7": {
+          "dependant_count": 0,
+          "dependants": []
+        },
+        "widget_8": {
+          "dependant_count": 0,
+          "dependants": []
+        },
+        "widget_9": {
+          "dependant_count": 0,
+          "dependants": []
+        }
+      }
+    },
+    "cap2d_incorrect_rebuilt_status_quo_r2": {
+      "class": "incorrect_rebuilt",
+      "seed": "3954be18cb646b4ab38bd10eb2fecb13ddd8b0eb",
+      "final": "6290d1aabe6f5eccfe3c0bc045c6341f3c6ad8dd",
+      "changed_symbol_count": 20,
+      "changed_symbols": [
+        "add",
+        "widget_1",
+        "widget_10",
+        "widget_11",
+        "widget_12",
+        "widget_13",
+        "widget_14",
+        "widget_15",
+        "widget_16",
+        "widget_17",
+        "widget_18",
+        "widget_19",
+        "widget_2",
+        "widget_3",
+        "widget_4",
+        "widget_5",
+        "widget_6",
+        "widget_7",
+        "widget_8",
+        "widget_9"
+      ],
+      "has_structural_dependants": true,
+      "hub_symbol": "add",
+      "dependant_sets": {
+        "add": {
+          "dependant_count": 20,
+          "dependants": [
+            "test_add",
+            "widget_1",
+            "widget_10",
+            "widget_11",
+            "widget_12",
+            "widget_13",
+            "widget_14",
+            "widget_15",
+            "widget_16",
+            "widget_17",
+            "widget_18",
+            "widget_19",
+            "widget_2",
+            "widget_3",
+            "widget_4",
+            "widget_5",
+            "widget_6",
+            "widget_7",
+            "widget_8",
+            "widget_9"
+          ]
+        },
+        "widget_1": {
+          "dependant_count": 0,
+          "dependants": []
+        },
+        "widget_10": {
+          "dependant_count": 0,
+          "dependants": []
+        },
+        "widget_11": {
+          "dependant_count": 0,
+          "dependants": []
+        },
+        "widget_12": {
+          "dependant_count": 0,
+          "dependants": []
+        },
+        "widget_13": {
+          "dependant_count": 0,
+          "dependants": []
+        },
+        "widget_14": {
+          "dependant_count": 0,
+          "dependants": []
+        },
+        "widget_15": {
+          "dependant_count": 0,
+          "dependants": []
+        },
+        "widget_16": {
+          "dependant_count": 0,
+          "dependants": []
+        },
+        "widget_17": {
+          "dependant_count": 0,
+          "dependants": []
+        },
+        "widget_18": {
+          "dependant_count": 0,
+          "dependants": []
+        },
+        "widget_19": {
+          "dependant_count": 0,
+          "dependants": []
+        },
+        "widget_2": {
+          "dependant_count": 0,
+          "dependants": []
+        },
+        "widget_3": {
+          "dependant_count": 0,
+          "dependants": []
+        },
+        "widget_4": {
+          "dependant_count": 0,
+          "dependants": []
+        },
+        "widget_5": {
+          "dependant_count": 0,
+          "dependants": []
+        },
+        "widget_6": {
+          "dependant_count": 0,
+          "dependants": []
+        },
+        "widget_7": {
+          "dependant_count": 0,
+          "dependants": []
+        },
+        "widget_8": {
+          "dependant_count": 0,
+          "dependants": []
+        },
+        "widget_9": {
+          "dependant_count": 0,
+          "dependants": []
+        }
+      }
+    },
+    "cap2d_correct_abstention_r1": {
+      "class": "correct",
+      "seed": "cf207abceba1420f36b2cd4cacd7d4717a54a1b6",
+      "final": "6ac54a1af1416f8f2af4ecf69d3a79eef0b24269",
+      "changed_symbol_count": 2,
+      "changed_symbols": [
+        "classify",
+        "test_classify"
+      ],
+      "has_structural_dependants": false,
+      "hub_symbol": "classify",
+      "dependant_sets": {
+        "classify": {
+          "dependant_count": 0,
+          "dependants": []
+        },
+        "test_classify": {
+          "dependant_count": 0,
+          "dependants": []
+        }
+      }
+    },
+    "cap2d_competing_abstention_r1": {
+      "class": "competing",
+      "seed": "9bb2b64e0fac8d5415e5ba8a23b9906e805c1e4e",
+      "final": "21ba70fc9ebb78fee904c1f72f498e2904017d52",
+      "changed_symbol_count": 2,
+      "changed_symbols": [
+        "classify",
+        "test_classify"
+      ],
+      "has_structural_dependants": false,
+      "hub_symbol": "classify",
+      "dependant_sets": {
+        "classify": {
+          "dependant_count": 0,
+          "dependants": []
+        },
+        "test_classify": {
+          "dependant_count": 0,
+          "dependants": []
+        }
+      }
+    },
+    "cap2d_harmful_partial_abstention_r1": {
+      "class": "harmful_partial",
+      "seed": "9a30546dcafc54404a92a509963afc8c8323f458",
+      "final": "0a961064d9796a04e4b8a12ba7dbf0eb1ec5f749",
+      "changed_symbol_count": 2,
+      "changed_symbols": [
+        "classify",
+        "test_classify"
+      ],
+      "has_structural_dependants": false,
+      "hub_symbol": "classify",
+      "dependant_sets": {
+        "classify": {
+          "dependant_count": 0,
+          "dependants": []
+        },
+        "test_classify": {
+          "dependant_count": 0,
+          "dependants": []
+        }
+      }
+    },
+    "cap2d_irrelevant_abstention_r1": {
+      "class": "irrelevant",
+      "seed": "6fe7fa6cc3bf6835e8105f253a24ca40aafc839a",
+      "final": "e649ae7af4a57cae122f37c63fd7daf6592f4541",
+      "changed_symbol_count": 2,
+      "changed_symbols": [
+        "product",
+        "test_product"
+      ],
+      "has_structural_dependants": true,
+      "hub_symbol": "product",
+      "dependant_sets": {
+        "product": {
+          "dependant_count": 1,
+          "dependants": [
+            "test_product"
+          ]
+        },
+        "test_product": {
+          "dependant_count": 0,
+          "dependants": []
+        }
+      }
+    },
+    "cap2d_absent-clean_abstention_r1": {
+      "class": "absent",
+      "seed": "d9d6ed3096ca80907e9d8f0b184a7a8f4c6a57b3",
+      "final": "ecf7a42b44e7c4fe161791ada82502b38f871037",
+      "changed_symbol_count": 1,
+      "changed_symbols": [
+        "widget"
+      ],
+      "has_structural_dependants": false,
+      "hub_symbol": "widget",
+      "dependant_sets": {
+        "widget": {
+          "dependant_count": 0,
+          "dependants": []
+        }
+      }
+    },
+    "cap2d_absent-defective_abstention_r1": {
+      "class": "absent",
+      "seed": "cd8d7de4d3cbd11c488ddcad50c6a748c8e6ceb6",
+      "final": "326c1d2ca7b059686f9ae2d43343163728ae52da",
+      "changed_symbol_count": 1,
+      "changed_symbols": [
+        "wrong_op"
+      ],
+      "has_structural_dependants": false,
+      "hub_symbol": "wrong_op",
+      "dependant_sets": {
+        "wrong_op": {
+          "dependant_count": 0,
+          "dependants": []
+        }
+      }
+    },
+    "cap2d_unseen_family_abstention_r1": {
+      "class": "unseen_family",
+      "seed": "74441cc828b3fa2f9472f24387be6fe7cfab7a62",
+      "final": "62cbe81ab45c2a30ad8679344a149da4acd39320",
+      "changed_symbol_count": 2,
+      "changed_symbols": [
+        "tally",
+        "test_tally"
+      ],
+      "has_structural_dependants": true,
+      "hub_symbol": "tally",
+      "dependant_sets": {
+        "tally": {
+          "dependant_count": 1,
+          "dependants": [
+            "test_tally"
+          ]
+        },
+        "test_tally": {
+          "dependant_count": 0,
+          "dependants": []
+        }
+      }
+    },
+    "cap2e_absent-defective_abstention_r1": {
+      "class": "absent",
+      "seed": "fad99f54a9d0200abaf7aab9faebfd3d89c24562",
+      "final": "15e985287c88975714b799d12df19ec49d542771",
+      "changed_symbol_count": 1,
+      "changed_symbols": [
+        "wrong_op"
+      ],
+      "has_structural_dependants": false,
+      "hub_symbol": "wrong_op",
+      "dependant_sets": {
+        "wrong_op": {
+          "dependant_count": 0,
+          "dependants": []
+        }
+      }
+    },
+    "cap2e_absent-defective_status_quo_r1": {
+      "class": "absent",
+      "seed": "ab407f906197fa8f00ecc08ece0ac9a4977a151f",
+      "final": "78af6fc25924bb802a6defce8f4466ef9fa1cff6",
+      "changed_symbol_count": 1,
+      "changed_symbols": [
+        "wrong_op"
+      ],
+      "has_structural_dependants": false,
+      "hub_symbol": "wrong_op",
+      "dependant_sets": {
+        "wrong_op": {
+          "dependant_count": 0,
+          "dependants": []
+        }
+      }
+    },
+    "cap2e_unseen_family_abstention_r1": {
+      "class": "unseen_family",
+      "seed": "67c4711dd7582497510c9486c38f6accecef03e2",
+      "final": "c75b1deff74186e07bd8f7ac7333f4a7efc2da32",
+      "changed_symbol_count": 2,
+      "changed_symbols": [
+        "tally",
+        "test_tally"
+      ],
+      "has_structural_dependants": true,
+      "hub_symbol": "tally",
+      "dependant_sets": {
+        "tally": {
+          "dependant_count": 1,
+          "dependants": [
+            "test_tally"
+          ]
+        },
+        "test_tally": {
+          "dependant_count": 0,
+          "dependants": []
+        }
+      }
+    },
+    "cap2e_unseen_family_status_quo_r1": {
+      "class": "unseen_family",
+      "seed": "67c4711dd7582497510c9486c38f6accecef03e2",
+      "final": "d0454b30e8b0256e80dd788069235cbc05f18188",
+      "changed_symbol_count": 2,
+      "changed_symbols": [
+        "tally",
+        "test_tally"
+      ],
+      "has_structural_dependants": true,
+      "hub_symbol": "tally",
+      "dependant_sets": {
+        "tally": {
+          "dependant_count": 1,
+          "dependants": [
+            "test_tally"
+          ]
+        },
+        "test_tally": {
+          "dependant_count": 0,
+          "dependants": []
+        }
+      }
+    }
+  },
+  "controls": {
+    "leaf": {
+      "symbol": "widget_1@cap2d_incorrect_rebuilt_status_quo_r1",
+      "question": "a leaf with no structural dependants (the negative case)",
+      "dependant_count": 0,
+      "dependants": []
+    },
+    "reference_non_hub": {
+      "symbol": "subtract@cap2d_incorrect_rebuilt_status_quo_r1",
+      "question": "a non-hub symbol with a single dependant (the mid case)",
+      "dependant_count": 1,
+      "dependants": [
+        "test_subtract"
+      ]
+    }
+  },
+  "verdict": {
+    "construction_caught_before_grid": {
+      "incorrect_rebuilt (the 2e wall)": {
+        "changed_symbol": "add",
+        "has_structural_dependants": true,
+        "dependant_count": 20,
+        "dependants": [
+          "test_add",
+          "widget_1",
+          "widget_10",
+          "widget_11",
+          "widget_12",
+          "widget_13",
+          "widget_14",
+          "widget_15",
+          "widget_16",
+          "widget_17",
+          "widget_18",
+          "widget_19",
+          "widget_2",
+          "widget_3",
+          "widget_4",
+          "widget_5",
+          "widget_6",
+          "widget_7",
+          "widget_8",
+          "widget_9"
+        ],
+        "pre_verification_action": "VERIFY \u2014 the construction changes a symbol with 20 structural dependants; the structural reach demands verification before the grid runs."
+      }
+    },
+    "construction_with_weak_signal": {
+      "unseen_family (the mutation defect)": {
+        "changed_symbol": "tally",
+        "has_structural_dependants": true,
+        "dependant_count": 1,
+        "dependants": [
+          "test_tally"
+        ],
+        "pre_verification_answer": "WEAK signal \u2014 the changed symbol has only a test-only dependant; the defect (input mutation) is behavioral and invisible to the structural question. The pre-verification is a structural tripwire, not a semantic oracle."
+      }
+    },
+    "control_leaf": {
+      "symbol": "widget_1@cap2d_incorrect_rebuilt_status_quo_r1",
+      "question": "a leaf with no structural dependants (the negative case)",
+      "dependant_count": 0,
+      "dependants": []
+    },
+    "finding": "the pre-verification is a query with a visible answer: the wall's construction (add) HAS structural dependants (20) \u2014 caught BEFORE the grid \u2014 the unseen_family construction's symbol (tally) has a weak test-only signal, and the leaf control (widget_1) has none \u2014 the negative case returned cleanly."
+  }
+}
