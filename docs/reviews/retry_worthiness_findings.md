@@ -38,7 +38,7 @@ two planes and joined:
 
 - **rescue signal** — retry succeeded (the retry's `test_executed_success`) / retry failed /
   no-retry-was-taken.
-- **known-at-failure features** — the `[H]` confidence (opencode.py:113), the perturbation
+- **known-at-failure features** — the `[H]` confidence (opencode.py:119), the perturbation
   strength, the cost-so-far, the attempt number.
 - **WOC** = `1/(1+r)` (the framework equation, unchanged); **E_x anchors** = 11.47 / 28 (spec
   hard rule 7; 12.51 reported alongside as the sonnet-measured value).
