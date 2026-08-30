@@ -209,7 +209,7 @@ factors:
 design: factorial
 rules:
   - {name: instruments_implemented, plane: measurement, evidence_class: "[C]", requires: [], produces: [delta_entropy_instrument, beta_instrument]}
-  - {name: corpus_computed, plane: measurement, evidence_class: "[C]", requires: [instruments_implemented], produces: [dh_quadrants, beta_curve]}
+  - {name: corpus_computed, plane: measurement, evidence_class: "[C]", requires: [delta_entropy_instrument, beta_instrument], produces: [dh_quadrants, beta_curve]}
   - {name: findings_written, plane: measurement, evidence_class: "[C]", requires: [dh_quadrants, beta_curve], produces: [entropy_beta_findings]}
   - {name: findings_verified, plane: measurement, evidence_class: "[C]", requires: [entropy_beta_findings], produces: [findings_known_safe]}
 metrics:
