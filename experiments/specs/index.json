@@ -1,7 +1,7 @@
 {
   "schema_version": "spec-status/v2",
-  "generated_at": "2026-08-29T17:40:01.960354+00:00",
-  "n_specs": 152,
+  "generated_at": "2026-08-30T18:26:39.377298+00:00",
+  "n_specs": 155,
   "specs": [
     {
       "name": "auto_posthoc_wiring",
@@ -652,6 +652,24 @@
       "n_runs": 0
     },
     {
+      "name": "fleet_ladder_implementation",
+      "version": "0.1",
+      "status": "awaiting_approval",
+      "spec_path": "workflows/repository/fleet_ladder_implementation.yaml",
+      "artifact_kind": "workflow",
+      "repeatable": false,
+      "supersedes": [],
+      "superseded_by": null,
+      "completed_at": null,
+      "last_run_at": "2026-08-30T17:12:27.021108+00:00",
+      "latest_ok": false,
+      "latest_model": "deepseek/deepseek-v4-pro",
+      "latest_cost_usd": 0.0,
+      "latest_git_sha": "d6a96356e",
+      "results_pointer": "experiments/results/workflows/fleet_ladder_implementation/20260830T171227Z.json",
+      "n_runs": 3
+    },
+    {
       "name": "agentic_dynamics_rebrand",
       "version": "0.1",
       "status": "failed",
@@ -757,6 +775,24 @@
       "latest_cost_usd": 0.0,
       "latest_git_sha": "d5f85126b",
       "results_pointer": "experiments/results/workflows/design_sessions/20260814T065812Z.json",
+      "n_runs": 1
+    },
+    {
+      "name": "entropy_beta_instruments",
+      "version": "0.1",
+      "status": "failed",
+      "spec_path": "workflows/repository/entropy_beta_instruments.yaml",
+      "artifact_kind": "workflow",
+      "repeatable": false,
+      "supersedes": [],
+      "superseded_by": null,
+      "completed_at": null,
+      "last_run_at": "2026-08-30T18:26:39.321682+00:00",
+      "latest_ok": false,
+      "latest_model": "deepseek/deepseek-v4-pro",
+      "latest_cost_usd": 0.165854,
+      "latest_git_sha": "62f8e5db2",
+      "results_pointer": "experiments/results/workflows/entropy_beta_instruments/20260830T182639Z.json",
       "n_runs": 1
     },
     {
@@ -2734,6 +2770,24 @@
       "latest_git_sha": "c324aab5b",
       "results_pointer": "experiments/results/workflows/website_rewrite/20260817T210037Z.json",
       "n_runs": 3
+    },
+    {
+      "name": "workflow_metrics",
+      "version": "0.1",
+      "status": "completed",
+      "spec_path": "workflows/repository/workflow_metrics.yaml",
+      "artifact_kind": "workflow",
+      "repeatable": false,
+      "supersedes": [],
+      "superseded_by": null,
+      "completed_at": null,
+      "last_run_at": "2026-08-30T18:06:47.233592+00:00",
+      "latest_ok": true,
+      "latest_model": "deepseek/deepseek-v4-pro",
+      "latest_cost_usd": 0.623031,
+      "latest_git_sha": "97d9e423c",
+      "results_pointer": "experiments/results/workflows/workflow_metrics/20260830T180647Z.json",
+      "n_runs": 1
     },
     {
       "name": "workflow_step_routing",
