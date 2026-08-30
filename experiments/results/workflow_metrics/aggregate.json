@@ -1,0 +1,1259 @@
+{
+  "schema": "workflow_metrics/v1",
+  "generated_at": "2026-08-30T17:46:52.848365+00:00",
+  "pinned_definitions": {
+    "retry_rate": "r = attempts with attempt_count > 1 / total attempts (per campaign)",
+    "first_call_resolution": "WOC = first_pass / total",
+    "escalation_rate": "escalation rate = the escalations / total",
+    "batch_fraction": "b = batch-mode jobs / total",
+    "throughput": "throughput = cells or phases per hour per campaign",
+    "cost_per_accepted": "cost-per-accepted = the accepted outcomes' cost",
+    "checkpoint_latency": "the checkpoint latency = decided_at - reached_at per approval",
+    "sla_behavior": "SLA = the timeouts/deadline breaches / total"
+  },
+  "n_ledgers_discovered": 45,
+  "n_campaigns": 9,
+  "run_ledger_coverage": {
+    "referenced": 118,
+    "present": 0,
+    "absent": 118
+  },
+  "campaigns": [
+    {
+      "campaign": "cap_2a",
+      "n_ledgers": 1,
+      "n_jobs": 0,
+      "n_attempts": 0,
+      "n_phases": 3,
+      "n_checkpoints": 0,
+      "started_at": "",
+      "ended_at": "",
+      "metrics": {
+        "retry_rate": {
+          "name": "retry_rate",
+          "definition": "r = attempts with attempt_count > 1 / total attempts (per campaign)",
+          "measurable": false,
+          "value": null,
+          "basis": "not_measurable",
+          "source_fields": [
+            "attempt_count",
+            "attempts"
+          ],
+          "reason": "missing field(s): attempt_count, attempts \u2014 not written by the runtime"
+        },
+        "first_call_resolution": {
+          "name": "first_call_resolution",
+          "definition": "WOC = first_pass / total",
+          "measurable": false,
+          "value": null,
+          "basis": "not_measurable",
+          "source_fields": [
+            "first_pass"
+          ],
+          "reason": "missing field(s): first_pass \u2014 not written by the runtime"
+        },
+        "escalation_rate": {
+          "name": "escalation_rate",
+          "definition": "escalation rate = the escalations / total",
+          "measurable": false,
+          "value": null,
+          "basis": "not_measurable",
+          "source_fields": [
+            "escalation_from",
+            "escalation_to"
+          ],
+          "reason": "missing field(s): escalation_from, escalation_to \u2014 not written by the runtime"
+        },
+        "batch_fraction": {
+          "name": "batch_fraction",
+          "definition": "b = batch-mode jobs / total",
+          "measurable": false,
+          "value": null,
+          "basis": "not_measurable",
+          "source_fields": [
+            "batch_mode"
+          ],
+          "reason": "missing field(s): batch_mode \u2014 not written by the runtime"
+        },
+        "throughput": {
+          "name": "throughput",
+          "definition": "throughput = cells or phases per hour per campaign",
+          "measurable": false,
+          "value": {
+            "phases": 3
+          },
+          "basis": "not_measurable",
+          "source_fields": [
+            "phases"
+          ],
+          "reason": "3 phases but no started_at/ended_at span to divide by"
+        },
+        "cost_per_accepted": {
+          "name": "cost_per_accepted",
+          "definition": "cost-per-accepted = the accepted outcomes' cost",
+          "measurable": false,
+          "value": null,
+          "basis": "not_measurable",
+          "source_fields": [
+            "accepted"
+          ],
+          "reason": "missing field(s): accepted \u2014 not written by the runtime"
+        },
+        "checkpoint_latency": {
+          "name": "checkpoint_latency",
+          "definition": "the checkpoint latency = decided_at - reached_at per approval",
+          "measurable": false,
+          "value": null,
+          "basis": "not_measurable",
+          "source_fields": [
+            "checkpoints"
+          ],
+          "reason": "missing field(s): checkpoints \u2014 not written by the runtime"
+        },
+        "sla_behavior": {
+          "name": "sla_behavior",
+          "definition": "SLA = the timeouts/deadline breaches / total",
+          "measurable": false,
+          "value": null,
+          "basis": "not_measurable",
+          "source_fields": [
+            "timeout",
+            "deadline_breach"
+          ],
+          "reason": "missing field(s): timeout, deadline_breach \u2014 not written by the runtime"
+        }
+      }
+    },
+    {
+      "campaign": "cap_2a_rerun",
+      "n_ledgers": 4,
+      "n_jobs": 0,
+      "n_attempts": 0,
+      "n_phases": 10,
+      "n_checkpoints": 0,
+      "started_at": "",
+      "ended_at": "",
+      "metrics": {
+        "retry_rate": {
+          "name": "retry_rate",
+          "definition": "r = attempts with attempt_count > 1 / total attempts (per campaign)",
+          "measurable": false,
+          "value": null,
+          "basis": "not_measurable",
+          "source_fields": [
+            "attempt_count",
+            "attempts"
+          ],
+          "reason": "missing field(s): attempt_count, attempts \u2014 not written by the runtime"
+        },
+        "first_call_resolution": {
+          "name": "first_call_resolution",
+          "definition": "WOC = first_pass / total",
+          "measurable": false,
+          "value": null,
+          "basis": "not_measurable",
+          "source_fields": [
+            "first_pass"
+          ],
+          "reason": "missing field(s): first_pass \u2014 not written by the runtime"
+        },
+        "escalation_rate": {
+          "name": "escalation_rate",
+          "definition": "escalation rate = the escalations / total",
+          "measurable": false,
+          "value": null,
+          "basis": "not_measurable",
+          "source_fields": [
+            "escalation_from",
+            "escalation_to"
+          ],
+          "reason": "missing field(s): escalation_from, escalation_to \u2014 not written by the runtime"
+        },
+        "batch_fraction": {
+          "name": "batch_fraction",
+          "definition": "b = batch-mode jobs / total",
+          "measurable": false,
+          "value": null,
+          "basis": "not_measurable",
+          "source_fields": [
+            "batch_mode"
+          ],
+          "reason": "missing field(s): batch_mode \u2014 not written by the runtime"
+        },
+        "throughput": {
+          "name": "throughput",
+          "definition": "throughput = cells or phases per hour per campaign",
+          "measurable": false,
+          "value": {
+            "phases": 10
+          },
+          "basis": "not_measurable",
+          "source_fields": [
+            "phases"
+          ],
+          "reason": "10 phases but no started_at/ended_at span to divide by"
+        },
+        "cost_per_accepted": {
+          "name": "cost_per_accepted",
+          "definition": "cost-per-accepted = the accepted outcomes' cost",
+          "measurable": false,
+          "value": null,
+          "basis": "not_measurable",
+          "source_fields": [
+            "accepted"
+          ],
+          "reason": "missing field(s): accepted \u2014 not written by the runtime"
+        },
+        "checkpoint_latency": {
+          "name": "checkpoint_latency",
+          "definition": "the checkpoint latency = decided_at - reached_at per approval",
+          "measurable": false,
+          "value": null,
+          "basis": "not_measurable",
+          "source_fields": [
+            "checkpoints"
+          ],
+          "reason": "missing field(s): checkpoints \u2014 not written by the runtime"
+        },
+        "sla_behavior": {
+          "name": "sla_behavior",
+          "definition": "SLA = the timeouts/deadline breaches / total",
+          "measurable": false,
+          "value": null,
+          "basis": "not_measurable",
+          "source_fields": [
+            "timeout",
+            "deadline_breach"
+          ],
+          "reason": "missing field(s): timeout, deadline_breach \u2014 not written by the runtime"
+        }
+      }
+    },
+    {
+      "campaign": "cap_2a_rerun2",
+      "n_ledgers": 3,
+      "n_jobs": 0,
+      "n_attempts": 0,
+      "n_phases": 7,
+      "n_checkpoints": 0,
+      "started_at": "",
+      "ended_at": "",
+      "metrics": {
+        "retry_rate": {
+          "name": "retry_rate",
+          "definition": "r = attempts with attempt_count > 1 / total attempts (per campaign)",
+          "measurable": false,
+          "value": null,
+          "basis": "not_measurable",
+          "source_fields": [
+            "attempt_count",
+            "attempts"
+          ],
+          "reason": "missing field(s): attempt_count, attempts \u2014 not written by the runtime"
+        },
+        "first_call_resolution": {
+          "name": "first_call_resolution",
+          "definition": "WOC = first_pass / total",
+          "measurable": false,
+          "value": null,
+          "basis": "not_measurable",
+          "source_fields": [
+            "first_pass"
+          ],
+          "reason": "missing field(s): first_pass \u2014 not written by the runtime"
+        },
+        "escalation_rate": {
+          "name": "escalation_rate",
+          "definition": "escalation rate = the escalations / total",
+          "measurable": false,
+          "value": null,
+          "basis": "not_measurable",
+          "source_fields": [
+            "escalation_from",
+            "escalation_to"
+          ],
+          "reason": "missing field(s): escalation_from, escalation_to \u2014 not written by the runtime"
+        },
+        "batch_fraction": {
+          "name": "batch_fraction",
+          "definition": "b = batch-mode jobs / total",
+          "measurable": false,
+          "value": null,
+          "basis": "not_measurable",
+          "source_fields": [
+            "batch_mode"
+          ],
+          "reason": "missing field(s): batch_mode \u2014 not written by the runtime"
+        },
+        "throughput": {
+          "name": "throughput",
+          "definition": "throughput = cells or phases per hour per campaign",
+          "measurable": false,
+          "value": {
+            "phases": 7
+          },
+          "basis": "not_measurable",
+          "source_fields": [
+            "phases"
+          ],
+          "reason": "7 phases but no started_at/ended_at span to divide by"
+        },
+        "cost_per_accepted": {
+          "name": "cost_per_accepted",
+          "definition": "cost-per-accepted = the accepted outcomes' cost",
+          "measurable": false,
+          "value": null,
+          "basis": "not_measurable",
+          "source_fields": [
+            "accepted"
+          ],
+          "reason": "missing field(s): accepted \u2014 not written by the runtime"
+        },
+        "checkpoint_latency": {
+          "name": "checkpoint_latency",
+          "definition": "the checkpoint latency = decided_at - reached_at per approval",
+          "measurable": false,
+          "value": null,
+          "basis": "not_measurable",
+          "source_fields": [
+            "checkpoints"
+          ],
+          "reason": "missing field(s): checkpoints \u2014 not written by the runtime"
+        },
+        "sla_behavior": {
+          "name": "sla_behavior",
+          "definition": "SLA = the timeouts/deadline breaches / total",
+          "measurable": false,
+          "value": null,
+          "basis": "not_measurable",
+          "source_fields": [
+            "timeout",
+            "deadline_breach"
+          ],
+          "reason": "missing field(s): timeout, deadline_breach \u2014 not written by the runtime"
+        }
+      }
+    },
+    {
+      "campaign": "cap_2a_rerun3",
+      "n_ledgers": 6,
+      "n_jobs": 0,
+      "n_attempts": 0,
+      "n_phases": 17,
+      "n_checkpoints": 0,
+      "started_at": "",
+      "ended_at": "",
+      "metrics": {
+        "retry_rate": {
+          "name": "retry_rate",
+          "definition": "r = attempts with attempt_count > 1 / total attempts (per campaign)",
+          "measurable": false,
+          "value": null,
+          "basis": "not_measurable",
+          "source_fields": [
+            "attempt_count",
+            "attempts"
+          ],
+          "reason": "missing field(s): attempt_count, attempts \u2014 not written by the runtime"
+        },
+        "first_call_resolution": {
+          "name": "first_call_resolution",
+          "definition": "WOC = first_pass / total",
+          "measurable": false,
+          "value": null,
+          "basis": "not_measurable",
+          "source_fields": [
+            "first_pass"
+          ],
+          "reason": "missing field(s): first_pass \u2014 not written by the runtime"
+        },
+        "escalation_rate": {
+          "name": "escalation_rate",
+          "definition": "escalation rate = the escalations / total",
+          "measurable": false,
+          "value": null,
+          "basis": "not_measurable",
+          "source_fields": [
+            "escalation_from",
+            "escalation_to"
+          ],
+          "reason": "missing field(s): escalation_from, escalation_to \u2014 not written by the runtime"
+        },
+        "batch_fraction": {
+          "name": "batch_fraction",
+          "definition": "b = batch-mode jobs / total",
+          "measurable": false,
+          "value": null,
+          "basis": "not_measurable",
+          "source_fields": [
+            "batch_mode"
+          ],
+          "reason": "missing field(s): batch_mode \u2014 not written by the runtime"
+        },
+        "throughput": {
+          "name": "throughput",
+          "definition": "throughput = cells or phases per hour per campaign",
+          "measurable": false,
+          "value": {
+            "phases": 17
+          },
+          "basis": "not_measurable",
+          "source_fields": [
+            "phases"
+          ],
+          "reason": "17 phases but no started_at/ended_at span to divide by"
+        },
+        "cost_per_accepted": {
+          "name": "cost_per_accepted",
+          "definition": "cost-per-accepted = the accepted outcomes' cost",
+          "measurable": false,
+          "value": null,
+          "basis": "not_measurable",
+          "source_fields": [
+            "accepted"
+          ],
+          "reason": "missing field(s): accepted \u2014 not written by the runtime"
+        },
+        "checkpoint_latency": {
+          "name": "checkpoint_latency",
+          "definition": "the checkpoint latency = decided_at - reached_at per approval",
+          "measurable": false,
+          "value": null,
+          "basis": "not_measurable",
+          "source_fields": [
+            "checkpoints"
+          ],
+          "reason": "missing field(s): checkpoints \u2014 not written by the runtime"
+        },
+        "sla_behavior": {
+          "name": "sla_behavior",
+          "definition": "SLA = the timeouts/deadline breaches / total",
+          "measurable": false,
+          "value": null,
+          "basis": "not_measurable",
+          "source_fields": [
+            "timeout",
+            "deadline_breach"
+          ],
+          "reason": "missing field(s): timeout, deadline_breach \u2014 not written by the runtime"
+        }
+      }
+    },
+    {
+      "campaign": "cap_2b",
+      "n_ledgers": 1,
+      "n_jobs": 0,
+      "n_attempts": 0,
+      "n_phases": 3,
+      "n_checkpoints": 0,
+      "started_at": "",
+      "ended_at": "",
+      "metrics": {
+        "retry_rate": {
+          "name": "retry_rate",
+          "definition": "r = attempts with attempt_count > 1 / total attempts (per campaign)",
+          "measurable": false,
+          "value": null,
+          "basis": "not_measurable",
+          "source_fields": [
+            "attempt_count",
+            "attempts"
+          ],
+          "reason": "missing field(s): attempt_count, attempts \u2014 not written by the runtime"
+        },
+        "first_call_resolution": {
+          "name": "first_call_resolution",
+          "definition": "WOC = first_pass / total",
+          "measurable": false,
+          "value": null,
+          "basis": "not_measurable",
+          "source_fields": [
+            "first_pass"
+          ],
+          "reason": "missing field(s): first_pass \u2014 not written by the runtime"
+        },
+        "escalation_rate": {
+          "name": "escalation_rate",
+          "definition": "escalation rate = the escalations / total",
+          "measurable": false,
+          "value": null,
+          "basis": "not_measurable",
+          "source_fields": [
+            "escalation_from",
+            "escalation_to"
+          ],
+          "reason": "missing field(s): escalation_from, escalation_to \u2014 not written by the runtime"
+        },
+        "batch_fraction": {
+          "name": "batch_fraction",
+          "definition": "b = batch-mode jobs / total",
+          "measurable": false,
+          "value": null,
+          "basis": "not_measurable",
+          "source_fields": [
+            "batch_mode"
+          ],
+          "reason": "missing field(s): batch_mode \u2014 not written by the runtime"
+        },
+        "throughput": {
+          "name": "throughput",
+          "definition": "throughput = cells or phases per hour per campaign",
+          "measurable": false,
+          "value": {
+            "phases": 3
+          },
+          "basis": "not_measurable",
+          "source_fields": [
+            "phases"
+          ],
+          "reason": "3 phases but no started_at/ended_at span to divide by"
+        },
+        "cost_per_accepted": {
+          "name": "cost_per_accepted",
+          "definition": "cost-per-accepted = the accepted outcomes' cost",
+          "measurable": false,
+          "value": null,
+          "basis": "not_measurable",
+          "source_fields": [
+            "accepted"
+          ],
+          "reason": "missing field(s): accepted \u2014 not written by the runtime"
+        },
+        "checkpoint_latency": {
+          "name": "checkpoint_latency",
+          "definition": "the checkpoint latency = decided_at - reached_at per approval",
+          "measurable": false,
+          "value": null,
+          "basis": "not_measurable",
+          "source_fields": [
+            "checkpoints"
+          ],
+          "reason": "missing field(s): checkpoints \u2014 not written by the runtime"
+        },
+        "sla_behavior": {
+          "name": "sla_behavior",
+          "definition": "SLA = the timeouts/deadline breaches / total",
+          "measurable": false,
+          "value": null,
+          "basis": "not_measurable",
+          "source_fields": [
+            "timeout",
+            "deadline_breach"
+          ],
+          "reason": "missing field(s): timeout, deadline_breach \u2014 not written by the runtime"
+        }
+      }
+    },
+    {
+      "campaign": "cap_adaptive_2c",
+      "n_ledgers": 1,
+      "n_jobs": 0,
+      "n_attempts": 0,
+      "n_phases": 3,
+      "n_checkpoints": 0,
+      "started_at": "",
+      "ended_at": "",
+      "metrics": {
+        "retry_rate": {
+          "name": "retry_rate",
+          "definition": "r = attempts with attempt_count > 1 / total attempts (per campaign)",
+          "measurable": false,
+          "value": null,
+          "basis": "not_measurable",
+          "source_fields": [
+            "attempt_count",
+            "attempts"
+          ],
+          "reason": "missing field(s): attempt_count, attempts \u2014 not written by the runtime"
+        },
+        "first_call_resolution": {
+          "name": "first_call_resolution",
+          "definition": "WOC = first_pass / total",
+          "measurable": false,
+          "value": null,
+          "basis": "not_measurable",
+          "source_fields": [
+            "first_pass"
+          ],
+          "reason": "missing field(s): first_pass \u2014 not written by the runtime"
+        },
+        "escalation_rate": {
+          "name": "escalation_rate",
+          "definition": "escalation rate = the escalations / total",
+          "measurable": false,
+          "value": null,
+          "basis": "not_measurable",
+          "source_fields": [
+            "escalation_from",
+            "escalation_to"
+          ],
+          "reason": "missing field(s): escalation_from, escalation_to \u2014 not written by the runtime"
+        },
+        "batch_fraction": {
+          "name": "batch_fraction",
+          "definition": "b = batch-mode jobs / total",
+          "measurable": false,
+          "value": null,
+          "basis": "not_measurable",
+          "source_fields": [
+            "batch_mode"
+          ],
+          "reason": "missing field(s): batch_mode \u2014 not written by the runtime"
+        },
+        "throughput": {
+          "name": "throughput",
+          "definition": "throughput = cells or phases per hour per campaign",
+          "measurable": false,
+          "value": {
+            "phases": 3
+          },
+          "basis": "not_measurable",
+          "source_fields": [
+            "phases"
+          ],
+          "reason": "3 phases but no started_at/ended_at span to divide by"
+        },
+        "cost_per_accepted": {
+          "name": "cost_per_accepted",
+          "definition": "cost-per-accepted = the accepted outcomes' cost",
+          "measurable": false,
+          "value": null,
+          "basis": "not_measurable",
+          "source_fields": [
+            "accepted"
+          ],
+          "reason": "missing field(s): accepted \u2014 not written by the runtime"
+        },
+        "checkpoint_latency": {
+          "name": "checkpoint_latency",
+          "definition": "the checkpoint latency = decided_at - reached_at per approval",
+          "measurable": false,
+          "value": null,
+          "basis": "not_measurable",
+          "source_fields": [
+            "checkpoints"
+          ],
+          "reason": "missing field(s): checkpoints \u2014 not written by the runtime"
+        },
+        "sla_behavior": {
+          "name": "sla_behavior",
+          "definition": "SLA = the timeouts/deadline breaches / total",
+          "measurable": false,
+          "value": null,
+          "basis": "not_measurable",
+          "source_fields": [
+            "timeout",
+            "deadline_breach"
+          ],
+          "reason": "missing field(s): timeout, deadline_breach \u2014 not written by the runtime"
+        }
+      }
+    },
+    {
+      "campaign": "cap_escalation_measurement",
+      "n_ledgers": 2,
+      "n_jobs": 0,
+      "n_attempts": 0,
+      "n_phases": 4,
+      "n_checkpoints": 0,
+      "started_at": "2026-08-26T12:52:13.023410+00:00",
+      "ended_at": "2026-08-26T12:55:29.132538+00:00",
+      "metrics": {
+        "retry_rate": {
+          "name": "retry_rate",
+          "definition": "r = attempts with attempt_count > 1 / total attempts (per campaign)",
+          "measurable": false,
+          "value": null,
+          "basis": "not_measurable",
+          "source_fields": [
+            "attempt_count",
+            "attempts"
+          ],
+          "reason": "missing field(s): attempt_count, attempts \u2014 not written by the runtime"
+        },
+        "first_call_resolution": {
+          "name": "first_call_resolution",
+          "definition": "WOC = first_pass / total",
+          "measurable": false,
+          "value": null,
+          "basis": "not_measurable",
+          "source_fields": [
+            "first_pass"
+          ],
+          "reason": "missing field(s): first_pass \u2014 not written by the runtime"
+        },
+        "escalation_rate": {
+          "name": "escalation_rate",
+          "definition": "escalation rate = the escalations / total",
+          "measurable": false,
+          "value": null,
+          "basis": "not_measurable",
+          "source_fields": [
+            "escalation_from",
+            "escalation_to"
+          ],
+          "reason": "missing field(s): escalation_from, escalation_to \u2014 not written by the runtime"
+        },
+        "batch_fraction": {
+          "name": "batch_fraction",
+          "definition": "b = batch-mode jobs / total",
+          "measurable": false,
+          "value": null,
+          "basis": "not_measurable",
+          "source_fields": [
+            "batch_mode"
+          ],
+          "reason": "missing field(s): batch_mode \u2014 not written by the runtime"
+        },
+        "throughput": {
+          "name": "throughput",
+          "definition": "throughput = cells or phases per hour per campaign",
+          "measurable": true,
+          "value": {
+            "phases_per_hour": 73.4285,
+            "phases": 4,
+            "span_hours": 0.0545
+          },
+          "basis": "derived",
+          "source_fields": [
+            "phases",
+            "started_at",
+            "ended_at"
+          ],
+          "reason": ""
+        },
+        "cost_per_accepted": {
+          "name": "cost_per_accepted",
+          "definition": "cost-per-accepted = the accepted outcomes' cost",
+          "measurable": false,
+          "value": null,
+          "basis": "not_measurable",
+          "source_fields": [
+            "accepted"
+          ],
+          "reason": "missing field(s): accepted \u2014 not written by the runtime"
+        },
+        "checkpoint_latency": {
+          "name": "checkpoint_latency",
+          "definition": "the checkpoint latency = decided_at - reached_at per approval",
+          "measurable": false,
+          "value": null,
+          "basis": "not_measurable",
+          "source_fields": [
+            "checkpoints"
+          ],
+          "reason": "missing field(s): checkpoints \u2014 not written by the runtime"
+        },
+        "sla_behavior": {
+          "name": "sla_behavior",
+          "definition": "SLA = the timeouts/deadline breaches / total",
+          "measurable": false,
+          "value": null,
+          "basis": "not_measurable",
+          "source_fields": [
+            "timeout",
+            "deadline_breach"
+          ],
+          "reason": "missing field(s): timeout, deadline_breach \u2014 not written by the runtime"
+        }
+      }
+    },
+    {
+      "campaign": "cap_grit_strength_grid",
+      "n_ledgers": 1,
+      "n_jobs": 8,
+      "n_attempts": 9,
+      "n_phases": 0,
+      "n_checkpoints": 0,
+      "started_at": "",
+      "ended_at": "",
+      "metrics": {
+        "retry_rate": {
+          "name": "retry_rate",
+          "definition": "r = attempts with attempt_count > 1 / total attempts (per campaign)",
+          "measurable": true,
+          "value": 0.125,
+          "basis": "derived",
+          "source_fields": [
+            "attempts",
+            "attempt_number"
+          ],
+          "reason": "1/8 jobs with >1 attempt (attempt_count derived from the attempts array)"
+        },
+        "first_call_resolution": {
+          "name": "first_call_resolution",
+          "definition": "WOC = first_pass / total",
+          "measurable": false,
+          "value": null,
+          "basis": "not_measurable",
+          "source_fields": [
+            "first_pass"
+          ],
+          "reason": "missing field(s): first_pass \u2014 not written by the runtime"
+        },
+        "escalation_rate": {
+          "name": "escalation_rate",
+          "definition": "escalation rate = the escalations / total",
+          "measurable": false,
+          "value": null,
+          "basis": "not_measurable",
+          "source_fields": [
+            "escalation_from",
+            "escalation_to"
+          ],
+          "reason": "missing field(s): escalation_from, escalation_to \u2014 not written by the runtime"
+        },
+        "batch_fraction": {
+          "name": "batch_fraction",
+          "definition": "b = batch-mode jobs / total",
+          "measurable": false,
+          "value": null,
+          "basis": "not_measurable",
+          "source_fields": [
+            "batch_mode"
+          ],
+          "reason": "missing field(s): batch_mode \u2014 not written by the runtime"
+        },
+        "throughput": {
+          "name": "throughput",
+          "definition": "throughput = cells or phases per hour per campaign",
+          "measurable": false,
+          "value": {
+            "cells": 8
+          },
+          "basis": "not_measurable",
+          "source_fields": [
+            "cells"
+          ],
+          "reason": "8 cells but no started_at/ended_at span to divide by"
+        },
+        "cost_per_accepted": {
+          "name": "cost_per_accepted",
+          "definition": "cost-per-accepted = the accepted outcomes' cost",
+          "measurable": true,
+          "value": {
+            "accepted_count": 7,
+            "total_accepted_cost_usd": 27.715817
+          },
+          "basis": "measured",
+          "source_fields": [
+            "status",
+            "realized_cost"
+          ],
+          "reason": ""
+        },
+        "checkpoint_latency": {
+          "name": "checkpoint_latency",
+          "definition": "the checkpoint latency = decided_at - reached_at per approval",
+          "measurable": false,
+          "value": null,
+          "basis": "not_measurable",
+          "source_fields": [
+            "checkpoints"
+          ],
+          "reason": "missing field(s): checkpoints \u2014 not written by the runtime"
+        },
+        "sla_behavior": {
+          "name": "sla_behavior",
+          "definition": "SLA = the timeouts/deadline breaches / total",
+          "measurable": false,
+          "value": null,
+          "basis": "not_measurable",
+          "source_fields": [
+            "timeout",
+            "deadline_breach"
+          ],
+          "reason": "missing field(s): timeout, deadline_breach \u2014 not written by the runtime"
+        }
+      }
+    },
+    {
+      "campaign": "cap_session_routing_prospective",
+      "n_ledgers": 26,
+      "n_jobs": 0,
+      "n_attempts": 0,
+      "n_phases": 76,
+      "n_checkpoints": 0,
+      "started_at": "2026-08-26T14:49:36.962198+00:00",
+      "ended_at": "2026-08-26T16:03:37.863059+00:00",
+      "metrics": {
+        "retry_rate": {
+          "name": "retry_rate",
+          "definition": "r = attempts with attempt_count > 1 / total attempts (per campaign)",
+          "measurable": false,
+          "value": null,
+          "basis": "not_measurable",
+          "source_fields": [
+            "attempt_count",
+            "attempts"
+          ],
+          "reason": "missing field(s): attempt_count, attempts \u2014 not written by the runtime"
+        },
+        "first_call_resolution": {
+          "name": "first_call_resolution",
+          "definition": "WOC = first_pass / total",
+          "measurable": false,
+          "value": null,
+          "basis": "not_measurable",
+          "source_fields": [
+            "first_pass"
+          ],
+          "reason": "missing field(s): first_pass \u2014 not written by the runtime"
+        },
+        "escalation_rate": {
+          "name": "escalation_rate",
+          "definition": "escalation rate = the escalations / total",
+          "measurable": false,
+          "value": null,
+          "basis": "not_measurable",
+          "source_fields": [
+            "escalation_from",
+            "escalation_to"
+          ],
+          "reason": "missing field(s): escalation_from, escalation_to \u2014 not written by the runtime"
+        },
+        "batch_fraction": {
+          "name": "batch_fraction",
+          "definition": "b = batch-mode jobs / total",
+          "measurable": false,
+          "value": null,
+          "basis": "not_measurable",
+          "source_fields": [
+            "batch_mode"
+          ],
+          "reason": "missing field(s): batch_mode \u2014 not written by the runtime"
+        },
+        "throughput": {
+          "name": "throughput",
+          "definition": "throughput = cells or phases per hour per campaign",
+          "measurable": true,
+          "value": {
+            "phases_per_hour": 61.6091,
+            "phases": 76,
+            "span_hours": 1.2336
+          },
+          "basis": "derived",
+          "source_fields": [
+            "phases",
+            "started_at",
+            "ended_at"
+          ],
+          "reason": ""
+        },
+        "cost_per_accepted": {
+          "name": "cost_per_accepted",
+          "definition": "cost-per-accepted = the accepted outcomes' cost",
+          "measurable": false,
+          "value": null,
+          "basis": "not_measurable",
+          "source_fields": [
+            "accepted"
+          ],
+          "reason": "missing field(s): accepted \u2014 not written by the runtime"
+        },
+        "checkpoint_latency": {
+          "name": "checkpoint_latency",
+          "definition": "the checkpoint latency = decided_at - reached_at per approval",
+          "measurable": false,
+          "value": null,
+          "basis": "not_measurable",
+          "source_fields": [
+            "checkpoints"
+          ],
+          "reason": "missing field(s): checkpoints \u2014 not written by the runtime"
+        },
+        "sla_behavior": {
+          "name": "sla_behavior",
+          "definition": "SLA = the timeouts/deadline breaches / total",
+          "measurable": false,
+          "value": null,
+          "basis": "not_measurable",
+          "source_fields": [
+            "timeout",
+            "deadline_breach"
+          ],
+          "reason": "missing field(s): timeout, deadline_breach \u2014 not written by the runtime"
+        }
+      }
+    }
+  ],
+  "aggregate": {
+    "campaigns": 9,
+    "pooled": {
+      "retry_rate": {
+        "definition": "r = attempts with attempt_count > 1 / total attempts (per campaign)",
+        "measurable_in": 1,
+        "campaigns_total": 9,
+        "values": [
+          {
+            "name": "retry_rate",
+            "definition": "r = attempts with attempt_count > 1 / total attempts (per campaign)",
+            "measurable": true,
+            "value": 0.125,
+            "basis": "derived",
+            "source_fields": [
+              "attempts",
+              "attempt_number"
+            ],
+            "reason": "1/8 jobs with >1 attempt (attempt_count derived from the attempts array)"
+          }
+        ]
+      },
+      "first_call_resolution": {
+        "definition": "WOC = first_pass / total",
+        "measurable_in": 0,
+        "campaigns_total": 9,
+        "values": []
+      },
+      "escalation_rate": {
+        "definition": "escalation rate = the escalations / total",
+        "measurable_in": 0,
+        "campaigns_total": 9,
+        "values": []
+      },
+      "batch_fraction": {
+        "definition": "b = batch-mode jobs / total",
+        "measurable_in": 0,
+        "campaigns_total": 9,
+        "values": []
+      },
+      "throughput": {
+        "definition": "throughput = cells or phases per hour per campaign",
+        "measurable_in": 2,
+        "campaigns_total": 9,
+        "values": [
+          {
+            "name": "throughput",
+            "definition": "throughput = cells or phases per hour per campaign",
+            "measurable": true,
+            "value": {
+              "phases_per_hour": 73.4285,
+              "phases": 4,
+              "span_hours": 0.0545
+            },
+            "basis": "derived",
+            "source_fields": [
+              "phases",
+              "started_at",
+              "ended_at"
+            ],
+            "reason": ""
+          },
+          {
+            "name": "throughput",
+            "definition": "throughput = cells or phases per hour per campaign",
+            "measurable": true,
+            "value": {
+              "phases_per_hour": 61.6091,
+              "phases": 76,
+              "span_hours": 1.2336
+            },
+            "basis": "derived",
+            "source_fields": [
+              "phases",
+              "started_at",
+              "ended_at"
+            ],
+            "reason": ""
+          }
+        ]
+      },
+      "cost_per_accepted": {
+        "definition": "cost-per-accepted = the accepted outcomes' cost",
+        "measurable_in": 1,
+        "campaigns_total": 9,
+        "values": [
+          {
+            "name": "cost_per_accepted",
+            "definition": "cost-per-accepted = the accepted outcomes' cost",
+            "measurable": true,
+            "value": {
+              "accepted_count": 7,
+              "total_accepted_cost_usd": 27.715817
+            },
+            "basis": "measured",
+            "source_fields": [
+              "status",
+              "realized_cost"
+            ],
+            "reason": ""
+          }
+        ]
+      },
+      "checkpoint_latency": {
+        "definition": "the checkpoint latency = decided_at - reached_at per approval",
+        "measurable_in": 0,
+        "campaigns_total": 9,
+        "values": []
+      },
+      "sla_behavior": {
+        "definition": "SLA = the timeouts/deadline breaches / total",
+        "measurable_in": 0,
+        "campaigns_total": 9,
+        "values": []
+      }
+    }
+  },
+  "coverage": [
+    {
+      "campaign": "cap_2a",
+      "n_ledgers": 1,
+      "n_jobs": 0,
+      "n_attempts": 0,
+      "n_phases": 3,
+      "n_checkpoints": 0,
+      "retry_rate_measurable": false,
+      "first_call_resolution_measurable": false,
+      "escalation_rate_measurable": false,
+      "batch_fraction_measurable": false,
+      "throughput_measurable": false,
+      "cost_per_accepted_measurable": false,
+      "checkpoint_latency_measurable": false,
+      "sla_behavior_measurable": false,
+      "complete_metrics": []
+    },
+    {
+      "campaign": "cap_2a_rerun",
+      "n_ledgers": 4,
+      "n_jobs": 0,
+      "n_attempts": 0,
+      "n_phases": 10,
+      "n_checkpoints": 0,
+      "retry_rate_measurable": false,
+      "first_call_resolution_measurable": false,
+      "escalation_rate_measurable": false,
+      "batch_fraction_measurable": false,
+      "throughput_measurable": false,
+      "cost_per_accepted_measurable": false,
+      "checkpoint_latency_measurable": false,
+      "sla_behavior_measurable": false,
+      "complete_metrics": []
+    },
+    {
+      "campaign": "cap_2a_rerun2",
+      "n_ledgers": 3,
+      "n_jobs": 0,
+      "n_attempts": 0,
+      "n_phases": 7,
+      "n_checkpoints": 0,
+      "retry_rate_measurable": false,
+      "first_call_resolution_measurable": false,
+      "escalation_rate_measurable": false,
+      "batch_fraction_measurable": false,
+      "throughput_measurable": false,
+      "cost_per_accepted_measurable": false,
+      "checkpoint_latency_measurable": false,
+      "sla_behavior_measurable": false,
+      "complete_metrics": []
+    },
+    {
+      "campaign": "cap_2a_rerun3",
+      "n_ledgers": 6,
+      "n_jobs": 0,
+      "n_attempts": 0,
+      "n_phases": 17,
+      "n_checkpoints": 0,
+      "retry_rate_measurable": false,
+      "first_call_resolution_measurable": false,
+      "escalation_rate_measurable": false,
+      "batch_fraction_measurable": false,
+      "throughput_measurable": false,
+      "cost_per_accepted_measurable": false,
+      "checkpoint_latency_measurable": false,
+      "sla_behavior_measurable": false,
+      "complete_metrics": []
+    },
+    {
+      "campaign": "cap_2b",
+      "n_ledgers": 1,
+      "n_jobs": 0,
+      "n_attempts": 0,
+      "n_phases": 3,
+      "n_checkpoints": 0,
+      "retry_rate_measurable": false,
+      "first_call_resolution_measurable": false,
+      "escalation_rate_measurable": false,
+      "batch_fraction_measurable": false,
+      "throughput_measurable": false,
+      "cost_per_accepted_measurable": false,
+      "checkpoint_latency_measurable": false,
+      "sla_behavior_measurable": false,
+      "complete_metrics": []
+    },
+    {
+      "campaign": "cap_adaptive_2c",
+      "n_ledgers": 1,
+      "n_jobs": 0,
+      "n_attempts": 0,
+      "n_phases": 3,
+      "n_checkpoints": 0,
+      "retry_rate_measurable": false,
+      "first_call_resolution_measurable": false,
+      "escalation_rate_measurable": false,
+      "batch_fraction_measurable": false,
+      "throughput_measurable": false,
+      "cost_per_accepted_measurable": false,
+      "checkpoint_latency_measurable": false,
+      "sla_behavior_measurable": false,
+      "complete_metrics": []
+    },
+    {
+      "campaign": "cap_escalation_measurement",
+      "n_ledgers": 2,
+      "n_jobs": 0,
+      "n_attempts": 0,
+      "n_phases": 4,
+      "n_checkpoints": 0,
+      "retry_rate_measurable": false,
+      "first_call_resolution_measurable": false,
+      "escalation_rate_measurable": false,
+      "batch_fraction_measurable": false,
+      "throughput_measurable": true,
+      "cost_per_accepted_measurable": false,
+      "checkpoint_latency_measurable": false,
+      "sla_behavior_measurable": false,
+      "complete_metrics": [
+        "throughput"
+      ]
+    },
+    {
+      "campaign": "cap_grit_strength_grid",
+      "n_ledgers": 1,
+      "n_jobs": 8,
+      "n_attempts": 9,
+      "n_phases": 0,
+      "n_checkpoints": 0,
+      "retry_rate_measurable": true,
+      "first_call_resolution_measurable": false,
+      "escalation_rate_measurable": false,
+      "batch_fraction_measurable": false,
+      "throughput_measurable": false,
+      "cost_per_accepted_measurable": true,
+      "checkpoint_latency_measurable": false,
+      "sla_behavior_measurable": false,
+      "complete_metrics": [
+        "retry_rate",
+        "cost_per_accepted"
+      ]
+    },
+    {
+      "campaign": "cap_session_routing_prospective",
+      "n_ledgers": 26,
+      "n_jobs": 0,
+      "n_attempts": 0,
+      "n_phases": 76,
+      "n_checkpoints": 0,
+      "retry_rate_measurable": false,
+      "first_call_resolution_measurable": false,
+      "escalation_rate_measurable": false,
+      "batch_fraction_measurable": false,
+      "throughput_measurable": true,
+      "cost_per_accepted_measurable": false,
+      "checkpoint_latency_measurable": false,
+      "sla_behavior_measurable": false,
+      "complete_metrics": [
+        "throughput"
+      ]
+    }
+  ]
+}

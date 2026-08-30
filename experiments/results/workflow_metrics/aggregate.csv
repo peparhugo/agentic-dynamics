@@ -1,0 +1,10 @@
+campaign,n_ledgers,n_jobs,n_attempts,n_phases,n_checkpoints,retry_rate_measurable,first_call_resolution_measurable,escalation_rate_measurable,batch_fraction_measurable,throughput_measurable,cost_per_accepted_measurable,checkpoint_latency_measurable,sla_behavior_measurable,retry_rate_value,first_call_resolution_value,escalation_rate_value,batch_fraction_value,throughput_value,cost_per_accepted_value,checkpoint_latency_value,sla_behavior_value
+cap_2a,1,0,0,3,0,false,false,false,false,false,false,false,false,null,null,null,null,"{""phases"": 3}",null,null,null
+cap_2a_rerun,4,0,0,10,0,false,false,false,false,false,false,false,false,null,null,null,null,"{""phases"": 10}",null,null,null
+cap_2a_rerun2,3,0,0,7,0,false,false,false,false,false,false,false,false,null,null,null,null,"{""phases"": 7}",null,null,null
+cap_2a_rerun3,6,0,0,17,0,false,false,false,false,false,false,false,false,null,null,null,null,"{""phases"": 17}",null,null,null
+cap_2b,1,0,0,3,0,false,false,false,false,false,false,false,false,null,null,null,null,"{""phases"": 3}",null,null,null
+cap_adaptive_2c,1,0,0,3,0,false,false,false,false,false,false,false,false,null,null,null,null,"{""phases"": 3}",null,null,null
+cap_escalation_measurement,2,0,0,4,0,false,false,false,false,true,false,false,false,null,null,null,null,"{""phases_per_hour"": 73.4285, ""phases"": 4, ""span_hours"": 0.0545}",null,null,null
+cap_grit_strength_grid,1,8,9,0,0,true,false,false,false,false,true,false,false,0.125,null,null,null,"{""cells"": 8}","{""accepted_count"": 7, ""total_accepted_cost_usd"": 27.715817}",null,null
+cap_session_routing_prospective,26,0,0,76,0,false,false,false,false,true,false,false,false,null,null,null,null,"{""phases_per_hour"": 61.6091, ""phases"": 76, ""span_hours"": 1.2336}",null,null,null
