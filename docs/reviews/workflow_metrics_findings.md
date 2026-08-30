@@ -6,6 +6,10 @@ status: accepted
 
 **Role:** p0 (pin + verify) + p3 (findings). **Spec:** `workflows/repository/workflow_metrics.yaml`.
 
+**Numbers source:** every figure below is **cited from p2's computed outputs** —
+`experiments/results/workflow_metrics/aggregate.json` (per-campaign rows, pooled `aggregate`,
+the `framework_comparison` block, and the exact `run_ledger_coverage`). Nothing is re-derived here.
+
 ## Pinned header (p0)
 
 - **Spec SHA256:** `2cd4bb1105c915f3b9ae5e4e835c4277eddb6ba6da58ac7b7d8efd31498768d1`
@@ -60,6 +64,13 @@ wrappers), and **0 non-empty `checkpoints` arrays**.
 | checkpoint latency | **not measurable** (0 records committed) | — | no `checkpoints` arrays carry `reached_at`/`decided_at`; the decisions/reasons/approval-evidence distributions are reported empty |
 | SLA | **not measurable** | — | the breach fields (`stall_evidence`/`deploy_gate`/`commit_gate`/`relabel_gate`) are defined by the runner but **absent from every committed phase ledger** (all predate the runner hardening) |
 
+**Checkpoint behavior (the I10 typed records).** The corpus carries **0 committed checkpoint
+records** — hence 0 checkpoint counts, 0 approval latencies, an empty decisions distribution, and
+**0 awaited-approval runs** (`awaiting: true` / `state: awaiting_approval` appears in no committed
+ledger). The approval flow the spec's question names ("the machine just lived through the approval
+flow") produced no committed I10 records — the checkpoint machinery exists in
+`workflow_runner.py`, but its typed records live in the gitignored run-ledger directory.
+
 Alongside the pinned metrics the instrument reports two measured quantities: **W (workload volume)**
 = 8 jobs (the grit grid only; every other campaign is phase-only, so W=0), and the **phase-cost
 structure** (agent vs test vs other): pooled **$0.5047** agent-phase cost + **$0.00** test-phase
@@ -91,6 +102,11 @@ other pinned metric is pooled as "0 of N campaigns measurable" — see `aggregat
 3. **Confirmed unchanged:** `WOC = 1/(1+r)`, `T_max = Budget/C_job`, `C_job = C₀·EPM·(1−b·0.5)·(1+r·E_x)`
    remain the framework equations; nothing here contradicts them — but `r`, `b`, and the autonomous
    `C_job` that feed them are still unmeasured in the committed corpus.
+
+These three comparisons are the computed `framework_comparison` block of p2's `aggregate.json`,
+not prose re-derivations: `measured_r=0.125` vs `framework_scenario=0.115`, `measured_ex` (11.4671 /
+12.5134) vs `framework_ex_price_ratios` (28.2 / 68.7), and the escalation rate `None` vs the
+`<1%` design target.
 
 ## 4. WFM implications (scoped to the evidence)
 
