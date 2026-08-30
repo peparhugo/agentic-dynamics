@@ -1,0 +1,315 @@
+name: fleet_ladder_implementation
+question: >-
+  Implement the ENTIRE fleet-ladder plan (docs/fleet/00_proposal.md — the signed-off
+  mapping): all four migration slices + the per-step scope model + the neo4j bridge, as
+  bounded workflow phases. The proposal is the MANDATE — every phase cites its section and
+  closes its slice; the guards (G1-G6) are never weakened; the four constraints hold (host
+  bootstrap only, master control = the operator chat, the socket as the ONE escalation in
+  the orchestrator tier, the mount contract as the isolation constant). The runtime pieces
+  (the image builds, the compose, the probes) are TESTED on the host's docker daemon by the
+  phases themselves — a phase that writes a Dockerfile builds it; a phase that writes
+  compose brings it up; the binary-resolution + network-policy probes run for real. The
+  operator's gate: after the phases, the operator runs the end-of-implementation smoke test
+  (a real cell through the container path); nothing activates in production before that
+  sign-off. Execution model: deepseek-v4-pro (the escalation pattern).
+version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: true
+repeatable: false
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: true
+    context:
+      domain_context: >-
+        PROVISIONAL DomainProfile. domain: infrastructure implementation (the fleet
+        ladder). canonical_sources:
+        [docs/fleet/00_proposal.md (THE MANDATE — every section cited per phase),
+        docs/designs/proposed/fleet_ladder_architecture.md (the design),
+        docs/fleet/01_infra_inventory.md + 02_kb_access_map.md + 03_review.md (the
+        research the proposal assembles), docs/reviews/fleet_ladder_proposal_reverify.md
+        + fleet_ladder_proposal_known_safe.md (the verified state), the current
+        infrastructure (docker ps: redis 6380 / chroma 8000 / sonar 9000-9003 / neo4j),
+        src/agentic_dynamics/* (the code being containerized), scripts/{worker,
+        analysis_worker, trigger_reviews, review_all, kb_worker, run_workflow}.py].
+        policies: [proposal_is_the_mandate, runtime_tested_not_assumed,
+        guards_never_weakened, constraints_hold, bounded_phases]
+      challenge_context: >-
+        PROVISIONAL ChallengeProfile. challenge: implementation (the four slices + the
+        scope model + the neo4j bridge, phase by phase). deliberation: [slice 1, slice 2,
+        slice 3, slice 4, adversarial, runtime smoke handoff].
+        session_policy: {default: fork_per_phase}
+      current_state: >-
+        The proposal is signed off (reverify SUPPORT, the 7 findings closed, the three
+        refinements folded in). The infra: 9 containers (the data plane), the ad-hoc host
+        workers (the fleet being replaced), the registry drained (14,545 entities), the
+        KB stream with the four groups (three never consumed — the neo4j bridge is slice
+        3's). The machine's campaigns run on the host path until slice 2's cut-over. The
+        operator's smoke test awaits at the end.
+      hard_rules: >-
+        (1) Every phase commits '[workflow] <phase>' (the worktree hook enforces it);
+        every docs/ file carries status frontmatter (the DOC_CONTRACT gate).
+        (2) THE PROPOSAL IS THE MANDATE: each phase cites its proposal sections; a
+        deviation from the mapping (a mount, a guard, a scope, a network) is a FAILED
+        finding. The proposal's decisions (D-1..D-18) are implemented as written.
+        (3) RUNTIME TESTED, NOT ASSUMED: a phase that writes a Dockerfile builds it
+        (docker build — the host daemon); a phase that writes compose brings it up
+        (docker compose up + the service health); the binary-resolution probe and the
+        network-policy probe RUN (a broken symlink chain or an unexpected network
+        attachment is a FAILED finding). The runtime tests are committed with the code.
+        (4) THE GUARDS ARE NEVER WEAKENED: G1-G6 as placed (§8 of the proposal) — a
+        weakened guard is a FAILED finding.
+        (5) THE CONSTRAINTS HOLD: host bootstrap only (the systemd unit ~3 lines); the
+        socket in the orchestrator tier ONLY; the mount contract (the four + the D-2
+        auth set) as the isolation constant; the supervisor KB-read-only.
+        (6) BOUNDED PHASES: each phase is one slice's one deliverable (or a bounded
+        half); a phase that finds a larger question records it for the next slice,
+        never expands its own scope. The runtime debugging (the image/mount cycles) is
+        the phase's own work — the phase runs the builds and the probes and fixes until
+        they pass, bounded by its timeout.
+        (7) The ADDITIVE discipline: the story/analysis workers' migration is additive
+        (BRPOP atomic — old + new workers never double-process); the review path is a
+        SEQUENCED CUT-OVER (stop the host trigger_reviews + drain review_all BEFORE the
+        containerized path starts — D-10); a phase that breaks the sequencing is a
+        FAILED finding.
+        (8) The operator's gates: after the implementation phases, the workflow STOPS
+        for the operator's smoke test (a real cell through the container path) — the
+        final phase hands off with the run instructions; nothing activates beyond the
+        test scope before the sign-off.
+        (9) Every number cites its source. (10) The data chain stays single-writer; the
+        machine's running campaigns are untouched by the implementation (the additive
+        discipline). (11) The adversarial phase is mandatory. (12) Resumable only when
+        spec version, goal hash, source revision, and candidate-manifest hash match.
+      read_first: >-
+        docs/fleet/00_proposal.md (the mandate — read fully first),
+        docs/fleet/02_kb_access_map.md, docs/reviews/fleet_ladder_proposal_reverify.md,
+        infrastructure/ (the existing compose), scripts/kb_worker.py,
+        scripts/worker.py, scripts/run_workflow.py
+      run_shape: >-
+        SINGLE wrapper: deepseek/deepseek-v4-pro. One branch
+        (feature/fleet-ladder-implementation); each phase commits [workflow] <phase>;
+        the infrastructure lands under infrastructure/ + Dockerfile.fleet + the fleet
+        manager app under scripts/fleet/. The phases test on the host docker daemon. The
+        operator's smoke test at the end. The data chain stays single-writer.
+    phases:
+      - name: p0_pin_mandate
+        kind: agent
+        timeout: 3600
+        prompt: |
+          GOAL: {goal}
+          ROLE: verification — the proposal (docs/fleet/00_proposal.md) is the signed-off
+          mandate. Append this spec's SHA256 to the proposal's header (the ONLY edit
+          allowed). Verify the mandate is complete: the four slices, the scope model
+          (D-16), the network policy (D-17), the binary attach (D-18), the neo4j bridge,
+          the guard placement (§8), the constraints. A deviation is a FAILED finding.
+          DELIVER: the pinned header + verification; committed.
+          LOG: PASS/FAIL; commit.
+      - name: p1_slice1_base_supervisor
+        kind: agent
+        timeout: 28800
+        prompt: |
+          GOAL: {goal}
+          ROLE: slice 1 — the base image + the supervisor + the worker pools
+          (proposal §7 slice 1, §2, §4). Build:
+          (1) Dockerfile.fleet — `fleet/base`: python deps (pyproject + the [neo4j]
+          extra), node, git, the sonar client baked (from /tmp/sonar-scanner-6.2.1.4610);
+          the CLIs NOT baked (the binary attach — the D-2 auth mounts carry them, D-18);
+          the binary-resolution probe script (resolves opencode + claude at start, fails
+          loudly on a broken chain).
+          (2) infrastructure/docker-compose.ladder.yml — the fleet-net bridge attached
+          to ONLY the queue redis (6380), chroma (8000), neo4j (7687), sonar
+          (9000-9003), + the egress proxy; the cell service group (story-worker x4,
+          analysis-worker x4, review-unit x2, kb-* consumers x4, the batch producers
+          profiles, run-single, supervise, orphan-sweep) with the D-2 mounts + the env
+          (FINOPS_KB_WRITE=1 ONLY on the P1-P10 units + the kb-registry consumer — D-11),
+          restart: on-failure.
+          (3) The fleet manager (scripts/fleet/): the read-only queue watcher (depth +
+          heartbeats + DLQ -> the board), the heartbeat writes
+          (worker:<type>:<id> -> {last_seen, jobs, pid}), the DLQ, restart-with-backoff,
+          the resize/drain command channel (fleet:commands on db1, 6380 — the
+          supervisor LPUSHes, the orchestrator validates, D-14), the supervisor-tier
+          services (portal, game board, trigger-reviews, registry CLI, report tools —
+          D-13 mounts: results rw / repo ro / auth ro + the fleet-logs named volume,
+          NO socket).
+          (4) The review cut-over (D-10): the sequencing script (stop the host
+          trigger_reviews + drain review_all, then start the containerized path).
+          (5) The systemd bootstrap unit (~3 lines: docker compose up -d fleet-manager,
+          Restart=always).
+          TEST: docker build fleet/base succeeds; docker compose config validates; the
+          binary-resolution probe runs (resolves the host's CLIs); the egress proxy
+          starts. A failed build/probe is a FAILED finding — fix and re-run within the
+          phase.
+          DELIVER: the image + compose + fleet manager + probes + the test evidence;
+          committed.
+          LOG: the build/test results; PASS/FAIL; commit.
+      - name: p2_slice1_workers_live
+        kind: agent
+        timeout: 28800
+        prompt: |
+          GOAL: {goal}
+          ROLE: slice 1 live — the worker pools + the portal/daemons as supervisor-tier
+          containers, the ADDITIVE cut-over (proposal §7 slice 1, D-10). Do:
+          (1) docker compose up the cell + supervisor groups; verify the services start
+          (the story/analysis workers pop the queues — the ADDITIVE discipline: the old
+          host workers still run, BRPOP is atomic — verify no double-processing by
+          watching the queue counters).
+          (2) The review CUT-OVER, sequenced (D-10): stop the host trigger_reviews +
+          drain the in-flight review_all FIRST, then start the containerized
+          review-unit + supervisor trigger-reviews. Verify the review queue drains once.
+          (3) The heartbeats live (worker:<type>:<id> keys appear), the DLQ live, the
+          board surfaces them.
+          (4) The portal + daemons as supervisor-tier containers (the SPOF fix) — the
+          host's ad-hoc portal process is stopped after its container starts.
+          TEST: the services' health (docker compose ps), the queue counters move
+          without double-processing, the heartbeats appear. A sequencing violation or a
+          double-process is a FAILED finding.
+          DELIVER: the live compose state + the test evidence; committed.
+          LOG: the cut-over log; PASS/FAIL; commit.
+      - name: p3_slice2_orchestrator
+        kind: agent
+        timeout: 28800
+        prompt: |
+          GOAL: {goal}
+          ROLE: slice 2 — the orchestrator tier + the per-step scope model
+          (proposal §7 slice 2, §2 D-14, §4, §5 D-16). Build:
+          (1) Dockerfile.fleet orchestrator stage: fleet/base + the docker CLI + the
+          sibling-spawn wrapper.
+          (2) The spawn-wrapper (scripts/fleet/spawn_wrapper.py): validates every spawn
+          request — scope ∈ the closed five-scope vocabulary, the phase authorized for
+          the scope, the mounts ⊆ the scope's mount set (and ⊆ the four + D-2), the
+          network = the scope's network, the env = the scope's env (no undeclared write
+          flag) — BEFORE the socket call; the fleet:commands BRPOP consumer (validates
+          the resize/drain against the compose allowlist + the mount contract, D-14).
+          (3) The scope: field in the ExperimentSpec (src/agentic_dynamics/experiment/
+          experiment_spec.py — the phases' optional scope field) + the phase->scope
+          authorization table (the proposal's own phases as the example).
+          (4) The campaign wrapper as an orchestrator container: run_workflow's phases
+          spawn as sibling containers with their scope configs — the 4-wide grid shape
+          unchanged.
+          TEST: the spawn-wrapper's validation unit tests (a scope not in the
+          vocabulary fails at step 1; an unauthorized scope fails at step 2; a bad mount
+          fails at step 3 — BEFORE the socket call); the scope field parses; the
+          orchestrator image builds. A validation bypass is a FAILED finding.
+          DELIVER: the wrapper + the scope field + the tests; committed.
+          LOG: the validation test results; PASS/FAIL; commit.
+      - name: p4_slice3_neo4j
+        kind: agent
+        timeout: 28800
+        prompt: |
+          GOAL: {goal}
+          ROLE: slice 3 — the neo4j bridge + the RRF leg live (proposal §7 slice 3, §6).
+          Do:
+          (1) The kb-neo4j cell container: kb_worker.py --group kb-neo4j-v1 supervised
+          (restart: on-failure, heartbeats), the [neo4j] extra, the D-12 group catch-up
+          (the stream head start point + the DLQ triage — bounded), the
+          direct-producer reconciliation (MERGE idempotency vs the existing nodes).
+          (2) The schema + index: create_knowledge_schema() + the knowledge_text_ft
+          fulltext-index write, the SUPERSEDES/CLEARED_BY/REPLACED_BY edges.
+          (3) The RRF activation: the retrieval's lexical leg goes live (the graph
+          client's search_knowledge_fulltext over the populated index); rag_augment
+          enabled for the orchestrator workflows as the measured product gate.
+          TEST: the group's pending -> 0 (the catch-up completes); the fulltext index
+          populated (a real query returns non-empty); the RRF fusion returns fused
+          results (the two legs both contribute); the DLQ's disposition recorded. A
+          group stuck with pending > 0 or an empty index is a FAILED finding.
+          DELIVER: the consumer + the catch-up + the RRF verification report; committed.
+          LOG: the pending/index/RRF test results; PASS/FAIL; commit.
+      - name: p5_slice4_guards
+        kind: agent
+        timeout: 21600
+        prompt: |
+          GOAL: {goal}
+          ROLE: slice 4 — the audit guards (proposal §7 slice 4, §8). Build the guard
+          tests:
+          (1) the compose-contract guard (the mount contract holds — no unexpected
+          mount; the socket appears in exactly ONE tier — the orchestrator);
+          (2) the fleet-health guard (the heartbeats + DLQ counts on the board);
+          (3) the neo4j index guard (the fulltext index populated <-> the group's
+          pending = 0);
+          (4) the single-write-back audit (D-11 — exactly one consumer carries
+          FINOPS_KB_WRITE);
+          (5) the binary-resolution probe (each CLI resolves at container start — the
+          symlink chain to a live executable — a broken chain fails the container
+          loudly);
+          (6) the scope-vocabulary guard (every phase's scope: ∈ the five-scope
+          vocabulary and is phase-authorized);
+          (7) the network-policy guard (each tier attaches to exactly fleet-net + the
+          egress proxy; 6379/8001/4096/host absent from the cells' networks).
+          TEST: the full deterministic suite passes with the new guards
+          (python3 -m pytest tests/ -m "not external" -q — the repo guards included); a
+          guard that fails on the CURRENT state (a real violation the implementation
+          left) is a FAILED finding — fix the implementation, not the guard.
+          DELIVER: the guard tests + the green suite; committed.
+          LOG: the guard list + the suite result; PASS/FAIL; commit.
+      - name: p6_adversarial
+        kind: agent
+        timeout: 28800
+        prompt: |
+          GOAL: {goal}
+          ROLE: adversarial verifier — falsify the IMPLEMENTATION (not the proposal — the
+          proposal is signed off). Attack in order:
+          (1) THE MANDATE: every slice's deliverables exist and match the proposal's
+          sections (the images, the compose, the manager, the wrapper, the consumer, the
+          guards) — a missing or deviating deliverable is a FAILED finding.
+          (2) THE GUARDS: G1-G6 re-traced from the code through the implementation —
+          FINOPS_KB_WRITE on exactly the placed units, the single write-back audited, a
+          weakened guard is a FAILED finding.
+          (3) THE CONSTRAINTS: the socket in the orchestrator tier ONLY (grep the
+          compose), the mount contract (no unexpected mounts), the supervisor
+          KB-read-only, the host bootstrap ~3 lines.
+          (4) THE SCOPE MODEL: the spawn-wrapper's five checks bypassable? (a phase
+          minting an unauthorized scope, a bad mount, an undeclared write flag) — a
+          bypass is a FAILED finding.
+          (5) THE NETWORK POLICY: the cells' networks contain 6379/8001/4096/the host?
+          the egress proxy is the only route out? — a leak is a FAILED finding.
+          (6) THE RUNTIME: the images build, the compose comes up, the binary probe
+          passes, the neo4j group pending = 0, the RRF returns — re-run the probes.
+          (7) THE SEQUENCING: the review cut-over sequenced (no double-review window)?
+          the additive discipline held?
+          Deliver TWO outputs:
+          docs/reviews/fleet_ladder_implementation_adversary.md +
+          docs/reviews/fleet_ladder_implementation_known_safe.md (BOTH with status:
+          accepted frontmatter). The verdict: SUPPORT iff no finding; FAIL with the
+          findings listed otherwise (the implementation must then be revised).
+          LOG: finding table + known-safe list; PASS/FAIL; commit.
+      - name: p7_smoke_handoff
+        kind: agent
+        timeout: 10800
+        prompt: |
+          GOAL: {goal}
+          ROLE: the operator's gate — the smoke-test HANDOFF. Do NOT run the production
+          smoke test yourself; prepare it:
+          (1) The run instructions: how the operator runs a REAL cell through the
+          container path (the exact commands: docker compose run the cell service with a
+          test cell id, the expected result path, the expected heartbeats), the binary
+          probe's expected output, the review cut-over's re-run instructions.
+          (2) The verification checklist for the operator: the container cell's result
+          lands, the queues move without double-processing, the heartbeats appear, the
+          neo4j group pending = 0, the RRF returns, the guard suite green.
+          (3) The rollback instructions: how to return to the ad-hoc workers (the
+          additive inverse).
+          DELIVER: docs/fleet/smoke_test_handoff.md (status: proposed) + commit it.
+          LOG: the handoff summary; PASS/FAIL; commit.
+factors:
+  - {name: model, levels: [deepseek/deepseek-v4-pro]}
+design: factorial
+rules:
+  - {name: mandate_pinned, plane: measurement, evidence_class: "[M]", requires: [], produces: [proposal_pinned]}
+  - {name: slice1_done, plane: measurement, evidence_class: "[C]", requires: [proposal_pinned], produces: [base_image, supervisor, pools_live]}
+  - {name: slice2_done, plane: measurement, evidence_class: "[C]", requires: [base_image], produces: [orchestrator, scope_model]}
+  - {name: slice3_done, plane: measurement, evidence_class: "[C]", requires: [base_image], produces: [neo4j_bridge, rrf_live]}
+  - {name: slice4_done, plane: measurement, evidence_class: "[C]", requires: [orchestrator, neo4j_bridge], produces: [audit_guards]}
+  - {name: implementation_verified, plane: measurement, evidence_class: "[C]", requires: [audit_guards], produces: [implementation_known_safe]}
+metrics:
+  - {name: mandate_fidelity, agg: mean, over: cell}
+  - {name: runtime_probes_passing, agg: mean, over: cell}
+comparison: {kind: effect_size, arm_factor: model, loss: {cost: 1.0, quality: 0.0, value: 0.0}}
+writeup:
+  format: lab_book
+  sections: [question, p0_pin_mandate, p1_slice1_base_supervisor, p2_slice1_workers_live, p3_slice2_orchestrator, p4_slice3_neo4j, p5_slice4_guards, p6_adversarial, p7_smoke_handoff]
+stop: {budget_usd: 30.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}
