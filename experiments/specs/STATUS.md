@@ -3,8 +3,8 @@
 **Generated — do not edit by hand.** Regenerate with `python scripts/spec_status.py`;
 `scripts/run_workflow.py` also refreshes it at the end of every run.
 
-Generated at: `2026-08-30T19:20:39.873536+00:00`  ·  156 spec(s)
-**Work remaining:** 42 open · 114 completed/retired
+Generated at: `2026-08-30T21:59:29.482552+00:00`  ·  159 spec(s)
+**Work remaining:** 44 open · 115 completed/retired
 
 | name | kind | repeatable | status | version | supersedes | last_run | ok | model | cost | n_runs |
 |---|---|---|---|---|---|---|---|---|---|---|
@@ -29,10 +29,12 @@ Generated at: `2026-08-30T19:20:39.873536+00:00`  ·  156 spec(s)
 | `cap_session_policy_cell` | workflow | yes | runnable | 0.1 | — | — | — | — | — | 0 |
 | `cap_session_routing_evidence` | experiment | yes | runnable | 0.2 | — | — | — | — | — | 0 |
 | `cap_shadow_comparison` | experiment | yes | runnable | 0.1 | — | — | — | — | — | 0 |
+| `concurrency_ladder` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `context_abstraction_implement` | workflow | no | runnable | 0.1 | — | 2026-08-23 19:16 | ok | anthropic/claude-sonnet-5 | $49.5218 | 4 |
 | `explanation_tax` | experiment | yes | runnable | 0.2 | — | — | — | — | — | 0 |
 | `finding_economics_closure` | workflow | yes | runnable | 0.1 | — | 2026-08-22 17:22 | ok | deepseek/deepseek-v4-pro | $1.2820 | 1 |
 | `labbook_refresh` | workflow | yes | runnable | 0.1 | — | 2026-08-17 18:14 | ok | deepseek/deepseek-v4-flash | $0.0275 | 1 |
+| `ledger_instrumentation_probe` | workflow | yes | runnable | 0.1 | — | 2026-08-30 19:05 | fail | openai/gpt-5.6-sol | $0.0020 | 1 |
 | `posthoc_pipeline` | workflow | yes | runnable | 0.1 | — | — | — | — | — | 0 |
 | `process_perturbation_resample` | experiment | yes | runnable | 0.1 | — | — | — | — | — | 0 |
 | `public_truth_closure` | workflow | yes | runnable | 0.1 | — | 2026-08-21 22:03 | ok | deepseek/deepseek-v4-pro | $2.0485 | 1 |
@@ -150,6 +152,7 @@ Generated at: `2026-08-30T19:20:39.873536+00:00`  ·  156 spec(s)
 | `refactor_repair_release` | workflow | no | completed | 0.1 | — | 2026-08-20 22:10 | ok | deepseek/deepseek-v4-pro | $3.5232 | 1 |
 | `remediation_data_integrity` | workflow | no | completed | 0.1 | — | 2026-08-15 20:31 | ok | deepseek/deepseek-v4-pro | $0.6293 | 1 |
 | `repo_review_fable` | workflow | no | completed | 0.1 | — | 2026-08-18 23:24 | ok | deepseek/deepseek-v4-pro | $0.5659 | 2 |
+| `retry_observational_analysis` | workflow | no | completed | 0.1 | — | 2026-08-30 21:59 | ok | deepseek/deepseek-v4-pro | $0.3321 | 1 |
 | `routing_follow_up` | workflow | no | completed | 0.1 | — | 2026-08-14 22:26 | ok | deepseek/deepseek-v4-pro | $0.2511 | 1 |
 | `routing_kb_more_itertools` | workflow | no | completed | 0.1 | — | 2026-08-17 18:38 | ok | deepseek/deepseek-v4-pro | $0.0337 | 1 |
 | `routing_kb_wiring` | workflow | no | completed | 0.1 | — | 2026-08-17 19:52 | ok | deepseek/deepseek-v4-pro | $1.3789 | 1 |
