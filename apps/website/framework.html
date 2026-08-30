@@ -228,7 +228,7 @@
   <dl>
     <dt>What is measured [M]</dt><dd>Observed cost, outcome, narration, and cache fields from the corpus (1,067 story sessions, 7 models).</dd>
     <dt>What is computed [C]</dt><dd>First-pass quality, Grit, cost per accepted outcome, WOC ratio — derived from the measured fields.</dd>
-    <dt>What is modeled [P]/[X]</dt><dd>β context inflation, EPM energy horizon, batch/cascade/SLA extensions — calibrated inputs and assumptions, not measured outcomes.</dd>
+    <dt>What is modeled [P]/[X]</dt><dd>β context inflation, EPM provider-pricing horizon, batch/cascade/SLA extensions — calibrated inputs and assumptions, not measured outcomes. EPM is a HIGH-LEVEL RISK FACTOR for provider selection and WFM/budget planning (DeepSeek's peak/off-peak pricing is the energy-market shape made literal) — never a per-session input; the per-session levers are C₀, P, ε, r.</dd>
     <dt>Limitation</dt><dd>A rule's premise being measured does not make the rule measured; rules not run as policy arms remain proposals. See <a href="evidence.html" style="color:var(--ac)">The Evidence</a> for verdicts.</dd>
   </dl>
 </aside>
@@ -723,7 +723,7 @@
 <section class="fsec" id="levers"><div class="inr wide">
 <div class="section-kicker">ECONOMIC INPUTS / MEASURED AND MODELED</div>
 <h2>Separate what is measured,<br>controlled, and modeled.</h2>
-<p class="lead">Observed cost, outcome, and narration fields come from 227 historical experiment worktrees. Retry rate is a workload input until the attempt ledger measures it directly. Modeling parameters (&beta;, EPM) are calibrated to your codebase and energy market. Separating observations, controls, and assumptions is the difference between deterministic budgeting and surprise overruns.</p>
+<p class="lead">Observed cost, outcome, and narration fields come from 227 historical experiment worktrees. Retry rate is a workload input until the attempt ledger measures it directly — it now IS measured (the attempt ledger). Modeling parameters (&beta;, EPM) are calibrated to your codebase and provider-pricing horizon; EPM is the selection-time + budget-horizon risk factor, never a session lever. Separating observations, controls, and assumptions is the difference between deterministic budgeting and surprise overruns.</p>
 <div class="lever-console">
   <article class="lever-lane">
     <div class="lane-head"><h3>Augmented Workforce (Rules 1&ndash;5)</h3><span>human + AI / per session</span></div>
@@ -735,7 +735,7 @@
       <div class="param"><div class="psym">&epsilon;</div><div class="pname"><strong>How much it narrates.</strong> Measured flail rates: 8.4% (DeepSeek) to 50% (GPT-5.5). Narration penalty: 0.3% to 30%. Pay only when you need auditable reasoning.</div><div class="lever-meta"><span>Measured</span><span>Selection</span></div></div>
       <div class="param modeled"><div class="psym">&beta;</div><div class="pname"><strong>Context inflation per line.</strong> Compounds quadratically through the Snowball Rule (N&sup2;). Default 0.001 — calibrate to your codebase growth rate.</div><div class="lever-meta"><span>Modeled</span><span>One-way door</span></div></div>
       <div class="param modeled"><div class="psym">v</div><div class="pname"><strong>Code velocity per session.</strong> How much code you generate per session. Higher velocity accelerates the N&sup2; compounding.</div><div class="lever-meta"><span>Controlled</span><span>One-way effect</span></div></div>
-      <div class="param modeled"><div class="psym">EPM(t)</div><div class="pname"><strong>Energy price trajectory.</strong> Local energy markets determine long-term compute prices. IEA baseline: 1.6%/yr. Hedge scenario: 2.5%/yr.</div><div class="lever-meta"><span>Modeled</span><span>One-way horizon</span></div></div>
+      <div class="param modeled"><div class="psym">EPM(t)</div><div class="pname"><strong>Provider pricing trajectory — a HIGH-LEVEL risk factor, not a session lever.</strong> Energy-market-shaped pricing has arrived in inference itself: DeepSeek moved to peak/off-peak pricing like an energy market. EPM is the horizon lens for PROVIDER SELECTION and WFM/budget planning — how much the pricing schedule may drift over quarters, never a per-session input. IEA baseline: 1.6%/yr. Hedge scenario: 2.5%/yr. The batch/scheduling rules (b) interact with the peak/off-peak windows — schedule batch work into off-peak.</div><div class="lever-meta"><span>Modeled</span><span>Horizon risk — provider selection + WFM/budget planning</span></div></div>
     </div>
   </article>
   <article class="lever-lane autonomous">
@@ -747,7 +747,7 @@
       <div class="param modeled"><div class="psym">r</div><div class="pname"><strong>Retry rate.</strong> Fraction of jobs that fail first-pass and require another attempt or escalation. The calculator begins with an 11.5% scenario; replace it with your attempt-ledger rate before making a policy decision.</div><div class="lever-meta"><span>Scenario input</span><span>Escalation gate</span></div></div>
       <div class="param modeled"><div class="psym">E&#8340;</div><div class="pname"><strong>Escalation cost multiplier.</strong> How many &times; more expensive the escalation tier is vs the base model. Price ratio: 28.2&times; (DeepSeek &rarr; GPT-5.6), 68.7&times; (DS &rarr; Claude). Design for &lt;1% escalation to human.</div><div class="lever-meta"><span>Modeled</span><span>Autonomous door</span></div></div>
       <div class="param modeled"><div class="psym">W</div><div class="pname"><strong>Workload volume.</strong> Jobs per day processed autonomously. Throughput limit: T<sub>max</sub> = Budget / C<sub>job</sub>. Double the budget, double the capacity.</div><div class="lever-meta"><span>Controlled</span><span>Budget ceiling</span></div></div>
-      <div class="param autonomous"><div class="psym">EPM(t)</div><div class="pname"><strong>Energy price trajectory.</strong> Same multiplier as augmented. Applies to both the base job cost and the retry/escallation overhead.</div><div class="lever-meta"><span>Modeled</span><span>One-way horizon</span></div></div>
+      <div class="param autonomous"><div class="psym">EPM(t)</div><div class="pname"><strong>Provider pricing trajectory (horizon risk).</strong> Same multiplier as augmented — a selection-time + budget-horizon factor, not a per-session driver. The org's planning (WFM, budgets) is where it lands: the whole cost model reduces to the workforce-management calculus.</div><div class="lever-meta"><span>Modeled</span><span>Horizon risk — provider selection + WFM/budget planning</span></div></div>
     </div>
     <details class="wfm-panel">
       <summary>Autonomous AI workforce management is call center WFM, reframed.</summary>
