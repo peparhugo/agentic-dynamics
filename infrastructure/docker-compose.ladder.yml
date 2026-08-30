@@ -81,6 +81,30 @@ x-supervisor-base: &supervisor-base
     FLEET_SKIP_PROBE: "1"         # the supervisor services invoke no CLI
   volumes: *supervisor-mounts
 
+# The orchestrator tier (slice 2, D-3/D-14/D-16): the cell mount set PLUS the docker socket
+# (ro) — the ONE escalation in the ladder. The socket is gated by the sibling-spawn wrapper
+# (scripts/fleet/spawn_wrapper.py), which validates every spawn against the scope model before
+# the socket call. Env (D-15): the cell env MINUS FINOPS_KB_WRITE — the orchestrator never
+# carries the write flag at the container level; its F-1/F-2/P11 writes authorize in code.
+x-orchestrator-mounts: &orchestrator-mounts
+  - ${FINOPS_WORKTREE_ROOT:-/tmp}:/tmp:rw
+  - ${FINOPS_RESULTS_DIR:-../experiments/results}:/app/experiments/results:rw
+  - ${FINOPS_REPO_DIR:-..}:/repo:ro
+  - ${AUTH_HOME:-/home/drseuss}/.claude:/home/drseuss/.claude:ro
+  - ${AUTH_HOME:-/home/drseuss}/.local/share/opencode:/home/drseuss/.local/share/opencode:ro
+  - ${AUTH_HOME:-/home/drseuss}/.local/bin:/home/drseuss/.local/bin:ro
+  - ${AUTH_HOME:-/home/drseuss}/.local/share/claude:/home/drseuss/.local/share/claude:ro
+  - ${AUTH_HOME:-/home/drseuss}/.opencode/bin:/home/drseuss/.opencode/bin:ro
+  - /var/run/docker.sock:/var/run/docker.sock:ro
+
+x-orchestrator-base: &orchestrator-base
+  image: fleet/orchestrator
+  restart: on-failure
+  networks: [fleet-net]
+  environment:
+    <<: *ladder-env
+  volumes: *orchestrator-mounts
+
 services:
   # =========================================================================
   # fleet/cell — one job at a time, per-queue pools, no socket.
@@ -208,6 +232,20 @@ services:
       EGRESS_LISTEN_HOST: 0.0.0.0
       EGRESS_LISTEN_PORT: "8888"
       EGRESS_ALLOWLIST: "api.deepseek.com,api.anthropic.com,api.openai.com,*.anthropic.com,*.deepseek.com,*.openai.com"
+
+  # =========================================================================
+  # fleet/orchestrator — the campaign wrapper + the workflow runner. The ONE
+  # socket-holder tier (D-3): /var/run/docker.sock ro, gated by the spawn-wrapper.
+  # =========================================================================
+  campaign-wrapper:
+    <<: *orchestrator-base
+    # The campaign wrapper runs a spec's phases as sibling cells (scope-driven, D-16); the
+    # --orchestrator flag switches run_workflow into sibling-spawn mode (spawn_wrapper).
+    command: ["python3", "scripts/run_workflow.py", "--orchestrator"]
+
+  workflow-runner:
+    <<: *orchestrator-base
+    command: ["python3", "scripts/run_workflow.py", "--orchestrator"]
 
   # =========================================================================
   # fleet/supervisor — the fleet manager + the portal + the daemons. NO socket

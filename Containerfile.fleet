@@ -115,13 +115,21 @@ CMD ["python3", "-c", "import os; print('fleet/base ready (uid %s)' % os.getuid(
 FROM base AS orchestrator
 
 # The orchestrator is the ONE socket-holder (D-3): it mounts /var/run/docker.sock ro and its
-# spawn-wrapper validates every spawn against the mount contract + scope vocabulary before
-# the socket call. The docker CLI + spawn-wrapper land here in slice 2.
+# spawn-wrapper (scripts/fleet/spawn_wrapper.py — baked in base via COPY scripts/) validates
+# every spawn against the mount contract + scope vocabulary before the socket call. It needs
+# only the docker CLIENT (`docker-cli` — talks to the host daemon over the socket); the Debian
+# `docker.io` package is the daemon, which the orchestrator must NOT run.
 USER root
 RUN apt-get update && apt-get install -y --no-install-recommends \
-        docker.io \
+        docker-cli \
         && rm -rf /var/lib/apt/lists/*
 USER "${LADDER_UID}:${LADDER_GID}"
+
+# The orchestrator's default command is the fleet:commands consumer (D-14): it BRPOPs the
+# supervisor's resize/drain commands, validates them against the compose allowlist + bounded
+# counts, and dispatches only validated commands. The compose's campaign-wrapper /
+# workflow-runner services override this with run_workflow.py --orchestrator.
+CMD ["python3", "scripts/fleet/spawn_wrapper.py", "consume"]
 
 # ---------------------------------------------------------------------------
 # fleet/supervisor — orchestrator + the fleet manager (the supervisor-tier daemon)

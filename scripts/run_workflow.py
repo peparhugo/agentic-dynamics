@@ -222,9 +222,39 @@ def main() -> None:
                          "also passed; a missing optional dep / unparseable URI / unreachable "
                          "graph degrades to delta-only facts with an explicit graph_status "
                          "(unavailable) — never a CLI crash.")
+    ap.add_argument("--orchestrator", action="store_true",
+                    help="slice 2 (D-3/D-14/D-16): run each agent phase as a SIBLING cell "
+                         "container with its scope config (via scripts/fleet/spawn_wrapper.py) "
+                         "instead of in-process. OPT-IN — the default path is unchanged. The "
+                         "orchestrator container mounts the docker socket (ro); a phase whose "
+                         "scope fails validation refuses BEFORE the socket call.")
+    ap.add_argument("--only-phase", default=None, metavar="NAME",
+                    help="run a SINGLE phase (name) only — the sibling-cell entrypoint the "
+                         "--orchestrator mode spawns for each phase. When set, the spec's phase "
+                         "list is filtered to this name before the run.")
     args = ap.parse_args()
 
     spec = load_spec(Path(args.spec))
+
+    # --only-phase: filter the spec's phases to the named phase (the sibling-cell path). The
+    # rest of the composition root (routing/signals/etc.) is unchanged — a single-phase run is
+    # a normal run whose phase list happens to have one member.
+    if args.only_phase:
+        phases = spec.workflow.params.get("phases") or []
+        spec.workflow.params["phases"] = [
+            p for p in phases if str(p.get("name", "")) == args.only_phase
+        ]
+        if not spec.workflow.params["phases"]:
+            raise SystemExit(
+                f"--only-phase {args.only_phase!r}: no such phase (have "
+                f"{[p.get('name') for p in phases]})"
+            )
+
+    # --orchestrator: the sibling-spawn execution path (slice 2). Runs the phases as sibling
+    # cells, each in its own scope, instead of calling run_workflow() in-process.
+    if args.orchestrator:
+        _run_orchestrator(spec, args)
+        return
 
     # Signal-store wiring (docs/routing_next_steps.md item 1): when the spec declares routing
     # and no explicit --signals override was supplied, build the store from the measured
@@ -338,6 +368,77 @@ def main() -> None:
     _emit_spec_record(spec.name, revision=result.git_sha)
     if _fact_auto_emit_enabled(args):
         _emit_workflow_facts(spec, args, result)
+
+
+def _run_orchestrator(spec: ExperimentSpec, args: argparse.Namespace) -> None:
+    """The orchestrator execution path (slice 2, D-3/D-14/D-16).
+
+    Each agent phase spawns as a SIBLING cell container with its scope config, instead of
+    running in-process. The sibling runs ``run_workflow.py --only-phase <name>`` (the normal
+    single-phase path) inside a container whose mounts/network/env are the phase's scope —
+    resolved + validated by ``scripts/fleet/spawn_wrapper.py`` BEFORE the docker socket call.
+
+    Path mapping: the orchestrator container mounts the repo at ``/repo`` (ro) and the host
+    worktree root at ``/tmp`` (rw). The sibling inherits the SAME mounts, so the spec path maps
+    to ``/repo/<spec>`` and the workdir is used verbatim (the host /tmp namespace is shared).
+    """
+    # scripts/fleet/ is a dir, not a package — add it beside scripts/ so the wrapper imports.
+    sys.path.insert(0, str(Path(__file__).resolve().parent / "fleet"))
+    import spawn_wrapper  # noqa: E402
+
+    spec_path = f"/repo/{args.spec}"
+    phases = spec.workflow.params.get("phases") or []
+    print(f"[orchestrator] running {len(phases)} phase(s) as sibling cells (spec {spec_path})",
+          flush=True)
+
+    failures = 0
+    for phase_def in phases:
+        name = str(phase_def.get("name", "?"))
+        kind = str(phase_def.get("kind", "agent"))
+        if kind == "test":
+            print(f"[orchestrator] {name}: skipping test phase in orchestrator mode (run "
+                  f"in-process or as its own cell)", flush=True)
+            continue
+
+        sibling_cmd = [
+            sys.executable, "scripts/run_workflow.py",
+            "--spec", spec_path,
+            "--goal", args.goal,
+            "--model", args.model,
+            "--workdir", args.workdir,
+            "--only-phase", name,
+            "--timeout", str(args.timeout),
+        ]
+        if args.backend:
+            sibling_cmd += ["--backend", args.backend]
+
+        request = spawn_wrapper.build_phase_request(
+            phase_def,
+            goal=args.goal,
+            workdir=args.workdir,
+            model=args.model,
+            spec_name=spec.name,
+            command=sibling_cmd,
+        )
+        # build_phase_request resolves the scope; a phase with NO declared scope and no
+        # authorization-table entry resolves to "" and spawn_sibling refuses it at step 2.
+        print(f"[orchestrator] {name}: scope={request['scope'] or '(unauthorized)'}", flush=True)
+        try:
+            outcome = spawn_wrapper.spawn_sibling(request, docker="docker")
+        except spawn_wrapper.SpawnValidationError as exc:
+            print(f"[orchestrator] {name}: REFUSED before the socket call:\n{exc}", flush=True)
+            failures += 1
+            continue
+        if not outcome["ok"]:
+            print(f"[orchestrator] {name}: sibling exited {outcome.get('returncode')}\n"
+                  f"{outcome.get('stderr', '')[-800:]}", flush=True)
+            failures += 1
+        else:
+            print(f"[orchestrator] {name}: ok", flush=True)
+
+    print(f"[orchestrator] done: {failures} failure(s) across {len(phases)} phase(s)", flush=True)
+    if failures:
+        raise SystemExit(1)
 
 
 def _fact_auto_emit_enabled(args: argparse.Namespace) -> bool:
