@@ -1,0 +1,89 @@
+{
+  "spec_name": "cap_adaptive_2d",
+  "spec_id": "cap_adaptive_2d@0.1",
+  "model": "deepseek/deepseek-v4-flash",
+  "workdir": "/tmp/wt_adaptive_2d",
+  "goal": "Run the adaptive 2d informational-abstention campaign end to end: verify the committed preregistration (docs/designs/current/cap_adaptive_2d_preregistration.md at 9dc0b4a63 \u2014 28 cells, seed 617e6763fcd238dc93a59ba1f41e01ba5f281c4748ef3867dbebeeca344c7dfb, the Option A leg-3 fingerprint, the four decision-rule legs) and pin the campaign spec SHA into its header; measure one cell (E1 = cap2d_correct_abstention_r1) and pre-verify the incorrect_rebuilt impacted guarantee (impacted >= 1 via the widgets-call-add dependant edge \u2014 a second impacted=0 refutes the design); run the 28-cell grid at 4-wide concurrency with the abstention rule shadow-evaluated per cell (DECLINE legs 1-3 per the pinned table / APPLY / APPLY-NULL) vs the status-quo arm applying proposals exactly as proposed; score the four decision-rule legs (cpvo_harm(abstention) < cpvo_harm(status_quo) at E_x=11.47, capture >= 2/3 of the low-information cells, flag cost < saved escape harm, the reused NI margin) plus the exploratory confidence curve; and deliver the verdict: does the adaptive controller know when not to intervene?",
+  "git_sha": "9f12ab9ad",
+  "started_at": "2026-08-27T23:59:39.886461+00:00",
+  "ended_at": "2026-08-28T00:56:00.413235+00:00",
+  "awaiting": false,
+  "awaiting_phase": "",
+  "awaiting_reason": "",
+  "state": "failed",
+  "total_cost_usd": 0.0,
+  "ok": false,
+  "phases": [
+    {
+      "phase": "p0_pin_spec",
+      "kind": "agent",
+      "status": "failed",
+      "spec_id": "cap_adaptive_2d@0.1",
+      "model": "deepseek/deepseek-v4-flash",
+      "duration_s": 3380.31,
+      "commit_hash": "",
+      "error": "STALLED \u2014 no session step for 20.0 min (threshold 20.0 min); last step at 2026-08-28T00:35:59.967921+00:00; transcript tail:\ntext\",\"timestamp\":1787877357370,\"sessionID\":\"ses_fba55b835ffeVyMkiRHJ34OS05\",\"part\":{\"id\":\"prt_045cb73ad001vIGFTWZEOGqLiF\",\"messageID\":\"msg_045cb6331001iz2zU98Q87FMe5\",\"sessionID\":\"ses_fba55b835ffeVyMkiRHJ34OS05\",\"type\":\"text\",\"text\":\"The grid died when the shell terminated. Let me relaunch fully detached with `setsid` and then poll separately.\",\"time\":{\"start\":1787877356461,\"end\":1787877357368}}}\nCOMMIT_PREFIX \u2014 commits made during phase 'p0_pin_spec' do not match '[workflow] p0_pin_spec \u2014 Run the adaptive 2d informational-absten': '2d p2: deterministic block order (canonical CELLS order, not set-index)' (9f12ab9adf9f), '2d p1: E1 (cap2d_correct_abstention_r1) measured \u2014 rework APPLY accepted=true, cost $0.01302, FORECAST $0.02604; incorrect_rebuilt probe FAILED (impacted=0 under the pinned analyzer \u2014 second construction failure, design refuted per prereg \u00a74/design \u00a74); label-agnostic defect evaluator' (72dc47f94498), '2d p1/p2 machinery: grid harness (28-cell abstention table, 4-wide, abstention shadow-rule with legs 1-3), incorrect_rebuilt (widgets-call-add) + harmful_partial stimulus specs, FINOPS_SKIP_SPEC_INDEX guard for 4-wide runs' (e2bb2f94b690), '2d p0 verified: preregistration pinned to spec SHA 1258280d (28-cell table reproduces from seed 617e6763, 14/arm, 9 defect-bearing/arm; Option A leg-3; four legs; $30 stop) \u2014 verification log' (044f7c23c01e) (note: the separator is an EM-DASH U+2014 '\u2014', not a hyphen; the resume machinery matches the exact byte pattern)",
+      "tokens": {},
+      "cost_usd": 0.0,
+      "cache_read_tokens": 0,
+      "cache_write_tokens": 0,
+      "cache_hit_rate": 0.0,
+      "session_id": "",
+      "files_created": [],
+      "files_modified": [],
+      "confidence": null,
+      "raw_prompt_hash": "",
+      "pre_phase_commit": "",
+      "retrieval_attempt_id": "",
+      "constructor_attempt_id": "",
+      "selected_evidence_ids": [],
+      "augmentation_versions": {},
+      "augmentation_tokens": {},
+      "augmentation_cost_usd": 0.0,
+      "augmentation_latency_ms": 0.0,
+      "fallback_mode": "",
+      "test_executed_success": null,
+      "tests_passed": 0,
+      "tests_total": 0,
+      "change_analysis": null,
+      "stall_evidence": {
+        "reason": "STALLED",
+        "last_step_at": "2026-08-28T00:35:59.967921+00:00",
+        "stale_age_s": 1200.0,
+        "stale_min": 20.0,
+        "threshold_min": 20.0,
+        "transcript_tail": "text\",\"timestamp\":1787877357370,\"sessionID\":\"ses_fba55b835ffeVyMkiRHJ34OS05\",\"part\":{\"id\":\"prt_045cb73ad001vIGFTWZEOGqLiF\",\"messageID\":\"msg_045cb6331001iz2zU98Q87FMe5\",\"sessionID\":\"ses_fba55b835ffeVyMkiRHJ34OS05\",\"type\":\"text\",\"text\":\"The grid died when the shell terminated. Let me relaunch fully detached with `setsid` and then poll separately.\",\"time\":{\"start\":1787877356461,\"end\":1787877357368}}}"
+      },
+      "deploy_gate": null,
+      "commit_gate": {
+        "reason": "COMMIT_PREFIX",
+        "subjects": [
+          "2d p2: deterministic block order (canonical CELLS order, not set-index)",
+          "2d p1: E1 (cap2d_correct_abstention_r1) measured \u2014 rework APPLY accepted=true, cost $0.01302, FORECAST $0.02604; incorrect_rebuilt probe FAILED (impacted=0 under the pinned analyzer \u2014 second construction failure, design refuted per prereg \u00a74/design \u00a74); label-agnostic defect evaluator",
+          "2d p1/p2 machinery: grid harness (28-cell abstention table, 4-wide, abstention shadow-rule with legs 1-3), incorrect_rebuilt (widgets-call-add) + harmful_partial stimulus specs, FINOPS_SKIP_SPEC_INDEX guard for 4-wide runs",
+          "2d p0 verified: preregistration pinned to spec SHA 1258280d (28-cell table reproduces from seed 617e6763, 14/arm, 9 defect-bearing/arm; Option A leg-3; four legs; $30 stop) \u2014 verification log"
+        ],
+        "offenders": [
+          {
+            "sha": "9f12ab9adf9fd855cec91daf5e1689f03fe907b3",
+            "subject": "2d p2: deterministic block order (canonical CELLS order, not set-index)"
+          },
+          {
+            "sha": "72dc47f94498fb99ca684c270cdec13bca08f113",
+            "subject": "2d p1: E1 (cap2d_correct_abstention_r1) measured \u2014 rework APPLY accepted=true, cost $0.01302, FORECAST $0.02604; incorrect_rebuilt probe FAILED (impacted=0 under the pinned analyzer \u2014 second construction failure, design refuted per prereg \u00a74/design \u00a74); label-agnostic defect evaluator"
+          },
+          {
+            "sha": "e2bb2f94b6908b775dd6f806e231a0459ab02742",
+            "subject": "2d p1/p2 machinery: grid harness (28-cell abstention table, 4-wide, abstention shadow-rule with legs 1-3), incorrect_rebuilt (widgets-call-add) + harmful_partial stimulus specs, FINOPS_SKIP_SPEC_INDEX guard for 4-wide runs"
+          },
+          {
+            "sha": "044f7c23c01ed0c75530e78b925ecb02a657c187",
+            "subject": "2d p0 verified: preregistration pinned to spec SHA 1258280d (28-cell table reproduces from seed 617e6763, 14/arm, 9 defect-bearing/arm; Option A leg-3; four legs; $30 stop) \u2014 verification log"
+          }
+        ],
+        "expected_prefix": "[workflow] p0_pin_spec \u2014 Run the adaptive 2d informational-absten"
+      },
+      "relabel_gate": null
+    }
+  ]
+}

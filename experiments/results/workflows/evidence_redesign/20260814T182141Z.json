@@ -1,0 +1,12 @@
+{
+  "spec_name": "evidence_redesign",
+  "model": "openai/gpt-5.6-sol",
+  "workdir": "/tmp/pipeline/feature_evidence-redesign",
+  "goal": "Redesign the evidence page to lead with the story corpus (221 stories, 1,097 sessions, 7 models \u2014 the primary evidence) and treat the perturbation precursor as a compact 'how we got here' background section. Remove every explicit golden-circle label (Simon Sinek, WHY/HOW/WHAT kickers) \u2014 the golden circle is a thinking tool, not page furniture. Keep every number, provenance tag, and the natural-behavior caveat.",
+  "git_sha": "4c4acc5d3",
+  "started_at": "2026-08-14T18:21:41.130192+00:00",
+  "ended_at": "2026-08-14T18:21:41.200602+00:00",
+  "total_cost_usd": 0,
+  "ok": false,
+  "phases": []
+}

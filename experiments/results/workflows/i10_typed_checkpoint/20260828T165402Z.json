@@ -1,0 +1,17 @@
+{
+  "spec_name": "i10_typed_checkpoint",
+  "spec_id": "i10_typed_checkpoint@0.1",
+  "model": "deepseek/deepseek-v4-flash",
+  "workdir": "/tmp/wt_i10_backfill",
+  "goal": "Verify the I10 typed-checkpoint capture implementation on this branch (feature/i10-typed-checkpoint @ 968e7d816, 3 files +491/-12): the additive checkpoints ledger array with the typed CheckpointRecord fields (phase, phase_index, reason, approval_path, decision, reached_at, decided_at, cost_usd, tokens, commit_hash, approval_evidence), both capture points (mechanical stop + resume-decided contract reads), LEDGER_FIELDS admission, the four I10 tests green, and the gates (commit-prefix hook + rewrite, checkpoint approval semantics, RunState) byte-identical to main. VERIFY, never redo \u2014 record the measurements and commit the verification.",
+  "git_sha": "7b59a7aee",
+  "started_at": "2026-08-28T16:54:02.642006+00:00",
+  "ended_at": "2026-08-28T16:54:02.709402+00:00",
+  "awaiting": false,
+  "awaiting_phase": "",
+  "awaiting_reason": "",
+  "state": "cancelled",
+  "total_cost_usd": 0,
+  "ok": false,
+  "phases": []
+}

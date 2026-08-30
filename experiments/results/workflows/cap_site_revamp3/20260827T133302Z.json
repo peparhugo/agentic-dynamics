@@ -1,0 +1,16 @@
+{
+  "spec_name": "cap_site_revamp3",
+  "spec_id": "cap_site_revamp3@0.1",
+  "model": "openai/gpt-5.6-terra",
+  "workdir": "/tmp/wt_site_revamp3",
+  "goal": "Revamp the site by KEEPING the instrument and ADDING the field layer: verify the incumbent census first (the sliders, charts, tables, Grit matrix, theme toggle all counted), design the delta preview (keep X / remove Y with reason / add Z) and STOP for the operator's approval, implement the approved design as augmentation in small increments with the preservation gate running continuously, run the comparison gate (feature-by-feature delta vs the incumbent \u2014 spec satisfied is not a pass), the independent review (different model, feature-by-feature survival verdicts), and deploy only from the final phase with deployed-census verification. NOTE: commit messages must use the EM-DASH (U+2014) in '[workflow] <phase> \u2014 <goal>' \u2014 the resume machinery matches the exact byte pattern.",
+  "git_sha": "c11f3b61b",
+  "started_at": "2026-08-27T13:33:02.042445+00:00",
+  "ended_at": "2026-08-27T13:33:02.092913+00:00",
+  "awaiting": true,
+  "awaiting_phase": "p2_design_with_human_checkpoint",
+  "awaiting_reason": "approval_refused",
+  "total_cost_usd": 0,
+  "ok": false,
+  "phases": []
+}

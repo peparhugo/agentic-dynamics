@@ -1,0 +1,16 @@
+{
+  "spec_name": "cap_site_revamp4",
+  "spec_id": "cap_site_revamp4@0.1",
+  "model": "deepseek/deepseek-v4-flash",
+  "workdir": "/tmp/wt_site_revamp4",
+  "goal": "The model experiment: revamp the site by KEEPING the instrument and ADDING the field layer \u2014 verify the incumbent census, design the delta preview and STOP for the operator's approval, implement the approved design as augmentation in small increments with the preservation gate running continuously, run the comparison gate (feature-by-feature delta vs the incumbent), the independent review (deepseek-v4-pro, feature-by-feature survival verdicts), and deploy only from the final phase with deployed-census verification. Same gates as revamp3; you are the different executor (deepseek-v4-flash). NOTE: commit messages must use the EM-DASH (U+2014) in '[workflow] <phase> \u2014 <goal>'.",
+  "git_sha": "fa9f0bcc9",
+  "started_at": "2026-08-27T16:13:04.716612+00:00",
+  "ended_at": "2026-08-27T16:13:04.774267+00:00",
+  "awaiting": true,
+  "awaiting_phase": "p2_design_with_human_checkpoint",
+  "awaiting_reason": "approval_refused",
+  "total_cost_usd": 0,
+  "ok": false,
+  "phases": []
+}

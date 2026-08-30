@@ -1,0 +1,52 @@
+{
+  "spec_name": "fleet_ladder_implementation",
+  "spec_id": "fleet_ladder_implementation@0.1",
+  "model": "deepseek/deepseek-v4-pro",
+  "workdir": "/tmp/wt_fleet_impl",
+  "goal": "Implement the ENTIRE fleet-ladder plan per the signed-off proposal (docs/fleet/00_proposal.md \u2014 the mandate), DOCKER-NATIVE (the operator's finalized runtime decision \u2014 docker for now, podman deferred): slice 1 (the fleet/base Dockerfile with the non-root USER 1001 \u2014 the container user IS the host user so the worktree + results + D-2 auth mounts have the right ownership without daemon-level userns-remap \u2014 the binary attach + the binary-resolution probe, the docker-compose ladder with fleet-net + the egress proxy + the D-2 mounts + the env placement, the fleet manager with the read-only watcher + heartbeats + DLQ + the fleet:commands channel, the supervisor-tier services, the sequenced review cut-over, the ~3-line systemd bootstrap); slice 2 (the orchestrator image + the spawn-wrapper's five-check validation before the docker socket call + the scope: field + the campaign wrapper as an orchestrator); slice 3 (the kb-neo4j consumer + the D-12 catch-up + the fulltext index + the RRF live); slice 4 (the seven audit guards, the full suite green); the ADVERSARIAL (mandate fidelity, G1-G6, the constraints, the scope bypasses, the network leaks, the runtime probes, the sequencing); and the OPERATOR'S SMOKE-TEST HANDOFF. Runtime-tested on the host docker daemon by the phases themselves \u2014 a Dockerfile gets built, compose comes up, the probes run. The guards never weaken; the isolation story = the mount contract + the network policy + the scope model + the non-root user; the operator's smoke test gates production.",
+  "git_sha": "d6a96356e",
+  "started_at": "2026-08-30T17:12:26.929233+00:00",
+  "ended_at": "2026-08-30T17:12:27.021108+00:00",
+  "awaiting": true,
+  "awaiting_phase": "p1_slice1_base_supervisor",
+  "awaiting_reason": "approval_refused",
+  "checkpoints": [
+    {
+      "phase": "p1_slice1_base_supervisor",
+      "phase_index": 2,
+      "reason": "approval_required",
+      "approval_path": "/tmp/wt_fleet_impl/approvals/fleet_ladder_implementation/p1_slice1_base_supervisor_approval.md",
+      "decision": "rejected",
+      "reached_at": "2026-08-30T17:00:51.507556+00:00",
+      "decided_at": "2026-08-30T17:12:26.995992+00:00",
+      "cost_usd": 0.16151889299999997,
+      "tokens": {
+        "in": 91279,
+        "out": 33417,
+        "reasoning": 60095,
+        "answer": 32909,
+        "explanation": 508,
+        "total": 184791
+      },
+      "commit_hash": "c80c7cd09e376c4d0aca1cd44c4916814b38af21",
+      "approval_evidence": {
+        "valid": false,
+        "path": "/tmp/wt_fleet_impl/approvals/fleet_ladder_implementation/p1_slice1_base_supervisor_approval.md",
+        "committed_at_head": true,
+        "absent_at_checkpoint_commit": true,
+        "checkpoint_is_ancestor": true,
+        "parsed": {
+          "date": "** 2026-08-30"
+        },
+        "failed_checks": [
+          "operator",
+          "date"
+        ]
+      }
+    }
+  ],
+  "state": "awaiting_approval",
+  "total_cost_usd": 0,
+  "ok": false,
+  "phases": []
+}
