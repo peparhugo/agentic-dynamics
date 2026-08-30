@@ -1,5 +1,6 @@
 ---
 status: proposed
+spec_sha256: 0d30d4bc6d6014c8f1d2283aaad88c79dd9b6d749ca9a48e6b028f35ff733589
 ---
 
 # The fleet ladder — containerized execution, supervised fleet, master control
