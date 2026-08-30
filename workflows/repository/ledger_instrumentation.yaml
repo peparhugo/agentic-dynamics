@@ -1,0 +1,223 @@
+name: ledger_instrumentation
+question: >-
+  The data-integrity phase the workflow-metrics findings exposed (docs/reviews/
+  workflow_metrics_findings.md — the named gaps): make the autonomous-workflow operating
+  metrics MEASURABLE from the committed corpus. The findings measured: r = 0.125 from ONE
+  campaign; WOC, escalation rate, batch fraction, checkpoint latency, SLA "not measurable —
+  declared-not-written"; 0 committed checkpoint records (the I10 typed records live in the
+  GITIGNORED run-ledger directory — the approval flow produced no committed records); 118
+  referenced ledgers absent; the website's "retry rate is now measured" claim unsupported.
+  THIS phase fixes the data layer: (1) the ATTEMPT-FIELD emission (attempt_count,
+  retry_reason, first_pass, accepted — declared in the schema, never written), (2) the
+  BREACH-FIELD emission (stall_evidence / deploy_gate / commit_gate / relabel_gate — absent
+  from every committed phase ledger), (3) the CHECKPOINT-RECORD persistence (the I10 typed
+  records' gitignore gap — the approval flow's records must reach the committed corpus),
+  (4) the verification (a fresh run through the modified runner produces the complete
+  records → the aggregator re-runs → the metrics measurable), and (5) the findings update
+  (the workflow-metrics findings corrected). BRANCH DISCIPLINE: the in-flight campaigns
+  (the fleet-ladder implementation) run on the runner pinned at main — this phase works on
+  feature/ledger-instrumentation and never edits main until the in-flight runs finish.
+version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: false
+repeatable: false
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: true
+    context:
+      domain_context: >-
+        PROVISIONAL DomainProfile. domain: instrumentation (the ledger data layer).
+        canonical_sources:
+        [docs/reviews/workflow_metrics_findings.md (THE MANDATE — the named gaps: the
+        attempt fields declared-not-written, the breach fields absent, the 0 committed
+        checkpoint records, the 118 absent ledgers), the ledger schema
+        (src/agentic_dynamics/runtime/workflow_runner.py — the AttemptRecord + PhaseResult
+        fields + the I10 checkpoint records + the ledger to_dict), the gitignore (the
+        run-ledger directory's exclusion), scripts/aggregate_workflow_metrics.py (the
+        aggregator the metrics ride)].
+        policies: [fields_pinned_to_schema, branch_discipline, verified_by_fresh_run,
+        findings_corrected]
+      challenge_context: >-
+        PROVISIONAL ChallengeProfile. challenge: instrumentation (the data-layer fixes,
+        the verification, the findings update, the adversarial). deliberation:
+        [wire the fields, persist the records, verify with a fresh run, update the
+        findings, adversarial]. session_policy: {default: fork_per_phase}
+      current_state: >-
+        The workflow-metrics findings named the gaps: the attempt fields (attempt_count,
+        retry_reason, first_pass, accepted) are declared in the schema but never written
+        to the committed ledgers; the breach fields (stall_evidence, deploy_gate,
+        commit_gate, relabel_gate) are defined by the runner but absent from every
+        committed phase ledger (all predate the runner hardening); the I10 checkpoint
+        records (reached_at, decided_at, the decisions) live in the GITIGNORED run-ledger
+        directory — 0 committed records despite the machine living through the approval
+        flow; 118 referenced ledgers are absent. The fleet-ladder implementation is
+        mid-flight on the runner pinned at main — this phase's runner changes stay on
+        feature/ledger-instrumentation.
+      hard_rules: >-
+        (1) Every phase commits '[workflow] <phase>' (the worktree hook enforces it);
+        every docs/ file carries status frontmatter (the DOC_CONTRACT gate).
+        (2) BRANCH DISCIPLINE: the runner changes are committed on feature/ledger-
+        instrumentation ONLY — main is never edited until the in-flight campaigns (the
+        fleet-ladder implementation) finish their runs; the branch is merged after.
+        (3) THE FIELDS ARE PINNED TO THE SCHEMA: the attempt fields' emission writes the
+        EXACT schema fields (attempt_count, retry_reason, first_pass, accepted, ...) with
+        their declared semantics; a deviating emission is a FAILED finding.
+        (4) THE CHECKPOINT-RECORD PERSISTENCE: the I10 typed records (the checkpoints
+        array — reached_at, decided_at, the decisions) must reach the COMMITTED corpus —
+        the gitignore gap's fix is a persistence design decision (the ledger directory's
+        tracked path, the commit step, or the manifest-verified export) — the records the
+        machine produces must be measurable.
+        (5) VERIFIED BY A FRESH RUN: the phase's claim is only established when a fresh
+        run through the modified runner produces the complete records (the attempt fields
+        present, the breach fields present on the phase ledgers, the checkpoint records
+        committed) AND the aggregator (scripts/aggregate_workflow_metrics.py) re-runs
+        with the metrics now measurable (r, WOC, escalation, checkpoint latency). A
+        verification without the fresh run is a FAILED finding.
+        (6) THE FINDINGS CORRECTED: the workflow-metrics findings' "not measurable"
+        rows + the website's retry-rate claim are corrected to the post-fix measurable
+        state — cited to the fresh run's ledger.
+        (7) BOUNDED PHASES: p1 wires the fields + the persistence; p2 verifies with the
+        fresh run; p3 updates the findings; p4 adversarial-verifies.
+        (8) The aggregator's pinned metric definitions (the workflow_metrics spec §3) are
+        unchanged — the data becomes measurable, the definitions do not change.
+        (9) Every number cites its source. (10) The in-flight campaigns are untouched
+        (the branch discipline). (11) p4 adversarial mandatory. (12) Resumable only when
+        spec version, goal hash, source revision, and candidate-manifest hash match.
+      read_first: >-
+        docs/reviews/workflow_metrics_findings.md (the mandate — the named gaps),
+        src/agentic_dynamics/runtime/workflow_runner.py (the AttemptRecord + PhaseResult +
+        the I10 checkpoint records + the ledger to_dict + the write path), .gitignore (the
+        run-ledger exclusion), scripts/aggregate_workflow_metrics.py
+      run_shape: >-
+        SINGLE wrapper: deepseek/deepseek-v4-pro. One branch
+        (feature/ledger-instrumentation); each phase commits [workflow] <phase>. The
+        verification's fresh run is a small test workflow (the runner's own test spec) in
+        a scratch worktree. No grid, no cells. The data chain stays single-writer.
+    phases:
+      - name: p0_pin_mandate
+        kind: agent
+        timeout: 3600
+        prompt: |
+          GOAL: {goal}
+          ROLE: verification — the workflow-metrics findings are the mandate. Append this
+          spec's SHA256 to the findings' header (the ONLY edit allowed). Verify the named
+          gaps (the attempt fields declared-not-written, the breach fields absent, the 0
+          committed checkpoint records, the 118 absent ledgers) match the current state.
+          A deviation is a FAILED finding.
+          DELIVER: the pinned header + verification; committed.
+          LOG: PASS/FAIL; commit.
+      - name: p1_wire_fields
+        kind: agent
+        timeout: 28800
+        prompt: |
+          GOAL: {goal}
+          ROLE: wire the data layer — the attempt + breach fields' emission + the
+          checkpoint-record persistence. On feature/ledger-instrumentation ONLY (the
+          branch discipline — main untouched). Do:
+          (1) THE ATTEMPT-FIELD EMISSION: find the attempt-record write path in
+          workflow_runner.py (where the attempts array / the attempt records are built and
+          serialized) and wire the schema's declared fields that are never written:
+          attempt_count, retry_reason, first_pass, accepted (+ the escalation_from/to
+          fields if the schema declares them). The emission writes the EXACT schema
+          semantics.
+          (2) THE BREACH-FIELD EMISSION: the phase-ledger write path must emit the
+          breach fields (stall_evidence, deploy_gate, commit_gate, relabel_gate) with
+          their declared shapes (the runner computes them — they must be serialized).
+          (3) THE CHECKPOINT-RECORD PERSISTENCE: the I10 typed records (the checkpoints
+          array) currently live in the gitignored run-ledger directory. Design + wire the
+          persistence so the records reach the committed corpus: the options include the
+          tracked ledger path, a committed export step, or the manifest-verified export —
+          pick the design that makes the records measurable (the workflow-metrics
+          aggregator reads the committed ledgers) without breaking the gitignore
+          discipline for the run-time artifacts.
+          TEST: the unit tests — a synthetic run's ledger carries the attempt fields, the
+          breach fields, and the checkpoints array; a ledger WITHOUT the fields still
+          parses (the backward compatibility — the old ledgers are never broken).
+          DELIVER: the runner changes + the tests; committed on the branch.
+          LOG: the field wiring + the test results; PASS/FAIL; commit.
+      - name: p2_verify_fresh_run
+        kind: agent
+        timeout: 28800
+        prompt: |
+          GOAL: {goal}
+          ROLE: verify by a FRESH run — the phase's claim is only established when the
+          modified runner produces the complete records. Do:
+          (1) A fresh run of a small test workflow (the runner's own test spec — a
+          multi-phase workflow) through the modified runner in a scratch worktree.
+          (2) Verify the produced ledger: the attempt fields present (attempt_count,
+          retry_reason, first_pass, accepted), the breach fields present on the phase
+          ledgers (stall_evidence, deploy_gate, commit_gate, relabel_gate — or the
+          declared-null shapes), the checkpoints array committed (the record with
+          reached_at/decided_at — the test workflow may use a checkpoint phase to produce
+          a real record, or the record's shape verified).
+          (3) Re-run the aggregator (scripts/aggregate_workflow_metrics.py) against the
+          fresh run's ledger: the metrics now measurable (r, WOC, the escalation rate, the
+          checkpoint latency) — the pinned definitions unchanged.
+          A verification without the complete records is a FAILED finding — fix the
+          emission and re-run.
+          DELIVER: the fresh run's ledger + the aggregator's output + the verification;
+          committed.
+          LOG: the fields-present table + the aggregator output; PASS/FAIL; commit.
+      - name: p3_update_findings
+        kind: agent
+        timeout: 21600
+        prompt: |
+          GOAL: {goal}
+          ROLE: update the findings — correct docs/reviews/workflow_metrics_findings.md
+          to the post-fix measurable state. Do NOT re-measure the corpus (the old ledgers
+          still lack the fields — the historical state stands); ADD the
+          post-instrumentation section: the fields now emitted, the fresh run's ledger as
+          the proof, the metrics now measurable (r, WOC, escalation, checkpoint latency
+          from the fresh run), the aggregator's re-run output cited, and the website's
+          retry-rate claim's correction (the claim is now SUPPORTED — the attempt ledger
+          produces the fields). The historical "not measurable" rows stay (they describe
+          the committed corpus's past state, honestly).
+          Also update the website's framework lead paragraph if its retry-rate claim needs
+          the correction (the claim's support now exists).
+          DELIVER: the updated findings + the website change; committed.
+          LOG: the corrections; PASS/FAIL; commit.
+      - name: p4_adversarial
+        kind: agent
+        timeout: 21600
+        prompt: |
+          GOAL: {goal}
+          ROLE: adversarial verifier — falsify the instrumentation. Attack in order:
+          (1) THE FIELD WIRING: the attempt + breach fields' emission writes the EXACT
+          schema fields with the declared semantics — a deviating or invented field is a
+          FAILED finding.
+          (2) THE BACKWARD COMPATIBILITY: a ledger WITHOUT the new fields still parses
+          (the old corpus unbroken) — a break is a FAILED finding.
+          (3) THE FRESH-RUN VERIFICATION: the complete records really land (re-derive the
+          fields' presence from the fresh run's ledger); the aggregator's re-run really
+          produces the metrics.
+          (4) THE BRANCH DISCIPLINE: main is untouched — the runner changes are on the
+          branch only.
+          (5) THE FINDINGS HONESTY: the historical "not measurable" rows stand; the
+          post-instrumentation claims cite the fresh run.
+          Deliver TWO outputs:
+          docs/reviews/ledger_instrumentation_adversary.md +
+          docs/reviews/ledger_instrumentation_known_safe.md (BOTH with status: accepted
+          frontmatter).
+          LOG: finding table + known-safe list; PASS/FAIL; commit.
+factors:
+  - {name: model, levels: [deepseek/deepseek-v4-pro]}
+design: factorial
+rules:
+  - {name: fields_wired, plane: measurement, evidence_class: "[C]", requires: [], produces: [ledger_fields_emitted]}
+  - {name: fresh_run_verified, plane: measurement, evidence_class: "[M]", requires: [ledger_fields_emitted], produces: [complete_records, metrics_measurable]}
+  - {name: findings_updated, plane: measurement, evidence_class: "[C]", requires: [complete_records, metrics_measurable], produces: [findings_corrected]}
+  - {name: instrumentation_verified, plane: measurement, evidence_class: "[C]", requires: [findings_corrected], produces: [instrumentation_known_safe]}
+metrics:
+  - {name: schema_fidelity, agg: mean, over: cell}
+  - {name: records_complete, agg: mean, over: cell}
+comparison: {kind: effect_size, arm_factor: model, loss: {cost: 1.0, quality: 0.0, value: 0.0}}
+writeup:
+  format: lab_book
+  sections: [question, p0_pin_mandate, p1_wire_fields, p2_verify_fresh_run, p3_update_findings, p4_adversarial]
+stop: {budget_usd: 30.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}
