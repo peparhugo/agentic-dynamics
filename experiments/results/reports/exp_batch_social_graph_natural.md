@@ -2,7 +2,7 @@
 
 **Model:** deepseek/deepseek-v4-pro  |  **Task:** [batch:social_graph:baseline] ds_natural...
 **Operator:** baseline (baseline, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-27T20:33:46
+**Repetitions:** 1  |  **Timestamp:** 2026-08-30T18:48:25
 
 ---
 

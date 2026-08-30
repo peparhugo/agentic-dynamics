@@ -9,6 +9,7 @@ client after long subprocess runs to avoid stale connections.
 
 import json
 import os
+import socket
 import subprocess
 import sys
 import time
@@ -21,6 +22,13 @@ except ImportError:  # imported as scripts.<name> — repo root is on sys.path
     from scripts import _bootstrap  # noqa: E402,F401
 
 import redis
+
+# The fleet heartbeat + dead-letter helpers are dependency-light (redis only) and live in
+# scripts/fleet/ (a dir, not a package). Add that dir to sys.path so they import beside the
+# other scripts — the same convention fleet_manager.py uses.
+sys.path.insert(0, str(Path(__file__).resolve().parent / "fleet"))
+import heartbeat  # noqa: E402  (worker:<type>:<id> liveness -> fleet:board, slice 1)
+import dlq  # noqa: E402       (job dead-letter surface, R4)
 
 from agentic_dynamics.core.constants import SESSION_TIMEOUT, STORY_SESSIONS
 
@@ -83,6 +91,21 @@ def _safe_hset(r: redis.Redis, key: str, field: str, value: str) -> bool:
     return False
 
 
+def _safe_record_dead(r: redis.Redis, queue_key: str, job: object, reason: str) -> None:
+    """Record a terminal failure to the queue's dead-letter list (best-effort, R4).
+
+    A DLQ write must never take down the worker it is reporting on, so any Redis
+    error is logged and swallowed — the status hash still carries the ``failed`` row.
+    """
+    for attempt in range(2):
+        try:
+            dlq.record_dead(r, queue_key, job, reason)
+            return
+        except Exception as e:  # noqa: BLE001 — best-effort DLQ
+            log(f"DLQ record error (attempt {attempt+1}/2): {e}")
+            time.sleep(1)
+
+
 def _result_path_from_stdout(stdout: str) -> Path | None:
     """Extract the saved result path from run_story.py's stdout.
 
@@ -136,6 +159,15 @@ def main() -> None:
     completed = 0
     failed = 0
     empty_polls = 0
+
+    # Worker liveness (slice 1): a daemon heartbeat thread beats every 10s so the fleet
+    # manager's read-only watcher can surface this worker on the board. The thread owns its
+    # own Redis connection (the main loop reconnects after long subprocess runs).
+    worker_id = f"{socket.gethostname()}:{os.getpid()}"
+    heartbeat.HeartbeatThread(
+        "story", worker_id, jobs_counter=lambda: completed + failed,
+    ).start()
+    log(f"heartbeat: worker:story:{worker_id}")
 
     while True:
         try:
@@ -240,6 +272,7 @@ def main() -> None:
                     log(f"[{cell_id}] NOT A REAL RUN (silent dead sessions) ret={proc.returncode}")
                     _safe_hset(r, STATUS_KEY, cell_id, "failed")
                     publisher.publish_status("failed")
+                    _safe_record_dead(r, QUEUE_KEY, cell, "silent dead sessions (not a real run)")
                     error_log = log_dir / f"{cell_id}.error.log"
                     error_log.write_text(proc.stderr or proc.stdout)
                     failed += 1
@@ -253,6 +286,7 @@ def main() -> None:
                 log(f"[{cell_id}] FAILED ret={proc.returncode} ({elapsed:.0f}s)")
                 _safe_hset(r, STATUS_KEY, cell_id, "failed")
                 publisher.publish_status("failed")
+                _safe_record_dead(r, QUEUE_KEY, cell, f"run_story returned {proc.returncode}")
                 error_log = log_dir / f"{cell_id}.error.log"
                 error_log.write_text(proc.stderr or proc.stdout)
                 failed += 1
@@ -263,12 +297,14 @@ def main() -> None:
             r = _connect_redis()
             _safe_hset(r, STATUS_KEY, cell_id, "timeout")
             publisher.publish_status("timeout")
+            _safe_record_dead(r, QUEUE_KEY, cell, "timeout")
             failed += 1
 
         except Exception as e:
             log(f"[{cell_id}] EXCEPTION: {e}")
             _safe_hset(r, STATUS_KEY, cell_id, "failed")
             publisher.publish_status("failed")
+            _safe_record_dead(r, QUEUE_KEY, cell, f"exception: {e}")
             failed += 1
             # Reconnect — the exception may have been a Redis error mid-run
             r = _connect_redis()

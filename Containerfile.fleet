@@ -1,0 +1,143 @@
+# Containerfile.fleet — the fleet ladder, docker-native (proposal §4).
+#
+# Three image targets, one per rung of the ladder (base -> orchestrator -> supervisor):
+#
+#   fleet/base         — the generic toolchain ONLY: python deps (pyproject + the [neo4j]
+#                        extra), node, git, the sonar client (baked — it lives on the host at
+#                        /tmp/sonar-scanner-6.2.1.4610, ephemeral, so it must NOT be a mount).
+#                        The model CLIs (opencode / claude) are NOT baked — they attach via the
+#                        D-2 auth mounts (D-18), and the binary-resolution probe asserts the
+#                        chain at start. Runs as the non-root USER 1001.
+#   fleet/orchestrator — base + the docker CLI + the sibling-spawn wrapper (slice 2).
+#   fleet/supervisor   — orchestrator + the fleet manager (the supervisor-tier daemon).
+#
+# The container user IS the host user (uid 1001 = the operator's uid): the worktree, results,
+# and D-2 auth mounts have the right ownership without daemon-level userns-remap (which would
+# disturb the data plane). The auth mounts land at the SAME absolute home as the host so the
+# claude symlink chain (~/.local/bin/claude -> ~/.local/share/claude/versions/<v>) resolves
+# inside the container unchanged — the probe enforces this at start.
+#
+# Build (from the repo root; `scripts/fleet/build.sh` stages the sonar client first):
+#   docker build -f Containerfile.fleet --target base       -t fleet/base       .
+#   docker build -f Containerfile.fleet --target orchestrator -t fleet/orchestrator .
+#   docker build -f Containerfile.fleet --target supervisor -t fleet/supervisor .
+
+# ---------------------------------------------------------------------------
+# fleet/base — the generic toolchain (the cell-tier + consumer image)
+# ---------------------------------------------------------------------------
+FROM python:3.10-slim AS base
+
+# The container auth home — MUST match the host user's home so the claude symlink chain
+# resolves inside the container (the probe verifies it at start). Overridable at build time.
+ARG LADDER_HOME=/home/drseuss
+ARG LADDER_UID=1001
+ARG LADDER_GID=1001
+
+# Generic toolchain (system level). `libgomp1` is the OpenMP runtime scikit-learn needs;
+# `nodejs`/`npm` cover the JS toolchain the stories use; `git` is the worktree substrate;
+# `procps` gives the ps the worker autopsies + heartbeats reference.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        ca-certificates \
+        curl \
+        git \
+        nodejs \
+        npm \
+        procps \
+        libgomp1 \
+        unzip \
+        && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# The sonar client is BAKED (it lives at /tmp/sonar-scanner-6.2.1.4610 on the host — ephemeral,
+# so it must not be a mount). `scripts/fleet/build.sh` stages the host copy into the build
+# context at `.build/sonar-scanner` before `docker build`; a pinned download is the fallback.
+COPY .build/sonar-scanner/ /opt/sonar-scanner/
+
+# Python deps — the repo's base dependencies + the [neo4j] extra (the resurrected consumer's
+# driver) + the [admin] extra (flask — the supervisor-tier Control Room portal). Editable
+# install so the baked /app/src stays the import source (matches the reproduction Dockerfile).
+COPY pyproject.toml ./
+COPY src/ ./src/
+RUN pip install --no-cache-dir -e ".[neo4j,admin]"
+
+# The runtime code surface (the mount contract declares the WRITABLE paths — worktree,
+# results — in the compose, NOT the image; design §6). `experiments/results` is created empty
+# and mounted rw at runtime; `experiments/definitions` + `experiments/specs` + `experiments/
+# waivers` are baked read-only inputs (matching the reproduction image).
+COPY scripts/ ./scripts/
+COPY conventions/ ./conventions/
+COPY apps/ ./apps/
+COPY experiments/definitions/ ./experiments/definitions/
+COPY experiments/specs/ ./experiments/specs/
+COPY experiments/waivers/ ./experiments/waivers/
+
+# Ensure the runtime output roots exist (the rw results mount overlays the empty dir).
+RUN mkdir -p /app/experiments/results /app/experiments/results/artifacts
+
+# The non-root user — uid 1001 == the host user, so rw mounts carry the right ownership
+# without daemon-level userns-remap (the DeepSeek review's #2, adapted to docker).
+RUN groupadd --gid "${LADDER_GID}" fleet \
+    && useradd --uid "${LADDER_UID}" --gid "${LADDER_GID}" --home-dir "${LADDER_HOME}" \
+       --create-home --shell /bin/bash fleet \
+    # The 5 D-2 auth dirs are mounted READ-ONLY at runtime, but the CLIs still need WRITABLE
+    # state/cache/config under $HOME (opencode mkdir's ~/.local/state at startup — the probe
+    # caught it). Bake those writable subdirs, owned by the container user, so the ro mounts
+    # overlay the auth dirs but the state dirs stay writable. (The ro mount points are created
+    # by docker INSIDE these already-owned parents, so ownership is preserved.)
+    && mkdir -p "${LADDER_HOME}/.local/state" "${LADDER_HOME}/.local/share" \
+               "${LADDER_HOME}/.cache" "${LADDER_HOME}/.config" \
+    && chown -R "${LADDER_UID}:${LADDER_GID}" "${LADDER_HOME}"
+
+# Canonical env (the R1 "canonical env per unit" fix): the CLIs ride the auth mounts, and
+# the sonar client rides /opt. PATH keeps the claude launcher dir ahead of the system bins.
+ENV HOME="${LADDER_HOME}" \
+    PATH="/opt/sonar-scanner/bin:${LADDER_HOME}/.local/bin:/usr/local/bin:/usr/bin:/bin" \
+    OPENCODE_BIN="${LADDER_HOME}/.opencode/bin/opencode" \
+    CLAUDE_BIN="${LADDER_HOME}/.local/bin/claude" \
+    FINOPS_REDIS_HOST="127.0.0.1" \
+    FINOPS_REDIS_PORT="6380"
+
+# The binary-resolution probe (D-18) is the container-start assertion: it resolves each CLI
+# chain and fails loudly on a broken one. Services that do not use the CLIs (kb consumers,
+# the manager) opt out with FLEET_SKIP_PROBE=1.
+COPY scripts/fleet/entrypoint.sh /usr/local/bin/fleet-entrypoint
+RUN chmod +x /usr/local/bin/fleet-entrypoint
+
+USER "${LADDER_UID}:${LADDER_GID}"
+
+ENTRYPOINT ["/usr/local/bin/fleet-entrypoint"]
+CMD ["python3", "-c", "import os; print('fleet/base ready (uid %s)' % os.getuid())"]
+
+# ---------------------------------------------------------------------------
+# fleet/orchestrator — base + the docker CLI + the sibling-spawn wrapper (slice 2)
+# ---------------------------------------------------------------------------
+FROM base AS orchestrator
+
+# The orchestrator is the ONE socket-holder (D-3): it mounts /var/run/docker.sock ro and its
+# spawn-wrapper (scripts/fleet/spawn_wrapper.py — baked in base via COPY scripts/) validates
+# every spawn against the mount contract + scope vocabulary before the socket call. It needs
+# only the docker CLIENT (`docker-cli` — talks to the host daemon over the socket); the Debian
+# `docker.io` package is the daemon, which the orchestrator must NOT run.
+USER root
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        docker-cli \
+        && rm -rf /var/lib/apt/lists/*
+USER "${LADDER_UID}:${LADDER_GID}"
+
+# The orchestrator's default command is the fleet:commands consumer (D-14): it BRPOPs the
+# supervisor's resize/drain commands, validates them against the compose allowlist + bounded
+# counts, and dispatches only validated commands. The compose's campaign-wrapper /
+# workflow-runner services override this with run_workflow.py --orchestrator.
+CMD ["python3", "scripts/fleet/spawn_wrapper.py", "consume"]
+
+# ---------------------------------------------------------------------------
+# fleet/supervisor — orchestrator + the fleet manager (the supervisor-tier daemon)
+# ---------------------------------------------------------------------------
+FROM orchestrator AS supervisor
+
+# The fleet manager (watcher + heartbeats + DLQ + the fleet:commands channel) is baked here;
+# the compose configs ride the repo ro mount (D-13), not the image. The supervisor holds NO
+# socket at runtime (D-3/D-14) — its restart authority is the compose policies it owns plus
+# the orchestrator as its hands (fleet:commands).
+CMD ["python3", "scripts/fleet/fleet_manager.py", "watch"]

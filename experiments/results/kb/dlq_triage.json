@@ -1,0 +1,12 @@
+{
+  "ts": "2026-08-30T18:21:24.287438+00:00",
+  "dlq_stream": "kb:v1:dead_letter",
+  "total": 2747,
+  "inspected": 2747,
+  "re_driven": 89,
+  "tombstoned": 2658,
+  "by_reason": {
+    "artifact missing": 2658
+  },
+  "dry_run": false
+}

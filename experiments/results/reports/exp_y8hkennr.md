@@ -2,7 +2,7 @@
 
 **Model:** openai/gpt-5.6-luna  |  **Task:** [inject_alien_vocab_s0.5] task_manager...
 **Operator:** perturbed (process_perturbation, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-27T20:33:49
+**Repetitions:** 1  |  **Timestamp:** 2026-08-30T18:48:29
 
 ---
 
@@ -63,7 +63,7 @@
 | **Total energy [X]** | **~3439 J** |
 | Solution density [C] | 0.010464 LOC/tok |
 | Correctness/$ [C] | 45 |
-| Quality/J [C] | 0.000176 |
+| Quality/J [C] | 0.000163 |
 
 ---
 

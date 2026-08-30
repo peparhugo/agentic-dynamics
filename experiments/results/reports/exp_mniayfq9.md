@@ -2,7 +2,7 @@
 
 **Model:** openai/gpt-5.6-sol  |  **Task:** [invert_constraint_s0.5] task_manager...
 **Operator:** perturbed (objective_mutation, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-27T20:33:48
+**Repetitions:** 1  |  **Timestamp:** 2026-08-30T18:48:28
 
 ---
 
@@ -35,12 +35,12 @@
 | Metric | Value |
 |--------|-------|
 | Correctness | 100% (0/0 tests) [H] |
-| Constraint satisfaction [H] | 71% (5/7 constraints) |
+| Constraint satisfaction [H] | 86% (6/7 constraints) |
 | Lines of code [M] | 719 |
 | Cyclomatic complexity [C] | 130.0 |
 | Code quality [H] | 0.139 |
 | Novelty vs baseline [H] | 0.500 |
-| **Composite [H]** | **0.667** |
+| **Composite [H]** | **0.710** |
 
 ---
 
@@ -63,7 +63,7 @@
 | **Total energy [X]** | **~4605 J** |
 | Solution density [C] | 0.021824 LOC/tok |
 | Correctness/$ [C] | 2 |
-| Quality/J [C] | 0.000145 |
+| Quality/J [C] | 0.000154 |
 
 ---
 

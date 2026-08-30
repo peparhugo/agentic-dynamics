@@ -88,7 +88,11 @@
     "report_name": "exp_05ngi4l9",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 50,
+    "reasoning_distance": 0.1387,
+    "nearest_baseline": "exp_batch_twitter_timeline_natural"
   },
   {
     "total_tokens": 202526,
@@ -146,7 +150,9 @@
     "report_name": "exp_0_7l5qfp",
     "detected_model": "openai/gpt-5.6-luna",
     "detected_operator": "perturbed",
-    "task_type": "shift_framing"
+    "task_type": "shift_framing",
+    "reasoning_embedding_available": false,
+    "reasoning_distance": null
   },
   {
     "total_tokens": 6592,
@@ -173,7 +179,11 @@
     "report_name": "exp_0msu9zd1",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 2,
+    "reasoning_distance": 0.4035,
+    "nearest_baseline": "exp_batch_mint_financial_natural"
   },
   {
     "total_tokens": 110236,
@@ -222,7 +232,11 @@
     "report_name": "exp_0mwneie4",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 9,
+    "reasoning_distance": 0.151,
+    "nearest_baseline": "exp_batch_task_manager_natural"
   },
   {
     "total_tokens": 770021,
@@ -299,7 +313,11 @@
     "report_name": "exp_0s36_d3n",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 32,
+    "reasoning_distance": 0.0931,
+    "nearest_baseline": "exp_batch_twitter_timeline_natural"
   },
   {
     "total_tokens": 372055,
@@ -368,7 +386,9 @@
     "report_name": "exp_0umx0pra",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": false,
+    "reasoning_distance": null
   },
   {
     "total_tokens": 103945,
@@ -416,7 +436,11 @@
     "report_name": "exp_1d30evhp",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 10,
+    "reasoning_distance": 0.1794,
+    "nearest_baseline": "exp_batch_fastapi_maintenance_natural"
   },
   {
     "total_tokens": 417378,
@@ -477,7 +501,11 @@
     "report_name": "exp_1erxln69",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 14,
+    "reasoning_distance": 0.0707,
+    "nearest_baseline": "exp_batch_task_manager_natural"
   },
   {
     "total_tokens": 6408,
@@ -504,7 +532,11 @@
     "report_name": "exp_1gahysrh",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 1,
+    "reasoning_distance": 0.4339,
+    "nearest_baseline": "exp_batch_mint_financial_natural"
   },
   {
     "total_tokens": 85589,
@@ -551,7 +583,11 @@
     "report_name": "exp_1q13yzyh",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 3,
+    "reasoning_distance": 0.1401,
+    "nearest_baseline": "exp_batch_mint_financial_natural"
   },
   {
     "total_tokens": 209687,
@@ -603,7 +639,11 @@
     "report_name": "exp_1ruzb3rc",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 25,
+    "reasoning_distance": 0.1758,
+    "nearest_baseline": "exp_batch_fastapi_maintenance_natural"
   },
   {
     "total_tokens": 382406,
@@ -664,7 +704,11 @@
     "report_name": "exp_1spl4mgd",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 1,
+    "reasoning_distance": 0.27,
+    "nearest_baseline": "exp_batch_mint_financial_natural"
   },
   {
     "total_tokens": 172047,
@@ -713,7 +757,9 @@
     "report_name": "exp_21k4d83_",
     "detected_model": "deepseek/deepseek-v4-pro",
     "detected_operator": "baseline",
-    "task_type": "perturbed"
+    "task_type": "perturbed",
+    "reasoning_embedding_available": false,
+    "reasoning_distance": null
   },
   {
     "total_tokens": 96938,
@@ -762,7 +808,11 @@
     "report_name": "exp_27doc_o4",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 1,
+    "reasoning_distance": 0.3091,
+    "nearest_baseline": "exp_batch_task_manager_natural"
   },
   {
     "total_tokens": 111679,
@@ -804,7 +854,11 @@
     "report_name": "exp_2890hja3",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 1,
+    "reasoning_distance": 0.2961,
+    "nearest_baseline": "exp_batch_task_manager_natural"
   },
   {
     "total_tokens": 503199,
@@ -865,7 +919,9 @@
     "report_name": "exp_2bdc08dn",
     "detected_model": "deepseek/deepseek-v4-flash",
     "detected_operator": "perturbed",
-    "task_type": "invert_constraint"
+    "task_type": "invert_constraint",
+    "reasoning_embedding_available": false,
+    "reasoning_distance": null
   },
   {
     "total_tokens": 26922,
@@ -905,7 +961,11 @@
     "report_name": "exp_2dqodvt8",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 4,
+    "reasoning_distance": 0.1747,
+    "nearest_baseline": "exp_batch_twitter_timeline_natural"
   },
   {
     "total_tokens": 594801,
@@ -979,7 +1039,11 @@
     "report_name": "exp_2hoxdd8p",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 29,
+    "reasoning_distance": 0.1559,
+    "nearest_baseline": "exp_batch_fastapi_maintenance_natural"
   },
   {
     "total_tokens": 732202,
@@ -1056,7 +1120,11 @@
     "report_name": "exp_2yyxp_8_",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 34,
+    "reasoning_distance": 0.1073,
+    "nearest_baseline": "exp_batch_twitter_timeline_natural"
   },
   {
     "total_tokens": 134670,
@@ -1109,7 +1177,11 @@
     "report_name": "exp_34qst87v",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 13,
+    "reasoning_distance": 0.1197,
+    "nearest_baseline": "exp_batch_twitter_timeline_natural"
   },
   {
     "total_tokens": 91063,
@@ -1159,7 +1231,11 @@
     "report_name": "exp_37jbey_e",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 8,
+    "reasoning_distance": 0.1024,
+    "nearest_baseline": "exp_batch_task_manager_natural"
   },
   {
     "total_tokens": 470579,
@@ -1227,7 +1303,11 @@
     "report_name": "exp_37z0nq68",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 20,
+    "reasoning_distance": 0.0805,
+    "nearest_baseline": "exp_batch_twitter_timeline_natural"
   },
   {
     "total_tokens": 0,
@@ -1254,7 +1334,9 @@
     "report_name": "exp_3_rc_aql",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": false,
+    "reasoning_distance": null
   },
   {
     "total_tokens": 251490,
@@ -1306,7 +1388,11 @@
     "report_name": "exp_3hlb2bus",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 3,
+    "reasoning_distance": 0.1566,
+    "nearest_baseline": "exp_batch_mint_financial_natural"
   },
   {
     "total_tokens": 149293,
@@ -1357,7 +1443,11 @@
     "report_name": "exp_3j2vrct4",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 2,
+    "reasoning_distance": 0.1864,
+    "nearest_baseline": "exp_batch_mint_financial_natural"
   },
   {
     "total_tokens": 519123,
@@ -1414,7 +1504,9 @@
     "report_name": "exp_3s1gcbb1",
     "detected_model": "deepseek/deepseek-v4-flash",
     "detected_operator": "perturbed",
-    "task_type": "remove_critical_constraint"
+    "task_type": "remove_critical_constraint",
+    "reasoning_embedding_available": false,
+    "reasoning_distance": null
   },
   {
     "total_tokens": 6937,
@@ -1441,7 +1533,11 @@
     "report_name": "exp_3uf12sxn",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 4,
+    "reasoning_distance": 0.3982,
+    "nearest_baseline": "exp_batch_fastapi_maintenance_natural"
   },
   {
     "total_tokens": 332038,
@@ -1499,7 +1595,11 @@
     "report_name": "exp_3zxicj_v",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 11,
+    "reasoning_distance": 0.0591,
+    "nearest_baseline": "exp_batch_task_manager_natural"
   },
   {
     "total_tokens": 252840,
@@ -1560,7 +1660,11 @@
     "report_name": "exp_4f5g2wms",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 16,
+    "reasoning_distance": 0.0555,
+    "nearest_baseline": "exp_batch_task_manager_natural"
   },
   {
     "total_tokens": 107879,
@@ -1610,7 +1714,11 @@
     "report_name": "exp_4jvdqhzs",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 7,
+    "reasoning_distance": 0.172,
+    "nearest_baseline": "exp_batch_task_manager_natural"
   },
   {
     "total_tokens": 166157,
@@ -1661,7 +1769,9 @@
     "report_name": "exp_4ox5fsle",
     "detected_model": "openai/gpt-5.6-sol",
     "detected_operator": "perturbed",
-    "task_type": "reverse_causality"
+    "task_type": "reverse_causality",
+    "reasoning_embedding_available": false,
+    "reasoning_distance": null
   },
   {
     "total_tokens": 192902,
@@ -1728,7 +1838,11 @@
     "report_name": "exp_4v4v2uq8",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 14,
+    "reasoning_distance": 0.0878,
+    "nearest_baseline": "exp_batch_twitter_timeline_natural"
   },
   {
     "total_tokens": 294259,
@@ -1785,7 +1899,11 @@
     "report_name": "exp_5d0kt9ne",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 18,
+    "reasoning_distance": 0.1078,
+    "nearest_baseline": "exp_batch_twitter_timeline_natural"
   },
   {
     "total_tokens": 7783,
@@ -1812,7 +1930,11 @@
     "report_name": "exp_5gy0qplu",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 1,
+    "reasoning_distance": 0.3917,
+    "nearest_baseline": "exp_batch_mint_financial_natural"
   },
   {
     "total_tokens": 242886,
@@ -1893,7 +2015,11 @@
     "report_name": "exp_6462vbw3",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 19,
+    "reasoning_distance": 0.081,
+    "nearest_baseline": "exp_batch_task_manager_natural"
   },
   {
     "total_tokens": 94244,
@@ -1941,7 +2067,11 @@
     "report_name": "exp_6ij8p3sl",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 19,
+    "reasoning_distance": 0.1694,
+    "nearest_baseline": "exp_batch_task_manager_natural"
   },
   {
     "total_tokens": 117685,
@@ -1990,7 +2120,11 @@
     "report_name": "exp_6km9sho1",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 19,
+    "reasoning_distance": 0.1737,
+    "nearest_baseline": "exp_batch_fastapi_maintenance_natural"
   },
   {
     "total_tokens": 125181,
@@ -2042,7 +2176,11 @@
     "report_name": "exp_6w9zsvwr",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 13,
+    "reasoning_distance": 0.1602,
+    "nearest_baseline": "exp_batch_fastapi_maintenance_natural"
   },
   {
     "total_tokens": 166341,
@@ -2094,7 +2232,11 @@
     "report_name": "exp_6wexzcci",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 1,
+    "reasoning_distance": 0.2807,
+    "nearest_baseline": "exp_batch_mint_financial_natural"
   },
   {
     "total_tokens": 69766,
@@ -2136,7 +2278,11 @@
     "report_name": "exp_6xzauw79",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 2,
+    "reasoning_distance": 0.2058,
+    "nearest_baseline": "exp_batch_task_manager_natural"
   },
   {
     "total_tokens": 187608,
@@ -2184,7 +2330,11 @@
     "report_name": "exp_73hs5n35",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 1,
+    "reasoning_distance": 0.2568,
+    "nearest_baseline": "exp_batch_mint_financial_natural"
   },
   {
     "total_tokens": 122997,
@@ -2230,7 +2380,11 @@
     "report_name": "exp_7eir0g9s",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 8,
+    "reasoning_distance": 0.1931,
+    "nearest_baseline": "exp_batch_task_manager_natural"
   },
   {
     "total_tokens": 824649,
@@ -2313,7 +2467,11 @@
     "report_name": "exp_7eo89cdf",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 34,
+    "reasoning_distance": 0.1489,
+    "nearest_baseline": "exp_batch_fastapi_maintenance_natural"
   },
   {
     "total_tokens": 473389,
@@ -2376,7 +2534,9 @@
     "report_name": "exp_7fjsmcwg",
     "detected_model": "deepseek/deepseek-v4-pro",
     "detected_operator": "perturbed",
-    "task_type": "shift_framing"
+    "task_type": "shift_framing",
+    "reasoning_embedding_available": false,
+    "reasoning_distance": null
   },
   {
     "total_tokens": 232180,
@@ -2442,7 +2602,11 @@
     "report_name": "exp_7l_2qyd3",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 19,
+    "reasoning_distance": 0.0966,
+    "nearest_baseline": "exp_batch_twitter_timeline_natural"
   },
   {
     "total_tokens": 151899,
@@ -2491,7 +2655,9 @@
     "report_name": "exp_7mgfyiq7",
     "detected_model": "openai/gpt-5.6-sol",
     "detected_operator": "baseline",
-    "task_type": "task_manager"
+    "task_type": "task_manager",
+    "reasoning_embedding_available": false,
+    "reasoning_distance": null
   },
   {
     "total_tokens": 212479,
@@ -2548,7 +2714,11 @@
     "report_name": "exp_82jg7qi3",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 12,
+    "reasoning_distance": 0.1542,
+    "nearest_baseline": "exp_batch_fastapi_maintenance_natural"
   },
   {
     "total_tokens": 530862,
@@ -2612,7 +2782,9 @@
     "report_name": "exp_8an6dhoh",
     "detected_model": "deepseek/deepseek-v4-flash",
     "detected_operator": "perturbed",
-    "task_type": "shift_framing"
+    "task_type": "shift_framing",
+    "reasoning_embedding_available": false,
+    "reasoning_distance": null
   },
   {
     "total_tokens": 35377,
@@ -2650,7 +2822,9 @@
     "report_name": "exp_8ivd26c4",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": false,
+    "reasoning_distance": null
   },
   {
     "total_tokens": 80494,
@@ -2697,7 +2871,11 @@
     "report_name": "exp_965hk7_6",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 8,
+    "reasoning_distance": 0.1117,
+    "nearest_baseline": "exp_batch_task_manager_natural"
   },
   {
     "total_tokens": 84235,
@@ -2755,7 +2933,9 @@
     "report_name": "exp_96rfqfgd",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": false,
+    "reasoning_distance": null
   },
   {
     "total_tokens": 322204,
@@ -2808,7 +2988,9 @@
     "report_name": "exp_9i_wq5gc",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": false,
+    "reasoning_distance": null
   },
   {
     "total_tokens": 66318,
@@ -2855,7 +3037,9 @@
     "report_name": "exp_9iaxwdel",
     "detected_model": "openai/gpt-5.6-sol",
     "detected_operator": "perturbed",
-    "task_type": "inject_alien_vocab"
+    "task_type": "inject_alien_vocab",
+    "reasoning_embedding_available": false,
+    "reasoning_distance": null
   },
   {
     "total_tokens": 494237,
@@ -2922,7 +3106,11 @@
     "report_name": "exp_9o_y1a_8",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 22,
+    "reasoning_distance": 0.04,
+    "nearest_baseline": "exp_batch_task_manager_natural"
   },
   {
     "total_tokens": 101846,
@@ -2972,7 +3160,11 @@
     "report_name": "exp_9tfs606s",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 1,
+    "reasoning_distance": 0.314,
+    "nearest_baseline": "exp_batch_mint_financial_natural"
   },
   {
     "total_tokens": 118175,
@@ -3019,7 +3211,9 @@
     "report_name": "exp_9u5r2dl0",
     "detected_model": "openai/gpt-5.6-sol",
     "detected_operator": "perturbed",
-    "task_type": "inject_competing_goal"
+    "task_type": "inject_competing_goal",
+    "reasoning_embedding_available": false,
+    "reasoning_distance": null
   },
   {
     "total_tokens": 83487,
@@ -3061,7 +3255,11 @@
     "report_name": "exp_9u9p6onc",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 2,
+    "reasoning_distance": 0.1944,
+    "nearest_baseline": "exp_batch_task_manager_natural"
   },
   {
     "total_tokens": 361204,
@@ -3138,7 +3336,9 @@
     "report_name": "exp_9uzjxitk",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": false,
+    "reasoning_distance": null
   },
   {
     "total_tokens": 77507,
@@ -3187,7 +3387,11 @@
     "report_name": "exp_9vkw4hu4",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 10,
+    "reasoning_distance": 0.0885,
+    "nearest_baseline": "exp_batch_social_graph_natural"
   },
   {
     "total_tokens": 175202,
@@ -3243,7 +3447,11 @@
     "report_name": "exp__3wx7dg4",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 16,
+    "reasoning_distance": 0.1082,
+    "nearest_baseline": "exp_batch_task_manager_natural"
   },
   {
     "total_tokens": 115246,
@@ -3293,7 +3501,11 @@
     "report_name": "exp__gihw__t",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 10,
+    "reasoning_distance": 0.1741,
+    "nearest_baseline": "exp_batch_fastapi_maintenance_natural"
   },
   {
     "total_tokens": 120377,
@@ -3344,7 +3556,9 @@
     "report_name": "exp__j8nwj0v",
     "detected_model": "openai/gpt-5.6-sol",
     "detected_operator": "perturbed",
-    "task_type": "shift_framing"
+    "task_type": "shift_framing",
+    "reasoning_embedding_available": false,
+    "reasoning_distance": null
   },
   {
     "total_tokens": 143542,
@@ -3398,7 +3612,11 @@
     "report_name": "exp__l_pm4_4",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 9,
+    "reasoning_distance": 0.1763,
+    "nearest_baseline": "exp_batch_fastapi_maintenance_natural"
   },
   {
     "total_tokens": 160807,
@@ -3448,7 +3666,9 @@
     "report_name": "exp__n7sboft",
     "detected_model": "openai/gpt-5.6-sol",
     "detected_operator": "baseline",
-    "task_type": "perturbed"
+    "task_type": "perturbed",
+    "reasoning_embedding_available": false,
+    "reasoning_distance": null
   },
   {
     "total_tokens": 236096,
@@ -3502,7 +3722,9 @@
     "report_name": "exp__p5nkznd",
     "detected_model": "deepseek/deepseek-v4-pro",
     "detected_operator": "perturbed",
-    "task_type": "remove_critical_constraint"
+    "task_type": "remove_critical_constraint",
+    "reasoning_embedding_available": false,
+    "reasoning_distance": null
   },
   {
     "total_tokens": 1012934,
@@ -3576,7 +3798,9 @@
     "report_name": "exp__ygf4hz3",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": false,
+    "reasoning_distance": null
   },
   {
     "total_tokens": 557703,
@@ -3639,7 +3863,9 @@
     "report_name": "exp_a3eztkke",
     "detected_model": "deepseek/deepseek-v4-pro",
     "detected_operator": "perturbed",
-    "task_type": "invert_constraint"
+    "task_type": "invert_constraint",
+    "reasoning_embedding_available": false,
+    "reasoning_distance": null
   },
   {
     "total_tokens": 99070,
@@ -3688,7 +3914,11 @@
     "report_name": "exp_a90ybf13",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 9,
+    "reasoning_distance": 0.1857,
+    "nearest_baseline": "exp_batch_task_manager_natural"
   },
   {
     "total_tokens": 29108,
@@ -3727,7 +3957,9 @@
     "report_name": "exp_aeomzucw",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": false,
+    "reasoning_distance": null
   },
   {
     "total_tokens": 218263,
@@ -3781,7 +4013,11 @@
     "report_name": "exp_agmqo28z",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 14,
+    "reasoning_distance": 0.0696,
+    "nearest_baseline": "exp_batch_task_manager_natural"
   },
   {
     "total_tokens": 330352,
@@ -3857,7 +4093,11 @@
     "report_name": "exp_aqqqi9v5",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 19,
+    "reasoning_distance": 0.1127,
+    "nearest_baseline": "exp_batch_twitter_timeline_natural"
   },
   {
     "total_tokens": 26149,
@@ -3895,7 +4135,9 @@
     "report_name": "exp_arc_7as6",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": false,
+    "reasoning_distance": null
   },
   {
     "total_tokens": 256111,
@@ -3971,7 +4213,9 @@
     "report_name": "exp_ay66qv12",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": false,
+    "reasoning_distance": null
   },
   {
     "total_tokens": 361399,
@@ -4031,7 +4275,11 @@
     "report_name": "exp_azk0fzz7",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 12,
+    "reasoning_distance": 0.1725,
+    "nearest_baseline": "exp_batch_task_manager_natural"
   },
   {
     "total_tokens": 255102,
@@ -4096,7 +4344,11 @@
     "report_name": "exp_b48bnosz",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 1,
+    "reasoning_distance": 0.2795,
+    "nearest_baseline": "exp_batch_mint_financial_natural"
   },
   {
     "total_tokens": 46577,
@@ -4137,7 +4389,11 @@
     "report_name": "exp_b4kiud1q",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 6,
+    "reasoning_distance": 0.1342,
+    "nearest_baseline": "exp_batch_task_manager_natural"
   },
   {
     "total_tokens": 277089,
@@ -4190,7 +4446,11 @@
     "report_name": "exp_ba8s0njl",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 13,
+    "reasoning_distance": 0.1549,
+    "nearest_baseline": "exp_batch_fastapi_maintenance_natural"
   },
   {
     "total_tokens": 119762,
@@ -4240,7 +4500,9 @@
     "report_name": "exp_batch_autocomplete_search_natural",
     "detected_model": "deepseek/deepseek-v4-pro",
     "detected_operator": "unknown",
-    "task_type": "perturbed"
+    "task_type": "perturbed",
+    "reasoning_embedding_available": false,
+    "reasoning_distance": null
   },
   {
     "total_tokens": 537187,
@@ -4292,7 +4554,9 @@
     "report_name": "exp_batch_batch_collaborative_editor_baseline clau",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": false,
+    "reasoning_distance": null
   },
   {
     "total_tokens": 232901,
@@ -4343,7 +4607,11 @@
     "report_name": "exp_batch_batch_collaborative_editor_baseline gpt_",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 11,
+    "reasoning_distance": 0.1797,
+    "nearest_baseline": "exp_batch_fastapi_maintenance_natural"
   },
   {
     "total_tokens": 503981,
@@ -4399,7 +4667,11 @@
     "report_name": "exp_batch_batch_data_table_baseline claude_fable_5",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 2,
+    "reasoning_distance": 0.2164,
+    "nearest_baseline": "exp_batch_task_manager_natural"
   },
   {
     "total_tokens": 291765,
@@ -4454,7 +4726,11 @@
     "report_name": "exp_batch_batch_data_table_baseline gpt_5_6",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 17,
+    "reasoning_distance": 0.1853,
+    "nearest_baseline": "exp_batch_fastapi_maintenance_natural"
   },
   {
     "total_tokens": 411785,
@@ -4513,7 +4789,11 @@
     "report_name": "exp_batch_batch_task_manager_baseline claude_fable",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 4,
+    "reasoning_distance": 0.1119,
+    "nearest_baseline": "exp_batch_task_manager_natural"
   },
   {
     "total_tokens": 151558,
@@ -4561,7 +4841,11 @@
     "report_name": "exp_batch_batch_task_manager_baseline gpt_5_6",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 10,
+    "reasoning_distance": 0.1601,
+    "nearest_baseline": "exp_batch_task_manager_natural"
   },
   {
     "total_tokens": 113735,
@@ -4603,7 +4887,11 @@
     "report_name": "exp_batch_batch_task_manager_baseline gpt_5_mini",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 10,
+    "reasoning_distance": 0.1406,
+    "nearest_baseline": "exp_batch_task_manager_natural"
   },
   {
     "total_tokens": 130793,
@@ -4668,7 +4956,11 @@
     "report_name": "exp_batch_collaborative_editor_natural",
     "detected_model": "deepseek/deepseek-v4-pro",
     "detected_operator": "unknown",
-    "task_type": "perturbed"
+    "task_type": "perturbed",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 11,
+    "reasoning_distance": 0.1126,
+    "nearest_baseline": "exp_batch_mint_financial_natural"
   },
   {
     "total_tokens": 229837,
@@ -4718,7 +5010,11 @@
     "report_name": "exp_batch_data_table_g56",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 9,
+    "reasoning_distance": 0.2074,
+    "nearest_baseline": "exp_batch_fastapi_maintenance_natural"
   },
   {
     "total_tokens": 279094,
@@ -4773,7 +5069,11 @@
     "report_name": "exp_batch_data_table_natural",
     "detected_model": "deepseek/deepseek-v4-pro",
     "detected_operator": "unknown",
-    "task_type": "perturbed"
+    "task_type": "perturbed",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 20,
+    "reasoning_distance": 0.1066,
+    "nearest_baseline": "exp_batch_mint_financial_natural"
   },
   {
     "total_tokens": 153556,
@@ -4820,7 +5120,11 @@
     "report_name": "exp_batch_factorial_compound_natural",
     "detected_model": "deepseek/deepseek-v4-pro",
     "detected_operator": "unknown",
-    "task_type": "perturbed"
+    "task_type": "perturbed",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 9,
+    "reasoning_distance": 0.0622,
+    "nearest_baseline": "exp_batch_task_manager_natural"
   },
   {
     "total_tokens": 1066170,
@@ -4907,7 +5211,10 @@
     "report_name": "exp_batch_fastapi_maintenance_natural",
     "detected_model": "deepseek/deepseek-v4-pro",
     "detected_operator": "baseline",
-    "task_type": "fastapi_maintenance"
+    "task_type": "fastapi_maintenance",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 30,
+    "reasoning_distance": 0.0
   },
   {
     "total_tokens": 127345,
@@ -4970,7 +5277,9 @@
     "report_name": "exp_batch_form_wizard_natural",
     "detected_model": "deepseek/deepseek-v4-pro",
     "detected_operator": "unknown",
-    "task_type": "perturbed"
+    "task_type": "perturbed",
+    "reasoning_embedding_available": false,
+    "reasoning_distance": null
   },
   {
     "total_tokens": 125157,
@@ -5049,7 +5358,10 @@
     "report_name": "exp_batch_mint_financial_natural",
     "detected_model": "deepseek/deepseek-v4-pro",
     "detected_operator": "baseline",
-    "task_type": "mint_financial"
+    "task_type": "mint_financial",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 16,
+    "reasoning_distance": 0.0
   },
   {
     "total_tokens": 125912,
@@ -5096,7 +5408,11 @@
     "report_name": "exp_batch_notification_system_natural",
     "detected_model": "deepseek/deepseek-v4-pro",
     "detected_operator": "unknown",
-    "task_type": "perturbed"
+    "task_type": "perturbed",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 10,
+    "reasoning_distance": 0.0988,
+    "nearest_baseline": "exp_batch_twitter_timeline_natural"
   },
   {
     "total_tokens": 230635,
@@ -5147,7 +5463,11 @@
     "report_name": "exp_batch_search_kv_store_natural",
     "detected_model": "deepseek/deepseek-v4-pro",
     "detected_operator": "unknown",
-    "task_type": "perturbed"
+    "task_type": "perturbed",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 11,
+    "reasoning_distance": 0.1041,
+    "nearest_baseline": "exp_batch_twitter_timeline_natural"
   },
   {
     "total_tokens": 105646,
@@ -5207,7 +5527,10 @@
     "report_name": "exp_batch_social_graph_natural",
     "detected_model": "deepseek/deepseek-v4-pro",
     "detected_operator": "baseline",
-    "task_type": "social_graph"
+    "task_type": "social_graph",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 9,
+    "reasoning_distance": 0.0
   },
   {
     "total_tokens": 93436,
@@ -5259,7 +5582,10 @@
     "report_name": "exp_batch_task_manager_natural",
     "detected_model": "deepseek/deepseek-v4-pro",
     "detected_operator": "baseline",
-    "task_type": "task_manager"
+    "task_type": "task_manager",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 8,
+    "reasoning_distance": 0.0
   },
   {
     "total_tokens": 90742,
@@ -5313,7 +5639,10 @@
     "report_name": "exp_batch_twitter_timeline_natural",
     "detected_model": "deepseek/deepseek-v4-pro",
     "detected_operator": "baseline",
-    "task_type": "twitter_timeline"
+    "task_type": "twitter_timeline",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 9,
+    "reasoning_distance": 0.0
   },
   {
     "total_tokens": 88572,
@@ -5357,7 +5686,9 @@
     "report_name": "exp_batch_web_crawler_natural",
     "detected_model": "deepseek/deepseek-v4-pro",
     "detected_operator": "baseline",
-    "task_type": "web_crawler"
+    "task_type": "web_crawler",
+    "reasoning_embedding_available": false,
+    "reasoning_distance": null
   },
   {
     "total_tokens": 177014,
@@ -5403,7 +5734,9 @@
     "report_name": "exp_bh23zs7r",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": false,
+    "reasoning_distance": null
   },
   {
     "total_tokens": 344682,
@@ -5460,7 +5793,9 @@
     "report_name": "exp_brg802xf",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": false,
+    "reasoning_distance": null
   },
   {
     "total_tokens": 433766,
@@ -5541,7 +5876,11 @@
     "report_name": "exp_bvv94cn2",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 25,
+    "reasoning_distance": 0.0853,
+    "nearest_baseline": "exp_batch_twitter_timeline_natural"
   },
   {
     "total_tokens": 16715,
@@ -5601,7 +5940,11 @@
     "report_name": "exp_coqsg2pu",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 5,
+    "reasoning_distance": 0.2205,
+    "nearest_baseline": "exp_batch_twitter_timeline_natural"
   },
   {
     "total_tokens": 197092,
@@ -5657,7 +6000,11 @@
     "report_name": "exp_cqc0vqav",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 17,
+    "reasoning_distance": 0.0914,
+    "nearest_baseline": "exp_batch_twitter_timeline_natural"
   },
   {
     "total_tokens": 298587,
@@ -5716,7 +6063,11 @@
     "report_name": "exp_d0xsrs9k",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 9,
+    "reasoning_distance": 0.0714,
+    "nearest_baseline": "exp_batch_twitter_timeline_natural"
   },
   {
     "total_tokens": 326572,
@@ -5779,7 +6130,11 @@
     "report_name": "exp_d6lkz5pg",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 25,
+    "reasoning_distance": 0.099,
+    "nearest_baseline": "exp_batch_twitter_timeline_natural"
   },
   {
     "total_tokens": 340265,
@@ -5839,7 +6194,11 @@
     "report_name": "exp_dalqefiq",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 11,
+    "reasoning_distance": 0.2082,
+    "nearest_baseline": "exp_batch_fastapi_maintenance_natural"
   },
   {
     "total_tokens": 307915,
@@ -5897,7 +6256,11 @@
     "report_name": "exp_dbzmm0qd",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 21,
+    "reasoning_distance": 0.1072,
+    "nearest_baseline": "exp_batch_twitter_timeline_natural"
   },
   {
     "total_tokens": 96611,
@@ -5944,7 +6307,11 @@
     "report_name": "exp_dfyjk1mo",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 9,
+    "reasoning_distance": 0.1961,
+    "nearest_baseline": "exp_batch_task_manager_natural"
   },
   {
     "total_tokens": 143787,
@@ -5996,7 +6363,11 @@
     "report_name": "exp_dm1gxwnd",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 11,
+    "reasoning_distance": 0.1674,
+    "nearest_baseline": "exp_batch_task_manager_natural"
   },
   {
     "total_tokens": 137686,
@@ -6047,7 +6418,11 @@
     "report_name": "exp_dmot6oqc",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 14,
+    "reasoning_distance": 0.1051,
+    "nearest_baseline": "exp_batch_mint_financial_natural"
   },
   {
     "total_tokens": 86493,
@@ -6091,7 +6466,9 @@
     "report_name": "exp_dt3xucys",
     "detected_model": "openai/gpt-5.6-sol",
     "detected_operator": "perturbed",
-    "task_type": "inject_phantom_success"
+    "task_type": "inject_phantom_success",
+    "reasoning_embedding_available": false,
+    "reasoning_distance": null
   },
   {
     "total_tokens": 245973,
@@ -6160,7 +6537,11 @@
     "report_name": "exp_dw4oal4i",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 20,
+    "reasoning_distance": 0.1006,
+    "nearest_baseline": "exp_batch_twitter_timeline_natural"
   },
   {
     "total_tokens": 851521,
@@ -6237,7 +6618,9 @@
     "report_name": "exp_dy02vni8",
     "detected_model": "deepseek/deepseek-v4-flash",
     "detected_operator": "perturbed",
-    "task_type": "inject_phantom_success"
+    "task_type": "inject_phantom_success",
+    "reasoning_embedding_available": false,
+    "reasoning_distance": null
   },
   {
     "total_tokens": 366313,
@@ -6297,7 +6680,11 @@
     "report_name": "exp_e6nmmhtb",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 14,
+    "reasoning_distance": 0.1177,
+    "nearest_baseline": "exp_batch_twitter_timeline_natural"
   },
   {
     "total_tokens": 188465,
@@ -6353,7 +6740,11 @@
     "report_name": "exp_e8bbu37m",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 3,
+    "reasoning_distance": 0.1464,
+    "nearest_baseline": "exp_batch_mint_financial_natural"
   },
   {
     "total_tokens": 0,
@@ -6380,7 +6771,9 @@
     "report_name": "exp_ea_jehfc",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": false,
+    "reasoning_distance": null
   },
   {
     "total_tokens": 344438,
@@ -6440,7 +6833,11 @@
     "report_name": "exp_eajrttu6",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 22,
+    "reasoning_distance": 0.102,
+    "nearest_baseline": "exp_batch_twitter_timeline_natural"
   },
   {
     "total_tokens": 237396,
@@ -6489,7 +6886,11 @@
     "report_name": "exp_ednngz36",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 1,
+    "reasoning_distance": 0.291,
+    "nearest_baseline": "exp_batch_mint_financial_natural"
   },
   {
     "total_tokens": 183171,
@@ -6539,7 +6940,11 @@
     "report_name": "exp_ejk4tssk",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 16,
+    "reasoning_distance": 0.1796,
+    "nearest_baseline": "exp_batch_fastapi_maintenance_natural"
   },
   {
     "total_tokens": 62937,
@@ -6582,7 +6987,11 @@
     "report_name": "exp_epk792rd",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 7,
+    "reasoning_distance": 0.1291,
+    "nearest_baseline": "exp_batch_twitter_timeline_natural"
   },
   {
     "total_tokens": 240174,
@@ -6642,7 +7051,11 @@
     "report_name": "exp_er1n2rx3",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 13,
+    "reasoning_distance": 0.0626,
+    "nearest_baseline": "exp_batch_task_manager_natural"
   },
   {
     "total_tokens": 259060,
@@ -6695,7 +7108,11 @@
     "report_name": "exp_erp5e4d9",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 15,
+    "reasoning_distance": 0.1557,
+    "nearest_baseline": "exp_batch_fastapi_maintenance_natural"
   },
   {
     "total_tokens": 190643,
@@ -6751,7 +7168,9 @@
     "report_name": "exp_erqd13i_",
     "detected_model": "openai/gpt-5.6-terra",
     "detected_operator": "perturbed",
-    "task_type": "remove_critical_constraint"
+    "task_type": "remove_critical_constraint",
+    "reasoning_embedding_available": false,
+    "reasoning_distance": null
   },
   {
     "total_tokens": 240033,
@@ -6824,7 +7243,11 @@
     "report_name": "exp_eyt9cssv",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 19,
+    "reasoning_distance": 0.0665,
+    "nearest_baseline": "exp_batch_task_manager_natural"
   },
   {
     "total_tokens": 331574,
@@ -6884,7 +7307,11 @@
     "report_name": "exp_f1cezegh",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 11,
+    "reasoning_distance": 0.1025,
+    "nearest_baseline": "exp_batch_twitter_timeline_natural"
   },
   {
     "total_tokens": 42731,
@@ -6929,7 +7356,11 @@
     "report_name": "exp_f9j9q60r",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 5,
+    "reasoning_distance": 0.1769,
+    "nearest_baseline": "exp_batch_task_manager_natural"
   },
   {
     "total_tokens": 232444,
@@ -6984,7 +7415,11 @@
     "report_name": "exp_fhxfescx",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 2,
+    "reasoning_distance": 0.2206,
+    "nearest_baseline": "exp_batch_mint_financial_natural"
   },
   {
     "total_tokens": 972714,
@@ -7060,7 +7495,9 @@
     "report_name": "exp_fnrlj6k0",
     "detected_model": "deepseek/deepseek-v4-flash",
     "detected_operator": "baseline",
-    "task_type": "task_manager"
+    "task_type": "task_manager",
+    "reasoning_embedding_available": false,
+    "reasoning_distance": null
   },
   {
     "total_tokens": 183895,
@@ -7111,7 +7548,9 @@
     "report_name": "exp_fp4wko3z",
     "detected_model": "openai/gpt-5.6-sol",
     "detected_operator": "perturbed",
-    "task_type": "shift_framing"
+    "task_type": "shift_framing",
+    "reasoning_embedding_available": false,
+    "reasoning_distance": null
   },
   {
     "total_tokens": 123681,
@@ -7170,7 +7609,11 @@
     "report_name": "exp_fw57sbqz",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 10,
+    "reasoning_distance": 0.0744,
+    "nearest_baseline": "exp_batch_twitter_timeline_natural"
   },
   {
     "total_tokens": 113509,
@@ -7215,7 +7658,11 @@
     "report_name": "exp_g56_sweep",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 10,
+    "reasoning_distance": 0.17,
+    "nearest_baseline": "exp_batch_task_manager_natural"
   },
   {
     "total_tokens": 1006694,
@@ -7294,7 +7741,9 @@
     "report_name": "exp_ga7iubmt",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": false,
+    "reasoning_distance": null
   },
   {
     "total_tokens": 6409,
@@ -7321,7 +7770,11 @@
     "report_name": "exp_gbgylz6j",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 1,
+    "reasoning_distance": 0.4339,
+    "nearest_baseline": "exp_batch_mint_financial_natural"
   },
   {
     "total_tokens": 197021,
@@ -7381,7 +7834,11 @@
     "report_name": "exp_gfjpa3ah",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 2,
+    "reasoning_distance": 0.2167,
+    "nearest_baseline": "exp_batch_mint_financial_natural"
   },
   {
     "total_tokens": 215293,
@@ -7433,7 +7890,9 @@
     "report_name": "exp_gmnl5d6g",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": false,
+    "reasoning_distance": null
   },
   {
     "total_tokens": 674457,
@@ -7507,7 +7966,11 @@
     "report_name": "exp_grgmkhc9",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 21,
+    "reasoning_distance": 0.0989,
+    "nearest_baseline": "exp_batch_twitter_timeline_natural"
   },
   {
     "total_tokens": 149641,
@@ -7564,7 +8027,11 @@
     "report_name": "exp_h2zma6v0",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 12,
+    "reasoning_distance": 0.1595,
+    "nearest_baseline": "exp_batch_twitter_timeline_natural"
   },
   {
     "total_tokens": 286437,
@@ -7633,7 +8100,11 @@
     "report_name": "exp_hcnattl6",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 22,
+    "reasoning_distance": 0.0638,
+    "nearest_baseline": "exp_batch_task_manager_natural"
   },
   {
     "total_tokens": 0,
@@ -7660,7 +8131,11 @@
     "report_name": "exp_hieh5rmt",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 1,
+    "reasoning_distance": 0.3483,
+    "nearest_baseline": "exp_batch_fastapi_maintenance_natural"
   },
   {
     "total_tokens": 123938,
@@ -7705,7 +8180,11 @@
     "report_name": "exp_hk87k0l8",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 1,
+    "reasoning_distance": 0.3132,
+    "nearest_baseline": "exp_batch_task_manager_natural"
   },
   {
     "total_tokens": 121833,
@@ -7763,7 +8242,11 @@
     "report_name": "exp_hn0qqsuf",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 9,
+    "reasoning_distance": 0.082,
+    "nearest_baseline": "exp_batch_task_manager_natural"
   },
   {
     "total_tokens": 553970,
@@ -7824,7 +8307,9 @@
     "report_name": "exp_hw5wger9",
     "detected_model": "deepseek/deepseek-v4-pro",
     "detected_operator": "perturbed",
-    "task_type": "inject_competing_goal"
+    "task_type": "inject_competing_goal",
+    "reasoning_embedding_available": false,
+    "reasoning_distance": null
   },
   {
     "total_tokens": 6651,
@@ -7851,7 +8336,11 @@
     "report_name": "exp_i2wnu2xf",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 2,
+    "reasoning_distance": 0.3305,
+    "nearest_baseline": "exp_batch_task_manager_natural"
   },
   {
     "total_tokens": 11296,
@@ -7878,7 +8367,9 @@
     "report_name": "exp_iccce3rh",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": false,
+    "reasoning_distance": null
   },
   {
     "total_tokens": 155978,
@@ -7931,7 +8422,11 @@
     "report_name": "exp_icd406w9",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 4,
+    "reasoning_distance": 0.1324,
+    "nearest_baseline": "exp_batch_mint_financial_natural"
   },
   {
     "total_tokens": 231383,
@@ -7990,7 +8485,11 @@
     "report_name": "exp_icyyq90k",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 16,
+    "reasoning_distance": 0.08,
+    "nearest_baseline": "exp_batch_twitter_timeline_natural"
   },
   {
     "total_tokens": 84728,
@@ -8036,7 +8535,11 @@
     "report_name": "exp_iedauets",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 9,
+    "reasoning_distance": 0.1107,
+    "nearest_baseline": "exp_batch_twitter_timeline_natural"
   },
   {
     "total_tokens": 194620,
@@ -8089,7 +8592,11 @@
     "report_name": "exp_ih5ct7z5",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 12,
+    "reasoning_distance": 0.1212,
+    "nearest_baseline": "exp_batch_twitter_timeline_natural"
   },
   {
     "total_tokens": 227909,
@@ -8156,7 +8663,11 @@
     "report_name": "exp_ikhirync",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 15,
+    "reasoning_distance": 0.0644,
+    "nearest_baseline": "exp_batch_twitter_timeline_natural"
   },
   {
     "total_tokens": 255967,
@@ -8212,7 +8723,9 @@
     "report_name": "exp_iwqmgxf0",
     "detected_model": "openai/gpt-5.6-terra",
     "detected_operator": "perturbed",
-    "task_type": "inject_competing_goal"
+    "task_type": "inject_competing_goal",
+    "reasoning_embedding_available": false,
+    "reasoning_distance": null
   },
   {
     "total_tokens": 117625,
@@ -8260,7 +8773,9 @@
     "report_name": "exp_j3ze0rh7",
     "detected_model": "openai/gpt-5.6-sol",
     "detected_operator": "perturbed",
-    "task_type": "inject_alien_vocab"
+    "task_type": "inject_alien_vocab",
+    "reasoning_embedding_available": false,
+    "reasoning_distance": null
   },
   {
     "total_tokens": 228436,
@@ -8313,7 +8828,9 @@
     "report_name": "exp_j5j50mlh",
     "detected_model": "openai/gpt-5.6-sol",
     "detected_operator": "perturbed",
-    "task_type": "remove_critical_constraint"
+    "task_type": "remove_critical_constraint",
+    "reasoning_embedding_available": false,
+    "reasoning_distance": null
   },
   {
     "total_tokens": 105616,
@@ -8365,7 +8882,11 @@
     "report_name": "exp_j5rhhp06",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 11,
+    "reasoning_distance": 0.1076,
+    "nearest_baseline": "exp_batch_task_manager_natural"
   },
   {
     "total_tokens": 223141,
@@ -8414,7 +8935,11 @@
     "report_name": "exp_jcrbm3rt",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 2,
+    "reasoning_distance": 0.1678,
+    "nearest_baseline": "exp_batch_mint_financial_natural"
   },
   {
     "total_tokens": 520649,
@@ -8482,7 +9007,9 @@
     "report_name": "exp_jgikdggu",
     "detected_model": "deepseek/deepseek-v4-pro",
     "detected_operator": "perturbed",
-    "task_type": "inject_alien_vocab"
+    "task_type": "inject_alien_vocab",
+    "reasoning_embedding_available": false,
+    "reasoning_distance": null
   },
   {
     "total_tokens": 0,
@@ -8509,7 +9036,9 @@
     "report_name": "exp_k40fbca6",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": false,
+    "reasoning_distance": null
   },
   {
     "total_tokens": 35134,
@@ -8552,7 +9081,11 @@
     "report_name": "exp_k443ygtb",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 7,
+    "reasoning_distance": 0.1975,
+    "nearest_baseline": "exp_batch_task_manager_natural"
   },
   {
     "total_tokens": 140120,
@@ -8608,7 +9141,11 @@
     "report_name": "exp_kg2a1_b0",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 13,
+    "reasoning_distance": 0.0997,
+    "nearest_baseline": "exp_batch_twitter_timeline_natural"
   },
   {
     "total_tokens": 75529,
@@ -8659,7 +9196,11 @@
     "report_name": "exp_kh2siwsa",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 8,
+    "reasoning_distance": 0.1146,
+    "nearest_baseline": "exp_batch_twitter_timeline_natural"
   },
   {
     "total_tokens": 193909,
@@ -8716,7 +9257,9 @@
     "report_name": "exp_knt09sid",
     "detected_model": "openai/gpt-5.6-luna",
     "detected_operator": "perturbed",
-    "task_type": "invert_constraint"
+    "task_type": "invert_constraint",
+    "reasoning_embedding_available": false,
+    "reasoning_distance": null
   },
   {
     "total_tokens": 94714,
@@ -8763,7 +9306,11 @@
     "report_name": "exp_kpkjjdv3",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 8,
+    "reasoning_distance": 0.1722,
+    "nearest_baseline": "exp_batch_fastapi_maintenance_natural"
   },
   {
     "total_tokens": 103601,
@@ -8806,7 +9353,9 @@
     "report_name": "exp_kqqzaabe",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": false,
+    "reasoning_distance": null
   },
   {
     "total_tokens": 11314,
@@ -8833,7 +9382,11 @@
     "report_name": "exp_kr8u4k9e",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 1,
+    "reasoning_distance": 0.4339,
+    "nearest_baseline": "exp_batch_mint_financial_natural"
   },
   {
     "total_tokens": 167272,
@@ -8885,7 +9438,11 @@
     "report_name": "exp_kt9lwfj8",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 2,
+    "reasoning_distance": 0.3315,
+    "nearest_baseline": "exp_batch_twitter_timeline_natural"
   },
   {
     "total_tokens": 372913,
@@ -8947,7 +9504,9 @@
     "report_name": "exp_kto6q4mt",
     "detected_model": "deepseek/deepseek-v4-flash",
     "detected_operator": "baseline",
-    "task_type": "url"
+    "task_type": "url",
+    "reasoning_embedding_available": false,
+    "reasoning_distance": null
   },
   {
     "total_tokens": 149329,
@@ -8995,7 +9554,11 @@
     "report_name": "exp_l05r7o3a",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 26,
+    "reasoning_distance": 0.1762,
+    "nearest_baseline": "exp_batch_task_manager_natural"
   },
   {
     "total_tokens": 0,
@@ -9022,7 +9585,9 @@
     "report_name": "exp_l6jq0rd1",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": false,
+    "reasoning_distance": null
   },
   {
     "total_tokens": 493159,
@@ -9086,7 +9651,9 @@
     "report_name": "exp_la5hts12",
     "detected_model": "deepseek/deepseek-v4-flash",
     "detected_operator": "perturbed",
-    "task_type": "inject_alien_vocab"
+    "task_type": "inject_alien_vocab",
+    "reasoning_embedding_available": false,
+    "reasoning_distance": null
   },
   {
     "total_tokens": 152107,
@@ -9131,7 +9698,9 @@
     "report_name": "exp_lfx8xnoq",
     "detected_model": "deepseek/deepseek-v4-pro",
     "detected_operator": "perturbed",
-    "task_type": "force_abandonment"
+    "task_type": "force_abandonment",
+    "reasoning_embedding_available": false,
+    "reasoning_distance": null
   },
   {
     "total_tokens": 271146,
@@ -9190,7 +9759,11 @@
     "report_name": "exp_lk5zq3vn",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 4,
+    "reasoning_distance": 0.1688,
+    "nearest_baseline": "exp_batch_mint_financial_natural"
   },
   {
     "total_tokens": 71615,
@@ -9233,7 +9806,11 @@
     "report_name": "exp_lw9zhue9",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 8,
+    "reasoning_distance": 0.1932,
+    "nearest_baseline": "exp_swp_DeepSeek_fp"
   },
   {
     "total_tokens": 235316,
@@ -9308,7 +9885,11 @@
     "report_name": "exp_m3c9h6l0",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 17,
+    "reasoning_distance": 0.0686,
+    "nearest_baseline": "exp_batch_task_manager_natural"
   },
   {
     "total_tokens": 87377,
@@ -9353,7 +9934,11 @@
     "report_name": "exp_m3di3pys",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 9,
+    "reasoning_distance": 0.0968,
+    "nearest_baseline": "exp_batch_task_manager_natural"
   },
   {
     "total_tokens": 6600,
@@ -9387,7 +9972,11 @@
     "report_name": "exp_mbijryn4",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 1,
+    "reasoning_distance": 0.2903,
+    "nearest_baseline": "exp_batch_task_manager_natural"
   },
   {
     "total_tokens": 375480,
@@ -9449,7 +10038,11 @@
     "report_name": "exp_mho8njwt",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 15,
+    "reasoning_distance": 0.062,
+    "nearest_baseline": "exp_batch_task_manager_natural"
   },
   {
     "total_tokens": 185763,
@@ -9516,7 +10109,11 @@
     "report_name": "exp_mmp26p5c",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 15,
+    "reasoning_distance": 0.0747,
+    "nearest_baseline": "exp_batch_twitter_timeline_natural"
   },
   {
     "total_tokens": 110199,
@@ -9565,7 +10162,11 @@
     "report_name": "exp_mn5mnvtw",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 11,
+    "reasoning_distance": 0.1255,
+    "nearest_baseline": "exp_batch_mint_financial_natural"
   },
   {
     "total_tokens": 107698,
@@ -9614,7 +10215,9 @@
     "report_name": "exp_mniayfq9",
     "detected_model": "openai/gpt-5.6-sol",
     "detected_operator": "perturbed",
-    "task_type": "invert_constraint"
+    "task_type": "invert_constraint",
+    "reasoning_embedding_available": false,
+    "reasoning_distance": null
   },
   {
     "total_tokens": 252708,
@@ -9670,7 +10273,11 @@
     "report_name": "exp_mp0le40h",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 17,
+    "reasoning_distance": 0.0754,
+    "nearest_baseline": "exp_batch_twitter_timeline_natural"
   },
   {
     "total_tokens": 12970,
@@ -9697,7 +10304,11 @@
     "report_name": "exp_mz5y0vdz",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 1,
+    "reasoning_distance": 0.3563,
+    "nearest_baseline": "exp_swp_DeepSeek_fp"
   },
   {
     "total_tokens": 130500,
@@ -9758,7 +10369,9 @@
     "report_name": "exp_n7psw3ue",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": false,
+    "reasoning_distance": null
   },
   {
     "total_tokens": 85270,
@@ -9808,7 +10421,11 @@
     "report_name": "exp_nbqsk827",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 9,
+    "reasoning_distance": 0.134,
+    "nearest_baseline": "exp_batch_twitter_timeline_natural"
   },
   {
     "total_tokens": 14399,
@@ -9835,7 +10452,9 @@
     "report_name": "exp_nelwyyzc",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": false,
+    "reasoning_distance": null
   },
   {
     "total_tokens": 77555,
@@ -9876,7 +10495,11 @@
     "report_name": "exp_ner1874a",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 6,
+    "reasoning_distance": 0.2048,
+    "nearest_baseline": "exp_swp_DeepSeek_fp"
   },
   {
     "total_tokens": 7813,
@@ -9903,7 +10526,11 @@
     "report_name": "exp_njr4tmez",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 2,
+    "reasoning_distance": 0.3702,
+    "nearest_baseline": "exp_batch_twitter_timeline_natural"
   },
   {
     "total_tokens": 227151,
@@ -9957,7 +10584,11 @@
     "report_name": "exp_nlme9vjk",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 19,
+    "reasoning_distance": 0.0909,
+    "nearest_baseline": "exp_batch_twitter_timeline_natural"
   },
   {
     "total_tokens": 136748,
@@ -10016,7 +10647,11 @@
     "report_name": "exp_nvn1kdwj",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 11,
+    "reasoning_distance": 0.0884,
+    "nearest_baseline": "exp_batch_task_manager_natural"
   },
   {
     "total_tokens": 123530,
@@ -10072,7 +10707,11 @@
     "report_name": "exp_nxb87bod",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 8,
+    "reasoning_distance": 0.1817,
+    "nearest_baseline": "exp_batch_task_manager_natural"
   },
   {
     "total_tokens": 159714,
@@ -10121,7 +10760,11 @@
     "report_name": "exp_ot4ttmtr",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 13,
+    "reasoning_distance": 0.081,
+    "nearest_baseline": "exp_batch_twitter_timeline_natural"
   },
   {
     "total_tokens": 183100,
@@ -10171,7 +10814,11 @@
     "report_name": "exp_ovy9g9b5",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 2,
+    "reasoning_distance": 0.2077,
+    "nearest_baseline": "exp_batch_task_manager_natural"
   },
   {
     "total_tokens": 117206,
@@ -10215,7 +10862,11 @@
     "report_name": "exp_owxe4fim",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 12,
+    "reasoning_distance": 0.1981,
+    "nearest_baseline": "exp_batch_fastapi_maintenance_natural"
   },
   {
     "total_tokens": 330324,
@@ -10274,7 +10925,11 @@
     "report_name": "exp_oylan6wf",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 2,
+    "reasoning_distance": 0.2063,
+    "nearest_baseline": "exp_batch_twitter_timeline_natural"
   },
   {
     "total_tokens": 246805,
@@ -10329,7 +10984,11 @@
     "report_name": "exp_p31ut41o",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 18,
+    "reasoning_distance": 0.1223,
+    "nearest_baseline": "exp_batch_twitter_timeline_natural"
   },
   {
     "total_tokens": 113620,
@@ -10381,7 +11040,9 @@
     "report_name": "exp_plz1xajw",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": false,
+    "reasoning_distance": null
   },
   {
     "total_tokens": 395427,
@@ -10443,7 +11104,11 @@
     "report_name": "exp_pqcfk5nr",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 24,
+    "reasoning_distance": 0.1887,
+    "nearest_baseline": "exp_batch_fastapi_maintenance_natural"
   },
   {
     "total_tokens": 270494,
@@ -10499,7 +11164,11 @@
     "report_name": "exp_pqk11z7c",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 1,
+    "reasoning_distance": 0.2508,
+    "nearest_baseline": "exp_batch_mint_financial_natural"
   },
   {
     "total_tokens": 141133,
@@ -10550,7 +11219,11 @@
     "report_name": "exp_pt6mynpf",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 1,
+    "reasoning_distance": 0.2631,
+    "nearest_baseline": "exp_batch_mint_financial_natural"
   },
   {
     "total_tokens": 19684,
@@ -10600,7 +11273,11 @@
     "report_name": "exp_pyo2sck7",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 8,
+    "reasoning_distance": 0.2097,
+    "nearest_baseline": "exp_batch_fastapi_maintenance_natural"
   },
   {
     "total_tokens": 11480,
@@ -10627,7 +11304,9 @@
     "report_name": "exp_q4k0walj",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": false,
+    "reasoning_distance": null
   },
   {
     "total_tokens": 0,
@@ -10654,7 +11333,9 @@
     "report_name": "exp_q4woj79t",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": false,
+    "reasoning_distance": null
   },
   {
     "total_tokens": 322173,
@@ -10712,7 +11393,11 @@
     "report_name": "exp_q8yr7jw4",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 3,
+    "reasoning_distance": 0.1702,
+    "nearest_baseline": "exp_batch_mint_financial_natural"
   },
   {
     "total_tokens": 123878,
@@ -10762,7 +11447,11 @@
     "report_name": "exp_q9ckxin5",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 3,
+    "reasoning_distance": 0.1455,
+    "nearest_baseline": "exp_batch_mint_financial_natural"
   },
   {
     "total_tokens": 167616,
@@ -10813,7 +11502,9 @@
     "report_name": "exp_qdfsit09",
     "detected_model": "openai/gpt-5.6-luna",
     "detected_operator": "baseline",
-    "task_type": "task_manager"
+    "task_type": "task_manager",
+    "reasoning_embedding_available": false,
+    "reasoning_distance": null
   },
   {
     "total_tokens": 214049,
@@ -10885,7 +11576,11 @@
     "report_name": "exp_qpkpyt0z",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 15,
+    "reasoning_distance": 0.112,
+    "nearest_baseline": "exp_batch_twitter_timeline_natural"
   },
   {
     "total_tokens": 263976,
@@ -10942,7 +11637,11 @@
     "report_name": "exp_qqhhxsn1",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 16,
+    "reasoning_distance": 0.0568,
+    "nearest_baseline": "exp_batch_task_manager_natural"
   },
   {
     "total_tokens": 137432,
@@ -10989,7 +11688,9 @@
     "report_name": "exp_qqo8owz4",
     "detected_model": "openai/gpt-5.6-terra",
     "detected_operator": "perturbed",
-    "task_type": "inject_phantom_success"
+    "task_type": "inject_phantom_success",
+    "reasoning_embedding_available": false,
+    "reasoning_distance": null
   },
   {
     "total_tokens": 129944,
@@ -11036,7 +11737,11 @@
     "report_name": "exp_qtjyfkab",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 11,
+    "reasoning_distance": 0.0962,
+    "nearest_baseline": "exp_batch_task_manager_natural"
   },
   {
     "total_tokens": 120443,
@@ -11086,7 +11791,11 @@
     "report_name": "exp_qu6tc1zc",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 2,
+    "reasoning_distance": 0.1984,
+    "nearest_baseline": "exp_batch_mint_financial_natural"
   },
   {
     "total_tokens": 174328,
@@ -11160,7 +11869,11 @@
     "report_name": "exp_quas142w",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 14,
+    "reasoning_distance": 0.0821,
+    "nearest_baseline": "exp_batch_twitter_timeline_natural"
   },
   {
     "total_tokens": 71038,
@@ -11205,7 +11918,9 @@
     "report_name": "exp_rcgqarrf",
     "detected_model": "openai/gpt-5.6-sol",
     "detected_operator": "perturbed",
-    "task_type": "force_abandonment"
+    "task_type": "force_abandonment",
+    "reasoning_embedding_available": false,
+    "reasoning_distance": null
   },
   {
     "total_tokens": 0,
@@ -11232,7 +11947,9 @@
     "report_name": "exp_rg56187q",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": false,
+    "reasoning_distance": null
   },
   {
     "total_tokens": 166768,
@@ -11305,7 +12022,11 @@
     "report_name": "exp_rkpaq3gp",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 12,
+    "reasoning_distance": 0.0677,
+    "nearest_baseline": "exp_batch_twitter_timeline_natural"
   },
   {
     "total_tokens": 177035,
@@ -11350,7 +12071,11 @@
     "report_name": "exp_rt6ocba2",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 17,
+    "reasoning_distance": 0.1894,
+    "nearest_baseline": "exp_batch_fastapi_maintenance_natural"
   },
   {
     "total_tokens": 275891,
@@ -11423,7 +12148,11 @@
     "report_name": "exp_ru1v2479",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 17,
+    "reasoning_distance": 0.0928,
+    "nearest_baseline": "exp_batch_twitter_timeline_natural"
   },
   {
     "total_tokens": 386740,
@@ -11481,7 +12210,11 @@
     "report_name": "exp_rz0gn48h",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 24,
+    "reasoning_distance": 0.0672,
+    "nearest_baseline": "exp_batch_task_manager_natural"
   },
   {
     "total_tokens": 6410,
@@ -11508,7 +12241,11 @@
     "report_name": "exp_s3c_4qka",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 1,
+    "reasoning_distance": 0.4339,
+    "nearest_baseline": "exp_batch_mint_financial_natural"
   },
   {
     "total_tokens": 7791,
@@ -11535,7 +12272,11 @@
     "report_name": "exp_s5brvk5l",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 1,
+    "reasoning_distance": 0.427,
+    "nearest_baseline": "exp_batch_mint_financial_natural"
   },
   {
     "total_tokens": 379806,
@@ -11597,7 +12338,11 @@
     "report_name": "exp_s73ost4b",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 8,
+    "reasoning_distance": 0.059,
+    "nearest_baseline": "exp_batch_twitter_timeline_natural"
   },
   {
     "total_tokens": 133371,
@@ -11650,7 +12395,11 @@
     "report_name": "exp_selbvg5r",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 14,
+    "reasoning_distance": 0.1659,
+    "nearest_baseline": "exp_batch_task_manager_natural"
   },
   {
     "total_tokens": 83625,
@@ -11690,7 +12439,11 @@
     "report_name": "exp_siw0dufk",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 8,
+    "reasoning_distance": 0.2178,
+    "nearest_baseline": "exp_batch_task_manager_natural"
   },
   {
     "total_tokens": 61238,
@@ -11731,7 +12484,11 @@
     "report_name": "exp_sweep_gpt_5_6_fb",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 3,
+    "reasoning_distance": 0.2213,
+    "nearest_baseline": "exp_batch_twitter_timeline_natural"
   },
   {
     "total_tokens": 119949,
@@ -11775,7 +12532,11 @@
     "report_name": "exp_sweep_gpt_5_6_fp",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 2,
+    "reasoning_distance": 0.2835,
+    "nearest_baseline": "exp_batch_task_manager_natural"
   },
   {
     "total_tokens": 120788,
@@ -11821,7 +12582,11 @@
     "report_name": "exp_sweep_gpt_5_6_np",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 11,
+    "reasoning_distance": 0.1753,
+    "nearest_baseline": "exp_batch_fastapi_maintenance_natural"
   },
   {
     "total_tokens": 314623,
@@ -11878,7 +12643,11 @@
     "report_name": "exp_sweep_gpt_5_mini_fb",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 16,
+    "reasoning_distance": 0.1666,
+    "nearest_baseline": "exp_batch_fastapi_maintenance_natural"
   },
   {
     "total_tokens": 332675,
@@ -11938,7 +12707,11 @@
     "report_name": "exp_sweep_gpt_5_mini_fp",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 16,
+    "reasoning_distance": 0.1688,
+    "nearest_baseline": "exp_batch_fastapi_maintenance_natural"
   },
   {
     "total_tokens": 779156,
@@ -12011,7 +12784,11 @@
     "report_name": "exp_sweep_gpt_5_mini_nb",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 28,
+    "reasoning_distance": 0.1756,
+    "nearest_baseline": "exp_batch_fastapi_maintenance_natural"
   },
   {
     "total_tokens": 263052,
@@ -12064,7 +12841,11 @@
     "report_name": "exp_sweep_gpt_5_mini_np",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 14,
+    "reasoning_distance": 0.1582,
+    "nearest_baseline": "exp_batch_task_manager_natural"
   },
   {
     "total_tokens": 11968,
@@ -12103,7 +12884,9 @@
     "report_name": "exp_swp_Claude_F_fb",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": false,
+    "reasoning_distance": null
   },
   {
     "total_tokens": 64052,
@@ -12149,7 +12932,11 @@
     "report_name": "exp_swp_Claude_F_fp",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 1,
+    "reasoning_distance": 0.3587,
+    "nearest_baseline": "exp_batch_task_manager_natural"
   },
   {
     "total_tokens": 37556,
@@ -12188,7 +12975,11 @@
     "report_name": "exp_swp_Claude_F_nb",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 1,
+    "reasoning_distance": 0.2939,
+    "nearest_baseline": "exp_batch_mint_financial_natural"
   },
   {
     "total_tokens": 36643,
@@ -12228,7 +13019,11 @@
     "report_name": "exp_swp_Claude_F_np",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 2,
+    "reasoning_distance": 0.2106,
+    "nearest_baseline": "exp_batch_task_manager_natural"
   },
   {
     "total_tokens": 0,
@@ -12255,7 +13050,9 @@
     "report_name": "exp_swp_DeepSeek_fb",
     "detected_model": "deepseek/deepseek-v4-pro",
     "detected_operator": "baseline",
-    "task_type": "baseline"
+    "task_type": "baseline",
+    "reasoning_embedding_available": false,
+    "reasoning_distance": null
   },
   {
     "total_tokens": 8225,
@@ -12291,7 +13088,10 @@
     "report_name": "exp_swp_DeepSeek_fp",
     "detected_model": "deepseek/deepseek-v4-pro",
     "detected_operator": "baseline",
-    "task_type": "perturbed"
+    "task_type": "perturbed",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 1,
+    "reasoning_distance": 0.0
   },
   {
     "total_tokens": 0,
@@ -12318,7 +13118,9 @@
     "report_name": "exp_swp_DeepSeek_nb",
     "detected_model": "deepseek/deepseek-v4-pro",
     "detected_operator": "baseline",
-    "task_type": "baseline"
+    "task_type": "baseline",
+    "reasoning_embedding_available": false,
+    "reasoning_distance": null
   },
   {
     "total_tokens": 0,
@@ -12345,7 +13147,9 @@
     "report_name": "exp_swp_DeepSeek_np",
     "detected_model": "deepseek/deepseek-v4-pro",
     "detected_operator": "baseline",
-    "task_type": "perturbed"
+    "task_type": "perturbed",
+    "reasoning_embedding_available": false,
+    "reasoning_distance": null
   },
   {
     "total_tokens": 0,
@@ -12372,7 +13176,9 @@
     "report_name": "exp_swp_GPT_5_6_fb",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": false,
+    "reasoning_distance": null
   },
   {
     "total_tokens": 0,
@@ -12399,7 +13205,9 @@
     "report_name": "exp_swp_GPT_5_6_fp",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": false,
+    "reasoning_distance": null
   },
   {
     "total_tokens": 0,
@@ -12426,7 +13234,9 @@
     "report_name": "exp_swp_GPT_5_6_nb",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": false,
+    "reasoning_distance": null
   },
   {
     "total_tokens": 0,
@@ -12453,7 +13263,9 @@
     "report_name": "exp_swp_GPT_5_6_np",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": false,
+    "reasoning_distance": null
   },
   {
     "total_tokens": 160008,
@@ -12502,7 +13314,9 @@
     "report_name": "exp_sycx09_a",
     "detected_model": "openai/gpt-5.6-terra",
     "detected_operator": "perturbed",
-    "task_type": "inject_alien_vocab"
+    "task_type": "inject_alien_vocab",
+    "reasoning_embedding_available": false,
+    "reasoning_distance": null
   },
   {
     "total_tokens": 137595,
@@ -12549,7 +13363,9 @@
     "report_name": "exp_t53dgk0j",
     "detected_model": "openai/gpt-5.6-terra",
     "detected_operator": "perturbed",
-    "task_type": "invert_constraint"
+    "task_type": "invert_constraint",
+    "reasoning_embedding_available": false,
+    "reasoning_distance": null
   },
   {
     "total_tokens": 475311,
@@ -12616,7 +13432,9 @@
     "report_name": "exp_t9_uxbcz",
     "detected_model": "deepseek/deepseek-v4-pro",
     "detected_operator": "perturbed",
-    "task_type": "inject_phantom_success"
+    "task_type": "inject_phantom_success",
+    "reasoning_embedding_available": false,
+    "reasoning_distance": null
   },
   {
     "total_tokens": 15762,
@@ -12650,7 +13468,11 @@
     "report_name": "exp_test_cell",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 3,
+    "reasoning_distance": 0.355,
+    "nearest_baseline": "exp_batch_twitter_timeline_natural"
   },
   {
     "total_tokens": 91771,
@@ -12696,7 +13518,11 @@
     "report_name": "exp_tjlvdunl",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 7,
+    "reasoning_distance": 0.1176,
+    "nearest_baseline": "exp_batch_twitter_timeline_natural"
   },
   {
     "total_tokens": 170863,
@@ -12758,7 +13584,11 @@
     "report_name": "exp_tqnuch_d",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 13,
+    "reasoning_distance": 0.0631,
+    "nearest_baseline": "exp_batch_task_manager_natural"
   },
   {
     "total_tokens": 157621,
@@ -12807,7 +13637,11 @@
     "report_name": "exp_trdn7iwn",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 3,
+    "reasoning_distance": 0.1485,
+    "nearest_baseline": "exp_batch_mint_financial_natural"
   },
   {
     "total_tokens": 9682,
@@ -12834,7 +13668,9 @@
     "report_name": "exp_u32m5is3",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": false,
+    "reasoning_distance": null
   },
   {
     "total_tokens": 0,
@@ -12861,7 +13697,9 @@
     "report_name": "exp_u3rb6y74",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": false,
+    "reasoning_distance": null
   },
   {
     "total_tokens": 383586,
@@ -12926,7 +13764,11 @@
     "report_name": "exp_u9zvdibz",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 24,
+    "reasoning_distance": 0.0673,
+    "nearest_baseline": "exp_batch_task_manager_natural"
   },
   {
     "total_tokens": 145328,
@@ -12982,7 +13824,9 @@
     "report_name": "exp_u_utcf0x",
     "detected_model": "openai/gpt-5.6-luna",
     "detected_operator": "perturbed",
-    "task_type": "remove_critical_constraint"
+    "task_type": "remove_critical_constraint",
+    "reasoning_embedding_available": false,
+    "reasoning_distance": null
   },
   {
     "total_tokens": 292545,
@@ -13043,7 +13887,11 @@
     "report_name": "exp_uaqvwo_n",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 12,
+    "reasoning_distance": 0.0876,
+    "nearest_baseline": "exp_batch_task_manager_natural"
   },
   {
     "total_tokens": 663401,
@@ -13114,7 +13962,9 @@
     "report_name": "exp_ubnnbogv",
     "detected_model": "deepseek/deepseek-v4-flash",
     "detected_operator": "perturbed",
-    "task_type": "inject_competing_goal"
+    "task_type": "inject_competing_goal",
+    "reasoning_embedding_available": false,
+    "reasoning_distance": null
   },
   {
     "total_tokens": 19310,
@@ -13148,7 +13998,9 @@
     "report_name": "exp_ubxsfht9",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": false,
+    "reasoning_distance": null
   },
   {
     "total_tokens": 152837,
@@ -13203,7 +14055,11 @@
     "report_name": "exp_uc2lmxka",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 9,
+    "reasoning_distance": 0.1764,
+    "nearest_baseline": "exp_batch_fastapi_maintenance_natural"
   },
   {
     "total_tokens": 151868,
@@ -13250,7 +14106,9 @@
     "report_name": "exp_ue8ftmhw",
     "detected_model": "deepseek/deepseek-v4-flash",
     "detected_operator": "perturbed",
-    "task_type": "inject_alien_vocab"
+    "task_type": "inject_alien_vocab",
+    "reasoning_embedding_available": false,
+    "reasoning_distance": null
   },
   {
     "total_tokens": 47707,
@@ -13291,7 +14149,11 @@
     "report_name": "exp_ue8nk4wv",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 6,
+    "reasoning_distance": 0.117,
+    "nearest_baseline": "exp_batch_task_manager_natural"
   },
   {
     "total_tokens": 303106,
@@ -13346,7 +14208,9 @@
     "report_name": "exp_ug62t91f",
     "detected_model": "deepseek/deepseek-v4-pro",
     "detected_operator": "perturbed",
-    "task_type": "inject_alien_vocab"
+    "task_type": "inject_alien_vocab",
+    "reasoning_embedding_available": false,
+    "reasoning_distance": null
   },
   {
     "total_tokens": 172410,
@@ -13402,7 +14266,11 @@
     "report_name": "exp_uiem8t3d",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 11,
+    "reasoning_distance": 0.1572,
+    "nearest_baseline": "exp_batch_fastapi_maintenance_natural"
   },
   {
     "total_tokens": 129802,
@@ -13442,7 +14310,11 @@
     "report_name": "exp_ujzch41n",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 18,
+    "reasoning_distance": 0.1931,
+    "nearest_baseline": "exp_batch_task_manager_natural"
   },
   {
     "total_tokens": 20638,
@@ -13478,7 +14350,9 @@
     "report_name": "exp_uqt5f9yi",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": false,
+    "reasoning_distance": null
   },
   {
     "total_tokens": 93604,
@@ -13519,7 +14393,11 @@
     "report_name": "exp_usldw7y_",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 1,
+    "reasoning_distance": 0.2754,
+    "nearest_baseline": "exp_batch_task_manager_natural"
   },
   {
     "total_tokens": 120508,
@@ -13565,7 +14443,11 @@
     "report_name": "exp_uzrxy1t2",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 11,
+    "reasoning_distance": 0.1004,
+    "nearest_baseline": "exp_batch_twitter_timeline_natural"
   },
   {
     "total_tokens": 426670,
@@ -13628,7 +14510,11 @@
     "report_name": "exp_v0u6d7t1",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 19,
+    "reasoning_distance": 0.0781,
+    "nearest_baseline": "exp_batch_twitter_timeline_natural"
   },
   {
     "total_tokens": 491170,
@@ -13694,7 +14580,9 @@
     "report_name": "exp_v8957xqb",
     "detected_model": "deepseek/deepseek-v4-pro",
     "detected_operator": "baseline",
-    "task_type": "task_manager"
+    "task_type": "task_manager",
+    "reasoning_embedding_available": false,
+    "reasoning_distance": null
   },
   {
     "total_tokens": 96874,
@@ -13741,7 +14629,11 @@
     "report_name": "exp_vtp26dz3",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 10,
+    "reasoning_distance": 0.1792,
+    "nearest_baseline": "exp_batch_task_manager_natural"
   },
   {
     "total_tokens": 49207,
@@ -13780,7 +14672,9 @@
     "report_name": "exp_vw0msd_3",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": false,
+    "reasoning_distance": null
   },
   {
     "total_tokens": 90694,
@@ -13833,7 +14727,11 @@
     "report_name": "exp_vx4gb129",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 10,
+    "reasoning_distance": 0.0956,
+    "nearest_baseline": "exp_batch_twitter_timeline_natural"
   },
   {
     "total_tokens": 185310,
@@ -13889,7 +14787,9 @@
     "report_name": "exp_w0fiexd7",
     "detected_model": "openai/gpt-5.6-luna",
     "detected_operator": "perturbed",
-    "task_type": "inject_competing_goal"
+    "task_type": "inject_competing_goal",
+    "reasoning_embedding_available": false,
+    "reasoning_distance": null
   },
   {
     "total_tokens": 174034,
@@ -13937,7 +14837,9 @@
     "report_name": "exp_w3h7zigv",
     "detected_model": "deepseek/deepseek-v4-pro",
     "detected_operator": "perturbed",
-    "task_type": "shift_framing"
+    "task_type": "shift_framing",
+    "reasoning_embedding_available": false,
+    "reasoning_distance": null
   },
   {
     "total_tokens": 120362,
@@ -14007,7 +14909,11 @@
     "report_name": "exp_w8ayd_ci",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 10,
+    "reasoning_distance": 0.0796,
+    "nearest_baseline": "exp_batch_task_manager_natural"
   },
   {
     "total_tokens": 225381,
@@ -14067,7 +14973,11 @@
     "report_name": "exp_wa776dmx",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 16,
+    "reasoning_distance": 0.0506,
+    "nearest_baseline": "exp_batch_task_manager_natural"
   },
   {
     "total_tokens": 358205,
@@ -14130,7 +15040,9 @@
     "report_name": "exp_wdek_qaf",
     "detected_model": "deepseek/deepseek-v4-pro",
     "detected_operator": "perturbed",
-    "task_type": "reverse_causality"
+    "task_type": "reverse_causality",
+    "reasoning_embedding_available": false,
+    "reasoning_distance": null
   },
   {
     "total_tokens": 191956,
@@ -14183,7 +15095,9 @@
     "report_name": "exp_wg4vn0zn",
     "detected_model": "openai/gpt-5.6-terra",
     "detected_operator": "baseline",
-    "task_type": "task_manager"
+    "task_type": "task_manager",
+    "reasoning_embedding_available": false,
+    "reasoning_distance": null
   },
   {
     "total_tokens": 286337,
@@ -14236,7 +15150,9 @@
     "report_name": "exp_whigxsgm",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": false,
+    "reasoning_distance": null
   },
   {
     "total_tokens": 179574,
@@ -14293,7 +15209,11 @@
     "report_name": "exp_wkclt_vt",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 12,
+    "reasoning_distance": 0.0749,
+    "nearest_baseline": "exp_batch_twitter_timeline_natural"
   },
   {
     "total_tokens": 190435,
@@ -14363,7 +15283,11 @@
     "report_name": "exp_wmysu1lk",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 14,
+    "reasoning_distance": 0.0704,
+    "nearest_baseline": "exp_batch_twitter_timeline_natural"
   },
   {
     "total_tokens": 249147,
@@ -14434,7 +15358,11 @@
     "report_name": "exp_wo07wfxb",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 17,
+    "reasoning_distance": 0.0632,
+    "nearest_baseline": "exp_batch_twitter_timeline_natural"
   },
   {
     "total_tokens": 90891,
@@ -14481,7 +15409,11 @@
     "report_name": "exp_wo0bkk9m",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 4,
+    "reasoning_distance": 0.1373,
+    "nearest_baseline": "exp_batch_mint_financial_natural"
   },
   {
     "total_tokens": 581420,
@@ -14556,7 +15488,11 @@
     "report_name": "exp_x5tqss1y",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 15,
+    "reasoning_distance": 0.1018,
+    "nearest_baseline": "exp_batch_twitter_timeline_natural"
   },
   {
     "total_tokens": 171845,
@@ -14606,7 +15542,11 @@
     "report_name": "exp_x8g28_k8",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 16,
+    "reasoning_distance": 0.1808,
+    "nearest_baseline": "exp_batch_fastapi_maintenance_natural"
   },
   {
     "total_tokens": 42522,
@@ -14650,7 +15590,11 @@
     "report_name": "exp_xbxssi1k",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 6,
+    "reasoning_distance": 0.2065,
+    "nearest_baseline": "exp_batch_twitter_timeline_natural"
   },
   {
     "total_tokens": 190470,
@@ -14717,7 +15661,11 @@
     "report_name": "exp_xszdrm2e",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 15,
+    "reasoning_distance": 0.0766,
+    "nearest_baseline": "exp_batch_task_manager_natural"
   },
   {
     "total_tokens": 147460,
@@ -14771,7 +15719,9 @@
     "report_name": "exp_y8hkennr",
     "detected_model": "openai/gpt-5.6-luna",
     "detected_operator": "perturbed",
-    "task_type": "inject_alien_vocab"
+    "task_type": "inject_alien_vocab",
+    "reasoning_embedding_available": false,
+    "reasoning_distance": null
   },
   {
     "total_tokens": 300998,
@@ -14830,7 +15780,9 @@
     "report_name": "exp_ygblv0tb",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": false,
+    "reasoning_distance": null
   },
   {
     "total_tokens": 266736,
@@ -14884,7 +15836,11 @@
     "report_name": "exp_yl5gcl6d",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 1,
+    "reasoning_distance": 0.285,
+    "nearest_baseline": "exp_batch_mint_financial_natural"
   },
   {
     "total_tokens": 178497,
@@ -14941,7 +15897,9 @@
     "report_name": "exp_yxs6s0ee",
     "detected_model": "openai/gpt-5.6-luna",
     "detected_operator": "perturbed",
-    "task_type": "inject_phantom_success"
+    "task_type": "inject_phantom_success",
+    "reasoning_embedding_available": false,
+    "reasoning_distance": null
   },
   {
     "total_tokens": 85300,
@@ -14988,7 +15946,11 @@
     "report_name": "exp_z13l8zhz",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 9,
+    "reasoning_distance": 0.131,
+    "nearest_baseline": "exp_batch_twitter_timeline_natural"
   },
   {
     "total_tokens": 84116,
@@ -15033,7 +15995,11 @@
     "report_name": "exp_zbc1mgbx",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 7,
+    "reasoning_distance": 0.1163,
+    "nearest_baseline": "exp_batch_task_manager_natural"
   },
   {
     "total_tokens": 487586,
@@ -15100,7 +16066,11 @@
     "report_name": "exp_ze0y99pc",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 20,
+    "reasoning_distance": 0.0954,
+    "nearest_baseline": "exp_batch_mint_financial_natural"
   },
   {
     "total_tokens": 32846,
@@ -15138,7 +16108,11 @@
     "report_name": "exp_zfgdwu49",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 5,
+    "reasoning_distance": 0.1672,
+    "nearest_baseline": "exp_batch_twitter_timeline_natural"
   },
   {
     "total_tokens": 383912,
@@ -15202,7 +16176,11 @@
     "report_name": "exp_zg0opvwm",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 16,
+    "reasoning_distance": 0.0773,
+    "nearest_baseline": "exp_batch_twitter_timeline_natural"
   },
   {
     "total_tokens": 199577,
@@ -15256,7 +16234,11 @@
     "report_name": "exp_zjb30bfm",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 15,
+    "reasoning_distance": 0.0935,
+    "nearest_baseline": "exp_batch_twitter_timeline_natural"
   },
   {
     "total_tokens": 43956,
@@ -15297,7 +16279,11 @@
     "report_name": "exp_zmwy64er",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 5,
+    "reasoning_distance": 0.079,
+    "nearest_baseline": "exp_batch_social_graph_natural"
   },
   {
     "total_tokens": 323322,
@@ -15351,7 +16337,9 @@
     "report_name": "exp_zpgio1qs",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": false,
+    "reasoning_distance": null
   },
   {
     "total_tokens": 121370,
@@ -15415,7 +16403,11 @@
     "report_name": "exp_zwdvkm4q",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": true,
+    "reasoning_step_count": 12,
+    "reasoning_distance": 0.075,
+    "nearest_baseline": "exp_batch_task_manager_natural"
   },
   {
     "total_tokens": 14155,
@@ -15474,7 +16466,9 @@
     "report_name": "process_perturbation_resample_claude-fable-5_baseline_s0.0",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": false,
+    "reasoning_distance": null
   },
   {
     "total_tokens": 14569,
@@ -15529,7 +16523,9 @@
     "report_name": "process_perturbation_resample_claude-fable-5_force_abandonment_s0.5",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": false,
+    "reasoning_distance": null
   },
   {
     "total_tokens": 15299,
@@ -15576,7 +16572,9 @@
     "report_name": "process_perturbation_resample_claude-fable-5_inject_alien_vocab_s0.5",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": false,
+    "reasoning_distance": null
   },
   {
     "total_tokens": 13035,
@@ -15625,7 +16623,9 @@
     "report_name": "process_perturbation_resample_claude-fable-5_reverse_causality_s0.5",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": false,
+    "reasoning_distance": null
   },
   {
     "total_tokens": 4384,
@@ -15652,7 +16652,9 @@
     "report_name": "process_perturbation_resample_claude-fable-5_shift_framing_s0.5",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": false,
+    "reasoning_distance": null
   },
   {
     "total_tokens": 172047,
@@ -15701,7 +16703,9 @@
     "report_name": "process_perturbation_resample_deepseek-v4-pro_baseline_s0.0",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": false,
+    "reasoning_distance": null
   },
   {
     "total_tokens": 152107,
@@ -15746,7 +16750,9 @@
     "report_name": "process_perturbation_resample_deepseek-v4-pro_force_abandonment_s0.5",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": false,
+    "reasoning_distance": null
   },
   {
     "total_tokens": 303106,
@@ -15801,7 +16807,9 @@
     "report_name": "process_perturbation_resample_deepseek-v4-pro_inject_alien_vocab_s0.5",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": false,
+    "reasoning_distance": null
   },
   {
     "total_tokens": 358205,
@@ -15864,7 +16872,9 @@
     "report_name": "process_perturbation_resample_deepseek-v4-pro_reverse_causality_s0.5",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": false,
+    "reasoning_distance": null
   },
   {
     "total_tokens": 174034,
@@ -15912,7 +16922,9 @@
     "report_name": "process_perturbation_resample_deepseek-v4-pro_shift_framing_s0.5",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": false,
+    "reasoning_distance": null
   },
   {
     "total_tokens": 160807,
@@ -15962,7 +16974,9 @@
     "report_name": "process_perturbation_resample_gpt-5.6-sol_baseline_s0.0",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": false,
+    "reasoning_distance": null
   },
   {
     "total_tokens": 71038,
@@ -16007,7 +17021,9 @@
     "report_name": "process_perturbation_resample_gpt-5.6-sol_force_abandonment_s0.5",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": false,
+    "reasoning_distance": null
   },
   {
     "total_tokens": 117625,
@@ -16055,7 +17071,9 @@
     "report_name": "process_perturbation_resample_gpt-5.6-sol_inject_alien_vocab_s0.5",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": false,
+    "reasoning_distance": null
   },
   {
     "total_tokens": 166157,
@@ -16106,7 +17124,9 @@
     "report_name": "process_perturbation_resample_gpt-5.6-sol_reverse_causality_s0.5",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": false,
+    "reasoning_distance": null
   },
   {
     "total_tokens": 183895,
@@ -16157,7 +17177,9 @@
     "report_name": "process_perturbation_resample_gpt-5.6-sol_shift_framing_s0.5",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": false,
+    "reasoning_distance": null
   },
   {
     "total_tokens": 0,
@@ -16184,7 +17206,9 @@
     "report_name": "process_perturbation_resample_gpt-5.6_baseline_s0.0",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": false,
+    "reasoning_distance": null
   },
   {
     "total_tokens": 0,
@@ -16211,7 +17235,9 @@
     "report_name": "process_perturbation_resample_gpt-5.6_force_abandonment_s0.5",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": false,
+    "reasoning_distance": null
   },
   {
     "total_tokens": 0,
@@ -16238,7 +17264,9 @@
     "report_name": "process_perturbation_resample_gpt-5.6_inject_alien_vocab_s0.5",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": false,
+    "reasoning_distance": null
   },
   {
     "total_tokens": 0,
@@ -16265,7 +17293,9 @@
     "report_name": "process_perturbation_resample_gpt-5.6_reverse_causality_s0.5",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": false,
+    "reasoning_distance": null
   },
   {
     "total_tokens": 0,
@@ -16292,7 +17322,9 @@
     "report_name": "process_perturbation_resample_gpt-5.6_shift_framing_s0.5",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": false,
+    "reasoning_distance": null
   },
   {
     "total_tokens": 0,
@@ -16356,7 +17388,9 @@
     "report_name": "task_manager_claude-haiku-4-5_baseline_s0.0",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": false,
+    "reasoning_distance": null
   },
   {
     "total_tokens": 0,
@@ -16416,7 +17450,9 @@
     "report_name": "task_manager_claude-haiku-4-5_inject_alien_vocab_s0.5",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": false,
+    "reasoning_distance": null
   },
   {
     "total_tokens": 0,
@@ -16478,7 +17514,9 @@
     "report_name": "task_manager_claude-haiku-4-5_inject_competing_goal_s0.5",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": false,
+    "reasoning_distance": null
   },
   {
     "total_tokens": 0,
@@ -16551,7 +17589,9 @@
     "report_name": "task_manager_claude-haiku-4-5_inject_phantom_success_s0.5",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": false,
+    "reasoning_distance": null
   },
   {
     "total_tokens": 0,
@@ -16608,7 +17648,9 @@
     "report_name": "task_manager_claude-haiku-4-5_invert_constraint_s0.5",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": false,
+    "reasoning_distance": null
   },
   {
     "total_tokens": 22980,
@@ -16674,7 +17716,9 @@
     "report_name": "task_manager_claude-haiku-4-5_remove_critical_constraint_s0.5",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": false,
+    "reasoning_distance": null
   },
   {
     "total_tokens": 0,
@@ -16735,7 +17779,9 @@
     "report_name": "task_manager_claude-haiku-4-5_shift_framing_s0.5",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": false,
+    "reasoning_distance": null
   },
   {
     "total_tokens": 0,
@@ -16812,7 +17858,9 @@
     "report_name": "task_manager_claude-sonnet-5_baseline_s0.0",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": false,
+    "reasoning_distance": null
   },
   {
     "total_tokens": 0,
@@ -16908,7 +17956,9 @@
     "report_name": "task_manager_claude-sonnet-5_inject_alien_vocab_s0.5",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": false,
+    "reasoning_distance": null
   },
   {
     "total_tokens": 0,
@@ -17000,7 +18050,9 @@
     "report_name": "task_manager_claude-sonnet-5_inject_competing_goal_s0.5",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": false,
+    "reasoning_distance": null
   },
   {
     "total_tokens": 0,
@@ -17083,7 +18135,9 @@
     "report_name": "task_manager_claude-sonnet-5_inject_phantom_success_s0.5",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": false,
+    "reasoning_distance": null
   },
   {
     "total_tokens": 0,
@@ -17177,7 +18231,9 @@
     "report_name": "task_manager_claude-sonnet-5_invert_constraint_s0.5",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": false,
+    "reasoning_distance": null
   },
   {
     "total_tokens": 20988,
@@ -17268,7 +18324,9 @@
     "report_name": "task_manager_claude-sonnet-5_remove_critical_constraint_s0.5",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": false,
+    "reasoning_distance": null
   },
   {
     "total_tokens": 2413,
@@ -17295,7 +18353,9 @@
     "report_name": "task_manager_claude-sonnet-5_shift_framing_s0.5",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": false,
+    "reasoning_distance": null
   },
   {
     "total_tokens": 972714,
@@ -17371,7 +18431,9 @@
     "report_name": "task_manager_deepseek-v4-flash_baseline_s0.0",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": false,
+    "reasoning_distance": null
   },
   {
     "total_tokens": 493159,
@@ -17435,7 +18497,9 @@
     "report_name": "task_manager_deepseek-v4-flash_inject_alien_vocab_s0.5",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": false,
+    "reasoning_distance": null
   },
   {
     "total_tokens": 663401,
@@ -17506,7 +18570,9 @@
     "report_name": "task_manager_deepseek-v4-flash_inject_competing_goal_s0.5",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": false,
+    "reasoning_distance": null
   },
   {
     "total_tokens": 851521,
@@ -17583,7 +18649,9 @@
     "report_name": "task_manager_deepseek-v4-flash_inject_phantom_success_s0.5",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": false,
+    "reasoning_distance": null
   },
   {
     "total_tokens": 503199,
@@ -17644,7 +18712,9 @@
     "report_name": "task_manager_deepseek-v4-flash_invert_constraint_s0.5",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": false,
+    "reasoning_distance": null
   },
   {
     "total_tokens": 519123,
@@ -17701,7 +18771,9 @@
     "report_name": "task_manager_deepseek-v4-flash_remove_critical_constraint_s0.5",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": false,
+    "reasoning_distance": null
   },
   {
     "total_tokens": 530862,
@@ -17765,7 +18837,9 @@
     "report_name": "task_manager_deepseek-v4-flash_shift_framing_s0.5",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": false,
+    "reasoning_distance": null
   },
   {
     "total_tokens": 491170,
@@ -17831,7 +18905,9 @@
     "report_name": "task_manager_deepseek-v4-pro_baseline_s0.0",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": false,
+    "reasoning_distance": null
   },
   {
     "total_tokens": 520649,
@@ -17899,7 +18975,9 @@
     "report_name": "task_manager_deepseek-v4-pro_inject_alien_vocab_s0.5",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": false,
+    "reasoning_distance": null
   },
   {
     "total_tokens": 553970,
@@ -17960,7 +19038,9 @@
     "report_name": "task_manager_deepseek-v4-pro_inject_competing_goal_s0.5",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": false,
+    "reasoning_distance": null
   },
   {
     "total_tokens": 475311,
@@ -18027,7 +19107,9 @@
     "report_name": "task_manager_deepseek-v4-pro_inject_phantom_success_s0.5",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": false,
+    "reasoning_distance": null
   },
   {
     "total_tokens": 557703,
@@ -18090,7 +19172,9 @@
     "report_name": "task_manager_deepseek-v4-pro_invert_constraint_s0.5",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": false,
+    "reasoning_distance": null
   },
   {
     "total_tokens": 236096,
@@ -18144,7 +19228,9 @@
     "report_name": "task_manager_deepseek-v4-pro_remove_critical_constraint_s0.5",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": false,
+    "reasoning_distance": null
   },
   {
     "total_tokens": 473389,
@@ -18207,7 +19293,9 @@
     "report_name": "task_manager_deepseek-v4-pro_shift_framing_s0.5",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": false,
+    "reasoning_distance": null
   },
   {
     "total_tokens": 167616,
@@ -18258,7 +19346,9 @@
     "report_name": "task_manager_gpt-5.6-luna_baseline_s0.0",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": false,
+    "reasoning_distance": null
   },
   {
     "total_tokens": 147460,
@@ -18312,7 +19402,9 @@
     "report_name": "task_manager_gpt-5.6-luna_inject_alien_vocab_s0.5",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": false,
+    "reasoning_distance": null
   },
   {
     "total_tokens": 185310,
@@ -18368,7 +19460,9 @@
     "report_name": "task_manager_gpt-5.6-luna_inject_competing_goal_s0.5",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": false,
+    "reasoning_distance": null
   },
   {
     "total_tokens": 178497,
@@ -18425,7 +19519,9 @@
     "report_name": "task_manager_gpt-5.6-luna_inject_phantom_success_s0.5",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": false,
+    "reasoning_distance": null
   },
   {
     "total_tokens": 193909,
@@ -18482,7 +19578,9 @@
     "report_name": "task_manager_gpt-5.6-luna_invert_constraint_s0.5",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": false,
+    "reasoning_distance": null
   },
   {
     "total_tokens": 145328,
@@ -18538,7 +19636,9 @@
     "report_name": "task_manager_gpt-5.6-luna_remove_critical_constraint_s0.5",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": false,
+    "reasoning_distance": null
   },
   {
     "total_tokens": 202526,
@@ -18596,7 +19696,9 @@
     "report_name": "task_manager_gpt-5.6-luna_shift_framing_s0.5",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": false,
+    "reasoning_distance": null
   },
   {
     "total_tokens": 151899,
@@ -18645,7 +19747,9 @@
     "report_name": "task_manager_gpt-5.6-sol_baseline_s0.0",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": false,
+    "reasoning_distance": null
   },
   {
     "total_tokens": 66318,
@@ -18692,7 +19796,9 @@
     "report_name": "task_manager_gpt-5.6-sol_inject_alien_vocab_s0.5",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": false,
+    "reasoning_distance": null
   },
   {
     "total_tokens": 118175,
@@ -18739,7 +19845,9 @@
     "report_name": "task_manager_gpt-5.6-sol_inject_competing_goal_s0.5",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": false,
+    "reasoning_distance": null
   },
   {
     "total_tokens": 86493,
@@ -18783,7 +19891,9 @@
     "report_name": "task_manager_gpt-5.6-sol_inject_phantom_success_s0.5",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": false,
+    "reasoning_distance": null
   },
   {
     "total_tokens": 107698,
@@ -18832,7 +19942,9 @@
     "report_name": "task_manager_gpt-5.6-sol_invert_constraint_s0.5",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": false,
+    "reasoning_distance": null
   },
   {
     "total_tokens": 228436,
@@ -18885,7 +19997,9 @@
     "report_name": "task_manager_gpt-5.6-sol_remove_critical_constraint_s0.5",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": false,
+    "reasoning_distance": null
   },
   {
     "total_tokens": 120377,
@@ -18936,7 +20050,9 @@
     "report_name": "task_manager_gpt-5.6-sol_shift_framing_s0.5",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": false,
+    "reasoning_distance": null
   },
   {
     "total_tokens": 191956,
@@ -18989,7 +20105,9 @@
     "report_name": "task_manager_gpt-5.6-terra_baseline_s0.0",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": false,
+    "reasoning_distance": null
   },
   {
     "total_tokens": 160008,
@@ -19038,7 +20156,9 @@
     "report_name": "task_manager_gpt-5.6-terra_inject_alien_vocab_s0.5",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": false,
+    "reasoning_distance": null
   },
   {
     "total_tokens": 255967,
@@ -19094,7 +20214,9 @@
     "report_name": "task_manager_gpt-5.6-terra_inject_competing_goal_s0.5",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": false,
+    "reasoning_distance": null
   },
   {
     "total_tokens": 137432,
@@ -19141,7 +20263,9 @@
     "report_name": "task_manager_gpt-5.6-terra_inject_phantom_success_s0.5",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": false,
+    "reasoning_distance": null
   },
   {
     "total_tokens": 137595,
@@ -19188,7 +20312,9 @@
     "report_name": "task_manager_gpt-5.6-terra_invert_constraint_s0.5",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": false,
+    "reasoning_distance": null
   },
   {
     "total_tokens": 190643,
@@ -19244,7 +20370,9 @@
     "report_name": "task_manager_gpt-5.6-terra_remove_critical_constraint_s0.5",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": false,
+    "reasoning_distance": null
   },
   {
     "total_tokens": 6294,
@@ -19271,7 +20399,9 @@
     "report_name": "task_manager_gpt-5.6-terra_shift_framing_s0.5",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": false,
+    "reasoning_distance": null
   },
   {
     "total_tokens": 323322,
@@ -19325,7 +20455,9 @@
     "report_name": "typescript_ssg_gpt5_baseline_s0",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": false,
+    "reasoning_distance": null
   },
   {
     "total_tokens": 286337,
@@ -19378,7 +20510,9 @@
     "report_name": "typescript_ssg_gpt5_inject_alien_vocab_s0.5",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": false,
+    "reasoning_distance": null
   },
   {
     "total_tokens": 177014,
@@ -19424,7 +20558,9 @@
     "report_name": "typescript_ssg_gpt5_inject_phantom_success_s0.5",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": false,
+    "reasoning_distance": null
   },
   {
     "total_tokens": 344682,
@@ -19481,7 +20617,9 @@
     "report_name": "typescript_ssg_gpt5_invert_constraint_s0.5",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": false,
+    "reasoning_distance": null
   },
   {
     "total_tokens": 322204,
@@ -19534,7 +20672,9 @@
     "report_name": "typescript_ssg_gpt5_remove_critical_constraint_s0.5",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": false,
+    "reasoning_distance": null
   },
   {
     "total_tokens": 9682,
@@ -19561,7 +20701,9 @@
     "report_name": "typescript_ssg_gpt5_shift_framing_s0.5",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": false,
+    "reasoning_distance": null
   },
   {
     "total_tokens": 372913,
@@ -19623,7 +20765,9 @@
     "report_name": "url_shortener_deepseek-v4-flash_baseline_s0",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": false,
+    "reasoning_distance": null
   },
   {
     "total_tokens": 151868,
@@ -19670,6 +20814,8 @@
     "report_name": "url_shortener_deepseek-v4-flash_inject_alien_vocab_s0.5",
     "detected_model": "unknown",
     "detected_operator": "unknown",
-    "task_type": ""
+    "task_type": "",
+    "reasoning_embedding_available": false,
+    "reasoning_distance": null
   }
 ]

@@ -1,0 +1,338 @@
+# docker-compose.ladder.yml — the fleet ladder (proposal §2/§3/§7 slice 1).
+#
+# Three service groups on ONE cell network (`fleet-net`) + the egress proxy (the single
+# internet policy point, D-17). The data plane (queue redis 6380 / chroma 8000 / neo4j 7687 /
+# sonar 9000-9003) is NOT defined here — it lives in the other infrastructure/ compose files
+# and is attached to `fleet-net` BY NAME via `scripts/fleet/attach_data_plane.sh` (the D-17
+# wiring). `finops-redis` (6379) is deliberately NEVER attached: the cells hold no network
+# path to the story-agent sandbox (the two-channel rule made topological).
+#
+# The socket (D-3/D-14) appears in the ORCHESTRATOR tier only — slice 2. The supervisor tier
+# below holds NO socket: its restart authority is the compose policies it owns + the
+# orchestrator as its hands over Redis `fleet:commands` (db1 / 6380).
+#
+# Scale (static pools, D-14):  docker-compose up -d --scale story-worker=4 \
+#                              --scale analysis-worker=4 --scale review-unit=2
+
+version: '3.8'
+
+# ---------------------------------------------------------------------------
+# Shared anchors — the mount contract (D-2) + the canonical env (R1).
+# ---------------------------------------------------------------------------
+x-ladder-env: &ladder-env
+  # By-name reachability (D-17/R-11): the data-plane services resolve by container name on
+  # fleet-net. 127.0.0.1 inside a container is the container itself, never the host.
+  FINOPS_REDIS_HOST: finops-queue
+  # finops-queue publishes 127.0.0.1:6380 -> container 6379 on the HOST; on fleet-net the
+  # ladder reaches it on its INTERNAL port 6379 (finops-redis on host 6379 is never attached
+  # to fleet-net, so the in-network 6379 has no sandbox counterpart — the two-channel rule
+  # holds topologically).
+  FINOPS_REDIS_PORT: "6379"
+  FINOPS_REDIS_DB: "1"
+  FINOPS_KB_DB: "2"
+  # The worktree root mount (host /tmp -> /tmp) is where story/workflow worktrees land. It is
+  # mapped to the SAME absolute path as the host so existing story results (whose ``worktree``
+  # field is a host /tmp/... path) resolve unchanged inside the container — the additive
+  # cut-over (old host workers + new container workers) shares the same path namespace.
+  FINOPS_WORKTREE_ROOT: /tmp
+  # The container auth home == the host user's home, so the claude symlink chain
+  # (~/.local/bin/claude -> ~/.local/share/claude/versions/<v>) resolves unchanged (D-18).
+  HOME: /home/drseuss
+  OPENCODE_BIN: /home/drseuss/.opencode/bin/opencode
+  CLAUDE_BIN: /home/drseuss/.local/bin/claude
+  # RAG retrieval store endpoints (slice 3, D-17 by-name reachability): the two-leg fusion's
+  # dense (chroma 8000) + lexical (neo4j 7687) stores. Consulted only by rag_augment-enabled
+  # workflows (and the kb-* consumers) — inert for the plain worker cells.
+  CHROMA_HOST: chromadb
+  FINOPS_NEO4J_URI: bolt://neo4j:7687
+
+# The four-mount contract (the isolation constant, §3) + the D-2 auth set (D-18), REVISED
+# by the smoke test (2026-08-30 — the five findings): the results OVERLAY at
+# /repo/experiments/results (the worker's relative paths resolve from /repo), the CLI STATE
+# dirs rw + ISOLATED per worker (the host's live opencode.db must never enter a cell — the
+# WAL crash), the CREDENTIAL files ro (the auth.json mounted as a file), the provider
+# config (~/.config) ro, and the workdir /repo on the cell base. Every scope (§5) is a
+# subset of these — nothing outside them is ever mounted.
+x-ladder-mounts: &ladder-mounts
+  - ${FINOPS_WORKTREE_ROOT:-/tmp}:/tmp:rw
+  - ${FINOPS_REPO_DIR:-..}:/repo:ro
+  - ${FINOPS_REPO_DIR:-..}/experiments/results:/repo/experiments/results:rw
+  - ${FINOPS_WORKTREE_ROOT:-/tmp}/opencode_state:/home/drseuss/.local/share/opencode:rw
+  - ${AUTH_HOME:-/home/drseuss}/.local/share/opencode/auth.json:/auth/opencode_auth.json:ro
+  - ${AUTH_HOME:-/home/drseuss}/.local/share/claude:/home/drseuss/.local/share/claude:ro
+  # (the claude binary's symlink target rides here — an isolated claude STATE dir is the
+  # recorded open item: the smoke test proved the binary chain needs this ro mount; the
+  # claude CLI's own write-state isolation is a follow-up for the claude-model cells)
+  - ${AUTH_HOME:-/home/drseuss}/.claude:/home/drseuss/.claude:ro
+  - ${AUTH_HOME:-/home/drseuss}/.config:/home/drseuss/.config:ro
+  - ${AUTH_HOME:-/home/drseuss}/.local/bin:/home/drseuss/.local/bin:ro
+  - ${AUTH_HOME:-/home/drseuss}/.opencode:/home/drseuss/.opencode:ro
+
+# The supervisor tier's mount set (D-13): results rw / repo ro / auth ro + the fleet-logs
+# NAMED volume. NO worktree mount (the supervisor holds no worktree), NO socket.
+x-supervisor-mounts: &supervisor-mounts
+  - ${FINOPS_REPO_DIR:-..}:/repo:ro
+  - ${FINOPS_REPO_DIR:-..}/experiments/results:/repo/experiments/results:rw
+  - ${AUTH_HOME:-/home/drseuss}/.claude:/home/drseuss/.claude:ro
+  - ${AUTH_HOME:-/home/drseuss}/.config:/home/drseuss/.config:ro
+  - ${AUTH_HOME:-/home/drseuss}/.local/bin:/home/drseuss/.local/bin:ro
+  - ${AUTH_HOME:-/home/drseuss}/.opencode:/home/drseuss/.opencode:ro
+  - fleet-logs:/var/log/fleet
+
+x-cell-base: &cell-base
+  image: fleet/base
+  restart: on-failure
+  networks: [fleet-net]
+  working_dir: /repo
+  environment:
+    <<: *ladder-env
+  volumes: *ladder-mounts
+
+x-supervisor-base: &supervisor-base
+  image: fleet/base
+  networks: [fleet-net]
+  environment:
+    <<: *ladder-env
+    FLEET_SKIP_PROBE: "1"         # the supervisor services invoke no CLI
+  volumes: *supervisor-mounts
+
+# The orchestrator tier (slice 2, D-3/D-14/D-16): the cell mount set PLUS the docker socket
+# (ro) — the ONE escalation in the ladder. The socket is gated by the sibling-spawn wrapper
+# (scripts/fleet/spawn_wrapper.py), which validates every spawn against the scope model before
+# the socket call. Env (D-15): the cell env MINUS FINOPS_KB_WRITE — the orchestrator never
+# carries the write flag at the container level; its F-1/F-2/P11 writes authorize in code.
+x-orchestrator-mounts: &orchestrator-mounts
+  - ${FINOPS_WORKTREE_ROOT:-/tmp}:/tmp:rw
+  - ${FINOPS_RESULTS_DIR:-../experiments/results}:/app/experiments/results:rw
+  - ${FINOPS_REPO_DIR:-..}:/repo:ro
+  - ${AUTH_HOME:-/home/drseuss}/.claude:/home/drseuss/.claude:ro
+  - ${AUTH_HOME:-/home/drseuss}/.local/share/opencode:/home/drseuss/.local/share/opencode:ro
+  - ${AUTH_HOME:-/home/drseuss}/.local/bin:/home/drseuss/.local/bin:ro
+  - ${AUTH_HOME:-/home/drseuss}/.local/share/claude:/home/drseuss/.local/share/claude:ro
+  - ${AUTH_HOME:-/home/drseuss}/.opencode/bin:/home/drseuss/.opencode/bin:ro
+  - /var/run/docker.sock:/var/run/docker.sock:ro
+
+x-orchestrator-base: &orchestrator-base
+  image: fleet/orchestrator
+  restart: on-failure
+  networks: [fleet-net]
+  environment:
+    <<: *ladder-env
+  volumes: *orchestrator-mounts
+
+services:
+  # =========================================================================
+  # fleet/cell — one job at a time, per-queue pools, no socket.
+  # =========================================================================
+  story-worker:
+    <<: *cell-base
+    command: ["python3", "scripts/worker.py"]
+    environment:
+      <<: *ladder-env
+      FINOPS_KB_WRITE: "1"        # P1 (story) — a KB writer (story_ingestion)
+    # scale: 4 (declared at `up --scale story-worker=4`)
+
+  analysis-worker:
+    <<: *cell-base
+    command: ["python3", "scripts/analysis_worker.py"]
+    # NO FINOPS_KB_WRITE — the analysis worker is a compute-only consumer.
+    # scale: 4
+
+  review-unit:
+    <<: *cell-base
+    command: ["python3", "scripts/fleet/review_unit.py"]
+    restart: "no"                 # run-to-completion; triggered by the supervisor's trigger-reviews
+    environment:
+      <<: *ladder-env
+      FINOPS_KB_WRITE: "1"        # P3 (review) — review_ingestion
+    # scale: 2
+
+  kb-chroma:
+    <<: *cell-base
+    command: ["python3", "scripts/kb_worker.py", "--group", "kb-chroma-v1"]
+    # NO FINOPS_KB_WRITE — a read-only consumer (G6)
+
+  kb-ledger:
+    <<: *cell-base
+    command: ["python3", "scripts/kb_worker.py", "--group", "kb-ledger-v1"]
+    # NO FINOPS_KB_WRITE — a read-only consumer (G6)
+
+  kb-registry:
+    <<: *cell-base
+    command: ["python3", "scripts/kb_worker.py", "--group", "kb-registry-v1"]
+    environment:
+      <<: *ladder-env
+      # D-11: the kb-registry consumer is the ONE consumer carrying the write env, so the
+      # flag auto-clear's env gate (kb_worker.py:198) AND authorized=True (:212) both pass.
+      FINOPS_KB_WRITE: "1"
+
+  kb-neo4j:
+    <<: *cell-base
+    command: ["python3", "scripts/kb_worker.py", "--group", "kb-neo4j-v1"]
+    # NO FINOPS_KB_WRITE — a read-only consumer (G6); the resurrected leg (slice 3, §6).
+    environment:
+      <<: *ladder-env
+      # The graph client reaches neo4j BY NAME on fleet-net (its internal port 7687, not the
+      # host's localhost); credentials are the data-plane container's own (neo4j/password123).
+      FINOPS_NEO4J_URI: bolt://neo4j:7687
+
+  # The batch producers (run-to-completion; the `batch` profile keeps them out of `up -d`).
+  kb-produce:
+    <<: *cell-base
+    command: ["python3", "scripts/kb_produce.py"]
+    restart: "no"
+    profiles: ["batch"]
+    environment:
+      <<: *ladder-env
+      FINOPS_KB_WRITE: "1"
+
+  kb-produce-sources:
+    <<: *cell-base
+    command: ["python3", "scripts/kb_produce_sources.py"]
+    restart: "no"
+    profiles: ["batch"]
+    environment:
+      <<: *ladder-env
+      FINOPS_KB_WRITE: "1"
+
+  kb-produce-facts:
+    <<: *cell-base
+    command: ["python3", "scripts/kb_produce_facts.py"]
+    restart: "no"
+    profiles: ["batch"]
+    environment:
+      <<: *ladder-env
+      FINOPS_KB_WRITE: "1"
+
+  kb-produce-campaign-evidence:
+    <<: *cell-base
+    command: ["python3", "scripts/kb_produce_campaign_evidence.py"]
+    restart: "no"
+    profiles: ["batch"]
+    environment:
+      <<: *ladder-env
+      FINOPS_KB_WRITE: "1"
+
+  run-single:
+    <<: *cell-base
+    # One-shot single runner: `docker-compose run --rm run-single <config.yaml> --model deepseek`
+    command: ["python3", "scripts/run.py"]
+    restart: "no"
+    profiles: ["batch"]
+    environment:
+      <<: *ladder-env
+      FINOPS_KB_WRITE: "1"        # P2 (run) — a KB writer
+
+  supervise:
+    <<: *cell-base
+    command: ["python3", "scripts/supervise.py", "--once"]
+    restart: "no"
+    profiles: ["batch"]
+    environment:
+      <<: *ladder-env
+      FINOPS_KB_WRITE: "1"        # P4 (supervise) — observation/flag ingestion
+
+  orphan-sweep:
+    <<: *cell-base
+    command: ["python3", "scripts/orphan_sweep.py", "--interval", "300"]
+    environment:
+      <<: *ladder-env
+      FINOPS_KB_WRITE: "1"        # P5 (orphan) — orphan ingestion
+
+  # =========================================================================
+  # The egress proxy — the single internet policy point (D-17, §3).
+  # =========================================================================
+  egress:
+    image: fleet/base
+    command: ["python3", "scripts/fleet/egress_proxy.py"]
+    restart: on-failure
+    networks: [fleet-net]
+    environment:
+      FLEET_SKIP_PROBE: "1"       # the proxy invokes no CLI
+      EGRESS_LISTEN_HOST: 0.0.0.0
+      EGRESS_LISTEN_PORT: "8888"
+      EGRESS_ALLOWLIST: "api.deepseek.com,api.anthropic.com,api.openai.com,*.anthropic.com,*.deepseek.com,*.openai.com"
+
+  # =========================================================================
+  # fleet/orchestrator — the campaign wrapper + the workflow runner. The ONE
+  # socket-holder tier (D-3): /var/run/docker.sock ro, gated by the spawn-wrapper.
+  # =========================================================================
+  campaign-wrapper:
+    <<: *orchestrator-base
+    # The campaign wrapper runs a spec's phases as sibling cells (scope-driven, D-16); the
+    # --orchestrator flag switches run_workflow into sibling-spawn mode (spawn_wrapper).
+    command: ["python3", "scripts/run_workflow.py", "--orchestrator"]
+
+  workflow-runner:
+    <<: *orchestrator-base
+    command: ["python3", "scripts/run_workflow.py", "--orchestrator"]
+
+  # =========================================================================
+  # fleet/supervisor — the fleet manager + the portal + the daemons. NO socket
+  # (D-3/D-14), NO FINOPS_KB_WRITE (the master-control boundary).
+  # =========================================================================
+  fleet-manager:
+    <<: *supervisor-base
+    command: ["python3", "scripts/fleet/fleet_manager.py", "watch"]
+    restart: always                 # the ONLY `always` (the supervisor's own liveness)
+
+  control-room:
+    <<: *supervisor-base
+    command: ["python3", "apps/control_room/server.py"]
+    restart: on-failure
+    ports:
+      - "127.0.0.1:8001:8001"       # host loopback only (the operator's dashboard)
+    environment:
+      <<: *ladder-env
+      FLEET_SKIP_PROBE: "1"
+      FINOPS_PORT: "8001"
+      FINOPS_HOST: 0.0.0.0
+
+  game-board:
+    <<: *supervisor-base
+    # The snapshot writes to the writable results mount (the repo + /app are read-only under
+    # the non-root user; the canonical L0 agent_config/system_snapshot.md remains host-generated
+    # by `agentic-dynamics surfaces snapshot`).
+    command: ["python3", "scripts/system_snapshot.py", "--out", "/app/experiments/results/system_snapshot.md"]
+    restart: on-failure
+
+  trigger-reviews:
+    <<: *supervisor-base
+    # D-10: the supervisor never runs review_all itself — --trigger-only enqueues reviews and
+    # signals the cell-tier review-unit over fleet:review_trigger (exactly one review runner).
+    command: ["python3", "scripts/trigger_reviews.py", "--trigger-only"]
+    restart: on-failure
+
+  # Read-only supervisor tools (run-to-completion; the read tools, §1a/§1b).
+  registry-cli:
+    <<: *supervisor-base
+    command: ["python3", "scripts/registry.py"]
+    restart: "no"
+    profiles: ["read-tools"]
+
+  bundle-reference-check:
+    <<: *supervisor-base
+    command: ["python3", "scripts/bundle_artifacts.py"]
+    restart: "no"
+    profiles: ["read-tools"]
+
+  report-tools:
+    <<: *supervisor-base
+    command: ["python3", "scripts/context_snapshot_report.py"]
+    restart: "no"
+    profiles: ["read-tools"]
+
+# ---------------------------------------------------------------------------
+# Networks + volumes.
+# ---------------------------------------------------------------------------
+networks:
+  # `fleet-net` is EXTERNAL (created by `docker network create fleet-net`, or by
+  # scripts/fleet/attach_data_plane.sh) so the network name is exactly `fleet-net` — the
+  # name the D-17 wiring and the slice-4 network-policy guard both reference — rather than a
+  # project-prefixed `<dir>_fleet-net`. The data plane joins it BY NAME; finops-redis (6379)
+  # is never attached.
+  fleet-net:
+    external: true
+
+volumes:
+  fleet-logs:          # the supervisor's log volume (docker-managed, NOT a host path — D-13)

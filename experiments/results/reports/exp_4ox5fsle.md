@@ -2,7 +2,7 @@
 
 **Model:** openai/gpt-5.6-sol  |  **Task:** [reverse_causality_s0.5] process_perturbation_resample...
 **Operator:** perturbed (process_perturbation, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-27T20:33:42
+**Repetitions:** 1  |  **Timestamp:** 2026-08-30T18:48:20
 
 ---
 
@@ -35,12 +35,12 @@
 | Metric | Value |
 |--------|-------|
 | Correctness | 100% (0/0 tests) [H] |
-| Constraint satisfaction [H] | 43% (3/7 constraints) |
+| Constraint satisfaction [H] | 29% (2/7 constraints) |
 | Lines of code [M] | 415 |
 | Cyclomatic complexity [C] | 44.0 |
 | Code quality [H] | 0.241 |
 | Novelty vs baseline [H] | 0.500 |
-| **Composite [H]** | **0.602** |
+| **Composite [H]** | **0.559** |
 
 ---
 
@@ -63,7 +63,7 @@
 | **Total energy [X]** | **~3598 J** |
 | Solution density [C] | 0.014340 LOC/tok |
 | Correctness/$ [C] | 3 |
-| Quality/J [C] | 0.000167 |
+| Quality/J [C] | 0.000155 |
 
 ---
 

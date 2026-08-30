@@ -36,6 +36,91 @@ METRIC_OVERS = frozenset({"outcome", "attempt", "job", "cell"})
 ADAPT_STRATEGIES = frozenset({"coordinate_descent", "manual"})
 ADAPT_SELECTIONS = frozenset({"highest_uncertainty", "highest_regret", "largest_effect"})
 
+# ── The per-step scope model (D-16, proposal §5) ─────────────────────────────
+#
+# Every workflow phase MAY declare a ``scope:`` from a CLOSED five-scope vocabulary. Each
+# scope resolves to a declared config (``results_mode`` / ``network`` / ``write_flag`` /
+# ``capabilities``); the orchestrator's spawn-wrapper (``scripts/fleet/spawn_wrapper.py``)
+# validates a spawn request against it BEFORE the docker socket call — a phase requesting an
+# undeclared or unauthorized scope fails at validation, never at the socket (the isolation
+# story's runtime half). Every scope's mounts stay a subset of the four-mount contract + the
+# D-2 auth set (``results_mode`` is the only mount that varies, ro vs rw).
+
+#: The closed five-scope vocabulary (proposal §5, D-16) — no others exist; a phase declaring
+#: an undeclared scope is a validation error.
+SCOPE_VOCABULARY: frozenset[str] = frozenset(
+    {
+        "research_readonly",
+        "implementation",
+        "review_readonly",
+        "proposal_write",
+        "adversarial_readonly",
+    }
+)
+
+#: The declared config per scope (proposal §5 table, made machine-readable). ``results_mode``
+#: is ro/rw over the results mount; ``network`` is the scope's allowed attachment (always
+#: ``fleet-net`` — the cell net carries the retrieval stores + queue redis + sonar + egress);
+#: ``write_flag`` says whether ``FINOPS_KB_WRITE=1`` MAY appear in the scope's env (only the
+#: ``implementation`` scope, and only when the phase emits P1-P11); ``capabilities`` is the
+#: descriptive closed what-it-may-do list.
+SCOPE_CONFIGS: dict[str, dict[str, Any]] = {
+    "research_readonly": {
+        "results_mode": "ro",
+        "network": "fleet-net",
+        "write_flag": False,
+        "capabilities": ("kb_read",),
+    },
+    "implementation": {
+        "results_mode": "rw",
+        "network": "fleet-net",
+        "write_flag": True,
+        "capabilities": ("run_code", "git_commit", "emit_findings"),
+    },
+    "review_readonly": {
+        "results_mode": "rw",
+        "network": "fleet-net",
+        "write_flag": False,
+        "capabilities": ("read_artifacts", "emit_review_records"),
+    },
+    "proposal_write": {
+        "results_mode": "rw",
+        "network": "fleet-net",
+        "write_flag": False,
+        "capabilities": ("assemble_docs", "git_commit"),
+    },
+    "adversarial_readonly": {
+        "results_mode": "ro",
+        "network": "fleet-net",
+        "write_flag": False,
+        "capabilities": ("read_only_attack",),
+    },
+}
+
+#: The phase → scope authorization table (proposal §5's example, plus the implementation
+#: workflow's own phases). A phase's DECLARED ``scope:`` in the spec wins over this table;
+#: the table is the fallback the spawn-wrapper checks when the spec does not declare one. The
+#: proposal's own ``fleet_ladder_plan`` phases (p1_research_infra/p2_research_kb_access →
+#: research_readonly, p3_review → review_readonly, p4_proposal → proposal_write,
+#: p5_adversarial → adversarial_readonly; the execution slices → implementation) are the
+#: worked example the proposal cites.
+PHASE_SCOPE_AUTHORIZATION: dict[str, str] = {
+    "p1_research_infra": "research_readonly",
+    "p2_research_kb_access": "research_readonly",
+    "p3_review": "review_readonly",
+    "p4_proposal": "proposal_write",
+    "p5_adversarial": "adversarial_readonly",
+    # the implementation workflow's own phases (the running example)
+    "p0_pin_mandate": "proposal_write",
+    "p1_slice1_base_supervisor": "implementation",
+    "p2_slice1_workers_live": "implementation",
+    "p3_slice2_orchestrator": "implementation",
+    "p4_slice3_neo4j": "implementation",
+    "p5_slice4_guards": "implementation",
+    "p6_adversarial": "adversarial_readonly",
+    "p7_smoke_handoff": "proposal_write",
+}
+
 # ── Artifact identity (refactor-repair P1-3) ─────────────────────
 #
 # Identity used to be guessed from the question text (a substring classifier) — fragile and
@@ -621,6 +706,26 @@ def load_spec(path: Path) -> ExperimentSpec:
     return ExperimentSpec.from_yaml(Path(path))
 
 
+def phase_scope(phase: dict[str, Any], *, phase_name: str | None = None) -> str | None:
+    """Resolve a phase's authorized scope: its declared ``scope:``, else the authorization table.
+
+    The resolution order is the spawn-wrapper's step-2 check in reverse: a phase's DECLARED
+    ``scope:`` in the spec wins; when absent, :data:`PHASE_SCOPE_AUTHORIZATION` (the proposal's
+    phase→scope example table) supplies the fallback. Returns ``None`` when neither is present —
+    the spawn-wrapper then refuses the spawn at its step 2 (no phase is authorized for an
+    undeclared scope by default; an authorization must exist, not be assumed).
+    """
+    declared = phase.get("scope") if isinstance(phase, dict) else None
+    if declared in SCOPE_VOCABULARY:
+        return declared
+    name = phase_name or (phase.get("name") if isinstance(phase, dict) else None)
+    if name:
+        table_scope = PHASE_SCOPE_AUTHORIZATION.get(name)
+        if table_scope in SCOPE_VOCABULARY:
+            return table_scope
+    return None
+
+
 # ── The validator (the load-bearing gate) ───────────────────────
 
 
@@ -860,6 +965,22 @@ def validate_spec(
             errors.append(
                 f'phase "{ph.get("name", "?")}": checkpoint must be a boolean '
                 f"(got {ph.get('checkpoint')!r})"
+            )
+
+    # ── Phase-level gate: ``scope`` (D-16, proposal §5) ──────────────────
+    # Optional per-phase scope from the closed five-scope vocabulary. A phase's declared scope
+    # must be a real vocabulary member — a typo'd string is a scope the spawn-wrapper can never
+    # authorize (its step-1 membership check fails), so catch it at spec load time instead of
+    # leaving it to fail at spawn time. Membership only: the phase→scope *authorization* is the
+    # spawn-wrapper's step-2 check (a phase may declare any vocabulary member; whether it is
+    # *authorized* for it is what the spawn request's phase+scope pair is validated against).
+    for ph in spec.workflow.params.get("phases") or []:
+        if not isinstance(ph, dict):
+            continue
+        if "scope" in ph and ph.get("scope") not in SCOPE_VOCABULARY:
+            errors.append(
+                f'phase "{ph.get("name", "?")}": scope {ph.get("scope")!r} is not one of '
+                f"{sorted(SCOPE_VOCABULARY)}"
             )
 
     # ── Phase-level gate: prose-required safety (review P1) ──────────────────

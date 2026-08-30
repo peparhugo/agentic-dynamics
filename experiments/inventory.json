@@ -1,30 +1,30 @@
 {
-  "generated_at": "2026-08-27T20:33:39.858767+00:00",
+  "generated_at": "2026-08-30T18:48:18.391054+00:00",
   "counts": {
-    "db_sessions_total": 5593,
-    "db_sessions_experiments": 1697,
-    "worktrees_total": 1771,
+    "db_sessions_total": 6333,
+    "db_sessions_experiments": 1819,
+    "worktrees_total": 1837,
     "worktrees_experiments": 222,
-    "worktrees_other": 1549,
-    "result_files": 35,
+    "worktrees_other": 1615,
+    "result_files": 36,
     "config_files": 0
   },
   "costs": {
-    "total_all_sessions": 603.6432,
-    "total_experiment_sessions": 42.0932,
-    "tokens_all_sessions": 574373242,
-    "tokens_experiment_sessions": 86713178
+    "total_all_sessions": 618.9947,
+    "total_experiment_sessions": 43.2001,
+    "tokens_all_sessions": 618047152,
+    "tokens_experiment_sessions": 93173384
   },
   "model_breakdown": {
     "deepseek/deepseek-v4-pro": {
-      "sessions": 376,
-      "cost": 27.848,
-      "tokens": 41521930
+      "sessions": 377,
+      "cost": 27.854,
+      "tokens": 41529055
     },
     "deepseek/deepseek-v4-flash": {
-      "sessions": 652,
-      "cost": 6.5234,
-      "tokens": 24459470
+      "sessions": 733,
+      "cost": 7.6243,
+      "tokens": 29288757
     },
     "anthropic/claude-sonnet-5": {
       "sessions": 10,
@@ -32,14 +32,14 @@
       "tokens": 172925
     },
     "openai/gpt-5.6-luna": {
-      "sessions": 238,
+      "sessions": 268,
       "cost": 3.085,
-      "tokens": 3706790
+      "tokens": 4786123
     },
     "openai/gpt-5.6-sol": {
-      "sessions": 212,
+      "sessions": 222,
       "cost": 0.0,
-      "tokens": 10079759
+      "tokens": 10624220
     },
     "openai/gpt-5.6-terra": {
       "sessions": 209,
@@ -70,6 +70,22 @@
     },
     {
       "file": "experiments/results/cap_2a_p1_verification.json",
+      "experiment": null,
+      "model": null,
+      "num_runs": 0,
+      "total_cost": 0,
+      "operators": []
+    },
+    {
+      "file": "experiments/results/cap_2a_rerun_p1_verification.json",
+      "experiment": null,
+      "model": null,
+      "num_runs": 0,
+      "total_cost": 0,
+      "operators": []
+    },
+    {
+      "file": "experiments/results/cap_2a_rerun_score_20260826T001107Z.json",
       "experiment": null,
       "model": null,
       "num_runs": 0,
@@ -191,10 +207,10 @@
       "num_runs": 5,
       "total_cost": 2.3825,
       "operators": [
-        "force_abandonment",
-        "reverse_causality",
         "inject_alien_vocab",
+        "force_abandonment",
         "baseline",
+        "reverse_causality",
         "shift_framing"
       ]
     },
@@ -205,10 +221,10 @@
       "num_runs": 5,
       "total_cost": 0.0676,
       "operators": [
-        "force_abandonment",
-        "reverse_causality",
         "inject_alien_vocab",
+        "force_abandonment",
         "baseline",
+        "reverse_causality",
         "shift_framing"
       ]
     },
@@ -219,10 +235,10 @@
       "num_runs": 5,
       "total_cost": 2.0064,
       "operators": [
-        "force_abandonment",
-        "reverse_causality",
         "inject_alien_vocab",
+        "force_abandonment",
         "baseline",
+        "reverse_causality",
         "shift_framing"
       ]
     },
@@ -233,10 +249,10 @@
       "num_runs": 5,
       "total_cost": 0,
       "operators": [
-        "force_abandonment",
-        "reverse_causality",
         "inject_alien_vocab",
+        "force_abandonment",
         "baseline",
+        "reverse_causality",
         "shift_framing"
       ]
     },
@@ -255,11 +271,11 @@
       "num_runs": 7,
       "total_cost": 0.3097,
       "operators": [
-        "remove_critical_constraint",
         "inject_alien_vocab",
-        "baseline",
-        "inject_phantom_success",
         "invert_constraint",
+        "remove_critical_constraint",
+        "inject_phantom_success",
+        "baseline",
         "inject_competing_goal",
         "shift_framing"
       ]
@@ -271,11 +287,11 @@
       "num_runs": 7,
       "total_cost": 1.296,
       "operators": [
-        "remove_critical_constraint",
         "inject_alien_vocab",
-        "baseline",
-        "inject_phantom_success",
         "invert_constraint",
+        "remove_critical_constraint",
+        "inject_phantom_success",
+        "baseline",
         "inject_competing_goal",
         "shift_framing"
       ]
@@ -287,11 +303,11 @@
       "num_runs": 7,
       "total_cost": 0.0672,
       "operators": [
-        "remove_critical_constraint",
         "inject_alien_vocab",
-        "baseline",
-        "inject_phantom_success",
         "invert_constraint",
+        "remove_critical_constraint",
+        "inject_phantom_success",
+        "baseline",
         "inject_competing_goal",
         "shift_framing"
       ]
@@ -303,11 +319,11 @@
       "num_runs": 7,
       "total_cost": 0.1357,
       "operators": [
-        "remove_critical_constraint",
         "inject_alien_vocab",
-        "baseline",
-        "inject_phantom_success",
         "invert_constraint",
+        "remove_critical_constraint",
+        "inject_phantom_success",
+        "baseline",
         "inject_competing_goal",
         "shift_framing"
       ]
@@ -319,11 +335,11 @@
       "num_runs": 7,
       "total_cost": 0.1211,
       "operators": [
-        "remove_critical_constraint",
         "inject_alien_vocab",
-        "baseline",
-        "inject_phantom_success",
         "invert_constraint",
+        "remove_critical_constraint",
+        "inject_phantom_success",
+        "baseline",
         "inject_competing_goal",
         "shift_framing"
       ]
@@ -335,11 +351,11 @@
       "num_runs": 7,
       "total_cost": 3.377,
       "operators": [
-        "remove_critical_constraint",
         "inject_alien_vocab",
-        "baseline",
-        "inject_phantom_success",
         "invert_constraint",
+        "remove_critical_constraint",
+        "inject_phantom_success",
+        "baseline",
         "inject_competing_goal",
         "shift_framing"
       ]
@@ -351,11 +367,11 @@
       "num_runs": 7,
       "total_cost": 1.3082,
       "operators": [
-        "remove_critical_constraint",
         "inject_alien_vocab",
-        "baseline",
-        "inject_phantom_success",
         "invert_constraint",
+        "remove_critical_constraint",
+        "inject_phantom_success",
+        "baseline",
         "inject_competing_goal",
         "shift_framing"
       ]
@@ -367,11 +383,11 @@
       "num_runs": 7,
       "total_cost": 0.8173,
       "operators": [
-        "remove_critical_constraint",
         "inject_alien_vocab",
-        "baseline",
-        "inject_phantom_success",
         "invert_constraint",
+        "remove_critical_constraint",
+        "inject_phantom_success",
+        "baseline",
         "inject_competing_goal",
         "shift_framing"
       ]
@@ -383,11 +399,11 @@
       "num_runs": 7,
       "total_cost": 0.0039,
       "operators": [
-        "remove_critical_constraint",
         "inject_alien_vocab",
-        "baseline",
-        "inject_phantom_success",
         "invert_constraint",
+        "remove_critical_constraint",
+        "inject_phantom_success",
+        "baseline",
         "inject_competing_goal",
         "shift_framing"
       ]
@@ -399,11 +415,11 @@
       "num_runs": 7,
       "total_cost": 0.1044,
       "operators": [
-        "remove_critical_constraint",
         "inject_alien_vocab",
-        "baseline",
-        "inject_phantom_success",
         "invert_constraint",
+        "remove_critical_constraint",
+        "inject_phantom_success",
+        "baseline",
         "inject_competing_goal",
         "shift_framing"
       ]
@@ -418,14 +434,6 @@
         "inject_alien_vocab",
         "baseline"
       ]
-    },
-    {
-      "file": "experiments/results/verified_tests.json",
-      "experiment": null,
-      "model": null,
-      "num_runs": 0,
-      "total_cost": 0,
-      "operators": []
     }
   ],
   "configs": [],
@@ -5687,6 +5695,13 @@
       }
     },
     {
+      "path": "/tmp/exp_0irr5qcr",
+      "name": "exp_0irr5qcr",
+      "mtime": "2026-08-27T23:54:07.358546+00:00",
+      "total_files": 0,
+      "py_files": 0
+    },
+    {
       "path": "/tmp/exp_0k414lx6",
       "name": "exp_0k414lx6",
       "mtime": "2026-08-14T19:16:14.238739+00:00",
@@ -5878,6 +5893,13 @@
       "name": "exp_0uh9kn6l",
       "mtime": "2026-08-21T22:35:12.191095+00:00",
       "total_files": 1,
+      "py_files": 0
+    },
+    {
+      "path": "/tmp/exp_0vfru3b7",
+      "name": "exp_0vfru3b7",
+      "mtime": "2026-08-28T15:57:33.515644+00:00",
+      "total_files": 0,
       "py_files": 0
     },
     {
@@ -6578,10 +6600,24 @@
       }
     },
     {
+      "path": "/tmp/exp_281aq5et",
+      "name": "exp_281aq5et",
+      "mtime": "2026-08-29T01:14:35.044686+00:00",
+      "total_files": 0,
+      "py_files": 0
+    },
+    {
       "path": "/tmp/exp_2_b6m50a",
       "name": "exp_2_b6m50a",
       "mtime": "2026-08-14T23:10:30.066269+00:00",
       "total_files": 0,
+      "py_files": 0
+    },
+    {
+      "path": "/tmp/exp_2_cvj4uu",
+      "name": "exp_2_cvj4uu",
+      "mtime": "2026-08-27T23:29:52.470896+00:00",
+      "total_files": 1,
       "py_files": 0
     },
     {
@@ -6904,6 +6940,13 @@
       "py_files": 0
     },
     {
+      "path": "/tmp/exp_2v5ppxe5",
+      "name": "exp_2v5ppxe5",
+      "mtime": "2026-08-29T01:30:34.579977+00:00",
+      "total_files": 0,
+      "py_files": 0
+    },
+    {
       "path": "/tmp/exp_2vfhvbsj",
       "name": "exp_2vfhvbsj",
       "mtime": "2026-08-19T00:05:46.514695+00:00",
@@ -7033,6 +7076,13 @@
       }
     },
     {
+      "path": "/tmp/exp_32n9rngx",
+      "name": "exp_32n9rngx",
+      "mtime": "2026-08-29T01:30:34.647976+00:00",
+      "total_files": 1,
+      "py_files": 0
+    },
+    {
       "path": "/tmp/exp_33bteq87",
       "name": "exp_33bteq87",
       "mtime": "2026-08-14T04:19:54.375067+00:00",
@@ -7111,10 +7161,24 @@
       "py_files": 0
     },
     {
+      "path": "/tmp/exp_3_zbdl1u",
+      "name": "exp_3_zbdl1u",
+      "mtime": "2026-08-28T14:41:33.927204+00:00",
+      "total_files": 1,
+      "py_files": 0
+    },
+    {
       "path": "/tmp/exp_3a8ld8sy",
       "name": "exp_3a8ld8sy",
       "mtime": "2026-08-20T15:29:42.090445+00:00",
       "total_files": 1,
+      "py_files": 0
+    },
+    {
+      "path": "/tmp/exp_3a905__0",
+      "name": "exp_3a905__0",
+      "mtime": "2026-08-29T01:23:46.999212+00:00",
+      "total_files": 0,
       "py_files": 0
     },
     {
@@ -7146,6 +7210,13 @@
       "py_files": 0
     },
     {
+      "path": "/tmp/exp_3e41slyr",
+      "name": "exp_3e41slyr",
+      "mtime": "2026-08-28T13:13:54.366297+00:00",
+      "total_files": 1,
+      "py_files": 0
+    },
+    {
       "path": "/tmp/exp_3f6hrii9",
       "name": "exp_3f6hrii9",
       "mtime": "2026-08-19T22:29:55.484441+00:00",
@@ -7166,6 +7237,20 @@
         "time_created": 1787178516602,
         "time_updated": 1787178595331
       }
+    },
+    {
+      "path": "/tmp/exp_3h2skkul",
+      "name": "exp_3h2skkul",
+      "mtime": "2026-08-28T16:11:46.353514+00:00",
+      "total_files": 1,
+      "py_files": 0
+    },
+    {
+      "path": "/tmp/exp_3hiskotl",
+      "name": "exp_3hiskotl",
+      "mtime": "2026-08-30T18:41:55.607781+00:00",
+      "total_files": 0,
+      "py_files": 0
     },
     {
       "path": "/tmp/exp_3ivrea6j",
@@ -7189,6 +7274,20 @@
       "py_files": 0
     },
     {
+      "path": "/tmp/exp_3mu0o_d5",
+      "name": "exp_3mu0o_d5",
+      "mtime": "2026-08-27T22:46:51.649890+00:00",
+      "total_files": 1,
+      "py_files": 0
+    },
+    {
+      "path": "/tmp/exp_3muk5i8a",
+      "name": "exp_3muk5i8a",
+      "mtime": "2026-08-27T22:37:56.978652+00:00",
+      "total_files": 1,
+      "py_files": 0
+    },
+    {
       "path": "/tmp/exp_3n_85vfn",
       "name": "exp_3n_85vfn",
       "mtime": "2026-08-14T15:05:18.051107+00:00",
@@ -7206,6 +7305,13 @@
       "path": "/tmp/exp_3qir7xsf",
       "name": "exp_3qir7xsf",
       "mtime": "2026-08-21T21:35:10.774640+00:00",
+      "total_files": 0,
+      "py_files": 0
+    },
+    {
+      "path": "/tmp/exp_3qrbpam_",
+      "name": "exp_3qrbpam_",
+      "mtime": "2026-08-27T23:29:52.402898+00:00",
       "total_files": 0,
       "py_files": 0
     },
@@ -7440,6 +7546,13 @@
       "py_files": 0
     },
     {
+      "path": "/tmp/exp_4f2879v4",
+      "name": "exp_4f2879v4",
+      "mtime": "2026-08-28T16:07:14.378018+00:00",
+      "total_files": 1,
+      "py_files": 0
+    },
+    {
       "path": "/tmp/exp_4h596w7_",
       "name": "exp_4h596w7_",
       "mtime": "2026-08-14T03:33:43.170133+00:00",
@@ -7559,6 +7672,13 @@
         "time_created": 1786715427695,
         "time_updated": 1786715456968
       }
+    },
+    {
+      "path": "/tmp/exp_50eji7o7",
+      "name": "exp_50eji7o7",
+      "mtime": "2026-08-28T14:23:21.625341+00:00",
+      "total_files": 1,
+      "py_files": 0
     },
     {
       "path": "/tmp/exp_51ei7m9y",
@@ -7934,6 +8054,20 @@
       }
     },
     {
+      "path": "/tmp/exp_5pgz4ncp",
+      "name": "exp_5pgz4ncp",
+      "mtime": "2026-08-28T15:57:33.583642+00:00",
+      "total_files": 1,
+      "py_files": 0
+    },
+    {
+      "path": "/tmp/exp_5qauint_",
+      "name": "exp_5qauint_",
+      "mtime": "2026-08-27T23:54:07.422545+00:00",
+      "total_files": 1,
+      "py_files": 0
+    },
+    {
       "path": "/tmp/exp_5qowdjg4",
       "name": "exp_5qowdjg4",
       "mtime": "2026-08-21T00:29:40.358843+00:00",
@@ -8220,6 +8354,13 @@
         "time_created": 1787285366028,
         "time_updated": 1787285399737
       }
+    },
+    {
+      "path": "/tmp/exp_6b7woxow",
+      "name": "exp_6b7woxow",
+      "mtime": "2026-08-28T14:41:33.859205+00:00",
+      "total_files": 0,
+      "py_files": 0
     },
     {
       "path": "/tmp/exp_6bwx1vfj",
@@ -8621,6 +8762,13 @@
       }
     },
     {
+      "path": "/tmp/exp_6yipnz80",
+      "name": "exp_6yipnz80",
+      "mtime": "2026-08-30T18:41:55.679780+00:00",
+      "total_files": 1,
+      "py_files": 0
+    },
+    {
       "path": "/tmp/exp_6ymijkft",
       "name": "exp_6ymijkft",
       "mtime": "2026-08-21T15:16:24.368679+00:00",
@@ -8760,6 +8908,13 @@
       "path": "/tmp/exp_79wfq3d8",
       "name": "exp_79wfq3d8",
       "mtime": "2026-08-21T14:52:53.292059+00:00",
+      "total_files": 0,
+      "py_files": 0
+    },
+    {
+      "path": "/tmp/exp_7a1latc3",
+      "name": "exp_7a1latc3",
+      "mtime": "2026-08-28T12:38:10.945374+00:00",
       "total_files": 0,
       "py_files": 0
     },
@@ -8959,6 +9114,13 @@
       "py_files": 0
     },
     {
+      "path": "/tmp/exp_7mq0mqjt",
+      "name": "exp_7mq0mqjt",
+      "mtime": "2026-08-28T13:13:54.298298+00:00",
+      "total_files": 0,
+      "py_files": 0
+    },
+    {
       "path": "/tmp/exp_7n0rmjuq",
       "name": "exp_7n0rmjuq",
       "mtime": "2026-08-14T15:16:53.451134+00:00",
@@ -9020,6 +9182,13 @@
       "name": "exp_7uulyuun",
       "mtime": "2026-08-24T01:53:33.292441+00:00",
       "total_files": 18,
+      "py_files": 0
+    },
+    {
+      "path": "/tmp/exp_7vnd_fsk",
+      "name": "exp_7vnd_fsk",
+      "mtime": "2026-08-28T14:23:21.561342+00:00",
+      "total_files": 0,
       "py_files": 0
     },
     {
@@ -9192,6 +9361,13 @@
         "time_created": 1786728585838,
         "time_updated": 1786728610334
       }
+    },
+    {
+      "path": "/tmp/exp_8bds75ad",
+      "name": "exp_8bds75ad",
+      "mtime": "2026-08-28T00:08:25.160211+00:00",
+      "total_files": 0,
+      "py_files": 0
     },
     {
       "path": "/tmp/exp_8cqf0b_r",
@@ -9421,6 +9597,13 @@
       "path": "/tmp/exp_8u75nmuv",
       "name": "exp_8u75nmuv",
       "mtime": "2026-08-14T02:46:41.929182+00:00",
+      "total_files": 0,
+      "py_files": 0
+    },
+    {
+      "path": "/tmp/exp_8vrvf1zg",
+      "name": "exp_8vrvf1zg",
+      "mtime": "2026-08-28T15:50:55.650250+00:00",
       "total_files": 0,
       "py_files": 0
     },
@@ -9672,6 +9855,13 @@
       }
     },
     {
+      "path": "/tmp/exp_9cg80x03",
+      "name": "exp_9cg80x03",
+      "mtime": "2026-08-29T16:03:04.473903+00:00",
+      "total_files": 1,
+      "py_files": 0
+    },
+    {
       "path": "/tmp/exp_9d7ts35c",
       "name": "exp_9d7ts35c",
       "mtime": "2026-08-21T03:07:48.928339+00:00",
@@ -9910,6 +10100,13 @@
       "path": "/tmp/exp__4jk6h0l",
       "name": "exp__4jk6h0l",
       "mtime": "2026-08-18T18:49:06.477686+00:00",
+      "total_files": 1,
+      "py_files": 0
+    },
+    {
+      "path": "/tmp/exp__660jpy2",
+      "name": "exp__660jpy2",
+      "mtime": "2026-08-29T15:48:35.420440+00:00",
       "total_files": 1,
       "py_files": 0
     },
@@ -10243,6 +10440,13 @@
       "path": "/tmp/exp__xcc_de7",
       "name": "exp__xcc_de7",
       "mtime": "2026-08-22T01:34:35.403869+00:00",
+      "total_files": 1,
+      "py_files": 0
+    },
+    {
+      "path": "/tmp/exp__yus88yn",
+      "name": "exp__yus88yn",
+      "mtime": "2026-08-29T01:03:13.096102+00:00",
       "total_files": 1,
       "py_files": 0
     },
@@ -11160,6 +11364,13 @@
       "py_files": 0
     },
     {
+      "path": "/tmp/exp_bqd10v7i",
+      "name": "exp_bqd10v7i",
+      "mtime": "2026-08-29T01:23:47.067211+00:00",
+      "total_files": 1,
+      "py_files": 0
+    },
+    {
       "path": "/tmp/exp_bqn9oq5w",
       "name": "exp_bqn9oq5w",
       "mtime": "2026-08-26T21:20:33.755684+00:00",
@@ -11568,6 +11779,13 @@
       "py_files": 0
     },
     {
+      "path": "/tmp/exp_ciryxa0l",
+      "name": "exp_ciryxa0l",
+      "mtime": "2026-08-27T22:53:00.687828+00:00",
+      "total_files": 0,
+      "py_files": 0
+    },
+    {
       "path": "/tmp/exp_cm_1a179",
       "name": "exp_cm_1a179",
       "mtime": "2026-08-14T18:49:53.421961+00:00",
@@ -11778,6 +11996,13 @@
       }
     },
     {
+      "path": "/tmp/exp_czzsmdf4",
+      "name": "exp_czzsmdf4",
+      "mtime": "2026-08-28T12:42:30.261103+00:00",
+      "total_files": 1,
+      "py_files": 0
+    },
+    {
       "path": "/tmp/exp_d0101bnu",
       "name": "exp_d0101bnu",
       "mtime": "2026-08-14T19:10:24.116654+00:00",
@@ -11797,6 +12022,13 @@
       "mtime": "2026-08-15T19:41:03.298176+00:00",
       "total_files": 38,
       "py_files": 4
+    },
+    {
+      "path": "/tmp/exp_d3gjmvx1",
+      "name": "exp_d3gjmvx1",
+      "mtime": "2026-08-27T23:01:41.915257+00:00",
+      "total_files": 1,
+      "py_files": 0
     },
     {
       "path": "/tmp/exp_d3mojtzs",
@@ -11886,6 +12118,13 @@
       "py_files": 0
     },
     {
+      "path": "/tmp/exp_d_qvsb6x",
+      "name": "exp_d_qvsb6x",
+      "mtime": "2026-08-28T14:16:28.928118+00:00",
+      "total_files": 1,
+      "py_files": 0
+    },
+    {
       "path": "/tmp/exp_da9wlsiw",
       "name": "exp_da9wlsiw",
       "mtime": "2026-08-27T00:29:07.679969+00:00",
@@ -11893,9 +12132,23 @@
       "py_files": 0
     },
     {
+      "path": "/tmp/exp_daey8brf",
+      "name": "exp_daey8brf",
+      "mtime": "2026-08-27T23:20:35.924214+00:00",
+      "total_files": 0,
+      "py_files": 0
+    },
+    {
       "path": "/tmp/exp_dbe1cimy",
       "name": "exp_dbe1cimy",
       "mtime": "2026-08-14T20:37:49.672474+00:00",
+      "total_files": 1,
+      "py_files": 0
+    },
+    {
+      "path": "/tmp/exp_dbyco6gf",
+      "name": "exp_dbyco6gf",
+      "mtime": "2026-08-27T23:20:35.992213+00:00",
       "total_files": 1,
       "py_files": 0
     },
@@ -11968,6 +12221,13 @@
       "path": "/tmp/exp_dhfomps_",
       "name": "exp_dhfomps_",
       "mtime": "2026-08-20T14:45:42.389724+00:00",
+      "total_files": 1,
+      "py_files": 0
+    },
+    {
+      "path": "/tmp/exp_dhs4meik",
+      "name": "exp_dhs4meik",
+      "mtime": "2026-08-29T01:14:35.112685+00:00",
       "total_files": 1,
       "py_files": 0
     },
@@ -12524,6 +12784,13 @@
         "time_created": 1786813450251,
         "time_updated": 1786813487990
       }
+    },
+    {
+      "path": "/tmp/exp_ei5x6p_1",
+      "name": "exp_ei5x6p_1",
+      "mtime": "2026-08-29T16:03:04.405904+00:00",
+      "total_files": 0,
+      "py_files": 0
     },
     {
       "path": "/tmp/exp_eisz4l4h",
@@ -13389,6 +13656,13 @@
       "py_files": 0
     },
     {
+      "path": "/tmp/exp_g8_mbwzd",
+      "name": "exp_g8_mbwzd",
+      "mtime": "2026-08-28T17:02:18.992579+00:00",
+      "total_files": 1,
+      "py_files": 0
+    },
+    {
       "path": "/tmp/exp_g91hvnjf",
       "name": "exp_g91hvnjf",
       "mtime": "2026-08-18T23:48:35.048128+00:00",
@@ -14039,6 +14313,13 @@
       "py_files": 0
     },
     {
+      "path": "/tmp/exp_i2e8cl2x",
+      "name": "exp_i2e8cl2x",
+      "mtime": "2026-08-27T23:24:54.375874+00:00",
+      "total_files": 1,
+      "py_files": 0
+    },
+    {
       "path": "/tmp/exp_i4d4w0ef",
       "name": "exp_i4d4w0ef",
       "mtime": "2026-08-27T04:20:01.565657+00:00",
@@ -14356,6 +14637,13 @@
         "time_created": 1786715852329,
         "time_updated": 1786715886260
       }
+    },
+    {
+      "path": "/tmp/exp_ikugn2vv",
+      "name": "exp_ikugn2vv",
+      "mtime": "2026-08-28T15:46:31.162654+00:00",
+      "total_files": 0,
+      "py_files": 0
     },
     {
       "path": "/tmp/exp_ikvz2kar",
@@ -15543,6 +15831,13 @@
       "py_files": 0
     },
     {
+      "path": "/tmp/exp_koxc8orx",
+      "name": "exp_koxc8orx",
+      "mtime": "2026-08-28T00:08:25.228209+00:00",
+      "total_files": 1,
+      "py_files": 0
+    },
+    {
       "path": "/tmp/exp_kqaj54_u",
       "name": "exp_kqaj54_u",
       "mtime": "2026-08-14T14:13:52.288181+00:00",
@@ -15634,6 +15929,13 @@
       "path": "/tmp/exp_krzeiqbu",
       "name": "exp_krzeiqbu",
       "mtime": "2026-08-19T00:32:58.080283+00:00",
+      "total_files": 1,
+      "py_files": 0
+    },
+    {
+      "path": "/tmp/exp_ktc1o8pq",
+      "name": "exp_ktc1o8pq",
+      "mtime": "2026-08-28T16:25:09.192798+00:00",
       "total_files": 1,
       "py_files": 0
     },
@@ -15852,6 +16154,13 @@
       "py_files": 0
     },
     {
+      "path": "/tmp/exp_l8exfsln",
+      "name": "exp_l8exfsln",
+      "mtime": "2026-08-28T16:07:14.314019+00:00",
+      "total_files": 0,
+      "py_files": 0
+    },
+    {
       "path": "/tmp/exp_l8xloo4l",
       "name": "exp_l8xloo4l",
       "mtime": "2026-08-13T17:33:56.710246+00:00",
@@ -15974,6 +16283,13 @@
       "py_files": 0
     },
     {
+      "path": "/tmp/exp_ll2rkw_j",
+      "name": "exp_ll2rkw_j",
+      "mtime": "2026-08-28T17:02:18.924580+00:00",
+      "total_files": 0,
+      "py_files": 0
+    },
+    {
       "path": "/tmp/exp_llbrs5ly",
       "name": "exp_llbrs5ly",
       "mtime": "2026-08-14T20:56:13.966488+00:00",
@@ -15985,6 +16301,20 @@
       "name": "exp_llcef2hi",
       "mtime": "2026-08-23T23:41:39.220461+00:00",
       "total_files": 0,
+      "py_files": 0
+    },
+    {
+      "path": "/tmp/exp_lmbadqgb",
+      "name": "exp_lmbadqgb",
+      "mtime": "2026-08-27T22:46:51.581891+00:00",
+      "total_files": 0,
+      "py_files": 0
+    },
+    {
+      "path": "/tmp/exp_ln85d_87",
+      "name": "exp_ln85d_87",
+      "mtime": "2026-08-27T22:53:00.755827+00:00",
+      "total_files": 1,
       "py_files": 0
     },
     {
@@ -16407,6 +16737,13 @@
       "py_files": 0
     },
     {
+      "path": "/tmp/exp_mdz490g_",
+      "name": "exp_mdz490g_",
+      "mtime": "2026-08-28T14:16:28.860119+00:00",
+      "total_files": 0,
+      "py_files": 0
+    },
+    {
       "path": "/tmp/exp_me58jxo0",
       "name": "exp_me58jxo0",
       "mtime": "2026-08-14T13:58:42.411676+00:00",
@@ -16707,6 +17044,13 @@
         "time_created": 1787783445575,
         "time_updated": 1787783514609
       }
+    },
+    {
+      "path": "/tmp/exp_n1enu9ts",
+      "name": "exp_n1enu9ts",
+      "mtime": "2026-08-28T15:50:55.718249+00:00",
+      "total_files": 1,
+      "py_files": 0
     },
     {
       "path": "/tmp/exp_n1szwjk0",
@@ -17143,6 +17487,13 @@
       "path": "/tmp/exp_o2f8dns_",
       "name": "exp_o2f8dns_",
       "mtime": "2026-08-22T01:34:35.335870+00:00",
+      "total_files": 0,
+      "py_files": 0
+    },
+    {
+      "path": "/tmp/exp_o2fusuim",
+      "name": "exp_o2fusuim",
+      "mtime": "2026-08-28T16:25:09.124799+00:00",
       "total_files": 0,
       "py_files": 0
     },
@@ -18094,6 +18445,13 @@
       "py_files": 0
     },
     {
+      "path": "/tmp/exp_q1oorszy",
+      "name": "exp_q1oorszy",
+      "mtime": "2026-08-27T23:24:54.307875+00:00",
+      "total_files": 0,
+      "py_files": 0
+    },
+    {
       "path": "/tmp/exp_q23pdpk8",
       "name": "exp_q23pdpk8",
       "mtime": "2026-08-14T14:47:49.893576+00:00",
@@ -18678,6 +19036,13 @@
       "py_files": 0
     },
     {
+      "path": "/tmp/exp_r2ug79e0",
+      "name": "exp_r2ug79e0",
+      "mtime": "2026-08-29T15:55:12.269802+00:00",
+      "total_files": 1,
+      "py_files": 0
+    },
+    {
       "path": "/tmp/exp_r4bs6qvi",
       "name": "exp_r4bs6qvi",
       "mtime": "2026-08-14T18:45:18.630574+00:00",
@@ -18858,6 +19223,13 @@
       "py_files": 0
     },
     {
+      "path": "/tmp/exp_rc5ejy3c",
+      "name": "exp_rc5ejy3c",
+      "mtime": "2026-08-28T16:49:52.584756+00:00",
+      "total_files": 0,
+      "py_files": 0
+    },
+    {
       "path": "/tmp/exp_rdws5a7f",
       "name": "exp_rdws5a7f",
       "mtime": "2026-08-20T21:09:26.214633+00:00",
@@ -18987,6 +19359,13 @@
       "py_files": 0
     },
     {
+      "path": "/tmp/exp_rm41lqp7",
+      "name": "exp_rm41lqp7",
+      "mtime": "2026-08-27T23:01:41.847259+00:00",
+      "total_files": 0,
+      "py_files": 0
+    },
+    {
       "path": "/tmp/exp_rmjuida0",
       "name": "exp_rmjuida0",
       "mtime": "2026-08-14T20:27:57.202059+00:00",
@@ -19026,6 +19405,13 @@
       "path": "/tmp/exp_rp4b21m7",
       "name": "exp_rp4b21m7",
       "mtime": "2026-08-23T19:35:35.128440+00:00",
+      "total_files": 0,
+      "py_files": 0
+    },
+    {
+      "path": "/tmp/exp_rp96fbw8",
+      "name": "exp_rp96fbw8",
+      "mtime": "2026-08-28T16:11:46.285515+00:00",
       "total_files": 0,
       "py_files": 0
     },
@@ -19171,6 +19557,13 @@
       "path": "/tmp/exp_s0kz4ne5",
       "name": "exp_s0kz4ne5",
       "mtime": "2026-08-15T15:51:48.464046+00:00",
+      "total_files": 0,
+      "py_files": 0
+    },
+    {
+      "path": "/tmp/exp_s0z59hd7",
+      "name": "exp_s0z59hd7",
+      "mtime": "2026-08-28T12:42:30.193104+00:00",
       "total_files": 0,
       "py_files": 0
     },
@@ -19816,6 +20209,13 @@
       "py_files": 0
     },
     {
+      "path": "/tmp/exp_sw8j1gz0",
+      "name": "exp_sw8j1gz0",
+      "mtime": "2026-08-28T19:02:10.468161+00:00",
+      "total_files": 0,
+      "py_files": 0
+    },
+    {
       "path": "/tmp/exp_swls5_dg",
       "name": "exp_swls5_dg",
       "mtime": "2026-08-26T23:38:57.918150+00:00",
@@ -19911,6 +20311,13 @@
       }
     },
     {
+      "path": "/tmp/exp_t720_z5o",
+      "name": "exp_t720_z5o",
+      "mtime": "2026-08-29T15:55:12.205803+00:00",
+      "total_files": 0,
+      "py_files": 0
+    },
+    {
       "path": "/tmp/exp_t7eknvoj",
       "name": "exp_t7eknvoj",
       "mtime": "2026-08-19T23:51:10.487604+00:00",
@@ -19957,6 +20364,13 @@
       "name": "exp_t919c4sj",
       "mtime": "2026-08-17T16:14:54.752456+00:00",
       "total_files": 0,
+      "py_files": 0
+    },
+    {
+      "path": "/tmp/exp_t9cn23ni",
+      "name": "exp_t9cn23ni",
+      "mtime": "2026-08-30T05:13:47.950215+00:00",
+      "total_files": 1,
       "py_files": 0
     },
     {
@@ -20609,6 +21023,13 @@
       }
     },
     {
+      "path": "/tmp/exp_um77goby",
+      "name": "exp_um77goby",
+      "mtime": "2026-08-30T05:13:47.886216+00:00",
+      "total_files": 0,
+      "py_files": 0
+    },
+    {
       "path": "/tmp/exp_um86mhs3",
       "name": "exp_um86mhs3",
       "mtime": "2026-08-15T19:44:22.214847+00:00",
@@ -20677,6 +21098,13 @@
       "path": "/tmp/exp_upopkziq",
       "name": "exp_upopkziq",
       "mtime": "2026-08-14T16:00:17.006833+00:00",
+      "total_files": 0,
+      "py_files": 0
+    },
+    {
+      "path": "/tmp/exp_uqj26ppq",
+      "name": "exp_uqj26ppq",
+      "mtime": "2026-08-29T15:48:35.352441+00:00",
       "total_files": 0,
       "py_files": 0
     },
@@ -20974,6 +21402,13 @@
       "py_files": 0
     },
     {
+      "path": "/tmp/exp_verjdrv9",
+      "name": "exp_verjdrv9",
+      "mtime": "2026-08-28T19:02:10.536160+00:00",
+      "total_files": 1,
+      "py_files": 0
+    },
+    {
       "path": "/tmp/exp_vfnikt9b",
       "name": "exp_vfnikt9b",
       "mtime": "2026-08-14T20:24:53.909142+00:00",
@@ -21238,6 +21673,13 @@
         "time_created": 1787807616270,
         "time_updated": 1787807655150
       }
+    },
+    {
+      "path": "/tmp/exp_vxq83fd9",
+      "name": "exp_vxq83fd9",
+      "mtime": "2026-08-28T15:46:31.226653+00:00",
+      "total_files": 1,
+      "py_files": 0
     },
     {
       "path": "/tmp/exp_vxzo9_4n",
@@ -21800,6 +22242,13 @@
       "py_files": 0
     },
     {
+      "path": "/tmp/exp_x_o7rv1b",
+      "name": "exp_x_o7rv1b",
+      "mtime": "2026-08-29T01:03:13.028104+00:00",
+      "total_files": 0,
+      "py_files": 0
+    },
+    {
       "path": "/tmp/exp_xa6phmic",
       "name": "exp_xa6phmic",
       "mtime": "2026-08-26T19:39:41.988071+00:00",
@@ -22210,6 +22659,13 @@
         "time_created": 1787804402980,
         "time_updated": 1787804429204
       }
+    },
+    {
+      "path": "/tmp/exp_xspgoawr",
+      "name": "exp_xspgoawr",
+      "mtime": "2026-08-28T12:38:11.009373+00:00",
+      "total_files": 1,
+      "py_files": 0
     },
     {
       "path": "/tmp/exp_xstb5k75",
@@ -22877,6 +23333,13 @@
       "py_files": 0
     },
     {
+      "path": "/tmp/exp_yys8ys73",
+      "name": "exp_yys8ys73",
+      "mtime": "2026-08-27T22:37:56.910653+00:00",
+      "total_files": 0,
+      "py_files": 0
+    },
+    {
       "path": "/tmp/exp_z18iodwm",
       "name": "exp_z18iodwm",
       "mtime": "2026-08-25T14:25:25.768904+00:00",
@@ -23002,6 +23465,13 @@
       "path": "/tmp/exp_z9ej3w5p",
       "name": "exp_z9ej3w5p",
       "mtime": "2026-08-14T13:34:16.865385+00:00",
+      "total_files": 1,
+      "py_files": 0
+    },
+    {
+      "path": "/tmp/exp_z9p30bz5",
+      "name": "exp_z9p30bz5",
+      "mtime": "2026-08-28T16:49:52.652755+00:00",
       "total_files": 1,
       "py_files": 0
     },
@@ -35314,6 +35784,860 @@
       "model_id": "deepseek-v4-flash",
       "cost": 0.0011597712,
       "tokens_output": 529
+    },
+    {
+      "title": "Docs taxonomy restructure design (@general subagent)",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.018623555999999996,
+      "tokens_output": 14221
+    },
+    {
+      "title": "Map verify_proposal + facts API (@explore subagent)",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.015354460800000002,
+      "tokens_output": 9390
+    },
+    {
+      "title": "Classifier boundary defect task",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-pro",
+      "cost": 0.006025156,
+      "tokens_output": 1447
+    },
+    {
+      "title": "Multi-session notification_service commit review",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.005517187199999999,
+      "tokens_output": 1819
+    },
+    {
+      "title": "Notification service session review",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0054423768,
+      "tokens_output": 1517
+    },
+    {
+      "title": "Notification service 5-session commit review",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.006378999199999999,
+      "tokens_output": 1540
+    },
+    {
+      "title": "Notification service story review",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.005538747199999999,
+      "tokens_output": 2055
+    },
+    {
+      "title": "Review of notification_service commit sequence",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.010198188,
+      "tokens_output": 3381
+    },
+    {
+      "title": "Notification service multi-session review",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.006792794400000001,
+      "tokens_output": 2851
+    },
+    {
+      "title": "Reviewing notification_service commit sequence",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0042189672,
+      "tokens_output": 2322
+    },
+    {
+      "title": "Notification service multi-session review",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.008014249599999999,
+      "tokens_output": 3099
+    },
+    {
+      "title": "Reviewing notification_service commit story",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0074082736,
+      "tokens_output": 3887
+    },
+    {
+      "title": "Notification service multi-session review",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.007849592799999998,
+      "tokens_output": 2859
+    },
+    {
+      "title": "Rate AI commit: notification server",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0010403008,
+      "tokens_output": 537
+    },
+    {
+      "title": "Notification service multi-session review",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0094016328,
+      "tokens_output": 4906
+    },
+    {
+      "title": "Reviewing notification service commits",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0074108888,
+      "tokens_output": 3248
+    },
+    {
+      "title": "Notification service AI build review",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.006387752,
+      "tokens_output": 3441
+    },
+    {
+      "title": "Multi-session notification service review",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0105401464,
+      "tokens_output": 2113
+    },
+    {
+      "title": "Notification service multi-session review",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0075351640000000004,
+      "tokens_output": 4432
+    },
+    {
+      "title": "Reviewing notification_service commit story",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0085053528,
+      "tokens_output": 3127
+    },
+    {
+      "title": "Notification service multi-session review",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0070743456,
+      "tokens_output": 2534
+    },
+    {
+      "title": "Notification service multi-session review",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.010783813599999999,
+      "tokens_output": 3475
+    },
+    {
+      "title": "Notification service sessions evaluation",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.013219774399999999,
+      "tokens_output": 5601
+    },
+    {
+      "title": "Evaluating notification service commits",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.012697210399999997,
+      "tokens_output": 4368
+    },
+    {
+      "title": "Notification service multi-session code review",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0085637552,
+      "tokens_output": 2996
+    },
+    {
+      "title": "task_manager_api commit review",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.009631081600000002,
+      "tokens_output": 3388
+    },
+    {
+      "title": "Review of task_manager_api commit sequence",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.009342631200000001,
+      "tokens_output": 4044
+    },
+    {
+      "title": "task_manager_api session coherence review",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0073633167999999985,
+      "tokens_output": 4275
+    },
+    {
+      "title": "task_manager_api commit sequence evaluation",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.008644832,
+      "tokens_output": 3517
+    },
+    {
+      "title": "AI commit review: auth & task ownership",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0016864008,
+      "tokens_output": 616
+    },
+    {
+      "title": "Task Manager API 5-session review",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0062459488,
+      "tokens_output": 2990
+    },
+    {
+      "title": "Task manager API 5-session review",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.005833996,
+      "tokens_output": 3529
+    },
+    {
+      "title": "task_manager_api multi-session commit review",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0064027264,
+      "tokens_output": 2613
+    },
+    {
+      "title": "task_manager_api multi-session commit review",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.010274751200000001,
+      "tokens_output": 3110
+    },
+    {
+      "title": "Task manager API 5-session review",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0112373296,
+      "tokens_output": 3223
+    },
+    {
+      "title": "Task manager API commit sequence review",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0069426112,
+      "tokens_output": 2538
+    },
+    {
+      "title": "Task manager API coding story review",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0051741592,
+      "tokens_output": 2285
+    },
+    {
+      "title": "Evaluating multi-session task manager API story",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0059711232,
+      "tokens_output": 2439
+    },
+    {
+      "title": "Task manager API story review",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.008655320800000001,
+      "tokens_output": 2919
+    },
+    {
+      "title": "task_manager_api story review",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.004916576,
+      "tokens_output": 1456
+    },
+    {
+      "title": "task_manager_api commit review",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.006317466399999999,
+      "tokens_output": 2739
+    },
+    {
+      "title": "Reviewing task_manager_api multi-session story",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0037475424,
+      "tokens_output": 1285
+    },
+    {
+      "title": "task_manager_api story evaluation",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.007127316,
+      "tokens_output": 1836
+    },
+    {
+      "title": "Task manager API commit review",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0025837952,
+      "tokens_output": 1505
+    },
+    {
+      "title": "Task manager API story review",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0103674088,
+      "tokens_output": 3757
+    },
+    {
+      "title": "Task_manager_api multi-session review",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0083862296,
+      "tokens_output": 2117
+    },
+    {
+      "title": "Review of task_manager_api commit sequence",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.004970436799999999,
+      "tokens_output": 2083
+    },
+    {
+      "title": "Reviewing task_manager_api commit sequence",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0053275376,
+      "tokens_output": 2439
+    },
+    {
+      "title": "False premise mutation for Flask API",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.003075156,
+      "tokens_output": 205
+    },
+    {
+      "title": "Mutation of task API spec with false premise",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0032099816,
+      "tokens_output": 355
+    },
+    {
+      "title": "Spec mutation: inject_false_premise",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0034086136,
+      "tokens_output": 358
+    },
+    {
+      "title": "False premise mutation of Flask spec",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0018310824,
+      "tokens_output": 210
+    },
+    {
+      "title": "Spec mutation: inject_false_premise",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0015741376000000002,
+      "tokens_output": 369
+    },
+    {
+      "title": "Inject false premise into SSG spec",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0009731736,
+      "tokens_output": 310
+    },
+    {
+      "title": "Inject false premise into SSG spec",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0003716328,
+      "tokens_output": 212
+    },
+    {
+      "title": "Inject false premise into WebSocket spec",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.001899436,
+      "tokens_output": 195
+    },
+    {
+      "title": "False premise spec mutation task",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0017217144,
+      "tokens_output": 231
+    },
+    {
+      "title": "Luna probe campaign execution",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0700534128,
+      "tokens_output": 35044
+    },
+    {
+      "title": "Remove constraint spec mutation",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.001184008,
+      "tokens_output": 127
+    },
+    {
+      "title": "[static_site_gen] Session 1: greenfield",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.0,
+      "tokens_output": 3968
+    },
+    {
+      "title": "[task_manager_api] Session 1: greenfield",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.0,
+      "tokens_output": 2649
+    },
+    {
+      "title": "[notification_service] Session 1: greenfield",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.0,
+      "tokens_output": 4650
+    },
+    {
+      "title": "[task_manager_api] Session 1: greenfield",
+      "provider": "openai",
+      "model_id": "gpt-5.6-sol",
+      "cost": 0.0,
+      "tokens_output": 2671
+    },
+    {
+      "title": "[task_manager_api] Session 2: feature_addition",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.0,
+      "tokens_output": 4639
+    },
+    {
+      "title": "[task_manager_api] Session 2: feature_addition",
+      "provider": "openai",
+      "model_id": "gpt-5.6-sol",
+      "cost": 0.0,
+      "tokens_output": 7176
+    },
+    {
+      "title": "[static_site_gen] Session 2: feature_addition",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.0,
+      "tokens_output": 3807
+    },
+    {
+      "title": "[task_manager_api] Session 3: integration",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.0,
+      "tokens_output": 3058
+    },
+    {
+      "title": "[static_site_gen] Session 3: integration",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.0,
+      "tokens_output": 5000
+    },
+    {
+      "title": "[notification_service] Session 2: feature_addition",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.0,
+      "tokens_output": 4264
+    },
+    {
+      "title": "[task_manager_api] Session 3: integration",
+      "provider": "openai",
+      "model_id": "gpt-5.6-sol",
+      "cost": 0.0,
+      "tokens_output": 3176
+    },
+    {
+      "title": "[task_manager_api] Session 4: refactor",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.0,
+      "tokens_output": 4596
+    },
+    {
+      "title": "[static_site_gen] Session 4: refactor",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.0,
+      "tokens_output": 6651
+    },
+    {
+      "title": "[task_manager_api] Session 4: refactor",
+      "provider": "openai",
+      "model_id": "gpt-5.6-sol",
+      "cost": 0.0,
+      "tokens_output": 5269
+    },
+    {
+      "title": "[task_manager_api] Session 5: cross_cutting",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.0,
+      "tokens_output": 3591
+    },
+    {
+      "title": "[task_manager_api] Session 5: cross_cutting",
+      "provider": "openai",
+      "model_id": "gpt-5.6-sol",
+      "cost": 0.0,
+      "tokens_output": 4467
+    },
+    {
+      "title": "[notification_service] Session 3: integration",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.0,
+      "tokens_output": 5232
+    },
+    {
+      "title": "[static_site_gen] Session 5: cross_cutting",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.0,
+      "tokens_output": 5394
+    },
+    {
+      "title": "[notification_service] Session 4: refactor",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.0,
+      "tokens_output": 3819
+    },
+    {
+      "title": "[notification_service] Session 5: cross_cutting",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.0,
+      "tokens_output": 4410
+    },
+    {
+      "title": "Mutation compiler: notification spec",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.000303296,
+      "tokens_output": 152
+    },
+    {
+      "title": "Remove_constraint mutation for SSG refactor",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0035376824,
+      "tokens_output": 352
+    },
+    {
+      "title": "[task_manager_api] Session 1: greenfield",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.0,
+      "tokens_output": 2582
+    },
+    {
+      "title": "[notification_service] Session 1: greenfield",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.0,
+      "tokens_output": 4465
+    },
+    {
+      "title": "[static_site_gen] Session 1: greenfield",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.0,
+      "tokens_output": 4263
+    },
+    {
+      "title": "[static_site_gen] Session 1: greenfield",
+      "provider": "openai",
+      "model_id": "gpt-5.6-sol",
+      "cost": 0.0,
+      "tokens_output": 7208
+    },
+    {
+      "title": "[task_manager_api] Session 2: feature_addition",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.0,
+      "tokens_output": 5140
+    },
+    {
+      "title": "[notification_service] Session 2: feature_addition",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.0,
+      "tokens_output": 4021
+    },
+    {
+      "title": "[static_site_gen] Session 2: feature_addition",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.0,
+      "tokens_output": 4591
+    },
+    {
+      "title": "[task_manager_api] Session 3: integration",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.0,
+      "tokens_output": 2686
+    },
+    {
+      "title": "[static_site_gen] Session 2: feature_addition",
+      "provider": "openai",
+      "model_id": "gpt-5.6-sol",
+      "cost": 0.0,
+      "tokens_output": 8284
+    },
+    {
+      "title": "[notification_service] Session 3: integration",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.0,
+      "tokens_output": 5847
+    },
+    {
+      "title": "[static_site_gen] Session 3: integration",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.0,
+      "tokens_output": 4004
+    },
+    {
+      "title": "[task_manager_api] Session 4: refactor",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.0,
+      "tokens_output": 3704
+    },
+    {
+      "title": "[static_site_gen] Session 4: refactor",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.0,
+      "tokens_output": 5426
+    },
+    {
+      "title": "[task_manager_api] Session 5: cross_cutting",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.0,
+      "tokens_output": 3407
+    },
+    {
+      "title": "[notification_service] Session 4: refactor",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.0,
+      "tokens_output": 3366
+    },
+    {
+      "title": "[static_site_gen] Session 5: cross_cutting",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.0,
+      "tokens_output": 5840
+    },
+    {
+      "title": "[static_site_gen] Session 3: integration",
+      "provider": "openai",
+      "model_id": "gpt-5.6-sol",
+      "cost": 0.0,
+      "tokens_output": 8619
+    },
+    {
+      "title": "[notification_service] Session 5: cross_cutting",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.0,
+      "tokens_output": 4903
+    },
+    {
+      "title": "[static_site_gen] Session 4: refactor",
+      "provider": "openai",
+      "model_id": "gpt-5.6-sol",
+      "cost": 0.0,
+      "tokens_output": 11988
+    },
+    {
+      "title": "[static_site_gen] Session 5: cross_cutting",
+      "provider": "openai",
+      "model_id": "gpt-5.6-sol",
+      "cost": 0.0,
+      "tokens_output": 7248
+    },
+    {
+      "title": "Luna probe campaign execution (fork #1)",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0972268528,
+      "tokens_output": 36906
+    },
+    {
+      "title": "Luna probe campaign execution (fork #2)",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.1224897128,
+      "tokens_output": 38339
+    },
+    {
+      "title": "Luna probe campaign execution (fork #3)",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.144632124,
+      "tokens_output": 39037
+    },
+    {
+      "title": "Luna probe campaign execution (fork #4)",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.147026516,
+      "tokens_output": 39984
+    },
+    {
+      "title": "Notification service commit sequence review",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.007938117599999999,
+      "tokens_output": 3545
+    },
+    {
+      "title": "Notification service coding review",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0063613424,
+      "tokens_output": 3301
+    },
+    {
+      "title": "Reviewing notification service commits",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.008199032799999999,
+      "tokens_output": 3307
+    },
+    {
+      "title": "Multi-session notification service review",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.007034753600000001,
+      "tokens_output": 3097
+    },
+    {
+      "title": "Multi-session AI story: notification_service",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.008309559999999999,
+      "tokens_output": 2666
+    },
+    {
+      "title": "Assessing notification service commits",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.009625688799999999,
+      "tokens_output": 3048
+    },
+    {
+      "title": "Task manager API multi-session review",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.009640036000000001,
+      "tokens_output": 3498
+    },
+    {
+      "title": "Task_manager_api multi-session story review",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0078983408,
+      "tokens_output": 4598
+    },
+    {
+      "title": "Evaluating task_manager_api commit sequence",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.009865576000000001,
+      "tokens_output": 3862
+    },
+    {
+      "title": "Review of task_manager_api commit sequence",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.007663280799999997,
+      "tokens_output": 3568
+    },
+    {
+      "title": "Evaluating task_manager_api commit sequence",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0053728808,
+      "tokens_output": 2102
+    },
+    {
+      "title": "Reviewing task_manager_api commit sequence",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.005908061600000001,
+      "tokens_output": 4041
+    },
+    {
+      "title": "Task manager API coding story review",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.009398703999999999,
+      "tokens_output": 2794
+    },
+    {
+      "title": "Task manager API: 5-session assessment",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.006371265600000001,
+      "tokens_output": 3883
+    },
+    {
+      "title": "AI coding story review for task_manager_api",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.007067950399999999,
+      "tokens_output": 3724
+    },
+    {
+      "title": "AI coding story review: task_manager_api",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0061795944,
+      "tokens_output": 3484
+    },
+    {
+      "title": "Docs taxonomy restructure phase 2 (@general subagent)",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.01197084,
+      "tokens_output": 2324
     }
   ]
 }

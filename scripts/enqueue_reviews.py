@@ -34,7 +34,7 @@ from agentic_dynamics.runtime.posthoc import (  # noqa: E402
 )
 from agentic_dynamics.runtime.story import load_story_result
 
-REDIS_HOST = "127.0.0.1"
+REDIS_HOST = os.environ.get("FINOPS_REDIS_HOST", "127.0.0.1")
 REDIS_PORT = int(os.environ.get("FINOPS_REDIS_PORT", "6380"))
 REDIS_DB = int(os.environ.get("FINOPS_REDIS_DB", "1"))
 RESULTS_DIR = Path(__file__).resolve().parent.parent / "experiments" / "results" / "stories"

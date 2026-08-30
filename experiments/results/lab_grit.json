@@ -1,6 +1,6 @@
 {
   "experiment_id": "lab_grit",
-  "generated_at": "2026-08-30T07:12:35.436808",
+  "generated_at": "2026-08-30T20:48:39.311385",
   "metric_definition": "G(s) = P(test_executed_success | perturbation_strength = s)",
   "summary": {
     "cells": 136,
@@ -274,6 +274,6 @@
     "data_integrity_policy": "docs/data_integrity_findings.md",
     "requires_external_service": null,
     "contract_version": "lab-contract/v6",
-    "generated_at": "2026-08-30T05:12:35.437421+00:00"
+    "generated_at": "2026-08-30T18:48:39.312027+00:00"
   }
 }

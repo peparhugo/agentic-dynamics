@@ -20,6 +20,7 @@ import hashlib
 import json
 import os
 import socket
+import sys
 import time
 import traceback
 from dataclasses import replace as _replace_record
@@ -33,6 +34,14 @@ try:
     import _bootstrap  # noqa: E402  # direct run: scripts/ is sys.path[0]
 except ImportError:  # imported as scripts.<name> — repo root is on sys.path
     from scripts import _bootstrap  # noqa: E402,F401
+
+
+# The fleet heartbeat helper (redis-only) lives in scripts/fleet/ (a dir, not a package) — add
+# it to sys.path so it imports beside the other scripts (the worker.py convention). The kb
+# consumers are cell-tier workers, so they publish worker:<group>:<id> heartbeats exactly like
+# the story/analysis workers (the fleet-manager's board surfaces them; slice 1/3).
+sys.path.insert(0, str(PROJECT_ROOT / "scripts" / "fleet"))
+import heartbeat  # noqa: E402
 
 
 from agentic_dynamics.control import observation_ingestion as oi  # noqa: E402
@@ -506,11 +515,23 @@ def main() -> None:
     created = ks.create_consumer_group(r, group)
     log(f"consumer group {group} {'created' if created else 'already existed'}")
 
+    # The completed-job counter the heartbeat reports — initialized BEFORE the heartbeat thread
+    # starts (the thread's first beat fires immediately, and the closure reads it by cell).
+    processed_total = 0
+
+    # Worker liveness (slice 3): a daemon heartbeat thread beats every 10s so the fleet
+    # manager's read-only watcher surfaces this consumer on the board. The thread owns its own
+    # Redis connection (the main loop reconnects after store failures).
+    heartbeat.HeartbeatThread(
+        group, f"{socket.gethostname()}:{os.getpid()}",
+        jobs_counter=lambda: processed_total,
+    ).start()
+    log(f"heartbeat: worker:{group}")
+
     handler = build_handler(group, r)
     last_reconcile = time.monotonic()
 
     empty_polls = 0
-    processed_total = 0
 
     while True:
         try:

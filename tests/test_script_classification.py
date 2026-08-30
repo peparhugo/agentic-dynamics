@@ -15,7 +15,7 @@ ROOT = Path(__file__).resolve().parent.parent
 SCRIPTS_DIR = ROOT / "scripts"
 CONTEXT = SCRIPTS_DIR / "CONTEXT.md"
 
-BUCKETS = ("maintained", "historical", "one-time")
+BUCKETS = ("maintained", "historical", "one-time", "fleet")
 
 # Helper modules (underscore-prefixed) are shared infrastructure, not commands: `_bootstrap.py`
 # inserts src/ onto sys.path; `_gen_instructions.py` regenerates the instruction surfaces.
