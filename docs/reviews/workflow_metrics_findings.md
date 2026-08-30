@@ -57,8 +57,14 @@ wrappers), and **0 non-empty `checkpoints` arrays**.
 | `b` (batch fraction) | **not measurable** | — | no batch-mode field |
 | throughput (phases/hr) | **73.43** (escalation campaign), **61.61** (session-routing) | `phases` + `started_at`/`ended_at` | the 16 cap_2a/2b/2c phase ledgers carry phases but no timestamps |
 | cost-per-accepted | **$27.716** over 7 accepted jobs (mean **$3.959**) | `status` + `realized_cost` | the grit grid only |
-| checkpoint latency | **not measurable** (0 records committed) | — | no `checkpoints` arrays carry `reached_at`/`decided_at` |
-| SLA | **not measurable** | — | no timeout/deadline-breach field |
+| checkpoint latency | **not measurable** (0 records committed) | — | no `checkpoints` arrays carry `reached_at`/`decided_at`; the decisions/reasons/approval-evidence distributions are reported empty |
+| SLA | **not measurable** | — | the breach fields (`stall_evidence`/`deploy_gate`/`commit_gate`/`relabel_gate`) are defined by the runner but **absent from every committed phase ledger** (all predate the runner hardening) |
+
+Alongside the pinned metrics the instrument reports two measured quantities: **W (workload volume)**
+= 8 jobs (the grit grid only; every other campaign is phase-only, so W=0), and the **phase-cost
+structure** (agent vs test vs other): pooled **$0.5047** agent-phase cost + **$0.00** test-phase
+cost + **$0.2024** untyped-phase cost across the phase ledgers — the agent/test split, not the 2b
+"wrapper vs cell" split (which lives in the campaign's own score artifacts, cited below).
 
 Pooled over the corpus: the only pooled figures that survive the measured-not-estimated rule are
 throughput (two campaigns contribute) and cost-per-accepted (one campaign contributes). Every

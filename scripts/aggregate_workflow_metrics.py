@@ -89,6 +89,12 @@ KIND_CAMPAIGN_PHASE = "campaign_phase"
 KIND_ATTEMPT = "attempt"
 KIND_OTHER = "other"
 
+#: The per-phase runner fields that carry the SLA/limit-breach evidence (a timeout via the
+#: phase watchdog ``stall_evidence``, and the mechanical gate breaches). A phase from a
+#: post-hardening runner carries these keys (``None`` = no breach); a pre-hardening ledger omits
+#: them entirely. The sla_behavior metric is only measurable over phases that actually carry them.
+BREACH_FIELDS = ("stall_evidence", "deploy_gate", "commit_gate", "relabel_gate")
+
 
 @dataclass
 class Attempt:
@@ -116,23 +122,43 @@ class Job:
 
 @dataclass
 class Phase:
-    """One workflow/campaign phase, normalized."""
+    """One workflow/campaign phase, normalized.
+
+    The runner writes structured limit/breach evidence as ``None``-or-dict fields
+    (``stall_evidence`` = the phase-watchdog timeout; ``deploy_gate``/``commit_gate``/
+    ``relabel_gate`` = the mechanical gate breaches). Those fields ARE the SLA/limit behavior the
+    pinned ``sla_behavior`` metric consumes — a non-empty value is a measured breach, ``None`` is
+    "no breach recorded".
+    """
 
     phase: str
     kind: str
     status: str
     cost_usd: float
     duration_s: float
+    model: str = ""
+    error: str = ""
+    test_executed_success: bool | None = None
+    #: True when the raw phase dict carried any of BREACH_FIELDS — the runner version that wrote
+    #: the ledger records breach evidence. A pre-hardening ledger omits these keys entirely, and
+    #: "absent key" must not be read as "no breach".
+    breach_fields_recorded: bool = False
+    stall_evidence: dict[str, Any] | None = None
+    deploy_gate: dict[str, Any] | None = None
+    commit_gate: dict[str, Any] | None = None
+    relabel_gate: dict[str, Any] | None = None
 
 
 @dataclass
 class Checkpoint:
-    """One I10 checkpoint record, normalized."""
+    """One I10 checkpoint record, normalized (phase, decision, timestamps, reason, evidence)."""
 
     phase: str
     decision: str
     reached_at: str
     decided_at: str
+    reason: str = ""
+    approval_evidence: dict[str, Any] | None = None
 
 
 @dataclass
@@ -379,6 +405,24 @@ def _extract_run_like_ledger(payload: dict[str, Any], path: str) -> LedgerCorpus
                 status=str(p.get("status") or ""),
                 cost_usd=float(p["cost_usd"]) if _is_number(p.get("cost_usd")) else 0.0,
                 duration_s=float(p["duration_s"]) if _is_number(p.get("duration_s")) else 0.0,
+                model=str(p.get("model") or ""),
+                error=str(p.get("error") or ""),
+                test_executed_success=p.get("test_executed_success")
+                if isinstance(p.get("test_executed_success"), bool)
+                else None,
+                breach_fields_recorded=any(k in p for k in BREACH_FIELDS),
+                stall_evidence=p.get("stall_evidence")
+                if isinstance(p.get("stall_evidence"), dict)
+                else None,
+                deploy_gate=p.get("deploy_gate")
+                if isinstance(p.get("deploy_gate"), dict)
+                else None,
+                commit_gate=p.get("commit_gate")
+                if isinstance(p.get("commit_gate"), dict)
+                else None,
+                relabel_gate=p.get("relabel_gate")
+                if isinstance(p.get("relabel_gate"), dict)
+                else None,
             )
         )
     for c in _checkpoints_from(payload):
@@ -388,6 +432,10 @@ def _extract_run_like_ledger(payload: dict[str, Any], path: str) -> LedgerCorpus
                 decision=str(c.get("decision") or ""),
                 reached_at=str(c.get("reached_at") or ""),
                 decided_at=str(c.get("decided_at") or ""),
+                reason=str(c.get("reason") or ""),
+                approval_evidence=c.get("approval_evidence")
+                if isinstance(c.get("approval_evidence"), dict)
+                else None,
             )
         )
     return corpus
@@ -566,11 +614,32 @@ def compute_cost_per_accepted(corpus: LedgerCorpus) -> MetricValue:
     )
 
 
-def compute_checkpoint_latency(corpus: LedgerCorpus) -> MetricValue:
-    """checkpoint latency = decided_at - reached_at per approval.
+def _decisions_distribution(checkpoints: list[Checkpoint]) -> dict[str, int]:
+    """Count the I10 checkpoint records by ``decision`` (awaiting/approved/rejected/other)."""
+    dist: dict[str, int] = {}
+    for c in checkpoints:
+        key = c.decision or "unrecorded"
+        dist[key] = dist.get(key, 0) + 1
+    return dict(sorted(dist.items()))
 
-    Requires the I10 checkpoint records with both timestamps. ``None`` timestamps or an empty
-    checkpoint array make the metric not-measurable (the coverage gap is reported, not imputed).
+
+def _reasons_distribution(checkpoints: list[Checkpoint]) -> dict[str, int]:
+    """Count the I10 checkpoint records by ``reason`` (checkpoint_reached/approval_required)."""
+    dist: dict[str, int] = {}
+    for c in checkpoints:
+        key = c.reason or "unrecorded"
+        dist[key] = dist.get(key, 0) + 1
+    return dict(sorted(dist.items()))
+
+
+def compute_checkpoint_latency(corpus: LedgerCorpus) -> MetricValue:
+    """checkpoint latency = decided_at - reached_at per approval (plus the checkpoint behavior).
+
+    The pinned definition is the latency; the p1 instrument additionally reports the checkpoint
+    *behavior* that the latency belongs to — the record count, the decision distribution
+    (awaiting/approved/rejected), the reason distribution (mechanical stop vs resume contract
+    read), and how many records carry approval evidence. ``None`` timestamps or an empty checkpoint
+    array make the latency not-measurable (the coverage gap is reported, not imputed).
     """
     latencies: list[float] = []
     for c in corpus.checkpoints:
@@ -578,6 +647,9 @@ def compute_checkpoint_latency(corpus: LedgerCorpus) -> MetricValue:
         decided = parse_timestamp(c.decided_at)
         if reached is not None and decided is not None:
             latencies.append((decided - reached).total_seconds())
+    decisions = _decisions_distribution(corpus.checkpoints)
+    reasons = _reasons_distribution(corpus.checkpoints)
+    with_evidence = sum(1 for c in corpus.checkpoints if c.approval_evidence is not None)
     if not corpus.checkpoints:
         return _not_measurable("checkpoint_latency", ["checkpoints"])
     if not latencies:
@@ -585,7 +657,12 @@ def compute_checkpoint_latency(corpus: LedgerCorpus) -> MetricValue:
             name="checkpoint_latency",
             definition=PINNED_METRIC_DEFINITIONS["checkpoint_latency"],
             measurable=False,
-            value={"checkpoint_count": len(corpus.checkpoints)},
+            value={
+                "checkpoint_count": len(corpus.checkpoints),
+                "decisions": decisions,
+                "reasons": reasons,
+                "with_approval_evidence": with_evidence,
+            },
             basis="not_measurable",
             source_fields=["checkpoints", "reached_at", "decided_at"],
             reason=f"{len(corpus.checkpoints)} checkpoint record(s) but none carry both timestamps",
@@ -607,15 +684,58 @@ def compute_checkpoint_latency(corpus: LedgerCorpus) -> MetricValue:
             "mean_seconds": round(mean, 3),
             "median_seconds": round(median, 3),
             "max_seconds": round(latencies[-1], 3),
+            "decisions": decisions,
+            "reasons": reasons,
+            "with_approval_evidence": with_evidence,
         },
         basis="measured",
-        source_fields=["reached_at", "decided_at"],
+        source_fields=["reached_at", "decided_at", "decision", "reason", "approval_evidence"],
     )
 
 
 def compute_sla_behavior(corpus: LedgerCorpus) -> MetricValue:
-    """SLA = timeouts/deadline breaches / total — no breach field is written, not-measurable."""
-    return _not_measurable("sla_behavior", ["timeout", "deadline_breach"])
+    """SLA = timeouts/deadline breaches / total, plus the runner's limit-breach evidence.
+
+    The pinned definition names ``timeouts``/``deadline breaches``. The runner writes those as
+    structured per-phase fields (``BREACH_FIELDS``): ``stall_evidence`` (the phase-watchdog
+    timeout) and the mechanical gate breaches ``deploy_gate``/``commit_gate``/``relabel_gate``. A
+    non-empty value is a measured breach. The metric is measurable ONLY over phases whose ledger
+    actually recorded the fields (``breach_fields_recorded``): a pre-hardening ledger omits the
+    keys entirely, and "absent key" must not be read as "zero breaches" — that would impute a
+    clean record onto a ledger that never recorded one.
+    """
+    recorded = [p for p in corpus.phases if p.breach_fields_recorded]
+    if not recorded:
+        return _not_measurable("sla_behavior", list(BREACH_FIELDS))
+
+    def _breach(evidence: dict[str, Any] | None) -> bool:
+        """A breach is a non-empty evidence dict (the runner writes ``None`` for no breach)."""
+        return isinstance(evidence, dict) and bool(evidence)
+
+    stall = sum(1 for p in recorded if _breach(p.stall_evidence))
+    deploy = sum(1 for p in recorded if _breach(p.deploy_gate))
+    commit = sum(1 for p in recorded if _breach(p.commit_gate))
+    relabel = sum(1 for p in recorded if _breach(p.relabel_gate))
+    total = len(recorded)
+    return MetricValue(
+        name="sla_behavior",
+        definition=PINNED_METRIC_DEFINITIONS["sla_behavior"],
+        measurable=True,
+        value={
+            "total_phases_with_breach_fields": total,
+            "timeout_breaches": stall,
+            "gate_breaches": deploy + commit + relabel,
+            "breakdown": {
+                "stall": stall,
+                "deploy_gate": deploy,
+                "commit_gate": commit,
+                "relabel_gate": relabel,
+            },
+            "timeout_breach_rate": round(stall / total, 6) if total else None,
+        },
+        basis="measured",
+        source_fields=list(BREACH_FIELDS),
+    )
 
 
 #: The metric name -> pure computation, in the §3 presentation order.
@@ -631,8 +751,37 @@ METRIC_COMPUTERS: list[tuple[str, Any]] = [
 ]
 
 
+def _phase_cost_structure(corpus: LedgerCorpus) -> dict[str, Any]:
+    """The wrapper-vs-cell phase cost structure: agent phases vs test phases (uniform across ledgers).
+
+    The runner's ``PhaseResult.kind`` is ``"agent"`` or ``"test"`` — the agent phases carry the
+    model cost, the test phases carry the independent-verification cost (``0.0`` in practice). This
+    is the phase-cost half of the "wrapper vs cells" split; the cell-side total cost lives in the
+    per-cell wrappers (heterogeneous shapes across campaigns), so this instrument reports the
+    agent/test split it can read uniformly and leaves the campaign-specific cell split to the
+    campaign's own score artifacts.
+    """
+    agent = [p for p in corpus.phases if p.kind == "agent"]
+    test = [p for p in corpus.phases if p.kind == "test"]
+    other = [p for p in corpus.phases if p.kind not in ("agent", "test")]
+    return {
+        "n_agent_phases": len(agent),
+        "n_test_phases": len(test),
+        "n_other_phases": len(other),
+        "agent_cost_usd": round(sum(p.cost_usd for p in agent), 6),
+        "test_cost_usd": round(sum(p.cost_usd for p in test), 6),
+        "other_cost_usd": round(sum(p.cost_usd for p in other), 6),
+        "total_phase_cost_usd": round(sum(p.cost_usd for p in corpus.phases), 6),
+    }
+
+
 def compute_campaign_metrics(corpus: LedgerCorpus) -> dict[str, Any]:
-    """Compute every pinned metric for one campaign, plus the exact field coverage."""
+    """Compute every pinned metric for one campaign, plus the measured quantities.
+
+    ``metrics`` is the eight pinned §3 metrics; ``workload_volume`` (W — the number of jobs
+    observed) and ``phase_cost_structure`` (agent vs test) are measured quantities the p1
+    instrument reports alongside, not redefinitions of the pinned metrics.
+    """
     metrics = {name: fn(corpus).to_dict() for name, fn in METRIC_COMPUTERS}
     return {
         "campaign": corpus.name,
@@ -643,6 +792,12 @@ def compute_campaign_metrics(corpus: LedgerCorpus) -> dict[str, Any]:
         "n_checkpoints": len(corpus.checkpoints),
         "started_at": corpus.started_at,
         "ended_at": corpus.ended_at,
+        "workload_volume": {
+            "W": len(corpus.jobs),
+            "unit": "jobs",
+            "note": "jobs/day requires a wall-clock window; W is the observed job count",
+        },
+        "phase_cost_structure": _phase_cost_structure(corpus),
         "metrics": metrics,
     }
 

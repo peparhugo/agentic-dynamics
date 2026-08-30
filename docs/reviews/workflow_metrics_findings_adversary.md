@@ -51,13 +51,19 @@ Re-derived `r` and cost-per-accepted for `cap_grit_strength_grid` from
   measurable`. **Correct.**
 - Checkpoint latency: `grep -rl '"checkpoints"' experiments/` finds zero committed files with a
   non-empty `checkpoints` array; the aggregator reports 0 records, `not_measurable`. **Correct.**
+- SLA: the breach fields (`stall_evidence`/`deploy_gate`/`commit_gate`/`relabel_gate`) are absent
+  from **all 123 committed phases** (they predate the runner hardening), so a naive "0 breaches"
+  would have imputed a clean record onto ledgers that never recorded one. The instrument reports
+  `not_measurable` over `breach_fields_recorded` — the "absent key ≠ no breach" distinction. **Correct.**
 
 ### (3) Measured-not-estimated rule — **PASS**
 
 Traced every `measurable=True` value to a ledger field: `r` → `attempts[].attempt_number`;
 throughput → `phases[].duration`/count + `started_at`/`ended_at`; cost-per-accepted →
 `cells[].status` + `cells[].realized_cost`. Every `measurable=False` value is `None` with a
-`reason` naming the missing field. No imputed figure anywhere in the output.
+`reason` naming the missing field. No imputed figure anywhere in the output — including the
+SLA/limit behavior, which is reported not-measurable over the absent breach fields rather than as a
+fabricated zero-breach record.
 
 ### (4) Coverage — complete-ledger table exact — **PASS**
 

@@ -127,6 +127,103 @@ def test_checkpoint_latency_arithmetic():
     assert result.value["max_seconds"] == pytest.approx(120.0)
 
 
+def test_checkpoint_decisions_and_reasons_distribution():
+    """The checkpoint behavior: decision + reason distribution + approval-evidence presence."""
+    corpus = _corpus(
+        checkpoints=[
+            agg.Checkpoint(
+                "p1",
+                "awaiting",
+                "2026-08-30T00:00:00+00:00",
+                "2026-08-30T00:01:00+00:00",
+                reason="checkpoint_reached",
+            ),
+            agg.Checkpoint(
+                "p1",
+                "approved",
+                "2026-08-30T00:00:00+00:00",
+                "2026-08-30T00:01:00+00:00",
+                reason="approval_required",
+                approval_evidence={"valid": True},
+            ),
+            agg.Checkpoint(
+                "p2",
+                "rejected",
+                "2026-08-30T00:00:00+00:00",
+                "2026-08-30T00:02:00+00:00",
+                reason="approval_required",
+            ),
+        ]
+    )
+    result = agg.compute_checkpoint_latency(corpus)
+    assert result.measurable is True
+    assert result.value["decisions"] == {"approved": 1, "awaiting": 1, "rejected": 1}
+    assert result.value["reasons"] == {"approval_required": 2, "checkpoint_reached": 1}
+    assert result.value["with_approval_evidence"] == 1
+
+
+def test_sla_behavior_measured_from_gate_fields():
+    """SLA/limit behavior is measured from the runner's timeout + gate-breach phase fields."""
+    corpus = _corpus(
+        phases=[
+            agg.Phase("a", "agent", "ok", 1.0, 10.0, breach_fields_recorded=True),
+            agg.Phase(
+                "b",
+                "agent",
+                "failed",
+                1.0,
+                10.0,
+                breach_fields_recorded=True,
+                stall_evidence={"reason": "STALLED"},
+            ),
+            agg.Phase(
+                "c",
+                "agent",
+                "failed",
+                1.0,
+                10.0,
+                breach_fields_recorded=True,
+                deploy_gate={"reason": "DEPLOY_GATE"},
+            ),
+        ]
+    )
+    result = agg.compute_sla_behavior(corpus)
+    assert result.measurable is True
+    assert result.basis == "measured"
+    assert result.value["total_phases_with_breach_fields"] == 3
+    assert result.value["timeout_breaches"] == 1
+    assert result.value["gate_breaches"] == 1
+    assert result.value["breakdown"]["stall"] == 1
+    assert result.value["breakdown"]["deploy_gate"] == 1
+    assert result.value["timeout_breach_rate"] == pytest.approx(1 / 3)
+
+
+def test_sla_behavior_not_measurable_when_breach_fields_absent():
+    """A pre-hardening ledger omits the breach keys entirely -> not-measurable, NOT zero breaches."""
+    corpus = _corpus(phases=[agg.Phase("a", "agent", "ok", 1.0, 10.0)])  # no breach_fields_recorded
+    result = agg.compute_sla_behavior(corpus)
+    assert result.measurable is False
+    assert result.value is None
+    assert "stall_evidence" in result.reason
+
+
+def test_workload_volume_and_phase_cost_structure_reported():
+    """W (workload volume) and the agent-vs-test phase cost structure are reported per campaign."""
+    corpus = _corpus(
+        jobs=[_job("a", 1, cost=1.0), _job("b", 1, cost=2.0)],
+        phases=[
+            agg.Phase("p", "agent", "ok", 1.5, 10.0),
+            agg.Phase("t", "test", "ok", 0.0, 1.0),
+        ],
+    )
+    row = agg.compute_campaign_metrics(corpus)
+    assert row["workload_volume"]["W"] == 2
+    assert row["phase_cost_structure"]["n_agent_phases"] == 1
+    assert row["phase_cost_structure"]["n_test_phases"] == 1
+    assert row["phase_cost_structure"]["agent_cost_usd"] == pytest.approx(1.5)
+    assert row["phase_cost_structure"]["test_cost_usd"] == pytest.approx(0.0)
+
+
 # ── Missing-field handling (covered, not imputed) ─────────────────────────────
 
 
@@ -160,7 +257,7 @@ def test_batch_fraction_is_not_measurable():
 def test_sla_behavior_is_not_measurable():
     result = agg.compute_sla_behavior(_corpus())
     assert result.measurable is False
-    assert "timeout" in result.reason
+    assert "stall_evidence" in result.reason
 
 
 # ── Pinned definitions are complete (hard rule 3) ─────────────────────────────

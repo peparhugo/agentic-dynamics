@@ -1,6 +1,6 @@
 {
   "schema": "workflow_metrics/v1",
-  "generated_at": "2026-08-30T17:46:52.848365+00:00",
+  "generated_at": "2026-08-30T17:58:36.836958+00:00",
   "pinned_definitions": {
     "retry_rate": "r = attempts with attempt_count > 1 / total attempts (per campaign)",
     "first_call_resolution": "WOC = first_pass / total",
@@ -28,6 +28,20 @@
       "n_checkpoints": 0,
       "started_at": "",
       "ended_at": "",
+      "workload_volume": {
+        "W": 0,
+        "unit": "jobs",
+        "note": "jobs/day requires a wall-clock window; W is the observed job count"
+      },
+      "phase_cost_structure": {
+        "n_agent_phases": 0,
+        "n_test_phases": 0,
+        "n_other_phases": 3,
+        "agent_cost_usd": 0,
+        "test_cost_usd": 0,
+        "other_cost_usd": 0.202402,
+        "total_phase_cost_usd": 0.202402
+      },
       "metrics": {
         "retry_rate": {
           "name": "retry_rate",
@@ -117,10 +131,12 @@
           "value": null,
           "basis": "not_measurable",
           "source_fields": [
-            "timeout",
-            "deadline_breach"
+            "stall_evidence",
+            "deploy_gate",
+            "commit_gate",
+            "relabel_gate"
           ],
-          "reason": "missing field(s): timeout, deadline_breach \u2014 not written by the runtime"
+          "reason": "missing field(s): stall_evidence, deploy_gate, commit_gate, relabel_gate \u2014 not written by the runtime"
         }
       }
     },
@@ -133,6 +149,20 @@
       "n_checkpoints": 0,
       "started_at": "",
       "ended_at": "",
+      "workload_volume": {
+        "W": 0,
+        "unit": "jobs",
+        "note": "jobs/day requires a wall-clock window; W is the observed job count"
+      },
+      "phase_cost_structure": {
+        "n_agent_phases": 6,
+        "n_test_phases": 3,
+        "n_other_phases": 1,
+        "agent_cost_usd": 0.024627,
+        "test_cost_usd": 0.0,
+        "other_cost_usd": 0.0,
+        "total_phase_cost_usd": 0.024627
+      },
       "metrics": {
         "retry_rate": {
           "name": "retry_rate",
@@ -222,10 +252,12 @@
           "value": null,
           "basis": "not_measurable",
           "source_fields": [
-            "timeout",
-            "deadline_breach"
+            "stall_evidence",
+            "deploy_gate",
+            "commit_gate",
+            "relabel_gate"
           ],
-          "reason": "missing field(s): timeout, deadline_breach \u2014 not written by the runtime"
+          "reason": "missing field(s): stall_evidence, deploy_gate, commit_gate, relabel_gate \u2014 not written by the runtime"
         }
       }
     },
@@ -238,6 +270,20 @@
       "n_checkpoints": 0,
       "started_at": "",
       "ended_at": "",
+      "workload_volume": {
+        "W": 0,
+        "unit": "jobs",
+        "note": "jobs/day requires a wall-clock window; W is the observed job count"
+      },
+      "phase_cost_structure": {
+        "n_agent_phases": 4,
+        "n_test_phases": 3,
+        "n_other_phases": 0,
+        "agent_cost_usd": 0.035029,
+        "test_cost_usd": 0.0,
+        "other_cost_usd": 0,
+        "total_phase_cost_usd": 0.035029
+      },
       "metrics": {
         "retry_rate": {
           "name": "retry_rate",
@@ -327,10 +373,12 @@
           "value": null,
           "basis": "not_measurable",
           "source_fields": [
-            "timeout",
-            "deadline_breach"
+            "stall_evidence",
+            "deploy_gate",
+            "commit_gate",
+            "relabel_gate"
           ],
-          "reason": "missing field(s): timeout, deadline_breach \u2014 not written by the runtime"
+          "reason": "missing field(s): stall_evidence, deploy_gate, commit_gate, relabel_gate \u2014 not written by the runtime"
         }
       }
     },
@@ -343,6 +391,20 @@
       "n_checkpoints": 0,
       "started_at": "",
       "ended_at": "",
+      "workload_volume": {
+        "W": 0,
+        "unit": "jobs",
+        "note": "jobs/day requires a wall-clock window; W is the observed job count"
+      },
+      "phase_cost_structure": {
+        "n_agent_phases": 11,
+        "n_test_phases": 6,
+        "n_other_phases": 0,
+        "agent_cost_usd": 0.057371,
+        "test_cost_usd": 0.0,
+        "other_cost_usd": 0,
+        "total_phase_cost_usd": 0.057371
+      },
       "metrics": {
         "retry_rate": {
           "name": "retry_rate",
@@ -432,10 +494,12 @@
           "value": null,
           "basis": "not_measurable",
           "source_fields": [
-            "timeout",
-            "deadline_breach"
+            "stall_evidence",
+            "deploy_gate",
+            "commit_gate",
+            "relabel_gate"
           ],
-          "reason": "missing field(s): timeout, deadline_breach \u2014 not written by the runtime"
+          "reason": "missing field(s): stall_evidence, deploy_gate, commit_gate, relabel_gate \u2014 not written by the runtime"
         }
       }
     },
@@ -448,6 +512,20 @@
       "n_checkpoints": 0,
       "started_at": "",
       "ended_at": "",
+      "workload_volume": {
+        "W": 0,
+        "unit": "jobs",
+        "note": "jobs/day requires a wall-clock window; W is the observed job count"
+      },
+      "phase_cost_structure": {
+        "n_agent_phases": 2,
+        "n_test_phases": 1,
+        "n_other_phases": 0,
+        "agent_cost_usd": 0.008781,
+        "test_cost_usd": 0.0,
+        "other_cost_usd": 0,
+        "total_phase_cost_usd": 0.008781
+      },
       "metrics": {
         "retry_rate": {
           "name": "retry_rate",
@@ -537,10 +615,12 @@
           "value": null,
           "basis": "not_measurable",
           "source_fields": [
-            "timeout",
-            "deadline_breach"
+            "stall_evidence",
+            "deploy_gate",
+            "commit_gate",
+            "relabel_gate"
           ],
-          "reason": "missing field(s): timeout, deadline_breach \u2014 not written by the runtime"
+          "reason": "missing field(s): stall_evidence, deploy_gate, commit_gate, relabel_gate \u2014 not written by the runtime"
         }
       }
     },
@@ -553,6 +633,20 @@
       "n_checkpoints": 0,
       "started_at": "",
       "ended_at": "",
+      "workload_volume": {
+        "W": 0,
+        "unit": "jobs",
+        "note": "jobs/day requires a wall-clock window; W is the observed job count"
+      },
+      "phase_cost_structure": {
+        "n_agent_phases": 2,
+        "n_test_phases": 1,
+        "n_other_phases": 0,
+        "agent_cost_usd": 0.015853,
+        "test_cost_usd": 0.0,
+        "other_cost_usd": 0,
+        "total_phase_cost_usd": 0.015853
+      },
       "metrics": {
         "retry_rate": {
           "name": "retry_rate",
@@ -642,10 +736,12 @@
           "value": null,
           "basis": "not_measurable",
           "source_fields": [
-            "timeout",
-            "deadline_breach"
+            "stall_evidence",
+            "deploy_gate",
+            "commit_gate",
+            "relabel_gate"
           ],
-          "reason": "missing field(s): timeout, deadline_breach \u2014 not written by the runtime"
+          "reason": "missing field(s): stall_evidence, deploy_gate, commit_gate, relabel_gate \u2014 not written by the runtime"
         }
       }
     },
@@ -658,6 +754,20 @@
       "n_checkpoints": 0,
       "started_at": "2026-08-26T12:52:13.023410+00:00",
       "ended_at": "2026-08-26T12:55:29.132538+00:00",
+      "workload_volume": {
+        "W": 0,
+        "unit": "jobs",
+        "note": "jobs/day requires a wall-clock window; W is the observed job count"
+      },
+      "phase_cost_structure": {
+        "n_agent_phases": 2,
+        "n_test_phases": 2,
+        "n_other_phases": 0,
+        "agent_cost_usd": 0.214601,
+        "test_cost_usd": 0.0,
+        "other_cost_usd": 0,
+        "total_phase_cost_usd": 0.214601
+      },
       "metrics": {
         "retry_rate": {
           "name": "retry_rate",
@@ -751,10 +861,12 @@
           "value": null,
           "basis": "not_measurable",
           "source_fields": [
-            "timeout",
-            "deadline_breach"
+            "stall_evidence",
+            "deploy_gate",
+            "commit_gate",
+            "relabel_gate"
           ],
-          "reason": "missing field(s): timeout, deadline_breach \u2014 not written by the runtime"
+          "reason": "missing field(s): stall_evidence, deploy_gate, commit_gate, relabel_gate \u2014 not written by the runtime"
         }
       }
     },
@@ -767,6 +879,20 @@
       "n_checkpoints": 0,
       "started_at": "",
       "ended_at": "",
+      "workload_volume": {
+        "W": 8,
+        "unit": "jobs",
+        "note": "jobs/day requires a wall-clock window; W is the observed job count"
+      },
+      "phase_cost_structure": {
+        "n_agent_phases": 0,
+        "n_test_phases": 0,
+        "n_other_phases": 0,
+        "agent_cost_usd": 0,
+        "test_cost_usd": 0,
+        "other_cost_usd": 0,
+        "total_phase_cost_usd": 0
+      },
       "metrics": {
         "retry_rate": {
           "name": "retry_rate",
@@ -860,10 +986,12 @@
           "value": null,
           "basis": "not_measurable",
           "source_fields": [
-            "timeout",
-            "deadline_breach"
+            "stall_evidence",
+            "deploy_gate",
+            "commit_gate",
+            "relabel_gate"
           ],
-          "reason": "missing field(s): timeout, deadline_breach \u2014 not written by the runtime"
+          "reason": "missing field(s): stall_evidence, deploy_gate, commit_gate, relabel_gate \u2014 not written by the runtime"
         }
       }
     },
@@ -876,6 +1004,20 @@
       "n_checkpoints": 0,
       "started_at": "2026-08-26T14:49:36.962198+00:00",
       "ended_at": "2026-08-26T16:03:37.863059+00:00",
+      "workload_volume": {
+        "W": 0,
+        "unit": "jobs",
+        "note": "jobs/day requires a wall-clock window; W is the observed job count"
+      },
+      "phase_cost_structure": {
+        "n_agent_phases": 51,
+        "n_test_phases": 25,
+        "n_other_phases": 0,
+        "agent_cost_usd": 0.148403,
+        "test_cost_usd": 0.0,
+        "other_cost_usd": 0,
+        "total_phase_cost_usd": 0.148403
+      },
       "metrics": {
         "retry_rate": {
           "name": "retry_rate",
@@ -969,10 +1111,12 @@
           "value": null,
           "basis": "not_measurable",
           "source_fields": [
-            "timeout",
-            "deadline_breach"
+            "stall_evidence",
+            "deploy_gate",
+            "commit_gate",
+            "relabel_gate"
           ],
-          "reason": "missing field(s): timeout, deadline_breach \u2014 not written by the runtime"
+          "reason": "missing field(s): stall_evidence, deploy_gate, commit_gate, relabel_gate \u2014 not written by the runtime"
         }
       }
     }
