@@ -1,0 +1,166 @@
+name: retry_observational_analysis
+question: >-
+  The observational retry-worthiness analysis (the grit-campaign replacement — the operator's
+  stand-back review: the retry decision is a LOOKUP, not a response curve, and the retry data
+  now exists in the attempt ledgers). The machine retries failing cells every day, guessing.
+  This workflow answers: **does the machine's retry behavior save money or burn it, and what
+  does the machine know at first-failure that predicts whether a retry rescues the attempt?**
+  The deliverable: the retry-worthiness lookup — per failed attempt, the known-at-failure
+  signals (the measured [H] confidence, the perturbation strength, the cost-so-far, the
+  attempt number) vs the retry's outcome (rescued / failed-again / no-retry-was-worse) —
+  the rescue-rate-by-signal table, the measured WOC (the framework's 1/(1+r)), and the retry
+  economics at the measured E_x. The approach is OBSERVATIONAL: the corpus's existing
+  fail → retry → outcome chains (the attempt records the ledger instrumentation wired) —
+  near-zero cost, no controlled grid, no cells — with the honest coverage (the attempts with
+  complete retry chains) + the confounds disclosed (the observational strengths are
+  uncontrolled).
+version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: false
+repeatable: false
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: true
+    context:
+      domain_context: >-
+        PROVISIONAL DomainProfile. domain: measurement (the retry-worthiness lookup).
+        canonical_sources: [the attempt ledgers (experiments/results/workflows/*/*.json — the
+        attempt_count / first_pass / retry_reason / accepted fields the ledger-instrumentation
+        wired), the story results (the fail → retry → outcome chains per cell), the [H]
+        confidence field (the per-attempt execution-confidence at emission), the perturbation
+        strength (the cells' condition_strength), the E_x values (the escalation measurement
+        campaign), the retry economics (the retry cost vs the rescue value at E_x)].
+        policies: [observational_not_controlled, confounds_disclosed, coverage_honest,
+        lookup_not_curve]
+      challenge_context: >-
+        PROVISIONAL ChallengeProfile. challenge: measurement (the observational retry
+        analysis). deliberation: [extract the chains, compute the lookup, findings,
+        adversarial]. session_policy: {default: fork_per_phase}
+      current_state: >-
+        The grit campaign is PARKED (the operator's review — the full 84-cell curve
+        over-built for the operational lookup). The retry data exists: the attempt records
+        (the ledger fields wired), the story results (the per-session chains), the
+        confidence + strengths. The machine retries failing cells with no measured signal
+        for the decision. The analysis is observational — the corpus's existing retry
+        events.
+      hard_rules: >-
+        (1) Every phase commits '[workflow] <phase>' (the worktree hook); docs carry
+        status frontmatter (DOC_CONTRACT).
+        (2) OBSERVATIONAL, NOT CONTROLLED: the analysis uses the corpus's EXISTING
+        fail → retry → outcome chains — no new cells, no grid, no assigned treatments. A
+        "controlled" claim is a FAILED finding.
+        (3) THE LOOKUP DEFINITIONS PINNED: per failed attempt — the rescue signal =
+        retry succeeded (the retry's test_executed_success) vs retry failed vs no-retry-
+        was-taken; the known-at-failure features = the [H] confidence, the perturbation
+        strength, the cost-so-far, the attempt number. A deviating definition is a FAILED
+        finding.
+        (4) CONFOUNDS DISCLOSED: the observational strengths are uncontrolled (the
+        campaigns' assignments, not a designed grid) — every relationship is a correlation,
+        reported as such, never a causal claim.
+        (5) COVERAGE HONEST: the attempts with complete retry chains / the total — exactly;
+        an imputed chain is a FAILED finding.
+        (6) MEASURED, NOT ESTIMATED: every number traces to a measured field.
+        (7) THE ECONOMICS AT E_x: the rescue value vs the retry cost at the measured E_x
+        (11.47/28) — the retry-worthiness boundary (the cost of a rescued attempt's retry
+        vs the value of the rescue).
+        (8) BOUNDED PHASES: p1 extracts the chains; p2 computes the lookup + the economics;
+        p3 the findings; p4 the adversarial.
+        (9) Every number cites its source. (10) No cells, no grid, no new runs. (11) p4
+        adversarial mandatory. (12) Resumable per the match checks.
+      read_first: >-
+        the attempt ledgers (experiments/results/workflows/*/*.json), the story results
+        (the fail → retry chains), the E_x measurement score
+      run_shape: >-
+        SINGLE wrapper: deepseek/deepseek-v4-pro. One branch
+        (feature/retry-observational); each phase commits [workflow] <phase>; the outputs
+        under experiments/results/retry_analysis/. No cells, no grid.
+    phases:
+      - name: p0_pin_definitions
+        kind: agent
+        timeout: 3600
+        prompt: |
+          GOAL: {goal}
+          ROLE: verification — the observational framing is the mandate. Append this spec's
+          SHA256 to the grit design's parking note (the ONLY edit allowed). Verify the
+          lookup definitions (the rescue signal, the known-at-failure features, the pinned
+          hard rules) are complete. A deviation is a FAILED finding.
+          DELIVER: the pinned header + verification; committed.
+          LOG: PASS/FAIL; commit.
+      - name: p1_extract_chains
+        kind: agent
+        timeout: 28800
+        prompt: |
+          GOAL: {goal}
+          ROLE: extract the corpus's fail → retry → outcome chains — BOUNDED to the
+          extraction. Walk the attempt ledgers + the story results: every failed first
+          attempt (the attempt_count / first_pass records + the story sessions' failures),
+          its retry (if any — the retry_reason + the retry's outcome), and the
+          known-at-first-failure features (the [H] confidence, the perturbation strength,
+          the cost-so-far). The chains table (the retry events) + the coverage (complete
+          chains vs the attempts — exactly). Commit the chains under
+          experiments/results/retry_analysis/.
+          LOG: the chain count + the coverage; PASS/FAIL; commit.
+      - name: p2_compute_lookup
+        kind: agent
+        timeout: 28800
+        prompt: |
+          GOAL: {goal}
+          ROLE: compute the retry-worthiness lookup — BOUNDED to the computation. From
+          p1's chains: (1) the rescue-rate-by-signal table (the rescue rate binned by the
+          confidence deciles, the strength, the cost-so-far — the known-at-failure
+          features), (2) the measured WOC = 1/(1+r) from the corpus's retries, (3) the
+          retry economics at E_x (the rescue value vs the retry cost — the
+          retry-worthiness boundary), (4) the no-retry-was-worse rate (the failed-without-
+          retry attempts' downstream cost vs the retried ones). The confounds + the
+          coverage disclosed alongside. Commit the lookup + the tables.
+          LOG: the lookup summary; PASS/FAIL; commit.
+      - name: p3_findings
+        kind: agent
+        timeout: 21600
+        prompt: |
+          GOAL: {goal}
+          ROLE: the findings — write docs/reviews/retry_worthiness_findings.md (status:
+          accepted) from p2. The methodology (the observational framing, the pinned
+          definitions, the coverage, the confounds), the retry-worthiness lookup (the
+          rescue-rate-by-signal + the boundary at E_x), the measured WOC + r, the
+          framework correction (the "11.5% scenario" vs the measured r; the WOC claim),
+          the retry policy recommendation (the lookup the machine should read at
+          first-failure — what feature to gate on, if any), the honest limits (the
+          observational confounds, the coverage).
+          DELIVER: the findings doc; commit.
+          LOG: the findings list; PASS/FAIL; commit.
+      - name: p4_adversarial
+        kind: agent
+        timeout: 21600
+        prompt: |
+          GOAL: {goal}
+          ROLE: adversarial — falsify the findings. (1) The observational framing (no
+          controlled claim — a "caused" statement is a FAILED finding); (2) the arithmetic
+          (re-derive the WOC + at least one rescue-rate bin from the raw chains); (3) the
+          coverage (the complete-chains table exact); (4) the confounds disclosed; (5) the
+          economics at E_x (the boundary re-derived); (6) the citations resolve. Deliver
+          docs/reviews/retry_worthiness_findings_adversary.md + _known_safe.md (status:
+          accepted).
+          LOG: finding table + known-safe; PASS/FAIL; commit.
+factors:
+  - {name: model, levels: [deepseek/deepseek-v4-pro]}
+design: factorial
+rules:
+  - {name: chains_extracted, plane: measurement, evidence_class: "[M]", requires: [], produces: [retry_chains]}
+  - {name: lookup_computed, plane: measurement, evidence_class: "[C]", requires: [retry_chains], produces: [retry_worthiness_lookup, measured_woc]}
+  - {name: findings_written, plane: measurement, evidence_class: "[C]", requires: [retry_worthiness_lookup, measured_woc], produces: [retry_findings]}
+  - {name: findings_verified, plane: measurement, evidence_class: "[C]", requires: [retry_findings], produces: [retry_findings_known_safe]}
+metrics:
+  - {name: observational_fidelity, agg: mean, over: cell}
+  - {name: coverage_honesty, agg: mean, over: cell}
+comparison: {kind: effect_size, arm_factor: model, loss: {cost: 1.0, quality: 0.0, value: 0.0}}
+writeup:
+  format: lab_book
+  sections: [question, p0_pin_definitions, p1_extract_chains, p2_compute_lookup, p3_findings, p4_adversarial]
+stop: {budget_usd: 30.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}

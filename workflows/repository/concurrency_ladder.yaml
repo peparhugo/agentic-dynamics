@@ -1,0 +1,173 @@
+name: concurrency_ladder
+question: >-
+  The β coordination-tax measurement — the concurrency ladder (the design
+  docs/experiments/designs/... the β design's §3 — wait, the design's path:
+  docs/designs/proposed/beta_snowball_measurement_design.md §3). Run the SAME grid at
+  **1 / 2 / 4 / 8 concurrent workers** and measure, at each rung: the coordination
+  overhead (wrapper + merge + chain + review) / (cell) per campaign, the wall-clock per
+  grid, the throughput (cells/hour), and the coordination events (merges, conflicts, chain
+  waits). The expected shape: the overhead curve bends up as the concurrency grows (the N²
+  snowball) — the operator's lived ceiling (4-5 concurrent sessions -> 1 workflow as
+  complexity grew) is the prior, and the fleet ladder's small-scoped parallel units (the
+  per-step scope model + the worker pools) are the countermeasure this curve measures
+  BEFORE and the ladder's re-measurement will verify AFTER. The measurements run ON THE
+  FLEET (the containerized worker pools at the scales 1/2/4/8 — the ladder's own
+  machinery), and the wall-clock + overhead are computed per rung from the ledgers.
+version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: true
+repeatable: false
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: true
+    context:
+      domain_context: >-
+        PROVISIONAL DomainProfile. domain: measurement (the coordination-tax curve).
+        canonical_sources: [docs/designs/proposed/beta_snowball_measurement_design.md (§2-3
+        — the coordination-overhead formula + the ladder preregistration sketch), the 2b
+        63% wrapper-share prior, the fleet's pools (the containerized workers +
+        scripts/fleet/fleet_manager.py's fleet:commands for the resize), the ledgers
+        (the wrapper vs cell costs per campaign)].
+        policies: [ladder_fixed_grid, concurrency_only_varied, overhead_measured,
+        prior_honest]
+      challenge_context: >-
+        PROVISIONAL ChallengeProfile. challenge: measurement (the β curve). deliberation:
+        [rung 1, rung 2, rung 4, rung 8, compute + findings, adversarial].
+        session_policy: {default: fork_per_phase}
+      current_state: >-
+        The β design is committed (proposed). The fleet's containerized pools are live
+        (the story workers at scale 4). The coordination-tax formula is pinned
+        (wrapper + merge + chain + review) / (cell). The 2b 63% wrapper share is the
+        prior. The operator's lived ceiling the curve should reproduce.
+      hard_rules: >-
+        (1) Every phase commits '[workflow] <phase>' (the worktree hook); docs carry
+        status frontmatter (DOC_CONTRACT).
+        (2) THE LADDER RULES PINNED: the SAME grid at the FOUR rungs (1/2/4/8) — the
+        concurrency is the ONLY varied factor; the grid (the story cells) is fixed; a
+        varied grid or a fifth rung is a FAILED finding.
+        (3) THE OVERHEAD FORMULA PINNED: coordination_overhead = (wrapper + merge + chain
+        + review) / (cell) per campaign, from the ledgers/git/chain/review records — a
+        deviating formula is a FAILED finding.
+        (4) THE FLEET IS THE MACHINERY: the rungs resize the fleet's worker pools (the
+        fleet:commands channel or the direct scales) — the measurement is ON the fleet; a
+        host-native worker pool at a rung is a FAILED finding (the ladder measured, not
+        the legacy path).
+        (5) THE PRIOR IS HONEST: the operator's lived ceiling is recorded as [H], never as
+        a measurement.
+        (6) THE ECONOMICS AT E_x: the rescue... (not applicable — this is the coordination
+        curve, the retry economics excluded).
+        (7) THE WALL-CLOCK + THROUGHPUT measured per rung (the rung's grid wall-clock, the
+        cells/hour).
+        (8) BOUNDED PHASES: p1 rung 1, p2 rung 2, p3 rung 4, p4 rung 8, p5 compute +
+        findings, p6 adversarial.
+        (9) Every number cites its source. (10) The data chain stays single-writer; the
+        fleet's production pools are untouched beyond the rung scales (restored after).
+        (11) p6 adversarial mandatory. (12) Resumable per the match checks.
+      read_first: >-
+        docs/designs/proposed/beta_snowball_measurement_design.md (§2-3),
+        scripts/fleet/fleet_manager.py (the fleet:commands resize path), the 2b ledger
+      run_shape: >-
+        SINGLE wrapper: deepseek/deepseek-v4-pro. One branch
+        (feature/concurrency-ladder); each phase commits [workflow] <phase>. The grid =
+        a fixed story-cell set (the standard set); each rung resizes the fleet's pools.
+        The outputs under experiments/results/concurrency_ladder/.
+    phases:
+      - name: p0_pin_mandate
+        kind: agent
+        timeout: 3600
+        prompt: |
+          GOAL: {goal}
+          ROLE: verification — the β design §2-3 is the mandate. Append this spec's
+          SHA256 to the design's header (the ONLY edit allowed). Verify the ladder rules
+          (the pinned formula, the four rungs, the fixed grid). A deviation is a FAILED
+          finding.
+          DELIVER: the pinned header + verification; committed.
+          LOG: PASS/FAIL; commit.
+      - name: p1_rung1
+        kind: agent
+        timeout: 21600
+        prompt: |
+          GOAL: {goal}
+          ROLE: rung 1 — the fixed grid at 1 concurrent worker. Resize the fleet's story
+          pool to ONE worker (the fleet:commands channel or the direct scale), enqueue the
+          fixed grid's cells, record the rung's metrics: the grid's wall-clock, the
+          cells/hour (throughput), the coordination events (merges, conflicts, chain
+          waits), the overhead components (the wrapper + merge + chain + review vs the
+          cell costs from the ledger). Record the rung's rows. Restore the pool scale
+          after. Commit the rung's data.
+          LOG: the rung's metrics; PASS/FAIL; commit.
+      - name: p2_rung2
+        kind: agent
+        timeout: 21600
+        prompt: |
+          GOAL: {goal}
+          ROLE: rung 2 — the SAME grid at 2 concurrent workers. Same recording discipline
+          (the wall-clock, throughput, coordination events, overhead components). The
+          fleet's pool to TWO workers. Record + commit.
+          LOG: the rung's metrics; PASS/FAIL; commit.
+      - name: p3_rung4
+        kind: agent
+        timeout: 21600
+        prompt: |
+          GOAL: {goal}
+          ROLE: rung 4 — the SAME grid at 4 concurrent workers (the current production
+          scale). Same recording. Record + commit.
+          LOG: the rung's metrics; PASS/FAIL; commit.
+      - name: p4_rung8
+        kind: agent
+        timeout: 21600
+        prompt: |
+          GOAL: {goal}
+          ROLE: rung 8 — the SAME grid at 8 concurrent workers. Same recording. Record +
+          commit.
+          LOG: the rung's metrics; PASS/FAIL; commit.
+      - name: p5_compute_findings
+        kind: agent
+        timeout: 21600
+        prompt: |
+          GOAL: {goal}
+          ROLE: compute the β curve + the findings — BOUNDED to the computation. From the
+          four rungs' rows: (1) the coordination-overhead curve (overhead vs concurrency —
+          the N² bend), (2) the throughput curve (cells/hour vs rung), (3) the
+          coordination-events curve (merges/conflicts/waits vs rung), (4) the 2b 63% prior
+          confirmed or corrected, (5) the operator's lived-ceiling reproduction (where the
+          overhead spikes). Write docs/reviews/concurrency_ladder_findings.md (status:
+          accepted): the methodology, the curves, the β interpretation (the measured
+          snowball), the WFM implication (the optimal concurrency vs the overhead — T_max
+          adjusted), the honest limits (the single grid, the fleet's shape). Commit.
+          LOG: the curve summary; PASS/FAIL; commit.
+      - name: p6_adversarial
+        kind: agent
+        timeout: 21600
+        prompt: |
+          GOAL: {goal}
+          ROLE: adversarial — falsify the findings. (1) The ladder rules (the same grid at
+          the four rungs — a varied grid is a FAILED finding); (2) the formula (re-derive
+          at least one rung's overhead from the raw records); (3) the fleet machinery (the
+          rungs resized the FLEET's pools — a host-native rung is a FAILED finding); (4)
+          the prior-honesty (the lived ceiling as [H]); (5) the arithmetic (the curves
+          re-derived); (6) the citations. Deliver docs/reviews/concurrency_ladder_findings_adversary.md
+          + _known_safe.md (status: accepted).
+          LOG: finding table + known-safe; PASS/FAIL; commit.
+factors:
+  - {name: model, levels: [deepseek/deepseek-v4-pro]}
+design: factorial
+rules:
+  - {name: rungs_run, plane: measurement, evidence_class: "[M]", requires: [], produces: [rung_metrics]}
+  - {name: beta_curve_computed, plane: measurement, evidence_class: "[C]", requires: [rung_metrics], produces: [coordination_overhead_curve]}
+  - {name: findings_written, plane: measurement, evidence_class: "[C]", requires: [coordination_overhead_curve], produces: [ladder_findings]}
+  - {name: findings_verified, plane: measurement, evidence_class: "[C]", requires: [ladder_findings], produces: [ladder_findings_known_safe]}
+metrics:
+  - {name: overhead_curve, agg: mean, over: cell}
+  - {name: throughput_curve, agg: mean, over: cell}
+comparison: {kind: effect_size, arm_factor: model, loss: {cost: 1.0, quality: 0.0, value: 0.0}}
+writeup:
+  format: lab_book
+  sections: [question, p0_pin_mandate, p1_rung1, p2_rung2, p3_rung4, p4_rung8, p5_compute_findings, p6_adversarial]
+stop: {budget_usd: 30.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}
