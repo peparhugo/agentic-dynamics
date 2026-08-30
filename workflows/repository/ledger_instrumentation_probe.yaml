@@ -1,0 +1,50 @@
+name: ledger_instrumentation_probe
+question: >-
+  Probe fixture (ledger_instrumentation p2 — the fresh-run verification): does the
+  instrumented workflow runner emit the COMPLETE ledger — the attempt fields
+  (attempt_count/retry_reason/first_pass/accepted), the breach fields (stall_evidence/
+  deploy_gate/commit_gate/relabel_gate), and the committed checkpoints array (a real
+  checkpoint_reached record with reached_at/decided_at) — so the autonomous-workflow
+  operating metrics are measurable from the committed corpus?
+version: "0.1"
+artifact_kind: workflow
+intent: measure
+side_effects:
+  repository: true
+  external_services: false
+repeatable: true
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    phases:
+      - name: scope
+        kind: agent
+        prompt: |
+          Write docs/scope.md scoping the following feature.
+
+          GOAL:
+          {goal}
+
+          DELIVER exactly one file, docs/scope.md, with (1) a problem statement and
+          (2) a numbered acceptance list.
+      - name: gate
+        kind: agent
+        checkpoint: true
+        prompt: |
+          Review docs/scope.md against the goal ({goal}) and record your verdict.
+
+          DELIVER exactly one file, docs/review.md, containing a PASS or FAIL verdict
+          plus a one-line rationale.
+factors:
+  - {name: model, levels: [openai/gpt-5.6-sol]}
+design: factorial
+rules: []
+metrics:
+  - {name: schema_fidelity, agg: mean, over: cell}
+comparison: {kind: effect_size, arm_factor: model, loss: {cost: 1.0, quality: 0.0, value: 0.0}}
+writeup:
+  format: lab_book
+  sections: [question]
+stop: {budget_usd: 1.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}

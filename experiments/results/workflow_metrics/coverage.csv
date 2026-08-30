@@ -8,3 +8,4 @@ cap_adaptive_2c,1,0,0,3,0,False,False,False,False,False,False,False,False,
 cap_escalation_measurement,2,0,0,4,0,False,False,False,False,True,False,False,False,throughput
 cap_grit_strength_grid,1,8,9,0,0,True,False,False,False,False,True,False,False,"retry_rate,cost_per_accepted"
 cap_session_routing_prospective,26,0,0,76,0,False,False,False,False,True,False,False,False,throughput
+ledger_instrumentation_probe,1,2,2,2,1,True,True,True,False,True,True,True,True,"retry_rate,cost_per_accepted,throughput,checkpoint_latency"

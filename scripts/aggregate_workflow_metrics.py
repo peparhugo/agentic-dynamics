@@ -108,13 +108,26 @@ FRAMEWORK_EX_PRICE_RATIOS = {  # framework.html:748 — PRICE RATIOS [X], not me
 
 @dataclass
 class Attempt:
-    """One attempt row, normalized across the three ledger shapes."""
+    """One attempt row, normalized across the three ledger shapes.
+
+    ``first_pass`` / ``accepted`` / ``escalation_from`` / ``escalation_to`` are the fields the
+    runner now emits (ledger_instrumentation p1); ``None`` means "this ledger never recorded
+    the field" (the pre-instrumentation corpus), True/False means "recorded". Because an
+    escalation field is ``None`` both when it is absent AND when the runner recorded
+    "no escalation", the ``escalation_fields_recorded`` flag distinguishes the two — exactly the
+    ``Phase.breach_fields_recorded`` distinction, one level down.
+    """
 
     job_id: str
     attempt_number: int
     status: str
     cost_usd: float
     retry_reason: str
+    first_pass: bool | None = None
+    accepted: bool | None = None
+    escalation_from: str | None = None
+    escalation_to: str | None = None
+    escalation_fields_recorded: bool = False
 
 
 @dataclass
@@ -395,14 +408,39 @@ def _checkpoints_from(payload: dict[str, Any]) -> list[dict[str, Any]]:
     return []
 
 
+def _attempts_from(payload: dict[str, Any]) -> list[dict[str, Any]]:
+    """The attempt array (``AttemptRecord`` rows), descending into a nested ``run_ledger``.
+
+    ledger_instrumentation p1: the workflow-run ledger now emits one attempt record per agent
+    phase. Old ledgers carry no ``attempts`` key — an absent key is an empty list here, never a
+    fabricated attempt.
+    """
+    attempts = payload.get("attempts")
+    if isinstance(attempts, list):
+        return [a for a in attempts if isinstance(a, dict)]
+    run_ledger = payload.get("run_ledger")
+    if isinstance(run_ledger, dict) and isinstance(run_ledger.get("attempts"), list):
+        return [a for a in run_ledger["attempts"] if isinstance(a, dict)]
+    return []
+
+
 def _extract_run_like_ledger(payload: dict[str, Any], path: str) -> LedgerCorpus:
-    """Normalize a workflow-run or campaign-phase ledger into phases + checkpoints.
+    """Normalize a workflow-run or campaign-phase ledger into phases + checkpoints + attempts.
 
     The campaign key is the DIRECTORY that owns the ledger under ``experiments/results/`` (the
     "per campaign" unit), not the ledger's own ``spec_name`` — a campaign's phase ledgers are
     often minted by a per-cell spec (e.g. the 26 session-routing ledgers all carry
     ``spec_name: cap_session_policy_cell``), and pooling them under the cell-spec name would
     fragment one campaign into a name per cell.
+
+    The attempt emission (ledger_instrumentation p1) maps each agent phase to ONE single-attempt
+    job: the runner makes exactly one attempt per phase (never retries, never escalates), so
+    ``attempt_number`` is always 1 and ``retry_reason`` is always empty. Each attempt row becomes
+    one :class:`Job` (``n_attempts=1``, scoped ``job_id:<phase>`` so two phases never collapse
+    into one "retried" job) plus one :class:`Attempt` carrying the recorded ``first_pass`` /
+    ``accepted`` / ``escalation_from`` / ``escalation_to``. The honest consequence is a retry
+    rate of 0 — the workflow runner genuinely does not retry; a phase is a sequential step, not a
+    second attempt of the same job.
     """
     corpus = LedgerCorpus(name=_campaign_name(path), paths=[path])
     corpus.started_at = str(payload.get("started_at") or "")
@@ -446,6 +484,42 @@ def _extract_run_like_ledger(payload: dict[str, Any], path: str) -> LedgerCorpus
                 approval_evidence=c.get("approval_evidence")
                 if isinstance(c.get("approval_evidence"), dict)
                 else None,
+            )
+        )
+    for a in _attempts_from(payload):
+        # Scope the job to the phase: the runner's own ``job_id`` is the RUN cell; two phases of
+        # the same run share it. Appending the phase makes each phase its own single-attempt job,
+        # so the retry-rate metric reads "no job had more than one attempt" (the honest truth),
+        # never "the run made N phases therefore N retries".
+        job_id = f"{a.get('job_id') or _campaign_name(path)}:{a.get('phase') or '?'}"
+        status = str(a.get("status") or "")
+        cost = float(a["cost_usd"]) if _is_number(a.get("cost_usd")) else 0.0
+        first_pass = a.get("first_pass") if isinstance(a.get("first_pass"), bool) else None
+        accepted = a.get("accepted") if isinstance(a.get("accepted"), bool) else None
+        escalation_fields_recorded = "escalation_from" in a or "escalation_to" in a
+        corpus.jobs.append(
+            Job(
+                job_id=job_id,
+                n_attempts=1,
+                status=status,
+                cost_usd=cost,
+                accepted=accepted,
+                started_at="",
+                ended_at="",
+            )
+        )
+        corpus.attempts.append(
+            Attempt(
+                job_id=job_id,
+                attempt_number=int(a.get("attempt_number") or 1),
+                status=status,
+                cost_usd=cost,
+                retry_reason=str(a.get("retry_reason") or ""),
+                first_pass=first_pass,
+                accepted=accepted,
+                escalation_from=a.get("escalation_from"),
+                escalation_to=a.get("escalation_to"),
+                escalation_fields_recorded=escalation_fields_recorded,
             )
         )
     return corpus
@@ -524,13 +598,51 @@ def compute_retry_rate(corpus: LedgerCorpus) -> MetricValue:
 
 
 def compute_first_call_resolution(corpus: LedgerCorpus) -> MetricValue:
-    """WOC = first_pass / total — ``first_pass`` is declared-not-written, so not-measurable."""
-    return _not_measurable("first_call_resolution", ["first_pass"])
+    """WOC = first_pass / total.
+
+    ledger_instrumentation p1: ``first_pass`` is now written by the runner, so the metric is
+    measurable over attempts that actually record it (``first_pass is not None``). An attempt
+    from a pre-instrumentation ledger leaves the field ``None`` and is a coverage gap, never a
+    fabricated pass or fail — the measured-not-estimated rule, one level down from the phases.
+    """
+    recorded = [a for a in corpus.attempts if a.first_pass is not None]
+    if not recorded:
+        return _not_measurable("first_call_resolution", ["first_pass"])
+    total = len(recorded)
+    first_pass = sum(1 for a in recorded if a.first_pass)
+    return MetricValue(
+        name="first_call_resolution",
+        definition=PINNED_METRIC_DEFINITIONS["first_call_resolution"],
+        measurable=True,
+        value=round(first_pass / total, 6),
+        basis="measured",
+        source_fields=["first_pass"],
+        reason=f"{first_pass}/{total} attempts passed on the first attempt",
+    )
 
 
 def compute_escalation_rate(corpus: LedgerCorpus) -> MetricValue:
-    """escalation rate = escalations / total — no escalation marker is written, not-measurable."""
-    return _not_measurable("escalation_rate", ["escalation_from", "escalation_to"])
+    """escalation rate = escalations / total.
+
+    ledger_instrumentation p1: ``escalation_from``/``escalation_to`` are now written (``None`` =
+    "no escalation", since the runner never escalates), so the metric is measurable over attempts
+    whose ledger recorded the fields. The ``escalation_fields_recorded`` flag is what separates
+    "recorded as None" (measurable, 0 escalations) from "absent" (a pre-instrumentation gap).
+    """
+    recorded = [a for a in corpus.attempts if a.escalation_fields_recorded]
+    if not recorded:
+        return _not_measurable("escalation_rate", ["escalation_from", "escalation_to"])
+    total = len(recorded)
+    escalations = sum(1 for a in recorded if a.escalation_to is not None)
+    return MetricValue(
+        name="escalation_rate",
+        definition=PINNED_METRIC_DEFINITIONS["escalation_rate"],
+        measurable=True,
+        value=round(escalations / total, 6),
+        basis="measured",
+        source_fields=["escalation_from", "escalation_to"],
+        reason=f"{escalations}/{total} attempts escalated",
+    )
 
 
 def compute_batch_fraction(corpus: LedgerCorpus) -> MetricValue:

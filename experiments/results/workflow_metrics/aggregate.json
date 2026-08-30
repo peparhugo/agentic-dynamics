@@ -1,6 +1,6 @@
 {
   "schema": "workflow_metrics/v1",
-  "generated_at": "2026-08-30T18:02:58.738365+00:00",
+  "generated_at": "2026-08-30T19:09:41.821869+00:00",
   "pinned_definitions": {
     "retry_rate": "r = attempts with attempt_count > 1 / total attempts (per campaign)",
     "first_call_resolution": "WOC = first_pass / total",
@@ -11,8 +11,8 @@
     "checkpoint_latency": "the checkpoint latency = decided_at - reached_at per approval",
     "sla_behavior": "SLA = the timeouts/deadline breaches / total"
   },
-  "n_ledgers_discovered": 45,
-  "n_campaigns": 9,
+  "n_ledgers_discovered": 46,
+  "n_campaigns": 10,
   "run_ledger_coverage": {
     "referenced": 118,
     "present": 0,
@@ -1119,15 +1119,172 @@
           "reason": "missing field(s): stall_evidence, deploy_gate, commit_gate, relabel_gate \u2014 not written by the runtime"
         }
       }
+    },
+    {
+      "campaign": "ledger_instrumentation_probe",
+      "n_ledgers": 1,
+      "n_jobs": 2,
+      "n_attempts": 2,
+      "n_phases": 2,
+      "n_checkpoints": 1,
+      "started_at": "2026-08-30T19:05:47.987453+00:00",
+      "ended_at": "2026-08-30T19:05:48.077328+00:00",
+      "workload_volume": {
+        "W": 2,
+        "unit": "jobs",
+        "note": "jobs/day requires a wall-clock window; W is the observed job count"
+      },
+      "phase_cost_structure": {
+        "n_agent_phases": 2,
+        "n_test_phases": 0,
+        "n_other_phases": 0,
+        "agent_cost_usd": 0.002,
+        "test_cost_usd": 0,
+        "other_cost_usd": 0,
+        "total_phase_cost_usd": 0.002
+      },
+      "metrics": {
+        "retry_rate": {
+          "name": "retry_rate",
+          "definition": "r = attempts with attempt_count > 1 / total attempts (per campaign)",
+          "measurable": true,
+          "value": 0.0,
+          "basis": "derived",
+          "source_fields": [
+            "attempts",
+            "attempt_number"
+          ],
+          "reason": "0/2 jobs with >1 attempt (attempt_count derived from the attempts array)"
+        },
+        "first_call_resolution": {
+          "name": "first_call_resolution",
+          "definition": "WOC = first_pass / total",
+          "measurable": true,
+          "value": 1.0,
+          "basis": "measured",
+          "source_fields": [
+            "first_pass"
+          ],
+          "reason": "2/2 attempts passed on the first attempt"
+        },
+        "escalation_rate": {
+          "name": "escalation_rate",
+          "definition": "escalation rate = the escalations / total",
+          "measurable": true,
+          "value": 0.0,
+          "basis": "measured",
+          "source_fields": [
+            "escalation_from",
+            "escalation_to"
+          ],
+          "reason": "0/2 attempts escalated"
+        },
+        "batch_fraction": {
+          "name": "batch_fraction",
+          "definition": "b = batch-mode jobs / total",
+          "measurable": false,
+          "value": null,
+          "basis": "not_measurable",
+          "source_fields": [
+            "batch_mode"
+          ],
+          "reason": "missing field(s): batch_mode \u2014 not written by the runtime"
+        },
+        "throughput": {
+          "name": "throughput",
+          "definition": "throughput = cells or phases per hour per campaign",
+          "measurable": true,
+          "value": {
+            "phases_per_hour": 80111.2656,
+            "phases": 2,
+            "span_hours": 0.0
+          },
+          "basis": "derived",
+          "source_fields": [
+            "phases",
+            "started_at",
+            "ended_at"
+          ],
+          "reason": ""
+        },
+        "cost_per_accepted": {
+          "name": "cost_per_accepted",
+          "definition": "cost-per-accepted = the accepted outcomes' cost",
+          "measurable": true,
+          "value": {
+            "accepted_count": 1,
+            "total_accepted_cost_usd": 0.001
+          },
+          "basis": "measured",
+          "source_fields": [
+            "status",
+            "realized_cost"
+          ],
+          "reason": ""
+        },
+        "checkpoint_latency": {
+          "name": "checkpoint_latency",
+          "definition": "the checkpoint latency = decided_at - reached_at per approval",
+          "measurable": true,
+          "value": {
+            "checkpoint_count": 1,
+            "approvals_with_timestamps": 1,
+            "mean_seconds": 0.0,
+            "median_seconds": 0.0,
+            "max_seconds": 0.0,
+            "decisions": {
+              "awaiting": 1
+            },
+            "reasons": {
+              "checkpoint_reached": 1
+            },
+            "with_approval_evidence": 0
+          },
+          "basis": "measured",
+          "source_fields": [
+            "reached_at",
+            "decided_at",
+            "decision",
+            "reason",
+            "approval_evidence"
+          ],
+          "reason": ""
+        },
+        "sla_behavior": {
+          "name": "sla_behavior",
+          "definition": "SLA = the timeouts/deadline breaches / total",
+          "measurable": true,
+          "value": {
+            "total_phases_with_breach_fields": 2,
+            "timeout_breaches": 0,
+            "gate_breaches": 0,
+            "breakdown": {
+              "stall": 0,
+              "deploy_gate": 0,
+              "commit_gate": 0,
+              "relabel_gate": 0
+            },
+            "timeout_breach_rate": 0.0
+          },
+          "basis": "measured",
+          "source_fields": [
+            "stall_evidence",
+            "deploy_gate",
+            "commit_gate",
+            "relabel_gate"
+          ],
+          "reason": ""
+        }
+      }
     }
   ],
   "aggregate": {
-    "campaigns": 9,
+    "campaigns": 10,
     "pooled": {
       "retry_rate": {
         "definition": "r = attempts with attempt_count > 1 / total attempts (per campaign)",
-        "measurable_in": 1,
-        "campaigns_total": 9,
+        "measurable_in": 2,
+        "campaigns_total": 10,
         "values": [
           {
             "name": "retry_rate",
@@ -1140,31 +1297,68 @@
               "attempt_number"
             ],
             "reason": "1/8 jobs with >1 attempt (attempt_count derived from the attempts array)"
+          },
+          {
+            "name": "retry_rate",
+            "definition": "r = attempts with attempt_count > 1 / total attempts (per campaign)",
+            "measurable": true,
+            "value": 0.0,
+            "basis": "derived",
+            "source_fields": [
+              "attempts",
+              "attempt_number"
+            ],
+            "reason": "0/2 jobs with >1 attempt (attempt_count derived from the attempts array)"
           }
         ]
       },
       "first_call_resolution": {
         "definition": "WOC = first_pass / total",
-        "measurable_in": 0,
-        "campaigns_total": 9,
-        "values": []
+        "measurable_in": 1,
+        "campaigns_total": 10,
+        "values": [
+          {
+            "name": "first_call_resolution",
+            "definition": "WOC = first_pass / total",
+            "measurable": true,
+            "value": 1.0,
+            "basis": "measured",
+            "source_fields": [
+              "first_pass"
+            ],
+            "reason": "2/2 attempts passed on the first attempt"
+          }
+        ]
       },
       "escalation_rate": {
         "definition": "escalation rate = the escalations / total",
-        "measurable_in": 0,
-        "campaigns_total": 9,
-        "values": []
+        "measurable_in": 1,
+        "campaigns_total": 10,
+        "values": [
+          {
+            "name": "escalation_rate",
+            "definition": "escalation rate = the escalations / total",
+            "measurable": true,
+            "value": 0.0,
+            "basis": "measured",
+            "source_fields": [
+              "escalation_from",
+              "escalation_to"
+            ],
+            "reason": "0/2 attempts escalated"
+          }
+        ]
       },
       "batch_fraction": {
         "definition": "b = batch-mode jobs / total",
         "measurable_in": 0,
-        "campaigns_total": 9,
+        "campaigns_total": 10,
         "values": []
       },
       "throughput": {
         "definition": "throughput = cells or phases per hour per campaign",
-        "measurable_in": 2,
-        "campaigns_total": 9,
+        "measurable_in": 3,
+        "campaigns_total": 10,
         "values": [
           {
             "name": "throughput",
@@ -1199,13 +1393,30 @@
               "ended_at"
             ],
             "reason": ""
+          },
+          {
+            "name": "throughput",
+            "definition": "throughput = cells or phases per hour per campaign",
+            "measurable": true,
+            "value": {
+              "phases_per_hour": 80111.2656,
+              "phases": 2,
+              "span_hours": 0.0
+            },
+            "basis": "derived",
+            "source_fields": [
+              "phases",
+              "started_at",
+              "ended_at"
+            ],
+            "reason": ""
           }
         ]
       },
       "cost_per_accepted": {
         "definition": "cost-per-accepted = the accepted outcomes' cost",
-        "measurable_in": 1,
-        "campaigns_total": 9,
+        "measurable_in": 2,
+        "campaigns_total": 10,
         "values": [
           {
             "name": "cost_per_accepted",
@@ -1221,20 +1432,90 @@
               "realized_cost"
             ],
             "reason": ""
+          },
+          {
+            "name": "cost_per_accepted",
+            "definition": "cost-per-accepted = the accepted outcomes' cost",
+            "measurable": true,
+            "value": {
+              "accepted_count": 1,
+              "total_accepted_cost_usd": 0.001
+            },
+            "basis": "measured",
+            "source_fields": [
+              "status",
+              "realized_cost"
+            ],
+            "reason": ""
           }
         ]
       },
       "checkpoint_latency": {
         "definition": "the checkpoint latency = decided_at - reached_at per approval",
-        "measurable_in": 0,
-        "campaigns_total": 9,
-        "values": []
+        "measurable_in": 1,
+        "campaigns_total": 10,
+        "values": [
+          {
+            "name": "checkpoint_latency",
+            "definition": "the checkpoint latency = decided_at - reached_at per approval",
+            "measurable": true,
+            "value": {
+              "checkpoint_count": 1,
+              "approvals_with_timestamps": 1,
+              "mean_seconds": 0.0,
+              "median_seconds": 0.0,
+              "max_seconds": 0.0,
+              "decisions": {
+                "awaiting": 1
+              },
+              "reasons": {
+                "checkpoint_reached": 1
+              },
+              "with_approval_evidence": 0
+            },
+            "basis": "measured",
+            "source_fields": [
+              "reached_at",
+              "decided_at",
+              "decision",
+              "reason",
+              "approval_evidence"
+            ],
+            "reason": ""
+          }
+        ]
       },
       "sla_behavior": {
         "definition": "SLA = the timeouts/deadline breaches / total",
-        "measurable_in": 0,
-        "campaigns_total": 9,
-        "values": []
+        "measurable_in": 1,
+        "campaigns_total": 10,
+        "values": [
+          {
+            "name": "sla_behavior",
+            "definition": "SLA = the timeouts/deadline breaches / total",
+            "measurable": true,
+            "value": {
+              "total_phases_with_breach_fields": 2,
+              "timeout_breaches": 0,
+              "gate_breaches": 0,
+              "breakdown": {
+                "stall": 0,
+                "deploy_gate": 0,
+                "commit_gate": 0,
+                "relabel_gate": 0
+              },
+              "timeout_breach_rate": 0.0
+            },
+            "basis": "measured",
+            "source_fields": [
+              "stall_evidence",
+              "deploy_gate",
+              "commit_gate",
+              "relabel_gate"
+            ],
+            "reason": ""
+          }
+        ]
       }
     }
   },
@@ -1247,7 +1528,7 @@
       "note": "the measured r is from the grit STORY grid (Rules 1-5 perturbation corpus), not an autonomous-workload ledger; the autonomous attempt ledger is absent (see run_ledger_coverage)"
     },
     "escalation": {
-      "measured_escalation_rate": null,
+      "measured_escalation_rate": 0.0,
       "measured_escalation_rate_source": "no committed ledger carries an escalation marker (escalation_from/escalation_to declared-not-written)",
       "framework_design": "design for <1% escalation to human",
       "framework_design_source": "framework.html:748,959 (a policy target, not a measured rate)",
@@ -1434,6 +1715,28 @@
       "sla_behavior_measurable": false,
       "complete_metrics": [
         "throughput"
+      ]
+    },
+    {
+      "campaign": "ledger_instrumentation_probe",
+      "n_ledgers": 1,
+      "n_jobs": 2,
+      "n_attempts": 2,
+      "n_phases": 2,
+      "n_checkpoints": 1,
+      "retry_rate_measurable": true,
+      "first_call_resolution_measurable": true,
+      "escalation_rate_measurable": true,
+      "batch_fraction_measurable": false,
+      "throughput_measurable": true,
+      "cost_per_accepted_measurable": true,
+      "checkpoint_latency_measurable": true,
+      "sla_behavior_measurable": true,
+      "complete_metrics": [
+        "retry_rate",
+        "cost_per_accepted",
+        "throughput",
+        "checkpoint_latency"
       ]
     }
   ]
