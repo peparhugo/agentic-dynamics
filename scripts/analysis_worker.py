@@ -32,8 +32,8 @@ import contextlib
 # package) — add it to sys.path so they import beside the other scripts (fleet_manager.py's
 # convention).
 sys.path.insert(0, str(Path(__file__).resolve().parent / "fleet"))
-import heartbeat  # noqa: E402  (worker:<type>:<id> liveness -> fleet:board, slice 1)
 import dlq  # noqa: E402       (job dead-letter surface, R4)
+import heartbeat  # noqa: E402  (worker:<type>:<id> liveness -> fleet:board, slice 1)
 
 from agentic_dynamics.measurement.commit_analysis import (
     agentic_token_dicts,
@@ -51,6 +51,7 @@ STATUS_KEY = "analysis_status"
 
 ROOT = Path(__file__).resolve().parent.parent
 ANALYSIS_DIR = ROOT / "experiments" / "results" / "analysis"
+RESULTS_DIR = ROOT / "experiments" / "results" / "stories"
 
 BLOCK_TIMEOUT = 5
 IDLE_POLLS_BEFORE_EXIT = 6
@@ -86,6 +87,25 @@ def _connect_redis() -> redis.Redis:
 def _safe_hset(r: redis.Redis, key: str, field: str, value: str) -> None:
     with contextlib.suppress(Exception):
         r.hset(key, field, value)
+
+
+def _resolve_result(job: dict) -> Path:
+    """Locate the story result file, container/host-agnostically.
+
+    The job's ``result_path`` may be a HOST path (jobs enqueued by host-side
+    producers like ``enqueue_analysis.py``) that does not resolve inside the
+    container's mount namespace. Fall back to scanning the worker's own
+    RESULTS_DIR for ``*_<story_id>.json`` — the same pattern the enqueue scan
+    uses — so a job never fails on a path-namespace mismatch.
+    """
+    path = Path(job.get("result_path", ""))
+    if path.exists():
+        return path
+    story_id = job.get("story_id", "")
+    matches = sorted(RESULTS_DIR.glob(f"*_{story_id}.json"))
+    if matches:
+        return matches[0]
+    return path
 
 
 def _trigger_reviews(r: redis.Redis, story_id: str, story_name: str, worktree: Path) -> None:
@@ -152,7 +172,7 @@ def main() -> None:
             if not worktree.exists():
                 raise RuntimeError(f"worktree missing: {worktree}")
 
-            story_result = load_story_result(Path(job["result_path"]))
+            story_result = load_story_result(_resolve_result(job))
             analysis = analyze_story_worktree(worktree, run_sonar=True)
             analysis.story_name = story_result.story_name
             analysis.story_id = story_result.story_id

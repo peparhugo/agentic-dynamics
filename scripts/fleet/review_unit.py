@@ -58,7 +58,16 @@ def main() -> int:
     print(f"[review-unit] waiting for trigger on {REVIEW_TRIGGER_KEY} "
           f"(timeout {BRPOP_TIMEOUT}s) ...", flush=True)
 
-    result = client.brpop(REVIEW_TRIGGER_KEY, timeout=BRPOP_TIMEOUT)
+    while True:
+        try:
+            result = client.brpop(REVIEW_TRIGGER_KEY, timeout=BRPOP_TIMEOUT)
+            break
+        except redis.RedisError as exc:
+            # A long BRPOP can die on a socket read timeout mid-wait — reconnect
+            # and re-arm, never die (the unit is the exactly-one review runner).
+            print(f"[review-unit] trigger read error ({exc}); reconnecting ...",
+                  flush=True)
+            client = _connect()
     if result is None:
         print("[review-unit] no trigger within timeout — exiting (nothing to review).",
               flush=True)
