@@ -1,0 +1,10 @@
+campaign,n_ledgers,n_jobs,n_attempts,n_phases,n_checkpoints,retry_rate_measurable,first_call_resolution_measurable,escalation_rate_measurable,batch_fraction_measurable,throughput_measurable,cost_per_accepted_measurable,checkpoint_latency_measurable,sla_behavior_measurable,complete_metrics
+cap_2a,1,0,0,3,0,False,False,False,False,False,False,False,False,
+cap_2a_rerun,4,0,0,10,0,False,False,False,False,False,False,False,False,
+cap_2a_rerun2,3,0,0,7,0,False,False,False,False,False,False,False,False,
+cap_2a_rerun3,6,0,0,17,0,False,False,False,False,False,False,False,False,
+cap_2b,1,0,0,3,0,False,False,False,False,False,False,False,False,
+cap_adaptive_2c,1,0,0,3,0,False,False,False,False,False,False,False,False,
+cap_escalation_measurement,2,0,0,4,0,False,False,False,False,True,False,False,False,throughput
+cap_grit_strength_grid,1,8,9,0,0,True,False,False,False,False,True,False,False,"retry_rate,cost_per_accepted"
+cap_session_routing_prospective,26,0,0,76,0,False,False,False,False,True,False,False,False,throughput
