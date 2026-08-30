@@ -4,6 +4,14 @@ status: accepted
 
 # cap_grit_calibration — design: the retry-threshold × verify-gate calibration (does a retry on a failing attempt pay, and where does it stop?)
 
+**PARKING NOTE (2026-08-30 — the operator's stand-back review).** This campaign is **PARKED**:
+the full 84-cell strength-response curve is over-built for the operational retry decision — the
+retry decision is a **lookup, not a response curve**. Superseded by the observational replacement
+`retry_observational_analysis` (spec SHA256
+`b07d86d7cac1a5cbab0db5b67e35085a02f5ee58d628b8ef0fccfdf105b12b9b`), which computes the
+retry-worthiness lookup from the corpus's existing fail → retry → outcome chains (no new cells,
+no grid, confounds disclosed). The preregistration grid (§3) and its 84 cells are **not run**.
+
 **Status: PROPOSED — a preregistration-style design doc, not a preregistration.** Nothing below
 commits a cell, a seed, or a number into execution. The operator reviews this document; the
 next artifact (if accepted) is the preregistration, which fixes every number (§3) before any
