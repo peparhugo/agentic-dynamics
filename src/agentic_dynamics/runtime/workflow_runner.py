@@ -326,6 +326,10 @@ class WorkflowRunResult:
     #: The record is written BEFORE the run exits so the resume machinery (and the spec index
     #: / ``checkpoint/v1`` reducer) can read the last checkpoint state.
     checkpoints: list[CheckpointRecord] = field(default_factory=list)
+    #: ledger_instrumentation p1 — the attempt-level ledger, one :class:`AttemptRecord` per
+    #: agent phase (the model invocation). Additive: a run that made no agent phases carries an
+    #: empty list; old ledgers lack the key and parse unchanged via ``.get("attempts", [])``.
+    attempts: list[AttemptRecord] = field(default_factory=list)
 
     @property
     def total_cost_usd(self) -> float:
@@ -389,9 +393,81 @@ class WorkflowRunResult:
             # so a checkpoint-paused run is distinguishable from a genuine failure on the
             # ledger without breaking consumers that read ``ok``/``awaiting``.
             "state": self.state,
+            # ADDED keys (ledger_instrumentation p1 — never renames an existing key): the
+            # attempt-level ledger. The schema's declared-but-never-written attempt fields
+            # (``retry_reason`` / ``first_pass`` / ``accepted`` / ``escalation_from`` /
+            # ``escalation_to``) plus the ``attempt_count`` the retry-rate metric consumes are
+            # now emitted, one :class:`AttemptRecord` per agent phase. Old ledgers lack these
+            # keys; consumers read them via ``.get("attempts", [])`` / ``.get("attempt_count",
+            # 0)`` so pre-instrumentation ledgers parse unchanged.
+            "attempts": [a.to_dict() for a in self.attempts],
+            "attempt_count": len(self.attempts),
             "total_cost_usd": self.total_cost_usd,
             "ok": self.ok,
             "phases": [p.to_dict() for p in self.phases],
+        }
+
+
+@dataclass
+class AttemptRecord:
+    """One attempt of one agent phase, in the schema's attempt-level field vocabulary.
+
+    The workflow runner makes EXACTLY one attempt per agent phase — it never retries a phase
+    and never escalates a model mid-phase (per-step *routing* switches the selected model, but
+    that is not a *retry* and never produces a second attempt). This record therefore pins the
+    honest values: ``attempt_number`` is always 1, ``retry_reason`` is always empty, and
+    ``escalation_from`` / ``escalation_to`` are always ``None``. It exists so the attempt-level
+    fields the schema declares (``experiment_spec.LEDGER_FIELDS``) but the runtime never wrote —
+    the workflow-metrics finding "declared-not-written" — become MEASURABLE on the committed
+    ledger. The values are truthful ("no retry happened, no escalation happened"), never
+    fabricated. Field names + semantics are pinned to ``LEDGER_FIELDS``.
+
+    ``first_pass`` and ``accepted`` are derived from the phase's final status (recorded AFTER
+    the phase loop resolves, so a checkpoint phase's ``awaiting`` status is already final):
+
+    * ``first_pass`` — True when the single attempt did NOT fail (``status != "failed"``). A
+      checkpoint phase reaches ``awaiting`` only after its work passed every gate and
+      committed, so that is a first-pass success, not a failure.
+    * ``accepted`` — True only when the outcome was accepted (``status == "ok"``). ``awaiting``
+      (a designed stop pending operator approval) and ``failed`` are not accepted outcomes.
+    """
+
+    attempt_id: str
+    job_id: str
+    phase: str
+    attempt_number: int = 1
+    parent_attempt_id: str | None = None
+    retry_reason: str = ""
+    first_pass: bool | None = None
+    accepted: bool | None = None
+    escalation_from: str | None = None
+    escalation_to: str | None = None
+    model: str = ""
+    status: str = ""
+    cost_usd: float = 0.0
+    tokens: dict[str, int] = field(default_factory=dict)
+    test_executed_success: bool | None = None
+    confidence: float | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        """Serialize the attempt record. ``None`` fields stay ``None`` (null-not-zero)."""
+        return {
+            "attempt_id": self.attempt_id,
+            "job_id": self.job_id,
+            "phase": self.phase,
+            "attempt_number": self.attempt_number,
+            "parent_attempt_id": self.parent_attempt_id,
+            "retry_reason": self.retry_reason,
+            "first_pass": self.first_pass,
+            "accepted": self.accepted,
+            "escalation_from": self.escalation_from,
+            "escalation_to": self.escalation_to,
+            "model": self.model,
+            "status": self.status,
+            "cost_usd": self.cost_usd,
+            "tokens": dict(self.tokens),
+            "test_executed_success": self.test_executed_success,
+            "confidence": self.confidence,
         }
 
 
@@ -2345,6 +2421,43 @@ def _first_unsatisfied_checkpoint(
     return unsatisfied
 
 
+def _build_attempt_records(result: WorkflowRunResult, job_id: str) -> list[AttemptRecord]:
+    """Derive one :class:`AttemptRecord` per agent phase from the finished run's phases.
+
+    Called AFTER the phase loop resolves, so every phase's final status — including a
+    checkpoint phase's ``awaiting`` flip — is already recorded. Agent phases are the model
+    invocations and are therefore the attempts; test phases run the language suite in-process
+    and produce no attempt record (they are independent verification, not a model call).
+
+    The emitted values are the schema's EXACT semantics, never invented: one attempt per phase
+    (``attempt_number=1``), no retry (``retry_reason=""``), no model escalation
+    (``escalation_from``/``escalation_to`` are ``None``), ``first_pass`` = the single attempt
+    did not fail, and ``accepted`` = the outcome was accepted (``status == "ok"``).
+    """
+    records: list[AttemptRecord] = []
+    for phase in result.phases:
+        if phase.kind == "test":
+            continue
+        records.append(
+            AttemptRecord(
+                attempt_id=f"{job_id}_{phase.phase}_a1",
+                job_id=job_id,
+                phase=phase.phase,
+                attempt_number=1,
+                retry_reason="",
+                first_pass=phase.status != "failed",
+                accepted=phase.status == "ok",
+                model=phase.model,
+                status=phase.status,
+                cost_usd=phase.cost_usd,
+                tokens=dict(phase.tokens),
+                test_executed_success=phase.test_executed_success,
+                confidence=phase.confidence,
+            )
+        )
+    return records
+
+
 def run_workflow(
     spec: ExperimentSpec,
     *,
@@ -2957,6 +3070,11 @@ def run_workflow(
                 })
             break
 
+    # ledger_instrumentation p1 — the attempt-level emission. Built from the FINAL phase
+    # statuses (a checkpoint phase's ``awaiting`` flip is already recorded), so the attempt
+    # fields the schema declares are measurable on the committed ledger. Empty for a resume
+    # that refused past a checkpoint (no new phase ran) — additive, never a re-shape.
+    result.attempts = _build_attempt_records(result, cell_id)
     result.ended_at = _now()
     result.git_sha = _git_head(wd)
     if publisher is not None and publisher.enabled:

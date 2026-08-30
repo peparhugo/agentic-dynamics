@@ -24,8 +24,15 @@ experiments/codebases/.mutation_cache/
 # Generated per-story analysis artifacts (rebuilt by analyze_stories.py)
 experiments/results/analysis/
 
-# Workflow run ledgers + supervisor runtime state (machine-local, not provenance)
-experiments/results/workflows/
+# Workflow run ledgers + supervisor runtime state.
+# The run ledgers (<spec>/<timestamp>.json) ARE provenance — committed, per the
+# workflow-metrics findings' data-integrity fix: the autonomous-workflow operating metrics
+# (retry rate, first-call resolution, escalation rate, checkpoint latency, SLA behavior) are
+# unmeasurable while the run ledgers stay gitignored. The machine-local gate state
+# (discarded_trees.jsonl — the relabel tree-identity gate's memory) stays ignored.
+experiments/results/workflows/**
+!experiments/results/workflows/**/
+!experiments/results/workflows/**/*.json
 experiments/results/supervisor/monitor_session.json
 experiments/results/verified_tests.json
 
