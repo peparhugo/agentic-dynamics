@@ -1,6 +1,6 @@
 {
   "experiment_id": "lab_story_arc",
-  "generated_at": "2026-08-30T07:12:37.285431",
+  "generated_at": "2026-08-30T20:48:40.606088",
   "summary": {
     "snowball_factor": 2.32,
     "session1_cost": 0.173207,
@@ -161,6 +161,6 @@
     "data_integrity_policy": "docs/data_integrity_findings.md",
     "requires_external_service": null,
     "contract_version": "lab-contract/v6",
-    "generated_at": "2026-08-30T05:12:37.286066+00:00"
+    "generated_at": "2026-08-30T18:48:40.606935+00:00"
   }
 }

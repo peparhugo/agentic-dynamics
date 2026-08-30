@@ -2,7 +2,7 @@
 
 **Model:** openai/gpt-5.6-luna  |  **Task:** [shift_framing_s0.5] task_manager...
 **Operator:** perturbed (process_perturbation, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-27T20:33:41
+**Repetitions:** 1  |  **Timestamp:** 2026-08-30T18:48:20
 
 ---
 
@@ -63,7 +63,7 @@
 | **Total energy [X]** | **~6546 J** |
 | Solution density [C] | 0.004698 LOC/tok |
 | Correctness/$ [C] | 29 |
-| Quality/J [C] | 0.000079 |
+| Quality/J [C] | 0.000085 |
 
 ---
 

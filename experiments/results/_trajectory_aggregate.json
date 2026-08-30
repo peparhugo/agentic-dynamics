@@ -21,7 +21,7 @@
       "avg_write_pct": 36.5,
       "avg_bash_pct": 23.8,
       "total_parse_errors": 0,
-      "avg_reasoning_distance": 0,
+      "avg_reasoning_distance": 0.1644,
       "tool_call_distribution": {
         "todowrite": 570,
         "bash": 1175,
@@ -82,7 +82,7 @@
       "avg_write_pct": 53.6,
       "avg_bash_pct": 22.7,
       "total_parse_errors": 0,
-      "avg_reasoning_distance": 0,
+      "avg_reasoning_distance": 0.044,
       "tool_call_distribution": {
         "bash": 146,
         "write": 331,

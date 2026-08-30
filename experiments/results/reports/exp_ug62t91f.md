@@ -2,7 +2,7 @@
 
 **Model:** deepseek/deepseek-v4-pro  |  **Task:** [inject_alien_vocab_s0.5] process_perturbation_resample...
 **Operator:** perturbed (process_perturbation, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-27T20:33:49
+**Repetitions:** 1  |  **Timestamp:** 2026-08-30T18:48:29
 
 ---
 
@@ -63,7 +63,7 @@
 | **Total energy [X]** | **~6084 J** |
 | Solution density [C] | 0.007467 LOC/tok |
 | Correctness/$ [C] | 18 |
-| Quality/J [C] | 0.000071 |
+| Quality/J [C] | 0.000078 |
 
 ---
 
