@@ -1,0 +1,223 @@
+name: entropy_beta_instruments
+question: >-
+  Implement and run the two unblocked instruments from the graph-analysis family (the
+  operator-directed thread 1): the Δ-ENTROPY instrument (the design
+  docs/designs/proposed/neo4j_graph_analysis_design.md §3 — the solution/test split, the
+  three-axis join with changed_symbols_with_tests_ratio + test_executed_success, the
+  four-quadrant interpretation — computed over the corpus's accessible solutions, the
+  four-quadrant contract honored: ΔH is never reported without the test-join) and the β
+  COORDINATION-TAX computation (the design docs/designs/proposed/beta_snowball_measurement_design.md
+  §2-3 — coordination_overhead = (wrapper + merge + chain + review) / (cell) per campaign
+  from the ledgers + the merge/chain/review records, the measured β curve across the
+  corpus's campaigns). Both are measurement rules over what is already on disk — no infra
+  dependency (the neo4j-dependent parts of the family wait for the ladder's slice 3). The
+  deliverables: the two instruments (committed, tested), the measured results (ΔH quadrants
+  per model + the β overhead curve), the findings doc (cited, with the methodology + the
+  honest limits), and the adversarial verification.
+version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: false
+repeatable: false
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: true
+    context:
+      domain_context: >-
+        PROVISIONAL DomainProfile. domain: measurement instruments (the Δ-entropy + the β
+        coordination tax). canonical_sources:
+        [docs/designs/proposed/neo4j_graph_analysis_design.md (§3 — the Δ-entropy pins: the
+        solution/test split, the three-axis join, the four-quadrant table, the 2e wall as
+        the blind-spot case), docs/designs/proposed/beta_snowball_measurement_design.md
+        (§2-3 — the coordination-tax formula, the concurrency-ladder preregistration
+        sketch, the 2b 63% prior), src/agentic_dynamics/measurement/entropy.py (the five
+        dimensions + the skip-list — the confound the split fixes), the ledgers
+        (experiments/results/workflows/*/*.json — the wrapper vs cell costs),
+        experiments/results/reviews/*.json (the review rounds), the accessible codebases
+        (the /tmp story + campaign worktrees — the coverage recorded honestly)].
+        policies: [measured_not_estimated, four_quadrant_contract, coverage_honest,
+        findings_cited]
+      challenge_context: >-
+        PROVISIONAL ChallengeProfile. challenge: implement + measure (the two instruments,
+        the corpus computation, the findings, the adversarial). deliberation:
+        [implement, compute, findings, adversarial]. session_policy:
+        {default: fork_per_phase}
+      current_state: >-
+        The designs are committed (proposed). The machine's entropy today includes the
+        test files silently (the confound the split fixes). The 2b campaign's 63%
+        wrapper-phase share is the coordination-tax prior. The corpus: the accessible
+        story + campaign worktrees on disk (their coverage recorded), the ledgers (the
+        wrapper vs cell costs per campaign), the review files (the review rounds), the
+        git history (the merge/conflict records). The four-quadrant contract: ΔH without
+        the test-join is a FAILED finding. The neo4j-dependent parts (the persistent code
+        graph, the lineage walks, the trajectory graph) are OUT of scope — they wait for
+        the ladder's slice 3.
+      hard_rules: >-
+        (1) Every phase commits '[workflow] <phase>' (the worktree hook enforces it);
+        every docs/ file carries status frontmatter (the DOC_CONTRACT gate).
+        (2) THE FOUR-QUADRANT CONTRACT: ΔH is reported ONLY joined with
+        test_executed_success (the quadrant table); a ΔH report without the test-join is a
+        FAILED finding.
+        (3) THE SOLUTION/TEST SPLIT: the instrument measures ΔH_solution (the production
+        code only — the test files excluded by naming + the tests/-dir rules) AND
+        ΔH_tests (the test tree's own entropy) as separate dimensions — the two never
+        blended (the current compute_entropy's silent inclusion is the confound being
+        fixed).
+        (4) MEASURED, NOT ESTIMATED: every ΔH and every overhead figure derives from the
+        measured fields (the codebases' entropy, the ledgers' costs, the git records);
+        an estimated or imputed figure is a FAILED finding. The coverage of the accessible
+        codebases is recorded exactly (a codebase no longer on disk is a coverage gap,
+        never an imputed value).
+        (5) THE β COORDINATION-TAX FORMULA (the design §2): coordination_overhead =
+        (wrapper + merge + chain + review) / (cell) per campaign — the wrapper phases'
+        costs vs the cells' from the ledgers, the merge/conflict events from the git
+        history, the chain runs (the data-chain commits), the review rounds (the review
+        files). The 2b 63% prior is cited, never re-derived without the ledger.
+        (6) FINDINGS CITED: every finding cites its rows (the ledger path, the codebase
+        path, the review file); an uncited claim is a FAILED finding.
+        (7) BOUNDED PHASES: p1 implements the two instruments + their unit tests; p2 runs
+        them over the corpus; p3 writes the findings; p4 adversarial-verifies.
+        (8) The instruments are committed scripts (scripts/measure_delta_entropy.py +
+        scripts/compute_coordination_overhead.py) with the outputs under
+        experiments/results/ — reproducible.
+        (9) Every number cites its source. (10) No infra changes, no campaign runs — the
+        instruments measure what exists. (11) p4 adversarial mandatory. (12) Resumable
+        only when spec version, goal hash, source revision, and candidate-manifest hash
+        match.
+      read_first: >-
+        docs/designs/proposed/neo4j_graph_analysis_design.md (§3), docs/designs/proposed/
+        beta_snowball_measurement_design.md (§2-3), src/agentic_dynamics/measurement/entropy.py,
+        the 2b campaign's ledger (the wrapper/cell cost split)
+      run_shape: >-
+        SINGLE wrapper: deepseek/deepseek-v4-pro (the judgment-heavy implementation +
+        interpretation). One branch (feature/entropy-beta-instruments); each phase commits
+        [workflow] <phase>; the instruments + outputs land under scripts/ +
+        experiments/results/entropy_beta/. No cells, no grid, no parallel workers. The
+        data chain stays single-writer.
+    phases:
+      - name: p0_pin_mandates
+        kind: agent
+        timeout: 3600
+        prompt: |
+          GOAL: {goal}
+          ROLE: verification — the two designs (neo4j_graph_analysis_design.md §3 + beta_
+          snowball_measurement_design.md §2-3) are the mandates. Append this spec's SHA256
+          to the Δ-entropy design's header (the ONLY edit allowed). Verify the mandates'
+          pins: the solution/test split, the three-axis join, the four-quadrant contract,
+          the coordination-tax formula, the 2b prior. A deviation is a FAILED finding.
+          DELIVER: the pinned header + verification; committed.
+          LOG: PASS/FAIL; commit.
+      - name: p1_implement
+        kind: agent
+        timeout: 28800
+        prompt: |
+          GOAL: {goal}
+          ROLE: implement the two instruments (the designs' pins — no deviation). Build:
+          (1) scripts/measure_delta_entropy.py — the Δ-entropy instrument: computes
+          entropy on the SOLUTION code only (the test files excluded by the naming +
+          tests/-dir rules — the split, per the design) AND the TEST-tree entropy as the
+          separate ΔH_tests dimension (the confound fix); the baseline-vs-final ΔH per
+          codebase pair (the story/campaign solutions); the output rows carry the
+          three-axis join (ΔH_solution, ΔH_tests, test_executed_success where available) +
+          the quadrant classification (the four-quadrant table: high/low ΔH x pass/fail).
+          The 2e wall's semantic is honored: a low-ΔH + failing-tests row is the
+          "clean but wrong" quadrant, explicitly labeled.
+          (2) scripts/compute_coordination_overhead.py — the β instrument: per campaign,
+          coordination_overhead = (wrapper + merge + chain + review) / (cell) from the
+          ledgers (the wrapper-phase costs vs the cells), the git history (the
+          merge/conflict counts), the chain runs (the data-chain commits), the review
+          files (the round counts); the output rows carry the components + the ratio +
+          the campaign id.
+          TEST: the unit tests — the split excludes the test files (a fixture with a
+          tests/ dir + a test_*.py), the quadrant classification (the four cases), the
+          overhead arithmetic (a synthetic campaign with known costs). A test failure is
+          a FAILED finding.
+          DELIVER: the two scripts + the tests; committed.
+          LOG: the test results; PASS/FAIL; commit.
+      - name: p2_compute
+        kind: agent
+        timeout: 28800
+        prompt: |
+          GOAL: {goal}
+          ROLE: run the instruments over the corpus — BOUNDED to the computation. Do:
+          (1) The Δ-entropy computation over the ACCESSIBLE codebases: the story worktrees
+          (the /tmp story + campaign cell worktrees still on disk) — for each accessible
+          pair (the baseline vs the final solution where both exist; otherwise the
+          single-tree entropy with the coverage noted), the ΔH_solution + ΔH_tests +
+          the quadrant (joined with the story/cell records' test_executed_success). The
+          coverage table: accessible pairs / total — recorded exactly, never imputed.
+          (2) The β coordination-tax computation over the corpus's campaigns: the ledgers
+          (experiments/results/workflows/*/*.json) — for each campaign with a ledger, the
+          wrapper/cell cost split + the merge/chain/review components + the overhead
+          ratio. The 2b prior cited alongside.
+          Outputs under experiments/results/entropy_beta/ (the rows + the coverage +
+          the aggregate tables). Commit the outputs.
+          LOG: the per-model ΔH quadrant counts + the per-campaign overhead table;
+          PASS/FAIL; commit.
+      - name: p3_findings
+        kind: agent
+        timeout: 21600
+        prompt: |
+          GOAL: {goal}
+          ROLE: the findings — write docs/reviews/entropy_beta_findings.md (status:
+          accepted frontmatter) from p2's computed outputs. Do NOT re-compute; cite p2's
+          numbers. The doc contains:
+          (1) THE METHODOLOGY: the instruments' semantics (the split, the three-axis join,
+          the quadrant table, the overhead formula), the coverage (the accessible
+          codebases + the ledgers — exactly), the limits.
+          (2) THE ΔH RESULTS: the per-model quadrant distribution (how the accessible
+          solutions split across the four quadrants), the ΔH_solution vs ΔH_tests
+          relationship (does the mess track the test structure?), the "clean but wrong"
+          quadrant's count (the 2e wall's prevalence in the corpus).
+          (3) THE β RESULTS: the per-campaign coordination overhead (the ratio + the
+          components), the measured β curve across the campaigns (the overhead vs the
+          campaign size/complexity), the 2b 63% prior confirmed or corrected.
+          (4) THE ROUTING/PROCESS IMPLICATIONS: what the ΔH quadrants + the β curve
+          suggest (the process axis alongside the review texture) — scoped to the
+          evidence.
+          (5) THE HONEST LIMITS: the coverage gaps, the confound residuals, the
+          single-reviewer... (not applicable), the small-n caveats.
+          DELIVER: the findings doc; commit it.
+          LOG: the findings list; PASS/FAIL; commit.
+      - name: p4_adversarial
+        kind: agent
+        timeout: 21600
+        prompt: |
+          GOAL: {goal}
+          ROLE: adversarial verifier — falsify the findings. Attack in order:
+          (1) THE SPLIT: the instrument's test-file exclusion really excludes (a fixture
+          check); a test file leaking into ΔH_solution is a FAILED finding.
+          (2) THE QUADRANT CONTRACT: every ΔH row carries the test-join + the quadrant; a
+          ΔH without the join is a FAILED finding.
+          (3) THE MEASURED-NOT-ESTIMATED RULE: every ΔH + overhead figure traces to a
+          measured field; an imputed value is a FAILED finding.
+          (4) THE β ARITHMETIC: re-derive the overhead for at least one campaign from the
+          ledger's raw fields; a mismatch is a FAILED finding.
+          (5) THE CITATIONS: every finding resolves to its rows.
+          (6) THE COVERAGE: the coverage table is exact.
+          Deliver TWO outputs:
+          docs/reviews/entropy_beta_findings_adversary.md +
+          docs/reviews/entropy_beta_findings_known_safe.md (BOTH with status: accepted
+          frontmatter).
+          LOG: finding table + known-safe list; PASS/FAIL; commit.
+factors:
+  - {name: model, levels: [deepseek/deepseek-v4-pro]}
+design: factorial
+rules:
+  - {name: instruments_implemented, plane: measurement, evidence_class: "[C]", requires: [], produces: [delta_entropy_instrument, beta_instrument]}
+  - {name: corpus_computed, plane: measurement, evidence_class: "[C]", requires: [instruments_implemented], produces: [dh_quadrants, beta_curve]}
+  - {name: findings_written, plane: measurement, evidence_class: "[C]", requires: [dh_quadrants, beta_curve], produces: [entropy_beta_findings]}
+  - {name: findings_verified, plane: measurement, evidence_class: "[C]", requires: [entropy_beta_findings], produces: [findings_known_safe]}
+metrics:
+  - {name: quadrant_contract, agg: mean, over: cell}
+  - {name: measured_not_estimated, agg: mean, over: cell}
+comparison: {kind: effect_size, arm_factor: model, loss: {cost: 1.0, quality: 0.0, value: 0.0}}
+writeup:
+  format: lab_book
+  sections: [question, p0_pin_mandates, p1_implement, p2_compute, p3_findings, p4_adversarial]
+stop: {budget_usd: 30.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}
