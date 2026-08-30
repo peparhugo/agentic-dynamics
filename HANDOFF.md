@@ -27,28 +27,25 @@ work is visible; the open items are named.**
 **The fleet (docker, the ladder's real deployment — the supervisor tier CLOSED, the cells live):**
 - the fleet-manager RUNS AS ITS CONTAINER (the F2 gap closed) — `infrastructure_fleet-manager_1`, `restart: always`, mounted to the CANONICAL repo (/home/drseuss/ai-finops-framework → /repo; it was previously booted with FINOPS_REPO_DIR=/tmp/wt_fleet_impl — the ephemeral worktree), sole writer of `fleet:board` (fresh every 15s; the stale HOST duplicate killed)
 - the game-board container now writes the FULL L0 snapshot (13495 bytes, HEAD + history + spec counts) to `experiments/results/system_snapshot.md` via the results mount (was: the image's stale /app copy → a thin 1134-byte file inside the container layer)
-- 1 story worker up (the concurrency ladder's RUNG-1 — processing the grid at 1-wide, cell ~4/30)
-- 1 trigger-reviews up (the supervisor-tier, waiting on the analysis drain)
-- the other 7 pool containers exited (analysis: idle-exit; story: the rung resize)
+- the STORY pool: 1 worker up (the ladder's rung-1 grid at 1-wide — the measurement; the pool resizes to 2/4/8 at the rungs)
+- the ANALYSIS pool: 4 workers up (drained the 4 queued in 11s each — the analysis is REAL: full deep metrics written; each cell enqueues 6 review jobs)
+- the REVIEW pool: 2 review-units up (1 consumed the manual trigger and ran review_all — 258/259, near-drained)
+- the other 5 pool containers exited (analysis idle-exit; story rung resize)
 - the data plane unchanged: redis 6380 (finops-queue) + 6379 (finops-redis, the story-agent sandbox) + chroma 8000 + neo4j + sonar ×4
 
-**The queues (redis 6380):**
-- story_jobs: 26 queued + 1 running (the ladder's rung-1 grid — the SAME 27 cells re-run at 1 worker to TIME coordination; the outcomes are not new science)
-- analysis: 3 queued / 106 failed / 29 done (the failed = the dead-file class + the poison job — correct)
-- review_jobs: 180 queued (the review pipeline's backlog — the review_unit is triggered by the drain)
-
 **The wrappers (host sessions):**
-- the retry-obs: **DONE + MERGED** (the findings landed; the worktree discarded)
 - the conc-ladder: at p1 (rung 1 in flight — the grid's at ~4/30 cells)
+- the sonnet re-measurement: /tmp/remeasure_sonnet.py — 30 cells, 2 concurrent claude sessions, DIRECT runner (bypasses story_jobs BY DESIGN — the ladder's grid owns the queue). The first launch died 1s-per-cell (the host PATH lacks ~/.local/bin → `claude` not found; the dead files removed + the wrapper fixed: PATH + dead-run self-cleanup). ~4h ETA. Log: /tmp/sonnet_remeasure_run.log.
+- the graph-family Part A: /tmp/wt_graph_persistent_code_graph (feature/persistent-code-graph) — the spec carries the PER-PHASE MODEL SPLIT (model_pool [pro, flash]; mechanical phases flash, interpretation pro). p0 in flight. Log: /tmp/graph_family_a_run.log.
 - the portal: systemd (the user unit, Tailscale-only bind 100.83.229.3:8001 — Restart=always — the 5-death fragility class is over)
 
 ## 3. The open items (named, actionable — the next session's work list)
 
 1. ~~**F2 — the supervisor as its container.**~~ **CLOSED** (commit `6624c2089`): the fleet-manager runs as its container on the canonical repo; the game-board writes the full snapshot to the results mount; the host duplicate killed. If the host ever reboots: `systemctl enable --now fleet-bootstrap` (the unit in `infrastructure/fleet-bootstrap.service`) is the ONE bootstrap step — it is currently NOT installed.
-2. **F1 — the egress proxy's enforcement.** The proxy runs (the DENY/ALLOW probe passed); the workers' routing THROUGH it as the single internet policy point — unverified.
-3. **The per-phase model split — BLOCKED-BY-PINNING (recorded, not done).** Both candidate specs are hash-pinned: the retry spec's SHA256 is pinned in its own findings/adversary docs + the ledger, and the ladder spec's SHA256 (`cd2bd37a…`) is pinned in the β design header by p0 — editing either breaks traceability, and the running wrapper loaded its spec in-memory at start, so the split can't apply mid-run. **The standard is recorded: mechanical phases (extraction, rungs, computation) → `deepseek/deepseek-v4-flash`, interpretation phases (findings, adversarial) → pro. Apply to the NEXT authored spec** (the graph-family Part A spec), and to the ladder spec at its post-merge revision.
-4. **The graph-family parts** (the persistent code graph + the trajectory graph — the designs committed as proposed). The neo4j is LIVE now (the ladder's slice 3 ran the consumer — lag 0). The 2e-wall diagnosis (impacted=0 despite the structural edges) becomes runnable on the persistent graph. **Part A (the persistent code graph) is the pick** — and it is where the per-phase split standard (§3) applies first.
-5. **The sonnet re-measurement** — blocked on the Claude subscription window (the session-limit deaths are the honest failures — the worker's real-run validation catches them, no junk).
+2. **F1 — the egress proxy's enforcement — VERIFIED UNWIRED (the fix is post-ladder).** The proxy runs with the allowlist but has seen ZERO traffic in 5h of logs, and the workers carry no HTTP(S)_PROXY env — they egress directly via NAT; the D-17 "single policy point" is not enforced. The wiring (authored, NOT applied — changing the egress path mid-ladder breaks the rung comparability): add to `ladder-env` in `infrastructure/docker-compose.ladder.yml` `HTTP_PROXY=http://egress:8888` + `HTTPS_PROXY=http://egress:8888` + `NO_PROXY=finops-queue,neo4j,chromadb,localhost,127.0.0.1` (the by-name data-plane hosts), then recreate the pools AFTER the ladder completes.
+3. **The per-phase model split — APPLIED (the graph-family Part A spec is the first consumer).** The retry + ladder specs stay hash-pinned (untouched). The standard: mechanical phases (extraction, rungs, computation, build, wiring) → `deepseek/deepseek-v4-flash`, interpretation phases (findings, adversarial, mandate) → pro — carried by `workflow.params.model_pool: [deepseek/deepseek-v4-pro, deepseek/deepseek-v4-flash]` + the per-phase `model:` pins (pin wins over the router — workflow_runner.py:2770). The ladder spec takes the same treatment at its post-merge revision.
+4. **The graph-family parts — Part A LAUNCHED** (the persistent code graph, the graph-first change-analysis; the 2e-wall fixture). The neo4j is LIVE (the kb-neo4j consumer — lag 0). Wrapper: /tmp/wt_graph_persistent_code_graph (feature/persistent-code-graph), p0 in flight, log /tmp/graph_family_a_run.log. The 2e-wall diagnosis (impacted=0 despite the structural edges) becomes runnable on the persistent graph.
+5. **The sonnet re-measurement — RUNNING** (unblocked 2026-08-31: the Claude auth restored — the binary works; the host PATH just lacked ~/.local/bin). 30 cells via the DIRECT runner (/tmp/remeasure_sonnet.py — bypasses story_jobs: the ladder's grid owns the queue), 2 concurrent claude sessions, ~4h ETA, log /tmp/sonnet_remeasure_run.log. The session-limit deaths were the honest failures — the real-run validation catches them, no junk.
 6. ~~**The retry-obs + the conc-ladder verdicts.**~~ The retry-obs half is **DONE + MERGED** (`e2458bcba`): the retry-worthiness lookup is unidentified (n=1, economically irrational at measured scales — the replacement for the parked grit campaign). The **conc-ladder verdict** is still pending — the rung-1 grid is in flight (~4/30 cells at 1 worker); when the rungs complete, merge them: the β curve is the second half of the grit replacement.
 7. **The regression-table follow-ups** (the docs restructure's post-merge: the experiment indexes — phase 3; the data.js rebuild — done in the seal).
 
@@ -62,9 +59,9 @@ work is visible; the open items are named.**
 
 ## 5. The concrete next moves (pick one)
 
-1. ~~Run the supervisor as its container (F2)~~ — **done** (`6624c2089`); if the host reboots, enable `fleet-bootstrap.service`.
-2. **The graph-family Part A** (the persistent code graph) — the neo4j's live, the 2e-wall fixture's waiting, and the per-phase model split standard (§3) applies to this spec first.
-3. Wait for the conc-ladder's rungs, then merge the β curve (the second half of the grit replacement — the ladder's rung-1 grid is at ~4/30 cells).
-4. **F1** — verify the workers' egress actually routes through the proxy (the single internet policy point) — a verification pass, ~1h.
+1. **Collect the Part A + sonnet + ladder verdicts as they land** — three findings are in flight: the graph-family Part A (p0 in flight, ~hours), the sonnet re-measurement (30 cells, ~4h), the ladder's β curve (rung-1 ~4/30 cells, then rungs 2/4/8). Each merges when its wrapper completes (the established pattern).
+2. **F1 post-ladder** — apply the egress wiring (HTTP(S)_PROXY + NO_PROXY) to `ladder-env` + recreate the pools once the ladder's four rungs are done (the rung resizes already recreate the story pool — the env change rides along).
+3. **The per-phase split at the ladder's revision** — when the ladder merges, add the model_pool + phase pins to `concurrency_ladder.yaml` (Part A is the template).
+4. **Part B (the Δ-entropy instrument)** — the design's second half (the solution/test split, the three-axis join, the four-quadrant table); a preregistration pins the ΔH response-curve axis for the next calibration campaign.
 
 **LOG:** the session's merges enumerated; the live machine state (the fleet's partial deployment, the queues, the wrappers, the portal); the seven open items named with the actionable fixes; the operator's recorded decisions (backlog, runtime, EPM, β, grit-parked); the concrete next moves. **The machine is green and running; the next session picks up at §3.**
