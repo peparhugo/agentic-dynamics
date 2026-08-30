@@ -1,5 +1,5 @@
 """Hermetic tests for the CAP fact auto-emit hook (design:
-``docs/designs/current/cap_fact_auto_emit_design.md``).
+``docs/architecture/current/cap_fact_auto_emit_design.md``).
 
 Two surfaces under test, both loaded via ``importlib.util.spec_from_file_location`` — the SAME
 technique ``tests/test_kb_produce_facts_integration.py`` already uses, because neither

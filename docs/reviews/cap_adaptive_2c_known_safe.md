@@ -34,7 +34,7 @@ are recorded, not swept under a known-safe entry.
 | K18 | Find the **treatment modified** during the campaign | The campaign runs the treatment (`verify_proposal.py`, `_risk_depth`, `VERIFY_RISK_THRESHOLD`, risk weights, severity filter) code-unchanged; no campaign-phase commit touches the treatment | The treatment is code-unchanged (pre-registration §6 / hard rule 10) |
 
 **Attempted attacks that were non-falsifying:** none of K1–K18 falsified the pre-registered
-decision or any of its inputs. The verdict (`docs/designs/current/cap_adaptive_2c.md`,
+decision or any of its inputs. The verdict (`docs/experiments/results/cap_adaptive_2c.md`,
 NON-INFERIOR; abstention: no improving threshold) stands unchanged. The two recorded findings
 (L1/L2 incorrect-class non-instantiation → wrong-apply unmeasured; L3 competing evaluator label
 bug → corrected in the score) are disclosed in the adversary review and do not alter the decision.

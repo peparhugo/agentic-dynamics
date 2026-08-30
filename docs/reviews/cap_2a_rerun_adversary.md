@@ -119,7 +119,7 @@ The 2b calibration threshold (hit-rate >= 0.6) is **NOT met**: hit-rate **0/3**,
 
 ### 18. p4 JSON hashes not matching the verdict citations — **SAFE**
 
-- **Attack:** does any SHA256 cited in `docs/designs/current/cap_2a_rerun.md` disagree with the file on disk?
+- **Attack:** does any SHA256 cited in `docs/experiments/results/cap_2a_rerun.md` disagree with the file on disk?
 - **Evidence:** all six cited hashes re-computed and match exactly (score `59bd15d8…`, validation `690e0878…`, p2 outcome `1307c0ca…`, p2 ledger `ab0bf334…`, p3 manifest `2cf106b6…`, candidate manifest `62af69cd…`).
 - **Result:** SAFE.
 

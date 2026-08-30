@@ -4,7 +4,7 @@ status: accepted
 # cap_terra_postmortem — adversarial verification
 
 **Status:** accepted · **Role:** adversarial verifier (try to falsify the post-mortem)
-**Campaign:** `cap_terra_postmortem` · **Subject:** the post-mortem artifacts (`timeline.md`, `decision_audit.md`, `failure_modes.md`, `docs/designs/current/cap_terra_postmortem.md`)
+**Campaign:** `cap_terra_postmortem` · **Subject:** the post-mortem artifacts (`timeline.md`, `decision_audit.md`, `failure_modes.md`, `docs/postmortems/cap_terra_postmortem.md`)
 **Date:** 2026-08-27. Every finding cites the primary source it was tested against (opencode DB parts/messages, git trees, review documents). The attacker's job was to prove the post-mortem wrong; where it failed to do so, the finding is recorded as attempted-not-falsified and moved to the known-safe list.
 
 ---

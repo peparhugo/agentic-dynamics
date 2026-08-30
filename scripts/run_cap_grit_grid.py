@@ -1,6 +1,6 @@
 """E4 live-grid executor — run cap_grit_strength_grid cells sequentially on sonnet-5.
 
-Phase x2 of ``cap_grit_grid_execute`` (see ``docs/designs/current/cap_grit_grid_runplan.md``):
+Phase x2 of ``cap_grit_grid_execute`` (see ``docs/experiments/designs/cap_grit_grid_runplan.md``):
 runs the 8 cells SEQUENTIALLY, one story (``task_manager_api``) per cell, on
 ``anthropic/claude-sonnet-5`` via ``claude_cli``. Applies the spec's declared retry policy
 (finding 4) at the ledger level, records ``LEDGER_FIELDS``-compliant attempt rows into

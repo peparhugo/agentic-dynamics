@@ -36,7 +36,7 @@ Isolation (load-bearing): this producer touches only ``127.0.0.1:FINOPS_REDIS_PO
 ``derive_run_facts`` (below ``_derive_workflow_facts``) is a SECOND, narrower entry point: the
 scoped, per-run derivation the workflow-completion auto-emit hook calls
 (``scripts/run_workflow.py:_emit_workflow_facts``, design:
-``docs/designs/current/cap_fact_auto_emit_design.md``). It runs the SAME reducers and the SAME
+``docs/architecture/current/cap_fact_auto_emit_design.md``). It runs the SAME reducers and the SAME
 ``fact_ingestion`` glue this CLI's ``main()`` does, but over evidence built from ONE already-loaded
 run + spec rather than a corpus-wide filesystem scan — no new transport, no reducer changes.
 """
@@ -374,7 +374,7 @@ def _derive_workflow_facts(repository_id: str, revision: str, now: str) -> list:
 
 # ── Scoped, per-run derivation: the workflow-completion auto-emit hook ──
 #
-# CAP fact-auto-emit (docs/designs/current/cap_fact_auto_emit_design.md). `_derive_workflow_facts`
+# CAP fact-auto-emit (docs/architecture/current/cap_fact_auto_emit_design.md). `_derive_workflow_facts`
 # above is the CORPUS-WIDE batch job: it rglobs every run JSON ever written and every spec YAML in
 # the repo. That is the right shape for an operator's periodic `--reducer workflow_facts/v1` sweep;
 # it is the wrong shape for a hook firing on every single workflow completion (O(corpus) I/O paid

@@ -1,6 +1,6 @@
 """Static-narrative guard (public-truth closure P0).
 
-``docs/review/public_truth_review.md`` P0: the site's *static* narrative still carries the
+``docs/reviews/public_truth_review.md`` P0: the site's *static* narrative still carries the
 retired corpus figures — 156 stories / 772 sessions / $219.51 in page metadata, Open Graph
 tags, headlines, prose, and footers — plus a stale "88.7% across 1572/1772 tests" claim and
 ``bad_seed`` presented as a live treatment arm. Client-side ``data.js`` replacement cannot
@@ -30,7 +30,7 @@ ROOT = Path(__file__).resolve().parent.parent
 WEBSITE_DIR = ROOT / "apps" / "website"
 DATA_JS = WEBSITE_DIR / "data.js"
 
-#: The retired figure set (docs/review/public_truth_review.md P0 + the README staleness the
+#: The retired figure set (docs/reviews/public_truth_review.md P0 + the README staleness the
 #: same review flagged as "smaller"). Each regex matches the figure as it appeared in static
 #: text; ``772`` uses a lookbehind so an SVG ``y="772"`` coordinate and the decimal range
 #: ``0.772–0.815`` are not treated as the retired session count.

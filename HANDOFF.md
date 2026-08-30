@@ -80,7 +80,7 @@ All merged to main, all with both-direction tests. **Every campaign you author r
 ### 3.1 Session-routing v2 (the honest null's follow-up) — needs I10 instrumentation FIRST
 - **The blocker**: typed checkpoints have ZERO production capture — `checkpoint_snapshot_identity` is declared-never-emitted; snapshots were never recorded. The session-routing prospective study (cap_session_routing_prospective, merged) ran 24 cells but the **escalate arm never triggered** (no failure-bearing cells) — the 3.1× retro escalation premium is untestable live until cells can fail.
 - **The path**: (a) instrument typed checkpoints at session boundaries (the SessionCheckpoint machinery exists in the control plane — durable typed handoffs with deterministic identity/validity; wire production capture), (b) author the failure-bearing study (deliberate stale-context condition, genuinely cold arm, triggered escalation — the design doc `cap_session_routing_prospective_design.md` §2 has the proxy mapping table), (c) challenge profiles + held-out tasks (the review's list).
-- **References**: `docs/designs/current/cap_session_routing_prospective.md` (the null), `context_abstraction_addendum_design.md` §4.4, the I10 forward-gate notes.
+- **References**: `docs/experiments/results/cap_session_routing_prospective.md` (the null), `context_abstraction_addendum_design.md` §4.4, the I10 forward-gate notes.
 
 ### 3.2 Grit/confidence calibration (the site's core claim deepened)
 - The review's list: full strength-response curves, model×strength interaction, calibrated confidence vs independent success, policy thresholds selected on training data + evaluated on held-out cells.
@@ -252,8 +252,8 @@ curl -s https://ai-finops-rulebook.web.app/question.html -o /dev/null -w "%{http
 
 # 4. Before authoring any spec, re-read:
 #    - this HANDOFF §1 (the execution stack) + §7 (the code map)
-#    - docs/designs/current/cap_2b_design.md (the pre-registration pattern)
-#    - the relevant verdict: docs/designs/current/cap_session_routing_prospective.md,
+#    - docs/experiments/designs/cap_2b_design.md (the pre-registration pattern)
+#    - the relevant verdict: docs/experiments/results/cap_session_routing_prospective.md,
 #      cap_adaptive_2c.md, cap_site_revamp4_diagrams-adjacent docs
 ```
 

@@ -1,9 +1,9 @@
 """Doc-lifecycle lint (consolidation Stage 0, phase `lifecycle`).
 
-Enforces critique rec 4 (``docs/review/semantic_monolith_review.md``): every
+Enforces critique rec 4 (``docs/reviews/semantic_monolith_review.md``): every
 top-level markdown document carries a structured lifecycle status, and the
 ``docs/archive/`` / ``docs/designs/`` trees carry the specific statuses the
-migration table (``docs/consolidation/design.md`` §3) requires.
+migration table (``docs/release/consolidation/design.md`` §3) requires.
 
 The status vocabulary (rec 4) is::
 
@@ -85,14 +85,36 @@ def test_archive_entries_are_superseded():
     assert not problems, "archive entries must be superseded + superseded_by:\n" + "\n".join(problems)
 
 
-def test_current_designs_are_accepted():
-    """Every ``docs/designs/current/`` entry is ``status: accepted``."""
+def test_kind_tree_statuses():
+    """Every kind tree carries the status its home directory requires.
+
+    The docs-taxonomy restructure (``docs/designs/proposed/docs_taxonomy_restructure.md`` §(d))
+    retired ``docs/designs/current/`` as a path family: the *kind* is now carried by the
+    directory (designs/verdicts/preregistrations/verification/…), the status by the frontmatter.
+    Each kind home enforces exactly one status value — verdicts are ``accepted`` findings,
+    preregistrations are ``accepted`` commitments, intake proposals are ``proposed``.
+    """
+    tree_status = {
+        "docs/architecture/current": "accepted",
+        "docs/experiments/designs": "accepted",
+        "docs/experiments/preregistrations": "accepted",
+        "docs/experiments/results": "accepted",
+        "docs/postmortems": "accepted",
+        "docs/verification": "accepted",
+        "docs/website": "accepted",
+        "docs/release": "accepted",
+        "docs/reviews": "accepted",
+        "docs/designs/proposed": "proposed",
+    }
     problems = []
-    for path in sorted((ROOT / "docs" / "designs" / "current").glob("*.md")):
-        meta = _front_matter(path)
-        if meta.get("status") != "accepted":
-            problems.append(f"{path.relative_to(ROOT)}: status={meta.get('status')!r}, want accepted")
-    assert not problems, "current designs must be accepted:\n" + "\n".join(problems)
+    for rel_dir, want in tree_status.items():
+        for path in sorted((ROOT / rel_dir).glob("*.md")):
+            meta = _front_matter(path)
+            if meta.get("status") != want:
+                problems.append(
+                    f"{path.relative_to(ROOT)}: status={meta.get('status')!r}, want {want}"
+                )
+    assert not problems, "kind-tree status violations:\n" + "\n".join(problems)
 
 
 def test_implemented_designs_name_their_branch():

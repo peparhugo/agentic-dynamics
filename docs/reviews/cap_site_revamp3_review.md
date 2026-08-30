@@ -10,7 +10,7 @@ status: accepted
 **Census baseline:** `experiments/results/cap_site_revamp3/incumbent_census.json` (p1, `40691ff0b`)
 **Comparison report under review:** `experiments/results/cap_site_revamp3/comparison_report.md`
 **Approval artifact:** `approvals/cap_site_revamp4/p2_design_with_human_checkpoint_approval.md` (signed `peparhugo`, 2026-08-27)
-**Design:** `docs/designs/current/cap_site_revamp3_design.md`
+**Design:** `docs/website/cap_site_revamp3_design.md`
 **Date:** 2026-08-27
 **Method:** read-only re-measurement of the served source (`apps/website/`) via `grep -o | wc -l`, fixed-string matching; per-feature id/key presence checks; diff inspection against the census sha `2a58408a`; provenance cross-checks of `data.js` against committed score JSONs. No site file was modified.
 

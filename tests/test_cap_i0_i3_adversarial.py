@@ -4,7 +4,7 @@ This file exists to try to FALSIFY the I0-I3 repair contracts (r1-r3) before I4 
 begin, per the ten attack vectors the r4 task named. Each test below is named after the vector it
 attacks. Two genuine defects were found and fixed here (duplicate evidence inflating workflow
 phase counts; out-of-order evidence letting an older observation "win" a supersession race) — see
-``docs/context_abstraction/implementation_notes.md`` for the recorded design note. The rest of the
+``docs/designs/implemented/implementation_notes.md`` for the recorded design note. The rest of the
 vectors were already closed by r1-r3 and are re-verified here from an adversarial angle (a
 different construction than the original repair tests used), or are accepted limitations with a
 documented reason (see the module-level comments at each such test).

@@ -1,6 +1,6 @@
 """Canonical-lab-contract guard (semantic-integrity release, phase s2).
 
-``docs/review/semantic_integrity_review.md`` P0, required correction:
+``docs/reviews/semantic_integrity_review.md`` P0, required correction:
 
     A publication-eligible lab must carry ``input_dataset_id``,
     ``input_manifest_sha256``, ``registry_version``, ``metric_definition_version``,

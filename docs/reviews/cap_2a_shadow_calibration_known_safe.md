@@ -51,7 +51,7 @@ checklist; each entry is tied to a specific attempt.
 ### S5 — p4 JSON hashes do not match the verdict citations
 
 - **Tried:** re-hashed every input artifact the p5 verdict cites.
-- **Evidence:** `docs/designs/current/cap_2a_shadow_calibration.md` cites candidate-manifest
+- **Evidence:** `docs/experiments/results/cap_2a_shadow_calibration.md` cites candidate-manifest
   `6b8bbab6…` and p4 JSON `3862c784…adc197`; `sha256sum` on `p2_candidate_manifest.json` and
   `cap_2a_score_20260825T222430Z.json` reproduce both exactly.
 - **Why safe:** the verdict's provenance hashes match the tree.

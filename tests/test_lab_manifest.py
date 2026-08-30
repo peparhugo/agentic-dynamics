@@ -1,6 +1,6 @@
 """Lab-quarantine guard (semantic-integrity release, phase s1).
 
-``docs/review/semantic_integrity_review.md`` P0: the lab-book path bypassed the canonical
+``docs/reviews/semantic_integrity_review.md`` P0: the lab-book path bypassed the canonical
 data-integrity boundary — ten labs read the retired ``experiments/results/_results_summary.json``
 while ``reproduce.sh`` still ran them and ``build_data.py`` still published their JSON with zero
 provenance checks (a split publication path: canonical main metrics, legacy lab metrics).

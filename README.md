@@ -231,7 +231,7 @@ The backing scripts can also be run directly (`python scripts/<script>.py …`).
 ## The Spec / Compiler Layer
 
 The library has moved from a linear pipeline to a closed loop (see
-[`docs/designs/current/2026-08-14_experiment-spec-and-compiler-design.md`](docs/designs/current/2026-08-14_experiment-spec-and-compiler-design.md)):
+[`docs/architecture/current/2026-08-14_experiment-spec-and-compiler-design.md`](docs/architecture/current/2026-08-14_experiment-spec-and-compiler-design.md)):
 
 ```
 spec (ExperimentSpec) ──compile──▶ DAG ──▶ cells ──▶ jobs ──▶ attempts

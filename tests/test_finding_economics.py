@@ -1,4 +1,4 @@
-"""Finding-economics closure guards (docs/review/finding_economics_review.md P0).
+"""Finding-economics closure guards (docs/reviews/finding_economics_review.md P0).
 
 The review found the last unconverted data path — the single-task FINDING corpus — still
 treated uncaptured economics as measured zeroes: ``build_data._finding_entry_from_run``
@@ -32,7 +32,7 @@ ROUTING = ROOT / "src" / "agentic_dynamics" / "control" / "routing.py"
 DATA_JS = ROOT / "apps" / "website" / "data.js"
 
 #: The finding-corpus economic/optional fields whose *absence* is "not measured" (null), never
-#: "measured as zero" (docs/review/finding_economics_review.md P0).
+#: "measured as zero" (docs/reviews/finding_economics_review.md P0).
 _FINDING_OPTIONAL_FIELDS = (
     "cost_usd",
     "energy_j",

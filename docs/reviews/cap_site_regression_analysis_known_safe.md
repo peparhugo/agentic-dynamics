@@ -100,7 +100,7 @@ attack, the evidence, and why it is safe.
 - **Attack:** did the campaign touch apps/website?
 - **Evidence against:** the only commits in this campaign touch
   `experiments/results/cap_site_regression_analysis/` and
-  `docs/designs/current/cap_site_regression_analysis.md` + `docs/reviews/*`. No apps/website
+  `docs/experiments/results/cap_site_regression_analysis.md` + `docs/reviews/*`. No apps/website
   file is written; the revamp branches were read-only. git status of the campaign branch
   confirms analysis-only files.
 - **Why safe:** verified by the commit list.

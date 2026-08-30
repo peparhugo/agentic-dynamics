@@ -1,7 +1,7 @@
 """cap_adaptive_2e p1+p2 grid executor — the leg-3 capture reconstruction (6 cells).
 
 Phase p1/p2 of ``cap_adaptive_2e`` per the pre-registered table
-(``docs/designs/current/cap_adaptive_2e_preregistration.md`` section 3 — 6 cells:
+(``docs/experiments/preregistrations/cap_adaptive_2e_preregistration.md`` section 3 — 6 cells:
 2 arms x 3 low-information cells; unseen_family x2 + absent-defective x1 per arm). The
 campaign reconstructs the unseen-family cells so they PRESENT the Option A fingerprint
 (``risk == 0.20·min(1, impacted/10)`` exactly) and re-runs the capture leg only.
@@ -708,7 +708,7 @@ def main() -> None:
             "written_at": now_iso(), "seed_string": SEED_STRING,
             "seed_committed_hash": SEED_COMMITTED_HASH, "seed_measured_sha256": SEED_MEASURED_HASH,
             "seed_mismatch": SEED_COMMITTED_HASH != SEED_MEASURED_HASH,
-            "preregistration": "docs/designs/current/cap_adaptive_2e_preregistration.md",
+            "preregistration": "docs/experiments/preregistrations/cap_adaptive_2e_preregistration.md",
             "preregistration_revision": "d1a0ad777",
             "probe": probe,
             "e1_cell": cell["cell_id"], "e1_status": rec.get("status"),
@@ -728,7 +728,7 @@ def main() -> None:
         "written_at": now_iso(), "seed_string": SEED_STRING,
         "seed_committed_hash": SEED_COMMITTED_HASH, "seed_measured_sha256": SEED_MEASURED_HASH,
         "seed_mismatch": SEED_COMMITTED_HASH != SEED_MEASURED_HASH,
-        "preregistration": "docs/designs/current/cap_adaptive_2e_preregistration.md",
+        "preregistration": "docs/experiments/preregistrations/cap_adaptive_2e_preregistration.md",
         "preregistration_revision": "d1a0ad777",
         "cells": [
             {**c, "repetition": c["rep"]}

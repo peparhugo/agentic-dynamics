@@ -4,7 +4,7 @@ implemented_by: feature/website-repoint
 ---
 # Website repoint (S3 + C1 + C2 + C3/C4) — implementation trace & verification
 
-**Status:** implemented and verified. Every finding in `docs/review/website.md` §2–3 is
+**Status:** implemented and verified. Every finding in `docs/reviews/website.md` §2–3 is
 traced below to its file + line, with PASS/FAIL, the verification greps, and the pytest
 result. This document is the proof that the site now resolves models by explicit id,
 labels the fable-5 alias correctly, quotes the rebased DeepSeek pricing, and reports

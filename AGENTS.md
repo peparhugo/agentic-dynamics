@@ -16,7 +16,7 @@ Answer direct questions about the subject matter fully in any role. The rule is 
 - `perturbation_strength` + `test_executed_success` — measured on every story attempt (`src/agentic_dynamics/knowledge/ledger_ingestion.py:180-181`); the `grit` rule consumes them (`src/agentic_dynamics/experiment/compile_experiment.py:265`).
 - attempt/timestamp fields + the `answer`/`explanation` token split — on the ledger (see `experiment_spec.py`'s ledger table, `src/agentic_dynamics/experiment/experiment_spec.py:83`).
 
-Design: `docs/designs/current/2026-08-14_experiment-spec-and-compiler-design.md` (spec is **written**; compiler is **written**).
+Design: `docs/architecture/current/2026-08-14_experiment-spec-and-compiler-design.md` (spec is **written**; compiler is **written**).
 
 **NAVIGATION:** Use `agent_config/mental-model.md` for file paths, function signatures, the module map, and dependencies. Read `ARCHITECTURE.md` for the plane boundaries. Never read more than 3 source files without checking the module map first. Always offload research to explore subagents.
 
@@ -71,12 +71,12 @@ firebase deploy --only hosting --project agentic-dynamics  # mirror site — dep
 - `ARCHITECTURE.md` — the single architectural authority (planes, boundaries, dependency direction).
 - `agent_config/mental-model.md` — architecture, signatures, module map, dependencies (rendered to `.opencode/instructions/mental-model.md` + `.claude/rules/mental-model.md`).
 - `experiments/specs/STATUS.md` — **read this first before authoring a new spec** — the generated spec lifecycle index: what exists, what is done, when it was completed, and the supersedes chains (`index.json` is the machine-readable twin). Derived, never hand-edited — `python scripts/spec_status.py`.
-- `docs/designs/current/2026-08-14_experiment-spec-and-compiler-design.md` — ExperimentSpec + compiler design (the roadmap).
+- `docs/architecture/current/2026-08-14_experiment-spec-and-compiler-design.md` — ExperimentSpec + compiler design (the roadmap).
 - `scripts/_gen_instructions.py` — the surface generator (`render_opencode()` / `render_claude()` + per-target validators).
 - `scripts/CONTEXT.md` — script reference (classification manifest).
 - `experiments/CONTEXT.md` — experiment ecosystem.
 - `apps/website/CONTEXT.md` — website documentation.
-- `apps/control_room/server.py` — Control Room portal (28 routes); see `docs/designs/current/supervisor_design.md` for the flag-only supervisor rail.
+- `apps/control_room/server.py` — Control Room portal (28 routes); see `docs/architecture/current/supervisor_design.md` for the flag-only supervisor rail.
 
 The eight package planes (`core` · `experiment` · `measurement` · `runtime` · `adapters` · `knowledge` · `control` · `reporting`) live under `src/agentic_dynamics/` — see `ARCHITECTURE.md` §1 and the mental-model module map for ownership.
 
@@ -92,4 +92,4 @@ The eight package planes (`core` · `experiment` · `measurement` · `runtime` �
 
 ## Conventions
 
-Snake_case functions, PascalCase classes, type hints on public signatures. Deprecated: `experiment.py`, `adapter.py`, `lab_book.py` — use `opencode.py` / `run_opencode_agentic()`. Update `__init__.py` for new exports. Dataclasses over dicts. Source lives under `src/agentic_dynamics/`; configs under `experiments/definitions/configs/`; apps under `apps/`; designs under `docs/designs/current/`.
+Snake_case functions, PascalCase classes, type hints on public signatures. Deprecated: `experiment.py`, `adapter.py`, `lab_book.py` — use `opencode.py` / `run_opencode_agentic()`. Update `__init__.py` for new exports. Dataclasses over dicts. Source lives under `src/agentic_dynamics/`; configs under `experiments/definitions/configs/`; apps under `apps/`; designs under `docs/designs/` (implemented + proposed), architecture under `docs/architecture/current/`, experiment docs under `docs/experiments/`.

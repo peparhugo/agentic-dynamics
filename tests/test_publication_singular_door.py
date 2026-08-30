@@ -1,6 +1,6 @@
 """The singular publication door (canonical-publication closure, phase c1).
 
-``docs/review/canonical_publication_review.md`` P0:
+``docs/reviews/canonical_publication_review.md`` P0:
 
     The lab path is canonical, but the primary story/model/review/analysis sections still
     flow through ``stories/*.json -> sync_data -> parquet`` and raw ``reviews/*.json`` /
@@ -48,7 +48,7 @@ FORBIDDEN_GLOB_ROOTS = (
     "experiments/results/analysis",
 )
 
-#: The canonical condition split (docs/review/canonical_publication_review.md P0).
+#: The canonical condition split (docs/reviews/canonical_publication_review.md P0).
 #: 225 current story rows − 10 payload-less = 215 resolved; 135 clean (incl. the 9
 #: empty-label + relabeled no-ops) and 72 genuinely instrumented ``early_degrade``.
 CANONICAL_SPLIT = {"clean": 135, "early_degrade": 72}

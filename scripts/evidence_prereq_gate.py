@@ -16,7 +16,7 @@ Checks (each must pass):
      gate is re-runnable at any branch tip with the inputs that the p0 phase actually
      used.
   2. The sonnet adversary produced an APPROVED verdict, not merely an ok run: for each of the
-     four branches, its review doc (docs/review/cap_<branch>_review.md) exists ON HEAD (i.e.
+     four branches, its review doc (docs/reviews/cap_<branch>_review.md) exists ON HEAD (i.e.
      committed and merged) and contains a non-FAIL verdict line (starts with "## Verdict:" and
      does not contain "FAIL").
   3. cap_story_bridge's last run (ledger or pinned record) is ok=True.
@@ -31,7 +31,7 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
 RESULTS = REPO / "experiments" / "results" / "workflows"
-REVIEWS = REPO / "docs" / "review"
+REVIEWS = REPO / "docs" / "reviews"
 PINNED_INPUTS = REPO / "experiments" / "results" / "evidence_prereq_inputs.json"
 
 PREREQ_BRANCHES = (

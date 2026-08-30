@@ -34,7 +34,7 @@ status: accepted
 **Evidence:**
 - p4 `calibration.per_cell_rows[]` maps 1:1 to `cells[]` (same `cell_id`, `action`, `depth`, `code_change_risk`, `new_sonar_critical_count`, `realized_outcome`, `realized_depth`, `hit`).
 - `calibration.risk_buckets` and `calibration.finding_outcome` are aggregates over `cells[]`; `calibration.severity_strictness` lists the live-probed rule/severity/file/line sets (Attack 1's probe).
-- p5 `docs/designs/current/cap_2a_rerun2.md` fitted-mapping items 1–4 each cite a `calibration` field (`finding_outcome`, `severity_strictness`, `risk_buckets`, and the scope miss read off `cells[cap2a_p3_critical].proposal_scope` vs `.realized_symbol_set`).
+- p5 `docs/experiments/results/cap_2a_rerun2.md` fitted-mapping items 1–4 each cite a `calibration` field (`finding_outcome`, `severity_strictness`, `risk_buckets`, and the scope miss read off `cells[cap2a_p3_critical].proposal_scope` vs `.realized_symbol_set`).
 
 **Result: traceable.** `p4_validation.json` `verdict_number_to_field` maps each aggregate to its source field. **Verified safe.**
 
@@ -61,7 +61,7 @@ status: accepted
 | applied=true / any actuation | all `applied=false`; `verify_proposal.py` untouched since `e61c709eb` (pre-campaign); no `control_route`/`actuation` | safe |
 | Unclosed drivers | graph client closed in `scripts/run_workflow.py:305-308` `finally`; sonar/lsp legs under `ANALYZER_LEG_TIMEOUT_SECONDS=360` with worker-pool `shutdown` | safe |
 | Leaked credentials | no credential in any campaign artifact; the only `admin`/`password` string is the design doc documenting the local server's default scanner creds (already `SONAR_USER/PASSWORD_DEFAULT` in `sonar.py`) | safe |
-| p4 hashes not matching verdict citations | `cap_2a_rerun2_score_…json` → `ef42f8b0…` and `p4_validation.json` → `a2fd71fd…`, both match `docs/designs/current/cap_2a_rerun2.md` | safe |
+| p4 hashes not matching verdict citations | `cap_2a_rerun2_score_…json` → `ef42f8b0…` and `p4_validation.json` → `a2fd71fd…`, both match `docs/experiments/results/cap_2a_rerun2.md` | safe |
 
 ## Re-stated verdict (after attack)
 

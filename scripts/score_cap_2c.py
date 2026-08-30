@@ -35,7 +35,7 @@ RESULTS = ROOT / "experiments" / "results" / "cap_adaptive_2c"
 CELLS_DIR = RESULTS / "cells"
 
 SCHEMA = "cap_adaptive_2c_score/v1"
-PREREG = "docs/designs/current/cap_adaptive_2c_preregistration.md"
+PREREG = "docs/experiments/preregistrations/cap_adaptive_2c_preregistration.md"
 
 #: Pre-registered pinned constants (§0, §1).
 BASE_DOWNSTREAM_DEFECT_COST = 0.004021  # escalation score `base_downstream_defect_cost_usd`
@@ -48,7 +48,7 @@ NI_SUCCESS_GAP = 0.05
 
 #: The pre-registered margin reference + decision rule.
 DECISION_RULE_REF = (
-    "docs/designs/current/cap_adaptive_2c_preregistration.md section 2 (margin, the 2b rule "
+    "docs/experiments/preregistrations/cap_adaptive_2c_preregistration.md section 2 (margin, the 2b rule "
     "reused verbatim on the full heterogeneous grid) + section 5 (analysis plan / decision rule)"
 )
 

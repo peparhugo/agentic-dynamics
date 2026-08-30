@@ -6,7 +6,7 @@ step_routing via compile_experiment.compare_arms-style loss (cost/quality) so th
 make the I7 flip decision with measured evidence."
 
 HONEST LIMITATION, stated up front (recorded in
-``docs/context_abstraction/implementation_notes.md``): in shadow mode (I6), the plane's ``route``
+``docs/designs/implemented/implementation_notes.md``): in shadow mode (I6), the plane's ``route``
 proposal is NEVER applied — only ``step_routing``'s choice ever executes a phase, so there is no
 independently measured cost/quality outcome for "what if the plane's choice had run instead".
 This script therefore reports TWO complementary signals rather than one fused "plane vs

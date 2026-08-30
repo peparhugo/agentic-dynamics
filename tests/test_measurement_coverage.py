@@ -1,6 +1,6 @@
 """Measurement-coverage guard (measurement-contribution closure, m2).
 
-``docs/review/measurement_contribution_review.md`` P1/P2 found the same defect in every
+``docs/reviews/measurement_contribution_review.md`` P1/P2 found the same defect in every
 canonical producer under different names: an unavailable measurement was coerced to
 numeric zero, so "not measured" became "measured as 0" and diluted published averages
 (``or 0`` cost defaults, ``sum(costs)/len(all_cells)``, ``if cost > 0`` with no coverage).

@@ -1,6 +1,6 @@
 """CAP test-runner wiring — `workflows/repository/cap_test_runner_wiring.yaml` (t2_wire_it).
 
-Covers the named seam (docs/designs/current/cap_test_runner_wiring.md §1): an agent phase that
+Covers the named seam (docs/architecture/current/cap_test_runner_wiring.md §1): an agent phase that
 declares ``test_gate: true`` gets the independent test_runner's outcome recorded on
 ``PhaseResult.test_executed_success``, which ``attempt_facts/v1`` reads (kind-agnostically) to
 mint ``phase_test_verified``. Guards honoured: the boolean comes ONLY from
@@ -36,7 +36,7 @@ def _fake_agent(**overrides):
         reasoning_tokens=5,
         total_tokens=35,
         estimated_cost_usd=0.001,
-        files_created=["docs/scope.md"],
+        files_created=["docs/architecture/current/scope.md"],
         files_modified=[],
         final_response="done",
         ok=True,

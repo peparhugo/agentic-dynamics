@@ -5,8 +5,8 @@ status: accepted
 # cap_2b — adversarial review (p5)
 
 **Campaign:** `cap_2b` (`cap_2b@0.1`) · **Verdict under review:**
-`docs/designs/current/cap_2b.md` (committed `b90397323`) · **Pre-registration:**
-`docs/designs/current/cap_2b_preregistration.md` (committed `19e47b60b`, SHA256
+`docs/experiments/results/cap_2b.md` (committed `b90397323`) · **Pre-registration:**
+`docs/experiments/preregistrations/cap_2b_preregistration.md` (committed `19e47b60b`, SHA256
 `8259fe8d4776d7cb2c310348ea1315876eea74277d126e91fd74b98ef352c193`).
 **Score:** `cap_2b_score_20260826T160018Z.json` (SHA256
 `5f24f5072f1bb0ab17769b8db3734680b83981c2506df3b57fffa529c42ed3d9`).
@@ -20,7 +20,7 @@ reseeded assignment, or dropped cell is a FAILED finding.
 
 **Evidence:**
 - Commit order (provable by `git log`): `19e47b60b` p0_preregister **16:53:43** → `f1a29803f` p1_measure_one **17:00:34** → `969e112ac` p2_run_randomized_cells **17:53:29** → `56a80c1e8` p3_score **18:00:44** → `b90397323` p4_verdict **18:01:55**. p0 precedes every cell: the E4 run ledger was written `20260826T145915Z` (14:59 UTC = 16:59 +0200), after p0 (16:53 +0200).
-- The p0 commit adds exactly one file, `docs/designs/current/cap_2b_preregistration.md` (301 lines), containing the margin (`≤ 1.10 ×` and `− 5 percentage points`, §2), the seed `fa74bbe6f9d4a67a019799ebfa61ac9e` (§4), and the full 18-cell assignment table (§4).
+- The p0 commit adds exactly one file, `docs/experiments/preregistrations/cap_2b_preregistration.md` (301 lines), containing the margin (`≤ 1.10 ×` and `− 5 percentage points`, §2), the seed `fa74bbe6f9d4a67a019799ebfa61ac9e` (§4), and the full 18-cell assignment table (§4).
 - The score/verdict applied exactly that margin: `score.decision_rule.margin_cpvo_ratio_le = 1.10`, `margin_success_gap_le = 0.05` — matching pre-registration §2 verbatim. No redefinition anywhere in the scored artifacts.
 - Cells: 18 in the pre-registered table, 18 scored (`join_validation.n_scored=18`); zero dropped (`denominators.n_invalid_join=0`, no stopped cells).
 

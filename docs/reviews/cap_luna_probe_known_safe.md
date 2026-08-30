@@ -10,7 +10,7 @@ adversarial review (`docs/reviews/cap_luna_probe_adversary.md`). Nothing in this
 
 | # | item | evidence |
 |---|---|---|
-| K1 | Preregistration committed before any cell ran | `docs/designs/current/cap_luna_probe_preregistration.md` @ `1395a4e4e`; no `cap_luna_probe` results existed at that commit |
+| K1 | Preregistration committed before any cell ran | `docs/experiments/preregistrations/cap_luna_probe_preregistration.md` @ `1395a4e4e`; no `cap_luna_probe` results existed at that commit |
 | K2 | Spec SHA pinned in the preregistration header (the ONLY edit) | `sha256sum workflows/repository/cap_luna_probe.yaml` = `e7220621d318a86d8be681a55fab3220a3a5e0f14c7f442c7b9ab1a1b9af1f54` matches the pinned header; the header pin is the only preregistration diff |
 | K3 | Exactly the 8 pre-registered cells ran, nothing unlisted | p1 manifest @ `dbbba6d7d` (committed before any cell ran) lists exactly the 8 cell ids; `cells/luna_probe_*.json` = exactly those 8; p2 join-validation all 8 `ok` |
 | K4 | Per-cell MESSAGE counts measured from transcripts, never estimated | re-derived `step-finish` recount matches the recorded value for all 8 cells (72/77/79/80/99/104/76/120), 5 sessions each, 0 parse errors (`p4_rederivation.json`) |

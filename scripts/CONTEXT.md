@@ -135,7 +135,7 @@ Note the axis: this is *not* the `historical:` bucket of the script-classificati
 (which says "a lab book, not a maintained command") — it says *which corpus a lab reads*.
 
 The quarantine is the semantic-integrity release's item 1
-(`docs/review/semantic_integrity_review.md` P0): a lab that reaches the **retired**
+(`docs/reviews/semantic_integrity_review.md` P0): a lab that reaches the **retired**
 `experiments/results/_results_summary.json`, directly or transitively, is quarantined —
 `reproduce.sh` does not run it (its default set is derived from the manifest) and `build_data.py`
 does not publish it (rejections are logged by lab name). The file stays, and
@@ -200,7 +200,7 @@ reasoning_divergence, semantic_clusters. Superseded by `semantic_validation.py`.
 - **Claude background sessions** (9): `/api/claude-agents`, `POST /api/claude-agents`, `/api/claude-agents/<session_id>/logs`, `POST /api/claude-agents/<session_id>/stop`, `POST /api/claude-agents/<session_id>/respawn`, `POST /api/claude-agents/<session_id>/rm`, `POST /api/claude-agents/<session_id>/steer`, `/api/claude-agents/daemon`, `POST /api/claude-agents/daemon/stop`
 - **Static shell** (1): `GET /`
 
-Full endpoint reference: `docs/designs/current/supervisor_design.md`, `docs/spec.md`.
+Full endpoint reference: `docs/architecture/current/supervisor_design.md`, `docs/architecture/current/spec.md`.
 
 The portal is a human-facing live dashboard; the control-plane agent pulls state via `.opencode/tools/dashboard.ts` (which calls `monitor.py --json`) and `.opencode/tools/control_room.ts` (§3.1, read-only GET routes only). No agent-callable tool wraps the `POST` steer/interrupt/control routes — those are human-operator-only, by design (see `supervisor.ts`/`control_room.ts` in §3.1). No events are pushed back into opencode — Redis is the single shared state.
 
@@ -222,4 +222,4 @@ writeup → adapt) and generalizes the existing transport:
 Ordering: instrument `confidence` (plus `answer`/`explanation` token split, attempt/timestamp
 fields) before authoring `model_cascade`/`dynamics` control arms — the validator refuses unmet
 `requires`. `confidence` is now measured ([H] per-attempt, `src/agentic_dynamics/adapters/opencode.py:113`),
-so those arms are writable. Design: `docs/designs/current/2026-08-14_experiment-spec-and-compiler-design.md`.
+so those arms are writable. Design: `docs/architecture/current/2026-08-14_experiment-spec-and-compiler-design.md`.

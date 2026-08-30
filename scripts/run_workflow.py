@@ -50,7 +50,7 @@ from agentic_dynamics.knowledge.record_factory import _now_iso  # noqa: E402
 from agentic_dynamics.knowledge.spec_ingestion import emit_spec_record  # noqa: E402
 from agentic_dynamics.runtime.workflow_runner import cell_scope, run_workflow  # noqa: E402
 
-#: CAP fact auto-emit (docs/designs/current/cap_fact_auto_emit_design.md §4): the disable-flag
+#: CAP fact auto-emit (docs/architecture/current/cap_fact_auto_emit_design.md §4): the disable-flag
 #: env var. Deliberately the ONE default-ON flag in the FINOPS_* family (every other gate —
 #: FINOPS_KB_WRITE, FINOPS_ACTUATION_ARMED — is opt-in, "1"-truthy, default OFF): the fact store
 #: must stay current WITHOUT an operator remembering to run kb_produce_facts.py by hand after
@@ -196,7 +196,7 @@ def main() -> None:
                          "never applied, never arms actuation. The actual route is always "
                          "route_step's, unchanged. Implies --cap-snapshot. OFF by default.")
     ap.add_argument("--no-fact-emit", action="store_true",
-                    help="disable the CAP fact auto-emit hook (docs/designs/current/"
+                    help="disable the CAP fact auto-emit hook (docs/architecture/current/"
                          "cap_fact_auto_emit_design.md) for THIS invocation only. The hook is "
                          "default-ON — every completed run derives its own attempt/job/policy/"
                          "workflow facts and emits them, best-effort, scoped to this run's own "
@@ -245,7 +245,7 @@ def main() -> None:
         # CAP I7 seam (design §9 I7): a PER-SPEC opt-in — only a spec that explicitly sets
         # `workflow.params.control_route: true` ever has the plane's route choice applied, and
         # only when a fresh validate_decision() admits it. OFF by default; no committed spec
-        # sets this field (docs/context_abstraction/implementation_notes.md's flip procedure).
+        # sets this field (docs/designs/implemented/implementation_notes.md's flip procedure).
         # Takes priority over --cap-shadow/--cap-snapshot: those are per-INVOCATION measurement
         # opt-ins, this is the per-SPEC apply opt-in.
         from agentic_dynamics.control.rules import make_applying_router
@@ -359,7 +359,7 @@ def _fact_auto_emit_enabled(args: argparse.Namespace) -> bool:
 def _emit_workflow_facts(spec: ExperimentSpec, args: argparse.Namespace, result) -> None:
     """Derive and emit this run's own facts into the KB. Best-effort — never fails the run.
 
-    The CAP fact-auto-emit hook (design: ``docs/designs/current/cap_fact_auto_emit_design.md``).
+    The CAP fact-auto-emit hook (design: ``docs/architecture/current/cap_fact_auto_emit_design.md``).
     Runs AFTER ``_emit_spec_record`` on purpose — the ledger is already on disk and the spec's
     lifecycle record is already current, so this call adds nothing new to the *run's* outcome; it
     can only add facts to the KB. Mirrors ``_emit_spec_record``'s two-layer posture exactly (see

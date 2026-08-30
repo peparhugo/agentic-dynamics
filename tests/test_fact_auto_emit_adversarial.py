@@ -1,5 +1,5 @@
 """CAP fact-auto-emit adversarial verification (``f3_adversarial_verify``, design:
-``docs/designs/current/cap_fact_auto_emit_design.md``).
+``docs/architecture/current/cap_fact_auto_emit_design.md``).
 
 ROLE: adversarial verifier. This file exists to try to FALSIFY the fact-auto-emit hook's five
 hard-rule guarantees (idempotence, failure-tolerance, flag precedence, no reducer/transport

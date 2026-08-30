@@ -1930,11 +1930,11 @@ def _load_verdicts() -> dict:
     Three verdicts feed the revamp's new evidence:
 
     - ``cap_2b`` — the randomized non-inferiority decision (CPVO ratio, CI, margin, arms)
-      :cite: `docs/designs/current/cap_2b.md`
+      :cite: `docs/experiments/results/cap_2b.md`
     - ``escalation`` — the measured escalation-chain E_x figures (Sol / Sonnet)
       :cite: `experiments/results/cap_escalation_measurement/`
     - ``calibration`` — the 0/3 → 2/3 calibration arc
-      :cite: `docs/designs/current/cap_2a_rerun2.md`
+      :cite: `docs/experiments/results/cap_2a_rerun2.md`
 
     Every value keeps its evidence class and its authorization boundary in-band, so the page
     renders scope and limitation at the point of reading (the provenance rule).

@@ -10,7 +10,7 @@ These assert *behaviour at the data level*, not just the import graph:
   producer ``actuation_ingestion.derive_actuation_record``.
 
 See ``tests/test_dependency_direction.py`` for the import-graph lint and
-``docs/consolidation/design.md`` §1.4.
+``docs/release/consolidation/design.md`` §1.4.
 """
 
 from __future__ import annotations

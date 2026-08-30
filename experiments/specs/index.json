@@ -1,7 +1,7 @@
 {
   "schema_version": "spec-status/v2",
-  "generated_at": "2026-08-30T18:26:39.377298+00:00",
-  "n_specs": 155,
+  "generated_at": "2026-08-30T19:20:39.873536+00:00",
+  "n_specs": 156,
   "specs": [
     {
       "name": "auto_posthoc_wiring",
@@ -652,24 +652,6 @@
       "n_runs": 0
     },
     {
-      "name": "fleet_ladder_implementation",
-      "version": "0.1",
-      "status": "awaiting_approval",
-      "spec_path": "workflows/repository/fleet_ladder_implementation.yaml",
-      "artifact_kind": "workflow",
-      "repeatable": false,
-      "supersedes": [],
-      "superseded_by": null,
-      "completed_at": null,
-      "last_run_at": "2026-08-30T17:12:27.021108+00:00",
-      "latest_ok": false,
-      "latest_model": "deepseek/deepseek-v4-pro",
-      "latest_cost_usd": 0.0,
-      "latest_git_sha": "d6a96356e",
-      "results_pointer": "experiments/results/workflows/fleet_ladder_implementation/20260830T171227Z.json",
-      "n_runs": 3
-    },
-    {
       "name": "agentic_dynamics_rebrand",
       "version": "0.1",
       "status": "failed",
@@ -775,24 +757,6 @@
       "latest_cost_usd": 0.0,
       "latest_git_sha": "d5f85126b",
       "results_pointer": "experiments/results/workflows/design_sessions/20260814T065812Z.json",
-      "n_runs": 1
-    },
-    {
-      "name": "entropy_beta_instruments",
-      "version": "0.1",
-      "status": "failed",
-      "spec_path": "workflows/repository/entropy_beta_instruments.yaml",
-      "artifact_kind": "workflow",
-      "repeatable": false,
-      "supersedes": [],
-      "superseded_by": null,
-      "completed_at": null,
-      "last_run_at": "2026-08-30T18:26:39.321682+00:00",
-      "latest_ok": false,
-      "latest_model": "deepseek/deepseek-v4-pro",
-      "latest_cost_usd": 0.165854,
-      "latest_git_sha": "62f8e5db2",
-      "results_pointer": "experiments/results/workflows/entropy_beta_instruments/20260830T182639Z.json",
       "n_runs": 1
     },
     {
@@ -1980,6 +1944,24 @@
       "n_runs": 1
     },
     {
+      "name": "entropy_beta_instruments",
+      "version": "0.1",
+      "status": "completed",
+      "spec_path": "workflows/repository/entropy_beta_instruments.yaml",
+      "artifact_kind": "workflow",
+      "repeatable": false,
+      "supersedes": [],
+      "superseded_by": null,
+      "completed_at": null,
+      "last_run_at": "2026-08-30T19:14:33.279901+00:00",
+      "latest_ok": true,
+      "latest_model": "deepseek/deepseek-v4-pro",
+      "latest_cost_usd": 0.293977,
+      "latest_git_sha": "9ad80cfb0",
+      "results_pointer": "experiments/results/workflows/entropy_beta_instruments/20260830T191433Z.json",
+      "n_runs": 2
+    },
+    {
       "name": "evidence_narrative",
       "version": "0.1",
       "status": "completed",
@@ -2032,6 +2014,24 @@
       "latest_git_sha": "efac823cf",
       "results_pointer": "experiments/results/workflows/fix_review_findings/20260814T134837Z.json",
       "n_runs": 1
+    },
+    {
+      "name": "fleet_ladder_implementation",
+      "version": "0.1",
+      "status": "completed",
+      "spec_path": "workflows/repository/fleet_ladder_implementation.yaml",
+      "artifact_kind": "workflow",
+      "repeatable": false,
+      "supersedes": [],
+      "superseded_by": null,
+      "completed_at": null,
+      "last_run_at": "2026-08-30T19:13:51.253755+00:00",
+      "latest_ok": true,
+      "latest_model": "deepseek/deepseek-v4-pro",
+      "latest_cost_usd": 1.292377,
+      "latest_git_sha": "53a74e1ca",
+      "results_pointer": "experiments/results/workflows/fleet_ladder_implementation/20260830T191351Z.json",
+      "n_runs": 4
     },
     {
       "name": "fleet_ladder_plan",
@@ -2229,6 +2229,24 @@
       "latest_cost_usd": 0.242495,
       "latest_git_sha": "b2b1f86f1",
       "results_pointer": "experiments/results/workflows/kb_write_path/20260818T234822Z.json",
+      "n_runs": 1
+    },
+    {
+      "name": "ledger_instrumentation",
+      "version": "0.1",
+      "status": "completed",
+      "spec_path": "workflows/repository/ledger_instrumentation.yaml",
+      "artifact_kind": "workflow",
+      "repeatable": false,
+      "supersedes": [],
+      "superseded_by": null,
+      "completed_at": null,
+      "last_run_at": "2026-08-30T19:20:39.612882+00:00",
+      "latest_ok": true,
+      "latest_model": "deepseek/deepseek-v4-pro",
+      "latest_cost_usd": 0.708458,
+      "latest_git_sha": "18197df62",
+      "results_pointer": "experiments/results/workflows/ledger_instrumentation/20260830T192039Z.json",
       "n_runs": 1
     },
     {

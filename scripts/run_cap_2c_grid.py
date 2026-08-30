@@ -2,7 +2,7 @@
 
 Phase p2 of ``cap_adaptive_2c``: runs the 23 remaining cells (E4 = cap2c_correct_adaptive_r1 was
 measured in p1) EXACTLY per the pre-registered assignment table
-(``docs/designs/current/cap_adaptive_2c_preregistration.md`` section 4 — the committed seed
+(``docs/experiments/preregistrations/cap_adaptive_2c_preregistration.md`` section 4 — the committed seed
 ``92983f6f...`` + block scheme). Per cell: fresh worktree, unique FINOPS_CELL_ID, proposal emitted
 + validated BEFORE the outcome; static = recorded never applied; adaptive = applied exactly as
 proposed (rework = ONE bounded pass, verify = one pass, continue = null). Outcomes INDEPENDENT

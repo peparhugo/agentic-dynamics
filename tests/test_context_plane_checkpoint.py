@@ -8,7 +8,7 @@ the real ``session_routing.yaml`` contract — loads, R11-clean, and (via a fixt
 addendum's own literal §4.2 sketch) a demonstration that the addendum's UNCONDITIONAL invariant
 grouping is refused by R11 / is logically unsatisfiable, which is why this contract moves those
 facts to ``requires_facts`` instead (documented in the contract file's own header and
-``docs/context_abstraction/implementation_notes.md`` §15); (4) ``session_routing_v1`` — the
+``docs/designs/implemented/implementation_notes.md`` §15); (4) ``session_routing_v1`` — the
 shadow control rule's four-way branching, each DELIVER-required refusal case (stale continue,
 checkpointless fork) via the REAL validator check C5; (5) proposals are durably recorded and
 NEVER actuated (``record_shadow_decision``, reused verbatim — no new recording path); (6)
@@ -650,7 +650,7 @@ def test_continue_with_a_stale_snapshot_is_refused():
     mechanical mechanism that already refuses fork-without-a-checkpoint below.
 
     FIX NOTE (this increment's own adversarial finding, recorded in
-    ``docs/context_abstraction/implementation_notes.md`` §16): an EARLIER version of this test
+    ``docs/designs/implemented/implementation_notes.md`` §16): an EARLIER version of this test
     used an EMPTY store (no checkpoint facts at all) and asserted ``ctx.admissible is False``,
     treating "absent" and "stale" as the same case. They are not, and the assertion was actually
     proving a BUG: ``session_routing.yaml`` had (at that point) left ``on_missing: halt`` on all

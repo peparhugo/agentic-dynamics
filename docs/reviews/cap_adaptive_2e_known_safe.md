@@ -10,7 +10,7 @@ adversarial review (`docs/reviews/cap_adaptive_2e_adversary.md`). Nothing in thi
 
 | # | item | evidence |
 |---|---|---|
-| K1 | Preregistration committed before any cell ran | `docs/designs/current/cap_adaptive_2e_preregistration.md` @ `d1a0ad777`, on main before the spec commit `3458f916d`; no `cap_adaptive_2e` results existed at that commit |
+| K1 | Preregistration committed before any cell ran | `docs/experiments/preregistrations/cap_adaptive_2e_preregistration.md` @ `d1a0ad777`, on main before the spec commit `3458f916d`; no `cap_adaptive_2e` results existed at that commit |
 | K2 | Spec SHA pinned in the preregistration header | `sha256sum workflows/repository/cap_adaptive_2e.yaml` = `b0ad1c4f…` matches the header |
 | K3 | Exactly the 6 pre-registered cells ran, nothing unlisted | `cells/` holds exactly the §3 table's 6 cell ids |
 | K4 | Fingerprint divergence is real (not a scoring artifact) | raw facts in every cell record + the p1 probe: ratio 0.5, risk 0.18, expected 0.08; risk re-derived as `0.20·0.5 + 0.20·0.4` |

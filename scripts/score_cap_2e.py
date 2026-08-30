@@ -4,7 +4,7 @@ Phase p3 of ``cap_adaptive_2e`` (the leg-3 capture reconstruction). Inputs are O
 p1/p2 artifacts under ``experiments/results/cap_adaptive_2e/`` — the p1 execution manifest
 (fingerprint probe + E1), the p2 execution manifest (the pre-registered 6-cell table), and the
 per-cell records (``cells/*.json``) + the durable proposals. Joins are validated FIRST against the
-pre-registered table (``docs/designs/current/cap_adaptive_2e_preregistration.md`` section 3); a
+pre-registered table (``docs/experiments/preregistrations/cap_adaptive_2e_preregistration.md`` section 3); a
 cell whose (cell_id, class, variant, arm, repetition) does not match the table is INVALID, not
 corrected.
 
@@ -34,7 +34,7 @@ RESULTS = ROOT / "experiments" / "results" / "cap_adaptive_2e"
 CELLS_DIR = RESULTS / "cells"
 
 SCHEMA = "cap_adaptive_2e_score/v1"
-PREREG = "docs/designs/current/cap_adaptive_2e_preregistration.md"
+PREREG = "docs/experiments/preregistrations/cap_adaptive_2e_preregistration.md"
 PREREG_REVISION = "d1a0ad777"
 
 #: Pre-registered pinned constants (preregistration section 4-5): the harm model at E_x 11.47/28.
@@ -47,7 +47,7 @@ FINGERPRINT_TOLERANCE = 1e-9
 CAPTURE_FLOOR = 2 / 3
 
 DECISION_RULE_REF = (
-    "docs/designs/current/cap_adaptive_2e_preregistration.md section 4 (the decision rule: "
+    "docs/experiments/preregistrations/cap_adaptive_2e_preregistration.md section 4 (the decision rule: "
     "SUPPORT iff construction fidelity AND capture >= 2/3 of the 3 low-information cells in the "
     "abstention arm; REFUTE if the fingerprint fails to construct — a THIRD divergence — or "
     "capture < 2/3)"

@@ -88,7 +88,7 @@ Every attack below was actually attempted and failed to falsify the campaign. Fo
 
 ## 11. p4 hashes don't match the verdict's citations
 
-**Tried:** recompute the two p4 JSON SHA256s and compare to `docs/designs/current/cap_2a_rerun2.md`.
+**Tried:** recompute the two p4 JSON SHA256s and compare to `docs/experiments/results/cap_2a_rerun2.md`.
 
 **Evidence:** `cap_2a_rerun2_score_20260826T015846Z.json` → `ef42f8b0ae07704cc693c51243dc755807586b0b745365d606e76410b19dd1ec`; `p4_validation.json` → `a2fd71fde21ef2563debd497fbd6224761c89365a05cbca64bf89ac87dd3375b` — both equal the verdict's citations.
 

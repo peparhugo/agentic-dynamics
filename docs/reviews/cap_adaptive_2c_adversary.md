@@ -5,9 +5,9 @@ status: accepted
 # cap_adaptive_2c — adversarial review (p5)
 
 **Campaign:** `cap_adaptive_2c` (`cap_adaptive_2c@0.1`) · **Verdict under review:**
-`docs/designs/current/cap_adaptive_2c.md` (committed `f1799ed53be089b6f66d88f1b51fb3928d0e3b8b`,
+`docs/experiments/results/cap_adaptive_2c.md` (committed `f1799ed53be089b6f66d88f1b51fb3928d0e3b8b`,
 SHA256 `e287933781872da854b75a559911449de8349ef18726147244606b2034fb91dc`). **Pre-registration:**
-`docs/designs/current/cap_adaptive_2c_preregistration.md` (committed `104a8eade91c8b77849d9db5fcd0f1e99d7925ad`,
+`docs/experiments/preregistrations/cap_adaptive_2c_preregistration.md` (committed `104a8eade91c8b77849d9db5fcd0f1e99d7925ad`,
 SHA256 `0f3a5de755784a6e9f8a71da3e7706782cddf930095fbc65a685ccc361da5e3d`). **Score:**
 `experiments/results/cap_adaptive_2c/cap_adaptive_2c_score_20260827T180241Z.json` (SHA256
 `076751e4b14d74085fba46581a9bf9bd6bb627bee1089a5afce4c87d5cde60f7`) + the validation JSON
@@ -28,7 +28,7 @@ reseeded assignment, dropped cell, or post-hoc class re-label is a FAILED findin
   **18:02** → `f1799ed53` p4_verdict **20:07:01**. p0 precedes every cell: the first p2 cell
   record was written `2026-08-27T15:47:29Z` (UTC), after p0 (17:28 +0200 = 15:28 UTC); the E4
   p1 manifest was written `2026-08-27T15:37:10Z`, after p0.
-- The p0 commit adds exactly one file, `docs/designs/current/cap_adaptive_2c_preregistration.md`
+- The p0 commit adds exactly one file, `docs/experiments/preregistrations/cap_adaptive_2c_preregistration.md`
   (591 lines), containing the margin (`≤ 1.10 ×` and `− 5 percentage points`, §2), the committed
   seed `92983f6f06f8b5a13d24ecfae87aac5b6f707b780e716a5bf434a244c3e0f252` (§4), and the full
   24-cell assignment table (§4). The current file's SHA256 equals the committed version's

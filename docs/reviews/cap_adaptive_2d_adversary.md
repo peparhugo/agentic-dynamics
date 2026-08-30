@@ -6,7 +6,7 @@ status: accepted
 
 **Campaign:** `cap_adaptive_2d` (`cap_adaptive_2d@0.1`, spec SHA256
 `1258280d44f608c7fcccf91ef514cc5a39994a9fd352852d96fb35c919f2ea0c`) · **Verdict under review:**
-`docs/designs/current/cap_adaptive_2d.md` (committed `02abd464988aee8ddbe9ffd04916f5658008114b`,
+`docs/experiments/results/cap_adaptive_2d.md` (committed `02abd464988aee8ddbe9ffd04916f5658008114b`,
 SHA256 `c21bc97c5997adee…`). **Pre-registration:**
 `docs/designs/current/cap_adaptive_2d_preregistration.md` (committed `9dc0b4a638810af28ccf82b6beeb4af6b596d467`;
 current file SHA256 `98da62a31f3817e6…`, spec pinned in header at `044f7c23c`).

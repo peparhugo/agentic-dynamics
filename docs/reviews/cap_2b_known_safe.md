@@ -26,7 +26,7 @@ FAILED finding in `docs/reviews/cap_2b_adversary.md`; none of these falsified th
 | K14 | Find **post-hoc margin renegotiation** in the verdict | The verdict's decision is computed from the pre-registered rule only; CI (ratio upper 0.9105) is reported, not used to loosen the margin | Descriptive framing; the margin is untouched |
 
 **Attempted attacks that were non-falsifying:** none of K1–K14 falsified the pre-registered
-decision or any of its inputs. The verdict (`docs/designs/current/cap_2b.md`, NON-INFERIOR) stands
+decision or any of its inputs. The verdict (`docs/experiments/results/cap_2b.md`, NON-INFERIOR) stands
 unchanged.
 
 **LOG:** 14 attempted non-falsifying attacks, 14 safe. **PASS** — commit.

@@ -3,7 +3,7 @@
 **Campaign:** `cap_site_revamp4`
 **Phase:** `p2_design_with_human_checkpoint`
 **Executor:** deepseek/deepseek-v4-flash
-**Design:** `docs/designs/current/cap_site_revamp3_design.md`
+**Design:** `docs/website/cap_site_revamp3_design.md`
 **Baseline:** `experiments/results/cap_site_revamp3/incumbent_census.json` (verified p1, `40691ff0b`)
 
 ## Approval Status

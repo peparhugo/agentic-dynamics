@@ -11,7 +11,7 @@ re-pointed at (or marks it "historical" when no canonical replacement exists). E
 count in here is measured against the current `experiments/data_manifest.json` registry
 array — not inferred from prose.
 
-**Authoritative grounding:** `docs/data_integrity_findings.md` (the canonical record) +
+**Authoritative grounding:** `docs/verification/data_integrity_findings.md` (the canonical record) +
 the canonical-state registry produced by `scripts/generate_manifest.py` and read by
 `scripts/registry.py` (`load_registry`). The registry row is the *index*; the payload is
 the source artifact pointed at by `source_uri`.
@@ -21,7 +21,7 @@ the source artifact pointed at by `source_uri`.
 ## 1. Why the repoint exists
 
 The current site (and the lab books) are fed by `_results_summary.json` — 144 entries
-whose condition labels are not backed by real perturbations (`docs/data_integrity_findings.md`).
+whose condition labels are not backed by real perturbations (`docs/verification/data_integrity_findings.md`).
 The remediation retired those 144 entries and replaced them with the clean re-runs, now
 registered as canonical-state `finding` records. The site must stop reading the summary and
 start reading the registry, so the same number the Control Room's `/api/registry` shows is
@@ -56,7 +56,7 @@ Measured directly from `experiments/data_manifest.json` (generated 2026-08-19), 
 
 The 77 tombstones are all `story` records whose `reason` begins
 `"contaminated: ran as CLEAN due to the P0-7 mutation fallback…"` — exactly the
-quarantined corpus `docs/data_integrity_findings.md` treatment rule 3 mandates.
+quarantined corpus `docs/verification/data_integrity_findings.md` treatment rule 3 mandates.
 
 ### Exact counts the site must show post-repoint
 
@@ -91,7 +91,7 @@ For each section: the canonical source, the join key, and the replacement verdic
   energy, correctness-per-dollar, AST aggregates, cost/token breakdowns, narration_rate).
 - **Canonical source:** `finding` payload (via registry). The 64 finding records are the
   clean single-task re-runs that replace the 144 summary entries
-  (`docs/data_integrity_findings.md` treatment rule 4).
+  (`docs/verification/data_integrity_findings.md` treatment rule 4).
 - **Join key:** registry `source_uri` (→ the `task_manager_*` / `process_perturbation_resample_*`
   JSON file) **then** `logical_locator` == `basename(run.workdir)` to select the specific
   `runs[]` entry inside that file. (Example: finding row `logical_locator = "exp_jgikdggu"`,

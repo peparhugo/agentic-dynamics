@@ -8,7 +8,7 @@ Recorded shadow decisions (``control.rules.record_shadow_decision``) live as loo
 content-addressed JSON artifacts under ``KB_ARTIFACT_DIR`` — DELIBERATELY never published to the
 registry/stream (design §8.6: the plane arms no actuation; a shadow decision is a
 ``source_type="actuation"`` artifact that never enters the live registry a real consumer would
-react to — see ``docs/context_abstraction/implementation_notes.md``). This script scans that
+react to — see ``docs/designs/implemented/implementation_notes.md``). This script scans that
 directory directly (``extractor_version == "actuation/v1"``) rather than reading
 ``experiments/data_manifest.json``, unlike ``context_snapshot_report.py`` (I4's snapshots ARE
 observation-family and DO go through the normal registry pipe).

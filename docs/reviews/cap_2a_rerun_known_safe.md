@@ -75,7 +75,7 @@ Every entry is an attack that was actually attempted and did **not** falsify the
 
 ### N. No leaked credentials
 - **Tried:** scan the campaign artifacts + the two docs for secrets.
-- **Evidence:** no `password=`/`password123`/`sk-…`/`api_key=…` match in `experiments/results/cap_2a_rerun/**` or `docs/designs/current/cap_2a_rerun.md`.
+- **Evidence:** no `password=`/`password123`/`sk-…`/`api_key=…` match in `experiments/results/cap_2a_rerun/**` or `docs/experiments/results/cap_2a_rerun.md`.
 - **Why safe:** nothing secret reached a committed artifact.
 
 ### O. Verdict hash citations are exact

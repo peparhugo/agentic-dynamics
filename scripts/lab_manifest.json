@@ -9,7 +9,7 @@
     "Consumers: scripts/reproduce.sh (default lab set) and scripts/build_data.py (publication),",
     "both via the typed loader src/agentic_dynamics/reporting/lab_manifest.py.",
     "",
-    "Why this file exists: docs/review/semantic_integrity_review.md P0 \u2014 the lab pipeline",
+    "Why this file exists: docs/reviews/semantic_integrity_review.md P0 \u2014 the lab pipeline",
     "bypassed the canonical data-integrity boundary. _results_summary.json is RETIRED (144",
     "entries, replaced by the registry-backed canonical corpus in build_data.py), yet labs still",
     "read it and the website still published their output. This manifest is release item 1",
@@ -29,7 +29,7 @@
     "lab_grit_matrix.py -> lab_correctness_escape_quadrants.py (quadrant 'high_grit' -> 'robust',",
     "metric_definition_version v1 -> v2) and stays quarantined."
   ],
-  "review_source": "docs/review/semantic_integrity_review.md",
+  "review_source": "docs/reviews/semantic_integrity_review.md",
   "release_phase": "s4_grit_resolution",
   "data_integrity_policy": "docs/data_integrity_findings.md",
   "status_vocabulary": {

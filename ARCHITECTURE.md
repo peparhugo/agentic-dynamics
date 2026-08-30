@@ -6,13 +6,13 @@ supersedes: BLUEPRINT.md, BLUEPRINT_v2.md, BLUEPRINT_v3.md, dated handoffs, supe
 # ARCHITECTURE.md — the single architectural authority
 
 This document is the one current architectural authority for the repository (critique rec 4,
-`docs/review/semantic_monolith_review.md` §"The nine recommendations"). It answers, in order: the
+`docs/reviews/semantic_monolith_review.md` §"The nine recommendations"). It answers, in order: the
 planes, the package boundaries, the dependency direction, implemented vs proposed, the canonical
 execution loop, and which documents supersede which. Detailed designs live under
 `docs/designs/{current,implemented}` and `docs/archive/`; this file is the map, not the design.
 
 **Provenance:** [C] computed from the current tree; [M] measured ground truth; [X] the critique
-(`docs/review/semantic_monolith_review.md`); [P] policy/prior (invariants). Where a claim is
+(`docs/reviews/semantic_monolith_review.md`); [P] policy/prior (invariants). Where a claim is
 internal it carries a `file:line`; where it derives from the critique it names the recommendation.
 
 ---
@@ -21,11 +21,11 @@ internal it carries a `file:line`; where it derives from the critique it names t
 
 The repository's single semantic monolith (the old `src/instrument/` — "almost everything" —
 critique finding 1) is partitioned into eight bounded planes, realized as
-`src/agentic_dynamics/<plane>/` (Stage 1, `docs/consolidation/stage_map.md` §4). A module's plane
+`src/agentic_dynamics/<plane>/` (Stage 1, `docs/release/consolidation/stage_map.md` §4). A module's plane
 is the conceptual system it serves (critique §"What the repository actually contains (six
 systems)"), not its former directory. The full 64-module disposition — executed, with the
 transient `instrument.*` compatibility shim retired at the end of Stage 1 — is
-`docs/consolidation/design.md` §1.1.
+`docs/release/consolidation/design.md` §1.1.
 
 | Plane | One-line ownership | Six-system map |
 |---|---|---|
@@ -45,7 +45,7 @@ application tier at the top of the dependency spine (§3).
 
 The physical reality today: all eight planes live in `src/agentic_dynamics/<plane>/` (59 live
 modules + the `agentic-dynamics` CLI; the deprecated five were retired in Stage 1 — see
-`docs/consolidation/design.md` §1.1's `legacy/` rows). `src/instrument/` no longer exists; its
+`docs/release/consolidation/design.md` §1.1's `legacy/` rows). `src/instrument/` no longer exists; its
 compatibility shim was deleted once every consumer had been rewritten (Stage 1, phase E).
 
 ---
@@ -65,7 +65,7 @@ forbidden edges are the executable rules.
 | 2 — `control` | `control` |
 | 3 — `apps` | `apps/` (outside `src/agentic_dynamics/`, still linted) |
 
-**Forbidden edges** (rec 8, verbatim in `docs/review/semantic_monolith_review.md`):
+**Forbidden edges** (rec 8, verbatim in `docs/reviews/semantic_monolith_review.md`):
 
 1. `core` imports nothing from tier ≥ 1 — only stdlib/third-party + core siblings.
 2. `measurement` does not import `control`.
@@ -154,7 +154,7 @@ blanket-rejected.
 
 ### The Context Abstraction Plane — implementation-status map (CAP I0–I10)
 
-The CAP design (`docs/designs/current/context_abstraction_design.md`) is **frozen** — the design
+The CAP design (`docs/architecture/current/context_abstraction_design.md`) is **frozen** — the design
 doc is the commitment and is never revised here. This section is the CURRENT map: every increment
 I0–I7 plus the addenda (I9 `pattern/v1`, typed checkpoints, the fact auto-emit hook) is
 **implemented** and under `src/agentic_dynamics/control/` (+ `core/contracts.py` for the spec-gate
@@ -203,8 +203,8 @@ regenerated instruction surfaces. `stage_map.md` §5.)
 
 ### The release plan
 
-This consolidation was staged by **`docs/consolidation/stage_map.md`** — the dependency-ordered
-release plan (S0 → S1 → S2 → S3 → S4/S5 → S6), now complete (S6: `docs/consolidation/verification.md`
+This consolidation was staged by **`docs/release/consolidation/stage_map.md`** — the dependency-ordered
+release plan (S0 → S1 → S2 → S3 → S4/S5 → S6), now complete (S6: `docs/release/consolidation/verification.md`
 "Final result: PASS"). This file's plane/boundary definitions are the release's architectural spine.
 
 ---
@@ -245,9 +245,9 @@ ARCHITECTURE.md`):**
 |---|---|
 | `agent_config/mental-model.md` (generated into `.opencode/instructions/mental-model.md` + `.claude/`) | The file map, signatures, and dependencies — the operational reference, not the architectural authority. |
 | `scripts/CONTEXT.md` | The per-script reference (the authoritative script table, machine-parsed by the classification guard). |
-| `docs/data_integrity_findings.md` | The data-integrity boundary (no `_results_summary.json` resurrection). |
-| `docs/review/` | The review directory — including the critique this file answers (`semantic_monolith_review.md`). |
-| `docs/consolidation/{stage_map,design}.md` | The release plan + per-stage design this file is one output of. |
+| `docs/verification/data_integrity_findings.md` | The data-integrity boundary (no `_results_summary.json` resurrection). |
+| `docs/reviews/` | The review directory — including the critique this file answers (`semantic_monolith_review.md`). |
+| `docs/release/consolidation/{stage_map,design}.md` | The release plan + per-stage design this file is one output of. |
 
 ---
 

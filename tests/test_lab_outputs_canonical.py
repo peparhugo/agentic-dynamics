@@ -1,6 +1,6 @@
 """Canonical-output guard (semantic-integrity release, phase s3).
 
-``docs/review/semantic_integrity_review.md`` recommended release item 3:
+``docs/reviews/semantic_integrity_review.md`` recommended release item 3:
 
     Rebuild derived outputs — every active lab + website dataset from current canonical
     records only. […] Verify zero lab outputs carry the retired summary's lineage; the
@@ -225,7 +225,7 @@ def test_condition_effects_contract_reconciles_with_output():
 def test_verification_value_join_publishes_no_placeholder_identity():
     """The story→review join fails explicitly — no ``model: "?"`` row survives (m1).
 
-    ``docs/review/measurement_contribution_review.md`` P0: ``lab_verification_value``
+    ``docs/reviews/measurement_contribution_review.md`` P0: ``lab_verification_value``
     converted unmatched reviews into ``stories.get(sid, ("?", 0))`` placeholder rows (432
     commit-review observations driving a −0.154 correlation) while its contract declared
     457/457/457/0. The m1 fix makes the join fail explicitly: a review whose ``_story_id``

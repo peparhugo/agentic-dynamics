@@ -1,9 +1,8 @@
 """Stale-path guard (refactor-repair P0-2 guard).
 
-Rejects retired path families in every ``status: accepted`` document (and every
-``docs/designs/current/*`` design) unless the occurrence sits in the explicit historical
-allowlist below. The retired families are the pre-refactor locations the repair release
-retired:
+Rejects retired path families in every ``status: accepted`` document unless the
+occurrence sits in the explicit historical allowlist below. The retired families
+are the pre-refactor locations the repair release retired:
 
 ====================  ==========================
 retired               current
@@ -12,7 +11,7 @@ retired               current
 ``experiments/configs/``  ``experiments/definitions/configs/``
 ``admin/server.py``   ``apps/control_room/server.py``
 ``firebase/public/``  ``apps/website/``
-``code_reviews/2026-08-14_*``  ``docs/designs/current/2026-08-14_*``
+``code_reviews/2026-08-14_*``  ``docs/architecture/current/2026-08-14_*``
 ====================  ==========================
 
 An accepted doc that names one of these as a *current* location is a bug: accepted docs are
@@ -20,6 +19,11 @@ runtime context given to the agents that modify the repo. Historical discussion 
 pre-refactor tree, consolidation release records, rebrand/survey/verify docs that describe the
 move) is legitimate ONLY via an explicit per-path allowlist entry — never a blanket exception.
 A new accepted doc, or a new retired-family mention in an already-allowlisted doc, fails here.
+
+The allowlist keys track the docs-taxonomy restructure
+(``docs/designs/proposed/docs_taxonomy_restructure.md`` §(d)): every key lives at the file's
+post-restructure home (``docs/reviews/``, ``docs/verification/``,
+``docs/architecture/current/``, ``docs/experiments/*``, ``docs/website/``, ``docs/release/``).
 """
 
 from __future__ import annotations
@@ -48,68 +52,90 @@ ALLOWLIST: dict[str, frozenset[str]] = {
     # src/instrument/", "src/instrument/ no longer exists") — historical, not a current path.
     "ARCHITECTURE.md": frozenset({"src/instrument/"}),
     # --- directories of historical records (critiques, release logs, research) ---
-    "docs/review/": _ALL,  # external/internal critiques of the pre-refactor tree
-    "docs/consolidation/": _ALL,  # S0–S6 release records (describe the move itself)
-    "docs/control_room_ui/": frozenset({"src/instrument/", "admin/server.py"}),
-    "docs/context_abstraction/": frozenset({"src/instrument/"}),
-    "docs/spec_lifecycle/": frozenset({"src/instrument/"}),
+    "docs/release/consolidation/": _ALL,  # S0–S6 release records (describe the move itself)
+    # --- reviews (external/internal critiques of the pre-refactor tree) ---
+    "docs/reviews/architecture_review.md": frozenset({"src/instrument/", "admin/server.py"}),
+    "docs/reviews/bugs.md": frozenset({"src/instrument/", "experiments/configs/"}),
+    "docs/reviews/code_review.md": frozenset({"src/instrument/", "admin/server.py"}),
+    "docs/reviews/context_abstraction_review.md": frozenset({"src/instrument/"}),
+    "docs/reviews/control_room.md": frozenset({"src/instrument/", "admin/server.py"}),
+    "docs/reviews/refactor_repair_review.md": frozenset(
+        {"src/instrument/", "experiments/configs/", "admin/server.py", "firebase/public/",
+         "code_reviews/2026-08-14"}
+    ),
+    "docs/reviews/restructure.md": frozenset({"src/instrument/"}),
+    "docs/reviews/semantic_integrity_review.md": frozenset({"admin/server.py"}),
+    "docs/reviews/semantic_monolith_review.md": frozenset({"src/instrument/"}),
+    "docs/reviews/website.md": frozenset({"src/instrument/", "firebase/public/"}),
+    # --- Control Room surface material (documents the admin/server.py mapping) ---
+    "docs/website/control_room_ui/": frozenset(
+        {"src/instrument/", "admin/server.py", "firebase/public/"}
+    ),
     # --- rebrand + website archaeology (firebase/public/ → apps/website/, src/instrument/) ---
-    "docs/agentic_dynamics_arxiv_draft.md": frozenset(
+    "docs/release/agentic_dynamics_arxiv_draft.md": frozenset(
         {"src/instrument/", "firebase/public/", "code_reviews/2026-08-14"}
     ),
-    "docs/agentic_dynamics_rebrand_plan.md": frozenset({"src/instrument/", "firebase/public/"}),
-    "docs/agentic_dynamics_rebrand_verify.md": frozenset({"firebase/public/"}),
-    "docs/architecture_visual.md": frozenset({"firebase/public/"}),
-    "docs/facelift.md": frozenset({"firebase/public/"}),
-    "docs/fixplan.md": frozenset({"src/instrument/", "admin/server.py", "firebase/public/"}),
-    "docs/narrative.md": frozenset({"firebase/public/"}),
-    "docs/redesign.md": frozenset({"firebase/public/"}),
-    "docs/remediation_plan.md": frozenset(
+    "docs/release/agentic_dynamics_rebrand_plan.md": frozenset(
+        {"src/instrument/", "firebase/public/"}
+    ),
+    "docs/verification/agentic_dynamics_rebrand_verify.md": frozenset({"firebase/public/"}),
+    "docs/architecture/current/architecture_visual.md": frozenset({"firebase/public/"}),
+    "docs/website/facelift.md": frozenset({"firebase/public/"}),
+    "docs/website/narrative.md": frozenset({"firebase/public/"}),
+    "docs/website/redesign.md": frozenset({"firebase/public/"}),
+    "docs/release/remediation_plan.md": frozenset(
         {"src/instrument/", "experiments/configs/", "firebase/public/"}
     ),
-    "docs/remediation_verify.md": frozenset({"src/instrument/", "firebase/public/"}),
-    "docs/verify_evidence.md": frozenset({"firebase/public/"}),
-    "docs/verify_evidence_redesign.md": frozenset({"firebase/public/"}),
-    "docs/verify_framework.md": frozenset({"firebase/public/"}),
+    "docs/verification/remediation_verify.md": frozenset({"src/instrument/", "firebase/public/"}),
+    "docs/verification/verify_evidence.md": frozenset({"firebase/public/"}),
+    "docs/verification/verify_evidence_redesign.md": frozenset({"firebase/public/"}),
+    "docs/verification/verify_framework.md": frozenset({"firebase/public/"}),
     # --- opencode docs refresh + Claude Code port (document the admin/server.py mapping) ---
-    "docs/opencode_docs_challenge.md": frozenset({"src/instrument/"}),
-    "docs/opencode_docs_scope.md": frozenset(
+    "docs/website/opencode_docs_challenge.md": frozenset({"src/instrument/"}),
+    "docs/website/opencode_docs_scope.md": frozenset(
         {"src/instrument/", "experiments/configs/", "admin/server.py", "code_reviews/2026-08-14"}
     ),
-    "docs/opencode_docs_spec.md": frozenset(
+    "docs/website/opencode_docs_spec.md": frozenset(
         {"src/instrument/", "experiments/configs/", "admin/server.py", "code_reviews/2026-08-14"}
     ),
-    "docs/claude_code_port.md": frozenset({"admin/server.py"}),
-    "docs/claude_tools_to_skills_scope.md": frozenset(
+    "docs/architecture/current/claude_code_port.md": frozenset({"admin/server.py"}),
+    "docs/architecture/current/claude_tools_to_skills_scope.md": frozenset(
         {"src/instrument/", "experiments/configs/", "admin/server.py"}
     ),
-    "docs/claude_tools_to_skills_verify.md": frozenset(
+    "docs/verification/claude_tools_to_skills_verify.md": frozenset(
         {"src/instrument/", "experiments/configs/", "admin/server.py"}
     ),
     # --- routing design/survey/verify (predate the package rename + Control Room move) ---
-    "docs/routing_design.md": frozenset(
+    "docs/architecture/current/routing_design.md": frozenset(
         {"src/instrument/", "admin/server.py", "code_reviews/2026-08-14"}
     ),
-    "docs/routing_follow_up_verify.md": frozenset({"src/instrument/"}),
-    "docs/routing_next_steps.md": frozenset({"src/instrument/"}),
-    "docs/routing_signal_store_notes.md": frozenset({"src/instrument/"}),
-    "docs/routing_survey.md": frozenset(
+    "docs/verification/review_verify.md": frozenset({"admin/server.py"}),
+    "docs/verification/routing_follow_up_verify.md": frozenset({"src/instrument/"}),
+    "docs/architecture/current/routing_next_steps.md": frozenset({"src/instrument/"}),
+    "docs/architecture/current/routing_signal_store_notes.md": frozenset({"src/instrument/"}),
+    "docs/verification/routing_survey.md": frozenset(
         {"src/instrument/", "admin/server.py", "firebase/public/", "code_reviews/2026-08-14"}
     ),
-    "docs/routing_verify.md": frozenset({"src/instrument/"}),
+    "docs/verification/routing_verify.md": frozenset({"src/instrument/"}),
     # --- spec/scope/challenge/verify (pre-refactor design + verification) ---
-    "docs/challenge.md": frozenset({"src/instrument/", "admin/server.py"}),
-    "docs/scope.md": frozenset({"src/instrument/", "admin/server.py"}),
-    "docs/spec.md": frozenset({"src/instrument/", "admin/server.py"}),
-    "docs/verify.md": frozenset({"admin/server.py"}),
+    "docs/architecture/current/challenge.md": frozenset({"src/instrument/", "admin/server.py"}),
+    "docs/architecture/current/scope.md": frozenset({"src/instrument/", "admin/server.py"}),
+    "docs/architecture/current/spec.md": frozenset({"src/instrument/", "admin/server.py"}),
+    "docs/verification/verify.md": frozenset({"admin/server.py"}),
     # --- surveys / audits / verifies (analyze the pre-refactor tree) ---
-    "docs/auto_posthoc_survey.md": frozenset({"src/instrument/"}),
-    "docs/auto_posthoc_verify.md": frozenset({"src/instrument/"}),
-    "docs/control_room_survey.md": frozenset({"src/instrument/", "admin/server.py"}),
-    "docs/operator_audit.md": frozenset({"src/instrument/"}),
-    "docs/operator_fix_verify.md": frozenset({"src/instrument/"}),
-    "docs/workflow_phase_survey.md": frozenset({"src/instrument/", "admin/server.py"}),
-    "docs/workflow_phase_verify.md": frozenset({"src/instrument/", "admin/server.py"}),
+    "docs/verification/auto_posthoc_survey.md": frozenset({"src/instrument/"}),
+    "docs/verification/auto_posthoc_verify.md": frozenset({"src/instrument/"}),
+    "docs/verification/control_room_survey.md": frozenset({"src/instrument/", "admin/server.py"}),
+    "docs/verification/operator_audit.md": frozenset({"src/instrument/"}),
+    "docs/verification/operator_fix_verify.md": frozenset({"src/instrument/"}),
+    "docs/verification/workflow_phase_survey.md": frozenset(
+        {"src/instrument/", "admin/server.py"}
+    ),
+    "docs/verification/workflow_phase_verify.md": frozenset(
+        {"src/instrument/", "admin/server.py"}
+    ),
+    # --- spec-lifecycle verification (moved from docs/spec_lifecycle/) ---
+    "docs/verification/spec_lifecycle_verify.md": frozenset({"src/instrument/"}),
 }
 
 
@@ -128,13 +154,16 @@ def _status(path: Path) -> str | None:
 
 
 def _scan_targets() -> list[Path]:
-    """Every accepted doc (root + ``docs/**``) plus every ``docs/designs/current/*`` design."""
+    """Every accepted doc (root + ``docs/**``).
+
+    ``docs/designs/current/`` was retired as a path family by the docs-taxonomy restructure;
+    its two remaining entries (the in-flight 2d/2f preregistrations) are ``accepted`` and are
+    therefore already covered by the accepted-status scan.
+    """
     targets: set[Path] = set()
     for path in sorted(ROOT.glob("*.md")) + sorted((ROOT / "docs").rglob("*.md")):
         if _status(path) == "accepted":
             targets.add(path)
-    for path in (ROOT / "docs" / "designs" / "current").glob("*.md"):
-        targets.add(path)
     return sorted(targets)
 
 
@@ -160,7 +189,7 @@ def _is_allowed(rel: str, family: str) -> bool:
 
 
 def test_accepted_docs_use_no_retired_paths():
-    """No accepted/current doc names a retired path outside the explicit historical allowlist."""
+    """No accepted doc names a retired path outside the explicit historical allowlist."""
     violations: list[str] = []
     for path in _scan_targets():
         rel = str(path.relative_to(ROOT))

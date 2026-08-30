@@ -32,7 +32,7 @@ rules:
 
 The compiler refuses `dynamics`/`model_cascade` until `confidence` is instrumented (measure
 before policy); `confidence` is now measured ([H] per-attempt, `src/agentic_dynamics/adapters/opencode.py:113`),
-so those arms are writable. Design: `docs/designs/current/2026-08-14_experiment-spec-and-compiler-design.md`.
+so those arms are writable. Design: `docs/architecture/current/2026-08-14_experiment-spec-and-compiler-design.md`.
 
 The runtime-RAG workflow family is a committed spec set — `rag_knowledge_base.yaml` →
 `rag_knowledge_base_build.yaml` → `rag_knowledge_base_wire.yaml` → `rag_knowledge_base_reconcile.yaml`
@@ -106,7 +106,7 @@ Each YAML defines: task description, constraints, perturbation operators, streng
 
 | File | Description |
 |------|-------------|
-| `_results_summary.json` | **RETIRED** (`docs/data_integrity_findings.md` rule 4). Not a build input and not a lab input; every lab that still reads it is quarantined. |
+| `_results_summary.json` | **RETIRED** (`docs/verification/data_integrity_findings.md` rule 4). Not a build input and not a lab input; every lab that still reads it is quarantined. |
 | `_trajectory_summary.json` | Per-transcript trajectory metrics |
 | `_trajectory_aggregate.json` | Per-model comparable trajectory aggregates |
 | `typescript_ssg_*.json` | Per-model SSG results (deepseek, claude, gpt5) |

@@ -6,7 +6,7 @@ status: accepted
 
 **Role:** adversarial verifier (p6). **Source revision:** `83b65e9f58e60991acbc5500f0d6688fa7c32fe5`.
 **p4 score JSON:** `cap_2a_rerun3_score_20260826T050000Z.json` (SHA256 `08b6fb3297a5a41a3b81b4abc69b68cf86dde108918a244b4cf4fe6689a66a09`).
-**p5 verdict:** `docs/designs/current/cap_2a_rerun3.md` (SHA256 `ae90187d6aaa6835253c063261eaed7be8235e44fbe2439b2ec538366331906d`).
+**p5 verdict:** `docs/experiments/results/cap_2a_rerun3.md` (SHA256 `ae90187d6aaa6835253c063261eaed7be8235e44fbe2439b2ec538366331906d`).
 
 ## Findings table
 

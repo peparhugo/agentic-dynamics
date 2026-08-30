@@ -1,6 +1,6 @@
 """Contribution-derived contract guard (measurement-contribution closure, m3).
 
-``docs/review/measurement_contribution_review.md`` P1: record-scope contracts were
+``docs/reviews/measurement_contribution_review.md`` P1: record-scope contracts were
 explicit, but not *proven against computation* — the validator checked the counts added
 up, not that they described the records that actually contributed. m3 closes that gap:
 

@@ -269,7 +269,7 @@ def test_compose_requirements_adds_a_new_fact_the_contract_did_not_require():
     # NOTE: the profile's OWN entry ("workflow_phases_remaining") must be a REAL, registered
     # predicate — see _validate_context_requirement's R1/R2 mirror, added after an adversarial
     # pass found a profile's context_requirements never passed through the R1-R8 spec gate at
-    # all (docs/context_abstraction/implementation_notes.md §17). The CONTRACT's own fictional
+    # all (docs/designs/implemented/implementation_notes.md §17). The CONTRACT's own fictional
     # "a" is untouched by that check (only PROFILE-supplied requirements are validated here).
     contract = _Contract(requires_facts=(_req(fact="a"),))
     challenge = ChallengeProfile(
