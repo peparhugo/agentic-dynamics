@@ -238,17 +238,20 @@ def main() -> None:
 
     # --only-phase: filter the spec's phases to the named phase (the sibling-cell path). The
     # rest of the composition root (routing/signals/etc.) is unchanged — a single-phase run is
-    # a normal run whose phase list happens to have one member.
+    # a normal run whose phase list happens to have one member. The FULL list's count and the
+    # phase's true position are carried through so the Control Room publishes "i of N".
+    only_phase_total: int | None = None
+    only_phase_index: int | None = None
     if args.only_phase:
         phases = spec.workflow.params.get("phases") or []
-        spec.workflow.params["phases"] = [
-            p for p in phases if str(p.get("name", "")) == args.only_phase
-        ]
-        if not spec.workflow.params["phases"]:
+        names = [str(p.get("name", "")) for p in phases]
+        if args.only_phase not in names:
             raise SystemExit(
-                f"--only-phase {args.only_phase!r}: no such phase (have "
-                f"{[p.get('name') for p in phases]})"
+                f"--only-phase {args.only_phase!r}: no such phase (have {names})"
             )
+        only_phase_index = names.index(args.only_phase)
+        only_phase_total = len(phases)
+        spec.workflow.params["phases"] = [phases[only_phase_index]]
 
     # --orchestrator: the sibling-spawn execution path (slice 2). Runs the phases as sibling
     # cells, each in its own scope, instead of calling run_workflow() in-process.
@@ -337,6 +340,8 @@ def main() -> None:
             router=router,
             publisher_factory=LivePublisher,
             change_analyzer=change_analyzer,
+            phase_total=only_phase_total,
+            phase_index=only_phase_index,
         )
     finally:
         if graph_client is not None:

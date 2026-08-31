@@ -2491,6 +2491,8 @@ def run_workflow(
     change_analyzer: ChangeAnalyzer | None = None,
     phase_watchdog_min: float | None = None,
     discarded_trees_ledger: Path | str | None = None,
+    phase_total: int | None = None,
+    phase_index: int | None = None,
 ) -> WorkflowRunResult:
     """Run a compiled ``agent_task`` spec against a goal in a git worktree.
 
@@ -2736,7 +2738,12 @@ def run_workflow(
     prev_model = ""
     prev_cache_read_tokens = 0
 
-    total = len(phases)
+    # Single-phase (sibling-cell) runs publish the FULL spec's phase count and the phase's
+    # true position, so the Control Room shows "phase i of N" even under ``--only-phase``
+    # (the orchestrator spawns one cell per phase; without the hints each cell would
+    # advertise "1 of 1").
+    total = phase_total if phase_total is not None else len(phases)
+    full_phase_index = phase_index if phase_index is not None else None
     for phase_idx, phase_def in enumerate(phases[start_idx:], start=start_idx):
         name = str(phase_def.get("name", "?"))
         kind = str(phase_def.get("kind", "agent"))
@@ -2748,7 +2755,8 @@ def run_workflow(
         # Publish the live phase as each phase *starts* (1-based index over the full
         # list, so resume keeps the original position). Display-only badge data.
         if publisher is not None and publisher.enabled:
-            publisher.set_phase({"name": name, "index": phase_idx + 1, "total": total})
+            display_index = (full_phase_index + 1) if full_phase_index is not None else phase_idx + 1
+            publisher.set_phase({"name": name, "index": display_index, "total": total})
         t0 = time.time()
 
         try:
