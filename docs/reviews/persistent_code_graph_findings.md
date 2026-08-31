@@ -86,7 +86,7 @@ side in one artifact (`wall_reproduction.json` → `verdict`: `edges_exist = tru
 `counter_recorded_0 = true`).
 
 **The mechanism, now inspectable.** Two cited lines explain the 0 (`counter_definition.mechanism`,
-`evidence_analyzer.py:225-247`):
+`evidence_analyzer.py:314` (the `timeout_ms=300` deadline) + `:96-99` / `:324-325` (the seeds-exclusion)):
 
 1. **Seeds exclusion.** The changed symbols are the *seeds* of the impact expansion, and the seeds
    themselves are excluded from the impacted set. The 19 `widget_*` symbols are *added* symbols (the
@@ -214,7 +214,7 @@ mandate delivered — the semantics inspectable, the pre-verification a query, t
 **LOG:** findings written from p0–p4's committed outputs (no re-computation); the methodology (the
 graph build, the wall reproduction, the pre-verification, the seam + the rollback); the wall
 diagnosed (the behavioral counter vs the structural edges side-by-side, the 2e lesson restated as a
-graph fact — edges EXIST + counter read 0, mechanism cited to `evidence_analyzer.py:225-247`); the
+graph fact — edges EXIST + counter read 0, mechanism cited to `evidence_analyzer.py:314` (the `timeout_ms=300` deadline) + `:96-99` / `:324-325` (the seeds-exclusion)); the
 pre-verification's answer (the `incorrect_rebuilt` construction caught BEFORE the grid at 20
 dependants, `unseen_family` a weak structural tripwire, the leaf control a clean negative); the
 seam's posture (the rollback, the additive guarantee, the declared semantics, the controlled
