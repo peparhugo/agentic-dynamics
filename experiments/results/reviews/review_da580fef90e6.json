@@ -1,251 +1,410 @@
 {
   "story_name": "static_site_gen",
   "story_id": "da580fef90e6",
-  "model": "deepseek/deepseek-v4-flash",
+  "model": "measured",
   "commit_reviews": [
     {
       "commit_hash": "2aacf83699a5ce75f4837c588317ffd58476be2c",
-      "reviewer_model": "deepseek/deepseek-v4-flash",
-      "architectural_fit": 0.4,
-      "convention_adherence": 0.55,
+      "reviewer_model": "measured",
+      "architectural_fit": null,
+      "convention_adherence": 0.559,
       "introduces_technical_debt": true,
       "respects_existing_patterns": false,
       "better_or_worse": "worse",
       "problems": [
         {
-          "category": "architecture",
-          "severity": "critical",
-          "description": "Session 1 deletes the entire baseline index.ts (Express Todo API seed, 'designed as a baseline for multi-session stories') and replaces it with a greenfield static-site-generator instead of building within or preserving the provided seams, destroying the intended multi-session baseline."
-        },
-        {
-          "category": "architecture",
-          "severity": "major",
-          "description": "All SSG logic \u2014 markdown parsing, HTML escaping, page/index document templates \u2014 is collapsed into a single monolithic generator.ts with no layer separation, regressing from the seed's explicit models/routes/error-handling structure."
-        },
-        {
-          "category": "testing",
-          "severity": "major",
-          "description": "package.json configures jest + ts-jest but the commit adds no test files; the new generator/cli code ships with zero coverage."
-        },
-        {
-          "category": "convention",
-          "severity": "major",
-          "description": "SonarQube reports 42 convention violations and a 0.52 convention score (smells +2, cognitive complexity +31); the generator.ts/parser code does not meet the repo's naming-convention bar."
+          "category": "maintainability",
+          "severity": "minor",
+          "description": "SonarQube: +2 code smells introduced"
         },
         {
           "category": "maintainability",
-          "severity": "minor",
-          "description": "escapeHtml reconstructs its HTML-entity lookup object inside the regex callback on every matched character instead of hoisting it to a module-level constant."
+          "severity": "info",
+          "description": "SonarQube: cognitive complexity +31"
         },
         {
           "category": "convention",
           "severity": "info",
-          "description": "Discrepancy: the shown code uses camelCase functions and PascalCase interfaces (Page, BuildOptions), yet listed violations claim snake_case functions and PascalCase classes \u2014 those may target truncated config.ts, which I could not verify from the visible diff."
+          "description": "cli.ts: Classes should use PascalCase"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "cli.ts: Interfaces should use PascalCase"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "cli.ts: Constants should be UPPER_CASE"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "cli.ts: Functions should not use snake_case"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "config.ts: Classes should use PascalCase"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "config.ts: Interfaces should use PascalCase"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "config.ts: Constants should be UPPER_CASE"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "generator.ts: Classes should use PascalCase"
+        },
+        {
+          "category": "testing",
+          "severity": "major",
+          "description": "no tests executed in this session"
         }
       ],
       "strengths": [
-        "Proper ESM TypeScript scaffolding with separate build (tsc) and test (jest) scripts and pinned devDependencies",
-        "Typed public interfaces (Page, BuildOptions) and defensive type guards (toTags, toDateString) handle arbitrary front-matter values safely",
-        "CLI errors surface to stderr with a non-zero exit code and a clear usage message"
+        "convention score 0.56 [M]"
       ],
-      "summary": "The agent greenfield-replaced the provided multi-session baseline with a monolithic, untested static-site-generator scaffold, earning a poor architectural-fit score (0.4) \u2014 it discards existing patterns wholesale and ships above the convention bar (0.52 measured) \u2014 while the raw output is competent, modern TypeScript.",
+      "summary": "[story] Session 1: greenfield: +211/-106 lines, convention 0.56 [M], 42 violations, +0 bugs / +2 smells [M]",
       "session_number": 1
     },
     {
       "commit_hash": "984aefccb84d831a354cda1ad1152fa1911d5976",
-      "reviewer_model": "deepseek/deepseek-v4-flash",
-      "architectural_fit": 0.85,
-      "convention_adherence": 0.6,
-      "introduces_technical_debt": false,
-      "respects_existing_patterns": true,
-      "better_or_worse": "neutral",
+      "reviewer_model": "measured",
+      "architectural_fit": null,
+      "convention_adherence": 0.559,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": false,
+      "better_or_worse": "worse",
       "problems": [
         {
           "category": "maintainability",
-          "severity": "minor",
-          "description": "Handlebars partials are registered on the module-global Handlebars object via loadPartials, so partial state persists across buildSite invocations (fine for a one-shot CLI, but a leak if buildSite is ever called repeatedly in-process)."
-        },
-        {
-          "category": "maintainability",
-          "severity": "minor",
-          "description": "renderPage reuses renderTemplate by passing path.join(templatesDir, 'layouts') as the 'templatesDir' argument, overloading the function's contract to render the layout; clearer to render the layout as a distinct second call or pass an explicit path."
-        },
-        {
-          "category": "performance",
           "severity": "info",
-          "description": "Handlebars.compile is invoked per page inside renderTemplate; templates/layouts could be compiled once and cached per build."
+          "description": "SonarQube: cognitive complexity +19"
         },
         {
-          "category": "maintainability",
+          "category": "convention",
           "severity": "info",
-          "description": "SonarQube reports cognitive complexity +19 for this feature size; the branching in parseArguments and the layered render/layout flow add complexity that could be simplified."
+          "description": "cli.ts: Classes should use PascalCase"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "cli.ts: Interfaces should use PascalCase"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "cli.ts: Constants should be UPPER_CASE"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "cli.ts: Functions should not use snake_case"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "config.ts: Classes should use PascalCase"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "config.ts: Interfaces should use PascalCase"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "config.ts: Constants should be UPPER_CASE"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "generator.ts: Classes should use PascalCase"
+        },
+        {
+          "category": "testing",
+          "severity": "major",
+          "description": "no tests executed in this session"
         }
       ],
       "strengths": [
-        "Feature is additive and backward-compatible: existing markdown->HTML output via pageDocument is preserved when no templates dir exists.",
-        "Respects existing module boundaries: arg parsing stays in cli.ts, build logic in generator.ts, matching the established structure.",
-        "Solid test coverage added for templates, layouts, and partials integration.",
-        "toTemplateName guards against path traversal (rejecting '/', '\\', '.', '..'), good security hygiene for a user-supplied template name."
+        "convention score 0.56 [M]"
       ],
-      "summary": "A clean, backward-compatible templating feature that fits the existing SSG architecture and patterns, with minor global-state and compile-per-page smells. NOTE: the 0.52 convention score and listed violations (PascalCase/UPPER_CASE/snake_case) are pre-existing codebase style choices flagged by the analyzer, not introduced by this commit; the new code consistently follows the existing snake_case/camelCase conventions, so the measured score understates this commit's actual convention adherence.",
+      "summary": "[story] Session 2: feature_addition: +113/-8 lines, convention 0.56 [M], 42 violations, +0 bugs / +0 smells [M]",
       "session_number": 2
     },
     {
       "commit_hash": "6282afa725246aa3b1fe432a79be0cef3216c553",
-      "reviewer_model": "deepseek/deepseek-v4-flash",
-      "architectural_fit": 0.85,
-      "convention_adherence": 0.8,
+      "reviewer_model": "measured",
+      "architectural_fit": null,
+      "convention_adherence": 0.559,
       "introduces_technical_debt": true,
-      "respects_existing_patterns": true,
-      "better_or_worse": "better",
+      "respects_existing_patterns": false,
+      "better_or_worse": "worse",
       "problems": [
         {
-          "category": "architecture",
-          "severity": "major",
-          "description": "Async request handler in serveSite awaits decodeURIComponent/readFile/fileExists with no try/catch, so a malformed URL (decodeURIComponent throws) or I/O error rejects the promise with no handler \u2014 unhandled rejection can crash or leave the request hanging."
+          "category": "maintainability",
+          "severity": "minor",
+          "description": "SonarQube: +5 code smells introduced"
         },
         {
           "category": "maintainability",
-          "severity": "minor",
-          "description": "Cognitive complexity +52 (SonarQube); the rebuild-queue flag logic (rebuilding/rebuildQueued recursion) and the nested serveSite lifecycle add complexity that could be factored into a small state machine or class."
-        },
-        {
-          "category": "maintainability",
-          "severity": "minor",
-          "description": "contentType() only maps html/css/js/json/svg and defaults everything else to octet-stream, so png/jpg/ico fonts served from dist get the wrong MIME type."
-        },
-        {
-          "category": "testing",
-          "severity": "minor",
-          "description": "tests/server.test.ts (29 lines) covers basic serving but not the live-reload injection, WebSocket broadcast, or rebuild-on-chokidar-event paths \u2014 the highest-risk logic is untested."
+          "severity": "info",
+          "description": "SonarQube: cognitive complexity +52"
         },
         {
           "category": "convention",
           "severity": "info",
-          "description": "reloadScript is declared camelCase while the surrounding module-style convention (and the analyzer's 'Constants should be UPPER_CASE') favors LIVE_RELOAD_SCRIPT-style uppercase constants."
+          "description": "cli.ts: Classes should use PascalCase"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "cli.ts: Interfaces should use PascalCase"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "cli.ts: Constants should be UPPER_CASE"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "cli.ts: Functions should not use snake_case"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "config.ts: Classes should use PascalCase"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "config.ts: Interfaces should use PascalCase"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "config.ts: Constants should be UPPER_CASE"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "generator.ts: Classes should use PascalCase"
+        },
+        {
+          "category": "testing",
+          "severity": "major",
+          "description": "no tests executed in this session"
         }
       ],
       "strengths": [
-        "Reuses buildSite for the initial build and rebuilds instead of duplicating the generator pipeline \u2014 clean composition with the existing module.",
-        "Rebuild debouncing (rebuilding/rebuildQueued) prevents overlapping rebuilds on rapid chokidar bursts.",
-        "Path traversal guard (outputDir prefix check) on file serving is a sound security default.",
-        "CLI integration is consistent: parseArguments extended for --port with integer/range validation, usage string updated.",
-        "New server module ships with a test file and typed interfaces (ServeOptions, DevelopmentServer)."
+        "convention score 0.56 [M]"
       ],
-      "summary": "A solid, well-composed integration of a dev server that reuses the existing generator pipeline with proper rebuild debouncing and a traversal guard, but it carries some debt in unhandled async request errors, incomplete MIME coverage, and an untested live-reload path. Flag: mechanical convention score 0.52 (42 violations incl. 'Classes should use PascalCase' in cli.ts/config.ts, where no classes exist and config.ts is absent) appears to be analyzer noise and contradicts the diff's observable TS/ESM conventions; the measured score understates real adherence.",
+      "summary": "[story] Session 3: integration: +170/-7 lines, convention 0.56 [M], 42 violations, +0 bugs / +5 smells [M]",
       "session_number": 3
     },
     {
       "commit_hash": "e079b34e7f9589e191e11054354b36faa4ced3e7",
-      "reviewer_model": "deepseek/deepseek-v4-flash",
-      "architectural_fit": 0.85,
-      "convention_adherence": 0.55,
-      "introduces_technical_debt": false,
-      "respects_existing_patterns": true,
-      "better_or_worse": "better",
-      "problems": [
-        {
-          "category": "maintainability",
-          "severity": "minor",
-          "description": "The hook dispatcher in SsgEngine.run() relies on non-null assertion (page!) and type casts (as NonNullable<Plugin['onFile']>) to force a uniform hook signature, which weakens type safety and will be brittle as hooks diverge."
-        },
-        {
-          "category": "dependency",
-          "severity": "minor",
-          "description": "tsx (an esbuild-based loader) is added as a runtime dependency solely to evaluate ssg.config.ts; it is a heavyweight dependency for config loading and may be better gated or replaced with a lighter runtime."
-        },
-        {
-          "category": "convention",
-          "severity": "major",
-          "description": "Mechanical convention score is 0.52 with 42 violations (PascalCase classes/interfaces, UPPER_CASE constants, snake_case functions) reported across cli.ts, config.ts, and generator.ts."
-        },
-        {
-          "category": "testing",
-          "severity": "minor",
-          "description": "Refactor of the core build pipeline (extraction into plugins, new config loader) ships without visible accompanying tests in the diff; the plugin lifecycle hooks deserve coverage."
-        },
-        {
-          "category": "maintainability",
-          "severity": "minor",
-          "description": "SonarQube reports cognitive complexity +15 and +1 smell in the refactored logic, concentrated in the new dispatch/config-loading code paths."
-        }
-      ],
-      "strengths": [
-        "Introduces a clean plugin architecture: SsgEngine orchestrator with a well-defined hook lifecycle (onStart/beforeBuild/onFile/afterBuild/onEnd) decoupled from MarkdownPlugin and TemplatePlugin.",
-        "User-extensible via ssg.config.ts with type-safe TS config loading, so features can be added without modifying the core generator.",
-        "Net reduction of ~250 lines (342 added vs 247 removed) breaking down a monolithic generator into focused modules (config.ts, plugin types, plugins/).",
-        "Modern ESM conventions maintained: node: prefixed imports, .js extension specifiers, pathToFileURL usage for dynamic import."
-      ],
-      "summary": "Architecturally strong refactor toward a plugin-based static site generator that is a clear net improvement, but the mechanical convention score (0.52, 42 violations) sits below what the visible code suggests \u2014 the cited violations (e.g., class SsgEngine 'should be PascalCase') contradict the diff and point to analyzer/standard mismatch, so the low convention score should be validated against the repo's actual lint config rather than taken at face value.",
-      "session_number": 4
-    },
-    {
-      "commit_hash": "458946a291589f5fa26cbedc7e46ece312883902",
-      "reviewer_model": "deepseek/deepseek-v4-flash",
-      "architectural_fit": 0.68,
-      "convention_adherence": 0.52,
+      "reviewer_model": "measured",
+      "architectural_fit": null,
+      "convention_adherence": 0.559,
       "introduces_technical_debt": true,
-      "respects_existing_patterns": true,
-      "better_or_worse": "neutral",
+      "respects_existing_patterns": false,
+      "better_or_worse": "worse",
       "problems": [
         {
           "category": "maintainability",
-          "severity": "major",
-          "description": "Cognitive complexity jumps +43 \u2014 all cache/hash/file-I/O logic is inlined into SsgEngine (loadCache, selectPagesToBuild, templateHash, fileExists, writeCache) rather than a dedicated cache module; the class now owns hashing, persistence, and build scheduling."
-        },
-        {
-          "category": "architecture",
           "severity": "minor",
-          "description": "Cache file is derived as path.join(dirname(outputDir), '.ssg-cache.json'), coupling cache location to the output dir's parent rather than a configured/explicit path."
+          "description": "SonarQube: +1 code smells introduced"
         },
         {
           "category": "maintainability",
-          "severity": "minor",
-          "description": "lastBuildStats is a public mutable field on the engine, leaking stateful build results between build() invocations."
-        },
-        {
-          "category": "architecture",
-          "severity": "minor",
-          "description": "Stale cache entries are never pruned: if a page is removed from content, its entry persists in the cache forever with no cleanup."
+          "severity": "info",
+          "description": "SonarQube: cognitive complexity +15"
         },
         {
           "category": "convention",
           "severity": "info",
-          "description": "Flagged discrepancy: the 42 convention violations (PascalCase classes, UPPER_CASE constants, snake_case functions) cite cli.ts/config.ts/generator.ts, but config.ts is untouched by this diff and the diff itself uses camelCase functions and PascalCase classes \u2014 the low 0.52 score appears largely pre-existing analyzer noise rather than introduced here."
+          "description": "cli.ts: Classes should use PascalCase"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "cli.ts: Interfaces should use PascalCase"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "cli.ts: Constants should be UPPER_CASE"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "cli.ts: Functions should not use snake_case"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "config.ts: Classes should use PascalCase"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "config.ts: Interfaces should use PascalCase"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "config.ts: Constants should be UPPER_CASE"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "generator.ts: Classes should use PascalCase"
         },
         {
           "category": "testing",
-          "severity": "minor",
-          "description": "No tests in the diff covering cache read/write, skip-vs-rebuild selection, --clean forcing a full build, or template-change invalidation."
+          "severity": "major",
+          "description": "no tests executed in this session"
         }
       ],
       "strengths": [
-        "Integrates with the existing plugin lifecycle correctly \u2014 loadCache runs before onStart, writeCache after afterBuild \u2014 respecting the context/hook architecture.",
-        "Combines per-page source hash with a template-dir hash, a sound invalidation strategy that catches template-only edits.",
-        "Graceful ENOENT handling and a --clean override give sensible failure modes; CLI stats output is user-friendly and computed, not fabricated."
+        "convention score 0.56 [M]"
       ],
-      "summary": "Solidly integrated incremental-build feature with a good invalidation strategy, but ships a +43 cognitive-complexity bump from monolithing cache logic into the engine and a low convention score that appears largely pre-existing.",
+      "summary": "[story] Session 4: refactor: +342/-247 lines, convention 0.56 [M], 42 violations, +0 bugs / +1 smells [M]",
+      "session_number": 4
+    },
+    {
+      "commit_hash": "458946a291589f5fa26cbedc7e46ece312883902",
+      "reviewer_model": "measured",
+      "architectural_fit": null,
+      "convention_adherence": 0.559,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": false,
+      "better_or_worse": "worse",
+      "problems": [
+        {
+          "category": "maintainability",
+          "severity": "info",
+          "description": "SonarQube: cognitive complexity +43"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "cli.ts: Classes should use PascalCase"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "cli.ts: Interfaces should use PascalCase"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "cli.ts: Constants should be UPPER_CASE"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "cli.ts: Functions should not use snake_case"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "config.ts: Classes should use PascalCase"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "config.ts: Interfaces should use PascalCase"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "config.ts: Constants should be UPPER_CASE"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "generator.ts: Classes should use PascalCase"
+        },
+        {
+          "category": "testing",
+          "severity": "major",
+          "description": "no tests executed in this session"
+        }
+      ],
+      "strengths": [
+        "convention score 0.56 [M]"
+      ],
+      "summary": "[story] Session 5: cross_cutting: +171/-22 lines, convention 0.56 [M], 42 violations, +0 bugs / +0 smells [M]",
       "session_number": 5
     }
   ],
   "story_review": {
     "story_name": "static_site_gen",
-    "reviewer_model": "deepseek/deepseek-v4-flash",
-    "overall_coherence": 0.85,
+    "reviewer_model": "measured",
+    "overall_coherence": 0.0,
     "compounding_issues": [
-      "Session 1 greenfield-replaced the seeded baseline instead of building within its seams, destroying the domain-relevant structure (models/routes/error-handling) and forcing every later session to compensate",
-      "The monolithic generator.ts became the system's center of gravity: Session 5 re-monolithized incremental-cache logic into the engine (+43 complexity) even after Session 4's plugin refactor, and Session 3's server reused the same pipeline with only partial cleanup",
-      "Convention adherence locked in at ~0.52 across all five sessions; the naming/style choices made in Session 1 were never corrected",
-      "Session 1 shipped zero tests, creating persistent coverage debt that later sessions only partially repaid (live-reload and MIME paths left untested)"
+      "cli.ts: Classes should use PascalCase (in 5 sessions)",
+      "cli.ts: Interfaces should use PascalCase (in 5 sessions)",
+      "cli.ts: Constants should be UPPER_CASE (in 5 sessions)",
+      "cli.ts: Functions should not use snake_case (in 5 sessions)",
+      "config.ts: Classes should use PascalCase (in 5 sessions)",
+      "config.ts: Interfaces should use PascalCase (in 5 sessions)",
+      "config.ts: Constants should be UPPER_CASE (in 5 sessions)",
+      "generator.ts: Classes should use PascalCase (in 5 sessions)",
+      "generator.ts: Interfaces should use PascalCase (in 5 sessions)",
+      "generator.ts: Constants should be UPPER_CASE (in 5 sessions)",
+      "plugin.ts: Functions should use camelCase (in 5 sessions)",
+      "plugin.ts: Classes should use PascalCase (in 5 sessions)",
+      "plugin.ts: Interfaces should use PascalCase (in 5 sessions)",
+      "plugin.ts: Constants should be UPPER_CASE (in 5 sessions)",
+      "dev-server.ts: Classes should use PascalCase (in 5 sessions)",
+      "dev-server.ts: Interfaces should use PascalCase (in 5 sessions)",
+      "dev-server.ts: Constants should be UPPER_CASE (in 5 sessions)",
+      "markdown.ts: Classes should use PascalCase (in 5 sessions)",
+      "markdown.ts: Interfaces should use PascalCase (in 5 sessions)",
+      "markdown.ts: Constants should be UPPER_CASE (in 5 sessions)",
+      "template.ts: Classes should use PascalCase (in 5 sessions)",
+      "template.ts: Interfaces should use PascalCase (in 5 sessions)",
+      "template.ts: Constants should be UPPER_CASE (in 5 sessions)",
+      "server.ts: Classes should use PascalCase (in 5 sessions)",
+      "server.ts: Interfaces should use PascalCase (in 5 sessions)",
+      "server.ts: Constants should be UPPER_CASE (in 5 sessions)",
+      "ssg.config.ts: Functions should use camelCase (in 5 sessions)",
+      "ssg.config.ts: Classes should use PascalCase (in 5 sessions)",
+      "ssg.config.ts: Interfaces should use PascalCase (in 5 sessions)",
+      "ssg.config.ts: Constants should be UPPER_CASE (in 5 sessions)",
+      "generator.test.ts: Functions should use camelCase (in 5 sessions)",
+      "generator.test.ts: Classes should use PascalCase (in 5 sessions)",
+      "generator.test.ts: Interfaces should use PascalCase (in 5 sessions)",
+      "generator.test.ts: Constants should be UPPER_CASE (in 5 sessions)",
+      "plugin.test.ts: Functions should use camelCase (in 5 sessions)",
+      "plugin.test.ts: Classes should use PascalCase (in 5 sessions)",
+      "plugin.test.ts: Interfaces should use PascalCase (in 5 sessions)",
+      "plugin.test.ts: Constants should be UPPER_CASE (in 5 sessions)",
+      "server.test.ts: Functions should use camelCase (in 5 sessions)",
+      "server.test.ts: Classes should use PascalCase (in 5 sessions)",
+      "server.test.ts: Interfaces should use PascalCase (in 5 sessions)",
+      "server.test.ts: Constants should be UPPER_CASE (in 5 sessions)"
     ],
     "key_decisions": [
-      "Greenfield replacement of the baseline seed with a fresh static-site-generator scaffold (Session 1)",
-      "Dev server integrated into the same generator pipeline with rebuild debouncing and a traversal guard rather than as a standalone process (Session 3)",
-      "Plugin/hook architecture (onStart/beforeBuild/afterBuild/onFile/onEnd) with per-concern plugins \u2014 markdown, template, dev-server \u2014 extracted from the monolith (Session 4)",
-      "Config-file-driven plugin loading via ssg.config.ts compiled with tsx (Session 4)",
-      "Content-hash-based incremental builds with a persisted render cache for skip-if-unchanged (Session 5)"
+      "[story] Session 1: greenfield",
+      "[story] Session 2: feature_addition",
+      "[story] Session 3: integration",
+      "[story] Session 4: refactor",
+      "[story] Session 5: cross_cutting"
     ],
-    "trajectory_description": "The arc is a classic 'rocky start, steady recovery' trajectory. Session 1 opened poorly \u2014 architectural fit 0.4, wholesale deletion of the baseline, a monolithic untested generator \u2014 then quality climbed through Session 2 (features plus first real tests, fit 0.85) and Session 3 (solid dev-server integration), reached its structural peak in Session 4's refactor into a clean plugin architecture (fit 0.85, larger removals than additions), and settled flat in Session 5, which delivered the cross-cutting incremental-build feature but at a measurable cognitive-complexity cost and a dip in fit to 0.68. Overall the codebase improved and matured substantially, but the early decisions constrained the ceiling.",
-    "summary": "A logically coherent, improving five-session arc that overcame a weak greenfield start through a strong mid-project plugin refactor, though Session 1's monolith-and-testing decisions capped the final quality."
+    "trajectory_description": "S1 25942 tokens $0.152; S2 40981 tokens $0.196; S3 32620 tokens $0.181; S4 43307 tokens $0.444; S5 39161 tokens $0.359",
+    "summary": "5 sessions, 0/5 with tests, test_executed_success=None"
   }
 }

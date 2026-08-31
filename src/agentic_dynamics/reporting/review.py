@@ -1,9 +1,14 @@
-"""Agent review system — use LLMs to evaluate AI-generated commits.
+"""Agent review system — LLM review functions + the measured review manifest.
 
-Review agents run post-hoc and are deterministic for a given artifact.
-They produce durable JSON output committed as experimental evidence.
+The PIPELINE's review files are MEASURED MANIFESTS since 2026-08-31: the LLM review
+output (scores + prose) was nondeterministic (the same commit re-reviewed produced
+different content — 0.85 vs 0.7 on the same artifact) and never requested; the
+review-unit pipeline calls ``measured_commit_review`` / ``measured_story_review`` and
+writes only the measured signals (git metadata, the analysis's convention/AST/Sonar
+mechanics, the sessions' outcomes) plus deterministic [C] derivations. The LLM review
+functions below remain for the legacy ``review_stories.py`` path; no pipeline runs them.
 
-Pool:
+Pool (legacy):
   - Commit Reviewer (GPT-5.6): Reviews individual commits
   - Story Reviewer (Claude): Reviews full story coherence
   - Cross-Model Comparator (Claude): Compares architectural choices across models
@@ -49,8 +54,8 @@ class CommitReview:
 
     commit_hash: str
     reviewer_model: str
-    architectural_fit: float  # 0.0-1.0
-    convention_adherence: float  # 0.0-1.0
+    architectural_fit: float | None  # 0.0-1.0 — None when unmeasured (the measured manifest)
+    convention_adherence: float | None  # 0.0-1.0 — the measured convention score [M]
     introduces_technical_debt: bool
     respects_existing_patterns: bool
     better_or_worse: str  # "better", "worse", "neutral", "unclear"
@@ -105,7 +110,7 @@ class StoryReview:
 
     story_name: str
     reviewer_model: str
-    overall_coherence: float  # 0.0-1.0
+    overall_coherence: float | None  # 0.0-1.0 — None when unmeasured (the measured manifest)
     compounding_issues: list[str] = field(default_factory=list)
     key_decisions: list[str] = field(default_factory=list)
     trajectory_description: str = ""
@@ -807,3 +812,138 @@ def compare_implementations(
         pass
 
     return None
+
+
+# ── Measured review (no LLM) ─────────────────────────────────────
+# The review-unit pipeline's review files: measured signals only. Every field below is
+# [M] (git metadata, the analysis's convention/AST/Sonar mechanics, the sessions'
+# outcomes) or a deterministic [C] derivation from them — never an LLM judgment.
+
+def measured_commit_review(
+    worktree: Path,
+    commit_hash: str,
+    *,
+    story_name: str = "",
+    session_number: int = 0,
+    session: dict[str, Any] | None = None,
+    story_id: str = "",
+) -> CommitReview:
+    """A commit's measured manifest: git metadata + the analysis mechanics + [C] verdicts."""
+    commit_msg = _run_git(worktree, "log", "-1", "--format=%s", commit_hash).strip()
+    mechanics = _load_commit_mechanics(story_id, commit_hash)
+    convention = mechanics.get("convention") or {}
+    sonar = mechanics.get("sonar") or {}
+    ast = mechanics.get("ast") or {}
+    violations = [str(v) for v in (convention.get("violations") or [])]
+    score = convention.get("score")
+    if isinstance(score, (int, float)):
+        convention_score: float | None = float(score)
+    else:
+        convention_score = None
+    bugs = int(sonar.get("bugs_delta", 0) or 0)
+    smells = int(sonar.get("smells_delta", 0) or 0)
+    complexity = int(sonar.get("complexity_delta", 0) or 0)
+    sonar_available = bool(sonar.get("available"))
+
+    problems: list[ReviewProblem] = []
+    if sonar_available:
+        if bugs > 0:
+            problems.append(ReviewProblem("performance", "minor",
+                                          f"SonarQube: {bugs:+d} bugs introduced"))
+        if smells > 0:
+            problems.append(ReviewProblem("maintainability", "minor",
+                                          f"SonarQube: {smells:+d} code smells introduced"))
+        if complexity > 0:
+            problems.append(ReviewProblem("maintainability", "info",
+                                          f"SonarQube: cognitive complexity {complexity:+d}"))
+    for v in violations[:8]:
+        problems.append(ReviewProblem("convention", "info", v))
+    if session is not None and session.get("test_count", 0) == 0:
+        problems.append(ReviewProblem("testing", "major", "no tests executed in this session"))
+
+    # [C] verdicts — deterministic, derived from the measured deltas.
+    negative = sonar_available and (bugs > 0 or smells > 0 or complexity > 0)
+    has_violations = bool(violations)
+    touched_code = int(ast.get("lines_added", 0) or 0) + int(ast.get("lines_removed", 0) or 0) > 0
+    if negative or has_violations:
+        better_or_worse = "worse"
+    elif touched_code and (convention_score is not None and convention_score >= 0.7):
+        better_or_worse = "better"
+    else:
+        better_or_worse = "neutral"
+    introduces_debt = negative or bool(smells > 0 or complexity > 0)
+    respects_patterns = convention_score is not None and convention_score >= 0.7
+
+    strengths: list[str] = []
+    if not negative and not has_violations:
+        strengths.append("measured deltas clean (no bugs/smells/complexity/violations)")
+    if convention_score is not None:
+        strengths.append(f"convention score {convention_score:.2f} [M]")
+    if session is not None and session.get("test_count", 0) > 0:
+        strengths.append(f"{session['test_count']} tests executed")
+
+    conv_str = f"{convention_score:.2f}" if convention_score is not None else "n/a"
+    summary = (
+        f"{commit_msg or commit_hash[:8]}: +{ast.get('lines_added', 0)}/-{ast.get('lines_removed', 0)} "
+        f"lines, convention {conv_str} [M], {len(violations)} violations, "
+        f"{bugs:+d} bugs / {smells:+d} smells [M]"
+    )
+    return CommitReview(
+        commit_hash=commit_hash,
+        reviewer_model="measured",
+        architectural_fit=None,
+        convention_adherence=convention_score,
+        introduces_technical_debt=introduces_debt,
+        respects_existing_patterns=respects_patterns,
+        better_or_worse=better_or_worse,
+        problems=problems,
+        strengths=strengths,
+        summary=summary,
+    )
+
+
+def measured_story_review(
+    story_name: str,
+    story_id: str,
+    sessions: list[dict[str, Any]],
+    commits: list[tuple[str, str, int]],
+    story_test_executed_success: bool | None = None,
+) -> StoryReview:
+    """A story's measured manifest: the outcome share + the recurring measured issues."""
+    tested_sessions = [s for s in sessions if s.get("test_count", 0) > 0]
+    if sessions:
+        overall_coherence: float | None = len(tested_sessions) / len(sessions)
+    elif story_test_executed_success is not None:
+        overall_coherence = 1.0 if story_test_executed_success else 0.0
+    else:
+        overall_coherence = None
+
+    recurring: list[str] = []
+    viol_by_text: dict[str, int] = {}
+    for _hash, _msg, _sn in commits:
+        mechanics = _load_commit_mechanics(story_id, _hash)
+        for v in (mechanics.get("convention") or {}).get("violations") or []:
+            text = str(v)
+            viol_by_text[text] = viol_by_text.get(text, 0) + 1
+    for text, count in sorted(viol_by_text.items(), key=lambda kv: -kv[1]):
+        if count >= 2:
+            recurring.append(f"{text} (in {count} sessions)")
+
+    key_decisions = [msg for _hash, msg, _sn in commits if msg]
+    trajectory = "; ".join(
+        f"S{s.get('session_number', i + 1)} {s.get('total_tokens', 0)} tokens "
+        f"${s.get('cost_usd', 0.0):.3f}" for i, s in enumerate(sessions)
+    )
+    summary = (
+        f"{len(commits)} sessions, {len(tested_sessions)}/{len(sessions)} with tests, "
+        f"test_executed_success={story_test_executed_success}"
+    )
+    return StoryReview(
+        story_name=story_name,
+        reviewer_model="measured",
+        overall_coherence=overall_coherence,
+        compounding_issues=recurring,
+        key_decisions=key_decisions,
+        trajectory_description=trajectory,
+        summary=summary,
+    )

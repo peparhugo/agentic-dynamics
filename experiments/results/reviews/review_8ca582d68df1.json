@@ -1,208 +1,241 @@
 {
   "story_name": "notification_service",
   "story_id": "8ca582d68df1",
-  "model": "deepseek/deepseek-v4-flash",
+  "model": "measured",
   "commit_reviews": [
     {
       "commit_hash": "113e9a072d5256991c7d61398a3a1a3f5d794393",
-      "reviewer_model": "deepseek/deepseek-v4-flash",
-      "architectural_fit": 0.5,
-      "convention_adherence": 0.5,
-      "introduces_technical_debt": false,
-      "respects_existing_patterns": true,
-      "better_or_worse": "unclear",
-      "problems": [],
-      "strengths": [],
-      "summary": "Review unavailable.",
-      "session_number": 1
-    },
-    {
-      "commit_hash": "50e29000ba794fa7f6c15dac78d85cd09c912c32",
-      "reviewer_model": "deepseek/deepseek-v4-flash",
-      "architectural_fit": 0.85,
-      "convention_adherence": 0.82,
+      "reviewer_model": "measured",
+      "architectural_fit": null,
+      "convention_adherence": 0.833,
       "introduces_technical_debt": true,
       "respects_existing_patterns": true,
-      "better_or_worse": "better",
-      "problems": [
-        {
-          "category": "maintainability",
-          "severity": "minor",
-          "description": "Channel extraction/validation logic is duplicated in _handle_message (computed once at the top, then re-computed identically in the subscribe/unsubscribe branch), inflating cognitive complexity (+50)."
-        },
-        {
-          "category": "architecture",
-          "severity": "minor",
-          "description": "Behavioral ambiguity: a 'direct' message carrying a channel field silently falls through to a channel broadcast instead of a direct send, which could misroute messages."
-        },
-        {
-          "category": "maintainability",
-          "severity": "info",
-          "description": "Channel name accepted from two places (payload and top-level message) in subscribe/unsubscribe, creating an implicit precedence rule that is easy to misuse."
-        }
-      ],
-      "strengths": [
-        "Backwards-compatible broadcast signature (channel defaults to None) so existing callers are unaffected.",
-        "Consistent JSON responses via the new _json_response helper across /health, /channels, and /subscribers endpoints.",
-        "Correctly hoists the Connection: upgrade check so any path can upgrade, fixing the previous /health-only behavior.",
-        "Clean cleanup of empty channels in both _remove and unsubscribe keeps state tidy.",
-        "Tests added for channel isolation and unsubscribe behavior."
-      ],
-      "summary": "A coherent pub/sub channel feature that fits the existing server architecture and patterns, introducing only minor maintainability debt from duplicated channel-validation logic.",
-      "session_number": 2
-    },
-    {
-      "commit_hash": "3b7c3abe5afc89575fa0c24d19c14a1ba07101fb",
-      "reviewer_model": "deepseek/deepseek-v4-flash",
-      "architectural_fit": 0.65,
-      "convention_adherence": 0.82,
-      "introduces_technical_debt": true,
-      "respects_existing_patterns": false,
       "better_or_worse": "worse",
       "problems": [
         {
           "category": "maintainability",
-          "severity": "major",
-          "description": "Cognitive complexity +46: per-endpoint helper methods (_health_response, _channels_response, _subscribers_response) were inlined into _process_request, and _sqlite_path added a multi-branch URL parser; this regresses the prior separation of concerns."
-        },
-        {
-          "category": "architecture",
-          "severity": "major",
-          "description": "Mixed concurrency model: sqlite3.connect() (blocking, sync) runs per call inside an asyncio event loop guarded by threading.Lock()/RLock(), risking event-loop stalls and inconsistent thread-safety semantics."
-        },
-        {
-          "category": "performance",
-          "severity": "minor",
-          "description": "_persist and _history open a fresh SQLite connection per message/query rather than reusing a connection pool."
-        },
-        {
-          "category": "maintainability",
-          "severity": "minor",
-          "description": "Docstrings removed from previously documented methods (timestamp, bound_port, _make_message, __init__), losing API self-documentation."
-        },
-        {
-          "category": "convention",
-          "severity": "minor",
-          "description": "Convention violations in test_app.py (PascalCase class, UPPER_CASE module constants) and transport.py (UPPER_CASE constants) per static analysis."
-        },
-        {
-          "category": "dependency",
-          "severity": "minor",
-          "description": "The commit widens the runtime surface (redis.asyncio, sqlite3, env-driven REDIS_URL/DATABASE_URL) with no explicit failure/fallback path when Redis is unreachable."
-        }
-      ],
-      "strengths": [
-        "Adds Redis pub/sub, enabling multi-instance fan-out and horizontal scaling of the notification service.",
-        "Introduces SQLite message retention with bounded pagination (limit clamped to 1000) and a /messages endpoint.",
-        "Validates query params defensively, returning 400 on malformed limit/offset instead of raising.",
-        "Zero new bugs, smells, or code duplication per SonarQube; reuses the existing _json_response helper and class structure."
-      ],
-      "summary": "A functional integration (Redis pub/sub + SQLite persistence) that delivers the scaling goal but at the cost of significantly raised complexity (+46), degraded maintainability (inlined handlers, stripped docstrings), and a mixed sync/async threading model that burdens the event loop.",
-      "session_number": 3
-    },
-    {
-      "commit_hash": "d3c2e55e12e59199e1eac1eff0f62f977ed50689",
-      "reviewer_model": "deepseek/deepseek-v4-flash",
-      "architectural_fit": 0.75,
-      "convention_adherence": 0.82,
-      "introduces_technical_debt": true,
-      "respects_existing_patterns": true,
-      "better_or_worse": "better",
-      "problems": [
-        {
-          "category": "architecture",
-          "severity": "minor",
-          "description": "self._server typed as Any where a concrete Server type was previously used \u2014 the seam erases static type safety at the exact boundary where the concrete transport type is known (transport.py owns the Server type now)."
-        },
-        {
-          "category": "architecture",
-          "severity": "minor",
-          "description": "Partial abstraction leak: self.clients still stores websockets ServerConnection objects while all sends go through transport by client_id \u2014 the stored connections now serve only as membership markers, so the server remains coupled to websockets types despite the new abstraction."
-        },
-        {
-          "category": "maintainability",
-          "severity": "minor",
-          "description": "Transport selection mixes constructor injection with ambient TRANSPORT env-var branching inside __init__, which makes the selection path hard to test and duplicates config responsibility that belongs in a factory."
-        },
-        {
-          "category": "maintainability",
-          "severity": "minor",
-          "description": "Redundant configuration: port is passed both to WebSocketTransport(port) at construction and to transport.start(host, port), a duplicated-parameter smell that can drift."
-        },
-        {
-          "category": "convention",
-          "severity": "minor",
-          "description": "Module-level constants in new transport.py should be UPPER_CASE per the measured convention violations (score 0.82)."
+          "severity": "info",
+          "description": "SonarQube: cognitive complexity +7"
         },
         {
           "category": "convention",
           "severity": "info",
-          "description": "Flagged discrepancy: two of the three measured convention violations reference test_app.py (not shown in this diff); if that file is untouched, those count as pre-existing, not introduced here."
+          "description": "test_app.py: Classes should use PascalCase"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "test_app.py: Module-level constants should be UPPER_CASE"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "transport.py: Module-level constants should be UPPER_CASE"
+        },
+        {
+          "category": "testing",
+          "severity": "major",
+          "description": "no tests executed in this session"
         }
       ],
       "strengths": [
-        "Extracts a clean BaseTransport ABC that decouples app.py from websockets internals and enables alternate transports (e.g., SSE/TCP) without touching core server logic.",
-        "Centralizes send/error handling in transport.broadcast with a failed-recipients return, collapsing the messy per-connection gather logic in _deliver.",
-        "Constructor injection of the transport enables test doubles without network exposure."
+        "convention score 0.83 [M]"
       ],
-      "summary": "A solid transport-abstraction refactor that decouples the server from WebSocket internals and simplifies delivery logic, held back only by minor type-erasure, config-hygiene, and convention warts.",
-      "session_number": 4
+      "summary": "[story] Session 1: greenfield: +249/-234 lines, convention 0.83 [M], 3 violations, +0 bugs / -3 smells [M]",
+      "session_number": 1
     },
     {
-      "commit_hash": "f07f99450669d386b1cf05fd6a8530689cea1fa8",
-      "reviewer_model": "deepseek/deepseek-v4-flash",
-      "architectural_fit": 0.85,
-      "convention_adherence": 0.82,
-      "introduces_technical_debt": false,
+      "commit_hash": "50e29000ba794fa7f6c15dac78d85cd09c912c32",
+      "reviewer_model": "measured",
+      "architectural_fit": null,
+      "convention_adherence": 0.833,
+      "introduces_technical_debt": true,
       "respects_existing_patterns": true,
-      "better_or_worse": "better",
+      "better_or_worse": "worse",
       "problems": [
         {
           "category": "maintainability",
           "severity": "minor",
-          "description": "Magic numbers for the rate window (60s) and cleanup interval (3600s) are hardcoded rather than env-driven, unlike RATE_LIMIT and MESSAGE_TTL_DAYS."
+          "description": "SonarQube: +2 code smells introduced"
         },
         {
           "category": "maintainability",
-          "severity": "minor",
-          "description": "The local fallback _rate_windows dict is never pruned, so unbounded memory growth is possible under many client IDs once Redis is unavailable."
+          "severity": "info",
+          "description": "SonarQube: cognitive complexity +31"
         },
         {
           "category": "convention",
-          "severity": "minor",
-          "description": "SonarQube convention score 0.82 with violations in test_app.py (PascalCase class, non-UPPER module constants) and transport.py (module constants not UPPER_CASE)."
+          "severity": "info",
+          "description": "test_app.py: Classes should use PascalCase"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "test_app.py: Module-level constants should be UPPER_CASE"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "transport.py: Module-level constants should be UPPER_CASE"
+        },
+        {
+          "category": "testing",
+          "severity": "major",
+          "description": "no tests executed in this session"
         }
       ],
       "strengths": [
-        "New features reuse existing idioms: _connect_db(), _json_response(), _db_lock, and the async cleanup task mirrors the established _redis_task lifecycle.",
-        "Parameterized SQL throughout, plus input validation on channel/since/limit before hitting the database.",
-        "Graceful degradation from Redis to an in-process rate limiter rather than failing hard.",
-        "The /history endpoint fits the existing message/channels endpoint surface and adds a supporting index on (channel, timestamp)."
+        "convention score 0.83 [M]"
       ],
-      "summary": "A well-fitted cross-cutting session that extends the notification server with rate limiting, message TTL cleanup, and per-channel history while faithfully following the app's established patterns; only minor maintainability nits (magic intervals, unpruned rate-window dict) and a 0.82 convention score (test/transport constants) hold it back.",
+      "summary": "[story] Session 2: feature_addition: +129/-9 lines, convention 0.83 [M], 3 violations, +0 bugs / +2 smells [M]",
+      "session_number": 2
+    },
+    {
+      "commit_hash": "3b7c3abe5afc89575fa0c24d19c14a1ba07101fb",
+      "reviewer_model": "measured",
+      "architectural_fit": null,
+      "convention_adherence": 0.833,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": true,
+      "better_or_worse": "worse",
+      "problems": [
+        {
+          "category": "maintainability",
+          "severity": "info",
+          "description": "SonarQube: cognitive complexity +39"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "test_app.py: Classes should use PascalCase"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "test_app.py: Module-level constants should be UPPER_CASE"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "transport.py: Module-level constants should be UPPER_CASE"
+        },
+        {
+          "category": "testing",
+          "severity": "major",
+          "description": "no tests executed in this session"
+        }
+      ],
+      "strengths": [
+        "convention score 0.83 [M]"
+      ],
+      "summary": "[story] Session 3: integration: +221/-121 lines, convention 0.83 [M], 3 violations, +0 bugs / +0 smells [M]",
+      "session_number": 3
+    },
+    {
+      "commit_hash": "d3c2e55e12e59199e1eac1eff0f62f977ed50689",
+      "reviewer_model": "measured",
+      "architectural_fit": null,
+      "convention_adherence": 0.833,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": true,
+      "better_or_worse": "worse",
+      "problems": [
+        {
+          "category": "maintainability",
+          "severity": "info",
+          "description": "SonarQube: cognitive complexity +2"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "test_app.py: Classes should use PascalCase"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "test_app.py: Module-level constants should be UPPER_CASE"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "transport.py: Module-level constants should be UPPER_CASE"
+        },
+        {
+          "category": "testing",
+          "severity": "major",
+          "description": "no tests executed in this session"
+        }
+      ],
+      "strengths": [
+        "convention score 0.83 [M]"
+      ],
+      "summary": "[story] Session 4: refactor: +135/-30 lines, convention 0.83 [M], 3 violations, +0 bugs / +0 smells [M]",
+      "session_number": 4
+    },
+    {
+      "commit_hash": "f07f99450669d386b1cf05fd6a8530689cea1fa8",
+      "reviewer_model": "measured",
+      "architectural_fit": null,
+      "convention_adherence": 0.833,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": true,
+      "better_or_worse": "worse",
+      "problems": [
+        {
+          "category": "maintainability",
+          "severity": "minor",
+          "description": "SonarQube: +4 code smells introduced"
+        },
+        {
+          "category": "maintainability",
+          "severity": "info",
+          "description": "SonarQube: cognitive complexity +24"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "test_app.py: Classes should use PascalCase"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "test_app.py: Module-level constants should be UPPER_CASE"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "transport.py: Module-level constants should be UPPER_CASE"
+        },
+        {
+          "category": "testing",
+          "severity": "major",
+          "description": "no tests executed in this session"
+        }
+      ],
+      "strengths": [
+        "convention score 0.83 [M]"
+      ],
+      "summary": "[story] Session 5: cross_cutting: +144/-4 lines, convention 0.83 [M], 3 violations, +0 bugs / +4 smells [M]",
       "session_number": 5
     }
   ],
   "story_review": {
     "story_name": "notification_service",
-    "reviewer_model": "deepseek/deepseek-v4-flash",
-    "overall_coherence": 0.85,
+    "reviewer_model": "measured",
+    "overall_coherence": 0.0,
     "compounding_issues": [
-      "Session 3 introduced three sources of truth (in-memory clients/channels, Redis subscription sets, SQLite history) that all had to be kept in sync; sessions 4-5 worked around rather than resolved this, e.g. session 5 added a local rate-limit fallback alongside the Redis limiter instead of unifying state.",
-      "Session 1 locked in a single-file app.py monolith holding routing, persistence, rate limiting, and messaging together; only session 4 split out transport.py, and the DB/HTTP/WS logic stayed coupled in app.py through session 5.",
-      "Hand-rolled SQLite URL parsing (session 3's _sqlite_path with multiple edge cases) forced session 5 to bolt on :memory: shared-cache handling on top, growing complexity in the storage layer.",
-      "Blocking sqlite3 calls (connect/INSERT/SELECT) run directly in async handlers behind a threading lock, blocking the event loop; this pattern from session 3 was never fixed.",
-      "Session 3's Redis probe in start() made behavior environment-dependent (Redis up vs down changes delivery semantics and test outcomes), and Redis vs local delivery paths drifted apart over time.",
-      "Session 4-5 committed runtime artifacts (__pycache__/*.pyc, messages.db), a hygiene regression in an otherwise clean history."
+      "test_app.py: Classes should use PascalCase (in 5 sessions)",
+      "test_app.py: Module-level constants should be UPPER_CASE (in 5 sessions)",
+      "transport.py: Module-level constants should be UPPER_CASE (in 5 sessions)"
     ],
     "key_decisions": [
-      "Session 1 discarded the Flask auth seed entirely and greenfielded an async WebSocket notification server (asyncio + websockets) with OS-assigned ports and health-over-WebSocket-hook for testability.",
-      "Session 2 fixed the wire protocol (broadcast/direct/system/subscribe/unsubscribe) and multiplexed HTTP introspection endpoints (/channels, /channels/<name>/subscribers) on the same WebSocket listener.",
-      "Session 3 added a Redis pub/sub backbone with graceful local-delivery fallback for multi-instance scaling, plus SQLite persistence and a /messages history endpoint, turning an ephemeral server into a durable one.",
-      "Session 4 extracted a BaseTransport/WebSocketTransport abstraction so messaging logic no longer depends on the WebSocket server, enabling alternative transports and cleaner unit tests.",
-      "Session 5 layered cross-cutting operational concerns: Redis-backed rate limiting with local fallback, TTL-based message retention with a background cleanup loop, and per-channel history pagination with since/limit/has_more semantics plus a DB index."
+      "[story] Session 1: greenfield",
+      "[story] Session 2: feature_addition",
+      "[story] Session 3: integration",
+      "[story] Session 4: refactor",
+      "[story] Session 5: cross_cutting"
     ],
-    "trajectory_description": "Quality rose steadily from a clean, minimal async core in session 1 through a coherent feature layer in session 2 and a meaningful architectural jump in session 3 (Redis + SQLite durability). Session 4's transport extraction was the high point \u2014 a genuine decoupling that kept all nine tests green while restructuring internals. Session 5 broadened scope (rate limiting, TTL cleanup, paginated history) with tests growing 5\u21927\u21929\u21929\u219211 monotonically, but it added features on top of the accumulating dual-state complexity rather than paying it down, so the arc is 'improving design quality' up to session 4, then a plateau where feature breadth outpaces internal consolidation.",
-    "summary": "A coherent greenfield\u2192features\u2192integration\u2192refactor\u2192cross-cutting arc that steadily added real capability and tests, peaking at the session 4 transport refactor while leaving a multi-source-of-truth state model as the story's one persistent architectural debt."
+    "trajectory_description": "S1 6543 tokens $0.018; S2 5085 tokens $0.015; S3 8074 tokens $0.023; S4 5146 tokens $0.015; S5 6505 tokens $0.021",
+    "summary": "5 sessions, 0/5 with tests, test_executed_success=None"
   }
 }

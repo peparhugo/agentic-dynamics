@@ -1,0 +1,127 @@
+{
+  "story_name": "static_site_gen",
+  "story_id": "f468cff68982",
+  "model": "measured",
+  "commit_reviews": [
+    {
+      "commit_hash": "de5ff69bc622f2f6612f075d310341b61abc973a",
+      "reviewer_model": "measured",
+      "architectural_fit": null,
+      "convention_adherence": null,
+      "introduces_technical_debt": false,
+      "respects_existing_patterns": false,
+      "better_or_worse": "neutral",
+      "problems": [
+        {
+          "category": "testing",
+          "severity": "major",
+          "description": "no tests executed in this session"
+        }
+      ],
+      "strengths": [
+        "measured deltas clean (no bugs/smells/complexity/violations)"
+      ],
+      "summary": "[story] Session 1: greenfield: +0/-0 lines, convention n/a [M], 0 violations, +0 bugs / +0 smells [M]",
+      "session_number": 1
+    },
+    {
+      "commit_hash": "fe0bc600d41ade072ec0166fd47512f53e020e93",
+      "reviewer_model": "measured",
+      "architectural_fit": null,
+      "convention_adherence": null,
+      "introduces_technical_debt": false,
+      "respects_existing_patterns": false,
+      "better_or_worse": "neutral",
+      "problems": [
+        {
+          "category": "testing",
+          "severity": "major",
+          "description": "no tests executed in this session"
+        }
+      ],
+      "strengths": [
+        "measured deltas clean (no bugs/smells/complexity/violations)"
+      ],
+      "summary": "[story] Session 2: feature_addition: +0/-0 lines, convention n/a [M], 0 violations, +0 bugs / +0 smells [M]",
+      "session_number": 2
+    },
+    {
+      "commit_hash": "3cf07f682d1633cad998c26cbb8d11a62eb3e988",
+      "reviewer_model": "measured",
+      "architectural_fit": null,
+      "convention_adherence": null,
+      "introduces_technical_debt": false,
+      "respects_existing_patterns": false,
+      "better_or_worse": "neutral",
+      "problems": [
+        {
+          "category": "testing",
+          "severity": "major",
+          "description": "no tests executed in this session"
+        }
+      ],
+      "strengths": [
+        "measured deltas clean (no bugs/smells/complexity/violations)"
+      ],
+      "summary": "[story] Session 3: integration: +0/-0 lines, convention n/a [M], 0 violations, +0 bugs / +0 smells [M]",
+      "session_number": 3
+    },
+    {
+      "commit_hash": "136834d490bdf80fc9c934ccc92e95044b9531b3",
+      "reviewer_model": "measured",
+      "architectural_fit": null,
+      "convention_adherence": null,
+      "introduces_technical_debt": false,
+      "respects_existing_patterns": false,
+      "better_or_worse": "neutral",
+      "problems": [
+        {
+          "category": "testing",
+          "severity": "major",
+          "description": "no tests executed in this session"
+        }
+      ],
+      "strengths": [
+        "measured deltas clean (no bugs/smells/complexity/violations)"
+      ],
+      "summary": "[story] Session 4: refactor: +0/-0 lines, convention n/a [M], 0 violations, +0 bugs / +0 smells [M]",
+      "session_number": 4
+    },
+    {
+      "commit_hash": "bd6ca567541c1648969abd62511aa9a644fcff05",
+      "reviewer_model": "measured",
+      "architectural_fit": null,
+      "convention_adherence": null,
+      "introduces_technical_debt": false,
+      "respects_existing_patterns": false,
+      "better_or_worse": "neutral",
+      "problems": [
+        {
+          "category": "testing",
+          "severity": "major",
+          "description": "no tests executed in this session"
+        }
+      ],
+      "strengths": [
+        "measured deltas clean (no bugs/smells/complexity/violations)"
+      ],
+      "summary": "[story] Session 5: cross_cutting: +0/-0 lines, convention n/a [M], 0 violations, +0 bugs / +0 smells [M]",
+      "session_number": 5
+    }
+  ],
+  "story_review": {
+    "story_name": "static_site_gen",
+    "reviewer_model": "measured",
+    "overall_coherence": 0.0,
+    "compounding_issues": [],
+    "key_decisions": [
+      "[story] Session 1: greenfield",
+      "[story] Session 2: feature_addition",
+      "[story] Session 3: integration",
+      "[story] Session 4: refactor",
+      "[story] Session 5: cross_cutting"
+    ],
+    "trajectory_description": "S1 17416 tokens $0.012; S2 34441 tokens $0.025; S3 23129 tokens $0.017; S4 46937 tokens $0.039; S5 39611 tokens $0.029",
+    "summary": "5 sessions, 0/5 with tests, test_executed_success=True"
+  }
+}

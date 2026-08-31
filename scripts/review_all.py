@@ -29,13 +29,13 @@ except ImportError:  # imported as scripts.<name> — repo root is on sys.path
     from scripts import _bootstrap  # noqa: E402,F401
 
 
-from agentic_dynamics.reporting.review import review_commit, review_story
+from agentic_dynamics.reporting.review import measured_commit_review, measured_story_review
 from agentic_dynamics.runtime.story import load_story_result
 
 RESULTS_DIR = Path(__file__).resolve().parent.parent / "experiments" / "results" / "stories"
 REVIEWS_DIR = Path(__file__).resolve().parent.parent / "experiments" / "results" / "reviews"
 ANALYSIS_DIR = Path(__file__).resolve().parent.parent / "experiments" / "results" / "analysis"
-MODEL = "deepseek/deepseek-v4-flash"
+MODEL = "measured"
 
 AGGREGATE_RE = re.compile(r"^review_[0-9a-f]{12}\.json$")
 
@@ -86,7 +86,12 @@ def _get_story_commits(worktree: Path) -> list[tuple[str, str, int]]:
 
 
 def _review_one_story(result_file: Path) -> tuple[str, str]:
-    """Review a single story and write its review file. Returns (name, err)."""
+    """Assemble a story's MEASURED review manifest (no LLM — git + analysis mechanics).
+
+    The review files carry only measured signals ([M]) + deterministic [C] derivations;
+    the LLM review output was nondeterministic (the same commit re-reviewed produced
+    different content) and is not part of the review artifact. Returns (name, err).
+    """
     name = result_file.name
     try:
         story = load_story_result(result_file)
@@ -105,37 +110,26 @@ def _review_one_story(result_file: Path) -> tuple[str, str]:
         return name, "no session commits"
 
     review_path = REVIEWS_DIR / f"review_{story.story_id}.json"
-    data = {"commit_reviews": []}
-    if review_path.exists():
-        try:
-            data = json.loads(review_path.read_text())
-        except (json.JSONDecodeError, OSError):
-            data = {"commit_reviews": []}
 
-    # Commit reviews
-    existing = {cr.get("session_number"): cr for cr in data.get("commit_reviews", [])}
+    # Commit reviews — measured manifests, one per session commit.
+    sessions_by_sn = {s.session_number: s.to_dict() for s in story.sessions}
     commit_reviews = []
     for ch, _cm, sn in commits:
-        if sn in existing and existing[sn]:
-            commit_reviews.append(existing[sn])  # reuse already-done review
-            continue
-        r = review_commit(
+        session = sessions_by_sn.get(sn)
+        cr = measured_commit_review(
             worktree, ch,
             story_name=story.story_name, session_number=sn,
-            model=MODEL, story_id=story.story_id,
+            session=session, story_id=story.story_id,
         )
-        d = r.to_dict()
+        d = cr.to_dict()
         d["session_number"] = sn
         commit_reviews.append(d)
 
-    # Story review (reuse if already done)
-    story_review = data.get("story_review")
-    if not story_review:
-        try:
-            sr = review_story(worktree, story.story_name, model=MODEL)
-            story_review = sr.to_dict()
-        except Exception as e:
-            story_review = {"error": str(e)}
+    # Story review — the measured aggregate.
+    story_review = measured_story_review(
+        story.story_name, story.story_id, [s.to_dict() for s in story.sessions], commits,
+        story_test_executed_success=story.test_executed_success,
+    ).to_dict()
 
     data = {
         "story_name": story.story_name,

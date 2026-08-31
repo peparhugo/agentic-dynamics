@@ -1,142 +1,278 @@
 {
   "story_name": "notification_service",
   "story_id": "dd3a11bd2fe0",
-  "model": "deepseek/deepseek-v4-flash",
+  "model": "measured",
   "commit_reviews": [
     {
       "commit_hash": "37fd7e6f044e3f9e4dd7707112167323c4060ade",
-      "reviewer_model": "deepseek/deepseek-v4-flash",
-      "architectural_fit": 0.65,
-      "convention_adherence": 0.72,
-      "introduces_technical_debt": true,
-      "respects_existing_patterns": false,
-      "better_or_worse": "neutral",
-      "problems": [
-        {
-          "category": "convention",
-          "severity": "minor",
-          "description": "app.py declares module-level constants in lower case; repo convention (and the seed it replaced) uses UPPER_CASE module-level constants."
-        },
-        {
-          "category": "convention",
-          "severity": "minor",
-          "description": "test_app.py and conftest.py declare classes in non-PascalCase (2 violations each: class naming + module-level constant casing) \u2014 4 of the 5 reported convention violations live in the test layer, contradicting the repo rule 'PascalCase classes'."
-        },
-        {
-          "category": "architecture",
-          "severity": "minor",
-          "description": "The commit wholesale-replaces the seed's multi-file Blueprint structure with a single-file app.py (~145 LOC) that merges client registry, broadcast, and message handling into one module, deleting the seed's existing organization and tests."
-        },
-        {
-          "category": "maintainability",
-          "severity": "minor",
-          "description": "SonarQube delta shows +3 smells and +13 cognitive complexity in the new code \u2014 rising complexity in a deliberately flat single-module design."
-        }
-      ],
-      "strengths": [
-        "Zero new bugs and zero duplication (SonarQube: bugs +0, duplications +0.0%)",
-        "Requirement-complete: per-client ID assignment, broadcast, disconnect cleanup, and the GET /health endpoint returning connected-client count are all implemented",
-        "Ships a test suite in session 1 (+3 files, conftest.py + test_app.py)",
-        "Compact and readable ~145-line implementation"
-      ],
-      "summary": "A requirement-complete, bug-free greenfield first session that delivers the notification-service story goal plus tests, but flattens the seed's modular structure into a single file and accumulates 5 naming-convention violations (convention score 0.72).",
-      "session_number": 1
-    },
-    {
-      "commit_hash": "e6fd880c6a225d1dd24f7c79fb912cc4ecaa8a63",
-      "reviewer_model": "deepseek/deepseek-v4-flash",
-      "architectural_fit": 0.85,
-      "convention_adherence": 0.75,
+      "reviewer_model": "measured",
+      "architectural_fit": null,
+      "convention_adherence": 0.722,
       "introduces_technical_debt": true,
       "respects_existing_patterns": true,
-      "better_or_worse": "neutral",
+      "better_or_worse": "worse",
       "problems": [
         {
           "category": "maintainability",
           "severity": "minor",
-          "description": "Inconsistent message schema: the channel is read from the top-level envelope (`data.get(\"channel\")`) for `broadcast` but from `payload.get(\"channel\")` for `subscribe`/`unsubscribe` \u2014 two locations for the same concept invites API drift."
+          "description": "SonarQube: +3 code smells introduced"
         },
         {
           "category": "maintainability",
-          "severity": "minor",
-          "description": "Broadcast envelope construction (timestamp + type) is duplicated between the channel and all-clients branches instead of being factored into a helper (contributing to the +19 cognitive complexity delta)."
-        },
-        {
-          "category": "testing",
-          "severity": "minor",
-          "description": "The commit adds a new feature (ChannelRegistry + subscribe/unsubscribe/broadcast + two HTTP endpoints) but touches zero test files \u2014 no coverage for the new channel behavior."
+          "severity": "info",
+          "description": "SonarQube: cognitive complexity +13"
         },
         {
           "category": "convention",
           "severity": "info",
-          "description": "Measured convention score 0.72 is dragged down mostly by violations in conftest.py and test_app.py, which are NOT part of this diff \u2014 the app.py module-level constant violation may also be pre-existing. The actual added code follows conventions well."
+          "description": "app.py: Module-level constants should be UPPER_CASE"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "conftest.py: Classes should use PascalCase"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "conftest.py: Module-level constants should be UPPER_CASE"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "test_app.py: Classes should use PascalCase"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "test_app.py: Module-level constants should be UPPER_CASE"
+        },
+        {
+          "category": "testing",
+          "severity": "major",
+          "description": "no tests executed in this session"
         }
       ],
       "strengths": [
-        "ChannelRegistry closely mirrors the existing ClientRegistry pattern (threading.Lock, symmetric subscribe/unsubscribe/get methods), so it slots into the codebase idiomatically.",
-        "Clean cleanup path \u2014 remove_client_from_all in the finally block guarantees no stale channel membership on disconnect.",
-        "Thread-safety is handled consistently; get_subscribers returns a defensive copy, and empty channels are pruned."
+        "convention score 0.72 [M]"
       ],
-      "summary": "A coherent, pattern-following feature addition that mirrors the existing registry idiom, but carries minor maintainability warts (schema inconsistency, duplicated envelope logic) and adds no tests for the new channel paths; the measured 0.72 convention score overstates the diff's own violations since most flagged files (conftest.py, test_app.py) are untouched by this commit.",
+      "summary": "[story] Session 1: greenfield: +465/-244 lines, convention 0.72 [M], 5 violations, +0 bugs / +3 smells [M]",
+      "session_number": 1
+    },
+    {
+      "commit_hash": "e6fd880c6a225d1dd24f7c79fb912cc4ecaa8a63",
+      "reviewer_model": "measured",
+      "architectural_fit": null,
+      "convention_adherence": 0.722,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": true,
+      "better_or_worse": "worse",
+      "problems": [
+        {
+          "category": "maintainability",
+          "severity": "minor",
+          "description": "SonarQube: +2 code smells introduced"
+        },
+        {
+          "category": "maintainability",
+          "severity": "info",
+          "description": "SonarQube: cognitive complexity +19"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "app.py: Module-level constants should be UPPER_CASE"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "conftest.py: Classes should use PascalCase"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "conftest.py: Module-level constants should be UPPER_CASE"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "test_app.py: Classes should use PascalCase"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "test_app.py: Module-level constants should be UPPER_CASE"
+        },
+        {
+          "category": "testing",
+          "severity": "major",
+          "description": "no tests executed in this session"
+        }
+      ],
+      "strengths": [
+        "convention score 0.72 [M]"
+      ],
+      "summary": "[story] Session 2: feature_addition: +83/-6 lines, convention 0.72 [M], 5 violations, +0 bugs / +2 smells [M]",
       "session_number": 2
     },
     {
       "commit_hash": "b970dca396b062c9ab11d833139f207d86ac3f91",
-      "reviewer_model": "deepseek/deepseek-v4-flash",
-      "architectural_fit": 1.0,
-      "convention_adherence": 1.0,
+      "reviewer_model": "measured",
+      "architectural_fit": null,
+      "convention_adherence": 0.722,
       "introduces_technical_debt": false,
       "respects_existing_patterns": true,
-      "better_or_worse": "neutral",
-      "problems": [],
-      "strengths": [],
-      "summary": "No changes in this commit.",
+      "better_or_worse": "worse",
+      "problems": [
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "app.py: Module-level constants should be UPPER_CASE"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "conftest.py: Classes should use PascalCase"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "conftest.py: Module-level constants should be UPPER_CASE"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "test_app.py: Classes should use PascalCase"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "test_app.py: Module-level constants should be UPPER_CASE"
+        },
+        {
+          "category": "testing",
+          "severity": "major",
+          "description": "no tests executed in this session"
+        }
+      ],
+      "strengths": [
+        "convention score 0.72 [M]"
+      ],
+      "summary": "[story] Session 3: integration: +0/-0 lines, convention 0.72 [M], 5 violations, +0 bugs / +0 smells [M]",
       "session_number": 3
     },
     {
       "commit_hash": "6e4394c8ad0d2c2511564457a65249a06b9069a7",
-      "reviewer_model": "deepseek/deepseek-v4-flash",
-      "architectural_fit": 1.0,
-      "convention_adherence": 1.0,
+      "reviewer_model": "measured",
+      "architectural_fit": null,
+      "convention_adherence": 0.722,
       "introduces_technical_debt": false,
       "respects_existing_patterns": true,
-      "better_or_worse": "neutral",
-      "problems": [],
-      "strengths": [],
-      "summary": "No changes in this commit.",
+      "better_or_worse": "worse",
+      "problems": [
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "app.py: Module-level constants should be UPPER_CASE"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "conftest.py: Classes should use PascalCase"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "conftest.py: Module-level constants should be UPPER_CASE"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "test_app.py: Classes should use PascalCase"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "test_app.py: Module-level constants should be UPPER_CASE"
+        },
+        {
+          "category": "testing",
+          "severity": "major",
+          "description": "no tests executed in this session"
+        }
+      ],
+      "strengths": [
+        "convention score 0.72 [M]"
+      ],
+      "summary": "[story] Session 4: refactor: +0/-0 lines, convention 0.72 [M], 5 violations, +0 bugs / +0 smells [M]",
       "session_number": 4
     },
     {
       "commit_hash": "9dcf96f5df3acab055727a57a237aebbe96e7354",
-      "reviewer_model": "deepseek/deepseek-v4-flash",
-      "architectural_fit": 1.0,
-      "convention_adherence": 1.0,
+      "reviewer_model": "measured",
+      "architectural_fit": null,
+      "convention_adherence": 0.722,
       "introduces_technical_debt": false,
       "respects_existing_patterns": true,
-      "better_or_worse": "neutral",
-      "problems": [],
-      "strengths": [],
-      "summary": "No changes in this commit.",
+      "better_or_worse": "worse",
+      "problems": [
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "app.py: Module-level constants should be UPPER_CASE"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "conftest.py: Classes should use PascalCase"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "conftest.py: Module-level constants should be UPPER_CASE"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "test_app.py: Classes should use PascalCase"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "test_app.py: Module-level constants should be UPPER_CASE"
+        },
+        {
+          "category": "testing",
+          "severity": "major",
+          "description": "no tests executed in this session"
+        }
+      ],
+      "strengths": [
+        "convention score 0.72 [M]"
+      ],
+      "summary": "[story] Session 5: cross_cutting: +0/-0 lines, convention 0.72 [M], 5 violations, +0 bugs / +0 smells [M]",
       "session_number": 5
     }
   ],
   "story_review": {
     "story_name": "notification_service",
-    "reviewer_model": "deepseek/deepseek-v4-flash",
-    "overall_coherence": 0.45,
+    "reviewer_model": "measured",
+    "overall_coherence": 0.0,
     "compounding_issues": [
-      "Subscription session limit (Claude quota, 'resets 2am Europe/Berlin') aborted sessions 3-5 \u2014 the integration, refactor, and cross-cutting commits are empty placeholder commits (0 tokens, 0 tool calls) carrying only .instrument/session.jsonl files, so the planned arc never materialized",
-      "Session 2's channel feature shipped with zero new tests (test_app.py unchanged at 13 tests) and exited non-zero mid-feature, leaving untested channel routing/registries as the foundation later sessions would have built on",
-      "Session 1 committed after a 383-line rewrite without running the test suite in-session (tests_passed 0/0); the post-hoc deep evaluator reported correctness 0.0 with evaluator_source 'unavailable', so the greenfield result was never independently verified",
-      "Early concurrency choice mixed threading.Lock-protected registries with asyncio (cyclomatic complexity 119, code_quality_score 0.117) \u2014 a maintainability burden cemented in session 1 that the aborted refactor session was meant to address"
+      "app.py: Module-level constants should be UPPER_CASE (in 5 sessions)",
+      "conftest.py: Classes should use PascalCase (in 5 sessions)",
+      "conftest.py: Module-level constants should be UPPER_CASE (in 5 sessions)",
+      "test_app.py: Classes should use PascalCase (in 5 sessions)",
+      "test_app.py: Module-level constants should be UPPER_CASE (in 5 sessions)"
     ],
     "key_decisions": [
-      "Session 1 fully rewrote the 250-line seed (383 lines changed) into an aiohttp-HTTP + websockets dual-stack server with a conftest.py async fixture harness, rather than extending the seed incrementally",
-      "Adopted a threading.Lock-serialized ClientRegistry/ChannelRegistry (thread-safety over a pure async design), accepting cross-concurrency-model complexity from the start",
-      "Session 2 added a ChannelRegistry with per-channel subscribe/unsubscribe routing and REST channel/subscriber endpoints, treating 'channel' as an optional broadcast field to preserve backward compatibility",
-      "The runner committed session states even on exit code 1 (session 2) and emitted empty commits for the quota-blocked sessions 3-5, cementing partial/placeholder states as permanent history"
+      "[story] Session 1: greenfield",
+      "[story] Session 2: feature_addition",
+      "[story] Session 3: integration",
+      "[story] Session 4: refactor",
+      "[story] Session 5: cross_cutting"
     ],
-    "trajectory_description": "Quality opened strong: session 1 delivered a complete, well-structured greenfield build (async server, thread-safe registries, a 13-test harness, 46 tool calls, $0.53) and session 2 added a sensible channel-subscription feature with clean REST endpoints \u2014 but that feature arrived untested and the session was cut off mid-work (exit 1). The remaining three sessions produced nothing: each died on the Claude subscription session limit within ~2 seconds at zero cost, yielding empty commits. The arc is a two-session story wearing a five-session mask \u2014 competence in what was built, but the integration/refactor/cross-cutting legs that would have hardened or vindicated it never executed, so the measured trajectory is flat-then-truncated rather than improving.",
-    "summary": "A promising greenfield start and a coherent feature session collapse into three quota-killed empty commits, leaving an untested channel feature and a truncated 2-of-5-session story that never reached integration, refactor, or cross-cutting."
+    "trajectory_description": "S1 32286 tokens $0.526; S2 3912 tokens $0.063; S3 0 tokens $0.000; S4 0 tokens $0.000; S5 0 tokens $0.000",
+    "summary": "5 sessions, 0/5 with tests, test_executed_success=True"
   }
 }

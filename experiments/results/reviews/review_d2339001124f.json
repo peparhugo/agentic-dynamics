@@ -1,244 +1,225 @@
 {
   "story_name": "notification_service",
   "story_id": "d2339001124f",
-  "model": "deepseek/deepseek-v4-flash",
+  "model": "measured",
   "commit_reviews": [
     {
       "commit_hash": "2c7b04a04d996272da12481c894034caca9989be",
-      "reviewer_model": "deepseek/deepseek-v4-flash",
-      "architectural_fit": 0.72,
-      "convention_adherence": 0.83,
+      "reviewer_model": "measured",
+      "architectural_fit": null,
+      "convention_adherence": 0.833,
       "introduces_technical_debt": true,
       "respects_existing_patterns": true,
-      "better_or_worse": "better",
+      "better_or_worse": "worse",
       "problems": [
         {
           "category": "maintainability",
+          "severity": "info",
+          "description": "SonarQube: cognitive complexity +1"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "test_notification_server.py: Classes should use PascalCase"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "test_notification_server.py: Module-level constants should be UPPER_CASE"
+        },
+        {
+          "category": "testing",
           "severity": "major",
-          "description": "New test file is named test_notification_server.py while the code under test is app.py (a Flask auth API). The module-under-test naming convention is broken, so future sessions/maintenance will not be able to map the test suite to the app it exercises."
-        },
-        {
-          "category": "convention",
-          "severity": "minor",
-          "description": "test_notification_server.py declares classes that are not PascalCase (per static analysis), violating the repo's Python naming convention."
-        },
-        {
-          "category": "convention",
-          "severity": "minor",
-          "description": "test_notification_server.py declares module-level constants that are not UPPER_CASE (per static analysis)."
-        },
-        {
-          "category": "architecture",
-          "severity": "minor",
-          "description": "Session 1 rewrote the tier-2 seed baseline outright (-247/+213 lines), consolidating the app into a leaner single app.py rather than building incrementally; cognitive complexity rose +1 even as smells fell, so the rewrite is not strictly additive."
+          "description": "no tests executed in this session"
         }
       ],
       "strengths": [
-        "Zero new bugs and zero duplication introduced (bugs +0, duplications +0.0%)",
-        "Net reduction of 3 code smells (smells -3), improving overall code health",
-        "Expanded the codebase with 3 new files and +19 functions, adding tests alongside the app",
-        "Net -34 lines while adding functionality \u2014 a lean consolidation"
+        "convention score 0.83 [M]"
       ],
-      "summary": "Session 1 greenfield rewrite trims the auth seed to a leaner app and adds test coverage with zero new bugs and fewer smells, but the test file's mismatched name (test_notification_server.py vs. app.py) and class/constant casing leave convention debt for later sessions.",
+      "summary": "[story] Session 1: greenfield: +213/-247 lines, convention 0.83 [M], 2 violations, +0 bugs / -3 smells [M]",
       "session_number": 1
     },
     {
       "commit_hash": "a35d2b8d4297e875127aeff18b928dd4ef32d09b",
-      "reviewer_model": "deepseek/deepseek-v4-flash",
-      "architectural_fit": 0.8,
-      "convention_adherence": 0.83,
+      "reviewer_model": "measured",
+      "architectural_fit": null,
+      "convention_adherence": 0.833,
       "introduces_technical_debt": true,
       "respects_existing_patterns": true,
-      "better_or_worse": "better",
+      "better_or_worse": "worse",
       "problems": [
         {
           "category": "maintainability",
-          "severity": "major",
-          "description": "broadcast()/system() semantics are silently overloaded: if the payload contains a 'channel' key they send to only that channel's subscribers, otherwise to all connections. This changes the meaning of the existing broadcast/system protocol for callers who include a 'channel' field, coupling routing decision to payload contents rather than an explicit message type."
+          "severity": "minor",
+          "description": "SonarQube: +1 code smells introduced"
         },
         {
           "category": "maintainability",
-          "severity": "major",
-          "description": "Cognitive complexity jumped +26 (SonarQube), concentrated in _handle_message and _handle_http, which are now heavily branched (subscribe/unsubscribe/broadcast/direct/system + three HTTP path shapes with nested parsing). The new feature accounts for nearly all of the added complexity."
-        },
-        {
-          "category": "maintainability",
-          "severity": "minor",
-          "description": "Cleanup logic in _handle_client's finally block (discard client + delete empty channel) duplicates _unsubscribe's behavior inline instead of reusing it, so channel-eviction bookkeeping lives in two places."
-        },
-        {
-          "category": "security",
-          "severity": "minor",
-          "description": "The /channels/<name>/subscribers endpoint exposes subscriber client IDs over an unauthenticated HTTP route; low severity since IDs are UUIDs but it widens the server's information surface beyond the health count."
+          "severity": "info",
+          "description": "SonarQube: cognitive complexity +26"
         },
         {
           "category": "convention",
           "severity": "info",
-          "description": "Convention score 0.83 per measurement; the two flagged violations (PascalCase class, UPPER_CASE module constant) are in test_notification_server.py and appear pre-existing rather than introduced by this diff's added snake_case functions."
+          "description": "test_notification_server.py: Classes should use PascalCase"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "test_notification_server.py: Module-level constants should be UPPER_CASE"
+        },
+        {
+          "category": "testing",
+          "severity": "major",
+          "description": "no tests executed in this session"
         }
       ],
       "strengths": [
-        "Feature is architecturally coherent: it slots into the existing message-type dispatch chain, reuses _send_to_connections, and guards all _channels mutation under the existing _clients_lock, matching the module's concurrency pattern.",
-        "Channel validation (_message_channel) is defensive \u2014 rejects non-string/empty channels and conflicting top-level-vs-payload channel values via the existing ValueError error path.",
-        "The /health and new /channels endpoints follow the same response/header construction style, and the new HTTP behavior is covered by tests via a raw-socket helper."
+        "convention score 0.83 [M]"
       ],
-      "summary": "A well-integrated channel subscribe/unsubscribe feature that follows the server's existing dispatch and locking patterns but introduces technical debt by overloading broadcast/system semantics and adding substantial branching complexity (+26 cognitive complexity).",
+      "summary": "[story] Session 2: feature_addition: +124/-6 lines, convention 0.83 [M], 2 violations, +0 bugs / +1 smells [M]",
       "session_number": 2
     },
     {
       "commit_hash": "b634f7d8a9d4bba148a90f7bce897ef47b09543d",
-      "reviewer_model": "deepseek/deepseek-v4-flash",
-      "architectural_fit": 0.72,
-      "convention_adherence": 0.83,
+      "reviewer_model": "measured",
+      "architectural_fit": null,
+      "convention_adherence": 0.833,
       "introduces_technical_debt": true,
       "respects_existing_patterns": true,
-      "better_or_worse": "better",
+      "better_or_worse": "worse",
       "problems": [
         {
           "category": "maintainability",
           "severity": "minor",
-          "description": "InMemoryBroker and RedisBroker expose an identical async method surface (start/stop/publish/add_client/remove_client/has_client/subscribe/unsubscribe/channel_members/channel_summary) but no Protocol/ABC enforces it; NotificationServer.__init__ takes the union type directly, so a third backend could drift silently."
-        },
-        {
-          "category": "performance",
-          "severity": "minor",
-          "description": "RedisBroker.remove_client scans every registered channel (smembers over notifications:channels) and issues an srem per channel on every disconnect, making teardown O(channels)."
-        },
-        {
-          "category": "performance",
-          "severity": "minor",
-          "description": "A synchronous sqlite3.Connection is opened in the async server lifecycle without check_same_thread handling; if touched from async handlers it blocks the event loop and may conflict with the monitoring thread the removed RLock comment referenced (usage only partially visible in the truncated diff)."
-        },
-        {
-          "category": "convention",
-          "severity": "minor",
-          "description": "Measured violations in test_notification_server.py: a class not using PascalCase and module-level constants not UPPER_CASE \u2014 the two items behind the 0.83 convention score."
+          "description": "SonarQube: +2 code smells introduced"
         },
         {
           "category": "maintainability",
           "severity": "info",
-          "description": "Measured cognitive complexity +38; the broker listener and delivery paths could be decomposed into smaller helpers."
+          "description": "SonarQube: cognitive complexity +38"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "test_notification_server.py: Classes should use PascalCase"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "test_notification_server.py: Module-level constants should be UPPER_CASE"
+        },
+        {
+          "category": "testing",
+          "severity": "major",
+          "description": "no tests executed in this session"
         }
       ],
       "strengths": [
-        "Clean broker strategy with backward-compatible constructor defaults, falling back to InMemoryBroker when Redis is unconfigured.",
-        "Correct async lifecycle handling: start/stop symmetry and explicit cancellation of the pub/sub listener task with CancelledError handling.",
-        "Modern, well-typed surface: PEP 604 unions and a typed MessageHandler Callable alias on public signatures.",
-        "Static analysis reports zero new bugs and 0.0% duplication while preserving the existing NotificationServer surface and server lifecycle."
+        "convention score 0.83 [M]"
       ],
-      "summary": "A solid integration session that delivers Redis distribution and SQLite history behind a clean broker seam (architectural fit 0.72, convention 0.83, agreeing with the mechanical scores), though the implicit broker interface and an unguarded sync SQLite connection introduce moderate maintainability debt.",
+      "summary": "[story] Session 3: integration: +294/-55 lines, convention 0.83 [M], 2 violations, +0 bugs / +2 smells [M]",
       "session_number": 3
     },
     {
       "commit_hash": "40e03761d5ae294e22f3c7b64a648ec302309711",
-      "reviewer_model": "deepseek/deepseek-v4-flash",
-      "architectural_fit": 0.8,
-      "convention_adherence": 0.85,
+      "reviewer_model": "measured",
+      "architectural_fit": null,
+      "convention_adherence": 0.833,
       "introduces_technical_debt": true,
       "respects_existing_patterns": true,
-      "better_or_worse": "better",
+      "better_or_worse": "worse",
       "problems": [
         {
           "category": "maintainability",
           "severity": "minor",
-          "description": "broadcast() gathers sends with return_exceptions=True but silently discards any exception via an early return, hiding per-connection failures with no logging."
-        },
-        {
-          "category": "architecture",
-          "severity": "minor",
-          "description": "WebSocketTransport._handle_http reaches directly into NotificationServer private members (_broker, _messages) and embeds HTTP endpoint routing in the transport layer, so any future transport must reimplement server-level endpoints; HTTP handling arguably belongs on the server, not the transport."
-        },
-        {
-          "category": "maintainability",
-          "severity": "minor",
-          "description": "start() detects 'already running' by probing transport.port and catching RuntimeError \u2014 exception-based control flow is convoluted and couples the server to the transport's not-running error contract."
+          "description": "SonarQube: +3 code smells introduced"
         },
         {
           "category": "maintainability",
           "severity": "info",
-          "description": "assert self._client_handler is not None guards runtime state but is stripped under python -O; a plain runtime check would be safer."
+          "description": "SonarQube: cognitive complexity +5"
         },
         {
           "category": "convention",
           "severity": "info",
-          "description": "The two measured convention violations (PascalCase classes, UPPER_CASE constants) are in test_notification_server.py, a file NOT touched by this diff \u2014 pre-existing, not introduced by this commit, so the 0.83 score does not penalize the change itself."
+          "description": "test_notification_server.py: Classes should use PascalCase"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "test_notification_server.py: Module-level constants should be UPPER_CASE"
+        },
+        {
+          "category": "testing",
+          "severity": "major",
+          "description": "no tests executed in this session"
         }
       ],
       "strengths": [
-        "Extracting a BaseTransport ABC decouples NotificationServer from websockets, enabling alternate transports and isolated testing.",
-        "Lazy imports inside start()/_handle_http keep the websockets dependency deferred, improving import cost and optional-dependency handling.",
-        "stop() properly closes and waits for the transport and resets handler state, keeping lifecycle cleanup symmetric with start().",
-        "Type hints and docstrings on public signatures follow project conventions (snake_case, PascalCase, ABC/abstractmethod pattern mirroring the existing broker classes)."
+        "convention score 0.83 [M]"
       ],
-      "summary": "A clean, net-positive transport-abstraction refactor that decouples the server from websockets, with minor debt from swallowed exceptions in broadcast(), server-internal access in the transport's HTTP handler, and exception-as-control-flow in start(); the measured convention violations are pre-existing in an untouched test file.",
+      "summary": "[story] Session 4: refactor: +143/-55 lines, convention 0.83 [M], 2 violations, +0 bugs / +3 smells [M]",
       "session_number": 4
     },
     {
       "commit_hash": "4b120b26dd704d911e38e535bbd4dbb0123d0b8e",
-      "reviewer_model": "deepseek/deepseek-v4-flash",
-      "architectural_fit": 0.85,
-      "convention_adherence": 0.83,
-      "introduces_technical_debt": false,
+      "reviewer_model": "measured",
+      "architectural_fit": null,
+      "convention_adherence": 0.833,
+      "introduces_technical_debt": true,
       "respects_existing_patterns": true,
-      "better_or_worse": "better",
+      "better_or_worse": "worse",
       "problems": [
         {
           "category": "maintainability",
           "severity": "minor",
-          "description": "The in-memory rate-limit path grows `_local_rate_limits` unboundedly \u2014 entries for distinct client_ids are never pruned, a slow memory leak for long-running instances with many short-lived connections."
-        },
-        {
-          "category": "performance",
-          "severity": "minor",
-          "description": "The daily TTL cleanup issues a full-table `DELETE ... WHERE timestamp < ?`; the new index is on (channel, timestamp) so its leading column doesn't serve the cleanup scan, which will degrade as the table grows."
+          "description": "SonarQube: +1 code smells introduced"
         },
         {
           "category": "maintainability",
-          "severity": "minor",
-          "description": "The /history request branch adds a dense try/except/else parse-and-validate block (parse_qs + 5-field validation in one shot), which is the likely source of the +19 cognitive complexity and +1 smell delta."
+          "severity": "info",
+          "description": "SonarQube: cognitive complexity +19"
         },
         {
           "category": "convention",
-          "severity": "minor",
-          "description": "Two convention violations in the test file (a class not in PascalCase and a module-level constant not in UPPER_CASE), per the mechanical measurements; the source file itself is clean."
+          "severity": "info",
+          "description": "test_notification_server.py: Classes should use PascalCase"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "test_notification_server.py: Module-level constants should be UPPER_CASE"
         },
         {
           "category": "testing",
-          "severity": "info",
-          "description": "The new test exercises the configured-limit path; the Redis-broker rate-limit branch (incr/expire) does not appear to be covered separately, so the dual-path behavior lacks equal test coverage."
+          "severity": "major",
+          "description": "no tests executed in this session"
         }
       ],
       "strengths": [
-        "Closely mirrors existing patterns: the /history route reuses the established request-dispatch and error-shape style, and the Redis-vs-local rate-limit dual path mirrors the existing broker abstraction.",
-        "Parameterized SQL throughout \u2014 no injection surface introduced.",
-        "The cleanup background task has a clean lifecycle: created in start(), cancelled and awaited in stop().",
-        "Adds an index on (channel, timestamp) aligned with the new history query's filter and ordering.",
-        "All new behavior ships with tests and configuration via env vars with sensible defaults."
+        "convention score 0.83 [M]"
       ],
-      "summary": "A well-structured cross-cutting addition (rate limiting, message TTL, history endpoint) that respects existing dispatch and broker patterns, with only minor maintainability concerns around the unbounded in-memory rate-limit map and the cleanup scan's index fit.",
+      "summary": "[story] Session 5: cross_cutting: +133/-1 lines, convention 0.83 [M], 2 violations, +0 bugs / +1 smells [M]",
       "session_number": 5
     }
   ],
   "story_review": {
     "story_name": "notification_service",
-    "reviewer_model": "deepseek/deepseek-v4-flash",
-    "overall_coherence": 0.9,
+    "reviewer_model": "measured",
+    "overall_coherence": 0.0,
     "compounding_issues": [
-      "Binary __pycache__/*.pyc artifacts committed in every session (3 tracked pyc files in the final tree) \u2014 diff/repo pollution that grew monotonically and was acknowledged in Session 4 but never cleaned up (no .gitignore, pycache tracked from Session 1 onward)",
-      "Single-file monolith: Session 4 extracted transports into classes but left everything in app.py (561 lines final), so the codebase never modularized as features, persistence, and brokers accumulated",
-      "HTTP endpoints are coupled into WebSocketTransport._handle_http via the websockets process_request hook \u2014 a future SSE/polling transport (the stated point of the abstraction) cannot reuse them, so the transport boundary doesn't fully generalize",
-      "Rate limiter charges every inbound message (including malformed and control/subscribe traffic) against the per-client budget before protocol validation, so invalid messages consume the 100/min allowance"
+      "test_notification_server.py: Classes should use PascalCase (in 5 sessions)",
+      "test_notification_server.py: Module-level constants should be UPPER_CASE (in 5 sessions)"
     ],
     "key_decisions": [
-      "Session 1 discarded the unrelated Flask-auth seed codebase entirely and greenfielded a websockets.asyncio server rather than reusing the seed",
-      "Canonical message envelope {type, payload, timestamp} plus system event/ack protocol established in Session 1 and preserved unchanged across all five sessions",
-      "Broker abstraction (InMemoryBroker/RedisBroker) in Session 3 \u2014 retained zero-config in-process behavior while adding Redis pub/sub fan-out and set-based connection/channel state for multi-instance deployment",
-      "SQLite history table introduced in Session 3, then indexed (composite channel/timestamp) and exposed as paginated /messages and /history endpoints with a periodic TTL cleanup task in Session 5",
-      "BaseTransport ABC dependency-inversion refactor in Session 4, decoupling the server from websockets while keeping all 7 prior tests passing with zero changes",
-      "Dual wire format for channel targeting (top-level 'channel' or nested in payload) supported and normalized into delivered payloads since Session 2",
-      "Dual rate-limit implementations \u2014 Redis INCR/expiry when Redis is configured, in-memory sliding window otherwise (Session 5)"
+      "[story] Session 1: greenfield",
+      "[story] Session 2: feature_addition",
+      "[story] Session 3: integration",
+      "[story] Session 4: refactor",
+      "[story] Session 5: cross_cutting"
     ],
-    "trajectory_description": "Quality improved steadily across the five sessions. The code grew from a 137-line flat handler into a layered 561-line system (protocol \u2192 channels \u2192 broker abstraction \u2192 transport abstraction \u2192 rate limiting/history), with integration tests accumulating 3 \u2192 5 \u2192 7 \u2192 7 \u2192 9 \u2014 the pure-refactor Session 4 held steady at 7 with no regression, demonstrating a disciplined, behavior-preserving restructuring. Every increment was validated end-to-end against real websocket clients, fakeredis, and on-disk SQLite. The two test failures that occurred (Sessions 3 and 5) were correctly diagnosed as test-setup deadlocks rather than application defects. The only blemishes are accumulating hygiene debt \u2014 committed .pyc binaries and a growing single-file monolith \u2014 rather than any functional decay, so the arc is a clean, compounding-quality climb with a slight hygiene plateau at the end.",
-    "summary": "A high-coherence, steadily improving five-session build that grew a minimal WebSocket notification server into a layered multi-instance platform through disciplined, fully integration-tested increments, capped by a behavior-preserving transport refactor and a cross-cutting rate-limiting/history session, though punctuated by accumulating hygiene debt in committed .pyc artifacts and a single-file monolith."
+    "trajectory_description": "S1 42488 tokens $0.234; S2 24734 tokens $0.150; S3 28768 tokens $0.219; S4 26006 tokens $0.184; S5 39776 tokens $0.395",
+    "summary": "5 sessions, 0/5 with tests, test_executed_success=True"
   }
 }

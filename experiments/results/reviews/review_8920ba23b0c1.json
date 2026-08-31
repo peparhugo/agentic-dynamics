@@ -1,207 +1,251 @@
 {
   "story_name": "notification_service",
   "story_id": "8920ba23b0c1",
-  "model": "deepseek/deepseek-v4-flash",
+  "model": "measured",
   "commit_reviews": [
     {
       "commit_hash": "c2f467098b3525b6c6ad9e675f3125508c6703d3",
-      "reviewer_model": "deepseek/deepseek-v4-flash",
-      "architectural_fit": 0.9,
-      "convention_adherence": 0.83,
-      "introduces_technical_debt": false,
+      "reviewer_model": "measured",
+      "architectural_fit": null,
+      "convention_adherence": 0.833,
+      "introduces_technical_debt": true,
       "respects_existing_patterns": true,
-      "better_or_worse": "neutral",
+      "better_or_worse": "worse",
       "problems": [
-        {
-          "category": "convention",
-          "severity": "minor",
-          "description": "app.py defines classes without PascalCase, violating the python.yaml naming pattern (one of the 3 measured convention violations)."
-        },
-        {
-          "category": "convention",
-          "severity": "minor",
-          "description": "test_notification_server.py: classes use non-PascalCase names and module-level constants are not UPPER_CASE (measured convention violations)."
-        },
         {
           "category": "maintainability",
           "severity": "minor",
-          "description": "ClientRegistry stores connections as untyped object (dict[str, object]) rather than the concrete websocket type, weakening static guarantees across the registry API."
+          "description": "SonarQube: +2 code smells introduced"
         },
         {
-          "category": "security",
+          "category": "maintainability",
           "severity": "info",
-          "description": "No authentication on the WebSocket \u2014 any connected client can emit broadcast/direct/system messages. Acceptable for session-1 greenfield per the story spec, but should be revisited in later sessions."
+          "description": "SonarQube: cognitive complexity +33"
         },
         {
-          "category": "performance",
+          "category": "convention",
           "severity": "info",
-          "description": "_new_client_id() loops with a registry lookup for a uuid4 collision that is astronomically unlikely; a plain uuid4() would suffice."
+          "description": "app.py: Classes should use PascalCase"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "test_notification_server.py: Classes should use PascalCase"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "test_notification_server.py: Module-level constants should be UPPER_CASE"
+        },
+        {
+          "category": "testing",
+          "severity": "major",
+          "description": "no tests executed in this session"
         }
       ],
       "strengths": [
-        "Faithful to the session-1 greenfield spec: unique client IDs, broadcast, clean disconnect handling, GET /health with connected client count, and the exact JSON message contract {type, payload, timestamp} with the required broadcast/direct/system types.",
-        "Correct tech selection per constraints: websockets library (not Flask-SocketIO) with asyncio, and a genuinely thread-safe ClientRegistry guarded by an RLock shared with the synchronous HTTP path.",
-        "Clean separation of concerns (ClientRegistry state vs NotificationServer behavior) that anticipates session 4's transport-layer extraction.",
-        "Consistent docstrings and type hints on the public surface; broadcast() gracefully prunes dead connections."
+        "convention score 0.83 [M]"
       ],
-      "summary": "A well-factored, spec-compliant greenfield implementation (architectural fit 0.9) whose only real blemish is the measured convention score of 0.83 \u2014 and notably all three convention violations sit in app.py and the test file, while the main notification_server.py module itself follows PascalCase/UPPER_CASE conventions cleanly.",
+      "summary": "[story] Session 1: greenfield: +465/-0 lines, convention 0.83 [M], 3 violations, +0 bugs / +2 smells [M]",
       "session_number": 1
     },
     {
       "commit_hash": "ad78d639703a55322b5050dff2bcd50f86452e90",
-      "reviewer_model": "deepseek/deepseek-v4-flash",
-      "architectural_fit": 0.9,
-      "convention_adherence": 0.85,
-      "introduces_technical_debt": false,
+      "reviewer_model": "measured",
+      "architectural_fit": null,
+      "convention_adherence": 0.833,
+      "introduces_technical_debt": true,
       "respects_existing_patterns": true,
-      "better_or_worse": "better",
+      "better_or_worse": "worse",
       "problems": [
         {
-          "category": "testing",
-          "severity": "major",
-          "description": "New channel routing, subscribe/unsubscribe handling, and REST endpoints ship with zero test additions (AST diff +0 files); the channel-field routing logic is exactly where a bug would slip through."
+          "category": "maintainability",
+          "severity": "minor",
+          "description": "SonarQube: +14 code smells introduced"
+        },
+        {
+          "category": "maintainability",
+          "severity": "info",
+          "description": "SonarQube: cognitive complexity +28"
         },
         {
           "category": "convention",
           "severity": "info",
-          "description": "Measured convention score 0.83 with 3 violations (PascalCase in app.py, test_notification_server.py; UPPER_CASE constants) \u2014 but all three are in files untouched by this diff and pre-date the commit, so the score understates this change's own conformance."
+          "description": "app.py: Classes should use PascalCase"
         },
         {
-          "category": "maintainability",
-          "severity": "minor",
-          "description": "_handle_subscribe/_handle_unsubscribe duplicate the validate-channel + ack-response pattern; a shared helper would avoid the near-identical 20-line blocks."
-        },
-        {
-          "category": "architecture",
-          "severity": "minor",
-          "description": "Channel resolution is ambiguous: `message.get('channel') or payload.get('channel')` dual-sources the channel, so the effective routing key depends on caller placement of the field."
-        },
-        {
-          "category": "performance",
+          "category": "convention",
           "severity": "info",
-          "description": "ChannelRegistry.remove_client scans every channel on disconnect (O(channels)); acceptable at this scale but linear per teardown."
+          "description": "test_notification_server.py: Classes should use PascalCase"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "test_notification_server.py: Module-level constants should be UPPER_CASE"
+        },
+        {
+          "category": "testing",
+          "severity": "major",
+          "description": "no tests executed in this session"
         }
       ],
       "strengths": [
-        "ChannelRegistry mirrors the existing ClientRegistry pattern exactly (RLock + set-backed, same locking idiom), so it slots into the codebase architecture cleanly.",
-        "Dead-client cleanup was factored into _deliver and reused by both broadcast paths, removing pre-existing duplication.",
-        "Comprehensive docstring updated in lockstep with behavior (new message types, channel semantics, REST endpoints).",
-        "Empty channels are pruned on unsubscribe/disconnect, so the registry leaks no stale state.",
-        "Validation + _send_error error handling is consistent with the established _handle_direct/_handle_system flow."
+        "convention score 0.83 [M]"
       ],
-      "summary": "A clean, idiomatic feature addition that extends the notification server along its existing registry/handler patterns and removes duplication, though it adds no test coverage for the new routing logic.",
+      "summary": "[story] Session 2: feature_addition: +355/-17 lines, convention 0.83 [M], 3 violations, +0 bugs / +14 smells [M]",
       "session_number": 2
     },
     {
       "commit_hash": "69c52fdcbf10dc668ec0b5e6af78cda27158e0fe",
-      "reviewer_model": "deepseek/deepseek-v4-flash",
-      "architectural_fit": 0.5,
-      "convention_adherence": 0.5,
-      "introduces_technical_debt": false,
-      "respects_existing_patterns": true,
-      "better_or_worse": "unclear",
-      "problems": [],
-      "strengths": [],
-      "summary": "Review unavailable.",
-      "session_number": 3
-    },
-    {
-      "commit_hash": "2e526375f41768097161ff1caed3bbd59be76ec3",
-      "reviewer_model": "deepseek/deepseek-v4-flash",
-      "architectural_fit": 0.85,
-      "convention_adherence": 0.9,
-      "introduces_technical_debt": false,
-      "respects_existing_patterns": true,
-      "better_or_worse": "better",
-      "problems": [
-        {
-          "category": "maintainability",
-          "severity": "minor",
-          "description": "Abstract `broadcast` on BaseTransport (and the WebSocketTransport implementation) is dead code: the server's `_deliver` loops per-client `send_message` calls and never invokes `transport.broadcast`, leaving unused API surface on the new abstraction."
-        },
-        {
-          "category": "architecture",
-          "severity": "minor",
-          "description": "The pluggability seam is incomplete: `run()` still hardcodes `websockets.serve(self.handler, ...)`, so adding an SSE/polling/TCP transport (promised in the docstring as 'without touching the core notification logic') would require modifying the server binding code \u2014 the docstring overclaims."
-        },
-        {
-          "category": "testing",
-          "severity": "minor",
-          "description": "No tests cover the new abstraction: `_make_transport`, the `__init_subclass__` registry, the `TRANSPORT` env var, and the unknown-transport error path (+2 classes, +1 function, +0 tests)."
-        },
-        {
-          "category": "maintainability",
-          "severity": "info",
-          "description": "`NotificationServer.handler()` is now a trivial one-line delegate to `transport.on_connect`; the retained name no longer reflects its reduced responsibility."
-        }
-      ],
-      "strengths": [
-        "Clean transport seam: BaseTransport ABC with `__init_subclass__`-based registry and `_make_transport` factory, mirroring the existing `broker or _make_default_broker()` dependency-injection pattern.",
-        "Core routing fully decoupled from WebSocket objects \u2014 `_handle_message`, `_handle_subscribe`, `_handle_unsubscribe`, `_handle_direct`, and `_send_error` drop the websocket parameter in favor of `client_id`.",
-        "Improved error handling in `_deliver`: dead clients detected via `send_message`'s bool return instead of silently swallowing `ConnectionClosed`.",
-        "Consistent documentation updates \u2014 module docstring, config section with `TRANSPORT` env var, and new transport-layer section all kept in sync.",
-        "Behavior-preserving, low-risk refactor confined to one source file with the default WebSocket path unchanged."
-      ],
-      "summary": "A clean, behavior-preserving transport abstraction that follows existing DI/factory patterns and decouples routing from delivery (discrepancy note: the measured 0.83 convention score comes from pre-existing violations in app.py and test_notification_server.py, neither of which this commit touches \u2014 the diff itself is convention-clean).",
-      "session_number": 4
-    },
-    {
-      "commit_hash": "5577eac6403238e21ad825c5845e002c06f62757",
-      "reviewer_model": "deepseek/deepseek-v4-flash",
-      "architectural_fit": 0.9,
-      "convention_adherence": 0.83,
+      "reviewer_model": "measured",
+      "architectural_fit": null,
+      "convention_adherence": 0.833,
       "introduces_technical_debt": true,
       "respects_existing_patterns": true,
-      "better_or_worse": "better",
+      "better_or_worse": "worse",
       "problems": [
         {
-          "category": "performance",
+          "category": "maintainability",
           "severity": "minor",
-          "description": "MessageStore.query() fetches the entire messages table with an unfiltered SELECT and filters channel/since in Python, so /history cost scales with total table size instead of pushing predicates into SQL (an indexed WHERE clause would keep the endpoint O(rows-matched))."
+          "description": "SonarQube: +3 code smells introduced"
         },
         {
-          "category": "performance",
+          "category": "maintainability",
           "severity": "info",
-          "description": "RateLimiter uses a fixed-window bucket keyed by int(time.time() // window_seconds), which allows up to 2x the limit at window boundaries rather than a true sliding window; acceptable given the Redis fallback is explicitly documented."
+          "description": "SonarQube: cognitive complexity +75"
         },
         {
           "category": "convention",
           "severity": "info",
-          "description": "Mechanical scan flags 3 convention violations (PascalCase classes in app.py and test_notification_server.py; UPPER_CASE constants in test_notification_server.py) \u2014 these fall outside the primary changed file notification_server.py, whose additions (DEFAULT_* constants, class per section) are consistent with existing module style."
+          "description": "app.py: Classes should use PascalCase"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "test_notification_server.py: Classes should use PascalCase"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "test_notification_server.py: Module-level constants should be UPPER_CASE"
+        },
+        {
+          "category": "testing",
+          "severity": "major",
+          "description": "no tests executed in this session"
         }
       ],
       "strengths": [
-        "Cross-cutting concerns (rate limiting, message TTL, history querying) are cleanly factored into new classes and a dedicated module section banner, matching the existing Broker/MessageStore organization.",
-        "RateLimiter gracefully degrades from Redis (shared, cross-instance) to an in-memory sliding window, with RATE_LIMIT configurable via _env_int and sane defaults.",
-        "The /history endpoint returns (messages, has_more) with limit/offset pagination and robust ISO-8601 parsing (_parse_iso handles naive-UTC and trailing Z), a solid, tested public API contract.",
-        "Background TTL sweep is configurable (MESSAGE_TTL_DAYS, CLEANUP_INTERVAL_SECONDS) and started at boot, keeping history unbounded growth in check.",
-        "Added from __future__ import annotations for forward compatibility and extended the module docstring (configuration table + REST endpoints) in step with the new features."
+        "convention score 0.83 [M]"
       ],
-      "summary": "A well-integrated commit that adds rate limiting, message expiry, and a filtered history endpoint in the file's existing idioms, with only minor scalability debt (full-table scan in query, fixed-window Redis limiter) and the three flagged convention violations all outside the primary changed file.",
+      "summary": "[story] Session 3: integration: +691/-25 lines, convention 0.83 [M], 3 violations, +0 bugs / +3 smells [M]",
+      "session_number": 3
+    },
+    {
+      "commit_hash": "2e526375f41768097161ff1caed3bbd59be76ec3",
+      "reviewer_model": "measured",
+      "architectural_fit": null,
+      "convention_adherence": 0.833,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": true,
+      "better_or_worse": "worse",
+      "problems": [
+        {
+          "category": "maintainability",
+          "severity": "info",
+          "description": "SonarQube: cognitive complexity +4"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "app.py: Classes should use PascalCase"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "test_notification_server.py: Classes should use PascalCase"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "test_notification_server.py: Module-level constants should be UPPER_CASE"
+        },
+        {
+          "category": "testing",
+          "severity": "major",
+          "description": "no tests executed in this session"
+        }
+      ],
+      "strengths": [
+        "convention score 0.83 [M]"
+      ],
+      "summary": "[story] Session 4: refactor: +152/-61 lines, convention 0.83 [M], 3 violations, +0 bugs / -1 smells [M]",
+      "session_number": 4
+    },
+    {
+      "commit_hash": "5577eac6403238e21ad825c5845e002c06f62757",
+      "reviewer_model": "measured",
+      "architectural_fit": null,
+      "convention_adherence": 0.833,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": true,
+      "better_or_worse": "worse",
+      "problems": [
+        {
+          "category": "maintainability",
+          "severity": "minor",
+          "description": "SonarQube: +4 code smells introduced"
+        },
+        {
+          "category": "maintainability",
+          "severity": "info",
+          "description": "SonarQube: cognitive complexity +50"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "app.py: Classes should use PascalCase"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "test_notification_server.py: Classes should use PascalCase"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "test_notification_server.py: Module-level constants should be UPPER_CASE"
+        },
+        {
+          "category": "testing",
+          "severity": "major",
+          "description": "no tests executed in this session"
+        }
+      ],
+      "strengths": [
+        "convention score 0.83 [M]"
+      ],
+      "summary": "[story] Session 5: cross_cutting: +540/-8 lines, convention 0.83 [M], 3 violations, +0 bugs / +4 smells [M]",
       "session_number": 5
     }
   ],
   "story_review": {
     "story_name": "notification_service",
-    "reviewer_model": "deepseek/deepseek-v4-flash",
-    "overall_coherence": 0.87,
+    "reviewer_model": "measured",
+    "overall_coherence": 0.0,
     "compounding_issues": [
-      "Session 1 chose a full greenfield rewrite on the `websockets` library and abandoned the provided Flask auth seed (app.py); the seed was never integrated, adapted, or deleted and sat as dead weight in the repo through all 5 sessions",
-      "Speculative cross-thread complexity from Session 1 (ClientRegistry's threading.RLock guarding a single-asyncio-loop design) persisted unchanged through Session 4's refactor, which was the natural opportunity to retire it",
-      "Measured convention violations (non-PascalCase classes, non-UPPER_CASE constants) held the convention score flat at 0.833 from Session 1 to Session 5 \u2014 flagged by analysis each session but never remediated",
-      "Session 4's transport refactor shipped with zero new tests (test count stayed at 28) and a leaky seam: WebSocketTransport reaches into server private internals (_ensure_listener, _new_client_id, _sync_channel_subscriptions), so the abstraction was never validated in isolation and future transports must know server internals",
-      "The server accreted into a single ~1165-line monolith (broker, rate limiter, stores, transport, server all in one file); Session 4 reorganized in place rather than splitting into a package, so later concerns kept inflating one module",
-      "Session 5's 'persistent message history' defaults to in-memory SQLite (`:memory:`) unless DATABASE_URL is set, and MessageStore.query/purge_older_than fetch all rows and filter/sort in Python \u2014 persistence is opt-in and history lookup does not scale"
+      "app.py: Classes should use PascalCase (in 5 sessions)",
+      "test_notification_server.py: Classes should use PascalCase (in 5 sessions)",
+      "test_notification_server.py: Module-level constants should be UPPER_CASE (in 5 sessions)"
     ],
     "key_decisions": [
-      "Discarding the unrelated Flask auth seed and building a greenfield asyncio WebSocket server on the `websockets` library \u2014 a consequential call that defined the entire architecture and test strategy from Session 1",
-      "Centralizing the canonical message contract in make_message() (validated types, payload dict, auto-timestamp), which every message type and REST path conformed to throughout the story",
-      "Constructor-injected state-holder classes (ClientRegistry, ChannelRegistry in S1-S2) established a DI pattern consistently extended to Broker, MessageStore, ConnectionStore, RateLimiter, and BaseTransport \u2014 the load-bearing architectural convention",
-      "Choosing Redis pub/sub as the message backbone with graceful degradation to in-process delivery when Redis is absent (S3), enabling multi-instance scaling while keeping the test suite green without a broker",
-      "Adding SQLite message persistence in S3, which S5's cross-cutting work naturally reused for both the /history endpoint and the TTL purge (purge_older_than)",
-      "Extracting a pluggable transport layer in S4 via a BaseTransport ABC with a __init_subclass__ factory registry and TRANSPORT env selection, anticipating SSE/polling/raw-TCP transports"
+      "[story] Session 1: greenfield",
+      "[story] Session 2: feature_addition",
+      "[story] Session 3: integration",
+      "[story] Session 4: refactor",
+      "[story] Session 5: cross_cutting"
     ],
-    "trajectory_description": "Quality was high from the first commit and the arc is accretive with one risk plateau: Session 1 delivered a well-factored, spec-compliant greenfield with a clean DI pattern and 10 passing tests; Session 2 added channel subscriptions cleanly (19 tests); Session 3 was the largest integration (Redis backbone + SQLite persistence, the bulk of the story's token spend) and added real complexity but stayed well-structured (28 tests); Session 4 plateaued \u2014 a large transport abstraction shipped with zero new tests and a leaky seam into server internals while the file grew into a monolith; Session 5 recovered strongly with 18 new tests (46 total, all green) for rate limiting, message expiry, and history. Net: quality improved in coverage and feature depth while the measured convention score stayed flat at 0.833, and structural cleanliness declined slightly as every concern accrued into one file.",
-    "summary": "A highly coherent, test-disciplined five-session build that follows a textbook greenfield-to-cross-cutting arc with strong DI and reuse (S3's store powering S5's history), let down only by an untested Session-4 abstraction, an abandoned seed codebase, and convention debt that was flagged but never paid down."
+    "trajectory_description": "S1 22701 tokens $0.006; S2 35550 tokens $0.009; S3 97776 tokens $0.034; S4 41483 tokens $0.011; S5 75121 tokens $0.026",
+    "summary": "5 sessions, 0/5 with tests, test_executed_success=None"
   }
 }

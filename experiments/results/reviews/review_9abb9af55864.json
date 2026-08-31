@@ -1,230 +1,298 @@
 {
   "story_name": "notification_service",
   "story_id": "9abb9af55864",
-  "model": "deepseek/deepseek-v4-flash",
+  "model": "measured",
   "commit_reviews": [
     {
       "commit_hash": "0747fdb2bb1497c381362b3fefc83e02cb35431b",
-      "reviewer_model": "deepseek/deepseek-v4-flash",
-      "architectural_fit": 0.78,
-      "convention_adherence": 0.83,
-      "introduces_technical_debt": false,
-      "respects_existing_patterns": false,
-      "better_or_worse": "better",
+      "reviewer_model": "measured",
+      "architectural_fit": null,
+      "convention_adherence": 0.833,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": true,
+      "better_or_worse": "worse",
       "problems": [
         {
-          "category": "convention",
-          "severity": "minor",
-          "description": "Module-level constants should be UPPER_CASE in broker.py, storage.py, transport.py, and test_app.py (5 violations per the mechanical scan) \u2014 conflicts with the repo's naming discipline and PEP8."
-        },
-        {
-          "category": "convention",
-          "severity": "minor",
-          "description": "Classes in test_app.py should use PascalCase (repo convention: 'PascalCase classes'); measured as a violation."
-        },
-        {
-          "category": "architecture",
-          "severity": "minor",
-          "description": "Session 1 wholesale-replaced the tier-2 Flask auth seed with an unrelated async WebSocket server (+348/-256 lines). Acceptable under a greenfield brief, but a large blast radius \u2014 every later session inherits the rewrite and its module split."
-        },
-        {
           "category": "maintainability",
           "severity": "info",
-          "description": "process_request deletes then re-sets the Content-Type header rather than building the response cleanly."
+          "description": "SonarQube: cognitive complexity +15"
         },
         {
-          "category": "maintainability",
+          "category": "convention",
           "severity": "info",
-          "description": "Dispatch collapses 'broadcast' and 'system' to the same path, so system messages are semantically indistinguishable from broadcasts once on the wire."
+          "description": "broker.py: Module-level constants should be UPPER_CASE"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "storage.py: Module-level constants should be UPPER_CASE"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "test_app.py: Classes should use PascalCase"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "test_app.py: Module-level constants should be UPPER_CASE"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "transport.py: Module-level constants should be UPPER_CASE"
+        },
+        {
+          "category": "testing",
+          "severity": "major",
+          "description": "no tests executed in this session"
         }
       ],
       "strengths": [
-        "Clean async architecture with clear separation of concerns across broker/storage/transport modules and a ClientRegistry.",
-        "Thread-safe registry uses snapshots so the lock is never held across an await \u2014 rationale documented in the docstring.",
-        "Strict wire-format validation before dispatch, explicit UTC ISO-8601 timestamps, and a JSON health endpoint.",
-        "SonarQube: 0 new bugs, 0 duplications, -4 smells; the rewrite also removed the seed's hardcoded static salt."
+        "convention score 0.83 [M]"
       ],
-      "summary": "A clean, well-typed greenfield rewrite that replaces the tier-2 Flask seed with a solid async notification architecture \u2014 net quality improvement over the seed, at the cost of systemic but minor naming-convention violations across the new modules.",
+      "summary": "[story] Session 1: greenfield: +348/-256 lines, convention 0.83 [M], 5 violations, +0 bugs / -4 smells [M]",
       "session_number": 1
     },
     {
       "commit_hash": "af2649ee79f7644f25158f29e8e72aa9fdf595e0",
-      "reviewer_model": "deepseek/deepseek-v4-flash",
-      "architectural_fit": 0.85,
-      "convention_adherence": 0.85,
-      "introduces_technical_debt": false,
+      "reviewer_model": "measured",
+      "architectural_fit": null,
+      "convention_adherence": 0.833,
+      "introduces_technical_debt": true,
       "respects_existing_patterns": true,
-      "better_or_worse": "better",
+      "better_or_worse": "worse",
       "problems": [
         {
           "category": "maintainability",
           "severity": "minor",
-          "description": "process_request() REST dispatch is now a growing if/elif chain (/health, /channels, /channels/<name>/subscribers); fine at this scale but would benefit from a small route table as endpoints accrete (aligns with the +1 Sonar smell)."
+          "description": "SonarQube: +1 code smells introduced"
         },
         {
-          "category": "architecture",
+          "category": "maintainability",
           "severity": "info",
-          "description": "subscribe() silently no-ops for an unknown client_id rather than signaling an error, and channel routing rides on an optional 'channel' field for any message type \u2014 slightly conflates 'broadcast' type semantics with channel routing. Cohesive enough, but worth documenting the routing contract."
+          "description": "SonarQube: cognitive complexity +24"
         },
         {
           "category": "convention",
           "severity": "info",
-          "description": "Measured convention score is 0.83, but all five listed violations (broker.py, storage.py, transport.py UPPER_CASE; test_app.py PascalCase/constants) are in files untouched by this commit \u2014 pre-existing, not introduced here."
+          "description": "broker.py: Module-level constants should be UPPER_CASE"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "storage.py: Module-level constants should be UPPER_CASE"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "test_app.py: Classes should use PascalCase"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "test_app.py: Module-level constants should be UPPER_CASE"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "transport.py: Module-level constants should be UPPER_CASE"
+        },
+        {
+          "category": "testing",
+          "severity": "major",
+          "description": "no tests executed in this session"
         }
       ],
       "strengths": [
-        "Backward-compatible feature addition: channel is optional, existing message types keep working, and broadcast() was extended with a defaulted param rather than rewritten.",
-        "Strong reuse of existing idioms: channel state lives in ClientRegistry behind the same _lock, with snapshot-style accessors mirroring snapshot()/items().",
-        "Clean channel lifecycle: remove() prunes dead clients on disconnect and empty channels are deleted from _channels.",
-        "Validation is thorough and consistent with the existing gate in _parse_message: channel must be a non-empty string, and subscribe/unsubscribe require it.",
-        "Tests added for the new functionality; static analysis reports +0 bugs, +0 duplications."
+        "convention score 0.83 [M]"
       ],
-      "summary": "A well-scoped, backward-compatible channel-subscription feature that composes cleanly with the existing ClientRegistry/process_request patterns and ships with tests \u2014 though the convention score's 0.83 reflects pre-existing violations in untouched files rather than this commit, which is cleaner than the repo baseline.",
+      "summary": "[story] Session 2: feature_addition: +182/-11 lines, convention 0.83 [M], 5 violations, +0 bugs / +1 smells [M]",
       "session_number": 2
     },
     {
       "commit_hash": "4301fd54e0449486c6f771e7e05401e8d96fdfc4",
-      "reviewer_model": "deepseek/deepseek-v4-flash",
-      "architectural_fit": 0.9,
-      "convention_adherence": 0.83,
-      "introduces_technical_debt": false,
+      "reviewer_model": "measured",
+      "architectural_fit": null,
+      "convention_adherence": 0.833,
+      "introduces_technical_debt": true,
       "respects_existing_patterns": true,
-      "better_or_worse": "better",
+      "better_or_worse": "worse",
       "problems": [
-        {
-          "category": "convention",
-          "severity": "minor",
-          "description": "broker.py, storage.py, transport.py use module-level constants that are not UPPER_CASE, violating the existing convention (5 violations across the diff, incl. a non-PascalCase class in test_app.py)"
-        },
         {
           "category": "maintainability",
           "severity": "minor",
-          "description": "SonarQube reports +52 cognitive complexity; the broker routing/delivery paths (_deliver, message dispatch, query parsing) grew significantly in a single integration commit, which will be harder to test as a unit"
+          "description": "SonarQube: +3 code smells introduced"
         },
         {
-          "category": "performance",
-          "severity": "minor",
-          "description": "MessageStore.list is called synchronously (sqlite) inside the async /messages handler, blocking the event loop for potentially large result sets with no await or batching"
-        },
-        {
-          "category": "architecture",
+          "category": "maintainability",
           "severity": "info",
-          "description": "store.save(message) persists control messages (subscribe/unsubscribe) as well as payload messages before type dispatch, mixing storage of transport traffic with domain messages"
+          "description": "SonarQube: cognitive complexity +52"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "broker.py: Module-level constants should be UPPER_CASE"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "storage.py: Module-level constants should be UPPER_CASE"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "test_app.py: Classes should use PascalCase"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "test_app.py: Module-level constants should be UPPER_CASE"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "transport.py: Module-level constants should be UPPER_CASE"
+        },
+        {
+          "category": "testing",
+          "severity": "major",
+          "description": "no tests executed in this session"
         }
       ],
       "strengths": [
-        "Clean Broker abstraction (Broker/LocalBroker/RedisBroker) injected via the existing optional-arg constructor pattern, enabling multi-instance scaling without touching ClientRegistry's contract",
-        "Idempotent lifecycle management (start()/close() guarded by _started flag + asyncio.Lock) is correct and safe against concurrent WebSocket handshakes",
-        "Proper URL handling via urlsplit + parse_qs replaces naive partition(), with explicit 400 responses for malformed limit/offset",
-        "Replaces the try/except around direct sends that silently dropped connections with broker-based pre-checks (client_exists, is_subscribed), moving failure handling to the publish path"
+        "convention score 0.83 [M]"
       ],
-      "summary": "A well-factored integration commit that adds broker + storage abstractions with clean dependency injection and correct lifecycle handling, held back only by minor naming-convention violations and a growing cognitive-complexity footprint.",
+      "summary": "[story] Session 3: integration: +528/-35 lines, convention 0.83 [M], 5 violations, +0 bugs / +3 smells [M]",
       "session_number": 3
     },
     {
       "commit_hash": "2defd40f97b36f8a18613b83e3ffc7d96b8baf0d",
-      "reviewer_model": "deepseek/deepseek-v4-flash",
-      "architectural_fit": 0.8,
-      "convention_adherence": 0.83,
+      "reviewer_model": "measured",
+      "architectural_fit": null,
+      "convention_adherence": 0.833,
       "introduces_technical_debt": true,
       "respects_existing_patterns": true,
-      "better_or_worse": "better",
+      "better_or_worse": "worse",
       "problems": [
         {
-          "category": "architecture",
-          "severity": "major",
-          "description": "Contradictory constructor contract: NotificationServer raises ValueError when both transport and registry are passed, yet then splices registry onto the transport post-construction (`self.transport.registry = registry`). The exclusive-or check is undermined by the mutation branch, producing a confusing dual-path injection contract that future maintainers can trip over."
+          "category": "maintainability",
+          "severity": "info",
+          "description": "SonarQube: cognitive complexity +8"
         },
         {
           "category": "convention",
-          "severity": "minor",
-          "description": "New file transport.py adds a module-level constant that violates UPPER_CASE naming (per measurement); the other four violations (broker.py, storage.py, test_app.py) are pre-existing and not attributable to this commit."
+          "severity": "info",
+          "description": "broker.py: Module-level constants should be UPPER_CASE"
         },
         {
-          "category": "maintainability",
-          "severity": "minor",
-          "description": "Cognitive complexity increased by +8 (measured): the three-callback handle_connection API plus the transport/registry dual injection adds indirection; the callbacks need doc/tests to stay navigable."
+          "category": "convention",
+          "severity": "info",
+          "description": "storage.py: Module-level constants should be UPPER_CASE"
         },
         {
-          "category": "maintainability",
-          "severity": "minor",
-          "description": "_on_connect catches BaseException to guarantee broker cleanup on failure \u2014 defensible, but the broad except-and-reraise leaves teardown responsibility split awkwardly between the transport and the server."
+          "category": "convention",
+          "severity": "info",
+          "description": "test_app.py: Classes should use PascalCase"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "test_app.py: Module-level constants should be UPPER_CASE"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "transport.py: Module-level constants should be UPPER_CASE"
+        },
+        {
+          "category": "testing",
+          "severity": "major",
+          "description": "no tests executed in this session"
         }
       ],
       "strengths": [
-        "Clean extraction of the transport concern (BaseTransport / WebSocketTransport / create_transport) decouples NotificationServer from websockets specifics and enables alternate transports and easier testing.",
-        "Follows the established constructor-injection pattern (broker, store, transport) consistently with the existing architecture.",
-        "Mechanical delta is clean: +0 bugs, +0 smells, +0 duplications; sends are now addressed by client_id rather than raw connection, removing a per-message registry lookup."
+        "convention score 0.83 [M]"
       ],
-      "summary": "A net-positive transport-abstraction refactor that decouples the server from WebSocket plumbing, marred only by a self-contradicting transport/registry injection contract and a minor new-file convention violation.",
+      "summary": "[story] Session 4: refactor: +237/-125 lines, convention 0.83 [M], 5 violations, +0 bugs / +0 smells [M]",
       "session_number": 4
     },
     {
       "commit_hash": "6cb105349dbff381556fd781de0ca3f67efa6726",
-      "reviewer_model": "deepseek/deepseek-v4-flash",
-      "architectural_fit": 0.85,
-      "convention_adherence": 0.83,
+      "reviewer_model": "measured",
+      "architectural_fit": null,
+      "convention_adherence": 0.833,
       "introduces_technical_debt": true,
       "respects_existing_patterns": true,
-      "better_or_worse": "better",
+      "better_or_worse": "worse",
       "problems": [
         {
-          "category": "architecture",
-          "severity": "minor",
-          "description": "Rate-limiting policy is folded into the Broker protocol (allow_message) rather than kept as a transport-independent concern; pragmatic for the two-implementation scale, but it conflates delivery transport with policy enforcement and every future broker must implement the counter."
-        },
-        {
           "category": "maintainability",
           "severity": "minor",
-          "description": "Magic numbers are hardcoded inline: the 60-second rate window, the 3600-second cleanup sweep interval, and default limits (100, 7) \u2014 the latter two are configurable but the sweep cadence is not."
-        },
-        {
-          "category": "performance",
-          "severity": "info",
-          "description": "Hourly _cleanup_messages does a full delete_before sweep over the message store rather than a scheduled/incremental pass; fine at small scale, unbounded as history grows."
+          "description": "SonarQube: +3 code smells introduced"
         },
         {
           "category": "maintainability",
           "severity": "info",
-          "description": "_parse_iso_timestamp re-raises ValueError from exc with no added context and does redundant timezone validation \u2014 harmless but slightly noisy."
+          "description": "SonarQube: cognitive complexity +26"
         },
         {
           "category": "convention",
-          "severity": "minor",
-          "description": "Measured convention score 0.83 with 5 module-level UPPER_CASE violations; note most are in files this commit did not touch (storage.py, transport.py, test_app.py), so they appear pre-existing rather than introduced."
+          "severity": "info",
+          "description": "broker.py: Module-level constants should be UPPER_CASE"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "storage.py: Module-level constants should be UPPER_CASE"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "test_app.py: Classes should use PascalCase"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "test_app.py: Module-level constants should be UPPER_CASE"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "transport.py: Module-level constants should be UPPER_CASE"
+        },
+        {
+          "category": "testing",
+          "severity": "major",
+          "description": "no tests executed in this session"
         }
       ],
       "strengths": [
-        "Follows the existing route dispatch and static-helper patterns exactly (if/elif path chain, _json_response, _single_query_value mirroring _query_integer).",
-        "Extends the Broker protocol uniformly \u2014 LocalBroker and RedisBroker both implement allow_message, keeping the abstraction in sync.",
-        "Env-driven config with _positive_setting validation gives rate_limit/message_ttl_days sane, validated defaults.",
-        "Cleanup task lifecycle is handled correctly: created in start(), cancelled and awaited via gather in close(), re-raises CancelledError.",
-        "Rate-limit state is cleaned up on client removal in LocalBroker, avoiding unbounded dictionary growth."
+        "convention score 0.83 [M]"
       ],
-      "summary": "Well-structured cross-cutting feature (rate limiting, TTL cleanup, /history endpoint) that respects existing patterns and the broker abstraction, though +26 cognitive complexity, 3 new smells, and hardcoded magic numbers add modest maintenance burden and the measured convention score is dragged down mainly by pre-existing violations in untouched files.",
+      "summary": "[story] Session 5: cross_cutting: +279/-2 lines, convention 0.83 [M], 5 violations, +0 bugs / +3 smells [M]",
       "session_number": 5
     }
   ],
   "story_review": {
     "story_name": "notification_service",
-    "reviewer_model": "deepseek/deepseek-v4-flash",
-    "overall_coherence": 0.95,
+    "reviewer_model": "measured",
+    "overall_coherence": 0.0,
     "compounding_issues": [
-      "The Flask auth seed was entirely discarded in Session 1 (replaced with an asyncio/websockets implementation) \u2014 defensible for greenfield, but the seed contributed zero carryover value.",
-      "Dual bookkeeping of subscription state: channel membership is tracked both in the transport ClientRegistry and in Redis broker sets (subscribe_client/unsubscribe_client), a consistency surface that persists to the final commit.",
-      "__pycache__/.pyc binaries were committed in every one of the five commits \u2014 accumulating hygiene debt.",
-      "Retry counts rose monotonically (0 \u2192 2 \u2192 2 \u2192 4 \u2192 4) as later sessions added edge cases, signaling rising complexity churn even though every suite stayed green.",
-      "Session 3 concentrated risk in a single jump: LOC tripled (308 \u2192 691) and cost spiked to the highest of the story (1.158 USD), with no incremental staging between in-memory and Redis-backed state."
+      "broker.py: Module-level constants should be UPPER_CASE (in 5 sessions)",
+      "storage.py: Module-level constants should be UPPER_CASE (in 5 sessions)",
+      "test_app.py: Classes should use PascalCase (in 5 sessions)",
+      "test_app.py: Module-level constants should be UPPER_CASE (in 5 sessions)",
+      "transport.py: Module-level constants should be UPPER_CASE (in 5 sessions)"
     ],
     "key_decisions": [
-      "Clean-slate async stack: Session 1 replaced the Flask seed with asyncio/websockets and a thread-safe ClientRegistry using snapshot semantics, explicitly correcting the seed's unsafe concurrency claim.",
-      "Stable wire envelope {type, payload, timestamp} with strict validation and formatted system/error messages \u2014 established in Session 1 and unchanged through Session 5.",
-      "Channel subscription model (Session 2): subscribe/unsubscribe message types plus per-channel fan-out and REST channel inspection endpoints.",
-      "Broker abstraction (Session 3): a Broker protocol with an in-process LocalBroker fallback and env-driven RedisBroker (REDIS_URL/DATABASE_URL), persisting each valid message at ingress before broker publication.",
-      "Transport extraction (Session 4): BaseTransport/WebSocketTransport split socket mechanics, serialization, and local fan-out out of the core, shrinking app.py from 401 to 319 lines and enabling the TRANSPORT plug-in seam.",
-      "Operational hardening (Session 5): broker-level per-client rate limiting (RATE_LIMIT, 100/min default), GET /history with channel/since filtering and has_more pagination, and a background TTL-based cleanup task backed by a new (channel, timestamp) index."
+      "[story] Session 1: greenfield",
+      "[story] Session 2: feature_addition",
+      "[story] Session 3: integration",
+      "[story] Session 4: refactor",
+      "[story] Session 5: cross_cutting"
     ],
-    "trajectory_description": "Quality steadily improved across the story. It opened with a clean, well-tested greenfield core (227 LOC, 5 tests), then added channels and Redis/SQLite integration incrementally, with a deliberate structural refactor in Session 4 that decomposed the growing monolith into broker/storage/transport modules rather than letting it accrete. The suite grew monotonically (5 \u2192 8 \u2192 10 \u2192 10 \u2192 13) and stayed fully green at every commit with zero test regressions, finishing as a 940-LOC, four-module service with rate limiting, history queries, and retention cleanup. The only blemishes were an early cost/complexity spike in the integration session, a rising retry count in the later sessions, and persistent __pycache__ commits.",
-    "summary": "A canonical greenfield \u2192 feature \u2192 integration \u2192 refactor \u2192 cross-cutting arc that builds naturally session-over-session into a well-factored, operationally hardened notification service with a green test suite at every commit."
+    "trajectory_description": "S1 31490 tokens $0.362; S2 37469 tokens $0.496; S3 80391 tokens $1.158; S4 44454 tokens $0.698; S5 45874 tokens $0.908",
+    "summary": "5 sessions, 0/5 with tests, test_executed_success=True"
   }
 }

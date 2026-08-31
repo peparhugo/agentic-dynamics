@@ -1,160 +1,288 @@
 {
   "story_name": "notification_service",
   "story_id": "4a5da5a3d8fe",
-  "model": "deepseek/deepseek-v4-flash",
+  "model": "measured",
   "commit_reviews": [
     {
       "commit_hash": "870fd70f89090fb960110d4e23f90ec8cb436c3a",
-      "reviewer_model": "deepseek/deepseek-v4-flash",
-      "architectural_fit": 0.5,
-      "convention_adherence": 0.5,
-      "introduces_technical_debt": false,
-      "respects_existing_patterns": true,
-      "better_or_worse": "unclear",
-      "problems": [],
-      "strengths": [],
-      "summary": "Review unavailable.",
-      "session_number": 1
-    },
-    {
-      "commit_hash": "492d422912cfea9e5b76a70a44d25fb81da0640f",
-      "reviewer_model": "deepseek/deepseek-v4-flash",
-      "architectural_fit": 0.88,
-      "convention_adherence": 0.9,
-      "introduces_technical_debt": false,
-      "respects_existing_patterns": true,
-      "better_or_worse": "better",
-      "problems": [
-        {
-          "category": "performance",
-          "severity": "minor",
-          "description": "broadcast() unconditionally calls get_all() (fetches the full client dict) even when channel-targeted; acceptable here because the websocket lookup needs the map, but a channel-only path could avoid copying all clients."
-        },
-        {
-          "category": "security",
-          "severity": "info",
-          "description": "No bound on channels a client may subscribe to or on total channel count, so a single client could accumulate unbounded subscriptions; low risk for this story server but worth a cap."
-        },
-        {
-          "category": "maintainability",
-          "severity": "info",
-          "description": "Broadcast payload embeds the channel field via **payload spread while channel is also passed as a separate arg, duplicating the routing info in the message body; harmless but slightly redundant."
-        },
-        {
-          "category": "testing",
-          "severity": "info",
-          "description": "New tests use fixed ports (19015/19016), matching the file's existing convention but risking collision on parallel runs."
-        }
-      ],
-      "strengths": [
-        "Channels are a clean extension of the existing ClientRegistry using the same asyncio.Lock concurrency model as clients.",
-        "Disconnect cleanup properly removes a client from all channels and prunes empty channels, preventing stale subscriptions.",
-        "broadcast() signature is backward compatible (channel optional), preserving existing broadcast/direct behavior.",
-        "REST introspection endpoints (/channels, /channels/{name}/subscribers) mirror the existing /health handler pattern.",
-        "Docstrings, type hints, snake_case naming, and logger usage all match surrounding conventions."
-      ],
-      "summary": "A well-scoped, pattern-following addition of channel subscriptions that slots cleanly into the existing thread-safe registry architecture with only minor efficiency and robustness nits.",
-      "session_number": 2
-    },
-    {
-      "commit_hash": "a23910092836c717cbdd7de1ece8c70e05d2669a",
-      "reviewer_model": "deepseek/deepseek-v4-flash",
-      "architectural_fit": 0.55,
-      "convention_adherence": 0.7,
+      "reviewer_model": "measured",
+      "architectural_fit": null,
+      "convention_adherence": 0.792,
       "introduces_technical_debt": true,
       "respects_existing_patterns": true,
-      "better_or_worse": "neutral",
+      "better_or_worse": "worse",
       "problems": [
         {
-          "category": "architecture",
-          "severity": "major",
-          "description": "Redis pub/sub is implemented publish-only: publish_to_redis fires into channels but nothing subscribes/consumes or fans out to other server instances, so it is not the 'message backbone' the session requested (multi-instance delivery via workers). Delivery still goes through the in-memory ClientRegistry.broadcast."
+          "category": "maintainability",
+          "severity": "minor",
+          "description": "SonarQube: +3 code smells introduced"
         },
         {
           "category": "maintainability",
-          "severity": "major",
-          "description": "Runtime artifact messages.db (20KB binary) is committed to git and there is no .gitignore; __pycache__ is also in the tree. Session-3 tests write into it because DATABASE_URL is overridden after server.py is imported (module-scope os.environ.get already evaluated), so tests hit the production DB file."
-        },
-        {
-          "category": "testing",
-          "severity": "major",
-          "description": "test_redis_publish_on_broadcast ends with `assert message is not None or True` and swallows asyncio.TimeoutError, so the headline Redis pub/sub integration test can never fail and asserts nothing."
-        },
-        {
-          "category": "performance",
-          "severity": "major",
-          "description": "Synchronous sqlite3 connect/commit per message (persist_message/get_messages) runs inline in the async event loop (broadcast, handle_client, messages_handler), blocking all I/O on every persist; no connection reuse or executor offload."
-        },
-        {
-          "category": "architecture",
-          "severity": "minor",
-          "description": "Message transport (Redis) and persistence (SQLite) are bolted onto ClientRegistry.broadcast, mixing transport/persistence concerns into what was a client-tracking class; a redis_bus/db split (as other story runs did) would fit the existing module boundaries better."
-        },
-        {
-          "category": "robustness",
-          "severity": "minor",
-          "description": "messages_handler does int(request.query.get('limit', 50)) with no try/except \u2014 malformed query params raise ValueError and return a 500."
+          "severity": "info",
+          "description": "SonarQube: cognitive complexity +51"
         },
         {
           "category": "convention",
           "severity": "info",
-          "description": "New imports (sqlite3, os) are inserted out of alphabetical order; persist_message returns msg_id that callers ignore; datetime.utcnow() is deprecated (though pre-existing in this file)."
+          "description": "app.py: Classes should use PascalCase"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "client_example.py: Classes should use PascalCase"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "client_example.py: Module-level constants should be UPPER_CASE"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "test_server.py: Classes should use PascalCase"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "test_server.py: Module-level constants should be UPPER_CASE"
+        },
+        {
+          "category": "testing",
+          "severity": "major",
+          "description": "no tests executed in this session"
         }
       ],
       "strengths": [
-        "Parameterized SQL (SQL injection-safe) with bounded pagination (limit capped at 500, offset clamped at 0).",
-        "Redis/SQLite failures degrade gracefully \u2014 try/except with logging so the server keeps serving when Redis is down.",
-        "Wide new test surface: persistence, /messages endpoint + pagination, broadcast/direct persistence, Redis client-state and publish.",
-        "External config via REDIS_URL/DATABASE_URL env vars, added pinned deps to requirements.txt, existing behavior/tests preserved."
+        "convention score 0.79 [M]"
       ],
-      "summary": "Solid, well-typed, config-driven integration that delivers SQLite persistence and a Redis publish path, but stops short of the requested pub/sub backbone, blocks the event loop on sync sqlite3 calls, and commits runtime artifacts (messages.db) while shipping a can't-fail Redis test.",
+      "summary": "[story] Session 1: greenfield: +933/-0 lines, convention 0.79 [M], 5 violations, +0 bugs / +3 smells [M]",
+      "session_number": 1
+    },
+    {
+      "commit_hash": "492d422912cfea9e5b76a70a44d25fb81da0640f",
+      "reviewer_model": "measured",
+      "architectural_fit": null,
+      "convention_adherence": 0.792,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": true,
+      "better_or_worse": "worse",
+      "problems": [
+        {
+          "category": "maintainability",
+          "severity": "minor",
+          "description": "SonarQube: +4 code smells introduced"
+        },
+        {
+          "category": "maintainability",
+          "severity": "info",
+          "description": "SonarQube: cognitive complexity +35"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "app.py: Classes should use PascalCase"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "client_example.py: Classes should use PascalCase"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "client_example.py: Module-level constants should be UPPER_CASE"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "test_server.py: Classes should use PascalCase"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "test_server.py: Module-level constants should be UPPER_CASE"
+        },
+        {
+          "category": "testing",
+          "severity": "major",
+          "description": "no tests executed in this session"
+        }
+      ],
+      "strengths": [
+        "convention score 0.79 [M]"
+      ],
+      "summary": "[story] Session 2: feature_addition: +504/-7 lines, convention 0.79 [M], 5 violations, +0 bugs / +4 smells [M]",
+      "session_number": 2
+    },
+    {
+      "commit_hash": "a23910092836c717cbdd7de1ece8c70e05d2669a",
+      "reviewer_model": "measured",
+      "architectural_fit": null,
+      "convention_adherence": 0.792,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": true,
+      "better_or_worse": "worse",
+      "problems": [
+        {
+          "category": "maintainability",
+          "severity": "minor",
+          "description": "SonarQube: +6 code smells introduced"
+        },
+        {
+          "category": "maintainability",
+          "severity": "info",
+          "description": "SonarQube: cognitive complexity +41"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "app.py: Classes should use PascalCase"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "client_example.py: Classes should use PascalCase"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "client_example.py: Module-level constants should be UPPER_CASE"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "test_server.py: Classes should use PascalCase"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "test_server.py: Module-level constants should be UPPER_CASE"
+        },
+        {
+          "category": "testing",
+          "severity": "major",
+          "description": "no tests executed in this session"
+        }
+      ],
+      "strengths": [
+        "convention score 0.79 [M]"
+      ],
+      "summary": "[story] Session 3: integration: +523/-3 lines, convention 0.79 [M], 5 violations, +0 bugs / +6 smells [M]",
       "session_number": 3
     },
     {
       "commit_hash": "0cb7afc45bc4eb62b78bd378d3f2763bd767fed1",
-      "reviewer_model": "deepseek/deepseek-v4-flash",
-      "architectural_fit": 1.0,
-      "convention_adherence": 1.0,
+      "reviewer_model": "measured",
+      "architectural_fit": null,
+      "convention_adherence": 0.792,
       "introduces_technical_debt": false,
       "respects_existing_patterns": true,
-      "better_or_worse": "neutral",
-      "problems": [],
-      "strengths": [],
-      "summary": "No changes in this commit.",
+      "better_or_worse": "worse",
+      "problems": [
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "app.py: Classes should use PascalCase"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "client_example.py: Classes should use PascalCase"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "client_example.py: Module-level constants should be UPPER_CASE"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "test_server.py: Classes should use PascalCase"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "test_server.py: Module-level constants should be UPPER_CASE"
+        },
+        {
+          "category": "testing",
+          "severity": "major",
+          "description": "no tests executed in this session"
+        }
+      ],
+      "strengths": [
+        "convention score 0.79 [M]"
+      ],
+      "summary": "[story] Session 4: refactor: +0/-0 lines, convention 0.79 [M], 5 violations, +0 bugs / +0 smells [M]",
       "session_number": 4
     },
     {
       "commit_hash": "746e46e14eed73ddc7a8ba002eb08c224b196b6d",
-      "reviewer_model": "deepseek/deepseek-v4-flash",
-      "architectural_fit": 1.0,
-      "convention_adherence": 1.0,
+      "reviewer_model": "measured",
+      "architectural_fit": null,
+      "convention_adherence": 0.792,
       "introduces_technical_debt": false,
       "respects_existing_patterns": true,
-      "better_or_worse": "neutral",
-      "problems": [],
-      "strengths": [],
-      "summary": "No changes in this commit.",
+      "better_or_worse": "worse",
+      "problems": [
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "app.py: Classes should use PascalCase"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "client_example.py: Classes should use PascalCase"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "client_example.py: Module-level constants should be UPPER_CASE"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "test_server.py: Classes should use PascalCase"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "test_server.py: Module-level constants should be UPPER_CASE"
+        },
+        {
+          "category": "testing",
+          "severity": "major",
+          "description": "no tests executed in this session"
+        }
+      ],
+      "strengths": [
+        "convention score 0.79 [M]"
+      ],
+      "summary": "[story] Session 5: cross_cutting: +0/-0 lines, convention 0.79 [M], 5 violations, +0 bugs / +0 smells [M]",
       "session_number": 5
     }
   ],
   "story_review": {
     "story_name": "notification_service",
-    "reviewer_model": "deepseek/deepseek-v4-flash",
-    "overall_coherence": 0.55,
+    "reviewer_model": "measured",
+    "overall_coherence": 0.0,
     "compounding_issues": [
-      "Sessions 4 (refactor) and 5 (cross_cutting) never executed: the Claude subscription session limit hit during session 3, and sessions 4-5 committed only instrument bookkeeping (0 tokens, 0 tool calls, ~1.8s each), so the final two phases contain no code and build on nothing",
-      "Session 3's Redis integration was committed partially wired and unverified (exit_code 1, cut off mid-test-fix): it publishes to Redis and stores client state, but the 'workers subscribe and deliver' leg was never built, so the pub/sub backbone never actually routes messages",
-      "Early sessions committed binary artifacts into history from session 1 onward (three __pycache__/*.pyc files, then messages.db in session 3), polluting the repo and bloating commits",
-      "Session 1's single-file, WebSocket-only server.py with no interface seam made session 4's 'extract pluggable transport' a large invasive refactor that never happened; the intended abstraction point was never carved out",
-      "Session 3's dual-path delivery (direct websocket send + Redis publish in the same broadcast) meant local tests could pass while the Redis backbone silently did nothing, masking the incomplete integration and leaving session 5's Redis-counter rate limiting without a solid foundation"
+      "app.py: Classes should use PascalCase (in 5 sessions)",
+      "client_example.py: Classes should use PascalCase (in 5 sessions)",
+      "client_example.py: Module-level constants should be UPPER_CASE (in 5 sessions)",
+      "test_server.py: Classes should use PascalCase (in 5 sessions)",
+      "test_server.py: Module-level constants should be UPPER_CASE (in 5 sessions)"
     ],
     "key_decisions": [
-      "Session 1 chose an asyncio aiohttp/websockets architecture with a global ClientRegistry singleton in a single server.py (WebSocket + REST on one file) \u2014 simple, but with no transport abstraction seam",
-      "Session 2 implemented channels as in-process dict-of-sets keyed to the local registry rather than Redis-backed channel state, keeping subscriptions non-distributed across server instances",
-      "Session 3 adopted Redis pub/sub + SQLite persistence as the message backbone and client-state store, and added REST observation endpoints (/health, /channels, /messages) \u2014 the most consequential architecture bet, though wired publish-only with no consumer workers",
-      "Established a per-session test-expansion pattern (12 \u2192 19 \u2192 26 tests with growing integration coverage) that kept quality high in sessions 1-2"
+      "[story] Session 1: greenfield",
+      "[story] Session 2: feature_addition",
+      "[story] Session 3: integration",
+      "[story] Session 4: refactor",
+      "[story] Session 5: cross_cutting"
     ],
-    "trajectory_description": "Quality rose cleanly across the first two sessions: greenfield produced a structured 182-line server with 435 test lines, and channel support extended it with disciplined test growth. Session 3 pushed the scope furthest (Redis pub/sub, SQLite persistence, message-history endpoint, ~1,240 test lines) but was severed by the subscription session limit mid-verification, committing a half-wired backbone with failing exit status. Sessions 4 and 5 then collapsed into empty 1.8-second commits with zero tokens, so the arc is a genuine build-up that plateaus into an unverified integration and falls off a cliff at the end \u2014 the code that exists is competent, but the story as delivered is 60% complete and its last two phases are voids.",
-    "summary": "A coherent greenfield\u2192feature\u2192integration arc (sessions 1-3) that was truncated by the Claude session limit, leaving the refactor and cross-cutting phases as empty commits and the Redis backbone only half-integrated."
+    "trajectory_description": "S1 23348 tokens $0.463; S2 11438 tokens $0.176; S3 20245 tokens $0.330; S4 0 tokens $0.000; S5 0 tokens $0.000",
+    "summary": "5 sessions, 0/5 with tests, test_executed_success=False"
   }
 }

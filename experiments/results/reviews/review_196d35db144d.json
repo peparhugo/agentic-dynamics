@@ -1,173 +1,371 @@
 {
   "story_name": "notification_service",
   "story_id": "196d35db144d",
-  "model": "deepseek/deepseek-v4-flash",
+  "model": "measured",
   "commit_reviews": [
     {
       "commit_hash": "7a0dd02be334e767beb209a787294d06fda35708",
-      "reviewer_model": "deepseek/deepseek-v4-flash",
-      "architectural_fit": 0.6,
-      "convention_adherence": 0.78,
+      "reviewer_model": "measured",
+      "architectural_fit": null,
+      "convention_adherence": 0.778,
       "introduces_technical_debt": true,
-      "respects_existing_patterns": false,
+      "respects_existing_patterns": true,
       "better_or_worse": "worse",
       "problems": [
         {
-          "category": "architecture",
-          "severity": "major",
-          "description": "Scope creep: the diff bundles session-1 greenfield with future-session features (transports.py transport abstraction, rate-limit/history and integration tests). The notification_service story assigns the pluggable transport layer to session 4 and rate limiting/history to session 5 (builtins.py:364,383), so later sessions become no-ops and per-session perturbation measurement is contaminated."
-        },
-        {
           "category": "maintainability",
-          "severity": "minor",
-          "description": "Wholesale rewrites the seed app.py (Flask Todo baseline, 'tier 1, good seams') in place instead of adding the new server as its own module (canonical session-1 runs create notification_server.py + requirements.txt + test_notification_server.py); destroys the staged baseline rather than building alongside it."
+          "severity": "info",
+          "description": "SonarQube: cognitive complexity +15"
         },
         {
           "category": "convention",
-          "severity": "minor",
-          "description": "8 convention violations (measured, score 0.78): non-PascalCase classes in test_app.py/test_integration.py/test_rate_limit_history.py, and non-UPPER_CASE module-level constants in those test files plus transports.py."
+          "severity": "info",
+          "description": "test_app.py: Classes should use PascalCase"
         },
         {
-          "category": "maintainability",
-          "severity": "minor",
-          "description": "Cognitive complexity +15 (SonarQube) from stacking the whole architecture into a single greenfield commit; diff spans +328/-119 lines, +32 functions, +38 imports across 4+ files."
+          "category": "convention",
+          "severity": "info",
+          "description": "test_app.py: Module-level constants should be UPPER_CASE"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "test_integration.py: Classes should use PascalCase"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "test_integration.py: Module-level constants should be UPPER_CASE"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "test_rate_limit_history.py: Classes should use PascalCase"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "test_rate_limit_history.py: Module-level constants should be UPPER_CASE"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "test_transports.py: Module-level constants should be UPPER_CASE"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "transports.py: Module-level constants should be UPPER_CASE"
+        },
+        {
+          "category": "testing",
+          "severity": "major",
+          "description": "no tests executed in this session"
         }
       ],
       "strengths": [
-        "Session-1 requirements fully met with the mandated stack: websockets library (not Flask-SocketIO), asyncio, thread-safe ClientRegistry, per-client UUID, broadcast, clean disconnect handling, JSON wire format {type, payload, timestamp}.",
-        "Health endpoint served on the WebSocket port via process_request, avoiding a second HTTP framework/port \u2014 minimal dependency footprint.",
-        "SonarQube delta is clean: 0 new bugs, -2 smells, 0.0% duplication; drops the seed's dead code (unused _notify_admin stub, legacy _legacy_format_date helper).",
-        "Consistent typing (from __future__ import annotations, type hints on all public signatures) and context-manager lifecycle (__aenter__/__aexit__) on NotificationServer."
+        "convention score 0.78 [M]"
       ],
-      "summary": "Delivers a working, well-typed session-1 WebSocket server but undermines the multi-session story architecture by pre-building the session 4/5 transport and rate-limit/history layers and rewriting the seed in place \u2014 convention score 0.78 reflects 8 real naming violations.",
+      "summary": "[story] Session 1: greenfield: +328/-119 lines, convention 0.78 [M], 8 violations, +0 bugs / -2 smells [M]",
       "session_number": 1
     },
     {
       "commit_hash": "773c1983f6bffa0abac0660cd9aca3cfd5feec72",
-      "reviewer_model": "deepseek/deepseek-v4-flash",
-      "architectural_fit": 0.5,
-      "convention_adherence": 0.5,
-      "introduces_technical_debt": false,
+      "reviewer_model": "measured",
+      "architectural_fit": null,
+      "convention_adherence": 0.778,
+      "introduces_technical_debt": true,
       "respects_existing_patterns": true,
-      "better_or_worse": "unclear",
-      "problems": [],
-      "strengths": [],
-      "summary": "Review unavailable.",
+      "better_or_worse": "worse",
+      "problems": [
+        {
+          "category": "maintainability",
+          "severity": "info",
+          "description": "SonarQube: cognitive complexity +28"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "test_app.py: Classes should use PascalCase"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "test_app.py: Module-level constants should be UPPER_CASE"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "test_integration.py: Classes should use PascalCase"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "test_integration.py: Module-level constants should be UPPER_CASE"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "test_rate_limit_history.py: Classes should use PascalCase"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "test_rate_limit_history.py: Module-level constants should be UPPER_CASE"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "test_transports.py: Module-level constants should be UPPER_CASE"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "transports.py: Module-level constants should be UPPER_CASE"
+        },
+        {
+          "category": "testing",
+          "severity": "major",
+          "description": "no tests executed in this session"
+        }
+      ],
+      "strengths": [
+        "convention score 0.78 [M]"
+      ],
+      "summary": "[story] Session 2: feature_addition: +203/-10 lines, convention 0.78 [M], 8 violations, +0 bugs / +0 smells [M]",
       "session_number": 2
     },
     {
       "commit_hash": "dd35ccfc6348ec377e59448b2d57da9e67a29d6f",
-      "reviewer_model": "deepseek/deepseek-v4-flash",
-      "architectural_fit": 0.5,
-      "convention_adherence": 0.5,
-      "introduces_technical_debt": false,
-      "respects_existing_patterns": true,
-      "better_or_worse": "unclear",
-      "problems": [],
-      "strengths": [],
-      "summary": "Review unavailable.",
-      "session_number": 3
-    },
-    {
-      "commit_hash": "51f23e678902c225ec33e97ace41a7ddb420ec20",
-      "reviewer_model": "deepseek/deepseek-v4-flash",
-      "architectural_fit": 0.82,
-      "convention_adherence": 0.62,
-      "introduces_technical_debt": false,
-      "respects_existing_patterns": true,
-      "better_or_worse": "better",
-      "problems": [
-        {
-          "category": "convention",
-          "severity": "major",
-          "description": "The newly added transports.py already violates module-level constant naming (non-UPPER_CASE), so new code ships with a convention violation on day one rather than inheriting only pre-existing ones."
-        },
-        {
-          "category": "convention",
-          "severity": "minor",
-          "description": "8 convention violations overall (score 0.78), concentrated in test files (non-PascalCase classes, non-UPPER constants); the truncation makes it unclear how many are newly introduced vs. pre-existing, but at least transports.py is new."
-        },
-        {
-          "category": "maintainability",
-          "severity": "minor",
-          "description": "Compatibility shim `_server` property (getattr on the transport's private attr) retains a WebSocket-specific accessor on the now-transport-agnostic server \u2014 a small seam that can be deleted once nothing consumes it."
-        },
-        {
-          "category": "maintainability",
-          "severity": "minor",
-          "description": "Cognitive complexity +14 and +361/-101 lines with +52 imports for the transport abstraction \u2014 mild indirection cost, though smells improved by 1 and duplications dropped 0.7%, so the net is positive."
-        }
-      ],
-      "strengths": [
-        "Clean transport abstraction (BaseTransport / WebSocketTransport / create_transport) decouples the server core from the websockets library \u2014 a textbook strategy pattern that directly serves the pluggable-transport goal in the module docstring.",
-        "ClientRegistry now stores plain client IDs in a set instead of ServerConnection objects, removing the tight coupling to websockets types and shrinking per-client memory.",
-        "handle_http_request returns plain (payload, status) tuples, making HTTP handling unit-testable without a live websocket handshake.",
-        "Zero new bugs, fewer smells, and less duplication \u2014 a genuine net-debt-reducing refactor at story Session 4."
-      ],
-      "summary": "Architecturally strong pluggable-transport refactor that cleanly decouples the server from websockets (better), held back only by new-code convention violations in transports.py and the compatibility _server shim.",
-      "session_number": 4
-    },
-    {
-      "commit_hash": "1c9b3806ba1e7787ae5c66832b61b6647126775f",
-      "reviewer_model": "deepseek/deepseek-v4-flash",
-      "architectural_fit": 0.88,
-      "convention_adherence": 0.72,
+      "reviewer_model": "measured",
+      "architectural_fit": null,
+      "convention_adherence": 0.778,
       "introduces_technical_debt": true,
       "respects_existing_patterns": true,
-      "better_or_worse": "better",
+      "better_or_worse": "worse",
       "problems": [
         {
-          "category": "architecture",
+          "category": "maintainability",
           "severity": "minor",
-          "description": "TTL cleanup runs exactly once at startup (asyncio.create_task in start()); a long-lived server never purges expired messages, so the configured message_ttl_days is not continuously enforced. A periodic task (or cleanup on write) would match the intended semantic."
-        },
-        {
-          "category": "performance",
-          "severity": "minor",
-          "description": "history()/delete_before() filter and ORDER BY julianday(timestamp), which defeats any index on the timestamp column; fine at story scale but degrades as the messages table grows."
-        },
-        {
-          "category": "convention",
-          "severity": "minor",
-          "description": "The new test file test_rate_limit_history.py introduces the measured PascalCase and module-level UPPER_CASE violations; the other 6 flagged violations live in test_app.py/test_integration.py/test_transports.py/transports.py, which this commit does not touch \u2014 so the 0.78 mechanical convention score overstates the commit's own adherence."
+          "description": "SonarQube: +1 code smells introduced"
         },
         {
           "category": "maintainability",
           "severity": "info",
-          "description": "The /history handler inlines the since-formatting plus validation logic into the routing method, which is a contributor to the +24 cognitive-complexity delta (and +3 smells); extracting an endpoint helper would mirror the existing _query_integer/_query_string pattern more cleanly."
+          "description": "SonarQube: cognitive complexity +57"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "test_app.py: Classes should use PascalCase"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "test_app.py: Module-level constants should be UPPER_CASE"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "test_integration.py: Classes should use PascalCase"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "test_integration.py: Module-level constants should be UPPER_CASE"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "test_rate_limit_history.py: Classes should use PascalCase"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "test_rate_limit_history.py: Module-level constants should be UPPER_CASE"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "test_transports.py: Module-level constants should be UPPER_CASE"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "transports.py: Module-level constants should be UPPER_CASE"
+        },
+        {
+          "category": "testing",
+          "severity": "major",
+          "description": "no tests executed in this session"
         }
       ],
       "strengths": [
-        "RateLimiter follows the established dual backend pattern (MemoryRateLimiter/RedisRateLimiter behind a Protocol), exactly mirroring the MemoryConnectionState/RedisConnectionState and MemoryBroker/RedisBroker precedent.",
-        "The _rows_to_messages() refactor removes row-to-dict duplication from MessageStore and is reused by both list() and the new history().",
-        "Config and query validation (_positive_config, _query_string) match existing validation conventions and produce consistent, user-facing error messages.",
-        "Blocking SQLite TTL cleanup is wrapped in asyncio.to_thread so the event loop is never stalled, and the cleanup task is properly awaited and nulled in stop().",
-        "history() uses a limit+1 probe for a correct has_more flag and orders results deterministically by (timestamp, id)."
+        "convention score 0.78 [M]"
       ],
-      "summary": "A well-fitted, pattern-respecting cross-cutting change (rate limiting, history, TTL) that follows the app's dual memory/Redis abstraction conventions; its main gaps are a one-shot (not periodic) TTL cleanup, non-indexable julianday() queries, and new-test-file convention violations that inflate the 0.78 mechanical score against pre-existing issues in untouched files.",
+      "summary": "[story] Session 3: integration: +573/-95 lines, convention 0.78 [M], 8 violations, +0 bugs / +1 smells [M]",
+      "session_number": 3
+    },
+    {
+      "commit_hash": "51f23e678902c225ec33e97ace41a7ddb420ec20",
+      "reviewer_model": "measured",
+      "architectural_fit": null,
+      "convention_adherence": 0.778,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": true,
+      "better_or_worse": "worse",
+      "problems": [
+        {
+          "category": "maintainability",
+          "severity": "info",
+          "description": "SonarQube: cognitive complexity +14"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "test_app.py: Classes should use PascalCase"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "test_app.py: Module-level constants should be UPPER_CASE"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "test_integration.py: Classes should use PascalCase"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "test_integration.py: Module-level constants should be UPPER_CASE"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "test_rate_limit_history.py: Classes should use PascalCase"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "test_rate_limit_history.py: Module-level constants should be UPPER_CASE"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "test_transports.py: Module-level constants should be UPPER_CASE"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "transports.py: Module-level constants should be UPPER_CASE"
+        },
+        {
+          "category": "testing",
+          "severity": "major",
+          "description": "no tests executed in this session"
+        }
+      ],
+      "strengths": [
+        "convention score 0.78 [M]"
+      ],
+      "summary": "[story] Session 4: refactor: +361/-101 lines, convention 0.78 [M], 8 violations, +0 bugs / -1 smells [M]",
+      "session_number": 4
+    },
+    {
+      "commit_hash": "1c9b3806ba1e7787ae5c66832b61b6647126775f",
+      "reviewer_model": "measured",
+      "architectural_fit": null,
+      "convention_adherence": 0.778,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": true,
+      "better_or_worse": "worse",
+      "problems": [
+        {
+          "category": "maintainability",
+          "severity": "minor",
+          "description": "SonarQube: +3 code smells introduced"
+        },
+        {
+          "category": "maintainability",
+          "severity": "info",
+          "description": "SonarQube: cognitive complexity +24"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "test_app.py: Classes should use PascalCase"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "test_app.py: Module-level constants should be UPPER_CASE"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "test_integration.py: Classes should use PascalCase"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "test_integration.py: Module-level constants should be UPPER_CASE"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "test_rate_limit_history.py: Classes should use PascalCase"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "test_rate_limit_history.py: Module-level constants should be UPPER_CASE"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "test_transports.py: Module-level constants should be UPPER_CASE"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "transports.py: Module-level constants should be UPPER_CASE"
+        },
+        {
+          "category": "testing",
+          "severity": "major",
+          "description": "no tests executed in this session"
+        }
+      ],
+      "strengths": [
+        "convention score 0.78 [M]"
+      ],
+      "summary": "[story] Session 5: cross_cutting: +271/-2 lines, convention 0.78 [M], 8 violations, +0 bugs / +3 smells [M]",
       "session_number": 5
     }
   ],
   "story_review": {
     "story_name": "notification_service",
-    "reviewer_model": "deepseek/deepseek-v4-flash",
-    "overall_coherence": 0.92,
+    "reviewer_model": "measured",
+    "overall_coherence": 0.0,
     "compounding_issues": [
-      "Seed codebase (Flask Todo API) was entirely discarded in Session 1; no code or seams from the seed carried into the notification service, so the seed contributed nothing to the trajectory",
-      "Subscription state is tracked in two places from Session 3 onward \u2014 the local ClientRegistry and the ConnectionState backend \u2014 creating a permanent dual-write on every subscribe/unsubscribe that persists through Sessions 4-5",
-      "Session 4's transport refactor retained compatibility shims (the `_server` property via getattr, `process_request`/`handle_connection` isinstance hooks on NotificationServer) rather than cutting over cleanly, and those shims carry into Session 5 as residual debt",
-      "MessageStore timestamp filtering relies on SQLite julianday() string parsing rather than stored epoch/ISO-normalized timestamps, a fragile choice that the Session 5 /history endpoint inherits"
+      "test_app.py: Classes should use PascalCase (in 5 sessions)",
+      "test_app.py: Module-level constants should be UPPER_CASE (in 5 sessions)",
+      "test_integration.py: Classes should use PascalCase (in 5 sessions)",
+      "test_integration.py: Module-level constants should be UPPER_CASE (in 5 sessions)",
+      "test_rate_limit_history.py: Classes should use PascalCase (in 5 sessions)",
+      "test_rate_limit_history.py: Module-level constants should be UPPER_CASE (in 5 sessions)",
+      "test_transports.py: Module-level constants should be UPPER_CASE (in 5 sessions)",
+      "transports.py: Module-level constants should be UPPER_CASE (in 5 sessions)"
     ],
     "key_decisions": [
-      "Session 1: abandon the Flask seed and build an asyncio/websockets server from scratch, defining the type/payload/timestamp wire envelope and a thread-locked ClientRegistry",
-      "Session 1: serve /health from the WebSocket process_request hook instead of a second HTTP framework \u2014 the 'one port, no extra framework' constraint that shaped all later HTTP API endpoints",
-      "Session 2: make channels/subscriptions first-class message types (subscribe/unsubscribe) with server-side routing, establishing the domain model for delivery",
-      "Session 3: introduce Protocol-based abstractions (ConnectionState, MessageBroker) with paired Memory*/Redis* implementations, enabling multi-instance pub/sub delivery while keeping a test-friendly in-process fallback",
-      "Session 3: adopt Redis pub/sub as the cross-instance backbone plus SQLite MessageStore for durable history \u2014 the persistence foundation Session 5 extends",
-      "Session 4: extract a pluggable transport layer (BaseTransport ABC, transport registry, create_transport, TransportApplication dependency-inversion protocol), decoupling sockets from the core and making ClientRegistry id-only",
-      "Session 5: drive cross-cutting concerns through env config (RATE_LIMIT, MESSAGE_TTL_DAYS, TRANSPORT) and add a RateLimiter protocol following the same Memory/Redis pattern, keeping the architecture internally consistent"
+      "[story] Session 1: greenfield",
+      "[story] Session 2: feature_addition",
+      "[story] Session 3: integration",
+      "[story] Session 4: refactor",
+      "[story] Session 5: cross_cutting"
     ],
-    "trajectory_description": "Quality improved monotonically and stayed high across all five sessions. The story follows a textbook arc \u2014 greenfield core, feature addition, integration, refactor, cross-cutting \u2014 with the test suite growing steadily (5\u21928\u219211\u219214\u219217 tests) and the full suite passing at every step, ending at 17/17 green. Session 4's transport extraction reduced app.py's coupling and was honored rather than undone by Session 5, which added rate limiting, a /history endpoint, and TTL cleanup by extending the existing protocols and stores instead of layering new machinery. The only wobbles are mild: the seed contributed nothing, subscription state is dual-written between the local registry and the connection-state backend, and the Session 4 refactor left compatibility shims that survived into Session 5. Overall this is a disciplined, well-tested progression with no degradation and several architecture-preserving decisions.",
-    "summary": "A highly coherent five-session build that progressed cleanly from a single-file greenfield WebSocket server to a modular, multi-instance, pluggable-transport notification service with durable history and rate limiting, keeping all 17 tests green throughout."
+    "trajectory_description": "S1 37241 tokens $0.398; S2 39462 tokens $0.679; S3 40721 tokens $0.700; S4 48855 tokens $0.940; S5 43748 tokens $0.881",
+    "summary": "5 sessions, 0/5 with tests, test_executed_success=True"
   }
 }

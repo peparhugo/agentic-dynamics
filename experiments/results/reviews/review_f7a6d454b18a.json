@@ -1,89 +1,154 @@
 {
   "story_name": "notification_service",
   "story_id": "f7a6d454b18a",
-  "model": "deepseek/deepseek-v4-flash",
+  "model": "measured",
   "commit_reviews": [
     {
       "commit_hash": "b4dc3db1f8fc2b871f9d9765101016058c702caf",
-      "reviewer_model": "deepseek/deepseek-v4-flash",
-      "architectural_fit": 1.0,
-      "convention_adherence": 1.0,
+      "reviewer_model": "measured",
+      "architectural_fit": null,
+      "convention_adherence": 0.833,
       "introduces_technical_debt": false,
       "respects_existing_patterns": true,
-      "better_or_worse": "neutral",
-      "problems": [],
-      "strengths": [],
-      "summary": "No changes in this commit.",
+      "better_or_worse": "worse",
+      "problems": [
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "app.py: Classes should use PascalCase"
+        },
+        {
+          "category": "testing",
+          "severity": "major",
+          "description": "no tests executed in this session"
+        }
+      ],
+      "strengths": [
+        "convention score 0.83 [M]"
+      ],
+      "summary": "[story] Session 1: greenfield: +0/-0 lines, convention 0.83 [M], 1 violations, +0 bugs / +0 smells [M]",
       "session_number": 1
     },
     {
       "commit_hash": "b9cc2dcd30737f7c8929feb2afad4f9dbd637114",
-      "reviewer_model": "deepseek/deepseek-v4-flash",
-      "architectural_fit": 1.0,
-      "convention_adherence": 1.0,
+      "reviewer_model": "measured",
+      "architectural_fit": null,
+      "convention_adherence": 0.833,
       "introduces_technical_debt": false,
       "respects_existing_patterns": true,
-      "better_or_worse": "neutral",
-      "problems": [],
-      "strengths": [],
-      "summary": "No changes in this commit.",
+      "better_or_worse": "worse",
+      "problems": [
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "app.py: Classes should use PascalCase"
+        },
+        {
+          "category": "testing",
+          "severity": "major",
+          "description": "no tests executed in this session"
+        }
+      ],
+      "strengths": [
+        "convention score 0.83 [M]"
+      ],
+      "summary": "[story] Session 2: feature_addition: +0/-0 lines, convention 0.83 [M], 1 violations, +0 bugs / +0 smells [M]",
       "session_number": 2
     },
     {
       "commit_hash": "17c40f97bded32eaaaeb8d1255f9985005af2bb3",
-      "reviewer_model": "deepseek/deepseek-v4-flash",
-      "architectural_fit": 1.0,
-      "convention_adherence": 1.0,
+      "reviewer_model": "measured",
+      "architectural_fit": null,
+      "convention_adherence": 0.833,
       "introduces_technical_debt": false,
       "respects_existing_patterns": true,
-      "better_or_worse": "neutral",
-      "problems": [],
-      "strengths": [],
-      "summary": "No changes in this commit.",
+      "better_or_worse": "worse",
+      "problems": [
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "app.py: Classes should use PascalCase"
+        },
+        {
+          "category": "testing",
+          "severity": "major",
+          "description": "no tests executed in this session"
+        }
+      ],
+      "strengths": [
+        "convention score 0.83 [M]"
+      ],
+      "summary": "[story] Session 3: integration: +0/-0 lines, convention 0.83 [M], 1 violations, +0 bugs / +0 smells [M]",
       "session_number": 3
     },
     {
       "commit_hash": "249095f918e0f11b4f7aa12c6aef19aadf8a40ec",
-      "reviewer_model": "deepseek/deepseek-v4-flash",
-      "architectural_fit": 1.0,
-      "convention_adherence": 1.0,
+      "reviewer_model": "measured",
+      "architectural_fit": null,
+      "convention_adherence": 0.833,
       "introduces_technical_debt": false,
       "respects_existing_patterns": true,
-      "better_or_worse": "neutral",
-      "problems": [],
-      "strengths": [],
-      "summary": "No changes in this commit.",
+      "better_or_worse": "worse",
+      "problems": [
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "app.py: Classes should use PascalCase"
+        },
+        {
+          "category": "testing",
+          "severity": "major",
+          "description": "no tests executed in this session"
+        }
+      ],
+      "strengths": [
+        "convention score 0.83 [M]"
+      ],
+      "summary": "[story] Session 4: refactor: +0/-0 lines, convention 0.83 [M], 1 violations, +0 bugs / +0 smells [M]",
       "session_number": 4
     },
     {
       "commit_hash": "17614d86ac7ae1ff355c7ae8d29440d091f3118b",
-      "reviewer_model": "deepseek/deepseek-v4-flash",
-      "architectural_fit": 1.0,
-      "convention_adherence": 1.0,
+      "reviewer_model": "measured",
+      "architectural_fit": null,
+      "convention_adherence": 0.833,
       "introduces_technical_debt": false,
       "respects_existing_patterns": true,
-      "better_or_worse": "neutral",
-      "problems": [],
-      "strengths": [],
-      "summary": "No changes in this commit.",
+      "better_or_worse": "worse",
+      "problems": [
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "app.py: Classes should use PascalCase"
+        },
+        {
+          "category": "testing",
+          "severity": "major",
+          "description": "no tests executed in this session"
+        }
+      ],
+      "strengths": [
+        "convention score 0.83 [M]"
+      ],
+      "summary": "[story] Session 5: cross_cutting: +0/-0 lines, convention 0.83 [M], 1 violations, +0 bugs / +0 smells [M]",
       "session_number": 5
     }
   ],
   "story_review": {
     "story_name": "notification_service",
-    "reviewer_model": "deepseek/deepseek-v4-flash",
-    "overall_coherence": 0.05,
+    "reviewer_model": "measured",
+    "overall_coherence": 0.0,
     "compounding_issues": [
-      "Session-limit throttling blocked every session: S1 got one prompt turn (read app.py, announced a plan) then was cut off; S2\u2013S5 produced only step_start \u2192 'You've hit your session limit' \u2192 step_finish with 0 tokens and ~2s duration each",
-      "Seed/codebase mismatch: the seed worktree contains a 260-line Flask Auth API (tier2_small/bad), but the story asks for a WebSocket notification server \u2014 the agent's only real action in S1 was exploring an unrelated codebase",
-      "The 5 '[story]' commits contain no code changes, only .instrument transcript files, so the commit labels (greenfield \u2192 feature_addition \u2192 integration \u2192 refactor \u2192 cross_cutting) describe an arc that never happened"
+      "app.py: Classes should use PascalCase (in 5 sessions)"
     ],
     "key_decisions": [
-      "No architectural decisions were made \u2014 the agent wrote zero code; the only consequential choice was the experiment harness committing empty instrument-only commits instead of failing the session",
-      "The seed selection (Flask Auth API for a notification-service story) was the binding decision, and it was wrong for the task",
-      "Session 1's intent to build the WebSocket server with a health endpoint and tests was expressed but never executed"
+      "[story] Session 1: greenfield",
+      "[story] Session 2: feature_addition",
+      "[story] Session 3: integration",
+      "[story] Session 4: refactor",
+      "[story] Session 5: cross_cutting"
     ],
-    "trajectory_description": "Flat at zero. Session 1 was the only session with any agentic activity (a codebase read and a stated plan) before the session limit fired; sessions 2 through 5 were empty placeholders that added no tokens, no files, and no cost. Because nothing was produced, quality neither improved nor degraded \u2014 the project never started, and the final tree differs from the seed only by six transcript files. test_count is 0, test_code_ratio is 0.0, and all_successful is False.",
-    "summary": "A fully failed run \u2014 the session-limit throttling prevented any code from being written across all 5 sessions, leaving an unrelated Flask Auth seed untouched and rendering the commit sequence a sequence of empty placeholders rather than a story."
+    "trajectory_description": "S1 918 tokens $0.075; S2 0 tokens $0.000; S3 0 tokens $0.000; S4 0 tokens $0.000; S5 0 tokens $0.000",
+    "summary": "5 sessions, 0/5 with tests, test_executed_success=None"
   }
 }

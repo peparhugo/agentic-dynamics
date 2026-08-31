@@ -1,243 +1,366 @@
 {
   "story_name": "task_manager_api",
   "story_id": "39a8522e4ce3",
-  "model": "deepseek/deepseek-v4-flash",
+  "model": "measured",
   "commit_reviews": [
     {
       "commit_hash": "06c77684edd7f98f81ed938298ce07755fd35c63",
-      "reviewer_model": "deepseek/deepseek-v4-flash",
-      "architectural_fit": 0.9,
-      "convention_adherence": 0.88,
-      "introduces_technical_debt": false,
+      "reviewer_model": "measured",
+      "architectural_fit": null,
+      "convention_adherence": 0.733,
+      "introduces_technical_debt": true,
       "respects_existing_patterns": true,
-      "better_or_worse": "better",
+      "better_or_worse": "worse",
       "problems": [
         {
           "category": "maintainability",
-          "severity": "minor",
-          "description": "Cognitive complexity +55 (per SonarQube) driven by the added guard-clause validation in edit_task/add_task; acceptable since they are flat early-returns, but the PUT handler could be factored into a validate_payload helper to keep the route thin."
-        },
-        {
-          "category": "architecture",
-          "severity": "minor",
-          "description": "Module-level init_db() call executes a side effect (schema creation) on import; justified for WSGI/test compat and idempotent, but worth noting as an import-time side effect."
+          "severity": "info",
+          "description": "SonarQube: cognitive complexity +11"
         },
         {
           "category": "convention",
           "severity": "info",
-          "description": "Static convention score (0.71, 8 violations) is dominated by pre-existing issues in files untouched by this diff (celery_config.py, repositories.py, tasks.py PascalCase/UPPER_CASE warnings). No violations are actually introduced by the changed lines."
+          "description": "app.py: Classes should use PascalCase"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "celery_config.py: Functions should use snake_case"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "celery_config.py: Classes should use PascalCase"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "repositories.py: Module-level constants should be UPPER_CASE"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "tasks.py: Classes should use PascalCase"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "tasks.py: Module-level constants should be UPPER_CASE"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "test_app.py: Classes should use PascalCase"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "test_app.py: Module-level constants should be UPPER_CASE"
+        },
+        {
+          "category": "testing",
+          "severity": "major",
+          "description": "no tests executed in this session"
         }
       ],
       "strengths": [
-        "Removes dead code: _legacy_format_date, _notify_admin, fetch_task, and stale section-comment noise, reducing smells by 3 with no duplication added.",
-        "Fixes a real correctness bug \u2014 new tasks were inserted with status 'done' instead of 'pending'.",
-        "Replaces deprecated datetime.utcnow() with timezone-aware datetime.now(timezone.utc).",
-        "Adds a solid pytest suite (7 tests) covering default status, input validation, ordering, and 404 paths.",
-        "Tightens request validation on PUT (non-dict bodies, missing fields, non-empty title, typed status) matching the added tests.",
-        "Keeps the single-file Flask structure, existing get_db()/get_tasks() helpers, and API surface intact, preserving the baseline seams."
+        "convention score 0.73 [M]"
       ],
-      "summary": "A disciplined cleanup commit that removes dead code, fixes the default-status bug, and adds real test coverage while fully respecting the existing single-file Flask architecture \u2014 the low static convention score is contaminated by pre-existing violations in untouched files, not by this change.",
+      "summary": "[story] Session 1: greenfield: +88/-35 lines, convention 0.73 [M], 8 violations, +0 bugs / -2 smells [M]",
       "session_number": 1
     },
     {
       "commit_hash": "3047eb5dea46fa42a6d7aec147c27f4a032798d2",
-      "reviewer_model": "deepseek/deepseek-v4-flash",
-      "architectural_fit": 0.72,
-      "convention_adherence": 0.71,
+      "reviewer_model": "measured",
+      "architectural_fit": null,
+      "convention_adherence": 0.733,
       "introduces_technical_debt": true,
       "respects_existing_patterns": true,
-      "better_or_worse": "neutral",
+      "better_or_worse": "worse",
       "problems": [
         {
-          "category": "security",
-          "severity": "critical",
-          "description": "Hand-rolled JWT: manual base64url encoding, HMAC signing and token parsing in app.py instead of a vetted library (PyJWT). Roll-your-own-crypto risk, especially the manual header/payload/signature split and validation."
-        },
-        {
-          "category": "security",
-          "severity": "major",
-          "description": "Insecure default secret: `JWT_SECRET` falls back to the literal \"development-secret-change-me\", so any deployment missing the env var issues forgeable tokens. Should fail hard or generate a per-process secret."
+          "category": "maintainability",
+          "severity": "minor",
+          "description": "SonarQube: +2 code smells introduced"
         },
         {
           "category": "maintainability",
-          "severity": "major",
-          "description": "+27 cognitive complexity (SonarQube) concentrated in get_current_user: dense inline validation with nested try/except, header equality check, exp/sub type checks and a subquery all in one function."
+          "severity": "info",
+          "description": "SonarQube: cognitive complexity +19"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "app.py: Classes should use PascalCase"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "celery_config.py: Functions should use snake_case"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "celery_config.py: Classes should use PascalCase"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "repositories.py: Module-level constants should be UPPER_CASE"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "tasks.py: Classes should use PascalCase"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "tasks.py: Module-level constants should be UPPER_CASE"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "test_app.py: Classes should use PascalCase"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "test_app.py: Module-level constants should be UPPER_CASE"
         },
         {
           "category": "testing",
           "severity": "major",
-          "description": "No tests added for the new auth flow (register, login, token validation, owner scoping) despite the diff touching security-sensitive logic."
-        },
-        {
-          "category": "maintainability",
-          "severity": "minor",
-          "description": "Regression in typing: original public functions had hints (`def create_task(title: str) -> dict`); rewritten signatures (create_task, get_task, update_task, register, login) drop them."
-        },
-        {
-          "category": "convention",
-          "severity": "minor",
-          "description": "Long single-line expressions (header/payload construction, `f\"{header}.{payload}.{signature}\"` string building) exceed typical line lengths."
+          "description": "no tests executed in this session"
         }
       ],
       "strengths": [
-        "Uses hmac.compare_digest for constant-time signature comparison",
-        "Password storage via werkzeug generate_password_hash (proper hashing)",
-        "Schema migration via PRAGMA table_info + ALTER TABLE preserves existing task rows",
-        "Owner scoping (`WHERE owner_id = ?`) on every task query prevents cross-user access"
+        "convention score 0.73 [M]"
       ],
-      "summary": "Discrepancy flagged: the 8 convention violations reference files outside this diff (celery_config.py, repositories.py, tasks.py, test_app.py) and the app.py class/PascalCase items appear spurious for a file that defines only snake_case functions, so the 0.71 score reflects pre-existing codebase state rather than this commit; the commit adds a coherent, owner-scoped auth feature but introduces real technical debt via hand-rolled JWT, an insecure default secret, dropped type hints, and no test coverage, making it a net-neutral change.",
+      "summary": "[story] Session 2: feature_addition: +214/-89 lines, convention 0.73 [M], 8 violations, +0 bugs / +2 smells [M]",
       "session_number": 2
     },
     {
       "commit_hash": "c92ff52142400b92ea67f788bd8861a5b12c3a29",
-      "reviewer_model": "deepseek/deepseek-v4-flash",
-      "architectural_fit": 0.85,
-      "convention_adherence": 0.85,
+      "reviewer_model": "measured",
+      "architectural_fit": null,
+      "convention_adherence": 0.733,
       "introduces_technical_debt": true,
       "respects_existing_patterns": true,
-      "better_or_worse": "better",
+      "better_or_worse": "worse",
       "problems": [
         {
-          "category": "architecture",
-          "severity": "major",
-          "description": "Notification is enqueued after update_task commits but .delay() has no error handling: if the broker is down the request 500s while the task is already marked completed, and since the transition is then gone a retry will never re-trigger \u2014 the notification is silently lost."
-        },
-        {
-          "category": "architecture",
-          "severity": "minor",
-          "description": "Non-atomic check-then-act: previous_task is fetched via a separate get_task call before update_task, so a concurrent edit could enqueue based on stale state or miss the transition."
-        },
-        {
           "category": "maintainability",
-          "severity": "minor",
-          "description": "g.user['username'] is passed as the user_email parameter to send_notification_email \u2014 the name mismatch makes the intended recipient ambiguous (username is not an email address)."
+          "severity": "info",
+          "description": "SonarQube: cognitive complexity +2"
         },
         {
           "category": "convention",
           "severity": "info",
-          "description": "Mechanical convention score (0.71) is overstated: all 8 flagged violations are analyzer false positives (e.g. Flask/Celery app-instance variables flagged as classes/constants) or pre-existing in files this commit never touches (repositories.py is absent from the diff)."
+          "description": "app.py: Classes should use PascalCase"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "celery_config.py: Functions should use snake_case"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "celery_config.py: Classes should use PascalCase"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "repositories.py: Module-level constants should be UPPER_CASE"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "tasks.py: Classes should use PascalCase"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "tasks.py: Module-level constants should be UPPER_CASE"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "test_app.py: Classes should use PascalCase"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "test_app.py: Module-level constants should be UPPER_CASE"
+        },
+        {
+          "category": "testing",
+          "severity": "major",
+          "description": "no tests executed in this session"
         }
       ],
       "strengths": [
-        "Transition-only guard is correct: re-putting status 'completed' or renaming does not re-notify, and a dedicated test locks this in.",
-        "Clean separation of concerns: celery_config.py owns wiring, tasks.py owns job definitions, app.py only orchestrates the enqueue.",
-        "Explicit Celery task name and route to a dedicated 'notifications' queue follow operational conventions.",
-        "Tests monkeypatch .delay() following existing patterns, so the suite runs without a broker."
+        "convention score 0.73 [M]"
       ],
-      "summary": "Architecturally sound async notification feature with correct transition gating and clean module separation, but enqueue-after-commit without broker-failure handling risks silent notification loss; qualitative convention adherence is higher than the mechanical 0.71, which is inflated by analyzer false positives and pre-existing violations in untouched repositories.py.",
+      "summary": "[story] Session 3: integration: +67/-0 lines, convention 0.73 [M], 8 violations, +0 bugs / +0 smells [M]",
       "session_number": 3
     },
     {
       "commit_hash": "129b294362d1fa603031e150dc751501c1db27ba",
-      "reviewer_model": "deepseek/deepseek-v4-flash",
-      "architectural_fit": 0.82,
-      "convention_adherence": 0.75,
-      "introduces_technical_debt": false,
+      "reviewer_model": "measured",
+      "architectural_fit": null,
+      "convention_adherence": 0.733,
+      "introduces_technical_debt": true,
       "respects_existing_patterns": true,
-      "better_or_worse": "better",
+      "better_or_worse": "worse",
       "problems": [
         {
           "category": "maintainability",
-          "severity": "minor",
-          "description": "BaseRepository._repository_contract is a stub abstract method returning None, used only to force the ABC to be abstract; it adds cognitive complexity (+12) with no behavior. Prefer a real abstract method or drop the ABC."
-        },
-        {
-          "category": "architecture",
-          "severity": "minor",
-          "description": "Repositories take get_db (Flask g-context) as a connection_factory callable, coupling the data layer to Flask's request context; a context manager/proxy would decouple it more cleanly."
-        },
-        {
-          "category": "testing",
           "severity": "info",
-          "description": "New TaskRepository/UserRepository and initialize_database are untested; unit tests for the repository layer would lock in the refactor."
+          "description": "SonarQube: cognitive complexity +3"
         },
         {
           "category": "convention",
           "severity": "info",
-          "description": "Mechanical convention score of 0.71 is dominated by pre-existing violations in files untouched by this diff (celery_config.py, tasks.py, test_app.py); the new repositories.py itself follows snake_case methods / PascalCase classes."
+          "description": "app.py: Classes should use PascalCase"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "celery_config.py: Functions should use snake_case"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "celery_config.py: Classes should use PascalCase"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "repositories.py: Module-level constants should be UPPER_CASE"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "tasks.py: Classes should use PascalCase"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "tasks.py: Module-level constants should be UPPER_CASE"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "test_app.py: Classes should use PascalCase"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "test_app.py: Module-level constants should be UPPER_CASE"
+        },
+        {
+          "category": "testing",
+          "severity": "major",
+          "description": "no tests executed in this session"
         }
       ],
       "strengths": [
-        "Preserves owner_id scoping on all task queries, retaining the existing authorization boundary",
-        "Centralizes schema creation/migration into initialize_database, removing duplicated SQL from app.py",
-        "Reduces duplication and smells (smells -6, duplications 0.0%) while introducing no new bugs",
-        "Reuses the existing context-managed get_db() connection pattern rather than inventing a new one",
-        "New file follows project conventions (PascalCase classes, snake_case methods, type-hinted public surface)"
+        "convention score 0.73 [M]"
       ],
-      "summary": "A sound repository-layer extraction that preserves security scoping and the existing connection pattern while cutting duplication, with only minor seams (stub abstract method, Flask-context coupling) worth tightening.",
+      "summary": "[story] Session 4: refactor: +157/-60 lines, convention 0.73 [M], 8 violations, +0 bugs / +0 smells [M]",
       "session_number": 4
     },
     {
       "commit_hash": "f5609233426a7ff478aa5bfac1aec820d659c922",
-      "reviewer_model": "deepseek/deepseek-v4-flash",
-      "architectural_fit": 0.82,
-      "convention_adherence": 0.71,
+      "reviewer_model": "measured",
+      "architectural_fit": null,
+      "convention_adherence": 0.733,
       "introduces_technical_debt": true,
       "respects_existing_patterns": true,
-      "better_or_worse": "better",
+      "better_or_worse": "worse",
       "problems": [
         {
-          "category": "dependency",
-          "severity": "major",
-          "description": "flask_limiter is instantiated with the deprecated `Limiter(app=app)` constructor arg (v3 deprecates this in favor of `Limiter(key_func=...)` + `limiter.init_app(app)`); will break on upgrade."
-        },
-        {
-          "category": "architecture",
-          "severity": "minor",
-          "description": "Pagination protocol (limit+1 overfetch, has_next_page, next_cursor) is computed in the route handler while `get_tasks` remains a thin wrapper \u2014 pagination policy leaks into the transport layer instead of the repository/service layer."
-        },
-        {
           "category": "maintainability",
-          "severity": "minor",
-          "description": "`TaskRepository(get_db())` is instantiated twice inside list_tasks (once via get_tasks, once inline for count_for_owner); a `count_tasks` helper at the same layer as get_tasks would be more consistent."
-        },
-        {
-          "category": "performance",
-          "severity": "minor",
-          "description": "`total` runs a COUNT(*) query on every page, which is O(n) and unbounded as the table grows; the count is not needed for cursor-based navigation."
-        },
-        {
-          "category": "architecture",
-          "severity": "minor",
-          "description": "Ordering silently changed from `ORDER BY created_at DESC` to `ORDER BY id DESC` to enable keyset pagination; correlated for autoincrement ids but a semantic behavior change not called out."
+          "severity": "info",
+          "description": "SonarQube: cognitive complexity +12"
         },
         {
           "category": "convention",
           "severity": "info",
-          "description": "Measured convention score 0.71 (8 violations) reflects pre-existing issues in celery_config.py and tasks.py, which are NOT touched by this diff; the commit's own additions (rate_limit_key, count_for_owner, REDIS_URL, Limiter) are all snake_case/PascalCase/UPPER_CASE compliant."
+          "description": "app.py: Classes should use PascalCase"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "celery_config.py: Functions should use snake_case"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "celery_config.py: Classes should use PascalCase"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "repositories.py: Module-level constants should be UPPER_CASE"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "tasks.py: Classes should use PascalCase"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "tasks.py: Module-level constants should be UPPER_CASE"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "test_app.py: Classes should use PascalCase"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "test_app.py: Module-level constants should be UPPER_CASE"
+        },
+        {
+          "category": "testing",
+          "severity": "major",
+          "description": "no tests executed in this session"
         }
       ],
       "strengths": [
-        "Rate limiting is scoped per authenticated user via get_current_user() with a remote_addr fallback, plus headers_enabled=True and Retry-After \u2014 a good fit for the auth model.",
-        "Cursor pagination is correct for a DESC keyset: next_cursor derived from the last row's id, limit+1 overfetch, and a proper next_cursor=None terminal state.",
-        "Input validation rejects limit/cursor that are non-positive or limit > 100 with a clear 400 message and a dedicated parametrized test.",
-        "SQL uses bound `?` params throughout despite the f-string construction \u2014 no injection risk.",
-        "New tests cover pagination ordering, invalid params, and 429 rate limiting; the fixture calls task_app.limiter.reset() and existing tests were updated for the new response shape.",
-        "REDIS_URL follows the existing DATABASE/JWT_SECRET env-var pattern with a sane default and in-memory fallback for resilience."
+        "convention score 0.73 [M]"
       ],
-      "summary": "Solid feature commit (per-user rate limiting + cursor pagination) that fits the repository/env-var patterns and ships good tests, but the deprecated flask_limiter `app=` API and page-level COUNT add mild debt, and the 0.71 convention score stems from pre-existing violations in files outside this diff.",
+      "summary": "[story] Session 5: cross_cutting: +97/-7 lines, convention 0.73 [M], 8 violations, +0 bugs / +0 smells [M]",
       "session_number": 5
     }
   ],
   "story_review": {
     "story_name": "task_manager_api",
-    "reviewer_model": "deepseek/deepseek-v4-flash",
-    "overall_coherence": 0.9,
+    "reviewer_model": "measured",
+    "overall_coherence": 0.0,
     "compounding_issues": [
-      "No requirements.txt existed until Session 5, so dependency/env issues (pytest not on PATH, missing runtime deps) recurred in Sessions 1 and 4",
-      "Session 2 hand-rolled an HMAC JWT codec instead of using a library; every later session was constrained to work within that custom token format and the same JWT_SECRET/JWT_LIFETIME constants",
-      "The users schema stores only a username with no email field, forcing Session 3 to use the username as the notification email address \u2014 a placeholder that persists through the final commit",
-      "Session 4's refactor accidentally committed runtime artifacts (__pycache__/, todos.db) alongside repositories.py",
-      "The BaseRepository._repository_contract abstract method is a no-op placeholder, and generic CRUD uses f-string interpolated column names (SQL-injection smell if columns were ever user-controlled)"
+      "app.py: Classes should use PascalCase (in 5 sessions)",
+      "celery_config.py: Functions should use snake_case (in 5 sessions)",
+      "celery_config.py: Classes should use PascalCase (in 5 sessions)",
+      "repositories.py: Module-level constants should be UPPER_CASE (in 5 sessions)",
+      "tasks.py: Classes should use PascalCase (in 5 sessions)",
+      "tasks.py: Module-level constants should be UPPER_CASE (in 5 sessions)",
+      "test_app.py: Classes should use PascalCase (in 5 sessions)",
+      "test_app.py: Module-level constants should be UPPER_CASE (in 5 sessions)"
     ],
     "key_decisions": [
-      "Session 1: fixed the seed's inverted default status ('done'->'pending'), made init_db run on import, added request validation and UTC-aware timestamps",
-      "Session 2: added JWT auth with an idempotent SQLite migration (PRAGMA table_info + ALTER TABLE for owner_id) and owner-scoped queries \u2014 the ownership model every later session builds on",
-      "Session 3: integrated Redis-backed Celery for async completion notifications, triggered on the status transition to 'completed'",
-      "Session 4: extracted a repository layer (BaseRepository/TaskRepository/UserRepository), moving all SQL out of app.py while preserving behavior",
-      "Session 5: added Redis-backed Flask-Limiter with in-memory fallback for testability, plus cursor-based pagination over task IDs and a first dependency manifest"
+      "[story] Session 1: greenfield",
+      "[story] Session 2: feature_addition",
+      "[story] Session 3: integration",
+      "[story] Session 4: refactor",
+      "[story] Session 5: cross_cutting"
     ],
-    "trajectory_description": "Quality improved steadily and monotonically across the five sessions. The story follows a textbook escalation \u2014 greenfield cleanup, then a feature (auth), then integration (Celery), then refactor (repository layer), then cross-cutting concerns (rate limiting, pagination, packaging) \u2014 with each session building directly on the prior one. Test coverage grew from 8 to 18 passing tests with no regression: the Session 4 refactor was behavior-preserving (tests stayed green), and Session 5 extended the existing auth, ownership, and repository structure rather than reworking it. The architecture tightened from a single-file Flask app with a few leftover seed stubs to a cleanly modular codebase (app, repositories, tasks, celery_config, requirements.txt) with strong validation, migration, and security handling.",
-    "summary": "A highly coherent, well-tempered progression in which each session layered naturally onto the last \u2014 fixing, extending, integrating, refactoring, and hardening a small Flask API \u2014 with quality and test coverage rising steadily to a clean, fully-tested 18-pass final state."
+    "trajectory_description": "S1 4630 tokens $0.014; S2 6006 tokens $0.018; S3 3071 tokens $0.016; S4 4765 tokens $0.013; S5 5575 tokens $0.017",
+    "summary": "5 sessions, 0/5 with tests, test_executed_success=None"
   }
 }

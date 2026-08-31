@@ -1,90 +1,154 @@
 {
   "story_name": "task_manager_api",
   "story_id": "383dac7a0b46",
-  "model": "deepseek/deepseek-v4-flash",
+  "model": "measured",
   "commit_reviews": [
     {
       "commit_hash": "4272a3aebb3845623e714e6522527f1e49160d4f",
-      "reviewer_model": "deepseek/deepseek-v4-flash",
-      "architectural_fit": 1.0,
-      "convention_adherence": 1.0,
+      "reviewer_model": "measured",
+      "architectural_fit": null,
+      "convention_adherence": 0.833,
       "introduces_technical_debt": false,
       "respects_existing_patterns": true,
-      "better_or_worse": "neutral",
-      "problems": [],
-      "strengths": [],
-      "summary": "No changes in this commit.",
+      "better_or_worse": "worse",
+      "problems": [
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "app.py: Classes should use PascalCase"
+        },
+        {
+          "category": "testing",
+          "severity": "major",
+          "description": "no tests executed in this session"
+        }
+      ],
+      "strengths": [
+        "convention score 0.83 [M]"
+      ],
+      "summary": "[story] Session 1: greenfield: +0/-0 lines, convention 0.83 [M], 1 violations, +0 bugs / +0 smells [M]",
       "session_number": 1
     },
     {
       "commit_hash": "6c8576a13a507fd0a3185ee1daddced9011487e9",
-      "reviewer_model": "deepseek/deepseek-v4-flash",
-      "architectural_fit": 1.0,
-      "convention_adherence": 1.0,
+      "reviewer_model": "measured",
+      "architectural_fit": null,
+      "convention_adherence": 0.833,
       "introduces_technical_debt": false,
       "respects_existing_patterns": true,
-      "better_or_worse": "neutral",
-      "problems": [],
-      "strengths": [],
-      "summary": "No changes in this commit.",
+      "better_or_worse": "worse",
+      "problems": [
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "app.py: Classes should use PascalCase"
+        },
+        {
+          "category": "testing",
+          "severity": "major",
+          "description": "no tests executed in this session"
+        }
+      ],
+      "strengths": [
+        "convention score 0.83 [M]"
+      ],
+      "summary": "[story] Session 2: feature_addition: +0/-0 lines, convention 0.83 [M], 1 violations, +0 bugs / +0 smells [M]",
       "session_number": 2
     },
     {
       "commit_hash": "b224d4005fd0e08c29727bcc3b8aa266396623e9",
-      "reviewer_model": "deepseek/deepseek-v4-flash",
-      "architectural_fit": 1.0,
-      "convention_adherence": 1.0,
+      "reviewer_model": "measured",
+      "architectural_fit": null,
+      "convention_adherence": 0.833,
       "introduces_technical_debt": false,
       "respects_existing_patterns": true,
-      "better_or_worse": "neutral",
-      "problems": [],
-      "strengths": [],
-      "summary": "No changes in this commit.",
+      "better_or_worse": "worse",
+      "problems": [
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "app.py: Classes should use PascalCase"
+        },
+        {
+          "category": "testing",
+          "severity": "major",
+          "description": "no tests executed in this session"
+        }
+      ],
+      "strengths": [
+        "convention score 0.83 [M]"
+      ],
+      "summary": "[story] Session 3: integration: +0/-0 lines, convention 0.83 [M], 1 violations, +0 bugs / +0 smells [M]",
       "session_number": 3
     },
     {
       "commit_hash": "fef6182178d530435656294117c1056e3fb03aef",
-      "reviewer_model": "deepseek/deepseek-v4-flash",
-      "architectural_fit": 1.0,
-      "convention_adherence": 1.0,
+      "reviewer_model": "measured",
+      "architectural_fit": null,
+      "convention_adherence": 0.833,
       "introduces_technical_debt": false,
       "respects_existing_patterns": true,
-      "better_or_worse": "neutral",
-      "problems": [],
-      "strengths": [],
-      "summary": "No changes in this commit.",
+      "better_or_worse": "worse",
+      "problems": [
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "app.py: Classes should use PascalCase"
+        },
+        {
+          "category": "testing",
+          "severity": "major",
+          "description": "no tests executed in this session"
+        }
+      ],
+      "strengths": [
+        "convention score 0.83 [M]"
+      ],
+      "summary": "[story] Session 4: refactor: +0/-0 lines, convention 0.83 [M], 1 violations, +0 bugs / +0 smells [M]",
       "session_number": 4
     },
     {
       "commit_hash": "a100f167e8f0f315a12f09479d0d606afcde2d3d",
-      "reviewer_model": "deepseek/deepseek-v4-flash",
-      "architectural_fit": 1.0,
-      "convention_adherence": 1.0,
+      "reviewer_model": "measured",
+      "architectural_fit": null,
+      "convention_adherence": 0.833,
       "introduces_technical_debt": false,
       "respects_existing_patterns": true,
-      "better_or_worse": "neutral",
-      "problems": [],
-      "strengths": [],
-      "summary": "No changes in this commit.",
+      "better_or_worse": "worse",
+      "problems": [
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "app.py: Classes should use PascalCase"
+        },
+        {
+          "category": "testing",
+          "severity": "major",
+          "description": "no tests executed in this session"
+        }
+      ],
+      "strengths": [
+        "convention score 0.83 [M]"
+      ],
+      "summary": "[story] Session 5: cross_cutting: +0/-0 lines, convention 0.83 [M], 1 violations, +0 bugs / +0 smells [M]",
       "session_number": 5
     }
   ],
   "story_review": {
     "story_name": "task_manager_api",
-    "reviewer_model": "deepseek/deepseek-v4-flash",
-    "overall_coherence": 0.15,
+    "reviewer_model": "measured",
+    "overall_coherence": 0.0,
     "compounding_issues": [
-      "Every session failed at the backend/session layer ('Unexpected server error') before the agent could act \u2014 an infrastructure failure that reproduced identically across all 5 attempts from session 1 onward, so no session could ever build on a prior one",
-      "No code was ever written: app.py is byte-identical to the seed commit across the full sequence (git diff seed..HEAD touches only .instrument/session*.jsonl)",
-      "Each '[story] Session N' commit is empty of product code \u2014 it contains only instrumentation error lines, so the commit log masks total failure as a plausible progression",
-      "Zero measurement/verification signal: test_count 0, tests_passed 0, tool_calls 0, 0 tokens, confidence None on every session",
-      "No retry or cascade recovery despite exit_code 1 on all sessions (cascade_recovery false) \u2014 five isolated, identical failures"
+      "app.py: Classes should use PascalCase (in 5 sessions)"
     ],
     "key_decisions": [
-      "Seed architecture: single-file Flask app with sqlite3 and a models/routes split \u2014 a reasonable baseline, but it was never exercised or extended",
-      "Intended session ordering (greenfield \u2192 feature_addition \u2192 integration \u2192 refactor \u2192 cross_cutting) was a textbook incremental arc, but it existed only as prompts; no agent-level architectural decisions were ever made"
+      "[story] Session 1: greenfield",
+      "[story] Session 2: feature_addition",
+      "[story] Session 3: integration",
+      "[story] Session 4: refactor",
+      "[story] Session 5: cross_cutting"
     ],
-    "trajectory_description": "The quality arc is a flat zero: all five sessions are statistically identical failures (~2.03s duration, exit code 1, 0 tokens, 0 tool calls), each logging the same 'Unexpected server error' into its own session file and committing nothing but that error record. The product code never advances one line past the seed. There is no improvement, no degradation, and no work \u2014 the run is degenerate at the transport/backend layer, not a story about model behavior.",
-    "summary": "This is a failed run, not a story: all 5 sessions aborted with the same server error and produced zero code changes, so the commit sequence cannot be evaluated as a progression."
+    "trajectory_description": "S1 0 tokens $0.000; S2 0 tokens $0.000; S3 0 tokens $0.000; S4 0 tokens $0.000; S5 0 tokens $0.000",
+    "summary": "5 sessions, 0/5 with tests, test_executed_success=False"
   }
 }
