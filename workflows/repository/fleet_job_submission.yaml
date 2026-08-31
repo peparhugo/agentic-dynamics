@@ -1,0 +1,198 @@
+name: fleet_job_submission
+question: >-
+  Make jobs submittable to the fleet: a `submit` command in the supervisor's vocabulary
+  (fleet_manager submit → fleet:commands → the orchestrator validates and launches the
+  containerized workflow run), and a project-owned base image as the cache root for
+  per-job image builds. The design principle: the docker layer exists for ISOLATION — it
+  hides host services from the agent (the story Redis on 6379, the host filesystem, host
+  credentials) and enforces the mount contract + scope model; it is not a coordination
+  layer. Every submitted job runs as a sibling cell whose mounts/network/env are the
+  phase's scope, validated BEFORE any docker socket call.
+version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: false
+repeatable: false
+# NOTE (execution path): reference path is the orchestrator — this spec BUILDS part of
+# that path (the submit verb), so its own phases run in-process (they edit the fleet
+# code, they do not need the fleet to test the fleet) unless the operator opts in.
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: false
+    context:
+      domain_context: >-
+        canonical_sources: [scripts/fleet/spawn_wrapper.py (FLEET_ACTIONS =
+        {scale, drain, restart}; validate_fleet_command — the D-14 fleet:commands checks;
+        consume_fleet_commands — BRPOP fleet:commands (db1 / 6380) dispatching to docker
+        compose; COMMANDS_KEY = "fleet:commands"; the scope vocabulary +
+        PHASE_SCOPE_AUTHORIZATION + the five-check spawn validation),
+        scripts/fleet/fleet_manager.py (the supervisor tier: watch/status + resize/drain/
+        restart via LPUSH; the board key fleet:board), scripts/fleet/build.sh +
+        scripts/fleet/entrypoint.sh (the binary-resolution probe, the D-2 auth seeding),
+        infrastructure/docker-compose.ladder.yml (fleet/base + fleet/orchestrator images,
+        the x-orchestrator mounts — the four + the D-2 auth set + the socket in exactly
+        one tier), scripts/run_workflow.py (--orchestrator + _run_orchestrator +
+        --only-phase the sibling entrypoint), scripts/run.py + scripts/worker.py (the
+        queue entry points a submitted job may drive), scripts/CONTEXT.md (the fleet
+        bucket classification), tests/test_spawn_wrapper.py + tests/test_script_classification.py].
+        policies: [lease_before_admission, validate_before_socket, isolation_over_coordination,
+        mount_contract, regenerate_never_hand_edit].
+      challenge_context: >-
+        challenge: launching a containerized workflow today is a manual
+        `docker-compose run --rm workflow-runner ...` — the supervisor's command
+        vocabulary has no submit verb, so jobs cannot be commanded through the ladder.
+        The risk: submissions that bypass the scope/mount validation (an unchecked path,
+        an undeclared write flag, a host-service path leaking into a cell) — the very
+        isolation the ladder exists to enforce. The isolation contract is the design
+        constant: cells see ONLY their mounts (worktree rw, results, the CLI bins, the
+        D-2 auth set ro) on fleet-net; host services (the story Redis on 6379, the host
+        FS, host credentials) never appear in a submit request.
+        deliberation: [the submit contract first (validate + dispatch), then the launch
+        handler, then the base image as the cache root, then the isolation guard tests].
+        session_policy: {default: continue}
+      current_state: >-
+        MEASURED (2026-09-01): FLEET_ACTIONS = frozenset({"scale", "drain", "restart"})
+        (spawn_wrapper.py:128) — no submit action; validate_fleet_command covers the
+        three. fleet_manager has resize/drain/restart subcommands LPUSHing onto
+        fleet:commands. The workflow-runner service + fleet/base image exist
+        (docker-compose.ladder.yml:91,131) and the containerized path is proven (the
+        green_main_closure + admission_leases orchestrator runs, ledgers committed). The
+        isolation contract holds in the compose tier (four mounts + D-2 auth set, socket
+        in exactly one tier, fleet-net only) and in the spawn wrapper (five checks before
+        the socket). What does not exist: a submit verb, a per-job image build path off a
+        caching base, and a guard asserting a submitted job can never reach a host service.
+      hard_rules: >-
+        (1) VALIDATE BEFORE SOCKET: a submit is refused unless the request passes the
+        five-check spawn validation (scope ∈ vocabulary, phase-authorized, mounts ∈ the
+        contract, network = fleet-net, no undeclared write flags) — refusal before any
+        docker call, never after.
+        (2) ISOLATION OVER COORDINATION: agents never coordinate; the docker layer hides
+        host services from the agent. A submitted cell must not be able to reach the
+        story Redis (6379), the host filesystem beyond its mounts, or host credentials.
+        (3) BASE IMAGE IS THE CACHE ROOT: per-job images build FROM the project base
+        (fleet/base) with caching-friendly layer order (deps before code); no job
+        rebuilds the toolchain from scratch.
+        (4) NO ORCHESTRATOR LOCK: concurrent workflows are allowed (the design has no
+        exclusion); overlap is absorbed by the measurement apparatus (run ledgers,
+        incident ledger, exclusion rules), not by refusal.
+        (5) REGENERATE, NEVER HAND-EDIT: derived surfaces go through their generators;
+        scripts/CONTEXT.md follows its contract.
+    phases:
+      - name: p1_submit_contract
+        kind: agent
+        scope: implementation
+        timeout: 7200
+        prompt: |
+          GOAL: {goal}
+          SHAPE: add the submit action to the supervisor's command vocabulary. In
+          scripts/fleet/spawn_wrapper.py: extend FLEET_ACTIONS with "submit" and add
+          validate_submit_request (spec path resolvable + compile-validates, model ∈ the
+          whitelist, workdir an allowed worktree path, goal present, mounts derived from
+          the phase scopes ∈ the mount contract, network = fleet-net, write flags
+          declared); dispatch it in consume_fleet_commands (BRPOP → validate → docker
+          compose run --rm workflow-runner with the validated arguments). In
+          scripts/fleet/fleet_manager.py: add the submit subcommand (--spec --goal
+          --model --workdir) LPUSHing the bounded submit command onto fleet:commands,
+          and surface the launch on the board (fleet:board gets the submit record:
+          job id, spec, model, status launching). ZERO refusing of concurrency: the
+          submit path must not implement an orchestrator lock.
+          VERIFY (both directions): unit tests for a valid submit passing validation, a
+          bad scope failing BEFORE any docker call, an undeclared write flag failing,
+          a host-service path (the story Redis 6379, a host path outside the contract)
+          failing validation.
+          DELIVER: the submit contract + tests, committed.
+          LOG: PASS/FAIL; commit.
+      - name: p2_launch_handler
+        kind: agent
+        scope: implementation
+        timeout: 7200
+        prompt: |
+          GOAL: {goal}
+          SHAPE: complete the launch side. The dispatch must run the workflow-runner
+          container with the validated request: spec → the /repo/<spec> mapping, workdir
+          verbatim (the shared /tmp namespace), model, goal, per-phase scopes enforced by
+          the sibling spawn. Wire the job's lifecycle onto the board: launching →
+          running (the orchestrator's phase publications) → completed/failed with the
+          ledger pointer. Handle the compose run's exit codes and surface failures on the
+          board + DLQ (scripts/fleet/dlq.py) without inventing new tiers.
+          VERIFY: an end-to-end dry-run — submit a trivial validated job (a test spec
+          with a no-op phase) and observe the launch + board transition; a deliberately
+          invalid submit is refused pre-socket.
+          DELIVER: the launch handler + the dry-run evidence, committed.
+          LOG: PASS/FAIL with the board transitions observed; commit.
+      - name: p3_base_image_caching
+        kind: agent
+        scope: implementation
+        timeout: 7200
+        prompt: |
+          GOAL: {goal}
+          SHAPE: the project base image as the cache root. Ensure infrastructure/ (or
+          scripts/fleet/build.sh) declares the fleet/base image with caching-friendly
+          layer order: the toolchain (opencode + claude CLIs, python deps) BEFORE the
+          repo code, so a repo change never rebuilds the toolchain. Add the per-job
+          image path: a job with custom layers builds FROM fleet/base (build with
+          --cache-from fleet/base), tagged fleet/job-<name>, and the submit contract can
+          reference it. Document the isolation contract in the image/Dockerfile or its
+          sibling doc: cells see ONLY their mounts (worktree rw, results rw, the CLI
+          bins ro, the D-2 auth set ro) on fleet-net; host services (the story Redis
+          6379, the host FS, host credentials) are never reachable — the compose
+          contract asserts exactly this.
+          VERIFY: the base image builds with cache reuse (a rebuild after a repo-only
+          change hits the cache), docker-compose config validates, and the mount
+          contract guard (tests/test_fleet_guards.py) still passes.
+          DELIVER: the base-image declaration + job image path + the isolation doc,
+          committed.
+          LOG: PASS/FAIL; commit.
+      - name: p4_isolation_guards
+        kind: agent
+        scope: implementation
+        timeout: 7200
+        prompt: |
+          GOAL: {goal}
+          SHAPE: close with the isolation guard suite. Extend tests/test_fleet_guards.py
+          (or the submit tests): a submitted job's mounts contain ONLY the contract
+          paths; a submit request naming a host-service path (127.0.0.1:6379, a host
+          /home path outside the worktree, a host credential path) fails validation;
+          the compose config for the submitted job declares no port mapping to a host
+          service and network = fleet-net only. Run the fleet guard family + the script
+          classification + dependency-direction tests. The spec index must carry
+          fleet_job_submission as a completed workflow after the run.
+          DELIVER: the guards + the green suite, committed.
+          LOG: PASS/FAIL with the guard results; commit.
+factors:
+  - {name: model, levels: [anthropic/claude-sonnet-5]}
+design: factorial
+rules:
+  - name: submit_contract_built
+    plane: measurement
+    evidence_class: "[C]"
+    requires: []
+    produces: [submit_validated_before_socket, no_orchestrator_lock]
+  - name: launch_handler_wired
+    plane: measurement
+    evidence_class: "[C]"
+    requires: [submit_validated_before_socket]
+    produces: [job_board_lifecycle, dry_run_observed]
+  - name: base_image_cached
+    plane: measurement
+    evidence_class: "[C]"
+    requires: [job_board_lifecycle]
+    produces: [cache_reuse_verified, isolation_contract_documented]
+  - name: isolation_guarded
+    plane: measurement
+    evidence_class: "[C]"
+    requires: [cache_reuse_verified]
+    produces: [host_service_unreachable, guards_green]
+metrics:
+  - {name: submit_validated_before_socket, agg: mean, over: cell}
+  - {name: host_service_unreachable, agg: mean, over: cell}
+  - {name: guards_green, agg: mean, over: cell}
+writeup:
+  format: lab_book
+  sections: [question, p1_submit_contract, p2_launch_handler, p3_base_image_caching, p4_isolation_guards]
+stop: {budget_usd: 6.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}

@@ -1,0 +1,132 @@
+name: control_room_usage_wiring
+question: >-
+  Wire the subscription checks into the Control Room, end-to-end and visibly: the
+  provider usage windows (anthropic 5h/7d, openai prolite), the DeepSeek platform meter
+  (balance/wallet + spend), and the per-token cash view — served by the existing
+  subscription-usage/v3 service behind the 15-min polite cache, surfaced in the portal
+  UI with working refresh, sane error states, and tests. Audit first: much of the wiring
+  already exists; this workflow verifies it, fills the gaps (DeepSeek balance + spend
+  prominence, cache behavior, error/empty states), and closes with tests.
+version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: false
+repeatable: false
+# NOTE (execution path): reference path is the orchestrator; this is a small UI+service
+# spec — in-process is acceptable while the fleet is occupied (trivial-deterministic
+# fallback per the run-workflow skill).
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: false
+    context:
+      domain_context: >-
+        canonical_sources: [scripts/subscription_usage.py (the provider usage query —
+        subscription-usage/v3: anthropic oauth/usage windows, openai wham/usage,
+        deepseek platform meter + wallet; read-only, free; persists to
+        experiments/results/usage/), apps/control_room/services/subscription_usage.py
+        (the polite cache: 15-min TTL, 60s refetch floor, disk fallback),
+        apps/control_room/routes/telemetry.py (GET /api/subscription-usage at :177),
+        apps/control_room/static/app.js (the usage panel: anthropic windows, deepseek
+        per-token cash, deepseek_platform meter — :1878+), apps/control_room/server.py
+        (the route registry), tests/test_subscription_usage.py +
+        tests/test_subscription_usage_api.py (24 tests), the usage ledger
+        (experiments/results/usage/subscription_usage_history.jsonl + latest.json),
+        scripts/CONTEXT.md (classification manifest)].
+        policies: [usage_is_read_only, polite_cache_never_stale_over_fresh,
+        regenerate_never_hand_edit].
+      challenge_context: >-
+        challenge: the usage data exists and a panel exists, but the operator's view
+        must answer three questions at a glance — (1) are the windows safe right now
+        (anthropic 5h/7d %, openai windows), (2) what is the DeepSeek balance and spend
+        (platform meter + wallet + 14-day estimate), (3) is the number fresh (the cache
+        state visible, refresh working). The risk is a panel that renders stale or
+        unreadable states silently — a polite cache that hides an error behind old data
+        without saying so.
+        deliberation: [audit the existing wiring, then complete the gaps, then test].
+        session_policy: {default: continue}
+      current_state: >-
+        MEASURED (2026-09-01): GET /api/subscription-usage exists (routes/telemetry.py:
+        177) served by the subscription-usage service with a 15-min polite cache (60s
+        refetch floor, disk fallback); the portal UI renders anthropic windows + deepseek
+        per-token cash + the deepseek_platform meter (app.js:1878-1931); 24 tests cover
+        the service + API. Observed live: anthropic 5h 51%/7d 19%, openai prolite 2%,
+        deepseek platform meter + wallet present in the service payload. Unknown/gaps:
+        whether the DeepSeek balance + spend are prominently surfaced (the meter vs the
+        wallet vs the 14d estimate), whether the refresh path + error/empty states are
+        complete in the UI, and whether the cache's staleness is VISIBLE to the operator.
+      hard_rules: >-
+        (1) USAGE IS READ-ONLY: the query path never spends, never writes to providers —
+        only to the local ledger. (2) THE POLITE CACHE STAYS: 15-min TTL, 60s refetch
+        floor, disk fallback — and its staleness must be visible in the UI, never hidden.
+        (3) REGENERATE, NEVER HAND-EDIT: derived surfaces go through their generators;
+        scripts/CONTEXT.md follows its contract. (4) SMALL: this is a completion +
+        hardening spec, not a rewrite — no new services, no new providers.
+    phases:
+      - name: p1_audit_wiring
+        kind: agent
+        scope: research_readonly
+        timeout: 3600
+        prompt: |
+          GOAL: {goal}
+          SHAPE: audit the existing usage wiring end-to-end and write the gap list. Walk
+          the chain: scripts/subscription_usage.py → the service's polite cache (15-min
+          TTL, 60s refetch floor, disk fallback) → GET /api/subscription-usage
+          (routes/telemetry.py:177) → the portal panel (app.js:1878+: anthropic windows,
+          deepseek per-token cash, deepseek_platform meter). Verify LIVE by hitting the
+          running portal (FINOPS_PORT, default 8000): the payload's provider blocks
+          (anthropic windows with resets, openai windows, deepseek platform meter +
+          wallet + spend), the cache headers/age, and what the UI renders. Produce the
+          gap table: (surface | present | gap) — notably: is the DeepSeek BALANCE +
+          SPEND surfaced distinctly (wallet, meter, 14d estimate), is the cache age
+          visible, are error/empty/expired states handled in the UI, is refresh wired.
+          Do NOT edit anything in this phase.
+          DELIVER: the audit doc (docs/architecture/current/2026-09-01_usage_wiring_audit.md),
+          committed.
+          LOG: PASS/FAIL with the gap count; commit.
+      - name: p2_complete_wiring
+        kind: agent
+        scope: implementation
+        timeout: 7200
+        prompt: |
+          GOAL: {goal}
+          SHAPE: close the p1 gaps, per the audit list only. Expected work: (a) DeepSeek
+          balance + spend surfaced distinctly in the panel (wallet, platform meter, 14d
+          spend estimate — labeled, not a single number); (b) cache state visible (age +
+          a refresh affordance using /api/subscription-usage?refresh=1, honoring the 60s
+          refetch floor); (c) error/empty/expired states rendered instead of silent
+          blanks; (d) any service-side gaps the audit found (within the existing
+          subscription-usage/v3 schema — no new providers). Extend
+          tests/test_subscription_usage_api.py + the service tests for the new surface
+          (cache-age visibility, balance/spend fields, error states). Run the usage test
+          family.
+          VERIFY (both directions): the panel renders each state (fresh, stale-with-age,
+          provider-error) without crashing; the API honors the refetch floor.
+          DELIVER: the completed wiring + tests, committed.
+          LOG: PASS/FAIL with the gap closure count; commit.
+factors:
+  - {name: model, levels: [openai/gpt-5.6-luna]}
+design: factorial
+rules:
+  - name: wiring_audited
+    plane: measurement
+    evidence_class: "[C]"
+    requires: []
+    produces: [usage_gap_list]
+  - name: wiring_completed
+    plane: measurement
+    evidence_class: "[C]"
+    requires: [usage_gap_list]
+    produces: [deepseek_balance_spend_visible, cache_age_visible, error_states_rendered]
+metrics:
+  - {name: deepseek_balance_spend_visible, agg: mean, over: cell}
+  - {name: cache_age_visible, agg: mean, over: cell}
+  - {name: error_states_rendered, agg: mean, over: cell}
+writeup:
+  format: lab_book
+  sections: [question, p1_audit_wiring, p2_complete_wiring]
+stop: {budget_usd: 3.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}
