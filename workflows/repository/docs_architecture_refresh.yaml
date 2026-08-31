@@ -20,6 +20,11 @@ side_effects:
   repository: true
   external_services: false
 repeatable: false
+# NOTE (execution path): the reference path for this spec is the orchestrator
+# (docker-compose -f infrastructure/docker-compose.ladder.yml run --rm workflow-runner
+# python3 scripts/run_workflow.py --orchestrator ...) — the per-phase scopes declared below
+# are ENFORCED there (scope vocabulary, authorization, mount contract, network, write flags),
+# and only there. In-process is the documented fallback when the fleet is occupied.
 workflow:
   kind: agent_task
   params:

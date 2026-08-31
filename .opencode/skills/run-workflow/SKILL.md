@@ -165,12 +165,24 @@ not a hard prerequisite the script itself checks for.
 1. (Optional, fast-fail) Run the `compile_experiment` `validate` snippet against the spec. Fix
    any `requires` gap (instrument the missing information) before proceeding.
 2. Create/choose a git worktree at `--workdir`.
-3. Run `run_workflow.py` with `--spec`/`--goal`/`--model`/`--workdir`. Each phase commits to the
-   worktree (`"[workflow] <phase>"`) unless `--no-commit` is set.
-4. Use `--resume` to re-run after an interrupted workflow — it skips phases whose commit already
-   exists (falling back to the spec index's ok phases when the worktree has none) rather than
-   re-running them.
-5. After the run, `python scripts/spec_status.py` refreshes the spec lifecycle index
+3. **Default execution path: the orchestrator.** Spec workflows with declared phase scopes
+   (or any workflow whose isolation matters) run containerized:
+   `docker-compose -f infrastructure/docker-compose.ladder.yml run --rm workflow-runner
+   python3 scripts/run_workflow.py --orchestrator --spec <spec> --goal "<goal>"
+   --model <model> --workdir <path>` — each phase spawns as a validated sibling cell
+   (scope ∈ the vocabulary, phase-authorized, mount contract, network, write flags — all
+   checked BEFORE the docker socket call). The fleet runs one orchestrator at a time (the
+   socket lives in exactly one tier), so don't start a second orchestrator while one is
+   running.
+4. In-process (`python3 scripts/run_workflow.py` without `--orchestrator`) is the
+   **fallback**, not the default: use it only when the fleet is occupied (an orchestrator
+   run is in flight) or the run is trivial (deterministic measurement execution, e.g. a
+   lab run). In-process phases are documented scopes, not enforced ones.
+5. Each phase commits to the worktree (`"[workflow] <phase>"`) unless `--no-commit` is set.
+6. Use `--resume` to re-run after an interrupted workflow — it skips phases whose commit
+   already exists (falling back to the spec index's ok phases when the worktree has none)
+   rather than re-running them.
+7. After the run, `python scripts/spec_status.py` refreshes the spec lifecycle index
    (best-effort, `run_workflow.py` also refreshes it at the end of every run).
 
 ## Common gotchas
