@@ -149,6 +149,7 @@ plan doc.
 | `lab_quality_frontier.md` | Quality-per-cost frontier |
 | `lab_verification_frontier.md` | Verification depth vs correctness |
 | `lab_verification_value.md` | Independent verification value |
+| `lab_beta_from_corpus.md` | Fleet coordination-tax exponent β, estimated retrospectively (preregistered 2026-08-31) |
 
 ## `experiments/reviews/` — 6 Peer Review Documents
 

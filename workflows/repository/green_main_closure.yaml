@@ -1,0 +1,189 @@
+name: green_main_closure
+question: >-
+  Close the red deterministic suite on main 6f4fbd649: (1) repair the three test_admin_server
+  review-stage authority/isolation failures by dependency injection (never count bumps);
+  (2) run the publication-closure sequence (regenerate data.js, parquet sidecars, README spec
+  counts, and the stale canonical lab outputs); (3) prove the full deterministic suite green on
+  the exact final SHA. Paid execution is frozen — the repair itself makes ZERO paid LLM calls.
+version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: false
+repeatable: false
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: true
+    context:
+      domain_context: >-
+        PROVISIONAL DomainProfile. domain: green-main closure after the concurrency-ladder
+        incident. canonical_sources: [tests/test_admin_server.py (the three review-stage
+        authority tests), apps/control_room/routes/telemetry.py (api_matrix wiring of
+        review_stage_summary), src/agentic_dynamics/control/pipeline_status.py
+        (review_stage_summary), tests/test_doc_lifecycle.py (README spec-count contract),
+        tests/test_build_data.py (data.js publication contract), tests/test_lab_contract.py
+        + tests/test_lab_outputs_canonical.py (the stale lab digests),
+        agentic_dynamics/reporting/lab_contract.py, scripts/lab_quality_frontier.py,
+        scripts/lab_condition_effects.py, scripts/lab_verification_value.py,
+        scripts/CONTEXT.md (Lab Books + classification manifest),
+        experiments/specs/index.json (160 specs)].
+        policies: [inject_the_authority_never_bump_counts, regenerate_never_hand_edit,
+        zero_paid_llm_calls_in_the_repair, evidence_per_claim]
+      challenge_context: >-
+        PROVISIONAL ChallengeProfile. challenge: the red suite divides into the
+        review-stage authority/isolation mismatch (3 tests) and generated-surface drift
+        (stale data.js, parquet, README counts, lab digests). deliberation: [baseline the
+        failing set, inject the review authority, run the publication-closure sequence,
+        full-suite verification on the exact SHA].
+        session_policy: {default: fork_per_phase}
+      current_state: >-
+        MEASURED (2026-08-31): main 6f4fbd649. `python3 -m pytest tests/ -m "not external"`
+        → 7 failed / ~2260 passed: test_admin_server review-stage counts expect the patched
+        fake Redis population but receive the file/manifest-derived review population (346);
+        README reports 156 specs vs the generated index's 160; data.js publication contract
+        stale; lab_quality_frontier declares 414 resolved records while the registry resolves
+        363; lab_verification_value join stale. CI at this SHA additionally showed parquet
+        sidecar + lab_condition_effects digest items (verify locally). Guard families
+        (test_script_classification, test_doc_lifecycle, test_experiment_workflow_classification,
+        test_dependency_direction, test_kb_produce_registry) currently green. The
+        `preregistered` doc-lifecycle vocabulary item is already fixed.
+      hard_rules: >-
+        (1) INJECT, NEVER BUMP: the admin-server tests must prove the route uses an injected
+        review-population source that a fixture can completely isolate; changing the expected
+        counts to the larger population is forbidden.
+        (2) ZERO PAID LLM CALLS IN THE REPAIR: no story cells, no workflow runs, no
+        opencode/claude model invocations. Every repair step is deterministic (test edits,
+        regenerators, lab re-runs).
+        (3) REGENERATE, NEVER HAND-EDIT: data.js, parquet + sidecars, README spec counts,
+        lab outputs — all via their documented regenerators; the lab JSONs' embedded
+        input_manifest_sha256 must match the current registry.
+        (4) GUARD FAMILIES STAY GREEN: test_script_classification, test_doc_lifecycle,
+        test_experiment_workflow_classification, test_dependency_direction,
+        test_kb_produce_registry.
+        (5) FULL SUITE GREEN ON THE EXACT FINAL SHA: `python3 -m pytest tests/ -m "not external"`
+        → 0 failed; ruff clean on everything touched. The suite takes ~5-10 minutes; the
+        sonar root-commit test is part of the passing set and must stay passing.
+        (6) SCOPE DISCIPLINE: only the red-suite repair. Do NOT touch the usage ledger,
+        model-policy guard, control-room usage routes, or start admission/lease work.
+        (7) REPORT: the final message ends with the before/after failing list, the full-suite
+        result line, the regeneration steps run, and the final SHA.
+      read_first: >-
+        AGENTS.md, .opencode/instructions/mental-model.md,
+        tests/test_admin_server.py, apps/control_room/routes/telemetry.py,
+        src/agentic_dynamics/control/pipeline_status.py, tests/test_doc_lifecycle.py,
+        tests/test_build_data.py, tests/test_lab_contract.py, scripts/CONTEXT.md
+      run_shape: >-
+        SINGLE-model: --model anthropic/claude-opus-5 (subscription; the model-policy guard
+        allows it). One branch feature/green-main-closure; each phase commits
+        [workflow] <phase>; the runner ledgerizes every phase.
+    phases:
+      - name: p1_review_authority
+        kind: agent
+        scope: implementation
+        timeout: 10800
+        prompt: |
+          GOAL: {goal}
+          SHAPE: baseline the failing set and fix the review-stage authority/isolation
+          mismatch. (a) Run `python3 -m pytest tests/test_admin_server.py -q` and record the
+          exact failures. (b) Trace how the review-stage count reaches /api/matrix:
+          apps/control_room/routes/telemetry.py api_matrix → review_stage_summary in
+          src/agentic_dynamics/control/pipeline_status.py. The route currently returns the
+          file/manifest-derived review population while the tests seed a fake Redis with 3.
+          (c) Fix by DEPENDENCY INJECTION: the route reads its review population through an
+          injectable source; the test fixture proves it can completely isolate that source
+          (e.g., an explicit authority argument/object the tests override — follow the
+          existing ControlRoomServices injection pattern). The tests must PROVE the injected
+          source is used, not merely assert the larger number.
+          VERIFY (both directions): the three tests pass with the injected source AND fail
+          loudly if the source is removed; the rest of tests/test_admin_server.py stays
+          green; the live route behavior is unchanged when the real source is injected.
+          DELIVER: the injection + the tests, committed.
+          LOG: failing-test list before/after; PASS/FAIL; commit.
+      - name: p2_publication_closure
+        kind: agent
+        scope: implementation
+        timeout: 10800
+        prompt: |
+          GOAL: {goal}
+          SHAPE: run the publication-closure sequence for every stale generated surface.
+          (a) README spec counts: reconcile the README's 156 with the generated index's 160
+          per the README's documented contract (regenerate if derived — check how the count
+          is produced; evidence from experiments/specs/index.json). (b) data.js: regenerate
+          via python scripts/sync_data.py → python scripts/build_data.py (→
+          generate_manifest.py if required by the contract test). Never hand-edit data.js.
+          (c) Parquet + sidecars: sync_data.py regenerates them; verify the identity
+          sidecars. (d) Stale labs: re-run scripts/lab_quality_frontier.py,
+          scripts/lab_condition_effects.py, scripts/lab_verification_value.py so their
+          embedded input_manifest_sha256 matches the current registry (they are
+          deterministic; zero model calls). Run tests/test_build_data.py,
+          tests/test_lab_contract.py, tests/test_lab_outputs_canonical.py,
+          tests/test_doc_lifecycle.py to confirm each family.
+          VERIFY (both directions): each contract test passes; regenerated artifacts carry
+          the current registry identity (no stale digests remain); nothing was hand-edited.
+          DELIVER: the regenerated surfaces + any regenerator fixes, committed.
+          LOG: per-surface before/after; PASS/FAIL; commit.
+      - name: p3_full_suite_guards
+        kind: agent
+        scope: implementation
+        timeout: 14400
+        prompt: |
+          GOAL: {goal}
+          SHAPE: prove the whole deterministic suite green on the branch. (a) Run the guard
+          families: test_script_classification, test_doc_lifecycle,
+          test_experiment_workflow_classification, test_dependency_direction,
+          test_kb_produce_registry. (b) Run the FULL deterministic suite:
+          `python3 -m pytest tests/ -m "not external" -q` (allow 5-10 minutes; the sonar
+          root-commit test is part of the passing set — do not skip it). (c) ruff clean on
+          every file you touched. (d) If any failure remains, fix it within scope (red-suite
+          repair only) and re-run until 0 failed.
+          VERIFY (both directions): 0 failed on the exact branch SHA; the collection count
+          matches the pre-repair deterministic set (~2260 passed, no tests lost or deselected
+          beyond the existing `external` marker); guard families green.
+          DELIVER: any residual fixes committed; the full-suite result line recorded in the
+          final report.
+          LOG: full-suite result line, guard-family results, ruff result; PASS/FAIL; commit.
+      - name: p4_final_verify
+        kind: test
+        timeout: 7200
+        prompt: |
+          GOAL: {goal}
+          SHAPE: final gate on the exact candidate SHA. (a) Confirm the working tree is
+          clean, the branch has no stray commits beyond the repair, and
+          `python3 -m pytest tests/ -m "not external" -q` is 0 failed at this exact SHA.
+          (b) Verify the guard families once more. (c) Produce the final REPORT: the
+          before/after failing-test list, the full-suite result line, the regeneration steps
+          run, and the final SHA. (d) Do NOT push and do NOT merge — the branch awaits the
+          controller's permanence decision and the adversary (flash) review.
+          DELIVER: the report as the final message; no commit needed unless the gate found
+          something.
+          LOG: the report.
+factors:
+  - {name: model, levels: [anthropic/claude-opus-5]}
+design: factorial
+rules:
+  - name: review_authority_injected
+    plane: measurement
+    evidence_class: "[M]"
+    requires: []
+    produces: [admin_server_review_tests_green, review_source_injectable]
+  - name: surfaces_regenerated
+    plane: measurement
+    evidence_class: "[M]"
+    requires: []
+    produces: [data_js_contract_green, lab_digests_current, readme_spec_counts_match]
+  - name: suite_verified
+    plane: measurement
+    evidence_class: "[M]"
+    requires: [admin_server_review_tests_green, data_js_contract_green, lab_digests_current]
+    produces: [full_deterministic_suite_green, exact_sha_green]
+metrics:
+  - {name: full_deterministic_suite_green, agg: mean, over: cell}
+  - {name: admin_server_review_tests_green, agg: mean, over: cell}
+writeup:
+  format: lab_book
+  sections: [question, p1_review_authority, p2_publication_closure, p3_full_suite_guards, p4_final_verify]
+stop: {budget_usd: 5.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}

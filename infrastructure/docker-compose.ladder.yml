@@ -55,7 +55,11 @@ x-ladder-env: &ladder-env
 # subset of these — nothing outside them is ever mounted.
 x-ladder-mounts: &ladder-mounts
   - ${FINOPS_WORKTREE_ROOT:-/tmp}:/tmp:rw
-  - ${FINOPS_REPO_DIR:-..}:/repo:ro
+  - ${FINOPS_REPO_DIR:-/home/drseuss/ai-finops-framework}:/repo:ro
+  # D-16 fix (2026-08-31): the repo at its HOST path — worktree gitdir pointers resolve
+  # identically in the host and the containers, and the .git overlay lets phase commits write
+  - ${FINOPS_REPO_DIR:-/home/drseuss/ai-finops-framework}:/home/drseuss/ai-finops-framework:ro
+  - ${FINOPS_REPO_DIR:-/home/drseuss/ai-finops-framework}/.git:/home/drseuss/ai-finops-framework/.git:rw
   - ${FINOPS_REPO_DIR:-..}/experiments/results:/repo/experiments/results:rw
   - ${FINOPS_WORKTREE_ROOT:-/tmp}/opencode_state:/home/drseuss/.local/share/opencode:rw
   - ${AUTH_HOME:-/home/drseuss}/.local/share/opencode/auth.json:/auth/opencode_auth.json:ro
@@ -71,7 +75,11 @@ x-ladder-mounts: &ladder-mounts
 # The supervisor tier's mount set (D-13): results rw / repo ro / auth ro + the fleet-logs
 # NAMED volume. NO worktree mount (the supervisor holds no worktree), NO socket.
 x-supervisor-mounts: &supervisor-mounts
-  - ${FINOPS_REPO_DIR:-..}:/repo:ro
+  - ${FINOPS_REPO_DIR:-/home/drseuss/ai-finops-framework}:/repo:ro
+  # D-16 fix (2026-08-31): the repo at its HOST path — worktree gitdir pointers resolve
+  # identically in the host and the containers, and the .git overlay lets phase commits write
+  - ${FINOPS_REPO_DIR:-/home/drseuss/ai-finops-framework}:/home/drseuss/ai-finops-framework:ro
+  - ${FINOPS_REPO_DIR:-/home/drseuss/ai-finops-framework}/.git:/home/drseuss/ai-finops-framework/.git:rw
   - ${FINOPS_REPO_DIR:-..}/experiments/results:/repo/experiments/results:rw
   - ${AUTH_HOME:-/home/drseuss}/.claude:/home/drseuss/.claude:ro
   - ${AUTH_HOME:-/home/drseuss}/.config:/home/drseuss/.config:ro
@@ -104,7 +112,11 @@ x-supervisor-base: &supervisor-base
 # carries the write flag at the container level; its F-1/F-2/P11 writes authorize in code.
 x-orchestrator-mounts: &orchestrator-mounts
   - ${FINOPS_WORKTREE_ROOT:-/tmp}:/tmp:rw
-  - ${FINOPS_REPO_DIR:-..}:/repo:ro
+  - ${FINOPS_REPO_DIR:-/home/drseuss/ai-finops-framework}:/repo:ro
+  # D-16 fix (2026-08-31): the repo at its HOST path — worktree gitdir pointers resolve
+  # identically in the host and the containers, and the .git overlay lets phase commits write
+  - ${FINOPS_REPO_DIR:-/home/drseuss/ai-finops-framework}:/home/drseuss/ai-finops-framework:ro
+  - ${FINOPS_REPO_DIR:-/home/drseuss/ai-finops-framework}/.git:/home/drseuss/ai-finops-framework/.git:rw
   - ${FINOPS_REPO_DIR:-..}/experiments/results:/repo/experiments/results:rw
   - ${FINOPS_WORKTREE_ROOT:-/tmp}/opencode_state:/home/drseuss/.local/share/opencode:rw
   - ${AUTH_HOME:-/home/drseuss}/.local/share/opencode/auth.json:/auth/opencode_auth.json:ro
@@ -118,6 +130,7 @@ x-orchestrator-mounts: &orchestrator-mounts
 x-orchestrator-base: &orchestrator-base
   image: fleet/orchestrator
   restart: on-failure
+  working_dir: /repo          # the mounted repo, not the image's stale /app copy (mirrors cell-base)
   networks: [fleet-net]
   environment:
     <<: *ladder-env

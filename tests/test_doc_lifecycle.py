@@ -30,6 +30,7 @@ ROOT = Path(__file__).resolve().parent.parent
 
 STATUS_VOCABULARY = frozenset({
     "proposed", "accepted", "implementing", "implemented", "superseded", "abandoned",
+    "preregistered",
 })
 
 

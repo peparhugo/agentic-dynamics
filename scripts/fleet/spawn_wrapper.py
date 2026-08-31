@@ -80,6 +80,19 @@ CONTRACT_TARGETS: dict[str, tuple[str, str | None]] = {
     "/tmp": ("worktree", "rw"),
     "/app/experiments/results": ("results", None),
     "/repo": ("repo", "ro"),
+    #: The gitdir overlay (D-16 fix, 2026-08-31): a sibling cell must COMMIT its phase work
+    #: into the shared worktree, which writes the worktree registration + objects + refs under
+    #: /repo/.git — read-only there breaks every phase commit. Mirrors the results-overlay
+    #: pattern: the repo working tree stays ro; only .git is overlaid rw.
+    "/repo/.git": ("repo-git", "rw"),
+    #: The repo at its HOST path (D-16 fix, 2026-08-31): worktrees in the shared /tmp namespace
+    #: carry a ``gitdir:`` pointer to the repo's HOST path (e.g.
+    #: /home/drseuss/ai-finops-framework/.git/...). Without this mount the pointer does not
+    #: resolve inside a cell, git treats the worktree as foreign, and the runner rewrites the
+    #: pointer to /repo/.git — wedging the worktree for the host. Mounting the repo at the
+    #: SAME path in the container makes one pointer valid in both views.
+    "/home/drseuss/ai-finops-framework": ("repo-alias", "ro"),
+    "/home/drseuss/ai-finops-framework/.git": ("repo-alias-git", "rw"),
 }
 CONTRACT_TARGETS.update({d: ("auth", "ro") for d in AUTH_DIRS})
 
@@ -368,6 +381,13 @@ def build_phase_request(
          "target": "/app/experiments/results", "mode": results_mode},
         {"source": os.environ.get("FINOPS_REPO_DIR", str(_REPO_ROOT)),
          "target": "/repo", "mode": "ro"},
+        {"source": f"{os.environ.get('FINOPS_REPO_DIR', str(_REPO_ROOT))}/.git",
+         "target": "/repo/.git", "mode": "rw"},
+    ]
+    repo_home = os.environ.get("FINOPS_REPO_DIR", str(_REPO_ROOT))
+    mounts += [
+        {"source": repo_home, "target": repo_home, "mode": "ro"},
+        {"source": f"{repo_home}/.git", "target": f"{repo_home}/.git", "mode": "rw"},
     ]
     for d in AUTH_DIRS:
         mounts.append({"source": d, "target": d, "mode": "ro"})
@@ -382,6 +402,9 @@ def build_phase_request(
         "OPENCODE_BIN": f"{auth_home}/.opencode/bin/opencode",
         "CLAUDE_BIN": f"{auth_home}/.local/bin/claude",
         "FINOPS_CELL_ID": f"{spec_name}:{phase_def.get('name', 'phase')}",
+        #: The CLI's subagent (Task) socket lives under XDG_RUNTIME_DIR (/run/user/<uid> on the
+        #: host — not mounted into cells, which silently disabled the Task tool inside them).
+        "XDG_RUNTIME_DIR": "/tmp/cc-runtime",
     }
     if cfg.get("write_flag", False):
         # The implementation scope MAY emit (P1-P11) — the write flag is authorized; the

@@ -119,6 +119,11 @@ PHASE_SCOPE_AUTHORIZATION: dict[str, str] = {
     "p5_slice4_guards": "implementation",
     "p6_adversarial": "adversarial_readonly",
     "p7_smoke_handoff": "proposal_write",
+    # the green_main_closure workflow's phases (the red-suite repair — repo edits + commits)
+    "p1_review_authority": "implementation",
+    "p2_publication_closure": "implementation",
+    "p3_full_suite_guards": "implementation",
+    "p4_final_verify": "implementation",
 }
 
 # ── Artifact identity (refactor-repair P1-3) ─────────────────────
