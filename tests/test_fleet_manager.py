@@ -39,6 +39,9 @@ class _FakeRedis:
     def hvals(self, key: str) -> list[str]:
         return list(self._hashes.get(key, {}).values())
 
+    def hget(self, key: str, field: str) -> str | None:
+        return self._hashes.get(key, {}).get(field)
+
     def lpush(self, key: str, *values: str) -> int:
         self._lists.setdefault(key, []).extend(values)
         return len(self._lists[key])
@@ -104,6 +107,58 @@ def test_multiple_concurrent_submits_are_all_recorded_no_lock():
     job_ids = {j["job_id"] for j in board["jobs"]}
     assert job_ids == {cmd_a["job_id"], cmd_b["job_id"]}
     assert len(r._lists[fm.COMMANDS_KEY]) == 2
+
+
+# ── record_job_status: the launching -> running -> completed/failed transitions ──────────
+
+
+def test_record_job_status_preserves_identifying_fields_across_transitions():
+    fm = _fleet_manager()
+    r = _FakeRedis()
+    cmd = fm._send_submit_command(
+        r, spec="workflows/repository/fleet_job_submission.yaml", goal="g",
+        model="anthropic/claude-sonnet-5", workdir="/tmp/wt_z",
+    )
+    fm.record_job_status(r, cmd["job_id"], "running")
+    fm.record_job_status(
+        r, cmd["job_id"], "completed",
+        returncode=0, ledger="experiments/results/workflows/fleet_job_submission/x.json",
+    )
+    board = fm.build_board(r)
+    job = board["jobs"][0]
+    assert job["job_id"] == cmd["job_id"]
+    assert job["spec"] == "workflows/repository/fleet_job_submission.yaml"
+    assert job["model"] == "anthropic/claude-sonnet-5"
+    assert job["status"] == "completed"
+    assert job["returncode"] == 0
+    assert job["ledger"] == "experiments/results/workflows/fleet_job_submission/x.json"
+
+
+def test_record_job_status_failed_carries_the_error_reason():
+    fm = _fleet_manager()
+    r = _FakeRedis()
+    cmd = fm._send_submit_command(
+        r, spec="workflows/repository/fleet_job_submission.yaml", goal="g",
+        model="deepseek/deepseek-v4-pro", workdir="/tmp/wt_fail",
+    )
+    fm.record_job_status(r, cmd["job_id"], "failed", returncode=1, error="compose run exited 1")
+    board = fm.build_board(r)
+    job = board["jobs"][0]
+    assert job["status"] == "failed"
+    assert job["returncode"] == 1
+    assert job["error"] == "compose run exited 1"
+
+
+def test_record_job_status_on_an_unknown_job_id_still_writes_a_record():
+    # A refused submit never went through record_job_launch (fleet_manager didn't mint it in
+    # this test) — record_job_status must still produce a renderable record, not raise.
+    fm = _fleet_manager()
+    r = _FakeRedis()
+    record = fm.record_job_status(r, "orphan-job", "failed", error="boom")
+    assert record["job_id"] == "orphan-job"
+    assert record["status"] == "failed"
+    board = fm.build_board(r)
+    assert board["jobs"][0]["job_id"] == "orphan-job"
 
 
 def test_submit_cli_dispatches_through_main(monkeypatch, capsys):

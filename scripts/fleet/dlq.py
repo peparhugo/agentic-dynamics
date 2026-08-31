@@ -29,8 +29,12 @@ REDIS_HOST = os.environ.get("FINOPS_REDIS_HOST", "127.0.0.1")
 REDIS_PORT = int(os.environ.get("FINOPS_REDIS_PORT", "6380"))
 REDIS_DB = int(os.environ.get("FINOPS_REDIS_DB", "1"))
 
-# The three live job queues (mirrors worker.py / analysis_worker.py / the review queue).
-QUEUE_KEYS = ("story_jobs", "analysis_jobs", "review_jobs")
+# The live job queues (mirrors worker.py / analysis_worker.py / the review queue) plus the
+# fleet's own submitted-job "queue" (``fleet_jobs`` — not a real Redis list any submit is
+# LPUSHed onto, just the DLQ namespace a failed/refused submit's dead-letter entry is filed
+# under; the fleet's job submission proposal reuses this surface rather than inventing a
+# fourth tier of failure-tracking machinery, p2_launch_handler).
+QUEUE_KEYS = ("story_jobs", "analysis_jobs", "review_jobs", "fleet_jobs")
 
 
 def dlq_key(queue_key: str) -> str:

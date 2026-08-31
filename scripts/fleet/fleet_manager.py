@@ -22,6 +22,14 @@ This daemon does three things, all **read-only** with respect to spawning:
                 on a concurrent submit — there is no orchestrator lock (the isolation the
                 docker layer buys is a per-request property, not a scheduling one).
 
+A submitted job's board record then moves through ``launching -> running ->
+completed/failed`` as the spawn-wrapper's BRPOP consumer observes each transition
+(:func:`record_job_status`, p2_launch_handler) — a refusal before the socket call and a
+nonzero compose exit both land on "failed" (plus a ``fleet_jobs`` dead-letter entry,
+``scripts/fleet/dlq.py``), and a successful run's "completed" record carries the run's ledger
+pointer (the per-phase JSON ``run_workflow.py`` writes under
+``experiments/results/workflows/<spec>/``).
+
 The board is the supervisor's report surface: the Control Room portal and the game-board
 snapshot read the ``fleet:board`` key, so the operator sees depth/heartbeats/DLQ live —
 the visibility the bare ``setsid nohup`` workers never had.
@@ -147,6 +155,33 @@ def record_job_launch(client: redis.Redis, command: dict) -> dict:
         "ts": command["ts"],
     }
     client.hset(JOBS_KEY, mapping={command["job_id"]: json.dumps(record)})
+    return record
+
+
+def record_job_status(client: redis.Redis, job_id: str, status: str, **fields) -> dict:
+    """Update a submitted job's board record with an OBSERVED lifecycle transition.
+
+    Reads back whatever record already exists (written by :func:`record_job_launch` or a
+    previous call to this function) so a later transition never drops the job's identifying
+    fields (``spec``/``model``) — only ``status``/``ts`` and whatever ``fields`` the caller
+    passes (e.g. ``returncode``, ``ledger``, ``error``) change. This is the write side of
+    "launching -> running -> completed/failed" (p2_launch_handler): the spawn-wrapper's BRPOP
+    consumer calls it as it observes each transition (the orchestrator's own phase-by-phase
+    publications go over ``control.live``, a separate unscoped telemetry channel — this hash is
+    the coarser per-JOB lifecycle the board renders, not a mirror of every phase event). This
+    module's own :func:`_send_submit_command` never calls it — that stays
+    :func:`record_job_launch`'s one-shot "launching" write.
+    """
+    raw = client.hget(JOBS_KEY, job_id)
+    try:
+        record = json.loads(raw) if raw else {}
+    except (TypeError, ValueError):
+        record = {}
+    record.setdefault("job_id", job_id)
+    record["status"] = status
+    record["ts"] = time.time()
+    record.update(fields)
+    client.hset(JOBS_KEY, mapping={job_id: json.dumps(record)})
     return record
 
 

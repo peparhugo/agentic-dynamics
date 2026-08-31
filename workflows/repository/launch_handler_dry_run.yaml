@@ -1,0 +1,34 @@
+name: launch_handler_dry_run
+question: >-
+  p2_launch_handler's own dry-run proof fixture: a trivial, single no-op phase spec used to
+  exercise the fleet's submit -> validate -> launch -> board lifecycle
+  (launching -> running -> completed/failed, with the ledger pointer) end-to-end without
+  spending a real agent turn on anything but a no-op prompt. Not a research question — an
+  operational fixture for fleet_job_submission's VERIFY step and
+  tests/test_spawn_wrapper.py's consume_fleet_commands coverage.
+version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: false
+  external_services: false
+repeatable: true
+workflow:
+  kind: agent_task
+  params:
+    phases:
+      - name: p_launch_handler_noop
+        kind: agent
+        scope: implementation
+        timeout: 300
+        prompt: |
+          GOAL: {goal}
+          This is a no-op dry-run phase (fleet_job_submission's p2_launch_handler VERIFY
+          fixture) — confirm the phase ran and do nothing else.
+factors:
+  - {name: model, levels: [anthropic/claude-sonnet-5]}
+design: factorial
+rules: []
+metrics: []
+writeup: {format: lab_book, sections: [question]}
+stop: {budget_usd: 0.05, max_attempts: 1}

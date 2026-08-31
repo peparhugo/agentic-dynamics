@@ -8,6 +8,8 @@ with privileges it was never authorized for — is the FAILED finding this suite
 
 from __future__ import annotations
 
+import json
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -19,6 +21,7 @@ from agentic_dynamics.experiment.experiment_spec import (
     validate_spec,
 )
 from scripts.fleet.spawn_wrapper import (
+    COMMANDS_KEY,
     COMPOSE_ALLOWLIST,
     CONTRACT_TARGETS,
     FLEET_ACTIONS,
@@ -27,6 +30,7 @@ from scripts.fleet.spawn_wrapper import (
     build_phase_request,
     build_spawn_argv,
     build_submit_argv,
+    consume_fleet_commands,
     dispatch_submit,
     spawn_sibling,
     validate_fleet_command,
@@ -626,3 +630,219 @@ def test_validate_fleet_command_submit_does_not_require_a_service():
     request = _valid_submit_request(action="submit", spec="", model="", workdir="", goal="")
     errors = validate_fleet_command(request)
     assert not any("compose allowlist" in e for e in errors)
+
+
+# ── consume_fleet_commands: the launch handler's board + DLQ wiring (p2_launch_handler) ────
+#
+# No docker/redis daemon is exercised here — the redis client is a fake, and `subprocess.run`
+# is monkeypatched to a canned exit code, so these are "dry runs" in the same sense the rest of
+# this module already uses the word (dispatch_submit(..., dry_run=True) never calls docker
+# either): every OTHER step (validation, argv construction, board/DLQ writes) is the real code
+# path. Deliberately never LPUSHes onto the live `fleet:commands` (db1/6380) the deployed
+# ladder's own daemons are consuming — that queue is shared production state.
+
+
+class _FakeCommandsRedis:
+    """A minimal redis stand-in covering exactly the calls consume_fleet_commands makes."""
+
+    def __init__(self) -> None:
+        self._hashes: dict[str, dict[str, str]] = {}
+        self._lists: dict[str, list[str]] = {}
+
+    def lpush(self, key: str, value: str) -> int:
+        self._lists.setdefault(key, []).insert(0, value)
+        return len(self._lists[key])
+
+    def brpop(self, key: str, timeout: int | None = None):
+        lst = self._lists.get(key)
+        if not lst:
+            return None
+        return key, lst.pop()
+
+    def hset(self, key: str, mapping: dict | None = None, **_kw) -> None:
+        self._hashes.setdefault(key, {}).update({k: str(v) for k, v in (mapping or {}).items()})
+
+    def hget(self, key: str, field: str) -> str | None:
+        return self._hashes.get(key, {}).get(field)
+
+    def hvals(self, key: str) -> list[str]:
+        return list(self._hashes.get(key, {}).values())
+
+    def rpush(self, key: str, *values: str) -> int:
+        self._lists.setdefault(key, []).extend(values)
+        return len(self._lists[key])
+
+    def llen(self, key: str) -> int:
+        return len(self._lists.get(key, []))
+
+    def scan_iter(self, match: str | None = None, count: int | None = None):
+        return iter([])
+
+    def hgetall(self, key: str) -> dict[str, str]:
+        return {}
+
+
+# The committed dry-run fixture (workflows/repository/launch_handler_dry_run.yaml): a real,
+# permanently-registered, single no-op-phase spec — "p_launch_handler_noop" is a genuine entry
+# in PHASE_SCOPE_AUTHORIZATION (scope: implementation), so it is a job that ACTUALLY validates
+# and launches, not a synthetic fixture that only proves a refusal.
+_NOOP_SPEC_NAME = "launch_handler_dry_run"
+_NOOP_SPEC_REL = "workflows/repository/launch_handler_dry_run.yaml"
+
+
+def _push_submit(r: _FakeCommandsRedis, **overrides) -> dict:
+    command = {
+        "action": "submit",
+        "job_id": "job-noop-1",
+        "spec": _NOOP_SPEC_REL,
+        "goal": "run the no-op phase",
+        "model": "anthropic/claude-sonnet-5",
+        "workdir": "/tmp/wt_launch_handler_test",
+        "ts": 0.0,
+        "nonce": "abc",
+    }
+    command.update(overrides)
+    r.lpush(COMMANDS_KEY, json.dumps(command))
+    return command
+
+
+@pytest.fixture
+def _noop_spec(_canonical_repo_env):
+    ledger_dir = _REPO_ROOT / "experiments" / "results" / "workflows" / _NOOP_SPEC_NAME
+    try:
+        yield _REPO_ROOT / _NOOP_SPEC_REL, ledger_dir
+    finally:
+        if ledger_dir.is_dir():
+            for f in ledger_dir.iterdir():
+                f.unlink()
+            ledger_dir.rmdir()
+
+
+def _fleet_manager_module():
+    import sys as _sys
+
+    fleet_dir = str(_REPO_ROOT / "scripts" / "fleet")
+    if fleet_dir not in _sys.path:
+        _sys.path.insert(0, fleet_dir)
+    import fleet_manager
+
+    return fleet_manager
+
+
+def test_consume_fleet_commands_valid_submit_reaches_running_then_completed_with_ledger(
+    _noop_spec, monkeypatch,
+):
+    fleet_manager = _fleet_manager_module()
+    spec_path, ledger_dir = _noop_spec
+    ledger_dir.mkdir(parents=True, exist_ok=True)
+    ledger_file = ledger_dir / "20260901T000000Z.json"
+    ledger_file.write_text("{}")
+
+    r = _FakeCommandsRedis()
+    cmd = fleet_manager._send_submit_command(
+        r, spec=_NOOP_SPEC_REL, goal="run the no-op phase",
+        model="anthropic/claude-sonnet-5", workdir="/tmp/wt_launch_handler_test",
+    )
+    assert fleet_manager.build_board(r)["jobs"][0]["status"] == "launching"
+
+    calls = []
+
+    def fake_run(argv, check=False):
+        calls.append(argv)
+        return subprocess.CompletedProcess(argv, returncode=0)
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+
+    consume_fleet_commands(client=r, once=True)
+
+    assert len(calls) == 1
+    assert "--orchestrator" in calls[0] and "workflow-runner" in calls[0]
+
+    job = fleet_manager.build_board(r)["jobs"][0]
+    assert job["job_id"] == cmd["job_id"]
+    assert job["spec"] == _NOOP_SPEC_REL
+    assert job["model"] == "anthropic/claude-sonnet-5"
+    assert job["status"] == "completed"
+    assert job["returncode"] == 0
+    assert job["ledger"] == str(ledger_file)
+
+
+def test_consume_fleet_commands_nonzero_exit_marks_failed_and_files_the_dlq(
+    _noop_spec, monkeypatch,
+):
+    fleet_manager = _fleet_manager_module()
+    r = _FakeCommandsRedis()
+    cmd = fleet_manager._send_submit_command(
+        r, spec=_NOOP_SPEC_REL, goal="run the no-op phase",
+        model="deepseek/deepseek-v4-pro", workdir="/tmp/wt_launch_handler_test",
+    )
+
+    monkeypatch.setattr(
+        subprocess, "run",
+        lambda argv, check=False: subprocess.CompletedProcess(argv, returncode=1),
+    )
+
+    consume_fleet_commands(client=r, once=True)
+
+    job = fleet_manager.build_board(r)["jobs"][0]
+    assert job["job_id"] == cmd["job_id"]
+    assert job["status"] == "failed"
+    assert job["returncode"] == 1
+
+    dead = [json.loads(e) for e in r._lists.get("fleet_jobs:dead_letter", [])]
+    assert len(dead) == 1
+    assert dead[0]["job"]["job_id"] == cmd["job_id"]
+    assert "exited 1" in dead[0]["reason"]
+
+
+def test_consume_fleet_commands_invalid_submit_is_refused_before_any_subprocess_call(
+    _noop_spec, monkeypatch,
+):
+    # A deliberately invalid submit (a workdir naming the story-agent Redis host service) —
+    # refused at validate_fleet_command, BEFORE any docker/compose subprocess call. The board
+    # goes straight to "failed" (never leaving a phantom "launching" record) and a DLQ entry
+    # is filed even though the socket was never reached.
+    r = _FakeCommandsRedis()
+    fleet_manager = _fleet_manager_module()
+    cmd = fleet_manager._send_submit_command(
+        r, spec=_NOOP_SPEC_REL, goal="run the no-op phase",
+        model="anthropic/claude-sonnet-5", workdir="127.0.0.1:6379",
+    )
+
+    calls = []
+    monkeypatch.setattr(
+        subprocess, "run",
+        lambda *a, **k: calls.append(a) or subprocess.CompletedProcess(a, 0),
+    )
+
+    consume_fleet_commands(client=r, once=True)
+
+    assert calls == []
+    job = fleet_manager.build_board(r)["jobs"][0]
+    assert job["job_id"] == cmd["job_id"]
+    assert job["status"] == "failed"
+    assert "host service" in job["error"]
+
+    dead = [json.loads(e) for e in r._lists.get("fleet_jobs:dead_letter", [])]
+    assert len(dead) == 1
+    assert dead[0]["job"]["job_id"] == cmd["job_id"]
+
+
+def test_consume_fleet_commands_dry_run_never_calls_subprocess(_noop_spec, monkeypatch):
+    r = _FakeCommandsRedis()
+    fleet_manager = _fleet_manager_module()
+    fleet_manager._send_submit_command(
+        r, spec=_NOOP_SPEC_REL, goal="run the no-op phase",
+        model="anthropic/claude-sonnet-5", workdir="/tmp/wt_launch_handler_test",
+    )
+
+    calls = []
+    monkeypatch.setattr(subprocess, "run", lambda *a, **k: calls.append(a))
+
+    consume_fleet_commands(client=r, once=True, dry_run=True)
+
+    assert calls == []
+    # dry_run never observes an exit code, so the record stops at "running" — never a
+    # fabricated completed/failed.
+    job = fleet_manager.build_board(r)["jobs"][0]
+    assert job["status"] == "running"

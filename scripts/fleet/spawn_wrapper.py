@@ -21,7 +21,10 @@ fixed contract this module enforces):
     build_phase_request    — build a scope-driven spawn request from a workflow phase (the
                              campaign-wrapper→sibling-cell mechanism, D-16).
     consume_fleet_commands — BRPOP ``fleet:commands`` (db1 / 6380) and dispatch validated
-                             resize/drain commands to ``docker compose``.
+                             resize/drain/restart/submit commands to ``docker compose``,
+                             wiring a submitted job's board record through
+                             launching -> running -> completed/failed (+ the ``fleet_jobs``
+                             DLQ on refusal or a nonzero exit, p2_launch_handler).
 
 This module is a script (``scripts/fleet/``), not a package plane. Its ONLY package import is the
 scope model from the experiment plane (tier 1 — ``agentic_dynamics.experiment.experiment_spec``),
@@ -760,8 +763,46 @@ def _connect_redis() -> Any:
             delay = min(delay * 2, 30.0)
 
 
+def _spec_name_for_ledger(spec_rel: str) -> str:
+    """The spec's declared ``name:`` field, for locating its ledger directory.
+
+    A submit command only carries the spec's repo-relative PATH; the ledger a run writes is
+    keyed by the spec's declared name (``run_workflow.py``'s ``main()``: ``experiments/results/
+    workflows/<spec.name>/``), which need not match the file's stem. Reloading is cheap and, for
+    a command that already passed :func:`validate_submit_request` (which itself calls
+    :func:`load_spec`), should not fail — but this is purely an observability lookup, so any
+    failure falls back to the file stem rather than raising and losing the board update.
+    """
+    try:
+        path, errors = _resolve_spec_path(spec_rel, _REPO_ROOT)
+        if path is not None and not errors:
+            return load_spec(path).name
+    except (SpecError, OSError, ValueError):
+        pass
+    return Path(spec_rel).stem
+
+
+def _latest_ledger(spec_name: str) -> str | None:
+    """The most recently written ledger for a spec name — a submitted job's board pointer.
+
+    An ``--orchestrator`` run has no single top-level ledger of its own: each phase spawns as
+    its own sibling running ``run_workflow.py --only-phase <name>``, and THAT single-phase run
+    is what writes the timestamped ledger JSON under ``experiments/results/workflows/
+    <spec_name>/`` (``run_workflow.py``'s own ``main()``). The lexicographic
+    ``YYYYMMDDTHHMMSSZ.json`` naming sorts chronologically, so the last file is the job's most
+    recent phase result — the pointer :func:`fleet_manager.record_job_status` attaches to a
+    completed/failed submit record.
+    """
+    ledger_dir = _REPO_ROOT / "experiments" / "results" / "workflows" / spec_name
+    if not ledger_dir.is_dir():
+        return None
+    files = sorted(ledger_dir.glob("*.json"))
+    return str(files[-1]) if files else None
+
+
 def consume_fleet_commands(
     *,
+    client: Any | None = None,
     compose_file: str | None = None,
     dry_run: bool = False,
     once: bool = False,
@@ -776,8 +817,30 @@ def consume_fleet_commands(
     then run) but through :func:`build_submit_argv` instead of the service-shaped argv the
     other three actions use — and, per the isolation-over-coordination design, dispatching one
     submit never blocks or refuses another: there is no lock here, only per-request validation.
+
+    A submit's ``job_id`` additionally drives the board lifecycle (p2_launch_handler,
+    :func:`fleet_manager.record_job_status`): a refusal here (never reaching the socket) writes
+    "failed" straight away; otherwise "running" is recorded just before the ``docker compose``
+    call, and the observed exit code resolves it to "completed" or "failed" — a nonzero exit (or
+    a pre-socket refusal) is ALSO filed onto the ``fleet_jobs`` dead-letter list
+    (``scripts/fleet/dlq.py``), reusing the existing per-queue DLQ surface rather than adding a
+    new one. ``client`` is an injectable redis connection (tests pass a fake; the real consumer
+    loop leaves it ``None`` and connects via :func:`_connect_redis`) — the same "the caller may
+    own the connection" shape ``fleet_manager.py``'s own functions already use.
     """
-    client = _connect_redis()
+    # Sibling script modules (scripts/fleet/ is a dir, not a package — no __init__.py, so a
+    # bare "import dlq" only resolves once this dir is on sys.path; this module may itself be
+    # reached as the namespace package `scripts.fleet.spawn_wrapper`, which does NOT add this
+    # dir to sys.path, so it is added here rather than relying on some other caller having done
+    # it first). Imported lazily so the pure validators above this function never pull in
+    # `redis` (fleet_manager imports it at module scope) just to be importable.
+    _fleet_dir = str(Path(__file__).resolve().parent)
+    if _fleet_dir not in sys.path:
+        sys.path.insert(0, _fleet_dir)
+    import dlq  # noqa: PLC0415
+    import fleet_manager  # noqa: PLC0415
+
+    client = client if client is not None else _connect_redis()
     compose_file = compose_file or str(_REPO_ROOT / "infrastructure" / "docker-compose.ladder.yml")
     compose = os.environ.get("DOCKER_COMPOSE", "docker-compose")
 
@@ -793,10 +856,18 @@ def consume_fleet_commands(
             command = json.loads(raw)
         except json.JSONDecodeError:
             print(f"[spawn-wrapper] dropping malformed command: {raw!r}", flush=True)
+            if once:
+                return
             continue
         errors = validate_fleet_command(command)
         if errors:
             print(f"[spawn-wrapper] REFUSED {command}: {errors}", flush=True)
+            if command.get("action") == "submit" and command.get("job_id"):
+                reason = "; ".join(errors)
+                fleet_manager.record_job_status(client, command["job_id"], "failed", error=reason)
+                dlq.record_dead(client, "fleet_jobs", command, reason)
+            if once:
+                return
             continue
         action = command["action"]
         service = command.get("service")
@@ -811,8 +882,24 @@ def consume_fleet_commands(
             argv = [compose, "-f", compose_file, "restart", service]
         print(f"[spawn-wrapper] DISPATCH {action} {service or command.get('job_id')}: {argv}",
               flush=True)
+        job_id = command.get("job_id") if action == "submit" else None
+        if job_id:
+            fleet_manager.record_job_status(client, job_id, "running")
         if not dry_run:
-            subprocess.run(argv, check=False)
+            proc = subprocess.run(argv, check=False)
+            if job_id:
+                ledger = _latest_ledger(_spec_name_for_ledger(str(command.get("spec", ""))))
+                if proc.returncode == 0:
+                    fleet_manager.record_job_status(
+                        client, job_id, "completed", returncode=proc.returncode, ledger=ledger,
+                    )
+                else:
+                    reason = f"compose run exited {proc.returncode}"
+                    fleet_manager.record_job_status(
+                        client, job_id, "failed", returncode=proc.returncode, ledger=ledger,
+                        error=reason,
+                    )
+                    dlq.record_dead(client, "fleet_jobs", command, reason)
         if once:
             return
 

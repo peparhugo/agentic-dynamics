@@ -135,6 +135,11 @@ PHASE_SCOPE_AUTHORIZATION: dict[str, str] = {
     "p2_launch_handler": "implementation",
     "p3_base_image_caching": "implementation",
     "p4_isolation_guards": "implementation",
+    # p2_launch_handler's own dry-run proof fixture (workflows/repository/
+    # launch_handler_dry_run.yaml) — a trivial single no-op phase used to exercise the
+    # submit -> validate -> launch -> board lifecycle end-to-end without spending a real
+    # agent turn on anything but a no-op prompt.
+    "p_launch_handler_noop": "implementation",
 }
 
 # ── Artifact identity (refactor-repair P1-3) ─────────────────────

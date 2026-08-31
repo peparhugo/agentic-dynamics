@@ -197,7 +197,7 @@ def test_board_surfaces_heartbeats_and_dlq_counts():
     assert heartbeats["worker:story:a"]["jobs"] == "3"
 
     counts = dlq.dead_counts(r)
-    assert counts == {"story_jobs": 1, "analysis_jobs": 2, "review_jobs": 0}
+    assert counts == {"story_jobs": 1, "analysis_jobs": 2, "review_jobs": 0, "fleet_jobs": 0}
 
 
 # ── guard 3 — the neo4j index guard (D-12 / §6) ──────────────────────────────
