@@ -163,6 +163,28 @@ workflow:
           fleet_job_submission as a completed workflow after the run.
           DELIVER: the guards + the green suite, committed.
           LOG: PASS/FAIL with the guard results; commit.
+      - name: p5_egress_proxy_enforcement
+        kind: agent
+        scope: implementation
+        timeout: 7200
+        prompt: |
+          GOAL: {goal}
+          SHAPE: close the F1 egress-proxy gap (HANDOFF open item 2 — verified UNWIRED
+          post-ladder). The proxy runs with the allowlist but sees ZERO traffic: the
+          pools carry no HTTP(S)_PROXY env, so the D-17 "single policy point" is not
+          enforced — cells egress directly via NAT. Wire it: add to `ladder-env` in
+          infrastructure/docker-compose.ladder.yml HTTP_PROXY=http://egress:8888,
+          HTTPS_PROXY=http://egress:8888, NO_PROXY=finops-queue,neo4j,chromadb,localhost,
+          127.0.0.1 (the by-name data-plane hosts), then recreate the affected pools so
+          the env takes effect. VERIFY (both directions): after the recreate, the egress
+          proxy's logs show traffic from the pools (the D-17 policy point enforced), and
+          the data-plane hosts are still reachable by name (the NO_PROXY list is
+          complete — a cell that cannot reach neo4j/chroma is a regression). The
+          isolation contract from p4 must still hold: a submitted job's env carries the
+          proxy, never a bypass.
+          DELIVER: the ladder-env wiring + the recreate + the traffic evidence,
+          committed.
+          LOG: PASS/FAIL with the proxy-traffic evidence; commit.
 factors:
   - {name: model, levels: [anthropic/claude-sonnet-5]}
 design: factorial

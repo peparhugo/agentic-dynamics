@@ -1,0 +1,144 @@
+name: context_abstraction_closure
+question: >-
+  Close the context_abstraction_implement spec: its 8 phases all landed on main
+  (fact_schema, the three reducers, context_compiler, fact_contracts, controller_shadow,
+  apply_route — $49.52 across 4 runs, last 2026-08-23) but the lifecycle was never
+  finalized — the index still reads runnable with no completed_at, no verification
+  pass, and no closure writeup. This workflow verifies the delivered machinery against
+  the design (docs/architecture/current/context_abstraction_design.md + addendum),
+  regenerates the spec index so the spec reads completed, writes the closure verdict,
+  and runs the guard suite. It is a closure, not an implementation — it fixes nothing
+  it does not have to.
+version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: false
+repeatable: false
+# NOTE (execution path): trivial deterministic closure — in-process per the skill's
+# fallback (no fleet needed to regenerate an index and verify delivered code).
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: false
+    context:
+      domain_context: >-
+        canonical_sources: [experiments/specs/STATUS.md + index.json (the lifecycle —
+        context_abstraction_implement row: runnable, last run 2026-08-23T19:16, ok, 4
+        runs), experiments/results/workflows/context_abstraction_implement/ (the run
+        ledgers — the last run's 8 phases all ok: fact_schema 2985s $43.17,
+        spec_status_reducer, ledger_reducers, workflow_reducer, context_compiler,
+        fact_contracts, controller_shadow, apply_route),
+        src/agentic_dynamics/control/ (context_compiler.py — compile_context,
+        validate_spec_fact_contracts; facts.py + the REDUCERS registry; the shadow-mode
+        controller/validator rails), docs/architecture/current/context_abstraction_design.md
+        + context_abstraction_addendum_design.md (the design authority: I4 the context
+        compiler, the fact contracts, the shadow rails), tests/ (the control-plane test
+        family), scripts/spec_status.py (the lifecycle regenerator — derived, never
+        hand-edited), scripts/CONTEXT.md (classification manifest)].
+        policies: [lifecycle_derived_never_hand_edited, closure_over_reopening,
+        regenerate_never_hand_edit].
+      challenge_context: >-
+        challenge: the implementation ran and landed but the loop was never closed — the
+        index still says runnable, so the platform's own board shows the work as in
+        flight when it is delivered. The risk in closing: a rubber-stamp verification.
+        The closure must verify the delivered machinery against the design (each I4/I6
+        element present + tested) BEFORE the lifecycle flip, and the flip must come from
+        the generator (spec_status.py), never a hand-edit of the index.
+        deliberation: [verify the delivery, then close the lifecycle, then the guards].
+        session_policy: {default: continue}
+      current_state: >-
+        MEASURED (2026-09-01): the 8 phases of the last context_abstraction_implement
+        run are all ok in the ledger (2026-08-23T19:16, sonnet — fact_schema $43.17 +
+        the seven small phases). The control plane contains context_compiler.py,
+        facts.py + reducers, and the shadow rails (the I4/I6 elements). The spec
+        lifecycle still reads runnable, completed_at absent — the index was never
+        regenerated after the run. The design authority (context_abstraction_design.md
+        + addendum) is committed and implemented-status.
+      hard_rules: >-
+        (1) VERIFY BEFORE YOU FLIP: the lifecycle change is gated on the verification
+        pass — every I4/I6 element in the design has a code anchor + a test anchor.
+        (2) THE INDEX IS DERIVED: the flip happens through python3 scripts/spec_status.py,
+        never a hand-edit of STATUS.md/index.json. (3) CLOSURE OVER REOPENING: fix only
+        what the verification finds broken; anything merely unpolished is recorded in
+        the closure writeup, not fixed ad hoc.
+    phases:
+      - name: p1_verify_delivery
+        kind: agent
+        scope: research_readonly
+        timeout: 3600
+        prompt: |
+          GOAL: {goal}
+          SHAPE: verify the delivered context-abstraction machinery against the design.
+          For each I4/I6 element in docs/architecture/current/context_abstraction_design.md
+          + addendum (the context compiler / compile_context + the route_next_job/v1
+          contract, validate_spec_fact_contracts, the fact plane + the REDUCERS
+          registry, the shadow-mode controller/validator rails, the apply-route seam):
+          find the code anchor in src/agentic_dynamics/control/ and the test anchor in
+          tests/, and record both. Run the control-plane test family (the context
+          compiler + facts + validator tests). Produce the verification table (element |
+          code anchor | test anchor | status) in
+          docs/architecture/current/2026-09-01_context_abstraction_closure.md. Do NOT
+          edit code in this phase.
+          DELIVER: the verification table doc, committed.
+          LOG: PASS/FAIL with the verified-element count; commit.
+      - name: p2_close_lifecycle
+        kind: agent
+        scope: implementation
+        timeout: 3600
+        prompt: |
+          GOAL: {goal}
+          SHAPE: close the lifecycle — gated on p1's table (every element verified).
+          Append the closure section to the closure doc from p1: the run ledger pointer
+          (20260823T191652Z — 8/8 phases ok), the verified-element count, and the
+          closure verdict (implemented per the design authority). Then regenerate the
+          spec index with `python3 scripts/spec_status.py` so
+          context_abstraction_implement reads completed with completed_at = the closure
+          date. If the generator needs the completed marker from the ledger chain, do
+          whatever the generator's contract requires — never hand-edit the index.
+          DELIVER: the closure writeup + the regenerated lifecycle, committed.
+          LOG: PASS/FAIL with the index row before/after; commit.
+      - name: p3_guard_suite
+        kind: agent
+        scope: research_readonly
+        timeout: 3600
+        prompt: |
+          GOAL: {goal}
+          SHAPE: the guard suite. Run the lifecycle + dependency + classification
+          guards: python3 -m pytest tests/test_spec_status.py tests/test_doc_lifecycle.py
+          tests/test_dependency_direction.py tests/test_script_classification.py -q.
+          Also run the context-compiler test family. Confirm the index chain is intact
+          (context_abstraction_implement completed, no broken supersedes). Fix nothing
+          the guards do not demand.
+          DELIVER: the guard results recorded in the closure doc, committed.
+          LOG: PASS/FAIL with the guard summary; commit.
+factors:
+  - {name: model, levels: [deepseek/deepseek-v4-flash]}
+design: factorial
+rules:
+  - name: delivery_verified
+    plane: measurement
+    evidence_class: "[C]"
+    requires: []
+    produces: [elements_verified, closure_doc_written]
+  - name: lifecycle_closed
+    plane: measurement
+    evidence_class: "[C]"
+    requires: [elements_verified]
+    produces: [spec_index_completed, closure_verdict]
+  - name: guards_green
+    plane: measurement
+    evidence_class: "[M]"
+    requires: [spec_index_completed]
+    produces: [guard_suite_passed]
+metrics:
+  - {name: elements_verified, agg: mean, over: cell}
+  - {name: spec_index_completed, agg: mean, over: cell}
+  - {name: guard_suite_passed, agg: mean, over: cell}
+writeup:
+  format: lab_book
+  sections: [question, p1_verify_delivery, p2_close_lifecycle, p3_guard_suite]
+stop: {budget_usd: 2.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}
