@@ -84,8 +84,9 @@ workflow:
           SPEND surfaced distinctly (wallet, meter, 14d estimate), is the cache age
           visible, are error/empty/expired states handled in the UI, is refresh wired.
           Do NOT edit anything in this phase.
-          DELIVER: the audit doc (docs/architecture/current/2026-09-01_usage_wiring_audit.md),
-          committed.
+          DELIVER: the audit doc (docs/architecture/current/2026-09-01_usage_wiring_audit.md)
+          WITH the doc-lifecycle status frontmatter (status: accepted — the runner's
+          DOC_CONTRACT gate rejects a committed doc without it), committed.
           LOG: PASS/FAIL with the gap count; commit.
       - name: p2_complete_wiring
         kind: agent
