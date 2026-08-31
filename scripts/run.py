@@ -197,6 +197,12 @@ def _run_baseline(task, constraints, model_id, timeout, exp_name="exp",
         "confidence": r.confidence,
         "thinking_ratio": eff.thinking_ratio,
         "cost_usd": r.estimated_cost_usd,
+        # Cost provenance (admission_leases p3): ``cost_usd`` is a float and cannot express
+        # "no figure was reported". These three say whether to believe it — in particular
+        # whether a 0.0 above is a metered zero or an unmeasured one.
+        "cost_source": r.cost_source.value,
+        "estimation_method": r.estimation_method,
+        "reported_cost_usd": r.reported_cost_usd,
         "energy_j": eff.total_energy_j,
         "tool_calls": r.total_tool_calls,
         "retries": r.retry_loops,
@@ -316,6 +322,12 @@ def _run_perturbed(task, constraints, op_name, strength, baseline,
         "confidence": r.confidence,
         "thinking_ratio": eff.thinking_ratio,
         "cost_usd": r.estimated_cost_usd,
+        # Cost provenance (admission_leases p3): ``cost_usd`` is a float and cannot express
+        # "no figure was reported". These three say whether to believe it — in particular
+        # whether a 0.0 above is a metered zero or an unmeasured one.
+        "cost_source": r.cost_source.value,
+        "estimation_method": r.estimation_method,
+        "reported_cost_usd": r.reported_cost_usd,
         "energy_j": eff.total_energy_j,
         "tool_calls": r.total_tool_calls,
         "retries": r.retry_loops,

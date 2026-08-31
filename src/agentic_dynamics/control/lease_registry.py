@@ -134,6 +134,15 @@ from datetime import datetime, timezone
 from enum import Enum
 from typing import Any
 
+# The cost-provenance vocabulary is DEFINED in tier 0 so ``adapters`` (which emits it) and
+# ``experiment`` (whose ledger carries it) can use the same names without importing ``control``.
+# Re-exported below for every existing caller of ``lease_registry.CostSource`` / ``ProviderClass``.
+from agentic_dynamics.core.cost_provenance import (
+    PROVIDER_CLASSES,
+    CostSource,
+    ProviderClass,
+)
+
 # ── Redis placement (the framework instance — the one that is never flushed) ─────────────────
 
 REDIS_HOST = os.environ.get("FINOPS_REDIS_HOST", "127.0.0.1")
@@ -205,13 +214,12 @@ CONCURRENCY_CEILING = 32
 # ── Vocabularies ─────────────────────────────────────────────────────────────────────────────
 
 
-class ProviderClass(str, Enum):
-    """How a provider charges — the split that decides a budget lease's unit and cap."""
-
-    #: DeepSeek: real dollars per token, drawn from a real wallet. Unit: USD.
-    PER_TOKEN = "per_token"
-    #: Anthropic / OpenAI: fixed-price plan with rolling usage windows. Unit: window percent.
-    SUBSCRIPTION = "subscription"
+# ``ProviderClass`` and ``CostSource`` are DEFINED in ``core.cost_provenance`` (tier 0) and
+# imported above. They used to live here, but phase 3 needs the same vocabulary in ``adapters``
+# (which emits provenance) and ``experiment`` (whose ledger carries it), and neither may import
+# ``control`` — see ``tests/test_dependency_direction.py``. They stay re-exported from this
+# module because THIS is where the vocabulary has teeth: an ``UNKNOWN`` per-token reservation
+# is denied here, and a ``PER_TOKEN`` budget lease is denominated in dollars here.
 
 
 class LeaseKind(str, Enum):
@@ -236,24 +244,6 @@ class ScopeKind(str, Enum):
     RUN = "run"
 
 
-class CostSource(str, Enum):
-    """Provenance of a cost figure — the audit's "five states collapsed into one" fix.
-
-    Defined here, in the admission layer, because *this* is where provenance has teeth: a
-    per-token reservation carrying :attr:`UNKNOWN` is denied. Phase 3 wires the adapters and the
-    attempt ledger to emit these values; this enum is the single source of the vocabulary.
-    """
-
-    #: The provider's own meter reported it. Trustworthy.
-    METERED = "metered"
-    #: Computed locally from token counts × a price table. Trustworthy enough to reserve against.
-    ESTIMATED = "estimated"
-    #: No cost figure was available. NOT zero. Denies a per-token reservation.
-    UNKNOWN = "unknown"
-    #: An estimate that was later settled against the platform meter and matched.
-    RECONCILED = "reconciled"
-
-
 #: Units, kept explicit on every lease so a number can never be read in the wrong currency.
 UNIT_USD = "usd"
 UNIT_WINDOW_PERCENT = "window_percent"
@@ -269,14 +259,9 @@ BUDGET_UNIT_BY_CLASS: dict[ProviderClass, str] = {
 #: passed dollars to a window lease), and the boundary check refuses it.
 WINDOW_PERCENT_MAX = 100.0
 
-#: Provider id → class. Mirrors ``control.model_policy``'s cost model. Deliberately a closed
-#: allowlist: an unrecognised provider is NOT assumed to be free (see
-#: :func:`provider_class_for_provider`).
-PROVIDER_CLASSES: dict[str, ProviderClass] = {
-    "deepseek": ProviderClass.PER_TOKEN,
-    "anthropic": ProviderClass.SUBSCRIPTION,
-    "openai": ProviderClass.SUBSCRIPTION,
-}
+#: Provider id → class, re-exported from :mod:`agentic_dynamics.core.cost_provenance`. Mirrors
+#: ``control.model_policy``'s cost model. Deliberately a closed allowlist: an unrecognised
+#: provider is NOT assumed to be free (see :func:`provider_class_for_provider`).
 
 
 # ── Errors (every one of them a denial) ──────────────────────────────────────────────────────

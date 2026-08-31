@@ -126,6 +126,7 @@ from typing import Any
 
 from agentic_dynamics.adapters.backends import run_agentic
 from agentic_dynamics.core.admission_context import AdmissionRefused
+from agentic_dynamics.core.cost_provenance import CostSource
 from agentic_dynamics.core.language import build_code_snapshot, compute_code_delta, detect_language
 from agentic_dynamics.core.paths import PROJECT_ROOT
 from agentic_dynamics.experiment.experiment_spec import ExperimentSpec, validate_spec
@@ -190,6 +191,14 @@ class PhaseResult:
     # agent phases
     tokens: dict[str, int] = field(default_factory=dict)
     cost_usd: float = 0.0
+    # Cost provenance (admission_leases p3). ``cost_usd`` is a float and so cannot say "no
+    # figure was reported"; these three say whether to believe it. A phase whose model call
+    # never produced a priceable cost ends UNKNOWN, which the admission gate refuses to spend
+    # real per-token dollars against — rather than reading as a free phase.
+    cost_source: str = CostSource.UNKNOWN.value
+    estimation_method: str | None = None
+    #: The backend's verbatim figure: ``None`` = reported nothing, ``0.0`` = reported a zero.
+    reported_cost_usd: float | None = None
     cache_read_tokens: int = 0
     cache_write_tokens: int = 0
     cache_hit_rate: float = 0.0
@@ -250,6 +259,9 @@ class PhaseResult:
             "error": self.error,
             "tokens": self.tokens,
             "cost_usd": self.cost_usd,
+            "cost_source": self.cost_source,
+            "estimation_method": self.estimation_method,
+            "reported_cost_usd": self.reported_cost_usd,
             "cache_read_tokens": self.cache_read_tokens,
             "cache_write_tokens": self.cache_write_tokens,
             "cache_hit_rate": self.cache_hit_rate,
@@ -2941,6 +2953,16 @@ def run_workflow(
                         "total": getattr(ar, "total_tokens", 0),
                     }
                     pr.cost_usd = getattr(ar, "estimated_cost_usd", 0.0)
+                    # Carry the cost's PROVENANCE onto the ledger alongside its value, so a
+                    # phase whose cost was never reported is legible as UNKNOWN on disk
+                    # instead of as a $0.00 phase. ``getattr`` defaults keep this tolerant of
+                    # the stub results the runner's tests inject.
+                    _phase_source = getattr(ar, "cost_source", None)
+                    pr.cost_source = getattr(_phase_source, "value", None) or (
+                        _phase_source if isinstance(_phase_source, str) else CostSource.UNKNOWN.value
+                    )
+                    pr.estimation_method = getattr(ar, "estimation_method", None)
+                    pr.reported_cost_usd = getattr(ar, "reported_cost_usd", None)
                     pr.confidence = getattr(ar, "confidence", None)
                     pr.cache_read_tokens = getattr(ar, "cache_read_tokens", 0)
                     pr.cache_write_tokens = getattr(ar, "cache_write_tokens", 0)

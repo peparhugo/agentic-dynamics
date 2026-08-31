@@ -82,6 +82,13 @@ from contextvars import ContextVar
 from dataclasses import dataclass
 from typing import Any
 
+from agentic_dynamics.core.cost_provenance import (
+    TRUSTED_COST_SOURCES,
+    CostSource,
+    coerce_cost_source,
+    is_per_token_model,
+)
+
 # ── The env-var contract (the cross-process transport) ───────────────────────────────────────
 
 #: The arming switch. ``"1"``/``"true"``/``"yes"``/``"on"`` arms the gate; anything else
@@ -111,6 +118,13 @@ HARD_CAP_USD_ENV = "FINOPS_ADMISSION_HARD_CAP_USD"
 #: Epoch seconds (UTC) at which the admission's earliest lease expires.
 EXPIRES_AT_ENV = "FINOPS_ADMISSION_EXPIRES_AT"
 
+#: Provenance of :data:`RESERVED_USD_ENV` — a ``core.cost_provenance.CostSource`` value.
+#: Carried across the boundary because the *child* is where the invocation actually happens,
+#: and a per-token child whose reservation was never priced must refuse there too, not merely
+#: have been refused upstream. Empty/absent means no provenance stated, hence untrusted
+#: (see :func:`require_admission`).
+COST_SOURCE_ENV = "FINOPS_ADMISSION_COST_SOURCE"
+
 #: Every env key this module owns — the exact set :meth:`LeaseContext.to_env` writes and
 #: :func:`bind_context` restores. Kept as one tuple so a caller can scrub the whole block
 #: (a child that must NOT inherit the parent's admission unsets exactly these).
@@ -122,6 +136,7 @@ ADMISSION_ENV_KEYS: tuple[str, ...] = (
     RESERVED_USD_ENV,
     HARD_CAP_USD_ENV,
     EXPIRES_AT_ENV,
+    COST_SOURCE_ENV,
 )
 
 #: The lease fields a spawn/enqueue request carries, in the work order's own wording:
@@ -205,6 +220,16 @@ class LeaseContext:
     hard_cap_usd: float | None = None
     #: Epoch seconds (UTC): the earliest expiry among this admission's leases.
     expires_at: float = 0.0
+    #: Provenance of :attr:`reserved_cost_usd`. ``None`` means "no provenance stated", which
+    #: is treated exactly like ``CostSource.UNKNOWN`` — untrusted. Defaulting to ``None``
+    #: rather than to a trusted value means an older envelope (or a hand-built context) cannot
+    #: silently acquire permission to spend per-token dollars.
+    cost_source: CostSource | None = None
+
+    @property
+    def cost_is_trusted(self) -> bool:
+        """True when this admission's reservation may back real per-token spend."""
+        return self.cost_source in TRUSTED_COST_SOURCES
 
     # -- lifetime ---------------------------------------------------------------------------
 
@@ -235,6 +260,9 @@ class LeaseContext:
             # with a genuinely malformed value.
             HARD_CAP_USD_ENV: "" if self.hard_cap_usd is None else repr(float(self.hard_cap_usd)),
             EXPIRES_AT_ENV: repr(float(self.expires_at)),
+            # Empty string for "unstated", mirroring HARD_CAP_USD_ENV's convention: absence is
+            # a fact the child must be able to read, and it reads as untrusted.
+            COST_SOURCE_ENV: "" if self.cost_source is None else self.cost_source.value,
         }
 
     @classmethod
@@ -290,6 +318,10 @@ class LeaseContext:
             reserved_cost_usd=reserved,
             hard_cap_usd=hard_cap,
             expires_at=expires_at,
+            # ``coerce_cost_source`` returns None for an absent OR unrecognised value, so a
+            # typo in the envelope degrades to "untrusted" (a refusal) rather than to a
+            # silently granted permission.
+            cost_source=coerce_cost_source(source.get(COST_SOURCE_ENV)),
         )
 
     def to_request_fields(self) -> dict[str, Any]:
@@ -464,6 +496,31 @@ def require_admission(
             f"admission for run {context.run_id!r} was granted for model {context.model!r}, "
             f"not {model!r} — an admission is priced per provider class and is not "
             f"transferable between models."
+        )
+
+    # UNKNOWN COST IS NEVER FREE (work order hard rule 2), enforced at the invocation itself.
+    #
+    # The controller already refuses an unpriced per-token reservation at admission time. This
+    # is the second, independent check, and it is not redundant: admission happens in the
+    # PARENT (enqueue, the worker, the orchestrator) while the invocation happens HERE, often
+    # in a different process that received the admission as an env block. A block that arrives
+    # without provenance — an older envelope, a hand-edited launch script, a partially-copied
+    # spawn request — would otherwise spend real DeepSeek dollars against a reservation nobody
+    # ever priced. ``cost_source`` is required to be a TRUSTED value, so both "unknown" and
+    # "unstated" refuse.
+    #
+    # Scoped to per-token models on purpose: a subscription run has no marginal dollar cost, so
+    # requiring it to price a reservation would deny every Claude/OpenAI phase for no safety
+    # gain. ``is_per_token_model`` fails closed on an unclassified provider.
+    effective_model = model or context.model
+    if is_per_token_model(effective_model) and not context.cost_is_trusted:
+        stated = "unstated" if context.cost_source is None else context.cost_source.value
+        raise AdmissionContextError(
+            f"admission for run {context.run_id!r} on per-token model {effective_model!r} "
+            f"carries cost_source={stated} — unknown cost is never free. The reservation of "
+            f"${context.reserved_cost_usd} was never priced against a meter or a price table, "
+            f"so this invocation would spend real dollars against an unpriced claim. Instrument "
+            f"the cost (see core.cost_provenance) or route to a subscription model."
         )
     return context
 

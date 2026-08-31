@@ -44,10 +44,11 @@ from . import (
     pipeline_status,
     queue_reinterleave,
     routing,
+    settlement,
     signal_store,
     step_routing,
     supervisor,
     verify_proposal,
 )
 
-__all__ = ['actuation_ingestion', 'admission', 'evidence_analyzer', 'lease_registry', 'live', 'observation_ingestion', 'orphan_ingestion', 'orphan_sweep', 'pipeline_status', 'queue_reinterleave', 'routing', 'signal_store', 'step_routing', 'supervisor', 'verify_proposal']
+__all__ = ['actuation_ingestion', 'admission', 'evidence_analyzer', 'lease_registry', 'live', 'observation_ingestion', 'orphan_ingestion', 'orphan_sweep', 'pipeline_status', 'queue_reinterleave', 'routing', 'settlement', 'signal_store', 'step_routing', 'supervisor', 'verify_proposal']

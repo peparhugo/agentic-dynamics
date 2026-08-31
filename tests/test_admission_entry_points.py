@@ -31,6 +31,7 @@ import pytest
 
 from agentic_dynamics.control.admission import AdmissionController, AdmissionDenied
 from agentic_dynamics.control.lease_registry import (
+    CostSource,
     LeaseKind,
     LeaseRegistry,
     LeaseScope,
@@ -672,8 +673,11 @@ def test_run_agentic_proceeds_under_a_live_admission(armed, monkeypatch):
         opencode, "run_opencode_agentic",
         lambda prompt, **kwargs: calls.append(prompt) or _fake_agent(),
     )
+    # ``cost_source`` is required on a per-token admission since p3 (unknown cost is never
+    # free) — a live admission is one that is priced, not merely one that exists.
     context = LeaseContext(
-        run_id="r", model=PER_TOKEN_MODEL, budget_lease_id="b", expires_at=9e9
+        run_id="r", model=PER_TOKEN_MODEL, budget_lease_id="b", expires_at=9e9,
+        cost_source=CostSource.ESTIMATED,
     )
     with bind_context(context):
         backends.run_agentic("do the thing", model=PER_TOKEN_MODEL)

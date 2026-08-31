@@ -95,6 +95,7 @@ from agentic_dynamics.control.lease_registry import (
     provider_class_for_model,
 )
 from agentic_dynamics.control.model_policy import ModelPolicyError, ensure_model_allowed
+from agentic_dynamics.control.settlement import settle_run, settlement_enabled
 from agentic_dynamics.core.admission_context import (
     AdmissionRefused,
     LeaseContext,
@@ -288,6 +289,10 @@ class Admission:
             reserved_cost_usd=float(self.record.reserved_cost_usd or 0.0),
             hard_cap_usd=self.record.hard_cap_usd,
             expires_at=self.expires_at,
+            # The provenance travels with the reservation. Without it the child process's
+            # ``require_admission`` cannot tell a priced per-token claim from an unpriced one,
+            # and (fail-closed) would refuse every per-token invocation.
+            cost_source=self.record.cost_source,
         )
 
     def env(self) -> dict[str, str]:
@@ -719,6 +724,24 @@ def admitted(
         with bind_context(admission.context()):
             yield admission
     finally:
+        # POST-RUN SETTLEMENT (work order p3, audit item 5) — BEFORE the release, so the
+        # reservation being settled is still outstanding while it is measured.
+        #
+        # Here rather than at each call site because ``admitted`` wraps exactly the paths that
+        # are real runs (the worker's cells, the workflow's phases); ``scripts/enqueue.py``
+        # reserves through ``ctrl.admit`` directly precisely because a queue-fill claims budget
+        # for work that has not happened yet and must NOT be settled.
+        #
+        # Best-effort and opt-in: ``settle_run`` never raises (a bookkeeping failure must not
+        # surface over the body's own exception), and ``settlement_enabled()`` is off unless the
+        # operator armed it — the meter is a snapshot on its own refresh cadence, and settling
+        # every run against a stale one would manufacture variances.
+        if settlement_enabled():
+            settle_run(
+                run_id=admission.run_id,
+                model=request.model,
+                reserved_amount=float(admission.budget_lease.amount),
+            )
         # The lease's TTL is the guarantee; release is only the fast path — so a release
         # failure must never surface over whatever the body was already raising.
         with suppress(AdmissionError):
@@ -816,6 +839,8 @@ def make_phase_admission(
             ttl_seconds=ttl_seconds,
             metadata={"spec": spec_name, "phase": phase_name},
         )
+        # Settlement happens in ``admitted`` (below), so every real run settles — the worker's
+        # cells as well as these phases — without each entry point repeating the hook.
         with admitted(request, controller=controller) as admission:
             yield admission
 
