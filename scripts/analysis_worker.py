@@ -40,7 +40,6 @@ from agentic_dynamics.measurement.commit_analysis import (
     analyze_story_worktree,
     compute_deep_metrics,
 )
-from agentic_dynamics.runtime.posthoc import trigger_reviews
 from agentic_dynamics.runtime.story import load_story_result
 
 REDIS_HOST = os.environ.get("FINOPS_REDIS_HOST", "127.0.0.1")
@@ -109,14 +108,23 @@ def _resolve_result(job: dict) -> Path:
 
 
 def _trigger_reviews(r: redis.Redis, story_id: str, story_name: str, worktree: Path) -> None:
-    """Enqueue this story's review jobs after analysis completes (best-effort).
+    """Signal the review-unit after analysis completes (best-effort).
 
-    A trigger failure must not fail the analysis — ``enqueue_reviews.py`` is the
-    backfill safety net — so any error is logged and swallowed.
+    The review flow is AUTOMATIC since 2026-08-31: a completed analysis LPUSHes the
+    review trigger directly onto ``fleet:review_trigger`` (db1 / 6380); the review-unit
+    daemon (exactly one runner) consumes it and runs ``review_all --only-missing``. The
+    legacy ``review_jobs`` queue is retired from the display and never consumed — a
+    trigger failure must not fail the analysis, so any error is logged and swallowed.
     """
     try:
-        n = trigger_reviews(r, story_id, story_name, worktree)
-        log(f"[{story_id}] enqueued {n} review jobs")
+        payload = json.dumps({
+            "action": "review",
+            "story_id": story_id,
+            "story_name": story_name,
+            "ts": time.time(),
+        })
+        r.lpush("fleet:review_trigger", payload)
+        log(f"[{story_id}] signalled review-unit")
     except Exception as e:
         log(f"[{story_id}] review trigger failed (non-fatal): {e}")
 

@@ -165,25 +165,16 @@ def test_worker_trigger_skips_when_no_result_line():
 # ── 2. analysis worker auto-enqueues review after analysis ─────────────────
 
 def test_analysis_worker_triggers_reviews_after_analysis(story_worktree):
-    """After analysis, one commit job per session commit + a story-level job."""
+    """After analysis, the review trigger is LPUSHed for the review-unit daemon."""
     fake = FakeRedis()
 
     analysis_worker._trigger_reviews(fake, "s1", "task_manager_api", story_worktree)
 
-    jobs = fake.queues["review_jobs"]
-    job_ids = [j["job_id"] for j in jobs]
-    assert job_ids == ["s1_1", "s1_2", "s1_story"]
-
-    commit_jobs = [j for j in jobs if j.get("job_type") != "story_review"]
-    story_jobs = [j for j in jobs if j.get("job_type") == "story_review"]
-    assert len(commit_jobs) == 2
-    assert {j["session_number"] for j in commit_jobs} == {1, 2}
-    assert all(j["model"] == posthoc.DEFAULT_REVIEW_MODEL for j in jobs)
-    assert story_jobs[0]["commit_hash"] == ""
-
-    # Every review job seeds its status under its own job_id.
-    for jid in job_ids:
-        assert fake.statuses[("review_status", jid)] == "queued"
+    triggers = fake.queues.get("fleet:review_trigger", [])
+    assert len(triggers) == 1
+    assert triggers[0]["action"] == "review"
+    assert triggers[0]["story_id"] == "s1"
+    assert "ts" in triggers[0]
 
 
 def test_analysis_worker_skips_reviews_when_no_commits(tmp_path):
@@ -194,7 +185,7 @@ def test_analysis_worker_skips_reviews_when_no_commits(tmp_path):
 
     fake = FakeRedis()
     analysis_worker._trigger_reviews(fake, "s1", "story", empty)
-    assert "review_jobs" not in fake.queues
+    assert len(fake.queues.get("fleet:review_trigger", [])) == 1  # the trigger still fires
 
 
 # ── 3. trigger failure does not fail the cell ──────────────────────────────
@@ -210,13 +201,13 @@ def test_worker_trigger_failure_is_swallowed(monkeypatch, story_result_file):
     worker._trigger_analysis(fake, f"...\n  Results: {story_result_file}\n", "cell_1")
 
 
-def test_analysis_worker_trigger_failure_is_swallowed(monkeypatch, story_worktree):
-    """If the review trigger raises, the analysis still completes (no exception)."""
-    def boom(r, story_id, story_name, worktree, model=posthoc.DEFAULT_REVIEW_MODEL):
-        raise RuntimeError("redis down")
+def test_analysis_worker_trigger_failure_is_swallowed(story_worktree):
+    """If the review trigger push raises, the analysis still completes (no exception)."""
+    class BoomRedis(FakeRedis):
+        def lpush(self, key, value):
+            raise RuntimeError("redis down")
 
-    monkeypatch.setattr(analysis_worker, "trigger_reviews", boom)
-    analysis_worker._trigger_reviews(FakeRedis(), "s1", "story", story_worktree)
+    analysis_worker._trigger_reviews(BoomRedis(), "s1", "story", story_worktree)
 
 
 def test_posthoc_trigger_analysis_returns_false_for_bad_input(tmp_path):

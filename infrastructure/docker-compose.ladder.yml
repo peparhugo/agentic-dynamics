@@ -144,11 +144,11 @@ services:
   review-unit:
     <<: *cell-base
     command: ["python3", "scripts/fleet/review_unit.py"]
-    restart: "no"                 # run-to-completion; triggered by the supervisor's trigger-reviews
+    restart: "always"             # the review daemon — exactly one runner, stays up
     environment:
       <<: *ladder-env
       FINOPS_KB_WRITE: "1"        # P3 (review) — review_ingestion
-    # scale: 2
+    # scale: 1
 
   kb-chroma:
     <<: *cell-base
