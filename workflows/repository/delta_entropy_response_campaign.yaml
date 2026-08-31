@@ -1,0 +1,191 @@
+name: delta_entropy_response_campaign
+question: >-
+  Run the preregistered Δ-entropy response-curve campaign (graph-family Part B): the
+  E4/grit-style perturbation grid (operators × strengths × conditions on a fixed story)
+  with ΔH_solution as the recorded response axis, joined with the linkage axis
+  (changed_symbols_with_tests_ratio) and the outcome axis (test_executed_success),
+  testing the three falsifiable hypotheses (H1 mess-rises-with-stress, H2 mess-vs-
+  review-texture, H3 mess-vs-outcome), reporting the per-strength response distribution
+  (never a single fitted number — the prereg's [P] rule), and counting the wall
+  (clean_but_wrong). The preregistration
+  (docs/experiments/preregistrations/delta_entropy_response_curve.md) is the authority —
+  the campaign executes it, it does not revise it.
+version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: false
+repeatable: false
+# NOTE (execution path): reference path is the orchestrator; this campaign runs story
+# cells — if the fleet is free, run it containerized (the isolation contract applies to
+# every cell); in-process is the fallback while the fleet is occupied.
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: false
+    context:
+      domain_context: >-
+        canonical_sources: [docs/experiments/preregistrations/delta_entropy_response_curve.md
+        (the prereg — accepted, committed BEFORE any cell: the axis, H1-H3 falsifiable,
+        the quadrant contract, the response reported as per-strength distributions never
+        a single fitted number, the wall as a count), scripts/measure_delta_entropy.py
+        (the delta_entropy/v1 instrument — the solution/test split: ΔH_solution primary
+        (production only), ΔH_tests recorded secondary; measured corpus 235 story + 86
+        campaign cells; baseline quadrant distribution: messy_but_right 99,
+        messy_and_broken 21, clean_and_right 5, clean_but_wrong 1 (the 2d/2e wall);
+        test-join complete 126/321 — incomplete = FAILED finding, never a quadrant),
+        src/agentic_dynamics/measurement/entropy.py (compute_entropy, entropy_delta,
+        entropy_delta_detailed), src/agentic_dynamics/runtime/test_runner.py
+        (test_executed_success — the sole source of truth), the story machinery
+        (src/agentic_dynamics/runtime/story.py: BUILTIN_STORIES + PerturbationCondition
+        CLEAN/BAD_SEED/EARLY_DEGRADE/LATE_DEGRADE; scripts/run_story.py + scripts/enqueue.py
+        + scripts/worker.py for grid transport), the grit-grid precedent
+        (scripts/run_cap_grit_grid.py or its successor — the E4/grit-style shape),
+        scripts/CONTEXT.md (classification manifest)].
+        policies: [preregistration_is_authoritative, response_as_distributions,
+        incomplete_join_is_failed_finding, regenerate_never_hand_edit].
+      challenge_context: >-
+        challenge: the prereg promises the campaign's response axis and the H1-H3 tests,
+        but no cell has run — the risk is a campaign that silently drifts from the
+        prereg (a different story, a weaker strength ladder, a single-number response
+        curve) and a verdict that over-claims. The prereg's contract: per-strength
+        distributions, the sign-of-delta threshold for H1 (REFUTED if the highest
+        strength's mean ΔH_solution does not exceed the baseline condition's), the
+        quadrant gate (an incomplete test-join is a FAILED finding, never a quadrant),
+        the wall as a count (clean_but_wrong ≥ 1 is the 2d/2e wall, not a quadrant
+        verdict).
+        deliberation: [instrument check first, then the grid, then the hypothesis tests,
+        then the writeup].
+        session_policy: {default: continue}
+      current_state: >-
+        MEASURED (2026-09-01): the instrument is live (delta_entropy/v1, measured
+        2026-08-30 — 235 story + 86 campaign cells; entropy_delta + entropy_delta_detailed
+        in measurement/entropy.py). The prereg is committed (ce6411d8e, accepted) with
+        the baseline quadrant distribution and the test-join gate (126/321 complete). The
+        campaign itself has ZERO cells run — the ΔH response axis has no measurements yet.
+        The calibration grid machinery exists (grit-style grids ran before; story cells
+        transport via enqueue/worker or the direct runner). The 2d/2e wall stands at
+        clean_but_wrong 1 — the prereg pins it as the wall count for this campaign.
+      hard_rules: >-
+        (1) THE PREREG IS THE AUTHORITY: the campaign executes
+        delta_entropy_response_curve.md — same story family, same strength ladder, same
+        quadrant contract; any divergence is reported, never silently fixed.
+        (2) THE RESPONSE IS DISTRIBUTIONS, NOT A FITTED NUMBER: per-strength ΔH_solution
+        distributions are the deliverable; a single-number response curve is a violation.
+        (3) THE QUADRANT GATE HOLDS: a cell whose test-join is incomplete is a FAILED
+        finding, never a quadrant; the wall (clean_but_wrong) is counted, never
+        reclassified.
+        (4) REGENERATE, NEVER HAND-EDIT: derived surfaces go through their generators;
+        the spec index carries the campaign after the run.
+    phases:
+      - name: p1_instrument_check
+        kind: agent
+        scope: research_readonly
+        timeout: 3600
+        prompt: |
+          GOAL: {goal}
+          SHAPE: verify the instrument before any cell runs. Run
+          scripts/measure_delta_entropy.py over the existing corpus (delta_entropy/v1):
+          confirm the split is live (ΔH_solution production-only, ΔH_tests recorded
+          secondary), the baseline quadrant distribution matches the prereg's measured
+          numbers (messy_but_right 99, messy_and_broken 21, clean_and_right 5,
+          clean_but_wrong 1), and the test-join gate behaves (126/321 complete;
+          incomplete = FAILED finding, never a quadrant). Confirm the response-curve
+          output shape the campaign will produce: per-strength ΔH_solution distributions
+          joined with changed_symbols_with_tests_ratio and test_executed_success. Fix
+          nothing that is not a defect; record the check results.
+          DELIVER: the instrument check record (appended to
+          docs/experiments/preregistrations/delta_entropy_response_curve.md as a status
+          note or a sibling artifact), committed.
+          LOG: PASS/FAIL with the baseline re-measurement; commit.
+      - name: p2_grid_execution
+        kind: agent
+        scope: implementation
+        timeout: 14400
+        prompt: |
+          GOAL: {goal}
+          SHAPE: run the preregistered grid. The E4/grit-style shape: a fixed story
+          (BUILTIN_STORIES) × operators × strengths × conditions (CLEAN/BAD_SEED/
+          EARLY_DEGRADE/LATE_DEGRADE), the strength ladder the prereg pins. Per cell:
+          the baseline entropy (the seeded codebase), the final entropy (the worktree
+          HEAD after the agent's work), ΔH_solution + ΔH_tests via the instrument, the
+          linkage axis (changed_symbols_with_tests_ratio) and the outcome axis
+          (test_executed_success via the independent test runner). Transport: the
+          existing grid machinery (enqueue/worker or the direct runner — match the
+          grit-grid precedent). Cells whose test-join is incomplete are FAILED findings.
+          Record per-strength ΔH_solution distributions — do not aggregate into a single
+          number.
+          VERIFY: every cell's ledger row carries perturbation_strength +
+          test_executed_success + the ΔH fields; the per-strength distributions are
+          non-empty for every rung.
+          DELIVER: the grid results (the delta_entropy/v1 artifacts + the cell ledgers),
+          committed.
+          LOG: PASS/FAIL with the cell counts per strength + the quadrant counts; commit.
+      - name: p3_hypothesis_testing
+        kind: agent
+        scope: research_readonly
+        timeout: 3600
+        prompt: |
+          GOAL: {goal}
+          SHAPE: test the three falsifiable hypotheses against the grid, exactly per the
+          prereg: H1 (mess rises with stress) — REFUTED if the highest strength's mean
+          ΔH_solution does not exceed the baseline (clean) condition's by the measured
+          sign-of-delta; H2 (mess correlates with review texture) — do the review-texture
+          rates separate by quadrant at the grid's scale; H3 (mess correlates with
+          outcomes) — the ΔH_solution × test_executed_success join. Count the wall
+          (clean_but_wrong) and compare with the prereg's baseline (1). Report each
+          hypothesis as PASS/REFUTED/INDETERMINATE with the numbers — never a narrative
+          verdict alone.
+          DELIVER: the hypothesis results section (in the response-curve doc), committed.
+          LOG: PASS/FAIL with the three verdicts + the wall count; commit.
+      - name: p4_writeup
+        kind: agent
+        scope: implementation
+        timeout: 3600
+        prompt: |
+          GOAL: {goal}
+          SHAPE: close the campaign. Write the response curve
+          (experiments/results/entropy_beta/delta_entropy_response_curve.md or the
+          prereg-designated location): the per-strength ΔH_solution distributions (the
+          primary deliverable — never a single fitted number), the three-axis join, the
+          H1-H3 verdicts with their numbers, the wall count, and the campaign's meaning
+          for the calibration axis (does stronger stress produce messier solutions, does
+          the mess correlate with review texture and outcomes). The spec index must
+          carry delta_entropy_response_campaign as completed.
+          DELIVER: the response curve + the regenerated spec index, committed.
+          LOG: PASS/FAIL; commit.
+factors:
+  - {name: model, levels: [deepseek/deepseek-v4-pro]}
+design: factorial
+rules:
+  - name: instrument_verified
+    plane: measurement
+    evidence_class: "[M]"
+    requires: []
+    produces: [baseline_reproduced, split_live]
+  - name: grid_executed
+    plane: measurement
+    evidence_class: "[M]"
+    requires: [baseline_reproduced]
+    produces: [per_strength_dh_distributions, incomplete_join_is_failed_finding]
+  - name: hypotheses_tested
+    plane: measurement
+    evidence_class: "[C]"
+    requires: [per_strength_dh_distributions]
+    produces: [h1_verdict, h2_verdict, h3_verdict, wall_counted]
+  - name: campaign_closed
+    plane: measurement
+    evidence_class: "[C]"
+    requires: [h1_verdict, h2_verdict, h3_verdict]
+    produces: [response_curve_written, spec_index_updated]
+metrics:
+  - {name: per_strength_dh_distributions, agg: mean, over: cell}
+  - {name: h1_verdict, agg: mean, over: cell}
+  - {name: wall_counted, agg: mean, over: cell}
+writeup:
+  format: lab_book
+  sections: [question, p1_instrument_check, p2_grid_execution, p3_hypothesis_testing, p4_writeup]
+stop: {budget_usd: 6.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}
