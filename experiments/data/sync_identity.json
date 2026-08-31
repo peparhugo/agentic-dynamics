@@ -1,14 +1,14 @@
 {
   "schema_version": "sync-identity/v2",
-  "generated_at": "2026-08-30T21:04:23.712433+00:00",
-  "registry_identity_sha256": "319dba6e187b62d4b3a4c9ee8a4219aea044f69321e2e9fa443b25e2122d6aed",
-  "resolved_input_sha256": "00753f57e1b20017872d1cf16f347439a54a568b26c3b6d69d0a28cf5901cad6",
+  "generated_at": "2026-08-31T19:55:50.899180+00:00",
+  "registry_identity_sha256": "dfff942e34e5143e94ef238550994330059bbf4010e1c64555b5f72d59e75406",
+  "resolved_input_sha256": "a5d0fe60f7cc35a87673b480f9e12b6f969797277dbde35bce7729a233990dd3",
   "rows": {
     "sessions": 1027,
     "stories": 207
   },
   "sessions_rows_sha256": "d17b5701c968270c39139d582b46bb65321c95144f308c35ab75300b8160bf39",
-  "stories_rows_sha256": "677d2ee29101a02509a75908565ea871b401ca052c985effd6185afba468c6f2",
+  "stories_rows_sha256": "f5a628f129d74c7983f60d7598bb11034fcb36ee052b235f194b589e5b02f323",
   "sync_transform_sha256": "61c47ca1dd960996d1ceff88e24b19ea5b3f80780189a03bd3629b987b64c2fb",
   "schema_sha256": "8bac678e802e14f87b1d7a18cafd2c6b47a636d7760895967ada63f43836778f"
 }

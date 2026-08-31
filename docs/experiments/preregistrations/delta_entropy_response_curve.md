@@ -1,5 +1,5 @@
 ---
-status: preregistered
+status: accepted
 ---
 
 # Δ-entropy response curve — pre-registration: the structural-disorder axis for the next calibration campaign
