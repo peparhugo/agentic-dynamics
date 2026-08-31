@@ -119,6 +119,50 @@
       ],
       "summary": "A focused, correct stabilization pass \u2014 native file watching, proper WS teardown ordering, and reduced flakiness \u2014 that improves the serve integration, though it papers over residual test fragility with generous polling/timeouts and a suite-wide maxWorkers:1.",
       "session_number": 3
+    },
+    {
+      "commit_hash": "88b0eb503270b4b52b4756f31f0261e4e1f1be1b",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.72,
+      "convention_adherence": 0.62,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": true,
+      "better_or_worse": "better",
+      "problems": [
+        {
+          "category": "testing",
+          "severity": "minor",
+          "description": "The fixed wait(1000) is replaced with a 20x500ms existence-polling loop and test timeouts are inflated to 30s \u2014 a generous polling strategy that stabilizes flaky integration tests but can mask genuine regressions and slows the suite; consistent with the measured +50 cognitive complexity."
+        },
+        {
+          "category": "performance",
+          "severity": "minor",
+          "description": "jest maxWorkers:1 serializes the entire suite as a blunt fix for parallel test interference (shared content/dist dirs, WS ports) rather than making the serve tests parallel-safe; it also disables parallelism for the unrelated build/CLI tests."
+        },
+        {
+          "category": "maintainability",
+          "severity": "minor",
+          "description": "close() invokes watcher.close() but does not await its returned promise (chokidar v3 close is async), so the ServerInstance may resolve before the watcher is fully shut down."
+        },
+        {
+          "category": "maintainability",
+          "severity": "info",
+          "description": "watcher.on('all', (event, filePath) => ...) accepts event/filePath but ignores them \u2014 dead parameters that signal an intended per-path optimization (e.g. skip non-md) that was not implemented."
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "Discrepancy: the measured 0.53 convention score (44 violations) is driven entirely by pre-existing violations in index.ts/build.ts/generator.ts \u2014 files untouched by this diff. This commit's own changes (serve.ts, jest.config.js, serve.test.ts) introduce no new naming violations and reduce smells by 4, so the score overstates this commit's convention debt."
+        }
+      ],
+      "strengths": [
+        "Switches the watcher from forced usePolling (200ms interval) to native fs events with awaitWriteFinish \u2014 a real reliability and efficiency improvement confirmed by the transcript (10/10 test runs, faster rebuild detection).",
+        "Reorders close() to terminate WS clients and clear them before wss.close(), correctly fixing a teardown hang instead of layering on workarounds.",
+        "Zero new bugs, 0% duplication, and a net reduction of 4 code smells per SonarQube; a tight +26/-16 line diff confined to the serve integration.",
+        "TestBase renamed to serve-integration avoids colliding with a real integration directory, and the WS-message timeout is raised alongside the port-0/random-port pattern."
+      ],
+      "summary": "A focused, correct stabilization pass \u2014 native file watching, proper WS teardown ordering, and reduced flakiness \u2014 that improves the serve integration, though it papers over residual test fragility with generous polling/timeouts and a suite-wide maxWorkers:1.",
+      "session_number": 3
     }
   ],
   "story_review": {
