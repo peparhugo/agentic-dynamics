@@ -78,7 +78,8 @@ during `compile_spec`. Exit code `0` means the gate passed.
 
 ## `run_workflow.py` — the execute phase
 
-Confirmed flag set (`scripts/run_workflow.py`):
+Confirmed flag set (`scripts/run_workflow.py` — the runner-hardened CLI, cap_runner_hardening
+p1/p2):
 
 ```
 --spec PATH                   required — an ExperimentSpec YAML
@@ -90,9 +91,41 @@ Confirmed flag set (`scripts/run_workflow.py`):
 --thinking-budget-tokens INT  default: 0
 --output-token-limit INT      default: 0
 --timeout INT                 default: 1800 (per-phase timeout, seconds)
+--phase-watchdog-min MIN      phase stall watchdog — an agent phase with no new transcript
+                              step for MIN minutes is SIGTERM'd and fails STALLED + evidence.
+                              Default FINOPS_PHASE_WATCHDOG_MIN env, else 20; 0 disables.
 --no-commit                   flag — do not commit after each phase
---resume                      flag — skip phases that already have a "[workflow] <phase>" commit
+--resume                      flag — skip phases that already have a "[workflow] <phase>"
+                              commit; when the worktree has NO such commits, fall back to the
+                              phases the derived spec index (experiments/specs/index.json)
+                              shows as ok for this goal
 --signals PATH                optional — JSON signals override {model: {field: value}}
+--cap-snapshot                CAP I4 — compile + best-effort record a route_next_job/v1
+                              ControlContext snapshot beside every routing decision (read-only
+                              measurement; OFF by default)
+--cap-shadow                  CAP I6 — everything --cap-snapshot does PLUS runs the fact-based
+                              route_next_job_v1 rule beside route_step, validates its proposal
+                              (C1-C10), records it as a shadow decision artifact — never
+                              applied, never arms actuation. Implies --cap-snapshot. OFF.
+--no-fact-emit                disable the CAP fact auto-emit hook for THIS invocation only
+                              (the hook is default-ON: every completed run derives + emits its
+                              own attempt/job/policy/workflow facts, best-effort, scoped to the
+                              run's own repository_id / cell_scope)
+--change-analysis             evidence-integrity e6 seam — inject the concrete
+                              EvidenceChangeAnalyzer so every committed phase also hands its
+                              typed delta to the phase-boundary evidence loop
+                              (code_change_facts/v2). Best-effort, OFF by default.
+--change-analysis-graph URI   bolt://host:port for the versioned-graph evidence loop
+                              (CLI > FINOPS_NEO4J_URI > FINOPS_NEO4J_URL). Only consulted
+                              with --change-analysis; a missing/unreachable graph degrades to
+                              delta-only facts with graph_status (unavailable) — never a crash.
+--orchestrator                run each agent phase as a SIBLING cell container with its scope
+                              config (scripts/fleet/spawn_wrapper.py) instead of in-process.
+                              OPT-IN. The container mounts the docker socket (ro); a phase
+                              whose scope fails validation refuses BEFORE the socket call.
+--only-phase NAME             run a SINGLE phase only — the sibling-cell entrypoint that
+                              --orchestrator mode spawns per phase; the spec's phase list is
+                              filtered to this name before the run.
 ```
 
 `--spec`/`--goal`/`--model`/`--workdir` are **required, no positional fallback** — unlike
@@ -113,6 +146,20 @@ internally on every invocation. A prior `compile_experiment` `validate` pass is 
 convenience — it surfaces a requires/produces error before you spend time setting up a worktree —
 not a hard prerequisite the script itself checks for.
 
+### Phase-level hardening (spec markers, not CLI flags)
+
+- `deploy_allowed: true` per-phase marker — a phase that runs `firebase deploy` without it
+  fails `DEPLOY_GATE`.
+- Commit-prefix enforcement — a manual commit during a phase that does not match
+  `[workflow] <phase> — <goal prefix>` fails `COMMIT_PREFIX`.
+- The relabel tree-identity gate — post-phase, the committed tree is compared against the
+  discarded-trees ledger (`experiments/results/workflows/<spec>/discarded_trees.jsonl`); a
+  discarded tree re-presented fails `RELABEL` unless an operator-signed
+  `approvals/<spec>/<phase>_tree_reuse.md` authorizes it.
+- Checkpoint phases — a phase declaring `checkpoint: true` that succeeds stops the run with
+  `awaiting_operator_approval`; `--resume` refuses to proceed past an unsatisfied checkpoint
+  unless `approvals/<spec>/<phase>_approval.md` is committed with a real operator signature.
+
 ### Ordering
 
 1. (Optional, fast-fail) Run the `compile_experiment` `validate` snippet against the spec. Fix
@@ -121,7 +168,10 @@ not a hard prerequisite the script itself checks for.
 3. Run `run_workflow.py` with `--spec`/`--goal`/`--model`/`--workdir`. Each phase commits to the
    worktree (`"[workflow] <phase>"`) unless `--no-commit` is set.
 4. Use `--resume` to re-run after an interrupted workflow — it skips phases whose commit already
-   exists rather than re-running them.
+   exists (falling back to the spec index's ok phases when the worktree has none) rather than
+   re-running them.
+5. After the run, `python scripts/spec_status.py` refreshes the spec lifecycle index
+   (best-effort, `run_workflow.py` also refreshes it at the end of every run).
 
 ## Common gotchas
 
@@ -129,6 +179,10 @@ not a hard prerequisite the script itself checks for.
   it; none exists.
 - Don't add `--config` to `run_workflow.py` — its spec argument is `--spec`, not shared naming
   with `run.py`'s positional config.
+- Don't invent flags for the runner hardening — the watchdog (`--phase-watchdog-min`), cap
+  hooks (`--cap-snapshot`/`--cap-shadow`), and the orchestrator (`--orchestrator`/`--only-phase`)
+  are the only CLI knobs; the deploy gate, commit-prefix, relabel, and checkpoint gates are
+  **spec markers**, not flags.
 - A spec whose control-rule `requires` aren't yet produced by a measurement rule in the ledger
   fails `validate_rules` — instrument that information first (see `agent_config/mental-model.md`'s
   load-bearing rule), don't work around the gate.

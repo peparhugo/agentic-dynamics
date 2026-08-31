@@ -1,7 +1,7 @@
 {
   "schema_version": "spec-status/v2",
-  "generated_at": "2026-08-31T21:53:54.302697+00:00",
-  "n_specs": 162,
+  "generated_at": "2026-08-31T22:29:37.574449+00:00",
+  "n_specs": 163,
   "specs": [
     {
       "name": "auto_posthoc_wiring",
@@ -811,6 +811,24 @@
       "latest_cost_usd": 0.0,
       "latest_git_sha": "d5f85126b",
       "results_pointer": "experiments/results/workflows/design_sessions/20260814T065812Z.json",
+      "n_runs": 1
+    },
+    {
+      "name": "admission_leases",
+      "version": "0.1",
+      "status": "completed",
+      "spec_path": "workflows/repository/admission_leases.yaml",
+      "artifact_kind": "workflow",
+      "repeatable": false,
+      "supersedes": [],
+      "superseded_by": null,
+      "completed_at": null,
+      "last_run_at": "2026-08-31T22:24:16.438592+00:00",
+      "latest_ok": true,
+      "latest_model": "anthropic/claude-opus-5",
+      "latest_cost_usd": 5.887804,
+      "latest_git_sha": "92ae1a5c8",
+      "results_pointer": "experiments/results/workflows/admission_leases/20260831T222416Z.json",
       "n_runs": 1
     },
     {

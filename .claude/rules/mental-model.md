@@ -330,7 +330,12 @@ default_construct_fn(rag_params, run_agent) -> Callable  # ModelPromptConstructo
 # workflow_runner.py — phase execution + the opt-in self-build emit (default OFF)
 cell_scope(workdir) -> str   # f"self-{workdir.name}"; FINOPS_CELL_ID overrides — the cell's KB scope
 run_workflow(spec, *, goal, model, workdir, ..., rag_augment=None, retrieve_fn=None,
-             construct_fn=None, rag_params=None) -> WorkflowRunResult
+             construct_fn=None, rag_params=None, phase_watchdog_min=None,
+             discarded_trees_ledger=None, change_analyzer=None) -> WorkflowRunResult
+  # full CLI: scripts/run_workflow.py --spec/--goal/--model/--workdir [--backend --thinking-effort
+  #   --thinking-budget-tokens --output-token-limit --timeout --phase-watchdog-min --no-commit
+  #   --resume --signals --cap-snapshot --cap-shadow --no-fact-emit --change-analysis
+  #   --change-analysis-graph --orchestrator --only-phase] — see the run-workflow skill for semantics
   # rag_params.emit_self (opt-in, default OFF): after a phase commits, emit its finding into
   #   the cell's OWN scope via emit_phase_finding (best-effort — never blocks the phase)
 
