@@ -1,0 +1,204 @@
+name: retrieval_activation
+question: >-
+  Activate the two-leg RRF retrieval as a measured product. The knowledge stack exists
+  (dense Chroma + lexical Neo4j fused by reciprocal-rank-fusion × authority × freshness ×
+  exact-id × conflict, retrieval-weights/v1) and slice 3 proved the legs are live
+  (kb-neo4j-v1 pending 0, fulltext populated, fallback_mode "full") — but the retrieval
+  agenda from the 2026-08-30/31 session was deferred and its working notes were lost in
+  session compaction. The surviving record: HANDOFF.md, the visibility-matrix addendum
+  (D1: may agents retrieve facts; D2: a retrieval projection for patterns), and the slice-3
+  log's closing promise ("rag_augment on as the measured product gate"). This workflow
+  reconstructs that agenda from the surviving record and executes it: audit the retrieval
+  stack, decide D1/D2 (recommended: B — a retrieval-facing pattern projection, facts stay
+  out of the index), turn the RRF fusion + the augment seam on as the measured gate with
+  quality + index guards.
+version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: false
+repeatable: false
+# NOTE (execution path): reference path is the orchestrator; in-process acceptable while
+# the fleet is occupied (this spec touches retrieval + the augment seam, not the ladder).
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: false
+    context:
+      domain_context: >-
+        canonical_sources: [src/agentic_dynamics/knowledge/retrieval.py (the deterministic
+        pipeline: build_query_plan, retrieve, select_evidence, build_evidence_cards;
+        RRF base × authority × freshness × exact-id × conflict; WEIGHTS_VERSION =
+        retrieval-weights/v1 [H]; QueryPlan/Candidate/RetrievalAttempt/FallbackMode;
+        the two-channel rule: retrieve() scopes to knowledge records only, facts never
+        enter the index), src/agentic_dynamics/knowledge/augment.py (the retrieve→construct→
+        render seam: augment_prompt, default_retrieve_fn, default_construct_fn,
+        ModelPromptConstructor on DEFAULT_CONSTRUCTOR_MODEL; default OFF — any failure ->
+        base_prompt + named fallback_mode, never blocks), src/agentic_dynamics/knowledge/
+        knowledge_ingestion.py (the extractor producers + the pattern/finding side),
+        docs/architecture/current/visibility_matrix.md (the addendum: D1 — may agents
+        retrieve facts; D2 — a retrieval projection for patterns; recommended B: a
+        knowledge record carrying the PatternPayload, compressed + uncertainty-carrying +
+        citable; C5 ADVISORY uncitable, is_canonical gates), docs/fleet/06_slice3_neo4j_rrf_log.md
+        (slice 3 PASS: kb-neo4j-v1 live, pending 0, RRF fused, the closing promise:
+        "turns rag_augment on as the measured product gate"), docs/fleet/07_slice4_guards_log.md
+        (the audit-guard slice: the neo4j index-guard, fleet-health, mount contract),
+        HANDOFF.md (the session record — the retrieval agenda deferred), the kb consumers
+        (kb-chroma-v1, kb-neo4j-v1, kb-ledger-v1, kb-registry-v1 in kb_worker.py),
+        scripts/CONTEXT.md (classification manifest)].
+        policies: [two_channel_rule, citable_advisory, regenerate_never_hand_edit,
+        measured_gate_not_vibes].
+      challenge_context: >-
+        challenge: the retrieval agenda was deferred at the end of the ladder session and
+        its working notes died in compaction — only the durable record survives. The risk
+        is re-architecting from memory instead of from the surviving record. The design
+        constraint is the two-channel rule: agents may consume knowledge records (and, if
+        D1/D2 resolve toward B, the pattern projection), never raw facts — the fact plane
+        is for rules. The activation must be MEASURED: retrieval quality (leg contributions,
+        fallback modes, fusion weights) and the index-health guards (fulltext populated <-> 
+        stream pending) are the gate, not a demo.
+        deliberation: [reconstruct the agenda from the surviving record, audit the stack,
+        decide D1/D2, implement the pattern projection, then activate + measure].
+        session_policy: {default: continue}
+      current_state: >-
+        MEASURED (2026-09-01): the legs are live (slice 3 PASS — kb-neo4j-v1 pending 0,
+        fulltext index populated, RRF returns fused results, fallback_mode "full"; the
+        kb-neo4j container runs supervised with heartbeats). retrieve() scopes to
+        knowledge records only — facts never enter the index (two-channel rule);
+        retrieve() never returns patterns (D2 open). The augment seam exists and is
+        default OFF; NO workflow runs with rag_augment today (the slice-3 promise
+        "rag_augment on as the measured product gate" is unfulfilled). The visibility
+        matrix records D1 (agent fact access — recommended B) and D3 (cross-repo
+        isolation by boundary — accept today) as open. Slice 4's audit guards (the neo4j
+        index-guard) are PROPOSED, not implemented. The retrieval agenda's working notes
+        were lost in the 08-31 session compaction — HANDOFF.md + the visibility matrix +
+        the slice logs are the surviving record.
+      hard_rules: >-
+        (1) TWO-CHANNEL RULE HOLDS: facts are never written to the retrieval index;
+        retrieve() returns knowledge records + (after D2 resolves) the pattern
+        projection — never raw facts. (2) PATTERNS ARE COMPRESSED + UNCERTAIN + CITABLE:
+        a pattern record carries its uncertainty and its lineage; ADVISORY stays
+        uncitable (C5, is_canonical gates consumption). (3) ACTIVATION IS MEASURED: the
+        augment seam turns on only with the quality + index guards in place — leg
+        contributions, fallback-mode census, fulltext-populated <-> stream-pending. (4)
+        REGENERATE, NEVER HAND-EDIT: derived surfaces go through their generators;
+        scripts/CONTEXT.md follows its contract.
+    phases:
+      - name: p1_agenda_reconstruction
+        kind: agent
+        scope: research_readonly
+        timeout: 3600
+        prompt: |
+          GOAL: {goal}
+          SHAPE: reconstruct the deferred retrieval agenda from the surviving record —
+          HANDOFF.md, docs/architecture/current/visibility_matrix.md (D1/D2/D3),
+          docs/fleet/06_slice3_neo4j_rrf_log.md + 07_slice4_guards_log.md, and the
+          retrieval/augment module docstrings. Produce the agenda doc
+          (docs/architecture/current/2026-09-01_retrieval_agenda.md): what was promised
+          (the slice-3 product gate, the D1/D2 decisions, the slice-4 guards), what
+          exists (legs live, seam default OFF, no pattern projection), and the
+          decision inputs (D1 options A/B/C, D2 recommendation B). Verify each claim
+          against the code before writing it — the notes died in compaction, so the
+          record is the contract. Do NOT edit code or docs in this phase.
+          DELIVER: the agenda doc, committed.
+          LOG: PASS/FAIL with the reconstructed items + the verified-vs-unverifiable
+          split; commit.
+      - name: p2_d1_d2_decisions
+        kind: agent
+        scope: research_readonly
+        timeout: 3600
+        prompt: |
+          GOAL: {goal}
+          SHAPE: decide D1 and D2 per the agenda doc, as a decision record in
+          docs/architecture/current/2026-09-01_retrieval_decisions.md. Default to the
+          matrix's recommendation unless the audit finds a reason not to: D1 = B (agents
+          may retrieve PATTERNS — compressed, uncertainty-carrying, citable — never raw
+          facts); D2 = yes (a retrieval-facing projection of I9 patterns as knowledge
+          records carrying the PatternPayload). Document the consequence for the
+          two-channel rule (unchanged for facts), for C5/ADVISORY (pattern records are
+          citable DERIVED [C], not ADVISORY), and for retrieve()/build_evidence_cards
+          (the projection joins the candidate pool as a third surface, scoped by the
+          repository_id + cell_scope rules). Record D3 as decided: boundary-only
+          isolation accepted (record the risk).
+          DELIVER: the decision record, committed.
+          LOG: PASS/FAIL with the decisions + rationale; commit.
+      - name: p3_pattern_projection
+        kind: agent
+        scope: implementation
+        timeout: 7200
+        prompt: |
+          GOAL: {goal}
+          SHAPE: implement the D1/D2 pattern projection. A knowledge record surface that
+          carries the PatternPayload (compressed + uncertainty-carrying + citable, [C],
+          minted by the reducers only — hard rule 3), and retrieve() + select_evidence +
+          build_evidence_cards learn to return it: QueryPlan gains a pattern-projection
+          flag, Candidate carries the pattern surface, the fusion applies the same
+          RRF × authority × freshness weights (patterns weigh by uncertainty, so a
+          low-uncertainty pattern outranks a high-uncertainty one at equal relevance).
+          The two-channel rule holds: raw facts never enter the index. Keep the
+          repository_id/cell_scope pre-filter (scope_excluded) identical for the new
+          surface.
+          VERIFY (both directions): a corpus with minted patterns returns them fused with
+          knowledge records; an uncertainty-carrying pattern ranks by uncertainty;
+          retrieve() with the projection OFF is byte-identical to today (no regression);
+          facts are still absent from every candidate.
+          DELIVER: the projection + tests, committed.
+          LOG: PASS/FAIL with the fusion behavior; commit.
+      - name: p4_activation_gate
+        kind: agent
+        scope: implementation
+        timeout: 7200
+        prompt: |
+          GOAL: {goal}
+          SHAPE: the measured activation. (a) The quality measurement: a retrieval
+          census — leg contributions (dense-only, lexical-only, fused) + fallback_mode
+          distribution over real queries, written as a lab-style artifact; calibrate
+          WEIGHTS_VERSION if the census says the fusion is degenerate. (b) The index
+          guards (slice 4): the neo4j index-guard (fulltext populated <-> the stream's
+          pending, kb-neo4j-v1) as a test, plus the fleet-health shape if it fits the
+          existing guard family (tests/test_fleet_guards.py). (c) The product proof: run
+          ONE workflow phase with rag_augment ON (the opt-in seam; construct on the
+          default constructor model; the projection + knowledge records in the evidence
+          cards) and record fallback_mode + augmented-prompt acceptance — the measured
+          gate the slice-3 log promised. The spec index must carry retrieval_activation
+          after the run.
+          VERIFY: the guards pass; the rag_augment phase ran without a blocked phase
+          (any failure -> base_prompt + named fallback_mode, never a crash).
+          DELIVER: the census + guards + the augment proof, committed.
+          LOG: PASS/FAIL with the census numbers + the augment run's fallback modes;
+          commit.
+factors:
+  - {name: model, levels: [openai/gpt-5.6-sol]}
+design: factorial
+rules:
+  - name: agenda_reconstructed
+    plane: measurement
+    evidence_class: "[C]"
+    requires: []
+    produces: [retrieval_agenda_documented]
+  - name: d1_d2_decided
+    plane: measurement
+    evidence_class: "[P]"
+    requires: [retrieval_agenda_documented]
+    produces: [pattern_projection_approved, two_channel_rule_holds]
+  - name: projection_implemented
+    plane: measurement
+    evidence_class: "[C]"
+    requires: [pattern_projection_approved]
+    produces: [patterns_in_candidates, no_regression]
+  - name: activation_measured
+    plane: measurement
+    evidence_class: "[M]"
+    requires: [patterns_in_candidates, no_regression]
+    produces: [retrieval_census, index_guards_green, rag_augment_proof]
+metrics:
+  - {name: patterns_in_candidates, agg: mean, over: cell}
+  - {name: index_guards_green, agg: mean, over: cell}
+  - {name: rag_augment_proof, agg: mean, over: cell}
+writeup:
+  format: lab_book
+  sections: [question, p1_agenda_reconstruction, p2_d1_d2_decisions, p3_pattern_projection, p4_activation_gate]
+stop: {budget_usd: 5.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}
