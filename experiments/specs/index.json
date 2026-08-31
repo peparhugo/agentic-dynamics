@@ -1,7 +1,7 @@
 {
   "schema_version": "spec-status/v2",
-  "generated_at": "2026-08-31T22:29:37.574449+00:00",
-  "n_specs": 163,
+  "generated_at": "2026-08-31T22:45:02.205018+00:00",
+  "n_specs": 164,
   "specs": [
     {
       "name": "auto_posthoc_wiring",
@@ -829,6 +829,24 @@
       "latest_cost_usd": 5.887804,
       "latest_git_sha": "92ae1a5c8",
       "results_pointer": "experiments/results/workflows/admission_leases/20260831T222416Z.json",
+      "n_runs": 1
+    },
+    {
+      "name": "beta_lab_execution",
+      "version": "0.1",
+      "status": "completed",
+      "spec_path": "workflows/repository/beta_lab_execution.yaml",
+      "artifact_kind": "workflow",
+      "repeatable": false,
+      "supersedes": [],
+      "superseded_by": null,
+      "completed_at": null,
+      "last_run_at": "2026-08-31T22:38:04.127969+00:00",
+      "latest_ok": true,
+      "latest_model": "openai/gpt-5.6-terra",
+      "latest_cost_usd": 1.400021,
+      "latest_git_sha": "cdce97eb6",
+      "results_pointer": "experiments/results/workflows/beta_lab_execution/20260831T223804Z.json",
       "n_runs": 1
     },
     {

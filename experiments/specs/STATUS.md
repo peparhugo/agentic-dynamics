@@ -3,8 +3,8 @@
 **Generated — do not edit by hand.** Regenerate with `python scripts/spec_status.py`;
 `scripts/run_workflow.py` also refreshes it at the end of every run.
 
-Generated at: `2026-08-31T22:29:37.574449+00:00`  ·  163 spec(s)
-**Work remaining:** 45 open · 118 completed/retired
+Generated at: `2026-08-31T22:45:02.205018+00:00`  ·  164 spec(s)
+**Work remaining:** 45 open · 119 completed/retired
 
 | name | kind | repeatable | status | version | supersedes | last_run | ok | model | cost | n_runs |
 |---|---|---|---|---|---|---|---|---|---|---|
@@ -54,6 +54,7 @@ Generated at: `2026-08-31T22:29:37.574449+00:00`  ·  163 spec(s)
 | `control_room_portal` | workflow | no | failed | 0.2 | — | 2026-08-14 03:36 | fail | openai/gpt-5.6-sol | $0.0000 | 3 |
 | `design_sessions` | workflow | no | failed | 0.1 | — | 2026-08-14 06:58 | fail | openai/gpt-5.6-sol | $0.0000 | 1 |
 | `admission_leases` | workflow | no | completed | 0.1 | — | 2026-08-31 22:24 | ok | anthropic/claude-opus-5 | $5.8878 | 1 |
+| `beta_lab_execution` | workflow | no | completed | 0.1 | — | 2026-08-31 22:38 | ok | openai/gpt-5.6-terra | $1.4000 | 1 |
 | `canonical_publication_closure` | workflow | no | completed | 0.1 | — | 2026-08-21 17:06 | ok | deepseek/deepseek-v4-pro | $1.4475 | 1 |
 | `canonical_state_design` | workflow | no | completed | 0.1 | — | 2026-08-18 15:48 | fail | openai/gpt-5.6-sol | $0.0798 | 5 |
 | `canonical_state_finalize` | workflow | no | completed | 0.1 | — | 2026-08-18 20:38 | ok | anthropic/claude-fable-5 | $14.5891 | 1 |
