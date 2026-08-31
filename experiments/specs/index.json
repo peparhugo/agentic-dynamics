@@ -1,7 +1,7 @@
 {
   "schema_version": "spec-status/v2",
-  "generated_at": "2026-08-31T19:54:11.071388+00:00",
-  "n_specs": 161,
+  "generated_at": "2026-08-31T21:53:54.302697+00:00",
+  "n_specs": 162,
   "specs": [
     {
       "name": "auto_posthoc_wiring",
@@ -2140,6 +2140,24 @@
       "latest_git_sha": "69182e561",
       "results_pointer": "experiments/results/workflows/framework_facelift/20260814T151812Z.json",
       "n_runs": 1
+    },
+    {
+      "name": "green_main_closure",
+      "version": "0.1",
+      "status": "completed",
+      "spec_path": "workflows/repository/green_main_closure.yaml",
+      "artifact_kind": "workflow",
+      "repeatable": false,
+      "supersedes": [],
+      "superseded_by": null,
+      "completed_at": null,
+      "last_run_at": "2026-08-31T20:16:27.535499+00:00",
+      "latest_ok": true,
+      "latest_model": "anthropic/claude-opus-5",
+      "latest_cost_usd": 10.749674,
+      "latest_git_sha": "9a72f00d6",
+      "results_pointer": "experiments/results/workflows/green_main_closure/20260831T201627Z.json",
+      "n_runs": 4
     },
     {
       "name": "grit_calibration_design",

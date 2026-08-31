@@ -3,8 +3,8 @@
 **Generated — do not edit by hand.** Regenerate with `python scripts/spec_status.py`;
 `scripts/run_workflow.py` also refreshes it at the end of every run.
 
-Generated at: `2026-08-31T19:54:11.071388+00:00`  ·  161 spec(s)
-**Work remaining:** 45 open · 116 completed/retired
+Generated at: `2026-08-31T21:53:54.302697+00:00`  ·  162 spec(s)
+**Work remaining:** 45 open · 117 completed/retired
 
 | name | kind | repeatable | status | version | supersedes | last_run | ok | model | cost | n_runs |
 |---|---|---|---|---|---|---|---|---|---|---|
@@ -126,6 +126,7 @@ Generated at: `2026-08-31T19:54:11.071388+00:00`  ·  161 spec(s)
 | `fleet_ladder_plan` | workflow | no | completed | 0.1 | — | 2026-08-29 15:33 | ok | deepseek/deepseek-v4-flash | $0.0836 | 1 |
 | `fleet_ladder_revision` | workflow | no | completed | 0.1 | — | 2026-08-29 17:02 | ok | deepseek/deepseek-v4-pro | $0.1724 | 2 |
 | `framework_facelift` | workflow | no | completed | 0.2 | — | 2026-08-14 15:18 | ok | openai/gpt-5.6-sol | $0.0000 | 1 |
+| `green_main_closure` | workflow | no | completed | 0.1 | — | 2026-08-31 20:16 | ok | anthropic/claude-opus-5 | $10.7497 | 4 |
 | `grit_calibration_design` | workflow | no | completed | 0.1 | — | 2026-08-28 15:05 | ok | deepseek/deepseek-v4-flash | $0.0250 | 1 |
 | `i10_typed_checkpoint` | workflow | no | completed | 0.1 | — | 2026-08-28 17:00 | ok | deepseek/deepseek-v4-flash | $0.0085 | 3 |
 | `investing_domain_audit` | workflow | no | completed | 0.1 | — | 2026-08-22 18:09 | ok | deepseek/deepseek-v4-pro | $0.2010 | 1 |
