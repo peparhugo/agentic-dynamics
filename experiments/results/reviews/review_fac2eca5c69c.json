@@ -1,0 +1,284 @@
+{
+  "story_name": "task_manager_api",
+  "story_id": "fac2eca5c69c",
+  "model": "measured",
+  "commit_reviews": [
+    {
+      "commit_hash": "a32d6ba04929bfa32f3bf656a41de0304082442c",
+      "reviewer_model": "measured",
+      "architectural_fit": null,
+      "convention_adherence": 0.75,
+      "introduces_technical_debt": false,
+      "respects_existing_patterns": true,
+      "better_or_worse": "worse",
+      "problems": [
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "app.py: Classes should use PascalCase"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "celery_config.py: Classes should use PascalCase"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "celery_config.py: Module-level constants should be UPPER_CASE"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "repositories.py: Module-level constants should be UPPER_CASE"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "test_app.py: Classes should use PascalCase"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "test_app.py: Module-level constants should be UPPER_CASE"
+        },
+        {
+          "category": "testing",
+          "severity": "major",
+          "description": "no tests executed in this session"
+        }
+      ],
+      "strengths": [
+        "convention score 0.75 [M]"
+      ],
+      "summary": "[story] Session 1: greenfield: +123/-41 lines, convention 0.75 [M], 6 violations, +0 bugs / +0 smells [M]",
+      "session_number": 1
+    },
+    {
+      "commit_hash": "2f57b093af32c5b97361d9ca4b923f9c573e5951",
+      "reviewer_model": "measured",
+      "architectural_fit": null,
+      "convention_adherence": 0.75,
+      "introduces_technical_debt": false,
+      "respects_existing_patterns": true,
+      "better_or_worse": "worse",
+      "problems": [
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "app.py: Classes should use PascalCase"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "celery_config.py: Classes should use PascalCase"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "celery_config.py: Module-level constants should be UPPER_CASE"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "repositories.py: Module-level constants should be UPPER_CASE"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "test_app.py: Classes should use PascalCase"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "test_app.py: Module-level constants should be UPPER_CASE"
+        },
+        {
+          "category": "testing",
+          "severity": "major",
+          "description": "no tests executed in this session"
+        }
+      ],
+      "strengths": [
+        "convention score 0.75 [M]"
+      ],
+      "summary": "[story] Session 2: feature_addition: +293/-43 lines, convention 0.75 [M], 6 violations, +0 bugs / +0 smells [M]",
+      "session_number": 2
+    },
+    {
+      "commit_hash": "b4bdbeb53e875de2760923ef7bcda3c26ded5d82",
+      "reviewer_model": "measured",
+      "architectural_fit": null,
+      "convention_adherence": 0.75,
+      "introduces_technical_debt": false,
+      "respects_existing_patterns": true,
+      "better_or_worse": "worse",
+      "problems": [
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "app.py: Classes should use PascalCase"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "celery_config.py: Classes should use PascalCase"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "celery_config.py: Module-level constants should be UPPER_CASE"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "repositories.py: Module-level constants should be UPPER_CASE"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "test_app.py: Classes should use PascalCase"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "test_app.py: Module-level constants should be UPPER_CASE"
+        },
+        {
+          "category": "testing",
+          "severity": "major",
+          "description": "no tests executed in this session"
+        }
+      ],
+      "strengths": [
+        "convention score 0.75 [M]"
+      ],
+      "summary": "[story] Session 3: integration: +156/-10 lines, convention 0.75 [M], 6 violations, +0 bugs / +0 smells [M]",
+      "session_number": 3
+    },
+    {
+      "commit_hash": "3f074e8a522c8d32e1dbb5e6f69f788126ed1b94",
+      "reviewer_model": "measured",
+      "architectural_fit": null,
+      "convention_adherence": 0.75,
+      "introduces_technical_debt": false,
+      "respects_existing_patterns": true,
+      "better_or_worse": "worse",
+      "problems": [
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "app.py: Classes should use PascalCase"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "celery_config.py: Classes should use PascalCase"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "celery_config.py: Module-level constants should be UPPER_CASE"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "repositories.py: Module-level constants should be UPPER_CASE"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "test_app.py: Classes should use PascalCase"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "test_app.py: Module-level constants should be UPPER_CASE"
+        },
+        {
+          "category": "testing",
+          "severity": "major",
+          "description": "no tests executed in this session"
+        }
+      ],
+      "strengths": [
+        "convention score 0.75 [M]"
+      ],
+      "summary": "[story] Session 4: refactor: +172/-96 lines, convention 0.75 [M], 6 violations, +0 bugs / +0 smells [M]",
+      "session_number": 4
+    },
+    {
+      "commit_hash": "56300734af5192689c1b1bb20b29f1729d768dda",
+      "reviewer_model": "measured",
+      "architectural_fit": null,
+      "convention_adherence": 0.75,
+      "introduces_technical_debt": false,
+      "respects_existing_patterns": true,
+      "better_or_worse": "worse",
+      "problems": [
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "app.py: Classes should use PascalCase"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "celery_config.py: Classes should use PascalCase"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "celery_config.py: Module-level constants should be UPPER_CASE"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "repositories.py: Module-level constants should be UPPER_CASE"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "test_app.py: Classes should use PascalCase"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "test_app.py: Module-level constants should be UPPER_CASE"
+        },
+        {
+          "category": "testing",
+          "severity": "major",
+          "description": "no tests executed in this session"
+        }
+      ],
+      "strengths": [
+        "convention score 0.75 [M]"
+      ],
+      "summary": "[story] Session 5: cross_cutting: +200/-5 lines, convention 0.75 [M], 6 violations, +0 bugs / +0 smells [M]",
+      "session_number": 5
+    }
+  ],
+  "story_review": {
+    "story_name": "task_manager_api",
+    "reviewer_model": "measured",
+    "overall_coherence": 0.0,
+    "compounding_issues": [
+      "app.py: Classes should use PascalCase (in 5 sessions)",
+      "celery_config.py: Classes should use PascalCase (in 5 sessions)",
+      "celery_config.py: Module-level constants should be UPPER_CASE (in 5 sessions)",
+      "repositories.py: Module-level constants should be UPPER_CASE (in 5 sessions)",
+      "test_app.py: Classes should use PascalCase (in 5 sessions)",
+      "test_app.py: Module-level constants should be UPPER_CASE (in 5 sessions)"
+    ],
+    "key_decisions": [
+      "[story] Session 1: greenfield",
+      "[story] Session 2: feature_addition",
+      "[story] Session 3: integration",
+      "[story] Session 4: refactor",
+      "[story] Session 5: cross_cutting"
+    ],
+    "trajectory_description": "S1 17154 tokens $0.012; S2 17875 tokens $0.012; S3 18507 tokens $0.014; S4 21218 tokens $0.015; S5 61099 tokens $0.048",
+    "summary": "5 sessions, 0/5 with tests, test_executed_success=True"
+  }
+}
