@@ -42,6 +42,7 @@ from agentic_dynamics.control.reducers._common import REVISION_FALLBACK  # noqa:
 from agentic_dynamics.control.reducers._common import cell_id as _reducer_cell_id  # noqa: E402
 from agentic_dynamics.control.signal_store import build_signal_store, load_results  # noqa: E402
 from agentic_dynamics.control.step_routing import ModelSignals, route_step  # noqa: E402
+from agentic_dynamics.core.admission_context import AdmissionRefused  # noqa: E402
 from agentic_dynamics.experiment.experiment_spec import ExperimentSpec, load_spec  # noqa: E402
 from agentic_dynamics.experiment.spec_status import refresh_spec_status  # noqa: E402
 from agentic_dynamics.knowledge import knowledge_stream as ks  # noqa: E402
@@ -159,6 +160,75 @@ def _build_change_analyzer(args: argparse.Namespace) -> tuple[Any | None, Any | 
     ), graph_client
 
 
+def _build_phase_admission(spec: ExperimentSpec, args: argparse.Namespace):
+    """Composition-root wiring for the per-phase spend gate (admission_leases p2).
+
+    Returns the ``runtime.admission.PhaseAdmission`` callable the runner wraps each agent phase
+    in, or ``None`` when no gate should be injected. ``None`` in two cases, both of which leave
+    the run byte-identical to the pre-admission behaviour:
+
+    * ``--no-admission`` — the explicit per-invocation escape (a repair run, a replay).
+    * the gate is disarmed (``FINOPS_ADMISSION_REQUIRED`` unset/falsey) — the default posture
+      while the freeze holds. Checked HERE as well as inside the gate so a disarmed run never
+      even opens a Redis connection: the composition root should not require infrastructure for
+      a feature the operator has not turned on.
+
+    When the gate IS armed this function is deliberately **not** best-effort. Unlike the graph
+    client (which degrades to delta-only facts) or the fact emitter (which degrades to a printed
+    warning), an unreachable lease registry means the spend gate cannot be consulted — and the
+    whole point of a fail-closed gate is that "cannot ask" is refused, not waved through. So
+    ``LeaseRegistry.from_env``'s ``LeaseUnavailableError`` propagates and the run does not start.
+
+    ``--campaign-budget-usd`` / ``--campaign-concurrency`` install the campaign scope's caps
+    before the first phase. Without them the scope's already-installed caps apply, and an
+    uncapped scope admits nothing — the registry has no default cap on purpose ("an admission
+    layer whose unconfigured state is unlimited is not an admission layer").
+    """
+    if args.no_admission:
+        print("admission: gate NOT injected (--no-admission)", file=sys.stderr)
+        return None
+
+    from agentic_dynamics.core.admission_context import admission_required
+
+    if not admission_required():
+        # The default while the freeze holds. Stated, not silent — an operator reading the run
+        # log can see that no lease accounted for this run's spend.
+        print(
+            "admission: gate disarmed (FINOPS_ADMISSION_REQUIRED unset) — phases run unleased",
+            file=sys.stderr,
+        )
+        return None
+
+    from agentic_dynamics.control.admission import AdmissionController, make_phase_admission
+    from agentic_dynamics.control.lease_registry import (
+        LeaseKind,
+        LeaseRegistry,
+        LeaseScope,
+        ScopeKind,
+    )
+
+    registry = LeaseRegistry.from_env()
+    scope = LeaseScope(ScopeKind.CAMPAIGN, spec.name)
+    if args.campaign_budget_usd is not None:
+        registry.set_cap(LeaseKind.BUDGET, scope, float(args.campaign_budget_usd))
+    if args.campaign_concurrency is not None:
+        registry.set_cap(LeaseKind.CONCURRENCY, scope, float(args.campaign_concurrency))
+
+    print(
+        f"admission: ARMED — campaign scope {scope} "
+        f"(budget cap {registry.get_cap(LeaseKind.BUDGET, scope)}, "
+        f"concurrency cap {registry.get_cap(LeaseKind.CONCURRENCY, scope)})",
+        file=sys.stderr,
+    )
+    return make_phase_admission(
+        spec_name=spec.name,
+        worktree_identity=Path(args.workdir).name,
+        result_namespace=cell_scope(args.workdir),
+        controller=AdmissionController(registry),
+        campaign_scope=scope,
+    )
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description="Run an agent_task workflow spec against a goal.")
     ap.add_argument("--spec", required=True, help="path to an ExperimentSpec YAML")
@@ -222,6 +292,27 @@ def main() -> None:
                          "also passed; a missing optional dep / unparseable URI / unreachable "
                          "graph degrades to delta-only facts with an explicit graph_status "
                          "(unavailable) — never a CLI crash.")
+    ap.add_argument("--no-admission", action="store_true",
+                    help="admission_leases p2: do NOT inject the per-phase spend gate for THIS "
+                         "invocation. The gate itself is armed by the operator's "
+                         "FINOPS_ADMISSION_REQUIRED=1 environment (default: disarmed, and then "
+                         "this flag changes nothing) — this flag is the per-invocation escape "
+                         "for a run that must execute outside the campaign's lease accounting "
+                         "(a repair run, a replay). It is deliberately a CLI flag and not an "
+                         "env var: skipping the gate should appear in the shell history of "
+                         "whoever skipped it.")
+    ap.add_argument("--campaign-budget-usd", type=float, default=None, metavar="USD",
+                    help="admission_leases p2: the dollar ceiling installed on this workflow's "
+                         "campaign budget scope before the run (per-token models only; "
+                         "subscription models have no dollar cap by construction). Without it "
+                         "the scope's already-installed cap applies, and an uncapped scope "
+                         "admits nothing — unconfigured never means unlimited.")
+    ap.add_argument("--campaign-concurrency", type=int, default=None, metavar="N",
+                    help="admission_leases p2: the slot ceiling installed on this workflow's "
+                         "campaign concurrency scope before the run. Size it with "
+                         "control.lease_registry.recommended_concurrency() (the measured "
+                         "beta_tokens=0.80 puts the knee at 6): the coordination tax is paid "
+                         "in throughput, not dollars.")
     ap.add_argument("--orchestrator", action="store_true",
                     help="slice 2 (D-3/D-14/D-16): run each agent phase as a SIBLING cell "
                          "container with its scope config (via scripts/fleet/spawn_wrapper.py) "
@@ -251,7 +342,10 @@ def main() -> None:
             )
 
     # --orchestrator: the sibling-spawn execution path (slice 2). Runs the phases as sibling
-    # cells, each in its own scope, instead of calling run_workflow() in-process.
+    # cells, each in its own scope, instead of calling run_workflow() in-process. The gate is
+    # threaded in the same way as the in-process path, but the admission has to be stamped onto
+    # the SPAWN REQUEST rather than bound to a ContextVar — a container inherits an environment,
+    # not a call stack.
     if args.orchestrator:
         _run_orchestrator(spec, args)
         return
@@ -319,6 +413,13 @@ def main() -> None:
     # requested graph analysis has graph_client=None and the finally is a no-op.
     change_analyzer, graph_client = _build_change_analyzer(args)
 
+    # The per-phase spend gate (admission_leases p2) — injected at the composition root exactly
+    # like ``router``/``publisher_factory``/``change_analyzer`` above, so ``runtime`` consumes
+    # only the runtime-owned ``PhaseAdmission`` protocol and never imports ``control`` (Debt-2).
+    # Returns None when the gate is disarmed or --no-admission was passed, in which case the
+    # runner's seam is inert and the run is byte-identical to the pre-admission behaviour.
+    phase_admission = _build_phase_admission(spec, args)
+
     try:
         result = run_workflow(
             spec,
@@ -337,6 +438,7 @@ def main() -> None:
             router=router,
             publisher_factory=LivePublisher,
             change_analyzer=change_analyzer,
+            phase_admission=phase_admission,
         )
     finally:
         if graph_client is not None:
@@ -388,6 +490,9 @@ def _run_orchestrator(spec: ExperimentSpec, args: argparse.Namespace) -> None:
 
     spec_path = f"/repo/{args.spec}"
     phases = spec.workflow.params.get("phases") or []
+    # The same gate the in-process path injects into the runner — here it is called directly,
+    # once per phase, because there is no runner to inject it into.
+    gate = _build_phase_admission(spec, args)
     print(f"[orchestrator] running {len(phases)} phase(s) as sibling cells (spec {spec_path})",
           flush=True)
 
@@ -412,19 +517,33 @@ def _run_orchestrator(spec: ExperimentSpec, args: argparse.Namespace) -> None:
         if args.backend:
             sibling_cmd += ["--backend", args.backend]
 
-        request = spawn_wrapper.build_phase_request(
-            phase_def,
-            goal=args.goal,
-            workdir=args.workdir,
-            model=args.model,
-            spec_name=spec.name,
-            command=sibling_cmd,
-        )
-        # build_phase_request resolves the scope; a phase with NO declared scope and no
-        # authorization-table entry resolves to "" and spawn_sibling refuses it at step 2.
-        print(f"[orchestrator] {name}: scope={request['scope'] or '(unauthorized)'}", flush=True)
+        # ADMIT, then spawn (admission_leases p2). The leases are held for the lifetime of the
+        # sibling container and released when it exits; a denial raises here and this phase's
+        # container is never created. ``gate`` is None when the gate is disarmed, in which case
+        # ``_phase_admission_context`` yields None and the request carries no lease block —
+        # exactly the pre-admission behaviour.
         try:
-            outcome = spawn_wrapper.spawn_sibling(request, docker="docker")
+            with _phase_admission_context(gate, name, args.model) as admission:
+                request = spawn_wrapper.build_phase_request(
+                    phase_def,
+                    goal=args.goal,
+                    workdir=args.workdir,
+                    model=args.model,
+                    spec_name=spec.name,
+                    command=sibling_cmd,
+                    admission=admission.context() if admission is not None else None,
+                )
+                # build_phase_request resolves the scope; a phase with NO declared scope and no
+                # authorization-table entry resolves to "" and spawn_sibling refuses it at
+                # step 2 — and now a phase with no lease block is refused at step 6.
+                print(f"[orchestrator] {name}: scope={request['scope'] or '(unauthorized)'}",
+                      flush=True)
+                outcome = spawn_wrapper.spawn_sibling(request, docker="docker")
+        except AdmissionRefused as exc:
+            print(f"[orchestrator] {name}: ADMISSION DENIED — no container was spawned:\n{exc}",
+                  flush=True)
+            failures += 1
+            continue
         except spawn_wrapper.SpawnValidationError as exc:
             print(f"[orchestrator] {name}: REFUSED before the socket call:\n{exc}", flush=True)
             failures += 1
@@ -439,6 +558,21 @@ def _run_orchestrator(spec: ExperimentSpec, args: argparse.Namespace) -> None:
     print(f"[orchestrator] done: {failures} failure(s) across {len(phases)} phase(s)", flush=True)
     if failures:
         raise SystemExit(1)
+
+
+@contextlib.contextmanager
+def _phase_admission_context(gate, phase_name: str, model: str):
+    """Enter the phase's admission, or yield ``None`` when no gate was built.
+
+    The orchestrator's equivalent of ``runtime.admission.phase_admission_scope`` — the same
+    "inert when absent" shape, kept here rather than imported because the orchestrator path
+    lives entirely in this script and never touches the runner.
+    """
+    if gate is None:
+        yield None
+        return
+    with gate(phase_name, model) as admission:
+        yield admission
 
 
 def _fact_auto_emit_enabled(args: argparse.Namespace) -> bool:

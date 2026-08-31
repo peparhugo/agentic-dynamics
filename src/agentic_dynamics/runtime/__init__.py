@@ -10,11 +10,23 @@ Dependency-inverted seam (refactor-repair Debt-2): ``workflow_runner`` no longer
 the control implementations injected at the composition root (``scripts/run_workflow.py``).
 Runtime depends on the protocol; control supplies the decision. Same for the evidence-integrity
 seam (design §5.7): ``change_analyzer`` owns the ``ChangeAnalyzer`` protocol; the concrete
-implementation (``control.evidence_analyzer``) is injected at the root, default no-op.
+implementation (``control.evidence_analyzer``) is injected at the root, default no-op. Same
+again for the spend gate (``admission``): ``PhaseAdmission`` is the runtime-owned protocol,
+``control.admission.make_phase_admission`` the injected implementation, inert when absent.
 """
 
-from . import change_analyzer, posthoc, routing, story, telemetry, test_runner, workflow_runner
+from . import (
+    admission,
+    change_analyzer,
+    posthoc,
+    routing,
+    story,
+    telemetry,
+    test_runner,
+    workflow_runner,
+)
 
 __all__ = [
-    'change_analyzer', 'posthoc', 'routing', 'story', 'telemetry', 'test_runner', 'workflow_runner',
+    'admission', 'change_analyzer', 'posthoc', 'routing', 'story', 'telemetry', 'test_runner',
+    'workflow_runner',
 ]
