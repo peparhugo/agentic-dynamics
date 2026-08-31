@@ -1,3 +1,7 @@
+---
+status: accepted
+---
+
 # Control Room Usage Wiring Audit
 
 **Date:** 2026-09-01
