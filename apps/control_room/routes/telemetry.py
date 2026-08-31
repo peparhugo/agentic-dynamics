@@ -9,6 +9,7 @@ review authority. This module deliberately does NOT import a concrete review sum
 authority answers for the review population (the files on disk, a Redis queue, a test double) is
 a composition-root decision, not a route-level one.
 """
+
 from __future__ import annotations
 
 import json
@@ -47,6 +48,7 @@ from apps.control_room.services.telemetry import _parse_phases, _retained_teleme
 
 #: The injected application context, bound by ``register()`` before any request is served.
 _services: ControlRoomServices | None = None
+
 
 def api_matrix() -> Response:
     """Return the legacy fleet matrix plus the three-stage pipeline view."""
@@ -93,8 +95,10 @@ def api_matrix() -> Response:
     response["telemetry"] = _retained_telemetry(r, [*execute["cells"], *design_stream_ids])
     return jsonify(response)
 
+
 def api_status() -> Response:
     """Stream status transitions while preserving the existing SSE payload."""
+
     def gen():
         r = _services.redis()
         pubsub = r.pubsub()
@@ -116,6 +120,7 @@ def api_status() -> Response:
                 pass
 
     return _sse(gen())
+
 
 def api_events(cell_id) -> Response:
     """Replay retained cell events, mark the boundary, then stream live data.
@@ -158,6 +163,7 @@ def api_events(cell_id) -> Response:
 
     return _sse(gen())
 
+
 def api_routing() -> Response:
     summary_path = _services.root / "experiments" / "results" / "_results_summary.json"
     try:
@@ -174,6 +180,7 @@ def api_routing() -> Response:
         )
     return jsonify(compute_routing(entries))
 
+
 def api_subscription_usage() -> Response:
     """Serve provider subscription usage through the polite cache (15 min TTL).
 
@@ -184,25 +191,41 @@ def api_subscription_usage() -> Response:
     force = request.args.get("refresh") == "1"
     try:
         payload, served_from, age = load_or_refresh(_services.redis, _services.root, force=force)
-    except UsageUnavailableError:
-        return jsonify({"error": "subscription_usage_unavailable"}), 503
+    except UsageUnavailableError as error:
+        return jsonify(
+            {
+                "schema": "subscription-usage/v3",
+                "error": "subscription_usage_unavailable",
+                "state": error.state,
+                "cache": {
+                    "age_seconds": error.age_seconds,
+                    "ttl_seconds": CACHE_TTL_SECONDS,
+                    "min_refresh_seconds": MIN_REFRESH_INTERVAL_SECONDS,
+                },
+            }
+        ), 503
 
     refetched = served_from == "live"
-    return jsonify({
-        "providers": payload["providers"],
-        "deepseek": payload.get("deepseek"),
-        "deepseek_platform": payload.get("deepseek_platform"),
-        "fetched_at": payload.get("fetched_at"),
-        "stale": bool(payload.get("stale", False)) or served_from == "disk-cache",
-        "served_from": served_from,
-        "refetched_now": refetched,
-        "history": history_summary(_services.root),
-        "cache": {
-            "age_seconds": age,
-            "ttl_seconds": CACHE_TTL_SECONDS,
-            "min_refresh_seconds": MIN_REFRESH_INTERVAL_SECONDS,
-        },
-    })
+    return jsonify(
+        {
+            "schema": payload.get("schema", "subscription-usage/v3"),
+            "providers": payload["providers"],
+            "deepseek": payload.get("deepseek"),
+            "deepseek_platform": payload.get("deepseek_platform"),
+            "fetched_at": payload.get("fetched_at"),
+            "stale": bool(payload.get("stale", False)) or served_from == "disk-cache",
+            "served_from": served_from,
+            "refetched_now": refetched,
+            "refresh_error": payload.get("refresh_error"),
+            "history": history_summary(_services.root),
+            "cache": {
+                "age_seconds": age,
+                "ttl_seconds": CACHE_TTL_SECONDS,
+                "min_refresh_seconds": MIN_REFRESH_INTERVAL_SECONDS,
+            },
+        }
+    )
+
 
 def api_experiments() -> Response:
     """Enqueue or clear the experiment queue — the most expensive mutation.
@@ -236,6 +259,7 @@ def api_experiments() -> Response:
 
     return _idempotent_design_response("experiments", body, enqueue)
 
+
 def api_queue_reinterleave() -> Response:
     """Re-interleave ``story_jobs`` round-robin across providers.
 
@@ -254,14 +278,17 @@ def api_queue_reinterleave() -> Response:
         before = read_queue(r)
         after = reinterleave_cells(before)
         write_queue(r, after)
-        return jsonify({
-            "ok": True,
-            "count": len(before),
-            "before": provider_summary(before),
-            "after": provider_summary(after),
-        }), 200
+        return jsonify(
+            {
+                "ok": True,
+                "count": len(before),
+                "before": provider_summary(before),
+                "after": provider_summary(after),
+            }
+        ), 200
 
     return _idempotent_design_response("queue-reinterleave", body, reinterleave)
+
 
 def register(app, services: ControlRoomServices) -> None:
     """Register this module's routes on the Flask app, receiving the application context."""

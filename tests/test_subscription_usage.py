@@ -120,7 +120,11 @@ def test_fetch_usage_shape(monkeypatch, tmp_path):
 
     monkeypatch.setattr(su, "_anthropic_token", lambda: "tok")
     monkeypatch.setattr(su, "_openai_token", lambda: "tok")
-    monkeypatch.setattr(su, "_get_json", lambda url, token: (200, RAW_ANTHROPIC if "anthropic" in url else RAW_OPENAI))
+    monkeypatch.setattr(
+        su,
+        "_get_json",
+        lambda url, token: (200, RAW_ANTHROPIC if "anthropic" in url else RAW_OPENAI),
+    )
     monkeypatch.setattr(su, "_read_deepseek_rows", lambda: [])
     monkeypatch.setattr(su, "_deepseek_platform_token", lambda: None)
     payload = fetch_usage()
@@ -141,18 +145,30 @@ RAW_PLATFORM = {
             "api_key": {"name": "vds", "sensitive_id": "sk-7e3cc****59e0", "valid": True},
             "model": "deepseek-v4-pro",
             "buckets": [
-                {"time": 1787011200, "usage": {
-                    "RESPONSE_TOKEN": 1_000_000, "REQUEST": 100,
-                    "PROMPT_CACHE_HIT_TOKEN": 10_000_000, "PROMPT_CACHE_MISS_TOKEN": 1_000_000}},
+                {
+                    "time": 1787011200,
+                    "usage": {
+                        "RESPONSE_TOKEN": 1_000_000,
+                        "REQUEST": 100,
+                        "PROMPT_CACHE_HIT_TOKEN": 10_000_000,
+                        "PROMPT_CACHE_MISS_TOKEN": 1_000_000,
+                    },
+                },
             ],
         },
         {
             "api_key": {"name": "vds", "sensitive_id": "sk-7e3cc****59e0", "valid": True},
             "model": "deepseek-v4-flash",
             "buckets": [
-                {"time": 1787011200, "usage": {
-                    "RESPONSE_TOKEN": 500_000, "REQUEST": 50,
-                    "PROMPT_CACHE_HIT_TOKEN": 1_000_000, "PROMPT_CACHE_MISS_TOKEN": 200_000}},
+                {
+                    "time": 1787011200,
+                    "usage": {
+                        "RESPONSE_TOKEN": 500_000,
+                        "REQUEST": 50,
+                        "PROMPT_CACHE_HIT_TOKEN": 1_000_000,
+                        "PROMPT_CACHE_MISS_TOKEN": 200_000,
+                    },
+                },
             ],
         },
     ],
@@ -178,16 +194,49 @@ def test_normalize_platform_amount_day_buckets_and_cost_estimate():
 
 def test_normalize_platform_amount_unknown_model_gets_no_cost():
     raw = {
-        "series": [{
-            "api_key": {"name": "x", "valid": True},
-            "model": "deepseek-unknown-model",
-            "buckets": [{"time": 1787011200, "usage": {
-                "RESPONSE_TOKEN": 1000, "REQUEST": 1,
-                "PROMPT_CACHE_HIT_TOKEN": 0, "PROMPT_CACHE_MISS_TOKEN": 1000}}],
-        }],
+        "series": [
+            {
+                "api_key": {"name": "x", "valid": True},
+                "model": "deepseek-unknown-model",
+                "buckets": [
+                    {
+                        "time": 1787011200,
+                        "usage": {
+                            "RESPONSE_TOKEN": 1000,
+                            "REQUEST": 1,
+                            "PROMPT_CACHE_HIT_TOKEN": 0,
+                            "PROMPT_CACHE_MISS_TOKEN": 1000,
+                        },
+                    }
+                ],
+            }
+        ],
     }
     out = normalize_platform_amount(raw)
-    assert out["days"][0]["estimated_cost_usd"] == 0.0  # no rate -> unknown, never fabricated
+    assert out["days"][0]["estimated_cost_usd"] is None
+    assert out["totals"]["estimated_cost_usd"] is None
+    assert out["totals"]["pricing_complete"] is False
+    assert out["totals"]["unpriced_models"] == ["deepseek-unknown-model"]
+
+
+def test_platform_wallet_failure_does_not_hide_a_healthy_meter(monkeypatch):
+    import scripts.subscription_usage as su
+
+    monkeypatch.setattr(su, "_deepseek_platform_token", lambda: "token")
+
+    def get_json(url, token, headers):
+        assert token == "token"
+        if "get_user_summary" in url:
+            return 503, "wallet unavailable"
+        return 200, {"code": 0, "data": {"biz_code": 0, "biz_data": RAW_PLATFORM}}
+
+    monkeypatch.setattr(su, "_get_json", get_json)
+    out = su.deepseek_platform_usage()
+
+    assert out["ok"] is True
+    assert out["wallet"]["ok"] is False
+    assert out["wallet"]["balance_usd"] is None
+    assert out["totals"]["estimated_cost_usd"] is not None
 
 
 def _ms(year, month, day, hour=12):
