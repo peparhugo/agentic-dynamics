@@ -11,10 +11,14 @@ The concrete flow (control tier, which may see both ``runtime`` and ``control.re
 1. **Graph update** — ``populate_versioned_graph`` for the after-snapshot (additive; a
    ``graph_client`` is duck-typed, so the analyzer is hermetic-testable with a store double and
    never requires a live Neo4j).
-2. **Executor neighborhood** — the ACL-scoped 1-2 hop reachable set, seeded from the changed
-   symbols' ``version_id``\\ s (``expand_candidates`` with ``repository_id`` + ``acl_scope``);
-   the returned symbol qualified names ARE the bounded context the executor gets, and their
-   count is the ``impacted_symbol_count`` fact's input.
+2. **Executor neighborhood** — the graph-first impacted computation (graph-family Part A p4):
+   the in-process AST walk (:func:`_in_process_impacted`) is the default posture; a healthy
+   persistent graph UPGRADES the answer (the ACL-scoped 1-2 hop reachable set, seeded from the
+   changed symbols' ``version_id``\\ s — ``expand_candidates`` with ``repository_id`` +
+   ``acl_scope``). Any graph failure (down / empty / timeout) rolls back to the in-process walk —
+   additive, never a gate. The returned symbol qualified names ARE the bounded context the
+   executor gets; the non-seed dependants' count is the ``impacted_symbol_count`` fact's input,
+   with the semantics DECLARED (``impacted_semantics`` / ``impacted_source`` — queryable).
 3. **Facts emit** — ``code_change_facts_v2`` over the delta + analyzer statuses + impacted
    count, de-typed to plain dicts so ``runtime`` stays free of ``control`` imports.
 
@@ -29,7 +33,10 @@ from concurrent.futures import TimeoutError as FuturesTimeout
 from typing import Any
 
 from agentic_dynamics.control.facts import EvidenceItem, ReducerInput
-from agentic_dynamics.control.reducers.code_change_facts import code_change_facts_v2
+from agentic_dynamics.control.reducers.code_change_facts import (
+    IMPACTED_SEMANTICS,
+    code_change_facts_v2,
+)
 from agentic_dynamics.core.language import (
     symbol_entity_id,
     symbol_version_id,
@@ -57,6 +64,53 @@ def _seed_scope_names(change: ChangeInput) -> list[str]:
     return sorted(names)
 
 
+def _in_process_impacted(change: ChangeInput) -> tuple[list[str], int | None]:
+    """The in-process AST walk — the seam's rollback + default posture (graph-family Part A p4).
+
+    Computes the impacted computation WITHOUT the graph: the structural dependants of the
+    change's symbols over the AST call graph (the same CALLS semantics the graph uses), bounded
+    to 1-2 hops, non-seed only. Pure + deterministic — no I/O, no deadline, no graph. The
+    graph NEVER gates a run: this walk produces the impacted set on ANY graph failure
+    (down / empty / timeout) and is the default when no graph client is injected. The returned
+    ``(scope, impacted)`` matches the graph path's shape (the changed symbols UNION the non-seed
+    dependants; impacted = the non-seed dependants' count; None only when the delta is absent).
+    """
+    delta = change.delta
+    if delta is None:
+        return [], None
+    seed_names = set(_seed_scope_names(change))
+    after = change.after
+    if after is None:
+        return sorted(seed_names), 0
+
+    # The symbol call map: qualified_name -> the qualified names it calls (name-resolved from
+    # ``CodeSymbol.calls``, the same extraction the graph's CALLS edges use).
+    qname_to_calls: dict[str, set[str]] = {
+        sym.qualified_name: set(sym.calls) for sym in after.all_symbols
+    }
+
+    # 1 hop: symbols that call a changed symbol directly (non-seed only — the seeds themselves
+    # are not the impacted set, the wall's rule).
+    dependants: set[str] = set()
+    for caller, calls in qname_to_calls.items():
+        if caller in seed_names:
+            continue
+        if calls & seed_names:
+            dependants.add(caller)
+
+    # 2 hop: symbols that call the 1-hop dependants (non-seed, non-already-counted).
+    second_hop: set[str] = set()
+    for caller, calls in qname_to_calls.items():
+        if caller in seed_names or caller in dependants:
+            continue
+        if calls & dependants:
+            second_hop.add(caller)
+    dependants |= second_hop
+
+    scope = sorted(seed_names | dependants)
+    return scope, len(dependants)
+
+
 def _seed_version_ids(change: ChangeInput) -> list[str]:
     """The version_ids of the change's added/changed/removed symbols (two-ID contract)."""
     delta = change.delta
@@ -81,7 +135,16 @@ class EvidenceChangeAnalyzer(ChangeAnalyzer):
     surface from e4; ``expand_candidates`` additionally accepts the optional ``rels`` allowlist,
     and the analyzer passes ``IMPACT_EXPANSION_RELS`` so version history (SUPERSEDES) is never
     counted as an impact edge). ``None`` skips the graph step (the loop still emits facts +
-    neighborhood from the delta alone — hermetically testable).
+    neighborhood from the in-process AST walk — hermetically testable).
+
+    Graph-first with the in-process rollback (graph-family Part A p4 — additive, never a gate):
+    the impacted computation ALWAYS happens. The in-process AST walk (:func:`_in_process_impacted`)
+    is the default posture; a healthy persistent graph UPGRADES the answer (its richer 1-2 hop
+    over the module edges). On ANY graph failure — down, timeout, or empty/truncated (the graph
+    returns fewer dependants than the AST can see — the 2d/2e wall's exact signature) — the seam
+    keeps the in-process walk's answer and records the provenance
+    (``impacted_source``/``impacted_semantics``), so the semantics stay declared, queryable,
+    auditable. The graph never gates a run.
 
     Graph resilience (cap_2a p1): a graph error — a downed server, a timeout, a malformed
     response — NEVER escapes ``analyze``. The graph leg degrades to delta-only facts with an
@@ -113,12 +176,16 @@ class EvidenceChangeAnalyzer(ChangeAnalyzer):
     def analyze(self, change: ChangeInput) -> ChangeAnalysis:
         graph_status = "unavailable" if self.graph_requested and self.graph_client is None else "not_requested"
         graph_updated = False
-        neighborhood: list[str] = []
-        impacted: int | None = None
+
+        # The in-process AST walk is the seam's DEFAULT POSTURE (graph-family Part A p4 — the
+        # rollback is the default): the impacted computation always happens, purely in-process,
+        # and the persistent graph UPGRADES it when healthy. The graph never gates a run.
+        neighborhood, impacted = _in_process_impacted(change)
+        impacted_source = "in_process_walk"
 
         # Graph leg — populate first, then the impact expansion. Best-effort under a hard
         # client-side deadline: a failure (raised OR timed-out — a stalled driver never
-        # returns) degrades to delta-only facts + an explicit graph_status, never an escaping
+        # returns) degrades to the in-process walk + an explicit graph_status, never an escaping
         # exception and never a hung phase (the runner records the analysis as a phase-boundary
         # evidence product; a graph-down cell must be FLAGGED, not crash the phase).
         if self.graph_client is not None:
@@ -139,22 +206,34 @@ class EvidenceChangeAnalyzer(ChangeAnalyzer):
         if graph_status == "available":
             pool = ThreadPoolExecutor(max_workers=1)
             try:
-                neighborhood, impacted = pool.submit(self._neighborhood, change).result(
+                graph_neighborhood, graph_impacted = pool.submit(self._graph_neighborhood, change).result(
                     timeout=self.GRAPH_LEG_TIMEOUT_SECONDS
                 )
             except (FuturesTimeout, Exception):
                 # The impact leg failed — flag the cell so downstream scoring never mistakes
-                # the delta-only facts for a full-fact analysis.
-                neighborhood, impacted = [], None
+                # the in-process-walk facts for a graph-complete analysis.
+                graph_neighborhood, graph_impacted = [], None
                 graph_status = "unavailable"
             finally:
                 pool.shutdown(wait=False)
-        else:
-            # No graph (or a failed one): the executor scope is the change's OWN symbols —
-            # the cap_2a_rerun2 scope-miss fix, delta-only. Impacted stays unknown.
-            neighborhood, impacted = _seed_scope_names(change), None
 
-        facts = code_change_facts_v2(self._reducer_input(change, impacted))
+            if graph_status == "available" and graph_impacted is not None:
+                # Healthy graph: prefer the graph's richer 1-2 hop (module-edge) result UNLESS
+                # it under-counts vs the in-process walk — the wall's exact signature (the
+                # 300ms/max_nodes truncation or an empty scope returns 0 while the AST's
+                # structural dependants exist). That is a graph failure ("empty"), so roll back.
+                if graph_impacted >= (impacted or 0):
+                    neighborhood, impacted = graph_neighborhood, graph_impacted
+                    impacted_source = "graph"
+                else:
+                    # The graph truncated / was empty — keep the in-process walk's answer.
+                    impacted_source = "in_process_walk"
+        else:
+            # No graph (or a failed one): the in-process walk IS the fallback — the executor
+            # scope already carries the change's own symbols + their AST dependants (set above).
+            pass
+
+        facts = code_change_facts_v2(self._reducer_input(change, impacted, impacted_source))
         return ChangeAnalysis(
             facts=tuple(
                 {
@@ -168,6 +247,8 @@ class EvidenceChangeAnalyzer(ChangeAnalyzer):
             neighborhood=tuple(neighborhood),
             graph_updated=graph_updated,
             impacted_count=impacted,
+            impacted_semantics=IMPACTED_SEMANTICS["definition"],
+            impacted_source=impacted_source,
             graph_status=graph_status,
             revision=change.revision,
             repository_id=change.repository_id,
@@ -204,17 +285,20 @@ class EvidenceChangeAnalyzer(ChangeAnalyzer):
                 graph_updated = bool((counts or {}).get("symbol_versions", 0))
         return graph_updated
 
-    def _neighborhood(self, change: ChangeInput) -> tuple[list[str], int | None]:
-        """The change's OWN symbols UNION their ACL-scoped 1-2 hop reachable set.
+    def _graph_neighborhood(self, change: ChangeInput) -> tuple[list[str], int | None]:
+        """The graph-first impact expansion: the change's OWN symbols UNION their ACL-scoped
+        1-2 hop reachable set, queried from the PERSISTENT graph (graph-family Part A p4).
 
         The returned set is the executor's scope surface: the changed symbols FIRST (the
         delta's added/changed/removed qualified names — the cap_2a_rerun2 scope miss was
         structural: the neighborhood returned only the reachable dependents, so a rework
         proposal's scope EXCLUDED the very symbol the rework targets, and the fixed hit rule
-        could never score a rework leg), then the 1-2 hop dependents when a graph is
-        available. Without a graph the changed symbols still form a usable (delta-only)
-        scope, and the impacted count is None (unknown, never 0). Traversal is bounded to
-        ``IMPACT_EXPANSION_RELS`` — version history (SUPERSEDES) is not an impact edge.
+        could never score a rework leg), then the 1-2 hop dependents from the graph. The
+        impacted count is the NON-SEED dependants' count (the DECLARED structural definition —
+        see :data:`code_change_facts.IMPACTED_SEMANTICS`). Traversal is bounded to
+        ``IMPACT_EXPANSION_RELS`` — version history (SUPERSEDES) is not an impact edge. The
+        in-process AST walk (:func:`_in_process_impacted`) is the rollback when this graph
+        query fails, truncates, or comes back empty.
         """
         seed_names = _seed_scope_names(change)
         if self.graph_client is None or change.delta is None:
@@ -247,7 +331,9 @@ class EvidenceChangeAnalyzer(ChangeAnalyzer):
         return sorted(set(seed_names) | neighbors), len(neighbors)
 
     @staticmethod
-    def _reducer_input(change: ChangeInput, impacted: int | None) -> ReducerInput:
+    def _reducer_input(
+        change: ChangeInput, impacted: int | None, impacted_source: str = ""
+    ) -> ReducerInput:
         evidence: list[EvidenceItem] = []
         evidence_prefix = f"{change.repository_id}:{change.phase_id or 'phase'}:{change.revision}"
         if change.delta is not None:
@@ -279,7 +365,13 @@ class EvidenceChangeAnalyzer(ChangeAnalyzer):
                 EvidenceItem(
                     source_type="impacted_symbols",
                     evidence_id=f"impacted:{evidence_prefix}",
-                    payload={"count": impacted},
+                    # The DECLARED semantics + provenance ride on the evidence payload (the
+                    # fact's evidence_ids link back to this audit record — queryable).
+                    payload={
+                        "count": impacted,
+                        "semantics": IMPACTED_SEMANTICS["definition"],
+                        "source": impacted_source or "in_process_walk",
+                    },
                 )
             )
         job_id = change.repository_id or "unscoped"
