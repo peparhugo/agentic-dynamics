@@ -221,12 +221,12 @@ rules:
   - name: settlement_reconciled
     plane: measurement
     evidence_class: "[M]"
-    requires: [leases_reserve_atomically, cost_provenance_established]
+    requires: [budget_lease_reserved, cost_source_emitted]
     produces: [lease_settled_against_meter, expiry_quarantined]
   - name: suite_verified
     plane: measurement
     evidence_class: "[M]"
-    requires: [leases_reserve_atomically, cost_provenance_established, settlement_reconciled]
+    requires: [budget_lease_reserved, cost_source_emitted, lease_settled_against_meter]
     produces: [full_deterministic_suite_green, exact_sha_green]
 metrics:
   - {name: full_deterministic_suite_green, agg: mean, over: cell}
