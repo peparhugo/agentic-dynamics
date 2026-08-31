@@ -124,6 +124,12 @@ PHASE_SCOPE_AUTHORIZATION: dict[str, str] = {
     "p2_publication_closure": "implementation",
     "p3_full_suite_guards": "implementation",
     "p4_final_verify": "implementation",
+    # the admission_leases workflow's phases (the fail-closed spend gate)
+    "p1_lease_registry": "implementation",
+    "p2_admission_controller": "implementation",
+    "p3_cost_provenance": "implementation",
+    "p4_expiry_and_quarantine": "implementation",
+    "p5_suite_and_closure": "implementation",
 }
 
 # ── Artifact identity (refactor-repair P1-3) ─────────────────────

@@ -1,0 +1,238 @@
+name: admission_leases
+question: >-
+  Build the fail-closed admission/lease layer that un-freezes paid execution: per-provider-class
+  budget + concurrency leases (DeepSeek dollar-exact, subscription window-aware), wired into
+  every spend entry point, with cost provenance (metered/estimated/unknown → deny on DeepSeek),
+  settlement against the platform meter, and lease-expiry quarantine. Implements the audit's
+  P0 safety contract (reserve atomically, lease before spawn, refuse if either fails, unknown
+  cost is never free, reconcile, release transactionally, kill on expiry, quarantine
+  contaminated work).
+version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: false
+repeatable: false
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: true
+    context:
+      domain_context: >-
+        PROVISIONAL DomainProfile. domain: the fail-closed admission layer (the freeze's exit
+        gate). canonical_sources: [src/agentic_dynamics/control/model_policy.py (the existing
+        spend guard), scripts/enqueue.py + scripts/worker.py (queue + worker entry points),
+        scripts/fleet/spawn_wrapper.py (the fleet admission contract: scope/mounts/network/env
+        checks), infrastructure/docker-compose.ladder.yml, src/agentic_dynamics/control/live.py
+        (Redis telemetry on 6380 db1), scripts/subscription_usage.py +
+        experiments/results/usage/ (the provider usage ledger: anthropic/openai windows +
+        deepseek platform meter + wallet), apps/control_room/services/subscription_usage.py
+        (the polite cache), scripts/supervise.py + apps/control_room/services/supervisor.py
+        (the flag-only supervisor rail), scripts/lab_beta_from_corpus.py +
+        experiments/results/lab_beta_from_corpus.json (the β coordination-tax estimate for
+        lease sizing), tests/test_model_policy.py, tests/test_spawn_wrapper.py,
+        scripts/CONTEXT.md (classification manifest)].
+        policies: [lease_before_admission, unknown_cost_is_never_free,
+        per_provider_class_accounting, regenerate_never_hand_edit, zero_paid_llm_calls_in_the_implementation]
+      challenge_context: >-
+        PROVISIONAL ChallengeProfile. challenge: cost observability exists (the usage ledger)
+        but cost control does not — no atomic spend reservation, no global concurrency lease,
+        unknown costs coerced to 0. The audit's minimum safety contract (P0): (1) reserve
+        budget atomically before admission; (2) reserve a concurrency lease before starting a
+        worker; (3) refuse admission if either reservation fails; (4) treat missing or
+        untrusted cost as unknown, never as free; (5) reconcile estimated and metered cost
+        after execution; (6) release or correct reservations transactionally; (7) kill or
+        quarantine work whose lease expires; (8) detect and quarantine contaminated worktrees,
+        results and ladder rungs. deliberation: [lease registry first, then the admission
+        controller at every entry point, then cost provenance, then settlement + expiry, then
+        the full suite].
+        session_policy: {default: fork_per_phase}
+      current_state: >-
+        MEASURED (2026-08-31): main green (2295 passed / 0 failed). The model-policy guard
+        exists (deepseek-v4-pro is opt-in via FINOPS_ALLOW_PRO=1) but is class-based, not
+        lease-based. The fleet spawn wrapper validates scope/mounts/network/env but carries no
+        spend or concurrency reservation. The usage ledger (subscription-usage/v3) provides the
+        telemetry: anthropic 5h/7d windows + openai prolite windows + the deepseek platform
+        meter (wallet $98.93, 14d est $207) — the admission contract's data sources, all
+        served through the Control Room's polite 15-min cache. Cost provenance is ambiguous:
+        the claude adapter coerces absent total_cost_usd to 0.0, and the shared result object
+        keeps a single estimated_cost_usd with no cost_source. The β lab estimates the
+        coordination tax (β_cost 0.154 moderate; β_tokens 0.80 severe) — the lease sizing
+        input. Paid execution remains frozen: this workflow's own phases run on the
+        subscription (opus-5) and must make ZERO paid model calls in the code they produce.
+      hard_rules: >-
+        (1) LEASE-BASED ADMISSION: two lease classes — DeepSeek = dollar lease (atomic
+        reservation against the ledger's meter/wallet, per run/workflow/campaign + rolling
+        daily exposure), Claude/OpenAI = window lease (usage-ledger % vs the 5h/7d windows,
+        no dollar cap). A concurrency lease per scope (fleet/provider/model/campaign) —
+        atomic INCR with TTL expiry; a per-service scale cap is NOT a global invariant.
+        (2) UNKNOWN COST IS NEVER FREE: the adapters emit cost_source ∈ {metered, estimated,
+        unknown, reconciled}; a DeepSeek run with unknown cost is DENIED at admission; the
+        zero-coercion sites (absent total_cost_usd → 0.0) are removed.
+        (3) THE FREEZE STAYS: this workflow does not lift the freeze. Its deliverable is the
+        gate that will lift it, plus the green suite that proves it.
+        (4) ZERO PAID LLM CALLS IN THE IMPLEMENTATION: every change is deterministic (code +
+        tests + regenerators). Do not run story cells, workflows, or model invocations.
+        (5) REGENERATE, NEVER HAND-EDIT: derived surfaces (spec index/STATUS, agent surfaces,
+        data.js) go through their generators; the classification manifest (scripts/CONTEXT.md)
+        follows its contract.
+        (6) GUARD FAMILIES STAY GREEN: test_script_classification, test_doc_lifecycle,
+        test_experiment_workflow_classification, test_dependency_direction,
+        test_kb_produce_registry, test_spawn_wrapper, test_model_policy.
+        (7) FULL SUITE GREEN ON THE EXACT FINAL SHA: `python3 -m pytest tests/ -m "not external"`
+        → 0 failed (~5 min); ruff clean on everything touched.
+        (8) SCOPE DISCIPLINE: the admission/lease layer only. Do NOT touch the website, the
+        measurement corpus, the lab books, or the routing work.
+        (9) REPORT: the final message ends with the lease API surface, the entry points wired,
+        the cost_source sites, the before/after test counts, and the final SHA.
+      read_first: >-
+        AGENTS.md, .opencode/instructions/mental-model.md,
+        src/agentic_dynamics/control/model_policy.py, scripts/subscription_usage.py,
+        scripts/fleet/spawn_wrapper.py, src/agentic_dynamics/control/live.py,
+        experiments/results/lab_beta_from_corpus.json, tests/test_spawn_wrapper.py,
+        tests/test_model_policy.py, scripts/CONTEXT.md
+      run_shape: >-
+        SINGLE-model: --model anthropic/claude-opus-5 (subscription). One branch
+        feature/admission-leases; each phase commits [workflow] <phase>; the runner ledgerizes
+        every phase. The phases run as sibling cells (the fleet orchestrator path).
+    phases:
+      - name: p1_lease_registry
+        kind: agent
+        scope: implementation
+        timeout: 14400
+        prompt: |
+          GOAL: {goal}
+          SHAPE: build the lease registry — the atomic admission primitives on the framework
+          Redis (6380 db1, the finops-queue instance — NEVER 6379). A new module
+          src/agentic_dynamics/control/lease_registry.py with a typed lease API:
+          reserve_budget(provider_class, scope, amount) / reserve_concurrency(scope, count) /
+          release(lease_id) / expire_leases() — atomic (Lua or WATCH/MULTI), TTL'd, per-scope
+          counters (fleet/provider/model/campaign), fail-closed on Redis errors, and a lease
+          record shaped like the audit's admission record (run_id, lease_ids, reserved_cost_usd,
+          hard_cap_usd, cost_source, provider, model, expires_at, worktree_identity,
+          result_namespace). Provider classes: "per_token" (deepseek — dollars) vs
+          "subscription" (anthropic/openai — window %, no dollar cap). Size the concurrency
+          lease with the β estimate: β_cost 0.154 (moderate) — wide fleets are dollar-cheap but
+          throughput-taxed (β_tokens 0.80); the registry documents this and exposes both knobs.
+          VERIFY (both directions): unit tests for atomicity, refusal, TTL expiry, release;
+          a lease that exceeds the provider-class boundary is refused; a missing lease field
+          is a loud error, never a silent zero.
+          DELIVER: the module + tests, committed.
+          LOG: PASS/FAIL; commit.
+      - name: p2_admission_controller
+        kind: agent
+        scope: implementation
+        timeout: 14400
+        prompt: |
+          GOAL: {goal}
+          SHAPE: wire admission into every spend entry point. The controller
+          (src/agentic_dynamics/control/admission.py) checks BOTH leases before any paid
+          invocation and refuses with a typed AdmissionDenied when either fails. Entry points:
+          (a) scripts/enqueue.py — reserve at queue-fill time (each job's budget lease) so the
+          queue never carries unbudgeted work; (b) scripts/worker.py + the fleet
+          story/analysis workers — lease before spawn, release after the cell settles;
+          (c) scripts/fleet/spawn_wrapper.py — the spawn request gains the lease fields
+          (reserved_cost_usd, hard_cap_usd, budget_lease_id, concurrency_lease_id, expires_at)
+          and validate_spawn gains the lease checks as a new step; (d) scripts/run_workflow.py
+          — per-phase budget reservation against the workflow's campaign lease; (e) the
+          model-policy guard stays as the class-level backstop (pro opt-in) under the new
+          admission. The Control Room's /api/subscription-usage route becomes the admission
+          telemetry surface (the leases' data source).
+          VERIFY (both directions): each entry point's tests prove refusal (no invocation
+          happens) when a lease fails; a bypass attempt (calling the backend directly without
+          admission) is detectable — the adapters' run_agentic entry refuses when
+          FINOPS_ADMISSION_REQUIRED=1 and no lease context is present.
+          DELIVER: the controller + wiring + tests, committed.
+          LOG: entry points wired; PASS/FAIL; commit.
+      - name: p3_cost_provenance
+        kind: agent
+        scope: implementation
+        timeout: 14400
+        prompt: |
+          GOAL: {goal}
+          SHAPE: kill the zero-coercion. The claude adapter's absent total_cost_usd → 0.0
+          coercion is removed; the shared result object (AgenticResult / the attempt ledger)
+          gains cost_source ∈ {metered, estimated, unknown, reconciled} + estimation_method.
+          The opencode adapter's step-cost parsing records cost_source per attempt. The ledger
+          (experiment_spec.py's attempt schema) carries the new fields, and the usage ledger
+          (scripts/subscription_usage.py) already carries the reconciliation surface — wire the
+          post-run settlement: after each run, settle the reserved lease against the meter's
+          daily buckets (deepseek) or the window usage (subscriptions) and record the settled
+          amount + cost_source=reconciled when it matches.
+          VERIFY (both directions): a provider-reported zero is distinguishable from a missing
+          cost (the audit's five states collapse is undone); the ledger tests prove
+          cost_source survives a full run; unknown-cost denial is tested at the adapter level.
+          DELIVER: the provenance changes + ledger fields + settlement, committed.
+          LOG: cost_source sites; PASS/FAIL; commit.
+      - name: p4_expiry_and_quarantine
+        kind: agent
+        scope: implementation
+        timeout: 14400
+        prompt: |
+          GOAL: {goal}
+          SHAPE: the expiry/kill rail. A watcher (extending the supervisor's observe-only
+          role, never steering unilaterally) marks work whose lease expired: expired
+          concurrency leases → a supervisor flag + the Control Room board; expired budget
+          leases → the cell is flagged for quarantine (worktree + results + ledger rungs are
+          marked contaminated, not silently reused). The audit's item 8: quarantine
+          detection for worktrees/results/ladder rungs — a quarantine registry (Redis + a
+          durable JSONL under experiments/results/quarantine/) that the permanence gate and
+          the analyze pipeline consult.
+          VERIFY (both directions): an expired lease produces a flag within the watchdog
+          window; a quarantined worktree is excluded from the analyze/data chain; the flag is
+          advisory (no automatic steering).
+          DELIVER: the watcher + quarantine registry + tests, committed.
+          LOG: PASS/FAIL; commit.
+      - name: p5_suite_and_closure
+        kind: agent
+        scope: implementation
+        timeout: 14400
+        prompt: |
+          GOAL: {goal}
+          SHAPE: close the loop. (a) Run the guard families + the new lease/admission tests.
+          (b) Run the FULL deterministic suite: `python3 -m pytest tests/ -m "not external" -q`
+          → 0 failed on the exact SHA. (c) ruff clean everywhere touched. (d) Update
+          scripts/CONTEXT.md's classification for any new maintained script per its contract.
+          (e) Regenerate any derived surfaces the changes touch (spec index via
+          spec_status.py at the run's end, agent surfaces via scripts/_gen_instructions.py —
+          verify no drift). (f) Update the mental-model's control-plane section ONLY if the
+          lease API is a public surface (follow the existing module-map conventions).
+          VERIFY (both directions): 0 failed on the exact branch SHA; guard families green;
+          the freeze note in the workflow's question is still true (no execution lifted).
+          DELIVER: final fixes committed; the REPORT (lease API surface, entry points wired,
+          cost_source sites, before/after test counts, final SHA) as the final message.
+          LOG: the report.
+factors:
+  - {name: model, levels: [anthropic/claude-opus-5]}
+design: factorial
+rules:
+  - name: leases_reserve_atomically
+    plane: measurement
+    evidence_class: "[M]"
+    requires: []
+    produces: [budget_lease_reserved, concurrency_lease_reserved, admission_refusal_tested]
+  - name: cost_provenance_established
+    plane: measurement
+    evidence_class: "[M]"
+    requires: []
+    produces: [cost_source_emitted, unknown_cost_denied, zero_coercion_removed]
+  - name: settlement_reconciled
+    plane: measurement
+    evidence_class: "[M]"
+    requires: [leases_reserve_atomically, cost_provenance_established]
+    produces: [lease_settled_against_meter, expiry_quarantined]
+  - name: suite_verified
+    plane: measurement
+    evidence_class: "[M]"
+    requires: [leases_reserve_atomically, cost_provenance_established, settlement_reconciled]
+    produces: [full_deterministic_suite_green, exact_sha_green]
+metrics:
+  - {name: full_deterministic_suite_green, agg: mean, over: cell}
+  - {name: admission_refusal_tested, agg: mean, over: cell}
+writeup:
+  format: lab_book
+  sections: [question, p1_lease_registry, p2_admission_controller, p3_cost_provenance, p4_expiry_and_quarantine, p5_suite_and_closure]
+stop: {budget_usd: 5.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}

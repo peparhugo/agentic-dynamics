@@ -369,6 +369,23 @@
       "contract_status": "enforced",
       "metric_definition_version": "verification_value/v2",
       "rationale": "Consumes the canonical registry resolver only (story + review tables); reviews join to stories via their registry logical_locator, replacing the old filename heuristic. Contract-bearing. metric_definition_version bumped v1 -> v2 in m1 (measurement-contribution closure): the join now fails explicitly (review_without_current_story) and story_without_review is counted, so the published correlation contains only joined observations."
+    },
+    "lab_beta_from_corpus.py": {
+      "lab_status": "historical",
+      "publication_eligible": false,
+      "website_key": null,
+      "reproduce_default": false,
+      "output": "experiments/results/lab_beta_from_corpus.json",
+      "input_sources": [
+        "~/.local/share/opencode/opencode.db (session table)",
+        "experiments/results/stories/*.json (container-cell windows, sensitivity)",
+        "experiments/results/usage/subscription_usage_latest.json (meter reconciliation)"
+      ],
+      "reads_retired_summary": false,
+      "requires_external_service": null,
+      "contract_status": "n/a",
+      "metric_definition_version": "beta-from-corpus/v1",
+      "rationale": "Observational \u03b2 coordination-tax estimate from the session corpus (preregistered 2026-08-31); reads the opencode DB + story files + the usage ledger, never the retired summary \u2014 standalone analysis artifact, not a publication lab."
     }
   },
   "canonical_resolver": "src/agentic_dynamics/reporting/canonical_corpus.py",
