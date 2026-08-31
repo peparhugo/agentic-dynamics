@@ -3,8 +3,8 @@
 **Generated — do not edit by hand.** Regenerate with `python scripts/spec_status.py`;
 `scripts/run_workflow.py` also refreshes it at the end of every run.
 
-Generated at: `2026-08-30T21:59:29.482552+00:00`  ·  159 spec(s)
-**Work remaining:** 44 open · 115 completed/retired
+Generated at: `2026-08-31T00:35:50.668546+00:00`  ·  160 spec(s)
+**Work remaining:** 44 open · 116 completed/retired
 
 | name | kind | repeatable | status | version | supersedes | last_run | ok | model | cost | n_runs |
 |---|---|---|---|---|---|---|---|---|---|---|
@@ -137,6 +137,7 @@ Generated at: `2026-08-30T21:59:29.482552+00:00`  ·  159 spec(s)
 | `measurement_bug_fixes` | workflow | no | completed | 0.1 | — | 2026-08-18 23:39 | ok | deepseek/deepseek-v4-pro | $0.1011 | 1 |
 | `measurement_contribution_closure` | workflow | no | completed | 0.1 | — | 2026-08-22 01:23 | ok | deepseek/deepseek-v4-pro | $1.9018 | 1 |
 | `opencode_docs_refresh` | workflow | no | completed | 0.1 | — | 2026-08-14 21:33 | ok | anthropic/claude-fable-5 | $23.1829 | 1 |
+| `persistent_code_graph` | workflow | no | completed | 0.1 | — | 2026-08-31 00:35 | ok | deepseek/deepseek-v4-pro | $0.4824 | 1 |
 | `perturbation_operators_fix` | workflow | no | completed | 0.1 | — | 2026-08-15 16:32 | ok | deepseek/deepseek-v4-pro | $0.1822 | 1 |
 | `qualitative_routing_analysis` | workflow | no | completed | 0.1 | — | 2026-08-29 17:40 | ok | deepseek/deepseek-v4-pro | $0.3308 | 1 |
 | `rag_knowledge_base` | workflow | no | completed | 0.1 | — | 2026-08-14 23:37 | ok | openai/gpt-5.6-sol | $5.4215 | 4 |

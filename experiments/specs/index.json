@@ -1,7 +1,7 @@
 {
   "schema_version": "spec-status/v2",
-  "generated_at": "2026-08-30T21:59:29.482552+00:00",
-  "n_specs": 159,
+  "generated_at": "2026-08-31T00:35:50.668546+00:00",
+  "n_specs": 160,
   "specs": [
     {
       "name": "auto_posthoc_wiring",
@@ -2337,6 +2337,24 @@
       "latest_cost_usd": 23.182931,
       "latest_git_sha": "c34496c65",
       "results_pointer": "experiments/results/workflows/opencode_docs_refresh/20260814T213337Z.json",
+      "n_runs": 1
+    },
+    {
+      "name": "persistent_code_graph",
+      "version": "0.1",
+      "status": "completed",
+      "spec_path": "workflows/repository/persistent_code_graph.yaml",
+      "artifact_kind": "workflow",
+      "repeatable": false,
+      "supersedes": [],
+      "superseded_by": null,
+      "completed_at": null,
+      "last_run_at": "2026-08-31T00:35:50.082750+00:00",
+      "latest_ok": true,
+      "latest_model": "deepseek/deepseek-v4-pro",
+      "latest_cost_usd": 0.482366,
+      "latest_git_sha": "9bd44f7fa",
+      "results_pointer": "experiments/results/workflows/persistent_code_graph/20260831T003550Z.json",
       "n_runs": 1
     },
     {
