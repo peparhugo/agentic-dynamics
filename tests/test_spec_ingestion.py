@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import os
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -530,8 +531,13 @@ def test_emit_never_raises_when_the_stream_is_unreachable(tmp_path: Path, monkey
     assert emit_spec_record("alpha", root=tmp_path, registry_path=tmp_path / "r.jsonl") is None
 
 
-def test_emit_writes_the_artifact_before_publishing(tmp_path: Path, monkeypatch):
-    """Ordering contract: the durable bytes must exist by the time the pointer lands."""
+def _emit_with_guard_probe(tmp_path: Path, monkeypatch) -> tuple[object, list, list]:
+    """Run one ``emit_spec_record`` against a stubbed stream, probing the write guard.
+
+    Returns ``(record, published, guard_during)`` where ``guard_during`` records the value of
+    ``FINOPS_KB_WRITE`` observed at the moment ``publish_event`` was called — the only point
+    where the guard has to be active.
+    """
     specs = tmp_path / "experiments" / "specs"
     specs.mkdir(parents=True)
     (specs / "index.json").write_text(
@@ -547,24 +553,60 @@ def test_emit_writes_the_artifact_before_publishing(tmp_path: Path, monkeypatch)
     monkeypatch.setattr(ks, "connect", lambda *a, **k: object())
 
     published: list = []
+    guard_during: list = []
 
     def capture(_client, event, *, source_type):
         # The artifact must already be readable at this point.
         assert (artifact_dir / f"{event.knowledge_id}.json").is_file()
+        guard_during.append(os.environ.get("FINOPS_KB_WRITE"))
         published.append((event, source_type))
 
     monkeypatch.setattr(ks, "publish_event", capture)
 
     record = emit_spec_record("alpha", root=tmp_path, registry_path=tmp_path / "r.jsonl")
+    return record, published, guard_during
+
+
+def test_emit_writes_the_artifact_before_publishing(tmp_path: Path, monkeypatch):
+    """Ordering contract: the durable bytes must exist by the time the pointer lands."""
+    # Pin the ambient guard state instead of inheriting the host's. This repo's workflow scopes
+    # export FINOPS_KB_WRITE=1 (scripts/fleet/spawn_wrapper.py), which used to make the
+    # "restored to None" assertion below pass or fail depending purely on how the suite was
+    # launched. The guard's contract is "restore whatever was there", so the test must say
+    # what was there.
+    monkeypatch.delenv("FINOPS_KB_WRITE", raising=False)
+
+    record, published, guard_during = _emit_with_guard_probe(tmp_path, monkeypatch)
+
     assert record is not None
     assert len(published) == 1
     event, source_type = published[0]
     assert source_type == "spec"
     assert event.operation == "upsert"
     assert event.knowledge_id == record.knowledge_id
-    # The write guard is set for the emit only and restored afterwards.
-    import os
+    # The write guard is set for the emit only...
+    assert guard_during == ["1"]
+    # ...and restored afterwards to the ambient value (unset, as pinned above).
     assert os.environ.get("FINOPS_KB_WRITE") is None
+
+
+def test_emit_restores_a_preexisting_write_guard_value(tmp_path: Path, monkeypatch):
+    """The guard RESTORES the prior value — it does not blanket-unset ``FINOPS_KB_WRITE``.
+
+    Pinning the ambient value to ``"0"`` (an explicit not-authorized marker, distinct from both
+    "unset" and the ``"1"`` the guard installs) makes restoration observable: a guard that
+    popped the variable, or one that left its own ``"1"`` behind, both fail here.
+    """
+    monkeypatch.setenv("FINOPS_KB_WRITE", "0")
+
+    record, published, guard_during = _emit_with_guard_probe(tmp_path, monkeypatch)
+
+    assert record is not None
+    assert len(published) == 1
+    # Active during the publish, even though the ambient value was a non-authorizing "0"...
+    assert guard_during == ["1"]
+    # ...and put back exactly as found afterwards.
+    assert os.environ.get("FINOPS_KB_WRITE") == "0"
 
 
 def test_emit_returns_none_when_the_lifecycle_is_unchanged(tmp_path: Path, monkeypatch):

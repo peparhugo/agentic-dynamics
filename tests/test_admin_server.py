@@ -2,9 +2,49 @@
 
 from __future__ import annotations
 
+import dataclasses
+import functools
 import json
 
+import pytest
+
+from agentic_dynamics.control.pipeline_status import review_stage_summary, stage_summary
 from apps.control_room import server
+from apps.control_room.routes import telemetry as telemetry_routes
+from apps.control_room.services.context import ControlRoomServices
+
+# --------------------------------------------------------------------------------------
+# The review-stage authority (dependency injection).
+#
+# ``GET /api/matrix`` does not compute the review population itself; it asks the authority
+# injected as ``ControlRoomServices.review_stage_source``. Production binds the file-derived
+# ``review_stage_summary`` (the reviews on disk). The tests below bind their OWN authority so
+# the route is isolated from the filesystem completely — with no injection these tests would be
+# measuring the repo's real experiments/results/reviews/ directory, which is exactly the
+# coupling that made them red (they assert a seeded fake-Redis population of 3, while the real
+# tree holds hundreds of review files).
+# --------------------------------------------------------------------------------------
+
+
+def _inject_review_source(monkeypatch, source):
+    """Bind ``source`` as the review authority the matrix route consults, for one test.
+
+    ``monkeypatch.setattr`` restores the production authority at teardown, so a test that
+    injects can never leak its double into the next test.
+    """
+    monkeypatch.setattr(telemetry_routes._services, "review_stage_source", source)
+    return source
+
+
+def _queue_review_source():
+    """A Redis/queue-derived review authority built from the public ``stage_summary``.
+
+    This is the legacy review population — the ``review_jobs`` list plus the ``review_status``
+    hash — which the display retired in favour of the files on disk. It remains a perfectly
+    valid *authority*: the tests that exercise status folding (retry_N → running) inject it so
+    they read the ``FakeRedis`` state they seed rather than the real review directory.
+    """
+    return functools.partial(stage_summary, queue_key="review_jobs", status_key="review_status")
 
 
 class FakePubSub:
@@ -258,6 +298,9 @@ def test_matrix_surfaces_three_stage_pipeline(monkeypatch):
         review_statuses={"alpha_S1": "done", "alpha_story": "queued", "beta_S1": "retry_1"},
     )
     monkeypatch.setattr(server, "_redis", lambda: redis)
+    # Inject the queue-derived review authority so the review stage reflects the
+    # ``review_statuses`` seeded above and nothing on disk.
+    _inject_review_source(monkeypatch, _queue_review_source())
 
     body = server.app.test_client().get("/api/matrix").get_json()
 
@@ -295,6 +338,7 @@ def test_matrix_posthoc_queues_report_remaining_and_empty_stages(monkeypatch):
         review_queue=1,
     )
     monkeypatch.setattr(server, "_redis", lambda: redis)
+    _inject_review_source(monkeypatch, _queue_review_source())
 
     stages = server.app.test_client().get("/api/matrix").get_json()["stages"]
 
@@ -322,6 +366,7 @@ def test_matrix_review_retry_folds_multiple_into_running(monkeypatch):
         review_statuses={"a": "running", "b": "retry_1", "c": "retry_2"},
     )
     monkeypatch.setattr(server, "_redis", lambda: redis)
+    _inject_review_source(monkeypatch, _queue_review_source())
 
     review = server.app.test_client().get("/api/matrix").get_json()["stages"]["review"]
 
@@ -329,6 +374,100 @@ def test_matrix_review_retry_folds_multiple_into_running(monkeypatch):
     assert review["running"] == 3  # 1 running + 2 retries, still in flight
     assert review["total"] == 3
     assert review["done"] == 0
+
+
+def test_matrix_review_stage_comes_from_the_injected_authority(monkeypatch):
+    """PROOF the injection is real: a sentinel authority's payload reaches the response verbatim.
+
+    This asserts *provenance*, not a number. If ``api_matrix`` ever re-acquires a concrete
+    review summariser (a hard-wired import, a filesystem read, a Redis read of its own), the
+    sentinel payload cannot appear in ``stages.review`` and this test fails.
+    """
+    redis = FakeRedis(
+        statuses={"alpha": "done"},
+        # Deliberately non-empty: a route that computed the review stage itself would report
+        # these instead of the sentinel below.
+        review_statuses={"a": "done", "b": "done", "c": "done"},
+    )
+    monkeypatch.setattr(server, "_redis", lambda: redis)
+
+    # A payload no real authority could ever produce — the marker proves provenance.
+    sentinel = {
+        "total": 4242,
+        "remaining_in_queue": 0,
+        "queued": 0,
+        "running": 0,
+        "done": 4242,
+        "failed": 0,
+        "timeout": 0,
+        "retry": 0,
+        "completed": 4242,
+        "results_saved": None,
+        "cells": {"authority": "sentinel-not-a-real-source"},
+    }
+    calls = []
+
+    def sentinel_source(redis_client):
+        """Record the client it was handed, then answer with the sentinel population."""
+        calls.append(redis_client)
+        return sentinel
+
+    _inject_review_source(monkeypatch, sentinel_source)
+
+    review = server.app.test_client().get("/api/matrix").get_json()["stages"]["review"]
+
+    # The response carries the injected authority's answer, byte for byte.
+    assert review == sentinel
+    # The authority was consulted exactly once, and handed the same Redis client the rest of
+    # the route used — the injected source is wired into the real request path, not a bypass.
+    assert calls == [redis]
+
+
+def test_matrix_review_stage_falls_back_to_the_production_file_authority(monkeypatch):
+    """PROOF the injection is load-bearing: remove it and the answer changes shape.
+
+    With no test authority injected, the route consults the production one bound by
+    ``build_services()`` — the file-derived ``review_stage_summary``, which ignores Redis
+    entirely. Its ``cells`` is a ``{reviewed, corpus}`` rollup, whereas the queue-derived
+    authority returns the raw ``id -> status`` map. Asserting on that structural difference is
+    stable regardless of how many review files the repo happens to hold.
+    """
+    redis = FakeRedis(
+        statuses={"alpha": "done"},
+        review_statuses={"a": "running", "b": "retry_1", "c": "retry_2"},
+    )
+    monkeypatch.setattr(server, "_redis", lambda: redis)
+    # NOTE: no _inject_review_source call here — that omission is the point of the test.
+
+    review = server.app.test_client().get("/api/matrix").get_json()["stages"]["review"]
+
+    # The production authority answered: the file-derived rollup shape, not the status map.
+    assert set(review["cells"]) == {"reviewed", "corpus"}
+    assert review == review_stage_summary(redis)
+    # And it is genuinely a different answer from the one the injected authority gives, so the
+    # three tests above would fail loudly if their injection were dropped.
+    assert review != _queue_review_source()(redis)
+
+
+def test_control_room_services_requires_a_review_authority():
+    """The review authority has no dataclass default — omitting it fails loudly at build time.
+
+    A default would let a route silently re-acquire the real filesystem dependency that the
+    injection exists to remove. Construction must raise instead.
+    """
+    live = telemetry_routes._services
+    kwargs = {
+        field.name: getattr(live, field.name)
+        for field in dataclasses.fields(ControlRoomServices)
+    }
+
+    # The full kwargs set still builds a valid context...
+    assert isinstance(ControlRoomServices(**kwargs), ControlRoomServices)
+
+    # ...but dropping the review authority is a TypeError, never a silent default.
+    kwargs.pop("review_stage_source")
+    with pytest.raises(TypeError, match="review_stage_source"):
+        ControlRoomServices(**kwargs)
 
 
 def test_matrix_redis_failure_keeps_existing_503_contract(monkeypatch):
@@ -817,12 +956,18 @@ def test_design_session_input_forwards_allowlisted_delivery(monkeypatch):
 
 
 def test_route_inventory_covers_all_registered_routes():
-    """F2: the inventory's 28 routes match the actual url_map exactly."""
+    """F2: the inventory's 29 routes match the actual url_map exactly.
+
+    The count tracks the documented inventory in ``apps/control_room/server.py``'s module
+    docstring and ``scripts/CONTEXT.md``. It went 28 -> 29 when ``GET /api/subscription-usage``
+    landed; this guard is what catches a route shipped without its inventory entry, so a bump
+    here must always be paired with the doc update (never the other way round).
+    """
     rules = [rule for rule in server.app.url_map.iter_rules() if not rule.rule.startswith("/static")]
 
     # GET and POST on the same path register two Rule objects; count them
-    # (28), then dedupe for path-membership assertions below.
-    assert len(rules) == 28
+    # (29), then dedupe for path-membership assertions below.
+    assert len(rules) == 29
     routes = {rule.rule for rule in rules}
 
     # The surfaces the stale inventory omitted are all registered.
@@ -832,6 +977,7 @@ def test_route_inventory_covers_all_registered_routes():
         "/api/registry/<entity_id>",
         "/api/queue/reinterleave",
         "/api/experiments",
+        "/api/subscription-usage",
         "/api/flags",
         "/api/flags/<session_id>/steer",
         "/api/flags/<session_id>/interrupt",

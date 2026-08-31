@@ -195,11 +195,11 @@ reasoning_divergence, semantic_clusters. Superseded by `semantic_validation.py`.
 
 | File | Purpose |
 |------|---------|
-| `apps/control_room/server.py` | Flask backend — the **Control Room portal**, 28 routes across 5 API categories plus the static shell (below). Serves `apps/control_room/static/`. Port 8000 (`FINOPS_PORT`). |
+| `apps/control_room/server.py` | Flask backend — the **Control Room portal**, 29 routes across 5 API categories plus the static shell (below). Serves `apps/control_room/static/`. Port 8000 (`FINOPS_PORT`). |
 | `apps/control_room/static/` | Vanilla-JS dashboard: Matrix grid, Cell Inspector (live transcript), Routing board, supervisor flags, design sessions, Claude background sessions. |
 
-`apps/control_room/server.py`'s 28 routes, categorized:
-- **Legacy telemetry** (6): `/api/matrix`, `/api/status` (SSE), `/api/events/<cell_id>` (SSE), `/api/routing`, `POST /api/experiments`, `POST /api/queue/reinterleave`
+`apps/control_room/server.py`'s 29 routes, categorized:
+- **Legacy telemetry** (7): `/api/matrix`, `/api/status` (SSE), `/api/events/<cell_id>` (SSE), `/api/routing`, `/api/subscription-usage`, `POST /api/experiments`, `POST /api/queue/reinterleave`
 - **Supervisor flags** (3): `/api/flags`, `POST /api/flags/<session_id>/steer`, `POST /api/flags/<session_id>/interrupt`
 - **Registry** (2): `/api/registry`, `/api/registry/<entity_id>`
 - **Design sessions** (7): `/api/design-sessions`, `POST /api/design-sessions`, `/api/design-sessions/<portal_id>/spec`, `POST /api/design-sessions/<portal_id>/input`, `POST /api/design-sessions/<portal_id>/interrupt`, `POST /api/design-sessions/<portal_id>/save`, `POST /api/design-sessions/<portal_id>/run`

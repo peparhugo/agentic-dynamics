@@ -72,7 +72,7 @@ firebase deploy --only hosting --project agentic-dynamics  # mirror site — dep
 - `scripts/CONTEXT.md` — script reference (classification manifest).
 - `experiments/CONTEXT.md` — experiment ecosystem.
 - `apps/website/CONTEXT.md` — website documentation.
-- `apps/control_room/server.py` — Control Room portal (28 routes); see `docs/architecture/current/supervisor_design.md` for the flag-only supervisor rail.
+- `apps/control_room/server.py` — Control Room portal (29 routes); see `docs/architecture/current/supervisor_design.md` for the flag-only supervisor rail.
 
 The eight package planes (`core` · `experiment` · `measurement` · `runtime` · `adapters` · `knowledge` · `control` · `reporting`) live under `src/agentic_dynamics/` — see `ARCHITECTURE.md` §1 and the mental-model module map for ownership.
 

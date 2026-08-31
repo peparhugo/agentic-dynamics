@@ -1,7 +1,7 @@
 {
   "schema_version": "spec-status/v2",
-  "generated_at": "2026-08-31T19:16:41.358022+00:00",
-  "n_specs": 162,
+  "generated_at": "2026-08-31T19:54:11.071388+00:00",
+  "n_specs": 161,
   "specs": [
     {
       "name": "auto_posthoc_wiring",
@@ -811,24 +811,6 @@
       "latest_cost_usd": 0.0,
       "latest_git_sha": "d5f85126b",
       "results_pointer": "experiments/results/workflows/design_sessions/20260814T065812Z.json",
-      "n_runs": 1
-    },
-    {
-      "name": "green_main_closure",
-      "version": "0.1",
-      "status": "failed",
-      "spec_path": "workflows/repository/green_main_closure.yaml",
-      "artifact_kind": "workflow",
-      "repeatable": false,
-      "supersedes": [],
-      "superseded_by": null,
-      "completed_at": null,
-      "last_run_at": "2026-08-31T19:16:41.301751+00:00",
-      "latest_ok": false,
-      "latest_model": "anthropic/claude-opus-5",
-      "latest_cost_usd": 0.0,
-      "latest_git_sha": "6f4fbd649",
-      "results_pointer": "experiments/results/workflows/green_main_closure/20260831T191641Z.json",
       "n_runs": 1
     },
     {

@@ -21,18 +21,40 @@ plain field is honest where a lazy property would be ceremony.
 
 This is a *local* change — the five route modules swap one import and one accessor prefix; no
 other module changes shape.
+
+**Injected data sources.** Beyond the service modules and the lazy ``server`` accessors, the
+context also carries the *authorities* a route consults for a derived population — currently
+:attr:`ControlRoomServices.review_stage_source`. A route must never hard-wire which authority
+answers "how many reviews are there?": that binding is a composition-root decision, so it lives
+here as an explicit, overridable field. Production binds the file-derived
+``pipeline_status.review_stage_summary`` (the reviews on disk are the single source of truth the
+pipeline actually writes); a test binds whatever authority it wants and can therefore isolate the
+route from the filesystem *completely* — no monkeypatching of module globals, no partial
+stubbing. The field is deliberately REQUIRED (no dataclass default) so that dropping the
+injection is a loud ``TypeError`` at construction rather than a silent fallback to the real
+filesystem, which would let a route quietly re-acquire the dependency the injection removed.
 """
 
 from __future__ import annotations
 
 import re
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 from types import ModuleType
 from typing import Any
 
+from agentic_dynamics.control.pipeline_status import review_stage_summary
 from apps.control_room import server
 from apps.control_room.services import design_sessions, mutations, registry, supervisor, telemetry
+
+#: An authority that answers "what is the review-stage population?".
+#:
+#: Takes the request's Redis client and returns one pipeline-stage summary dict (the same shape
+#: ``pipeline_status.stage_summary`` returns: ``total``/``queued``/``running``/``done``/… ). The
+#: client is passed even to sources that ignore it (the production file-derived source does), so
+#: every source shares one signature and a Redis-backed authority stays swappable in.
+ReviewStageSource = Callable[[Any], dict[str, Any]]
 
 
 @dataclass
@@ -61,6 +83,14 @@ class ControlRoomServices:
     claude_agent_advisor_id_pattern: re.Pattern[str]
     max_claude_agent_log_bytes: int
     max_claude_agent_task_chars: int
+
+    # -- injected data sources (the authority a route consults, chosen by the composition root) --
+
+    #: The authority for the review-stage population served by ``GET /api/matrix``.
+    #:
+    #: REQUIRED on purpose — see the module docstring. Production binds the file-derived
+    #: ``review_stage_summary``; tests bind their own source to isolate the route from disk.
+    review_stage_source: ReviewStageSource
 
     # -- lazy server accessors (delegate at call time so monkeypatch still wins) --
 
@@ -129,4 +159,8 @@ def build_services() -> ControlRoomServices:
         claude_agent_advisor_id_pattern=server.CLAUDE_AGENT_ADVISOR_ID_PATTERN,
         max_claude_agent_log_bytes=server.MAX_CLAUDE_AGENT_LOG_BYTES,
         max_claude_agent_task_chars=server.MAX_CLAUDE_AGENT_TASK_CHARS,
+        # The production review authority: the review FILES on disk. The legacy
+        # review_jobs/review_status Redis state was retired from the display (the trigger →
+        # review_all cut-over never wrote it), so binding it here would report a stale zero.
+        review_stage_source=review_stage_summary,
     )

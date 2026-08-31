@@ -180,9 +180,18 @@ def test_entity_id_stable_version_id_changes():
 
 
 def _git_repo(tmp_path: Path) -> Path:
+    """A scratch git repo with a LOCAL identity stamped on it.
+
+    ``git init`` alone leaves the repo with no author identity (this host configures
+    user.name/user.email per-project, never globally), so a later ``git commit`` would die with
+    "Author identity unknown". Stamping it here matches what every other scratch-repo test in
+    the suite does and keeps the suite independent of the host's global git config.
+    """
     dp = tmp_path / "repo"
     dp.mkdir()
     _run_git(dp, "init")
+    _run_git(dp, "config", "user.email", "test@instrument.local")
+    _run_git(dp, "config", "user.name", "Instrument Test")
     return dp
 
 
