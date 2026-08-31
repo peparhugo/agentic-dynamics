@@ -180,3 +180,38 @@ preregistered exclusions and a **moderate_tax** point-estimate verdict, but it i
 compliant execution of the preregistered protocol until the missing sensitivity analysis is
 separately specified and run. This result remains observational, not a causal replacement for
 a clean controlled ladder.
+
+## Reframing — β is a contention exponent, not a coordination exponent (operator annotation, 2026-09-01)
+
+**Status: operator annotation [P] — policy/prior, appended after the terra run, not a
+preregistration change.**
+
+This architecture has **no agent-to-agent coordination by design**: every agent works
+isolated — its own worktree (ephemeral branch, the permanence gate), its own container
+(mount contract + scope model + PHASE_SCOPE_AUTHORIZATION), its own KB scope
+(repository_id = self-<worktree>), and no shared mutable state. "Coordination tax" is
+therefore a misnomer for anything this corpus can measure: there is no coordination to tax.
+
+What the β_tokens estimate actually captures is **infrastructure/provider contention** —
+sessions lose tokens per minute as the provider key (and the shared machine: CPU, Redis,
+network) load rises. It is a rate-limit curve, not a fleet-economics or agent-economics
+curve, and it says nothing about whether isolated agents should run concurrently (they
+should — concurrency is the intended operating mode).
+
+The controlled ladder (`concurrency_ladder`, excluded per rule 1) tried to measure a
+coordination curve the architecture makes moot: its flat rung costs were meaningless twice
+over — cross-phase work compared as if it were rungs, and a premise that does not exist.
+The incident ledger + window exclusion stand as the record of that failure.
+
+What survives the reframing:
+
+- **β_cost ≈ 0** (robust, incl. the pooled 0.154 boundary reading vs the 0.11-0.14 robust
+  range) — concurrency under isolation is **dollar-safe**. That is the real, policy-relevant
+  finding.
+- **β_tokens ≈ 0.3-0.8 direction** — contention exists; wide fleets share provider limits.
+  An infrastructure sizing input, not an agent-behavior finding.
+
+**Policy consequence:** the `admission_leases` concurrency leases protect **provider windows
+and spend caps**; they are NOT sized on a coordination tax. Wide fleets of isolated agents
+are the intended mode — lease width is an infrastructure/cost-control knob, never a
+coordination-safety device.

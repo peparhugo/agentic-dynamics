@@ -82,3 +82,14 @@ pattern that steepens a negative OLS slope.
 [C] computed from the same opencode.db session corpus + exclusion rules as
 `lab_beta_from_corpus.py` (n = 1,429), battery run 2026-09-01 00:45 CEST. Fit code: ad-hoc
 script, not committed as a maintained command; the tables above are the durable record.
+
+## Reframing (operator annotation, 2026-09-01) [P]
+
+The "coordination tax" framing is wrong for this architecture: agents do not coordinate —
+each works isolated in its own worktree + container + KB scope. β is a **contention
+exponent** (provider rate limits + shared machine load), not a coordination exponent. The
+robust β_tokens ≈ 0.3 therefore sizes infrastructure expectations (a loaded key yields
+fewer tokens/min per session), never fleet-width policy — wide fleets of isolated agents
+are the intended operating mode. The surviving policy reading is β_cost ≈ 0: concurrency
+under isolation is dollar-safe. Concurrency leases (admission_leases) protect provider
+windows and spend caps; they are not coordination-safety devices.
