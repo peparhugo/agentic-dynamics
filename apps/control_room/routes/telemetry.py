@@ -3,6 +3,11 @@
 Extracted from ``server.py`` (refactor-repair Debt-1). Read-only telemetry plus the two
 experiment-queue mutations; all shared state (``server._redis``, Redis keys, ``EVENT_LOG_MAX``)
 is read through ``server.*`` so the tests' monkeypatches keep working.
+
+``api_matrix``'s review stage is read through ``_services.review_stage_source`` — the injected
+review authority. This module deliberately does NOT import a concrete review summariser: which
+authority answers for the review population (the files on disk, a Redis queue, a test double) is
+a composition-root decision, not a route-level one.
 """
 from __future__ import annotations
 
@@ -20,7 +25,7 @@ from agentic_dynamics.control.live import (
     STATUS_CHANNEL,
     STATUS_KEY,
 )
-from agentic_dynamics.control.pipeline_status import review_stage_summary, stage_summary
+from agentic_dynamics.control.pipeline_status import stage_summary
 from agentic_dynamics.control.queue_reinterleave import (
     provider_summary,
     read_queue,
@@ -49,7 +54,11 @@ def api_matrix() -> Response:
         r = _services.redis()
         execute = stage_summary(r, _services.queue_key, STATUS_KEY, _services.results_key)
         analyze = stage_summary(r, _services.analysis_queue_key, _services.analysis_status_key)
-        review = review_stage_summary(r)
+        # The review population comes from the INJECTED authority, never a hard-wired import:
+        # the composition root binds the file-derived source in production (see
+        # ControlRoomServices.review_stage_source), and a test binds its own to isolate this
+        # route from the filesystem entirely.
+        review = _services.review_stage_source(r)
         phase_payloads = r.hgetall(PHASE_KEY)
     except Exception:
         return jsonify({"error": "redis_unavailable", "cells": {}}), 503

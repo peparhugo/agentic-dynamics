@@ -1,6 +1,6 @@
 """Control Room route modules (refactor-repair Debt-1; review P2 service context).
 
-The 28 routes, grouped by surface, extracted from ``server.py``. Each submodule exposes a
+The 29 routes, grouped by surface, extracted from ``server.py``. Each submodule exposes a
 ``register(app, services)`` function; :func:`register` wires them all, forwarding the injected
 ``ControlRoomServices`` application context. Route handlers read shared state through the injected
 ``services`` object (``services.redis()``, ``services.design_manager()``, …) rather than importing
