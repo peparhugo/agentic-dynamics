@@ -80,11 +80,25 @@ class TestConventions:
         assert len(rules.naming_patterns) == 0
 
 
+
+# A temporary repo created by ``git init`` inherits no identity: this host sets ``user.name`` /
+# ``user.email`` only in the project repo, never globally, so ``git commit`` inside a tmp_path
+# repo dies with "Author identity unknown". Every other scratch-repo test in this suite
+# (test_workflow_runner, test_opencode_events, test_checkpoint_mechanism, test_auto_posthoc)
+# already stamps a local identity after init; these helpers bring the remaining files onto that
+# same convention so the suite is deterministic regardless of the host's global git config.
+def _init_repo(dp: Path) -> None:
+    """``git init`` a scratch repo AND stamp a local identity so commits succeed."""
+    _run_git(dp, "init")
+    _run_git(dp, "config", "user.email", "test@instrument.local")
+    _run_git(dp, "config", "user.name", "Instrument Test")
+
+
 class TestScoreConventions:
     def test_scores_python_naming(self):
         with tempfile.TemporaryDirectory() as d:
             dp = Path(d)
-            _run_git(dp, "init")
+            _init_repo(dp)
             (dp / "app.py").write_text(
                 "def get_user(id):\n    pass\n\nclass UserService:\n    pass\n"
             )
@@ -98,7 +112,7 @@ class TestScoreConventions:
     def test_scores_lower_with_bad_naming(self):
         with tempfile.TemporaryDirectory() as d:
             dp = Path(d)
-            _run_git(dp, "init")
+            _init_repo(dp)
             # Bad naming: camelCase function, lowercase class
             (dp / "app.py").write_text(
                 "def GetUser(id):\n    pass\n\nclass user_service:\n    pass\n"
@@ -115,7 +129,7 @@ class TestASTDiff:
     def test_computes_delta(self):
         with tempfile.TemporaryDirectory() as d:
             dp = Path(d)
-            _run_git(dp, "init")
+            _init_repo(dp)
             # Commit 1: initial
             (dp / "app.py").write_text("import os\n\ndef foo():\n    pass\n")
             _run_git(dp, "add", "-A")
@@ -137,7 +151,7 @@ class TestASTDiff:
     def test_counts_go_functions(self):
         with tempfile.TemporaryDirectory() as d:
             dp = Path(d)
-            _run_git(dp, "init")
+            _init_repo(dp)
             (dp / "main.go").write_text("package main\n\nfunc Foo() {}\n")
             _run_git(dp, "add", "-A")
             _run_git(dp, "commit", "-m", "initial")
@@ -154,7 +168,7 @@ class TestASTDiff:
     def test_counts_rust_functions(self):
         with tempfile.TemporaryDirectory() as d:
             dp = Path(d)
-            _run_git(dp, "init")
+            _init_repo(dp)
             (dp / "main.rs").write_text("fn foo() {}\n")
             _run_git(dp, "add", "-A")
             _run_git(dp, "commit", "-m", "initial")
@@ -173,14 +187,14 @@ class TestAnalyzeStoryWorktree:
     def test_empty_worktree(self):
         with tempfile.TemporaryDirectory() as d:
             dp = Path(d)
-            _run_git(dp, "init")
+            _init_repo(dp)
             analysis = analyze_story_worktree(dp)
             assert len(analysis.commits) == 0
 
     def test_with_session_commits(self):
         with tempfile.TemporaryDirectory() as d:
             dp = Path(d)
-            _run_git(dp, "init")
+            _init_repo(dp)
             (dp / "app.py").write_text("x = 1\n")
             _run_git(dp, "add", "-A")
             _run_git(dp, "commit", "-m", "Initial seed")

@@ -266,11 +266,25 @@ class TestSessionTokenSplit:
             assert loaded.sessions[0].total_tokens == 500
 
 
+
+# A temporary repo created by ``git init`` inherits no identity: this host sets ``user.name`` /
+# ``user.email`` only in the project repo, never globally, so ``git commit`` inside a tmp_path
+# repo dies with "Author identity unknown". Every other scratch-repo test in this suite
+# (test_workflow_runner, test_opencode_events, test_checkpoint_mechanism, test_auto_posthoc)
+# already stamps a local identity after init; these helpers bring the remaining files onto that
+# same convention so the suite is deterministic regardless of the host's global git config.
+def _init_repo(dp: Path) -> None:
+    """``git init`` a scratch repo AND stamp a local identity so commits succeed."""
+    _git(dp, "init")
+    _git(dp, "config", "user.email", "test@instrument.local")
+    _git(dp, "config", "user.name", "Instrument Test")
+
+
 class TestGitHelpers:
     def test_init_and_commit(self):
         with tempfile.TemporaryDirectory() as d:
             dp = Path(d)
-            _git(dp, "init")
+            _init_repo(dp)
             (dp / "test.txt").write_text("hello")
             _git(dp, "add", "-A")
             _git(dp, "commit", "-m", "initial commit")
@@ -280,7 +294,7 @@ class TestGitHelpers:
     def test_ls_files(self):
         with tempfile.TemporaryDirectory() as d:
             dp = Path(d)
-            _git(dp, "init")
+            _init_repo(dp)
             (dp / "a.txt").write_text("a")
             (dp / "b.txt").write_text("b")
             _git(dp, "add", "-A")
@@ -292,7 +306,7 @@ class TestGitHelpers:
     def test_rev_parse(self):
         with tempfile.TemporaryDirectory() as d:
             dp = Path(d)
-            _git(dp, "init")
+            _init_repo(dp)
             (dp / "x.txt").write_text("x")
             _git(dp, "add", "-A")
             _git(dp, "commit", "-m", "first")
