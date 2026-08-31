@@ -13,7 +13,6 @@ from apps.control_room import server
 from apps.control_room.routes import telemetry as telemetry_routes
 from apps.control_room.services.context import ControlRoomServices
 
-
 # --------------------------------------------------------------------------------------
 # The review-stage authority (dependency injection).
 #

@@ -38,10 +38,11 @@ filesystem, which would let a route quietly re-acquire the dependency the inject
 from __future__ import annotations
 
 import re
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 from types import ModuleType
-from typing import Any, Callable
+from typing import Any
 
 from agentic_dynamics.control.pipeline_status import review_stage_summary
 from apps.control_room import server
