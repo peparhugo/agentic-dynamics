@@ -790,10 +790,29 @@ def analyze_worktree(worktree_path: str, session: dict = None, baseline_code: st
 # ── Worktree Discovery ───────────────────────────────────────────────────────
 
 def discover_worktrees(sessions_by_dir: dict) -> list[dict]:
-    """Discover experiment worktrees and match to DB sessions."""
+    """Discover experiment worktrees and match to DB sessions, minus the quarantined ones.
+
+    The quarantine filter is the analyze chain's half of the admission layer's expiry rail
+    (``agentic_dynamics/control/quarantine.py``): a worktree whose run outlived its budget lease
+    produced output the system never admitted, and folding it into a Game Report would launder
+    unaccounted-for work into a published aggregate.
+
+    Exclusions are *reported*, never silent — a corpus that quietly shrank is indistinguishable
+    from one that was never that big. An unreadable ledger raises (``on_error="raise"``): this
+    surface produces published aggregates, and "contamination status unknown" must not be
+    rendered as "nothing is contaminated".
+    """
     import glob
+
+    from agentic_dynamics.control.quarantine import filter_quarantined_paths
+
+    candidates = sorted(glob.glob(str(WORKTREE_GLOB)))
+    kept, excluded = filter_quarantined_paths(candidates, on_error="raise")
+    for path in excluded:
+        print(f"  [quarantined] excluded from analysis: {Path(path).name}")
+
     worktrees = []
-    for path in sorted(glob.glob(str(WORKTREE_GLOB))):
+    for path in kept:
         wt = {"path": path, "name": Path(path).name}
         if path in sessions_by_dir:
             wt["session"] = sessions_by_dir[path]

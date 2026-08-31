@@ -501,6 +501,16 @@ class AdmissionController:
                 request=request,
             )
 
+        # The quarantine handles travel ON the lease, not only on the admission record. Phase
+        # 4's watchdog (`control.lease_watchdog`) sees expired *leases* and nothing else — it
+        # sweeps the registry, not the records — so an expired budget lease whose metadata does
+        # not name an output surface cannot be quarantined by identity, which is precisely what
+        # this request's docstring promises phase 4 will be able to do.
+        identity_metadata = {
+            "worktree_identity": request.worktree_identity,
+            "result_namespace": request.result_namespace,
+        }
+
         # 2 — the budget lease.
         try:
             budget_lease = self._registry.reserve_budget(
@@ -511,7 +521,10 @@ class AdmissionController:
                 cost_source=cost_source,
                 hard_cap=request.budget_cap,
                 ttl_seconds=request.ttl_seconds,
-                metadata={**request.metadata, "model": request.model, "kind": "budget"},
+                metadata={
+                    **request.metadata, **identity_metadata,
+                    "model": request.model, "kind": "budget",
+                },
             )
         except AdmissionError as exc:
             raise AdmissionDenied(
@@ -533,7 +546,8 @@ class AdmissionController:
                     hard_cap=request.concurrency_caps.get(scope),
                     ttl_seconds=request.ttl_seconds,
                     metadata={
-                        **request.metadata, "model": request.model, "kind": "concurrency",
+                        **request.metadata, **identity_metadata,
+                        "model": request.model, "kind": "concurrency",
                     },
                 )
                 concurrency_leases.append(lease)

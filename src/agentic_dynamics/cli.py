@@ -96,6 +96,7 @@ _COMMANDS: dict[tuple[str, ...], str] = {
     ("supervise",): "supervise.py",
     ("supervise", "claude-agents"): "claude_agents_supervisor.py",
     ("supervise", "orphans"): "orphan_sweep.py",
+    ("supervise", "leases"): "lease_watchdog.py",
     # usage (subscription quota check — read-only provider endpoints)
     ("usage",): "subscription_usage.py",
     # release
@@ -134,7 +135,7 @@ Subcommands (each forwards to its backing script):
   review      all|stories|trigger|enqueue|finalize
   spec        status|pipeline
   validate    session|tests|prereq
-  supervise   [claude-agents|orphans]
+  supervise   [claude-agents|orphans|leases]
   release     check-protection
   surfaces    sync|snapshot
 

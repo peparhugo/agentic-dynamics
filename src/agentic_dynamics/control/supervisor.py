@@ -39,7 +39,11 @@ def normalize_flag(value: Any) -> dict[str, Any] | None:
         return None
 
     flag = {field: value[field] for field in FLAG_FIELDS}
-    for field in ("last_activity_at", "review", "mapping"):
+    # Additive extras preserved verbatim. `lease` is the admission layer's expiry rail
+    # (`control.lease_watchdog`): a lease-expiry flag rides the SAME supervisor_flags list as a
+    # session flag so an operator has one board, and its observation payload must survive
+    # normalization to be actionable.
+    for field in ("last_activity_at", "review", "mapping", "lease"):
         if field in value:
             flag[field] = value[field]
     digest_fields = {field: flag[field] for field in FLAG_FIELDS}
