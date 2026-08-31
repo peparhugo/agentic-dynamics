@@ -13,11 +13,13 @@ import sys
 import time
 from pathlib import Path
 
+from agentic_dynamics.control.model_policy import SUBSCRIPTION_DEFAULT, ensure_model_allowed
+
 # ── Matrix Definition ──────────────────────────────────────────
 
 STORIES = ["task_manager_api", "static_site_gen", "notification_service"]
 TIERS = ["tier1_minimal", "tier2_small"]
-MODEL = "deepseek/deepseek-v4-pro"
+MODEL = SUBSCRIPTION_DEFAULT
 
 GOOD_CONDITIONS = ["clean", "bad_seed", "early_degrade"]
 BAD_CONDITIONS = ["clean", "early_degrade"]
@@ -29,6 +31,7 @@ QUALITIES = {
 
 
 def main():
+    ensure_model_allowed(MODEL)
     dry_run = "--dry-run" in sys.argv
 
     cells = []

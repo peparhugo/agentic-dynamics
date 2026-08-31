@@ -12,13 +12,14 @@ try:
 except ImportError:  # imported as scripts.<name> — repo root is on sys.path
     from scripts import _bootstrap  # noqa: E402,F401
 
+from agentic_dynamics.control.model_policy import ensure_model_allowed
 from agentic_dynamics.core.constants import WORKTREE_ROOT
 
 OPENSCODE_DB = Path.home() / ".local/share/opencode/opencode.db"
 OPENCODE_BIN = os.environ.get("OPENCODE_BIN", str(Path.home() / ".opencode/bin/opencode"))
 
 MODELS = [
-    ("deepseek/deepseek-v4-pro", "DeepSeek_v4_Pro"),
+    ("deepseek/deepseek-v4-flash", "DeepSeek_v4_Flash"),
     ("anthropic/claude-fable-5", "Claude_Fable_5"),
     ("openai/gpt-5.6", "GPT_5_6"),
     ("openai/gpt-5-mini", "GPT_5_mini"),
@@ -49,6 +50,7 @@ def cell_done(title):
         return False
 
 def run_cell(model_id, silent_mode, operator, label_slug, timeout=200):
+    ensure_model_allowed(model_id)
     title = f"[silent_sweep:{operator}:{silent_mode}] {label_slug}"
 
     if cell_done(title):

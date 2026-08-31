@@ -96,6 +96,8 @@ _COMMANDS: dict[tuple[str, ...], str] = {
     ("supervise",): "supervise.py",
     ("supervise", "claude-agents"): "claude_agents_supervisor.py",
     ("supervise", "orphans"): "orphan_sweep.py",
+    # usage (subscription quota check — read-only provider endpoints)
+    ("usage",): "subscription_usage.py",
     # release
     ("release", "check-protection"): "check_branch_protection.py",
     # surfaces (the self-maintenance command — design: system_knowledge_abstraction)

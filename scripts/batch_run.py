@@ -13,6 +13,7 @@ try:
 except ImportError:  # imported as scripts.<name> — repo root is on sys.path
     from scripts import _bootstrap  # noqa: E402,F401
 
+from agentic_dynamics.control.model_policy import SUBSCRIPTION_DEFAULT, ensure_model_allowed
 from agentic_dynamics.core.constants import WORKTREE_ROOT
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -34,7 +35,8 @@ def _config_path(name: str) -> Path:
 
 OPENSCODE_DB = Path.home() / ".local/share/opencode/opencode.db"
 OPENCODE_BIN = os.environ.get("OPENCODE_BIN", str(Path.home() / ".opencode/bin/opencode"))
-MODEL = "deepseek/deepseek-v4-pro"
+MODEL = SUBSCRIPTION_DEFAULT
+ensure_model_allowed(MODEL)
 TIMEOUT = 250
 
 def get_task(config_name):

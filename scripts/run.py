@@ -22,6 +22,7 @@ except ImportError:  # imported as scripts.<name> — repo root is on sys.path
 
 
 from agentic_dynamics.adapters.backends import run_agentic
+from agentic_dynamics.control.model_policy import SUBSCRIPTION_DEFAULT, ensure_model_allowed
 from agentic_dynamics.core.language import detect_language
 from agentic_dynamics.measurement.basin import BasinMetrics, measure_basin_escape
 from agentic_dynamics.measurement.efficiency import compute_efficiency
@@ -71,7 +72,8 @@ def run_experiment(config_path: str, model_override: str = "", limit: int = 0,
     # authors the perturbation and it is pinned as a reusable, variant-indexed artifact).
     perturbation_mode = cfg.get("perturbation_mode", "deterministic")
     perturbation_cache_dir = Path(cfg.get("perturbation_cache_dir", "experiments/results/perturbations"))
-    model_id = model_override or cfg.get("model_id", "deepseek/deepseek-v4-pro")
+    model_id = model_override or cfg.get("model_id", SUBSCRIPTION_DEFAULT)
+    ensure_model_allowed(model_id)
     # The display slug is a pure function of the canonical model id, so the same
     # physical model is labeled identically whether it arrived via ``--model`` or
     # via the config's ``model``/``model_id`` key (BUG-3: the two paths used to

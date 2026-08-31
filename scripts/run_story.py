@@ -19,6 +19,7 @@ except ImportError:  # imported as scripts.<name> — repo root is on sys.path
     from scripts import _bootstrap  # noqa: E402,F401
 
 
+from agentic_dynamics.control.model_policy import SUBSCRIPTION_DEFAULT, ensure_model_allowed
 from agentic_dynamics.core.constants import SESSION_TIMEOUT, model_slug
 from agentic_dynamics.runtime.story import (
     BUILTIN_STORIES,
@@ -54,7 +55,8 @@ def main():
         "--list", action="store_true", help="List available built-in stories"
     )
     parser.add_argument(
-        "--model", default="deepseek/deepseek-v4-pro", help="Model ID"
+        "--model", default=SUBSCRIPTION_DEFAULT,
+        help="Model ID (subscription default; per-token pro needs FINOPS_ALLOW_PRO=1)"
     )
     parser.add_argument(
         "--backend",
@@ -146,6 +148,8 @@ def main():
             sys.exit(1)
 
     condition = PerturbationCondition(args.condition)
+
+    ensure_model_allowed(args.model)
 
     print(f"\nStory: {story.name} ({len(story.sessions)} sessions, {story.language})")
     print(f"Model: {args.model}")

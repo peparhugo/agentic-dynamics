@@ -27,6 +27,7 @@ except ImportError:  # imported as scripts.<name> — repo root is on sys.path
 OPENSCODE_DB = Path.home() / ".local/share/opencode/opencode.db"
 
 from agentic_dynamics.adapters.opencode import run_opencode_agentic
+from agentic_dynamics.control.model_policy import ensure_model_allowed
 from agentic_dynamics.measurement.constraint_detection import detect_constraints
 from agentic_dynamics.measurement.efficiency import compute_efficiency
 from agentic_dynamics.measurement.perturb import build_operators, derive_seed, perturb_prompt
@@ -36,7 +37,7 @@ from agentic_dynamics.measurement.solution import evaluate_solution
 
 # Core models for the sweep
 DEFAULT_MODELS = [
-    ("deepseek/deepseek-v4-pro", "DeepSeek v4 Pro"),
+    ("deepseek/deepseek-v4-flash", "DeepSeek v4 Flash"),
     ("anthropic/claude-fable-5", "Claude Fable 5"),
     ("openai/gpt-5.6", "GPT-5.6"),
     ("openai/gpt-5-mini", "GPT-5-mini"),
@@ -79,6 +80,7 @@ def run_sweep(models=None, dry_run=False, limit=0, timeout=200):
     results = []
 
     for model_id, label in models:
+        ensure_model_allowed(model_id)
         for silent_mode, _ in [(None, "natural"), (True, "forced-silent")]:
             sm_str = "natural" if silent_mode is None else "forced-silent"
 

@@ -32,13 +32,15 @@ try:
 except ImportError:  # imported as scripts.<name> — repo root is on sys.path
     from scripts import _bootstrap  # noqa: E402,F401
 
+from agentic_dynamics.control.model_policy import SUBSCRIPTION_DEFAULT, ensure_model_allowed
 from agentic_dynamics.core.constants import model_slug
 
 # ── Matrix Definition ──────────────────────────────────────────
 
 STORIES = ["task_manager_api", "static_site_gen", "notification_service"]
 TIERS = ["tier1_minimal", "tier2_small"]
-MODEL = os.environ.get("FINOPS_MODEL", "deepseek/deepseek-v4-pro")
+MODEL = os.environ.get("FINOPS_MODEL", SUBSCRIPTION_DEFAULT)
+ensure_model_allowed(MODEL)
 
 GOOD_CONDITIONS = ["clean", "bad_seed", "early_degrade"]
 BAD_CONDITIONS = ["clean", "early_degrade"]

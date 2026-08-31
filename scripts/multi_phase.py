@@ -14,6 +14,7 @@ except ImportError:  # imported as scripts.<name> — repo root is on sys.path
 
 
 from agentic_dynamics.adapters.opencode import run_opencode_agentic
+from agentic_dynamics.control.model_policy import SUBSCRIPTION_DEFAULT, ensure_model_allowed
 from agentic_dynamics.measurement.solution import evaluate_solution
 
 PHASES = [
@@ -110,10 +111,13 @@ if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("--model", default="deepseek/deepseek-v4-pro")
+    parser.add_argument("--model", default=SUBSCRIPTION_DEFAULT)
     parser.add_argument("--compare", nargs="*")
     parser.add_argument("--timeout", type=int, default=300)
     args = parser.parse_args()
+
+    for model_id in (args.compare or [args.model]):
+        ensure_model_allowed(model_id)
 
     if args.compare:
         for model_id in args.compare:

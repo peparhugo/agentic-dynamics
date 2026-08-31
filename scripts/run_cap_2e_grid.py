@@ -54,13 +54,16 @@ try:
 except ImportError:
     from scripts import _bootstrap  # noqa: E402, F401
 
+from agentic_dynamics.control.model_policy import FLASH_MODEL, ensure_model_allowed
+
 ROOT = Path(__file__).resolve().parent.parent
 RESULTS = ROOT / "experiments" / "results" / "cap_adaptive_2e"
 PROPOSALS = RESULTS / "proposals"
 CELLS_DIR = RESULTS / "cells"
 WORKTREES_DIR = Path("/tmp")
 
-MODEL = "deepseek/deepseek-v4-pro"
+MODEL = os.environ.get("FINOPS_MODEL", FLASH_MODEL)
+ensure_model_allowed(MODEL)
 BACKEND = "opencode"
 GRAPH_URI = "bolt://localhost:7687"
 

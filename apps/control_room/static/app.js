@@ -1865,6 +1865,99 @@
   }
 
   /**
+   * Subscription usage — provider quota from the polite cache (15 min TTL, 60 s
+   * min refetch floor on the server). Polls hit Redis, never the providers.
+   */
+  async function loadSubscriptionUsage(force = false) {
+    const content = $("#usage-content")
+    if (!content) return
+    if (!content.dataset.loaded) {
+      content.replaceChildren(element("p", "empty-state", "Loading subscription usage…"))
+    }
+    try {
+      const url = force ? "/api/subscription-usage?refresh=1" : "/api/subscription-usage"
+      const response = await fetch(url)
+      const data = await response.json()
+      if (!response.ok) throw new Error(data.error || "usage unavailable")
+      content.replaceChildren()
+      content.dataset.loaded = "1"
+      const cache = data.cache || {}
+      content.appendChild(element("p", "pane-note",
+        `Fetched ${String(data.fetched_at ?? "?").slice(0, 19).replace("T", " ")}Z · ` +
+        `${data.served_from ?? "?"} · ${data.stale ? "STALE" : "fresh"} · ` +
+        `age ${cache.age_seconds ?? "?"}s · TTL ${Math.round((cache.ttl_seconds ?? 0) / 60)}m · ` +
+        `${data.history?.count ?? 0} saved snapshots`))
+      for (const [provider, info] of Object.entries(data.providers || {})) {
+        content.appendChild(element("h3", "", `${provider} — ${info.plan ?? "?"}`))
+        if (!info.ok) {
+          content.appendChild(element("p", "empty-state", `Unavailable: ${info.error ?? "?"}`))
+          continue
+        }
+        const rows = (info.windows || []).map((window) => [
+          window.name ?? "?",
+          `${window.used_percent ?? "?"}%`,
+          window.limit_seconds ? `${Math.round(window.limit_seconds / 3600)}h` : "—",
+          window.resets_at ? String(window.resets_at).slice(0, 16).replace("T", " ") + "Z" : "—",
+        ])
+        content.appendChild(routingTable(
+          `${provider} subscription usage windows`,
+          ["Window", "Used", "Length", "Resets (UTC)"],
+          rows,
+        ))
+      }
+      const deepseek = data.deepseek || {}
+      content.appendChild(element("h3", "", "deepseek — per-token cash (local opencode.db)"))
+      if (!deepseek.ok) {
+        content.appendChild(element("p", "empty-state", `Unavailable: ${deepseek.error ?? "?"}`))
+      } else {
+        const totals = deepseek.totals || {}
+        content.appendChild(element("p", "pane-note",
+          `Cash (local estimate): $${core.safeNumber(totals.cost_usd)?.toFixed(2) ?? "?"} · ` +
+          `${totals.sessions ?? "?"} sessions · subagents $${(totals.subagent_cost_usd ?? 0).toFixed(2)} · ` +
+          `${(totals.tokens ?? 0).toLocaleString()} tokens · 14d window`))
+        const dayRows = (deepseek.days || []).map((day) => [
+          day.date ?? "?",
+          `$${core.safeNumber(day.cost_usd)?.toFixed(4) ?? "?"}`,
+          day.sessions ?? "?",
+          (day.tokens ?? 0).toLocaleString(),
+          `$${(day.subagent_cost_usd ?? 0).toFixed(4)}`,
+        ])
+        content.appendChild(routingTable(
+          "DeepSeek per-day cash spend (local DB estimates)",
+          ["Date", "Cost $", "Sessions", "Tokens", "Subagent $"],
+          dayRows,
+        ))
+      }
+      const meter = data.deepseek_platform || {}
+      content.appendChild(element("h3", "", "deepseek platform — authoritative meter"))
+      if (!meter.ok) {
+        content.appendChild(element("p", "empty-state", `Unavailable: ${meter.error ?? "?"}`))
+      } else {
+        const wallet = meter.wallet || {}
+        const mtotals = meter.totals || {}
+        content.appendChild(element("p", "pane-note",
+          `Wallet $${core.safeNumber(wallet.balance_usd)?.toFixed(2) ?? "?"} · ` +
+          `lifetime $${core.safeNumber(wallet.lifetime_cost_usd)?.toFixed(2) ?? "?"} · ` +
+          `14d est $${core.safeNumber(mtotals.estimated_cost_usd)?.toFixed(2) ?? "?"} (meter tokens × off-peak rates)`))
+        const meterRows = (meter.days || []).map((day) => [
+          day.date ?? "?",
+          `$${core.safeNumber(day.estimated_cost_usd)?.toFixed(2) ?? "?"}`,
+          (day.requests ?? 0).toLocaleString(),
+          (day.response_tokens ?? 0).toLocaleString(),
+          `${(day.cache_hit_tokens ?? 0).toLocaleString()} / ${(day.cache_miss_tokens ?? 0).toLocaleString()}`,
+        ])
+        content.appendChild(routingTable(
+          "DeepSeek per-day meter spend (authoritative tokens, estimated $)",
+          ["Date", "Est $", "Requests", "Resp tokens", "Cache hit / miss"],
+          meterRows,
+        ))
+      }
+    } catch (err) {
+      content.replaceChildren(element("p", "empty-state", `Subscription usage unavailable: ${err.message}`))
+    }
+  }
+
+  /**
    * canonical-state round 2, plan step 17 — fetch the registry table lazily (only
    * once the drawer is first opened, mirroring loadRouting's own state.routingLoaded
    * gate), honoring the three filter controls. GET-only: this panel never sends a
@@ -2604,6 +2697,7 @@
       state.routingReturnFocus?.focus()
     })
     $("#routing-refresh").addEventListener("click", loadRouting)
+    $("#usage-refresh").addEventListener("click", () => loadSubscriptionUsage(true))
     $("#registry-toggle").addEventListener("click", () => {
       state.registryOpen = !state.registryOpen
       $("#registry-drawer").hidden = !state.registryOpen
@@ -2863,11 +2957,13 @@
   loadDesignSessions({ restore: true })
   loadClaudeAgents()
   loadClaudeAgentDaemon()
+  loadSubscriptionUsage()
   connectStatusStream()
   window.setInterval(loadMatrix, MATRIX_POLL_MS)
   window.setInterval(loadSupervisorFlags, FLAGS_POLL_MS)
   window.setInterval(loadDesignSessions, DESIGN_LIST_POLL_MS)
   window.setInterval(loadClaudeAgents, CLAUDE_AGENTS_POLL_MS)
   window.setInterval(loadClaudeAgentDaemon, CLAUDE_AGENTS_DAEMON_POLL_MS)
+  window.setInterval(() => loadSubscriptionUsage(), 60_000)
   window.setInterval(tick, 1000)
 })(window.ControlRoomCore, window)

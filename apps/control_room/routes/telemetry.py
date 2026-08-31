@@ -11,7 +11,7 @@ import subprocess
 import sys
 import time
 
-from flask import Response, jsonify
+from flask import Response, jsonify, request
 
 from agentic_dynamics.control.live import (
     EVENT_CHANNEL_PREFIX,
@@ -31,6 +31,13 @@ from agentic_dynamics.control.routing import compute_routing
 from apps.control_room.services.context import ControlRoomServices
 from apps.control_room.services.design_sessions import DESIGN_SESSIONS_KEY
 from apps.control_room.services.mutations import _design_mutation_body, _idempotent_design_response
+from apps.control_room.services.subscription_usage import (
+    CACHE_TTL_SECONDS,
+    MIN_REFRESH_INTERVAL_SECONDS,
+    UsageUnavailableError,
+    history_summary,
+    load_or_refresh,
+)
 from apps.control_room.services.telemetry import _parse_phases, _retained_telemetry, _sse
 
 #: The injected application context, bound by ``register()`` before any request is served.
@@ -158,6 +165,36 @@ def api_routing() -> Response:
         )
     return jsonify(compute_routing(entries))
 
+def api_subscription_usage() -> Response:
+    """Serve provider subscription usage through the polite cache (15 min TTL).
+
+    ``?refresh=1`` requests a live refetch, but never more often than once per
+    ``MIN_REFRESH_INTERVAL_SECONDS`` — dashboard polls must not hammer the
+    providers' OAuth endpoints.
+    """
+    force = request.args.get("refresh") == "1"
+    try:
+        payload, served_from, age = load_or_refresh(_services.redis, _services.root, force=force)
+    except UsageUnavailableError:
+        return jsonify({"error": "subscription_usage_unavailable"}), 503
+
+    refetched = served_from == "live"
+    return jsonify({
+        "providers": payload["providers"],
+        "deepseek": payload.get("deepseek"),
+        "deepseek_platform": payload.get("deepseek_platform"),
+        "fetched_at": payload.get("fetched_at"),
+        "stale": bool(payload.get("stale", False)) or served_from == "disk-cache",
+        "served_from": served_from,
+        "refetched_now": refetched,
+        "history": history_summary(_services.root),
+        "cache": {
+            "age_seconds": age,
+            "ttl_seconds": CACHE_TTL_SECONDS,
+            "min_refresh_seconds": MIN_REFRESH_INTERVAL_SECONDS,
+        },
+    })
+
 def api_experiments() -> Response:
     """Enqueue or clear the experiment queue — the most expensive mutation.
 
@@ -225,5 +262,6 @@ def register(app, services: ControlRoomServices) -> None:
     app.get("/api/status")(api_status)
     app.get("/api/events/<cell_id>")(api_events)
     app.get("/api/routing")(api_routing)
+    app.get("/api/subscription-usage")(api_subscription_usage)
     app.post("/api/experiments")(api_experiments)
     app.post("/api/queue/reinterleave")(api_queue_reinterleave)

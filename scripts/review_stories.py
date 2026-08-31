@@ -16,6 +16,7 @@ except ImportError:  # imported as scripts.<name> — repo root is on sys.path
     from scripts import _bootstrap  # noqa: E402,F401
 
 
+from agentic_dynamics.control.model_policy import FLASH_MODEL
 from agentic_dynamics.reporting.review import review_commit, review_story
 from agentic_dynamics.runtime.story import load_story_result
 
@@ -71,9 +72,9 @@ def main():
             )
             commit_reviews.append(review.to_dict())
 
-        # Story review with DeepSeek V4 Pro (better coherence analysis)
-        print("    Reviewing full story with DeepSeek V4 Pro...")
-        story_review = review_story(worktree, story.story_name, model="deepseek/deepseek-v4-pro")
+        # Story review — advisory prose, cheap per-token tier only
+        print("    Reviewing full story (advisory, flash)...")
+        story_review = review_story(worktree, story.story_name, model=FLASH_MODEL)
 
         # Save
         out = {

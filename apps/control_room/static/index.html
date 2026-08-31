@@ -712,6 +712,22 @@
         </section>
         <output id="queue-result" class="inline-result" aria-live="polite"></output>
       </section>
+
+      <section class="system-section" aria-labelledby="usage-title">
+        <header class="drawer-header">
+          <div>
+            <span class="eyebrow">Provider quota</span>
+            <h3 id="usage-title">SUBSCRIPTION USAGE</h3>
+          </div>
+          <div class="board-header-actions">
+            <button id="usage-refresh" type="button">Refresh</button>
+          </div>
+        </header>
+        <p class="boundary-copy">Read from the providers' own usage endpoints through a 15-minute cache; Refresh never queries them more than once per minute.</p>
+        <div id="usage-content" class="routing-content">
+          <p class="empty-state">Open System to load subscription usage.</p>
+        </div>
+      </section>
     </div>
   </section>
 
