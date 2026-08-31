@@ -1,6 +1,6 @@
 {
   "schema_version": "spec-status/v2",
-  "generated_at": "2026-08-31T00:35:50.668546+00:00",
+  "generated_at": "2026-08-31T01:48:36.267067+00:00",
   "n_specs": 160,
   "specs": [
     {
@@ -382,24 +382,6 @@
       "n_runs": 0
     },
     {
-      "name": "concurrency_ladder",
-      "version": "0.1",
-      "status": "runnable",
-      "spec_path": "workflows/repository/concurrency_ladder.yaml",
-      "artifact_kind": "workflow",
-      "repeatable": false,
-      "supersedes": [],
-      "superseded_by": null,
-      "completed_at": null,
-      "last_run_at": null,
-      "latest_ok": null,
-      "latest_model": null,
-      "latest_cost_usd": null,
-      "latest_git_sha": null,
-      "results_pointer": null,
-      "n_runs": 0
-    },
-    {
       "name": "context_abstraction_implement",
       "version": "0.1",
       "status": "runnable",
@@ -757,6 +739,24 @@
       "latest_cost_usd": 15.447095,
       "latest_git_sha": "0b69db16b",
       "results_pointer": "experiments/results/workflows/claude_background_sessions/20260814T173806Z.json",
+      "n_runs": 1
+    },
+    {
+      "name": "concurrency_ladder",
+      "version": "0.1",
+      "status": "failed",
+      "spec_path": "workflows/repository/concurrency_ladder.yaml",
+      "artifact_kind": "workflow",
+      "repeatable": false,
+      "supersedes": [],
+      "superseded_by": null,
+      "completed_at": null,
+      "last_run_at": "2026-08-31T01:48:35.997069+00:00",
+      "latest_ok": false,
+      "latest_model": "deepseek/deepseek-v4-pro",
+      "latest_cost_usd": 0.464847,
+      "latest_git_sha": "27a959fd1",
+      "results_pointer": "experiments/results/workflows/concurrency_ladder/20260831T014836Z.json",
       "n_runs": 1
     },
     {

@@ -1,0 +1,250 @@
+name: test_suite_tiering
+question: >-
+  Reclassify the pytest suite into explicit unit/integration tiers so the default loop is
+  hermetic and fast, WITHOUT losing integration/system coverage:
+  (1) inventory every test file into a tier manifest with measured timings;
+  (2) make the workflow runner's sonar/mypy analyzer legs injectable and skippable in tests
+  (the 108-second root-commit test is ~94% real sonar-scanner JVM runs);
+  (3) mark integration tests per-test, never per-file, under a registered `integration` marker;
+  (4) extract the watchdog/tree-gate/checkpoint decision logic into pure functions with thin
+  unit tests so the fast loop keeps behavioral coverage the E2E tests currently own alone;
+  (5) make the fast loop the pytest default (`-m "not external and not integration"`);
+  (6) verify fast loop + full suite green, before/after timing recorded.
+version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: false
+repeatable: false
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: true
+    context:
+      domain_context: >-
+        PROVISIONAL DomainProfile. domain: pytest suite tiering + workflow-runner test seams.
+        canonical_sources: [tests/conftest.py (the marker registry + the availability probes),
+        pyproject.toml [tool.pytest.ini_options], src/agentic_dynamics/runtime/workflow_runner.py
+        (the analyzer legs, the watchdog, the tree gate, the checkpoint contract),
+        src/agentic_dynamics/measurement/sonar.py (run_sonar_analysis — the JVM cost),
+        tests/test_workflow_runner.py + tests/test_relabel_tree_gate.py +
+        tests/test_checkpoint_mechanism.py (the mixed unit/E2E files),
+        docs/architecture/current/2026-08-14_experiment-spec-and-compiler-design.md (spec
+        conventions)].
+        policies: [per_test_never_per_file, e2e_coverage_is_kept, evidence_per_claim]
+      challenge_context: >-
+        PROVISIONAL ChallengeProfile. challenge: suite tiering + fast-loop default.
+        deliberation: [tier inventory, analyzer-leg seams, per-test marking, unit extraction,
+        fast default, full-suite verification].
+        session_policy: {default: fork_per_phase}
+      current_state: >-
+        MEASURED (2026-08-31): 2390 tests across 125 files; 116 deselected as `external`
+        (opencode/Ollama/Chroma/Neo4j). The non-external suite runs in 282.87s; the slowest
+        test is test_run_workflow_change_analysis_root_commit_never_fails at 108.71s — ~94%
+        real sonar-scanner JVM invocations against the live SonarQube on localhost:9000
+        (the phase runner's _sonar_evidence leg runs the scanner on both revisions even
+        under a faked agent). Next: relabel_tree_gate ~12s x4 (27 real git subprocess calls
+        per test), checkpoint ~13.6s, watchdog ~5s x8 (deliberate stalls). pytest-timeout is
+        NOT installed — the ini `timeout = 600` hang guard is inert ("Unknown config option:
+        timeout"). The only test taxonomy is the binary `external` marker; no `integration`
+        marker exists. The mixed files interleave pure unit tests with full run_workflow E2E
+        tests, and watchdog/tree-gate/checkpoint BEHAVIORS have E2E-only coverage (the
+        decision logic is not unit-tested).
+      hard_rules: >-
+        (1) PER-TEST MARKING, NEVER PER-FILE: unit tests inside the mixed files
+        (test_workflow_runner.py, test_relabel_tree_gate.py, test_checkpoint_mechanism.py)
+        stay in the fast loop; only the E2E tests carry the integration marker.
+        (2) THE E2E TESTS ARE KEPT: they are integration/system coverage — marked, still
+        run in the full suite. Never delete, gut, or weaken them into no-ops.
+        (3) NO BEHAVIOR CHANGE to watchdog/tree-gate/checkpoint semantics: p4 is pure
+        extraction + new unit tests; the existing E2E tests are the regression proofs and
+        must stay green UNCHANGED in their assertions.
+        (4) Analyzer legs: injectable fakes for tests only; production run_workflow
+        behavior unchanged; the dedicated sonar/lsp unit tests stay green.
+        (5) The fast default is opt-out-able: running without the default marker filter
+        (e.g. `pytest -m ""`) must still run everything, integration included.
+        (6) EVERY CLAIM LANDS WITH EVIDENCE: timings (--durations before/after), tier
+        counts, marker counts — recorded in docs/designs/current/test_suite_tiering_design.md.
+        (7) Guard families stay green: test_script_classification, test_doc_lifecycle,
+        test_experiment_workflow_classification, test_dependency_direction — if the campaign
+        touches scripts/CONTEXT.md, docs, or instruction surfaces, regenerate/update them per
+        their contracts.
+        (8) pytest-timeout must be installed (pyproject dev dependency) — the 600s hang
+        guard is currently inert.
+        (9) External-marked tests are untouched. No generated-surface edits, no secrets,
+        no external actuation.
+        (10) Resumable only when spec version, goal hash, source revision, and
+        candidate-manifest hash match.
+      read_first: >-
+        tests/conftest.py (marker registration + availability probes), pyproject.toml
+        [tool.pytest.ini_options], src/agentic_dynamics/runtime/workflow_runner.py
+        (_sonar_evidence/_lsp_evidence/_call_with_deadline, the watchdog, the tree gate,
+        the checkpoint contract), tests/test_workflow_runner.py + tests/test_relabel_tree_gate.py
+        + tests/test_checkpoint_mechanism.py (the mixed files),
+        src/agentic_dynamics/measurement/sonar.py (the JVM cost),
+        docs/architecture/current/2026-08-14_experiment-spec-and-compiler-design.md
+      run_shape: >-
+        SINGLE-model: --model deepseek/deepseek-v4-flash (engineering + tests). One branch
+        (feature/test-suite-tiering); each phase commits [workflow] <phase>. The campaign
+        runs through the hardened runner (its own commits must comply).
+    phases:
+      - name: p1_inventory_and_baseline
+        kind: agent
+        timeout: 10800
+        prompt: |
+          GOAL: {goal}
+          SHAPE: inventory the suite and baseline it. (a) Classify ALL 125 test files
+          (tests/*.py) into exactly one tier each: `unit` (pure/hermetic, no real
+          subprocess or service or repo-state dependency), `hermetic_integration` (real
+          subprocesses — git, pytest, worktree materialization — but temp state only),
+          `live_service` (real sonar-scanner/SonarQube, mypy, Redis, Neo4j/Chroma/Ollama
+          availability-gated, or any other running service), `repo_guard` (asserts the
+          committed repo state: specs corpus, docs lifecycle, data.js, registry index,
+          canonical corpus). Write the manifest as tests/tiers.json: one entry per FILE
+          {file, tier, rationale, slow_seconds (measured where >= 2s)} plus the measured
+          per-test slowest-20 table from `python3 -m pytest tests/ -q -m "not external"
+          --durations=20`. (b) Write docs/designs/current/test_suite_tiering_design.md:
+          the tier taxonomy, the marker plan (one `integration` marker, per-test, never
+          per-file), the fast-default plan, and the unit-extraction list (watchdog stall
+          classification, tree-gate verdict, checkpoint resume ordering — the E2E-only
+          behaviors p4 will extract).
+          VERIFY (both directions): every test file appears exactly once in the manifest;
+          every file with a >= 2s test has its slow_seconds recorded; the baseline timing
+          table is complete enough to compute the suite total before/after.
+          DELIVER: tests/tiers.json + the design doc, committed.
+          LOG: per-tier counts, baseline suite seconds, slowest-20 table; PASS/FAIL; commit.
+      - name: p2_analyzer_legs
+        kind: agent
+        timeout: 10800
+        prompt: |
+          GOAL: {goal}
+          SHAPE: make the workflow runner's analyzer legs test-injectable and
+          availability-probed, per the design doc. (a) _sonar_evidence/_lsp_evidence in
+          src/agentic_dynamics/runtime/workflow_runner.py accept injected functions (the
+          same seam run_agentic_fn already uses) so tests can fake the legs; (b) add a
+          cheap availability probe to the sonar path so an unreachable/absent server or
+          scanner returns the measured unavailable payload WITHOUT starting the JVM
+          (currently run_sonar_analysis runs the full scanner first); (c) the target:
+          test_run_workflow_change_analysis_root_commit_never_fails drops from 108.71s to
+          well under 10s; the E2E run_workflow tests stop paying scanner wall-clock.
+          VERIFY (both directions): the root-commit test and the other previously-slow
+          workflow tests re-timed with --durations and the drop recorded; the dedicated
+          unit tests (test_sonar_evidence_*, test_lsp_evidence_* in test_workflow_runner.py,
+          test_sonar.py) stay green with monkeypatched tools; production run_workflow
+          behavior with a real scanner is unchanged (the probe only short-circuits when
+          the service is confirmed absent).
+          DELIVER: the seam + the probe + the timing evidence, committed.
+          LOG: before/after seconds per slow test; PASS/FAIL; commit.
+      - name: p3_tier_marks
+        kind: agent
+        timeout: 10800
+        prompt: |
+          GOAL: {goal}
+          SHAPE: register and apply the integration marker, per the design doc and hard
+          rule 1 (PER-TEST, NEVER PER-FILE). (a) Register `integration` in
+          tests/conftest.py pytest_configure with a docstring defining it (real
+          subprocess/live-service/repo-state-dependent tests that the fast loop excludes
+          but the full suite always runs); (b) mark the E2E tests per-test in the mixed
+          files (test_workflow_runner.py, test_relabel_tree_gate.py,
+          test_checkpoint_mechanism.py) and any other file whose tier is
+          hermetic_integration/live_service/repo_guard; (c) document the taxonomy in
+          tests/CONTEXT.md (create it if absent): tiers, marker semantics, and the two
+          run commands (fast default vs full suite).
+          VERIFY (both directions): `pytest -m "not external and not integration"` still
+          collects EVERY pure unit test from the mixed files (grep the collected list);
+          the full-suite invocation `pytest -m "not external"` still collects every E2E
+          test; no file has ALL of its tests marked (spot-check per mixed file).
+          DELIVER: conftest marker + per-test marks + tests/CONTEXT.md, committed.
+          LOG: marked-test count, fast-loop collected count, full-suite collected count;
+          PASS/FAIL; commit.
+      - name: p4_unit_extraction
+        kind: agent
+        timeout: 14400
+        prompt: |
+          GOAL: {goal}
+          SHAPE: extract the E2E-only decision logic into pure functions with thin unit
+          tests, per the design doc's extraction list. (a) WATCHDOG: the stall verdict
+          (STALLED + evidence shape: stale age, last-step timestamp, transcript tail)
+          computed from step timestamps becomes a pure function; (b) TREE GATE: the
+          relabel verdict (committed tree hash vs recorded discarded trees + the approval
+          contract check) becomes a pure decision function; (c) CHECKPOINT: the resume
+          ordering verdict (artifact present, real signature, commit is a strict
+          descendant of the checkpoint commit) becomes a pure function. Each gets unit
+          tests in the FAST loop (no subprocess, no sleeps, no services). Hard rule 3:
+          the runner's runtime behavior is byte-for-byte unchanged — the E2E tests in
+          test_workflow_runner.py / test_relabel_tree_gate.py / test_checkpoint_mechanism.py
+          stay green UNCHANGED in their assertions (they are the regression proofs).
+          VERIFY (both directions): each new unit test asserts both polarities (stall vs
+          compliant; relabel vs approved reuse; refuse vs proceed); the E2E regression
+          tests pass unchanged; the fast loop collects the new unit tests.
+          DELIVER: the extracted functions + the unit tests + unchanged E2E proofs,
+          committed.
+          LOG: extraction list with verdicts; PASS/FAIL; commit.
+      - name: p5_fast_default
+        kind: agent
+        timeout: 10800
+        prompt: |
+          GOAL: {goal}
+          SHAPE: make the fast loop the default, per the design doc. (a) pyproject.toml
+          [tool.pytest.ini_options]: addopts `-m "not external and not integration"` with
+          a comment documenting the escape hatch (run everything with `pytest -m ""` or
+          `pytest -m "integration"`); keep the `timeout = 600` hang guard and add
+          pytest-timeout to the dev dependency set (it is currently NOT installed — the
+          guard is inert); (b) confirm `agentic-dynamics validate tests` and any
+          documented test commands in scripts/CONTEXT.md / agent_config surfaces match the
+          new default (guard family test_script_classification must pass); (c) measure and
+          record the fast-loop runtime and the full-suite runtime in the design doc.
+          VERIFY (both directions): `python3 -m pytest tests/ -q` runs the fast loop only
+          and its runtime is recorded; `python3 -m pytest tests/ -q -m ""` still collects
+          and runs the full non-external suite; the ini parses without the "Unknown config
+          option" warning once pytest-timeout is installed.
+          DELIVER: pyproject.toml change + deps + timing table, committed.
+          LOG: fast-loop seconds, full-suite seconds, collection counts; PASS/FAIL; commit.
+      - name: p6_verify
+        kind: test
+factors:
+  - {name: model, levels: [deepseek/deepseek-v4-flash]}
+design: factorial
+rules:
+  - name: tier_inventory
+    plane: measurement
+    evidence_class: "[M]"
+    requires: []
+    produces: [tier_inventory_complete]
+  - name: analyzer_legs
+    plane: measurement
+    evidence_class: "[M]"
+    requires: []
+    produces: [analyzer_legs_test_injectable, slow_test_time_reduced]
+  - name: tier_marks
+    plane: measurement
+    evidence_class: "[M]"
+    requires: [tier_inventory_complete]
+    produces: [integration_tests_marked]
+  - name: unit_extraction
+    plane: measurement
+    evidence_class: "[M]"
+    requires: [tier_inventory_complete]
+    produces: [watchdog_decision_unit_tested, tree_gate_verdict_unit_tested, checkpoint_ordering_unit_tested]
+  - name: fast_default
+    plane: measurement
+    evidence_class: "[M]"
+    requires: [integration_tests_marked, watchdog_decision_unit_tested]
+    produces: [fast_loop_default_configured]
+  - name: suite_verify
+    plane: measurement
+    evidence_class: "[M]"
+    requires: [tier_inventory_complete, analyzer_legs_test_injectable, integration_tests_marked, fast_loop_default_configured]
+    produces: [fast_loop_green, full_suite_green, timing_improvement_recorded]
+metrics:
+  - {name: tier_inventory_complete, agg: mean, over: cell}
+  - {name: fast_loop_seconds, agg: distribution, over: cell}
+  - {name: integration_tests_marked, agg: mean, over: cell}
+  - {name: slow_test_time_reduced, agg: mean, over: cell}
+writeup:
+  format: lab_book
+  sections: [question, p1_inventory_and_baseline, p2_analyzer_legs, p3_tier_marks, p4_unit_extraction, p5_fast_default, p6_verify]
+stop: {budget_usd: 10.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}
