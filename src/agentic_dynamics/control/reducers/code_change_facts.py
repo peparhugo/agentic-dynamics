@@ -12,8 +12,11 @@ Evidence contract (``ReducerSpec.consumes``):
 * ``sonar_analysis``    — payload dict ``{"status", "revision_matches"|None,
   "new_critical_count"|None, "analyzed_sha"}``.
 * ``lsp_analysis``      — payload dict ``{"status", "new_error_count"|None, "tool"}``.
-* ``impacted_symbols``  — payload dict ``{"count"|None}`` (the 1-2 hop reachable set, bounded by
-  the same ACL-scoped expansion, computed by the caller).
+* ``impacted_symbols``  — payload dict ``{"count"|None, "semantics", "source"}`` (the 1-2 hop
+  reachable set, bounded by the same ACL-scoped expansion, computed by the caller). The
+  ``semantics`` / ``source`` keys are the DECLARED audit trail (graph-family Part A p4): the
+  impacted definition is pinned (see :data:`IMPACTED_SEMANTICS`) and the computation's provenance
+  (``"graph"`` vs ``"in_process_walk"``) is recorded on every emission — never implicit.
 
 SEMANTICS (hard rule 6 + design §5.6, DEFINED here — not delegated to the docstring):
 
@@ -108,6 +111,36 @@ CODE_CHANGE_FACTS_V2 = ReducerSpec(
 #: evidence — so it is DERIVED ([C]) by the §3.4 epistemic map.
 _EPISTEMIC_STATUS = "derived"
 _AUTHORITY, _EVIDENCE_CLASS = EPISTEMIC_MAP[_EPISTEMIC_STATUS]
+
+#: The DECLARED impacted semantics (graph-family Part A, spec hard rule 3 — semantics pinned).
+#: The 2d/2e wall's lesson is that the impacted definition must be a declared, queryable,
+#: auditable choice, never implicit: the impacted counter counts the change's NON-SEED
+#: STRUCTURAL dependants (the reachable callers over the CALLS edges), while a behavior-
+#: preserving change has ZERO behavioral impact on those callers even though the structural
+#: edges exist. This constant IS the record — the seam writes its value onto every
+#: ``impacted_symbols`` evidence payload and the ``ChangeAnalysis`` it returns.
+IMPACTED_SEMANTICS: dict[str, str] = {
+    "definition": "structural",
+    "description": (
+        "the impacted count is the number of NON-SEED structural dependants of the change's "
+        "symbols reachable over the CALLS edges (bounded 1-2 hop, ACL-scoped). STRUCTURAL by "
+        "declaration — the 2e lesson pinned the impacted definition as a declared, queryable, "
+        "auditable choice."
+    ),
+    "contrast": (
+        "behavioral — a behavior-preserving change has zero behavioral impact on its callers "
+        "even though the structural edges exist (the 2d/2e wall: the widgets-call-add edges "
+        "EXIST while the behavioral counter read 0)."
+    ),
+    "source": (
+        "docs/designs/proposed/neo4j_graph_analysis_design.md §1/§2; "
+        "workflows/repository/persistent_code_graph.yaml hard rule 3"
+    ),
+}
+
+#: The impacted-computation provenance values recorded on ``impacted_symbols.semantics``'s
+#: sibling ``source`` key (and on the ``ChangeAnalysis.impacted_source`` record).
+IMPACTED_SOURCES = ("graph", "in_process_walk")
 
 #: The ``code_change_risk`` weights — ``[P]`` operator policy, UNCHANGED from v1 (the v2 bump
 #: redefines only the *meaning* of the two analyzer-count terms, not the weights — design doc

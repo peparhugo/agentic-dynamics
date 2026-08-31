@@ -61,12 +61,21 @@ class ChangeAnalysis:
     ``revision`` is the full commit SHA the analysis was produced for (provenance).
     ``repository_id``/``phase_id``/``observed_at`` identify the cell boundary that produced the
     facts; they are optional for structural compatibility with existing analyzer doubles.
+
+    The graph-family Part A seam (persistent_code_graph@0.1 p4) adds the DECLARED semantics
+    surface: ``impacted_semantics`` is the pinned impacted definition (structural — the 2e
+    lesson) and ``impacted_source`` is the computation's provenance ("graph" when the persistent
+    graph produced the count, "in_process_walk" when the rollback AST walk did). Both are
+    queryable + auditable on the record; an empty ``impacted_source`` means no impacted
+    computation was attempted.
     """
 
     facts: tuple[dict[str, Any], ...] = ()
     neighborhood: tuple[str, ...] = ()
     graph_updated: bool = False
     impacted_count: int | None = None
+    impacted_semantics: str = ""
+    impacted_source: str = ""
     graph_status: str = "not_requested"
     revision: str | None = None
     repository_id: str = ""
@@ -80,6 +89,8 @@ class ChangeAnalysis:
             "neighborhood": list(self.neighborhood),
             "graph_updated": self.graph_updated,
             "impacted_count": self.impacted_count,
+            "impacted_semantics": self.impacted_semantics,
+            "impacted_source": self.impacted_source,
             "graph_status": self.graph_status,
             "revision": self.revision,
             "repository_id": self.repository_id,

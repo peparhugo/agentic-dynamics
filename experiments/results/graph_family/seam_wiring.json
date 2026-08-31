@@ -1,0 +1,46 @@
+{
+  "phase": "p4_seam_wiring",
+  "spec": "persistent_code_graph@0.1",
+  "role": "wire the graph-first change-analysis seam — BOUNDED to the implementation",
+  "date": "2026-08-31",
+  "seam": {
+    "primary": "src/agentic_dynamics/control/evidence_analyzer.py (EvidenceChangeAnalyzer — the runtime-owned ChangeAnalyzer protocol's concrete impl)",
+    "reducer": "src/agentic_dynamics/control/reducers/code_change_facts.py (the impacted_symbols evidence contract)",
+    "record": "src/agentic_dynamics/runtime/change_analyzer.py (ChangeAnalysis — the queryable ledger record)",
+    "evidence_context": "src/agentic_dynamics/runtime/workflow_runner.py (_evidence_context — the semantics ride forward to the next phase)"
+  },
+  "the_change": {
+    "graph_first": "the impacted computation queries the PERSISTENT graph (expand_candidates over IMPACT_EXPANSION_RELS, ACL-scoped, seeded from the changed symbols' version_ids) — the primary path when a healthy graph is available",
+    "semantics_declared": "IMPACTED_SEMANTICS in code_change_facts.py pins the impacted definition as STRUCTURAL (the non-seed structural dependants over the CALLS edges), with the behavioral contrast + the 2e-lesson provenance recorded — a documented, queryable, auditable choice, never implicit",
+    "rollback_in_process": "the in-process AST walk (_in_process_impacted — pure, deterministic, no I/O) is the seam's default posture and its fallback: on ANY graph failure (down / timeout / empty-or-truncated — the graph returns fewer dependants than the AST can see, the 2d/2e wall's exact signature) the seam keeps the walk's answer. The graph NEVER gates a run",
+    "provenance_queryable": "ChangeAnalysis carries impacted_semantics + impacted_source (\"graph\" | \"in_process_walk\"); the impacted_symbols evidence payload carries {\"count\", \"semantics\", \"source\"}; the EVIDENCE context rides both forward"
+  },
+  "the_wall_fix": {
+    "recorded_behavior_before": "the 2d/2e impacted counter read 0 despite the widgets->add structural edges (the 300ms graph BFS truncated before the non-seed dependants; the per-change AST graph was discarded)",
+    "seam_behavior_after": "the wall-style fixture (behavior-preserving change to add + the added widgets calling it) now reports impacted=1 (test_add — the non-seed structural dependant): the graph's empty/truncated answer (0) is detected and rolled back to the in-process walk",
+    "controlled_check": "a graph whose populate raises, a graph whose expand raises, and a stalled graph all return within the deadline with graph_status=unavailable and the in-process walk's impacted computation — the seam falls back, never blocks"
+  },
+  "test_outcome": {
+    "affected_modules_all_pass": [
+      "tests/test_change_analyzer.py — 16 passed (the seam's hermetic loop + the wall-fix + the controlled fallback checks)",
+      "tests/test_code_change_facts.py — passed with the guards (the reducer's pure contract)",
+      "tests/test_workflow_runner.py — 82 passed (the composition-root loop + the EVIDENCE context)",
+      "tests/test_cap_2a_spec.py + tests/test_graph.py + tests/test_dependency_direction.py — 42 passed (the guards)",
+      "tests/test_run_workflow_graph_cli.py — 15 passed",
+      "tests/test_script_classification.py + tests/test_cli_resolution.py — 76 passed (the script guards)"
+    ],
+    "full_suite": {
+      "result": "2367 passed, 6 failed, 9 skipped (1222s)",
+      "failures": [
+        "tests/test_build_data.py::test_data_js_publication_contract_present_and_verifies",
+        "tests/test_contribution_report.py::test_contract_reconciles_with_recomputed_contribution[lab_quality_frontier.py]",
+        "tests/test_doc_lifecycle.py::test_readme_spec_counts_match_index",
+        "tests/test_lab_contract.py::test_published_lab_artifacts_carry_a_valid_contract",
+        "tests/test_lab_outputs_canonical.py::test_published_artifacts_match_the_current_registry",
+        "tests/test_sync_data.py::test_check_returns_zero_when_current"
+      ],
+      "failures_assessed": "PRE-EXISTING data-chain drift, none touching the seam: stale parquet vs new story results (sync_data.check=1), README spec count 156 vs regenerated index 159 (new specs from the in-flight campaigns), lab contracts stale vs the shrunken registry (lab_quality_frontier 414 vs 363), stale data.js. All are derived-surface guards that drift whenever the campaign writes new data without regenerating the surfaces — not caused by the seam change (which touches evidence_analyzer / code_change_facts / change_analyzer / workflow_runner only)."
+    }
+  },
+  "verdict": "PASS — the seam is graph-first with the in-process rollback as the default posture; the semantics are declared + queryable + auditable; the wall-style fixture reports impacted=1 via the rollback; the controlled graph-unavailable check (populate-raises / expand-raises / stalled) falls back, never blocks; all affected-module tests pass; the 6 full-suite failures are pre-existing derived-surface drift."
+}

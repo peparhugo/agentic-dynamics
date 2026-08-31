@@ -781,6 +781,9 @@ def _evidence_context(pr: PhaseResult, *, max_neighborhood: int = 16, max_facts:
         "phase_id": ca.get("phase_id", pr.phase),
         "observed_at": ca.get("observed_at", ""),
         "graph_status": ca.get("graph_status", "not_requested"),
+        "impacted_count": ca.get("impacted_count"),
+        "impacted_semantics": ca.get("impacted_semantics", ""),
+        "impacted_source": ca.get("impacted_source", ""),
         "neighborhood": list(ca.get("neighborhood") or [])[:max_neighborhood],
         "facts": list(ca.get("facts") or [])[:max_facts],
     }

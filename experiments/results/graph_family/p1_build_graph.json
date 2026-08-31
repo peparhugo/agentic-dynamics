@@ -1,0 +1,4487 @@
+{
+  "phase": "p1_build_graph",
+  "spec": "persistent_code_graph@0.1",
+  "source_revision": "e5ab0127e5d7ff7e80fd5ed3e517525f14286e3e",
+  "graph_service": "bolt://localhost:7687 (FINOPS_NEO4J_URI)",
+  "framework_src": {
+    "worktree_name": "framework-src",
+    "codebase": "src/agentic_dynamics",
+    "modules": 108,
+    "imports": 125,
+    "imported_by": 125,
+    "touched": 108
+  },
+  "fixture_cells": {
+    "cap2d_incorrect_rebuilt_abstention_r1": {
+      "worktree": "/tmp/cap2d_incorrect_rebuilt_abstention_r1",
+      "revision": "fde0232ae2cdc82256d3a7300652636903d5a889",
+      "module_graph": {
+        "modules": 3,
+        "imports": 2,
+        "imported_by": 2,
+        "touched": 3
+      },
+      "symbol_graph": {
+        "revisions": 1,
+        "module_versions": 3,
+        "symbol_versions": 23,
+        "contains": 26,
+        "defines": 23,
+        "imports": 2,
+        "calls": 21,
+        "tested_by": 4,
+        "affects": 0,
+        "supersedes": 26
+      },
+      "shape": {
+        "revision": "fde0232ae2cdc82256d3a7300652636903d5a889",
+        "language": "python",
+        "module_count": 3,
+        "file_count": 8,
+        "symbol_count": 23,
+        "call_edge_count": 21,
+        "coupling": 0.041502,
+        "hub_nodes": [
+          {
+            "symbol": "add",
+            "in_degree": 20
+          },
+          {
+            "symbol": "subtract",
+            "in_degree": 1
+          }
+        ]
+      }
+    },
+    "cap2d_incorrect_rebuilt_abstention_r2": {
+      "worktree": "/tmp/cap2d_incorrect_rebuilt_abstention_r2",
+      "revision": "6961ed7b26df083a6d5631b572e680e8a4592146",
+      "module_graph": {
+        "modules": 3,
+        "imports": 2,
+        "imported_by": 2,
+        "touched": 3
+      },
+      "symbol_graph": {
+        "revisions": 1,
+        "module_versions": 3,
+        "symbol_versions": 23,
+        "contains": 26,
+        "defines": 23,
+        "imports": 2,
+        "calls": 21,
+        "tested_by": 4,
+        "affects": 0,
+        "supersedes": 26
+      },
+      "shape": {
+        "revision": "6961ed7b26df083a6d5631b572e680e8a4592146",
+        "language": "python",
+        "module_count": 3,
+        "file_count": 8,
+        "symbol_count": 23,
+        "call_edge_count": 21,
+        "coupling": 0.041502,
+        "hub_nodes": [
+          {
+            "symbol": "add",
+            "in_degree": 20
+          },
+          {
+            "symbol": "subtract",
+            "in_degree": 1
+          }
+        ]
+      }
+    },
+    "cap2d_incorrect_rebuilt_status_quo_r1": {
+      "worktree": "/tmp/cap2d_incorrect_rebuilt_status_quo_r1",
+      "revision": "e6603608a31a99afc98d260124004fbcd360c776",
+      "module_graph": {
+        "modules": 3,
+        "imports": 2,
+        "imported_by": 2,
+        "touched": 3
+      },
+      "symbol_graph": {
+        "revisions": 1,
+        "module_versions": 3,
+        "symbol_versions": 23,
+        "contains": 26,
+        "defines": 23,
+        "imports": 2,
+        "calls": 21,
+        "tested_by": 4,
+        "affects": 0,
+        "supersedes": 26
+      },
+      "shape": {
+        "revision": "e6603608a31a99afc98d260124004fbcd360c776",
+        "language": "python",
+        "module_count": 3,
+        "file_count": 8,
+        "symbol_count": 23,
+        "call_edge_count": 21,
+        "coupling": 0.041502,
+        "hub_nodes": [
+          {
+            "symbol": "add",
+            "in_degree": 20
+          },
+          {
+            "symbol": "subtract",
+            "in_degree": 1
+          }
+        ]
+      }
+    },
+    "cap2d_incorrect_rebuilt_status_quo_r2": {
+      "worktree": "/tmp/cap2d_incorrect_rebuilt_status_quo_r2",
+      "revision": "6290d1aabe6f5eccfe3c0bc045c6341f3c6ad8dd",
+      "module_graph": {
+        "modules": 3,
+        "imports": 2,
+        "imported_by": 2,
+        "touched": 3
+      },
+      "symbol_graph": {
+        "revisions": 1,
+        "module_versions": 3,
+        "symbol_versions": 23,
+        "contains": 26,
+        "defines": 23,
+        "imports": 2,
+        "calls": 21,
+        "tested_by": 4,
+        "affects": 0,
+        "supersedes": 26
+      },
+      "shape": {
+        "revision": "6290d1aabe6f5eccfe3c0bc045c6341f3c6ad8dd",
+        "language": "python",
+        "module_count": 3,
+        "file_count": 7,
+        "symbol_count": 23,
+        "call_edge_count": 21,
+        "coupling": 0.041502,
+        "hub_nodes": [
+          {
+            "symbol": "add",
+            "in_degree": 20
+          },
+          {
+            "symbol": "subtract",
+            "in_degree": 1
+          }
+        ]
+      }
+    },
+    "cap2d_probe_incorrect_rebuilt": {
+      "worktree": "/tmp/cap2d_probe_incorrect_rebuilt",
+      "revision": "e579e68ce8675d9a3daf266f1c98bdd3fc972989",
+      "module_graph": {
+        "modules": 3,
+        "imports": 2,
+        "imported_by": 2,
+        "touched": 3
+      },
+      "symbol_graph": {
+        "revisions": 1,
+        "module_versions": 3,
+        "symbol_versions": 23,
+        "contains": 26,
+        "defines": 23,
+        "imports": 2,
+        "calls": 21,
+        "tested_by": 4,
+        "affects": 0,
+        "supersedes": 26
+      },
+      "shape": {
+        "revision": "e579e68ce8675d9a3daf266f1c98bdd3fc972989",
+        "language": "python",
+        "module_count": 3,
+        "file_count": 3,
+        "symbol_count": 23,
+        "call_edge_count": 21,
+        "coupling": 0.041502,
+        "hub_nodes": [
+          {
+            "symbol": "add",
+            "in_degree": 20
+          },
+          {
+            "symbol": "subtract",
+            "in_degree": 1
+          }
+        ]
+      }
+    },
+    "cap2e_absent-defective_abstention_r1": {
+      "worktree": "/tmp/cap2e_absent-defective_abstention_r1",
+      "revision": "15e985287c88975714b799d12df19ec49d542771",
+      "module_graph": {
+        "modules": 3,
+        "imports": 1,
+        "imported_by": 1,
+        "touched": 3
+      },
+      "symbol_graph": {
+        "revisions": 1,
+        "module_versions": 3,
+        "symbol_versions": 5,
+        "contains": 8,
+        "defines": 5,
+        "imports": 1,
+        "calls": 2,
+        "tested_by": 4,
+        "affects": 0,
+        "supersedes": 8
+      },
+      "shape": {
+        "revision": "15e985287c88975714b799d12df19ec49d542771",
+        "language": "python",
+        "module_count": 3,
+        "file_count": 5,
+        "symbol_count": 5,
+        "call_edge_count": 2,
+        "coupling": 0.1,
+        "hub_nodes": [
+          {
+            "symbol": "add",
+            "in_degree": 1
+          },
+          {
+            "symbol": "subtract",
+            "in_degree": 1
+          }
+        ]
+      }
+    },
+    "cap2e_absent-defective_status_quo_r1": {
+      "worktree": "/tmp/cap2e_absent-defective_status_quo_r1",
+      "revision": "78af6fc25924bb802a6defce8f4466ef9fa1cff6",
+      "module_graph": {
+        "modules": 3,
+        "imports": 1,
+        "imported_by": 1,
+        "touched": 3
+      },
+      "symbol_graph": {
+        "revisions": 1,
+        "module_versions": 3,
+        "symbol_versions": 5,
+        "contains": 8,
+        "defines": 5,
+        "imports": 1,
+        "calls": 2,
+        "tested_by": 4,
+        "affects": 0,
+        "supersedes": 8
+      },
+      "shape": {
+        "revision": "78af6fc25924bb802a6defce8f4466ef9fa1cff6",
+        "language": "python",
+        "module_count": 3,
+        "file_count": 5,
+        "symbol_count": 5,
+        "call_edge_count": 2,
+        "coupling": 0.1,
+        "hub_nodes": [
+          {
+            "symbol": "add",
+            "in_degree": 1
+          },
+          {
+            "symbol": "subtract",
+            "in_degree": 1
+          }
+        ]
+      }
+    },
+    "cap2e_unseen_family_abstention_r1": {
+      "worktree": "/tmp/cap2e_unseen_family_abstention_r1",
+      "revision": "c75b1deff74186e07bd8f7ac7333f4a7efc2da32",
+      "module_graph": {
+        "modules": 2,
+        "imports": 1,
+        "imported_by": 1,
+        "touched": 2
+      },
+      "symbol_graph": {
+        "revisions": 1,
+        "module_versions": 2,
+        "symbol_versions": 6,
+        "contains": 8,
+        "defines": 6,
+        "imports": 1,
+        "calls": 3,
+        "tested_by": 9,
+        "affects": 0,
+        "supersedes": 8
+      },
+      "shape": {
+        "revision": "c75b1deff74186e07bd8f7ac7333f4a7efc2da32",
+        "language": "python",
+        "module_count": 2,
+        "file_count": 6,
+        "symbol_count": 6,
+        "call_edge_count": 3,
+        "coupling": 0.1,
+        "hub_nodes": [
+          {
+            "symbol": "add",
+            "in_degree": 1
+          },
+          {
+            "symbol": "subtract",
+            "in_degree": 1
+          },
+          {
+            "symbol": "tally",
+            "in_degree": 1
+          }
+        ]
+      }
+    },
+    "cap2e_unseen_family_abstention_r2": {
+      "worktree": "/tmp/cap2e_unseen_family_abstention_r2",
+      "revision": "2fd25363863dc41e7033780ab249a061a880a69a",
+      "module_graph": {
+        "modules": 2,
+        "imports": 1,
+        "imported_by": 1,
+        "touched": 2
+      },
+      "symbol_graph": {
+        "revisions": 1,
+        "module_versions": 2,
+        "symbol_versions": 6,
+        "contains": 8,
+        "defines": 6,
+        "imports": 1,
+        "calls": 3,
+        "tested_by": 9,
+        "affects": 0,
+        "supersedes": 8
+      },
+      "shape": {
+        "revision": "2fd25363863dc41e7033780ab249a061a880a69a",
+        "language": "python",
+        "module_count": 2,
+        "file_count": 6,
+        "symbol_count": 6,
+        "call_edge_count": 3,
+        "coupling": 0.1,
+        "hub_nodes": [
+          {
+            "symbol": "add",
+            "in_degree": 1
+          },
+          {
+            "symbol": "subtract",
+            "in_degree": 1
+          },
+          {
+            "symbol": "tally",
+            "in_degree": 1
+          }
+        ]
+      }
+    },
+    "cap2e_unseen_family_status_quo_r1": {
+      "worktree": "/tmp/cap2e_unseen_family_status_quo_r1",
+      "revision": "d0454b30e8b0256e80dd788069235cbc05f18188",
+      "module_graph": {
+        "modules": 2,
+        "imports": 1,
+        "imported_by": 1,
+        "touched": 2
+      },
+      "symbol_graph": {
+        "revisions": 1,
+        "module_versions": 2,
+        "symbol_versions": 6,
+        "contains": 8,
+        "defines": 6,
+        "imports": 1,
+        "calls": 3,
+        "tested_by": 9,
+        "affects": 0,
+        "supersedes": 8
+      },
+      "shape": {
+        "revision": "d0454b30e8b0256e80dd788069235cbc05f18188",
+        "language": "python",
+        "module_count": 2,
+        "file_count": 6,
+        "symbol_count": 6,
+        "call_edge_count": 3,
+        "coupling": 0.1,
+        "hub_nodes": [
+          {
+            "symbol": "add",
+            "in_degree": 1
+          },
+          {
+            "symbol": "subtract",
+            "in_degree": 1
+          },
+          {
+            "symbol": "tally",
+            "in_degree": 1
+          }
+        ]
+      }
+    },
+    "cap2e_unseen_family_status_quo_r2": {
+      "worktree": "/tmp/cap2e_unseen_family_status_quo_r2",
+      "revision": "f74bae33a7680f6e3bb5cfbffe1b351a005a8510",
+      "module_graph": {
+        "modules": 2,
+        "imports": 1,
+        "imported_by": 1,
+        "touched": 2
+      },
+      "symbol_graph": {
+        "revisions": 1,
+        "module_versions": 2,
+        "symbol_versions": 6,
+        "contains": 8,
+        "defines": 6,
+        "imports": 1,
+        "calls": 3,
+        "tested_by": 9,
+        "affects": 0,
+        "supersedes": 8
+      },
+      "shape": {
+        "revision": "f74bae33a7680f6e3bb5cfbffe1b351a005a8510",
+        "language": "python",
+        "module_count": 2,
+        "file_count": 6,
+        "symbol_count": 6,
+        "call_edge_count": 3,
+        "coupling": 0.1,
+        "hub_nodes": [
+          {
+            "symbol": "add",
+            "in_degree": 1
+          },
+          {
+            "symbol": "subtract",
+            "in_degree": 1
+          },
+          {
+            "symbol": "tally",
+            "in_degree": 1
+          }
+        ]
+      }
+    },
+    "cap2e_probe_unseen_family": {
+      "worktree": "/tmp/cap2e_probe_unseen_family",
+      "revision": "61c0a26f6c7f0682ab6d38448e6809bb7f6a8929",
+      "module_graph": {
+        "modules": 2,
+        "imports": 1,
+        "imported_by": 1,
+        "touched": 2
+      },
+      "symbol_graph": {
+        "revisions": 1,
+        "module_versions": 2,
+        "symbol_versions": 6,
+        "contains": 8,
+        "defines": 6,
+        "imports": 1,
+        "calls": 3,
+        "tested_by": 9,
+        "affects": 0,
+        "supersedes": 8
+      },
+      "shape": {
+        "revision": "61c0a26f6c7f0682ab6d38448e6809bb7f6a8929",
+        "language": "python",
+        "module_count": 2,
+        "file_count": 2,
+        "symbol_count": 6,
+        "call_edge_count": 3,
+        "coupling": 0.1,
+        "hub_nodes": [
+          {
+            "symbol": "add",
+            "in_degree": 1
+          },
+          {
+            "symbol": "subtract",
+            "in_degree": 1
+          },
+          {
+            "symbol": "tally",
+            "in_degree": 1
+          }
+        ]
+      }
+    }
+  },
+  "story_arc": {
+    "worktree": "/tmp/story_c55b0cf5d2e9",
+    "story_id": "c55b0cf5d2e9",
+    "repository_id": "self-story_c55b0cf5d2e9",
+    "commit_count": 6,
+    "commits": [
+      {
+        "sha": "51ff538fc44c913318c03743f583efcc19de37ab",
+        "short": "51ff538",
+        "message": "Initial seed codebase"
+      },
+      {
+        "sha": "7aa30d824afac4249389eb88a991a07e3a40546c",
+        "short": "7aa30d8",
+        "message": "[story] Session 1: greenfield"
+      },
+      {
+        "sha": "3facd922ce01092602423df7127b47702148966a",
+        "short": "3facd92",
+        "message": "[story] Session 2: feature_addition"
+      },
+      {
+        "sha": "4e0171f3ccd0550846b23f8c1bf04d4d2dafb15e",
+        "short": "4e0171f",
+        "message": "[story] Session 3: integration"
+      },
+      {
+        "sha": "d5c1fe7e4768f962306b946b13ab1234ec89cd00",
+        "short": "d5c1fe7",
+        "message": "[story] Session 4: refactor"
+      },
+      {
+        "sha": "eb4ec685752457dbe86efd7cfa19be41b198757e",
+        "short": "eb4ec68",
+        "message": "[story] Session 5: cross_cutting"
+      }
+    ],
+    "snapshot_shapes": [
+      {
+        "revision": "51ff538fc44c913318c03743f583efcc19de37ab",
+        "language": "python",
+        "module_count": 1,
+        "file_count": 1,
+        "symbol_count": 17,
+        "call_edge_count": 16,
+        "coupling": 0.058824,
+        "hub_nodes": [
+          {
+            "symbol": "get_db",
+            "in_degree": 10
+          },
+          {
+            "symbol": "get_user_from_token",
+            "in_degree": 3
+          },
+          {
+            "symbol": "hash_password",
+            "in_degree": 2
+          },
+          {
+            "symbol": "create_token",
+            "in_degree": 1
+          }
+        ],
+        "commit_message": "Initial seed codebase",
+        "populate_counts": {
+          "revisions": 1,
+          "module_versions": 1,
+          "symbol_versions": 17,
+          "contains": 18,
+          "defines": 17,
+          "imports": 0,
+          "calls": 16,
+          "tested_by": 0,
+          "affects": 0,
+          "supersedes": 18
+        }
+      },
+      {
+        "revision": "7aa30d824afac4249389eb88a991a07e3a40546c",
+        "language": "python",
+        "module_count": 2,
+        "file_count": 5,
+        "symbol_count": 32,
+        "call_edge_count": 20,
+        "coupling": 0.020161,
+        "hub_nodes": [
+          {
+            "symbol": "_recv_json",
+            "in_degree": 16
+          },
+          {
+            "symbol": "_broadcast",
+            "in_degree": 1
+          },
+          {
+            "symbol": "_free_port",
+            "in_degree": 1
+          },
+          {
+            "symbol": "_make_timestamp",
+            "in_degree": 1
+          },
+          {
+            "symbol": "_send_direct",
+            "in_degree": 1
+          }
+        ],
+        "commit_message": "[story] Session 1: greenfield",
+        "populate_counts": {
+          "revisions": 1,
+          "module_versions": 2,
+          "symbol_versions": 32,
+          "contains": 34,
+          "defines": 32,
+          "imports": 1,
+          "calls": 20,
+          "tested_by": 240,
+          "affects": 0,
+          "supersedes": 34
+        }
+      },
+      {
+        "revision": "3facd922ce01092602423df7127b47702148966a",
+        "language": "python",
+        "module_count": 2,
+        "file_count": 5,
+        "symbol_count": 60,
+        "call_edge_count": 42,
+        "coupling": 0.011864,
+        "hub_nodes": [
+          {
+            "symbol": "_recv_json",
+            "in_degree": 37
+          },
+          {
+            "symbol": "_broadcast",
+            "in_degree": 1
+          },
+          {
+            "symbol": "_broadcast_to_channel",
+            "in_degree": 1
+          },
+          {
+            "symbol": "_free_port",
+            "in_degree": 1
+          },
+          {
+            "symbol": "_make_timestamp",
+            "in_degree": 1
+          }
+        ],
+        "commit_message": "[story] Session 2: feature_addition",
+        "populate_counts": {
+          "revisions": 1,
+          "module_versions": 2,
+          "symbol_versions": 60,
+          "contains": 62,
+          "defines": 60,
+          "imports": 1,
+          "calls": 42,
+          "tested_by": 731,
+          "affects": 0,
+          "supersedes": 62
+        }
+      },
+      {
+        "revision": "4e0171f3ccd0550846b23f8c1bf04d4d2dafb15e",
+        "language": "python",
+        "module_count": 2,
+        "file_count": 5,
+        "symbol_count": 81,
+        "call_edge_count": 79,
+        "coupling": 0.012191,
+        "hub_nodes": [
+          {
+            "symbol": "_recv_json",
+            "in_degree": 48
+          },
+          {
+            "symbol": "_start_background",
+            "in_degree": 4
+          },
+          {
+            "symbol": "_stop_background",
+            "in_degree": 4
+          },
+          {
+            "symbol": "_free_port",
+            "in_degree": 3
+          },
+          {
+            "symbol": "_init_db",
+            "in_degree": 3
+          }
+        ],
+        "commit_message": "[story] Session 3: integration",
+        "populate_counts": {
+          "revisions": 1,
+          "module_versions": 2,
+          "symbol_versions": 81,
+          "contains": 83,
+          "defines": 81,
+          "imports": 1,
+          "calls": 79,
+          "tested_by": 1458,
+          "affects": 0,
+          "supersedes": 83
+        }
+      },
+      {
+        "revision": "d5c1fe7e4768f962306b946b13ab1234ec89cd00",
+        "language": "python",
+        "module_count": 2,
+        "file_count": 5,
+        "symbol_count": 97,
+        "call_edge_count": 94,
+        "coupling": 0.010095,
+        "hub_nodes": [
+          {
+            "symbol": "_recv_json",
+            "in_degree": 48
+          },
+          {
+            "symbol": "_get_transport",
+            "in_degree": 5
+          },
+          {
+            "symbol": "_make_timestamp",
+            "in_degree": 5
+          },
+          {
+            "symbol": "_start_background",
+            "in_degree": 4
+          },
+          {
+            "symbol": "_stop_background",
+            "in_degree": 4
+          }
+        ],
+        "commit_message": "[story] Session 4: refactor",
+        "populate_counts": {
+          "revisions": 1,
+          "module_versions": 2,
+          "symbol_versions": 97,
+          "contains": 99,
+          "defines": 97,
+          "imports": 1,
+          "calls": 94,
+          "tested_by": 2322,
+          "affects": 0,
+          "supersedes": 99
+        }
+      },
+      {
+        "revision": "eb4ec685752457dbe86efd7cfa19be41b198757e",
+        "language": "python",
+        "module_count": 2,
+        "file_count": 5,
+        "symbol_count": 115,
+        "call_edge_count": 117,
+        "coupling": 0.008924,
+        "hub_nodes": [
+          {
+            "symbol": "_recv_json",
+            "in_degree": 59
+          },
+          {
+            "symbol": "_make_timestamp",
+            "in_degree": 10
+          },
+          {
+            "symbol": "_init_db",
+            "in_degree": 7
+          },
+          {
+            "symbol": "_get_transport",
+            "in_degree": 5
+          },
+          {
+            "symbol": "_init_redis",
+            "in_degree": 4
+          }
+        ],
+        "commit_message": "[story] Session 5: cross_cutting",
+        "populate_counts": {
+          "revisions": 1,
+          "module_versions": 2,
+          "symbol_versions": 115,
+          "contains": 117,
+          "defines": 115,
+          "imports": 1,
+          "calls": 117,
+          "tested_by": 3150,
+          "affects": 0,
+          "supersedes": 117
+        }
+      }
+    ],
+    "deltas": [
+      {
+        "added_symbols": [
+          "ClientRegistry",
+          "ClientRegistry.__init__",
+          "ClientRegistry.add",
+          "ClientRegistry.count",
+          "ClientRegistry.get_all",
+          "ClientRegistry.remove",
+          "_broadcast",
+          "_make_timestamp",
+          "_send_direct",
+          "handler",
+          "process_request",
+          "start_server",
+          "TestBroadcast",
+          "TestBroadcast.test_broadcast_includes_from",
+          "TestBroadcast.test_broadcast_to_all",
+          "TestConnection",
+          "TestConnection.test_connect_receives_welcome",
+          "TestConnection.test_disconnect_cleanup",
+          "TestConnection.test_disconnect_notifies_others",
+          "TestConnection.test_unique_client_ids",
+          "TestDirect",
+          "TestDirect.test_direct_message",
+          "TestDirect.test_direct_nonexistent_silent",
+          "TestHealth",
+          "TestHealth.test_health_returns_count",
+          "TestHealth.test_health_zero",
+          "TestSystem",
+          "TestSystem.test_invalid_json_ignored",
+          "TestSystem.test_message_has_timestamp",
+          "_free_port",
+          "_recv_json",
+          "server_url"
+        ],
+        "removed_symbols": [
+          "_run_migration_v1",
+          "create_item",
+          "create_token",
+          "decorated",
+          "delete_item",
+          "get_db",
+          "get_item",
+          "get_user_from_token",
+          "hash_password",
+          "health",
+          "init_db",
+          "list_items",
+          "list_users",
+          "login",
+          "register",
+          "require_auth",
+          "verify_token"
+        ],
+        "changed_symbols": [],
+        "added_files": [
+          "test_app.py"
+        ],
+        "removed_files": [],
+        "added_call_edges": [
+          [
+            "ClientRegistry",
+            "Lock"
+          ],
+          [
+            "ClientRegistry",
+            "dict"
+          ],
+          [
+            "ClientRegistry",
+            "len"
+          ],
+          [
+            "ClientRegistry",
+            "pop"
+          ],
+          [
+            "ClientRegistry",
+            "str"
+          ],
+          [
+            "ClientRegistry",
+            "uuid4"
+          ],
+          [
+            "ClientRegistry.__init__",
+            "Lock"
+          ],
+          [
+            "ClientRegistry.add",
+            "str"
+          ],
+          [
+            "ClientRegistry.add",
+            "uuid4"
+          ],
+          [
+            "ClientRegistry.count",
+            "len"
+          ],
+          [
+            "ClientRegistry.get_all",
+            "dict"
+          ],
+          [
+            "ClientRegistry.remove",
+            "pop"
+          ],
+          [
+            "TestBroadcast",
+            "_recv_json"
+          ],
+          [
+            "TestBroadcast",
+            "connect"
+          ],
+          [
+            "TestBroadcast",
+            "dumps"
+          ],
+          [
+            "TestBroadcast",
+            "send"
+          ],
+          [
+            "TestBroadcast.test_broadcast_includes_from",
+            "_recv_json"
+          ],
+          [
+            "TestBroadcast.test_broadcast_includes_from",
+            "connect"
+          ],
+          [
+            "TestBroadcast.test_broadcast_includes_from",
+            "dumps"
+          ],
+          [
+            "TestBroadcast.test_broadcast_includes_from",
+            "send"
+          ],
+          [
+            "TestBroadcast.test_broadcast_to_all",
+            "_recv_json"
+          ],
+          [
+            "TestBroadcast.test_broadcast_to_all",
+            "connect"
+          ],
+          [
+            "TestBroadcast.test_broadcast_to_all",
+            "dumps"
+          ],
+          [
+            "TestBroadcast.test_broadcast_to_all",
+            "send"
+          ],
+          [
+            "TestConnection",
+            "_recv_json"
+          ],
+          [
+            "TestConnection",
+            "connect"
+          ],
+          [
+            "TestConnection",
+            "sleep"
+          ],
+          [
+            "TestConnection.test_connect_receives_welcome",
+            "_recv_json"
+          ],
+          [
+            "TestConnection.test_connect_receives_welcome",
+            "connect"
+          ],
+          [
+            "TestConnection.test_disconnect_cleanup",
+            "_recv_json"
+          ],
+          [
+            "TestConnection.test_disconnect_cleanup",
+            "connect"
+          ],
+          [
+            "TestConnection.test_disconnect_cleanup",
+            "sleep"
+          ],
+          [
+            "TestConnection.test_disconnect_notifies_others",
+            "_recv_json"
+          ],
+          [
+            "TestConnection.test_disconnect_notifies_others",
+            "connect"
+          ],
+          [
+            "TestConnection.test_unique_client_ids",
+            "_recv_json"
+          ],
+          [
+            "TestConnection.test_unique_client_ids",
+            "connect"
+          ],
+          [
+            "TestDirect",
+            "_recv_json"
+          ],
+          [
+            "TestDirect",
+            "connect"
+          ],
+          [
+            "TestDirect",
+            "dumps"
+          ],
+          [
+            "TestDirect",
+            "send"
+          ],
+          [
+            "TestDirect",
+            "sleep"
+          ],
+          [
+            "TestDirect.test_direct_message",
+            "_recv_json"
+          ],
+          [
+            "TestDirect.test_direct_message",
+            "connect"
+          ],
+          [
+            "TestDirect.test_direct_message",
+            "dumps"
+          ],
+          [
+            "TestDirect.test_direct_message",
+            "send"
+          ],
+          [
+            "TestDirect.test_direct_nonexistent_silent",
+            "_recv_json"
+          ],
+          [
+            "TestDirect.test_direct_nonexistent_silent",
+            "connect"
+          ],
+          [
+            "TestDirect.test_direct_nonexistent_silent",
+            "dumps"
+          ],
+          [
+            "TestDirect.test_direct_nonexistent_silent",
+            "send"
+          ],
+          [
+            "TestDirect.test_direct_nonexistent_silent",
+            "sleep"
+          ],
+          [
+            "TestHealth",
+            "AsyncClient"
+          ],
+          [
+            "TestHealth",
+            "_recv_json"
+          ],
+          [
+            "TestHealth",
+            "connect"
+          ],
+          [
+            "TestHealth",
+            "get"
+          ],
+          [
+            "TestHealth",
+            "json"
+          ],
+          [
+            "TestHealth",
+            "replace"
+          ],
+          [
+            "TestHealth.test_health_returns_count",
+            "AsyncClient"
+          ],
+          [
+            "TestHealth.test_health_returns_count",
+            "_recv_json"
+          ],
+          [
+            "TestHealth.test_health_returns_count",
+            "connect"
+          ],
+          [
+            "TestHealth.test_health_returns_count",
+            "get"
+          ],
+          [
+            "TestHealth.test_health_returns_count",
+            "json"
+          ],
+          [
+            "TestHealth.test_health_returns_count",
+            "replace"
+          ],
+          [
+            "TestHealth.test_health_zero",
+            "AsyncClient"
+          ],
+          [
+            "TestHealth.test_health_zero",
+            "get"
+          ],
+          [
+            "TestHealth.test_health_zero",
+            "json"
+          ],
+          [
+            "TestHealth.test_health_zero",
+            "replace"
+          ],
+          [
+            "TestSystem",
+            "_recv_json"
+          ],
+          [
+            "TestSystem",
+            "connect"
+          ],
+          [
+            "TestSystem",
+            "dumps"
+          ],
+          [
+            "TestSystem",
+            "isinstance"
+          ],
+          [
+            "TestSystem",
+            "send"
+          ],
+          [
+            "TestSystem",
+            "sleep"
+          ],
+          [
+            "TestSystem.test_invalid_json_ignored",
+            "_recv_json"
+          ],
+          [
+            "TestSystem.test_invalid_json_ignored",
+            "connect"
+          ],
+          [
+            "TestSystem.test_invalid_json_ignored",
+            "send"
+          ],
+          [
+            "TestSystem.test_invalid_json_ignored",
+            "sleep"
+          ],
+          [
+            "TestSystem.test_message_has_timestamp",
+            "_recv_json"
+          ],
+          [
+            "TestSystem.test_message_has_timestamp",
+            "connect"
+          ],
+          [
+            "TestSystem.test_message_has_timestamp",
+            "dumps"
+          ],
+          [
+            "TestSystem.test_message_has_timestamp",
+            "isinstance"
+          ],
+          [
+            "TestSystem.test_message_has_timestamp",
+            "send"
+          ],
+          [
+            "_broadcast",
+            "append"
+          ],
+          [
+            "_broadcast",
+            "create_task"
+          ],
+          [
+            "_broadcast",
+            "dumps"
+          ],
+          [
+            "_broadcast",
+            "gather"
+          ],
+          [
+            "_broadcast",
+            "get_all"
+          ],
+          [
+            "_broadcast",
+            "send"
+          ],
+          [
+            "_broadcast",
+            "values"
+          ],
+          [
+            "_free_port",
+            "bind"
+          ],
+          [
+            "_free_port",
+            "getsockname"
+          ],
+          [
+            "_free_port",
+            "socket"
+          ],
+          [
+            "_make_timestamp",
+            "isoformat"
+          ],
+          [
+            "_make_timestamp",
+            "now"
+          ],
+          [
+            "_recv_json",
+            "loads"
+          ],
+          [
+            "_recv_json",
+            "recv"
+          ],
+          [
+            "_send_direct",
+            "dumps"
+          ],
+          [
+            "_send_direct",
+            "get"
+          ],
+          [
+            "_send_direct",
+            "get_all"
+          ],
+          [
+            "_send_direct",
+            "send"
+          ],
+          [
+            "handler",
+            "_broadcast"
+          ],
+          [
+            "handler",
+            "_make_timestamp"
+          ],
+          [
+            "handler",
+            "_send_direct"
+          ],
+          [
+            "handler",
+            "add"
+          ],
+          [
+            "handler",
+            "dumps"
+          ],
+          [
+            "handler",
+            "get"
+          ],
+          [
+            "handler",
+            "loads"
+          ],
+          [
+            "handler",
+            "remove"
+          ],
+          [
+            "handler",
+            "send"
+          ],
+          [
+            "process_request",
+            "Headers"
+          ],
+          [
+            "process_request",
+            "Response"
+          ],
+          [
+            "process_request",
+            "dumps"
+          ],
+          [
+            "process_request",
+            "encode"
+          ],
+          [
+            "server_url",
+            "_free_port"
+          ],
+          [
+            "server_url",
+            "clear"
+          ],
+          [
+            "server_url",
+            "serve"
+          ],
+          [
+            "start_server",
+            "serve"
+          ],
+          [
+            "start_server",
+            "serve_forever"
+          ]
+        ],
+        "removed_call_edges": [
+          [
+            "_run_migration_v1",
+            "connect"
+          ],
+          [
+            "_run_migration_v1",
+            "execute"
+          ],
+          [
+            "_run_migration_v1",
+            "fetchone"
+          ],
+          [
+            "create_item",
+            "commit"
+          ],
+          [
+            "create_item",
+            "execute"
+          ],
+          [
+            "create_item",
+            "get"
+          ],
+          [
+            "create_item",
+            "get_db"
+          ],
+          [
+            "create_item",
+            "get_json"
+          ],
+          [
+            "create_item",
+            "isoformat"
+          ],
+          [
+            "create_item",
+            "jsonify"
+          ],
+          [
+            "create_item",
+            "strip"
+          ],
+          [
+            "create_item",
+            "utcnow"
+          ],
+          [
+            "create_token",
+            "commit"
+          ],
+          [
+            "create_token",
+            "execute"
+          ],
+          [
+            "create_token",
+            "get_db"
+          ],
+          [
+            "create_token",
+            "isoformat"
+          ],
+          [
+            "create_token",
+            "timedelta"
+          ],
+          [
+            "create_token",
+            "token_hex"
+          ],
+          [
+            "create_token",
+            "utcnow"
+          ],
+          [
+            "decorated",
+            "f"
+          ],
+          [
+            "decorated",
+            "get"
+          ],
+          [
+            "decorated",
+            "get_user_from_token"
+          ],
+          [
+            "decorated",
+            "jsonify"
+          ],
+          [
+            "decorated",
+            "split"
+          ],
+          [
+            "decorated",
+            "startswith"
+          ],
+          [
+            "delete_item",
+            "commit"
+          ],
+          [
+            "delete_item",
+            "execute"
+          ],
+          [
+            "delete_item",
+            "fetchone"
+          ],
+          [
+            "delete_item",
+            "get_db"
+          ],
+          [
+            "delete_item",
+            "jsonify"
+          ],
+          [
+            "get_db",
+            "connect"
+          ],
+          [
+            "get_item",
+            "dict"
+          ],
+          [
+            "get_item",
+            "execute"
+          ],
+          [
+            "get_item",
+            "fetchone"
+          ],
+          [
+            "get_item",
+            "get_db"
+          ],
+          [
+            "get_item",
+            "jsonify"
+          ],
+          [
+            "get_user_from_token",
+            "dict"
+          ],
+          [
+            "get_user_from_token",
+            "execute"
+          ],
+          [
+            "get_user_from_token",
+            "fetchone"
+          ],
+          [
+            "get_user_from_token",
+            "get_db"
+          ],
+          [
+            "get_user_from_token",
+            "isoformat"
+          ],
+          [
+            "get_user_from_token",
+            "utcnow"
+          ],
+          [
+            "hash_password",
+            "encode"
+          ],
+          [
+            "hash_password",
+            "hexdigest"
+          ],
+          [
+            "hash_password",
+            "sha256"
+          ],
+          [
+            "health",
+            "jsonify"
+          ],
+          [
+            "init_db",
+            "executescript"
+          ],
+          [
+            "init_db",
+            "get_db"
+          ],
+          [
+            "list_items",
+            "dict"
+          ],
+          [
+            "list_items",
+            "execute"
+          ],
+          [
+            "list_items",
+            "fetchall"
+          ],
+          [
+            "list_items",
+            "get_db"
+          ],
+          [
+            "list_items",
+            "jsonify"
+          ],
+          [
+            "list_users",
+            "dict"
+          ],
+          [
+            "list_users",
+            "execute"
+          ],
+          [
+            "list_users",
+            "fetchall"
+          ],
+          [
+            "list_users",
+            "get"
+          ],
+          [
+            "list_users",
+            "get_db"
+          ],
+          [
+            "list_users",
+            "jsonify"
+          ],
+          [
+            "login",
+            "create_token"
+          ],
+          [
+            "login",
+            "execute"
+          ],
+          [
+            "login",
+            "fetchone"
+          ],
+          [
+            "login",
+            "get"
+          ],
+          [
+            "login",
+            "get_db"
+          ],
+          [
+            "login",
+            "get_json"
+          ],
+          [
+            "login",
+            "hash_password"
+          ],
+          [
+            "login",
+            "jsonify"
+          ],
+          [
+            "login",
+            "strip"
+          ],
+          [
+            "register",
+            "commit"
+          ],
+          [
+            "register",
+            "execute"
+          ],
+          [
+            "register",
+            "fetchone"
+          ],
+          [
+            "register",
+            "get"
+          ],
+          [
+            "register",
+            "get_db"
+          ],
+          [
+            "register",
+            "get_json"
+          ],
+          [
+            "register",
+            "hash_password"
+          ],
+          [
+            "register",
+            "isoformat"
+          ],
+          [
+            "register",
+            "jsonify"
+          ],
+          [
+            "register",
+            "len"
+          ],
+          [
+            "register",
+            "strip"
+          ],
+          [
+            "register",
+            "utcnow"
+          ],
+          [
+            "require_auth",
+            "f"
+          ],
+          [
+            "require_auth",
+            "get"
+          ],
+          [
+            "require_auth",
+            "get_user_from_token"
+          ],
+          [
+            "require_auth",
+            "jsonify"
+          ],
+          [
+            "require_auth",
+            "split"
+          ],
+          [
+            "require_auth",
+            "startswith"
+          ],
+          [
+            "require_auth",
+            "wraps"
+          ],
+          [
+            "verify_token",
+            "get_user_from_token"
+          ]
+        ],
+        "changed_symbol_count": 49,
+        "from_revision": "51ff538fc44c913318c03743f583efcc19de37ab",
+        "to_revision": "7aa30d824afac4249389eb88a991a07e3a40546c",
+        "commit_message": "[story] Session 1: greenfield"
+      },
+      {
+        "added_symbols": [
+          "ClientRegistry.get_channels",
+          "ClientRegistry.get_subscribers",
+          "ClientRegistry.subscribe",
+          "ClientRegistry.unsubscribe",
+          "_broadcast_to_channel",
+          "TestChannelBroadcast",
+          "TestChannelBroadcast.test_broadcast_without_channel_still_broadcasts_to_all",
+          "TestChannelBroadcast.test_channel_message_excludes_nonsubscribers",
+          "TestChannelBroadcast.test_channel_message_reaches_subscribers",
+          "TestChannelBroadcast.test_channel_message_to_empty_channel",
+          "TestChannelBroadcast.test_direct_message_still_works",
+          "TestChannelBroadcast.test_unsubscribe_stops_receiving",
+          "TestChannelsEndpoint",
+          "TestChannelsEndpoint.test_channels_cleanup_on_unsubscribe",
+          "TestChannelsEndpoint.test_channels_list_empty",
+          "TestChannelsEndpoint.test_channels_list_with_subscribers",
+          "TestChannelsEndpoint.test_channels_subscribers_list",
+          "TestChannelsEndpoint.test_channels_subscribers_nonexistent_channel",
+          "TestDisconnectChannelCleanup",
+          "TestDisconnectChannelCleanup.test_disconnect_notifies_channel_members",
+          "TestDisconnectChannelCleanup.test_disconnect_removes_from_channels",
+          "TestSubscribe",
+          "TestSubscribe.test_subscribe_missing_channel_ignored",
+          "TestSubscribe.test_subscribe_multiple_channels",
+          "TestSubscribe.test_subscribe_receives_confirmation",
+          "TestSubscribe.test_unsubscribe_missing_channel_ignored",
+          "TestSubscribe.test_unsubscribe_nonexistent_channel_silent",
+          "TestSubscribe.test_unsubscribe_receives_confirmation"
+        ],
+        "removed_symbols": [],
+        "changed_symbols": [
+          "ClientRegistry",
+          "ClientRegistry.__init__",
+          "ClientRegistry.remove",
+          "handler",
+          "process_request",
+          "server_url"
+        ],
+        "added_files": [],
+        "removed_files": [],
+        "added_call_edges": [
+          [
+            "ClientRegistry",
+            "add"
+          ],
+          [
+            "ClientRegistry",
+            "discard"
+          ],
+          [
+            "ClientRegistry",
+            "get"
+          ],
+          [
+            "ClientRegistry",
+            "items"
+          ],
+          [
+            "ClientRegistry",
+            "set"
+          ],
+          [
+            "ClientRegistry.get_channels",
+            "items"
+          ],
+          [
+            "ClientRegistry.get_channels",
+            "len"
+          ],
+          [
+            "ClientRegistry.get_subscribers",
+            "get"
+          ],
+          [
+            "ClientRegistry.get_subscribers",
+            "set"
+          ],
+          [
+            "ClientRegistry.remove",
+            "discard"
+          ],
+          [
+            "ClientRegistry.remove",
+            "set"
+          ],
+          [
+            "ClientRegistry.subscribe",
+            "add"
+          ],
+          [
+            "ClientRegistry.subscribe",
+            "set"
+          ],
+          [
+            "ClientRegistry.unsubscribe",
+            "discard"
+          ],
+          [
+            "TestChannelBroadcast",
+            "_recv_json"
+          ],
+          [
+            "TestChannelBroadcast",
+            "connect"
+          ],
+          [
+            "TestChannelBroadcast",
+            "dumps"
+          ],
+          [
+            "TestChannelBroadcast",
+            "recv"
+          ],
+          [
+            "TestChannelBroadcast",
+            "send"
+          ],
+          [
+            "TestChannelBroadcast",
+            "sleep"
+          ],
+          [
+            "TestChannelBroadcast",
+            "wait_for"
+          ],
+          [
+            "TestChannelBroadcast.test_broadcast_without_channel_still_broadcasts_to_all",
+            "_recv_json"
+          ],
+          [
+            "TestChannelBroadcast.test_broadcast_without_channel_still_broadcasts_to_all",
+            "connect"
+          ],
+          [
+            "TestChannelBroadcast.test_broadcast_without_channel_still_broadcasts_to_all",
+            "dumps"
+          ],
+          [
+            "TestChannelBroadcast.test_broadcast_without_channel_still_broadcasts_to_all",
+            "send"
+          ],
+          [
+            "TestChannelBroadcast.test_channel_message_excludes_nonsubscribers",
+            "_recv_json"
+          ],
+          [
+            "TestChannelBroadcast.test_channel_message_excludes_nonsubscribers",
+            "connect"
+          ],
+          [
+            "TestChannelBroadcast.test_channel_message_excludes_nonsubscribers",
+            "dumps"
+          ],
+          [
+            "TestChannelBroadcast.test_channel_message_excludes_nonsubscribers",
+            "recv"
+          ],
+          [
+            "TestChannelBroadcast.test_channel_message_excludes_nonsubscribers",
+            "send"
+          ],
+          [
+            "TestChannelBroadcast.test_channel_message_excludes_nonsubscribers",
+            "wait_for"
+          ],
+          [
+            "TestChannelBroadcast.test_channel_message_reaches_subscribers",
+            "_recv_json"
+          ],
+          [
+            "TestChannelBroadcast.test_channel_message_reaches_subscribers",
+            "connect"
+          ],
+          [
+            "TestChannelBroadcast.test_channel_message_reaches_subscribers",
+            "dumps"
+          ],
+          [
+            "TestChannelBroadcast.test_channel_message_reaches_subscribers",
+            "send"
+          ],
+          [
+            "TestChannelBroadcast.test_channel_message_to_empty_channel",
+            "_recv_json"
+          ],
+          [
+            "TestChannelBroadcast.test_channel_message_to_empty_channel",
+            "connect"
+          ],
+          [
+            "TestChannelBroadcast.test_channel_message_to_empty_channel",
+            "dumps"
+          ],
+          [
+            "TestChannelBroadcast.test_channel_message_to_empty_channel",
+            "send"
+          ],
+          [
+            "TestChannelBroadcast.test_channel_message_to_empty_channel",
+            "sleep"
+          ],
+          [
+            "TestChannelBroadcast.test_direct_message_still_works",
+            "_recv_json"
+          ],
+          [
+            "TestChannelBroadcast.test_direct_message_still_works",
+            "connect"
+          ],
+          [
+            "TestChannelBroadcast.test_direct_message_still_works",
+            "dumps"
+          ],
+          [
+            "TestChannelBroadcast.test_direct_message_still_works",
+            "send"
+          ],
+          [
+            "TestChannelBroadcast.test_unsubscribe_stops_receiving",
+            "_recv_json"
+          ],
+          [
+            "TestChannelBroadcast.test_unsubscribe_stops_receiving",
+            "connect"
+          ],
+          [
+            "TestChannelBroadcast.test_unsubscribe_stops_receiving",
+            "dumps"
+          ],
+          [
+            "TestChannelBroadcast.test_unsubscribe_stops_receiving",
+            "recv"
+          ],
+          [
+            "TestChannelBroadcast.test_unsubscribe_stops_receiving",
+            "send"
+          ],
+          [
+            "TestChannelBroadcast.test_unsubscribe_stops_receiving",
+            "wait_for"
+          ],
+          [
+            "TestChannelsEndpoint",
+            "AsyncClient"
+          ],
+          [
+            "TestChannelsEndpoint",
+            "_recv_json"
+          ],
+          [
+            "TestChannelsEndpoint",
+            "connect"
+          ],
+          [
+            "TestChannelsEndpoint",
+            "dumps"
+          ],
+          [
+            "TestChannelsEndpoint",
+            "get"
+          ],
+          [
+            "TestChannelsEndpoint",
+            "json"
+          ],
+          [
+            "TestChannelsEndpoint",
+            "replace"
+          ],
+          [
+            "TestChannelsEndpoint",
+            "send"
+          ],
+          [
+            "TestChannelsEndpoint.test_channels_cleanup_on_unsubscribe",
+            "AsyncClient"
+          ],
+          [
+            "TestChannelsEndpoint.test_channels_cleanup_on_unsubscribe",
+            "_recv_json"
+          ],
+          [
+            "TestChannelsEndpoint.test_channels_cleanup_on_unsubscribe",
+            "connect"
+          ],
+          [
+            "TestChannelsEndpoint.test_channels_cleanup_on_unsubscribe",
+            "dumps"
+          ],
+          [
+            "TestChannelsEndpoint.test_channels_cleanup_on_unsubscribe",
+            "get"
+          ],
+          [
+            "TestChannelsEndpoint.test_channels_cleanup_on_unsubscribe",
+            "json"
+          ],
+          [
+            "TestChannelsEndpoint.test_channels_cleanup_on_unsubscribe",
+            "replace"
+          ],
+          [
+            "TestChannelsEndpoint.test_channels_cleanup_on_unsubscribe",
+            "send"
+          ],
+          [
+            "TestChannelsEndpoint.test_channels_list_empty",
+            "AsyncClient"
+          ],
+          [
+            "TestChannelsEndpoint.test_channels_list_empty",
+            "get"
+          ],
+          [
+            "TestChannelsEndpoint.test_channels_list_empty",
+            "json"
+          ],
+          [
+            "TestChannelsEndpoint.test_channels_list_empty",
+            "replace"
+          ],
+          [
+            "TestChannelsEndpoint.test_channels_list_with_subscribers",
+            "AsyncClient"
+          ],
+          [
+            "TestChannelsEndpoint.test_channels_list_with_subscribers",
+            "_recv_json"
+          ],
+          [
+            "TestChannelsEndpoint.test_channels_list_with_subscribers",
+            "connect"
+          ],
+          [
+            "TestChannelsEndpoint.test_channels_list_with_subscribers",
+            "dumps"
+          ],
+          [
+            "TestChannelsEndpoint.test_channels_list_with_subscribers",
+            "get"
+          ],
+          [
+            "TestChannelsEndpoint.test_channels_list_with_subscribers",
+            "json"
+          ],
+          [
+            "TestChannelsEndpoint.test_channels_list_with_subscribers",
+            "replace"
+          ],
+          [
+            "TestChannelsEndpoint.test_channels_list_with_subscribers",
+            "send"
+          ],
+          [
+            "TestChannelsEndpoint.test_channels_subscribers_list",
+            "AsyncClient"
+          ],
+          [
+            "TestChannelsEndpoint.test_channels_subscribers_list",
+            "_recv_json"
+          ],
+          [
+            "TestChannelsEndpoint.test_channels_subscribers_list",
+            "connect"
+          ],
+          [
+            "TestChannelsEndpoint.test_channels_subscribers_list",
+            "dumps"
+          ],
+          [
+            "TestChannelsEndpoint.test_channels_subscribers_list",
+            "get"
+          ],
+          [
+            "TestChannelsEndpoint.test_channels_subscribers_list",
+            "json"
+          ],
+          [
+            "TestChannelsEndpoint.test_channels_subscribers_list",
+            "replace"
+          ],
+          [
+            "TestChannelsEndpoint.test_channels_subscribers_list",
+            "send"
+          ],
+          [
+            "TestChannelsEndpoint.test_channels_subscribers_nonexistent_channel",
+            "AsyncClient"
+          ],
+          [
+            "TestChannelsEndpoint.test_channels_subscribers_nonexistent_channel",
+            "get"
+          ],
+          [
+            "TestChannelsEndpoint.test_channels_subscribers_nonexistent_channel",
+            "json"
+          ],
+          [
+            "TestChannelsEndpoint.test_channels_subscribers_nonexistent_channel",
+            "replace"
+          ],
+          [
+            "TestDisconnectChannelCleanup",
+            "AsyncClient"
+          ],
+          [
+            "TestDisconnectChannelCleanup",
+            "_recv_json"
+          ],
+          [
+            "TestDisconnectChannelCleanup",
+            "connect"
+          ],
+          [
+            "TestDisconnectChannelCleanup",
+            "dumps"
+          ],
+          [
+            "TestDisconnectChannelCleanup",
+            "get"
+          ],
+          [
+            "TestDisconnectChannelCleanup",
+            "json"
+          ],
+          [
+            "TestDisconnectChannelCleanup",
+            "replace"
+          ],
+          [
+            "TestDisconnectChannelCleanup",
+            "send"
+          ],
+          [
+            "TestDisconnectChannelCleanup",
+            "sleep"
+          ],
+          [
+            "TestDisconnectChannelCleanup.test_disconnect_notifies_channel_members",
+            "_recv_json"
+          ],
+          [
+            "TestDisconnectChannelCleanup.test_disconnect_notifies_channel_members",
+            "connect"
+          ],
+          [
+            "TestDisconnectChannelCleanup.test_disconnect_notifies_channel_members",
+            "dumps"
+          ],
+          [
+            "TestDisconnectChannelCleanup.test_disconnect_notifies_channel_members",
+            "send"
+          ],
+          [
+            "TestDisconnectChannelCleanup.test_disconnect_notifies_channel_members",
+            "sleep"
+          ],
+          [
+            "TestDisconnectChannelCleanup.test_disconnect_removes_from_channels",
+            "AsyncClient"
+          ],
+          [
+            "TestDisconnectChannelCleanup.test_disconnect_removes_from_channels",
+            "_recv_json"
+          ],
+          [
+            "TestDisconnectChannelCleanup.test_disconnect_removes_from_channels",
+            "connect"
+          ],
+          [
+            "TestDisconnectChannelCleanup.test_disconnect_removes_from_channels",
+            "dumps"
+          ],
+          [
+            "TestDisconnectChannelCleanup.test_disconnect_removes_from_channels",
+            "get"
+          ],
+          [
+            "TestDisconnectChannelCleanup.test_disconnect_removes_from_channels",
+            "json"
+          ],
+          [
+            "TestDisconnectChannelCleanup.test_disconnect_removes_from_channels",
+            "replace"
+          ],
+          [
+            "TestDisconnectChannelCleanup.test_disconnect_removes_from_channels",
+            "send"
+          ],
+          [
+            "TestDisconnectChannelCleanup.test_disconnect_removes_from_channels",
+            "sleep"
+          ],
+          [
+            "TestSubscribe",
+            "_recv_json"
+          ],
+          [
+            "TestSubscribe",
+            "connect"
+          ],
+          [
+            "TestSubscribe",
+            "dumps"
+          ],
+          [
+            "TestSubscribe",
+            "send"
+          ],
+          [
+            "TestSubscribe",
+            "sleep"
+          ],
+          [
+            "TestSubscribe.test_subscribe_missing_channel_ignored",
+            "_recv_json"
+          ],
+          [
+            "TestSubscribe.test_subscribe_missing_channel_ignored",
+            "connect"
+          ],
+          [
+            "TestSubscribe.test_subscribe_missing_channel_ignored",
+            "dumps"
+          ],
+          [
+            "TestSubscribe.test_subscribe_missing_channel_ignored",
+            "send"
+          ],
+          [
+            "TestSubscribe.test_subscribe_missing_channel_ignored",
+            "sleep"
+          ],
+          [
+            "TestSubscribe.test_subscribe_multiple_channels",
+            "_recv_json"
+          ],
+          [
+            "TestSubscribe.test_subscribe_multiple_channels",
+            "connect"
+          ],
+          [
+            "TestSubscribe.test_subscribe_multiple_channels",
+            "dumps"
+          ],
+          [
+            "TestSubscribe.test_subscribe_multiple_channels",
+            "send"
+          ],
+          [
+            "TestSubscribe.test_subscribe_receives_confirmation",
+            "_recv_json"
+          ],
+          [
+            "TestSubscribe.test_subscribe_receives_confirmation",
+            "connect"
+          ],
+          [
+            "TestSubscribe.test_subscribe_receives_confirmation",
+            "dumps"
+          ],
+          [
+            "TestSubscribe.test_subscribe_receives_confirmation",
+            "send"
+          ],
+          [
+            "TestSubscribe.test_unsubscribe_missing_channel_ignored",
+            "_recv_json"
+          ],
+          [
+            "TestSubscribe.test_unsubscribe_missing_channel_ignored",
+            "connect"
+          ],
+          [
+            "TestSubscribe.test_unsubscribe_missing_channel_ignored",
+            "dumps"
+          ],
+          [
+            "TestSubscribe.test_unsubscribe_missing_channel_ignored",
+            "send"
+          ],
+          [
+            "TestSubscribe.test_unsubscribe_missing_channel_ignored",
+            "sleep"
+          ],
+          [
+            "TestSubscribe.test_unsubscribe_nonexistent_channel_silent",
+            "_recv_json"
+          ],
+          [
+            "TestSubscribe.test_unsubscribe_nonexistent_channel_silent",
+            "connect"
+          ],
+          [
+            "TestSubscribe.test_unsubscribe_nonexistent_channel_silent",
+            "dumps"
+          ],
+          [
+            "TestSubscribe.test_unsubscribe_nonexistent_channel_silent",
+            "send"
+          ],
+          [
+            "TestSubscribe.test_unsubscribe_receives_confirmation",
+            "_recv_json"
+          ],
+          [
+            "TestSubscribe.test_unsubscribe_receives_confirmation",
+            "connect"
+          ],
+          [
+            "TestSubscribe.test_unsubscribe_receives_confirmation",
+            "dumps"
+          ],
+          [
+            "TestSubscribe.test_unsubscribe_receives_confirmation",
+            "send"
+          ],
+          [
+            "_broadcast_to_channel",
+            "append"
+          ],
+          [
+            "_broadcast_to_channel",
+            "create_task"
+          ],
+          [
+            "_broadcast_to_channel",
+            "dumps"
+          ],
+          [
+            "_broadcast_to_channel",
+            "gather"
+          ],
+          [
+            "_broadcast_to_channel",
+            "get"
+          ],
+          [
+            "_broadcast_to_channel",
+            "get_all"
+          ],
+          [
+            "_broadcast_to_channel",
+            "get_subscribers"
+          ],
+          [
+            "_broadcast_to_channel",
+            "send"
+          ],
+          [
+            "handler",
+            "_broadcast_to_channel"
+          ],
+          [
+            "handler",
+            "subscribe"
+          ],
+          [
+            "handler",
+            "unsubscribe"
+          ],
+          [
+            "process_request",
+            "get_channels"
+          ],
+          [
+            "process_request",
+            "get_subscribers"
+          ],
+          [
+            "process_request",
+            "len"
+          ],
+          [
+            "process_request",
+            "list"
+          ],
+          [
+            "process_request",
+            "split"
+          ],
+          [
+            "process_request",
+            "startswith"
+          ]
+        ],
+        "removed_call_edges": [],
+        "changed_symbol_count": 34,
+        "from_revision": "7aa30d824afac4249389eb88a991a07e3a40546c",
+        "to_revision": "3facd922ce01092602423df7127b47702148966a",
+        "commit_message": "[story] Session 2: feature_addition"
+      },
+      {
+        "added_symbols": [
+          "_init_db",
+          "_init_redis",
+          "_local_broadcast",
+          "_local_broadcast_to_channel",
+          "_local_direct",
+          "_redis_listener",
+          "_redis_publish",
+          "_save_message",
+          "_start_background",
+          "_stop_background",
+          "TestMessagePersistence",
+          "TestMessagePersistence.test_messages_endpoint_returns_history",
+          "TestMessagePersistence.test_messages_include_channel_info",
+          "TestMessagePersistence.test_messages_limit_offset",
+          "TestMessagePersistence.test_messages_persist_across_server_restarts",
+          "TestMessagePersistence.test_messages_table_schema",
+          "TestRedisPubSub",
+          "TestRedisPubSub.test_multiple_servers_share_redis",
+          "TestRedisPubSub.test_redis_direct_message",
+          "TestRedisPubSub.test_redis_publish_broadcast",
+          "TestRedisPubSub.test_redis_publish_to_channel"
+        ],
+        "removed_symbols": [],
+        "changed_symbols": [
+          "_broadcast",
+          "_broadcast_to_channel",
+          "_send_direct",
+          "process_request",
+          "start_server",
+          "TestDisconnectChannelCleanup",
+          "TestDisconnectChannelCleanup.test_disconnect_notifies_channel_members",
+          "server_url"
+        ],
+        "added_files": [],
+        "removed_files": [],
+        "added_call_edges": [
+          [
+            "TestDisconnectChannelCleanup",
+            "recv"
+          ],
+          [
+            "TestDisconnectChannelCleanup",
+            "wait_for"
+          ],
+          [
+            "TestDisconnectChannelCleanup.test_disconnect_notifies_channel_members",
+            "recv"
+          ],
+          [
+            "TestDisconnectChannelCleanup.test_disconnect_notifies_channel_members",
+            "wait_for"
+          ],
+          [
+            "TestMessagePersistence",
+            "AsyncClient"
+          ],
+          [
+            "TestMessagePersistence",
+            "_recv_json"
+          ],
+          [
+            "TestMessagePersistence",
+            "connect"
+          ],
+          [
+            "TestMessagePersistence",
+            "dumps"
+          ],
+          [
+            "TestMessagePersistence",
+            "get"
+          ],
+          [
+            "TestMessagePersistence",
+            "isinstance"
+          ],
+          [
+            "TestMessagePersistence",
+            "json"
+          ],
+          [
+            "TestMessagePersistence",
+            "len"
+          ],
+          [
+            "TestMessagePersistence",
+            "range"
+          ],
+          [
+            "TestMessagePersistence",
+            "replace"
+          ],
+          [
+            "TestMessagePersistence",
+            "send"
+          ],
+          [
+            "TestMessagePersistence",
+            "sleep"
+          ],
+          [
+            "TestMessagePersistence.test_messages_endpoint_returns_history",
+            "AsyncClient"
+          ],
+          [
+            "TestMessagePersistence.test_messages_endpoint_returns_history",
+            "_recv_json"
+          ],
+          [
+            "TestMessagePersistence.test_messages_endpoint_returns_history",
+            "connect"
+          ],
+          [
+            "TestMessagePersistence.test_messages_endpoint_returns_history",
+            "get"
+          ],
+          [
+            "TestMessagePersistence.test_messages_endpoint_returns_history",
+            "isinstance"
+          ],
+          [
+            "TestMessagePersistence.test_messages_endpoint_returns_history",
+            "json"
+          ],
+          [
+            "TestMessagePersistence.test_messages_endpoint_returns_history",
+            "len"
+          ],
+          [
+            "TestMessagePersistence.test_messages_endpoint_returns_history",
+            "replace"
+          ],
+          [
+            "TestMessagePersistence.test_messages_endpoint_returns_history",
+            "sleep"
+          ],
+          [
+            "TestMessagePersistence.test_messages_include_channel_info",
+            "AsyncClient"
+          ],
+          [
+            "TestMessagePersistence.test_messages_include_channel_info",
+            "_recv_json"
+          ],
+          [
+            "TestMessagePersistence.test_messages_include_channel_info",
+            "connect"
+          ],
+          [
+            "TestMessagePersistence.test_messages_include_channel_info",
+            "dumps"
+          ],
+          [
+            "TestMessagePersistence.test_messages_include_channel_info",
+            "get"
+          ],
+          [
+            "TestMessagePersistence.test_messages_include_channel_info",
+            "json"
+          ],
+          [
+            "TestMessagePersistence.test_messages_include_channel_info",
+            "len"
+          ],
+          [
+            "TestMessagePersistence.test_messages_include_channel_info",
+            "replace"
+          ],
+          [
+            "TestMessagePersistence.test_messages_include_channel_info",
+            "send"
+          ],
+          [
+            "TestMessagePersistence.test_messages_include_channel_info",
+            "sleep"
+          ],
+          [
+            "TestMessagePersistence.test_messages_limit_offset",
+            "AsyncClient"
+          ],
+          [
+            "TestMessagePersistence.test_messages_limit_offset",
+            "_recv_json"
+          ],
+          [
+            "TestMessagePersistence.test_messages_limit_offset",
+            "connect"
+          ],
+          [
+            "TestMessagePersistence.test_messages_limit_offset",
+            "dumps"
+          ],
+          [
+            "TestMessagePersistence.test_messages_limit_offset",
+            "get"
+          ],
+          [
+            "TestMessagePersistence.test_messages_limit_offset",
+            "json"
+          ],
+          [
+            "TestMessagePersistence.test_messages_limit_offset",
+            "len"
+          ],
+          [
+            "TestMessagePersistence.test_messages_limit_offset",
+            "range"
+          ],
+          [
+            "TestMessagePersistence.test_messages_limit_offset",
+            "replace"
+          ],
+          [
+            "TestMessagePersistence.test_messages_limit_offset",
+            "send"
+          ],
+          [
+            "TestMessagePersistence.test_messages_limit_offset",
+            "sleep"
+          ],
+          [
+            "TestMessagePersistence.test_messages_persist_across_server_restarts",
+            "AsyncClient"
+          ],
+          [
+            "TestMessagePersistence.test_messages_persist_across_server_restarts",
+            "_recv_json"
+          ],
+          [
+            "TestMessagePersistence.test_messages_persist_across_server_restarts",
+            "connect"
+          ],
+          [
+            "TestMessagePersistence.test_messages_persist_across_server_restarts",
+            "dumps"
+          ],
+          [
+            "TestMessagePersistence.test_messages_persist_across_server_restarts",
+            "get"
+          ],
+          [
+            "TestMessagePersistence.test_messages_persist_across_server_restarts",
+            "json"
+          ],
+          [
+            "TestMessagePersistence.test_messages_persist_across_server_restarts",
+            "len"
+          ],
+          [
+            "TestMessagePersistence.test_messages_persist_across_server_restarts",
+            "replace"
+          ],
+          [
+            "TestMessagePersistence.test_messages_persist_across_server_restarts",
+            "send"
+          ],
+          [
+            "TestMessagePersistence.test_messages_persist_across_server_restarts",
+            "sleep"
+          ],
+          [
+            "TestMessagePersistence.test_messages_table_schema",
+            "AsyncClient"
+          ],
+          [
+            "TestMessagePersistence.test_messages_table_schema",
+            "_recv_json"
+          ],
+          [
+            "TestMessagePersistence.test_messages_table_schema",
+            "connect"
+          ],
+          [
+            "TestMessagePersistence.test_messages_table_schema",
+            "dumps"
+          ],
+          [
+            "TestMessagePersistence.test_messages_table_schema",
+            "get"
+          ],
+          [
+            "TestMessagePersistence.test_messages_table_schema",
+            "isinstance"
+          ],
+          [
+            "TestMessagePersistence.test_messages_table_schema",
+            "json"
+          ],
+          [
+            "TestMessagePersistence.test_messages_table_schema",
+            "len"
+          ],
+          [
+            "TestMessagePersistence.test_messages_table_schema",
+            "replace"
+          ],
+          [
+            "TestMessagePersistence.test_messages_table_schema",
+            "send"
+          ],
+          [
+            "TestMessagePersistence.test_messages_table_schema",
+            "sleep"
+          ],
+          [
+            "TestRedisPubSub",
+            "FakeAsyncRedis"
+          ],
+          [
+            "TestRedisPubSub",
+            "_free_port"
+          ],
+          [
+            "TestRedisPubSub",
+            "_recv_json"
+          ],
+          [
+            "TestRedisPubSub",
+            "_start_background"
+          ],
+          [
+            "TestRedisPubSub",
+            "_stop_background"
+          ],
+          [
+            "TestRedisPubSub",
+            "clear"
+          ],
+          [
+            "TestRedisPubSub",
+            "connect"
+          ],
+          [
+            "TestRedisPubSub",
+            "dumps"
+          ],
+          [
+            "TestRedisPubSub",
+            "send"
+          ],
+          [
+            "TestRedisPubSub",
+            "serve"
+          ],
+          [
+            "TestRedisPubSub.test_multiple_servers_share_redis",
+            "FakeAsyncRedis"
+          ],
+          [
+            "TestRedisPubSub.test_multiple_servers_share_redis",
+            "_free_port"
+          ],
+          [
+            "TestRedisPubSub.test_multiple_servers_share_redis",
+            "_recv_json"
+          ],
+          [
+            "TestRedisPubSub.test_multiple_servers_share_redis",
+            "_start_background"
+          ],
+          [
+            "TestRedisPubSub.test_multiple_servers_share_redis",
+            "_stop_background"
+          ],
+          [
+            "TestRedisPubSub.test_multiple_servers_share_redis",
+            "clear"
+          ],
+          [
+            "TestRedisPubSub.test_multiple_servers_share_redis",
+            "connect"
+          ],
+          [
+            "TestRedisPubSub.test_multiple_servers_share_redis",
+            "dumps"
+          ],
+          [
+            "TestRedisPubSub.test_multiple_servers_share_redis",
+            "send"
+          ],
+          [
+            "TestRedisPubSub.test_multiple_servers_share_redis",
+            "serve"
+          ],
+          [
+            "TestRedisPubSub.test_redis_direct_message",
+            "_recv_json"
+          ],
+          [
+            "TestRedisPubSub.test_redis_direct_message",
+            "connect"
+          ],
+          [
+            "TestRedisPubSub.test_redis_direct_message",
+            "dumps"
+          ],
+          [
+            "TestRedisPubSub.test_redis_direct_message",
+            "send"
+          ],
+          [
+            "TestRedisPubSub.test_redis_publish_broadcast",
+            "_recv_json"
+          ],
+          [
+            "TestRedisPubSub.test_redis_publish_broadcast",
+            "connect"
+          ],
+          [
+            "TestRedisPubSub.test_redis_publish_broadcast",
+            "dumps"
+          ],
+          [
+            "TestRedisPubSub.test_redis_publish_broadcast",
+            "send"
+          ],
+          [
+            "TestRedisPubSub.test_redis_publish_to_channel",
+            "_recv_json"
+          ],
+          [
+            "TestRedisPubSub.test_redis_publish_to_channel",
+            "connect"
+          ],
+          [
+            "TestRedisPubSub.test_redis_publish_to_channel",
+            "dumps"
+          ],
+          [
+            "TestRedisPubSub.test_redis_publish_to_channel",
+            "send"
+          ],
+          [
+            "_broadcast",
+            "_redis_publish"
+          ],
+          [
+            "_broadcast",
+            "_save_message"
+          ],
+          [
+            "_broadcast",
+            "get"
+          ],
+          [
+            "_broadcast_to_channel",
+            "_redis_publish"
+          ],
+          [
+            "_broadcast_to_channel",
+            "_save_message"
+          ],
+          [
+            "_init_db",
+            "commit"
+          ],
+          [
+            "_init_db",
+            "connect"
+          ],
+          [
+            "_init_db",
+            "execute"
+          ],
+          [
+            "_init_redis",
+            "from_url"
+          ],
+          [
+            "_local_broadcast",
+            "append"
+          ],
+          [
+            "_local_broadcast",
+            "create_task"
+          ],
+          [
+            "_local_broadcast",
+            "dumps"
+          ],
+          [
+            "_local_broadcast",
+            "gather"
+          ],
+          [
+            "_local_broadcast",
+            "get_all"
+          ],
+          [
+            "_local_broadcast",
+            "send"
+          ],
+          [
+            "_local_broadcast",
+            "values"
+          ],
+          [
+            "_local_broadcast_to_channel",
+            "append"
+          ],
+          [
+            "_local_broadcast_to_channel",
+            "create_task"
+          ],
+          [
+            "_local_broadcast_to_channel",
+            "dumps"
+          ],
+          [
+            "_local_broadcast_to_channel",
+            "gather"
+          ],
+          [
+            "_local_broadcast_to_channel",
+            "get"
+          ],
+          [
+            "_local_broadcast_to_channel",
+            "send"
+          ],
+          [
+            "_local_direct",
+            "dumps"
+          ],
+          [
+            "_local_direct",
+            "get"
+          ],
+          [
+            "_local_direct",
+            "send"
+          ],
+          [
+            "_redis_listener",
+            "_init_redis"
+          ],
+          [
+            "_redis_listener",
+            "_local_broadcast"
+          ],
+          [
+            "_redis_listener",
+            "_local_broadcast_to_channel"
+          ],
+          [
+            "_redis_listener",
+            "_local_direct"
+          ],
+          [
+            "_redis_listener",
+            "decode"
+          ],
+          [
+            "_redis_listener",
+            "get_all"
+          ],
+          [
+            "_redis_listener",
+            "get_subscribers"
+          ],
+          [
+            "_redis_listener",
+            "isinstance"
+          ],
+          [
+            "_redis_listener",
+            "len"
+          ],
+          [
+            "_redis_listener",
+            "listen"
+          ],
+          [
+            "_redis_listener",
+            "loads"
+          ],
+          [
+            "_redis_listener",
+            "psubscribe"
+          ],
+          [
+            "_redis_listener",
+            "pubsub"
+          ],
+          [
+            "_redis_listener",
+            "startswith"
+          ],
+          [
+            "_redis_listener",
+            "subscribe"
+          ],
+          [
+            "_redis_publish",
+            "_init_redis"
+          ],
+          [
+            "_redis_publish",
+            "dumps"
+          ],
+          [
+            "_redis_publish",
+            "publish"
+          ],
+          [
+            "_save_message",
+            "_init_db"
+          ],
+          [
+            "_save_message",
+            "commit"
+          ],
+          [
+            "_save_message",
+            "dumps"
+          ],
+          [
+            "_save_message",
+            "execute"
+          ],
+          [
+            "_send_direct",
+            "_redis_publish"
+          ],
+          [
+            "_send_direct",
+            "_save_message"
+          ],
+          [
+            "_start_background",
+            "_init_db"
+          ],
+          [
+            "_start_background",
+            "_init_redis"
+          ],
+          [
+            "_start_background",
+            "_redis_listener"
+          ],
+          [
+            "_start_background",
+            "create_task"
+          ],
+          [
+            "_stop_background",
+            "cancel"
+          ],
+          [
+            "_stop_background",
+            "close"
+          ],
+          [
+            "process_request",
+            "_init_db"
+          ],
+          [
+            "process_request",
+            "execute_fetchall"
+          ],
+          [
+            "process_request",
+            "int"
+          ],
+          [
+            "process_request",
+            "loads"
+          ],
+          [
+            "process_request",
+            "parse_qs"
+          ],
+          [
+            "process_request",
+            "urlparse"
+          ],
+          [
+            "server_url",
+            "FakeAsyncRedis"
+          ],
+          [
+            "server_url",
+            "_start_background"
+          ],
+          [
+            "server_url",
+            "_stop_background"
+          ],
+          [
+            "start_server",
+            "_start_background"
+          ],
+          [
+            "start_server",
+            "_stop_background"
+          ]
+        ],
+        "removed_call_edges": [
+          [
+            "_broadcast",
+            "append"
+          ],
+          [
+            "_broadcast",
+            "create_task"
+          ],
+          [
+            "_broadcast",
+            "dumps"
+          ],
+          [
+            "_broadcast",
+            "gather"
+          ],
+          [
+            "_broadcast",
+            "get_all"
+          ],
+          [
+            "_broadcast",
+            "send"
+          ],
+          [
+            "_broadcast",
+            "values"
+          ],
+          [
+            "_broadcast_to_channel",
+            "append"
+          ],
+          [
+            "_broadcast_to_channel",
+            "create_task"
+          ],
+          [
+            "_broadcast_to_channel",
+            "dumps"
+          ],
+          [
+            "_broadcast_to_channel",
+            "gather"
+          ],
+          [
+            "_broadcast_to_channel",
+            "get_all"
+          ],
+          [
+            "_broadcast_to_channel",
+            "get_subscribers"
+          ],
+          [
+            "_broadcast_to_channel",
+            "send"
+          ],
+          [
+            "_send_direct",
+            "dumps"
+          ],
+          [
+            "_send_direct",
+            "get_all"
+          ],
+          [
+            "_send_direct",
+            "send"
+          ]
+        ],
+        "changed_symbol_count": 29,
+        "from_revision": "3facd922ce01092602423df7127b47702148966a",
+        "to_revision": "4e0171f3ccd0550846b23f8c1bf04d4d2dafb15e",
+        "commit_message": "[story] Session 3: integration"
+      },
+      {
+        "added_symbols": [
+          "BaseTransport",
+          "BaseTransport.broadcast",
+          "BaseTransport.on_connect",
+          "BaseTransport.on_disconnect",
+          "BaseTransport.send_message",
+          "NotificationServer",
+          "NotificationServer.__init__",
+          "NotificationServer.handle_connect",
+          "NotificationServer.handle_disconnect",
+          "NotificationServer.handle_message",
+          "WebSocketTransport",
+          "WebSocketTransport.broadcast",
+          "WebSocketTransport.on_connect",
+          "WebSocketTransport.on_disconnect",
+          "WebSocketTransport.send_message",
+          "_get_transport"
+        ],
+        "removed_symbols": [],
+        "changed_symbols": [
+          "_local_broadcast",
+          "_local_broadcast_to_channel",
+          "_local_direct",
+          "_redis_listener",
+          "_start_background",
+          "_stop_background",
+          "handler",
+          "start_server"
+        ],
+        "added_files": [],
+        "removed_files": [],
+        "added_call_edges": [
+          [
+            "NotificationServer",
+            "_broadcast"
+          ],
+          [
+            "NotificationServer",
+            "_broadcast_to_channel"
+          ],
+          [
+            "NotificationServer",
+            "_make_timestamp"
+          ],
+          [
+            "NotificationServer",
+            "_send_direct"
+          ],
+          [
+            "NotificationServer",
+            "get"
+          ],
+          [
+            "NotificationServer",
+            "on_connect"
+          ],
+          [
+            "NotificationServer",
+            "on_disconnect"
+          ],
+          [
+            "NotificationServer",
+            "send_message"
+          ],
+          [
+            "NotificationServer",
+            "subscribe"
+          ],
+          [
+            "NotificationServer",
+            "unsubscribe"
+          ],
+          [
+            "NotificationServer.handle_connect",
+            "on_connect"
+          ],
+          [
+            "NotificationServer.handle_disconnect",
+            "_broadcast"
+          ],
+          [
+            "NotificationServer.handle_disconnect",
+            "_make_timestamp"
+          ],
+          [
+            "NotificationServer.handle_disconnect",
+            "on_disconnect"
+          ],
+          [
+            "NotificationServer.handle_message",
+            "_broadcast"
+          ],
+          [
+            "NotificationServer.handle_message",
+            "_broadcast_to_channel"
+          ],
+          [
+            "NotificationServer.handle_message",
+            "_make_timestamp"
+          ],
+          [
+            "NotificationServer.handle_message",
+            "_send_direct"
+          ],
+          [
+            "NotificationServer.handle_message",
+            "get"
+          ],
+          [
+            "NotificationServer.handle_message",
+            "send_message"
+          ],
+          [
+            "NotificationServer.handle_message",
+            "subscribe"
+          ],
+          [
+            "NotificationServer.handle_message",
+            "unsubscribe"
+          ],
+          [
+            "WebSocketTransport",
+            "_make_timestamp"
+          ],
+          [
+            "WebSocketTransport",
+            "add"
+          ],
+          [
+            "WebSocketTransport",
+            "create_task"
+          ],
+          [
+            "WebSocketTransport",
+            "dumps"
+          ],
+          [
+            "WebSocketTransport",
+            "gather"
+          ],
+          [
+            "WebSocketTransport",
+            "get"
+          ],
+          [
+            "WebSocketTransport",
+            "get_all"
+          ],
+          [
+            "WebSocketTransport",
+            "remove"
+          ],
+          [
+            "WebSocketTransport",
+            "send"
+          ],
+          [
+            "WebSocketTransport",
+            "values"
+          ],
+          [
+            "WebSocketTransport.broadcast",
+            "create_task"
+          ],
+          [
+            "WebSocketTransport.broadcast",
+            "dumps"
+          ],
+          [
+            "WebSocketTransport.broadcast",
+            "gather"
+          ],
+          [
+            "WebSocketTransport.broadcast",
+            "get_all"
+          ],
+          [
+            "WebSocketTransport.broadcast",
+            "send"
+          ],
+          [
+            "WebSocketTransport.broadcast",
+            "values"
+          ],
+          [
+            "WebSocketTransport.on_connect",
+            "_make_timestamp"
+          ],
+          [
+            "WebSocketTransport.on_connect",
+            "add"
+          ],
+          [
+            "WebSocketTransport.on_connect",
+            "dumps"
+          ],
+          [
+            "WebSocketTransport.on_connect",
+            "send"
+          ],
+          [
+            "WebSocketTransport.on_disconnect",
+            "remove"
+          ],
+          [
+            "WebSocketTransport.send_message",
+            "dumps"
+          ],
+          [
+            "WebSocketTransport.send_message",
+            "get"
+          ],
+          [
+            "WebSocketTransport.send_message",
+            "get_all"
+          ],
+          [
+            "WebSocketTransport.send_message",
+            "send"
+          ],
+          [
+            "_get_transport",
+            "ValueError"
+          ],
+          [
+            "_get_transport",
+            "WebSocketTransport"
+          ],
+          [
+            "_get_transport",
+            "get"
+          ],
+          [
+            "_get_transport",
+            "lower"
+          ],
+          [
+            "_local_broadcast",
+            "_get_transport"
+          ],
+          [
+            "_local_broadcast",
+            "broadcast"
+          ],
+          [
+            "_local_broadcast_to_channel",
+            "_get_transport"
+          ],
+          [
+            "_local_broadcast_to_channel",
+            "send_message"
+          ],
+          [
+            "_local_direct",
+            "_get_transport"
+          ],
+          [
+            "_local_direct",
+            "send_message"
+          ],
+          [
+            "_start_background",
+            "_get_transport"
+          ],
+          [
+            "handler",
+            "NotificationServer"
+          ],
+          [
+            "handler",
+            "_get_transport"
+          ],
+          [
+            "handler",
+            "handle_connect"
+          ],
+          [
+            "handler",
+            "handle_disconnect"
+          ],
+          [
+            "handler",
+            "handle_message"
+          ]
+        ],
+        "removed_call_edges": [
+          [
+            "_local_broadcast",
+            "append"
+          ],
+          [
+            "_local_broadcast",
+            "create_task"
+          ],
+          [
+            "_local_broadcast",
+            "dumps"
+          ],
+          [
+            "_local_broadcast",
+            "gather"
+          ],
+          [
+            "_local_broadcast",
+            "get_all"
+          ],
+          [
+            "_local_broadcast",
+            "send"
+          ],
+          [
+            "_local_broadcast",
+            "values"
+          ],
+          [
+            "_local_broadcast_to_channel",
+            "dumps"
+          ],
+          [
+            "_local_broadcast_to_channel",
+            "get"
+          ],
+          [
+            "_local_broadcast_to_channel",
+            "send"
+          ],
+          [
+            "_local_direct",
+            "dumps"
+          ],
+          [
+            "_local_direct",
+            "get"
+          ],
+          [
+            "_local_direct",
+            "send"
+          ],
+          [
+            "_redis_listener",
+            "get_all"
+          ],
+          [
+            "handler",
+            "_broadcast"
+          ],
+          [
+            "handler",
+            "_broadcast_to_channel"
+          ],
+          [
+            "handler",
+            "_make_timestamp"
+          ],
+          [
+            "handler",
+            "_send_direct"
+          ],
+          [
+            "handler",
+            "add"
+          ],
+          [
+            "handler",
+            "dumps"
+          ],
+          [
+            "handler",
+            "get"
+          ],
+          [
+            "handler",
+            "remove"
+          ],
+          [
+            "handler",
+            "send"
+          ],
+          [
+            "handler",
+            "subscribe"
+          ],
+          [
+            "handler",
+            "unsubscribe"
+          ]
+        ],
+        "changed_symbol_count": 24,
+        "from_revision": "4e0171f3ccd0550846b23f8c1bf04d4d2dafb15e",
+        "to_revision": "d5c1fe7e4768f962306b946b13ab1234ec89cd00",
+        "commit_message": "[story] Session 4: refactor"
+      },
+      {
+        "added_symbols": [
+          "_check_rate_limit",
+          "_expire_loop",
+          "TestHistoryEndpoint",
+          "TestHistoryEndpoint.test_history_chronological_order",
+          "TestHistoryEndpoint.test_history_default_limit",
+          "TestHistoryEndpoint.test_history_empty_channel",
+          "TestHistoryEndpoint.test_history_pagination_has_more",
+          "TestHistoryEndpoint.test_history_pagination_no_more",
+          "TestHistoryEndpoint.test_history_returns_messages_for_channel",
+          "TestHistoryEndpoint.test_history_since_filter",
+          "TestMessageExpiry",
+          "TestMessageExpiry.test_expiry_deletes_old_messages",
+          "TestMessageExpiry.test_expiry_keeps_recent_messages",
+          "TestRateLimiting",
+          "TestRateLimiting.test_rate_limit_allows_up_to_limit",
+          "TestRateLimiting.test_rate_limit_blocks_after_exceeded",
+          "TestRateLimiting.test_rate_limit_per_client_independent",
+          "TestRateLimiting.test_rate_limit_response_format"
+        ],
+        "removed_symbols": [],
+        "changed_symbols": [
+          "_start_background",
+          "_stop_background",
+          "handler",
+          "process_request"
+        ],
+        "added_files": [],
+        "removed_files": [],
+        "added_call_edges": [
+          [
+            "TestHistoryEndpoint",
+            "AsyncClient"
+          ],
+          [
+            "TestHistoryEndpoint",
+            "_make_timestamp"
+          ],
+          [
+            "TestHistoryEndpoint",
+            "_recv_json"
+          ],
+          [
+            "TestHistoryEndpoint",
+            "all"
+          ],
+          [
+            "TestHistoryEndpoint",
+            "connect"
+          ],
+          [
+            "TestHistoryEndpoint",
+            "dumps"
+          ],
+          [
+            "TestHistoryEndpoint",
+            "get"
+          ],
+          [
+            "TestHistoryEndpoint",
+            "isinstance"
+          ],
+          [
+            "TestHistoryEndpoint",
+            "json"
+          ],
+          [
+            "TestHistoryEndpoint",
+            "len"
+          ],
+          [
+            "TestHistoryEndpoint",
+            "range"
+          ],
+          [
+            "TestHistoryEndpoint",
+            "replace"
+          ],
+          [
+            "TestHistoryEndpoint",
+            "send"
+          ],
+          [
+            "TestHistoryEndpoint",
+            "sleep"
+          ],
+          [
+            "TestHistoryEndpoint.test_history_chronological_order",
+            "AsyncClient"
+          ],
+          [
+            "TestHistoryEndpoint.test_history_chronological_order",
+            "_recv_json"
+          ],
+          [
+            "TestHistoryEndpoint.test_history_chronological_order",
+            "connect"
+          ],
+          [
+            "TestHistoryEndpoint.test_history_chronological_order",
+            "dumps"
+          ],
+          [
+            "TestHistoryEndpoint.test_history_chronological_order",
+            "get"
+          ],
+          [
+            "TestHistoryEndpoint.test_history_chronological_order",
+            "json"
+          ],
+          [
+            "TestHistoryEndpoint.test_history_chronological_order",
+            "len"
+          ],
+          [
+            "TestHistoryEndpoint.test_history_chronological_order",
+            "replace"
+          ],
+          [
+            "TestHistoryEndpoint.test_history_chronological_order",
+            "send"
+          ],
+          [
+            "TestHistoryEndpoint.test_history_chronological_order",
+            "sleep"
+          ],
+          [
+            "TestHistoryEndpoint.test_history_default_limit",
+            "AsyncClient"
+          ],
+          [
+            "TestHistoryEndpoint.test_history_default_limit",
+            "get"
+          ],
+          [
+            "TestHistoryEndpoint.test_history_default_limit",
+            "isinstance"
+          ],
+          [
+            "TestHistoryEndpoint.test_history_default_limit",
+            "json"
+          ],
+          [
+            "TestHistoryEndpoint.test_history_default_limit",
+            "replace"
+          ],
+          [
+            "TestHistoryEndpoint.test_history_empty_channel",
+            "AsyncClient"
+          ],
+          [
+            "TestHistoryEndpoint.test_history_empty_channel",
+            "get"
+          ],
+          [
+            "TestHistoryEndpoint.test_history_empty_channel",
+            "json"
+          ],
+          [
+            "TestHistoryEndpoint.test_history_empty_channel",
+            "replace"
+          ],
+          [
+            "TestHistoryEndpoint.test_history_pagination_has_more",
+            "AsyncClient"
+          ],
+          [
+            "TestHistoryEndpoint.test_history_pagination_has_more",
+            "_recv_json"
+          ],
+          [
+            "TestHistoryEndpoint.test_history_pagination_has_more",
+            "connect"
+          ],
+          [
+            "TestHistoryEndpoint.test_history_pagination_has_more",
+            "dumps"
+          ],
+          [
+            "TestHistoryEndpoint.test_history_pagination_has_more",
+            "get"
+          ],
+          [
+            "TestHistoryEndpoint.test_history_pagination_has_more",
+            "json"
+          ],
+          [
+            "TestHistoryEndpoint.test_history_pagination_has_more",
+            "len"
+          ],
+          [
+            "TestHistoryEndpoint.test_history_pagination_has_more",
+            "range"
+          ],
+          [
+            "TestHistoryEndpoint.test_history_pagination_has_more",
+            "replace"
+          ],
+          [
+            "TestHistoryEndpoint.test_history_pagination_has_more",
+            "send"
+          ],
+          [
+            "TestHistoryEndpoint.test_history_pagination_has_more",
+            "sleep"
+          ],
+          [
+            "TestHistoryEndpoint.test_history_pagination_no_more",
+            "AsyncClient"
+          ],
+          [
+            "TestHistoryEndpoint.test_history_pagination_no_more",
+            "_recv_json"
+          ],
+          [
+            "TestHistoryEndpoint.test_history_pagination_no_more",
+            "connect"
+          ],
+          [
+            "TestHistoryEndpoint.test_history_pagination_no_more",
+            "dumps"
+          ],
+          [
+            "TestHistoryEndpoint.test_history_pagination_no_more",
+            "get"
+          ],
+          [
+            "TestHistoryEndpoint.test_history_pagination_no_more",
+            "json"
+          ],
+          [
+            "TestHistoryEndpoint.test_history_pagination_no_more",
+            "replace"
+          ],
+          [
+            "TestHistoryEndpoint.test_history_pagination_no_more",
+            "send"
+          ],
+          [
+            "TestHistoryEndpoint.test_history_pagination_no_more",
+            "sleep"
+          ],
+          [
+            "TestHistoryEndpoint.test_history_returns_messages_for_channel",
+            "AsyncClient"
+          ],
+          [
+            "TestHistoryEndpoint.test_history_returns_messages_for_channel",
+            "_recv_json"
+          ],
+          [
+            "TestHistoryEndpoint.test_history_returns_messages_for_channel",
+            "connect"
+          ],
+          [
+            "TestHistoryEndpoint.test_history_returns_messages_for_channel",
+            "dumps"
+          ],
+          [
+            "TestHistoryEndpoint.test_history_returns_messages_for_channel",
+            "get"
+          ],
+          [
+            "TestHistoryEndpoint.test_history_returns_messages_for_channel",
+            "isinstance"
+          ],
+          [
+            "TestHistoryEndpoint.test_history_returns_messages_for_channel",
+            "json"
+          ],
+          [
+            "TestHistoryEndpoint.test_history_returns_messages_for_channel",
+            "len"
+          ],
+          [
+            "TestHistoryEndpoint.test_history_returns_messages_for_channel",
+            "replace"
+          ],
+          [
+            "TestHistoryEndpoint.test_history_returns_messages_for_channel",
+            "send"
+          ],
+          [
+            "TestHistoryEndpoint.test_history_returns_messages_for_channel",
+            "sleep"
+          ],
+          [
+            "TestHistoryEndpoint.test_history_since_filter",
+            "AsyncClient"
+          ],
+          [
+            "TestHistoryEndpoint.test_history_since_filter",
+            "_make_timestamp"
+          ],
+          [
+            "TestHistoryEndpoint.test_history_since_filter",
+            "_recv_json"
+          ],
+          [
+            "TestHistoryEndpoint.test_history_since_filter",
+            "all"
+          ],
+          [
+            "TestHistoryEndpoint.test_history_since_filter",
+            "connect"
+          ],
+          [
+            "TestHistoryEndpoint.test_history_since_filter",
+            "dumps"
+          ],
+          [
+            "TestHistoryEndpoint.test_history_since_filter",
+            "get"
+          ],
+          [
+            "TestHistoryEndpoint.test_history_since_filter",
+            "json"
+          ],
+          [
+            "TestHistoryEndpoint.test_history_since_filter",
+            "replace"
+          ],
+          [
+            "TestHistoryEndpoint.test_history_since_filter",
+            "send"
+          ],
+          [
+            "TestHistoryEndpoint.test_history_since_filter",
+            "sleep"
+          ],
+          [
+            "TestMessageExpiry",
+            "_init_db"
+          ],
+          [
+            "TestMessageExpiry",
+            "_make_timestamp"
+          ],
+          [
+            "TestMessageExpiry",
+            "commit"
+          ],
+          [
+            "TestMessageExpiry",
+            "dumps"
+          ],
+          [
+            "TestMessageExpiry",
+            "execute"
+          ],
+          [
+            "TestMessageExpiry",
+            "execute_fetchall"
+          ],
+          [
+            "TestMessageExpiry",
+            "isoformat"
+          ],
+          [
+            "TestMessageExpiry",
+            "len"
+          ],
+          [
+            "TestMessageExpiry",
+            "now"
+          ],
+          [
+            "TestMessageExpiry",
+            "timedelta"
+          ],
+          [
+            "TestMessageExpiry.test_expiry_deletes_old_messages",
+            "_init_db"
+          ],
+          [
+            "TestMessageExpiry.test_expiry_deletes_old_messages",
+            "commit"
+          ],
+          [
+            "TestMessageExpiry.test_expiry_deletes_old_messages",
+            "dumps"
+          ],
+          [
+            "TestMessageExpiry.test_expiry_deletes_old_messages",
+            "execute"
+          ],
+          [
+            "TestMessageExpiry.test_expiry_deletes_old_messages",
+            "execute_fetchall"
+          ],
+          [
+            "TestMessageExpiry.test_expiry_deletes_old_messages",
+            "isoformat"
+          ],
+          [
+            "TestMessageExpiry.test_expiry_deletes_old_messages",
+            "len"
+          ],
+          [
+            "TestMessageExpiry.test_expiry_deletes_old_messages",
+            "now"
+          ],
+          [
+            "TestMessageExpiry.test_expiry_deletes_old_messages",
+            "timedelta"
+          ],
+          [
+            "TestMessageExpiry.test_expiry_keeps_recent_messages",
+            "_init_db"
+          ],
+          [
+            "TestMessageExpiry.test_expiry_keeps_recent_messages",
+            "_make_timestamp"
+          ],
+          [
+            "TestMessageExpiry.test_expiry_keeps_recent_messages",
+            "commit"
+          ],
+          [
+            "TestMessageExpiry.test_expiry_keeps_recent_messages",
+            "dumps"
+          ],
+          [
+            "TestMessageExpiry.test_expiry_keeps_recent_messages",
+            "execute"
+          ],
+          [
+            "TestMessageExpiry.test_expiry_keeps_recent_messages",
+            "execute_fetchall"
+          ],
+          [
+            "TestMessageExpiry.test_expiry_keeps_recent_messages",
+            "isoformat"
+          ],
+          [
+            "TestMessageExpiry.test_expiry_keeps_recent_messages",
+            "len"
+          ],
+          [
+            "TestMessageExpiry.test_expiry_keeps_recent_messages",
+            "now"
+          ],
+          [
+            "TestMessageExpiry.test_expiry_keeps_recent_messages",
+            "timedelta"
+          ],
+          [
+            "TestRateLimiting",
+            "_recv_json"
+          ],
+          [
+            "TestRateLimiting",
+            "connect"
+          ],
+          [
+            "TestRateLimiting",
+            "dumps"
+          ],
+          [
+            "TestRateLimiting",
+            "get"
+          ],
+          [
+            "TestRateLimiting",
+            "range"
+          ],
+          [
+            "TestRateLimiting",
+            "send"
+          ],
+          [
+            "TestRateLimiting.test_rate_limit_allows_up_to_limit",
+            "_recv_json"
+          ],
+          [
+            "TestRateLimiting.test_rate_limit_allows_up_to_limit",
+            "connect"
+          ],
+          [
+            "TestRateLimiting.test_rate_limit_allows_up_to_limit",
+            "dumps"
+          ],
+          [
+            "TestRateLimiting.test_rate_limit_allows_up_to_limit",
+            "range"
+          ],
+          [
+            "TestRateLimiting.test_rate_limit_allows_up_to_limit",
+            "send"
+          ],
+          [
+            "TestRateLimiting.test_rate_limit_blocks_after_exceeded",
+            "_recv_json"
+          ],
+          [
+            "TestRateLimiting.test_rate_limit_blocks_after_exceeded",
+            "connect"
+          ],
+          [
+            "TestRateLimiting.test_rate_limit_blocks_after_exceeded",
+            "dumps"
+          ],
+          [
+            "TestRateLimiting.test_rate_limit_blocks_after_exceeded",
+            "get"
+          ],
+          [
+            "TestRateLimiting.test_rate_limit_blocks_after_exceeded",
+            "range"
+          ],
+          [
+            "TestRateLimiting.test_rate_limit_blocks_after_exceeded",
+            "send"
+          ],
+          [
+            "TestRateLimiting.test_rate_limit_per_client_independent",
+            "_recv_json"
+          ],
+          [
+            "TestRateLimiting.test_rate_limit_per_client_independent",
+            "connect"
+          ],
+          [
+            "TestRateLimiting.test_rate_limit_per_client_independent",
+            "dumps"
+          ],
+          [
+            "TestRateLimiting.test_rate_limit_per_client_independent",
+            "get"
+          ],
+          [
+            "TestRateLimiting.test_rate_limit_per_client_independent",
+            "range"
+          ],
+          [
+            "TestRateLimiting.test_rate_limit_per_client_independent",
+            "send"
+          ],
+          [
+            "TestRateLimiting.test_rate_limit_response_format",
+            "_recv_json"
+          ],
+          [
+            "TestRateLimiting.test_rate_limit_response_format",
+            "connect"
+          ],
+          [
+            "TestRateLimiting.test_rate_limit_response_format",
+            "dumps"
+          ],
+          [
+            "TestRateLimiting.test_rate_limit_response_format",
+            "send"
+          ],
+          [
+            "_check_rate_limit",
+            "_init_redis"
+          ],
+          [
+            "_check_rate_limit",
+            "expire"
+          ],
+          [
+            "_check_rate_limit",
+            "incr"
+          ],
+          [
+            "_expire_loop",
+            "_init_db"
+          ],
+          [
+            "_expire_loop",
+            "commit"
+          ],
+          [
+            "_expire_loop",
+            "execute"
+          ],
+          [
+            "_expire_loop",
+            "isoformat"
+          ],
+          [
+            "_expire_loop",
+            "now"
+          ],
+          [
+            "_expire_loop",
+            "sleep"
+          ],
+          [
+            "_expire_loop",
+            "timedelta"
+          ],
+          [
+            "_start_background",
+            "_expire_loop"
+          ],
+          [
+            "_stop_background",
+            "get"
+          ],
+          [
+            "_stop_background",
+            "int"
+          ],
+          [
+            "handler",
+            "_check_rate_limit"
+          ],
+          [
+            "handler",
+            "_make_timestamp"
+          ],
+          [
+            "handler",
+            "send_message"
+          ],
+          [
+            "process_request",
+            "append"
+          ],
+          [
+            "process_request",
+            "join"
+          ]
+        ],
+        "removed_call_edges": [],
+        "changed_symbol_count": 22,
+        "from_revision": "d5c1fe7e4768f962306b946b13ab1234ec89cd00",
+        "to_revision": "eb4ec685752457dbe86efd7cfa19be41b198757e",
+        "commit_message": "[story] Session 5: cross_cutting"
+      }
+    ],
+    "story_graph": {
+      "revisions": 6,
+      "symbol_versions": 402,
+      "supersedes": 413,
+      "calls": 368
+    }
+  },
+  "wall_edges": {
+    "cells_with_edges": {
+      "cap2d_incorrect_rebuilt_abstention_r1": {
+        "dependant_count": 20,
+        "dependants": [
+          "test_add",
+          "widget_1",
+          "widget_10",
+          "widget_11",
+          "widget_12",
+          "widget_13",
+          "widget_14",
+          "widget_15",
+          "widget_16",
+          "widget_17",
+          "widget_18",
+          "widget_19",
+          "widget_2",
+          "widget_3",
+          "widget_4",
+          "widget_5",
+          "widget_6",
+          "widget_7",
+          "widget_8",
+          "widget_9"
+        ]
+      },
+      "cap2d_incorrect_rebuilt_abstention_r2": {
+        "dependant_count": 20,
+        "dependants": [
+          "test_add",
+          "widget_1",
+          "widget_10",
+          "widget_11",
+          "widget_12",
+          "widget_13",
+          "widget_14",
+          "widget_15",
+          "widget_16",
+          "widget_17",
+          "widget_18",
+          "widget_19",
+          "widget_2",
+          "widget_3",
+          "widget_4",
+          "widget_5",
+          "widget_6",
+          "widget_7",
+          "widget_8",
+          "widget_9"
+        ]
+      },
+      "cap2d_incorrect_rebuilt_status_quo_r1": {
+        "dependant_count": 20,
+        "dependants": [
+          "test_add",
+          "widget_1",
+          "widget_10",
+          "widget_11",
+          "widget_12",
+          "widget_13",
+          "widget_14",
+          "widget_15",
+          "widget_16",
+          "widget_17",
+          "widget_18",
+          "widget_19",
+          "widget_2",
+          "widget_3",
+          "widget_4",
+          "widget_5",
+          "widget_6",
+          "widget_7",
+          "widget_8",
+          "widget_9"
+        ]
+      },
+      "cap2d_incorrect_rebuilt_status_quo_r2": {
+        "dependant_count": 20,
+        "dependants": [
+          "test_add",
+          "widget_1",
+          "widget_10",
+          "widget_11",
+          "widget_12",
+          "widget_13",
+          "widget_14",
+          "widget_15",
+          "widget_16",
+          "widget_17",
+          "widget_18",
+          "widget_19",
+          "widget_2",
+          "widget_3",
+          "widget_4",
+          "widget_5",
+          "widget_6",
+          "widget_7",
+          "widget_8",
+          "widget_9"
+        ]
+      },
+      "cap2d_probe_incorrect_rebuilt": {
+        "dependant_count": 20,
+        "dependants": [
+          "test_add",
+          "widget_1",
+          "widget_10",
+          "widget_11",
+          "widget_12",
+          "widget_13",
+          "widget_14",
+          "widget_15",
+          "widget_16",
+          "widget_17",
+          "widget_18",
+          "widget_19",
+          "widget_2",
+          "widget_3",
+          "widget_4",
+          "widget_5",
+          "widget_6",
+          "widget_7",
+          "widget_8",
+          "widget_9"
+        ]
+      },
+      "cap2e_absent-defective_abstention_r1": {
+        "dependant_count": 1,
+        "dependants": [
+          "test_add"
+        ]
+      },
+      "cap2e_absent-defective_status_quo_r1": {
+        "dependant_count": 1,
+        "dependants": [
+          "test_add"
+        ]
+      },
+      "cap2e_unseen_family_abstention_r1": {
+        "dependant_count": 1,
+        "dependants": [
+          "test_add"
+        ]
+      },
+      "cap2e_unseen_family_abstention_r2": {
+        "dependant_count": 1,
+        "dependants": [
+          "test_add"
+        ]
+      },
+      "cap2e_unseen_family_status_quo_r1": {
+        "dependant_count": 1,
+        "dependants": [
+          "test_add"
+        ]
+      },
+      "cap2e_unseen_family_status_quo_r2": {
+        "dependant_count": 1,
+        "dependants": [
+          "test_add"
+        ]
+      },
+      "cap2e_probe_unseen_family": {
+        "dependant_count": 1,
+        "dependants": [
+          "test_add"
+        ]
+      }
+    },
+    "sample": [
+      {
+        "caller": "test_add",
+        "callee": "add"
+      },
+      {
+        "caller": "widget_1",
+        "callee": "add"
+      },
+      {
+        "caller": "widget_10",
+        "callee": "add"
+      },
+      {
+        "caller": "widget_11",
+        "callee": "add"
+      },
+      {
+        "caller": "widget_12",
+        "callee": "add"
+      },
+      {
+        "caller": "widget_13",
+        "callee": "add"
+      },
+      {
+        "caller": "widget_14",
+        "callee": "add"
+      },
+      {
+        "caller": "widget_15",
+        "callee": "add"
+      },
+      {
+        "caller": "widget_16",
+        "callee": "add"
+      },
+      {
+        "caller": "widget_17",
+        "callee": "add"
+      },
+      {
+        "caller": "widget_18",
+        "callee": "add"
+      },
+      {
+        "caller": "widget_19",
+        "callee": "add"
+      },
+      {
+        "caller": "widget_2",
+        "callee": "add"
+      },
+      {
+        "caller": "widget_3",
+        "callee": "add"
+      },
+      {
+        "caller": "widget_4",
+        "callee": "add"
+      },
+      {
+        "caller": "widget_5",
+        "callee": "add"
+      },
+      {
+        "caller": "widget_6",
+        "callee": "add"
+      },
+      {
+        "caller": "widget_7",
+        "callee": "add"
+      },
+      {
+        "caller": "widget_8",
+        "callee": "add"
+      },
+      {
+        "caller": "widget_9",
+        "callee": "add"
+      }
+    ]
+  },
+  "graph_counts": {
+    "CodeModule_nodes": 244,
+    "ModuleVersion_nodes": 4098,
+    "SymbolVersion_nodes": 32001,
+    "Revision_nodes": 281,
+    "Knowledge_nodes": 33961,
+    "IMPORTS_rels": 565,
+    "IMPORTED_BY_rels": 214,
+    "TOUCHED_rels": 272,
+    "CALLS_rels": 5394,
+    "CONTAINS_rels": 36099,
+    "DEFINES_rels": 32001,
+    "SUPERSEDES_rels": 3958,
+    "TESTED_BY_rels": 9685
+  }
+}
