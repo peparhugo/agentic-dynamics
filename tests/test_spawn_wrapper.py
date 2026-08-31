@@ -8,6 +8,8 @@ with privileges it was never authorized for — is the FAILED finding this suite
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 
 from agentic_dynamics.experiment.experiment_spec import (
@@ -19,13 +21,45 @@ from agentic_dynamics.experiment.experiment_spec import (
 from scripts.fleet.spawn_wrapper import (
     COMPOSE_ALLOWLIST,
     CONTRACT_TARGETS,
+    FLEET_ACTIONS,
+    MODEL_WHITELIST,
     SpawnValidationError,
     build_phase_request,
     build_spawn_argv,
+    build_submit_argv,
+    dispatch_submit,
     spawn_sibling,
     validate_fleet_command,
     validate_spawn,
+    validate_submit_request,
 )
+
+# The canonical host repo path the mount contract's ``CONTRACT_TARGETS`` hardcodes for the
+# repo-alias mounts (``spawn_wrapper.py``'s D-16 fix). ``build_phase_request`` derives that
+# mount's target from ``FINOPS_REPO_DIR`` (default: wherever the checkout lives) — inside an
+# isolated worktree (as tests run), that differs from the canonical path, so every submit test
+# below pins ``FINOPS_REPO_DIR`` to the canonical value the contract expects (matching how the
+# deployed ladder actually runs: the repo checked out at this fixed host path).
+_CANONICAL_REPO_DIR = "/home/drseuss/ai-finops-framework"
+
+_REPO_ROOT = Path(__file__).resolve().parent.parent
+_SUBMIT_SPEC = "workflows/repository/fleet_job_submission.yaml"
+
+
+@pytest.fixture(autouse=False)
+def _canonical_repo_env(monkeypatch):
+    monkeypatch.setenv("FINOPS_REPO_DIR", _CANONICAL_REPO_DIR)
+
+
+def _valid_submit_request(**overrides) -> dict:
+    request = {
+        "spec": _SUBMIT_SPEC,
+        "goal": "make jobs submittable to the fleet",
+        "model": "anthropic/claude-sonnet-5",
+        "workdir": "/tmp/wt_test_submit_job",
+    }
+    request.update(overrides)
+    return request
 
 # A valid spawn request: p1_slice1_base_supervisor is authorized for "implementation"
 # (the authorization table), the mounts are the full four + D-2, results rw (implementation),
@@ -324,3 +358,271 @@ def test_scope_field_round_trips_through_yaml(tmp_path):
     )
     spec = load_spec(yaml_path)
     assert phase_scope(spec.workflow.params["phases"][0]) == "review_readonly"
+
+
+# ── the submit contract (p1_submit_contract) ──────────────────────────────────
+#
+# "submit" is a fourth member of the supervisor's command vocabulary alongside
+# scale/drain/restart: fleet_manager submit -> fleet:commands -> the orchestrator's
+# spawn-wrapper validates BEFORE any docker/socket call, exactly like every other action here.
+# The load-bearing guarantee is the same one the rest of this file tests: a submit that names
+# an unauthorized scope, an unlisted model, a host-service path, or an undeclared write flag
+# never reaches build_submit_argv / a docker call.
+
+
+def test_submit_is_in_the_fleet_action_vocabulary():
+    assert "submit" in FLEET_ACTIONS
+
+
+def test_model_whitelist_matches_the_seven_models_in_use():
+    # AGENTS.md "Models in use" — the same seven the experiment matrix runs.
+    expected = {
+        "deepseek/deepseek-v4-flash",
+        "deepseek/deepseek-v4-pro",
+        "anthropic/claude-haiku-4-5",
+        "anthropic/claude-sonnet-5",
+        "openai/gpt-5.6-luna",
+        "openai/gpt-5.6-sol",
+        "openai/gpt-5.6-terra",
+    }
+    assert expected == MODEL_WHITELIST
+
+
+# ── a valid submit passes ──────────────────────────────────────────────────────
+
+
+def test_valid_submit_passes_validation(_canonical_repo_env):
+    errors = validate_submit_request(_valid_submit_request())
+    assert errors == []
+
+
+def test_valid_submit_dispatch_builds_the_compose_run_argv(_canonical_repo_env):
+    result = dispatch_submit(_valid_submit_request(), dry_run=True)
+    assert result["ok"] is True
+    argv = result["argv"]
+    assert argv[:2] == ["docker-compose", "-f"]
+    assert "run" in argv and "--rm" in argv and "workflow-runner" in argv
+    assert "scripts/run_workflow.py" in argv
+    assert "--orchestrator" in argv
+    assert "--spec" in argv and _SUBMIT_SPEC in argv
+    assert "--model" in argv and "anthropic/claude-sonnet-5" in argv
+
+
+def test_build_submit_argv_is_the_reference_orchestrator_invocation():
+    argv = build_submit_argv(
+        {"job_id": "abc123", "spec": "workflows/repository/x.yaml", "goal": "g",
+         "model": "anthropic/claude-sonnet-5", "workdir": "/tmp/wt_x"},
+        compose="docker-compose", compose_file="/repo/infrastructure/docker-compose.ladder.yml",
+    )
+    joined = " ".join(argv)
+    assert "docker-compose -f /repo/infrastructure/docker-compose.ladder.yml run --rm" in joined
+    assert "FINOPS_CELL_ID=abc123" in joined
+    assert "workflow-runner python3 scripts/run_workflow.py" in joined
+    assert "--spec workflows/repository/x.yaml" in joined
+    assert "--workdir /tmp/wt_x" in joined
+    assert argv[-1] == "--orchestrator"
+
+
+# ── spec resolution + compile-validation (step 1) ──────────────────────────────
+
+
+def test_submit_missing_spec_fails():
+    errors = validate_submit_request(_valid_submit_request(spec=""))
+    assert any("spec path is required" in e for e in errors)
+
+
+def test_submit_spec_path_escaping_repo_root_fails():
+    errors = validate_submit_request(_valid_submit_request(spec="../etc/passwd"))
+    assert any("escapes the repository root" in e for e in errors)
+
+
+def test_submit_spec_outside_declared_spec_dirs_fails():
+    # A real, resolvable, in-repo file — but not under workflows/ or experiments/definitions/.
+    errors = validate_submit_request(_valid_submit_request(spec="AGENTS.md"))
+    assert any("outside the declared spec directories" in e for e in errors)
+
+
+def test_submit_spec_that_does_not_resolve_fails():
+    errors = validate_submit_request(_valid_submit_request(spec="workflows/repository/does_not_exist.yaml"))
+    assert any("does not resolve to a file" in e for e in errors)
+
+
+def test_submit_spec_that_fails_compile_validation_is_refused(tmp_path, monkeypatch):
+    # A spec with a phase declaring an undeclared scope fails validate_spec, so compile_spec
+    # raises SpecError — validate_submit_request must surface that as a refusal, not a crash.
+    bad_spec_dir = _REPO_ROOT / "workflows" / "repository"
+    bad_spec_path = bad_spec_dir / "_test_submit_contract_bad_spec.yaml"
+    bad_spec_path.write_text(
+        "name: bad\nquestion: q\nversion: '1'\nworkflow:\n  kind: agent_task\n"
+        "  params:\n    phases:\n      - {name: p1, scope: not_a_scope, prompt: hi}\n"
+        "factors: []\ndesign: factorial\n"
+    )
+    try:
+        errors = validate_submit_request(
+            _valid_submit_request(spec="workflows/repository/_test_submit_contract_bad_spec.yaml")
+        )
+        assert any("does not compile-validate" in e for e in errors)
+    finally:
+        bad_spec_path.unlink(missing_ok=True)
+
+
+# ── model whitelist (step 2) ────────────────────────────────────────────────────
+
+
+def test_submit_model_outside_whitelist_fails(_canonical_repo_env):
+    errors = validate_submit_request(_valid_submit_request(model="openai/gpt-6-hypothetical"))
+    assert any("not in the model whitelist" in e for e in errors)
+
+
+@pytest.mark.parametrize("model", sorted(MODEL_WHITELIST))
+def test_every_whitelisted_model_passes_the_model_check(_canonical_repo_env, model):
+    errors = validate_submit_request(_valid_submit_request(model=model))
+    assert not any("model" in e and "whitelist" in e for e in errors)
+
+
+# ── workdir: an allowed worktree path (step 3) — the isolation guard ───────────
+
+
+def test_submit_missing_workdir_fails():
+    errors = validate_submit_request(_valid_submit_request(workdir=""))
+    assert any("workdir is required" in e for e in errors)
+
+
+def test_submit_workdir_naming_the_story_redis_host_service_fails():
+    # AGENTS.md: story agents build against finops-redis on 6379 — never the framework queue.
+    # A submit request whose workdir names that host service must be refused pre-socket.
+    errors = validate_submit_request(_valid_submit_request(workdir="127.0.0.1:6379"))
+    assert any("names a host service" in e for e in errors)
+
+
+def test_submit_workdir_naming_the_compose_hostname_fails():
+    errors = validate_submit_request(_valid_submit_request(workdir="finops-redis:6379/db0"))
+    assert any("names a host service" in e for e in errors)
+
+
+def test_submit_workdir_outside_the_worktree_root_fails():
+    errors = validate_submit_request(_valid_submit_request(workdir="/etc/passwd"))
+    assert any("not a path strictly under the worktree root" in e for e in errors)
+
+
+def test_submit_workdir_equal_to_the_worktree_root_itself_fails():
+    errors = validate_submit_request(_valid_submit_request(workdir="/tmp"))
+    assert any("not a path strictly under the worktree root" in e for e in errors)
+
+
+# ── goal present (step 4) ───────────────────────────────────────────────────────
+
+
+def test_submit_missing_goal_fails():
+    errors = validate_submit_request(_valid_submit_request(goal=""))
+    assert any("goal is required" in e for e in errors)
+
+
+def test_submit_blank_goal_fails():
+    errors = validate_submit_request(_valid_submit_request(goal="   "))
+    assert any("goal is required" in e for e in errors)
+
+
+# ── mounts derived from the phase scopes stay in the contract (step 5) ─────────
+# — "a bad scope failing BEFORE any docker call" (VERIFY) —
+
+
+def test_submit_with_an_unauthorized_phase_scope_fails_before_any_docker_call(
+    tmp_path, monkeypatch, _canonical_repo_env
+):
+    # A phase with no declared scope and no PHASE_SCOPE_AUTHORIZATION entry resolves to an
+    # empty scope (build_phase_request's own documented behavior) — validate_spawn refuses it
+    # at its step 1/2, and validate_submit_request must surface that refusal.
+    unauth_spec_dir = _REPO_ROOT / "workflows" / "repository"
+    unauth_spec_path = unauth_spec_dir / "_test_submit_contract_unauthorized_scope.yaml"
+    unauth_spec_path.write_text(
+        "name: unauth\nquestion: q\nversion: '1'\nworkflow:\n  kind: agent_task\n"
+        "  params:\n    phases:\n      - {name: p_never_registered_anywhere, prompt: hi}\n"
+        "factors: []\ndesign: factorial\n"
+    )
+    try:
+        request = _valid_submit_request(
+            spec="workflows/repository/_test_submit_contract_unauthorized_scope.yaml"
+        )
+        errors = validate_submit_request(request)
+        assert errors, "an unauthorized phase scope must be refused"
+        assert any("p_never_registered_anywhere" in e for e in errors)
+
+        # The socket guarantee: dispatch_submit must raise BEFORE building/running any argv.
+        with pytest.raises(SpawnValidationError) as exc:
+            dispatch_submit(request, dry_run=False)
+        assert any("p_never_registered_anywhere" in e for e in exc.value.errors)
+    finally:
+        unauth_spec_path.unlink(missing_ok=True)
+
+
+def test_submit_mount_derivation_reuses_the_step_3_mount_contract_check(_canonical_repo_env):
+    # Every phase in the real submit-verb spec is scope: implementation — its derived mounts
+    # (build_phase_request) must land squarely inside CONTRACT_TARGETS, the same four-mount +
+    # D-2 auth set every other spawn is checked against.
+    errors = validate_submit_request(_valid_submit_request())
+    assert not any("step 3" in e for e in errors)
+
+
+# ── network = fleet-net (step 6) ────────────────────────────────────────────────
+
+
+def test_submit_network_mismatch_fails(_canonical_repo_env):
+    errors = validate_submit_request(_valid_submit_request(network="ai-infra"))
+    assert any("!= fleet-net" in e for e in errors)
+
+
+def test_submit_default_network_is_fleet_net(_canonical_repo_env):
+    # fleet_manager submit never sets --network; the default must be the permitted value.
+    errors = validate_submit_request(_valid_submit_request())
+    assert not any("fleet-net" in e for e in errors)
+
+
+# ── write flags declared (step 7) — "an undeclared write flag failing" (VERIFY) ─
+
+
+def test_submit_actuation_armed_is_always_refused(_canonical_repo_env):
+    request = _valid_submit_request(env={"FINOPS_ACTUATION_ARMED": "1"})
+    errors = validate_submit_request(request)
+    assert any("FINOPS_ACTUATION_ARMED is never set" in e for e in errors)
+
+    with pytest.raises(SpawnValidationError) as exc:
+        dispatch_submit(request, dry_run=False)
+    assert any("FINOPS_ACTUATION_ARMED" in e for e in exc.value.errors)
+
+
+def test_submit_kb_write_undeclared_without_an_implementation_phase_fails(tmp_path, monkeypatch):
+    # A research_readonly-only spec never authorizes FINOPS_KB_WRITE — a request smuggling it
+    # in must be refused, independent of the mount-contract checks (isolated via a scope that
+    # doesn't touch the /repo-alias mount, so this doesn't need _canonical_repo_env).
+    ro_spec_dir = _REPO_ROOT / "workflows" / "repository"
+    ro_spec_path = ro_spec_dir / "_test_submit_contract_research_only.yaml"
+    ro_spec_path.write_text(
+        "name: ro\nquestion: q\nversion: '1'\nworkflow:\n  kind: agent_task\n"
+        "  params:\n    phases:\n      - {name: p1_research_infra, prompt: hi}\n"
+        "factors: []\ndesign: factorial\n"
+    )
+    try:
+        request = _valid_submit_request(
+            spec="workflows/repository/_test_submit_contract_research_only.yaml",
+            env={"FINOPS_KB_WRITE": "1"},
+        )
+        errors = validate_submit_request(request)
+        assert any("FINOPS_KB_WRITE=1 is undeclared" in e for e in errors)
+    finally:
+        ro_spec_path.unlink(missing_ok=True)
+
+
+# ── validate_fleet_command delegates "submit" whole (D-14 dispatch surface) ────
+
+
+def test_validate_fleet_command_delegates_submit_to_validate_submit_request(_canonical_repo_env):
+    assert validate_fleet_command(_valid_submit_request(action="submit")) == []
+
+
+def test_validate_fleet_command_submit_does_not_require_a_service():
+    # scale/drain/restart require "service" ∈ COMPOSE_ALLOWLIST; submit must not be checked
+    # against that allowlist at all (it has no "service" field).
+    request = _valid_submit_request(action="submit", spec="", model="", workdir="", goal="")
+    errors = validate_fleet_command(request)
+    assert not any("compose allowlist" in e for e in errors)
