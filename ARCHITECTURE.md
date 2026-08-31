@@ -1,6 +1,6 @@
 ---
 status: accepted
-supersedes: BLUEPRINT.md, BLUEPRINT_v2.md, BLUEPRINT_v3.md, dated handoffs, superseded reviews (see §6)
+supersedes: BLUEPRINT.md, BLUEPRINT_v2.md, BLUEPRINT_v3.md, dated handoffs, superseded reviews (see §8)
 ---
 
 # ARCHITECTURE.md — the single architectural authority
@@ -43,8 +43,8 @@ transient `instrument.*` compatibility shim retired at the end of Stage 1 — is
 rules. `apps/` is the ninth top-level unit but is *not* a Python package plane — it is the
 application tier at the top of the dependency spine (§3).
 
-The physical reality today: all eight planes live in `src/agentic_dynamics/<plane>/` (59 live
-modules + the `agentic-dynamics` CLI; the deprecated five were retired in Stage 1 — see
+The physical reality today: all eight planes live in `src/agentic_dynamics/<plane>/` (107 tracked
+Python modules + the `agentic-dynamics` CLI; the deprecated five were retired in Stage 1 — see
 `docs/release/consolidation/design.md` §1.1's `legacy/` rows). `src/instrument/` no longer exists; its
 compatibility shim was deleted once every consumer had been rewritten (Stage 1, phase E).
 
@@ -107,7 +107,7 @@ tests assert `retrieve()` never returns an `authority==POLICY` candidate and ref
 Reading bottom-up, the spine is:
 
 ```
-core ← experiment / measurement / runtime / knowledge ← control ← applications
+core ← experiment / measurement / runtime / adapters / knowledge / reporting ← control ← applications
 ```
 
 `core` is imported by everything; the planes import `core` and each other only within their tier;
@@ -229,38 +229,51 @@ validates a sibling request's scope, phase authorization, mounts, network, and w
 building a Docker command. The slice-2 log records that pre-socket validation and the orchestrator
 image build (`docs/fleet/05_slice2_orchestrator_log.md:12-17`, `34-67`).
 
-[M] The mount contract is a closed set of targets, not a literal four-host-path claim: it includes
-the worktree, read-only repository aliases plus writable `.git` overlays, results, isolated
-OpenCode state, and read-only credentials/configuration (`infrastructure/docker-compose.ladder.yml:49-88`).
-[M] The accepted slice-4 log records coverage for allowed targets, the single socket tier,
-supervisor mount restrictions, heartbeats/DLQ, the write boundary, and scope/network invariants
-(`docs/fleet/07_slice4_guards_log.md:20-30`).
+[M] The compose mount inventory includes the worktree, read-only repository aliases plus writable
+`.git` overlays, results, a shared OpenCode-state directory, and read-only credentials/configuration
+(`infrastructure/docker-compose.ladder.yml:49-88`). [C] The state mount keeps the host's live
+OpenCode state out of cells, but it is shared by scaled cells and therefore is not per-cell state
+isolation (`infrastructure/docker-compose.ladder.yml:57-64,90-97,143-155`). [C] The current mount
+guard does not cover the repository-alias and `.git` targets declared by compose, so its
+`test_mount_contract_holds_no_unexpected_target` check fails; the target contract is an open
+enforcement gap, not a proven invariant (`infrastructure/docker-compose.ladder.yml:59-63`,
+`tests/test_fleet_guards.py:85-118`).
+
+[M] The accepted slice-4 log records the then-run coverage for mount targets, the single socket
+tier, supervisor mount restrictions, heartbeats/DLQ, the write boundary, and scope/network
+invariants (`docs/fleet/07_slice4_guards_log.md:20-30`). [P] Current operating claims distinguish
+that historical evidence from the unresolved mount-guard gap above.
 
 [M] The slice logs record the live cutover, orchestrator validation, Neo4j consumer/RRF leg, and
 guard suite in `docs/fleet/04_slice1_live_cutover_log.md:12-18`,
-`05_slice2_orchestrator_log.md:12-17`, `06_slice3_neo4j_rrf_log.md:12-17`, and
-`07_slice4_guards_log.md:12-18`. [M] The containerized `green_main_closure` run ledger completed
-successfully in `/tmp/wt_green_main` (`experiments/results/workflows/green_main_closure/20260831T201627Z.json:2-14`).
+`docs/fleet/05_slice2_orchestrator_log.md:12-17`,
+`docs/fleet/06_slice3_neo4j_rrf_log.md:12-17`, and
+`docs/fleet/07_slice4_guards_log.md:12-18`. [M] The `green_main_closure` ledger records a
+successful workflow run in `/tmp/wt_green_main`; the ledger does not establish its container runtime
+(`experiments/results/workflows/green_main_closure/20260831T201627Z.json:2-14`).
 
 ## 6. Isolation inventory
 
 [M] The framework queue is Redis DB 1 on port 6380 and the durable knowledge stream is DB 2 on the
 same instance; the story-agent sandbox uses port 6379 and can call `flushall()`, so it must never
-share that instance (`knowledge/knowledge_stream.py:10-16`, `46-55`). In the ladder, cells reach
+share that instance (`src/agentic_dynamics/knowledge/knowledge_stream.py:10-16`, `46-55`). In the ladder, cells reach
 the queue container's internal 6379 only on `fleet-net`; `finops-redis` is deliberately absent
 from that network (`infrastructure/docker-compose.ladder.yml:22-32`, `344-351`).
 
 [M] Knowledge records include `repository_id` in their identity, and a workflow cell scope is
-`self-<worktree>` unless `FINOPS_CELL_ID` pins it (`knowledge/record_factory.py:106-175`,
-`runtime/workflow_runner.py:820-829`). [P] An empty scope is never a global wildcard; per-cell
-retrieval remains scoped unless an explicit non-empty shared repository id is supplied
-(`knowledge/retrieval.py:1-24`, `control/context_compiler.py:250-260`).
+`self-<worktree>` unless `FINOPS_CELL_ID` pins it
+(`src/agentic_dynamics/knowledge/record_factory.py:106-175`,
+`src/agentic_dynamics/runtime/workflow_runner.py:820-829`). [M] The workflow path supplies that
+non-empty cell scope, while a direct `retrieve()` call with an empty requested scope disables the
+repository filter; callers requiring isolation must supply a non-empty cell or shared scope
+(`src/agentic_dynamics/knowledge/retrieval.py:395-408`).
 
 [P] Worktree branches are ephemeral proposals until the controller's permanence decision; the
 snapshot's awaiting-permanence board records that decision boundary
 (`docs/designs/proposed/system_knowledge_abstraction.md:77-81`). [M] Container phase scopes are
 the closed `SCOPE_VOCABULARY` and `PHASE_SCOPE_AUTHORIZATION`; the spawn wrapper rejects an
-unknown or unauthorized scope before the socket call (`experiment/experiment_spec.py:65-133`,
+unknown or unauthorized scope before the socket call
+(`src/agentic_dynamics/experiment/experiment_spec.py:49-133`,
 `scripts/fleet/spawn_wrapper.py:155-192`).
 
 [P] The supervisor is an observation rail: it flags but does not call `send_input` or `interrupt`;

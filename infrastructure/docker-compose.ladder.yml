@@ -1,7 +1,8 @@
 # docker-compose.ladder.yml — the fleet ladder (proposal §2/§3/§7 slice 1).
 #
-# Three service groups on ONE cell network (`fleet-net`) + the egress proxy (the single
-# internet policy point, D-17). The data plane (queue redis 6380 / chroma 8000 / neo4j 7687 /
+# Three service groups on ONE cell network (`fleet-net`) + an egress proxy endpoint. Direct
+# Internet egress remains possible until cells are configured to use that proxy. The data plane
+# (queue redis 6380 / chroma 8000 / neo4j 7687 /
 # sonar 9000-9003) is NOT defined here — it lives in the other infrastructure/ compose files
 # and is attached to `fleet-net` BY NAME via `scripts/fleet/attach_data_plane.sh` (the D-17
 # wiring). `finops-redis` (6379) is deliberately NEVER attached: the cells hold no network
@@ -256,7 +257,7 @@ services:
       FINOPS_KB_WRITE: "1"        # P5 (orphan) — orphan ingestion
 
   # =========================================================================
-  # The egress proxy — the single internet policy point (D-17, §3).
+  # The egress proxy endpoint. It is not an enforced sole Internet route until cells configure it.
   # =========================================================================
   egress:
     image: fleet/base
