@@ -1,0 +1,106 @@
+name: beta_lab_execution
+question: >-
+  Execute the preregistered β coordination-tax lab (lab_beta_from_corpus) end-to-end: run the
+  deterministic measurement script, verify the output against the preregistration, write up
+  the measured β estimates (β_cost / β_tokens with CIs + exclusion-rule compliance), and
+  commit. Zero paid model calls in the implementation — the lab script is the measurement;
+  the agent's job is to run, verify, and report it faithfully.
+version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: false
+repeatable: false
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: false
+    context:
+      domain_context: >-
+        canonical_sources: [scripts/lab_beta_from_corpus.py (the preregistered lab — zero
+        model calls, reads opencode.db + experiments/results/stories/*.json +
+        experiments/results/usage/subscription_usage_latest.json, writes
+        experiments/results/lab_beta_from_corpus.json),
+        experiments/lab_books/lab_beta_from_corpus.md (the preregistration — method,
+        exclusion rules, decision thresholds fixed BEFORE fitting)].
+        policies: [measurement_is_never_edited, regenerate_never_hand_edit,
+        preregistration_is_authoritative].
+      challenge_context: >-
+        challenge: the controlled ladder was polluted (concurrency_ladder incident), so β is
+        estimated retrospectively from the session corpus — a natural experiment. The risk is
+        over-claiming: the writeup must report exactly what the script measured, respect the
+        exclusion rules (the confounded ladder window, the noise floor), and never fabricate
+        precision the preregistration did not promise.
+        deliberation: [run the script, then verify its output against the prereg doc, then
+        write up, then commit].
+        session_policy: {default: continue}
+      current_state: >-
+        MEASURED (2026-08-31): the lab script exists, is lint-clean, has 6 passing tests, and
+        is registered in scripts/lab_manifest.json. The preregistration doc is committed. The
+        measured result file does not yet exist — this workflow produces it.
+      hard_rules: >-
+        (1) RUN, DON'T REWRITE: the measurement is scripts/lab_beta_from_corpus.py — execute
+        it, never rewrite its statistics. (2) ZERO PAID MODEL CALLS IN THE IMPLEMENTATION:
+        every change is deterministic (the lab script + regenerators); do not run story cells
+        or other model invocations. (3) THE PREREGISTRATION IS AUTHORITATIVE: the writeup
+        must match the preregistered method; any divergence is reported, never silently fixed.
+        (4) REGENERATE, NEVER HAND-EDIT: derived surfaces go through their generators; the
+        lab manifest follows its contract.
+    phases:
+      - name: p1_execute_lab
+        kind: agent
+        scope: implementation
+        timeout: 3600
+        prompt: |
+          GOAL: {goal}
+          SHAPE: run the preregistered β lab end-to-end. Execute
+          `python3 scripts/lab_beta_from_corpus.py` (zero model calls — the deterministic
+          measurement). Verify BEFORE writing anything: (a) the run produced
+          experiments/results/lab_beta_from_corpus.json with the schema the script declares;
+          (b) the exclusion rules from experiments/lab_books/lab_beta_from_corpus.md were
+          honored (the confounded ladder window excluded, the noise floor applied); (c) the
+          estimates are finite and in plausible ranges. Report what you find — do not
+          "fix" the measurement. If the script fails, investigate and report the failure
+          rather than improvising a new estimator.
+          DELIVER: the result JSON (from the script run), committed.
+          LOG: PASS/FAIL with the β estimates + CI + exclusion compliance; commit.
+      - name: p2_writeup
+        kind: agent
+        scope: implementation
+        timeout: 3600
+        prompt: |
+          GOAL: {goal}
+          SHAPE: write up the measured β lab. Read the preregistration
+          (experiments/lab_books/lab_beta_from_corpus.md) and the measured result
+          (experiments/results/lab_beta_from_corpus.json). Update the lab book doc: flip its
+          status from preregistered to measured (with the run timestamp), and add the
+          measured section — β_cost with CI + interpretation, β_tokens with CI +
+          interpretation, the exclusion-rule compliance statement, and the decision verdict
+          per the preregistered thresholds. Ground every number in the result JSON. Do not
+          add claims the measurement does not support.
+          DELIVER: the updated lab book doc, committed.
+          LOG: PASS/FAIL with the verdict; commit.
+factors:
+  - {name: model, levels: [openai/gpt-5.6-terra]}
+design: factorial
+rules:
+  - name: lab_ran
+    plane: measurement
+    evidence_class: "[M]"
+    requires: []
+    produces: [lab_result_written, exclusion_rules_honored]
+  - name: lab_verified
+    plane: measurement
+    evidence_class: "[M]"
+    requires: [lab_result_written]
+    produces: [beta_estimates_reported]
+metrics:
+  - {name: lab_result_written, agg: mean, over: cell}
+  - {name: exclusion_rules_honored, agg: mean, over: cell}
+writeup:
+  format: lab_book
+  sections: [question, p1_execute_lab, p2_writeup]
+stop: {budget_usd: 2.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}
