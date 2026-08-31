@@ -2,9 +2,9 @@
 status: accepted
 ---
 
-# Retrieval Agenda — 2026-09-01
+# Retrieval Agenda - 2026-09-01
 
-**Status: PASS — p1 agenda reconstruction only.** This document reconstructs the deferred
+**Status: PASS - p1 agenda reconstruction only.** This document reconstructs the deferred
 retrieval work from the surviving record. It does not decide D1/D2, implement the pattern
 projection, or turn on a new measurement run. No source files or existing documents were changed
 for this phase.
@@ -63,8 +63,8 @@ modes, and a prompt-construction path that does not block the phase when infrast
 
 The visibility matrix leaves two related cells open:
 
-- **D1 — agent access to facts:** whether an agent session may retrieve facts at all.
-- **D2 — pattern projection:** how I9 patterns become visible to retrieval if D1 permits a
+- **D1 - agent access to facts:** whether an agent session may retrieve facts at all.
+- **D2 - pattern projection:** how I9 patterns become visible to retrieval if D1 permits a
   restricted form of access.
 
 The matrix records three D1 choices:
