@@ -1,8 +1,26 @@
 {
   "schema_version": "spec-status/v2",
-  "generated_at": "2026-08-31T22:45:02.205018+00:00",
-  "n_specs": 164,
+  "generated_at": "2026-08-31T23:12:08.295715+00:00",
+  "n_specs": 165,
   "specs": [
+    {
+      "name": "admission_leases",
+      "version": "0.1",
+      "status": "runnable",
+      "spec_path": "workflows/repository/admission_leases.yaml",
+      "artifact_kind": "workflow",
+      "repeatable": false,
+      "supersedes": [],
+      "superseded_by": null,
+      "completed_at": null,
+      "last_run_at": null,
+      "latest_ok": null,
+      "latest_model": null,
+      "latest_cost_usd": null,
+      "latest_git_sha": null,
+      "results_pointer": null,
+      "n_runs": 0
+    },
     {
       "name": "auto_posthoc_wiring",
       "version": "0.1",
@@ -398,6 +416,26 @@
       "latest_git_sha": "5d1cfe4cf",
       "results_pointer": "experiments/results/workflows/context_abstraction_implement/20260823T191652Z.json",
       "n_runs": 4
+    },
+    {
+      "name": "docs_architecture_refresh",
+      "version": "0.1",
+      "status": "runnable",
+      "spec_path": "workflows/repository/docs_architecture_refresh.yaml",
+      "artifact_kind": "workflow",
+      "repeatable": false,
+      "supersedes": [
+        "opencode_docs_refresh"
+      ],
+      "superseded_by": null,
+      "completed_at": null,
+      "last_run_at": null,
+      "latest_ok": null,
+      "latest_model": null,
+      "latest_cost_usd": null,
+      "latest_git_sha": null,
+      "results_pointer": null,
+      "n_runs": 0
     },
     {
       "name": "explanation_tax",
@@ -811,24 +849,6 @@
       "latest_cost_usd": 0.0,
       "latest_git_sha": "d5f85126b",
       "results_pointer": "experiments/results/workflows/design_sessions/20260814T065812Z.json",
-      "n_runs": 1
-    },
-    {
-      "name": "admission_leases",
-      "version": "0.1",
-      "status": "completed",
-      "spec_path": "workflows/repository/admission_leases.yaml",
-      "artifact_kind": "workflow",
-      "repeatable": false,
-      "supersedes": [],
-      "superseded_by": null,
-      "completed_at": null,
-      "last_run_at": "2026-08-31T22:24:16.438592+00:00",
-      "latest_ok": true,
-      "latest_model": "anthropic/claude-opus-5",
-      "latest_cost_usd": 5.887804,
-      "latest_git_sha": "92ae1a5c8",
-      "results_pointer": "experiments/results/workflows/admission_leases/20260831T222416Z.json",
       "n_runs": 1
     },
     {

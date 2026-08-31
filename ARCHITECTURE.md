@@ -209,7 +209,68 @@ release plan (S0 → S1 → S2 → S3 → S4/S5 → S6), now complete (S6: `docs
 
 ---
 
-## 5. The canonical execution loop
+## 5. Fleet ladder — containerized execution
+
+[M] `Containerfile.fleet` defines the `fleet/base`, `fleet/orchestrator`, and `fleet/supervisor`
+targets; the base supplies the non-root toolchain, while the orchestrator adds the Docker client and
+sibling-spawn wrapper (`Containerfile.fleet:3-23`, `78-109`, `112-143`). [M] The active compose
+supervisor units currently use `fleet/base`, not the defined supervisor target
+(`infrastructure/docker-compose.ladder.yml:99-106`, `docs/reviews/fleet_ladder_implementation_adversary.md:17-18`).
+
+[M] `infrastructure/docker-compose.ladder.yml:139-339` declares cell pools, the orchestrator
+services, and supervisor-managed `fleet-manager`, Control Room, game-board, and review-trigger
+units. The fleet manager exposes heartbeats and per-queue dead-letter counts; the live slice-1
+cutover recorded both surfaces and a no-double-processing probe
+(`docs/fleet/04_slice1_live_cutover_log.md:12-18`, `45-77`).
+
+[M] The Docker socket is mounted read-only only by the orchestrator tier
+(`infrastructure/docker-compose.ladder.yml:108-137`); `scripts/fleet/spawn_wrapper.py:155-240`
+validates a sibling request's scope, phase authorization, mounts, network, and write flags before
+building a Docker command. The slice-2 log records that pre-socket validation and the orchestrator
+image build (`docs/fleet/05_slice2_orchestrator_log.md:12-17`, `34-67`).
+
+[M] The mount contract is a closed set of targets, not a literal four-host-path claim: it includes
+the worktree, read-only repository aliases plus writable `.git` overlays, results, isolated
+OpenCode state, and read-only credentials/configuration (`infrastructure/docker-compose.ladder.yml:49-88`).
+[M] The accepted slice-4 log records coverage for allowed targets, the single socket tier,
+supervisor mount restrictions, heartbeats/DLQ, the write boundary, and scope/network invariants
+(`docs/fleet/07_slice4_guards_log.md:20-30`).
+
+[M] The slice logs record the live cutover, orchestrator validation, Neo4j consumer/RRF leg, and
+guard suite in `docs/fleet/04_slice1_live_cutover_log.md:12-18`,
+`05_slice2_orchestrator_log.md:12-17`, `06_slice3_neo4j_rrf_log.md:12-17`, and
+`07_slice4_guards_log.md:12-18`. [M] The containerized `green_main_closure` run ledger completed
+successfully in `/tmp/wt_green_main` (`experiments/results/workflows/green_main_closure/20260831T201627Z.json:2-14`).
+
+## 6. Isolation inventory
+
+[M] The framework queue is Redis DB 1 on port 6380 and the durable knowledge stream is DB 2 on the
+same instance; the story-agent sandbox uses port 6379 and can call `flushall()`, so it must never
+share that instance (`knowledge/knowledge_stream.py:10-16`, `46-55`). In the ladder, cells reach
+the queue container's internal 6379 only on `fleet-net`; `finops-redis` is deliberately absent
+from that network (`infrastructure/docker-compose.ladder.yml:22-32`, `344-351`).
+
+[M] Knowledge records include `repository_id` in their identity, and a workflow cell scope is
+`self-<worktree>` unless `FINOPS_CELL_ID` pins it (`knowledge/record_factory.py:106-175`,
+`runtime/workflow_runner.py:820-829`). [P] An empty scope is never a global wildcard; per-cell
+retrieval remains scoped unless an explicit non-empty shared repository id is supplied
+(`knowledge/retrieval.py:1-24`, `control/context_compiler.py:250-260`).
+
+[P] Worktree branches are ephemeral proposals until the controller's permanence decision; the
+snapshot's awaiting-permanence board records that decision boundary
+(`docs/designs/proposed/system_knowledge_abstraction.md:77-81`). [M] Container phase scopes are
+the closed `SCOPE_VOCABULARY` and `PHASE_SCOPE_AUTHORIZATION`; the spawn wrapper rejects an
+unknown or unauthorized scope before the socket call (`experiment/experiment_spec.py:65-133`,
+`scripts/fleet/spawn_wrapper.py:155-192`).
+
+[P] The supervisor is an observation rail: it flags but does not call `send_input` or `interrupt`;
+only an explicit operator action may cross into control (`docs/architecture/current/supervisor_design.md:6-17`).
+[C] Internal sandbox separation is evidenced by the `fleet-net` membership check, but Internet
+egress is not yet enforced because no cell scope configures `HTTP_PROXY`/`HTTPS_PROXY`; this remains
+an open limitation, not an isolation claim (`docs/fleet/04_slice1_live_cutover_log.md:126-134`,
+`docs/reviews/fleet_ladder_implementation_adversary.md:15-18`, `50-70`).
+
+## 7. The canonical execution loop
 
 The repository is an **information-acquisition machine for AI economics** — controlled trials →
 raw events → information → policy → grid → campaign → repeat. The canonical loop
@@ -228,7 +289,7 @@ Written linearly: **spec → compile → DAG → cells → jobs → attempts →
 
 ---
 
-## 6. Supersession map — what this file replaces, and what stays
+## 8. Supersession map — what this file replaces, and what stays
 
 **This file replaces (moved to `docs/archive/`, `status: superseded`, `superseded_by:
 ARCHITECTURE.md`):**
@@ -248,10 +309,11 @@ ARCHITECTURE.md`):**
 | `docs/verification/data_integrity_findings.md` | The data-integrity boundary (no `_results_summary.json` resurrection). |
 | `docs/reviews/` | The review directory — including the critique this file answers (`semantic_monolith_review.md`). |
 | `docs/release/consolidation/{stage_map,design}.md` | The release plan + per-stage design this file is one output of. |
+| `docs/designs/implemented/fleet_ladder_architecture.md` | Implemented fleet topology, mount/scope contract, evidence, and retained open limitations. |
 
 ---
 
-## 7. The architectural invariant — the load-bearing rule
+## 9. The architectural invariant — the load-bearing rule
 
 > **To make policies, we need information.**
 
