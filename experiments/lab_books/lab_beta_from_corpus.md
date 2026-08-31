@@ -1,10 +1,12 @@
 ---
-status: preregistered
+status: completed
 ---
 
 # Lab: β coordination tax from the session corpus (`lab_beta_from_corpus`)
 
-**Status: PREREGISTERED — committed BEFORE any fitting. No β has been computed yet.**
+**Status: COMPLETED — primary corpus fit executed without model calls; the required
+container-window sensitivity fit is not implemented by the preregistered script and is
+recorded below as a protocol-compliance failure.**
 
 **Preregistered:** 2026-08-31. **Origin:** the `concurrency_ladder` incident
 (`experiments/results/workflows/concurrency_ladder/20260831T014836Z.json`).
@@ -132,4 +134,51 @@ than the token curve and the lease can be wider in dollars than in tokens.
 
 ## Results
 
-_(empty — preregistered 2026-08-31; no fitting performed.)_
+### Execution
+
+`python3 scripts/lab_beta_from_corpus.py` completed successfully on 2026-09-01. The script
+uses only the local OpenCode SQLite database, committed story-result files, and the usage-meter
+snapshot; it made zero paid model calls. It wrote
+`experiments/results/lab_beta_from_corpus.json`.
+
+### Primary estimates
+
+The parent-session primary fit retained 1,429 of 1,541 eligible parent sessions. Its main
+cost estimate is **β_cost = 0.1542** (95% CI [0.1122, 0.1962], r² = 0.0350, n = 1,429), which
+the preregistered point-estimate thresholds classify as **moderate_tax**. The interval crosses
+the 0.15 negligible/moderate boundary, so that label should not be read as a precise threshold
+decision.
+
+The corresponding throughput estimate is **β_tokens = 0.7996** (95% CI [0.7103, 0.8889],
+r² = 0.1775, n = 1,429). The primary cache-share regression has slope **−0.0228** per
+log-concurrency unit (equivalently the artifact's `cache_share_slope.beta` is 0.0228, 95% CI
+[0.0133, 0.0322] under its negated-slope convention). Thus this corpus run does not support
+the preregistered positive cache-share-offset hypothesis.
+
+| Model | β_cost (95% CI) | β_tokens (95% CI) | n |
+|---|---:|---:|---:|
+| `deepseek-v4-flash` | 0.0160 [−0.0051, 0.0371] | 0.7659 [0.6622, 0.8696] | 987 |
+| `deepseek-v4-pro` | −0.0084 [−0.0325, 0.0158] | 0.7220 [0.5495, 0.8945] | 442 |
+| Pooled primary fit | 0.1542 [0.1122, 0.1962] | 0.7996 [0.7103, 0.8889] | 1,429 |
+
+The retained sessions span bins `1`: 3, `2-3`: 244, `4-5`: 385, `6-8`: 150, and `9+`: 647.
+The meter reconciliation reports 179,215,822 14-day DeepSeek-platform tokens, with the
+script's stated caveat that local DB totals undercount container cells.
+
+### Verification log
+
+| Check | Result | Evidence |
+|---|---|---|
+| Result schema | PASS | The output has exactly the script-declared top-level fields; bin totals equal `n_total`, and all 51 emitted floating-point values are finite. |
+| Ladder-window exclusion | PASS | All 23 parent rows overlapping `2026-08-30T21:32Z` through `2026-08-31T01:48Z` were absent from the fitted set. |
+| Noise-floor exclusion | PASS | All 89 parent rows with duration under 10 seconds or fewer than 100 tokens were absent from the fitted set; the union of exclusions is 112 rows. |
+| Parent/subagent split | PASS | No subagent enters the primary fit; 33 subagent sessions remain separately reported by concurrency bin. |
+| Model whitelist | PASS | Every retained primary row parsed to a whitelisted DeepSeek or Anthropic model; the realized fit contains the two DeepSeek models above. |
+| Primary container treatment | PASS | Container story windows are not included in the primary concurrency calculation or fit. |
+| Finite/plausible estimates | PASS | Each fitted estimate has `n >= 5`; every reported point estimate lies within its reported 95% CI. |
+| Container-window sensitivity fit | FAIL | The preregistration requires sensitivity results using story timestamps and agreement across primary and sensitivity fits. The script defines `_story_windows()` but never invokes it, and the artifact has no sensitivity estimate. This run records the omission rather than changing the estimator after preregistration. |
+
+The primary measurement artifact is therefore valid for its stated primary estimator and
+exclusions, but the lab is **not a fully compliant execution of the preregistered protocol**
+until the missing sensitivity analysis is separately specified and run. This result remains
+observational, not a causal replacement for a clean controlled ladder.
