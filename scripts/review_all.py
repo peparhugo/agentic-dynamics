@@ -41,13 +41,15 @@ AGGREGATE_RE = re.compile(r"^review_[0-9a-f]{12}\.json$")
 
 
 def _needs_review(story_id: str) -> bool:
-    """True when the story's review is missing, incomplete, or stale.
+    """True when the story's review is missing or incomplete.
 
     --only-missing skips a story when: an error marker exists (the attempt already
     failed — the worktree is gone; the marker records the error visibly), or the review
-    file is complete (story_review + at least one commit review) AND no newer analysis
-    has landed since the review (the review grounds in the analysis — a fresher
-    analysis file re-opens the story).
+    file is complete (story_review + at least one commit review). NO freshness rule:
+    the review model is nondeterministic, so re-opening a reviewed story by analysis
+    mtime would overwrite the previous review with different content (the analysis
+    files are routinely re-written by re-runs — their mtime is not a signal). A story
+    whose analysis deepens is re-reviewed deliberately: delete the review file.
     """
     if (REVIEWS_DIR / f"review_{story_id}.error").exists():
         return False
@@ -58,17 +60,7 @@ def _needs_review(story_id: str) -> bool:
         data = json.loads(review_path.read_text())
     except (json.JSONDecodeError, OSError):
         return True
-    complete = bool(data.get("story_review")) and len(data.get("commit_reviews") or []) > 0
-    if not complete:
-        return True
-    analysis_path = ANALYSIS_DIR / f"analysis_{story_id}.json"
-    if analysis_path.exists():
-        try:
-            if analysis_path.stat().st_mtime > review_path.stat().st_mtime:
-                return True
-        except OSError:
-            pass
-    return False
+    return not (data.get("story_review") and len(data.get("commit_reviews") or []) > 0)
 
 
 def _get_story_commits(worktree: Path) -> list[tuple[str, str, int]]:

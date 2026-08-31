@@ -180,6 +180,46 @@
       ],
       "summary": "The transport refactor follows the codebase's DI/env-config patterns and centralizes websocket I/O, but a leaky boundary (Any typing, private-method calls into the server, single-impl abstraction) keeps the net impact neutral with moderate technical debt.",
       "session_number": 4
+    },
+    {
+      "commit_hash": "1cdc5c6d4c5f0a119c351bbcd7dea30459be406b",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.88,
+      "convention_adherence": 0.76,
+      "introduces_technical_debt": false,
+      "respects_existing_patterns": true,
+      "better_or_worse": "better",
+      "problems": [
+        {
+          "category": "maintainability",
+          "severity": "minor",
+          "description": "Rate-limit check in _handle_message runs before UTF-8/bytes validation, so malformed messages still consume the client's rate budget."
+        },
+        {
+          "category": "convention",
+          "severity": "minor",
+          "description": "Test files (test_integrations.py, test_server.py) contain non-PascalCase class names and module-level constants not in UPPER_CASE; matches SonarQube convention score of 0.76."
+        },
+        {
+          "category": "architecture",
+          "severity": "info",
+          "description": "Cleanup task appears to run once at server start (single call to _cleanup_messages) rather than as a periodic loop; if periodic TTL enforcement is intended, a scheduled task is needed."
+        },
+        {
+          "category": "maintainability",
+          "severity": "info",
+          "description": "Cognitive complexity +23 and 3 new smells per SonarQube, concentrated in the /history handler and nested _iso_timestamp validation."
+        }
+      ],
+      "strengths": [
+        "History query is backed by a purpose-built composite index (channel, timestamp, id) matching the ORDER BY, a correct performance-first choice.",
+        "Rate limiting uses a single Redis INCR/EXPIRE pipeline \u2014 atomic, cheap, and fits the existing RedisBackbone seam rather than adding a new dependency.",
+        "New settings (RATE_LIMIT, MESSAGE_TTL_DAYS) follow the established constructor-override + env-fallback validation pattern.",
+        "The /history route, _json_response, and static helper conventions mirror the existing transport code, so new code reads like existing code.",
+        "History pagination handles the has_more sentinel correctly with a limit+1 probe."
+      ],
+      "summary": "A clean, convention-consistent addition of history, rate limiting, and TTL cleanup that slots into the existing store/backbone/transport seams; only minor test-file convention nits and a possibly one-shot cleanup task temper it.",
+      "session_number": 5
     }
   ],
   "story_review": {
