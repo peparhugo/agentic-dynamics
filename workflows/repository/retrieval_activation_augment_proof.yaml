@@ -23,6 +23,14 @@ workflow:
     language: python
     fork: false
     rag_augment: true
+    rag:
+      # The proof runs against the SHARED scope — the cell's own scope (self-<worktree>)
+      # holds zero records (a fresh worktree, nothing ingested into it), so the seam would
+      # degrade to no_rag with nothing to retrieve. The shared-scope override is the
+      # two-channel rule's explicit path for cross-cell retrieval (agentic-dynamics carries
+      # the 13.7k-record corpus); the measured signal is the augmentation OUTCOME.
+      repository_id: agentic-dynamics
+      acl_scope: agentic-dynamics
     context:
       domain_context: >-
         This cell exists ONLY to exercise the rag_augment seam
