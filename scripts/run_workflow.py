@@ -42,7 +42,6 @@ from agentic_dynamics.control.reducers._common import REVISION_FALLBACK  # noqa:
 from agentic_dynamics.control.reducers._common import cell_id as _reducer_cell_id  # noqa: E402
 from agentic_dynamics.control.signal_store import build_signal_store, load_results  # noqa: E402
 from agentic_dynamics.control.step_routing import ModelSignals, route_step  # noqa: E402
-from agentic_dynamics.core.admission_context import AdmissionRefused  # noqa: E402
 from agentic_dynamics.experiment.experiment_spec import ExperimentSpec, load_spec  # noqa: E402
 from agentic_dynamics.experiment.spec_status import refresh_spec_status  # noqa: E402
 from agentic_dynamics.knowledge import knowledge_stream as ks  # noqa: E402
@@ -413,6 +412,46 @@ def main() -> None:
 
     spec = load_spec(Path(args.spec))
 
+    # --orchestrator: the sibling-container execution path (slice 2). P0-2 (control-plane
+    # stabilization): this is NO LONGER a second phase loop. It injects a DockerAgentExecutor
+    # into the SAME engine below — the engine owns the loop, stop-on-failure, checkpoints,
+    # gates, and the aggregate ledger; the executor only answers "run this one step in this
+    # isolation envelope". The gate is threaded the same way as the in-process path: the
+    # executor reads the phase's admission (bound to the ContextVar by the engine's
+    # ``phase_admission_scope``) and stamps it onto the SPAWN REQUEST — a container inherits
+    # an environment, not a call stack.
+    if args.orchestrator:
+        sys.path.insert(0, str(Path(__file__).resolve().parent / "fleet"))
+        from fleet.docker_executor import DockerAgentExecutor  # noqa: E402
+
+        spec_path = f"/repo/{args.spec}"  # the sibling's view (the orchestrator mounts /repo)
+        return _run_workflow_cli(
+            spec, args,
+            step_executor=DockerAgentExecutor(
+                spec_path=spec_path,
+                spec_name=spec.name,
+                goal=args.goal,
+                model=args.model,
+                workdir=args.workdir,
+                backend=args.backend,
+                timeout=args.timeout,
+                cell_image=args.cell_image,
+            ),
+        )
+
+    return _run_workflow_cli(spec, args)
+
+
+def _run_workflow_cli(
+    spec: ExperimentSpec, args: argparse.Namespace, *, step_executor=None
+) -> None:
+    """The ONE engine's CLI wrapper (P0-2): build the composition root and run the engine.
+
+    Shared by the in-process path (``step_executor=None`` → the engine's default
+    LocalAgentExecutor) and the ``--orchestrator`` path (the DockerAgentExecutor injected
+    above).     This is the single phase loop, ledger writer, and exit-code contract — the
+    second phase loop is gone.
+    """
     # --only-phase: filter the spec's phases to the named phase (the sibling-cell path). The
     # rest of the composition root (routing/signals/etc.) is unchanged — a single-phase run is
     # a normal run whose phase list happens to have one member. The FULL list's count and the
@@ -429,15 +468,6 @@ def main() -> None:
         only_phase_index = names.index(args.only_phase)
         only_phase_total = len(phases)
         spec.workflow.params["phases"] = [phases[only_phase_index]]
-
-    # --orchestrator: the sibling-spawn execution path (slice 2). Runs the phases as sibling
-    # cells, each in its own scope, instead of calling run_workflow() in-process. The gate is
-    # threaded in the same way as the in-process path, but the admission has to be stamped onto
-    # the SPAWN REQUEST rather than bound to a ContextVar — a container inherits an environment,
-    # not a call stack.
-    if args.orchestrator:
-        _run_orchestrator(spec, args)
-        return
 
     # Signal-store wiring (docs/routing_next_steps.md item 1): when the spec declares routing
     # and no explicit --signals override was supplied, build the store from the measured
@@ -530,6 +560,7 @@ def main() -> None:
             phase_total=only_phase_total,
             phase_index=only_phase_index,
             phase_admission=phase_admission,
+            step_executor=step_executor,
         )
     finally:
         if graph_client is not None:
@@ -580,146 +611,6 @@ def main() -> None:
         raise SystemExit(exit_code_for_result(result))
 
 
-def _run_orchestrator(spec: ExperimentSpec, args: argparse.Namespace) -> None:
-    """The orchestrator execution path (slice 2, D-3/D-14/D-16).
-
-    Each agent phase spawns as a SIBLING cell container with its scope config, instead of
-    running in-process. The sibling runs ``run_workflow.py --only-phase <name>`` (the normal
-    single-phase path) inside a container whose mounts/network/env are the phase's scope —
-    resolved + validated by ``scripts/fleet/spawn_wrapper.py`` BEFORE the docker socket call.
-
-    Path mapping: the orchestrator container mounts the repo at ``/repo`` (ro) and the host
-    worktree root at ``/tmp`` (rw). The sibling inherits the SAME mounts, so the spec path maps
-    to ``/repo/<spec>`` and the workdir is used verbatim (the host /tmp namespace is shared).
-    """
-    # scripts/fleet/ is a dir, not a package — add it beside scripts/ so the wrapper imports.
-    sys.path.insert(0, str(Path(__file__).resolve().parent / "fleet"))
-    import spawn_wrapper  # noqa: E402
-
-    spec_path = f"/repo/{args.spec}"
-    phases = spec.workflow.params.get("phases") or []
-    # The same gate the in-process path injects into the runner — here it is called directly,
-    # once per phase, because there is no runner to inject it into.
-    gate = _build_phase_admission(spec, args)
-    print(f"[orchestrator] running {len(phases)} phase(s) as sibling cells (spec {spec_path})",
-          flush=True)
-
-    failures = 0
-    awaiting_stop = False
-    for phase_def in phases:
-        name = str(phase_def.get("name", "?"))
-        kind = str(phase_def.get("kind", "agent"))
-        if kind == "test":
-            # P0-1 fail-closed (control-plane stabilization): the container path has NO
-            # verifier executor — silently skipping a declared independent verification
-            # is exactly the false-success path this branch exists to remove. A hard
-            # refusal is safer than a skipped gate; the phase's suite was never run.
-            raise SystemExit(
-                f"[orchestrator] {name}: REFUSED — kind: test phases have no Docker verifier "
-                "executor; skipping is forbidden (P0-1 fail-closed). Run this spec "
-                "in-process, or land the verifier executor first."
-            )
-
-        sibling_cmd = [
-            sys.executable, "scripts/run_workflow.py",
-            "--spec", spec_path,
-            "--goal", args.goal,
-            "--model", args.model,
-            "--workdir", args.workdir,
-            "--only-phase", name,
-            "--timeout", str(args.timeout),
-        ]
-        if args.backend:
-            sibling_cmd += ["--backend", args.backend]
-
-        # ADMIT, then spawn (admission_leases p2). The leases are held for the lifetime of the
-        # sibling container and released when it exits; a denial raises here and this phase's
-        # container is never created. ``gate`` is None when the gate is disarmed, in which case
-        # ``_phase_admission_context`` yields None and the request carries no lease block —
-        # exactly the pre-admission behaviour.
-        try:
-            with _phase_admission_context(gate, name, args.model) as admission:
-                request = spawn_wrapper.build_phase_request(
-                    phase_def,
-                    goal=args.goal,
-                    workdir=args.workdir,
-                    model=args.model,
-                    spec_name=spec.name,
-                    command=sibling_cmd,
-                    admission=admission.context() if admission is not None else None,
-                    # P0-3 (control-plane stabilization): a per-attempt state namespace —
-                    # <spec>/<phase>/<run-ish> — so retries and concurrent phases never share a
-                    # writable CLI-state directory. The default inside build_phase_request is
-                    # <spec>/<phase>; this finer value isolates attempts within a phase too.
-                    state_namespace=f"{spec.name}/{name}",
-                )
-                # build_phase_request resolves the scope; a phase with NO declared scope and no
-                # authorization-table entry resolves to "" and spawn_sibling refuses it at
-                # step 2 — and now a phase with no lease block is refused at step 6.
-                print(f"[orchestrator] {name}: scope={request['scope'] or '(unauthorized)'}",
-                      flush=True)
-                outcome = spawn_wrapper.spawn_sibling(
-                    request, docker="docker", image=args.cell_image,
-                )
-        except AdmissionRefused as exc:
-            print(f"[orchestrator] {name}: ADMISSION DENIED — no container was spawned:\n{exc}",
-                  flush=True)
-            failures += 1
-            break  # P0-1 stop-on-failure: a refused phase must never start the next
-        except spawn_wrapper.SpawnValidationError as exc:
-            print(f"[orchestrator] {name}: REFUSED before the socket call:\n{exc}", flush=True)
-            failures += 1
-            break  # P0-1 stop-on-failure: a refused phase must never start the next
-        if not outcome["ok"] and outcome.get("returncode") not in (EXIT_OK, EXIT_AWAITING_APPROVAL):
-            print(f"[orchestrator] {name}: sibling exited {outcome.get('returncode')}\n"
-                  f"{outcome.get('stderr', '')[-800:]}", flush=True)
-            failures += 1
-            break  # P0-1 stop-on-failure: a failed phase must never start the next
-        # P0-1 (control-plane stabilization): classify the child by its result ENVELOPE
-        # first (the machine-readable ok/awaiting the child prints), the exit code as the
-        # secondary signal. `returncode == 0` alone proved false-success: a pre-contract
-        # child exits 0 with ok:false or awaiting:true. The envelope decides; the exit
-        # code is the fallback when no envelope is present.
-        decision = classify_child_outcome(
-            outcome.get("returncode"), outcome.get("stdout", "")
-        )
-        if decision["state"] == "awaiting":
-            awaiting_stop = True
-            envelope = decision.get("envelope") or {}
-            reason = envelope.get("awaiting_reason", "checkpoint")
-            print(f"[orchestrator] {name}: AWAITING operator approval (reason: {reason}) — "
-                  f"run stopped; approve + --resume to continue", flush=True)
-            break  # P0-1: an approval checkpoint must stop the sequence
-        if decision["state"] == "failed":
-            envelope = decision.get("envelope") or {}
-            error = (envelope.get("error") or outcome.get("stderr", ""))[-800:]
-            print(f"[orchestrator] {name}: FAILED ({error or 'no envelope, no detail'})",
-                  flush=True)
-            failures += 1
-            break  # P0-1 stop-on-failure: a failed phase must never start the next
-        print(f"[orchestrator] {name}: ok", flush=True)
-
-    if awaiting_stop:
-        print("[orchestrator] done: stopped for operator approval (awaiting)", flush=True)
-        raise SystemExit(EXIT_AWAITING_APPROVAL)
-    print(f"[orchestrator] done: {failures} failure(s) across {len(phases)} phase(s)", flush=True)
-    if failures:
-        raise SystemExit(EXIT_FAILED)
-
-
-@contextlib.contextmanager
-def _phase_admission_context(gate, phase_name: str, model: str):
-    """Enter the phase's admission, or yield ``None`` when no gate was built.
-
-    The orchestrator's equivalent of ``runtime.admission.phase_admission_scope`` — the same
-    "inert when absent" shape, kept here rather than imported because the orchestrator path
-    lives entirely in this script and never touches the runner.
-    """
-    if gate is None:
-        yield None
-        return
-    with gate(phase_name, model) as admission:
-        yield admission
 
 
 def _fact_auto_emit_enabled(args: argparse.Namespace) -> bool:
