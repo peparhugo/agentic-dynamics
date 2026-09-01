@@ -111,6 +111,15 @@ workflow:
           (the window, not the process, decides).
           DELIVER: the live board + tests, committed.
           LOG: PASS/FAIL with the state matrix; commit.
+      - name: p3_test_gate
+        kind: test
+        timeout: 900
+        # The independent test gate (degradation-review 3b.1 restoration): the harness runs
+        # run_suite itself and records test_executed_success — never the agent's self-report.
+        # Scoped to this spec's surfaces: the control-room path tests + the live telemetry.
+        tests:
+          - tests/test_control_room_paths.py
+          - tests/test_live.py
 factors:
   - {name: model, levels: [deepseek/deepseek-v4-flash]}
 design: factorial
@@ -125,12 +134,18 @@ rules:
     evidence_class: "[C]"
     requires: [liveness_signal_inventory]
     produces: [live_now_rendered, stalled_run_leaves_live, graceful_age_unknown]
+  - name: test_gate_measured
+    plane: measurement
+    evidence_class: "[M]"
+    requires: [test_executed_success]
+    produces: [independent_gate_recorded]
 metrics:
   - {name: live_now_rendered, agg: mean, over: cell}
   - {name: stalled_run_leaves_live, agg: mean, over: cell}
   - {name: graceful_age_unknown, agg: mean, over: cell}
+  - {name: independent_gate_recorded, agg: mean, over: cell}
 writeup:
   format: lab_book
-  sections: [question, p1_board_audit, p2_live_board]
+  sections: [question, p1_board_audit, p2_live_board, p3_test_gate]
 stop: {budget_usd: 2.0, max_attempts: 1}
 adapt: {strategy: manual, selection: highest_regret}

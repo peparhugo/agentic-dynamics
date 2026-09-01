@@ -169,6 +169,16 @@ workflow:
           DELIVER: the census + guards + the augment proof, committed.
           LOG: PASS/FAIL with the census numbers + the augment run's fallback modes;
           commit.
+      - name: p5_test_gate
+        kind: test
+        timeout: 900
+        # The independent test gate (degradation-review 3b.1 restoration): the harness runs
+        # run_suite itself and records test_executed_success — never the agent's self-report.
+        # Scoped to this spec's surfaces: the retrieval tests + the fleet guards (the slice-4
+        # index guard lives in tests/test_fleet_guards.py).
+        tests:
+          - tests/test_retrieval.py
+          - tests/test_fleet_guards.py
 factors:
   - {name: model, levels: [anthropic/claude-sonnet-5]}
 design: factorial
@@ -193,12 +203,18 @@ rules:
     evidence_class: "[M]"
     requires: [patterns_in_candidates, no_regression]
     produces: [retrieval_census, index_guards_green, rag_augment_proof]
+  - name: test_gate_measured
+    plane: measurement
+    evidence_class: "[M]"
+    requires: [test_executed_success]
+    produces: [independent_gate_recorded]
 metrics:
   - {name: patterns_in_candidates, agg: mean, over: cell}
   - {name: index_guards_green, agg: mean, over: cell}
   - {name: rag_augment_proof, agg: mean, over: cell}
+  - {name: independent_gate_recorded, agg: mean, over: cell}
 writeup:
   format: lab_book
-  sections: [question, p1_agenda_reconstruction, p2_d1_d2_decisions, p3_pattern_projection, p4_activation_gate]
+  sections: [question, p1_agenda_reconstruction, p2_d1_d2_decisions, p3_pattern_projection, p4_activation_gate, p5_test_gate]
 stop: {budget_usd: 5.0, max_attempts: 1}
 adapt: {strategy: manual, selection: highest_regret}

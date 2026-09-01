@@ -536,8 +536,15 @@ def _init_git_workdir(workdir: str) -> None:
     subprocess.run(["git", "commit", "-m", "Initial"], cwd=workdir, capture_output=True)
 
 
-def _diff_workdir(workdir: str, files_before: set[str]) -> tuple[list[str], list[str]]:
-    """Compute files created/modified relative to a prior snapshot."""
+def _diff_workdir(
+    workdir: str, files_before: dict[str, str]
+) -> tuple[list[str], list[str]]:
+    """Compute files created/modified relative to a prior snapshot.
+
+    ``files_modified`` is the CHANGED-set (content hash differs), not the
+    pre-existing-set: a file that existed before the run with unchanged content is
+    untouched, not "modified".
+    """
     files_after = _list_files(workdir)
 
     def _is_artifact(p: str) -> bool:
@@ -546,18 +553,34 @@ def _diff_workdir(workdir: str, files_before: set[str]) -> tuple[list[str], list
             for skip in (".venv", "venv", "__pycache__", ".pytest_cache", "node_modules", ".git")
         )
 
-    files_created = sorted(f for f in (files_after - files_before) if not _is_artifact(f))
-    files_modified = sorted(f for f in (files_after & files_before) if not _is_artifact(f))
+    files_created = sorted(f for f in (files_after.keys() - files_before.keys()) if not _is_artifact(f))
+    files_modified = sorted(
+        f
+        for f in (files_after.keys() & files_before.keys())
+        if not _is_artifact(f) and files_after[f] != files_before[f]
+    )
     return files_created, files_modified
 
 
-def _list_files(dirpath: str) -> set[str]:
-    """List files in a directory, relative to dirpath."""
+def _list_files(dirpath: str) -> dict[str, str]:
+    """Snapshot files in a directory: relative path -> sha256 content hash."""
+    import hashlib
+
     try:
         root = Path(dirpath)
-        return {str(p.relative_to(root)) for p in root.rglob("*") if p.is_file()}
+        snapshot: dict[str, str] = {}
+        for p in root.rglob("*"):
+            if not p.is_file():
+                continue
+            rel = str(p.relative_to(root))
+            try:
+                digest = hashlib.sha256(p.read_bytes()).hexdigest()
+            except OSError:
+                digest = ""
+            snapshot[rel] = digest
+        return snapshot
     except Exception:
-        return set()
+        return {}
 
 
 def _extract_session_id(stdout: str) -> str:

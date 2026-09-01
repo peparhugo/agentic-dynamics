@@ -7,7 +7,12 @@ and v2 (current) opencode event formats, producing a canonical representation.
 import subprocess
 from pathlib import Path
 
-from agentic_dynamics.adapters.opencode import _init_git_workdir, normalize_opencode_event
+from agentic_dynamics.adapters.opencode import (
+    _diff_workdir,
+    _init_git_workdir,
+    _list_files,
+    normalize_opencode_event,
+)
 
 # ── v1 format (historical — flat structure, no "part" key) ───────────────────
 
@@ -249,3 +254,27 @@ def test_init_git_workdir_skips_empty_initial_commit(tmp_path):
         ["git", "config", "user.email"], cwd=tmp_path, capture_output=True, text=True
     ).stdout.strip()
     assert email == "experiment@instrument.local"  # runner identity still set for the new repo
+
+
+# ── files_modified is the CHANGED-set, not the pre-existing-set (degradation review 3b.2) ──
+
+
+def test_diff_workdir_reports_changed_set_not_preexisting_set(tmp_path):
+    """A file that existed before the run but was untouched must NOT be "modified"."""
+    (tmp_path / "keep.py").write_text("v1")
+    (tmp_path / "mod.py").write_text("old")
+    (tmp_path / "gone.py").write_text("x")
+
+    before = _list_files(str(tmp_path))
+
+    (tmp_path / "mod.py").write_text("new content")  # changed
+    (tmp_path / "keep.py").write_text("v1")  # rewritten identically → not modified
+    (tmp_path / "gone.py").unlink()  # deleted → not listed
+    (tmp_path / "new.py").write_text("y")  # created
+
+    created, modified = _diff_workdir(str(tmp_path), before)
+
+    assert created == ["new.py"]
+    assert modified == ["mod.py"]
+    assert "keep.py" not in modified  # the pre-existing-set bug would list it
+    assert "gone.py" not in modified

@@ -141,6 +141,14 @@ workflow:
           index must carry retrieval_fusion_quality as completed.
           DELIVER: the writeup + the regenerated spec index, committed.
           LOG: PASS/FAIL; commit.
+      - name: p5_test_gate
+        kind: test
+        timeout: 900
+        # The independent test gate (degradation-review 3b.1 restoration): the harness runs
+        # run_suite itself and records test_executed_success — never the agent's self-report.
+        # Scoped to this spec's surfaces: the retrieval/fusion tests + the census harness.
+        tests:
+          - tests/test_retrieval.py
 factors:
   - {name: model, levels: [deepseek/deepseek-v4-flash]}
 design: factorial
@@ -160,12 +168,18 @@ rules:
     evidence_class: "[M]"
     requires: [content_fusion_or_two_view_recorded]
     produces: [fused_positive_or_two_view_documented]
+  - name: test_gate_measured
+    plane: measurement
+    evidence_class: "[M]"
+    requires: [test_executed_success]
+    produces: [independent_gate_recorded]
 metrics:
   - {name: join_answer, agg: mean, over: cell}
   - {name: fused_positive_or_two_view_documented, agg: mean, over: cell}
   - {name: no_regression, agg: mean, over: cell}
+  - {name: independent_gate_recorded, agg: mean, over: cell}
 writeup:
   format: lab_book
-  sections: [question, p1_overlap_instrument, p2_fusion_fix, p3_gate_recensus, p4_writeup]
+  sections: [question, p1_overlap_instrument, p2_fusion_fix, p3_gate_recensus, p4_writeup, p5_test_gate]
 stop: {budget_usd: 3.0, max_attempts: 1}
 adapt: {strategy: manual, selection: highest_regret}

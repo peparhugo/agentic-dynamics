@@ -180,6 +180,18 @@ workflow:
           without crashing; the approve affordance honors the idempotence contract.
           DELIVER: the route + panel + the state tests, committed.
           LOG: PASS/FAIL with the three-state render evidence; commit.
+      - name: p5_test_gate
+        kind: test
+        timeout: 900
+        # The independent test gate (degradation-review 3b.1 restoration): the harness runs
+        # run_suite itself and records test_executed_success — never the agent's self-report.
+        # Scoped to this spec's surfaces: the drift scanner, watchdog, proposal gate, and
+        # docs-health tests.
+        tests:
+          - tests/test_scan_docs_drift.py
+          - tests/test_docs_drift_watchdog.py
+          - tests/test_docs_proposal_gate.py
+          - tests/test_docs_health.py
 factors:
   - {name: model, levels: [anthropic/claude-opus-5]}
 design: factorial
@@ -204,12 +216,18 @@ rules:
     evidence_class: "[M]"
     requires: [approve_runs_once]
     produces: [three_state_render, approve_idempotent]
+  - name: test_gate_measured
+    plane: measurement
+    evidence_class: "[M]"
+    requires: [test_executed_success]
+    produces: [independent_gate_recorded]
 metrics:
   - {name: zero_drift_baseline, agg: mean, over: cell}
   - {name: proposes_without_running, agg: mean, over: cell}
   - {name: three_state_render, agg: mean, over: cell}
+  - {name: independent_gate_recorded, agg: mean, over: cell}
 writeup:
   format: lab_book
-  sections: [question, p1_drift_scanner, p2_watchdog_cadence, p3_proposal_gate, p4_docs_health_surface]
+  sections: [question, p1_drift_scanner, p2_watchdog_cadence, p3_proposal_gate, p4_docs_health_surface, p5_test_gate]
 stop: {budget_usd: 4.0, max_attempts: 1}
 adapt: {strategy: manual, selection: highest_regret}

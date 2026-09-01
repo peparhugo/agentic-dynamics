@@ -161,6 +161,15 @@ workflow:
           test_suite_speed after the run.
           DELIVER: the budgets + the gate + the before/after totals, committed.
           LOG: PASS/FAIL with the totals; commit.
+      - name: p5_test_gate
+        kind: test
+        timeout: 900
+        # The independent test gate (degradation-review 3b.1 restoration): the harness runs
+        # run_suite itself and records test_executed_success — never the agent's self-report.
+        # Scoped to this spec's own artifacts: the fast-path gate test + the runner family.
+        tests:
+          - tests/test_fast_path_gate.py
+          - tests/test_workflow_runner.py
 factors:
   - {name: model, levels: [deepseek/deepseek-v4-flash]}
 design: factorial
@@ -185,12 +194,18 @@ rules:
     evidence_class: "[M]"
     requires: [fast_under_budget]
     produces: [budget_documented, slow_regression_trip]
+  - name: test_gate_measured
+    plane: measurement
+    evidence_class: "[M]"
+    requires: [test_executed_success]
+    produces: [independent_gate_recorded]
 metrics:
   - {name: durations_down, agg: mean, over: cell}
   - {name: assertions_intact, agg: mean, over: cell}
   - {name: fast_under_budget, agg: mean, over: cell}
+  - {name: independent_gate_recorded, agg: mean, over: cell}
 writeup:
   format: lab_book
-  sections: [question, p1_profile_triage, p2_surgical_fixes, p3_fast_path, p4_gate]
+  sections: [question, p1_profile_triage, p2_surgical_fixes, p3_fast_path, p4_gate, p5_test_gate]
 stop: {budget_usd: 4.0, max_attempts: 1}
 adapt: {strategy: manual, selection: highest_regret}

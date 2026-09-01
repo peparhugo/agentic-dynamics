@@ -152,6 +152,20 @@ workflow:
           findings in this phase — record them.
           DELIVER: the gate record, committed.
           LOG: PASS/FAIL per gate step; commit.
+      - name: p5_test_gate
+        kind: test
+        timeout: 900
+        # The independent test gate (degradation-review 3b.1 restoration): the harness runs
+        # run_suite itself and records test_executed_success — never the agent's self-report.
+        # Scoped to this spec's guard family (the p4 acceptance gate's own list), never the
+        # whole multi-thousand-test tree.
+        tests:
+          - tests/test_doc_lifecycle.py
+          - tests/test_dependency_direction.py
+          - tests/test_script_classification.py
+          - tests/test_spec_status.py
+          - tests/test_agent_config_render.py
+          - tests/test_fleet_guards.py
 factors:
   - {name: model, levels: [deepseek/deepseek-v4-flash]}
 design: factorial
@@ -176,12 +190,18 @@ rules:
     evidence_class: "[M]"
     requires: [cap_2b_proposal_only, guard_passes_on_contract]
     produces: [adversary_checks_clean, guards_green, surfaces_reproducible]
+  - name: test_gate_measured
+    plane: measurement
+    evidence_class: "[M]"
+    requires: [test_executed_success]
+    produces: [independent_gate_recorded]
 metrics:
   - {name: anchors_repointed, agg: mean, over: cell}
   - {name: guard_passes_on_contract, agg: mean, over: cell}
   - {name: adversary_checks_clean, agg: mean, over: cell}
+  - {name: independent_gate_recorded, agg: mean, over: cell}
 writeup:
   format: lab_book
-  sections: [question, p1_doc_findings, p2_context_claim, p3_mount_guard, p4_acceptance_gate]
+  sections: [question, p1_doc_findings, p2_context_claim, p3_mount_guard, p4_acceptance_gate, p5_test_gate]
 stop: {budget_usd: 3.0, max_attempts: 1}
 adapt: {strategy: manual, selection: highest_regret}
