@@ -262,7 +262,7 @@ def _tail_stamps(redis_client, cell_ids) -> dict[str, Any]:
     try:
         pipe = redis_client.pipeline(transaction=False)
         for key in keys:
-            pipe.lrange(key, 0, 0)
+            pipe.lrange(key, 0, 7)
         heads = pipe.execute()
     except Exception:
         heads = [None] * len(cell_ids)
@@ -271,12 +271,20 @@ def _tail_stamps(redis_client, cell_ids) -> dict[str, Any]:
     for cell_id, head in zip(cell_ids, heads, strict=False):
         stamp = None
         if head:
-            try:
-                event = json.loads(head[0]) if isinstance(head[0], str) else head[0]
-            except (TypeError, json.JSONDecodeError):
-                event = None
-            if isinstance(event, dict):
-                stamp = _event_timestamp(event, event)
+            # Scan a small head window for the newest event with a parseable timestamp:
+            # some events carry their timestamp only inside ``part`` (the head element is
+            # one such shape), and a None stamp would age-unknown a live cell forever.
+            for raw in head[:8]:
+                try:
+                    event = json.loads(raw) if isinstance(raw, str) else raw
+                except (TypeError, json.JSONDecodeError):
+                    continue
+                if not isinstance(event, dict):
+                    continue
+                part = event.get("part") if isinstance(event.get("part"), dict) else {}
+                stamp = _event_timestamp(event, part)
+                if stamp is not None:
+                    break
         stamps[cell_id] = stamp
     return stamps
 
