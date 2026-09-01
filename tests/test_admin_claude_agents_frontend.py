@@ -46,9 +46,18 @@ def test_claude_agents_shell_exposes_roster_daemon_and_control_regions():
 
 
 def test_claude_agent_control_panel_has_steer_but_no_send_or_interrupt_affordance():
-    """Steering exists (owned-only); there is no separate send or interrupt control."""
+    """Steering exists (owned-only); there is no separate send or interrupt control.
+
+    The slice is the control panel's OWN element — start anchor to its first ``</section>``,
+    which is exact because the panel contains no nested section. It previously ran all the way
+    to ``recent-designs-title``, swallowing the entire fleet board on the way; that made the
+    "no ``type=\"text\"`` here" assertion a claim about half the page rather than about this
+    panel, and it went red the moment an unrelated board gained a text input (the docs-health
+    approve form). Narrowing it restores what the test means to assert.
+    """
     html = (STATIC / "index.html").read_text()
-    panel = html[html.index('id="claude-agent-control-panel"') : html.index('id="recent-designs-title"')]
+    start = html.index('id="claude-agent-control-panel"')
+    panel = html[start : html.index("</section>", start)]
 
     assert "Steer" in panel
     assert 'id="claude-agent-steer-prompt"' in panel

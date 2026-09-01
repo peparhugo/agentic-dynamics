@@ -39,7 +39,7 @@ from datetime import datetime, timezone
 from enum import Enum
 from typing import Any
 
-from agentic_dynamics.knowledge.knowledge import Authority
+from agentic_dynamics.knowledge.knowledge import Authority, compute_content_hash
 
 # ── Versioned weights (policy constants, [H]) ───────────────────
 
@@ -285,11 +285,38 @@ class Candidate:
     source_type: str = ""  # knowledge surface; "pattern" is the opt-in I9 projection.
     pattern_payload: dict[str, Any] | None = None
     evidence_class: str = ""
+    # The join-consistent content identity: sha256 of the candidate's stored TEXT
+    # (``knowledge.compute_content_hash``), derived identically on BOTH legs. This is
+    # the per-candidate content key for the cross-leg overlap join (the fusion-quality
+    # census) — deliberately NOT the persisted ``content_hash`` (which is
+    # ``sha256(record_to_artifact)`` and is not persisted on the Neo4j leg). It never
+    # feeds ``deduplicate``/``collapse_redundant``/fusion, so the fusion-off path is
+    # byte-identical (no-regression rule).
+    join_content_hash: str = ""
 
     @property
     def is_pattern(self) -> bool:
         """Whether this candidate is the reducer-minted pattern projection surface."""
         return self.source_type == "pattern" or self.pattern_payload is not None
+
+    @property
+    def legs(self) -> str:
+        """The leg(s) that surfaced this candidate: ``dense`` / ``lexical`` / ``both``.
+
+        A graph-expanded candidate (``graph_depth > 0``) that reached the list through
+        expansion rather than a direct leg hit reports ``"expansion"`` — it is a
+        structural neighbor, never a third ranked peer, so it must not count toward
+        the dense/lexical/both attribution.
+        """
+        has_dense = self.dense_rank is not None
+        has_lexical = self.lexical_rank is not None
+        if has_dense and has_lexical:
+            return "both"
+        if has_dense:
+            return "dense"
+        if has_lexical:
+            return "lexical"
+        return "expansion"
 
     def citation(self) -> str:
         """Render the audit citation ``[K:<id>@<commit>:<locator>]``."""
@@ -587,9 +614,7 @@ def _pairwise_similarities(
     try:
         embedded = candidates[:COLLAPSE_EMBED_CAP]
         with ThreadPoolExecutor(max_workers=8) as pool:
-            embeddings = list(
-                pool.map(embedder.embed, [c.text for c in embedded])
-            )
+            embeddings = list(pool.map(embedder.embed, [c.text for c in embedded]))
         sims: dict[tuple[str, str], float] = {}
         for i in range(len(embedded)):
             for j in range(i + 1, len(embedded)):
@@ -688,6 +713,57 @@ class RetrievalAttempt:
     weights_version: str = WEIGHTS_VERSION
     timestamp: str = ""
 
+    def leg_overlap(self) -> dict[str, Any]:
+        """The per-attempt join answer: id-level fusion vs cross-leg content overlap.
+
+        Computed over ``self.candidates`` — the fused/deduped/collapsed set the census
+        counts leg attribution from, so the content join is on the same list the
+        ``fused`` count measures. Returns:
+
+          - ``dense_only`` / ``lexical_only`` / ``fused`` — the id-level leg
+            attribution (``fused`` = one candidate surfaced by BOTH legs under the
+            same id, i.e. the RRF actually arbitrated).
+          - ``content_pairs`` — the number of ``(dense_candidate, lexical_candidate)``
+            pairs whose ``join_content_hash`` matches: same stored text under any ids.
+            This is the cross-leg content join the fusion-quality census answers.
+          - ``distinct_content_hashes`` — how many distinct shared texts those pairs
+            represent (``content_pairs`` over-counts when one side is duplicated).
+          - ``dense_with_content_hash`` / ``lexical_with_content_hash`` — how many
+            candidates per leg carry a *persisted* artifact ``content_hash`` (the
+            hash-gap hypothesis split; a zero lexical count = the gap is real).
+          - ``sample_pairs`` — up to 3 example ``(dense_id, lexical_id)`` pairs
+            sharing a text hash, for auditability.
+        """
+        dense = [c for c in self.candidates if c.dense_rank is not None]
+        lexical = [c for c in self.candidates if c.lexical_rank is not None]
+        dense_only = len([c for c in dense if c.lexical_rank is None])
+        lexical_only = len([c for c in lexical if c.dense_rank is None])
+        fused = len([c for c in self.candidates if c.legs == "both"])
+
+        dense_by_hash: dict[str, list[Candidate]] = {}
+        for c in dense:
+            if c.join_content_hash:
+                dense_by_hash.setdefault(c.join_content_hash, []).append(c)
+        pairs: list[tuple[str, str]] = []
+        paired_hashes: set[str] = set()
+        for lc in lexical:
+            for dc in dense_by_hash.get(lc.join_content_hash, []):
+                if dc.id == lc.id:
+                    continue  # same-id both-leg candidate — the id fusion already counted it
+                pairs.append((dc.id, lc.id))
+                paired_hashes.add(lc.join_content_hash)
+        sample_pairs = pairs[:3]
+        return {
+            "dense_only": dense_only,
+            "lexical_only": lexical_only,
+            "fused": fused,
+            "content_pairs": len(pairs),
+            "distinct_content_hashes": len(paired_hashes),
+            "dense_with_content_hash": len([c for c in dense if c.content_hash]),
+            "lexical_with_content_hash": len([c for c in lexical if c.content_hash]),
+            "sample_pairs": sample_pairs,
+        }
+
     def to_dict(self) -> dict[str, Any]:
         return {
             "query": self.query,
@@ -695,6 +771,15 @@ class RetrievalAttempt:
             "ranks": self.ranks,
             "raw_scores": self.raw_scores,
             "graph_paths": self.graph_paths,
+            "candidate_legs": {
+                c.id: {
+                    "legs": c.legs,
+                    "content_hash": c.content_hash,
+                    "join_content_hash": c.join_content_hash,
+                }
+                for c in self.candidates
+            },
+            "leg_overlap": self.leg_overlap(),
             "selected_evidence": [
                 {
                     "id": c.id,
@@ -1115,6 +1200,7 @@ def retrieve(
             id=cid,
             text=text,
             content_hash=meta.get("content_hash", ""),
+            join_content_hash=compute_content_hash(text),
             authority=authority,
             locator=meta.get("logical_locator", cid),
             commit_sha=meta.get("commit_sha", commit_sha),
@@ -1170,6 +1256,7 @@ def retrieve(
                 id=cid,
                 text=text,
                 content_hash=props.get("content_hash", ""),
+                join_content_hash=compute_content_hash(text),
                 authority=authority,
                 locator=props.get("logical_locator", props.get("doc_id", cid)),
                 commit_sha=props.get("commit_sha", commit_sha),
@@ -1270,6 +1357,7 @@ def retrieve(
                         id=cid,
                         text=props.get("text", ""),
                         content_hash=props.get("content_hash", ""),
+                        join_content_hash=compute_content_hash(props.get("text", "")),
                         authority=authority,
                         locator=props.get("logical_locator", cid),
                         commit_sha=props.get("commit_sha", commit_sha),

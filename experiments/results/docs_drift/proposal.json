@@ -1,0 +1,132 @@
+{
+  "action": {
+    "basis": "yaml: name/factors[model].levels[0]/stop/workflow.params.phases[].name in workflows/repository/docs_refresh_remediation.yaml",
+    "budget_usd": 3.0,
+    "max_attempts": 1,
+    "model": "deepseek/deepseek-v4-flash",
+    "name": "docs_refresh_remediation",
+    "phases": [
+      "p1_doc_findings",
+      "p2_context_claim",
+      "p3_mount_guard",
+      "p4_acceptance_gate"
+    ],
+    "spec": "workflows/repository/docs_refresh_remediation.yaml"
+  },
+  "approval": {},
+  "at": "2026-09-01T02:48:15.894520Z",
+  "check_ids": [
+    "cli_surface/mental_model_full_cli/complete/--campaign-budget-usd",
+    "cli_surface/mental_model_full_cli/complete/--campaign-concurrency",
+    "cli_surface/mental_model_full_cli/complete/--cell-image",
+    "cli_surface/mental_model_full_cli/complete/--no-admission",
+    "anchor_integrity/docs/architecture/current/claude_tools_to_skills_scope.md:152/admin/server.py:1365",
+    "anchor_integrity/docs/architecture/current/claude_tools_to_skills_scope.md:311/admin/server.py:779-802",
+    "anchor_integrity/docs/architecture/current/claude_tools_to_skills_scope.md:318/admin/server.py:738-776",
+    "anchor_integrity/docs/architecture/current/context_abstraction_addendum_design.md:399/verify.md:258-262",
+    "anchor_integrity/docs/architecture/current/routing_design.md:420/admin/server.py:860-877"
+  ],
+  "drift": 9,
+  "finding_count": 9,
+  "findings": [
+    {
+      "axis": "cli_surface",
+      "basis": "ast: add_argument(\"--\u2026\") in scripts/run_workflow.py minus the flags listed in the 'full CLI: scripts/run_workflow.py' block",
+      "check_id": "cli_surface/mental_model_full_cli/complete/--campaign-budget-usd",
+      "claim": "agent_config/mental-model.md claims to list the FULL CLI of scripts/run_workflow.py",
+      "code_truth": "--campaign-budget-usd is declared by argparse but absent from the doc",
+      "source": "agent_config/mental-model.md",
+      "status": "missing"
+    },
+    {
+      "axis": "cli_surface",
+      "basis": "ast: add_argument(\"--\u2026\") in scripts/run_workflow.py minus the flags listed in the 'full CLI: scripts/run_workflow.py' block",
+      "check_id": "cli_surface/mental_model_full_cli/complete/--campaign-concurrency",
+      "claim": "agent_config/mental-model.md claims to list the FULL CLI of scripts/run_workflow.py",
+      "code_truth": "--campaign-concurrency is declared by argparse but absent from the doc",
+      "source": "agent_config/mental-model.md",
+      "status": "missing"
+    },
+    {
+      "axis": "cli_surface",
+      "basis": "ast: add_argument(\"--\u2026\") in scripts/run_workflow.py minus the flags listed in the 'full CLI: scripts/run_workflow.py' block",
+      "check_id": "cli_surface/mental_model_full_cli/complete/--cell-image",
+      "claim": "agent_config/mental-model.md claims to list the FULL CLI of scripts/run_workflow.py",
+      "code_truth": "--cell-image is declared by argparse but absent from the doc",
+      "source": "agent_config/mental-model.md",
+      "status": "missing"
+    },
+    {
+      "axis": "cli_surface",
+      "basis": "ast: add_argument(\"--\u2026\") in scripts/run_workflow.py minus the flags listed in the 'full CLI: scripts/run_workflow.py' block",
+      "check_id": "cli_surface/mental_model_full_cli/complete/--no-admission",
+      "claim": "agent_config/mental-model.md claims to list the FULL CLI of scripts/run_workflow.py",
+      "code_truth": "--no-admission is declared by argparse but absent from the doc",
+      "source": "agent_config/mental-model.md",
+      "status": "missing"
+    },
+    {
+      "axis": "anchor_integrity",
+      "basis": "wc -l admin/server.py  # must be >= 1365",
+      "check_id": "anchor_integrity/docs/architecture/current/claude_tools_to_skills_scope.md:152/admin/server.py:1365",
+      "claim": "docs/architecture/current/claude_tools_to_skills_scope.md:152 cites `admin/server.py:1365`",
+      "code_truth": "line 1365 is past EOF in every candidate (apps/control_room/server.py=214 lines)",
+      "source": "docs/architecture/current/claude_tools_to_skills_scope.md:152",
+      "status": "stale"
+    },
+    {
+      "axis": "anchor_integrity",
+      "basis": "wc -l admin/server.py  # must be >= 802",
+      "check_id": "anchor_integrity/docs/architecture/current/claude_tools_to_skills_scope.md:311/admin/server.py:779-802",
+      "claim": "docs/architecture/current/claude_tools_to_skills_scope.md:311 cites `admin/server.py:779-802`",
+      "code_truth": "line 802 is past EOF in every candidate (apps/control_room/server.py=214 lines)",
+      "source": "docs/architecture/current/claude_tools_to_skills_scope.md:311",
+      "status": "stale"
+    },
+    {
+      "axis": "anchor_integrity",
+      "basis": "wc -l admin/server.py  # must be >= 776",
+      "check_id": "anchor_integrity/docs/architecture/current/claude_tools_to_skills_scope.md:318/admin/server.py:738-776",
+      "claim": "docs/architecture/current/claude_tools_to_skills_scope.md:318 cites `admin/server.py:738-776`",
+      "code_truth": "line 776 is past EOF in every candidate (apps/control_room/server.py=214 lines)",
+      "source": "docs/architecture/current/claude_tools_to_skills_scope.md:318",
+      "status": "stale"
+    },
+    {
+      "axis": "anchor_integrity",
+      "basis": "wc -l verify.md  # must be >= 262",
+      "check_id": "anchor_integrity/docs/architecture/current/context_abstraction_addendum_design.md:399/verify.md:258-262",
+      "claim": "docs/architecture/current/context_abstraction_addendum_design.md:399 cites `verify.md:258-262`",
+      "code_truth": "line 262 is past EOF in every candidate (docs/verification/verify.md=38 lines)",
+      "source": "docs/architecture/current/context_abstraction_addendum_design.md:399",
+      "status": "stale"
+    },
+    {
+      "axis": "anchor_integrity",
+      "basis": "wc -l admin/server.py  # must be >= 877",
+      "check_id": "anchor_integrity/docs/architecture/current/routing_design.md:420/admin/server.py:860-877",
+      "claim": "docs/architecture/current/routing_design.md:420 cites `admin/server.py:860-877`",
+      "code_truth": "line 877 is past EOF in every candidate (apps/control_room/server.py=214 lines)",
+      "source": "docs/architecture/current/routing_design.md:420",
+      "status": "stale"
+    }
+  ],
+  "git_sha": "ec4b7bda4533e2229a9bfe538527d2716c68c717",
+  "missing": 4,
+  "per_axis": {
+    "anchor_integrity": 5,
+    "cli_surface": 4,
+    "manifest_counts": 0,
+    "module_inventory": 0,
+    "spec_lifecycle": 0,
+    "status_vocabulary": 0
+  },
+  "proposal_id": "d6211d951cbc9940",
+  "report": "experiments/results/docs_drift/latest.json",
+  "run": {},
+  "schema": "docs-proposal/v1",
+  "stale": 5,
+  "state": "warranted",
+  "threshold": 0,
+  "why": "9 docs-drift finding(s) across 2 axis/axes (anchor_integrity 5, cli_surface 4)"
+}

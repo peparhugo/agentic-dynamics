@@ -1,0 +1,136 @@
+name: control_room_live_board
+question: >-
+  Make the Control Room's phases board distinguish LIVE runs from history. Today the
+  board shows all 267 cumulative phase publications with no live/historical separation —
+  a run in flight blends into the wall of completed phases, so "is anything running?"
+  has no visual answer (the 2026-09-01 session hit this: three runs finished and the
+  operator could not see that nothing was live). This tiny spec adds the live dimension:
+  the board's API marks each run live (a phase published within a live window OR a
+  runner heartbeat) vs historical, the portal renders a "LIVE NOW" section above the
+  full board with a filter, and the state degrades gracefully when the marker is
+  absent. Small: no new tiers, no new storage — the existing story_phase hash + the
+  runner's live telemetry are the source.
+version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: false
+repeatable: false
+# NOTE (execution path): tiny portal work — in-process per the skill's fallback.
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: false
+    context:
+      domain_context: >-
+        canonical_sources: [apps/control_room/routes/telemetry.py (the phases board:
+        story_phase hash parsing — _parse_phases, the /api/matrix + /api/status
+        surfaces; the i-of-N phase publications from the orchestrator siblings),
+        apps/control_room/static/app.js (the board rendering — the phases panel),
+        apps/control_room/server.py (the route registry), src/agentic_dynamics/control/
+        live.py (LivePublisher — the publish contract; the runner's set_status +
+        publish_event), src/agentic_dynamics/runtime/workflow_runner.py (the run's
+        lifecycle — started_at, the per-phase ledger writes), the run ledgers
+        (experiments/results/workflows/<spec>/*.json — state ok/failed/cancelled + the
+        ended_at), scripts/monitor.py (the queue dashboard — the live-watch precedent),
+        tests/test_admin_frontend.py + tests/test_admin_server.py (the portal test
+        families), the 2026-09-01 observation (the board showed 267 cumulative phases;
+        three finished runs were indistinguishable from live ones)].
+        policies: [live_is_inferred_never_stored, graceful_without_marker,
+        regenerate_never_hand_edit].
+      challenge_context: >-
+        challenge: "live" must be inferred, not stored — the story_phase hash is
+        cumulative and the runner never writes an explicit live flag. The risk: a
+        live/heuristic that mislabels (a run that stalled and died still looks live
+        until its phases age out; a freshly-published phase of a dead run looks live).
+        The discipline: LIVE = the run has a phase published within a bounded live
+        window (default: 10 minutes — the watchdog horizon) AND/OR the runner's live
+        telemetry marks the cell active; a run whose last phase is older than the
+        window renders as historical (with the age visible, so a stalled run is
+        visibly stale, not live). No marker → graceful (the board renders as today,
+        with live unknown rather than wrong).
+        deliberation: [audit the board surface, implement the live inference + the
+        LIVE NOW section, test the states].
+        session_policy: {default: continue}
+      current_state: >-
+        MEASURED (2026-09-01): the phases board serves 267 cumulative story_phase
+        entries; the portal renders them as one list with the i-of-N publications; no
+        live/historical separation exists. The runner publishes phases + a run's
+        ledger carries state/ended_at, but the board does not consume either for
+        liveness. The live-watch precedent exists in scripts/monitor.py's --watch.
+      hard_rules: >-
+        (1) LIVE IS INFERRED, NEVER STORED: no new Redis key, no new ledger field — the
+        live window + the existing telemetry are the source; the portal computes
+        liveness at render time.
+        (2) GRACEFUL WITHOUT A MARKER: a run with no phase timestamps renders as
+        historical-with-age-unknown, never as a mislabeled live.
+        (3) A STALLED RUN IS VISIBLY STALE: past the live window the run leaves LIVE
+        NOW and shows its age — a dead run must not hold the live slot.
+        (4) REGENERATE, NEVER HAND-EDIT: derived surfaces go through their generators.
+    phases:
+      - name: p1_board_audit
+        kind: agent
+        scope: research_readonly
+        timeout: 3600
+        prompt: |
+          GOAL: {goal}
+          SHAPE: audit the board surface end-to-end. Walk the chain: the story_phase
+          hash (db1/6380 — what each entry carries: the phase JSON with index/total/
+          name + any timestamps), the _parse_phases consumer in telemetry.py, the
+          /api/matrix + /api/status payloads, and the app.js rendering (where the
+          phases list is drawn). Answer: (a) do the phase entries carry timestamps
+          (published-at) or only the phase payload; (b) does the runner's live
+          telemetry (set_status/publish_event) leave anything the board could consume
+          for liveness; (c) what does a dead-run-with-fresh-phase look like today.
+          Produce the gap table (surface | liveness signal available | gap) in
+          docs/architecture/current/2026-09-01_live_board_audit.md. Do NOT edit code.
+          DELIVER: the audit doc, committed.
+          LOG: PASS/FAIL with the liveness-signal inventory; commit.
+      - name: p2_live_board
+        kind: agent
+        scope: implementation
+        timeout: 5400
+        prompt: |
+          GOAL: {goal}
+          SHAPE: implement the live dimension per the audit. (a) The API marks each run
+          live/historical: LIVE = a phase published within the live window (default 10
+          minutes — the watchdog horizon) and/or the runner's live telemetry marks the
+          cell active; each entry gains {live: bool, last_phase_ts, age_seconds}
+          (age-unknown when no timestamp exists). (b) The portal renders a LIVE NOW
+          section above the full board (live runs, newest first, with the i-of-N + age),
+          and a filter (live/all) — the historical section stays the current list with
+          ages. (c) The stalled-run rule: past the window, a run leaves LIVE NOW and
+          shows its age in the historical list. (d) Tests: fresh-phase-run renders
+          live; old-phase-run renders historical with age; no-timestamp-run renders
+          historical age-unknown; the filter works; the API marks exactly the runs the
+          window says.
+          VERIFY (both directions): a run with a fresh phase is LIVE; a run with only
+          old phases is not — and a phase published by a dead process is not live
+          (the window, not the process, decides).
+          DELIVER: the live board + tests, committed.
+          LOG: PASS/FAIL with the state matrix; commit.
+factors:
+  - {name: model, levels: [deepseek/deepseek-v4-flash]}
+design: factorial
+rules:
+  - name: board_audited
+    plane: measurement
+    evidence_class: "[C]"
+    requires: []
+    produces: [liveness_signal_inventory]
+  - name: live_board_built
+    plane: measurement
+    evidence_class: "[C]"
+    requires: [liveness_signal_inventory]
+    produces: [live_now_rendered, stalled_run_leaves_live, graceful_age_unknown]
+metrics:
+  - {name: live_now_rendered, agg: mean, over: cell}
+  - {name: stalled_run_leaves_live, agg: mean, over: cell}
+  - {name: graceful_age_unknown, agg: mean, over: cell}
+writeup:
+  format: lab_book
+  sections: [question, p1_board_audit, p2_live_board]
+stop: {budget_usd: 2.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}

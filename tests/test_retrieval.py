@@ -623,6 +623,145 @@ def test_candidate_citation_format():
     assert c.citation() == "[K:k1@abc:symbol:foo]"
 
 
+# ── Overlap instrument (retrieval_fusion_quality p1 — the cross-leg content join) ──
+
+
+def _lexical_hit_without_hash(cid="doc_lex", text="lexical websocket reload hit"):
+    """A lexical hit whose Neo4j properties carry NO content_hash (the real gap)."""
+    return {
+        "id": "elem:lex",
+        "properties": {
+            "text": text,
+            "authority": "source",
+            "knowledge_id": cid,
+        },
+        "score": 0.9,
+    }
+
+
+def test_candidate_legs_attribution():
+    both = _cand("b", dense_rank=0, lexical_rank=0)
+    dense = _cand("d", dense_rank=0)
+    lexical = _cand("l", lexical_rank=0)
+    expanded = _cand("e", graph_depth=1)
+    assert both.legs == "both"
+    assert dense.legs == "dense"
+    assert lexical.legs == "lexical"
+    assert expanded.legs == "expansion"
+
+
+def test_dense_leg_carries_persisted_and_join_content_hash():
+    from agentic_dynamics.knowledge.knowledge import compute_content_hash
+
+    text = "the retrieval fusion is a union under disjoint top-k"
+    hit = _dense_hit("k_dense", text, authority="source", content_hash="artifact-hash")
+    attempt = retrieve("retrieval fusion", dense_store=_FakeDenseStore([hit]))
+    cand = next(c for c in attempt.candidates if c.id == "k_dense")
+    # The persisted artifact hash stays on content_hash (unchanged semantics).
+    assert cand.content_hash == "artifact-hash"
+    # The join-consistent text hash is derived identically on the dense leg.
+    assert cand.join_content_hash == compute_content_hash(text)
+
+
+def test_lexical_leg_derives_join_content_hash_when_store_lacks_it():
+    from agentic_dynamics.knowledge.knowledge import compute_content_hash
+
+    text = "a lexical hit whose node carries no content_hash property"
+    graph = _FakeGraph(lexical_hits=[_lexical_hit_without_hash(cid="k_lex", text=text)])
+    attempt = retrieve("lexical websocket reload", dense_store=None, graph_client=graph)
+    cand = next(c for c in attempt.candidates if c.id == "k_lex")
+    # The gap is honest: no persisted artifact hash on the lexical leg.
+    assert cand.content_hash == ""
+    # The join-consistent text hash closes the gap with the same hashing rule.
+    assert cand.join_content_hash == compute_content_hash(text)
+
+
+def _no_embedder(monkeypatch):
+    """Force the cosine-collapse to degrade to a no-op (deterministic pair tests)."""
+    import agentic_dynamics.knowledge.embeddings as embeddings
+
+    class _Unavailable:
+        def __init__(self, *args, **kwargs):
+            raise RuntimeError("ollama unavailable in this test")
+
+    monkeypatch.setattr(embeddings, "EmbeddingClient", _Unavailable)
+
+
+def test_seeded_same_content_pair_is_detected_by_the_join(monkeypatch):
+    # H1 shape: the SAME text indexed under DIFFERENT ids on the two legs — the
+    # id-based fusion check can never fire (ids differ), but the content join must.
+    from agentic_dynamics.knowledge.knowledge import compute_content_hash
+
+    _no_embedder(monkeypatch)
+    text = "the same websocket reload protocol documented under two ids"
+    dense = _FakeDenseStore([_dense_hit("dense-id", text, authority="source")])
+    graph = _FakeGraph(lexical_hits=[_lexical_hit_without_hash(cid="lexical-id", text=text)])
+    attempt = retrieve("websocket reload protocol", dense_store=dense, graph_client=graph)
+
+    ids = {c.id for c in attempt.candidates}
+    assert {"dense-id", "lexical-id"} <= ids  # two genuinely distinct records kept
+    assert all(c.legs == "dense" or c.legs == "lexical" for c in attempt.candidates)
+
+    overlap = attempt.leg_overlap()
+    assert overlap["fused"] == 0  # id-based fusion still cannot fire (different ids)
+    assert overlap["content_pairs"] == 1  # ... but the content join sees the pair
+    assert overlap["distinct_content_hashes"] == 1
+    assert ("dense-id", "lexical-id") in overlap["sample_pairs"]
+    # The pair's shared text hash is the exact compute_content_hash rule.
+    shared = {c.join_content_hash for c in attempt.candidates}
+    assert shared == {compute_content_hash(text)}
+
+
+def test_distinct_content_pair_never_joins(monkeypatch):
+    # H2 shape: genuinely distinct texts on the two legs must never form a pair.
+    _no_embedder(monkeypatch)
+    dense = _FakeDenseStore(
+        [_dense_hit("d1", "quantum entanglement of distant particles", authority="source")]
+    )
+    graph = _FakeGraph(
+        lexical_hits=[_lexical_hit_without_hash(cid="l1", text="websocket reload protocol")]
+    )
+    attempt = retrieve("websocket reload", dense_store=dense, graph_client=graph)
+    assert {c.id for c in attempt.candidates} == {"d1", "l1"}
+    overlap = attempt.leg_overlap()
+    assert overlap["content_pairs"] == 0
+    assert overlap["distinct_content_hashes"] == 0
+    assert overlap["sample_pairs"] == []
+
+
+def test_leg_overlap_matches_rank_attribution_on_a_both_leg_candidate():
+    # The join must agree with the census's id-level attribution: a candidate the
+    # lexical leg merges onto (same id) counts as fused, with zero content pairs.
+    from agentic_dynamics.knowledge.knowledge import compute_content_hash
+
+    text = "same record surfaced by both legs under the same id"
+    dense = _FakeDenseStore([_dense_hit("k_both", text, authority="source")])
+    graph = _FakeGraph(lexical_hits=[_lexical_hit_without_hash(cid="k_both", text=text)])
+    attempt = retrieve("websocket reload", dense_store=dense, graph_client=graph)
+
+    both = [c for c in attempt.candidates if c.id == "k_both"]
+    assert len(both) == 1  # merged under the shared id
+    assert both[0].legs == "both"
+    assert both[0].join_content_hash == compute_content_hash(text)
+
+    overlap = attempt.leg_overlap()
+    assert overlap["fused"] == 1
+    assert overlap["dense_only"] == 0 and overlap["lexical_only"] == 0
+    assert overlap["content_pairs"] == 0  # one candidate, not a cross-id pair
+
+
+def test_join_instrument_does_not_change_fusion_off_path():
+    # The join fields are observational only: deduplicate must still key on the
+    # persisted content_hash (or id when absent) — never on the join hash — so a
+    # candidate carrying a join_content_hash but no persisted hash is NOT collapsed.
+    c1 = _cand("k1", content_hash="")
+    c2 = _cand("k2", content_hash="")
+    c1.join_content_hash = "shared-text-hash"
+    c2.join_content_hash = "shared-text-hash"
+    out = deduplicate([c1, c2])
+    assert len(out) == 2  # distinct ids, no persisted hash → never merged
+
+
 # ── Graph-expansion leg wiring (real seed score × weight × decay) ──
 
 

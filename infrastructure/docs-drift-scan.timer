@@ -1,0 +1,35 @@
+# docs-drift-scan.timer — the schedule for the docs-drift watchdog (automatic_docs_sync p2).
+#
+# Hourly by default, per the spec. The cadence is a trade between how fast a stale doc is
+# noticed and how much noise the rail generates — and the edge-triggered flag design is what
+# makes hourly cheap: a repeated finding rewrites the level surfaces (report, board row) but
+# appends NO new flag record, so a week of unfixed drift is one flag, not 168.
+#
+# Change the cadence by editing OnCalendar and re-running `systemctl --user daemon-reload`.
+# See docs-drift-scan.service for install and inspection commands.
+
+[Unit]
+Description=Hourly docs-drift scan (source-doc content rail)
+Documentation=file:///home/drseuss/ai-finops-framework/workflows/repository/automatic_docs_sync.yaml
+
+[Timer]
+# Top of every hour.
+OnCalendar=hourly
+
+# Catch up after downtime: if the host was asleep or off across a boundary, run once on resume
+# rather than silently skipping. A watchdog that goes quiet exactly when the machine was doing
+# something unusual is a watchdog that misses the interesting window.
+Persistent=true
+
+# Spread the start across the hour. Costs nothing here (the scan is local and model-free) but
+# keeps this unit from contending with any other top-of-the-hour job on the same box.
+RandomizedDelaySec=300
+
+# Also run shortly after boot, so a machine that has been off for a day reports its true state
+# promptly instead of waiting for the next calendar boundary.
+OnBootSec=10min
+
+Unit=docs-drift-scan.service
+
+[Install]
+WantedBy=timers.target

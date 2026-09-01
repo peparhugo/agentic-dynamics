@@ -599,6 +599,162 @@ pre {
   color: var(--text-faint);
 }
 
+/* ── 7b. Docs health panel ───────────────────────────────────────────────────────────────────
+
+   The docs-drift rail's surface, sitting beside the pipeline strip. It is a THIRD status axis
+   and is kept structurally distinct from the two board-fleet.js defines: its own `docs-health-`
+   class prefix, and its state carried on a `data-condition` attribute rather than a `status-`
+   class, so there is no way for a docs condition to be looked up in the lifecycle vocabulary.
+
+   HUE CHOICE, deliberately following the attention-axis precedent. The alarm colours come from
+   the ATTENTION family (`--attention-off-track` rose, `--attention-stalled` amber), not the
+   lifecycle family, for the same reason `off_track` is rose and not lifecycle red: a verdict
+   about the documentation must not be misreadable as an execution failure. Green is the one
+   token shared with the lifecycle axis (`--status-done`), because "current" has no confusable
+   second reading — nothing about a green docs panel can be mistaken for a cell having finished.
+
+   Colour is never the only signal: the glyph and the WORD are painted in the markup regardless,
+   and `warranted` and `unmeasured` are told apart by their word, not their (identical) hue. */
+
+.docs-health {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  padding: var(--sp-2);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--status-unknown);
+  border-radius: var(--radius-md);
+  background: var(--bg-1);
+}
+
+/* One rule per condition. `unknown` (the pre-fetch initial state) stays neutral: the panel must
+   not paint a verdict before it has one. */
+.docs-health[data-condition="clean"] { border-left-color: var(--status-done); }
+.docs-health[data-condition="findings"] { border-left-color: var(--attention-stalled); }
+.docs-health[data-condition="warranted"] { border-left-color: var(--attention-off-track); }
+.docs-health[data-condition="unmeasured"] { border-left-color: var(--attention-unknown); }
+
+.docs-health[data-condition="clean"] #docs-health-word { color: var(--status-done); }
+.docs-health[data-condition="findings"] #docs-health-word { color: var(--attention-stalled); }
+.docs-health[data-condition="warranted"] #docs-health-word { color: var(--attention-off-track); }
+.docs-health[data-condition="unmeasured"] #docs-health-word { color: var(--attention-unknown); }
+
+.docs-health-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--sp-2);
+  flex-wrap: wrap;
+}
+
+.docs-health-header h3 {
+  margin: 0;
+  font-size: var(--fs-small);
+  letter-spacing: 0.08em;
+}
+
+.docs-health-glyph {
+  display: inline-block;
+  min-width: 1em;
+  margin-right: var(--sp-1);
+  text-align: center;
+}
+
+.docs-health-headline {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: var(--fs-small);
+  color: var(--text);
+}
+
+/* Per-axis counts as a compact `name  N` grid. Collapses to nothing on a clean scan, where
+   there is no axis with anything to say. */
+.docs-health-axes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-1) var(--sp-2);
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: var(--fs-eyebrow);
+}
+
+.docs-health-axes:empty { display: none; }
+.docs-health-axis-name { color: var(--text-muted); }
+.docs-health-axis-count { margin: 0 var(--sp-2) 0 var(--sp-1); color: var(--text); }
+
+.docs-health-inventory {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+}
+
+.docs-health-inventory:empty { display: none; }
+
+/* Findings are collapsed by default: the inventory is evidence to open when a decision is being
+   made, not a wall to scroll past on every glance at the board. */
+.docs-health-finding {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: var(--sp-1) var(--sp-2);
+  background: var(--bg-0);
+}
+
+.docs-health-finding-summary {
+  cursor: pointer;
+  font-family: var(--font-mono);
+  font-size: var(--fs-eyebrow);
+}
+
+.docs-health-finding-status { margin-right: var(--sp-1); color: var(--attention-stalled); }
+.docs-health-finding-source { color: var(--text-muted); }
+
+.docs-health-finding p {
+  margin: var(--sp-1) 0 0;
+  font-family: var(--font-mono);
+  font-size: var(--fs-eyebrow);
+  color: var(--text-muted);
+  overflow-wrap: anywhere;
+}
+
+.docs-health-finding-basis { color: var(--text-faint); }
+
+.docs-health-proposal {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+  padding-top: var(--sp-2);
+  border-top: 1px solid var(--border);
+}
+
+.docs-health-proposal-detail {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: var(--fs-eyebrow);
+  color: var(--text);
+}
+
+.docs-health-approve {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+}
+
+.docs-health-approve label {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: var(--fs-eyebrow);
+  color: var(--text-muted);
+}
+
+.docs-health-approve-result {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: var(--fs-eyebrow);
+  color: var(--text-muted);
+  overflow-wrap: anywhere;
+}
+
 /* Expanded variant: the same strip, adopted by the Status board (design §5.2). */
 .board-status .pipeline-stages { grid-template-columns: minmax(0, 1fr); }
 .board-status .pipeline-stage { padding: var(--sp-3); }

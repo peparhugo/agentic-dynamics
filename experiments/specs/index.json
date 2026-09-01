@@ -1,7 +1,7 @@
 {
   "schema_version": "spec-status/v2",
-  "generated_at": "2026-09-01T03:15:48.469713+00:00",
-  "n_specs": 174,
+  "generated_at": "2026-09-01T04:18:59.346446+00:00",
+  "n_specs": 175,
   "specs": [
     {
       "name": "auto_posthoc_wiring",
@@ -625,13 +625,13 @@
       "supersedes": [],
       "superseded_by": null,
       "completed_at": null,
-      "last_run_at": "2026-09-01T03:15:48.411175+00:00",
-      "latest_ok": true,
-      "latest_model": "deepseek/deepseek-v4-flash",
-      "latest_cost_usd": 0.003068,
-      "latest_git_sha": "1e1fba49e",
-      "results_pointer": "experiments/results/workflows/retrieval_activation_augment_proof/20260901T031548Z.json",
-      "n_runs": 1
+      "last_run_at": null,
+      "latest_ok": null,
+      "latest_model": null,
+      "latest_cost_usd": null,
+      "latest_git_sha": null,
+      "results_pointer": null,
+      "n_runs": 0
     },
     {
       "name": "routing_kb_dispatch",
@@ -2880,6 +2880,24 @@
       "latest_git_sha": "8d17a7135",
       "results_pointer": "experiments/results/workflows/repo_review_fable/20260818T232411Z.json",
       "n_runs": 2
+    },
+    {
+      "name": "retrieval_fusion_quality",
+      "version": "0.1",
+      "status": "completed",
+      "spec_path": "workflows/repository/retrieval_fusion_quality.yaml",
+      "artifact_kind": "workflow",
+      "repeatable": false,
+      "supersedes": [],
+      "superseded_by": null,
+      "completed_at": null,
+      "last_run_at": "2026-09-01T04:10:00+00:00",
+      "latest_ok": true,
+      "latest_model": "deepseek/deepseek-v4-flash",
+      "latest_cost_usd": 0.0,
+      "latest_git_sha": "1cfee6fc1",
+      "results_pointer": "experiments/results/workflows/retrieval_fusion_quality/20260901T041000Z.json",
+      "n_runs": 1
     },
     {
       "name": "retry_observational_analysis",

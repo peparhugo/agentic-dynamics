@@ -12,6 +12,7 @@ argument-hint: ""
 this skill is a **flag-only, observe-never-steer** rail onto the Control Room portal
 (`apps/control_room/server.py`) and `scripts/supervise.py`. It exposes GET-only reads. **Never**
 issue a POST to any control route (`/api/flags/<id>/steer`, `/api/flags/<id>/interrupt`,
+`/api/docs-health/approve` — the docs-remediation signature is the CONTROLLER's, never an agent's,
 `/api/design-sessions/<id>/interrupt`, or the `/api/claude-agents` create/stop/respawn/rm/steer
 routes) — those are the human-operator control surface, and exposing them as an agent-callable
 action would let a session steer or interrupt itself or a peer session through the one channel
@@ -24,8 +25,8 @@ Port: `int(os.environ.get("FINOPS_PORT", "8000"))`. Requires the portal already 
 (`python3 apps/control_room/server.py`) — this skill does not start it.
 
 Routes are registered from `apps/control_room/routes/` (`telemetry.py`, `flags.py`,
-`registry.py`, `design_sessions.py`, `claude_agents.py`, `index.py`). The plain-JSON GET
-endpoints you may read:
+`registry.py`, `design_sessions.py`, `claude_agents.py`, `docs_health.py`, `index.py`).
+The plain-JSON GET endpoints you may read:
 
 ```
 GET /api/matrix           — experiment cell status matrix        (routes/telemetry.py)
@@ -35,6 +36,7 @@ GET /api/registry         — knowledge registry                   (routes/regis
 GET /api/registry/<id>    — registry lineage                     (routes/registry.py)
 GET /api/design-sessions  — design session state                 (routes/design_sessions.py)
 GET /api/claude-agents    — Claude background session state      (routes/claude_agents.py)
+GET /api/docs-health      — docs-drift health + proposal state   (routes/docs_health.py)
 ```
 
 Primary example — lead with `/api/matrix`, not `/api/status`:
@@ -45,6 +47,7 @@ curl -s "http://127.0.0.1:${FINOPS_PORT:-8000}/api/flags"
 curl -s "http://127.0.0.1:${FINOPS_PORT:-8000}/api/routing"
 curl -s "http://127.0.0.1:${FINOPS_PORT:-8000}/api/design-sessions"
 curl -s "http://127.0.0.1:${FINOPS_PORT:-8000}/api/claude-agents"
+curl -s "http://127.0.0.1:${FINOPS_PORT:-8000}/api/docs-health"
 ```
 
 ### `/api/status` is a hazard — do not bare-`curl` it
