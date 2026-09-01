@@ -2654,6 +2654,11 @@ def run_workflow(
         scope = cell_scope(wd)
         rag_params["repository_id"] = scope
         rag_params["acl_scope"] = scope
+    # The default constructor's own model call needs a real workdir (its opencode
+    # session is a paid invocation, like the executor's); empty would crash the
+    # adapter's ``_init_git_workdir`` and silently degrade the seam to ``no_rag``.
+    if rag_augment:
+        rag_params["workdir"] = str(wd)
     pinned_policy = str(rag_params.get("pinned_policy", ""))
     inherited_tools = list(rag_params.get("inherited_tools") or DEFAULT_INHERITED_TOOLS)
 

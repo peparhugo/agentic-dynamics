@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import functools
 import hashlib
+import os
 import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -261,7 +262,7 @@ def default_construct_fn(
             prompt,
             model=constructor_model,
             backend=None,
-            workdir="",
+            workdir=str(rag_params.get("workdir") or os.getcwd()),
             thinking_effort="low",
             thinking_budget_tokens=0,
             output_token_limit=int(rag_params.get("output_budget_tokens", 1500)),
