@@ -181,7 +181,7 @@ workflow:
           DELIVER: the route + panel + the state tests, committed.
           LOG: PASS/FAIL with the three-state render evidence; commit.
 factors:
-  - {name: model, levels: [deepseek/deepseek-v4-flash]}
+  - {name: model, levels: [anthropic/claude-opus-5]}
 design: factorial
 rules:
   - name: scanner_built
