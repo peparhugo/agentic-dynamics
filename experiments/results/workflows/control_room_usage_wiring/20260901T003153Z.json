@@ -1,0 +1,20 @@
+{
+  "spec_name": "control_room_usage_wiring",
+  "spec_id": "control_room_usage_wiring@0.1",
+  "model": "openai/gpt-5.6-luna",
+  "workdir": "/tmp/wt_usage_wiring",
+  "goal": "Wire the subscription checks into the Control Room, end-to-end and visibly: the provider usage windows (anthropic 5h/7d, openai prolite), the DeepSeek platform meter (balance/wallet + spend), and the per-token cash view \u2014 served by the existing subscription-usage/v3 service behind the 15-min polite cache, surfaced in the portal UI with working refresh, sane error states, and tests. Audit first, then close the gaps.",
+  "git_sha": "ce0a26c8a",
+  "started_at": "2026-09-01T00:31:53.361697+00:00",
+  "ended_at": "2026-09-01T00:31:53.390568+00:00",
+  "awaiting": false,
+  "awaiting_phase": "",
+  "awaiting_reason": "",
+  "checkpoints": [],
+  "state": "cancelled",
+  "attempts": [],
+  "attempt_count": 0,
+  "total_cost_usd": 0,
+  "ok": false,
+  "phases": []
+}
