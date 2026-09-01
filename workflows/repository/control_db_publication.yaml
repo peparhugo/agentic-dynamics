@@ -84,7 +84,10 @@ workflow:
         (p3 — the visibility a publication gate needs), then the control packet
         (p4 — the operator/master surface over the db), then the instruction-surface
         collapse (p5 — the generator must not drift), then the one publication
-        command + receipt (p6 — the last mile, which consumes every earlier phase)].
+        command + receipt (p6 — the last mile, which consumes every earlier phase),
+        then the independent cross-model adversarial review (p7 — the house
+        mandatory, trying to falsify the whole control plane), then the harness test
+        gate (p8)].
         session_policy: {default: continue}
       current_state: >-
         MEASURED (2026-09-01): no control.db exists; run state is the ledger JSON
@@ -130,6 +133,14 @@ workflow:
         (scripts/promote.py) alone updates main; projectors consume committed events
         and never change workflow outcome; the publisher releases only verified,
         receipt-covered artifacts.
+        (7) ADVERSARIAL MANDATORY (the house convention): p7 is an independent
+        cross-model adversarial review (run_model: deepseek/deepseek-v4-flash — a
+        DIFFERENT model and session than the author, the cheapest proven
+        adversarial reviewer in this repo) that tries to falsify the
+        control plane — at least 3 findings or a clean sweep with re-verification
+        evidence; a bare PASS is a failed review; every finding is fixed on the
+        branch or recorded as an accepted limitation. The run is not complete until
+        the adversarial review lands.
     phases:
       - name: p1_control_db
         kind: agent
@@ -306,7 +317,47 @@ workflow:
           DELIVER: publish_release.py + the HTML-consistency test + the receipt +
           the fixed homepage, committed.
           LOG: PASS/FAIL; commit.
-      - name: p7_test_gate
+      - name: p7_adversarial
+        kind: agent
+        scope: adversarial_readonly
+        requires_deliverable: true
+        run_model: deepseek/deepseek-v4-flash
+        timeout: 14400
+        prompt: |
+          GOAL: {goal}
+          ROLE: the INDEPENDENT adversarial reviewer — a DIFFERENT model and session
+          (flash vs the opus-5 author, the house independence convention). You are
+          NOT the author: your job is to falsify the control plane, not to certify it.
+          Attack in order, each re-verified against the actual code (never asserted):
+          (1) the control db — is there ANY code path that still treats a ledger JSON,
+          Redis story_status, the spec index, or the website as the authoritative run
+          state? does the run-state vocabulary hold everywhere (a bool that overloads
+          "completed" anywhere)? are terminal states immutable (an update of a merged/
+          failed run refused)? (2) the outbox — can ANY child still emit knowledge,
+          refresh an index, or write a ledger independently (the P0-2 child contract
+          bypassed)? is the at-least-once claim re-derived (a crash between stream ack
+          and row mark must produce a redelivery, never a loss)? (3) the watermarks —
+          is a stale projector VISIBLE, or can a lagging consumer still read as
+          "current"? (4) the control packet — are safe_actions really DERIVED from the
+          db (a hard-coded action list anywhere)? does control_epoch actually advance
+          on every transition? (5) the surfaces — does the generated root AGENTS.md
+          match its agent_config source byte-for-byte (--check genuinely fails on
+          drift)? is any run-state table/snapshot/177-spec list still in the DEFAULT
+          master context? (6) the publication — can the website still contradict its
+          own data.js through ANY page (the HTML-consistency test covers every page,
+          not just index.html)? does publish release --dry-run touch anything?
+          Every finding: FIX on the branch or RECORD as an accepted limitation with
+          reasoning (the deep-review findings this wave closes may have residual
+          accepted scope — say so explicitly). At least 3 findings or a clean sweep
+          with re-verification evidence — a bare PASS is a failed review.
+          RELEASE VERDICT: state whether the control_db_publication branch is
+          merge-ready to main and what the operator must do after merge (e.g. arm the
+          publication gate, re-point the Control Room routes).
+          DELIVER: docs/reviews/control_db_publication_adversarial.md (finding table:
+          finding / attack / re-verification evidence / fix-or-record / residual
+          scope), committed.
+          LOG: finding table; PASS/FAIL; commit.
+      - name: p8_test_gate
         kind: test
         scope: implementation
         timeout: 900
@@ -327,7 +378,7 @@ workflow:
           - tests/test_publish_release.py
           - tests/test_spawn_wrapper.py
 factors:
-  - {name: model, levels: [anthropic/claude-sonnet-5]}
+  - {name: model, levels: [anthropic/claude-opus-5]}
 design: factorial
 rules:
   - name: control_db_durable
@@ -360,6 +411,11 @@ rules:
     evidence_class: "[C]"
     requires: [control_status_json, projection_lag_visible, agents_generated_from_one_source]
     produces: [publication_receipt, html_consistency_verified]
+  - name: adversarial_reviewed
+    plane: measurement
+    evidence_class: "[M]"
+    requires: [publication_receipt, html_consistency_verified]
+    produces: [control_plane_adversarial_clean]
   - name: test_gate_measured
     plane: measurement
     evidence_class: "[M]"
@@ -373,9 +429,10 @@ metrics:
   - {name: agents_generated_from_one_source, agg: mean, over: cell}
   - {name: publication_receipt, agg: mean, over: cell}
   - {name: html_consistency_verified, agg: mean, over: cell}
+  - {name: control_plane_adversarial_clean, agg: mean, over: cell}
   - {name: independent_gate_recorded, agg: mean, over: cell}
 writeup:
   format: lab_book
-  sections: [question, p1_control_db, p2_outbox, p3_projection_watermarks, p4_control_packet, p5_instruction_surfaces, p6_publication_receipt, p7_test_gate]
+  sections: [question, p1_control_db, p2_outbox, p3_projection_watermarks, p4_control_packet, p5_instruction_surfaces, p6_publication_receipt, p7_adversarial, p8_test_gate]
 stop: {budget_usd: 12.0, max_attempts: 1}
 adapt: {strategy: manual, selection: highest_regret}
