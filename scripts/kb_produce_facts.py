@@ -356,7 +356,9 @@ def _derive_workflow_facts(repository_id: str, revision: str, now: str) -> list:
     lower += spec_status_v1(spec_inp)
 
     identity_out: dict[int, str] = {}
-    lower_records = fi.derive_fact_records(lower, registry_path=REGISTRY_INDEX_PATH, identity_out=identity_out)
+    lower_records = fi.derive_fact_records(
+        lower, registry_path=REGISTRY_INDEX_PATH, identity_out=identity_out
+    )
     wf_inp = ReducerInput(
         scope_path=f"org:{repository_id}",
         scope_type="workflow",
@@ -540,7 +542,9 @@ def derive_run_facts(
 
     lower = attempt + job + policy
     identity_out: dict[int, str] = {}
-    lower_records = fi.derive_fact_records(lower, registry_path=REGISTRY_INDEX_PATH, identity_out=identity_out)
+    lower_records = fi.derive_fact_records(
+        lower, registry_path=REGISTRY_INDEX_PATH, identity_out=identity_out
+    )
     wf_inp = ReducerInput(
         scope_path=workload_scope,
         scope_type="workflow",
@@ -612,7 +616,22 @@ def derive_facts(
         source_revision=revision,
     )
     facts = reducer_fn(inp)
-    return fi.derive_fact_records(facts, registry_path=REGISTRY_INDEX_PATH)
+    if reducer_version != "pattern/v1":
+        return fi.derive_fact_records(facts, registry_path=REGISTRY_INDEX_PATH)
+
+    # A pattern has two intentionally separate surfaces: the canonical fact for address-based
+    # control and its derived knowledge projection for agent retrieval. The projection receives
+    # the registered fact id, so it cites the actual fact version rather than a provisional id.
+    identity_out: dict[int, str] = {}
+    fact_records = fi.derive_fact_records(
+        facts, registry_path=REGISTRY_INDEX_PATH, identity_out=identity_out
+    )
+    projections = fi.derive_pattern_projection_records(
+        facts,
+        registry_path=REGISTRY_INDEX_PATH,
+        identity_out=identity_out,
+    )
+    return fact_records + projections
 
 
 # ── Additive corpus families: story cells + summary entries (CAP fact backfill, p3) ──
@@ -791,7 +810,8 @@ def _project_story_result(cell: dict) -> dict:
         "phases": [
             {
                 "phase": (
-                    f"session{s.get('session_number')}" if s.get("session_number") is not None
+                    f"session{s.get('session_number')}"
+                    if s.get("session_number") is not None
                     else "session"
                 ),
                 "kind": "agent",
@@ -851,9 +871,7 @@ def _project_summary_attempt(entry: dict) -> dict:
     }
 
 
-def _dedup_evidence(
-    projects: list[dict], source_type: str
-) -> tuple[EvidenceItem, ...]:
+def _dedup_evidence(projects: list[dict], source_type: str) -> tuple[EvidenceItem, ...]:
     """Mirror ``_run_evidence``'s content-addressed dedup for one projected artifact family.
 
     Two on-disk files carrying byte-identical content (a copied/duplicated artifact) collapse to
@@ -975,8 +993,9 @@ def _summary_facts(repository_id: str, revision: str, now: str) -> list:
 
 def derive_story_facts(repository_id: str, revision: str, now: str) -> list:
     """Derive the story corpus's fact records: per-session attempts + per-cell jobs."""
-    return fi.derive_fact_records(_story_facts(repository_id, revision, now),
-                                  registry_path=REGISTRY_INDEX_PATH)
+    return fi.derive_fact_records(
+        _story_facts(repository_id, revision, now), registry_path=REGISTRY_INDEX_PATH
+    )
 
 
 def derive_story_facts_v1(repository_id: str, revision: str, now: str) -> list:
@@ -1003,8 +1022,9 @@ def derive_story_facts_v1(repository_id: str, revision: str, now: str) -> list:
 
 def derive_summary_facts(repository_id: str, revision: str, now: str) -> list:
     """Derive the summary corpus's fact records: per-entry attempts."""
-    return fi.derive_fact_records(_summary_facts(repository_id, revision, now),
-                                  registry_path=REGISTRY_INDEX_PATH)
+    return fi.derive_fact_records(
+        _summary_facts(repository_id, revision, now), registry_path=REGISTRY_INDEX_PATH
+    )
 
 
 def derive_corpus_facts(repository_id: str, revision: str, now: str) -> list:
@@ -1040,7 +1060,9 @@ def derive_corpus_facts(repository_id: str, revision: str, now: str) -> list:
     )
     lower += spec_status_v1(spec_inp)
     identity_out: dict[int, str] = {}
-    lower_records = fi.derive_fact_records(lower, registry_path=REGISTRY_INDEX_PATH, identity_out=identity_out)
+    lower_records = fi.derive_fact_records(
+        lower, registry_path=REGISTRY_INDEX_PATH, identity_out=identity_out
+    )
     wf_inp = ReducerInput(
         scope_path=f"org:{repository_id}",
         scope_type="workflow",
@@ -1053,9 +1075,12 @@ def derive_corpus_facts(repository_id: str, revision: str, now: str) -> list:
     )
     wf_facts = workflow_facts_v1(wf_inp)
     wf_records = fi.derive_fact_records(wf_facts, registry_path=REGISTRY_INDEX_PATH)
-    all_facts = lower_records + wf_records + derive_story_facts(
-        repository_id, revision, now
-    ) + derive_summary_facts(repository_id, revision, now)
+    all_facts = (
+        lower_records
+        + wf_records
+        + derive_story_facts(repository_id, revision, now)
+        + derive_summary_facts(repository_id, revision, now)
+    )
     return all_facts
 
 
@@ -1084,7 +1109,9 @@ def load_checkpoint_ids(r) -> set[str]:
 
 
 def build_event(record):
-    """Build the pointer event for one fact record (operation + reason derived inside)."""
+    """Build the pointer event for a fact or its retrieval projection."""
+    if record.source_type == fi.PATTERN_SOURCE_TYPE:
+        return fi.pattern_projection_event(record)
     return fi.fact_event(record)
 
 
@@ -1101,8 +1128,12 @@ def _materialize_registry_row(record) -> None:
     a later consumer pass appends byte-identical duplicate lines, which
     ``generate_manifest.py``'s compaction folds away (latest-per-entity).
     """
-    operation = fi.fact_operation(record)
-    reason = fi.fact_reason(record)
+    if record.source_type == fi.PATTERN_SOURCE_TYPE:
+        operation = "supersede" if record.supersedes else "upsert"
+        reason = fi.pattern_projection_reason(record)
+    else:
+        operation = fi.fact_operation(record)
+        reason = fi.fact_reason(record)
     lifecycle = "current" if operation in ("upsert", "supersede") else "tombstoned"
     line = {
         "knowledge_id": record.knowledge_id,

@@ -49,6 +49,9 @@ from agentic_dynamics.knowledge.spec_ingestion import RegistryHead, registry_hea
 #: ``knowledge.SOURCE_TYPES`` (design §3.3). Observation family: a fact states what IS, never
 #: an instruction to act.
 SOURCE_TYPE = "fact"
+PATTERN_SOURCE_TYPE = "pattern"
+PATTERN_PROJECTION_VERSION = "pattern-projection/v1"
+PATTERN_REASON_PREFIX = "pattern-content="
 
 #: Prefix of the ``reason`` annotation a fact record's pointer event carries, so the NEXT
 #: producer run can read the content fingerprint back off the registry line and decide whether
@@ -147,6 +150,70 @@ def build_fact_record(
     )
 
 
+def build_pattern_projection_record(
+    fact: CanonicalFact,
+    *,
+    source_fact_id: str = "",
+    supersedes: str | None = None,
+    now: datetime | None = None,
+) -> KnowledgeRecord:
+    """Project one validated reducer pattern into the retrieval knowledge surface.
+
+    This function intentionally lives beside fact persistence, rather than in retrieval: only a
+    ``pattern/v1`` ``CanonicalFact`` can mint the projection. The raw fact remains a separate,
+    address-only record; this record carries only the typed pattern payload and explicit lineage.
+    """
+    if fact.predicate != "pattern" or fact.reducer_version != "pattern/v1":
+        raise ValueError("only facts minted by pattern/v1 can enter the pattern projection")
+    if fact.authority.name != "DERIVED" or fact.evidence_class != "[C]":
+        raise ValueError("pattern projections require DERIVED/[C] evidence")
+
+    from agentic_dynamics.control.reducers.pattern import decode_pattern_payload
+
+    payload = decode_pattern_payload(fact.value)
+    source_fact_id = source_fact_id or fact.fact_id
+    if not source_fact_id:
+        # Reducers emit provisional facts. Derive the same immutable id the fact pipe will use so
+        # callers can build a projection before the fact is finalized, without inventing identity.
+        source_fact_id = build_fact_record(fact).knowledge_id
+
+    text = json.dumps(
+        {
+            "claim": payload.claim,
+            "population": payload.population,
+            "conditions": list(payload.conditions),
+            "support": payload.support,
+            "uncertainty": payload.uncertainty,
+            "validity_window": payload.validity_window,
+            "source_experiment": payload.source_experiment,
+        },
+        sort_keys=True,
+    )
+    return build_record_from_parts(
+        source_type=PATTERN_SOURCE_TYPE,
+        source_uri=f"pattern:{source_fact_id}",
+        logical_locator=fact_logical_locator(fact.subject_type, fact.subject_id, fact.predicate),
+        repository_id=fact.repository_id,
+        revision=fact.source_revision,
+        authority=fact.authority,
+        evidence_class=fact.evidence_class,
+        text=text,
+        entity_id=f"pattern-projection:{fact.fact_entity_id}",
+        extra_fields={
+            "extractor_version": PATTERN_PROJECTION_VERSION,
+            "valid_from": fact.valid_from,
+            "valid_to": fact.valid_to,
+            "observed_at": fact.observed_at,
+            "pattern_payload": payload,
+            "source_fact_id": source_fact_id,
+            "evidence_ids": tuple(fact.evidence_ids),
+            "outcome_id": source_fact_id,
+            "supersedes": supersedes,
+        },
+        now=now,
+    )
+
+
 def fact_operation(record: KnowledgeRecord) -> str:
     """Return the pointer event's ``operation``: ``supersede`` when the record links a
     predecessor, else ``upsert`` (the same rule as ``spec_ingestion.spec_operation``)."""
@@ -157,6 +224,68 @@ def fact_reason(record: KnowledgeRecord) -> str:
     """Return the ``reason`` annotation carried on the pointer event (the fingerprint the NEXT
     producer run reads back off the registry line)."""
     return f"{REASON_PREFIX}{fact_fingerprint(record)}"
+
+
+def pattern_projection_event(
+    record: KnowledgeRecord, *, now: datetime | None = None
+) -> KnowledgeEvent:
+    """Build the pointer event for a pattern projection without treating it as a raw fact."""
+    if record.source_type != PATTERN_SOURCE_TYPE:
+        raise ValueError("pattern_projection_event requires a pattern record")
+    return record_to_event(
+        record,
+        operation="supersede" if record.supersedes else "upsert",
+        reason=pattern_projection_reason(record),
+        now=now,
+    )
+
+
+def pattern_projection_reason(record: KnowledgeRecord) -> str:
+    """Return the stable content marker used by projection registry lines."""
+    return PATTERN_REASON_PREFIX + hashlib.sha256(record.text.encode("utf-8")).hexdigest()
+
+
+def derive_pattern_projection_records(
+    facts: list[CanonicalFact] | tuple[CanonicalFact, ...],
+    *,
+    registry_path: Path | str = REGISTRY_INDEX_PATH,
+    identity_out: dict[int, str] | None = None,
+) -> list[KnowledgeRecord]:
+    """Derive scoped projection versions with the same convergence contract as facts.
+
+    The fact reducer remains the only minting authority. This mechanical registry step merely
+    couples the read-only view to the fact version: unchanged payloads emit nothing, while a new
+    source fact version links the new projection to its predecessor.
+    """
+    records: list[KnowledgeRecord] = []
+    pending: dict[str, RegistryHead] = {}
+    identity_out = identity_out or {}
+    for fact in sorted(facts, key=lambda item: item.observed_at):
+        source_fact_id = identity_out.get(id(fact), "")
+        candidate = build_pattern_projection_record(fact, source_fact_id=source_fact_id)
+        head = pending.get(candidate.entity_id)
+        if head is None:
+            head = registry_head(
+                candidate.entity_id,
+                registry_path=registry_path,
+                reason_prefix=PATTERN_REASON_PREFIX,
+            )
+        fingerprint = hashlib.sha256(candidate.text.encode("utf-8")).hexdigest()
+        if head is not None and head.fingerprint == fingerprint:
+            pending[candidate.entity_id] = head
+            continue
+        if head is not None and head.knowledge_id == candidate.knowledge_id:
+            pending[candidate.entity_id] = head
+            continue
+        if head is not None:
+            candidate = build_pattern_projection_record(
+                fact,
+                source_fact_id=source_fact_id,
+                supersedes=head.knowledge_id,
+            )
+        pending[candidate.entity_id] = RegistryHead(candidate.knowledge_id, fingerprint)
+        records.append(candidate)
+    return records
 
 
 def fact_event(record: KnowledgeRecord, *, now: datetime | None = None) -> KnowledgeEvent:
@@ -226,7 +355,7 @@ def _registry_state_map(
         bucket["lines"][str(kid)] = row  # latest line for an id wins
         reason = str(row.get("reason") or "")
         if reason.startswith(REASON_PREFIX):
-            bucket["fingerprints"].add(reason[len(REASON_PREFIX):])
+            bucket["fingerprints"].add(reason[len(REASON_PREFIX) :])
     for entity_id, bucket in per_entity.items():
         head_observed_at: str | None = None
         for kid in reversed(bucket["order"]):

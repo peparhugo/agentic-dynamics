@@ -31,7 +31,7 @@ identity + authority contract) and the companion ``docs/rag_design.md`` §1.3 / 
 from __future__ import annotations
 
 import hashlib
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from enum import IntEnum
 from typing import Any
 
@@ -152,6 +152,9 @@ SOURCE_TYPES: dict[str, SourceTypeSpec] = {
     # the CAP epistemic mapping (§3.4) at construction time, since a fact may be derived,
     # declared, measured, or advisory depending on its reducer.
     "fact": SourceTypeSpec("observation", Authority.DERIVED, "[C]"),
+    # I9 retrieval projection: the reducer-minted pattern view is derived evidence, while the
+    # underlying fact remains address-only and is still excluded by both KB consumers.
+    "pattern": SourceTypeSpec("observation", Authority.DERIVED, "[C]"),
     # Context Abstraction Plane I4 (context_abstraction_design.md §8.5): the compiler's
     # decision-specific snapshot, registered as an observation-family record so a later
     # ControlDecision's single-valued `causes` (I6) can point at the EXACT facts a decision was
@@ -292,7 +295,7 @@ class KnowledgeEvent:
 
     def to_dict(self) -> dict[str, Any]:
         """Serialize to a plain dict (no body — pointers only)."""
-        return {
+        data = {
             "knowledge_id": self.knowledge_id,
             "entity_id": self.entity_id,
             "operation": self.operation,
@@ -306,6 +309,7 @@ class KnowledgeEvent:
             "reason": self.reason,
             "observed_at": self.observed_at,
         }
+        return data
 
     @classmethod
     def from_dict(cls, d: dict[str, Any]) -> KnowledgeEvent:
@@ -362,8 +366,10 @@ class KnowledgeRecord:
     outcome_id: str
     test_executed_success: bool | None  # None = not independently verified.
     evidence_class: str  # [M] [C] [H] [P] [X].
-    confidence: float | None = None            # [H] execution-confidence; None = unmeasured.
-    perturbation_strength: float | None = None # [M] strength axis (0.0 = baseline); None = unmeasured.
+    confidence: float | None = None  # [H] execution-confidence; None = unmeasured.
+    perturbation_strength: float | None = (
+        None  # [M] strength axis (0.0 = baseline); None = unmeasured.
+    )
     # Round 2 addition (canonical-state design §1): the knowledge_id of the OBSERVATION-family
     # record that justified this record's existence. Cross-entity (unlike a same-entity
     # supersession chain) — populated only on source_type == "actuation" records; None
@@ -383,10 +389,17 @@ class KnowledgeRecord:
     # ``from_dict()``'s ``.get()``-based construction (missing key -> empty, never a TypeError).
     subject_id: str = ""
     subject_status: str = ""
+    # Typed retrieval surface for a reducer-minted I9 pattern. Kept optional so every existing
+    # non-pattern record retains its prior serialized shape and content identity.
+    pattern_payload: Any = None
+    # Projection lineage is explicit rather than encoded in prose: the pattern view points to the
+    # canonical fact version and preserves the full reducer evidence set for citation.
+    source_fact_id: str = ""
+    evidence_ids: tuple[str, ...] = ()
 
     def to_dict(self) -> dict[str, Any]:
         """Serialize to a plain dict, encoding ``authority`` as its enum name."""
-        return {
+        data = {
             "knowledge_id": self.knowledge_id,
             "entity_id": self.entity_id,
             "source_uri": self.source_uri,
@@ -420,6 +433,18 @@ class KnowledgeRecord:
             "subject_id": self.subject_id,
             "subject_status": self.subject_status,
         }
+        if self.pattern_payload is not None:
+            payload = self.pattern_payload
+            if hasattr(payload, "to_dict"):
+                payload = payload.to_dict()
+            elif hasattr(payload, "__dataclass_fields__"):
+                payload = asdict(payload)
+            data["pattern_payload"] = payload
+        if self.source_fact_id:
+            data["source_fact_id"] = self.source_fact_id
+        if self.evidence_ids:
+            data["evidence_ids"] = list(self.evidence_ids)
+        return data
 
     @classmethod
     def from_dict(cls, d: dict[str, Any]) -> KnowledgeRecord:
@@ -457,4 +482,7 @@ class KnowledgeRecord:
             supersedes=d.get("supersedes"),
             subject_id=d.get("subject_id", ""),
             subject_status=d.get("subject_status", ""),
+            pattern_payload=d.get("pattern_payload"),
+            source_fact_id=d.get("source_fact_id", ""),
+            evidence_ids=tuple(d.get("evidence_ids", []) or ()),
         )

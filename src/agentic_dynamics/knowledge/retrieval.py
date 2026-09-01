@@ -29,6 +29,7 @@ companion ``docs/rag_design.md`` §2.
 
 from __future__ import annotations
 
+import json
 import math
 import re
 import time
@@ -44,14 +45,14 @@ from agentic_dynamics.knowledge.knowledge import Authority
 
 WEIGHTS_VERSION = "retrieval-weights/v1"  # [H]
 
-RRF_K = 60.0                 # [H] rank-smoothing constant in the RRF base.
-LEXICAL_LEG_WEIGHT = 1.2     # [H] lexical leg is weighted above dense in the base.
-DENSE_LEG_WEIGHT = 1.0       # [H]
-EXACT_IDENTIFIER_MULTIPLIER = 1.15   # [H] quoted path/symbol/error/test-name match.
-CONFLICT_MULTIPLIER = 0.70           # [H] unresolved contradictory evidence penalty.
-EXACT_COMMIT_MULTIPLIER = 1.10       # [H] freshness bonus for the exact commit.
+RRF_K = 60.0  # [H] rank-smoothing constant in the RRF base.
+LEXICAL_LEG_WEIGHT = 1.2  # [H] lexical leg is weighted above dense in the base.
+DENSE_LEG_WEIGHT = 1.0  # [H]
+EXACT_IDENTIFIER_MULTIPLIER = 1.15  # [H] quoted path/symbol/error/test-name match.
+CONFLICT_MULTIPLIER = 0.70  # [H] unresolved contradictory evidence penalty.
+EXACT_COMMIT_MULTIPLIER = 1.10  # [H] freshness bonus for the exact commit.
 
-GRAPH_DECAY = 0.7            # [H] 0.7 ** depth — a structural neighbor is categorically weaker.
+GRAPH_DECAY = 0.7  # [H] 0.7 ** depth — a structural neighbor is categorically weaker.
 
 DEFAULT_TOP_K = 40
 DEFAULT_SEED_COUNT = 12
@@ -71,8 +72,8 @@ AUTHORITY_MULTIPLIER: dict[Authority, float] = {
 }
 
 #: Freshness multipliers for advisory evidence by observed age.
-ADVISORY_FRESH_30D = 0.90   # [H]
-ADVISORY_FRESH_90D = 0.75   # [H] older advisory evidence is excluded entirely.
+ADVISORY_FRESH_30D = 0.90  # [H]
+ADVISORY_FRESH_90D = 0.75  # [H] older advisory evidence is excluded entirely.
 
 #: Graph-expansion relationship weights ([H]). CONTRADICTS always carries a conflict label.
 #: CONTAINS + AFFECTS (design §5.5) let the executor traverse the versioned graph
@@ -106,9 +107,7 @@ class FallbackMode(str, Enum):
 
 _QUOTED_RE = re.compile(r'["\'`]([^"\'`]+)["\'`]')
 _FILE_PATH_RE = re.compile(r"(?<![\w])(?:\.{0,2}/)?[\w.-]+(?:/[\w.-]+)+\.\w+")
-_STACK_FRAME_RE = re.compile(
-    r'File\s+"([^"]+)",\s*line\s+(\d+)|at\s+([\w./-]+\.\w+):(\d+)'
-)
+_STACK_FRAME_RE = re.compile(r'File\s+"([^"]+)",\s*line\s+(\d+)|at\s+([\w./-]+\.\w+):(\d+)')
 _TEST_NAME_RE = re.compile(r"\b(?:test[a-zA-Z0-9_]*|[a-zA-Z0-9_]+_test)\b")
 _TEST_FILE_RE = re.compile(r"\b(?:test_[a-zA-Z0-9_-]*|[a-zA-Z0-9_-]*_test)\.py\b")
 _PYTEST_NODE_RE = re.compile(r"([\w./-]+\.py)::([\w\[\]-]+)")
@@ -141,6 +140,7 @@ class QueryPlan:
     symbols: list[str]
     dense_query: str
     lexical_query: str
+    pattern_projection: bool = False
 
     @property
     def exact_terms(self) -> list[str]:
@@ -170,7 +170,12 @@ def _estimate_tokens(text: str) -> int:
     return max(1, len(text.split()))
 
 
-def build_query_plan(raw_work_item: str, phase_objective: str = "") -> QueryPlan:
+def build_query_plan(
+    raw_work_item: str,
+    phase_objective: str = "",
+    *,
+    pattern_projection: bool = False,
+) -> QueryPlan:
     """Extract a deterministic query plan from a raw work item (no LLM).
 
     Extracts quoted strings, file paths, stack frames, test names, CLI flags,
@@ -222,7 +227,8 @@ def build_query_plan(raw_work_item: str, phase_objective: str = "") -> QueryPlan
     exact_terms = quoted + bare_file_paths + test_names + cli_flags + dotted + symbols
     exact_set = {t.lower() for t in exact_terms}
     normalized = [
-        w for w in re.findall(r"[A-Za-z][A-Za-z0-9_-]*", raw_work_item.lower())
+        w
+        for w in re.findall(r"[A-Za-z][A-Za-z0-9_-]*", raw_work_item.lower())
         if w not in exact_set
     ]
     lexical_query = " ".join(_dedupe_in_order(exact_terms + normalized))
@@ -238,25 +244,27 @@ def build_query_plan(raw_work_item: str, phase_objective: str = "") -> QueryPlan
         symbols=symbols,
         dense_query=dense_query,
         lexical_query=lexical_query,
+        pattern_projection=pattern_projection,
     )
 
 
 # ── Candidate + fusion ──────────────────────────────────────────
 
+
 @dataclass
 class Candidate:
     """One fused retrieval candidate, carrying the raw leg signals and provenance."""
 
-    id: str                       # canonical knowledge_id (or step_doc_id) — the cross-store key.
+    id: str  # canonical knowledge_id (or step_doc_id) — the cross-store key.
     text: str
     content_hash: str
     authority: Authority
-    locator: str                  # durable source locator (for the citation).
+    locator: str  # durable source locator (for the citation).
     commit_sha: str = ""
-    repository_id: str = ""       # the cell scope a candidate belongs to ("" = unscoped/legacy).
+    repository_id: str = ""  # the cell scope a candidate belongs to ("" = unscoped/legacy).
     observed_at: str | None = None
-    lexical_rank: int | None = None     # None = absent from the lexical leg.
-    dense_rank: int | None = None       # None = absent from the dense leg.
+    lexical_rank: int | None = None  # None = absent from the lexical leg.
+    dense_rank: int | None = None  # None = absent from the dense leg.
     lexical_score: float | None = None
     dense_score: float | None = None
     exact_identifier_match: bool = False
@@ -267,6 +275,14 @@ class Candidate:
     token_count: int = 0
     provenance: list[str] = field(default_factory=list)  # merged provenance on dedupe.
     fused_score: float = 0.0
+    source_type: str = ""  # knowledge surface; "pattern" is the opt-in I9 projection.
+    pattern_payload: dict[str, Any] | None = None
+    evidence_class: str = ""
+
+    @property
+    def is_pattern(self) -> bool:
+        """Whether this candidate is the reducer-minted pattern projection surface."""
+        return self.source_type == "pattern" or self.pattern_payload is not None
 
     def citation(self) -> str:
         """Render the audit citation ``[K:<id>@<commit>:<locator>]``."""
@@ -354,6 +370,7 @@ def compute_fused_score(
     freshness: float,
     exact_identifier_match: bool,
     conflict: bool,
+    pattern_uncertainty: float | None = None,
 ) -> float:
     """Fuse ranks and multiply by the trust factors.
 
@@ -368,7 +385,29 @@ def compute_fused_score(
         multiplier *= EXACT_IDENTIFIER_MULTIPLIER
     if conflict:
         multiplier *= CONFLICT_MULTIPLIER
+    # ``uncertainty`` is a measured interval width in [0, 1]. A low-uncertainty pattern
+    # therefore receives more of the same RRF/authority/freshness score at equal relevance;
+    # an absent interval remains neutral because it means "not estimable", not "certain".
+    multiplier *= pattern_uncertainty_multiplier(pattern_uncertainty)
     return base * multiplier
+
+
+def pattern_uncertainty_multiplier(uncertainty: Any) -> float:
+    """Convert a measured interval width into a pattern-only ranking multiplier.
+
+    ``None`` is neutral because an unestimable interval is unknown, not evidence of certainty.
+    Values are clamped defensively to the reducer's proportion domain so malformed index metadata
+    cannot produce a score inversion or a negative rank.
+    """
+    if uncertainty is None:
+        return 1.0
+    try:
+        value = float(uncertainty)
+    except (TypeError, ValueError):
+        return 1.0
+    if not math.isfinite(value):
+        return 1.0
+    return max(0.0, 1.0 - min(1.0, max(0.0, value)))
 
 
 def exact_identifier_hit(candidate: Candidate, exact_terms: list[str]) -> bool:
@@ -402,16 +441,14 @@ def scope_excluded(candidate_repository_id: str, requested_scope: str) -> bool:
     "global". An empty requested scope disables the filter (no exclusion).
     """
     return bool(
-        requested_scope
-        and candidate_repository_id
-        and candidate_repository_id != requested_scope
+        requested_scope and candidate_repository_id and candidate_repository_id != requested_scope
     )
 
 
 def graph_boost(seed_score: float, depth: int, relationship: str) -> float:
     """Decayed boost for a graph-expanded node: ``seed_score * weight * 0.7**depth``."""
     weight = RELATIONSHIP_WEIGHTS.get(relationship, 0.0)
-    return seed_score * weight * (GRAPH_DECAY ** depth)
+    return seed_score * weight * (GRAPH_DECAY**depth)
 
 
 def is_conflict_relationship(relationship: str) -> bool:
@@ -419,6 +456,7 @@ def is_conflict_relationship(relationship: str) -> bool:
 
 
 # ── Fusion + dedupe + selection (pure, testable) ────────────────
+
 
 def fuse_candidates(
     candidates: list[Candidate],
@@ -451,6 +489,11 @@ def fuse_candidates(
             freshness=freshness,
             exact_identifier_match=exact,
             conflict=c.conflict,
+            pattern_uncertainty=(
+                c.pattern_payload.get("uncertainty")
+                if c.is_pattern and c.pattern_payload is not None
+                else None
+            ),
         )
         scored.append(replace(c, fused_score=score, exact_identifier_match=exact))
     scored.sort(key=lambda c: c.fused_score, reverse=True)
@@ -585,7 +628,10 @@ def select_evidence(
         if c.token_count <= 0 or c.token_count > remaining:
             continue
         source = c.locator or c.id
-        if max_chunks_per_source is not None and source_counts.get(source, 0) >= max_chunks_per_source:
+        if (
+            max_chunks_per_source is not None
+            and source_counts.get(source, 0) >= max_chunks_per_source
+        ):
             continue
         selected.append(c)
         remaining -= c.token_count
@@ -610,6 +656,7 @@ def resolve_fallback_mode(*, dense_ok: bool, lexical_ok: bool, graph_ok: bool) -
 
 # ── RetrievalAttempt (recorded before any LLM call) ─────────────
 
+
 @dataclass
 class RetrievalAttempt:
     """The full, auditable record of one retrieval pass — persisted before any LLM call."""
@@ -626,7 +673,7 @@ class RetrievalAttempt:
     latency_ms: float
     cache_status: str
     fallback_mode: str
-    dedup_path: str = ""          # "embedding" | "none" — which redundancy-collapse leg ran
+    dedup_path: str = ""  # "embedding" | "none" — which redundancy-collapse leg ran
     weights_version: str = WEIGHTS_VERSION
     timestamp: str = ""
 
@@ -646,6 +693,12 @@ class RetrievalAttempt:
                     "token_count": c.token_count,
                     "conflict": c.conflict,
                     "graph_path": c.graph_path,
+                    **({"source_type": c.source_type} if c.source_type else {}),
+                    **(
+                        {"pattern_payload": c.pattern_payload}
+                        if c.pattern_payload is not None
+                        else {}
+                    ),
                 }
                 for c in self.selected_evidence
             ],
@@ -660,6 +713,7 @@ class RetrievalAttempt:
 
 
 # ── Evidence cards (DeepSeek's unit — derived offline) ──────────
+
 
 @dataclass
 class EvidenceCard:
@@ -679,13 +733,15 @@ class EvidenceCard:
     correctness: float
     cost: float
     flail: float
-    confidence: float | None = None            # [H] execution-confidence; None = unmeasured
+    confidence: float | None = None  # [H] execution-confidence; None = unmeasured
     test_executed_success: bool | None = None  # [M] independent suite; False = unverified
-    perturbation_strength: float | None = None # [M] strength axis (0.0 = baseline)
-    text: str = ""                             # the rendered one-line finding
+    perturbation_strength: float | None = None  # [M] strength axis (0.0 = baseline)
+    text: str = ""  # the rendered one-line finding
+    source_type: str = ""
+    pattern_payload: dict[str, Any] | None = None
 
     def to_dict(self) -> dict[str, Any]:
-        return {
+        data = {
             "run_id": self.run_id,
             "model": self.model,
             "operator": self.operator,
@@ -699,6 +755,11 @@ class EvidenceCard:
             "perturbation_strength": self.perturbation_strength,
             "text": self.text,
         }
+        if self.source_type:
+            data["source_type"] = self.source_type
+        if self.pattern_payload is not None:
+            data["pattern_payload"] = self.pattern_payload
+        return data
 
 
 def _finite_float(value: Any) -> float | None:
@@ -775,6 +836,12 @@ def build_evidence_cards(runs: list[dict[str, Any]]) -> list[EvidenceCard]:
         cost = _finite_float(run.get("cost")) or 0.0
         flail = _derive_flail(run)
         run_id = str(run.get("worktree_name") or run.get("run_id") or "")
+        source_type = str(run.get("source_type", "") or "").lower()
+        pattern_payload = (
+            _pattern_payload(run.get("pattern_payload"), str(run.get("text", "")))
+            if source_type == "pattern"
+            else None
+        )
 
         # Ledger signals — measured-or-None, so an absent value never renders as 0.00.
         confidence = _finite_float(run.get("confidence"))
@@ -815,12 +882,15 @@ def build_evidence_cards(runs: list[dict[str, Any]]) -> list[EvidenceCard]:
                 test_executed_success=test_executed_success,
                 perturbation_strength=perturbation_strength,
                 text=text,
+                source_type=source_type,
+                pattern_payload=pattern_payload,
             )
         )
     return cards
 
 
 # ── Orchestration ───────────────────────────────────────────────
+
 
 def _coerce_authority(value: Any) -> Authority:
     if isinstance(value, Authority):
@@ -846,6 +916,88 @@ def _canonical_id(properties: dict[str, Any], fallback: str) -> str:
     return fallback
 
 
+def _pattern_payload(value: Any, text: str) -> dict[str, Any] | None:
+    """Decode the projection's structured payload from index metadata or its body.
+
+    Chroma metadata is intentionally scalar-only in many deployments, so the producer may store
+    the payload as JSON text. Neo4j projections already carry the canonical body. Invalid or
+    incomplete payloads are not pattern candidates: retrieval must never manufacture a typed
+    pattern surface from arbitrary narrative text.
+    """
+    if isinstance(value, dict):
+        data = value
+    elif all(
+        hasattr(value, field)
+        for field in (
+            "claim",
+            "population",
+            "conditions",
+            "support",
+            "uncertainty",
+            "validity_window",
+            "source_experiment",
+        )
+    ):
+        data = {
+            "claim": value.claim,
+            "population": value.population,
+            "conditions": list(value.conditions),
+            "support": value.support,
+            "uncertainty": value.uncertainty,
+            "validity_window": value.validity_window,
+            "source_experiment": value.source_experiment,
+        }
+    elif isinstance(value, str) and value:
+        try:
+            data = json.loads(value)
+        except json.JSONDecodeError:
+            return None
+    else:
+        try:
+            data = json.loads(text)
+        except (TypeError, json.JSONDecodeError):
+            return None
+    if not isinstance(data, dict):
+        return None
+    required = {
+        "claim",
+        "population",
+        "conditions",
+        "support",
+        "uncertainty",
+        "validity_window",
+        "source_experiment",
+    }
+    return data if required.issubset(data) else None
+
+
+def _source_type(metadata: dict[str, Any], text: str = "") -> str:
+    """Resolve a lower-case source type, recognizing only an explicit pattern payload fallback."""
+    source_type = str(metadata.get("source_type", "") or "").lower()
+    if not source_type and metadata.get("pattern_payload") is not None:
+        source_type = "pattern"
+    return source_type
+
+
+def _candidate_allowed(
+    source_type: str,
+    *,
+    pattern_projection: bool,
+    authority: Authority | None = None,
+    evidence_class: str = "",
+) -> bool:
+    """Apply the two-channel and C5 gates before a hit can become a candidate."""
+    if source_type == "fact":
+        return False
+    if source_type != "pattern":
+        return True
+    return (
+        pattern_projection
+        and authority is Authority.DERIVED
+        and (not evidence_class or evidence_class == "[C]")
+    )
+
+
 def retrieve(
     raw_work_item: str,
     *,
@@ -861,6 +1013,7 @@ def retrieve(
     top_k: int = DEFAULT_TOP_K,
     seed_count: int = DEFAULT_SEED_COUNT,
     now: datetime | None = None,
+    pattern_projection: bool = False,
 ) -> RetrievalAttempt:
     """Run the deterministic retrieval pipeline and record the attempt.
 
@@ -872,7 +1025,11 @@ def retrieve(
     trace survives construction/execution failures.
     """
     t0 = time.monotonic()
-    plan = build_query_plan(raw_work_item, phase_objective=phase_objective)
+    plan = build_query_plan(
+        raw_work_item,
+        phase_objective=phase_objective,
+        pattern_projection=pattern_projection,
+    )
     filters: dict[str, Any] = {
         "repository_id": repository_id,
         "commit_sha": commit_sha,
@@ -922,65 +1079,109 @@ def retrieve(
     graph_paths: dict[str, list[str]] = {}
 
     # Dense leg → candidates keyed by canonical id (already canonical from Chroma).
-    for rank, hit in enumerate(dense_hits):
+    dense_rank = 0
+    for hit in dense_hits:
         cid = hit.get("id", "")
-        authority = _coerce_authority((hit.get("metadata") or {}).get("authority"))
         meta = hit.get("metadata") or {}
+        text = hit.get("document", "")
+        source_type = _source_type(meta, text)
+        authority = _coerce_authority(meta.get("authority"))
+        if not _candidate_allowed(
+            source_type,
+            pattern_projection=plan.pattern_projection,
+            authority=authority,
+            evidence_class=str(meta.get("evidence_class", "") or ""),
+        ):
+            continue
+        payload = (
+            _pattern_payload(meta.get("pattern_payload"), text)
+            if source_type == "pattern"
+            else None
+        )
+        if source_type == "pattern" and payload is None:
+            continue
         cand = Candidate(
             id=cid,
-            text=hit.get("document", ""),
+            text=text,
             content_hash=meta.get("content_hash", ""),
             authority=authority,
             locator=meta.get("logical_locator", cid),
             commit_sha=meta.get("commit_sha", commit_sha),
             repository_id=meta.get("repository_id", ""),
             observed_at=meta.get("observed_at"),
-            dense_rank=rank,
+            dense_rank=dense_rank,
             dense_score=hit.get("distance"),
-            token_count=_estimate_tokens(hit.get("document", "")),
+            token_count=_estimate_tokens(text),
+            source_type=source_type,
+            pattern_payload=payload,
+            evidence_class=str(meta.get("evidence_class", "") or ""),
         )
         candidates.append(cand)
-        ranks.setdefault(cid, {})["dense"] = rank
+        ranks.setdefault(cid, {})["dense"] = dense_rank
         raw_scores.setdefault(cid, {})["dense"] = hit.get("distance")
+        dense_rank += 1
 
     # Lexical leg → candidates keyed by canonical id (resolved from node properties).
-    for rank, hit in enumerate(lexical_hits):
+    lexical_rank = 0
+    for hit in lexical_hits:
         props = hit.get("properties") or {}
         cid = _canonical_id(props, hit.get("id", ""))
         text = props.get("text", "")
+        source_type = _source_type(props, text)
+        authority = _coerce_authority(props.get("authority"))
+        if not _candidate_allowed(
+            source_type,
+            pattern_projection=plan.pattern_projection,
+            authority=authority,
+            evidence_class=str(props.get("evidence_class", "") or ""),
+        ):
+            continue
+        payload = (
+            _pattern_payload(props.get("pattern_payload"), text)
+            if source_type == "pattern"
+            else None
+        )
+        if source_type == "pattern" and payload is None:
+            continue
         existing = next((c for c in candidates if c.id == cid), None)
         if existing is not None:
-            existing.lexical_rank = rank
+            existing.lexical_rank = lexical_rank
             existing.lexical_score = hit.get("score")
-            ranks.setdefault(cid, {})["lexical"] = rank
+            if source_type == "pattern":
+                existing.source_type = source_type
+                existing.pattern_payload = payload
+            ranks.setdefault(cid, {})["lexical"] = lexical_rank
             raw_scores.setdefault(cid, {})["lexical"] = hit.get("score")
+            lexical_rank += 1
             continue
         candidates.append(
             Candidate(
                 id=cid,
                 text=text,
                 content_hash=props.get("content_hash", ""),
-                authority=_coerce_authority(props.get("authority")),
+                authority=authority,
                 locator=props.get("logical_locator", props.get("doc_id", cid)),
                 commit_sha=props.get("commit_sha", commit_sha),
                 repository_id=props.get("repository_id", ""),
                 observed_at=props.get("observed_at"),
-                lexical_rank=rank,
+                lexical_rank=lexical_rank,
                 lexical_score=hit.get("score"),
                 token_count=_estimate_tokens(text),
+                source_type=source_type,
+                pattern_payload=payload,
+                evidence_class=str(props.get("evidence_class", "") or ""),
             )
         )
-        ranks.setdefault(cid, {})["lexical"] = rank
+        ranks.setdefault(cid, {})["lexical"] = lexical_rank
         raw_scores.setdefault(cid, {})["lexical"] = hit.get("score")
+        lexical_rank += 1
 
     # Scope isolation (HARD pre-filter): the cell's repository_id must never leak another
     # cell's knowledge, even when the two scopes hold near-identical text. Applied before
     # fusion so an excluded candidate can never become a graph-expansion seed.
     requested_scope = str(filters.get("repository_id", ""))
     if requested_scope:
-        candidates = [
-            c for c in candidates if not scope_excluded(c.repository_id, requested_scope)
-        ]
+        candidates = [c for c in candidates if not scope_excluded(c.repository_id, requested_scope)]
 
     # Fuse, content-hash dedupe, then cosine-redundancy collapse (conflicts survive).
     fused = fuse_candidates(
@@ -1024,6 +1225,22 @@ def retrieve(
                 cid = node.get("canonical_id") or _canonical_id(props, node.get("id", ""))
                 if cid in fused_ids:
                     continue  # already a direct seed candidate — never re-added
+                source_type = _source_type(props, props.get("text", ""))
+                authority = _coerce_authority(props.get("authority"))
+                if not _candidate_allowed(
+                    source_type,
+                    pattern_projection=plan.pattern_projection,
+                    authority=authority,
+                    evidence_class=str(props.get("evidence_class", "") or ""),
+                ):
+                    continue
+                payload = (
+                    _pattern_payload(props.get("pattern_payload"), props.get("text", ""))
+                    if source_type == "pattern"
+                    else None
+                )
+                if source_type == "pattern" and payload is None:
+                    continue
                 if scope_excluded(props.get("repository_id", ""), requested_scope):
                     continue  # another cell's neighbor never surfaces via expansion
                 origin = node.get("origin_seed") or ""
@@ -1042,7 +1259,7 @@ def retrieve(
                         id=cid,
                         text=props.get("text", ""),
                         content_hash=props.get("content_hash", ""),
-                        authority=_coerce_authority(props.get("authority")),
+                        authority=authority,
                         locator=props.get("logical_locator", cid),
                         commit_sha=props.get("commit_sha", commit_sha),
                         repository_id=props.get("repository_id", ""),
@@ -1052,6 +1269,9 @@ def retrieve(
                         relationship_weight=weight,
                         token_count=_estimate_tokens(props.get("text", "")),
                         fused_score=boost,
+                        source_type=source_type,
+                        pattern_payload=payload,
+                        evidence_class=str(props.get("evidence_class", "") or ""),
                     )
                 )
         except Exception:
@@ -1104,12 +1324,14 @@ def _dense_filter(filters: dict[str, Any]) -> dict[str, Any]:
         conditions.append({"acl_scope": filters["acl_scope"]})
     commit = filters.get("commit_sha")
     if commit:
-        conditions.append({
-            "$or": [
-                {"commit_sha": ""},
-                {"commit_sha": commit},
-            ]
-        })
+        conditions.append(
+            {
+                "$or": [
+                    {"commit_sha": ""},
+                    {"commit_sha": commit},
+                ]
+            }
+        )
     if not conditions:
         return {}
     if len(conditions) == 1:
@@ -1123,8 +1345,14 @@ def render_evidence_packet(selected: list[Candidate]) -> str:
         return ""
     lines = []
     for c in selected:
+        surface = f" | surface={c.source_type}" if c.source_type else ""
+        pattern = (
+            f" | pattern={json.dumps(c.pattern_payload, sort_keys=True)}"
+            if c.pattern_payload is not None
+            else ""
+        )
         lines.append(
-            f"{c.citation()} | authority={c.authority.name} | score={c.fused_score:.4f}\n"
-            f"{c.text}"
+            f"{c.citation()} | authority={c.authority.name} | score={c.fused_score:.4f}"
+            f"{surface}{pattern}\n{c.text}"
         )
     return "\n\n".join(lines)

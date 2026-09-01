@@ -15,6 +15,7 @@ from dataclasses import replace
 
 import pytest
 
+from agentic_dynamics.control import fact_ingestion as fi
 from agentic_dynamics.control.context_compiler import ContractSpec, ControlContext
 from agentic_dynamics.control.decisions import ControlDecision
 from agentic_dynamics.control.facts import (
@@ -114,6 +115,33 @@ def test_pattern_v1_is_registered():
     assert get_reducer(PATTERN_V1.version) is pattern_v1
     assert PATTERN_V1.produces == ("pattern",)
     assert PATTERN_V1.level == "workload"
+
+
+def test_pattern_projection_is_a_scoped_typed_view_of_the_registered_fact():
+    rows = [
+        _finding(knowledge_id="k1", test_executed_success=True),
+        _finding(knowledge_id="k2", test_executed_success=False),
+        _finding(knowledge_id="k3", test_executed_success=True),
+    ]
+    fact = pattern_v1(_reducer_input(rows))[0]
+    fact_record = fi.build_fact_record(fact)
+    projection = fi.build_pattern_projection_record(
+        fact,
+        source_fact_id=fact_record.knowledge_id,
+        now=None,
+    )
+
+    assert projection.source_type == "pattern"
+    assert projection.authority is Authority.DERIVED
+    assert projection.evidence_class == "[C]"
+    assert projection.source_fact_id == fact_record.knowledge_id
+    assert projection.evidence_ids == tuple(fact.evidence_ids)
+    assert projection.pattern_payload == decode_pattern_payload(fact.value)
+    assert projection.entity_id == f"pattern-projection:{fact.fact_entity_id}"
+    assert "predicate" not in projection.text
+    replay = fi.build_pattern_projection_record(fact, source_fact_id=fact_record.knowledge_id)
+    assert replay.knowledge_id == projection.knowledge_id
+    assert replay.content_hash == projection.content_hash
 
 
 # ── (1) a pattern derived from real campaign records ────────────────
