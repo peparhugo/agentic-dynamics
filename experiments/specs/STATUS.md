@@ -3,12 +3,13 @@
 **Generated — do not edit by hand.** Regenerate with `python scripts/spec_status.py`;
 `scripts/run_workflow.py` also refreshes it at the end of every run.
 
-Generated at: `2026-09-01T03:48:15.484981+00:00`  ·  175 spec(s)
-**Work remaining:** 49 open · 126 completed/retired
+Generated at: `2026-09-01T04:18:59.346446+00:00`  ·  175 spec(s)
+**Work remaining:** 50 open · 125 completed/retired
 
 | name | kind | repeatable | status | version | supersedes | last_run | ok | model | cost | n_runs |
 |---|---|---|---|---|---|---|---|---|---|---|
 | `auto_posthoc_wiring` | workflow | yes | runnable | 0.1 | — | 2026-08-17 16:17 | ok | deepseek/deepseek-v4-pro | $0.1471 | 1 |
+| `automatic_docs_sync` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `cap_2a_calibration_cell` | workflow | yes | runnable | 0.1 | — | — | — | — | — | 0 |
 | `cap_2a_calibration_cell_divide` | workflow | yes | runnable | 0.1 | — | — | — | — | — | 0 |
 | `cap_2a_cell_clean` | workflow | yes | runnable | 0.1 | — | — | — | — | — | 0 |
@@ -41,8 +42,7 @@ Generated at: `2026-09-01T03:48:15.484981+00:00`  ·  175 spec(s)
 | `queue_steer` | workflow | yes | runnable | 0.1 | — | 2026-08-15 19:32 | ok | deepseek/deepseek-v4-flash | $0.0330 | 1 |
 | `rag_bare_vs_augmented` | experiment | yes | runnable | 0.1 | — | — | — | — | — | 0 |
 | `registry_canonicalize` | workflow | yes | runnable | 0.1 | — | 2026-08-19 13:42 | ok | deepseek/deepseek-v4-pro | $0.1872 | 1 |
-| `retrieval_activation_augment_proof` | workflow | yes | runnable | 0.1 | — | 2026-09-01 03:19 | fail | deepseek/deepseek-v4-flash | $0.0489 | 3 |
-| `retrieval_fusion_quality` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
+| `retrieval_activation_augment_proof` | workflow | yes | runnable | 0.1 | — | — | — | — | — | 0 |
 | `routing_kb_dispatch` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `routing_kb_experiment_design` | experiment | yes | runnable | 0.1 | — | 2026-08-17 18:28 | ok | openai/gpt-5.6-sol | $3.0669 | 7 |
 | `routing_kb_experiment_design_research` | experiment | yes | runnable | 0.1 | — | 2026-08-17 18:12 | ok | deepseek/deepseek-v4-pro | $0.2203 | 1 |
@@ -57,8 +57,8 @@ Generated at: `2026-09-01T03:48:15.484981+00:00`  ·  175 spec(s)
 | `control_room_portal` | workflow | no | failed | 0.2 | — | 2026-08-14 03:36 | fail | openai/gpt-5.6-sol | $0.0000 | 3 |
 | `control_room_usage_wiring` | workflow | no | failed | 0.1 | — | 2026-09-01 00:31 | fail | openai/gpt-5.6-luna | $0.0000 | 2 |
 | `design_sessions` | workflow | no | failed | 0.1 | — | 2026-08-14 06:58 | fail | openai/gpt-5.6-sol | $0.0000 | 1 |
+| `retrieval_activation` | workflow | no | failed | 0.1 | — | 2026-09-01 00:48 | fail | openai/gpt-5.6-luna | $0.6639 | 1 |
 | `admission_leases` | workflow | no | completed | 0.1 | — | 2026-09-01 00:37 | ok | anthropic/claude-opus-5 | $7.7920 | 5 |
-| `automatic_docs_sync` | workflow | no | completed | 0.1 | — | 2026-09-01 03:43 | ok | anthropic/claude-opus-5 | $47.5167 | 1 |
 | `beta_lab_execution` | workflow | no | completed | 0.1 | — | 2026-08-31 22:38 | ok | openai/gpt-5.6-terra | $1.4000 | 1 |
 | `canonical_publication_closure` | workflow | no | completed | 0.1 | — | 2026-08-21 17:06 | ok | deepseek/deepseek-v4-pro | $1.4475 | 1 |
 | `canonical_state_design` | workflow | no | completed | 0.1 | — | 2026-08-18 15:48 | fail | openai/gpt-5.6-sol | $0.0798 | 5 |
@@ -167,7 +167,7 @@ Generated at: `2026-09-01T03:48:15.484981+00:00`  ·  175 spec(s)
 | `refactor_repair_release` | workflow | no | completed | 0.1 | — | 2026-08-20 22:10 | ok | deepseek/deepseek-v4-pro | $3.5232 | 1 |
 | `remediation_data_integrity` | workflow | no | completed | 0.1 | — | 2026-08-15 20:31 | ok | deepseek/deepseek-v4-pro | $0.6293 | 1 |
 | `repo_review_fable` | workflow | no | completed | 0.1 | — | 2026-08-18 23:24 | ok | deepseek/deepseek-v4-pro | $0.5659 | 2 |
-| `retrieval_activation` | workflow | no | completed | 0.1 | — | 2026-09-01 01:59 | ok | anthropic/claude-sonnet-5 | $10.3858 | 2 |
+| `retrieval_fusion_quality` | workflow | no | completed | 0.1 | — | 2026-09-01 04:10 | ok | deepseek/deepseek-v4-flash | $0.0000 | 1 |
 | `retry_observational_analysis` | workflow | no | completed | 0.1 | — | 2026-08-30 21:59 | ok | deepseek/deepseek-v4-pro | $0.3321 | 1 |
 | `routing_follow_up` | workflow | no | completed | 0.1 | — | 2026-08-14 22:26 | ok | deepseek/deepseek-v4-pro | $0.2511 | 1 |
 | `routing_kb_more_itertools` | workflow | no | completed | 0.1 | — | 2026-08-17 18:38 | ok | deepseek/deepseek-v4-pro | $0.0337 | 1 |

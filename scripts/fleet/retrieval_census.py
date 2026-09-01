@@ -101,7 +101,15 @@ def build_queries() -> list[tuple[str, str]]:
 
 
 def run_census(queries: list[tuple[str, str]] | None = None) -> dict[str, Any]:
-    """Run ``retrieve()`` over ``queries`` and aggregate leg contribution + fallback modes."""
+    """Run ``retrieve()`` over ``queries`` and aggregate leg contribution + fallback modes.
+
+    The fusion-quality extension (``retrieval_fusion_quality`` p1) instruments the
+    overlap: every row now carries per-candidate ``legs`` (dense/lexical/both) +
+    content hashes (persisted artifact hash where the store keeps it, plus the
+    join-consistent text hash on both legs), and the totals answer the cross-leg
+    content join — how many dense candidates share a content hash with a lexical
+    candidate across the query set.
+    """
     from agentic_dynamics.knowledge.augment import default_retrieve_fn
     from agentic_dynamics.knowledge.retrieval import WEIGHTS_VERSION
 
@@ -114,16 +122,12 @@ def run_census(queries: list[tuple[str, str]] | None = None) -> dict[str, Any]:
 
     for label, raw in queries:
         attempt = retrieve_fn(raw)
-        dense_only = lexical_only = fused = 0
-        for cand in attempt.candidates:
-            has_dense = cand.dense_rank is not None
-            has_lexical = cand.lexical_rank is not None
-            if has_dense and has_lexical:
-                fused += 1
-            elif has_dense:
-                dense_only += 1
-            elif has_lexical:
-                lexical_only += 1
+        overlap = attempt.leg_overlap()
+        dense_only, lexical_only, fused = (
+            overlap["dense_only"],
+            overlap["lexical_only"],
+            overlap["fused"],
+        )
         fallback_counts[attempt.fallback_mode] += 1
         leg_totals["dense_only"] += dense_only
         leg_totals["lexical_only"] += lexical_only
@@ -136,6 +140,19 @@ def run_census(queries: list[tuple[str, str]] | None = None) -> dict[str, Any]:
                 "dense_only": dense_only,
                 "lexical_only": lexical_only,
                 "fused": fused,
+                "content_pairs": overlap["content_pairs"],
+                "distinct_content_hashes": overlap["distinct_content_hashes"],
+                "dense_with_content_hash": overlap["dense_with_content_hash"],
+                "lexical_with_content_hash": overlap["lexical_with_content_hash"],
+                "sample_pairs": overlap["sample_pairs"],
+                "candidate_legs": {
+                    c.id: {
+                        "legs": c.legs,
+                        "content_hash": c.content_hash,
+                        "join_content_hash": c.join_content_hash,
+                    }
+                    for c in attempt.candidates
+                },
                 "selected_evidence": len(attempt.selected_evidence),
                 "latency_ms": attempt.latency_ms,
             }
@@ -147,6 +164,23 @@ def run_census(queries: list[tuple[str, str]] | None = None) -> dict[str, Any]:
         "n_queries": len(queries),
         "fallback_mode_distribution": dict(fallback_counts),
         "leg_contribution_totals": dict(leg_totals),
+        # The fusion-quality join answer across the whole query set.
+        "content_join_totals": {
+            "content_pairs": sum(r["content_pairs"] for r in rows),
+            "distinct_content_hashes": sum(r["distinct_content_hashes"] for r in rows),
+            "dense_with_content_hash": sum(r["dense_with_content_hash"] for r in rows),
+            "lexical_with_content_hash": sum(r["lexical_with_content_hash"] for r in rows),
+            # Per-hypothesis split (the fusion-quality campaign's verdict inputs):
+            #   H1 id-namespace disjointness  — same content surfaced under DIFFERENT ids
+            #   H2 granularity (no same-content pairs) — content_pairs == 0
+            #   H3 hash gaps                   — a leg with zero persisted content hashes
+            "hypothesis_split": {
+                "h1_same_content_pairs": sum(r["content_pairs"] for r in rows),
+                "h2_no_same_content_pairs": all(r["content_pairs"] == 0 for r in rows),
+                "h3_lexical_hash_gap": all(r["lexical_with_content_hash"] == 0 for r in rows),
+                "h3_dense_hash_available": all(r["dense_with_content_hash"] > 0 for r in rows),
+            },
+        },
         "rows": rows,
     }
 
@@ -164,11 +198,13 @@ def main() -> int:
         print(f"n_queries: {result['n_queries']}")
         print(f"fallback_mode_distribution: {result['fallback_mode_distribution']}")
         print(f"leg_contribution_totals: {result['leg_contribution_totals']}")
+        print(f"content_join_totals: {result['content_join_totals']}")
         for row in result["rows"]:
             print(
                 f"  {row['label']:40s} fallback={row['fallback_mode']:20s} "
                 f"candidates={row['candidates']:3d} dense_only={row['dense_only']:2d} "
-                f"lexical_only={row['lexical_only']:2d} fused={row['fused']:2d}"
+                f"lexical_only={row['lexical_only']:2d} fused={row['fused']:2d} "
+                f"pairs={row['content_pairs']:2d}"
             )
     return 0
 
