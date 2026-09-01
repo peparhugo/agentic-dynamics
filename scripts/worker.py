@@ -5,14 +5,37 @@ for atomic job distribution. Logs to stdout (redirect to file with nohup).
 
 Reliability: retries Redis connections with exponential backoff, recreates
 client after long subprocess runs to avoid stale connections.
+
+Admission (``admission_leases`` p2) — lease before spawn, release after the cell settles.
+When the gate is armed (``FINOPS_ADMISSION_REQUIRED=1``) no ``run_story.py`` subprocess is
+spawned until this worker holds the cell's leases, and the lease context is stamped into the
+subprocess's environment so the adapter's bypass guard downstream sees an admitted run:
+
+* **Budget** — *reused, not re-reserved*, when the job carries the lease block
+  ``scripts/enqueue.py`` stamped on it at fill time. Reserving again would double-count the
+  same cell's dollars against the same cap. Only a job with no lease block (an older queue
+  entry, or a hand-pushed job) takes a fresh budget lease here.
+* **Concurrency** — always taken here, never at fill time: queueing occupies no execution
+  slot, starting a cell does. Two scopes, both required: the fleet-wide slot counter and the
+  per-provider one, so one provider's cells cannot consume the whole fleet.
+
+A denial does NOT dead-letter the cell. The job is pushed back onto the queue and the worker
+backs off, because the overwhelmingly common denial is transient (the fleet is momentarily
+full) and dead-lettering a perfectly good cell for it would be destructive. A worker that is
+denied :data:`MAX_CONSECUTIVE_DENIALS` times in a row exits instead of spinning — that pattern
+means a *cap*, not a queue, and a caps problem needs an operator, not a retry loop.
+
+With the gate disarmed this file behaves exactly as it did before.
 """
 
+import contextlib
 import json
 import os
 import socket
 import subprocess
 import sys
 import time
+from dataclasses import replace
 from datetime import datetime
 from pathlib import Path
 
@@ -27,9 +50,27 @@ import redis
 # scripts/fleet/ (a dir, not a package). Add that dir to sys.path so they import beside the
 # other scripts — the same convention fleet_manager.py uses.
 sys.path.insert(0, str(Path(__file__).resolve().parent / "fleet"))
-import heartbeat  # noqa: E402  (worker:<type>:<id> liveness -> fleet:board, slice 1)
 import dlq  # noqa: E402       (job dead-letter surface, R4)
+import heartbeat  # noqa: E402  (worker:<type>:<id> liveness -> fleet:board, slice 1)
 
+from agentic_dynamics.control.admission import (
+    AdmissionDenied,
+    AdmissionRequest,
+    admitted,
+    default_controller,
+)
+from agentic_dynamics.control.lease_registry import (
+    AdmissionError,
+    LeaseRegistry,
+    LeaseScope,
+    ScopeKind,
+)
+from agentic_dynamics.core.admission_context import (
+    LeaseContext,
+    admission_required,
+    bind_context,
+    validate_lease_fields,
+)
 from agentic_dynamics.core.constants import SESSION_TIMEOUT, STORY_SESSIONS
 
 REDIS_HOST = os.environ.get("FINOPS_REDIS_HOST", "127.0.0.1")
@@ -44,6 +85,22 @@ BLOCK_TIMEOUT = 10
 IDLE_POLLS_BEFORE_EXIT = 12  # 12 × 10s = 2 minutes idle → exit
 REDIS_MAX_RETRIES = 10
 REDIS_BASE_DELAY = 2.0  # seconds, doubled each retry
+
+#: Seconds to wait after an admission denial before taking the next job. Long enough that a
+#: full fleet has a realistic chance of freeing a slot, short enough that a worker is not
+#: parked for a whole cell's duration on one transient refusal.
+DENIAL_BACKOFF_SECONDS = 30.0
+
+#: Consecutive denials before the worker gives up and exits. A transient "fleet is full"
+#: clears within a few of these; ten in a row means the cap itself is the constraint, and a
+#: worker that keeps re-queueing against a hard cap is just a busy loop with extra steps.
+MAX_CONSECUTIVE_DENIALS = 10
+
+#: The concurrency lease's lifetime. Slightly longer than the per-cell timeout so a cell that
+#: runs to the very edge of its budget still holds its slot until the subprocess is reaped —
+#: a lease that expired mid-cell would let a second worker start against a full fleet, and
+#: would (correctly, per phase 4) mark this cell's output as quarantine-worthy.
+CELL_LEASE_TTL_SECONDS = TIMEOUT_PER_CELL + 600
 
 from agentic_dynamics.control.live import LivePublisher  # noqa: E402
 from agentic_dynamics.runtime.posthoc import trigger_analysis  # noqa: E402
@@ -106,6 +163,128 @@ def _safe_record_dead(r: redis.Redis, queue_key: str, job: object, reason: str) 
             time.sleep(1)
 
 
+def _cell_concurrency_scopes(model: str) -> tuple[LeaseScope, ...]:
+    """The slot counters a running cell must fit inside: fleet-wide AND per-provider.
+
+    Both are required (the audit's "refuse if either reservation fails" generalised over
+    scopes). The pairing is what stops one provider's cells from consuming the whole fleet
+    while still bounding total width — a per-provider cap alone would let three providers
+    together exceed the machine, and a fleet cap alone would let DeepSeek starve Anthropic.
+
+    Size the fleet cap with ``control.lease_registry.recommended_concurrency()``: the measured
+    β_tokens = 0.80 puts fleet throughput at N^0.20, so the knee is around 6 workers. The
+    coordination tax is paid in throughput, not dollars.
+    """
+    fleet = os.environ.get("FINOPS_FLEET_SCOPE", "").strip() or "default"
+    provider = model.split("/", 1)[0] if "/" in model else model
+    return (
+        LeaseScope(ScopeKind.FLEET, fleet),
+        LeaseScope(ScopeKind.PROVIDER, provider),
+    )
+
+
+def _queued_budget_context(cell: dict) -> LeaseContext | None:
+    """The budget lease ``enqueue.py`` stamped on this job, or ``None`` if it carries none.
+
+    A *malformed* block is not ``None``: it raises :class:`AdmissionDenied`. A job that looks
+    budgeted but is not is precisely the state the gate exists to catch — silently re-reserving
+    it would paper over a producer bug, and silently running it would be the unbudgeted run.
+    """
+    errors = validate_lease_fields(cell, required=False)
+    if errors:
+        raise AdmissionDenied(
+            f"queued job {cell.get('cell_id')!r} carries an invalid lease block: "
+            + "; ".join(errors)
+        )
+    if "budget_lease_id" not in cell:
+        return None
+    return LeaseContext.from_request_fields(
+        cell,
+        run_id=str(cell.get("admission_run_id") or cell.get("cell_id") or ""),
+        model=str(cell.get("model") or ""),
+    )
+
+
+@contextlib.contextmanager
+def cell_admission(cell: dict, *, controller=None, registry=None):
+    """Hold this cell's leases for the duration of the block; yield the subprocess env block.
+
+    Yields ``{}`` when the gate is disarmed (nothing reserved, nothing to stamp), otherwise the
+    ``FINOPS_ADMISSION_*`` env dict to merge into the ``run_story.py`` launch envelope — that
+    stamp is what makes the child's adapter-level bypass guard see an admitted run.
+
+    Two paths, because the budget may already be claimed:
+
+    * **Job carries a budget lease** (the normal path — ``enqueue.py`` reserved it at fill
+      time): reuse it and take only the concurrency leases. Re-reserving would double-count
+      the same cell's dollars against the same cap.
+    * **Job carries none** (an older queue entry, or a hand-pushed job): a full admission —
+      budget + concurrency — through the controller.
+
+    Releases on exit in both paths, including on an exception. A release failure is swallowed:
+    the lease TTL is the guarantee, and masking the body's exception with a bookkeeping error
+    is how a diagnosis gets lost.
+    """
+    if not admission_required():
+        yield {}
+        return
+
+    model = str(cell.get("model") or "")
+    scopes = _cell_concurrency_scopes(model)
+    queued = _queued_budget_context(cell)
+
+    if queued is None:
+        # No queue-time budget: admit the whole thing here.
+        request = AdmissionRequest(
+            run_id=str(cell.get("cell_id") or ""),
+            model=model,
+            worktree_identity=str(cell.get("cell_id") or ""),
+            result_namespace=f"stories/{cell.get('cell_id')}",
+            concurrency_scopes=scopes,
+            ttl_seconds=CELL_LEASE_TTL_SECONDS,
+            metadata={"source": "worker", "story": cell.get("story", "")},
+        )
+        with admitted(request, controller=controller or default_controller()) as admission:
+            yield admission.env()
+        return
+
+    # Budget already reserved at fill time — take only the slots.
+    reg = registry or LeaseRegistry.from_env()
+    leases = []
+    try:
+        for scope in scopes:
+            leases.append(
+                reg.reserve_concurrency(
+                    scope,
+                    1,
+                    run_id=queued.run_id,
+                    ttl_seconds=CELL_LEASE_TTL_SECONDS,
+                    metadata={"source": "worker", "cell_id": cell.get("cell_id", "")},
+                )
+            )
+    except AdmissionError as exc:
+        # All-or-nothing: unwind the slots already taken. The BUDGET lease is deliberately NOT
+        # released — it belongs to the queued job, which is about to be pushed back onto the
+        # queue and must still be budgeted when another worker picks it up.
+        for lease in leases:
+            with contextlib.suppress(AdmissionError):
+                reg.release(lease.lease_id)
+        raise AdmissionDenied(
+            f"concurrency denied for cell {cell.get('cell_id')!r}: {exc}", cause=exc
+        ) from exc
+
+    context = replace(
+        queued, concurrency_lease_ids=tuple(lease.lease_id for lease in leases)
+    )
+    try:
+        with bind_context(context):
+            yield context.to_env()
+    finally:
+        for lease in leases:
+            with contextlib.suppress(AdmissionError):
+                reg.release(lease.lease_id)
+
+
 def _result_path_from_stdout(stdout: str) -> Path | None:
     """Extract the saved result path from run_story.py's stdout.
 
@@ -159,6 +338,9 @@ def main() -> None:
     completed = 0
     failed = 0
     empty_polls = 0
+    #: Consecutive admission refusals. Reset by any successful admission; at
+    #: MAX_CONSECUTIVE_DENIALS the worker exits (see the denial handler below).
+    consecutive_denials = 0
 
     # Worker liveness (slice 1): a daemon heartbeat thread beats every 10s so the fleet
     # manager's read-only watcher can surface this worker on the board. The thread owns its
@@ -207,8 +389,17 @@ def main() -> None:
         log(f"[{cell_id}] Starting ({completed+failed+1}/30)")
 
         t0 = time.monotonic()
+        # The spend gate (admission_leases p2). An ExitStack so the leases are released by the
+        # same ``finally`` on every path — success, failure, timeout, or refusal.
+        admission_gate = contextlib.ExitStack()
 
         try:
+            # LEASE BEFORE SPAWN. A refusal raises here, before subprocess.run is reached, so
+            # "denied" provably means no run_story.py process ever existed. The returned env
+            # block is merged into the child's environment: that is how the admission crosses
+            # the process boundary to the adapter's bypass guard.
+            admission_env = admission_gate.enter_context(cell_admission(cell))
+            consecutive_denials = 0
             proc = subprocess.run(
                 [
                     sys.executable, "scripts/run_story.py",
@@ -222,7 +413,7 @@ def main() -> None:
                 capture_output=True,
                 text=True,
                 timeout=TIMEOUT_PER_CELL,
-                env={**os.environ, "FINOPS_CELL_ID": cell_id},
+                env={**os.environ, "FINOPS_CELL_ID": cell_id, **admission_env},
             )
 
             elapsed = time.monotonic() - t0
@@ -291,6 +482,32 @@ def main() -> None:
                 error_log.write_text(proc.stderr or proc.stdout)
                 failed += 1
 
+        except AdmissionDenied as e:
+            # REFUSED — nothing was spawned and nothing was spent. The cell is NOT dead-lettered:
+            # the usual cause is a momentarily full fleet, so the job goes back on the queue and
+            # this worker backs off. Its queue-time budget lease is untouched and still valid,
+            # so whichever worker picks it up next is still budgeted.
+            consecutive_denials += 1
+            log(f"[{cell_id}] ADMISSION DENIED ({consecutive_denials}/"
+                f"{MAX_CONSECUTIVE_DENIALS}): {e}")
+            _safe_hset(r, STATUS_KEY, cell_id, "queued")
+            publisher.publish_status("queued")
+            try:
+                # LPUSH against a BRPOP consumer puts it at the BACK of the queue, so the other
+                # jobs get a turn before this one is retried.
+                r.lpush(QUEUE_KEY, job_json)
+            except Exception as exc:  # noqa: BLE001 — a lost re-queue must not kill the worker
+                log(f"[{cell_id}] could not re-queue after denial: {exc}")
+                _safe_record_dead(r, QUEUE_KEY, cell, f"admission denied + re-queue failed: {e}")
+            if consecutive_denials >= MAX_CONSECUTIVE_DENIALS:
+                # A cap, not a queue. Exit rather than spin — this needs an operator.
+                log(f"{MAX_CONSECUTIVE_DENIALS} consecutive admission denials — the constraint "
+                    f"is a cap, not contention. Exiting for the operator.")
+                # No explicit close needed: ``break`` still runs the ``finally`` below.
+                break
+            time.sleep(DENIAL_BACKOFF_SECONDS)
+            continue
+
         except subprocess.TimeoutExpired:
             elapsed = time.monotonic() - t0
             log(f"[{cell_id}] TIMEOUT ({elapsed:.0f}s)")
@@ -308,6 +525,12 @@ def main() -> None:
             failed += 1
             # Reconnect — the exception may have been a Redis error mid-run
             r = _connect_redis()
+
+        finally:
+            # Release the cell's concurrency lease the moment the cell settles — success,
+            # failure, timeout, or refusal. (Release is the fast path; the lease TTL is the
+            # guarantee if this process dies before reaching it.)
+            admission_gate.close()
 
     log(f"Done: {completed} ok, {failed} failed, {completed+failed} total")
 

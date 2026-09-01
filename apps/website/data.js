@@ -1,8 +1,8 @@
-/* Generated 2026-08-31 19:56:01 UTC by build_data.py */
+/* Generated 2026-09-01 00:16:33 UTC by build_data.py */
 /* DO NOT EDIT — regenerate with: python scripts/build_data.py */
 window.DYNAMICS_DATA = {
   "_meta": {
-    "generated_at": "2026-08-31T19:55:57.743454+00:00",
+    "generated_at": "2026-09-01T00:16:27.279059+00:00",
     "provenance_note": "All values tagged [M]easured, [C]omputed, [H]euristic, or e[X]ternal. See methodology.html."
   },
   "summary": {
@@ -78,9 +78,9 @@ window.DYNAMICS_DATA = {
     "providers": 3,
     "experiment_configs": 0,
     "experiment_specs": 11,
-    "workflow_specs": 150,
+    "workflow_specs": 152,
     "perturbation_operators": 10,
-    "lab_books": 20,
+    "lab_books": 21,
     "lab_books_canonical": 8,
     "lab_books_quarantined": 12,
     "measured_spend_usd": 309.17,
@@ -3993,7 +3993,7 @@ window.DYNAMICS_DATA = {
       "successful": 1007,
       "failed": 20
     },
-    "generated_at": "2026-08-31T19:55:57.901194+00:00"
+    "generated_at": "2026-09-01T00:16:27.535630+00:00"
   },
   "reviews": {
     "models": [

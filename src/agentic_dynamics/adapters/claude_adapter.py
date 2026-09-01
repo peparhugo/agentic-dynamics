@@ -39,6 +39,11 @@ from agentic_dynamics.adapters.opencode import (  # noqa: E402  # isort: skip
     _list_files,
     _parse_session_output,
 )
+from agentic_dynamics.core.cost_provenance import (  # noqa: E402
+    METHOD_TOKEN_PRICE_TABLE,
+    CostSource,
+    resolve_cost_observation,
+)
 from agentic_dynamics.core.streaming import stream_subprocess
 
 
@@ -61,12 +66,22 @@ def _resolve_claude_bin(
 CLAUDE_BIN = _resolve_claude_bin(configured=os.environ.get("CLAUDE_BIN"))
 
 
-def adapt_usage(usage: Any, total_cost_usd: float = 0.0) -> dict[str, Any]:
+def adapt_usage(usage: Any, total_cost_usd: float | None = None) -> dict[str, Any]:
     """Map Claude CLI ``result.usage`` to opencode's ``step-finish`` tokens.
 
     Claude does not break out reasoning tokens in usage (thinking is folded
     into ``output_tokens``), so ``reasoning`` is always 0 — matching the
     framework's honest-token semantics. Cache fields map directly.
+
+    **The zero-coercion is gone.** This function used to default ``total_cost_usd`` to ``0.0``
+    and then emit ``float(total_cost_usd or 0.0)`` — two separate coercions, either of which
+    turned "Claude CLI reported no cost" into "this run was free". A subscription run legitimately
+    reports no ``total_cost_usd`` (there is no per-call charge to report), so the coercion was
+    firing on the common path and the resulting $0.00 was indistinguishable from a metered zero.
+
+    Now an absent cost stays ``None`` all the way into the emitted event, and
+    ``core.cost_provenance`` decides what it means. ``0.0`` passed in explicitly still emits
+    ``0.0`` — a reported zero is a real observation and is preserved as one.
     """
     if not isinstance(usage, dict):
         usage = {}
@@ -75,6 +90,12 @@ def adapt_usage(usage: Any, total_cost_usd: float = 0.0) -> dict[str, Any]:
     cache_read = int(usage.get("cache_read_input_tokens", 0) or 0)
     cache_write = int(usage.get("cache_creation_input_tokens", 0) or 0)
     total = input_tokens + output_tokens
+    # ``bool`` is an ``int`` in Python; a ``True`` here would otherwise become a $1.00 cost.
+    reported = (
+        float(total_cost_usd)
+        if isinstance(total_cost_usd, (int, float)) and not isinstance(total_cost_usd, bool)
+        else None
+    )
     return {
         "tokens": {
             "input": input_tokens,
@@ -83,7 +104,7 @@ def adapt_usage(usage: Any, total_cost_usd: float = 0.0) -> dict[str, Any]:
             "total": total,
             "cache": {"read": cache_read, "write": cache_write},
         },
-        "cost": float(total_cost_usd or 0.0),
+        "cost": reported,
     }
 
 
@@ -184,13 +205,17 @@ class ClaudeStreamAdapter:
             )
         self._pending_tools.clear()
 
-        usage = adapt_usage(event.get("usage", {}), event.get("total_cost_usd", 0.0))
-        out.append(
-            {
-                "type": "step_finish",
-                "part": {"type": "step-finish", "tokens": usage["tokens"], "cost": usage["cost"]},
-            }
-        )
+        # ``.get("total_cost_usd")`` with NO default: a missing key yields ``None`` (unknown),
+        # a present ``0.0`` yields ``0.0`` (a metered zero). The old ``, 0.0`` default erased
+        # that distinction at the source, before any downstream code could see it.
+        usage = adapt_usage(event.get("usage", {}), event.get("total_cost_usd"))
+        part: dict[str, Any] = {"type": "step-finish", "tokens": usage["tokens"]}
+        # Omit the key entirely when unknown, rather than emitting ``"cost": null``. The
+        # opencode event schema this stream is translated INTO expresses "no cost reported"
+        # by absence, and the parser's ``_reported_any_cost`` flag reads it that way.
+        if usage["cost"] is not None:
+            part["cost"] = usage["cost"]
+        out.append({"type": "step_finish", "part": part})
         return out
 
 
@@ -387,8 +412,27 @@ def run_claude_agentic(
     result.duration_s = time.monotonic() - t0
     result.files_created, result.files_modified = _diff_workdir(workdir, files_before)
 
-    if result.estimated_cost_usd <= 0 and result.total_tokens > 0:
-        result.estimated_cost_usd = _estimate_claude_cost(result, model)
+    # Resolve the cost's PROVENANCE. Anthropic is subscription-class: a Claude Code run has no
+    # per-call charge, so the CLI usually reports no ``total_cost_usd`` at all and the price-table
+    # figure below is a *counterfactual* — what these tokens would have cost on the metered API.
+    # That is a legitimate ESTIMATED figure and the repo already reports it; what was wrong was
+    # publishing it (or its absence) as if it were metered truth.
+    if result.cost_source is not CostSource.METERED:
+        estimate: float | None = None
+        if result.total_tokens > 0:
+            try:
+                estimate = _estimate_claude_cost(result, model)
+            except (ValueError, KeyError):
+                # No pricing row for this model id — an UNKNOWN cost, recorded as such.
+                estimate = None
+        result.apply_cost_observation(
+            resolve_cost_observation(
+                reported_cost_usd=result.reported_cost_usd,
+                estimated_cost_usd=estimate,
+                estimation_method=METHOD_TOKEN_PRICE_TABLE,
+                tokens_observed=result.total_tokens > 0 or result.usage_reported,
+            )
+        )
 
     if result.raw_transcript:
         out_path = (

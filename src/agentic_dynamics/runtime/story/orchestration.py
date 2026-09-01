@@ -16,6 +16,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from agentic_dynamics.adapters.backends import run_agentic
+from agentic_dynamics.core.cost_provenance import CostSource
 from agentic_dynamics.measurement.mutation import MutationArtifact, apply_mutation
 from agentic_dynamics.runtime.story.conditions import (
     CONDITION_STRENGTH,
@@ -416,5 +417,10 @@ def _run_session(
         answer_tokens=agentic.answer_tokens if agentic else 0,
         explanation_tokens=agentic.explanation_tokens if agentic else 0,
         tokens=session_token_split(agentic),
+        # Cost provenance rides through from the adapter. With no agentic result at all there
+        # was no model call to price, so the source stays UNKNOWN — never a metered $0.
+        cost_source=(agentic.cost_source.value if agentic else CostSource.UNKNOWN.value),
+        estimation_method=(agentic.estimation_method if agentic else None),
+        reported_cost_usd=(agentic.reported_cost_usd if agentic else None),
     )
 

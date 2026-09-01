@@ -304,6 +304,21 @@ LEDGER_FIELDS: frozenset[str] = frozenset(
         "tokens_explanation",
         "cost_inference",
         "cost_orchestration",
+        # Cost provenance (admission_leases p3). The cost fields above are floats and cannot
+        # express "no figure was reported" — these three say whether to believe them, and
+        # they are what the admission gate reads before spending real per-token dollars.
+        #   cost_source        — metered | estimated | unknown | reconciled
+        #   estimation_method  — how, when estimated/reconciled (a closed vocabulary)
+        #   reported_cost_usd  — the backend's verbatim figure; None = nothing reported,
+        #                        0.0 = a reported zero. The pair with cost_inference is what
+        #                        keeps a metered $0 distinguishable from an unmeasured one.
+        #   settled_cost_usd / settlement_status — the post-run reconciliation against the
+        #                        provider's meter (see ``control.settlement``).
+        "cost_source",
+        "estimation_method",
+        "reported_cost_usd",
+        "settled_cost_usd",
+        "settlement_status",
         "value",
         "rework_cost",
         "reuse_value",

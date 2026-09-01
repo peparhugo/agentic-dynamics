@@ -19,6 +19,14 @@ import time
 
 from flask import Response, jsonify, request
 
+from agentic_dynamics.control.admission import admission_board
+from agentic_dynamics.control.lease_registry import (
+    AdmissionError,
+    LeaseKind,
+    LeaseRegistry,
+    LeaseScope,
+    ScopeKind,
+)
 from agentic_dynamics.control.live import (
     EVENT_CHANNEL_PREFIX,
     EVENT_LOG_PREFIX,
@@ -180,13 +188,53 @@ def api_routing() -> Response:
         )
     return jsonify(compute_routing(entries))
 
+#: The lease counters the admission board reports beside the provider usage snapshot. Fixed
+#: rather than discovered, because a dashboard needs a stable set of rows: these are the scopes
+#: the wired entry points actually reserve against (``scripts/worker.py`` takes fleet +
+#: provider, ``scripts/analysis_worker.py`` takes ``fleet:analysis``, ``scripts/enqueue.py``
+#: takes the provider budget). Campaign scopes are per-spec and therefore not enumerable here;
+#: they are visible through ``control.admission.admission_board`` directly.
+ADMISSION_BOARD_SCOPES: tuple[tuple[LeaseKind, LeaseScope], ...] = (
+    (LeaseKind.CONCURRENCY, LeaseScope(ScopeKind.FLEET, "default")),
+    (LeaseKind.CONCURRENCY, LeaseScope(ScopeKind.FLEET, "analysis")),
+    (LeaseKind.BUDGET, LeaseScope(ScopeKind.PROVIDER, "deepseek")),
+    (LeaseKind.BUDGET, LeaseScope(ScopeKind.PROVIDER, "anthropic")),
+    (LeaseKind.BUDGET, LeaseScope(ScopeKind.PROVIDER, "openai")),
+    (LeaseKind.CONCURRENCY, LeaseScope(ScopeKind.PROVIDER, "deepseek")),
+    (LeaseKind.CONCURRENCY, LeaseScope(ScopeKind.PROVIDER, "anthropic")),
+    (LeaseKind.CONCURRENCY, LeaseScope(ScopeKind.PROVIDER, "openai")),
+)
+
+def _admission_block() -> dict:
+    """The live lease state for the admission board, or a stated unavailable reason.
+
+    Best-effort *for the dashboard only*. This is the one place in the admission layer where a
+    registry failure does NOT refuse: nothing is being admitted here, the route is read-only,
+    and a downed lease registry must not take the Control Room's usage page with it. The
+    distinction is the whole "telemetry degrades, admission does not" rule — degrading here is
+    safe precisely because no decision follows.
+    """
+    try:
+        return admission_board(LeaseRegistry.from_env(), ADMISSION_BOARD_SCOPES)
+    except AdmissionError as exc:
+        return {"available": False, "error": str(exc)}
+
 
 def api_subscription_usage() -> Response:
-    """Serve provider subscription usage through the polite cache (15 min TTL).
+    """Serve provider subscription usage + the admission board through the polite cache.
 
-    ``?refresh=1`` requests a live refetch, but never more often than once per
-    ``MIN_REFRESH_INTERVAL_SECONDS`` — dashboard polls must not hammer the
-    providers' OAuth endpoints.
+    Two halves of one question, deliberately on one route (``admission_leases`` p2 makes this
+    "the admission telemetry surface"):
+
+    * ``providers`` / ``deepseek_platform`` — what the providers say has been *consumed*
+      (15-min TTL cache; ``?refresh=1`` refetches, never more than once per
+      ``MIN_REFRESH_INTERVAL_SECONDS``, because dashboard polls must not hammer the OAuth
+      endpoints).
+    * ``admission`` — what the leases say has been *reserved but not yet spent*.
+
+    The second is exactly the number the first cannot show, and it is what the caps are sized
+    against, so separating them onto two endpoints would leave an operator correlating by hand
+    the two figures that only mean something together.
     """
     force = request.args.get("refresh") == "1"
     try:
@@ -218,6 +266,7 @@ def api_subscription_usage() -> Response:
             "refetched_now": refetched,
             "refresh_error": payload.get("refresh_error"),
             "history": history_summary(_services.root),
+            "admission": _admission_block(),
             "cache": {
                 "age_seconds": age,
                 "ttl_seconds": CACHE_TTL_SECONDS,
@@ -225,7 +274,6 @@ def api_subscription_usage() -> Response:
             },
         }
     )
-
 
 def api_experiments() -> Response:
     """Enqueue or clear the experiment queue — the most expensive mutation.

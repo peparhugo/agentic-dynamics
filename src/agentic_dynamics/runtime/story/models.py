@@ -12,6 +12,7 @@ from typing import Any
 import yaml
 
 from agentic_dynamics.adapters.opencode import AgenticResult
+from agentic_dynamics.core.cost_provenance import CostSource
 from agentic_dynamics.core.session_types import DEFAULT_TASK_TYPE
 
 
@@ -117,6 +118,15 @@ class SessionResult:
     # ``{"in": 300, "out": 200}``. ``None`` = the backend reported no usage — the split is
     # coverage-not-available and the flat ``total_tokens`` remains the valid fallback.
     tokens: dict[str, int] | None = None
+    # Cost provenance (admission_leases p3). ``cost_usd`` above is a float and cannot express
+    # "no figure was reported"; these three say whether to believe it. Defaults are the honest
+    # "nothing measured" values, so a record built without them never *claims* a metered cost.
+    cost_source: str = CostSource.UNKNOWN.value
+    estimation_method: str | None = None
+    #: The backend's verbatim figure — ``None`` for "reported nothing", ``0.0`` for "reported
+    #: a zero". The pair (cost_usd, reported_cost_usd) is what makes the two distinguishable
+    #: once the record is on disk.
+    reported_cost_usd: float | None = None
 
     def to_dict(self) -> dict[str, Any]:
         d: dict[str, Any] = {
@@ -141,6 +151,9 @@ class SessionResult:
             "confidence": self.confidence,
             "answer_tokens": self.answer_tokens,
             "explanation_tokens": self.explanation_tokens,
+            "cost_source": self.cost_source,
+            "estimation_method": self.estimation_method,
+            "reported_cost_usd": self.reported_cost_usd,
         }
         if self.tokens is not None:
             d["tokens"] = self.tokens
@@ -159,6 +172,11 @@ class SessionResult:
                 "explanation_tokens": self.agentic.explanation_tokens,
                 "total_tokens": self.agentic.total_tokens,
                 "estimated_cost_usd": self.agentic.estimated_cost_usd,
+                # Provenance travels WITH the figure into the nested agentic block too, so a
+                # consumer reading either level can tell a measured $0 from an unmeasured one.
+                "cost_source": self.agentic.cost_source.value,
+                "estimation_method": self.agentic.estimation_method,
+                "reported_cost_usd": self.agentic.reported_cost_usd,
                 "cache_read_tokens": self.agentic.cache_read_tokens,
                 "cache_write_tokens": self.agentic.cache_write_tokens,
                 "context_tokens": self.agentic.context_tokens,

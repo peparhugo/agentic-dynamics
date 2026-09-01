@@ -11,9 +11,15 @@ an undeclared write flag fails here — never at the socket.
 Two jobs, both read-only with respect to *what* is allowed (the compose + the scope model are the
 fixed contract this module enforces):
 
-    validate_spawn         — the five ordered checks (§5): scope ∈ vocab → phase-authorized →
+    validate_spawn         — the six ordered checks: scope ∈ vocab → phase-authorized →
                              mounts ⊆ scope's set (⊆ four + D-2) → network = scope's →
-                             env = scope's (no undeclared write flag).
+                             env = scope's (no undeclared write flag) → the LEASE block
+                             (admission_leases p2: reserved_cost_usd / hard_cap_usd /
+                             budget_lease_id / concurrency_lease_id / expires_at, well-formed
+                             and unexpired). Steps 1-5 are §5's original scope/isolation
+                             contract; step 6 is the spend contract layered on top — a cell may
+                             now be refused for being *unbudgeted* as well as for being
+                             *unauthorized*.
     validate_fleet_command — the D-14 fleet:commands check (resize/drain/restart against the
                              compose allowlist + bounded counts).
 
@@ -26,10 +32,13 @@ fixed contract this module enforces):
                              launching -> running -> completed/failed (+ the ``fleet_jobs``
                              DLQ on refusal or a nonzero exit, p2_launch_handler).
 
-This module is a script (``scripts/fleet/``), not a package plane. Its ONLY package import is the
+This module is a script (``scripts/fleet/``), not a package plane. Its package imports are the
 scope model from the experiment plane (tier 1 — ``agentic_dynamics.experiment.experiment_spec``),
-which is the source of truth for the vocabulary + authorization + configs; it never imports
-``control``/``runtime``/``adapters``.
+which is the source of truth for the vocabulary + authorization + configs, and the tier-0
+admission vocabulary (``agentic_dynamics.core.admission_context``) for step 6's pure lease-block
+check. It never imports ``control``/``runtime``/``adapters`` — the admission *decision* stays in
+``control.admission``; what lands here is only the structural validator, which is stdlib-only and
+so preserves this module's invariant that validation never requires ``redis``.
 """
 
 from __future__ import annotations
@@ -54,6 +63,12 @@ if str(_SRC) not in sys.path:
 from agentic_dynamics.experiment.compile_experiment import (  # noqa: E402
     SpecError,
     compile_spec,
+)
+from agentic_dynamics.core.admission_context import (  # noqa: E402
+    LEASE_REQUEST_FIELDS,
+    LeaseContext,
+    admission_required,
+    validate_lease_fields,
 )
 from agentic_dynamics.experiment.experiment_spec import (  # noqa: E402
     PHASE_SCOPE_AUTHORIZATION,
@@ -113,6 +128,12 @@ WRITE_FLAG_ENVS: frozenset[str] = frozenset({"FINOPS_KB_WRITE", "FINOPS_ACTUATIO
 
 #: A write flag is "set" only on an explicit truthy value (the FINOPS_* convention: "1" or "true").
 _TRUTHY = {"1", "true", "True", "yes", "on"}
+
+#: Step 6's vocabulary (admission_leases p2), re-exported from the tier-0 admission contract so
+#: the wrapper's own callers and tests can name the block without reaching past this module.
+#: Owned by ``core.admission_context`` — one definition, shared by the fleet wrapper, the
+#: enqueue producer, and the controller, so the three can never drift.
+LEASE_FIELDS: tuple[str, ...] = LEASE_REQUEST_FIELDS
 
 # ── The D-14 fleet:commands contract ─────────────────────────────────────────
 
@@ -222,20 +243,37 @@ def _scope_config(scope: str) -> dict[str, Any]:
 # ── The five-check validation (§5, D-16) ─────────────────────────────────────
 
 
-def validate_spawn(request: dict[str, Any], *, phase_scopes: dict[str, str] | None = None) -> list[str]:
-    """Validate a spawn request against the scope model. Empty list = valid.
+def validate_spawn(
+    request: dict[str, Any],
+    *,
+    phase_scopes: dict[str, str] | None = None,
+    now: float | None = None,
+    require_lease: bool | None = None,
+) -> list[str]:
+    """Validate a spawn request against the scope model + the spend contract. Empty list = valid.
 
-    The five ordered checks (§5) run in order and stop at the first failure family — a request
-    that fails step 1 (scope ∉ vocab) never reaches the mount/env checks, exactly as the proposal
-    specifies ("fails at step 1 or 2 — before the socket call").
+    The six ordered checks run in order and stop at the first failure family — a request that
+    fails step 1 (scope ∉ vocab) never reaches the mount/env/lease checks, exactly as the
+    proposal specifies ("fails at step 1 or 2 — before the socket call").
 
     ``request`` shape::
 
         {"phase": <name>, "scope": <one of five>, "mounts": [{"target", "mode"}...],
-         "network": <name>, "env": {<k>: <v>...}}
+         "network": <name>, "env": {<k>: <v>...},
+         # step 6, admission_leases p2 — required when the gate is armed:
+         "reserved_cost_usd": <float>, "hard_cap_usd": <float|None>,
+         "budget_lease_id": <str>, "concurrency_lease_id": <str>, "expires_at": <epoch s>}
 
     ``phase_scopes`` overrides the phase→scope authorization resolution (a test injects the
     spec's DECLARED scopes here; when ``None``, :data:`PHASE_SCOPE_AUTHORIZATION` is the fallback).
+
+    ``require_lease`` overrides step 6's strictness; ``None`` (the default) resolves it from
+    ``FINOPS_ADMISSION_REQUIRED``. Armed ⇒ a spawn with no lease block is refused. Disarmed ⇒
+    the block is optional — but a *partial* or malformed one is refused either way, because a
+    request that looks budgeted and is not is worse than one that plainly is not.
+
+    ``now`` is the clock step 6 judges expiry against (injected for deterministic tests; defaults
+    to the wall clock).
     """
     errors: list[str] = []
     phase = str(request.get("phase", ""))
@@ -306,6 +344,29 @@ def validate_spawn(request: dict[str, Any], *, phase_scopes: dict[str, str] | No
             errors.append(
                 f"step 5: scope {scope} does not authorize FINOPS_KB_WRITE=1 (undeclared "
                 f"write flag)"
+            )
+
+    # Step 6 — the LEASE block (admission_leases p2). The isolation contract (steps 1-5) says
+    # what a cell may TOUCH; this says whether its spend was reserved. A cell that is perfectly
+    # scoped and completely unbudgeted is exactly the run the audit found: authorized to write,
+    # unaccounted for in dollars.
+    #
+    # Structural only — "is this lease block well-formed and still live?", never "is this lease
+    # outstanding in the registry?". The second question needs Redis, and this validator's
+    # invariant is that it is pure (it runs in the orchestrator's hot path and in tests with no
+    # infrastructure). The registry-backed check is
+    # ``control.admission.AdmissionController.verify``, which the orchestrator may call
+    # separately.
+    strict = admission_required() if require_lease is None else bool(require_lease)
+    lease_errors = validate_lease_fields(request, required=strict)
+    for message in lease_errors:
+        errors.append(f"step 6: {message}")
+    if not lease_errors and "expires_at" in request:
+        moment = time.time() if now is None else now
+        if float(request["expires_at"]) <= moment:
+            errors.append(
+                f"step 6: lease expired at {request['expires_at']} (now {moment}) — the "
+                f"admission's claim is gone; re-admit before spawning"
             )
     return errors
 
@@ -592,15 +653,20 @@ def spawn_sibling(
     image: str | None = None,
     command: list[str] | None = None,
     dry_run: bool = False,
+    now: float | None = None,
+    require_lease: bool | None = None,
 ) -> dict[str, Any]:
     """Validate a spawn request, then (if valid) run the sibling container.
 
     The ordering is the load-bearing guarantee: :func:`validate_spawn` runs FIRST, and any error
     raises :class:`SpawnValidationError` before a single ``docker`` argv is built — a compromised
-    phase can never reach the socket with a request it was not authorized for. On success returns
+    phase can never reach the socket with a request it was not authorized for, and (since
+    admission_leases p2) never with a request it has no lease for. On success returns
     ``{"ok", "argv", "returncode"?, "stdout"?, "stderr"?}`` (``dry_run`` builds the argv only).
     """
-    errors = validate_spawn(request, phase_scopes=phase_scopes)
+    errors = validate_spawn(
+        request, phase_scopes=phase_scopes, now=now, require_lease=require_lease
+    )
     if errors:
         raise SpawnValidationError(errors)
 
@@ -627,6 +693,7 @@ def build_phase_request(
     spec_name: str = "",
     phase_scopes: dict[str, str] | None = None,
     command: list[str] | None = None,
+    admission: LeaseContext | None = None,
 ) -> dict[str, Any]:
     """Build a scope-driven spawn request for one workflow phase (the campaign-wrapper mechanism).
 
@@ -635,6 +702,21 @@ def build_phase_request(
     canonical cell env (the write flag only when the scope authorizes it). The result feeds
     :func:`spawn_sibling` — which re-validates it before the socket call. ``command`` is the
     sibling container's entrypoint (defaults to the phase-runner; see ``phase_runner.py``).
+
+    ``admission`` (admission_leases p2) is the phase's granted lease context, obtained by the
+    orchestrator from ``control.admission`` before it calls this. When supplied it lands in the
+    request twice, on purpose:
+
+    * as the top-level :data:`LEASE_FIELDS` block, which is what validation step 6 checks — the
+      *orchestrator side* of the contract; and
+    * as the ``FINOPS_ADMISSION_*`` env vars in the cell's environment, which is what the
+      *cell side* reads (its ``adapters.backends.run_agentic`` bypass guard), since a container
+      cannot inherit a ContextVar.
+
+    Omitting it produces a request with no lease block: valid while the gate is disarmed,
+    refused at step 6 once it is armed. The wrapper never mints an admission itself — reserving
+    against Redis is the controller's job, and a validator that could also grant would be a
+    validator that could grant itself a pass.
     """
     scope = phase_scope(phase_def)
     if scope is None:
@@ -681,7 +763,12 @@ def build_phase_request(
         # compose-level "P1-P10 units only" placement is the finer gate, not this wrapper.
         env["FINOPS_KB_WRITE"] = "1"
 
-    return {
+    if admission is not None:
+        # The cell reads its admission from the environment (no ContextVar crosses a container
+        # boundary); the orchestrator's validator reads it from the request's lease block.
+        env.update(admission.to_env())
+
+    request: dict[str, Any] = {
         "phase": str(phase_def.get("name", "")),
         "scope": scope,
         "mounts": mounts,
@@ -696,6 +783,9 @@ def build_phase_request(
             "--workdir", "/tmp",
         ],
     }
+    if admission is not None:
+        request.update(admission.to_request_fields())
+    return request
 
 
 def build_submit_argv(

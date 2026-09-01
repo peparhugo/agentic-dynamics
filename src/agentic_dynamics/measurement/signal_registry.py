@@ -115,6 +115,32 @@ SIGNALS: dict[str, Signal] = {
         "tokens_explanation", "ledger token split (tokens in prose-only steps)", "[M]",
         "attempt", "int", True, frozenset(), "per-attempt",
     ),
+    # ── cost provenance (admission_leases p3) ──
+    # Registered as MEASURED because the adapters now emit them on every attempt. They are
+    # deliberately reserved to no consumer yet: they are inputs to the ADMISSION gate
+    # (control.admission / control.settlement), not to a routing or cascade policy, and the
+    # registry's rule is that a signal may be "reserved for another consumer" but never
+    # "unmeasured" once the ledger produces it.
+    "cost_source": Signal(
+        "cost_source", "adapters (opencode/claude) via core.cost_provenance", "[M]",
+        "attempt", "str", True, frozenset(), "per-attempt",
+    ),
+    "estimation_method": Signal(
+        "estimation_method", "adapters (opencode/claude) via core.cost_provenance", "[M]",
+        "attempt", "str", True, frozenset(), "per-attempt",
+    ),
+    "reported_cost_usd": Signal(
+        "reported_cost_usd", "backend-reported cost, verbatim (None = none reported)", "[M]",
+        "attempt", "float", True, frozenset(), "per-attempt",
+    ),
+    "settled_cost_usd": Signal(
+        "settled_cost_usd", "control.settlement (reconciled against the provider meter)", "[M]",
+        "attempt", "float", True, frozenset(), "post-run",
+    ),
+    "settlement_status": Signal(
+        "settlement_status", "control.settlement.SettlementStatus", "[M]",
+        "attempt", "str", True, frozenset(), "post-run",
+    ),
 }
 
 

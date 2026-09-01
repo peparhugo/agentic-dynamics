@@ -10,6 +10,16 @@ Usage:
 
 Model is read from FINOPS_MODEL env var or --model flag.
 
+Admission (``admission_leases`` p2): when the spend gate is armed
+(``FINOPS_ADMISSION_REQUIRED=1``) every cell gets a **budget lease reserved at queue-fill
+time**, and the lease block rides on the job JSON — so the queue can never carry unbudgeted
+work. The reservation is all-or-nothing across the batch: if any cell is denied, every lease
+already taken for the batch is released and nothing is enqueued, because a half-budgeted queue
+is worse than an empty one (a worker cannot tell which of its jobs were paid for). No
+concurrency lease is taken here: filling a queue occupies no execution slot — the worker takes
+that lease when it actually starts the cell. With the gate disarmed this file behaves exactly
+as it did before.
+
 Cell ids are namespaced by model slug (``<slug>_<story>_<tier>_<quality>_<condition>``)
 so multiple models can share a queue without colliding on ``story_status`` fields
 or worker log filenames. ``--missing-only`` skips cells whose result JSON already
@@ -32,7 +42,13 @@ try:
 except ImportError:  # imported as scripts.<name> — repo root is on sys.path
     from scripts import _bootstrap  # noqa: E402,F401
 
+from agentic_dynamics.control.admission import (
+    AdmissionDenied,
+    AdmissionRequest,
+    default_controller,
+)
 from agentic_dynamics.control.model_policy import SUBSCRIPTION_DEFAULT, ensure_model_allowed
+from agentic_dynamics.core.admission_context import admission_required
 from agentic_dynamics.core.constants import model_slug
 
 # ── Matrix Definition ──────────────────────────────────────────
@@ -56,6 +72,13 @@ ROOT = Path(__file__).resolve().parent.parent
 RESULTS_DIR = ROOT / "experiments" / "results" / "stories"
 
 PROVIDER_PRIORITY = {"deepseek": 0, "anthropic": 1, "openai": 2}
+
+#: How long a queued cell's budget lease stays outstanding. Much longer than the registry's
+#: 1-hour default because a queued job legitimately waits for a free worker — a lease that
+#: expired while the job was still in the queue would hand its headroom to someone else and
+#: leave the job unbudgeted at pick-up time. 24h is the practical drain horizon for a full
+#: matrix; past that the sweeper reclaims it and the job is re-filled rather than silently run.
+QUEUE_LEASE_TTL_SECONDS = int(os.environ.get("FINOPS_QUEUE_LEASE_TTL", str(24 * 3600)))
 
 
 def completed_cells(model: str) -> set[str]:
@@ -147,6 +170,71 @@ def interleave_cells(cells: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return out
 
 
+def admit_cells(
+    cells: list[dict[str, Any]],
+    *,
+    controller: Any = None,
+    ttl_seconds: int = QUEUE_LEASE_TTL_SECONDS,
+) -> list[dict[str, Any]]:
+    """Reserve a budget lease per cell and stamp the lease block onto each job.
+
+    Returns the cells with the five ``LEASE_REQUEST_FIELDS`` (plus ``admission_run_id``) added,
+    so the worker that later pops a job can see — and re-verify — the budget it was queued
+    under. Returns the cells unchanged when the gate is disarmed.
+
+    Batch-atomic on purpose. The loop reserves cell by cell, but a denial anywhere releases
+    every lease already taken and re-raises: a queue holding 12 budgeted cells and 6 unbudgeted
+    ones is indistinguishable, to a worker, from a queue holding 18 budgeted ones — the failure
+    would surface as overspend at drain time rather than as a refusal at fill time. Refusing the
+    whole fill keeps the failure where the operator can act on it (raise the cap, or enqueue
+    fewer cells).
+
+    Concurrency is deliberately NOT reserved here: a queued job occupies no execution slot. The
+    worker takes the concurrency lease when it starts the cell (``scripts/worker.py``), which is
+    also where the slot is actually consumed.
+    """
+    if not admission_required():
+        return cells
+
+    ctrl = controller or default_controller()
+    admissions = []
+    stamped: list[dict[str, Any]] = []
+    try:
+        for cell in cells:
+            request = AdmissionRequest(
+                run_id=cell["cell_id"],
+                model=cell["model"],
+                # Both quarantine handles are the cell id: a story cell's worktree and its
+                # result file are both named after it, so phase 4 can find either from a lease.
+                worktree_identity=cell["cell_id"],
+                result_namespace=f"stories/{cell['cell_id']}",
+                enforce_concurrency=False,
+                ttl_seconds=ttl_seconds,
+                metadata={
+                    "source": "enqueue",
+                    "story": cell.get("story", ""),
+                    "condition": cell.get("condition", ""),
+                },
+            )
+            admission = ctrl.admit(request)
+            admissions.append(admission)
+            stamped.append({
+                **cell,
+                **admission.context().to_request_fields(),
+                "admission_run_id": admission.run_id,
+            })
+    except AdmissionDenied:
+        # Unwind the whole batch. Best-effort by necessity — the registry may be the thing that
+        # failed — and the TTL reclaims anything this misses.
+        for admission in admissions:
+            try:
+                ctrl.release(admission)
+            except Exception as exc:  # noqa: BLE001 — never mask the denial with a release error
+                print(f"warning: could not release {admission.run_id}: {exc}", file=sys.stderr)
+        raise
+    return stamped
+
+
 def main() -> None:
     dry_run = "--dry-run" in sys.argv
     clear = "--clear" in sys.argv
@@ -160,6 +248,16 @@ def main() -> None:
 
     cells = build_cells(model=model, missing_only=missing_only)
     total = len(cells)
+
+    # Admission (p2) — every cell's budget is reserved BEFORE it enters the queue. Skipped for
+    # --dry-run (a read-only flag must not take real leases) and for --clear (which enqueues
+    # nothing). A denial exits non-zero with the reason and leaves the queue untouched.
+    if not dry_run and not clear:
+        try:
+            cells = admit_cells(cells)
+        except AdmissionDenied as exc:
+            print(f"REFUSED: {exc}", file=sys.stderr)
+            raise SystemExit(2) from exc
 
     r = None
     if interleave or not dry_run:

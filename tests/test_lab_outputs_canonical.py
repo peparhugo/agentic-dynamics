@@ -10,9 +10,10 @@ s1 decided which labs may publish, s2 gave the survivors a contract. This module
 item 3's *verification* permanent rather than a one-time observation, asserting four
 things that together mean "the published derivation path is canonical end to end":
 
-1. ``experiments/results/lab_*.json`` contains **only** contract-bearing outputs of
-   publication-eligible labs. Non-canonical artifacts live in ``legacy_labs/``, so a
-   stale file can no longer be mistaken for a current measurement.
+1. ``experiments/results/lab_*.json`` contains **only** manifest-declared, non-quarantined
+   outputs, and every publication-eligible one is present. Quarantined artifacts live in
+   ``legacy_labs/`` and undeclared files are rejected outright, so a stale file can no
+   longer be mistaken for a current measurement.
 2. No live lab output carries the retired summary's lineage — checked structurally
    (a valid contract naming the canonical resolver) rather than by keyword.
 3. Every published artifact is **current**: its ``n_input_records`` matches what the
@@ -61,14 +62,42 @@ def _data_js_payload() -> dict | None:
 # ---------------------------------------------------------------------------
 
 
-def test_live_results_dir_holds_only_publication_lab_outputs():
-    """Every ``experiments/results/lab_*.json`` belongs to a publication-eligible lab."""
+def test_live_results_dir_holds_only_declared_non_quarantined_lab_outputs():
+    """Every ``experiments/results/lab_*.json`` is a manifest-DECLARED, non-quarantined output.
+
+    The teeth are unchanged in both directions that matter: a file no manifest entry claims
+    still fails (the stale-artifact case this guard exists for), and a quarantined lab's
+    output still may not sit here (``test_quarantined_labs_write_into_legacy_labs`` pins the
+    declaration; this pins the directory).
+
+    What changed: the manifest has THREE statuses (``lab_manifest.LAB_STATUSES``) and this
+    check only ever knew two. ``historical`` — "kept for provenance and still runnable by
+    hand, but its question or corpus belongs to a superseded measurement era; not published"
+    — is neither publication-eligible nor quarantined. Keying the expected set off
+    ``publication_eligible`` alone therefore declared the manifest's own ``output`` path
+    illegal the moment the first historical lab landed (``lab_beta_from_corpus``, whose
+    output is a live input to ``control.lease_registry``'s β lease sizing, not a stale
+    measurement). A historical lab reads canonical sources, so relocating it to
+    ``legacy_labs/`` would also misfile it — that directory's README scopes it to
+    retired-summary lineage.
+
+    The publication path itself is unaffected: invariants 2-4 below still key off
+    ``_published_artifacts()`` / ``publication_labs()``, so nothing non-eligible can reach
+    ``data.js`` or claim a lineage contract.
+    """
     manifest = load_lab_manifest()
-    expected = {Path(e.output).name for e in manifest if e.publication_eligible and e.output}
+    declared = {Path(e.output).name: e for e in manifest if e.output and not e.quarantined}
     on_disk = {p.name for p in RESULTS_DIR.glob("lab_*.json")}
-    assert on_disk == expected, (
-        f"unexpected lab artifacts in the canonical results dir: {sorted(on_disk - expected)} "
-        f"(move non-canonical outputs to legacy_labs/); missing: {sorted(expected - on_disk)}"
+
+    undeclared = sorted(on_disk - set(declared))
+    assert not undeclared, (
+        f"unexpected lab artifacts in the canonical results dir: {undeclared} — no manifest "
+        f"entry declares them (move non-canonical outputs to legacy_labs/)"
+    )
+    missing = sorted({n for n, e in declared.items() if e.publication_eligible} - on_disk)
+    assert not missing, (
+        f"publication-eligible lab outputs missing from the canonical results dir: {missing} "
+        f"— re-run the core lab set"
     )
 
 

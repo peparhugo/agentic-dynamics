@@ -6,6 +6,15 @@ in the ``analysis_status`` hash so the queue is resumable and monitorable.
 
 Usage:
     python3 scripts/analysis_worker.py     # single worker; run N in parallel
+
+Admission (``admission_leases`` p2) — **concurrency only**. This worker spends no model
+dollars (AST diff + SonarQube, no LLM call), so it has no provider class, no budget currency
+and no admission record: modelling it as a $0 budget lease would mint exactly the meaningless
+zero the audit's cost-provenance finding is about. What it very much does consume is an
+execution slot — a fleet of analysis workers starves the story workers of CPU just as
+effectively as a fleet of paid cells — so when the gate is armed
+(``FINOPS_ADMISSION_REQUIRED=1``) each job holds a concurrency lease on the analysis scope for
+its duration, and is refused (job re-queued, worker backs off) when the fleet is full.
 """
 
 from __future__ import annotations
@@ -35,6 +44,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent / "fleet"))
 import dlq  # noqa: E402       (job dead-letter surface, R4)
 import heartbeat  # noqa: E402  (worker:<type>:<id> liveness -> fleet:board, slice 1)
 
+from agentic_dynamics.control.admission import AdmissionDenied, concurrency_admitted
+from agentic_dynamics.control.lease_registry import LeaseScope, ScopeKind
 from agentic_dynamics.measurement.commit_analysis import (
     agentic_token_dicts,
     analyze_story_worktree,
@@ -54,6 +65,19 @@ RESULTS_DIR = ROOT / "experiments" / "results" / "stories"
 
 BLOCK_TIMEOUT = 5
 IDLE_POLLS_BEFORE_EXIT = 6
+
+#: The concurrency counter analysis jobs are admitted against. A scope of its own — analysis
+#: and story execution compete for the same machine but scale differently (Sonar is IO/CPU
+#: bound, a story cell is provider-latency bound), so one shared ceiling would tune neither.
+ANALYSIS_SCOPE = LeaseScope(ScopeKind.FLEET, "analysis")
+
+#: Lease lifetime for one analysis job. Generous: a SonarQube pass over a large worktree is
+#: minutes, and a lease that expires mid-job would release a slot that is still occupied.
+ANALYSIS_LEASE_TTL_SECONDS = 3600
+
+#: Seconds to back off after an admission denial before taking the next job (see the story
+#: worker's identical rationale: a denial is usually a momentarily full fleet, not a bad job).
+DENIAL_BACKOFF_SECONDS = 15.0
 
 
 def log(msg: str) -> None:
@@ -171,6 +195,27 @@ def main() -> None:
             continue
 
         story_id = job["story_id"]
+
+        # LEASE BEFORE WORK. Concurrency only (no dollars are spent here). A refusal re-queues
+        # the job and backs off — the slot will free up as other analyses finish.
+        try:
+            slot = contextlib.ExitStack()
+            slot.enter_context(
+                concurrency_admitted(
+                    ANALYSIS_SCOPE,
+                    1,
+                    run_id=f"analysis:{story_id}",
+                    ttl_seconds=ANALYSIS_LEASE_TTL_SECONDS,
+                    metadata={"source": "analysis_worker", "story_id": story_id},
+                )
+            )
+        except AdmissionDenied as e:
+            log(f"[{story_id}] ADMISSION DENIED (analysis slots full): {e}")
+            with contextlib.suppress(Exception):
+                r.lpush(QUEUE_KEY, job_json)
+            time.sleep(DENIAL_BACKOFF_SECONDS)
+            continue
+
         _safe_hset(r, STATUS_KEY, story_id, "running")
         log(f"[{story_id}] Starting")
 
@@ -215,6 +260,9 @@ def main() -> None:
             err_log = ANALYSIS_DIR / f"analysis_{story_id}.error.txt"
             with contextlib.suppress(Exception):
                 err_log.write_text(str(e))
+        finally:
+            # Release the slot the moment the job settles (the TTL is the backstop).
+            slot.close()
 
         # Reconnect after a long SonarQube run — the connection is likely stale.
         try:

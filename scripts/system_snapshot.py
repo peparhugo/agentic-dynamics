@@ -17,10 +17,7 @@ from __future__ import annotations
 import argparse
 import datetime
 import json
-import os
-import re
 import subprocess
-import sys
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -34,6 +31,30 @@ def _sh(cmd: list[str], cwd: Path | None = None, timeout: int = 20) -> str:
         return r.stdout.strip() if r.returncode == 0 else ""
     except Exception:  # noqa: BLE001 — best-effort: any subsystem may be unavailable
         return ""
+
+
+def _quarantined_worktrees() -> set[str]:
+    """Worktree names currently quarantined by the admission layer's expiry rail.
+
+    The permanence-gate consult (admission_leases phase 4). Best-effort in the same sense as
+    :func:`_sh` and :func:`_redis` above: the snapshot is a DISPLAY surface — the game board an
+    operator reads — and a board that refuses to render because one subsystem is unavailable is
+    worse than one that renders and is silent about that subsystem. The analyze and data chains
+    consult the same ledger with ``on_error="raise"``, because *they* publish aggregates and
+    must never treat "unknown" as "clean".
+
+    Imported locally (and defensively) so the snapshot keeps working from a checkout where
+    ``src/`` is not on ``sys.path`` — this script has no ``_bootstrap`` import by design.
+    """
+    try:
+        from agentic_dynamics.control.quarantine import (  # noqa: PLC0415
+            QuarantineKind,
+            quarantined_identities,
+        )
+
+        return quarantined_identities(QuarantineKind.WORKTREE, on_error="empty")
+    except Exception:  # noqa: BLE001 — a missing/unreadable ledger never breaks the board
+        return set()
 
 
 def _redis() -> tuple[object | None, str]:
@@ -188,14 +209,35 @@ def main() -> int:
     add("")
     add("_Worktree branches are proposals; the controller decides what merges into the")
     add("chronological history (main). Nothing merges without the controller's sign-off._")
+    # The quarantine consult (admission_leases phase 4). A worktree whose run outlived its
+    # budget lease produced unaccounted-for output; the controller must see that BEFORE signing
+    # a merge, since the permanence gate is the last point at which contaminated work can be
+    # kept out of the chronological history. Advisory: the mark annotates the row, it does not
+    # remove the branch from the board or decide anything — the controller still decides.
+    # `on_error="empty"` because this is a DISPLAY surface: a snapshot that refuses to render
+    # because the ledger is corrupt is a worse operator experience than one that renders and is
+    # silent about quarantine (the analyze/data chain consults raise instead, as they must).
+    quarantined = _quarantined_worktrees()
     if wdirs:
         for wd in wdirs:
             b = _sh(["git", "-C", str(wd), "rev-parse", "--abbrev-ref", "HEAD"])
             n = _sh(["git", "-C", str(wd), "rev-list", "--count", "main..HEAD"])
-            add(f"- `{wd.name}` on `{b}` — {n} commits ahead of main, awaiting the decision")
+            mark = " — **QUARANTINED** (lease expired; do not merge without review)" \
+                if wd.name in quarantined else ""
+            add(
+                f"- `{wd.name}` on `{b}` — {n} commits ahead of main, awaiting the decision"
+                f"{mark}"
+            )
     else:
         add("- none")
     add("")
+
+    if quarantined:
+        add("### quarantined (contaminated — excluded from the analyze/data chain)")
+        add("")
+        for name in sorted(quarantined):
+            add(f"- `{name}`")
+        add("")
 
     out = Path(args.out)
     out.parent.mkdir(parents=True, exist_ok=True)

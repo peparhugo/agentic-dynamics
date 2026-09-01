@@ -20,6 +20,12 @@ from pathlib import Path
 from typing import Any
 
 from agentic_dynamics.control.live import make_publisher
+from agentic_dynamics.core.cost_provenance import (
+    METHOD_TOKEN_PRICE_TABLE,
+    CostObservation,
+    CostSource,
+    resolve_cost_observation,
+)
 from agentic_dynamics.core.streaming import stream_subprocess
 from agentic_dynamics.measurement.efficiency import compute_cost_estimate
 
@@ -103,8 +109,66 @@ class AgenticResult:
             return 0.0
         return self.cache_read_tokens / total_context
 
-    # Cost
+    # ── Cost, and where the number came from ────────────────────────────────────────────
+    #
+    # ``estimated_cost_usd`` keeps its name, type and default so every existing consumer
+    # (efficiency, the game report, the lab books, sync_data) is unaffected. The three fields
+    # beside it are what phase 3 adds: they say whether that float is a measurement, a
+    # local estimate, or a placeholder standing in for a figure nobody ever reported.
+    #
+    # Read them together:
+    #   cost_source=METERED,   reported_cost_usd=0.0   → the provider metered a real $0
+    #   cost_source=UNKNOWN,   reported_cost_usd=None  → nobody reported anything; NOT $0
+    #   cost_source=ESTIMATED, reported_cost_usd=0.0   → a placeholder zero we declined to
+    #                                                    believe (tokens were spent), priced
+    #                                                    from the token table instead
+    # Before this phase all three arrived downstream as the single float 0.0 — the audit's
+    # five-state collapse. See ``core.cost_provenance``.
+
+    #: The figure to bill/report. Kept a plain float (never ``None``) for consumer
+    #: compatibility; consult :attr:`cost_source` before trusting a ``0.0``.
     estimated_cost_usd: float = 0.0
+
+    #: Provenance of :attr:`estimated_cost_usd`. Defaults to ``UNKNOWN``: a freshly
+    #: constructed result has measured nothing, and the default must not assert otherwise.
+    cost_source: CostSource = CostSource.UNKNOWN
+
+    #: How the figure was derived when :attr:`cost_source` is ``ESTIMATED``/``RECONCILED``
+    #: (a ``core.cost_provenance.ESTIMATION_METHODS`` member); ``None`` otherwise.
+    estimation_method: str | None = None
+
+    #: What the backend itself reported, verbatim and unrepaired — ``None`` when it reported
+    #: no cost at all, ``0.0`` when it reported a zero. This is the field that keeps a
+    #: provider-reported zero distinguishable from a missing cost.
+    reported_cost_usd: float | None = None
+
+    @property
+    def cost_observation(self) -> CostObservation:
+        """The cost + its provenance as one value object (the settlement step's input)."""
+        return CostObservation(
+            cost_usd=None if self.cost_source is CostSource.UNKNOWN else self.estimated_cost_usd,
+            source=self.cost_source,
+            estimation_method=self.estimation_method,
+            reported_cost_usd=self.reported_cost_usd,
+        )
+
+    @property
+    def cost_is_trusted(self) -> bool:
+        """True when this run's cost may back a real-dollar reservation (never ``UNKNOWN``)."""
+        return self.cost_observation.is_trusted
+
+    def apply_cost_observation(self, observation: CostObservation) -> None:
+        """Write a resolved observation onto the result — the adapters' single cost writer.
+
+        Both adapters (and the settlement step) go through here so the four fields can never
+        drift out of agreement. ``estimated_cost_usd`` takes ``0.0`` for an ``UNKNOWN``
+        observation purely to preserve the field's float contract; ``cost_source`` is what
+        says that zero means "not measured".
+        """
+        self.estimated_cost_usd = observation.billable_usd
+        self.cost_source = observation.source
+        self.estimation_method = observation.estimation_method
+        self.reported_cost_usd = observation.reported_cost_usd
 
     # Raw session transcript (JSONL from opencode stdout)
     raw_transcript: str = ""
@@ -380,24 +444,42 @@ def run_opencode_agentic(
 
     result.session_id = _extract_session_id(stream.stdout)
 
-    # Fall back to token × provider pricing when the events report no per-step cost
-    # (e.g. openai models, whose step_finish carries cost=0). Keeps live cost honest
-    # instead of silently reading $0.00.
-    if result.estimated_cost_usd == 0.0 and result.total_tokens > 0:
-        provider, _, model_id = model.partition("/")
-        try:
-            est = compute_cost_estimate(
-                prompt_tokens=result.prompt_tokens,
-                completion_tokens=result.completion_tokens,
-                reasoning_tokens=result.reasoning_tokens,
-                cache_read_tokens=result.cache_read_tokens,
-                cache_write_tokens=result.cache_write_tokens,
-                provider=provider,
-                model=model_id,
+    # Resolve the cost's PROVENANCE, not just its value. The parser has already recorded a
+    # metered figure if the provider reported one; this block supplies the token × price-table
+    # fallback for the two cases it cannot settle — a placeholder zero (openai's step_finish
+    # carries cost=0) and no cost reporting at all.
+    #
+    # The old code wrote the fallback straight into ``estimated_cost_usd`` and, when even the
+    # fallback was unavailable, left the field at its 0.0 default — indistinguishable from a
+    # genuinely free run. Now an unpriceable run ends as ``cost_source=UNKNOWN``, which the
+    # admission gate refuses to spend real dollars against.
+    if result.cost_source is not CostSource.METERED:
+        estimate: float | None = None
+        if result.total_tokens > 0:
+            provider, _, model_id = model.partition("/")
+            try:
+                est = compute_cost_estimate(
+                    prompt_tokens=result.prompt_tokens,
+                    completion_tokens=result.completion_tokens,
+                    reasoning_tokens=result.reasoning_tokens,
+                    cache_read_tokens=result.cache_read_tokens,
+                    cache_write_tokens=result.cache_write_tokens,
+                    provider=provider,
+                    model=model_id,
+                )
+                estimate = est["total_cost_usd"]
+            except (ValueError, KeyError):
+                # No price table for this provider/model. That is an UNKNOWN cost, and the
+                # resolver below records it as such rather than as a free run.
+                estimate = None
+        result.apply_cost_observation(
+            resolve_cost_observation(
+                reported_cost_usd=result.reported_cost_usd,
+                estimated_cost_usd=estimate,
+                estimation_method=METHOD_TOKEN_PRICE_TABLE,
+                tokens_observed=result.total_tokens > 0 or result.usage_reported,
             )
-            result.estimated_cost_usd = est["total_cost_usd"]
-        except (ValueError, KeyError):
-            pass
+        )
 
     result.duration_s = time.monotonic() - t0
 
@@ -512,7 +594,13 @@ def _parse_session_output(stdout: str, result: AgenticResult) -> None:
     current_depth = 0
     retry_count = 0
     last_was_error = False
+    # Positive per-step cost readings — the provider's own meter. Kept separate from
+    # ``_reported_any_cost`` because the two answer different questions: "how much?" vs
+    # "did the backend report a cost field AT ALL?". Conflating them is precisely how a
+    # missing cost became $0.00.
     _step_costs: list[float] = []
+    #: True once any step carried a numeric ``cost`` key, INCLUDING an explicit zero.
+    _reported_any_cost = False
     # Whether the current step produced tool calls (wrote/edited the deliverable)
     # vs was prose-only. Drives the answer/explanation token split at step_finish.
     step_has_tool = False
@@ -620,10 +708,17 @@ def _parse_session_output(stdout: str, result: AgenticResult) -> None:
                     result.prompt_tokens + result.completion_tokens + result.reasoning_tokens
                 )
                 result.context_tokens = result.total_tokens + result.cache_read_tokens
-            # Collect cost — format depends on provider
-            cost_val = part.get("cost", 0)
-            if isinstance(cost_val, (int, float)) and cost_val > 0:
-                _step_costs.append(float(cost_val))
+            # Collect cost — format depends on provider.
+            # ``cost`` absent entirely and ``cost: 0`` are DIFFERENT observations: opencode
+            # emits an explicit zero for providers it does not price (the openai path), and
+            # that zero is evidence the backend was asked and had nothing, whereas a missing
+            # key is evidence of nothing at all. Sentinel-default the lookup so the two stay
+            # apart, and record the zero without letting it into the arithmetic below.
+            cost_val = part.get("cost")
+            if isinstance(cost_val, (int, float)) and not isinstance(cost_val, bool):
+                _reported_any_cost = True
+                if cost_val > 0:
+                    _step_costs.append(float(cost_val))
 
         # Parse test output from bash tool results
         if etype == "tool_use" and part.get("tool") == "bash":
@@ -659,9 +754,19 @@ def _parse_session_output(stdout: str, result: AgenticResult) -> None:
     # If any cost is lower than a prior cost → per-step, sum all.
     if _step_costs:
         if all(_step_costs[i] >= _step_costs[i - 1] for i in range(1, len(_step_costs))):
-            result.estimated_cost_usd = _step_costs[-1]  # cumulative
+            reported = _step_costs[-1]  # cumulative
         else:
-            result.estimated_cost_usd = sum(_step_costs)  # per-step delta
+            reported = sum(_step_costs)  # per-step delta
+        # A positive reading IS the provider's meter, so the provenance is settled here; the
+        # caller's price-table fallback below will not fire (it only runs on 0.0/absent).
+        result.apply_cost_observation(
+            resolve_cost_observation(reported_cost_usd=reported, tokens_observed=True)
+        )
+    elif _reported_any_cost:
+        # Every step reported a cost, and every one of them was zero. Keep the observation —
+        # ``reported_cost_usd=0.0`` is what distinguishes this from "nothing was reported" —
+        # and leave the final call to the caller, which knows whether tokens were spent.
+        result.reported_cost_usd = 0.0
 
     # Estimate correctness from test results if not directly parsed
     if result.tests_total == 0 and "passed" in str(result.test_output).lower():
@@ -724,8 +829,16 @@ def normalize_opencode_event(event: dict, schema_version: int | None = None) -> 
             canonical["type"] = "step-finish"
             tokens = part.get("tokens", {})
             canonical["tokens"] = tokens if isinstance(tokens, dict) else {}
-            cost = part.get("cost", 0)
-            canonical["cost"] = float(cost) if isinstance(cost, (int, float)) else 0.0
+            # ``cost`` keeps its float contract (``scripts/analyze_trajectories.py`` sums it
+            # unconditionally), so this projection's ARITHMETIC is unchanged. ``cost_reported``
+            # is the additive provenance bit: False means the event carried no cost field, so
+            # the 0.0 beside it is a placeholder rather than a measured zero. Without it, a
+            # transcript that never reported a cost aggregates into ``total_cost: 0.0`` and
+            # reads as a free session — the same five-state collapse, on the post-hoc surface.
+            cost = part.get("cost")
+            reported = isinstance(cost, (int, float)) and not isinstance(cost, bool)
+            canonical["cost"] = float(cost) if reported else 0.0
+            canonical["cost_reported"] = reported
 
         elif etype == "text":
             canonical["type"] = "text"

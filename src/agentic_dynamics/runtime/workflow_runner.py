@@ -125,6 +125,8 @@ from pathlib import Path
 from typing import Any
 
 from agentic_dynamics.adapters.backends import run_agentic
+from agentic_dynamics.core.admission_context import AdmissionRefused
+from agentic_dynamics.core.cost_provenance import CostSource
 from agentic_dynamics.core.language import build_code_snapshot, compute_code_delta, detect_language
 from agentic_dynamics.core.paths import PROJECT_ROOT
 from agentic_dynamics.experiment.experiment_spec import ExperimentSpec, validate_spec
@@ -145,6 +147,7 @@ from agentic_dynamics.measurement.sonar import (
     project_key_for,
     run_sonar_analysis,
 )
+from agentic_dynamics.runtime.admission import PhaseAdmission, phase_admission_scope
 from agentic_dynamics.runtime.change_analyzer import (
     ChangeAnalyzer,
     ChangeInput,
@@ -188,6 +191,14 @@ class PhaseResult:
     # agent phases
     tokens: dict[str, int] = field(default_factory=dict)
     cost_usd: float = 0.0
+    # Cost provenance (admission_leases p3). ``cost_usd`` is a float and so cannot say "no
+    # figure was reported"; these three say whether to believe it. A phase whose model call
+    # never produced a priceable cost ends UNKNOWN, which the admission gate refuses to spend
+    # real per-token dollars against — rather than reading as a free phase.
+    cost_source: str = CostSource.UNKNOWN.value
+    estimation_method: str | None = None
+    #: The backend's verbatim figure: ``None`` = reported nothing, ``0.0`` = reported a zero.
+    reported_cost_usd: float | None = None
     cache_read_tokens: int = 0
     cache_write_tokens: int = 0
     cache_hit_rate: float = 0.0
@@ -248,6 +259,9 @@ class PhaseResult:
             "error": self.error,
             "tokens": self.tokens,
             "cost_usd": self.cost_usd,
+            "cost_source": self.cost_source,
+            "estimation_method": self.estimation_method,
+            "reported_cost_usd": self.reported_cost_usd,
             "cache_read_tokens": self.cache_read_tokens,
             "cache_write_tokens": self.cache_write_tokens,
             "cache_hit_rate": self.cache_hit_rate,
@@ -2489,6 +2503,7 @@ def run_workflow(
     construct_fn: Callable[..., Any] | None = None,
     rag_params: dict[str, Any] | None = None,
     change_analyzer: ChangeAnalyzer | None = None,
+    phase_admission: PhaseAdmission | None = None,
     phase_watchdog_min: float | None = None,
     discarded_trees_ledger: Path | str | None = None,
     phase_total: int | None = None,
@@ -2532,6 +2547,14 @@ def run_workflow(
     switch, so the existing fork chain (``fork: true``) keeps forking for free when it stays
     on the prior model. Without a ``model_pool`` the workflow is single-model (``model``) —
     backward compatible, and it needs no router.
+
+    Spend gate (``phase_admission``, ``admission_leases`` p2): the runtime-owned
+    ``runtime.admission.PhaseAdmission`` protocol, with ``control.admission``'s
+    implementation injected at the composition root (``scripts/run_workflow.py``). Each
+    agent phase reserves a budget + concurrency lease against the workflow's campaign
+    scope BEFORE its model is invoked, and releases them when the phase ends. A refusal
+    fails the phase with ``ADMISSION_DENIED`` and invokes nothing. Absent the injection —
+    or with the gate disarmed — the seam is inert and the run is byte-identical.
 
     Phase-boundary evidence (``change_analyzer``, design §5.7 — e6 of cap_evidence_integrity):
     when a ``ChangeAnalyzer`` is injected at the composition root, each phase that commits
@@ -2777,6 +2800,13 @@ def run_workflow(
                 ar = None
                 stall: dict[str, Any] | None = None
                 pre_head = ""
+                # The per-phase spend gate (admission_leases p2). An ExitStack rather
+                # than a nested ``with`` because the leases can only be reserved once
+                # the phase's model is KNOWN (the budget lease's currency follows the
+                # provider class), which is several statements into the try below —
+                # and they must still be released by the same ``finally`` that restores
+                # the cell id, on every path including a raised phase.
+                admission_gate = contextlib.ExitStack()
                 try:
                     # Select this step's model: pin wins, allowed_models restricts, else the
                     # full pool — scored over measured signals, pricing a model switch's cache
@@ -2808,6 +2838,18 @@ def run_workflow(
                             "spec declares a multi-model model_pool but no router was injected "
                             "— inject control.step_routing.route_step at the composition root"
                         )
+
+                    # ADMIT, then spend. The gate is entered the moment the executor
+                    # model is known and BEFORE the augmentation seam (whose prompt
+                    # constructor is itself a paid call), so every model invocation this
+                    # phase makes happens inside the admission. A refusal raises
+                    # ``AdmissionRefused`` here — before any prompt is built, any
+                    # subprocess is spawned, or any token is spent — and the phase
+                    # handler below records it as a failed phase. Inert (a no-op context)
+                    # when no gate was injected or the gate is disarmed.
+                    admission_gate.enter_context(
+                        phase_admission_scope(phase_admission, name, model_i)
+                    )
 
                     # RAG augmentation seam — retrieve -> construct -> render, placed
                     # between route_step and run_agent (never before routing, so the
@@ -2900,6 +2942,11 @@ def run_workflow(
                         pr.error = _format_stall_evidence(stall)
                         pr.stall_evidence = stall
                 finally:
+                    # Release the phase's leases before anything else: the headroom is
+                    # returned as soon as the phase stops spending, whether it finished,
+                    # failed, or was refused. (A missed release is still reclaimed by the
+                    # lease TTL — release is the fast path, expiry is the guarantee.)
+                    admission_gate.close()
                     if prev_cell is None:
                         os.environ.pop("FINOPS_CELL_ID", None)
                     else:
@@ -2914,6 +2961,16 @@ def run_workflow(
                         "total": getattr(ar, "total_tokens", 0),
                     }
                     pr.cost_usd = getattr(ar, "estimated_cost_usd", 0.0)
+                    # Carry the cost's PROVENANCE onto the ledger alongside its value, so a
+                    # phase whose cost was never reported is legible as UNKNOWN on disk
+                    # instead of as a $0.00 phase. ``getattr`` defaults keep this tolerant of
+                    # the stub results the runner's tests inject.
+                    _phase_source = getattr(ar, "cost_source", None)
+                    pr.cost_source = getattr(_phase_source, "value", None) or (
+                        _phase_source if isinstance(_phase_source, str) else CostSource.UNKNOWN.value
+                    )
+                    pr.estimation_method = getattr(ar, "estimation_method", None)
+                    pr.reported_cost_usd = getattr(ar, "reported_cost_usd", None)
                     pr.confidence = getattr(ar, "confidence", None)
                     pr.cache_read_tokens = getattr(ar, "cache_read_tokens", 0)
                     pr.cache_write_tokens = getattr(ar, "cache_write_tokens", 0)
@@ -2930,6 +2987,14 @@ def run_workflow(
                     if not getattr(ar, "ok", True):
                         pr.status = "failed"
                         pr.error = getattr(ar, "error", "") or f"exit_code={getattr(ar, 'exit_code', '?')}"
+        except AdmissionRefused as exc:
+            # The spend gate refused this phase — and refusal means NO invocation
+            # happened: ``phase_admission_scope`` is entered before the prompt is built
+            # and before any adapter is touched. Recorded with a stable marker so the
+            # ledger (and ``--resume``) can tell a budget refusal from a crash, and so
+            # phase 4's quarantine rail can key off it.
+            pr.status = "failed"
+            pr.error = f"ADMISSION_DENIED: {exc}"
         except Exception as exc:  # one bad phase must not crash the runner
             pr.status = "failed"
             pr.error = repr(exc)

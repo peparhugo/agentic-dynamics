@@ -189,9 +189,23 @@ def _scan_db():
 
 
 def _scan_worktrees():
+    """Scan experiment worktrees for the inventory, minus the quarantined ones.
+
+    The data chain's first step, and therefore the second quarantine consult point (the analyze
+    chain's is ``analyze_worktrees.discover_worktrees``). ``build_data.py`` reads this inventory
+    to generate the website's ``data.js``, so a contaminated worktree that survives here reaches
+    a published surface. ``on_error="raise"`` for the same reason it does there.
+    """
     import glob
+
+    from agentic_dynamics.control.quarantine import filter_quarantined_paths
+
     wts = []
-    for path in sorted(glob.glob(WORKTREE_GLOB)):
+    candidates = sorted(glob.glob(WORKTREE_GLOB))
+    kept, excluded = filter_quarantined_paths(candidates, on_error="raise")
+    for path in excluded:
+        print(f"  [quarantined] excluded from inventory: {Path(path).name}")
+    for path in kept:
         p = Path(path)
         mtime = datetime.fromtimestamp(p.stat().st_mtime, tz=timezone.utc).isoformat()
         files = list(p.rglob("*"))
