@@ -62,7 +62,6 @@ by content hash before the RRF so same-content documents actually fuse. The meas
 Provenance: [C] computed — `scripts/fleet/retrieval_census.py` over the live Chroma + Neo4j
 stores; artifacts `experiments/results/retrieval_census/20260901T022132Z.json` +
 `20260901T023603Z.json`.
-
 ## p1 measurement (the fusion-quality campaign) — the join answer + hypothesis verdict
 
 **Instrument landed.** `Candidate` now carries `join_content_hash` (the sha256 of the stored
@@ -73,7 +72,8 @@ The census rows carry per-candidate legs + content hashes, and `content_join_tot
 `hypothesis_split` report the answer over the whole set. The join is observational only:
 `join_content_hash` never feeds `deduplicate`/`collapse_redundant`/fusion, so the fusion-off
 path is byte-identical (no-regression). Artifact:
-`experiments/results/retrieval_census/20260901T035547Z.json`.
+`experiments/results/retrieval_census/20260901T035547Z.json` (the fresh gate re-run,
+`20260901T041554Z.json`, reproduces the verdict).
 
 **The join answer.** Across the same 15-query census set (same weights `retrieval-weights/v1`,
 same stores): **fused = 0, content_pairs = 0, distinct_content_hashes = 0.** Not one dense
@@ -120,13 +120,17 @@ test pins that `deduplicate` still keys on the persisted `content_hash`, never o
 | 2026-09-01T022132Z (pre-campaign) | 70 | 336 | **0** | — | full × 15 |
 | 2026-09-01T023603Z (pre-campaign) | 549 | 373 | **0** | — | full × 15 |
 | 2026-09-01T035547Z (instrumented, the gate) | 549 | 373 | **0** | **0** | full × 15 |
+| 2026-09-01T041554Z (fresh p3 gate re-run) | 549 | 373 | **0** | **0** | full × 15 |
 
 Same 15-query census set, same weights (`retrieval-weights/v1`), same stores. The gate is
 **fused > 0 OR the documented two-view verdict**: the campaign takes the latter — fused stays 0
 because the two legs' top-K candidate sets are genuinely disjoint (0 same-content pairs at the
 id level AND at the content level), and that two-view outcome is now measured and documented
-above (H2 verdict). The gate is PASSED on the documented-two-view branch, with the before/after
-table and the no-fix decision recorded here. Retrieval + census tests green (79 passed).
+above (H2 verdict). The `20260901T041554Z` row is a fresh re-execution of the gate against the
+live stores — byte-identical verdict to the instrumented run, confirming the join answer is
+reproducible, not a snapshot artifact. The gate is PASSED on the documented-two-view branch,
+with the before/after table and the no-fix decision recorded here. Retrieval + census tests
+green (79 passed).
 
 ## p4 writeup — the campaign close
 
@@ -155,9 +159,10 @@ a merge of distinct records). The RRF, id-based merge, `deduplicate`, and `colla
 are byte-identical to before the campaign; the instrument (`join_content_hash`, `legs`,
 `leg_overlap`) is observational only, and a test pins the fusion-off path unchanged.
 
-**The gated census before/after.** See the p3 table: fused stayed 0 across all three runs
-(70→549 dense growth, 336→373 lexical, fused 0), and the instrumented run additionally proves
-`content_pairs = 0`. The campaign closes on the documented-two-view branch of the gate.
+**The gated census before/after.** See the p3 table: fused stayed 0 across all four runs
+(70→549 dense growth, 336→373 lexical, fused 0), the instrumented run additionally proves
+`content_pairs = 0`, and the fresh gate re-run (`20260901T041554Z`) reproduces that answer
+exactly. The campaign closes on the documented-two-view branch of the gate.
 
 **Meaning for the augmentation path.** With the two-view system now MEASURED (not assumed), the
 evidence-card layer can state it precisely: a candidate carries either dense-leg or lexical-leg
