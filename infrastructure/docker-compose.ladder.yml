@@ -1,7 +1,7 @@
 # docker-compose.ladder.yml — the fleet ladder (proposal §2/§3/§7 slice 1).
 #
-# Three service groups on ONE cell network (`fleet-net`) + an egress proxy endpoint. Direct
-# Internet egress remains possible until cells are configured to use that proxy. The data plane
+# Three service groups on ONE cell network (`fleet-net`) + an egress proxy endpoint. Cells
+# egress directly today (no scope sets HTTP_PROXY/HTTPS_PROXY); the proxy is the declared policy point. The data plane
 # (queue redis 6380 / chroma 8000 / neo4j 7687 /
 # sonar 9000-9003) is NOT defined here — it lives in the other infrastructure/ compose files
 # and is attached to `fleet-net` BY NAME via `scripts/fleet/attach_data_plane.sh` (the D-17
@@ -139,7 +139,7 @@ x-orchestrator-base: &orchestrator-base
 
 services:
   # =========================================================================
-  # fleet/cell — one job at a time, per-queue pools, no socket.
+  # fleet/cell — the story/analysis/review pools drain one queue job at a time; the kb-* stream consumers and daemons are long-running; no socket.
   # =========================================================================
   story-worker:
     <<: *cell-base
@@ -257,7 +257,7 @@ services:
       FINOPS_KB_WRITE: "1"        # P5 (orphan) — orphan ingestion
 
   # =========================================================================
-  # The egress proxy endpoint. It is not an enforced sole Internet route until cells configure it.
+  # The egress proxy endpoint — the declared policy point; cells egress directly today (no scope sets HTTP_PROXY/HTTPS_PROXY).
   # =========================================================================
   egress:
     image: fleet/base

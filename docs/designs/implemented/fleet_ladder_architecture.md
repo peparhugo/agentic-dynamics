@@ -24,10 +24,13 @@ ledger does not identify the execution runtime, so it is not container-execution
 
 ## Implemented topology
 
-[M] The ladder has three runtime roles: cell services process one queue job at a time; the
+[M] The ladder has three runtime roles. Cell services are long-running units: the
+story/analysis/review workers are BRPOP queue consumers that process one queue job at a time, the
+`kb-*` stream consumers (`kb-chroma`, `kb-ledger`, `kb-registry`, `kb-neo4j`) run continuously
+against the KB stream, and the batch producers run to completion once; the
 orchestrator runs campaign/workflow wrappers and can spawn sibling cells; supervisor services run
 the fleet manager, Control Room, game board, and review trigger
-(`infrastructure/docker-compose.ladder.yml:139-339`). [P] The controller remains outside the
+(`infrastructure/docker-compose.ladder.yml:139-339,144-257`). [P] The controller remains outside the
 ladder and is the sole permanence authority
 (`docs/designs/proposed/system_knowledge_abstraction.md:77-81`).
 
@@ -52,10 +55,10 @@ build or run the Docker command (`scripts/fleet/spawn_wrapper.py:155-240`, `317-
 results, a shared OpenCode-state directory, and read-only credential/configuration paths
 (`infrastructure/docker-compose.ladder.yml:49-88`). [C] The state mount excludes the host's live
 OpenCode state but is shared by scaled cell services, so it is not per-cell state isolation
-(`infrastructure/docker-compose.ladder.yml:57-64,90-97,143-155`). [C] The current mount guard
-omits compose's repository-alias and `.git` targets, causing
-`test_mount_contract_holds_no_unexpected_target` to fail; its enforcement coverage remains open
-(`infrastructure/docker-compose.ladder.yml:59-63`, `tests/test_fleet_guards.py:85-118`).
+(`infrastructure/docker-compose.ladder.yml:57-64,90-97,143-155`). [C] The mount guard's allowlist
+now covers compose's repository-alias and `.git` overlay targets, mirroring the wrapper's runtime
+`CONTRACT_TARGETS` (`scripts/fleet/spawn_wrapper.py:79-97`); `test_mount_contract_holds_no_unexpected_target`
+passes and the guard is not weakened (`tests/test_fleet_guards.py:86-102,120-127`).
 
 [M] The closed `SCOPE_VOCABULARY`, `SCOPE_CONFIGS`, and `PHASE_SCOPE_AUTHORIZATION` declare the
 allowed phase scopes, result modes, network, and write flags
@@ -65,8 +68,8 @@ prove invalid scopes, unauthorized phases, and bad mounts fail before a socket c
 
 [M] The accepted slice-4 guard log records the then-run checks for mount targets, the single socket
 tier, supervisor restrictions, heartbeats/DLQ, single write-back, scope vocabulary, and network
-membership (`docs/fleet/07_slice4_guards_log.md:20-37`). [P] It is historical evidence and does
-not close the current mount-guard gap above.
+membership (`docs/fleet/07_slice4_guards_log.md:20-37`). [P] It is historical evidence and is kept
+distinct from the current mount-guard state above (which now passes).
 
 ## Knowledge and network evidence
 
@@ -78,8 +81,8 @@ and contributed a lexical leg to RRF retrieval (`docs/fleet/06_slice3_neo4j_rrf_
 structurally unreachable from cells (`infrastructure/docker-compose.ladder.yml:344-351`,
 `docs/fleet/04_slice1_live_cutover_log.md:57-61`).
 
-[C] The egress proxy is defined but is not the enforced sole Internet route: the cells do not set
-`HTTP_PROXY` or `HTTPS_PROXY`, so direct bridge-NAT egress remains possible
+[C] The egress proxy is the declared policy point, but it is not the enforced route: the cells do
+not set `HTTP_PROXY` or `HTTPS_PROXY`, so direct bridge-NAT egress is the current operating state
 (`docs/fleet/04_slice1_live_cutover_log.md:126-134`,
-`docs/reviews/fleet_ladder_implementation_adversary.md:15-18,50-70`). [P] This limitation stays
-open until a documented operator-approved remediation or deferral closes it.
+`docs/reviews/fleet_ladder_implementation_adversary.md:15-18,50-70`). [P] The proxy becomes the
+enforced route only when a scope configures it — recorded as current reality, not as a pending fix.

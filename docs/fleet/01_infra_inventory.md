@@ -4,9 +4,15 @@ status: proposed
 
 # Fleet-ladder infra inventory — the execution plane as it is TODAY
 
+**SUPERSEDED BY IMPLEMENTATION (2026-09-01):** the design this inventory fed has moved to
+`docs/designs/implemented/fleet_ladder_architecture.md` (`status: implemented`, implemented by
+`workflows/repository/fleet_ladder_implementation.yaml`). This document is the historical p1
+snapshot — queue state, store occupancy, and the failure ledger as of 2026-08-29 — not
+current-state documentation; the accepted slice logs supersede its operational claims.
+
 **Status: PROPOSED · Date: 2026-08-29T15:24:02Z · Source: p1_research_infra of the
 `fleet_ladder_plan` spec (spec_sha256 `0d30d4bc…`; the design under mapping is
-`docs/designs/proposed/fleet_ladder_architecture.md`).**
+`docs/designs/implemented/fleet_ladder_architecture.md`).**
 
 This is a **factual inventory** — no design, no proposal, no infra touched. Every number is
 cited to a live command or a file path. It answers the design's §1 problem statement with
@@ -199,7 +205,7 @@ Each entry: the incident, the evidence, and the requirement the ladder must sati
 | F-2 | Campaign wrappers died mid-run (watchdog; post-cells death) | `git b928c4d17` (p1_phase_watchdog: stale agent SIGTERM'd → phase STALLED); `git b435c734e` (2d spec index, STALLED ledger; `experiments/specs/index.json` cap_adaptive_2d status failed); the resumable-grid answer: `scripts/run_cap_2d_grid.py:830-857` (execution-manifest-first, skip recorded); `HANDOFF.md:214` (first campaign launch died — nohup only guards SIGHUP) | R2 health + restart-with-backoff; R3 queue watcher |
 | F-3 | Portal + respawn supervisor died (the supervisor SPOF) | `scripts/run_control_room.sh:2` ("died silently three times"); `HANDOFF.md:52,224`; the respawn loop is itself a bare host process | R2 (the supervisor becomes a top-rung container, host runs only the bootstrap) |
 | F-4 | 129 analysis jobs queued, zero workers | Live `analysis_status` = exactly **129** (104 failed / 25 done); no watcher code exists; the analysis worker only runs when started by hand | R3 queue watcher + per-queue pools |
-| F-5 | Worker env broke twice (claude PATH, then OAuth) | `docs/archive/HANDOFF_2026-08-19.md:129-131` (claude needs `PATH="$HOME/.local/bin:$PATH"` + live OAuth); `docs/designs/current/cap_grit_grid_runplan.md:110` (CLAUDE_BIN not exported), `:208-218` (OAuth tokens empty, session expired); `HANDOFF.md:54` (Claude auth down); fix `git d3a1e71db` | R1 canonical env baked into the image |
+| F-5 | Worker env broke twice (claude PATH, then OAuth) | `docs/archive/HANDOFF_2026-08-19.md:129-131` (claude needs `PATH="$HOME/.local/bin:$PATH"` + live OAuth); `docs/experiments/designs/cap_grit_grid_runplan.md:110` (CLAUDE_BIN not exported), `:208-218` (OAuth tokens empty, session expired); `HANDOFF.md:54` (Claude auth down); fix `git d3a1e71db` | R1 canonical env baked into the image |
 | F-6 | 70 dead analysis jobs pointed at removed files | Not independently documented (the design's own number); mechanism live at `scripts/analysis_worker.py:135` (worktree missing → fail) | R4 job-queue DLQ surface |
 | F-7 | 13 silent-dead story records (0 tokens, 0 cost, exit<0) | `docs/reviews/cross_models_mixed_effect_caveat.md:46-50,80-81`; `git 3bb286195`, `0b5bb38a8` (13 removed), `705a8eb3f` (worker validates real runs) | R2 health; worker-side run validation (already partially done) |
 | F-8 | Block-buffered logs; dead-process autopsy | `HANDOFF.md:44-45` (setsid; nohup died twice) | R5 live/streamed logs |

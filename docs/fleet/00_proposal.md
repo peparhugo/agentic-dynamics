@@ -4,11 +4,18 @@ status: proposed
 
 # Fleet-ladder proposal — the mapping, assembled (container topology + KB access per tier)
 
+**SUPERSEDED BY IMPLEMENTATION (2026-09-01):** the design this proposal maps is now implemented —
+`docs/designs/implemented/fleet_ladder_architecture.md` (`status: implemented`, implemented by
+`workflows/repository/fleet_ladder_implementation.yaml`). The accepted slice logs
+(`docs/fleet/04_slice1_live_cutover_log.md` … `07_slice4_guards_log.md`) supersede this
+document's operational claims (mounts, network policy, guards); this mapping stays as the
+mandate record, not as current-state documentation.
+
 **Status: PROPOSED · Date: 2026-08-29T16:05Z · Source: p4_proposal of the `fleet_ladder_plan`
 spec (spec_sha256 `0d30d4bc…`).** ASSEMBLES the prior phases — `docs/fleet/01_infra_inventory.md`
 (the infra facts), `02_kb_access_map.md` (the 31-touch KB map), `03_review.md` (the 6 unmapped
 touches F-1…F-6, the 2 constraint findings, 12 risks, 10 questions) — against the design
-(`docs/designs/proposed/fleet_ladder_architecture.md`). Nothing here re-researches; every
+(`docs/designs/implemented/fleet_ladder_architecture.md`). Nothing here re-researches; every
 decision resolves a prior-phase finding. **Nothing implements — the operator signs off.**
 
 **REVISED (2026-08-29, p0_revise of `fleet_ladder_revision`, escalated to deepseek-v4-pro):** the
