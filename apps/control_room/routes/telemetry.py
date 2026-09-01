@@ -86,6 +86,17 @@ def api_matrix() -> Response:
     # best-effort) so a phase without its own published-at stamp can still be dated by the
     # runner's telemetry — and a run with neither renders age-unknown, never mislabeled.
     tails = _tail_stamps(r, list(phase_payloads))
+    phases = _parse_phases(phase_payloads, tails=tails)
+    # Runner-truth liveness (live_board follow-up, 2026-09-01): a cell whose status is
+    # "running" but whose phase liveness says historical is an ENDED run with a stale status —
+    # a killed/interrupted runner never publishes its terminal status, so story_status keeps
+    # "running" forever. The window, not the publishing process, decides: the cell is
+    # re-presented as "ended" (outcome unknown-but-over) rather than falsely live.
+    live_cells = {cid for cid, p in phases.items() if p.get("live")}
+    cells = dict(execute["cells"])
+    for cid, status in cells.items():
+        if status == "running" and cid not in live_cells:
+            cells[cid] = "ended"
     response = {
         "total": execute["total"],
         "remaining_in_queue": execute["remaining_in_queue"],
@@ -96,8 +107,8 @@ def api_matrix() -> Response:
         "timeout": execute["timeout"],
         "completed": execute["completed"],
         "results_saved": execute["results_saved"],
-        "cells": execute["cells"],
-        "phases": _parse_phases(phase_payloads, tails=tails),
+        "cells": cells,
+        "phases": phases,
     }
     response["stages"] = {"execute": execute, "analyze": analyze, "review": review}
     design_stream_ids: list[str] = []

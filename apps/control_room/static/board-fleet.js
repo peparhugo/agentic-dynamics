@@ -49,6 +49,7 @@
     failed: { axis: "lifecycle", key: "failed", word: "FAILED", glyph: "×", className: "status-failed" },
     timeout: { axis: "lifecycle", key: "timeout", word: "TIMEOUT", glyph: "◷", className: "status-timeout" },
     retry: { axis: "lifecycle", key: "retry", word: "RETRY", glyph: "↻", className: "status-retry" },
+    ended: { axis: "lifecycle", key: "ended", word: "ENDED", glyph: "◻", className: "status-ended" },
     unknown: { axis: "lifecycle", key: "unknown", word: "UNKNOWN", glyph: "?", className: "status-unknown" },
   }
 

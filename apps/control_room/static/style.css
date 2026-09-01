@@ -60,6 +60,7 @@
   --cr-status-failed: #ff7a91;
   --cr-status-timeout: #ffc15c;
   --cr-status-retry: #78d6d0;
+  --cr-status-ended: #6b7a8e;
   --cr-status-unknown: #8596aa;
   --cr-attention-off-track: #ff8aa1;
   --cr-attention-stalled: #ffd27d;
@@ -121,6 +122,7 @@
   --status-failed: var(--cr-status-failed);
   --status-timeout: var(--cr-status-timeout);
   --status-retry: var(--cr-status-retry);
+  --status-ended: var(--cr-status-ended);
   --status-unknown: var(--cr-status-unknown);
   --attention-off-track: var(--cr-attention-off-track);
   --attention-stalled: var(--cr-attention-stalled);
@@ -219,6 +221,7 @@
   --status-failed: var(--cr-status-failed);
   --status-timeout: var(--cr-status-timeout);
   --status-retry: var(--cr-status-retry);
+  --status-ended: var(--cr-status-ended);
   --status-unknown: var(--cr-status-unknown);
   --attention-off-track: var(--cr-attention-off-track);
   --attention-stalled: var(--cr-attention-stalled);
