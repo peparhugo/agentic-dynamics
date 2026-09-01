@@ -141,6 +141,13 @@ workflow:
         evidence; a bare PASS is a failed review; every finding is fixed on the
         branch or recorded as an accepted limitation. The run is not complete until
         the adversarial review lands.
+        (8) PHASE SCOPE IS A FENCE (the 2026-09-02 failed-run lesson): each phase
+        delivers ONLY its own phase's deliverable. NEVER start the next phase's work,
+        never edit the workflow runner or the spec, never hand-edit generated
+        surfaces (.opencode/, .claude/, agent_config/ outputs, the spec index) —
+        those regenerate through their generators. ONE phase, ONE commit range
+        (or as many commits as that phase's own work needs, ALL prefixed with THIS
+        phase's name), then stop. The next phase is a SEPARATE session.
     phases:
       - name: p1_control_db
         kind: agent
@@ -165,6 +172,18 @@ workflow:
           STATE vocabulary is exact: queued, running, awaiting_approval, verifying,
           promotable, promoting, merged, projecting, published, failed, cancelled,
           quarantined — the db stores the state string, never a bool overload.
+          SCOPE FENCE: this phase delivers ONLY its own deliverable — never the next phase's work, never edits to the runner/spec, never hand-edited generated surfaces. All commits in this phase carry THIS phase's '[workflow] <phase>' prefix. Stop when the deliverable is committed.
+
+          SCOPE FENCE: this phase delivers ONLY its own deliverable — never the next phase's work, never edits to the runner/spec, never hand-edited generated surfaces. All commits in this phase carry THIS phase's '[workflow] <phase>' prefix. Stop when the deliverable is committed.
+
+          SCOPE FENCE: this phase delivers ONLY its own deliverable — never the next phase's work, never edits to the runner/spec, never hand-edited generated surfaces. All commits in this phase carry THIS phase's '[workflow] <phase>' prefix. Stop when the deliverable is committed.
+
+          SCOPE FENCE: this phase delivers ONLY its own deliverable — never the next phase's work, never edits to the runner/spec, never hand-edited generated surfaces. All commits in this phase carry THIS phase's '[workflow] <phase>' prefix. Stop when the deliverable is committed.
+
+          SCOPE FENCE: this phase delivers ONLY its own deliverable — never the next phase's work, never edits to the runner/spec, never hand-edited generated surfaces. All commits in this phase carry THIS phase's '[workflow] <phase>' prefix. Stop when the deliverable is committed.
+
+          SCOPE FENCE: this phase delivers ONLY its own deliverable — never the next phase's work, never edits to the runner/spec, never hand-edited generated surfaces. All commits in this phase carry THIS phase's '[workflow] <phase>' prefix. Stop when the deliverable is committed.
+
           The orchestrator/engine is the ONLY writer (the composition root in
           scripts/run_workflow.py opens the db and records run creation, per-phase
           attempts + gate results, and the terminal transition).
