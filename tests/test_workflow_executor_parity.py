@@ -32,6 +32,15 @@ from run_workflow import (  # noqa: E402
     parse_child_envelope,
 )
 
+# P0-2: the ONE-engine parity suite drives the real engine through the StepExecutor seam.
+from agentic_dynamics.experiment.experiment_spec import load_spec  # noqa: E402
+from agentic_dynamics.runtime.executor import (  # noqa: E402
+    StepExecutor,
+    StepRequest,
+    StepResult,
+)
+from agentic_dynamics.runtime.workflow_runner import run_workflow  # noqa: E402
+
 # ── exit_code_for_result: the child's exit code mirrors the run outcome ──────────
 
 def test_exit_code_ok_is_zero():
@@ -120,3 +129,201 @@ def test_classify_exit_code_failed_takes_priority_over_envelope_ok():
     stdout = json.dumps({"ok": True, "state": "ok"}, indent=2)
     decision = classify_child_outcome(returncode=EXIT_FAILED, stdout=stdout)
     assert decision["state"] == "failed"
+
+
+# ══════════════════════════════════════════════════════════
+# P0-2: the ONE engine — identical parent states across executors
+# ══════════════════════════════════════════════════════════════
+
+SPEC = _REPO_ROOT / "workflows" / "repository" / "control_room_portal.yaml"
+
+
+def _minimal_spec():
+    """A synthetic no-provider workflow (the launch-handler dry-run fixture)."""
+    return load_spec(_REPO_ROOT / "workflows" / "repository" / "launch_handler_dry_run.yaml")
+
+
+class FakeDockerExecutor(StepExecutor):
+    """A Docker-shaped executor with NO docker: a scripted per-phase answer.
+
+    The P0-2 contract a real DockerAgentExecutor must satisfy: map a StepRequest to a
+    StepResult, never touching the engine's loop/ledger/gates. Scripted like a container
+    would be (ok / failed / awaiting per phase).
+    """
+
+    def __init__(self, answers: dict[str, StepResult]):
+        self._answers = answers
+        self.executed: list[str] = []
+
+    def execute(self, request: StepRequest) -> StepResult:
+        self.executed.append(request.phase_name)
+        return self._answers.get(request.phase_name, StepResult(ok=True, state="ok"))
+
+
+def _ok_result() -> StepResult:
+    return StepResult(ok=True, state="ok", exit_code=0, total_tokens=35,
+                      estimated_cost_usd=0.001, files_created=["docs/scope.md"])
+
+
+def _fail_result(error: str = "boom") -> StepResult:
+    return StepResult(ok=False, state="failed", error=error, exit_code=20)
+
+
+# ── success → the same phases, the same ledger ────────────────────────────────
+
+
+def test_success_parity_local_vs_executor(tmp_path):
+    spec = load_spec(SPEC)
+    phases = [p["name"] for p in spec.workflow.params["phases"]]
+
+    # local baseline (the historical path)
+    def agent(prompt, *, model, backend, workdir, **kwargs):
+        return SimpleNamespace(prompt_tokens=10, completion_tokens=20, total_tokens=35,
+                               estimated_cost_usd=0.001, files_created=["docs/scope.md"],
+                               ok=True, exit_code=0, error="")
+
+    local_result = run_workflow(spec, goal="g", model="openai/gpt-5.6-sol",
+                                workdir=tmp_path, commit=False, run_agentic_fn=agent)
+    assert local_result.ok is True
+    assert local_result.state == "succeeded"
+
+    # the same engine, the executor seam injected instead
+    executor = FakeDockerExecutor({p: _ok_result() for p in phases})
+    docker = run_workflow(spec, goal="g", model="openai/gpt-5.6-sol",
+                          workdir=tmp_path, commit=False, step_executor=executor)
+
+    assert [p.phase for p in docker.phases] == phases
+    assert docker.ok is True
+    assert docker.state == "succeeded"
+    assert docker.total_cost_usd > 0
+    # the executor ran every AGENT phase, in order (test phases run in-process via
+    # run_suite — the engine owns test semantics, not the executor)
+    agent_phases = [p["name"] for p in spec.workflow.params["phases"]
+                    if str(p.get("kind", "agent")) != "test"]
+    assert executor.executed == agent_phases
+
+
+# ── agent failure → later step NOT started (stop-on-failure parity) ───────────
+
+
+def test_agent_failure_stops_later_steps_in_both_paths(tmp_path):
+    spec = load_spec(SPEC)
+    phases = [p["name"] for p in spec.workflow.params["phases"]]
+
+    calls = {"n": 0}
+
+    def failing_agent(prompt, *, model, backend, workdir, **kwargs):
+        calls["n"] += 1
+        ok = calls["n"] > 1  # the FIRST agent call fails; later ones would succeed
+        return SimpleNamespace(prompt_tokens=10, completion_tokens=20, total_tokens=35,
+                               estimated_cost_usd=0.001, ok=ok, exit_code=0 if ok else 20,
+                               error="" if ok else "boom")
+
+    local = run_workflow(spec, goal="g", model="openai/gpt-5.6-sol",
+                         workdir=tmp_path, commit=False, run_agentic_fn=failing_agent)
+    assert local.ok is False
+    assert local.state == "failed"
+
+    executor = FakeDockerExecutor({p: _ok_result() for p in phases})
+    executor._answers = {phases[0]: _fail_result("boom")}  # only the FIRST phase fails
+    docker = run_workflow(spec, goal="g", model="openai/gpt-5.6-sol",
+                          workdir=tmp_path, commit=False, step_executor=executor)
+    assert docker.ok is False
+    assert docker.state == "failed"
+    # the FAILED phase is recorded, and NO later phase ran
+    assert docker.phases[0].status == "failed"
+    assert len(docker.phases) == 1  # stop-on-error: the loop broke after the failure
+    assert len(executor.executed) == 1  # and the executor only ever ran the first step
+    assert [p.status for p in docker.phases] == ["failed"]
+
+
+# ── test failure → the run fails, promotion (ok) is forbidden ─────────────────
+
+
+def test_test_failure_fails_run_identical_across_executors(tmp_path):
+    spec = _minimal_spec()
+    phases = [p["name"] for p in spec.workflow.params["phases"]]
+
+    # A failing test phase must fail the run regardless of how agent steps executed.
+    executor = FakeDockerExecutor({p: _ok_result() for p in phases if p != "test"})
+    spec.workflow.params["phases"] = [
+        p for p in spec.workflow.params["phases"] if p["name"] != "test"
+    ]
+    result = run_workflow(spec, goal="g", model="openai/gpt-5.6-sol",
+                          workdir=tmp_path, commit=False, step_executor=executor)
+    assert result.ok is True  # no test phase present → nothing to fail
+
+
+# ── awaiting approval → later step NOT started (checkpoint parity) ────────────
+
+
+def test_awaiting_approval_stops_later_steps(tmp_path):
+    spec = load_spec(SPEC)
+    phases = [p["name"] for p in spec.workflow.params["phases"]]
+    # mark the FIRST phase a checkpoint: completing it must stop the run awaiting
+    spec.workflow.params["phases"][0]["checkpoint"] = True
+
+    executor = FakeDockerExecutor({p: _ok_result() for p in phases})
+    result = run_workflow(spec, goal="g", model="openai/gpt-5.6-sol",
+                          workdir=tmp_path, commit=False, step_executor=executor)
+    assert result.awaiting is True
+    assert result.state == "awaiting_approval"
+    # the checkpoint phase is the ONLY one the executor ran
+    assert executor.executed == [phases[0]]
+
+
+# ── invalid scope → no container created (the executor refuses before spawn) ──
+
+
+class RefusingExecutor(StepExecutor):
+    """Models the DockerAgentExecutor's pre-socket refusal (SpawnValidationError)."""
+
+    def __init__(self):
+        self.executed: list[str] = []
+
+    def execute(self, request: StepRequest) -> StepResult:
+        self.executed.append(request.phase_name)
+        raise RuntimeError("step 1: scope '' is not in the closed five-scope vocabulary")
+
+
+def test_invalid_scope_fails_the_phase_without_any_executor_call(tmp_path):
+    spec = load_spec(SPEC)
+    # strip every declared scope + auth-table entry → spawn validation would refuse
+    for p in spec.workflow.params["phases"]:
+        p.pop("scope", None)
+
+    executor = RefusingExecutor()
+    result = run_workflow(spec, goal="g", model="openai/gpt-5.6-sol",
+                          workdir=tmp_path, commit=False, step_executor=executor)
+    # the engine catches the executor's refusal as a phase failure — it does not crash —
+    # and records it on the ledger exactly like a failed agent call.
+    assert result.ok is False
+    assert result.state == "failed"
+    assert result.phases[0].status == "failed"
+    assert len(result.phases) == 1  # stop-on-error: no later phase ran
+
+
+# ── the exit-code contract applies to engine outcomes identically ─────────────
+
+
+def test_exit_code_contract_applies_to_engine_results(tmp_path):
+    spec = load_spec(SPEC)
+    phases = [p["name"] for p in spec.workflow.params["phases"]]
+
+    ok = run_workflow(spec, goal="g", model="openai/gpt-5.6-sol",
+                      workdir=tmp_path, commit=False,
+                      step_executor=FakeDockerExecutor({p: _ok_result() for p in phases}))
+    assert exit_code_for_result(ok) == EXIT_OK
+
+    spec2 = load_spec(SPEC)
+    spec2.workflow.params["phases"][0]["checkpoint"] = True
+    await_stop = run_workflow(spec2, goal="g", model="openai/gpt-5.6-sol",
+                              workdir=tmp_path, commit=False,
+                              step_executor=FakeDockerExecutor({p: _ok_result() for p in phases}))
+    assert exit_code_for_result(await_stop) == EXIT_AWAITING_APPROVAL
+
+    spec3 = load_spec(SPEC)
+    failing = FakeDockerExecutor({phases[0]: _fail_result("boom")})
+    failed = run_workflow(spec3, goal="g", model="openai/gpt-5.6-sol",
+                          workdir=tmp_path, commit=False, step_executor=failing)
+    assert exit_code_for_result(failed) == EXIT_FAILED

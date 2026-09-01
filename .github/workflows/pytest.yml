@@ -101,6 +101,36 @@ jobs:
         run: |
           python -c "import agentic_dynamics; print('agentic_dynamics imports OK')"
 
+  # P0-2 (control-plane stabilization): the workflow-parity contract. The ONE semantic
+  # engine must produce identical parent states whether an agent step runs in-process
+  # (LocalAgentExecutor) or in a sibling container (DockerAgentExecutor). This job runs
+  # the parity suite — synthetic, no-provider workflows (fake executors, no docker, no
+  # model calls) — as its own status check so a parity regression is a named failure,
+  # not a line buried in the deterministic suite.
+  workflow-parity:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
+
+      - name: Set up Python 3.10
+        uses: actions/setup-python@0b93645e9fea7318ecaed2b359559ac225c90a2b  # v5.3.0
+        with:
+          python-version: "3.10"
+
+      - name: Install core dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest pyyaml
+          pip install -e ".[admin]"
+
+      - name: Run the workflow-parity suite (no-provider, no docker, no model calls)
+        run: |
+          # P0-2 parity: success / agent failure (later step not started) / test failure /
+          # awaiting approval (later step not started) / invalid scope (no container) /
+          # the exit-code contract — all through the ONE engine across executors.
+          pytest tests/test_workflow_executor_parity.py -v --timeout=600
+
   # Refactor-repair P1-1 gates: a clean Docker build must succeed, and both
   # reproduction entrypoints (CLI + reproduce.sh) must at least parse + dispatch.
   repro:

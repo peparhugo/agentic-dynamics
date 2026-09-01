@@ -153,6 +153,7 @@ from agentic_dynamics.runtime.change_analyzer import (
     ChangeInput,
     run_change_analysis,
 )
+from agentic_dynamics.runtime.executor import LocalAgentExecutor, StepExecutor, StepRequest
 
 # Routing + telemetry are consumed through the runtime-owned contracts (refactor-repair
 # Debt-2): the ``Router`` decision and the ``TelemetryPublisher`` are injected at the
@@ -1131,6 +1132,60 @@ def _resolve_watchdog_min(cli_value: float | None) -> float:
         except ValueError:
             pass
     return PHASE_WATCHDOG_DEFAULT_MIN
+
+
+def _executor_as_run_agent(
+    executor: StepExecutor,
+    *,
+    phase_def: dict[str, Any],
+    spec_name: str,
+    goal: str,
+) -> Callable[..., Any]:
+    """Adapt a :class:`StepExecutor` to the engine's ``run_agent(prompt, **kwargs)`` shape.
+
+    P0-2 (control-plane stabilization): the engine calls agents as
+    ``run_agent(prompt, **agent_kwargs)`` (the historical seam, also used by tests that
+    substitute fakes). An injected executor speaks :class:`StepRequest`/`StepResult`
+    instead. This adapter bridges the two: the engine's kwargs (model, backend, workdir,
+    timeout, ...) become the :class:`StepRequest`, and the executor's
+    :class:`StepResult` is returned as-is — the engine's downstream reads
+    (``getattr(ar, "prompt_tokens", ...)``, ``ar.ok``, ``ar.session_id``, ...) already
+    match :class:`StepResult`'s field surface, so every post-phase decision reads both
+    paths identically.
+    """
+    def _call(prompt: str, **agent_kwargs: Any) -> Any:
+        phase = dict(phase_def)
+        # The engine's phase-loop may also hand executor-internal kwargs (watchdog seam,
+        # transcript path, session_id/fork for cache chaining). The StepRequest carries the
+        # public contract; these ride through on the phase dict so the LOCAL executor can
+        # forward them to the adapter (the Docker executor ignores them — its container has
+        # its own watchdog and its own fresh session).
+        phase["_agent_kwargs"] = {
+            k: v for k, v in agent_kwargs.items()
+            if k not in ("model", "backend", "workdir", "thinking_effort",
+                         "thinking_budget_tokens", "output_token_limit", "timeout",
+                         "silent_mode", "enforce_pytest")
+        }
+        return executor.execute(
+            StepRequest(
+                phase_name=str(phase_def.get("name", "?")),
+                phase_kind=str(phase_def.get("kind", "agent")),
+                prompt=prompt,
+                model=str(agent_kwargs.get("model", "")),
+                goal=goal,
+                spec_name=spec_name,
+                workdir=str(agent_kwargs.get("workdir", "")),
+                backend=agent_kwargs.get("backend"),
+                thinking_effort=str(agent_kwargs.get("thinking_effort", "high")),
+                thinking_budget_tokens=int(agent_kwargs.get("thinking_budget_tokens", 0) or 0),
+                output_token_limit=int(agent_kwargs.get("output_token_limit", 0) or 0),
+                timeout=int(agent_kwargs.get("timeout", 1800) or 1800),
+                silent_mode=bool(agent_kwargs.get("silent_mode", False)),
+                enforce_pytest=bool(agent_kwargs.get("enforce_pytest", False)),
+                phase_def=phase,
+            )
+        )
+    return _call
 
 
 def _run_agent_phase(
@@ -2551,6 +2606,7 @@ def run_workflow(
     discarded_trees_ledger: Path | str | None = None,
     phase_total: int | None = None,
     phase_index: int | None = None,
+    step_executor: StepExecutor | None = None,
 ) -> WorkflowRunResult:
     """Run a compiled ``agent_task`` spec against a goal in a git worktree.
 
@@ -2684,6 +2740,13 @@ def run_workflow(
         language = profile.name if profile else "python"
 
     run_agent = run_agentic_fn or run_agentic
+    # P0-2 (control-plane stabilization): the ONE semantic engine. When a step executor
+    # is injected (the ``--orchestrator`` path), agent phases execute through it — the
+    # engine still owns the phase loop, stop-on-failure, checkpoints, gates, and the
+    # aggregate ledger; the executor only answers "run this one step in this envelope".
+    # Absent the injection, the default LocalAgentExecutor reproduces the historical
+    # in-process call byte-for-byte.
+    step_executor = step_executor or LocalAgentExecutor(run_agent)
 
     # RAG augmentation seam. Default OFF — the prompt passed to the executor is then
     # byte-for-byte identical to ``_build_phase_prompt``. ``retrieve_fn``/``construct_fn``
@@ -2992,7 +3055,18 @@ def run_workflow(
                     if watchdog is not None:
                         agent_kwargs["watchdog"] = watchdog.seam
                         agent_kwargs["transcript_path"] = str(watchdog.transcript)
-                    ar, stall = _run_agent_phase(run_agent, prompt, agent_kwargs, watchdog)
+                    # P0-2 (control-plane stabilization): the ONE engine. Agent phases route
+                    # through the injected step executor (the default LocalAgentExecutor is
+                    # the historical in-process call; the DockerAgentExecutor under
+                    # --orchestrator runs the step in a sibling container). The engine —
+                    # not the executor — owns stop-on-failure, checkpoints, gates, and the
+                    # aggregate ledger: ``ar`` is whatever the executor returned, and every
+                    # downstream decision (tokens/cost/fail/commit/await) reads it the same
+                    # way for both paths.
+                    step_call = _executor_as_run_agent(
+                        step_executor, phase_def=phase_def, spec_name=spec.name, goal=goal
+                    )
+                    ar, stall = _run_agent_phase(step_call, prompt, agent_kwargs, watchdog)
                     if stall is not None:
                         # The stalled agent was SIGTERM'd; the phase fails with the evidence
                         # (last-step timestamp, stale age, transcript tail) on the ledger.
