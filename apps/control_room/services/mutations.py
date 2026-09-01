@@ -8,6 +8,7 @@ manager/client failures to HTTP without leaking internals.
 from __future__ import annotations
 
 import hashlib
+import ipaddress
 import json
 from contextlib import suppress
 from urllib.parse import urlsplit
@@ -23,13 +24,35 @@ from apps.control_room.clients.claude_agents_client import (
 from apps.control_room.clients.opencode_client import OpenCodeError
 
 
+#: The portal binds Tailscale-only, so the tailnet CGNAT range is the trusted surface.
+_TAILNET_CGNAT = ipaddress.ip_network("100.64.0.0/10")
+
+
+def _is_trusted_peer(address: str) -> bool:
+    """Loopback or a tailnet-CGNAT peer (the portal's own bind surface)."""
+    if address in {"127.0.0.1", "::1", "localhost"}:
+        return True
+    try:
+        return ipaddress.ip_address(address) in _TAILNET_CGNAT
+    except ValueError:
+        return False
+
+
 def _design_mutation_body() -> tuple[dict | None, tuple[Response, int] | None]:
-    """Enforce the unauthenticated control plane's local JSON trust boundary."""
+    """Enforce the unauthenticated control plane's local JSON trust boundary.
+
+    The trusted surface is the operator's own machine (loopback) PLUS the portal's
+    own bind — the Control Room binds Tailscale-only (100.83.229.3:8001), so the
+    tailnet CGNAT range (100.64.0.0/10) IS the trust boundary: a peer that can
+    reach the bind is the operator, by construction of the bind. The same-origin +
+    JSON + size + Idempotency-Key checks hold for every peer.
+    """
     remote = request.remote_addr or ""
-    if remote not in {"127.0.0.1", "::1", "localhost"}:
-        return None, (jsonify({"error": "loopback access required"}), 403)
-    if urlsplit(request.host_url).hostname not in {"127.0.0.1", "::1", "localhost"}:
-        return None, (jsonify({"error": "loopback Host required"}), 403)
+    if not _is_trusted_peer(remote):
+        return None, (jsonify({"error": "loopback or tailnet peer required"}), 403)
+    host = (urlsplit(request.host_url).hostname or "")
+    if host not in {"127.0.0.1", "::1", "localhost"} and not _is_trusted_peer(host):
+        return None, (jsonify({"error": "loopback or tailnet Host required"}), 403)
     origin = request.headers.get("Origin")
     if origin and origin.rstrip("/") != request.host_url.rstrip("/"):
         return None, (jsonify({"error": "cross-origin request rejected"}), 403)

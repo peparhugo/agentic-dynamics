@@ -1024,7 +1024,7 @@ def test_experiments_requires_idempotency_key():
 
 
 def test_experiments_rejects_non_loopback_remote():
-    """F1: the enqueue route is loopback-gated like every other mutation."""
+    """F1: the enqueue route is loopback/tailnet-gated like every other mutation."""
     response = server.app.test_client().post(
         "/api/experiments",
         json={"action": "enqueue"},
@@ -1033,7 +1033,25 @@ def test_experiments_rejects_non_loopback_remote():
     )
 
     assert response.status_code == 403
-    assert response.get_json()["error"] == "loopback access required"
+    assert response.get_json()["error"] == "loopback or tailnet peer required"
+
+
+def test_experiments_accepts_tailnet_peer():
+    """F1: the portal binds Tailscale-only, so a tailnet-CGNAT peer IS the operator —
+    the remote approve path (the docs gate's portal affordance) must not need loopback."""
+    redis = QueueRedis(queue=[])
+    monkeypatch = __import__("pytest").MonkeyPatch()
+    monkeypatch.setattr(server, "_redis", lambda: redis)
+    try:
+        response = server.app.test_client().post(
+            "/api/experiments",
+            json={"action": "enqueue"},
+            headers={"Idempotency-Key": "exp-tailnet"},
+            environ_overrides={"REMOTE_ADDR": "100.83.229.3", "HTTP_HOST": "100.83.229.3:8001"},
+        )
+        assert response.status_code in (200, 400, 422)  # passed the trust gate (any later refusal is semantic)
+    finally:
+        monkeypatch.undo()
 
 
 def test_experiments_rejects_unknown_action(monkeypatch):
