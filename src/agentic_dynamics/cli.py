@@ -104,6 +104,8 @@ _COMMANDS: dict[tuple[str, ...], str] = {
     # surfaces (the self-maintenance command — design: system_knowledge_abstraction)
     ("surfaces", "sync"): "sync_surfaces.py",
     ("surfaces", "snapshot"): "system_snapshot.py",
+    # docs (the docs-drift rail — deterministic source-doc drift scan, zero model calls)
+    ("docs", "scan"): "scan_docs_drift.py",
 }
 
 #: ``_COMMANDS`` keys ordered longest-first. ``_resolve`` iterates THIS list rather than
@@ -138,6 +140,7 @@ Subcommands (each forwards to its backing script):
   supervise   [claude-agents|orphans|leases]
   release     check-protection
   surfaces    sync|snapshot
+  docs        scan
 
 Run `agentic-dynamics <subcommand> --help` for the backing script's own options.
 

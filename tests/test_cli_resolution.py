@@ -104,6 +104,8 @@ DOCUMENTED_RESOLUTIONS: list[tuple[tuple[str, ...], str, tuple[str, ...]]] = [
     # surfaces — the self-maintenance command (design: system_knowledge_abstraction)
     (("surfaces", "sync"), "sync_surfaces.py", ()),
     (("surfaces", "snapshot"), "system_snapshot.py", ()),
+    # docs — the deterministic docs-drift scan (automatic_docs_sync p1)
+    (("docs", "scan"), "scan_docs_drift.py", ()),
 ]
 
 
