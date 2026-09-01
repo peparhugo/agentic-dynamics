@@ -13,8 +13,40 @@
     ],
     "spec": "workflows/repository/docs_refresh_remediation.yaml"
   },
-  "approval": {},
-  "at": "2026-09-01T02:48:15.894520Z",
+  "approval": {
+    "action": {
+      "basis": "yaml: name/factors[model].levels[0]/stop/workflow.params.phases[].name in workflows/repository/docs_refresh_remediation.yaml",
+      "budget_usd": 3.0,
+      "max_attempts": 1,
+      "model": "deepseek/deepseek-v4-flash",
+      "name": "docs_refresh_remediation",
+      "phases": [
+        "p1_doc_findings",
+        "p2_context_claim",
+        "p3_mount_guard",
+        "p4_acceptance_gate"
+      ],
+      "spec": "workflows/repository/docs_refresh_remediation.yaml"
+    },
+    "at": "2026-09-01T12:59:36.893767Z",
+    "by": "drseuss",
+    "check_ids": [
+      "cli_surface/mental_model_full_cli/complete/--campaign-budget-usd",
+      "cli_surface/mental_model_full_cli/complete/--campaign-concurrency",
+      "cli_surface/mental_model_full_cli/complete/--cell-image",
+      "cli_surface/mental_model_full_cli/complete/--no-admission",
+      "anchor_integrity/docs/architecture/current/claude_tools_to_skills_scope.md:152/admin/server.py:1365",
+      "anchor_integrity/docs/architecture/current/claude_tools_to_skills_scope.md:311/admin/server.py:779-802",
+      "anchor_integrity/docs/architecture/current/claude_tools_to_skills_scope.md:318/admin/server.py:738-776",
+      "anchor_integrity/docs/architecture/current/context_abstraction_addendum_design.md:399/verify.md:258-262",
+      "anchor_integrity/docs/architecture/current/routing_design.md:420/admin/server.py:860-877"
+    ],
+    "drift": 9,
+    "proposal_id": "d6211d951cbc9940",
+    "reason": "re-dispatch after the auth-table fix (dbc7bca69): the scanner's 9 findings stand, the phases are now authorized",
+    "report": "experiments/results/docs_drift/latest.json"
+  },
+  "at": "2026-09-01T13:35:56.816831Z",
   "check_ids": [
     "cli_surface/mental_model_full_cli/complete/--campaign-budget-usd",
     "cli_surface/mental_model_full_cli/complete/--campaign-concurrency",
@@ -123,10 +155,37 @@
   },
   "proposal_id": "d6211d951cbc9940",
   "report": "experiments/results/docs_drift/latest.json",
-  "run": {},
+  "run": {
+    "approved_at": "2026-09-01T12:59:36.893767Z",
+    "approved_by": "drseuss",
+    "at": "2026-09-01T12:59:37.041451Z",
+    "budget_usd": 3.0,
+    "command": [
+      "python3",
+      "scripts/run_workflow.py",
+      "--spec",
+      "workflows/repository/docs_refresh_remediation.yaml",
+      "--goal",
+      "Execute the docs-refresh remediation (docs_refresh_remediation) against the docs-drift inventory measured by the deterministic scanner at ec4b7bda4533e2229a9bfe538527d2716c68c717 (proposal d6211d951cbc9940).\n\nDRIFT: 9 docs-drift finding(s) across 2 axis/axes (anchor_integrity 5, cli_surface 4)\nFULL INVENTORY: experiments/results/docs_drift/latest.json (schema docs-drift/v1)\n\nFINDINGS (9 of 9):\n  [missing] cli_surface/mental_model_full_cli/complete/--campaign-budget-usd\n      claim      : agent_config/mental-model.md claims to list the FULL CLI of scripts/run_workflow.py\n      code truth : --campaign-budget-usd is declared by argparse but absent from the doc\n      basis      : ast: add_argument(\"--\u2026\") in scripts/run_workflow.py minus the flags listed in the 'full CLI: scripts/run_workflow.py' block\n      source     : agent_config/mental-model.md\n  [missing] cli_surface/mental_model_full_cli/complete/--campaign-concurrency\n      claim      : agent_config/mental-model.md claims to list the FULL CLI of scripts/run_workflow.py\n      code truth : --campaign-concurrency is declared by argparse but absent from the doc\n      basis      : ast: add_argument(\"--\u2026\") in scripts/run_workflow.py minus the flags listed in the 'full CLI: scripts/run_workflow.py' block\n      source     : agent_config/mental-model.md\n  [missing] cli_surface/mental_model_full_cli/complete/--cell-image\n      claim      : agent_config/mental-model.md claims to list the FULL CLI of scripts/run_workflow.py\n      code truth : --cell-image is declared by argparse but absent from the doc\n      basis      : ast: add_argument(\"--\u2026\") in scripts/run_workflow.py minus the flags listed in the 'full CLI: scripts/run_workflow.py' block\n      source     : agent_config/mental-model.md\n  [missing] cli_surface/mental_model_full_cli/complete/--no-admission\n      claim      : agent_config/mental-model.md claims to list the FULL CLI of scripts/run_workflow.py\n      code truth : --no-admission is declared by argparse but absent from the doc\n      basis      : ast: add_argument(\"--\u2026\") in scripts/run_workflow.py minus the flags listed in the 'full CLI: scripts/run_workflow.py' block\n      source     : agent_config/mental-model.md\n  [stale] anchor_integrity/docs/architecture/current/claude_tools_to_skills_scope.md:152/admin/server.py:1365\n      claim      : docs/architecture/current/claude_tools_to_skills_scope.md:152 cites `admin/server.py:1365`\n      code truth : line 1365 is past EOF in every candidate (apps/control_room/server.py=214 lines)\n      basis      : wc -l admin/server.py  # must be >= 1365\n      source     : docs/architecture/current/claude_tools_to_skills_scope.md:152\n  [stale] anchor_integrity/docs/architecture/current/claude_tools_to_skills_scope.md:311/admin/server.py:779-802\n      claim      : docs/architecture/current/claude_tools_to_skills_scope.md:311 cites `admin/server.py:779-802`\n      code truth : line 802 is past EOF in every candidate (apps/control_room/server.py=214 lines)\n      basis      : wc -l admin/server.py  # must be >= 802\n      source     : docs/architecture/current/claude_tools_to_skills_scope.md:311\n  [stale] anchor_integrity/docs/architecture/current/claude_tools_to_skills_scope.md:318/admin/server.py:738-776\n      claim      : docs/architecture/current/claude_tools_to_skills_scope.md:318 cites `admin/server.py:738-776`\n      code truth : line 776 is past EOF in every candidate (apps/control_room/server.py=214 lines)\n      basis      : wc -l admin/server.py  # must be >= 776\n      source     : docs/architecture/current/claude_tools_to_skills_scope.md:318\n  [stale] anchor_integrity/docs/architecture/current/context_abstraction_addendum_design.md:399/verify.md:258-262\n      claim      : docs/architecture/current/context_abstraction_addendum_design.md:399 cites `verify.md:258-262`\n      code truth : line 262 is past EOF in every candidate (docs/verification/verify.md=38 lines)\n      basis      : wc -l verify.md  # must be >= 262\n      source     : docs/architecture/current/context_abstraction_addendum_design.md:399\n  [stale] anchor_integrity/docs/architecture/current/routing_design.md:420/admin/server.py:860-877\n      claim      : docs/architecture/current/routing_design.md:420 cites `admin/server.py:860-877`\n      code truth : line 877 is past EOF in every candidate (apps/control_room/server.py=214 lines)\n      basis      : wc -l admin/server.py  # must be >= 877\n      source     : docs/architecture/current/routing_design.md:420\n\nFix exactly these findings \u2014 remediation, not rework. Every fix must itself carry an anchored, re-derivable claim (hard rule 4); derived surfaces go through their generators, never a hand-edit (hard rule 5).\nACCEPTANCE: `agentic-dynamics docs scan --fail-on-drift` returns clean for the axes named above \u2014 the scanner that raised this proposal is the gate that retires it.",
+      "--model",
+      "deepseek/deepseek-v4-flash",
+      "--workdir",
+      "/tmp/wt_docs_remediation"
+    ],
+    "goal_chars": 4861,
+    "mode": "fleet",
+    "model": "deepseek/deepseek-v4-flash",
+    "note": "in-process remediation succeeded (20260901T133313Z, $0.17) \u2014 the scanner that raised the proposal retired it: DRIFT SCORE 0 on 1230 claims",
+    "proposal_id": "d6211d951cbc9940",
+    "released_at": "2026-09-01T13:35:56.816831Z",
+    "run_id": "52257888a5d0",
+    "spec": "workflows/repository/docs_refresh_remediation.yaml",
+    "status": "completed",
+    "workdir": "/tmp/wt_docs_remediation"
+  },
   "schema": "docs-proposal/v1",
   "stale": 5,
-  "state": "warranted",
+  "state": "completed",
   "threshold": 0,
   "why": "9 docs-drift finding(s) across 2 axis/axes (anchor_integrity 5, cli_surface 4)"
 }

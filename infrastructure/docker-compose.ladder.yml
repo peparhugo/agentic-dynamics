@@ -291,7 +291,11 @@ services:
 
   workflow-runner:
     <<: *orchestrator-base
-    command: ["python3", "scripts/run_workflow.py", "--orchestrator"]
+    # The submit consume loop (fleet_job_submission p2): BRPOP fleet:commands and spawn a
+    # sibling workflow-runner per validated submit. NOT run_workflow --orchestrator — that
+    # path runs a spec's phases as siblings directly and needs the four required args; the
+    # consume mode boots with none (the submit supplies them).
+    command: ["python3", "scripts/fleet/spawn_wrapper.py", "consume"]
 
   # =========================================================================
   # fleet/supervisor — the fleet manager + the portal + the daemons. NO socket
