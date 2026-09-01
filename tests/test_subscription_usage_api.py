@@ -28,6 +28,13 @@ class FakeRedisUsage:
         self.values[key] = value
 
 
+class BrokenRedisUsage(FakeRedisUsage):
+    """Redis client whose connection drops when the service reads the cache."""
+
+    def get(self, key):
+        raise ConnectionError("redis unavailable")
+
+
 class StubServices:
     def __init__(self, redis, root):
         self._redis = redis
@@ -43,21 +50,34 @@ def _now_iso():
 
 def _payload(fetched_at=None):
     return {
-        "schema": "subscription-usage/v2",
+        "schema": "subscription-usage/v3",
         "fetched_at": fetched_at or _now_iso(),
         "providers": {
             "anthropic": {
                 "ok": True,
                 "plan": None,
-                "windows": [{"name": "five_hour", "used_percent": 1.0,
-                             "resets_at": "2026-08-31T18:20:00+00:00", "locked_reason": None}],
+                "windows": [
+                    {
+                        "name": "five_hour",
+                        "used_percent": 1.0,
+                        "resets_at": "2026-08-31T18:20:00+00:00",
+                        "locked_reason": None,
+                    }
+                ],
                 "metered_spend_usd": None,
             },
             "openai": {
                 "ok": True,
                 "plan": "prolite",
-                "windows": [{"name": "primary", "used_percent": 0, "limit_seconds": 604800,
-                             "resets_at": "2026-09-07T03:30:15+00:00", "allowed": True}],
+                "windows": [
+                    {
+                        "name": "primary",
+                        "used_percent": 0,
+                        "limit_seconds": 604800,
+                        "resets_at": "2026-09-07T03:30:15+00:00",
+                        "allowed": True,
+                    }
+                ],
                 "metered_spend_usd": None,
             },
         },
@@ -66,30 +86,54 @@ def _payload(fetched_at=None):
             "source": "opencode_db",
             "path": "/home/drseuss/.local/share/opencode/opencode.db",
             "note": "local estimates",
-            "days": [{"date": "2026-08-30", "cost_usd": 11.76, "sessions": 37,
-                      "subagent_cost_usd": 0.0, "subagent_sessions": 0, "tokens": 17_040_579}],
-            "totals": {"cost_usd": 14.32, "sessions": 50, "subagent_cost_usd": 0.0,
-                       "subagent_sessions": 0, "tokens": 21_348_846, "cache_read": 0,
-                       "models": {"deepseek/deepseek-v4-flash": 2.78,
-                                  "deepseek/deepseek-v4-pro": 14.32}},
+            "days": [
+                {
+                    "date": "2026-08-30",
+                    "cost_usd": 11.76,
+                    "sessions": 37,
+                    "subagent_cost_usd": 0.0,
+                    "subagent_sessions": 0,
+                    "tokens": 17_040_579,
+                }
+            ],
+            "totals": {
+                "cost_usd": 14.32,
+                "sessions": 50,
+                "subagent_cost_usd": 0.0,
+                "subagent_sessions": 0,
+                "tokens": 21_348_846,
+                "cache_read": 0,
+                "models": {"deepseek/deepseek-v4-flash": 2.78, "deepseek/deepseek-v4-pro": 14.32},
+            },
         },
         "deepseek_platform": {
             "ok": True,
             "source": "platform_meter",
             "wallet": {"balance_usd": 98.94, "lifetime_cost_usd": 321.06},
             "note": "authoritative meter token counts",
-            "days": [{"date": "2026-08-30", "requests": 19545, "response_tokens": 16_474_401,
-                      "cache_hit_tokens": 3_434_211_712, "cache_miss_tokens": 83_145_093,
-                      "estimated_cost_usd": 21.66}],
-            "totals": {"estimated_cost_usd": 207.0,
-                       "deepseek-v4-pro": {"estimated_cost_usd": 163.0}},
+            "days": [
+                {
+                    "date": "2026-08-30",
+                    "requests": 19545,
+                    "response_tokens": 16_474_401,
+                    "cache_hit_tokens": 3_434_211_712,
+                    "cache_miss_tokens": 83_145_093,
+                    "estimated_cost_usd": 21.66,
+                }
+            ],
+            "totals": {
+                "estimated_cost_usd": 207.0,
+                "deepseek-v4-pro": {"estimated_cost_usd": 163.0},
+            },
         },
     }
 
 
 def _client(monkeypatch, redis, root, fetch=None):
     monkeypatch.setattr(telemetry_routes, "_services", StubServices(redis, root))
-    monkeypatch.setattr(usage_service, "fetch_usage", fetch if fetch is not None else lambda: _payload())
+    monkeypatch.setattr(
+        usage_service, "fetch_usage", fetch if fetch is not None else lambda: _payload()
+    )
     return server.app.test_client()
 
 
@@ -158,6 +202,66 @@ def test_forced_refresh_refused_within_minute_floor(monkeypatch, tmp_path):
     assert calls == []
 
 
+def test_forced_refresh_fetches_after_minute_floor_before_ttl(monkeypatch, tmp_path):
+    fetched_at = (datetime.now(timezone.utc) - timedelta(seconds=61)).isoformat()
+    redis = FakeRedisUsage({usage_service.CACHE_KEY: json.dumps(_payload(fetched_at))})
+    calls = []
+
+    def fetch():
+        calls.append("fetch")
+        return _payload()
+
+    client = _client(monkeypatch, redis, tmp_path, fetch=fetch)
+    response = client.get("/api/subscription-usage?refresh=1")
+
+    assert response.status_code == 200
+    body = response.get_json()
+    assert body["schema"] == "subscription-usage/v3"
+    assert body["served_from"] == "live"
+    assert body["refetched_now"] is True
+    assert calls == ["fetch"]
+
+
+def test_redis_outage_uses_disk_snapshot_as_the_refetch_floor(monkeypatch, tmp_path):
+    fetched_at = (datetime.now(timezone.utc) - timedelta(seconds=30)).isoformat()
+    disk = tmp_path / "experiments" / "results" / "usage"
+    disk.mkdir(parents=True)
+    (disk / "subscription_usage_latest.json").write_text(json.dumps(_payload(fetched_at)))
+    calls = []
+
+    def boom():
+        calls.append("fetch")
+        raise AssertionError("fresh disk cache must honor the min-refetch floor")
+
+    client = _client(monkeypatch, None, tmp_path, fetch=boom)
+    response = client.get("/api/subscription-usage?refresh=1")
+
+    assert response.status_code == 200
+    body = response.get_json()
+    assert body["served_from"] == "disk-cache"
+    assert body["cache"]["age_seconds"] >= 29
+    assert calls == []
+
+
+def test_redis_read_failure_uses_disk_snapshot_as_the_refetch_floor(monkeypatch, tmp_path):
+    fetched_at = (datetime.now(timezone.utc) - timedelta(seconds=30)).isoformat()
+    disk = tmp_path / "experiments" / "results" / "usage"
+    disk.mkdir(parents=True)
+    (disk / "subscription_usage_latest.json").write_text(json.dumps(_payload(fetched_at)))
+    calls = []
+
+    def boom():
+        calls.append("fetch")
+        raise AssertionError("a broken Redis read must still honor the floor")
+
+    client = _client(monkeypatch, BrokenRedisUsage(), tmp_path, fetch=boom)
+    response = client.get("/api/subscription-usage?refresh=1")
+
+    assert response.status_code == 200
+    assert response.get_json()["served_from"] == "disk-cache"
+    assert calls == []
+
+
 def test_forced_refresh_fetches_when_stale(monkeypatch, tmp_path):
     stale_at = (datetime.now(timezone.utc) - timedelta(hours=2)).isoformat()
     redis = FakeRedisUsage({usage_service.CACHE_KEY: json.dumps(_payload(stale_at))})
@@ -173,6 +277,23 @@ def test_forced_refresh_fetches_when_stale(monkeypatch, tmp_path):
     assert response.status_code == 200
     assert response.get_json()["served_from"] == "live"
     assert calls == ["fetch"]
+
+
+def test_failed_forced_refresh_keeps_last_snapshot_visible(monkeypatch, tmp_path):
+    stale_at = (datetime.now(timezone.utc) - timedelta(hours=2)).isoformat()
+    redis = FakeRedisUsage({usage_service.CACHE_KEY: json.dumps(_payload(stale_at))})
+
+    def boom():
+        raise RuntimeError("providers down")
+
+    client = _client(monkeypatch, redis, tmp_path, fetch=boom)
+    response = client.get("/api/subscription-usage?refresh=1")
+
+    assert response.status_code == 200
+    body = response.get_json()
+    assert body["served_from"] == "redis-cache"
+    assert body["stale"] is True
+    assert "providers down" in body["refresh_error"]
 
 
 def test_fetch_failure_serves_recent_disk_cache(monkeypatch, tmp_path):
@@ -201,3 +322,31 @@ def test_total_failure_returns_503(monkeypatch, tmp_path):
 
     assert response.status_code == 503
     assert response.get_json()["error"] == "subscription_usage_unavailable"
+
+
+def test_expired_disk_snapshot_returns_expired_state(monkeypatch, tmp_path):
+    expired_at = (datetime.now(timezone.utc) - timedelta(hours=25)).isoformat()
+    disk = tmp_path / "experiments" / "results" / "usage"
+    disk.mkdir(parents=True)
+    (disk / "subscription_usage_latest.json").write_text(json.dumps(_payload(expired_at)))
+
+    def boom():
+        raise RuntimeError("providers down")
+
+    client = _client(monkeypatch, FakeRedisUsage(), tmp_path, fetch=boom)
+    response = client.get("/api/subscription-usage")
+
+    assert response.status_code == 503
+    body = response.get_json()
+    assert body["state"] == "expired"
+    assert body["cache"]["age_seconds"] >= 24 * 60 * 60
+
+
+def test_malformed_redis_snapshot_is_a_miss(monkeypatch, tmp_path):
+    redis = FakeRedisUsage({usage_service.CACHE_KEY: "not-json"})
+    client = _client(monkeypatch, redis, tmp_path, fetch=_payload)
+
+    response = client.get("/api/subscription-usage")
+
+    assert response.status_code == 200
+    assert response.get_json()["served_from"] == "live"

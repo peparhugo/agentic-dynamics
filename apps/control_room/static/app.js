@@ -101,6 +101,7 @@
     selectedClaudeAgentId: null,
     claudeAgentMutationPending: false,
     claudeAgentDaemon: null,
+    usageRequestInFlight: false,
   }
 
   /** Query one required shell element. */
@@ -1818,6 +1819,35 @@
     return wrap
   }
 
+  /** Format usage dollars without turning missing provider data into a fake zero. */
+  function usageUsd(value) {
+    const number = core.safeNumber(value)
+    return number === null ? "Unavailable" : `$${number.toFixed(2)}`
+  }
+
+  /** Build a compact, labeled metric group for balances and spend estimates. */
+  function usageMetrics(metrics) {
+    const grid = element("div", "metric-grid usage-metric-grid")
+    metrics.forEach(({ label, value, detail }) => {
+      const card = element("article", "metric-card usage-metric")
+      card.appendChild(element("span", "metric-label", label))
+      card.appendChild(element("strong", "metric-value cost-value", value))
+      if (detail) card.appendChild(element("span", "pane-note", detail))
+      grid.appendChild(card)
+    })
+    return grid
+  }
+
+  /** Render an explicit no-data state instead of an empty table. */
+  function usageEmpty(text) {
+    return element("p", "empty-state", text)
+  }
+
+  /** Render a provider or request failure with an actionable, visible state. */
+  function usageError(text) {
+    return element("p", "error-state", text)
+  }
+
   /** Fetch routing lazily so routing failure never blocks live supervision. */
   async function loadRouting() {
     const content = $("#routing-content")
@@ -1870,7 +1900,14 @@
    */
   async function loadSubscriptionUsage(force = false) {
     const content = $("#usage-content")
-    if (!content) return
+    const refreshButton = $("#usage-refresh")
+    if (!content || state.usageRequestInFlight) return
+    state.usageRequestInFlight = true
+    if (refreshButton) {
+      refreshButton.disabled = true
+      refreshButton.setAttribute("aria-busy", "true")
+    }
+    const hadContent = Boolean(content.dataset.loaded)
     if (!content.dataset.loaded) {
       content.replaceChildren(element("p", "empty-state", "Loading subscription usage…"))
     }
@@ -1878,82 +1915,122 @@
       const url = force ? "/api/subscription-usage?refresh=1" : "/api/subscription-usage"
       const response = await fetch(url)
       const data = await response.json()
-      if (!response.ok) throw new Error(data.error || "usage unavailable")
+      if (!response.ok) {
+        const error = new Error(data.error || "usage unavailable")
+        error.usageState = data.state
+        error.cacheAge = data.cache?.age_seconds
+        throw error
+      }
       content.replaceChildren()
       content.dataset.loaded = "1"
+      content.querySelectorAll("[data-usage-refresh-error]").forEach((node) => node.remove())
       const cache = data.cache || {}
+      const cacheState = data.stale ? "stale" : "fresh"
+      content.dataset.cacheState = cacheState
       content.appendChild(element("p", "pane-note",
-        `Fetched ${String(data.fetched_at ?? "?").slice(0, 19).replace("T", " ")}Z · ` +
-        `${data.served_from ?? "?"} · ${data.stale ? "STALE" : "fresh"} · ` +
-        `age ${cache.age_seconds ?? "?"}s · TTL ${Math.round((cache.ttl_seconds ?? 0) / 60)}m · ` +
-        `${data.history?.count ?? 0} saved snapshots`))
+        `Cache: ${cacheState} · age ${cache.age_seconds ?? "unavailable"}s · ` +
+        `refresh floor ${cache.min_refresh_seconds ?? "?"}s · ` +
+        `fetched ${String(data.fetched_at ?? "?").slice(0, 19).replace("T", " ")}Z · ` +
+        `${data.served_from ?? "?"} · ${data.history?.count ?? 0} saved snapshots`))
+      if (data.refresh_error) {
+        content.appendChild(usageError(`Refresh failed; showing the last snapshot: ${data.refresh_error}`))
+      }
       for (const [provider, info] of Object.entries(data.providers || {})) {
         content.appendChild(element("h3", "", `${provider} — ${info.plan ?? "?"}`))
         if (!info.ok) {
-          content.appendChild(element("p", "empty-state", `Unavailable: ${info.error ?? "?"}`))
+          content.appendChild(usageError(`${provider} unavailable: ${info.error ?? "unknown provider error"}`))
           continue
         }
-        const rows = (info.windows || []).map((window) => [
+        const windows = Array.isArray(info.windows) ? info.windows : []
+        const rows = windows.map((window) => [
           window.name ?? "?",
           `${window.used_percent ?? "?"}%`,
           window.limit_seconds ? `${Math.round(window.limit_seconds / 3600)}h` : "—",
           window.resets_at ? String(window.resets_at).slice(0, 16).replace("T", " ") + "Z" : "—",
         ])
-        content.appendChild(routingTable(
-          `${provider} subscription usage windows`,
-          ["Window", "Used", "Length", "Resets (UTC)"],
-          rows,
-        ))
+        content.appendChild(rows.length
+          ? routingTable(`${provider} subscription usage windows`, ["Window", "Used", "Length", "Resets (UTC)"], rows)
+          : usageEmpty(`${provider} has no usage windows in the provider response.`))
       }
       const deepseek = data.deepseek || {}
       content.appendChild(element("h3", "", "deepseek — per-token cash (local opencode.db)"))
       if (!deepseek.ok) {
-        content.appendChild(element("p", "empty-state", `Unavailable: ${deepseek.error ?? "?"}`))
+        content.appendChild(usageError(`DeepSeek local cash unavailable: ${deepseek.error ?? "unknown local DB error"}`))
       } else {
         const totals = deepseek.totals || {}
-        content.appendChild(element("p", "pane-note",
-          `Cash (local estimate): $${core.safeNumber(totals.cost_usd)?.toFixed(2) ?? "?"} · ` +
-          `${totals.sessions ?? "?"} sessions · subagents $${(totals.subagent_cost_usd ?? 0).toFixed(2)} · ` +
-          `${(totals.tokens ?? 0).toLocaleString()} tokens · 14d window`))
-        const dayRows = (deepseek.days || []).map((day) => [
+        content.appendChild(usageMetrics([
+          { label: "Local 14d cash estimate", value: usageUsd(totals.cost_usd), detail: "per-token local estimate" },
+          { label: "Local tokens", value: Number(totals.tokens ?? 0).toLocaleString(), detail: "opencode.db" },
+          { label: "Local sessions", value: String(totals.sessions ?? "Unavailable"), detail: "14-day window" },
+        ]))
+        const days = Array.isArray(deepseek.days) ? deepseek.days : []
+        const dayRows = days.map((day) => [
           day.date ?? "?",
-          `$${core.safeNumber(day.cost_usd)?.toFixed(4) ?? "?"}`,
+          usageUsd(day.cost_usd),
           day.sessions ?? "?",
           (day.tokens ?? 0).toLocaleString(),
-          `$${(day.subagent_cost_usd ?? 0).toFixed(4)}`,
+          usageUsd(day.subagent_cost_usd),
         ])
-        content.appendChild(routingTable(
-          "DeepSeek per-day cash spend (local DB estimates)",
-          ["Date", "Cost $", "Sessions", "Tokens", "Subagent $"],
-          dayRows,
-        ))
+        content.appendChild(dayRows.length
+          ? routingTable("DeepSeek per-day cash spend (local DB estimates)", ["Date", "Cost $", "Sessions", "Tokens", "Subagent $"], dayRows)
+          : usageEmpty("DeepSeek local cash has no sessions in the 14-day window."))
       }
       const meter = data.deepseek_platform || {}
       content.appendChild(element("h3", "", "deepseek platform — authoritative meter"))
+      const wallet = meter.wallet || {}
+      const mtotals = meter.totals || {}
+      content.appendChild(usageMetrics([
+        {
+          label: "DeepSeek wallet balance",
+          value: wallet.ok === false ? "Unavailable" : usageUsd(wallet.balance_usd),
+          detail: wallet.ok === false ? (wallet.error || "wallet summary unavailable") : "platform wallet",
+        },
+        {
+          label: "DeepSeek platform meter · 14d",
+          value: meter.ok ? usageUsd(mtotals.estimated_cost_usd) : "Unavailable",
+          detail: mtotals.pricing_complete === false ? "unpriced model data present" : "meter tokens × off-peak rates",
+        },
+        {
+          label: "DeepSeek lifetime spend",
+          value: wallet.ok === false ? "Unavailable" : usageUsd(wallet.lifetime_cost_usd),
+          detail: "platform wallet total",
+        },
+      ]))
       if (!meter.ok) {
-        content.appendChild(element("p", "empty-state", `Unavailable: ${meter.error ?? "?"}`))
+        content.appendChild(usageError(`DeepSeek platform meter unavailable: ${meter.error ?? "unknown meter error"}`))
       } else {
-        const wallet = meter.wallet || {}
-        const mtotals = meter.totals || {}
-        content.appendChild(element("p", "pane-note",
-          `Wallet $${core.safeNumber(wallet.balance_usd)?.toFixed(2) ?? "?"} · ` +
-          `lifetime $${core.safeNumber(wallet.lifetime_cost_usd)?.toFixed(2) ?? "?"} · ` +
-          `14d est $${core.safeNumber(mtotals.estimated_cost_usd)?.toFixed(2) ?? "?"} (meter tokens × off-peak rates)`))
-        const meterRows = (meter.days || []).map((day) => [
+        const days = Array.isArray(meter.days) ? meter.days : []
+        const meterRows = days.map((day) => [
           day.date ?? "?",
-          `$${core.safeNumber(day.estimated_cost_usd)?.toFixed(2) ?? "?"}`,
+          usageUsd(day.estimated_cost_usd),
           (day.requests ?? 0).toLocaleString(),
           (day.response_tokens ?? 0).toLocaleString(),
           `${(day.cache_hit_tokens ?? 0).toLocaleString()} / ${(day.cache_miss_tokens ?? 0).toLocaleString()}`,
         ])
-        content.appendChild(routingTable(
-          "DeepSeek per-day meter spend (authoritative tokens, estimated $)",
-          ["Date", "Est $", "Requests", "Resp tokens", "Cache hit / miss"],
-          meterRows,
-        ))
+        content.appendChild(meterRows.length
+          ? routingTable("DeepSeek per-day meter spend (authoritative tokens, estimated $)", ["Date", "Est $", "Requests", "Resp tokens", "Cache hit / miss"], meterRows)
+          : usageEmpty("DeepSeek platform meter returned no usage days in the 14-day window."))
       }
     } catch (err) {
-      content.replaceChildren(element("p", "empty-state", `Subscription usage unavailable: ${err.message}`))
+      const expired = err.usageState === "expired"
+      const message = expired
+        ? `Subscription usage expired; refresh to obtain a new snapshot. Cache age: ${err.cacheAge ?? "unavailable"}s.`
+        : `Subscription usage unavailable: ${err.message}`
+      if (hadContent) {
+        const notice = usageError(`Refresh failed; showing the last snapshot. ${message}`)
+        notice.dataset.usageRefreshError = "1"
+        content.prepend(notice)
+        announce("Subscription usage refresh failed; showing the last snapshot", true)
+      } else {
+        content.replaceChildren(usageError(message))
+        announce("Subscription usage unavailable", true)
+      }
+    } finally {
+      state.usageRequestInFlight = false
+      if (refreshButton) {
+        refreshButton.disabled = false
+        refreshButton.removeAttribute("aria-busy")
+      }
     }
   }
 

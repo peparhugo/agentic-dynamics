@@ -39,7 +39,7 @@ def test_client_keeps_one_status_source_and_replaces_selected_source():
     close_position = core.index("if (current) current.close()")
     construct_position = core.index("return new EventSourceClass(url)")
     assert close_position < construct_position
-    assert 'if (state.statusSource) return' in app
+    assert "if (state.statusSource) return" in app
     assert 'new EventSource("/api/status")' in app
     assert "core.replaceEventSource(" in app
     assert 'source.addEventListener("replay_complete"' in app
@@ -73,6 +73,23 @@ def test_styles_cover_narrow_screens_focus_and_reduced_motion():
     assert ".cell-card.status-running" in css
 
 
+def test_subscription_usage_panel_surfaces_cache_and_explicit_states():
+    """Usage wiring keeps balances, estimates, cache age, and failures visible."""
+    html = (STATIC / "index.html").read_text()
+    app = (STATIC / "app.js").read_text()
+
+    assert 'id="usage-refresh"' in html
+    assert '"/api/subscription-usage?refresh=1"' in app
+    assert "usageRequestInFlight" in app
+    assert "cache.age_seconds" in app
+    assert "DeepSeek wallet balance" in app
+    assert "DeepSeek platform meter · 14d" in app
+    assert "DeepSeek lifetime spend" in app
+    assert "usageError" in app
+    assert "usageEmpty" in app
+    assert "data-usage-refresh-error" in app
+
+
 def test_design_session_shell_has_distinct_launch_and_interactive_controls():
     """Design controls are explicit while the existing read-only panel remains."""
     html = (STATIC / "index.html").read_text()
@@ -92,7 +109,10 @@ def test_design_session_shell_has_distinct_launch_and_interactive_controls():
         'id="recent-design-list"',
     ):
         assert required in html
-    assert "Enqueue" not in html[html.index('id="design-control-panel"'):html.index('class="recent-designs"')]
+    assert (
+        "Enqueue"
+        not in html[html.index('id="design-control-panel"') : html.index('class="recent-designs"')]
+    )
 
 
 def test_design_client_reuses_one_stream_and_server_capability_gates():
@@ -104,20 +124,25 @@ def test_design_client_reuses_one_stream_and_server_capability_gates():
     assert "connectSelectedStream()" in app
     assert "!state.draftFresh || !draft?.capabilities?.save" in app
     assert "!state.draftFresh || !draft?.capabilities?.run" in app
-    assert 'fetch(`/api/design-sessions/${encodeURIComponent(selectedAtRequest)}/spec`)' in app
+    assert "fetch(`/api/design-sessions/${encodeURIComponent(selectedAtRequest)}/spec`)" in app
     assert 'delivery === "steer" ? $("#steer-design-input")' in app
     assert "/interrupt`, {})" in app
     assert "detachSelectedStream" in app
-    assert 'headers: { "Content-Type": "application/json", "Idempotency-Key": mutationKey() }' in app
+    assert (
+        'headers: { "Content-Type": "application/json", "Idempotency-Key": mutationKey() }' in app
+    )
 
 
 def test_enqueue_client_sends_idempotency_key():
     """F1: the enqueue mutation carries the shared Idempotency-Key convention."""
     app = (STATIC / "app.js").read_text()
 
-    enqueue_block = app[app.index('fetch("/api/experiments"'):app.index("function mutationKey()")]
-    assert 'headers: { "Content-Type": "application/json", "Idempotency-Key": mutationKey() }' in enqueue_block
-    assert 'body: JSON.stringify({ action })' in enqueue_block
+    enqueue_block = app[app.index('fetch("/api/experiments"') : app.index("function mutationKey()")]
+    assert (
+        'headers: { "Content-Type": "application/json", "Idempotency-Key": mutationKey() }'
+        in enqueue_block
+    )
+    assert "body: JSON.stringify({ action })" in enqueue_block
 
 
 def test_design_styles_keep_artifacts_bounded_on_narrow_screens():
@@ -134,7 +159,7 @@ def test_design_styles_keep_artifacts_bounded_on_narrow_screens():
         ".design-control-panel > .mobile-anchor",
     ):
         assert selector in css
-    mobile = css[css.index("@media (max-width: 420px)"):]
+    mobile = css[css.index("@media (max-width: 420px)") :]
     assert ".design-stream-actions" in mobile
     assert "grid-template-columns: minmax(0, 1fr)" in mobile
 
@@ -179,7 +204,14 @@ def test_supervisor_surface_preserves_human_action_and_single_terminal_boundarie
     assert html.count('id="transcript-feed"') == 1
     assert 'fetch("/api/flags?limit=50")' in app
     assert "selectSupervisorFlag" in app
-    assert "delivery" not in app[app.index("async function submitSupervisorSteer"):app.index("function openSupervisorInterruptDoor")]
+    assert (
+        "delivery"
+        not in app[
+            app.index("async function submitSupervisorSteer") : app.index(
+                "function openSupervisorInterruptDoor"
+            )
+        ]
+    )
     assert "confirmation !== `INTERRUPT ${flag.session_id}`" in app
     assert "grid-template-areas:" in css
     assert '"attention"' in css

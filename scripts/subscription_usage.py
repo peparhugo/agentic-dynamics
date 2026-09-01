@@ -10,7 +10,7 @@ Two read-only, quota-free endpoints (no model calls, no spend):
   (type=oauth; refreshed in-memory if expired).
 
 Output: ``experiments/results/usage/subscription_usage_latest.json`` (schema
-``subscription-usage/v1``) + an append-only history line in
+``subscription-usage/v3``) + an append-only history line in
 ``experiments/results/usage/subscription_usage_history.jsonl``.
 
 Secrets never leave this process: tokens are read from disk or minted via the
@@ -37,11 +37,19 @@ SCHEMA = "subscription-usage/v3"
 RESULTS_DIR = Path(__file__).resolve().parent.parent / "experiments" / "results" / "usage"
 DEEPSEEK_LOOKBACK_DAYS = 14
 
-CLAUDE_CREDS_PATH = Path(os.environ.get("FINOPS_CLAUDE_CREDS_PATH", "~/.claude/.credentials.json")).expanduser()
-OPENCODE_AUTH_PATH = Path(os.environ.get("FINOPS_OPENCODE_AUTH_PATH", "~/.local/share/opencode/auth.json")).expanduser()
-OPENCODE_DB_PATH = Path(os.environ.get("FINOPS_OPENCODE_DB", "~/.local/share/opencode/opencode.db")).expanduser()
+CLAUDE_CREDS_PATH = Path(
+    os.environ.get("FINOPS_CLAUDE_CREDS_PATH", "~/.claude/.credentials.json")
+).expanduser()
+OPENCODE_AUTH_PATH = Path(
+    os.environ.get("FINOPS_OPENCODE_AUTH_PATH", "~/.local/share/opencode/auth.json")
+).expanduser()
+OPENCODE_DB_PATH = Path(
+    os.environ.get("FINOPS_OPENCODE_DB", "~/.local/share/opencode/opencode.db")
+).expanduser()
 DEEPSEEK_PLATFORM_TOKEN_PATH = Path(
-    os.environ.get("FINOPS_DEEPSEEK_PLATFORM_TOKEN_PATH", "~/.config/opencode/deepseek_platform.token")
+    os.environ.get(
+        "FINOPS_DEEPSEEK_PLATFORM_TOKEN_PATH", "~/.config/opencode/deepseek_platform.token"
+    )
 ).expanduser()
 
 ANTHROPIC_USAGE_URL = "https://api.anthropic.com/api/oauth/usage"
@@ -79,7 +87,8 @@ def _get_json(url: str, token: str, headers: dict | None = None) -> tuple[int | 
 def _post_form(url: str, data: dict[str, str]) -> str | None:
     body = urllib.parse.urlencode(data).encode()
     req = urllib.request.Request(
-        url, data=body,
+        url,
+        data=body,
         headers={"Content-Type": "application/x-www-form-urlencoded", "User-Agent": "opencode/0.1"},
     )
     try:
@@ -103,12 +112,14 @@ def normalize_anthropic(raw: dict) -> dict:
     for name in ("five_hour", "seven_day"):
         w = raw.get(name)
         if isinstance(w, dict):
-            windows.append({
-                "name": name,
-                "used_percent": w.get("utilization"),
-                "resets_at": _iso(w.get("resets_at")),
-                "locked_reason": w.get("locked_reason"),
-            })
+            windows.append(
+                {
+                    "name": name,
+                    "used_percent": w.get("utilization"),
+                    "resets_at": _iso(w.get("resets_at")),
+                    "locked_reason": w.get("locked_reason"),
+                }
+            )
     return {
         "plan": (raw.get("plan") or {}).get("name") if isinstance(raw.get("plan"), dict) else None,
         "windows": windows,
@@ -121,33 +132,39 @@ def normalize_openai(raw: dict) -> dict:
     windows = []
     rl = raw.get("rate_limit") or {}
     if isinstance(rl.get("primary_window"), dict):
-        windows.append({
-            "name": "primary",
-            "used_percent": rl["primary_window"].get("used_percent"),
-            "limit_seconds": rl["primary_window"].get("limit_window_seconds"),
-            "resets_at": _iso(rl["primary_window"].get("reset_at")),
-            "allowed": rl.get("allowed"),
-        })
+        windows.append(
+            {
+                "name": "primary",
+                "used_percent": rl["primary_window"].get("used_percent"),
+                "limit_seconds": rl["primary_window"].get("limit_window_seconds"),
+                "resets_at": _iso(rl["primary_window"].get("reset_at")),
+                "allowed": rl.get("allowed"),
+            }
+        )
     if isinstance(rl.get("secondary_window"), dict):
-        windows.append({
-            "name": "secondary",
-            "used_percent": rl["secondary_window"].get("used_percent"),
-            "limit_seconds": rl["secondary_window"].get("limit_window_seconds"),
-            "resets_at": _iso(rl["secondary_window"].get("reset_at")),
-            "allowed": rl.get("allowed"),
-        })
+        windows.append(
+            {
+                "name": "secondary",
+                "used_percent": rl["secondary_window"].get("used_percent"),
+                "limit_seconds": rl["secondary_window"].get("limit_window_seconds"),
+                "resets_at": _iso(rl["secondary_window"].get("reset_at")),
+                "allowed": rl.get("allowed"),
+            }
+        )
     for arl in raw.get("additional_rate_limits") or []:
         name = arl.get("limit_name") or arl.get("metered_feature")
-        inner = (arl.get("rate_limit") or {})
+        inner = arl.get("rate_limit") or {}
         for slot in ("primary_window", "secondary_window"):
             if isinstance(inner.get(slot), dict):
-                windows.append({
-                    "name": f"{name}/{slot.removesuffix('_window')}",
-                    "used_percent": inner[slot].get("used_percent"),
-                    "limit_seconds": inner[slot].get("limit_window_seconds"),
-                    "resets_at": _iso(inner[slot].get("reset_at")),
-                    "allowed": inner.get("allowed"),
-                })
+                windows.append(
+                    {
+                        "name": f"{name}/{slot.removesuffix('_window')}",
+                        "used_percent": inner[slot].get("used_percent"),
+                        "limit_seconds": inner[slot].get("limit_window_seconds"),
+                        "resets_at": _iso(inner[slot].get("reset_at")),
+                        "allowed": inner.get("allowed"),
+                    }
+                )
     return {
         "plan": raw.get("plan_type"),
         "windows": windows,
@@ -163,11 +180,17 @@ def _anthropic_token() -> str | None:
     token = creds.get("accessToken")
     exp = creds.get("expiresAt") or 0
     if isinstance(exp, (int, float)) and exp and datetime.now(timezone.utc).timestamp() > exp - 60:
-        token = _post_form(ANTHROPIC_TOKEN_URL, {
-            "grant_type": "refresh_token",
-            "refresh_token": creds.get("refreshToken", ""),
-            "client_id": "claude.ai",
-        }) or token
+        token = (
+            _post_form(
+                ANTHROPIC_TOKEN_URL,
+                {
+                    "grant_type": "refresh_token",
+                    "refresh_token": creds.get("refreshToken", ""),
+                    "client_id": "claude.ai",
+                },
+            )
+            or token
+        )
     return token
 
 
@@ -179,11 +202,17 @@ def _openai_token() -> str | None:
     token = auth.get("access")
     exp = auth.get("expires") or 0
     if isinstance(exp, (int, float)) and exp and datetime.now(timezone.utc).timestamp() > exp - 60:
-        token = _post_form(OPENAI_TOKEN_URL, {
-            "grant_type": "refresh_token",
-            "refresh_token": auth.get("refresh", ""),
-            "client_id": "pdlLIX2Y72MIl2rhLhTE9VV9bN2kBsTe",
-        }) or token
+        token = (
+            _post_form(
+                OPENAI_TOKEN_URL,
+                {
+                    "grant_type": "refresh_token",
+                    "refresh_token": auth.get("refresh", ""),
+                    "client_id": "pdlLIX2Y72MIl2rhLhTE9VV9bN2kBsTe",
+                },
+            )
+            or token
+        )
     return token
 
 
@@ -229,14 +258,16 @@ def _read_deepseek_rows(days: int = DEEPSEEK_LOOKBACK_DAYS) -> list[DeepseekRow]
             except (ValueError, TypeError):
                 pass
             tokens = int(tin or 0) + int(tout or 0) + int(treason or 0)
-            rows.append((
-                model_id,
-                parent_id is not None,
-                float(cost or 0.0),
-                tokens,
-                int(tcache or 0),
-                int(created or 0),
-            ))
+            rows.append(
+                (
+                    model_id,
+                    parent_id is not None,
+                    float(cost or 0.0),
+                    tokens,
+                    int(tcache or 0),
+                    int(created or 0),
+                )
+            )
         conn.close()
     except Exception:
         return []
@@ -254,21 +285,32 @@ def aggregate_deepseek(rows: list[DeepseekRow], days: int = DEEPSEEK_LOOKBACK_DA
     subagent sessions (``parent_id`` set) are split out per bucket and in the
     totals so the cash attribution is auditable.
     """
-    cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).date().isoformat()
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=days - 1)).date().isoformat()
     by_day: dict[str, dict] = {}
     model_totals: dict[str, dict] = {}
     totals = {
-        "cost_usd": 0.0, "sessions": 0, "subagent_cost_usd": 0.0,
-        "subagent_sessions": 0, "tokens": 0, "cache_read": 0,
+        "cost_usd": 0.0,
+        "sessions": 0,
+        "subagent_cost_usd": 0.0,
+        "subagent_sessions": 0,
+        "tokens": 0,
+        "cache_read": 0,
     }
     for model_id, is_subagent, cost, tokens, cache_read, created in rows:
         date = _utc_date(created)
         if date < cutoff:
             continue
-        day = by_day.setdefault(date, {
-            "date": date, "cost_usd": 0.0, "sessions": 0,
-            "subagent_cost_usd": 0.0, "subagent_sessions": 0, "tokens": 0,
-        })
+        day = by_day.setdefault(
+            date,
+            {
+                "date": date,
+                "cost_usd": 0.0,
+                "sessions": 0,
+                "subagent_cost_usd": 0.0,
+                "subagent_sessions": 0,
+                "tokens": 0,
+            },
+        )
         mtot = model_totals.setdefault(model_id, {"cost_usd": 0.0, "sessions": 0})
         day["cost_usd"] += cost
         day["sessions"] += 1
@@ -305,13 +347,15 @@ def deepseek_usage() -> dict:
             "error": "no deepseek sessions in the local opencode DB (or DB absent)",
         }
     result = aggregate_deepseek(rows)
-    result.update({
-        "ok": True,
-        "source": "opencode_db",
-        "path": str(OPENCODE_DB_PATH),
-        "note": "local opencode.db estimates — container-run cells (fleet story workers) "
-                "are invisible to this DB and undercount the platform meter",
-    })
+    result.update(
+        {
+            "ok": True,
+            "source": "opencode_db",
+            "path": str(OPENCODE_DB_PATH),
+            "note": "local opencode.db estimates — container-run cells (fleet story workers) "
+            "are invisible to this DB and undercount the platform meter",
+        }
+    )
     return result
 
 
@@ -386,30 +430,51 @@ def normalize_platform_amount(raw: dict) -> dict:
     by_day: dict[str, dict] = {}
     model_totals: dict[str, dict] = {}
     totals = {
-        "requests": 0, "response_tokens": 0,
-        "cache_hit_tokens": 0, "cache_miss_tokens": 0, "estimated_cost_usd": 0.0,
+        "requests": 0,
+        "response_tokens": 0,
+        "cache_hit_tokens": 0,
+        "cache_miss_tokens": 0,
+        "estimated_cost_usd": 0.0,
     }
+    unpriced_models: set[str] = set()
     for series in raw.get("series") or []:
         model = series.get("model") or "?"
         rates = _meter_rates(model)
         model_total = {
-            "requests": 0, "response_tokens": 0,
-            "cache_hit_tokens": 0, "cache_miss_tokens": 0, "estimated_cost_usd": 0.0,
+            "requests": 0,
+            "response_tokens": 0,
+            "cache_hit_tokens": 0,
+            "cache_miss_tokens": 0,
+            "estimated_cost_usd": 0.0,
         }
+        pricing_available = rates is not None
+        if not pricing_available:
+            unpriced_models.add(model)
         for bucket in series.get("buckets") or []:
             usage = bucket.get("usage") or {}
             miss = int(usage.get("PROMPT_CACHE_MISS_TOKEN") or 0)
             hit = int(usage.get("PROMPT_CACHE_HIT_TOKEN") or 0)
             resp = int(usage.get("RESPONSE_TOKEN") or 0)
             req = int(usage.get("REQUEST") or 0)
-            day = by_day.setdefault(bucket.get("time"), {
-                "date": _utc_date(int(bucket.get("time") or 0) * 1000),  # meter: epoch seconds
-                "requests": 0, "response_tokens": 0,
-                "cache_hit_tokens": 0, "cache_miss_tokens": 0, "estimated_cost_usd": 0.0,
-            })
+            day = by_day.setdefault(
+                bucket.get("time"),
+                {
+                    "date": _utc_date(int(bucket.get("time") or 0) * 1000),  # meter: epoch seconds
+                    "requests": 0,
+                    "response_tokens": 0,
+                    "cache_hit_tokens": 0,
+                    "cache_miss_tokens": 0,
+                    "estimated_cost_usd": 0.0,
+                    "pricing_complete": True,
+                },
+            )
             cost = 0.0
             if rates:
-                cost = (miss * rates["input"] + resp * rates["output"] + hit * rates["cache_read"]) / 1_000_000
+                cost = (
+                    miss * rates["input"] + resp * rates["output"] + hit * rates["cache_read"]
+                ) / 1_000_000
+            else:
+                day["pricing_complete"] = False
             day["requests"] += req
             day["response_tokens"] += resp
             day["cache_hit_tokens"] += hit
@@ -429,12 +494,29 @@ def normalize_platform_amount(raw: dict) -> dict:
 
     totals["estimated_cost_usd"] = round(totals["estimated_cost_usd"], 6)
     model_totals = {
-        m: {k: (round(v, 4) if k.endswith("_usd") else v) for k, v in acc.items()}
+        m: {
+            **{k: (round(v, 4) if k.endswith("_usd") else v) for k, v in acc.items()},
+            "estimated_cost_usd": (
+                None if m in unpriced_models else round(acc["estimated_cost_usd"], 4)
+            ),
+        }
         for m, acc in model_totals.items()
     }
+    days = []
+    for timestamp in sorted(by_day):
+        day = by_day[timestamp]
+        day["estimated_cost_usd"] = (
+            round(day["estimated_cost_usd"], 6) if day["pricing_complete"] else None
+        )
+        days.append(day)
     return {
-        "days": [by_day[t] for t in sorted(by_day)],
-        "totals": {"estimated_cost_usd": totals["estimated_cost_usd"], **model_totals},
+        "days": days,
+        "totals": {
+            "estimated_cost_usd": (None if unpriced_models else totals["estimated_cost_usd"]),
+            "pricing_complete": not unpriced_models,
+            "unpriced_models": sorted(unpriced_models),
+            **model_totals,
+        },
     }
 
 
@@ -450,13 +532,14 @@ def deepseek_platform_usage() -> dict:
         return {
             "ok": False,
             "source": "platform_meter",
+            "wallet": {"ok": False, "balance_usd": None, "lifetime_cost_usd": None},
             "error": "no platform token (set FINOPS_DEEPSEEK_PLATFORM_TOKEN or write "
-                     f"{DEEPSEEK_PLATFORM_TOKEN_PATH})",
+            f"{DEEPSEEK_PLATFORM_TOKEN_PATH})",
         }
     headers = _platform_headers(token)
 
     status, body = _get_json(DEEPSEEK_SUMMARY_URL, token, headers)
-    wallet = {}
+    wallet = {"ok": False, "balance_usd": None, "lifetime_cost_usd": None}
     if status == 200 and isinstance(body, dict):
         biz = _platform_biz(body)
         if biz:
@@ -466,9 +549,16 @@ def deepseek_platform_usage() -> dict:
                 wallet["balance_usd"] = float(wallets[0].get("balance") or 0.0)
             if costs:
                 wallet["lifetime_cost_usd"] = float(costs[0].get("amount") or 0.0)
+            wallet["ok"] = bool(wallets or costs)
+            if not wallet["ok"]:
+                wallet["error"] = "wallet summary contained no balance or spend"
+        else:
+            wallet["error"] = f"wallet endpoint failed: http {status}: {str(body)[:200]}"
+    else:
+        wallet["error"] = f"wallet endpoint failed: http {status}: {str(body)[:200]}"
 
     now = int(datetime.now(timezone.utc).timestamp())
-    start = (now // 86400 - DEEPSEEK_LOOKBACK_DAYS) * 86400
+    start = (now // 86400 - (DEEPSEEK_LOOKBACK_DAYS - 1)) * 86400
     end = (now // 86400 + 1) * 86400
     url = f"{DEEPSEEK_USAGE_URL}?start={start}&end={end}&tz={DEEPSEEK_TZ_OFFSET_SECONDS}"
     status, body = _get_json(url, token, headers)
@@ -481,12 +571,14 @@ def deepseek_platform_usage() -> dict:
             "wallet": wallet,
         }
     result = normalize_platform_amount(biz)
-    result.update({
-        "ok": True,
-        "source": "platform_meter",
-        "wallet": wallet,
-        "note": "authoritative meter token counts; dollars estimated at repo off-peak rates",
-    })
+    result.update(
+        {
+            "ok": True,
+            "source": "platform_meter",
+            "wallet": wallet,
+            "note": "authoritative meter token counts; dollars estimated at repo off-peak rates",
+        }
+    )
     return result
 
 
@@ -540,7 +632,9 @@ def append_history(payload: dict, root: Path | None = None) -> None:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Query subscription usage endpoints (read-only, free).")
+    parser = argparse.ArgumentParser(
+        description="Query subscription usage endpoints (read-only, free)."
+    )
     parser.add_argument("--json", action="store_true", help="compact machine output")
     parser.add_argument("--no-write", action="store_true", help="check only, persist nothing")
     args = parser.parse_args()
