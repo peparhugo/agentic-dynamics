@@ -100,14 +100,17 @@ def api_matrix() -> Response:
         if not p.get("live") and isinstance(p.get("age_seconds"), (int, float))
     }
     cells = dict(execute["cells"])
+    stale_running_flipped = 0
     for cid, status in cells.items():
         if status == "running" and cid in stale_running:
             cells[cid] = "ended"
+            stale_running_flipped += 1
+    running = execute["running"] - stale_running_flipped
     response = {
         "total": execute["total"],
         "remaining_in_queue": execute["remaining_in_queue"],
         "queued": execute["queued"],
-        "running": execute["running"],
+        "running": running,
         "done": execute["done"],
         "failed": execute["failed"],
         "timeout": execute["timeout"],
