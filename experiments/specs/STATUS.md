@@ -3,11 +3,12 @@
 **Generated — do not edit by hand.** Regenerate with `python scripts/spec_status.py`;
 `scripts/run_workflow.py` also refreshes it at the end of every run.
 
-Generated at: `2026-08-31T21:53:54.302697+00:00`  ·  162 spec(s)
-**Work remaining:** 45 open · 117 completed/retired
+Generated at: `2026-09-01T00:17:29.323956+00:00`  ·  163 spec(s)
+**Work remaining:** 46 open · 117 completed/retired
 
 | name | kind | repeatable | status | version | supersedes | last_run | ok | model | cost | n_runs |
 |---|---|---|---|---|---|---|---|---|---|---|
+| `admission_leases` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `auto_posthoc_wiring` | workflow | yes | runnable | 0.1 | — | 2026-08-17 16:17 | ok | deepseek/deepseek-v4-pro | $0.1471 | 1 |
 | `cap_2a_calibration_cell` | workflow | yes | runnable | 0.1 | — | — | — | — | — | 0 |
 | `cap_2a_calibration_cell_divide` | workflow | yes | runnable | 0.1 | — | — | — | — | — | 0 |

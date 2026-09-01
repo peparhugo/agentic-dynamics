@@ -26,9 +26,7 @@ The seven guards:
 from __future__ import annotations
 
 import importlib
-import os
 import sys
-import time
 from pathlib import Path
 
 import pytest
@@ -85,7 +83,17 @@ def _fleet_module(name: str):
 ALLOWED_MOUNT_TARGETS = {
     "/tmp",                                  # worktree (rw)
     "/repo",                                 # repo (ro)
+    "/repo/.git",                            # gitdir OVERLAY (rw — D-16, phase commits write refs)
     "/repo/experiments/results",             # results OVERLAY (rw — the worker's relative paths)
+    # The repo at its HOST path (D-16 fix, 2026-08-31 — compose commit 685d53964). A worktree
+    # in the shared /tmp namespace carries a ``gitdir:`` pointer to the repo's HOST path; the
+    # SAME path must exist in the container or the pointer does not resolve, git treats the
+    # worktree as foreign, and the runner rewrites the pointer — wedging the worktree for the
+    # host. This is the one target that is also a host path by design, and it mirrors
+    # ``spawn_wrapper.CONTRACT_TARGETS`` ("repo-alias" / "repo-alias-git"), which is the
+    # runtime half of the same contract. Working tree stays ro; only .git is overlaid rw.
+    "/home/drseuss/ai-finops-framework",     # repo-alias (ro)
+    "/home/drseuss/ai-finops-framework/.git",  # repo-alias-git (rw)
     "/home/drseuss/.local/share/opencode",   # the ISOLATED opencode state (rw, per worker)
     "/auth/opencode_auth.json",              # the credential FILE (ro) — seeded by the entrypoint
     "/home/drseuss/.local/share/claude",     # the claude binary chain (ro, D-18 symlink target)
@@ -184,7 +192,6 @@ def test_board_surfaces_heartbeats_and_dlq_counts():
     dlq = _fleet_module("dlq")
 
     r = _FakeRedis()
-    now = time.time()
     heartbeat.publish(r, "story", "a", jobs=3, pid=100)
     heartbeat.publish(r, "analysis", "b", jobs=0, pid=101)
     dlq.record_dead(r, "analysis_jobs", {"job": "x"}, "worktree missing")

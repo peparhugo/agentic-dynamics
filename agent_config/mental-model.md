@@ -31,10 +31,13 @@ runtime.story ── measurement.mutation, measurement.commit_analysis, reportin
                  measurement.entropy, measurement.codebase_graph, measurement.lsp_diagnostics
 control.routing ── recommend model per task type from experiment results
 control.live ──── Redis pub/sub telemetry (feeds the Control Room portal)
+control.admission ── the fail-closed spend gate: lease_registry (reserve) → admission
+                     (admit/deny) → settlement (reconcile) → lease_watchdog + quarantine (expire)
 ```
 
 ```
 control.supervisor ── Redis flag/session↔cell mapping contracts (no OpenCode client dep — observe only, see docs/architecture/current/supervisor_design.md)
+control.lease_watchdog ── sweeps expired leases into supervisor flags + quarantine marks (flag-only, never steers — same contract as the supervisor rail)
 runtime.workflow_runner ── executes an agent_task workflow's phases inside a git worktree, committing + ledgering each
 runtime.test_runner ── independent pytest/jest/go-test/cargo-test runner; sole source of truth for test_executed_success
 ```
@@ -70,13 +73,13 @@ bounded planes (`ARCHITECTURE.md` §1; the dependency direction is enforced by
 
 | Plane | Ownership |
 |---|---|
-| `core` | foundation — language, paths, session vocabulary, streaming, constants |
+| `core` | foundation — language, paths, session vocabulary, streaming, constants, the admission-context + cost-provenance vocabularies (`admission_context`, `cost_provenance`) |
 | `experiment` | the platform — `ExperimentSpec`, the `requires`/`produces` gate, spec→DAG, spec-lifecycle index |
 | `measurement` | the measurement apparatus — perturb/mutation/solution/basin/efficiency/… + static analysis |
 | `runtime` | execution runtime — workflow_runner, test_runner, story, posthoc |
 | `adapters` | model backends — opencode, claude_adapter, backends |
 | `knowledge` | knowledge + augmentation — identity/authority, retrieval, prompt-construction, ingestion producers |
-| `control` | the implemented control plane — fact plane (`facts` + `fact_ingestion` + `reducers/`), context compiler, shadow-mode controller/validator, routing, supervisor, telemetry, queue steering, observation/actuation |
+| `control` | the implemented control plane — fact plane (`facts` + `fact_ingestion` + `reducers/`), context compiler, shadow-mode controller/validator, routing, supervisor, telemetry, queue steering, observation/actuation, the admission/lease gate (`lease_registry` + `admission` + `settlement` + `lease_watchdog` + `quarantine`) |
 | `reporting` | research output — game_report, review, analyzers |
 
 Tier map: `core` (0) ← `experiment/measurement/runtime/adapters/knowledge/reporting` (1) ←
@@ -85,7 +88,11 @@ Tier map: `core` (0) ← `experiment/measurement/runtime/adapters/knowledge/repo
 dependency-inverted (Debt-2) — it consumes the runtime-owned `Router`/`TelemetryPublisher`
 protocols (`runtime/routing.py`/`runtime/telemetry.py`) with the control implementations
 (`control.step_routing.route_step`, `control.live.LivePublisher`) injected at the composition
-root (`scripts/run_workflow.py`), so runtime never imports control.
+root (`scripts/run_workflow.py`), so runtime never imports control. The spend gate follows the
+same inversion: `runtime/admission.py` owns the `PhaseAdmission` protocol and
+`control.admission.make_phase_admission` is injected at that same root (inert when absent), while
+the vocabulary the adapters need to enforce it (`core.admission_context`, `core.cost_provenance`)
+sits in tier 0 so `adapters` can run the bypass guard without importing `control`.
 
 ## The spec/compiler layer — WRITTEN
 
@@ -194,6 +201,97 @@ make_publisher() -> LivePublisher | None
 compute_routing(entries) -> dict   # per-task recs + strategy simulation
 recommend_route(task_type, entries, *, correctness_threshold, lead_margin) -> dict
 ```
+
+### Admission / lease layer (the fail-closed spend gate — WRITTEN, admission_leases workflow)
+
+The freeze's exit gate: nothing paid runs without a lease, and an unknown cost is never free.
+Two lease classes over the framework Redis (6380 db1 — `assert_not_sandbox` refuses 6379):
+`per_token` (deepseek — a DOLLAR lease, atomic reserve against the meter/wallet) and
+`subscription` (anthropic/openai — a WINDOW-PERCENT lease against the 5h/7d usage windows, no
+dollar cap). Concurrency is its own lease kind: an atomic per-scope counter with TTL expiry.
+
+```
+# core.admission_context (tier 0 — adapters enforce without importing control)
+LeaseContext(run_id, model, budget_lease_id, concurrency_lease_ids, reserved_cost_usd,
+             hard_cap_usd, expires_at, cost_source, worktree_identity, result_namespace)
+  .to_env() / .to_dict() / .to_request_fields() / .is_expired(now)   # the portable proof
+current_context(env=None) -> LeaseContext | None       # reads the FINOPS_ADMISSION_* env block
+bind_context(context) -> contextmanager                # in-process propagation (ContextVar)
+admission_required(env=None) -> bool                   # FINOPS_ADMISSION_REQUIRED=1
+require_admission(...) -> LeaseContext                 # the bypass guard; raises AdmissionRefused
+validate_lease_fields(mapping) -> None                 # a missing field is loud, never a zero
+
+# core.cost_provenance (tier 0 — the vocabulary the whole chain speaks)
+CostSource: metered | estimated | unknown | reconciled
+TRUSTED_COST_SOURCES = {metered, estimated, reconciled}    # UNKNOWN's absence IS the rule:
+  # "unknown cost is never free" written once, so every enforcement point tests membership
+ProviderClass: per_token | subscription
+resolve_cost_observation(...) -> CostObservation           # decides what a MISSING cost means
+  # a provider-reported 0.0 stays metered; an ABSENT cost becomes unknown — never 0.0
+ESTIMATION_METHODS: provider_meter | token_price_table | platform_meter_daily | window_usage
+
+# control.lease_registry — the atomic primitives (Lua/WATCH-MULTI, TTL'd, fail-closed)
+LeaseRegistry.reserve_budget(provider_class, scope, amount, *, run_id, cost_source=None,
+                             hard_cap=None, ttl_seconds=3600, metadata=None) -> Lease
+LeaseRegistry.reserve_concurrency(scope, count=1, *, run_id, hard_cap=None,
+                                  ttl_seconds=3600, metadata=None) -> Lease
+LeaseRegistry.release(lease_id) -> Lease | None
+LeaseRegistry.expire_leases(*, scopes=None) -> list[Lease]
+LeaseRegistry.outstanding/headroom/leases/get_cap/set_cap(kind, scope, ...)
+LeaseKind: budget | concurrency     ScopeKind: fleet | provider | model | campaign | run
+Lease, LeaseScope, AdmissionRecord     # the audit's admission record (run_id, lease_ids,
+                                       # reserved_cost_usd, hard_cap_usd, cost_source, provider,
+                                       # model, expires_at, worktree_identity, result_namespace)
+LeaseDeniedError / LeaseUnavailableError / LeaseFieldError  (all AdmissionError)
+provider_class_for_model(model) / provider_class_for_provider(provider) -> ProviderClass
+recommended_concurrency(beta=BETA_TOKENS, *, min_marginal_gain=0.05, ceiling=32) -> int
+  # sized off the preregistered β coordination tax (BETA_TOKENS 0.802 severe / BETA_COST 0.154
+  # moderate — experiments/results/lab_beta_from_corpus.json): a wide fleet is dollar-cheap but
+  # throughput-taxed, so BOTH knobs are exposed rather than one global scale cap.
+assert_not_sandbox(host, port) -> None   # 6379 (finops-redis, the story agents' flushdb) is fatal
+
+# control.admission — the controller every spend entry point calls
+AdmissionController.admit(request: AdmissionRequest) -> Admission   # BOTH leases or neither
+AdmissionController.release(admission) -> list[Lease]               # transactional release
+AdmissionController.verify(context, *, now=None) -> None            # re-check at use time
+admitted(request, *, controller=None) -> contextmanager[Admission]  # reserve → run → release
+concurrency_admitted(scope, count=1, *, run_id, ...) -> contextmanager[Lease | None]
+make_phase_admission(*, spec_name, worktree_identity, result_namespace, ...) -> PhaseAdmission
+admission_board(registry, scopes) -> dict      # the Control Room's admission telemetry surface
+AdmissionDenied(AdmissionError, AdmissionRefused)   # the one typed refusal
+
+# control.settlement — reconcile the reservation against the platform meter / window
+settle(*, run_id, model, reserved_amount, ledger, date='', ...) -> Settlement
+settle_run(*, run_id, model, reserved_amount, date='', root=None, persist=True) -> Settlement
+SettlementStatus: matched | underspent | overspent | unsettled  # matched -> cost_source=reconciled
+  # deepseek settles against the meter's DAILY buckets; subscriptions against window usage %.
+  # ledger: experiments/results/usage/subscription_usage_latest.json (subscription-usage/v3)
+  # durable: experiments/results/settlement/settlements.jsonl
+
+# control.lease_watchdog + control.quarantine — the expiry/kill rail (FLAG-ONLY, never steers)
+sweep_once(...) -> WatchdogResult     # expired concurrency lease -> supervisor flag;
+                                      # expired budget lease -> flag PLUS a quarantine entry
+QuarantineRegistry / QuarantineRecord / QuarantineKind: worktree | result_namespace | ladder_rung
+quarantined_identities(kind, ...) -> set[str]
+is_worktree_quarantined(name, ...) -> bool
+filter_quarantined_paths(paths, ...) -> (kept, excluded)
+  # durable experiments/results/quarantine/quarantine.jsonl + Redis finops:quarantine:active;
+  # consulted by analyze_worktrees.py, inventory.py, and system_snapshot.py's permanence gate.
+
+# runtime.admission — the dependency-inverted seam (runtime never imports control)
+PhaseAdmission (Protocol) / phase_admission_scope(...)   # control impl injected at run_workflow.py
+```
+
+Entry points wired (every spend seam refuses when EITHER lease fails): `scripts/enqueue.py`
+(budget lease per job at queue-fill — the queue never carries unbudgeted work), `scripts/worker.py`
+(both leases before spawn, released after the cell settles), `scripts/analysis_worker.py`
+(concurrency ONLY — it spends no model dollars, and a $0 budget lease would mint a meaningless
+admission record),
+`scripts/fleet/spawn_wrapper.py` (the lease check is a new `validate_spawn` step),
+`scripts/run_workflow.py` (per-phase reservation against the campaign lease), `scripts/run.py`
+(cost provenance at the run seam), and `adapters.backends.run_agentic` (the bypass guard —
+refuses under `FINOPS_ADMISSION_REQUIRED=1` with no lease context). `control.model_policy`'s
+class guard (`FINOPS_ALLOW_PRO=1`) stays as the backstop underneath.
 
 ### Spec/compiler signatures (written — agentic_dynamics/experiment/{experiment_spec,compile_experiment}.py)
 

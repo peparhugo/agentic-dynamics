@@ -1,8 +1,26 @@
 {
   "schema_version": "spec-status/v2",
-  "generated_at": "2026-08-31T21:53:54.302697+00:00",
-  "n_specs": 162,
+  "generated_at": "2026-09-01T00:17:29.323956+00:00",
+  "n_specs": 163,
   "specs": [
+    {
+      "name": "admission_leases",
+      "version": "0.1",
+      "status": "runnable",
+      "spec_path": "workflows/repository/admission_leases.yaml",
+      "artifact_kind": "workflow",
+      "repeatable": false,
+      "supersedes": [],
+      "superseded_by": null,
+      "completed_at": null,
+      "last_run_at": null,
+      "latest_ok": null,
+      "latest_model": null,
+      "latest_cost_usd": null,
+      "latest_git_sha": null,
+      "results_pointer": null,
+      "n_runs": 0
+    },
     {
       "name": "auto_posthoc_wiring",
       "version": "0.1",
