@@ -1,0 +1,165 @@
+{
+  "generated_at": "2026-09-01T02:36:03.439214+00:00",
+  "weights_version": "retrieval-weights/v1",
+  "n_queries": 15,
+  "fallback_mode_distribution": {
+    "full": 15
+  },
+  "leg_contribution_totals": {
+    "dense_only": 549,
+    "lexical_only": 373,
+    "fused": 0
+  },
+  "rows": [
+    {
+      "label": "spec:context_abstraction_implement",
+      "fallback_mode": "full",
+      "candidates": 43,
+      "dense_only": 31,
+      "lexical_only": 12,
+      "fused": 0,
+      "selected_evidence": 43,
+      "latency_ms": 6732.57
+    },
+    {
+      "label": "spec:cap_addendum_implement",
+      "fallback_mode": "full",
+      "candidates": 46,
+      "dense_only": 34,
+      "lexical_only": 12,
+      "fused": 0,
+      "selected_evidence": 45,
+      "latency_ms": 6130.6
+    },
+    {
+      "label": "spec:fleet_job_submission",
+      "fallback_mode": "full",
+      "candidates": 59,
+      "dense_only": 38,
+      "lexical_only": 21,
+      "fused": 0,
+      "selected_evidence": 58,
+      "latency_ms": 4935.46
+    },
+    {
+      "label": "spec:routing_kb_experiment_design",
+      "fallback_mode": "full",
+      "candidates": 62,
+      "dense_only": 35,
+      "lexical_only": 27,
+      "fused": 0,
+      "selected_evidence": 58,
+      "latency_ms": 5537.79
+    },
+    {
+      "label": "spec:cap_2e_cell_unseen_family",
+      "fallback_mode": "full",
+      "candidates": 65,
+      "dense_only": 37,
+      "lexical_only": 28,
+      "fused": 0,
+      "selected_evidence": 63,
+      "latency_ms": 5804.64
+    },
+    {
+      "label": "spec:queue_steer",
+      "fallback_mode": "full",
+      "candidates": 63,
+      "dense_only": 36,
+      "lexical_only": 27,
+      "fused": 0,
+      "selected_evidence": 61,
+      "latency_ms": 5060.93
+    },
+    {
+      "label": "spec:routing_follow_up",
+      "fallback_mode": "full",
+      "candidates": 56,
+      "dense_only": 33,
+      "lexical_only": 23,
+      "fused": 0,
+      "selected_evidence": 53,
+      "latency_ms": 5469.89
+    },
+    {
+      "label": "spec:canonical_state_design",
+      "fallback_mode": "full",
+      "candidates": 67,
+      "dense_only": 40,
+      "lexical_only": 27,
+      "fused": 0,
+      "selected_evidence": 64,
+      "latency_ms": 5363.32
+    },
+    {
+      "label": "spec:delta_entropy_response_campaign",
+      "fallback_mode": "full",
+      "candidates": 62,
+      "dense_only": 37,
+      "lexical_only": 25,
+      "fused": 0,
+      "selected_evidence": 57,
+      "latency_ms": 5393.93
+    },
+    {
+      "label": "spec:website_rewrite",
+      "fallback_mode": "full",
+      "candidates": 61,
+      "dense_only": 34,
+      "lexical_only": 27,
+      "fused": 0,
+      "selected_evidence": 61,
+      "latency_ms": 5171.38
+    },
+    {
+      "label": "spec:cap_escalation_fix",
+      "fallback_mode": "full",
+      "candidates": 62,
+      "dense_only": 36,
+      "lexical_only": 26,
+      "fused": 0,
+      "selected_evidence": 61,
+      "latency_ms": 5272.4
+    },
+    {
+      "label": "spec:rag_knowledge_sources",
+      "fallback_mode": "full",
+      "candidates": 65,
+      "dense_only": 40,
+      "lexical_only": 25,
+      "fused": 0,
+      "selected_evidence": 65,
+      "latency_ms": 5582.2
+    },
+    {
+      "label": "identifier:0",
+      "fallback_mode": "full",
+      "candidates": 70,
+      "dense_only": 40,
+      "lexical_only": 30,
+      "fused": 0,
+      "selected_evidence": 44,
+      "latency_ms": 3994.88
+    },
+    {
+      "label": "identifier:1",
+      "fallback_mode": "full",
+      "candidates": 67,
+      "dense_only": 40,
+      "lexical_only": 27,
+      "fused": 0,
+      "selected_evidence": 50,
+      "latency_ms": 5900.66
+    },
+    {
+      "label": "identifier:2",
+      "fallback_mode": "full",
+      "candidates": 74,
+      "dense_only": 38,
+      "lexical_only": 36,
+      "fused": 0,
+      "selected_evidence": 53,
+      "latency_ms": 5107.09
+    }
+  ]
+}
