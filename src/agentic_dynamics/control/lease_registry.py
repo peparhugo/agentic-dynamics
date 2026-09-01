@@ -23,7 +23,9 @@ Two lease kinds, both implemented by the same primitive:
 
 ``LeaseKind.CONCURRENCY``
     A claim on N execution slots in a scope (fleet / provider / model / campaign / run). This is
-    the throughput knob, and it is sized off the measured coordination tax β (see below).
+    the throughput knob; its width is an infrastructure/cost-control decision (see below), never
+    a coordination-safety device — this architecture has zero agent-to-agent coordination by
+    design (isolated worktrees, containers, scoped KBs).
 
 Two provider classes (the cost-model split, mirroring ``control.model_policy``)
 -------------------------------------------------------------------------------
@@ -39,20 +41,24 @@ Two provider classes (the cost-model split, mirroring ``control.model_policy``)
     cap. There is NO dollar cap for this class — asking for one is a provider-class boundary
     violation and is refused, exactly like asking for a window-percent cap on DeepSeek.
 
-Sizing the concurrency lease: the measured coordination tax β
---------------------------------------------------------------
+Sizing the concurrency lease: the measured contention exponent β
+---------------------------------------------------------------------
 ``scripts/lab_beta_from_corpus.py`` (preregistered 2026-08-31) fit per-worker efficiency as
-``efficiency(N) = c · N^(−β)`` over the session corpus (n=1428) and produced two β's that point
-in *opposite* operational directions:
+``efficiency(N) = c · N^(−β)`` over the session corpus (n=1428). The operator's reframing
+(2026-09-01, ``experiments/lab_books/lab_beta_from_corpus.md`` + the outlier-sensitivity note
+``experiments/results/lab_beta_from_corpus_outlier_sensitivity.md``) governs the reading: β is a
+**contention exponent** (provider rate limits + shared machine load), not a coordination
+exponent — agents do not coordinate in this architecture. The pooled OLS point estimates
+(β_cost 0.154, β_tokens 0.800) are tail-inflated; the robust central-tendency readings are
+β_cost ≈ 0.11–0.14 (negligible — concurrency under isolation is dollar-safe) and β_tokens ≈
+0.26–0.43 (moderate contention — a loaded key yields fewer tokens/min per session).
 
-    β_cost   = 0.154  (CI 0.112–0.196)  → "moderate tax"  — running wide is dollar-cheap.
-    β_tokens = 0.800  (CI 0.712–0.891)  → "severe tax"    — running wide is throughput-poor.
-
-The consequence for lease sizing, stated plainly: **the coordination tax is paid in throughput,
-not in dollars.** A wide fleet does not blow the budget; it wastes wall-clock, because fleet
-throughput scales as ``N^(1−β_tokens) = N^0.20`` — the 7th worker buys under 5% of one worker's
-baseline output. So the concurrency lease, not the budget lease, is the binding constraint on
-fleet width, and it is sized off β_tokens. Both knobs are exposed
+The consequence for lease sizing, stated plainly: **the budget lease is the binding constraint
+for per-token providers; the concurrency lease protects the provider's usage windows and spend
+caps — it is not a coordination-safety device.** A wide fleet of isolated agents is the
+intended operating mode; the measured contention curve sizes expectations (fleet throughput
+scales sublinearly, roughly ``N^0.6`` at the robust reading — 8 workers ≈ 1.5× solo), never a
+"one or two workers should do everything" policy. Both knobs are exposed
 (:data:`BETA_TOKENS`, :data:`BETA_COST`) because the *budget* forecast still wants β_cost.
 
 Where the state lives
@@ -188,7 +194,7 @@ DEFAULT_TTL_SECONDS = 3600
 #: larger than any lease TTL (a scope key must never expire out from under a live lease).
 KEY_TTL_SECONDS = 7 * 24 * 3600
 
-# ── The measured coordination tax (scripts/lab_beta_from_corpus.py, preregistered 2026-08-31) ─
+# ── The measured contention exponent (scripts/lab_beta_from_corpus.py, preregistered 2026-08-31; reframed 2026-09-01) ─
 
 #: β for tokens — per-worker *throughput* efficiency exponent, ``efficiency(N) = c·N^(−β)``.
 #: 0.80 (CI 0.712–0.891, n=1428) — the lab's "severe tax" band. THIS is the concurrency knob.
@@ -625,8 +631,10 @@ def per_worker_efficiency(n: int, beta: float = BETA_TOKENS) -> float:
 def fleet_throughput(n: int, beta: float = BETA_TOKENS) -> float:
     """Aggregate fleet output relative to one worker: ``N · N^(−β) = N^(1−β)``.
 
-    At β_tokens=0.80 this is ``N^0.20``: ten workers deliver ~1.6× one worker's throughput.
-    That is the coordination tax, and it is why fleet width is capped by a concurrency lease.
+    At the robust contention reading β_tokens≈0.3 this is ≈ ``N^0.7``: eight workers
+    deliver ~1.5× one worker's throughput (the OLS 0.80 point estimate is tail-inflated — see
+    the lab reframing). This is provider/load contention, not a coordination tax, and the
+    concurrency lease protects the provider windows + spend caps — not a coordination device.
     """
     return float(n) * per_worker_efficiency(n, beta)
 
