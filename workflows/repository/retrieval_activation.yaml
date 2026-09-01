@@ -170,7 +170,7 @@ workflow:
           LOG: PASS/FAIL with the census numbers + the augment run's fallback modes;
           commit.
 factors:
-  - {name: model, levels: [openai/gpt-5.6-luna]}
+  - {name: model, levels: [anthropic/claude-sonnet-5]}
 design: factorial
 rules:
   - name: agenda_reconstructed
