@@ -59,7 +59,7 @@ OpenCode state but is shared by scaled cell services, so it is not per-cell stat
 now covers compose's repository-alias and `.git` overlay targets, mirroring the wrapper's runtime
 `CONTRACT_TARGETS` (`scripts/fleet/spawn_wrapper.py:79-97`); `test_mount_contract_holds_no_unexpected_target`
 passes and `test_mount_guard_rejects_a_foreign_target` proves the guard still fails on an invented
-foreign target — the guard is not weakened (`tests/test_fleet_guards.py:86-102,136-153`).
+foreign target — the guard is not weakened (`tests/test_fleet_guards.py:100-133,167-192`).
 
 [M] The closed `SCOPE_VOCABULARY`, `SCOPE_CONFIGS`, and `PHASE_SCOPE_AUTHORIZATION` declare the
 allowed phase scopes, result modes, network, and write flags

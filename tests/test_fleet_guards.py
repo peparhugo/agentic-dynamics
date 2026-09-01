@@ -83,30 +83,54 @@ def _fleet_module(name: str):
     return importlib.import_module(name)
 
 
-# The four-mount contract + the D-2 auth set (REVISED by the smoke test — the credential-
-# file-ro / state-rw split: the results OVERLAY at /repo/experiments/results, the ISOLATED
-# CLI state dirs rw, the credential files ro at /auth, the provider config ro) + the D-13
-# named volume + the D-3 socket (container-side TARGETS — the fixed paths).
-# The repo-alias + `.git` overlay targets below mirror the wrapper's runtime CONTRACT_TARGETS
-# (scripts/fleet/spawn_wrapper.py:79-97) — this guard stays aligned with that allowlist, never
-# weaker (an unexpected target still fails).
-ALLOWED_MOUNT_TARGETS = {
-    "/tmp",  # worktree (rw)
-    "/repo",  # repo (ro)
-    "/repo/.git",  # the gitdir overlay (rw — phase commits; wrapper CONTRACT_TARGETS)
-    "/repo/experiments/results",  # results OVERLAY (rw — the worker's relative paths)
-    "/home/drseuss/ai-finops-framework",  # the repo at its HOST path (ro — worktree gitdir pointer target)
-    "/home/drseuss/ai-finops-framework/.git",  # the repo-alias .git overlay (rw — phase commits)
-    "/home/drseuss/.local/share/opencode",  # the ISOLATED opencode state (rw, per worker)
-    "/auth/opencode_auth.json",  # the credential FILE (ro) — seeded by the entrypoint
-    "/home/drseuss/.local/share/claude",  # the claude binary chain (ro, D-18 symlink target)
-    "/home/drseuss/.claude",  # D-2 auth (ro)
-    "/home/drseuss/.config",  # the provider config (ro — smoke finding #4)
-    "/home/drseuss/.local/bin",  # D-2 auth (ro)
-    "/home/drseuss/.opencode",  # the opencode config + bin (ro)
-    "/var/log/fleet",  # the fleet-logs NAMED volume (D-13, not a host path)
-    "/var/run/docker.sock",  # the socket (orchestrator only, D-3)
-}
+# ── The mount contract — the single source is the wrapper's runtime CONTRACT_TARGETS ──
+#
+# F5 (the mount-contract guard gap, docs/reviews/docs_architecture_refresh_remediation.md): the
+# guard's allowlist used to be a hand-copied mirror of the wrapper's runtime contract, and it
+# went stale — the compose's repo-alias + `.git` overlay targets (docker-compose.ladder.yml:70-71)
+# were missing from the guard while the wrapper already allowed them
+# (scripts/fleet/spawn_wrapper.py:103-121). The fix is to CONSUME the wrapper's CONTRACT_TARGETS
+# as the single source (never a copy that can drift again): the guard's allowlist is the wrapper's
+# runtime contract unioned with the ladder's OWN compose-only surface (the D-3 socket, the D-13
+# named log volume, the credential file, the provider config, the compose results overlay, and the
+# compose-wide opencode dir) — targets the wrapper's sibling-spawn contract deliberately does not
+# govern. An unexpected target still fails (the negative test proves it).
+
+
+def _wrapper_contract_targets() -> frozenset[str]:
+    """The spawn-wrapper's runtime CONTRACT_TARGETS (scripts/fleet/spawn_wrapper.py:103-121).
+
+    Imported, never copied — the single source for the shared four-mount + D-2-auth surface.
+    A copy is exactly the staleness class F5 closed: the guard drifted from the wrapper's
+    runtime allowlist once; consuming it removes the copy entirely, so the two cannot diverge
+    again (a future wrapper addition is allowed here by construction, not by re-sync).
+    """
+    return frozenset(_fleet_module("spawn_wrapper").CONTRACT_TARGETS)
+
+
+# The ladder's compose-ONLY surface — targets the wrapper's sibling-spawn contract does not
+# govern, so they cannot come from CONTRACT_TARGETS: the D-3 socket (the wrapper never spawns a
+# sibling with the socket), the D-13 fleet-logs NAMED volume, the credential FILE, the provider
+# config, the compose's results OVERLAY at the /repo path (the wrapper mounts results at
+# /app/experiments/results instead), and the compose-wide opencode config dir (the wrapper's
+# auth set is the narrower ~/.opencode/bin).
+COMPOSE_ONLY_MOUNT_TARGETS = frozenset(
+    {
+        "/var/run/docker.sock",  # the socket (orchestrator only, D-3)
+        "/var/log/fleet",  # the fleet-logs NAMED volume (D-13, not a host path)
+        "/auth/opencode_auth.json",  # the credential FILE (ro) — seeded by the entrypoint
+        "/home/drseuss/.config",  # the provider config (ro — smoke finding #4)
+        "/repo/experiments/results",  # results OVERLAY (rw — the worker's relative paths)
+        "/home/drseuss/.opencode",  # the opencode config + bin (ro)
+    }
+)
+
+# The wrapper's CONTRACT_TARGETS carries the four-mount contract (worktree /tmp rw, repo /repo
+# ro, results /app/experiments/results, the /repo/.git + repo-alias + repo-alias/.git overlays)
+# and the D-2 auth set (~/.claude, ~/.local/share/{opencode,claude}, ~/.local/bin,
+# ~/.opencode/bin — ro). Unioned with the compose-only surface above, every target the runtime
+# contract allows is permitted here, and nothing outside it is.
+ALLOWED_MOUNT_TARGETS = _wrapper_contract_targets() | COMPOSE_ONLY_MOUNT_TARGETS
 
 ORCHESTRATOR_SERVICES = {"campaign-wrapper", "workflow-runner"}
 SUPERVISOR_SERVICES = {

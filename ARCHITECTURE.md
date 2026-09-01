@@ -250,7 +250,7 @@ allowlist covers the repository-alias and `.git` targets declared by compose, mi
 wrapper's runtime `CONTRACT_TARGETS` (`scripts/fleet/spawn_wrapper.py:79-97`); its
 `test_mount_contract_holds_no_unexpected_target` check passes (and
 `test_mount_guard_rejects_a_foreign_target` proves a foreign target still fails) and the guard is
-not weakened (`tests/test_fleet_guards.py:86-102,136-153`).
+not weakened (`tests/test_fleet_guards.py:100-133,167-192`).
 
 [M] The accepted slice-4 log records the then-run coverage for mount targets, the single socket
 tier, supervisor mount restrictions, heartbeats/DLQ, the write boundary, and scope/network

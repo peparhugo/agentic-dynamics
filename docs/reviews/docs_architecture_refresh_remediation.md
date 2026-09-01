@@ -96,10 +96,10 @@ acceptance gate has now re-run clean on the remediated branch and is recorded in
   the spec's p4 demands exactly this contract) + admission_leases p5 (already touching it).
 - **Closure evidence**: [M] the guard's `ALLOWED_MOUNT_TARGETS` now mirrors the wrapper's
   runtime `CONTRACT_TARGETS` (repo-alias + `.git` overlays —
-  `tests/test_fleet_guards.py:86-102` vs `scripts/fleet/spawn_wrapper.py:79-97`); [M] both
+  `tests/test_fleet_guards.py:100-133` vs `scripts/fleet/spawn_wrapper.py:103-121`); [M] both
   directions are asserted — `test_mount_contract_holds_no_unexpected_target` passes on the
   declared compose targets and `test_mount_guard_rejects_a_foreign_target` proves an invented
-  mount still fails (`tests/test_fleet_guards.py:136-161`); the guard is not weakened. [M]
+  mount still fails (`tests/test_fleet_guards.py:167-192`); the guard is not weakened. [M]
   The authority and the implemented design flip the enforcement-gap line to the passing
   current state (`ARCHITECTURE.md:248-253`, `docs/designs/implemented/fleet_ladder_architecture.md:58-62`).
 
