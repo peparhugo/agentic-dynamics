@@ -60,15 +60,15 @@ _SRC = _REPO_ROOT / "src"
 if str(_SRC) not in sys.path:
     sys.path.insert(0, str(_SRC))
 
-from agentic_dynamics.experiment.compile_experiment import (  # noqa: E402
-    SpecError,
-    compile_spec,
-)
 from agentic_dynamics.core.admission_context import (  # noqa: E402
     LEASE_REQUEST_FIELDS,
     LeaseContext,
     admission_required,
     validate_lease_fields,
+)
+from agentic_dynamics.experiment.compile_experiment import (  # noqa: E402
+    SpecError,
+    compile_spec,
 )
 from agentic_dynamics.experiment.experiment_spec import (  # noqa: E402
     PHASE_SCOPE_AUTHORIZATION,
@@ -84,18 +84,42 @@ from agentic_dynamics.experiment.experiment_spec import (  # noqa: E402
 # scope-dependent (rw for implementation/review_readonly/proposal_write, ro for
 # research_readonly/adversarial_readonly); every other category's mode is fixed.
 
-#: The D-2 auth set (proposal §0/D-2) — the five read-only auth mounts. The container auth home
+#: The D-2 auth set (proposal §0/D-2) — the four read-only auth mounts. The container auth home
 #: is the host user's home (``HOME=/home/drseuss`` in the compose), so the claude symlink chain
 #: (``~/.local/bin/claude`` → ``~/.local/share/claude/versions/<v>``) resolves unchanged.
+#:
+#: NOTE (P0-3, control-plane stabilization): ``~/.local/share/opencode`` is deliberately NOT
+#: here. The sibling's CLI state is the per-attempt :data:`STATE_TARGET` namespace (rw, mounted
+#: by :func:`build_phase_request`), and its credential is the :data:`AUTH_CRED_FILE` file mount
+#: (ro) — the host's LIVE opencode state (opencode.db, sessions, compaction) never enters a
+#: cell in any mode, and no two cells ever share a writable CLI-state directory.
 AUTH_DIRS: frozenset[str] = frozenset(
     {
         "/home/drseuss/.claude",
-        "/home/drseuss/.local/share/opencode",
         "/home/drseuss/.local/bin",
         "/home/drseuss/.local/share/claude",
         "/home/drseuss/.opencode/bin",
     }
 )
+
+#: P0-3: the credential FILE mount (ro). Auth is a single file, never the host's whole state
+#: directory: a cell mounts ``<host auth.json>`` at ``/auth/opencode_auth.json`` and the
+#: entrypoint seeds it into the cell's OWN state namespace. Mirrors the compose-level
+#: ``/auth/opencode_auth.json`` contract.
+AUTH_CRED_FILE = "/auth/opencode_auth.json"
+
+#: P0-3: the per-attempt CLI-state target (rw). Every spawned sibling gets a UNIQUE host
+#: namespace under :data:`STATE_ROOT` mounted here, and ``XDG_DATA_HOME``/``XDG_CONFIG_HOME``/
+#: ``XDG_CACHE_HOME`` point into it — opencode's session DB, SQLite/WAL, and compaction state
+#: are private to one run/step/attempt. Two concurrent cells can never see each other's
+#: session IDs (review finding P0: "all scaled OpenCode cells appear to share the same
+#: writable OpenCode state directory").
+STATE_TARGET = "/state"
+STATE_ROOT = os.environ.get("FINOPS_OPENCODE_STATE_ROOT", "/tmp/opencode_state")
+
+#: The XDG redirect vars the state namespace sets, so the CLI's writable state lands in the
+#: per-attempt namespace instead of the image's default ``~/.local/share``.
+STATE_ENV_KEYS: tuple[str, ...] = ("XDG_DATA_HOME", "XDG_CONFIG_HOME", "XDG_CACHE_HOME")
 
 #: The fixed-mount categories (proposal §3). ``mode`` is the CONTRACT's mode; ``results`` is
 #: ``None`` because the scope narrows it (ro vs rw). A mount target not in this map (plus the
@@ -117,8 +141,12 @@ CONTRACT_TARGETS: dict[str, tuple[str, str | None]] = {
     #: SAME path in the container makes one pointer valid in both views.
     "/home/drseuss/ai-finops-framework": ("repo-alias", "ro"),
     "/home/drseuss/ai-finops-framework/.git": ("repo-alias-git", "rw"),
+    #: P0-3: the per-attempt CLI-state namespace (rw). The ONE writable state a cell gets —
+    #: mounted as a unique per-run/step/attempt host dir, never a shared pool directory.
+    STATE_TARGET: ("state", "rw"),
 }
 CONTRACT_TARGETS.update({d: ("auth", "ro") for d in AUTH_DIRS})
+CONTRACT_TARGETS[AUTH_CRED_FILE] = ("auth-file", "ro")
 
 #: The write-flag env keys the scope model governs (G1/G2). ``FINOPS_KB_WRITE`` is allowed only
 #: when the scope's ``write_flag`` is True (the ``implementation`` scope, and only for a P1-P11
@@ -684,6 +712,23 @@ def spawn_sibling(
     }
 
 
+def _sanitize_namespace(namespace: str) -> str:
+    """P0-3: map an arbitrary run/step/attempt identifier onto a safe relative path segment.
+
+    The state namespace becomes a host path under :data:`STATE_ROOT` — it must be a single
+    relative path (no ``..``, no absolute path, no leading slash) or a ``..`` escape would
+    walk the state root. Separators that are legal in identifiers but hostile in paths are
+    collapsed to ``/`` segments, and any remaining ``..``/empty segments are dropped.
+    """
+    parts = [
+        p for p in str(namespace).replace("\\", "/").split("/")
+        if p not in ("", ".", "..")
+    ]
+    if not parts:
+        return "unnamed"
+    return "/".join(parts)
+
+
 def build_phase_request(
     phase_def: dict[str, Any],
     *,
@@ -694,6 +739,7 @@ def build_phase_request(
     phase_scopes: dict[str, str] | None = None,
     command: list[str] | None = None,
     admission: LeaseContext | None = None,
+    state_namespace: str | None = None,
 ) -> dict[str, Any]:
     """Build a scope-driven spawn request for one workflow phase (the campaign-wrapper mechanism).
 
@@ -702,6 +748,15 @@ def build_phase_request(
     canonical cell env (the write flag only when the scope authorizes it). The result feeds
     :func:`spawn_sibling` — which re-validates it before the socket call. ``command`` is the
     sibling container's entrypoint (defaults to the phase-runner; see ``phase_runner.py``).
+
+    P0-3 (control-plane stabilization): every sibling carries a UNIQUE writable state
+    namespace — ``<STATE_ROOT>/<state_namespace>`` mounted at ``/state`` (rw) with
+    ``XDG_DATA_HOME``/``XDG_CONFIG_HOME``/``XDG_CACHE_HOME`` pointed into it — plus the
+    credential FILE mount (``/auth/opencode_auth.json``, ro). ``state_namespace`` defaults to
+    ``<spec_name>/<phase>``; the orchestrator may pass a finer per-attempt value (run/step/
+    attempt) to isolate retries. A host namespace is NEVER shared between two cells, so two
+    concurrent OpenCode sessions can never read or write each other's state (session IDs,
+    SQLite/WAL, compaction).
 
     ``admission`` (admission_leases p2) is the phase's granted lease context, obtained by the
     orchestrator from ``control.admission`` before it calls this. When supplied it lands in the
@@ -744,6 +799,17 @@ def build_phase_request(
     for d in AUTH_DIRS:
         mounts.append({"source": d, "target": d, "mode": "ro"})
 
+    # P0-3: the per-attempt state namespace + the credential FILE mount. The host namespace is
+    # minted here (mkdir -p, best-effort — a mkdir failure surfaces as a spawn error, never a
+    # silent fallback to a shared directory) and is unique to this request: <spec>/<phase>
+    # by default, or a finer run/step/attempt value the orchestrator passes.
+    namespace = state_namespace or f"{spec_name or 'spec'}/{phase_def.get('name', 'phase')}"
+    state_src = Path(STATE_ROOT) / _sanitize_namespace(namespace)
+    state_src.mkdir(parents=True, exist_ok=True)
+    mounts.append({"source": str(state_src), "target": STATE_TARGET, "mode": "rw"})
+    mounts.append({"source": f"{auth_home}/.local/share/opencode/auth.json",
+                   "target": AUTH_CRED_FILE, "mode": "ro"})
+
     env: dict[str, str] = {
         "FINOPS_REDIS_HOST": os.environ.get("FINOPS_REDIS_HOST", "finops-queue"),
         "FINOPS_REDIS_PORT": os.environ.get("FINOPS_REDIS_PORT", "6379"),
@@ -757,6 +823,13 @@ def build_phase_request(
         #: The CLI's subagent (Task) socket lives under XDG_RUNTIME_DIR (/run/user/<uid> on the
         #: host — not mounted into cells, which silently disabled the Task tool inside them).
         "XDG_RUNTIME_DIR": "/tmp/cc-runtime",
+        #: P0-3: the CLI's writable state is redirected into the per-attempt namespace. With
+        #: XDG_DATA_HOME=/state/data the session DB, SQLite/WAL, and compaction all land under
+        #: this sibling's OWN host directory — never in a pool-shared one.
+        "XDG_DATA_HOME": f"{STATE_TARGET}/data",
+        "XDG_CONFIG_HOME": f"{STATE_TARGET}/config",
+        "XDG_CACHE_HOME": f"{STATE_TARGET}/cache",
+        "FINOPS_OPENCODE_STATE_DIR": f"{STATE_TARGET}/data",
     }
     if cfg.get("write_flag", False):
         # The implementation scope MAY emit (P1-P11) — the write flag is authorized; the

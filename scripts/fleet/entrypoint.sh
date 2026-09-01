@@ -11,11 +11,21 @@ set -euo pipefail
 # /auth/... — seed them into the ISOLATED per-cell CLI state (rw) so the CLIs find their
 # credentials without the host's live state ever entering the cell. Idempotent: an existing
 # state auth is never overwritten.
+#
+# P0-3 (control-plane stabilization): the writable CLI state is the per-attempt namespace —
+# XDG_DATA_HOME points at <state>/data, so the seed target is $XDG_DATA_HOME/opencode/auth.json
+# (opencode's data dir is "$XDG_DATA_HOME/opencode"). Fall back to the historical fixed path
+# for containers that never set XDG_DATA_HOME.
 if [ -f /auth/opencode_auth.json ]; then
-    mkdir -p /home/drseuss/.local/share/opencode
-    if [ ! -f /home/drseuss/.local/share/opencode/auth.json ]; then
-        cp /auth/opencode_auth.json /home/drseuss/.local/share/opencode/auth.json
-        chmod 600 /home/drseuss/.local/share/opencode/auth.json
+    if [ -n "${XDG_DATA_HOME:-}" ]; then
+        AUTH_STATE_DIR="${XDG_DATA_HOME}/opencode"
+    else
+        AUTH_STATE_DIR="/home/drseuss/.local/share/opencode"
+    fi
+    mkdir -p "$AUTH_STATE_DIR"
+    if [ ! -f "$AUTH_STATE_DIR/auth.json" ]; then
+        cp /auth/opencode_auth.json "$AUTH_STATE_DIR/auth.json"
+        chmod 600 "$AUTH_STATE_DIR/auth.json"
     fi
 fi
 

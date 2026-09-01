@@ -393,6 +393,21 @@ def main() -> None:
         # same ``finally`` on every path — success, failure, timeout, or refusal.
         admission_gate = contextlib.ExitStack()
 
+        # P0-3 (control-plane stabilization): a FRESH CLI-state namespace per accepted job —
+        # <state_root>/jobs/<cell_id>/, with XDG_DATA_HOME/XDG_CONFIG_HOME/XDG_CACHE_HOME
+        # pointed into it. The pool's mount is the state ROOT (/state, rw); the job namespace
+        # is minted HERE so two concurrent replicas (or two jobs on one replica) can never
+        # read/write the same opencode session DB, SQLite/WAL, or compaction state.
+        state_root = Path(os.environ.get("FINOPS_OPENCODE_STATE_ROOT", "/state"))
+        job_state = state_root / "jobs" / cell_id
+        job_state.mkdir(parents=True, exist_ok=True)
+        state_env = {
+            "XDG_DATA_HOME": str(job_state / "data"),
+            "XDG_CONFIG_HOME": str(job_state / "config"),
+            "XDG_CACHE_HOME": str(job_state / "cache"),
+            "FINOPS_OPENCODE_STATE_DIR": str(job_state / "data"),
+        }
+
         try:
             # LEASE BEFORE SPAWN. A refusal raises here, before subprocess.run is reached, so
             # "denied" provably means no run_story.py process ever existed. The returned env
@@ -413,7 +428,7 @@ def main() -> None:
                 capture_output=True,
                 text=True,
                 timeout=TIMEOUT_PER_CELL,
-                env={**os.environ, "FINOPS_CELL_ID": cell_id, **admission_env},
+                env={**os.environ, "FINOPS_CELL_ID": cell_id, **admission_env, **state_env},
             )
 
             elapsed = time.monotonic() - t0
