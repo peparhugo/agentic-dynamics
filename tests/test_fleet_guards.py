@@ -10,10 +10,17 @@ The seven guards:
 
   1. compose-contract (D-13/D-3)  — the mount contract holds (no unexpected mount target);
                                     the socket appears in exactly ONE tier (the orchestrator).
-  2. fleet-health (D-14)           — the board surfaces worker heartbeats + per-queue DLQ counts.
+  2. fleet-health (D-14)           — the board surfaces worker heartbeats + per-queue DLQ counts;
+                                    LIVE, scoped to kb-neo4j-v1 (retrieval_activation
+                                    p4_activation_gate) — the consumer the neo4j-index guard
+                                    below depends on being alive.
   3. neo4j-index (D-12/§6)         — the fulltext index is defined + the kb-neo4j handler writes
                                     text (so the index populates) + skips facts (address, not
-                                    relevance).
+                                    relevance); LIVE, the index's population state and
+                                    kb-neo4j-v1's stream backlog are asserted as ONE equivalence
+                                    (retrieval_activation p4_activation_gate — slice 3 asserted
+                                    these as two separate historical facts, never as a live
+                                    biconditional).
   4. single-write-back (D-11/G6)   — exactly ONE kb consumer (kb-registry) carries
                                     FINOPS_KB_WRITE=1; the orchestrator/supervisor never do (D-15).
   5. binary-probe (D-18)           — resolve_chain fails loudly on a missing/non-executable chain.
@@ -233,18 +240,87 @@ def test_kb_neo4j_handler_writes_text_and_skips_facts():
 
 
 @pytest.mark.external
-def test_neo4j_index_populated_and_group_caught_up_live(neo4j_available):
-    """LIVE (operator's smoke test): the index is populated and the group's pending = 0."""
+def test_neo4j_index_populated_and_group_caught_up_live(neo4j_available, redis_fleet_available):
+    """LIVE: the fulltext index's population state and kb-neo4j-v1's stream backlog must agree.
+
+    Slice 3 (docs/fleet/06_slice3_neo4j_rrf_log.md) asserted these as two SEPARATE facts (an
+    index query returned hits; a container log separately reported pending=0). The retrieval
+    activation agenda (docs/architecture/current/2026-09-01_retrieval_agenda.md, "Not yet
+    established" #3) found no test establishing them as one live equivalence. This measures
+    both from the SAME live services in one test: an ONLINE, fully-populated
+    ``knowledge_text_ft`` index implies ``kb-neo4j-v1`` has drained its backlog (pending == 0),
+    and a non-zero backlog implies the index is not (yet) fully caught up.
+    """
     if not neo4j_available:
         pytest.skip("neo4j not reachable")
+    if not redis_fleet_available:
+        pytest.skip("kb redis (6380) not reachable")
+    from agentic_dynamics.knowledge import knowledge_stream as ks
     from agentic_dynamics.knowledge.graph import Neo4jClient
 
     client = Neo4jClient()
     try:
         hits = client.search_knowledge_fulltext("task", limit=1)
         assert hits, "the fulltext index is empty — the lexical leg is dead"
+        row = client._run_value(
+            "SHOW INDEXES YIELD name, state, populationPercent WHERE name = $name",
+            {"name": "knowledge_text_ft"},
+        )
+        assert row is not None, "knowledge_text_ft is not defined"
+        index_caught_up = row["state"] == "ONLINE" and float(row["populationPercent"]) >= 100.0
     finally:
         client.close()
+
+    r = ks.connect()
+    try:
+        stream_caught_up = ks.pending_count(r, "kb-neo4j-v1") == 0
+    finally:
+        r.close()
+
+    assert index_caught_up == stream_caught_up, (
+        f"knowledge_text_ft state={row['state']} populationPercent={row['populationPercent']} "
+        f"(caught_up={index_caught_up}) disagrees with kb-neo4j-v1's stream backlog "
+        f"(caught_up={stream_caught_up}) — the index and the consumer disagree about whether "
+        "ingestion has drained"
+    )
+
+
+@pytest.mark.external
+def test_kb_neo4j_heartbeat_is_on_the_board_live(redis_fleet_available):
+    """LIVE fleet-health (guard 2, D-14), scoped to the consumer this activation depends on.
+
+    Guard 2's deterministic test (``test_board_surfaces_heartbeats_and_dlq_counts``) only
+    proves ``heartbeat.read_all`` parses a fake board correctly. This proves the REAL board
+    carries a live, non-stale heartbeat for ``kb-neo4j-v1`` — the consumer the neo4j-index
+    guard above depends on being alive and supervised (``docker-compose up -d kb-neo4j``,
+    slice 3 §1).
+    """
+    if not redis_fleet_available:
+        pytest.skip("kb redis (6380) not reachable")
+    heartbeat = _fleet_module("heartbeat")
+    import redis
+
+    r = redis.Redis(host="127.0.0.1", port=6380, db=1, decode_responses=True)
+    try:
+        beats = heartbeat.read_all(r)
+    finally:
+        r.close()
+    kb_neo4j_beats = {k: v for k, v in beats.items() if k.startswith("worker:kb-neo4j-v1:")}
+    assert kb_neo4j_beats, (
+        "no worker:kb-neo4j-v1:* heartbeat is on the board — the consumer is not running/"
+        "supervised, so the neo4j-index guard's live equivalence has no producer keeping it true"
+    )
+    # A restarted container's heartbeat key is never cleared (the DLQ's own precedent: dead
+    # entries linger, disposition is recorded rather than erased) — a PRIOR generation's
+    # container leaves a stale worker:kb-neo4j-v1:<old-host>:<pid> key beside the current one.
+    # The guard only needs ONE live producer today, so it checks the FRESHEST heartbeat, not
+    # the stalest.
+    now = time.time()
+    freshest = max(float(v.get("last_seen", 0)) for v in kb_neo4j_beats.values())
+    assert now - freshest < 60.0, (
+        f"the freshest worker:kb-neo4j-v1:* heartbeat is {now - freshest:.0f}s old — stale "
+        "(dead worker, per D-14's staleness rule)"
+    )
 
 
 # ── guard 4 — the single-write-back audit (D-11 / G6 / D-15) ─────────────────

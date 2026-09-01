@@ -1005,3 +1005,52 @@ def test_advisory_pattern_proposal_is_not_a_derived_candidate():
         pattern_projection=True,
     )
     assert attempt.candidates == []
+
+
+# ── Lucene escaping (p4_activation_gate — the retrieval census measured the lexical leg ────
+# silently dying on real, punctuation-heavy work-item text) ─────────────────────────────────
+
+
+class TestLuceneEscape:
+    """``_lucene_escape`` (``agentic_dynamics.knowledge.graph``) neutralizes Lucene classic
+    QueryParser syntax so ``search_fulltext``/``search_knowledge_fulltext`` matches free text
+    literally instead of raising a parser error on a file path, a call, or a CLI flag — the
+    exact shape of a real ``QueryPlan.lexical_query`` (see ``build_query_plan``).
+    """
+
+    def test_plain_words_are_unchanged(self):
+        from agentic_dynamics.knowledge.graph import _lucene_escape
+
+        assert _lucene_escape("task manager api story") == "task manager api story"
+
+    def test_file_path_slashes_are_escaped(self):
+        from agentic_dynamics.knowledge.graph import _lucene_escape
+
+        escaped = _lucene_escape("src/agentic_dynamics/knowledge/retrieval.py")
+        assert escaped == r"src\/agentic_dynamics\/knowledge\/retrieval.py"
+
+    def test_parens_and_colon_are_escaped(self):
+        from agentic_dynamics.knowledge.graph import _lucene_escape
+
+        escaped = _lucene_escape("retrieve() fallback_mode: full")
+        assert escaped == r"retrieve\(\) fallback_mode\: full"
+
+    def test_a_literal_backslash_is_escaped_exactly_once(self):
+        from agentic_dynamics.knowledge.graph import _lucene_escape
+
+        assert _lucene_escape(r"a\b") == r"a\\b"
+
+    def test_search_fulltext_escapes_before_sending_the_query(self, monkeypatch):
+        """``search_fulltext`` must send the ESCAPED query as the Cypher ``$query`` param."""
+        from agentic_dynamics.knowledge import graph as graph_module
+
+        client = graph_module.Neo4jClient.__new__(graph_module.Neo4jClient)
+        captured: dict = {}
+
+        def _fake_run(query_str, params):
+            captured["params"] = params
+            return []
+
+        monkeypatch.setattr(client, "_run", _fake_run)
+        client.search_fulltext("knowledge_text_ft", "retrieve() RRF")
+        assert captured["params"]["query"] == r"retrieve\(\) RRF"

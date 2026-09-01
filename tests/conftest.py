@@ -34,6 +34,12 @@ def chroma_available():
 
 
 @pytest.fixture(scope="session")
+def redis_fleet_available():
+    """The framework Redis (heartbeats on db1, the knowledge stream on db2) at 6380."""
+    return _try_connect("localhost", 6380)
+
+
+@pytest.fixture(scope="session")
 def opencode_available():
     bin_path = Path.home() / ".opencode" / "bin" / "opencode"
     return bin_path.exists()
