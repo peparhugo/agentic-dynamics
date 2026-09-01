@@ -617,6 +617,65 @@ def test_submit_kb_write_undeclared_without_an_implementation_phase_fails(tmp_pa
         ro_spec_path.unlink(missing_ok=True)
 
 
+# ── per-job image (step 8, p3_base_image_caching) ──────────────────────────────
+
+
+def test_submit_without_image_passes(_canonical_repo_env):
+    # image is optional — absent entirely is the common case (fleet_manager submit without
+    # --image), and must not fail step 8.
+    errors = validate_submit_request(_valid_submit_request())
+    assert not any("image" in e for e in errors)
+
+
+def test_submit_with_a_valid_job_image_passes(_canonical_repo_env):
+    errors = validate_submit_request(_valid_submit_request(image="fleet/job-example"))
+    assert errors == []
+
+
+@pytest.mark.parametrize(
+    "image",
+    [
+        "fleet/base",           # the ladder's own cache root — never a job's to pick directly
+        "fleet/orchestrator",   # the one socket-holder's own image
+        "fleet/supervisor",
+        "fleet/job-",           # no name after the prefix
+        "fleet/job-Bad-Name",   # uppercase — outside JOB_IMAGE_PATTERN
+        "evil/attacker-image",  # a third-party image entirely
+        "fleet/job-x; rm -rf /",  # shell-metacharacter smuggling attempt
+    ],
+)
+def test_submit_image_outside_the_job_namespace_fails(_canonical_repo_env, image):
+    errors = validate_submit_request(_valid_submit_request(image=image))
+    assert any("fleet/job-<name>" in e for e in errors)
+
+
+def test_build_submit_argv_carries_cell_image_when_present():
+    argv = build_submit_argv(
+        {"spec": "workflows/repository/x.yaml", "goal": "g",
+         "model": "anthropic/claude-sonnet-5", "workdir": "/tmp/wt_x",
+         "image": "fleet/job-example"},
+    )
+    assert "--cell-image" in argv
+    assert argv[argv.index("--cell-image") + 1] == "fleet/job-example"
+    assert argv[-2:] == ["--cell-image", "fleet/job-example"]
+
+
+def test_build_submit_argv_omits_cell_image_when_absent():
+    argv = build_submit_argv(
+        {"spec": "workflows/repository/x.yaml", "goal": "g",
+         "model": "anthropic/claude-sonnet-5", "workdir": "/tmp/wt_x"},
+    )
+    assert "--cell-image" not in argv
+    assert argv[-1] == "--orchestrator"
+
+
+def test_valid_submit_dispatch_with_image_reaches_the_compose_run_argv(_canonical_repo_env):
+    result = dispatch_submit(_valid_submit_request(image="fleet/job-example"), dry_run=True)
+    assert result["ok"] is True
+    assert "--cell-image" in result["argv"]
+    assert "fleet/job-example" in result["argv"]
+
+
 # ── validate_fleet_command delegates "submit" whole (D-14 dispatch surface) ────
 
 

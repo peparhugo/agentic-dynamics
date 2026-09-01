@@ -85,6 +85,9 @@ def _fleet_module(name: str):
 ALLOWED_MOUNT_TARGETS = {
     "/tmp",                                  # worktree (rw)
     "/repo",                                 # repo (ro)
+    "/home/drseuss/ai-finops-framework",     # the repo at its HOST path (ro, D-16 fix —
+                                              # worktree gitdir pointers resolve identically)
+    "/home/drseuss/ai-finops-framework/.git",  # the .git overlay (rw, D-16 — lets phase commits write)
     "/repo/experiments/results",             # results OVERLAY (rw — the worker's relative paths)
     "/home/drseuss/.local/share/opencode",   # the ISOLATED opencode state (rw, per worker)
     "/auth/opencode_auth.json",              # the credential FILE (ro) — seeded by the entrypoint

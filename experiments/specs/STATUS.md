@@ -3,11 +3,12 @@
 **Generated — do not edit by hand.** Regenerate with `python scripts/spec_status.py`;
 `scripts/run_workflow.py` also refreshes it at the end of every run.
 
-Generated at: `2026-08-31T22:45:02.205018+00:00`  ·  164 spec(s)
-**Work remaining:** 45 open · 119 completed/retired
+Generated at: `2026-09-01T00:13:57.373166+00:00`  ·  170 spec(s)
+**Work remaining:** 52 open · 118 completed/retired
 
 | name | kind | repeatable | status | version | supersedes | last_run | ok | model | cost | n_runs |
 |---|---|---|---|---|---|---|---|---|---|---|
+| `admission_leases` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `auto_posthoc_wiring` | workflow | yes | runnable | 0.1 | — | 2026-08-17 16:17 | ok | deepseek/deepseek-v4-pro | $0.1471 | 1 |
 | `cap_2a_calibration_cell` | workflow | yes | runnable | 0.1 | — | — | — | — | — | 0 |
 | `cap_2a_calibration_cell_divide` | workflow | yes | runnable | 0.1 | — | — | — | — | — | 0 |
@@ -30,9 +31,14 @@ Generated at: `2026-08-31T22:45:02.205018+00:00`  ·  164 spec(s)
 | `cap_session_routing_evidence` | experiment | yes | runnable | 0.2 | — | — | — | — | — | 0 |
 | `cap_shadow_comparison` | experiment | yes | runnable | 0.1 | — | — | — | — | — | 0 |
 | `context_abstraction_implement` | workflow | no | runnable | 0.1 | — | 2026-08-23 19:16 | ok | anthropic/claude-sonnet-5 | $49.5218 | 4 |
+| `control_room_usage_wiring` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
+| `delta_entropy_response_campaign` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
+| `docs_architecture_refresh` | workflow | no | runnable | 0.1 | opencode_docs_refresh | — | — | — | — | 0 |
 | `explanation_tax` | experiment | yes | runnable | 0.2 | — | — | — | — | — | 0 |
 | `finding_economics_closure` | workflow | yes | runnable | 0.1 | — | 2026-08-22 17:22 | ok | deepseek/deepseek-v4-pro | $1.2820 | 1 |
+| `fleet_job_submission` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `labbook_refresh` | workflow | yes | runnable | 0.1 | — | 2026-08-17 18:14 | ok | deepseek/deepseek-v4-flash | $0.0275 | 1 |
+| `launch_handler_dry_run` | workflow | yes | runnable | 0.1 | — | — | — | — | — | 0 |
 | `ledger_instrumentation_probe` | workflow | yes | runnable | 0.1 | — | 2026-08-30 19:05 | fail | openai/gpt-5.6-sol | $0.0020 | 1 |
 | `posthoc_pipeline` | workflow | yes | runnable | 0.1 | — | — | — | — | — | 0 |
 | `process_perturbation_resample` | experiment | yes | runnable | 0.1 | — | — | — | — | — | 0 |
@@ -40,6 +46,7 @@ Generated at: `2026-08-31T22:45:02.205018+00:00`  ·  164 spec(s)
 | `queue_steer` | workflow | yes | runnable | 0.1 | — | 2026-08-15 19:32 | ok | deepseek/deepseek-v4-flash | $0.0330 | 1 |
 | `rag_bare_vs_augmented` | experiment | yes | runnable | 0.1 | — | — | — | — | — | 0 |
 | `registry_canonicalize` | workflow | yes | runnable | 0.1 | — | 2026-08-19 13:42 | ok | deepseek/deepseek-v4-pro | $0.1872 | 1 |
+| `retrieval_activation` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `routing_kb_dispatch` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `routing_kb_experiment_design` | experiment | yes | runnable | 0.1 | — | 2026-08-17 18:28 | ok | openai/gpt-5.6-sol | $3.0669 | 7 |
 | `routing_kb_experiment_design_research` | experiment | yes | runnable | 0.1 | — | 2026-08-17 18:12 | ok | deepseek/deepseek-v4-pro | $0.2203 | 1 |
@@ -53,7 +60,6 @@ Generated at: `2026-08-31T22:45:02.205018+00:00`  ·  164 spec(s)
 | `concurrency_ladder` | workflow | no | failed | 0.1 | — | 2026-08-31 01:48 | fail | deepseek/deepseek-v4-pro | $0.4648 | 1 |
 | `control_room_portal` | workflow | no | failed | 0.2 | — | 2026-08-14 03:36 | fail | openai/gpt-5.6-sol | $0.0000 | 3 |
 | `design_sessions` | workflow | no | failed | 0.1 | — | 2026-08-14 06:58 | fail | openai/gpt-5.6-sol | $0.0000 | 1 |
-| `admission_leases` | workflow | no | completed | 0.1 | — | 2026-08-31 22:24 | ok | anthropic/claude-opus-5 | $5.8878 | 1 |
 | `beta_lab_execution` | workflow | no | completed | 0.1 | — | 2026-08-31 22:38 | ok | openai/gpt-5.6-terra | $1.4000 | 1 |
 | `canonical_publication_closure` | workflow | no | completed | 0.1 | — | 2026-08-21 17:06 | ok | deepseek/deepseek-v4-pro | $1.4475 | 1 |
 | `canonical_state_design` | workflow | no | completed | 0.1 | — | 2026-08-18 15:48 | fail | openai/gpt-5.6-sol | $0.0798 | 5 |

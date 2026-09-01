@@ -161,6 +161,28 @@ def test_record_job_status_on_an_unknown_job_id_still_writes_a_record():
     assert board["jobs"][0]["job_id"] == "orphan-job"
 
 
+def test_send_submit_command_carries_an_optional_image():
+    fm = _fleet_manager()
+    r = _FakeRedis()
+    cmd = fm._send_submit_command(
+        r, spec="workflows/repository/fleet_job_submission.yaml", goal="g",
+        model="anthropic/claude-sonnet-5", workdir="/tmp/wt_x", image="fleet/job-example",
+    )
+    assert cmd["image"] == "fleet/job-example"
+    queued = [json.loads(raw) for raw in r._lists[fm.COMMANDS_KEY]]
+    assert queued == [cmd]
+
+
+def test_send_submit_command_omits_image_field_when_not_given():
+    fm = _fleet_manager()
+    r = _FakeRedis()
+    cmd = fm._send_submit_command(
+        r, spec="workflows/repository/fleet_job_submission.yaml", goal="g",
+        model="anthropic/claude-sonnet-5", workdir="/tmp/wt_x",
+    )
+    assert "image" not in cmd
+
+
 def test_submit_cli_dispatches_through_main(monkeypatch, capsys):
     # A true end-to-end CLI check: main()'s "submit" branch parses --spec/--goal/--model/
     # --workdir and drives the same _send_submit_command path the unit tests above exercise
@@ -186,3 +208,18 @@ def test_submit_cli_dispatches_through_main(monkeypatch, capsys):
     out = capsys.readouterr().out
     assert "fleet:commands <-" in out
     assert "launching" in out
+
+
+def test_submit_cli_dispatches_the_optional_image_flag(monkeypatch):
+    fm = _fleet_manager()
+    r = _FakeRedis()
+    monkeypatch.setattr(fm, "_connect", lambda: r)
+
+    rc = fm.main([
+        "submit", "--spec", "workflows/repository/fleet_job_submission.yaml",
+        "--goal", "g", "--model", "anthropic/claude-sonnet-5", "--workdir", "/tmp/wt_cli",
+        "--image", "fleet/job-example",
+    ])
+    assert rc == 0
+    queued = [json.loads(raw) for raw in r._lists[fm.COMMANDS_KEY]]
+    assert queued[0]["image"] == "fleet/job-example"

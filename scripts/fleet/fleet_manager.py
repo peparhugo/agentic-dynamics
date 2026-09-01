@@ -253,7 +253,7 @@ def _send_command(client: redis.Redis, action: str, service: str, count: int | N
 
 
 def _send_submit_command(client: redis.Redis, *, spec: str, goal: str, model: str,
-                         workdir: str) -> dict:
+                         workdir: str, image: str | None = None) -> dict:
     """LPUSH a submit command onto ``fleet:commands`` and record its "launching" board entry.
 
     The fleet-manager mints the ``job_id`` (the board's join key) but does NOT validate the
@@ -262,6 +262,11 @@ def _send_submit_command(client: redis.Redis, *, spec: str, goal: str, model: st
     supervisor. Nothing here refuses a concurrent submit for the same or another spec; there is
     no lock (the design's "ZERO refusing of concurrency" rule) — every submit is independently
     LPUSHed and independently validated when it is popped.
+
+    ``image`` (p3_base_image_caching) is the optional per-job image the submitted spec's phase
+    cells should run — the fleet-manager passes it through UNCHECKED, same as every other
+    field; it is ``validate_submit_request``'s step 8 (``fleet/job-<name>`` only) that decides
+    whether it is actually honored.
     """
     job_id = uuid.uuid4().hex[:12]
     command = {
@@ -274,6 +279,8 @@ def _send_submit_command(client: redis.Redis, *, spec: str, goal: str, model: st
         "ts": time.time(),
         "nonce": uuid.uuid4().hex[:12],
     }
+    if image:
+        command["image"] = image
     client.lpush(COMMANDS_KEY, json.dumps(command))
     record_job_launch(client, command)
     return command
@@ -300,6 +307,10 @@ def main(argv: list[str] | None = None) -> int:
     p_submit.add_argument("--goal", required=True)
     p_submit.add_argument("--model", required=True)
     p_submit.add_argument("--workdir", required=True, help="a worktree path under FINOPS_WORKTREE_ROOT")
+    p_submit.add_argument("--image", default=None,
+                          help="optional per-job image for the spec's phase cells "
+                               "(fleet/job-<name>, built via scripts/fleet/build.sh job <name> "
+                               "— p3_base_image_caching); default: fleet/base")
 
     parser.add_argument("--interval", type=float, default=DEFAULT_INTERVAL)
     parser.add_argument("--once", action="store_true")
@@ -349,6 +360,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "submit":
         cmd = _send_submit_command(
             client, spec=args.spec, goal=args.goal, model=args.model, workdir=args.workdir,
+            image=args.image,
         )
         print(f"fleet:commands <- {json.dumps(cmd)}")
         print(f"fleet:jobs[{cmd['job_id']}] <- launching")

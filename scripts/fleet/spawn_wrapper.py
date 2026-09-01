@@ -37,6 +37,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import subprocess
 import sys
 import time
@@ -188,6 +189,18 @@ HOST_SERVICE_MARKERS: tuple[str, ...] = ("6379", "127.0.0.1", "finops-redis", "l
 #: CLI + this wrapper; the sibling PHASE cells run fleet/base, not the orchestrator).
 ORCHESTRATOR_IMAGE = "fleet/orchestrator"
 CELL_IMAGE = "fleet/base"
+
+#: The per-job image namespace a submit request's optional ``image`` field may name
+#: (p3_base_image_caching — ``scripts/fleet/build.sh job <name>`` builds
+#: ``infrastructure/jobs/<name>/Dockerfile`` FROM ``fleet/base`` with ``--cache-from
+#: fleet/base``, tagged ``fleet/job-<name>``). This is a CLOSED namespace, not an arbitrary
+#: image override: a submit can never name ``fleet/base``/``fleet/orchestrator``/
+#: ``fleet/supervisor`` directly (those are the ladder's own tiers, not a job's to pick) or an
+#: attacker-supplied third-party image on the one socket-holding service's phase cells. The
+#: matched image is threaded through to the orchestrator's sibling-cell spawn as
+#: ``--cell-image`` (``scripts/run_workflow.py``) — it changes what image the PHASE cells run,
+#: never the orchestrator/workflow-runner container itself.
+JOB_IMAGE_PATTERN = re.compile(r"^fleet/job-[a-z0-9][a-z0-9_-]*$")
 
 #: The fleet:commands + review-trigger Redis keys (db1 / 6380 — the D-14 channel).
 COMMANDS_KEY = "fleet:commands"
@@ -425,8 +438,9 @@ def validate_submit_request(
 ) -> list[str]:
     """Validate a ``submit`` request. Empty list = valid; the socket is reached only then.
 
-    Seven checks (p1_submit_contract's SHAPE, in order — later checks still run even after an
-    earlier one fails, so a caller sees every problem in one pass rather than iterating):
+    Eight checks (p1_submit_contract's SHAPE + p3_base_image_caching's image check, in order —
+    later checks still run even after an earlier one fails, so a caller sees every problem in
+    one pass rather than iterating):
 
     1. ``spec`` resolves to a file inside the repo's declared spec directories AND
        compile-validates (:func:`compile_spec` — the requires/produces gate).
@@ -441,10 +455,15 @@ def validate_submit_request(
     7. no undeclared write flag: ``FINOPS_ACTUATION_ARMED`` is never allowed (G2), and
        ``FINOPS_KB_WRITE`` is allowed only when the spec has at least one ``implementation``-
        scope phase (the one scope whose ``write_flag`` is ``True``).
+    8. ``image`` (when the request declares one) matches :data:`JOB_IMAGE_PATTERN` — a
+       ``fleet/job-<name>`` per-job image built off the fleet/base cache root
+       (p3_base_image_caching), never a bare override to fleet/base/orchestrator/supervisor or
+       an arbitrary third-party image on the phase cells.
 
-    ``request`` shape: ``{"spec", "goal", "model", "workdir", "network"?, "env"?}`` — the exact
-    fields ``fleet_manager submit`` LPUSHes, plus the two optional fields a caller may set to
-    exercise checks 6/7 directly (the CLI never sets them; they default to the permitted value).
+    ``request`` shape: ``{"spec", "goal", "model", "workdir", "network"?, "env"?, "image"?}`` —
+    the exact fields ``fleet_manager submit`` LPUSHes, plus the three optional fields a caller
+    may set to exercise checks 6/7/8 directly (the CLI never sets network/env; they default to
+    the permitted value — ``image`` is CLI-settable via ``--image``, still validated here).
     """
     errors: list[str] = []
     repo_root = Path(repo_root) if repo_root is not None else _REPO_ROOT
@@ -516,6 +535,17 @@ def validate_submit_request(
             errors.append(
                 "submit: FINOPS_KB_WRITE=1 is undeclared — the spec has no implementation-"
                 "scope phase to authorize it"
+            )
+
+    # Step 8 — an optional per-job image must be a fleet/job-<name> build off the cache root.
+    image = request.get("image")
+    if image is not None:
+        image = str(image)
+        if not JOB_IMAGE_PATTERN.match(image):
+            errors.append(
+                f"submit: image {image!r} is not a fleet/job-<name> image "
+                f"(the only per-job image namespace a submit may reference — never "
+                f"fleet/base, fleet/orchestrator, fleet/supervisor, or a third-party image)"
             )
 
     return errors
@@ -684,6 +714,13 @@ def build_submit_argv(
     where EVERY phase re-runs through :func:`validate_spawn` before its own container exists —
     this dispatch only proves the whole spec is launchable, not that any individual phase gets
     a free pass later.
+
+    ``command["image"]`` (already checked against :data:`JOB_IMAGE_PATTERN` by
+    :func:`validate_submit_request`'s step 8), when present, becomes ``--cell-image`` — it
+    changes which image the orchestrator spawns for each PHASE cell (``run_workflow.py``'s
+    ``_run_orchestrator`` threads it to :func:`spawn_sibling`), never the ``workflow-runner``
+    container itself, which always runs ``fleet/orchestrator`` (the one socket-holder needs the
+    docker CLI + this wrapper — a job image built off fleet/base does not carry either).
     """
     compose_file = compose_file or str(_REPO_ROOT / "infrastructure" / "docker-compose.ladder.yml")
     job_id = str(command.get("job_id", "") or "")
@@ -699,6 +736,9 @@ def build_submit_argv(
         "--workdir", str(command.get("workdir", "")),
         "--orchestrator",
     ]
+    image = command.get("image")
+    if image:
+        argv += ["--cell-image", str(image)]
     return argv
 
 
