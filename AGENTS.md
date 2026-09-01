@@ -28,7 +28,7 @@ Design: `docs/architecture/current/2026-08-14_experiment-spec-and-compiler-desig
 # CLI (checkout-only — forwards to scripts/)
 agentic-dynamics experiment run|sweep-parallel|sweep-silent|batch|remaining|multi-phase
 agentic-dynamics story run|batch
-agentic-dynamics workflow run|discard-tree
+agentic-dynamics workflow run|discard-tree|promote
 agentic-dynamics queue enqueue|worker|monitor|reinterleave|analysis-enqueue|analysis-worker
 agentic-dynamics analyze worktrees|trajectories|stories|lab <name>
 agentic-dynamics data build|sync|manifest|inventory

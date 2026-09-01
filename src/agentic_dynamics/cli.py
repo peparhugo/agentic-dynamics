@@ -44,6 +44,7 @@ _COMMANDS: dict[tuple[str, ...], str] = {
     # workflow
     ("workflow", "run"): "run_workflow.py",
     ("workflow", "discard-tree"): "record_discarded_tree.py",
+    ("workflow", "promote"): "promote.py",
     # queue
     ("queue", "enqueue"): "enqueue.py",
     ("queue", "worker"): "worker.py",
@@ -134,7 +135,7 @@ Subcommands (each forwards to its backing script):
 
   experiment run|sweep-parallel|sweep-silent|batch|remaining|multi-phase|cap-grit-grid|cap-grit-measure|cap-2c-grid|cap-2c-score|cap-2d-grid|cap-2d-score|cap-2e-grid|cap-2e-score|cap-2f-grid|cap-2f-score|delta-entropy|coordination-overhead
   story       run|batch
-  workflow    run|discard-tree
+  workflow    run|discard-tree|promote
   queue       enqueue|worker|monitor|reinterleave|analysis-enqueue|analysis-worker
   analyze     worktrees|trajectories|stories|session-routing|workflow-metrics|lab <name>
   data        build|sync|manifest|inventory|bundle

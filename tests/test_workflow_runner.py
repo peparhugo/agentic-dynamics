@@ -1410,11 +1410,13 @@ def test_commit_prefix_canonicalizes_a_plain_message_commit(tmp_path):
 
 
 def test_commit_prefix_gate_rewrites_a_plain_message_commit_with_hook_disabled(tmp_path, monkeypatch):
-    """(a2) With FINOPS_COMMIT_HOOK=0 (no commit-time hook), the gate's own rewrite path
-    fires for a plain-message commit: the proper history rewrite prefixes the subject, the
-    phase CONTINUES, and COMMIT_PREFIX_CANONICALIZED records the original subject + the
-    rewritten sha — the work preserved (the tree hash is unchanged)."""
+    """(a2) With FINOPS_COMMIT_HOOK=0 (no commit-time hook) AND the explicit opt-in
+    FINOPS_COMMIT_GATE=canonicalize, the gate's own rewrite path fires for a plain-message
+    commit: the proper history rewrite prefixes the subject, the phase CONTINUES, and
+    COMMIT_PREFIX_CANONICALIZED records the original subject + the rewritten sha — the work
+    preserved (the tree hash is unchanged). P0-4: canonicalize is no longer the default."""
     monkeypatch.setenv("FINOPS_COMMIT_HOOK", "0")
+    monkeypatch.setenv("FINOPS_COMMIT_GATE", "canonicalize")
     spec = load_spec(SPEC)
     _git_init(tmp_path)
 
@@ -1492,6 +1494,35 @@ def test_commit_prefix_strict_mode_fails_a_plain_message_commit(tmp_path, monkey
     assert "site: add things" in p.error
     assert result.ok is False
     assert result.to_dict()["phases"][0]["commit_gate"]["reason"] == "COMMIT_PREFIX"
+
+
+def test_commit_prefix_strict_is_the_default_no_rewrite(tmp_path, monkeypatch):
+    """P0-4 (control-plane stabilization): strict is now the DEFAULT commit-gate mode — the
+    ordinary autonomous path never rewrites history. A plain-message commit fails the phase
+    with evidence; no FINOPS_COMMIT_GATE is set, so the historical canonicalize path (which
+    changed SHAs after evidence referenced them) does NOT fire. Message normalization
+    belongs to the promoter, not the executor."""
+    monkeypatch.setenv("FINOPS_COMMIT_HOOK", "0")  # force the gate path (no commit-time hook)
+    monkeypatch.delenv("FINOPS_COMMIT_GATE", raising=False)
+    spec = load_spec(SPEC)
+    _git_init(tmp_path)
+
+    def agent(prompt, *, model, backend, workdir, **kwargs):
+        (Path(workdir) / "docs").mkdir(exist_ok=True)
+        (Path(workdir) / "docs" / "scope.md").write_text("---\nstatus: accepted\n---\n\nscope")
+        subprocess.run(["git", "add", "-A"], cwd=workdir, check=True)
+        subprocess.run(["git", "commit", "-q", "-m", "site: add things"], cwd=workdir, check=True)
+        return _fake_agent()
+
+    result = run_workflow(spec, goal="g", model="m", workdir=tmp_path, run_agentic_fn=agent)
+    p = result.phases[0]
+    assert p.status == "failed"  # strict-by-default: fails with evidence, no rewrite
+    assert p.commit_gate["reason"] == "COMMIT_PREFIX"
+    # the bad subject is UNCHANGED on disk — no history was rewritten
+    subjects = subprocess.run(
+        ["git", "log", "--format=%s"], cwd=tmp_path, capture_output=True, text=True
+    ).stdout.splitlines()
+    assert "site: add things" in subjects
 
 
 def test_commit_prefix_passes_a_matching_commit(tmp_path):
@@ -1641,8 +1672,9 @@ def test_commit_prefix_seven_commit_range_with_violations_is_rewritten_in_canoni
     CONTINUES, every subject conforms on re-read, and the final TREE hash is unchanged (only
     messages changed — the deliverable tree is preserved). FINOPS_COMMIT_HOOK=0 forces the
     gate path (with the hook, commit-time prevention would fix the subjects before the gate
-    ever sees them)."""
+    ever sees them). P0-4: canonicalize is an explicit opt-in now, not the default."""
     monkeypatch.setenv("FINOPS_COMMIT_HOOK", "0")
+    monkeypatch.setenv("FINOPS_COMMIT_GATE", "canonicalize")
     spec = load_spec(SPEC)
     _git_init(tmp_path)
     subjects = [
@@ -1726,8 +1758,9 @@ def test_commit_prefix_rewrites_a_single_bad_commit_with_hook_disabled(tmp_path,
     is canonicalized by the gate's rewrite path: the offender's subject becomes canonical,
     the gate records COMMIT_PREFIX_CANONICALIZED with the original subject + the rewritten
     sha, the phase CONTINUES, and the TREE is preserved (only the message changed —
-    content-addressed proof)."""
+    content-addressed proof). P0-4: canonicalize is an explicit opt-in, not the default."""
     monkeypatch.setenv("FINOPS_COMMIT_HOOK", "0")
+    monkeypatch.setenv("FINOPS_COMMIT_GATE", "canonicalize")
     spec = load_spec(SPEC)
     _git_init(tmp_path)
     made = []
@@ -1781,8 +1814,10 @@ def test_commit_prefix_rewrites_a_single_bad_commit_not_at_head(tmp_path, monkey
     the gate's rewrite path — the shape the P0 amend rule had to refuse (``git commit
     --amend`` would have rewritten the GOOD commit at HEAD). The filter-branch rewrite
     scopes to the phase range by exact shas: the bad subject becomes canonical, the good
-    commit's subject and every TREE are untouched."""
+    commit's subject and every TREE are untouched. P0-4: canonicalize is an explicit opt-in,
+    not the default."""
     monkeypatch.setenv("FINOPS_COMMIT_HOOK", "0")
+    monkeypatch.setenv("FINOPS_COMMIT_GATE", "canonicalize")
     spec = load_spec(SPEC)
     _git_init(tmp_path)
     made = []
