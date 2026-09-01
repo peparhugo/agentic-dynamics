@@ -15,6 +15,20 @@ This daemon does three things, all **read-only** with respect to spawning:
     status    — one-shot dump of the board (machine-readable JSON with ``--json``).
     resize / drain / restart — LPUSH a bounded command onto ``fleet:commands`` for the
                 orchestrator to validate and execute (the supervisor's "hands", D-14).
+    submit    — LPUSH a spec/goal/model/workdir submit command onto ``fleet:commands`` and
+                record a "launching" job on the board; the orchestrator's spawn-wrapper
+                (``scripts/fleet/spawn_wrapper.py:validate_submit_request``) is what actually
+                validates it BEFORE any container exists. This command never blocks or refuses
+                on a concurrent submit — there is no orchestrator lock (the isolation the
+                docker layer buys is a per-request property, not a scheduling one).
+
+A submitted job's board record then moves through ``launching -> running ->
+completed/failed`` as the spawn-wrapper's BRPOP consumer observes each transition
+(:func:`record_job_status`, p2_launch_handler) — a refusal before the socket call and a
+nonzero compose exit both land on "failed" (plus a ``fleet_jobs`` dead-letter entry,
+``scripts/fleet/dlq.py``), and a successful run's "completed" record carries the run's ledger
+pointer (the per-phase JSON ``run_workflow.py`` writes under
+``experiments/results/workflows/<spec>/``).
 
 The board is the supervisor's report surface: the Control Room portal and the game-board
 snapshot read the ``fleet:board`` key, so the operator sees depth/heartbeats/DLQ live —
@@ -46,6 +60,12 @@ REDIS_DB = int(os.environ.get("FINOPS_REDIS_DB", "1"))
 
 BOARD_KEY = "fleet:board"
 COMMANDS_KEY = "fleet:commands"
+#: The submit job board — one hash field per job id, holding the latest lifecycle record
+#: (``{job_id, spec, model, status, ts}``). Separate from BOARD_KEY (the queue/worker snapshot)
+#: because a job's lifecycle is written by whoever observes each transition (this module writes
+#: "launching" at submit time; the orchestrator/downstream tooling would write "running"/
+#: "completed"/"failed" as those are observed), not recomputed wholesale on each watch cycle.
+JOBS_KEY = "fleet:jobs"
 DEFAULT_INTERVAL = 15.0  # seconds between board refreshes
 
 # The queues the watcher surfaces (mirrors dlq.QUEUE_KEYS).
@@ -96,6 +116,75 @@ def _status_counts(client: redis.Redis, status_key: str) -> dict[str, int]:
     return counts
 
 
+def _job_records(client: redis.Redis) -> list[dict]:
+    """Read every job's latest lifecycle record from ``fleet:jobs`` (newest first).
+
+    A malformed field (should never happen — only this module and the orchestrator write
+    here) is skipped rather than raised: the board must stay renderable even if one job's
+    record is corrupt, the same "pure read, never raises" contract ``build_board`` already
+    holds for queues/workers/DLQ.
+    """
+    jobs: list[dict] = []
+    try:
+        raw_values = client.hvals(JOBS_KEY)
+    except Exception:  # noqa: BLE001 — the board must survive a Redis blip
+        return jobs
+    for raw in raw_values:
+        try:
+            jobs.append(json.loads(raw))
+        except (TypeError, ValueError):
+            continue
+    jobs.sort(key=lambda j: j.get("ts", 0), reverse=True)
+    return jobs
+
+
+def record_job_launch(client: redis.Redis, command: dict) -> dict:
+    """Write a submitted job's "launching" record onto the board (``fleet:jobs``).
+
+    This is the ONLY lifecycle transition the fleet-manager itself writes — it observes its
+    own LPUSH, nothing more. Later transitions (running/completed/failed) are the
+    orchestrator's / downstream tooling's to write as they observe them; this function does
+    not wait for or assume any of that (submit is fire-and-forget onto the queue, matching
+    resize/drain/restart's own "LPUSH and return" shape).
+    """
+    record = {
+        "job_id": command["job_id"],
+        "spec": command["spec"],
+        "model": command["model"],
+        "status": "launching",
+        "ts": command["ts"],
+    }
+    client.hset(JOBS_KEY, mapping={command["job_id"]: json.dumps(record)})
+    return record
+
+
+def record_job_status(client: redis.Redis, job_id: str, status: str, **fields) -> dict:
+    """Update a submitted job's board record with an OBSERVED lifecycle transition.
+
+    Reads back whatever record already exists (written by :func:`record_job_launch` or a
+    previous call to this function) so a later transition never drops the job's identifying
+    fields (``spec``/``model``) — only ``status``/``ts`` and whatever ``fields`` the caller
+    passes (e.g. ``returncode``, ``ledger``, ``error``) change. This is the write side of
+    "launching -> running -> completed/failed" (p2_launch_handler): the spawn-wrapper's BRPOP
+    consumer calls it as it observes each transition (the orchestrator's own phase-by-phase
+    publications go over ``control.live``, a separate unscoped telemetry channel — this hash is
+    the coarser per-JOB lifecycle the board renders, not a mirror of every phase event). This
+    module's own :func:`_send_submit_command` never calls it — that stays
+    :func:`record_job_launch`'s one-shot "launching" write.
+    """
+    raw = client.hget(JOBS_KEY, job_id)
+    try:
+        record = json.loads(raw) if raw else {}
+    except (TypeError, ValueError):
+        record = {}
+    record.setdefault("job_id", job_id)
+    record["status"] = status
+    record["ts"] = time.time()
+    record.update(fields)
+    client.hset(JOBS_KEY, mapping={job_id: json.dumps(record)})
+    return record
+
+
 def build_board(client: redis.Redis) -> dict:
     """Assemble the current board snapshot (pure read — never spawns)."""
     now = time.time()
@@ -126,6 +215,7 @@ def build_board(client: redis.Redis) -> dict:
         "alive_workers": sum(1 for w in workers if w["alive"]),
         "dead_workers": sum(1 for w in workers if not w["alive"]),
         "dlq": dlq.dead_counts(client),
+        "jobs": _job_records(client),
     }
 
 
@@ -162,6 +252,40 @@ def _send_command(client: redis.Redis, action: str, service: str, count: int | N
     return command
 
 
+def _send_submit_command(client: redis.Redis, *, spec: str, goal: str, model: str,
+                         workdir: str, image: str | None = None) -> dict:
+    """LPUSH a submit command onto ``fleet:commands`` and record its "launching" board entry.
+
+    The fleet-manager mints the ``job_id`` (the board's join key) but does NOT validate the
+    request — that stays the orchestrator's job (``spawn_wrapper.validate_submit_request``),
+    exactly as resize/drain/restart's validation stays with the orchestrator, never the
+    supervisor. Nothing here refuses a concurrent submit for the same or another spec; there is
+    no lock (the design's "ZERO refusing of concurrency" rule) — every submit is independently
+    LPUSHed and independently validated when it is popped.
+
+    ``image`` (p3_base_image_caching) is the optional per-job image the submitted spec's phase
+    cells should run — the fleet-manager passes it through UNCHECKED, same as every other
+    field; it is ``validate_submit_request``'s step 8 (``fleet/job-<name>`` only) that decides
+    whether it is actually honored.
+    """
+    job_id = uuid.uuid4().hex[:12]
+    command = {
+        "action": "submit",
+        "job_id": job_id,
+        "spec": spec,
+        "goal": goal,
+        "model": model,
+        "workdir": workdir,
+        "ts": time.time(),
+        "nonce": uuid.uuid4().hex[:12],
+    }
+    if image:
+        command["image"] = image
+    client.lpush(COMMANDS_KEY, json.dumps(command))
+    record_job_launch(client, command)
+    return command
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="The fleet manager (supervisor tier).")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -176,6 +300,17 @@ def main(argv: list[str] | None = None) -> int:
     p_restart = sub.add_parser("restart", help="command a restart-with-backoff")
     p_restart.add_argument("--service", required=True)
     p_restart.add_argument("--backoff", type=int, default=5, help="initial backoff seconds")
+    p_submit = sub.add_parser(
+        "submit", help="command the orchestrator to validate and launch a workflow job"
+    )
+    p_submit.add_argument("--spec", required=True, help="spec path, e.g. workflows/repository/<name>.yaml")
+    p_submit.add_argument("--goal", required=True)
+    p_submit.add_argument("--model", required=True)
+    p_submit.add_argument("--workdir", required=True, help="a worktree path under FINOPS_WORKTREE_ROOT")
+    p_submit.add_argument("--image", default=None,
+                          help="optional per-job image for the spec's phase cells "
+                               "(fleet/job-<name>, built via scripts/fleet/build.sh job <name> "
+                               "— p3_base_image_caching); default: fleet/base")
 
     parser.add_argument("--interval", type=float, default=DEFAULT_INTERVAL)
     parser.add_argument("--once", action="store_true")
@@ -200,6 +335,11 @@ def main(argv: list[str] | None = None) -> int:
                 state = "alive" if w["alive"] else "DEAD "
                 print(f"  [{state}] {w['key']} jobs={w['jobs']} age={w['age_s']}s pid={w['pid']}")
             print(f"dlq: {board['dlq']}")
+            if board["jobs"]:
+                print("jobs:")
+                for j in board["jobs"]:
+                    print(f"  [{j.get('status')}] {j.get('job_id')} spec={j.get('spec')} "
+                          f"model={j.get('model')}")
         return 0
 
     if args.command == "resize":
@@ -215,6 +355,15 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "restart":
         cmd = _send_command(client, "restart", args.service, None, args.backoff)
         print(f"fleet:commands <- {json.dumps(cmd)}")
+        return 0
+
+    if args.command == "submit":
+        cmd = _send_submit_command(
+            client, spec=args.spec, goal=args.goal, model=args.model, workdir=args.workdir,
+            image=args.image,
+        )
+        print(f"fleet:commands <- {json.dumps(cmd)}")
+        print(f"fleet:jobs[{cmd['job_id']}] <- launching")
         return 0
 
     parser.error(f"unknown command: {args.command}")

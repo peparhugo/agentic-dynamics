@@ -10,6 +10,9 @@
 #   scripts/fleet/build.sh                 # build base + orchestrator + supervisor
 #   scripts/fleet/build.sh base            # build only fleet/base (slice 1's build test)
 #   scripts/fleet/build.sh base --no-cache # force a clean rebuild
+#   scripts/fleet/build.sh job <name>      # build infrastructure/jobs/<name>/Dockerfile
+#                                           # FROM fleet/base, --cache-from fleet/base,
+#                                           # tagged fleet/job-<name> (p3_base_image_caching)
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
@@ -50,19 +53,46 @@ build_target() {
         -t "fleet/$target" "$@" "$REPO_ROOT"
 }
 
+# Per-job images (p3_base_image_caching): a job with custom layers builds FROM fleet/base
+# (never re-declaring the toolchain) at infrastructure/jobs/<name>/Dockerfile, tagged
+# fleet/job-<name> — the ONE namespace the submit contract's optional `image` field may name
+# (scripts/fleet/spawn_wrapper.py:JOB_IMAGE_PATTERN mirrors this same `<name>` shape). `--cache-
+# from fleet/base` is explicit (not just FROM) so a daemon/CI cache that has not yet re-resolved
+# `fleet/base` from a prior build in the SAME invocation still reuses its layers.
+build_job_target() {
+    local job_name="$1"; shift
+    if ! [[ "$job_name" =~ ^[a-z0-9][a-z0-9_-]*$ ]]; then
+        echo "error: job name $job_name must match [a-z0-9][a-z0-9_-]* (becomes fleet/job-$job_name)" >&2
+        exit 2
+    fi
+    local dockerfile="$REPO_ROOT/infrastructure/jobs/$job_name/Dockerfile"
+    if [ ! -f "$dockerfile" ]; then
+        echo "error: no Dockerfile at $dockerfile (expected infrastructure/jobs/$job_name/Dockerfile, FROM fleet/base)" >&2
+        exit 2
+    fi
+    log "building fleet/job-$job_name (docker build --cache-from fleet/base -f $dockerfile)"
+    docker build --cache-from fleet/base -f "$dockerfile" \
+        -t "fleet/job-$job_name" "$@" "$REPO_ROOT"
+}
+
 stage_sonar
 
 case "${1:-all}" in
     base)         build_target base ;;
     orchestrator) build_target orchestrator ;;
     supervisor)   build_target supervisor ;;
+    job)
+        job_name="${2:?usage: $0 job <name> [extra docker build args...]}"
+        shift 2
+        build_job_target "$job_name" "$@"
+        ;;
     all)
         build_target base
         build_target orchestrator
         build_target supervisor
         ;;
     *)
-        echo "usage: $0 {base|orchestrator|supervisor|all} [extra docker build args...]" >&2
+        echo "usage: $0 {base|orchestrator|supervisor|job <name>|all} [extra docker build args...]" >&2
         exit 2
         ;;
 esac

@@ -10,11 +10,14 @@ adversarial pass) are committed. This document is the handoff for the **operator
 (the operator gates production, proposal §7). Everything below is the exact commands, the
 expected outputs, and the rollback — prepared, not executed.
 
-> Known-open findings from the adversarial pass (`docs/reviews/fleet_ladder_implementation_
-> adversary.md`): **F1** (the egress proxy is not yet the enforced single internet policy
-> point) and **F2** (the `fleet/supervisor` image is unused). Neither blocks this smoke test —
+> Findings from the adversarial pass (`docs/reviews/fleet_ladder_implementation_adversary.md`):
+> **F1** (the egress proxy was not the enforced single internet policy point) is now **CLOSED**
+> — `x-ladder-env` carries `HTTP_PROXY`/`HTTPS_PROXY` to `egress:8888` + a `NO_PROXY` for the
+> by-name data-plane hosts, the affected pools were recreated, and the egress log shows real
+> ALLOW/DENY traffic (see the review's Disposition section for the evidence). **F2** (the
+> `fleet/supervisor` image is unused) remains open — cosmetic, does not block this smoke test —
 > it exercises the cell path, the queues, the heartbeats, and the RRF — but the operator
-> should read them before any production cut-over.
+> should read it before any production cut-over.
 
 ## Part 1 — Run instructions
 

@@ -85,6 +85,9 @@ def _fleet_module(name: str):
 ALLOWED_MOUNT_TARGETS = {
     "/tmp",                                  # worktree (rw)
     "/repo",                                 # repo (ro)
+    "/home/drseuss/ai-finops-framework",     # the repo at its HOST path (ro, D-16 fix —
+                                              # worktree gitdir pointers resolve identically)
+    "/home/drseuss/ai-finops-framework/.git",  # the .git overlay (rw, D-16 — lets phase commits write)
     "/repo/experiments/results",             # results OVERLAY (rw — the worker's relative paths)
     "/home/drseuss/.local/share/opencode",   # the ISOLATED opencode state (rw, per worker)
     "/auth/opencode_auth.json",              # the credential FILE (ro) — seeded by the entrypoint
@@ -197,7 +200,7 @@ def test_board_surfaces_heartbeats_and_dlq_counts():
     assert heartbeats["worker:story:a"]["jobs"] == "3"
 
     counts = dlq.dead_counts(r)
-    assert counts == {"story_jobs": 1, "analysis_jobs": 2, "review_jobs": 0}
+    assert counts == {"story_jobs": 1, "analysis_jobs": 2, "review_jobs": 0, "fleet_jobs": 0}
 
 
 # ── guard 3 — the neo4j index guard (D-12 / §6) ──────────────────────────────
@@ -413,3 +416,141 @@ def test_egress_proxy_is_the_single_policy_point_on_fleet_net():
     compose = _compose()
     egress = compose["services"]["egress"]
     assert egress.get("networks") == ["fleet-net"]
+
+
+# F1 close-out (2026-09-01): the network-policy guard above only checked the egress service's
+# OWN network membership — it never asserted that anything actually ROUTES through it. The
+# adversarial pass (docs/reviews/fleet_ladder_implementation_adversary.md, finding F1) caught
+# this: fleet-net is a normal bridge, so with no HTTP(S)_PROXY set the cells reached the
+# internet directly via NAT and the proxy saw zero traffic. This guard is the regression test
+# for the fix (HTTP_PROXY/HTTPS_PROXY/NO_PROXY added to x-ladder-env) — every ladder-env
+# consumer must carry the proxy pointed at egress:8888, the by-name data-plane hosts must be
+# NO_PROXY-exempted (the proxy only allowlists model endpoints — it must never sit between a
+# cell and the queue/graph/vector store), and egress itself must never proxy through itself.
+def test_every_ladder_env_consumer_routes_through_egress():
+    compose = _compose()
+    services = compose["services"]
+    egress_target = "http://egress:8888"
+    required_no_proxy = {"finops-queue", "neo4j", "chromadb", "localhost", "127.0.0.1"}
+
+    for name, svc in services.items():
+        env = _env(svc)
+        if name == "egress":
+            assert "HTTP_PROXY" not in env and "HTTPS_PROXY" not in env, (
+                "egress must not proxy through itself"
+            )
+            continue
+        assert env.get("HTTP_PROXY") == egress_target, (
+            f"{name}: HTTP_PROXY must point at {egress_target}"
+        )
+        assert env.get("HTTPS_PROXY") == egress_target, (
+            f"{name}: HTTPS_PROXY must point at {egress_target}"
+        )
+        no_proxy = {h.strip() for h in env.get("NO_PROXY", "").split(",") if h.strip()}
+        missing = required_no_proxy - no_proxy
+        assert not missing, f"{name}: NO_PROXY is missing the by-name data-plane hosts {missing}"
+
+
+# ── guard 8 — the submit-isolation guard (fleet_job_submission, p4_isolation_guards) ────────
+#
+# "submit" is the one place a caller-supplied string (spec/workdir/model) reaches the mount/
+# network derivation BEFORE any container exists (spawn_wrapper.validate_submit_request). These
+# four guards close the loop the p1-p3 phases opened: a submitted job's own derived mounts stay
+# inside the contract, three concrete host-service-smuggling attempts are refused pre-socket, and
+# the compose service a validated submit actually dispatches to (workflow-runner) carries no
+# host port mapping and no network but fleet-net.
+
+_SUBMIT_SPEC_REL = "workflows/repository/fleet_job_submission.yaml"
+
+
+def test_submitted_job_mounts_are_only_contract_paths(monkeypatch):
+    """Every phase of fleet_job_submission itself, run through the same mount derivation the
+    orchestrator uses for any submitted job (build_phase_request), must mount ONLY the
+    four-mount contract + the D-2 auth set — no host path outside CONTRACT_TARGETS slips
+    through for the very spec that built the submit path.
+    """
+    monkeypatch.setenv("FINOPS_REPO_DIR", "/home/drseuss/ai-finops-framework")
+    from agentic_dynamics.experiment.experiment_spec import load_spec
+    from scripts.fleet.spawn_wrapper import CONTRACT_TARGETS, build_phase_request
+
+    spec = load_spec(ROOT / _SUBMIT_SPEC_REL)
+    phases = [p for p in (spec.workflow.params.get("phases") or []) if isinstance(p, dict)]
+    assert phases, "fleet_job_submission must declare phases to exercise the derivation"
+    for phase in phases:
+        request = build_phase_request(
+            phase,
+            goal="submit isolation guard",
+            workdir="/tmp/wt_test_submit_job",
+            model="anthropic/claude-sonnet-5",
+            spec_name=spec.name,
+        )
+        for mount in request["mounts"]:
+            target = mount["target"]
+            assert target in CONTRACT_TARGETS, (
+                f"phase {phase.get('name')!r} derives mount {target!r} — outside the "
+                f"four-mount contract + the D-2 auth set"
+            )
+
+
+def test_submit_workdir_naming_a_host_service_ip_fails():
+    from scripts.fleet.spawn_wrapper import validate_submit_request
+
+    errors = validate_submit_request({
+        "spec": _SUBMIT_SPEC_REL, "goal": "g", "model": "anthropic/claude-sonnet-5",
+        "workdir": "127.0.0.1:6379",
+    })
+    assert any("names a host service" in e for e in errors), (
+        "a workdir naming the story Redis loopback address must be refused pre-socket"
+    )
+
+
+def test_submit_workdir_naming_a_host_home_path_outside_the_worktree_fails():
+    from scripts.fleet.spawn_wrapper import validate_submit_request
+
+    errors = validate_submit_request({
+        "spec": _SUBMIT_SPEC_REL, "goal": "g", "model": "anthropic/claude-sonnet-5",
+        "workdir": "/home/drseuss/some-other-repo-not-a-worktree",
+    })
+    assert any("not a path strictly under the worktree root" in e for e in errors), (
+        "a host /home path outside the worktree root must be refused pre-socket"
+    )
+
+
+def test_submit_workdir_naming_a_host_credential_path_fails():
+    from scripts.fleet.spawn_wrapper import validate_submit_request
+
+    # /home/drseuss/.claude is one of the D-2 auth dirs (CONTRACT_TARGETS: ro, mounted for
+    # every cell) — it is never a worktree, so naming it as a submit's workdir must be refused
+    # the same "outside the worktree root" way a bare host /home path is: a credential
+    # directory is not, and must never become, an admissible cell workdir.
+    errors = validate_submit_request({
+        "spec": _SUBMIT_SPEC_REL, "goal": "g", "model": "anthropic/claude-sonnet-5",
+        "workdir": "/home/drseuss/.claude",
+    })
+    assert any("not a path strictly under the worktree root" in e for e in errors), (
+        "a host credential path must be refused pre-socket"
+    )
+
+
+def test_workflow_runner_service_declares_no_host_service_port_and_fleet_net_only():
+    from scripts.fleet.spawn_wrapper import build_submit_argv
+
+    # build_submit_argv is what a VALIDATED submit actually dispatches — pin the guard to
+    # whatever compose service it names, so a future rename of the dispatch target is caught
+    # here rather than silently exempting the real submitted-job service from the ladder's
+    # network-policy guard (guard 7 asserts this for every service; this one asserts it by name
+    # for the specific service a submit reaches).
+    argv = build_submit_argv({
+        "spec": _SUBMIT_SPEC_REL, "goal": "g", "model": "anthropic/claude-sonnet-5",
+        "workdir": "/tmp/wt_test_submit_job",
+    })
+    assert "workflow-runner" in argv, "a submit dispatches through the workflow-runner service"
+
+    compose = _compose()
+    svc = compose["services"]["workflow-runner"]
+    assert not svc.get("ports"), (
+        "the submitted job's service must declare no port mapping to a host service"
+    )
+    assert svc.get("networks") == ["fleet-net"], (
+        "the submitted job's service must attach to exactly fleet-net"
+    )

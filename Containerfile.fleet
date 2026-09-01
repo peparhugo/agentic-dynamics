@@ -21,6 +21,31 @@
 #   docker build -f Containerfile.fleet --target base       -t fleet/base       .
 #   docker build -f Containerfile.fleet --target orchestrator -t fleet/orchestrator .
 #   docker build -f Containerfile.fleet --target supervisor -t fleet/supervisor .
+#
+# --- fleet/base is the CACHE ROOT for per-job images (p3_base_image_caching) -------------
+# `fleet/base` is the layer floor every other image builds on: the toolchain (apt packages,
+# node, the sonar client, the python deps) all land BEFORE any repo source is copied in (see
+# the base stage below), so a source-only change (scripts/, apps/, a story config) never
+# re-triggers apt or pip. A job that needs custom layers on top (an extra system package, a
+# pinned tool) builds its OWN image FROM fleet/base with `--cache-from fleet/base` — see
+# `scripts/fleet/build.sh job <name>` and `infrastructure/jobs/<name>/Dockerfile`, tagged
+# `fleet/job-<name>`. The submit contract (`scripts/fleet/spawn_wrapper.py:validate_submit_request`)
+# accepts an optional `image` field naming one of these — never a bare override of
+# fleet/base/orchestrator/supervisor — and threads it to the orchestrator's sibling-cell spawn
+# as `--cell-image` (`scripts/run_workflow.py`), so only the PHASE cells run the custom image;
+# the orchestrator/workflow-runner container itself (the one socket-holder) is unaffected.
+#
+# --- the isolation contract (docs/fleet/08_job_image_cache_root.md has the full writeup) -----
+# The docker layer exists for ISOLATION, not coordination: a cell (any image built off this
+# base, including a fleet/job-<name>) sees ONLY its declared mounts on `fleet-net` — the
+# worktree (rw), the results dir (rw), the CLI bins + D-2 auth set (ro) — and NOTHING else.
+# Host services are never reachable from inside a cell: the story-agent Redis on 6379 (only
+# `finops-queue` on the ladder's OWN 6379-inside-fleet-net is attached — the sandbox instance
+# is never joined to fleet-net at all), the host filesystem beyond the four mount targets, and
+# host credentials outside the D-2 auth set. `infrastructure/docker-compose.ladder.yml`'s mount
+# anchors (`x-ladder-mounts` / `x-orchestrator-mounts` / `x-supervisor-mounts`) are the
+# enforcement point; `tests/test_fleet_guards.py` asserts it holds (no unexpected mount target,
+# the socket in exactly one tier, every tier on fleet-net only).
 
 # ---------------------------------------------------------------------------
 # fleet/base — the generic toolchain (the cell-tier + consumer image)
@@ -55,11 +80,24 @@ WORKDIR /app
 COPY .build/sonar-scanner/ /opt/sonar-scanner/
 
 # Python deps — the repo's base dependencies + the [neo4j] extra (the resurrected consumer's
-# driver) + the [admin] extra (flask — the supervisor-tier Control Room portal). Editable
-# install so the baked /app/src stays the import source (matches the reproduction Dockerfile).
+# driver) + the [admin] extra (flask — the supervisor-tier Control Room portal). This is the
+# cache-root ordering (p3_base_image_caching): only `pyproject.toml` + an empty package stub
+# land before the install, so pip's dependency resolution/download runs against the METADATA
+# alone — a change anywhere under src/ (or scripts/, apps/, etc.) cannot invalidate this layer.
+# The stub is enough for setuptools' src-layout auto-discovery ([tool.setuptools.packages.find]
+# where=["src"]) to register the editable link; pip's default (lenient) editable mode adds
+# `src/` to sys.path via a .pth file rather than baking a fixed package list, so the REAL
+# source copied next (still ahead of the pip layer's own cache boundary — Docker cache
+# invalidation only cascades forward) is picked up by normal import resolution with no
+# reinstall needed.
 COPY pyproject.toml ./
+RUN mkdir -p src/agentic_dynamics \
+    && touch src/agentic_dynamics/__init__.py \
+    && pip install --no-cache-dir -e ".[neo4j,admin]"
+
+# The real source — installed already (deps + the editable link both landed above), so this
+# COPY costs nothing but a cheap layer of its own; it never re-triggers apt or pip.
 COPY src/ ./src/
-RUN pip install --no-cache-dir -e ".[neo4j,admin]"
 
 # The runtime code surface (the mount contract declares the WRITABLE paths — worktree,
 # results — in the compose, NOT the image; design §6). `experiments/results` is created empty

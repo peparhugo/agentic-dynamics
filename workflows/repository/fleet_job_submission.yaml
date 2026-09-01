@@ -15,6 +15,7 @@ side_effects:
   repository: true
   external_services: false
 repeatable: false
+status: completed
 # NOTE (execution path): reference path is the orchestrator — this spec BUILDS part of
 # that path (the submit verb), so its own phases run in-process (they edit the fleet
 # code, they do not need the fleet to test the fleet) unless the operator opts in.

@@ -130,6 +130,16 @@ PHASE_SCOPE_AUTHORIZATION: dict[str, str] = {
     "p3_cost_provenance": "implementation",
     "p4_expiry_and_quarantine": "implementation",
     "p5_suite_and_closure": "implementation",
+    # the fleet_job_submission workflow's phases (the submit verb + the base-image cache root)
+    "p1_submit_contract": "implementation",
+    "p2_launch_handler": "implementation",
+    "p3_base_image_caching": "implementation",
+    "p4_isolation_guards": "implementation",
+    # p2_launch_handler's own dry-run proof fixture (workflows/repository/
+    # launch_handler_dry_run.yaml) — a trivial single no-op phase used to exercise the
+    # submit -> validate -> launch -> board lifecycle end-to-end without spending a real
+    # agent turn on anything but a no-op prompt.
+    "p_launch_handler_noop": "implementation",
 }
 
 # ── Artifact identity (refactor-repair P1-3) ─────────────────────

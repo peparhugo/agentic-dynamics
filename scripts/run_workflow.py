@@ -232,6 +232,15 @@ def main() -> None:
                     help="run a SINGLE phase (name) only — the sibling-cell entrypoint the "
                          "--orchestrator mode spawns for each phase. When set, the spec's phase "
                          "list is filtered to this name before the run.")
+    ap.add_argument("--cell-image", default=None, metavar="IMAGE",
+                    help="p3_base_image_caching: the image each PHASE cell runs under "
+                         "--orchestrator mode (default: scripts/fleet/spawn_wrapper.CELL_IMAGE, "
+                         "fleet/base). A per-job image built FROM fleet/base — see "
+                         "scripts/fleet/build.sh job <name> — is named fleet/job-<name> and is "
+                         "the only namespace the submit contract's `image` field accepts "
+                         "(scripts/fleet/spawn_wrapper.py:JOB_IMAGE_PATTERN). Never changes the "
+                         "orchestrator/workflow-runner container's OWN image (fleet/orchestrator "
+                         "— the one socket-holder, unaffected by this flag).")
     args = ap.parse_args()
 
     spec = load_spec(Path(args.spec))
@@ -429,7 +438,9 @@ def _run_orchestrator(spec: ExperimentSpec, args: argparse.Namespace) -> None:
         # authorization-table entry resolves to "" and spawn_sibling refuses it at step 2.
         print(f"[orchestrator] {name}: scope={request['scope'] or '(unauthorized)'}", flush=True)
         try:
-            outcome = spawn_wrapper.spawn_sibling(request, docker="docker")
+            outcome = spawn_wrapper.spawn_sibling(
+                request, docker="docker", image=args.cell_image,
+            )
         except spawn_wrapper.SpawnValidationError as exc:
             print(f"[orchestrator] {name}: REFUSED before the socket call:\n{exc}", flush=True)
             failures += 1
