@@ -222,3 +222,12 @@ documented in `scripts/CONTEXT.md` + this doc. `test_workflow_runner.py` total: 
 Final deterministic (non-external) suite: **2856 passed, 0 failed, ~183s** — the 3 p1-triaged
 reds are green; the fast path (509 tests) is ~25s. The whole suite incl. the external-inference
 families stays runnable on demand (`python3 -m pytest tests/ -q` → 2964 passed, 9 skipped).
+
+**Before/after total (measured at the p4 gate, 2026-09-01, this commit):**
+
+| metric | before | after |
+|---|---|---|
+| whole suite (incl. external families) | 598.64s (census 1: 2,967 tests, 3 failed / 9 skipped) | **420.48s (2,967 passed / 9 skipped)** — the 3 p1-triaged reds green |
+| fast path (`pytest tests/ -m fast`, 509 tests) | — (no fast path existed) | **24.30s** (25.04s wall) |
+| `test_workflow_runner.py` | 187.04s | 38.49s |
+| fast-path budget gate | — | 180s ceiling (3x the measured time — a trip wire, not a flaky wall) |

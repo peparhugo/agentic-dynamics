@@ -53,7 +53,7 @@ maintained: scan_docs_drift.py docs_drift_watchdog.py docs_proposal_gate.py
 
 | family | before | after | note |
 |---|---|---|---|
-| whole suite (non-external) | ~598s (15 fat tests ≈ 76%) | recorded post-fix in `docs/architecture/current/2026-09-01_test_suite_profile.md` | full suite stays runnable + green on demand |
+| whole suite (incl. external families) | ~598s (census 1: 2,967 tests, 3 failed / 9 skipped) | **~420s (2,967 passed / 9 skipped)** — measured at the p4 gate | full suite stays runnable + green on demand (`python3 -m pytest tests/ -q`) |
 | `test_workflow_runner.py` | 187.0s | **38.5s** | the 132s change-analysis root-commit test → 0.7s (`change_analysis_legs=False` scopes the sonar/lsp external legs); the watchdog family 24.9s → 17.2s |
 | `test_relabel_tree_gate.py` | 49.1s | **26.4s** | the 298MB attempt-A tree is materialized ONCE (module fixture), the replay tests hardlink-copy it (~3.7s each, was ~12.5s) |
 | `test_checkpoint_mechanism.py` | 15.2s | **1.4s** | the revamp3 replay uses a minimal worktree + the REAL unsigned template content |
