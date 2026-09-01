@@ -88,14 +88,20 @@ def api_matrix() -> Response:
     tails = _tail_stamps(r, list(phase_payloads))
     phases = _parse_phases(phase_payloads, tails=tails)
     # Runner-truth liveness (live_board follow-up, 2026-09-01): a cell whose status is
-    # "running" but whose phase liveness says historical is an ENDED run with a stale status —
-    # a killed/interrupted runner never publishes its terminal status, so story_status keeps
-    # "running" forever. The window, not the publishing process, decides: the cell is
-    # re-presented as "ended" (outcome unknown-but-over) rather than falsely live.
-    live_cells = {cid for cid, p in phases.items() if p.get("live")}
+    # "running" but whose phase liveness says DEFINITIVELY historical is an ENDED run with a
+    # stale status — a killed/interrupted runner never publishes its terminal status, so
+    # story_status keeps "running" forever. The window, not the publishing process, decides.
+    # Age-UNKNOWN phases are never flipped (the "never mislabeled" rule — no stamps means we
+    # do not know, so the legacy status stands); only a phase with a real age past the window
+    # re-presents the cell as "ended" (outcome unknown-but-over) rather than falsely live.
+    stale_running = {
+        cid
+        for cid, p in phases.items()
+        if not p.get("live") and isinstance(p.get("age_seconds"), (int, float))
+    }
     cells = dict(execute["cells"])
     for cid, status in cells.items():
-        if status == "running" and cid not in live_cells:
+        if status == "running" and cid in stale_running:
             cells[cid] = "ended"
     response = {
         "total": execute["total"],
