@@ -176,8 +176,12 @@ def publish_event(
 
     Non-actuation events with a non-empty ``source_type`` are recorded into
     :data:`SOURCE_TYPE_INDEX_KEY` so a later actuation's ``causes`` can resolve against
-    them — see that constant's docstring for why this index exists and what it stands in
-    for. Nothing is written to the index for actuation events themselves (an actuation
+    them — see that constant's docstring for why this lookup exists and what it stands in
+    for. It is the *source-type lookup*, a gate's scratch space; it is NOT the
+    knowledge_registry_log (``experiments/results/registry_index.jsonl``, written by the
+    kb-registry-v1 consumer) and writing to one says nothing about the other. See
+    ``docs/architecture/current/control_plane_vocabulary.md``. Nothing is written to the lookup
+    for actuation events themselves (an actuation
     cannot be `causes`-cited by another actuation — see design §5a: `causes` must resolve
     to an *observation*).
     """

@@ -23,6 +23,7 @@ import socket
 import sys
 import time
 import traceback
+from dataclasses import dataclass
 from dataclasses import replace as _replace_record
 from datetime import datetime
 from pathlib import Path
@@ -52,8 +53,13 @@ from agentic_dynamics.knowledge.knowledge import compute_knowledge_id  # noqa: E
 REDIS_HOST = os.environ.get("FINOPS_REDIS_HOST", "127.0.0.1")
 REDIS_PORT = int(os.environ.get("FINOPS_REDIS_PORT", "6380"))
 
-#: canonical-state round 2, step 8 — the flat, append-only registry index the
-#: "kb-registry-v1" consumer group writes to. Deliberately the same durable,
+#: canonical-state round 2, step 8 — the **knowledge_registry_log**: the flat,
+#: append-only log the "kb-registry-v1" consumer group writes to. That name is this
+#: artifact's entry in the control-plane vocabulary
+#: (``docs/architecture/current/control_plane_vocabulary.md``), which exists because THIS
+#: FILE used the bare word "index" for three different things: this durable log, the
+#: canonical-state design's derived index layers (below), and an in-process Python dict of
+#: flags (further below). Only the first survives the process. Deliberately the same durable,
 #: human-greppable pattern as ``scripts/supervise.py``'s ``flags.jsonl``: one JSON line
 #: per indexed record, never rewritten in place. ``generate_manifest.py``'s compaction
 #: step (plan step 15, out of scope here) is what later collapses this append-only log
@@ -310,6 +316,9 @@ def build_handler(group: str, r: redis.Redis):
             # of this version's valid_from (base design §"Open Question 2": "the index
             # layers compute the effective valid_to for any non-current version as its
             # successor's valid_from, purely as a derived view over the supersedes chain").
+            # "Index layers" there means the DERIVED READERS over this log — the
+            # knowledge_manifest's compaction, chroma_projection, neo4j_projection — not
+            # the knowledge_registry_log itself, which only ever appends what it saw.
             # Recorded as a second append-only line — never a rewrite of the predecessor's
             # original entry.
             if operation == "supersede" and record.supersedes:
@@ -323,15 +332,17 @@ def build_handler(group: str, r: redis.Redis):
                 with open(REGISTRY_INDEX_PATH, "a") as f:
                     f.write(json.dumps(predecessor_line) + "\n")
 
-            # canonical-state finalize (G3): maintain the in-process flag index, then
-            # run the auto-clear rule. Order matters — a flag record updates the index
-            # FIRST (so an observation arriving in the SAME batch right after its own
+            # canonical-state finalize (G3): maintain the in-process flag map, then run
+            # the auto-clear rule. This map is a plain Python dict local to THIS process —
+            # not the knowledge_registry_log written above, and not any durable catalog;
+            # it does not survive the worker. Order matters — a flag record updates the
+            # map FIRST (so an observation arriving in the SAME batch right after its own
             # flag can still see it), and the auto-clear check only ever runs for
             # `observation` records (never re-triggered by the `delete` event this
             # same rule itself just published for a flag, since that event's own
             # source_type is "flag", not "observation" — no feedback loop).
             if record.source_type == "flag":
-                # Key the in-process index on the flag's structured subject id (the
+                # Key the in-process flag map on the flag's structured subject id (the
                 # session it flagged) — the SAME field the observation record carries as
                 # subject_id, so the auto-clear correlation reads both sides structurally.
                 # Fall back to logical_locator for a pre-fidelity flag whose subject_id is
@@ -498,13 +509,44 @@ def build_handler(group: str, r: redis.Redis):
     raise ValueError(f"unknown consumer group: {group!r}")
 
 
-def process_batch(r, group, consumer, handler, *, once: bool) -> int:
-    """Claim stale messages then read new ones; return how many were processed."""
-    processed = 0
+@dataclass
+class BatchOutcome:
+    """What one pass of :func:`process_batch` did — the input to the projection watermark.
 
-    # Reclaim messages left behind by a crashed/lagging consumer after the lease.
-    for entry in ks.claim_pending(r, group, consumer):
-        outcome = ks.process_entry(
+    ``process_batch`` used to return a bare ``int``. The watermark (p3) needs strictly more
+    than a count: it records the last stream id this projection **confirmed**, and only the
+    loop that called ``XACK`` knows which id that was. Redis can tell an observer the
+    *delivered* frontier, but delivered is not confirmed — an entry handed to a consumer that
+    then died was never projected. So the loop reports its own acks, first-hand.
+    """
+
+    #: How many entries were handled this pass (claimed + newly read), whatever the outcome.
+    processed: int = 0
+    #: The last entry id this consumer XACKed — the authoritative confirmed frontier. Empty
+    #: when nothing was acked this pass (an idle poll, or a pass where everything went to
+    #: ``retry`` and stayed pending).
+    last_acked_id: str = ""
+    #: Entries permanently given up on. A dead-letter IS acked, so the stream frontier moves
+    #: past it — but the event was never projected, which makes it a permanent hole in this
+    #: projection. It is recorded as the watermark's ``last_error`` precisely so that hole is
+    #: loud rather than invisible behind an advancing frontier.
+    dead_lettered: int = 0
+    #: Entries left pending for a later claim (handler raised, retries not exhausted).
+    retried: int = 0
+
+
+def process_batch(r, group, consumer, handler, *, once: bool) -> BatchOutcome:
+    """Claim stale messages then read new ones; report what the pass did.
+
+    :returns: a :class:`BatchOutcome` carrying the processed count *and* the confirmed
+        frontier, so the caller can land this projection's watermark without having to
+        re-derive from Redis what this loop already knows.
+    """
+    outcome_totals = BatchOutcome()
+
+    def handle(entry, origin: str) -> None:
+        """Process one entry and fold its result into ``outcome_totals``."""
+        result = ks.process_entry(
             r,
             group,
             entry.entry_id,
@@ -512,25 +554,85 @@ def process_batch(r, group, consumer, handler, *, once: bool) -> int:
             handler,
             extractor=ki.extract_record,
         )
-        processed += 1
-        log(f"claimed {entry.entry_id} {entry.event.knowledge_id[:12]} -> {outcome}")
+        outcome_totals.processed += 1
+        # "ok" and "dead_letter" both XACK (see knowledge_stream.process_entry); "retry" does
+        # not. Only an acked id may advance the confirmed frontier — crediting the projection
+        # with an entry still sitting in the pending list would be the exact over-report the
+        # watermark exists to prevent.
+        if result in ("ok", "dead_letter"):
+            outcome_totals.last_acked_id = entry.entry_id
+        if result == "dead_letter":
+            outcome_totals.dead_lettered += 1
+        elif result == "retry":
+            outcome_totals.retried += 1
+        log(f"{origin} {entry.entry_id} {entry.event.knowledge_id[:12]} -> {result}")
+
+    # Reclaim messages left behind by a crashed/lagging consumer after the lease.
+    for entry in ks.claim_pending(r, group, consumer):
+        handle(entry, "claimed")
 
     # Read new messages (block briefly so the loop is not a busy spin).
     for entry in ks.read_events(
         r, group, consumer, count=ks.CLAIM_BATCH, block_ms=BLOCK_TIMEOUT_MS
     ):
-        outcome = ks.process_entry(
-            r,
-            group,
-            entry.entry_id,
-            entry.event,
-            handler,
-            extractor=ki.extract_record,
-        )
-        processed += 1
-        log(f"new {entry.entry_id} {entry.event.knowledge_id[:12]} -> {outcome}")
+        handle(entry, "new")
 
-    return processed
+    return outcome_totals
+
+
+def refresh_watermark(group: str, r, outcome: BatchOutcome | None, error: str = "") -> None:
+    """Land this consumer group's projection watermark in the control database (p3).
+
+    Called after every batch — including empty ones, because "polled, found nothing, still
+    connected" is exactly the successful report that keeps a healthy idle projector out of the
+    ``STALE`` bucket.
+
+    Three properties, each deliberate:
+
+    * **Never fatal.** Ingestion must not stop because bookkeeping about ingestion failed. Every
+      exception is caught and logged. This is the one place where swallowing is correct — and it
+      is not silent, because a failure that *can* be recorded is written into the very surface
+      the operator reads (``last_error``), and one that cannot is logged here.
+    * **Never creates the control database.** ``create=False``: if the orchestrator has never
+      run, there is no control db, and a consumer conjuring an empty one would destroy the
+      distinction p1 built — a reader must be able to tell "the control plane is missing" from
+      "the control plane says there are no runs". A missing db makes watermarking inert, which
+      is the correct degraded behaviour for a bookkeeping side-channel.
+    * **Dead letters are errors.** An acked-but-unprojected entry advances the stream frontier
+      while leaving a permanent hole in this projection, so it is reported as a failure rather
+      than being hidden by a frontier that kept moving.
+    """
+    try:
+        # Imported lazily: the control-db dependency belongs to the watermark side-channel, and
+        # a worker whose only job is ingestion should not fail to start because of it.
+        from agentic_dynamics.control import projection_watermarks as pwm
+        from agentic_dynamics.control.control_db import ControlDB
+
+        with ControlDB(read_only=False, create=False) as db:
+            if error:
+                pwm.record_error(db, group, error)
+                return
+            assert outcome is not None
+            batch_error = ""
+            if outcome.dead_lettered:
+                # Flagged on the batch that produced it, then cleared by the next clean batch.
+                # The durable record of the lost entries is the dead-letter stream
+                # (``kb:v1:dead_letter``); the watermark's job is to raise the alarm at the
+                # moment the gap opens, while the frontier is still moving past it.
+                batch_error = (
+                    f"{outcome.dead_lettered} entr"
+                    f"{'y' if outcome.dead_lettered == 1 else 'ies'} dead-lettered — "
+                    "acked but never projected (permanent gap in this projection)"
+                )
+            pwm.record_from_batch(
+                db,
+                r,
+                group,
+                acked_event_id=outcome.last_acked_id,
+                last_error=batch_error,
+            )
+    except Exception as e:  # noqa: BLE001 — a watermark must never take down the consumer
+        log(f"watermark unavailable ({type(e).__name__}: {e})")
 
 
 def main() -> None:
@@ -571,18 +673,30 @@ def main() -> None:
 
     while True:
         try:
-            processed = process_batch(r, group, consumer, handler, once=args.once)
+            outcome = process_batch(r, group, consumer, handler, once=args.once)
         except redis.exceptions.ConnectionError as e:
             log(f"Redis connection error: {e}; reconnecting")
+            # Record the outage against this projection BEFORE sleeping. Without this the
+            # watermark would simply stop updating, and a reader could not tell "the consumer
+            # is blocked on a downed Redis" from "the consumer is idle and caught up" — the
+            # two look identical from the outside, which is the ambiguity p3 removes.
+            refresh_watermark(group, r, None, error=f"redis connection error: {e}")
             time.sleep(10)
             r = _connect_redis()
             ks.create_consumer_group(r, group)
             continue
         except Exception as e:
             log(f"batch error: {e}\n{traceback.format_exc()}")
+            refresh_watermark(group, r, None, error=f"batch error: {type(e).__name__}: {e}")
             time.sleep(5)
             continue
 
+        # The projection watermark is refreshed on EVERY batch, empty ones included: a poll
+        # that found nothing is still a successful report ("I am connected and caught up"),
+        # and it is what keeps a healthy quiet projector out of the STALE bucket.
+        refresh_watermark(group, r, outcome)
+
+        processed = outcome.processed
         processed_total += processed
         if processed == 0:
             empty_polls += 1

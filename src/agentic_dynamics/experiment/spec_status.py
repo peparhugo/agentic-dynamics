@@ -14,14 +14,19 @@ This module joins the two sides and emits both halves of the answer:
 * ``experiments/specs/STATUS.md`` — the agent-facing table (one row per spec, a legend,
   a generated-at line), for a human or an LLM reading the repo.
 
-**The index is derived, never hand-maintained.** The spec YAML's lifecycle fields are the
+**The spec_catalog is derived, never hand-maintained.** (`spec_catalog` is this
+artifact's name in the control-plane vocabulary — see
+``docs/architecture/current/control_plane_vocabulary.md``; it indexes *specs*, i.e. what work
+exists, and must not be confused with `run_state`, the control database that records what
+actually happened.) The spec YAML's lifecycle fields are the
 *seed* (what the operator asserted); the run JSONs are the *measured evidence* (what
 actually happened) and win wherever both speak. Nothing here writes back into a spec YAML.
 
 **Missing data is normal, not a failure.** ``experiments/results/workflows/`` is untracked,
 so a fresh checkout has zero run ledgers; every run-derived column then renders as an
-em-dash and every spec still appears in the index. A malformed run JSON is warned about and
-skipped, never raised — the index must be generatable from any state of the working tree.
+em-dash and every spec still appears in the spec_catalog. A malformed run JSON is warned
+about and skipped, never raised — the spec_catalog must be generatable from any state of the
+working tree.
 
 Design: ``code_reviews/2026-08-14_experiment-spec-and-compiler-design.md`` (the spec layer);
 ``experiments/specs/spec_lifecycle.yaml`` (this layer).

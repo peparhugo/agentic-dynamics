@@ -1165,12 +1165,13 @@ def test_design_session_input_forwards_allowlisted_delivery(monkeypatch):
 
 
 def test_route_inventory_covers_all_registered_routes():
-    """F2: the inventory's 31 routes match the actual url_map exactly.
+    """F2: the inventory's 32 routes match the actual url_map exactly.
 
     The count tracks the documented inventory in ``apps/control_room/server.py``'s module
     docstring and ``scripts/CONTEXT.md``. It went 28 -> 29 when ``GET /api/subscription-usage``
-    landed, and 29 -> 31 when the docs-health pair (``GET /api/docs-health`` +
-    ``POST /api/docs-health/approve``) landed with the docs-drift rail's p4; this guard is what
+    landed, 29 -> 31 when the docs-health pair (``GET /api/docs-health`` +
+    ``POST /api/docs-health/approve``) landed with the docs-drift rail's p4, and 31 -> 32 when
+    ``GET /api/projections`` landed with ``control_db_publication`` p3; this guard is what
     catches a route shipped without its inventory entry, so a bump here must always be paired
     with the doc update (never the other way round).
     """
@@ -1179,8 +1180,8 @@ def test_route_inventory_covers_all_registered_routes():
     ]
 
     # GET and POST on the same path register two Rule objects; count them
-    # (31), then dedupe for path-membership assertions below.
-    assert len(rules) == 31
+    # (32), then dedupe for path-membership assertions below.
+    assert len(rules) == 32
     routes = {rule.rule for rule in rules}
 
     # The surfaces the stale inventory omitted are all registered.
@@ -1199,6 +1200,7 @@ def test_route_inventory_covers_all_registered_routes():
         "/api/design-sessions/<portal_id>/run",
         "/api/docs-health",
         "/api/docs-health/approve",
+        "/api/projections",
     ):
         assert required in routes, f"missing route in inventory: {required}"
 
@@ -1451,3 +1453,100 @@ def test_get_only_paths_never_emit_actuation(tmp_path, monkeypatch):
     assert client.get("/api/flags").status_code == 200
     assert client.get("/api/registry").status_code == 200
     assert client.get("/api/matrix").status_code == 200
+
+
+# --------------------------------------------------------------------------------------
+# Knowledge projection watermarks (control_db_publication p3)
+#
+# The portal is where an operator SEES that a projection fell behind. These tests pin the
+# three response shapes the route distinguishes — rows, "no control plane", and the additive
+# matrix block — because collapsing any two of them reintroduces exactly the ambiguity the
+# watermark table was built to remove.
+# --------------------------------------------------------------------------------------
+
+
+def test_projections_route_reports_every_projection(tmp_path, monkeypatch):
+    """Every known projection appears, including ones that have never reported.
+
+    A projector that has never run has no row in the table. Listing only the rows present
+    would render it as absent — indistinguishable from a projection that does not exist —
+    so the route iterates the EXPECTED projections and reports the gaps as ``unknown``.
+    """
+    from agentic_dynamics.control import control_db as cdb
+    from agentic_dynamics.control import projection_watermarks as pwm
+
+    path = tmp_path / "control.db"
+    with cdb.ControlDB(path) as db:
+        db.record_watermark("registry", last_event_id="9-0", lag_events=0)
+        db.record_watermark("chroma", last_event_id="6-0", lag_events=3)
+    monkeypatch.setenv(cdb.CONTROL_DB_ENV, str(path))
+
+    response = server.app.test_client().get("/api/projections")
+
+    assert response.status_code == 200
+    body = response.get_json()
+    assert [p["projection"] for p in body["projections"]] == list(pwm.PROJECTIONS)
+    # The compact block the p4 control packet carries — rendered here too so the portal and
+    # the packet can never publish different numbers for the same fact.
+    assert body["projection_lag"] == {
+        "chroma": 3,
+        "ledger": None,
+        "neo4j": None,
+        "registry": 0,
+    }
+    assert set(body["unhealthy"]) == {"chroma", "ledger", "neo4j"}
+
+
+def test_projections_route_503s_when_there_is_no_control_db(tmp_path, monkeypatch):
+    """A missing control database is a 503, NOT an empty list of healthy projections.
+
+    The negative half, and the one that matters: "no control plane" and "a control plane
+    reporting nothing wrong" are opposite answers, and only one of them is safe to publish on.
+    A 200 with ``projections: []`` would read as the safe one.
+    """
+    from agentic_dynamics.control import control_db as cdb
+
+    monkeypatch.setenv(cdb.CONTROL_DB_ENV, str(tmp_path / "absent" / "control.db"))
+
+    response = server.app.test_client().get("/api/projections")
+
+    assert response.status_code == 503
+    assert response.get_json()["error"] == "control_db_unavailable"
+
+
+def test_matrix_carries_the_projections_block(tmp_path, monkeypatch):
+    """The fleet board answers "did the results get projected?", not only "what is running?".
+
+    Additive: an operator reading a green execution board previously had no way to see that
+    the registry was hundreds of events behind.
+    """
+    from agentic_dynamics.control import control_db as cdb
+
+    path = tmp_path / "control.db"
+    with cdb.ControlDB(path) as db:
+        db.record_watermark("registry", last_event_id="9-0", lag_events=0)
+    monkeypatch.setenv(cdb.CONTROL_DB_ENV, str(path))
+    monkeypatch.setattr(server, "_redis", lambda: FakeRedis())
+
+    body = server.app.test_client().get("/api/matrix").get_json()
+
+    registry = next(p for p in body["projections"] if p["projection"] == "registry")
+    assert registry["lag_events"] == 0
+    assert registry["reported"] is True
+
+
+def test_matrix_survives_a_missing_control_db(monkeypatch, tmp_path):
+    """A missing control database degrades the projections panel, never the fleet matrix.
+
+    The bounded-blast-radius half: the board's primary job is the execution fleet, and a
+    bookkeeping side-channel being absent must not take it down.
+    """
+    from agentic_dynamics.control import control_db as cdb
+
+    monkeypatch.setenv(cdb.CONTROL_DB_ENV, str(tmp_path / "absent" / "control.db"))
+    monkeypatch.setattr(server, "_redis", lambda: FakeRedis())
+
+    response = server.app.test_client().get("/api/matrix")
+
+    assert response.status_code == 200
+    assert response.get_json()["projections"] == []

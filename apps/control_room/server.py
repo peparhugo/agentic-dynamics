@@ -1,7 +1,7 @@
 """Dynamic-code admin portal backend (the Control Room).
 
 Serves the admin dashboard and exposes live experiment telemetry over SSE. This module is now
-the *composition root* (refactor-repair Debt-1): the 31 routes live in ``routes/``, the business
+the *composition root* (refactor-repair Debt-1): the 32 routes live in ``routes/``, the business
 logic in ``services/``, the external-interface clients in ``clients/``, and the filesystem paths
 in ``paths.py``. This file keeps the shared context — configuration constants, the Redis /
 manager / client factories, the parsed-manifest cache, and the Flask ``app`` — and builds the
@@ -11,10 +11,11 @@ It still re-exports the names the tests monkeypatch (``_redis``, ``_design_sessi
 ``DATA_MANIFEST_PATH``, …): the injected services delegate back to those names at call time, so
 the existing test suite is behaviour-identical.
 
-Endpoints (31 routes across 6 API categories, plus the static shell):
+Endpoints (32 routes across 6 API categories, plus the static shell):
 
     Legacy telemetry (7):
         GET  /api/matrix · GET /api/status · GET /api/events/<cell_id>
+        GET  /api/projections   (knowledge projection watermarks — control_db_publication p3)
         GET  /api/routing · GET /api/subscription-usage
         POST /api/experiments · POST /api/queue/reinterleave
     Supervisor flags (3):

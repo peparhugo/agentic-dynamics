@@ -19,6 +19,7 @@ import time
 
 from flask import Response, jsonify, request
 
+from agentic_dynamics.control import projection_watermarks
 from agentic_dynamics.control.admission import admission_board
 from agentic_dynamics.control.lease_registry import (
     AdmissionError,
@@ -131,7 +132,56 @@ def api_matrix() -> Response:
         # Fleet telemetry remains useful if optional design metadata is absent.
         pass
     response["telemetry"] = _retained_telemetry(r, [*execute["cells"], *design_stream_ids])
+    # Knowledge projection health, additively (control_db_publication p3). The board answers
+    # "what is executing"; without this it could not answer "did the results get projected",
+    # and an operator reading a green board had no way to know the registry was 400 events
+    # behind. Read through the control database, not Redis, so it survives the 503 above being
+    # the wrong answer for this block — and best-effort, because a missing control database
+    # must degrade the projections panel, never the fleet matrix.
+    response["projections"] = projection_watermarks.read_report() or []
     return jsonify(response)
+
+
+def api_projections() -> Response:
+    """Return every knowledge projection's watermark — the operator's projection surface.
+
+    One row per consumer group of the knowledge event stream (registry / chroma / neo4j /
+    ledger), each carrying how far it has confirmed, how far behind the stream head it is, when
+    it last reported, and its health verdict.
+
+    Three response shapes, deliberately distinct because they are three different situations
+    and only one of them is safe:
+
+    * **200 with rows** — the control database answered. A projection that has never reported
+      still appears, as ``health: "unknown"`` / ``reported: false``: "nobody has ever run this
+      projector" is a fact an operator can act on, and omitting the row would render it as
+      indistinguishable from a projection that does not exist.
+    * **503 ``control_db_unavailable``** — there is no control database to read. NOT an empty
+      list: "no control plane" and "a control plane reporting nothing" are opposite answers,
+      and collapsing them is exactly the false-authority failure the control db was built to
+      remove.
+    * **500** — never; failures here are one of the two above.
+    """
+    report = projection_watermarks.read_report()
+    if report is None:
+        return jsonify(
+            {
+                "error": "control_db_unavailable",
+                "detail": "no control database — has the orchestrator run?",
+                "projections": [],
+            }
+        ), 503
+    unhealthy = [p for p in report if p["health"] != "current"]
+    return jsonify(
+        {
+            "projections": report,
+            # The compact block the p4 control packet carries, rendered here too so the portal
+            # and the packet can never disagree about a number they both publish.
+            "projection_lag": {p["projection"]: p["lag_events"] for p in report},
+            "unhealthy": [p["projection"] for p in unhealthy],
+            "stale_after_seconds": projection_watermarks.stale_after_seconds(),
+        }
+    )
 
 
 def api_status() -> Response:
@@ -374,6 +424,7 @@ def register(app, services: ControlRoomServices) -> None:
     _services = services
     app.get("/api/matrix")(api_matrix)
     app.get("/api/status")(api_status)
+    app.get("/api/projections")(api_projections)
     app.get("/api/events/<cell_id>")(api_events)
     app.get("/api/routing")(api_routing)
     app.get("/api/subscription-usage")(api_subscription_usage)

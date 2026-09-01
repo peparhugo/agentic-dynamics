@@ -143,10 +143,11 @@ def derive_policy(repository_id: str, revision: str) -> list:
 def derive_spec(repository_id: str, revision: str) -> list:
     """Derive one ``source_type=spec`` lifecycle record per entry in ``index.json``.
 
-    Reads the *generated* index rather than the YAMLs directly: the index is the single place
-    the spec corpus and the run ledgers have already been joined, and re-deriving that join
-    here would give the KB a second, drift-prone opinion about what "done" means. Regenerate it
-    first with ``python scripts/spec_status.py``; a missing index simply yields zero records.
+    Reads the *generated* spec_catalog rather than the YAMLs directly: the spec_catalog is the
+    single place the spec corpus and the run ledgers have already been joined, and re-deriving
+    that join here would give the KB a second, drift-prone opinion about what "done" means.
+    Regenerate it first with ``python scripts/spec_status.py``; a missing spec_catalog simply
+    yields zero records. (Vocabulary: ``docs/architecture/current/control_plane_vocabulary.md``.)
 
     Only specs whose lifecycle actually changed since their last registration come back —
     ``derive_spec_records`` consults ``registry_index.jsonl`` and skips the rest, so a re-run

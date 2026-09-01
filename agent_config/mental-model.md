@@ -38,6 +38,7 @@ control.admission ── the fail-closed spend gate: lease_registry (reserve) �
 ```
 control.supervisor ── Redis flag/session↔cell mapping contracts (no OpenCode client dep — observe only, see docs/architecture/current/supervisor_design.md)
 control.lease_watchdog ── sweeps expired leases into supervisor flags + quarantine marks (flag-only, never steers — same contract as the supervisor rail)
+control.projection_watermarks ── how far each knowledge consumer group (registry/chroma/neo4j/ledger) has CONFIRMED, its lag, and when it last reported — makes a stale projector visible instead of silently 'current' (see docs/architecture/current/control_plane_vocabulary.md)
 runtime.workflow_runner ── executes an agent_task workflow's phases inside a git worktree, committing + ledgering each
 runtime.test_runner ── independent pytest/jest/go-test/cargo-test runner; sole source of truth for test_executed_success
 ```
@@ -79,7 +80,7 @@ bounded planes (`ARCHITECTURE.md` §1; the dependency direction is enforced by
 | `runtime` | execution runtime — workflow_runner, test_runner, story, posthoc |
 | `adapters` | model backends — opencode, claude_adapter, backends |
 | `knowledge` | knowledge + augmentation — identity/authority, retrieval, prompt-construction, ingestion producers |
-| `control` | the implemented control plane — fact plane (`facts` + `fact_ingestion` + `reducers/`), context compiler, shadow-mode controller/validator, routing, supervisor, telemetry, queue steering, observation/actuation, the admission/lease gate (`lease_registry` + `admission` + `settlement` + `lease_watchdog` + `quarantine`) |
+| `control` | the implemented control plane — fact plane (`facts` + `fact_ingestion` + `reducers/`), context compiler, shadow-mode controller/validator, routing, supervisor, telemetry, queue steering, observation/actuation, the admission/lease gate (`lease_registry` + `admission` + `settlement` + `lease_watchdog` + `quarantine`), the durable control state (`control_db` + `outbox` + `projection_watermarks`) |
 | `reporting` | research output — game_report, review, analyzers |
 
 Tier map: `core` (0) ← `experiment/measurement/runtime/adapters/knowledge/reporting` (1) ←
@@ -292,6 +293,42 @@ admission record),
 (cost provenance at the run seam), and `adapters.backends.run_agentic` (the bypass guard —
 refuses under `FINOPS_ADMISSION_REQUIRED=1` with no lease context). `control.model_policy`'s
 class guard (`FINOPS_ALLOW_PRO=1`) stays as the backstop underneath.
+
+### Projection watermarks (the knowledge projection surface — WRITTEN, control_db_publication p3)
+
+Four consumer groups project ONE knowledge event stream (`kb:v1:changes`) into four
+destinations, each acking independently and each able to be down independently. Before p3 a
+projector that had not run for six hours looked exactly like one fully caught up: both were
+silent, and silence read as good news. A watermark row per projection inverts that.
+
+```
+# control.projection_watermarks — the refresh + read seam (Redis handle always INJECTED)
+PROJECTIONS = ("chroma", "ledger", "neo4j", "registry")   # derived from ks.CONSUMER_GROUPS
+projection_name(group) / group_name(projection)           # kb-chroma-v1 <-> chroma
+read_position(r, group, *, stream) -> ConsumerPosition    # XINFO GROUPS + XINFO STREAM + XPENDING
+unconfirmed_events(position) -> int | None
+  # Redis `lag` (undelivered) + XPENDING (delivered-but-unacked). NULL lag with a group that
+  # was delivered NOTHING falls back to stream_length; a partially-consumed group with NULL
+  # bookkeeping stays None. Every value is a LOWER BOUND — never a fabricated 0.
+confirmed_event_id(position, *, acked_event_id, previous) -> str
+  # acked id (first-hand, from the consumer loop) > last-delivered when nothing pending >
+  # the previous frontier. Delivered != confirmed: a pending entry was never projected.
+classify(watermark, *, max_age_seconds, now) -> ProjectionHealth
+  # no row -> UNKNOWN | last_error -> FAILING | STALE (dominates a recorded lag 0 — a zero
+  # recorded four hours ago describes four-hour-old reality) | lag None -> UNKNOWN |
+  # lag > 0 -> LAGGING | else CURRENT
+record_position / record_error / record_from_batch(db, r, group, *, acked_event_id, last_error)
+refresh_all(db, r, *, groups, stream) -> list[ProjectionWatermark]   # the observer's poll
+projection_report(db) / projection_lag(db) / unhealthy_projections(db) / read_report(path)
+  # projection_lag is the {registry: 0, chroma: 3, neo4j: 3} block the p4 packet carries
+DEFAULT_STALE_AFTER_S = 900   # [H]; override FINOPS_PROJECTION_STALE_S
+```
+
+Writers: `scripts/kb_worker.py` after every batch (first-hand — it reports the id it XACKed),
+and any observer via `refresh_all` (XINFO only, consumes nothing). `projection_watermarks` is
+the ONE documented exception to the control db's single-writer rule — each projector owns its
+own row, the table is partitioned by `projection`, and WAL serialises the writes.
+Read surfaces: `GET /api/projections` + the `projections` block on `GET /api/matrix`.
 
 ### Spec/compiler signatures (written — agentic_dynamics/experiment/{experiment_spec,compile_experiment}.py)
 
