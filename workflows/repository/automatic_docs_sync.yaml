@@ -1,0 +1,215 @@
+name: automatic_docs_sync
+question: >-
+  Make "are the docs current?" a measured, continuously-scanned, self-proposing signal
+  instead of a contention point. The derived surfaces already regenerate
+  (scripts/sync_surfaces.py + scripts/_gen_instructions.py, renderer-drift guards); what
+  drifts silently is the SOURCE-doc CONTENT — ARCHITECTURE.md claims, the mental-model
+  signatures, the skills' documented flags, the CONTEXT.md inventories — until someone
+  audits by hand (the 2026-09-01 session: run-workflow skill 7 flags vs the runner's 15+,
+  ARCHITECTURE.md zero docker coverage, a proposed design that was implemented). This
+  workflow builds the automatic rail: a deterministic drift scanner (no LLM in the scan),
+  a watchdog cadence that turns drift into an observed finding on the board + KB, a
+  proposal gate that offers the remediation workflow when drift crosses the threshold
+  (machine proposes, the controller decides — never auto-applied), and a docs-health
+  surface in the Control Room. The scan is the instrument; the gate is the policy;
+  the merge stays the controller's.
+version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: false
+repeatable: false
+# NOTE (execution path): deterministic tooling + wiring — in-process per the skill's
+# fallback; the fleet is not needed to build the drift rail.
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: false
+    context:
+      domain_context: >-
+        canonical_sources: [scripts/sync_surfaces.py (the regeneration chain — the L0
+        game board -> agent surfaces -> spec lifecycle -> data chain; --verify appends
+        the guard suite), scripts/_gen_instructions.py (render_opencode/render_claude +
+        per-target validators; the derived surfaces are regenerated, never hand-edited),
+        tests/test_agent_config_render.py (the renderer-drift + orphan guards),
+        tests/test_doc_lifecycle.py (the status-frontmatter + README-count guards),
+        tests/test_script_classification.py (the CONTEXT.md manifest guard),
+        tests/test_spec_status.py, ARCHITECTURE.md (the authority — the anchored-claim
+        convention [M]/[C] + file:line anchors, hard rule 3 of docs_architecture_refresh),
+        agent_config/ (mental-model.md, skills/, rules.md — the source surfaces),
+        scripts/CONTEXT.md (the script manifest), the drift audit as the worked example
+        (docs/architecture/current/2026-09-01_docs_drift_audit.md — the p1 hypothesis
+        table + the PASS/FAIL register), docs/reviews/docs_architecture_refresh_remediation.md
+        (F1-F5 + the acceptance gate — the remediation this rail proposes),
+        scripts/fleet/fleet_manager.py (the board — fleet:board, the supervisor tier),
+        src/agentic_dynamics/knowledge/observation_ingestion.py (the observation/flag
+        records — every supervisor verdict registrable), the systemd user units
+        (infrastructure/fleet-bootstrap.service, the claude-cred-watch.service precedent),
+        apps/control_room/ (routes + app.js — the portal surface), scripts/CONTEXT.md].
+        policies: [scan_is_deterministic, machine_proposes_controller_decides,
+        anchored_claims_or_not_merged, regenerate_never_hand_edit,
+        drift_is_a_finding_not_a_verdict].
+      challenge_context: >-
+        challenge: docs drift is a class of stale-truth — it is detected only when a
+        human audits or an agent stumbles on it, and by then the cost is paid (the master
+        agent orienting off a 2-day-old game board, a skill documenting a 7-flag CLI).
+        The risk in automating: a scanner that cries wolf (a false drift flag burns
+        trust) or a scanner too weak to catch the real class (flag-count drift, anchor
+        breakage). The design constant: the scan is deterministic and anchored — it
+        verifies the SAME claim class the docs' own hard rule demands ([M]/[C] + file:line),
+        so a finding is a reproducible statement, not a model's opinion. The gate never
+        auto-applies a remediation: the controller signs merges; the rail proposes.
+        deliberation: [the scanner first (deterministic, anchored), then the watchdog
+        cadence + the observation rail, then the proposal gate, then the portal surface].
+        session_policy: {default: continue}
+      current_state: >-
+        MEASURED (2026-09-01): the derived-surface rail exists (sync_surfaces + renderer
+        guards — renderer drift, orphans, doc status, README counts are all guarded and
+        green post-merge). The SOURCE-doc content rail does NOT exist: no automated scan
+        verifies ARCHITECTURE.md's anchored claims, the mental-model's signatures, the
+        skills' documented CLI flags, or the CONTEXT.md inventories against the code. The
+        worked example of the drift class: the 2026-09-01 audit found 6 stale / 1 missing
+        across the layer/context/docker/isolation axes + the surfaces axis; the run-workflow
+        skill documented 7 flags when the runner had 15+; the fleet design sat 'proposed'
+        while implemented. The remediation path exists (docs_refresh_remediation —
+        executed 2026-09-01, gate passed); what is missing is the automatic TRIGGER.
+        The observation rail (observation_ingestion — findings/verdicts registrable) and
+        the board (fleet:board) are the wiring points. The systemd user-unit precedent
+        (claude-cred-watch.service) is the cadence pattern.
+      hard_rules: >-
+        (1) THE SCAN IS DETERMINISTIC: the drift scanner runs zero model calls; every
+        finding is a reproducible statement (a command output or a file comparison), with
+        the same anchored-claim discipline the docs' hard rule 3 demands.
+        (2) DRIFT IS A FINDING, NOT A VERDICT: a scan writes an observation/flag record
+        (the observation rail) + the board row; it never edits a doc, never reopens a
+        branch, never auto-runs a remediation.
+        (3) MACHINE PROPOSES, CONTROLLER DECIDES: the proposal gate surfaces
+        "docs-refresh remediation warranted (N findings)" with the inventory attached;
+        the controller's approval (or an explicit flag) is required before any
+        remediation workflow is queued.
+        (4) ANCHORED OR NOT MERGED: the scanner's own inventory of anchorable claims
+        ships with [C] anchors; a scan rule without a reproducible basis is not merged.
+        (5) REGENERATE, NEVER HAND-EDIT: derived surfaces go through their generators.
+    phases:
+      - name: p1_drift_scanner
+        kind: agent
+        scope: implementation
+        timeout: 7200
+        prompt: |
+          GOAL: {goal}
+          SHAPE: build the deterministic drift scanner (scripts/scan_docs_drift.py).
+          The scanner verifies the anchorable claim classes, each as a reproducible check:
+          (a) CLI-surface claims — every documented flag in the skills/mental-model for
+          run_workflow.py, the CLI surface, and the fleet tools resolves in --help/argparse;
+          (b) module inventory claims — ARCHITECTURE.md's plane/module counts match a [C]
+          glob of src/agentic_dynamics/ at the pinned SHA;
+          (c) spec-lifecycle claims — documented spec counts match experiments/specs/index.json;
+          (d) status-vocabulary claims — every doc under docs/ carries the enforced status
+          frontmatter (mirror the doc-lifecycle guard);
+          (e) anchor integrity — every docs/ file:line anchor cited in ARCHITECTURE.md and
+          docs/architecture/current/ resolves to a file that exists at that line;
+          (f) the CONTEXT.md manifest counts vs scripts/ on disk (mirror the script-
+          classification guard).
+          Output: a JSON drift report (check id, claim, code truth, status
+          current/stale/missing, the reproducible basis) + a machine-readable drift score
+          (stale + missing counts per axis). ZERO model calls in the scan.
+          VERIFY (both directions): the scanner reports ZERO findings on the current tree
+          (post-remediation main is the clean baseline), and a seeded break (a deleted
+          line anchor, a wrong flag) is caught by the matching check.
+          DELIVER: the scanner + its tests + the zero-drift baseline run, committed.
+          LOG: PASS/FAIL with the check inventory + the baseline score; commit.
+      - name: p2_watchdog_cadence
+        kind: agent
+        scope: implementation
+        timeout: 5400
+        prompt: |
+          GOAL: {goal}
+          SHAPE: the cadence + the observation rail. A systemd user unit
+          (infrastructure/docs-drift-scan.service + .timer — the claude-cred-watch
+          precedent) runs the scanner on a schedule (default: hourly); each run writes
+          the drift report (experiments/results/docs_drift/latest.json + history lines)
+          and — when the score is non-zero — an observation/flag record via the
+          observation rail (src/agentic_dynamics/knowledge/observation_ingestion.py,
+          source_type=flag, the drift inventory attached) + a board row on fleet:board
+          (fleet_manager's board shape — the supervisor tier). A ZERO score writes the
+          "current" row + clears the stale flag (the flag lifecycle: raised by a finding,
+          cleared by a clean scan, never hand-held).
+          VERIFY (both directions): a clean scan clears a raised flag; a seeded stale
+          anchor raises the flag within one cycle.
+          DELIVER: the unit + the observation wiring + the board rows, committed.
+          LOG: PASS/FAIL with the flag lifecycle demonstrated; commit.
+      - name: p3_proposal_gate
+        kind: agent
+        scope: implementation
+        timeout: 5400
+        prompt: |
+          GOAL: {goal}
+          SHAPE: the proposal gate — the machine proposes, the controller decides. When
+          the scan's stale+missing count crosses the threshold (default: >0), the gate
+          (a) marks the flag proposal_state=warranted with the inventory attached, (b)
+          surfaces the ready-made remediation (docs_refresh_remediation — the F1-F5
+          acceptance-gate workflow) on the board as a proposed action with its budget
+          estimate, and (c) queues NOTHING. The controller's approval is an explicit
+          record: a Redis flag (docs:remediation:approved) or a board action — the
+          supervisor rail's observation-only contract holds (never auto-steer). When the
+          controller approves, the gate may enqueue the remediation workflow run (the
+          existing run_workflow path) with the drift inventory as its goal context.
+          VERIFY (both directions): a non-zero scan proposes without running; an approved
+          gate enqueues exactly the remediation, once (idempotent — a second approval is
+          a no-op while one is in flight).
+          DELIVER: the gate + the approval contract + the idempotence proof, committed.
+          LOG: PASS/FAIL with the propose-without-running + approve-runs-once evidence;
+          commit.
+      - name: p4_docs_health_surface
+        kind: agent
+        scope: implementation
+        timeout: 5400
+        prompt: |
+          GOAL: {goal}
+          SHAPE: the Control Room surface — "is the docs current?" as a number. A
+          /api/docs-health route (the last scan: score, per-axis counts, the raised-flag
+          state, the proposal status) + a portal panel rendering it beside the phases
+          board: green = current (zero findings), yellow = findings with the inventory
+          summary, red = warranted (the remediation proposal visible with the approve
+          affordance wired to the p3 gate). The route is read-only; the approve action
+          goes through the existing mutation trust gate (loopback + same-origin + JSON +
+          idempotency — the design-mutation boundary).
+          VERIFY: the route + panel render all three states (clean / findings / warranted)
+          without crashing; the approve affordance honors the idempotence contract.
+          DELIVER: the route + panel + the state tests, committed.
+          LOG: PASS/FAIL with the three-state render evidence; commit.
+factors:
+  - {name: model, levels: [deepseek/deepseek-v4-flash]}
+design: factorial
+rules:
+  - name: scanner_built
+    plane: measurement
+    evidence_class: "[C]"
+    requires: []
+    produces: [zero_drift_baseline, seeded_break_caught]
+  - name: watchdog_wired
+    plane: measurement
+    evidence_class: "[C]"
+    requires: [zero_drift_baseline]
+    produces: [flag_raised_by_finding, flag_cleared_by_clean_scan]
+  - name: proposal_gate_built
+    plane: measurement
+    evidence_class: "[C]"
+    requires: [flag_raised_by_finding]
+    produces: [proposes_without_running, approve_runs_once]
+  - name: health_surface_rendered
+    plane: measurement
+    evidence_class: "[M]"
+    requires: [approve_runs_once]
+    produces: [three_state_render, approve_idempotent]
+metrics:
+  - {name: zero_drift_baseline, agg: mean, over: cell}
+  - {name: proposes_without_running, agg: mean, over: cell}
+  - {name: three_state_render, agg: mean, over: cell}
+writeup:
+  format: lab_book
+  sections: [question, p1_drift_scanner, p2_watchdog_cadence, p3_proposal_gate, p4_docs_health_surface]
+stop: {budget_usd: 4.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}
