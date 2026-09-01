@@ -121,6 +121,11 @@ HISTORY_FILE = "history.jsonl"
 FLAGS_FILE = "flags.jsonl"
 #: The durable flag state — the authority the Redis mirror is derived from.
 STATE_FILE = "flag_state.json"
+#: The p3 proposal gate's level document (``scripts/docs_proposal_gate.py`` writes it; this
+#: module only READS it, to fill the board row's proposal fields). The name is declared here
+#: rather than in the gate because this module owns :data:`RESULTS_DIR`, and the two would
+#: otherwise have to import each other — the gate imports this module, never the reverse.
+PROPOSAL_FILE = "proposal.json"
 
 #: Live flag state for the portal. The ``docs:`` namespace is the one p3's approval flag
 #: (``docs:remediation:approved``) also lives in, keeping the rail's keys greppable as a set.
@@ -269,6 +274,28 @@ def write_flag_state(results_dir: Path, state_doc: dict) -> Path:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(state_doc, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     return path
+
+
+def read_proposal(results_dir: Path) -> dict:
+    """Read the p3 gate's proposal document, or ``{}`` when there is none.
+
+    The board row's ``proposal_state`` is LEVEL state like every other field on the row, so it is
+    resolved from the durable file at row-build time rather than remembered. That matters because
+    this watchdog rewrites ``fleet:docs_drift`` wholesale on every pass: a proposal state written
+    into the row by the gate would be clobbered within the hour if the row were not rebuilt from
+    the gate's own file. One writer per key, one source of truth per field.
+
+    Degrades to ``{}`` (which renders as ``proposal_state: "none"``) rather than raising: an
+    unreadable proposal must not cost the operator the drift numbers on the same row.
+    """
+    path = results_dir / PROPOSAL_FILE
+    if not path.exists():
+        return {}
+    try:
+        doc = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    return doc if isinstance(doc, dict) else {}
 
 
 def decide_state(report: scan_docs_drift.DriftReport) -> str:
@@ -451,6 +478,7 @@ def build_board_row(
     state: str,
     since: str,
     at: str | None = None,
+    proposal: dict | None = None,
 ) -> dict:
     """Assemble the live docs-drift row published for the supervisor board.
 
@@ -458,9 +486,11 @@ def build_board_row(
     green/yellow/red the p4 panel renders, computed here rather than in the browser so the CLI,
     the board, and the portal cannot disagree about what a score means.
 
-    Note ``proposal_state`` is present and pinned to ``"none"``: the p3 gate owns that field, and
-    declaring it here (rather than letting p3 bolt a key on later) keeps the row's shape stable
-    for the panel that reads it. This watchdog proposes nothing — hard rule 3.
+    ``proposal_state`` and ``proposed_action`` are the p3 gate's fields, RESOLVED here from the
+    gate's durable ``proposal.json`` (via ``proposal``, defaulting to ``{}``) rather than owned
+    here. The watchdog still proposes nothing — hard rule 3 — it merely renders what the gate
+    decided, exactly as it renders what the scanner measured. Resolving them at row-build time is
+    what stops this level rewrite from clobbering the gate's state within the hour.
     """
     score = report.score()
     return {
@@ -481,9 +511,11 @@ def build_board_row(
         "axes_errored": score["axes_errored"],
         "git_sha": report.to_json().get("git_sha", "unknown"),
         "report": LATEST_REPORT_REL,
-        # Owned by the p3 proposal gate; never set by the watchdog (machine proposes ≠ scanner
-        # proposes — the scan is an instrument, the gate is the policy).
-        "proposal_state": "none",
+        # Owned by the p3 proposal gate; rendered, never decided, here (machine proposes ≠
+        # scanner proposes — the scan is an instrument, the gate is the policy).
+        "proposal_state": (proposal or {}).get("state", "none"),
+        "proposed_action": (proposal or {}).get("action", {}),
+        "proposal_id": (proposal or {}).get("proposal_id", ""),
     }
 
 
@@ -577,7 +609,8 @@ def run_once(
         "why": _summarise(report),
         "axes_errored": score["axes_errored"],
     }
-    row = build_board_row(report, state=state, since=since, at=at)
+    row = build_board_row(report, state=state, since=since, at=at,
+                          proposal=read_proposal(results_dir))
 
     result = WatchdogResult(
         at=at,

@@ -107,6 +107,11 @@ _COMMANDS: dict[tuple[str, ...], str] = {
     # docs (the docs-drift rail — deterministic source-doc drift scan, zero model calls)
     ("docs", "scan"): "scan_docs_drift.py",
     ("docs", "watch"): "docs_drift_watchdog.py",
+    # ``docs gate <verb>`` forwards the verb through: the gate is one script with its own
+    # subcommand parser (status|propose|approve|dispatch|release), so the prefix stops at
+    # ``gate`` and everything after it is the script's own argv — the same shape ``registry``
+    # uses, achieved here with a plain two-token prefix rather than a special case.
+    ("docs", "gate"): "docs_proposal_gate.py",
 }
 
 #: ``_COMMANDS`` keys ordered longest-first. ``_resolve`` iterates THIS list rather than
@@ -141,7 +146,7 @@ Subcommands (each forwards to its backing script):
   supervise   [claude-agents|orphans|leases]
   release     check-protection
   surfaces    sync|snapshot
-  docs        scan
+  docs        scan|watch|gate
 
 Run `agentic-dynamics <subcommand> --help` for the backing script's own options.
 

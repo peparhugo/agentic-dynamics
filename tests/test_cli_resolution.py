@@ -104,8 +104,11 @@ DOCUMENTED_RESOLUTIONS: list[tuple[tuple[str, ...], str, tuple[str, ...]]] = [
     # surfaces — the self-maintenance command (design: system_knowledge_abstraction)
     (("surfaces", "sync"), "sync_surfaces.py", ()),
     (("surfaces", "snapshot"), "system_snapshot.py", ()),
-    # docs — the deterministic docs-drift scan (automatic_docs_sync p1)
+    # docs — the drift rail: the scan (p1), the watchdog cadence (p2), the proposal gate (p3).
     (("docs", "scan"), "scan_docs_drift.py", ()),
+    (("docs", "watch"), "docs_drift_watchdog.py", ()),
+    # ``gate`` is a prefix, not a leaf: the trailing verb is forwarded to the script's own parser.
+    (("docs", "gate"), "docs_proposal_gate.py", ()),
 ]
 
 
