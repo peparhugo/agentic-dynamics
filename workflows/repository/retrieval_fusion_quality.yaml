@@ -1,0 +1,171 @@
+name: retrieval_fusion_quality
+question: >-
+  Diagnose and fix the retrieval fusion's fused=0 finding: the two legs (dense Chroma +
+  lexical Neo4j) are live on every query (fallback full) but NEVER return the same document,
+  so the RRF weights never arbitrate — the fusion is a union. The census proved the
+  measurement; this campaign tests the three hypotheses (id-namespace disjointness, content
+  granularity mismatch, content-hash gaps), instruments the per-leg ids + content hashes so a
+  same-content join is possible, dedupes by content hash before the RRF where the join says
+  the stores know the same documents, and closes with the measured gate: fused > 0 on the
+  same 15-query census set. The finding doc
+  (docs/architecture/current/2026-09-01_retrieval_fusion_finding.md) is the baseline.
+version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: false
+repeatable: false
+# NOTE (execution path): deterministic instrumentation + a small fusion change — in-process
+# per the skill's fallback (no fleet needed to join candidate sets).
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: false
+    context:
+      domain_context: >-
+        canonical_sources: [docs/architecture/current/2026-09-01_retrieval_fusion_finding.md
+        (the baseline: fused=0 across 15 queries, both runs; the three hypotheses; the
+        dense 70->549 / lexical 336->373 split), experiments/results/retrieval_census/
+        (the two census artifacts), scripts/fleet/retrieval_census.py (the census —
+        leg attribution via the per-leg candidate lists), src/agentic_dynamics/knowledge/
+        retrieval.py (the pipeline: per-leg retrieval, deduplicate, RRF fusion by id,
+        collapse, expand, budget, select; WEIGHTS_VERSION retrieval-weights/v1; the
+        Candidate + RetrievalAttempt shapes — candidate ids are opaque 50-char hashes, no
+        content_hash exposed), src/agentic_dynamics/knowledge/knowledge.py (KnowledgeRecord:
+        knowledge_id, content_hash = sha256(record_to_artifact), source_uri), the ingestion
+        producers (knowledge_ingestion.py + story_ingestion.py — what ids the dense vs
+        lexical stores assign), src/agentic_dynamics/knowledge/graph.py + the chroma store
+        (how Neo4j element ids vs chroma ids are minted), tests/test_retrieval.py (the
+        fusion tests), the two-channel rule (facts never enter the index)].
+        policies: [measured_gate_not_vibes, fusion_by_content_when_ids_diverge,
+        no_regression_byte_identical_off, regenerate_never_hand_edit].
+      challenge_context: >-
+        challenge: fused=0 could be a benign two-view system or a fusion defect — the
+        instrument cannot tell, because the candidate ids are opaque and no content join
+        exists. The risk: "fixing" a non-problem by forcing a content-hash dedupe that
+        merges legitimately distinct records, or leaving a real defect (same documents
+        indexed under different ids, the fusion's id check never firing) unmeasured. The
+        campaign's discipline: instrument FIRST (per-leg ids + content hashes on the
+        attempt), test the three hypotheses with the join BEFORE changing the fusion, and
+        only then dedupe by content — with the no-regression guarantee (fusion-off path
+        unchanged) and the measured gate (fused > 0 on the same census set).
+        deliberation: [instrument the overlap, test the hypotheses, fix the fusion if the
+        join warrants, re-census as the gate].
+        session_policy: {default: continue}
+      current_state: >-
+        MEASURED (2026-09-01): fused=0 across 15 real queries on both census runs; both
+        legs live everywhere (fallback full); dense leg grew 70->549 as the day's knowledge
+        landed while fused stayed 0. Candidate ids are opaque hashes; no content_hash on the
+        Candidate; the per-leg attribution exists only as aggregates (the census's
+        dense_only/lexical_only/fused counts). The retrieve path was sped up 31.5s -> 6.2s
+        (the collapse cap, commit 9a4d83623) so a re-census is cheap (~90s).
+      hard_rules: >-
+        (1) INSTRUMENT BEFORE YOU CHANGE: the per-leg ids + content hashes land on the
+        RetrievalAttempt before any fusion code is touched; the hypotheses are answered
+        with the join, not asserted.
+        (2) FUSION BY CONTENT ONLY WHEN THE JOIN WARRANTS: if the join shows the stores
+        know the same documents under different ids (hypothesis 1), dedupe by content hash
+        before the id-based RRF; if the stores index genuinely different units (hypothesis
+        2), record that as the finding and do NOT force a merge.
+        (3) NO REGRESSION: the fusion-off path stays byte-identical; the existing fusion
+        tests stay green; the 15-query census set is unchanged for the gate.
+        (4) THE GATE IS FUSED > 0: the campaign closes only with fused > 0 on the same
+        census set (when hypothesis 1 held) or with the hypothesis-2 finding recorded as
+        the deliberate outcome (fused may stay 0 — documented as a two-view system).
+    phases:
+      - name: p1_overlap_instrument
+        kind: agent
+        scope: implementation
+        timeout: 7200
+        prompt: |
+          GOAL: {goal}
+          SHAPE: instrument the overlap. Extend the RetrievalAttempt (and the census rows)
+          to carry, per candidate, the leg(s) that surfaced it (dense/lexical/both) AND the
+          candidate's content hash (the KnowledgeRecord.content_hash = sha256(record_to_artifact)
+          — available on the records the stores index; where a store does not persist it,
+          derive it from the record's stored text with the same hashing rule). Then run the
+          census and answer the join question for the first time: across the 15 queries,
+          how many dense candidates share a content hash with a lexical candidate (same
+          content, different ids)? Report the per-hypothesis split: (1) same-content pairs
+          under different ids (the id-namespace hypothesis), (2) no same-content pairs (the
+          granularity hypothesis), (3) content hashes unavailable (the gap hypothesis).
+          VERIFY (both directions): a seeded same-content pair (the same record ingested
+          into both stores) is detected by the join; the existing fusion tests stay green.
+          DELIVER: the instrument + the join answer + the hypothesis verdict, committed.
+          LOG: PASS/FAIL with the overlap count + the hypothesis verdict; commit.
+      - name: p2_fusion_fix
+        kind: agent
+        scope: implementation
+        timeout: 7200
+        prompt: |
+          GOAL: {goal}
+          SHAPE: apply the p1 verdict. If hypothesis 1 (same content, divergent ids):
+          dedupe candidates by content hash BEFORE the id-based RRF, keeping the
+          higher-ranked instance and merging their leg evidence (a same-content pair
+          becomes ONE candidate with both legs' scores feeding the fusion — the RRF then
+          arbitrates for real). Keep the fusion-off path byte-identical (hard rule 3). If
+          hypothesis 2 (genuinely disjoint units): do NOT merge — record the deliberate
+          two-view outcome in the finding doc and stop the campaign at p3's writeup. If
+          hypothesis 3 (hash gaps): backfill the hashes at ingestion (the producers) and
+          re-run p1.
+          VERIFY (both directions): the seeded same-content pair now fuses (one candidate,
+          both-leg evidence); the existing fusion tests stay green; a genuinely distinct
+          pair never merges.
+          DELIVER: the fusion change + the both-directions tests, committed.
+          LOG: PASS/FAIL with the fuse-now-fires evidence; commit.
+      - name: p3_gate_recensus
+        kind: agent
+        scope: research_readonly
+        timeout: 5400
+        prompt: |
+          GOAL: {goal}
+          SHAPE: the measured gate. Re-run the census (scripts/fleet/retrieval_census.py,
+          the SAME 15-query set, same weights) and record fused > 0 on the artifact +
+          the finding doc (status: accepted, the before/after table). If the campaign took
+          the hypothesis-2 path, record the two-view verdict with the fused=0 explained
+          and the no-fix decision. Run the retrieval + census tests green.
+          DELIVER: the gated census artifact + the updated finding doc, committed.
+          LOG: PASS/FAIL with the fused count before/after; commit.
+      - name: p4_writeup
+        kind: agent
+        scope: implementation
+        timeout: 3600
+        prompt: |
+          GOAL: {goal}
+          SHAPE: close the campaign. The writeup: the hypothesis verdicts with the join
+          numbers, the fusion change (or the no-change decision), the gated census
+          before/after, and the meaning for the augmentation path (a fused candidate now
+          carries both-leg evidence — what that does to the evidence cards). The spec
+          index must carry retrieval_fusion_quality as completed.
+          DELIVER: the writeup + the regenerated spec index, committed.
+          LOG: PASS/FAIL; commit.
+factors:
+  - {name: model, levels: [deepseek/deepseek-v4-flash]}
+design: factorial
+rules:
+  - name: overlap_instrumented
+    plane: measurement
+    evidence_class: "[M]"
+    requires: []
+    produces: [join_answer, hypothesis_verdict]
+  - name: fusion_fixed_or_decided
+    plane: measurement
+    evidence_class: "[C]"
+    requires: [join_answer]
+    produces: [content_fusion_or_two_view_recorded, no_regression]
+  - name: gate_recensused
+    plane: measurement
+    evidence_class: "[M]"
+    requires: [content_fusion_or_two_view_recorded]
+    produces: [fused_positive_or_two_view_documented]
+metrics:
+  - {name: join_answer, agg: mean, over: cell}
+  - {name: fused_positive_or_two_view_documented, agg: mean, over: cell}
+  - {name: no_regression, agg: mean, over: cell}
+writeup:
+  format: lab_book
+  sections: [question, p1_overlap_instrument, p2_fusion_fix, p3_gate_recensus, p4_writeup]
+stop: {budget_usd: 3.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}
