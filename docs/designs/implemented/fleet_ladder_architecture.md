@@ -58,7 +58,8 @@ OpenCode state but is shared by scaled cell services, so it is not per-cell stat
 (`infrastructure/docker-compose.ladder.yml:57-64,90-97,143-155`). [C] The mount guard's allowlist
 now covers compose's repository-alias and `.git` overlay targets, mirroring the wrapper's runtime
 `CONTRACT_TARGETS` (`scripts/fleet/spawn_wrapper.py:79-97`); `test_mount_contract_holds_no_unexpected_target`
-passes and the guard is not weakened (`tests/test_fleet_guards.py:86-102,120-127`).
+passes and `test_mount_guard_rejects_a_foreign_target` proves the guard still fails on an invented
+foreign target — the guard is not weakened (`tests/test_fleet_guards.py:86-102,136-153`).
 
 [M] The closed `SCOPE_VOCABULARY`, `SCOPE_CONFIGS`, and `PHASE_SCOPE_AUTHORIZATION` declare the
 allowed phase scopes, result modes, network, and write flags

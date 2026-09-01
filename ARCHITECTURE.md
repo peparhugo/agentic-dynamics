@@ -248,8 +248,9 @@ OpenCode state out of cells, but it is shared by scaled cells and therefore is n
 isolation (`infrastructure/docker-compose.ladder.yml:57-64,90-97,143-155`). [C] The mount guard's
 allowlist covers the repository-alias and `.git` targets declared by compose, mirroring the
 wrapper's runtime `CONTRACT_TARGETS` (`scripts/fleet/spawn_wrapper.py:79-97`); its
-`test_mount_contract_holds_no_unexpected_target` check passes and the guard is not weakened
-(`tests/test_fleet_guards.py:86-102,120-127`).
+`test_mount_contract_holds_no_unexpected_target` check passes (and
+`test_mount_guard_rejects_a_foreign_target` proves a foreign target still fails) and the guard is
+not weakened (`tests/test_fleet_guards.py:86-102,136-153`).
 
 [M] The accepted slice-4 log records the then-run coverage for mount targets, the single socket
 tier, supervisor mount restrictions, heartbeats/DLQ, the write boundary, and scope/network

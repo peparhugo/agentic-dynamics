@@ -103,8 +103,13 @@ ALLOWED_MOUNT_TARGETS = {
 
 ORCHESTRATOR_SERVICES = {"campaign-wrapper", "workflow-runner"}
 SUPERVISOR_SERVICES = {
-    "fleet-manager", "control-room", "game-board", "trigger-reviews",
-    "registry-cli", "bundle-reference-check", "report-tools",
+    "fleet-manager",
+    "control-room",
+    "game-board",
+    "trigger-reviews",
+    "registry-cli",
+    "bundle-reference-check",
+    "report-tools",
 }
 KB_CONSUMERS = {"kb-chroma", "kb-ledger", "kb-registry", "kb-neo4j"}
 
@@ -112,14 +117,48 @@ KB_CONSUMERS = {"kb-chroma", "kb-ledger", "kb-registry", "kb-neo4j"}
 # ── guard 1 — the compose-contract guard (D-13 / D-3) ────────────────────────
 
 
-def test_mount_contract_holds_no_unexpected_target():
-    compose = _compose()
+def _mount_contract_violations(compose: dict) -> list[tuple[str, str]]:
+    """Return ``[(service, target)]`` for every mount target outside the allowlist.
+
+    The single shared check for both directions of the mount guard: the positive
+    (every declared compose target is allowed) and the negative (a foreign target is
+    rejected). Keeping them on one predicate means the negative test proves the guard
+    still bites — it cannot silently diverge from what the positive test enforces.
+    """
+    out: list[tuple[str, str]] = []
     for name, svc in compose["services"].items():
         for target, _mode in _volume_targets(svc):
-            assert target in ALLOWED_MOUNT_TARGETS, (
-                f"service {name!r} mounts {target!r} — outside the four-mount contract "
-                f"+ the D-2 auth set + the fleet-logs named volume"
-            )
+            if target not in ALLOWED_MOUNT_TARGETS:
+                out.append((name, target))
+    return out
+
+
+def test_mount_contract_holds_no_unexpected_target():
+    violations = _mount_contract_violations(_compose())
+    assert violations == [], (
+        "these mounts are outside the four-mount contract + the D-2 auth set + the "
+        f"fleet-logs named volume: {violations}"
+    )
+
+
+def test_mount_guard_rejects_a_foreign_target():
+    """Both-directions evidence (F5): the guard still fails on an invented foreign mount.
+
+    The allowlist was aligned with the wrapper's runtime ``CONTRACT_TARGETS``
+    (repo-alias + ``.git`` overlays), never weakened — an unexpected target must still
+    fail. The compose's volume anchors are shared across the cell services, so a deep
+    copy is injected with a genuinely foreign target to prove the guard bites.
+    """
+    import copy
+
+    compose = copy.deepcopy(_compose())
+    foreign = "/opt/something/not/allowed:/opt/something/not/allowed:ro"
+    compose["services"]["story-worker"]["volumes"].append(foreign)
+    violations = _mount_contract_violations(compose)
+    assert ("story-worker", "/opt/something/not/allowed") in violations, (
+        "the mount guard must still reject a genuinely foreign mount target — the "
+        "allowlist alignment must never weaken it"
+    )
 
 
 def test_socket_appears_in_exactly_one_tier():
@@ -256,7 +295,9 @@ def test_neo4j_index_populated_and_group_caught_up_live(neo4j_available):
 
 def test_exactly_one_kb_consumer_carries_the_write_flag():
     compose = _compose()
-    writers = [n for n in KB_CONSUMERS if _env(compose["services"][n]).get("FINOPS_KB_WRITE") == "1"]
+    writers = [
+        n for n in KB_CONSUMERS if _env(compose["services"][n]).get("FINOPS_KB_WRITE") == "1"
+    ]
     assert writers == ["kb-registry"], (
         f"exactly the kb-registry consumer must carry FINOPS_KB_WRITE=1 (D-11), got {writers}"
     )
@@ -370,7 +411,9 @@ def test_implementation_workflow_phases_are_authorized():
         phase_scope,
     )
 
-    spec = ExperimentSpec.from_yaml(ROOT / "workflows" / "repository" / "fleet_ladder_implementation.yaml")
+    spec = ExperimentSpec.from_yaml(
+        ROOT / "workflows" / "repository" / "fleet_ladder_implementation.yaml"
+    )
     for phase in spec.workflow.params.get("phases") or []:
         authorized = phase_scope(phase)
         assert authorized in SCOPE_VOCABULARY, (
