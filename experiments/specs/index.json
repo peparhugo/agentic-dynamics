@@ -1,7 +1,7 @@
 {
   "schema_version": "spec-status/v2",
-  "generated_at": "2026-09-01T04:18:59.346446+00:00",
-  "n_specs": 175,
+  "generated_at": "2026-09-01T05:05:51.829303+00:00",
+  "n_specs": 177,
   "specs": [
     {
       "name": "auto_posthoc_wiring",
@@ -20,24 +20,6 @@
       "latest_git_sha": "01517934f",
       "results_pointer": "experiments/results/workflows/auto_posthoc_wiring/20260817T161730Z.json",
       "n_runs": 1
-    },
-    {
-      "name": "automatic_docs_sync",
-      "version": "0.1",
-      "status": "runnable",
-      "spec_path": "workflows/repository/automatic_docs_sync.yaml",
-      "artifact_kind": "workflow",
-      "repeatable": false,
-      "supersedes": [],
-      "superseded_by": null,
-      "completed_at": null,
-      "last_run_at": null,
-      "latest_ok": null,
-      "latest_model": null,
-      "latest_cost_usd": null,
-      "latest_git_sha": null,
-      "results_pointer": null,
-      "n_runs": 0
     },
     {
       "name": "cap_2a_calibration_cell",
@@ -400,6 +382,24 @@
       "n_runs": 0
     },
     {
+      "name": "control_room_live_board",
+      "version": "0.1",
+      "status": "runnable",
+      "spec_path": "workflows/repository/control_room_live_board.yaml",
+      "artifact_kind": "workflow",
+      "repeatable": false,
+      "supersedes": [],
+      "superseded_by": null,
+      "completed_at": null,
+      "last_run_at": null,
+      "latest_ok": null,
+      "latest_model": null,
+      "latest_cost_usd": null,
+      "latest_git_sha": null,
+      "results_pointer": null,
+      "n_runs": 0
+    },
+    {
       "name": "delta_entropy_response_campaign",
       "version": "0.1",
       "status": "runnable",
@@ -625,13 +625,13 @@
       "supersedes": [],
       "superseded_by": null,
       "completed_at": null,
-      "last_run_at": null,
-      "latest_ok": null,
-      "latest_model": null,
-      "latest_cost_usd": null,
-      "latest_git_sha": null,
-      "results_pointer": null,
-      "n_runs": 0
+      "last_run_at": "2026-09-01T04:45:49.093151+00:00",
+      "latest_ok": false,
+      "latest_model": "deepseek/deepseek-v4-flash",
+      "latest_cost_usd": 0.001582,
+      "latest_git_sha": "877708cd9",
+      "results_pointer": "experiments/results/workflows/retrieval_activation_augment_proof/20260901T044549Z.json",
+      "n_runs": 5
     },
     {
       "name": "routing_kb_dispatch",
@@ -710,6 +710,24 @@
       "version": "0.1",
       "status": "runnable",
       "spec_path": "workflows/research/self_recommending_experiment.yaml",
+      "artifact_kind": "workflow",
+      "repeatable": false,
+      "supersedes": [],
+      "superseded_by": null,
+      "completed_at": null,
+      "last_run_at": null,
+      "latest_ok": null,
+      "latest_model": null,
+      "latest_cost_usd": null,
+      "latest_git_sha": null,
+      "results_pointer": null,
+      "n_runs": 0
+    },
+    {
+      "name": "test_suite_speed",
+      "version": "0.1",
+      "status": "runnable",
+      "spec_path": "workflows/repository/test_suite_speed.yaml",
       "artifact_kind": "workflow",
       "repeatable": false,
       "supersedes": [],
@@ -886,24 +904,6 @@
       "n_runs": 1
     },
     {
-      "name": "retrieval_activation",
-      "version": "0.1",
-      "status": "failed",
-      "spec_path": "workflows/repository/retrieval_activation.yaml",
-      "artifact_kind": "workflow",
-      "repeatable": false,
-      "supersedes": [],
-      "superseded_by": null,
-      "completed_at": null,
-      "last_run_at": "2026-09-01T00:48:48.663920+00:00",
-      "latest_ok": false,
-      "latest_model": "openai/gpt-5.6-luna",
-      "latest_cost_usd": 0.663896,
-      "latest_git_sha": "523c0bac1",
-      "results_pointer": "experiments/results/workflows/retrieval_activation/20260901T004848Z.json",
-      "n_runs": 1
-    },
-    {
       "name": "admission_leases",
       "version": "0.1",
       "status": "completed",
@@ -920,6 +920,24 @@
       "latest_git_sha": "110d297f6",
       "results_pointer": "experiments/results/workflows/admission_leases/20260901T003719Z.json",
       "n_runs": 5
+    },
+    {
+      "name": "automatic_docs_sync",
+      "version": "0.1",
+      "status": "completed",
+      "spec_path": "workflows/repository/automatic_docs_sync.yaml",
+      "artifact_kind": "workflow",
+      "repeatable": false,
+      "supersedes": [],
+      "superseded_by": null,
+      "completed_at": null,
+      "last_run_at": "2026-09-01T03:43:12.692667+00:00",
+      "latest_ok": true,
+      "latest_model": "anthropic/claude-opus-5",
+      "latest_cost_usd": 47.516709,
+      "latest_git_sha": "f6ef98353",
+      "results_pointer": "experiments/results/workflows/automatic_docs_sync/20260901T034312Z.json",
+      "n_runs": 1
     },
     {
       "name": "beta_lab_execution",
@@ -2882,6 +2900,24 @@
       "n_runs": 2
     },
     {
+      "name": "retrieval_activation",
+      "version": "0.1",
+      "status": "completed",
+      "spec_path": "workflows/repository/retrieval_activation.yaml",
+      "artifact_kind": "workflow",
+      "repeatable": false,
+      "supersedes": [],
+      "superseded_by": null,
+      "completed_at": null,
+      "last_run_at": "2026-09-01T01:59:21.012287+00:00",
+      "latest_ok": true,
+      "latest_model": "anthropic/claude-sonnet-5",
+      "latest_cost_usd": 10.385829,
+      "latest_git_sha": "469b15559",
+      "results_pointer": "experiments/results/workflows/retrieval_activation/20260901T015921Z.json",
+      "n_runs": 2
+    },
+    {
       "name": "retrieval_fusion_quality",
       "version": "0.1",
       "status": "completed",
@@ -2891,13 +2927,13 @@
       "supersedes": [],
       "superseded_by": null,
       "completed_at": null,
-      "last_run_at": "2026-09-01T04:10:00+00:00",
+      "last_run_at": "2026-09-01T04:20:12.027115+00:00",
       "latest_ok": true,
       "latest_model": "deepseek/deepseek-v4-flash",
-      "latest_cost_usd": 0.0,
-      "latest_git_sha": "1cfee6fc1",
-      "results_pointer": "experiments/results/workflows/retrieval_fusion_quality/20260901T041000Z.json",
-      "n_runs": 1
+      "latest_cost_usd": 0.140816,
+      "latest_git_sha": "ee875703a",
+      "results_pointer": "experiments/results/workflows/retrieval_fusion_quality/20260901T042012Z.json",
+      "n_runs": 2
     },
     {
       "name": "retry_observational_analysis",
