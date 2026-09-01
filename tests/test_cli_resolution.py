@@ -51,6 +51,7 @@ DOCUMENTED_RESOLUTIONS: list[tuple[tuple[str, ...], str, tuple[str, ...]]] = [
     # workflow
     (("workflow", "run"), "run_workflow.py", ()),
     (("workflow", "discard-tree"), "record_discarded_tree.py", ()),
+    (("workflow", "promote"), "promote.py", ()),
     # queue
     (("queue", "enqueue"), "enqueue.py", ()),
     (("queue", "worker"), "worker.py", ()),

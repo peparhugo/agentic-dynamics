@@ -1841,11 +1841,16 @@ def _enforce_commit_prefix(
     # and a buried single offender were refused): the rewrite handles every shape. Commit-time
     # prevention is the FIRST line of defense (``_install_commit_msg_hook`` — the agent cannot
     # produce a violating commit); this gate path is the backstop for pre-hook commits and
-    # for ``FINOPS_COMMIT_HOOK=0`` runs. ``FINOPS_COMMIT_GATE=strict`` restores the
-    # fail-with-evidence mode outright. TREE violations (the relabel — a discarded tree
-    # re-presented) are NEVER canonicalized: they stay strict failures (cap_runner_hardening2
-    # p2).
-    if os.environ.get("FINOPS_COMMIT_GATE", "canonicalize") != "strict" and bad:
+    # for ``FINOPS_COMMIT_HOOK=0`` runs.
+    #
+    # P0-4 (control-plane stabilization): the DEFAULT flipped to ``strict``. A runtime that
+    # rewrites history changes commit SHAs after work was produced — and after evidence
+    # (ledgers, reviews, promotion candidates) referenced those SHAs. Message normalization
+    # belongs to PROMOTION (the non-LLM promoter squashes/normalizes the candidate on the way
+    # into main), never to the executor that produced the work. ``FINOPS_COMMIT_GATE=
+    # canonicalize`` remains available as an explicit opt-in for operators who accept the
+    # rewrite; the ordinary autonomous path fails with evidence instead.
+    if os.environ.get("FINOPS_COMMIT_GATE", "strict") == "canonicalize" and bad:
         rewritten_sha = _canonicalize_commit_range(wd, pre_head, expected, bad)
         if rewritten_sha:
             # Re-read the WHOLE range: a successful rewrite must leave zero violations.

@@ -51,6 +51,25 @@ path (the campaign machinery commits to `main` between phases), and the four req
 checks + loud CI are its safety net — not a review requirement (zero required reviews,
 the solo-dev shape).
 
+## P0-4 promotion boundary (control-plane stabilization, 2026-09-01)
+
+The workflow machinery itself never pushes to `main`. Execution produces a **candidate**
+(a worktree whose head is the verified `git_sha`); `scripts/promote.py`
+(`agentic-dynamics workflow promote`) is the ONLY command that updates `main`, and it
+refuses unless:
+
+1. the candidate head matches the run ledger's `git_sha` (a rewritten candidate refuses —
+   never repaired);
+2. every phase recorded `ok` with a `commit_hash`;
+3. every `kind: test` phase carries an independent `test_executed_success` verdict
+   (`None` = the declared verification never ran = refuse);
+4. an awaiting run is bound by a real operator approval naming THIS candidate.
+
+Message normalization (the `[workflow] <spec>` squash subject) happens at promotion, never
+by rewriting agent history inside the runtime: the workflow runner's commit-gate default
+is now `strict` (fail-with-evidence; `FINOPS_COMMIT_GATE=canonicalize` remains an explicit
+opt-in for operators who accept the rewrite).
+
 ## Applied settings (exact — verified live 2026-08-28)
 
 | Setting | Value | Notes |
