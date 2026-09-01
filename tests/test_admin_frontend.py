@@ -244,3 +244,98 @@ def test_pipeline_stages_surface_three_stage_view():
     assert ".pipeline-stages" in css
     assert ".pipeline-stage" in css
     assert ".stage-counts" in css
+
+
+def test_docs_health_panel_renders_three_states_and_never_colour_alone():
+    """The docs-drift rail's panel is mounted, and every state carries a word, not just a hue.
+
+    Structural, like the rest of this module — the repo has no JS runtime dependency, so the
+    guard is that the page and the client carry the affordances the design requires. The
+    behavioural half (which state resolves to which colour, and what the approve button does)
+    is covered by ``tests/test_docs_health.py`` against the real route.
+    """
+    html = (STATIC / "index.html").read_text()
+    css = (STATIC / "style.css").read_text()
+    app = (STATIC / "app.js").read_text()
+
+    # The panel is mounted in the fleet board, beside the pipeline-stage strip.
+    for required in (
+        'id="docs-health"',
+        'id="docs-health-word"',
+        'id="docs-health-glyph"',
+        'id="docs-health-headline"',
+        'id="docs-health-axes"',
+        'id="docs-health-inventory"',
+        'id="docs-health-proposal"',
+        'id="docs-health-approve-form"',
+    ):
+        assert required in html, required
+    assert html.index('id="pipeline-stages"') < html.index('id="docs-health"')
+
+    # All four conditions have a colour rule, and the two red ones are told apart by their word.
+    for condition in ("clean", "findings", "warranted", "unmeasured"):
+        assert f'.docs-health[data-condition="{condition}"]' in css, condition
+    assert "#docs-health-word" in css
+
+    # The client obeys the server's verdict rather than deriving a colour from a drift count.
+    assert "panel.dataset.condition = String(data.condition" in app
+    assert 'word.textContent = String(data.word' in app
+    # The approve affordance is hidden unless the server says the proposal is approvable.
+    assert "form.hidden = !proposal.approvable" in app
+
+
+def test_docs_health_approve_goes_through_the_mutation_trust_gate():
+    """The approve affordance posts JSON with an Idempotency-Key derived from the proposal.
+
+    Deriving the key (rather than minting a fresh UUID like the other portal mutations) is what
+    makes a double-click replay the first answer instead of reaching the gate twice. The fresh
+    key is reserved for the retryable case, where the gate rolled its claim back and the rail is
+    genuinely dispatchable again.
+    """
+    app = (STATIC / "app.js").read_text()
+
+    assert '"/api/docs-health/approve"' in app
+    assert '`docs-approve:${proposalId}`' in app
+    assert '`docs-approve:${proposalId}:${mutationKey()}`' in app
+    assert '"Idempotency-Key": key' in app
+    # A poll landing mid-approval must not repaint the form under the operator's hands.
+    assert "if (state.docsHealthApprovePending) return" in app
+    # An unattributed approval is refused client-side too, so the operator sees why immediately.
+    assert "an unattributed approval is not an approval" in app
+
+
+def test_docs_health_panel_never_falls_back_to_green_on_failure():
+    """A fetch failure paints the unmeasured state, not a clean one."""
+    app = (STATIC / "app.js").read_text()
+
+    unavailable = app[app.index("function renderDocsHealthUnavailable"):]
+    unavailable = unavailable[: unavailable.index("\n  }\n")]
+    assert 'condition: "unmeasured"' in unavailable
+    assert 'health: "red"' in unavailable
+    assert "green" not in unavailable
+
+
+def test_docs_health_panel_ids_queried_by_the_client_all_exist_in_the_shell():
+    """Every ``$("#docs-health-…")`` the client queries is an id the page actually defines.
+
+    A mismatched id is not a visible error — ``$()`` returns null, the guarded render returns
+    early, and the panel silently stops updating that field. Structural assertions on individual
+    ids cannot catch it, because both sides look fine in isolation; only the correspondence
+    between them does. The repository has no JavaScript runtime dependency, so this cross-check
+    is how the wiring gets verified without a browser.
+
+    ``docs-health-title`` is defined but not queried on purpose: it is the ``aria-labelledby``
+    target for the panel's section, so it exists for the accessibility tree rather than for the
+    client to write into.
+    """
+    import re
+
+    app = (STATIC / "app.js").read_text()
+    html = (STATIC / "index.html").read_text()
+
+    queried = set(re.findall(r'\$\("#(docs-health[a-z-]*)"\)', app))
+    defined = set(re.findall(r'id="(docs-health[a-z-]*)"', html))
+
+    assert queried, "the client no longer queries the docs-health panel at all"
+    assert queried <= defined, f"client queries ids the page does not define: {sorted(queried - defined)}"
+    assert defined - queried == {"docs-health-title"}, sorted(defined - queried)

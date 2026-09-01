@@ -111,6 +111,8 @@ import hashlib
 import json
 import os
 import sys
+import tempfile
+from contextlib import suppress
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable
@@ -306,8 +308,18 @@ def report_is_measured(report: dict) -> bool:
     Mirrors ``docs_drift_watchdog.decide_state``'s ``unmeasured`` test. Kept as its own predicate
     because the gate consults it three times (propose, approve, dispatch) and each of those is a
     place where treating a partial scan as authoritative would spend money on a guess.
+
+    ``score`` is type-checked rather than only truthiness-checked: ``(x or {})`` rescues a missing
+    or empty value but passes a WRONG-TYPED one straight through to a ``.get`` it does not have.
+    A half-written ``latest.json`` (the watchdog rewrites it every pass, so a reader can land
+    mid-write) would therefore crash ``propose``/``approve``/``dispatch`` rather than degrade —
+    and this predicate exists precisely to make an untrustworthy report safe to handle. Found by
+    the p4 panel's malformed-report tests, which reach this function through the same seam.
     """
-    return not report.get("errors") and not (report.get("score") or {}).get("axes_errored")
+    if not isinstance(report, dict) or report.get("errors"):
+        return False
+    score = report.get("score")
+    return not (score.get("axes_errored") if isinstance(score, dict) else False)
 
 
 def summarise_score(score: dict) -> str:
@@ -531,10 +543,44 @@ def read_proposal(results_dir: Path | None = None) -> dict:
 
 
 def write_proposal(results_dir: Path, proposal: dict) -> Path:
-    """Persist the proposal document (level state — rewritten on every decision)."""
+    """Persist the proposal document (level state — rewritten on every decision).
+
+    ATOMIC: written to a sibling temp file and ``os.replace``'d into position, so a reader never
+    observes a half-written document. ``write_text`` truncates and then writes, leaving a window
+    in which ``read_proposal`` returns ``{}`` — which the gate reads as *no proposal stands*.
+    That is not a graceful degradation like a missing file; it is a WRONG ANSWER, and it makes
+    ``approve``/``dispatch`` refuse with ``refused_no_proposal`` against a proposal that is very
+    much standing.
+
+    The window was always there — the hourly watchdog reads this file on a timer while a CLI
+    ``docs gate approve`` may be writing it — but a single CLI writer made it vanishingly
+    unlikely. The p4 Control Room route makes it easy: Flask serves ``threaded=True``, so two
+    operators (or two tabs) approving at once are two genuine concurrent writers. Observed
+    directly in the 8-way concurrency check for that route, where one caller was refused
+    ``refused_no_proposal`` mid-flight; ``os.replace`` is atomic on POSIX for a same-directory
+    rename, so the reader now sees either the old document or the new one and never neither.
+
+    This does NOT make the read-modify-write sequence in ``approve``/``dispatch`` atomic, and it
+    is not meant to. Serialising the *decision* is the claim's job (``O_EXCL`` in
+    :func:`claim_run`) — that is the guard that makes spending exactly-once. This only ensures
+    that whatever a reader sees is a document somebody actually wrote.
+    """
     path = results_dir / PROPOSAL_FILE
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(proposal, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    body = json.dumps(proposal, indent=2, sort_keys=True) + "\n"
+    # The temp file is unique per writer (pid + a monotonic counter via tempfile) and lands in
+    # the SAME directory, because os.replace is only atomic within one filesystem.
+    fd, tmp_name = tempfile.mkstemp(dir=str(path.parent), prefix=".proposal-", suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as handle:
+            handle.write(body)
+        os.replace(tmp_name, path)
+    except BaseException:
+        # Never leave a temp file behind on a failed write — the results dir is inspected by
+        # hand, and stray .proposal-*.tmp files would read as rail state.
+        with suppress(OSError):
+            os.unlink(tmp_name)
+        raise
     return path
 
 

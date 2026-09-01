@@ -956,18 +956,20 @@ def test_design_session_input_forwards_allowlisted_delivery(monkeypatch):
 
 
 def test_route_inventory_covers_all_registered_routes():
-    """F2: the inventory's 29 routes match the actual url_map exactly.
+    """F2: the inventory's 31 routes match the actual url_map exactly.
 
     The count tracks the documented inventory in ``apps/control_room/server.py``'s module
     docstring and ``scripts/CONTEXT.md``. It went 28 -> 29 when ``GET /api/subscription-usage``
-    landed; this guard is what catches a route shipped without its inventory entry, so a bump
-    here must always be paired with the doc update (never the other way round).
+    landed, and 29 -> 31 when the docs-health pair (``GET /api/docs-health`` +
+    ``POST /api/docs-health/approve``) landed with the docs-drift rail's p4; this guard is what
+    catches a route shipped without its inventory entry, so a bump here must always be paired
+    with the doc update (never the other way round).
     """
     rules = [rule for rule in server.app.url_map.iter_rules() if not rule.rule.startswith("/static")]
 
     # GET and POST on the same path register two Rule objects; count them
-    # (29), then dedupe for path-membership assertions below.
-    assert len(rules) == 29
+    # (31), then dedupe for path-membership assertions below.
+    assert len(rules) == 31
     routes = {rule.rule for rule in rules}
 
     # The surfaces the stale inventory omitted are all registered.
@@ -984,6 +986,8 @@ def test_route_inventory_covers_all_registered_routes():
         "/api/design-sessions/<portal_id>/spec",
         "/api/design-sessions/<portal_id>/save",
         "/api/design-sessions/<portal_id>/run",
+        "/api/docs-health",
+        "/api/docs-health/approve",
     ):
         assert required in routes, f"missing route in inventory: {required}"
 
