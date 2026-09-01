@@ -4,6 +4,9 @@ from agentic_dynamics.measurement.basin import BasinMetrics
 from agentic_dynamics.measurement.solution import SolutionMetrics
 
 
+import pytest
+pytestmark = pytest.mark.fast
+
 def _scrub_nan(d: dict) -> dict:
     for k, v in d.items():
         if isinstance(v, float) and v != v:

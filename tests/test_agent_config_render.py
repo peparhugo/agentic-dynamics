@@ -25,6 +25,9 @@ from pathlib import Path
 
 from scripts import _gen_instructions as gen
 
+import pytest
+pytestmark = pytest.mark.fast
+
 ROOT = Path(__file__).resolve().parent.parent
 
 

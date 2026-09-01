@@ -203,3 +203,85 @@ def test_real_re_derive_agent_phase_carries_bool(tmp_path):
 
     facts = _attempt_facts(result.to_dict())
     assert _verified_value(facts, "implement") == "true"
+
+
+# ── Scoped mode (test_suite_speed p2 — the runner targets the spec's tests, not 2,615) ──
+
+
+def _spec_with_scoped_test_phase(tests):
+    """control_room_portal with the verify (kind:test) phase's ``tests:`` field set."""
+    spec = load_spec(SPEC)
+    spec.workflow.params["phases"] = [
+        dict(p, tests=tests) if p.get("kind") == "test" else p
+        for p in spec.workflow.params["phases"]
+    ]
+    return spec
+
+
+def test_run_suite_scoped_target_runs_only_the_target(tmp_path):
+    """``run_suite(target=...)`` runs the declared file(s) — never the whole tree."""
+    from agentic_dynamics.runtime.test_runner import run_suite
+
+    (tmp_path / "app.py").write_text("def add(a, b):\n    return a + b\n")
+    (tmp_path / "test_app.py").write_text(
+        "from app import add\n\ndef test_add():\n    assert add(1, 2) == 3\n"
+        "def test_sub():\n    assert add(2, 2) == 4\n"
+    )
+    (tmp_path / "test_other.py").write_text("def test_unrelated():\n    assert True\n")
+
+    scoped = run_suite(tmp_path, "python", target="test_app.py")
+    assert scoped["total"] == 2, scoped  # the target's 2 tests, not the tree's 3
+    assert scoped["failed"] == 0 and scoped["pass_rate"] == 1.0
+    assert "test_unrelated" not in scoped["tail"] or scoped["total"] == 2
+
+    whole = run_suite(tmp_path, "python")
+    assert whole["total"] == 3, whole  # no target → the historical whole-tree scope
+
+
+def test_test_phase_with_tests_field_runs_scoped_and_seconds_fast(tmp_path):
+    """A spec's test phase with ``tests:`` runs ONLY the declared target (in seconds, not the
+    600s whole-tree wall) — the augment-proof failure mode is structurally impossible."""
+    (tmp_path / "app.py").write_text("def add(a, b):\n    return a + b\n")
+    (tmp_path / "test_app.py").write_text(
+        "from app import add\n\ndef test_add():\n    assert add(1, 2) == 3\n"
+        "def test_sub():\n    assert add(2, 2) == 4\n"
+        "def test_mul():\n    assert add(1, 0) == 1\n"
+    )
+    (tmp_path / "test_other.py").write_text("def test_unrelated():\n    assert True\n")
+    subprocess.run(["git", "init", "-q"], cwd=tmp_path, check=True)
+    subprocess.run(["git", "config", "user.email", "t@t"], cwd=tmp_path, check=True)
+    subprocess.run(["git", "config", "user.name", "t"], cwd=tmp_path, check=True)
+    subprocess.run(["git", "add", "-A"], cwd=tmp_path, check=True)
+    subprocess.run(["git", "commit", "-qm", "seed"], cwd=tmp_path, check=True)
+
+    spec = _spec_with_scoped_test_phase(["test_app.py"])
+    result = run_workflow(spec, goal="g", model="m", workdir=tmp_path,
+                          run_agentic_fn=lambda *a, **k: _fake_agent())
+    verify = next(p for p in result.phases if p.phase == "verify")
+    assert verify.kind == "test"
+    assert verify.test_executed_success is True
+    assert verify.tests_total == 3, verify.tests_total  # the spec's 3 tests
+    assert verify.tests_passed == 3
+    assert verify.status == "ok"
+    assert verify.duration_s < 60, "the scoped phase must run in seconds, never the tree wall"
+
+
+def test_test_phase_with_failing_target_fails_the_phase(tmp_path):
+    """The scoped mode still FAILS on a broken target — the proof survives the scope."""
+    (tmp_path / "app.py").write_text("def add(a, b):\n    return a + b\n")
+    (tmp_path / "test_app.py").write_text(
+        "from app import add\n\ndef test_add():\n    assert add(1, 2) == 99\n"
+    )
+    subprocess.run(["git", "init", "-q"], cwd=tmp_path, check=True)
+    subprocess.run(["git", "config", "user.email", "t@t"], cwd=tmp_path, check=True)
+    subprocess.run(["git", "config", "user.name", "t"], cwd=tmp_path, check=True)
+    subprocess.run(["git", "add", "-A"], cwd=tmp_path, check=True)
+    subprocess.run(["git", "commit", "-qm", "seed"], cwd=tmp_path, check=True)
+
+    spec = _spec_with_scoped_test_phase(["test_app.py"])
+    result = run_workflow(spec, goal="g", model="m", workdir=tmp_path,
+                          run_agentic_fn=lambda *a, **k: _fake_agent())
+    verify = next(p for p in result.phases if p.phase == "verify")
+    assert verify.status == "failed"
+    assert verify.test_executed_success is False
+    assert result.ok is False

@@ -26,6 +26,8 @@ from pathlib import Path
 
 import pytest
 
+pytestmark = pytest.mark.fast
+
 ROOT = Path(__file__).resolve().parent.parent
 BUILD_DATA = ROOT / "scripts" / "build_data.py"
 ROUTING = ROOT / "src" / "agentic_dynamics" / "control" / "routing.py"

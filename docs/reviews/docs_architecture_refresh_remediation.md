@@ -1,21 +1,10 @@
 ---
-<<<<<<< HEAD
-status: proposed
-=======
 status: accepted
->>>>>>> 9d2c3c57d
 supersedes:
 ---
 
 # docs_architecture_refresh — remediation plan (adversary FAIL findings)
 
-<<<<<<< HEAD
-**Status: proposed (operator-signed remediation plan).** Source: the p4 adversarial review
-(`docs/reviews/docs_architecture_refresh_adversary.md`, verdict FAIL — findings recorded,
-fixes deferred per the spec's contract: "remediation remains an operator decision or a
-follow-up phase"). This plan is the operator's decision: every FAIL finding below is
-accepted, assigned, and gated on re-verification before the branch may merge.
-=======
 **Status: implemented (operator-signed remediation plan) — frontmatter `accepted` per the
 doc-lifecycle kind-tree contract (`docs/reviews/*` → `accepted`).** Source: the p4 adversarial review
 (`docs/reviews/docs_architecture_refresh_adversary.md`, verdict FAIL — findings recorded,
@@ -24,7 +13,6 @@ follow-up phase"). This plan is the operator's decision: every FAIL finding belo
 accepted, assigned, and gated on re-verification before the branch may merge. The five-point
 acceptance gate has now re-run clean on the remediated branch and is recorded in
 [§ Acceptance gate](#acceptance-gate-re-verification-before-merge) below.
->>>>>>> 9d2c3c57d
 
 ## Findings → remediation
 
@@ -37,8 +25,6 @@ acceptance gate has now re-run clean on the remediated branch and is recorded in
   supersede the `docs/fleet/00`/`01` operational claims per the doc-lifecycle rules.
 - **Severity**: medium (broken references in the very docs this workflow exists to repair).
 - **Owner**: remediation phase (cheap — mechanical re-pointing).
-<<<<<<< HEAD
-=======
 - **Closure evidence**: [C] every audit anchor re-pointed
   (`docs/architecture/current/2026-09-01_docs_drift_audit.md:22,70,71,73,79` — the proposed
   location replaced by `docs/designs/implemented/fleet_ladder_architecture.md`); [M] both
@@ -46,7 +32,6 @@ acceptance gate has now re-run clean on the remediated branch and is recorded in
   (`docs/fleet/00_proposal.md:7-12`, `docs/fleet/01_infra_inventory.md:7-11`); [M] the deleted
   proposed path appears nowhere in the branch's `docs/` (`git grep` clean — see the gate's
   check (a) evidence).
->>>>>>> 9d2c3c57d
 
 ### F2 — Untagged, unanchored claims in ARCHITECTURE.md
 - **Evidence**: the module count (`ARCHITECTURE.md:46-49`, 59→107), the dependency spine
@@ -58,8 +43,6 @@ acceptance gate has now re-run clean on the remediated branch and is recorded in
   spine: anchor to `tests/test_dependency_direction.py` + the plane `__init__` imports.
 - **Severity**: high (violates the workflow's own provenance contract).
 - **Owner**: remediation phase.
-<<<<<<< HEAD
-=======
 - **Closure evidence**: [C] the module count is now `[C]`-tagged with the exact command and a
   pinned SHA (`ARCHITECTURE.md:46-49` — 107 modules at `806c0d344`, verified by re-running
   `git ls-files 'src/agentic_dynamics/**/*.py' | wc -l`); [M] the spine is `[M]`-tagged and
@@ -67,7 +50,6 @@ acceptance gate has now re-run clean on the remediated branch and is recorded in
   (`ARCHITECTURE.md:109-116`); [C] the CAP-consumption table now carries per-row `[C]` anchors
   to the consuming modules, the campaign specs, and the score artifacts
   (`ARCHITECTURE.md:161-194`).
->>>>>>> 9d2c3c57d
 
 ### F3 — cap_2b current-state claim contradicted by the seam
 - **Evidence**: `ARCHITECTURE.md:172` states cap_2b "applies accepted proposals" while the
@@ -79,15 +61,12 @@ acceptance gate has now re-run clean on the remediated branch and is recorded in
   exercising the applied path) is a separate decision, not part of this remediation.
 - **Severity**: high (a false current-state claim — the exact class this workflow kills).
 - **Owner**: remediation phase (doc correction) / operator (opt-in decision).
-<<<<<<< HEAD
-=======
 - **Closure evidence**: [C] the corrected claim anchors the applied path to the campaign's own
   `apply_only_in_adaptive_arm` invariant + the score artifact (3 applied cells in
   `experiments/results/cap_2b/cap_2b_score_20260826T160018Z.json`) and explicitly separates it
   from the I7 `control_route` seam, which no committed spec sets
   (`ARCHITECTURE.md:180`, `workflows/repository/cap_2b.yaml:36-37,64-66`,
   `tests/test_context_plane_seam.py:271-284`). The opt-in decision remains the operator's.
->>>>>>> 9d2c3c57d
 
 ### F4 — Fleet design overgeneralization
 - **Evidence**: `docs/designs/implemented/fleet_ladder_architecture.md:27-30` claims all
@@ -97,14 +76,11 @@ acceptance gate has now re-run clean on the remediated branch and is recorded in
   consumers/daemons as long-running units.
 - **Severity**: medium (wrong architecture description in the new authority doc).
 - **Owner**: remediation phase.
-<<<<<<< HEAD
-=======
 - **Closure evidence**: [M] the design now scopes "one queue job at a time" to the
   story/analysis/review BRPOP workers and describes the `kb-*` stream consumers as
   continuously-running and the batch producers as run-to-completion
   (`docs/designs/implemented/fleet_ladder_architecture.md:27-33`); the compose's cell-pool
   comment carries the same scoping (`infrastructure/docker-compose.ladder.yml:139-142`).
->>>>>>> 9d2c3c57d
 
 ### F5 — The mount-contract guard failure (real enforcement gap)
 - **Evidence**: `tests/test_fleet_guards.py:85-118` fails on the compose repo-alias + `.git`
@@ -118,8 +94,6 @@ acceptance gate has now re-run clean on the remediated branch and is recorded in
 - **Severity**: high (the one FAIL finding that is a code/test defect, not doc prose).
 - **Owner**: the running `fleet_job_submission` p4_isolation_guards (sonnet, in flight —
   the spec's p4 demands exactly this contract) + admission_leases p5 (already touching it).
-<<<<<<< HEAD
-=======
 - **Closure evidence**: [M] the guard's `ALLOWED_MOUNT_TARGETS` now mirrors the wrapper's
   runtime `CONTRACT_TARGETS` (repo-alias + `.git` overlays —
   `tests/test_fleet_guards.py:86-102` vs `scripts/fleet/spawn_wrapper.py:79-97`); [M] both
@@ -128,7 +102,6 @@ acceptance gate has now re-run clean on the remediated branch and is recorded in
   mount still fails (`tests/test_fleet_guards.py:136-161`); the guard is not weakened. [M]
   The authority and the implemented design flip the enforcement-gap line to the passing
   current state (`ARCHITECTURE.md:248-253`, `docs/designs/implemented/fleet_ladder_architecture.md:58-62`).
->>>>>>> 9d2c3c57d
 
 ## Coordination note (not a FAIL finding)
 The branch's compose-comment edits (`infrastructure/docker-compose.ladder.yml:1-8,257-260`
@@ -137,21 +110,6 @@ are honest documentation of F1. When `fleet_job_submission` p5_egress_proxy_enfo
 lands, those comments become stale again — the remediation phase must re-touch them (and the
 ARCHITECTURE.md §6 isolation line) at the same time.
 
-<<<<<<< HEAD
-## Acceptance gate (re-verification before merge)
-1. The five adversary checks (a)–(e) re-run clean on the remediated branch — in particular
-   (a) every cited anchor resolves, (b) every new claim is tagged + anchored.
-2. `tests/test_fleet_guards.py` passes (F5 closed) and the authority's "open enforcement
-   gap" line is removed.
-3. `python3 -m pytest tests/test_doc_lifecycle.py tests/test_dependency_direction.py
-   tests/test_script_classification.py tests/test_spec_status.py tests/test_agent_config_render.py
-   -q` — green.
-4. `python3 scripts/_gen_instructions.py` re-run leaves `git diff --exit-code` clean
-   (surfaces regenerated, not hand-edited).
-5. The merge re-runs `sync_surfaces.py` + `spec_status.py` on the merged tree (the branch
-   predates the newest specs; the derived index must be regenerated post-merge, per the
-   beta-lab merge pattern).
-=======
 **Egress note — re-touched (closure).** [M] The compose comments now state direct egress as the
 current operating reality, not as an open fix (`infrastructure/docker-compose.ladder.yml:3-6,260`)
 and ARCHITECTURE.md §6 does the same, explicitly marking the proxy as the declared policy
@@ -217,4 +175,3 @@ remediation state (`cbb0b06a1` + `6b768a952`), not on the pre-fix tree.
   guard now passes on the declared targets and still fails on a foreign one. The row is
   historical review evidence; updating it was not in the operator's five-finding scope, so it
   is recorded here rather than edited.
->>>>>>> 9d2c3c57d

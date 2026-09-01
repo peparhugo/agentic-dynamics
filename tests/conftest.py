@@ -10,6 +10,7 @@ sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
 def _try_connect(host: str, port: int) -> bool:
     import socket
+
     try:
         s = socket.create_connection((host, port), timeout=2)
         s.close()
@@ -69,4 +70,11 @@ def pytest_configure(config):
     config.addinivalue_line(
         "markers",
         "external: tests requiring external services (opencode, Ollama, ChromaDB, Neo4j)",
+    )
+    config.addinivalue_line(
+        "markers",
+        "fast: the parallel-safe unit subset (the sub-minute guards + audited pure-unit "
+        "families) — no real subprocesses, no Redis/stores/ports, no real worktrees; "
+        "selected by `pytest -m fast` (test_suite_speed p3). A test added to this subset "
+        "without passing the parallel-safety audit is a violation.",
     )

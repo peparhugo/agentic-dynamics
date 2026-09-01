@@ -25,6 +25,9 @@ from agentic_dynamics.measurement.signal_registry import (
 from agentic_dynamics.runtime import routing as routing_mod
 from agentic_dynamics.runtime.routing import RoutingPreferences, validate_preferences
 
+import pytest
+pytestmark = pytest.mark.fast
+
 ROOT = Path(__file__).resolve().parent.parent
 
 #: The four formerly-missing signals the ledger now produces (instrumentation step 3).

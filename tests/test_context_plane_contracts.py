@@ -15,6 +15,8 @@ from pathlib import Path
 
 import pytest
 
+pytestmark = pytest.mark.fast
+
 from agentic_dynamics.core.contracts import (
     ON_CONFLICT,
     ON_MISSING,

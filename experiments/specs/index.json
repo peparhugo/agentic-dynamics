@@ -1,7 +1,7 @@
 {
   "schema_version": "spec-status/v2",
-  "generated_at": "2026-09-01T04:18:59.346446+00:00",
-  "n_specs": 175,
+  "generated_at": "2026-09-01T06:09:28.248518+00:00",
+  "n_specs": 177,
   "specs": [
     {
       "name": "auto_posthoc_wiring",
@@ -400,6 +400,24 @@
       "n_runs": 0
     },
     {
+      "name": "control_room_live_board",
+      "version": "0.1",
+      "status": "runnable",
+      "spec_path": "workflows/repository/control_room_live_board.yaml",
+      "artifact_kind": "workflow",
+      "repeatable": false,
+      "supersedes": [],
+      "superseded_by": null,
+      "completed_at": null,
+      "last_run_at": null,
+      "latest_ok": null,
+      "latest_model": null,
+      "latest_cost_usd": null,
+      "latest_git_sha": null,
+      "results_pointer": null,
+      "n_runs": 0
+    },
+    {
       "name": "delta_entropy_response_campaign",
       "version": "0.1",
       "status": "runnable",
@@ -710,6 +728,24 @@
       "version": "0.1",
       "status": "runnable",
       "spec_path": "workflows/research/self_recommending_experiment.yaml",
+      "artifact_kind": "workflow",
+      "repeatable": false,
+      "supersedes": [],
+      "superseded_by": null,
+      "completed_at": null,
+      "last_run_at": null,
+      "latest_ok": null,
+      "latest_model": null,
+      "latest_cost_usd": null,
+      "latest_git_sha": null,
+      "results_pointer": null,
+      "n_runs": 0
+    },
+    {
+      "name": "test_suite_speed",
+      "version": "0.1",
+      "status": "runnable",
+      "spec_path": "workflows/repository/test_suite_speed.yaml",
       "artifact_kind": "workflow",
       "repeatable": false,
       "supersedes": [],

@@ -734,7 +734,25 @@ def _lsp_evidence(
     return result
 
 
-def _run_change_analysis(pr: PhaseResult, wd: Path, analyzer: ChangeAnalyzer) -> None:
+def _unavailable_sonar_payload() -> dict[str, Any]:
+    """The measured-unavailable sonar payload — the leg's contract when it cannot run.
+
+    The shape matches the reducer's ``sonar_analysis`` contract verbatim and the real leg's
+    degraded return: ``{"status", "revision_matches"|None, "new_critical_count"|None,
+    "analyzed_sha"}``. Null-not-zero, never a fabricated delta.
+    """
+    return {"status": SONAR_STATUS_UNAVAILABLE, "revision_matches": None,
+            "new_critical_count": None, "analyzed_sha": ""}
+
+
+def _unavailable_lsp_payload() -> dict[str, Any]:
+    """The measured-unavailable lsp payload (``{"status", "new_error_count"|None, "tool"}``)."""
+    return {"status": "unavailable", "new_error_count": None, "tool": "mypy"}
+
+
+def _run_change_analysis(
+    pr: PhaseResult, wd: Path, analyzer: ChangeAnalyzer, *, legs: bool = True
+) -> None:
     """Best-effort phase-boundary evidence: analyze ``pr.commit_hash`` and record the result.
 
     The typed before/after CodeSnapshots + CodeDelta are materialized from git (the phase
@@ -745,6 +763,13 @@ def _run_change_analysis(pr: PhaseResult, wd: Path, analyzer: ChangeAnalyzer) ->
     materialized once, then both legs run under the same hard deadline as the graph leg. Every
     failure path (no parent commit, unreadable revisions, an analyzer error) degrades to
     ``change_analysis=None`` — the seam can never change the phase's outcome (design §5.7).
+
+    ``legs=False`` (the suite-speed scoping — test_suite_speed p2) skips the external-service
+    sonar/lsp legs: the parent revision is never materialized and the ChangeInput carries the
+    measured-unavailable payloads instead. The seam's CORE proof — typed snapshots + delta +
+    analyzer over the committed change, degrading to ``None`` for a root commit — is exercised
+    identically; only the external subprocess windows are scoped off. The legs' correctness is
+    covered by their own unit tests (``test_sonar_evidence_*`` / ``test_lsp_evidence_*``).
 
     ``ChangeInput.revision`` and both snapshot revisions are FULL commit SHAs (provenance);
     ``pr.commit_hash`` remains the short display hash.
@@ -761,12 +786,17 @@ def _run_change_analysis(pr: PhaseResult, wd: Path, analyzer: ChangeAnalyzer) ->
 
         # Materialize the parent once; both analyzer legs share it. A failure (root commit,
         # missing revision) degrades each leg to its measured unavailable status — never a gate.
-        parent_checkout = _materialize_revision(wd, before_rev)
-        try:
-            sonar = _sonar_evidence(wd, parent_checkout, before_rev, full)
-            lsp = _lsp_evidence(wd, parent_checkout, before_rev, full, profile)
-        finally:
-            _remove_materialized_revision(wd, parent_checkout)
+        # ``legs=False`` skips the materialization + the external-service legs entirely.
+        if legs:
+            parent_checkout = _materialize_revision(wd, before_rev)
+            try:
+                sonar = _sonar_evidence(wd, parent_checkout, before_rev, full)
+                lsp = _lsp_evidence(wd, parent_checkout, before_rev, full, profile)
+            finally:
+                _remove_materialized_revision(wd, parent_checkout)
+        else:
+            sonar = _unavailable_sonar_payload()
+            lsp = _unavailable_lsp_payload()
 
         change = ChangeInput(
             before=before,
@@ -850,7 +880,8 @@ def cell_scope(workdir: str | Path) -> str:
     return f"self-{identity}"
 
 
-def _run_test_gate(pr: PhaseResult, wd: Path, language: str, timeout: int) -> None:
+def _run_test_gate(pr: PhaseResult, wd: Path, language: str, timeout: int,
+                   target: str | list[str] | None = None) -> None:
     """Run the independent suite for an agent phase that declared ``test_gate: true``.
 
     The test_runner (``run_suite``) is the sole source of truth for the outcome — never the
@@ -859,8 +890,12 @@ def _run_test_gate(pr: PhaseResult, wd: Path, language: str, timeout: int) -> No
     ``stop_on_error`` honours the failure. When the runner did not execute (no gate, or the
     agent phase already failed) the caller leaves ``test_executed_success`` at its ``None``
     default — null-not-zero, never a fabricated value.
+
+    ``target`` (test_suite_speed p2 scoping) is the phase's declared test target — an agent
+    phase may pair ``test_gate: true`` with ``tests:`` so its gate runs the spec's tests
+    instead of the whole tree.
     """
-    suite = run_suite(wd, language, timeout=timeout)
+    suite = run_suite(wd, language, timeout=timeout, target=target)
     pr.tests_passed = suite["passed"]
     pr.tests_total = suite["total"]
     pr.test_executed_success = suite_succeeded(suite)
@@ -2510,6 +2545,7 @@ def run_workflow(
     construct_fn: Callable[..., Any] | None = None,
     rag_params: dict[str, Any] | None = None,
     change_analyzer: ChangeAnalyzer | None = None,
+    change_analysis_legs: bool = True,
     phase_admission: PhaseAdmission | None = None,
     phase_watchdog_min: float | None = None,
     discarded_trees_ledger: Path | str | None = None,
@@ -2570,7 +2606,12 @@ def run_workflow(
     executor neighborhood, recorded on ``PhaseResult.change_analysis``. Best-effort by
     construction: a materialization failure, an unanalyzable commit (e.g. a root commit with
     no parent), or an analyzer error degrades to ``change_analysis=None`` — it can never
-    change the phase's outcome. ``None`` (default) leaves the seam inert.
+    change the phase's outcome. ``None`` (default) leaves the seam inert. The seam's
+    external-service sonar/lsp legs (real sonar-scanner against SonarQube + mypy on a
+    materialized parent — the test_suite_speed p1 profile's O(slow) step) run unless
+    ``change_analysis_legs=False`` scopes them off (unit tests; the legs' correctness has its
+    own tests, and the scoped seam still proves root-commit degradation + the analyzer
+    contract — only the external subprocess windows are skipped).
 
     Phase watchdog (``phase_watchdog_min``, cap_runner_hardening p1): every agent phase
     is wrapped in a stall monitor that watches the session transcript's last-step age
@@ -2791,7 +2832,12 @@ def run_workflow(
 
         try:
             if kind == "test":
-                suite = run_suite(wd, language, timeout=phase_timeout)
+                # test_suite_speed p2 scoping: a test phase may declare ``tests:`` (a file,
+                # node id, or list thereof — e.g. ``tests/test_<spec>.py``) so the phase runs
+                # the spec's own tests, never the whole multi-thousand-test tree. Without the
+                # field the historical whole-tree scope is preserved.
+                suite = run_suite(wd, language, timeout=phase_timeout,
+                                  target=phase_def.get("tests"))
                 pr.tests_passed = suite["passed"]
                 pr.tests_total = suite["total"]
                 pr.test_executed_success = suite_succeeded(suite)
@@ -3015,7 +3061,7 @@ def run_workflow(
         # (null-not-zero — no defaulting, no fabrication). A failing gate fails the phase so the
         # commit below is skipped, exactly like the ``kind == "test"`` branch.
         if kind != "test" and phase_def.get("test_gate") and pr.status == "ok":
-            _run_test_gate(pr, wd, language, phase_timeout)
+            _run_test_gate(pr, wd, language, phase_timeout, target=phase_def.get("tests"))
 
         # Deploy gate (cap_runner_hardening p2) — post-phase, agent phases only. Scan the
         # phase's session transcript for firebase production-deploy commands; a hit in a phase
@@ -3061,7 +3107,7 @@ def run_workflow(
             # hand the committed change to it (typed snapshots + delta materialized from git)
             # and record its analysis on the phase. Best-effort — never affects the phase.
             if change_analyzer is not None and pr.commit_hash:
-                _run_change_analysis(pr, wd, change_analyzer)
+                _run_change_analysis(pr, wd, change_analyzer, legs=change_analysis_legs)
                 # The evidence context rides the existing {prior_phases} channel so the NEXT
                 # phase's prompt receives it (bounded, machine-readable: graph status, full
                 # revision, neighborhood, facts) — only when an analyzer is injected AND this

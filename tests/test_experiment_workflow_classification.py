@@ -21,6 +21,9 @@ from pathlib import Path
 
 import yaml
 
+import pytest
+pytestmark = pytest.mark.fast
+
 ROOT = Path(__file__).resolve().parent.parent
 SPECS_FLAT = ROOT / "experiments" / "specs"
 DEFINITIONS = ROOT / "experiments" / "definitions"

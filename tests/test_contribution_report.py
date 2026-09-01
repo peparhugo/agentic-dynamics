@@ -34,6 +34,8 @@ from agentic_dynamics.reporting.lab_contract import (
 )
 from agentic_dynamics.reporting.lab_manifest import load_lab_manifest
 
+pytestmark = pytest.mark.fast
+
 ROOT = Path(__file__).resolve().parent.parent
 RESULTS_DIR = ROOT / "experiments" / "results"
 

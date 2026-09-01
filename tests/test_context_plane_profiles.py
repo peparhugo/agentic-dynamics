@@ -56,6 +56,8 @@ from agentic_dynamics.control.profiles import (
 from agentic_dynamics.control.reducers import REDUCERS, get_reducer
 from agentic_dynamics.core.contracts import FactRequirement
 
+pytestmark = pytest.mark.fast
+
 NOW = "2026-08-24T00:00:00+00:00"
 REPO = "agentic-dynamics"
 

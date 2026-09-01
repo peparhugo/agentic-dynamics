@@ -11,6 +11,9 @@ from agentic_dynamics.measurement.solution import SolutionMetrics
 from agentic_dynamics.measurement.strategy import StrategyType, classify_strategy
 
 
+import pytest
+pytestmark = pytest.mark.fast
+
 def _classify(correctness, novelty, escape, thinking_ratio, cost) -> StrategyType:
     basin = BasinMetrics(
         escape_score=escape,

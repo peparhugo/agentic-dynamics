@@ -34,6 +34,8 @@ from agentic_dynamics.control.facts import (
 from agentic_dynamics.core.contracts import FactRequirement
 from agentic_dynamics.knowledge.knowledge import Authority
 
+pytestmark = pytest.mark.fast
+
 NOW = "2026-08-23T00:00:00+00:00"
 REPO = "agentic-dynamics"
 WORKLOAD = "demo_spec"

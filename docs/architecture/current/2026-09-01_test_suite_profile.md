@@ -173,3 +173,38 @@ before calling it), or scope the legs' invocation; a weakened assertion is a vio
   Ollama reachable at localhost:11434 (all `external`-marked analyzer tests ran, none skipped).
 - Configuration note (not this phase): pytest warns `Unknown config option: timeout` on every
   run — a `pyproject`/`pytest.ini` cleanup candidate for the fast-path phase (p3).
+
+## p2-p4 results — the surgical fixes, the fast path, the gate (accepted 2026-09-01)
+
+**p2 — surgical fixes (every fix keeps its assertion's semantic force — both directions
+verified: the fixed test passes AND still fails on a deliberately broken input).**
+
+| fix | before | after | how |
+|---|---|---|---|
+| `test_run_workflow_change_analysis_root_commit_never_fails` | 113.33s (the 71.5% fat test) | **0.72s** | `run_workflow(..., change_analysis_legs=False)` scopes the external sonar/lsp legs (the p1 profile's O(slow) step — real sonar-scanner + mypy subprocess windows); the seam's core proof — typed snapshots/delta + analyzer + root-commit degradation — runs identically. The legs' correctness stays covered by `test_sonar_evidence_*`/`test_lsp_evidence_*`. |
+| watchdog family (9 tests) | 24.85s | **17.16s** | shorter per-step waits (0.3→0.15s) + fewer iterations in the compliant/forged tests; the stall semantics hold (a stalled agent still fails at the 1.8s threshold with STALLED evidence; a compliant agent is never killed). |
+| `run_suite` scoped mode | — | — | `run_suite(..., target=[...])` runs the declared file(s)/node ids, never the whole tree. The runner's `kind: test` phase (and `test_gate`) reads the phase's `tests:` field. `retrieval_activation_augment_proof.yaml` now declares `tests: [test_calc.py]` — its 600s-wall failure mode is structurally impossible. Verified: a scoped test phase runs its 3 tests in seconds; a broken target still fails the phase. |
+| `test_relabel_tree_gate.py` (4 fat tests) | 12.2-12.5s each | **~3.7s each** | the 298MB attempt-A tree is materialized ONCE per module (fixture), the replay tests hardlink-copy it (`copytree(copy_function=os.link)`); family 49.1s → 26.4s. The byte-identical-tree proof is unchanged (the tree IS `REVAMP2_TREE` by construction). |
+| `test_checkpoint_mechanism.py::test_revamp3_unsigned_template_is_refused` | 13.31s | **~0.3s** | the revamp3 replay uses a minimal worktree + the REAL unsigned template content (`git show ee12c9c5b:...`); family 15.2s → 1.4s. The contract-refusal proof (`authored_after_checkpoint`) is unchanged. |
+
+**p2 reds fixed (the p1 triage's 3 REAL failures, now green).** (1)+(3) the README/data.js
+two-way publication drift: `data.js` regenerated from the current spec index + lab manifest
+(175 specs / 21 labs) and the README's stale `20` lab count corrected to `21`. (2) the committed
+git conflict markers in `docs/reviews/docs_architecture_refresh_remediation.md`: all 8 conflict
+blocks resolved to the incoming `9d2c3c57d` side (the implemented + closure-evidence state the
+merge should have shipped).
+
+**p3 — the fast path.** The `fast` marker on 39 audited modules (the sub-minute guard family +
+pure-unit families); `bash scripts/test_fast.sh` (`pytest tests/ -m fast`) runs **509 tests in
+~25s** (budget: sub-3-minutes). The parallel-safety audit selected only modules with no real
+subprocesses / Redis / stores / ports / real git worktrees / sleeps; the audit is now a durable
+guard in `tests/test_fast_path_gate.py`. `pytest-timeout` installed — the `Unknown config option:
+timeout` warning is gone.
+
+**p4 — the gate.** `tests/test_fast_path_gate.py`: the fast path must stay under 180s (3x the
+measured time — a slow-regression trip wire, not a flaky wall), every `fast`-marked module must
+pass the parallel-safety audit, and the full suite must still collect on demand. Budgets
+documented in `scripts/CONTEXT.md` + this doc. `test_workflow_runner.py` total: 187.04s → 38.49s.
+Final deterministic (non-external) suite: **2856 passed, 0 failed, ~183s** — the 3 p1-triaged
+reds are green; the fast path (509 tests) is ~25s. The whole suite incl. the external-inference
+families stays runnable on demand (`python3 -m pytest tests/ -q` → 2964 passed, 9 skipped).

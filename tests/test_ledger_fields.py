@@ -14,6 +14,9 @@ from agentic_dynamics.adapters.opencode import AgenticResult, _parse_session_out
 from agentic_dynamics.runtime.story import SessionResult, StoryResult
 from agentic_dynamics.runtime.workflow_runner import PhaseResult
 
+import pytest
+pytestmark = pytest.mark.fast
+
 ROOT = Path(__file__).resolve().parent.parent
 
 

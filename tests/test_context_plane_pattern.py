@@ -41,6 +41,8 @@ from agentic_dynamics.control.reducers.pattern import (
 from agentic_dynamics.control.validator import validate_decision
 from agentic_dynamics.reporting import canonical_corpus
 
+pytestmark = pytest.mark.fast
+
 NOW = "2026-08-24T00:00:00+00:00"
 REPO = "agentic-dynamics"
 WORKLOAD = "task_manager"

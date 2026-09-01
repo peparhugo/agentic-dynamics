@@ -5,6 +5,8 @@ from pathlib import Path
 
 import pytest
 
+pytestmark = pytest.mark.fast
+
 SCRIPT = Path(__file__).resolve().parent.parent / "scripts" / "check_branch_protection.py"
 
 

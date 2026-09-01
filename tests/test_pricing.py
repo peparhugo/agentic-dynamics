@@ -3,6 +3,8 @@ import pytest
 from agentic_dynamics.measurement.efficiency import compute_cost_estimate, get_pricing
 
 
+pytestmark = pytest.mark.fast
+
 def test_get_pricing_deepseek():
     pricing = get_pricing("deepseek", "deepseek-v4-pro")
     assert pricing["input"] == 0.66

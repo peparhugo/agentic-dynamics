@@ -16,6 +16,8 @@ from pathlib import Path
 import pytest
 
 from agentic_dynamics.experiment.experiment_spec import ExperimentSpec, Factor, Workflow
+pytestmark = pytest.mark.fast
+
 from agentic_dynamics.experiment.spec_status import (
     INDEX_SCHEMA_VERSION,
     MISSING,
