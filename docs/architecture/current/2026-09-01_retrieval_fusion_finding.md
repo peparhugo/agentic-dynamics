@@ -94,3 +94,36 @@ genuinely distinct-per-query candidate sets. The campaign takes the hypothesis-2
 legs are a healthy two-view system at the fusion cutoff (semantic top-K vs lexical top-K rank
 the shared corpus disjointly), and **fused = 0 is the documented, deliberate two-view outcome** —
 not a defect to be "fixed" by a merge that nothing would join.
+
+## p2 decision — no fusion change (the H2 path, recorded)
+
+Per the p1 verdict (hypothesis 2: no same-content pairs in the fused candidate sets), the
+campaign's hard rule 2 applies: **do NOT force a merge**. No fusion code was changed — the RRF,
+the id-based merge, `deduplicate`, and `collapse_redundant` are byte-identical to before the
+campaign (the instrument added `join_content_hash` + `legs` as observational fields only, and a
+test pins that `deduplicate` still keys on the persisted `content_hash`, never on the join hash).
+
+**Both-directions verification (test_retrieval.py):**
+- A seeded same-content pair (the same record ingested into both stores under DIFFERENT ids) is
+  **detected** by the join (`leg_overlap()["content_pairs"] == 1`) — the instrument answers the
+  join question — and deliberately NOT merged (the id-based fusion correctly leaves the two
+  distinct records alone).
+- A genuinely distinct pair (different text on the two legs) never joins (`content_pairs == 0`)
+  and never merges.
+- The existing fusion tests stay green (79 in `tests/test_retrieval.py`), and the fusion-off
+  path is byte-identical.
+
+## p3 gate — re-census on the SAME 15-query set (the measured gate)
+
+| Run | dense_only | lexical_only | fused | content_pairs | fallback |
+|---|---|---|---|---|---|
+| 2026-09-01T022132Z (pre-campaign) | 70 | 336 | **0** | — | full × 15 |
+| 2026-09-01T023603Z (pre-campaign) | 549 | 373 | **0** | — | full × 15 |
+| 2026-09-01T035547Z (instrumented, the gate) | 549 | 373 | **0** | **0** | full × 15 |
+
+Same 15-query census set, same weights (`retrieval-weights/v1`), same stores. The gate is
+**fused > 0 OR the documented two-view verdict**: the campaign takes the latter — fused stays 0
+because the two legs' top-K candidate sets are genuinely disjoint (0 same-content pairs at the
+id level AND at the content level), and that two-view outcome is now measured and documented
+above (H2 verdict). The gate is PASSED on the documented-two-view branch, with the before/after
+table and the no-fix decision recorded here. Retrieval + census tests green (79 passed).
