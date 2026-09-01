@@ -18,6 +18,9 @@ from __future__ import annotations
 import ast
 from pathlib import Path
 
+import pytest
+pytestmark = pytest.mark.fast
+
 ROOT = Path(__file__).resolve().parent.parent
 AD = ROOT / "src" / "agentic_dynamics"
 

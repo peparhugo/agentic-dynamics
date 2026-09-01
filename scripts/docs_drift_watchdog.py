@@ -707,7 +707,7 @@ def main(argv: list[str] | None = None) -> int:
         "--check",
         action="append",
         choices=scan_docs_drift.AXES,
-        help="run only this axis (repeatable); default: all six",
+        help="run only this axis (repeatable); default: all seven",
     )
     parser.add_argument(
         "--dry-run",

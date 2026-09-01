@@ -3,6 +3,9 @@
 from agentic_dynamics.adapters.backends import get_backend_for_model, resolve_backend
 
 
+import pytest
+pytestmark = pytest.mark.fast
+
 def test_anthropic_routes_to_claude_cli():
     assert get_backend_for_model("anthropic/claude-sonnet-4-5") == "claude_cli"
     assert get_backend_for_model("anthropic/claude-opus-4-5") == "claude_cli"

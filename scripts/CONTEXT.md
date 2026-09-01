@@ -47,6 +47,35 @@ maintained: scan_docs_drift.py docs_drift_watchdog.py docs_proposal_gate.py
 | `agentic_dynamics/experiment/compile_experiment.py` (not in scripts/) | spec → DAG compiler, **written**; no standalone CLI — invoke via the `compile_experiment` tool (§3.1) or the Python API directly | Compiling a spec into a DAG |
 | `check_branch_protection.py` | Release-time drift check: compares the live GitHub branch protection for `main` against the committed settings doc (`docs/release/branch_protection_settings.md`); exit 1 on drift | Before any release; run after any manual protection change |
 
+## Test-suite budget + the fast path (test_suite_speed p2-p4)
+
+**Budgets** (measured 2026-09-01, `python3 -m pytest tests/ -q --durations=40 -p no:cacheprovider`):
+
+| family | before | after | note |
+|---|---|---|---|
+| whole suite (incl. external families) | ~598s (census 1: 2,967 tests, 3 failed / 9 skipped) | **~420s (2,967 passed / 9 skipped)** — measured at the p4 gate | full suite stays runnable + green on demand (`python3 -m pytest tests/ -q`) |
+| `test_workflow_runner.py` | 187.0s | **38.5s** | the 132s change-analysis root-commit test → 0.7s (`change_analysis_legs=False` scopes the sonar/lsp external legs); the watchdog family 24.9s → 17.2s |
+| `test_relabel_tree_gate.py` | 49.1s | **26.4s** | the 298MB attempt-A tree is materialized ONCE (module fixture), the replay tests hardlink-copy it (~3.7s each, was ~12.5s) |
+| `test_checkpoint_mechanism.py` | 15.2s | **1.4s** | the revamp3 replay uses a minimal worktree + the REAL unsigned template content |
+| fast path (`pytest tests/ -m fast`) | — | **~25s** | 509 tests; budget 180s (3x — a trip wire, not a flaky wall) |
+
+**The fast path** — `bash scripts/test_fast.sh` (or `python3 -m pytest tests/ -m fast -q -p no:cacheprovider`):
+the `fast`-marked subset = the sub-minute guard family + the audited pure-unit families (no real
+subprocesses, no Redis/stores/ports, no real git worktrees — the parallel-safety audit in
+`tests/test_fast_path_gate.py` enforces this on every run). Target: sub-3-minutes (measured
+~25s). **The full suite stays the gate** — the fast path is a smoke subset, never a replacement;
+run `python3 -m pytest tests/ -q` on demand and keep it green.
+
+**Budget gate** — `tests/test_fast_path_gate.py`: the fast path must stay under 180s (a slow
+regression trips the wire) and every `fast`-marked module must pass the parallel-safety audit.
+
+**Wired into the guard cadence** (test_suite_speed p3-d): CI runs `bash scripts/test_fast.sh`
+as the fast smoke in the `test` job of `.github/workflows/pytest.yml` (before the deterministic
+suite), and the docs-drift rail's `fast_path` axis (`scripts/scan_docs_drift.py`) re-derives the
+command + budget this section documents from the code and compares them — a doc that drifts from
+the gate (`FAST_BUDGET_SECONDS`) is a docs-drift finding, and a fast path the doc stops
+documenting errors the axis unmeasurable (exit 2), never clean.
+
 ## Experiment Runners
 
 | Script | Lines | Purpose |

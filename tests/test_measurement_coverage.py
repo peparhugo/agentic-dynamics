@@ -26,6 +26,8 @@ from pathlib import Path
 import pytest
 
 from agentic_dynamics.reporting.lab_manifest import load_lab_manifest
+pytestmark = pytest.mark.fast
+
 from agentic_dynamics.reporting.measurement_coverage import (
     MeasurementCoverage,
     cost_captured,

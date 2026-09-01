@@ -392,7 +392,14 @@ def test_run_workflow_change_analysis_full_sha_and_next_phase_evidence(tmp_path,
 
 def test_run_workflow_change_analysis_root_commit_never_fails(tmp_path):
     """A phase whose commit has NO parent (root commit in the worktree) cannot be diffed —
-    the seam degrades to None instead of failing the phase."""
+    the seam degrades to None instead of failing the phase.
+
+    The sonar/lsp external legs are scoped off (``change_analysis_legs=False`` — the
+    test_suite_speed p2 seam): the root-commit degradation the test proves lives in the
+    snapshots/delta/analyzer core, which still runs; the real sonar-scanner subprocess
+    windows (the p1 profile's 113-135s) are orthogonal to this assertion and covered by
+    ``test_sonar_evidence_*``/``test_lsp_evidence_*``. A weakened assertion would be a
+    violation; this is a scoped invocation, the proof is unchanged."""
     from agentic_dynamics.runtime.change_analyzer import ChangeAnalysis
 
     class Analyzer:
@@ -415,7 +422,8 @@ def test_run_workflow_change_analysis_root_commit_never_fails(tmp_path):
         return _fake_agent(files_created=["app.py"])
 
     result = run_workflow(spec, goal="g", model="m", workdir=tmp_path,
-                          run_agentic_fn=agent, change_analyzer=Analyzer())
+                          run_agentic_fn=agent, change_analyzer=Analyzer(),
+                          change_analysis_legs=False)
     assert result.ok
     # Root-commit phases degrade gracefully (change_analysis may be None), never a failure.
     assert all(p.status == "ok" for p in result.phases)
@@ -1081,10 +1089,10 @@ def test_watchdog_never_kills_a_compliant_agent(tmp_path):
         transcript = _watchdog_transcript(workdir)
         transcript.parent.mkdir(parents=True, exist_ok=True)
         watchdog["kill"] = lambda: (killed.append("SIGTERM"), release.set())
-        for i in range(5):
+        for i in range(4):
             with transcript.open("a") as fh:
                 fh.write(json.dumps({"type": "step_start", "n": i}) + "\n")
-            release.wait(timeout=0.3)  # continuous slow steps: max gap 0.3s < 1.8s threshold
+            release.wait(timeout=0.15)  # continuous slow steps: max gap 0.15s < 1.8s threshold
         return _fake_agent()
 
     result = run_workflow(
@@ -1126,7 +1134,7 @@ def test_watchdog_explicit_arg_overrides_env(tmp_path, monkeypatch):
         watchdog["kill"] = lambda: (killed.append("SIGTERM"), release.set())
         with transcript.open("a") as fh:
             fh.write("step\n")
-        release.wait(timeout=0.8)  # short — the explicit 60-min threshold never fires here
+        release.wait(timeout=0.5)  # short — the explicit 60-min threshold never fires here
         return _fake_agent()
 
     result = run_workflow(
@@ -1160,7 +1168,7 @@ def test_watchdog_zero_disables_it(tmp_path, monkeypatch):
 
     def agent(prompt, *, model, backend, workdir, **kwargs):
         seen.append(kwargs)
-        time.sleep(1.0)  # would definitely stall under the env threshold — but it is disabled
+        time.sleep(0.6)  # a stall-prone agent — but the watchdog is disabled, so no seam/kill
         return _fake_agent()
 
     result = run_workflow(
@@ -2031,8 +2039,8 @@ def test_watchdog_cannot_distinguish_a_forged_valid_step(tmp_path):
         watchdog["kill"] = lambda: (killed.append("SIGTERM"), release.set())
         with transcript.open("a") as fh:
             fh.write('{"type": "step_start"}\n')
-        for _ in range(8):  # keep emitting REAL-looking step boundaries, slowly
-            release.wait(timeout=0.2)
+        for _ in range(4):  # keep emitting REAL-looking step boundaries, slowly
+            release.wait(timeout=0.15)
             if release.is_set():
                 break
             with transcript.open("a") as fh:

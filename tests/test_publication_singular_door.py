@@ -32,6 +32,8 @@ import pytest
 
 from agentic_dynamics.reporting import canonical_corpus as cc
 
+pytestmark = pytest.mark.fast
+
 ROOT = Path(__file__).resolve().parent.parent
 SCRIPTS_DIR = ROOT / "scripts"
 DATA_JS = ROOT / "apps" / "website" / "data.js"

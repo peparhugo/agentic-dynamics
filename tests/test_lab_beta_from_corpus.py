@@ -5,6 +5,9 @@ from datetime import datetime, timezone
 from scripts.lab_beta_from_corpus import LADDER_WINDOW, _bin_of, _excluded, _fit_ols
 
 
+import pytest
+pytestmark = pytest.mark.fast
+
 def _row(**kw):
     base = {
         "duration_s": 120.0,

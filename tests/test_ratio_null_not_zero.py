@@ -13,6 +13,9 @@ from agentic_dynamics.measurement import basin, constraint_detection, efficiency
 from agentic_dynamics.measurement.solution import SolutionMetrics
 
 
+import pytest
+pytestmark = pytest.mark.fast
+
 def _solution(correctness=0.9, composite=0.8, loc=120):
     return SolutionMetrics(
         correctness_score=correctness, composite_score=composite, lines_of_code=loc

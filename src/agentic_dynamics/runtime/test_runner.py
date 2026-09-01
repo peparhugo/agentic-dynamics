@@ -42,9 +42,20 @@ def _int_from(pattern: str, text: str) -> int:
     return int(m.group(1)) if m else 0
 
 
-def _run_pytest(workdir: Path, timeout: int) -> dict:
+def _run_pytest(workdir: Path, timeout: int, *, target: str | list[str] | None = None) -> dict:
+    """Run pytest over ``target`` (default: the whole worktree), excluding stale generated data.
+
+    ``target`` is the scoped-mode selector (test_suite_speed p2): a spec's test phase passes
+    the spec-declared test target (the phase's ``tests:`` field — e.g. ``tests/test_<spec>.py``)
+    so the phase runs ITS tests, never the whole multi-thousand-test tree. ``None`` keeps the
+    historical whole-tree scope.
+    """
+    if target:
+        targets = [target] if isinstance(target, str) else list(target)
+    else:
+        targets = ["."]
     cmd = [
-        sys.executable, "-m", "pytest", "-q", "--tb=short", ".",
+        sys.executable, "-m", "pytest", "-q", "--tb=short", *targets,
         # Stale generated artifacts under experiments/results must never be collected.
         "--ignore=experiments/results", "--ignore=experiments/codebases",
     ]
@@ -116,11 +127,16 @@ def run_suite(
     *,
     node: str | None = None,
     timeout: int = TIMEOUT,
+    target: str | list[str] | None = None,
 ) -> dict:
     """Run the appropriate test suite for ``language``; return a normalized result.
 
     Result keys: ``runner, passed, failed, errors, total, pass_rate, tail``. The caller
     derives ``test_executed_success = total > 0 and failed == 0 and errors == 0``.
+
+    ``target`` (python only) is the scoped-mode selector: run the given file(s)/node ids
+    instead of the whole tree — a spec's test phase targets its own tests
+    (``tests/test_<spec>.py`` / the phase's ``tests:`` field), never the whole suite.
     """
     if language == "typescript":
         node = node or resolve_node()
@@ -132,7 +148,7 @@ def run_suite(
         return _run_framework(workdir, ["go", "test", "./..."], "go test", timeout)
     if language == "rust":
         return _run_framework(workdir, ["cargo", "test", "--quiet"], "cargo test", timeout)
-    return _run_pytest(workdir, timeout)
+    return _run_pytest(workdir, timeout, target=target)
 
 
 def suite_succeeded(result: dict) -> bool:

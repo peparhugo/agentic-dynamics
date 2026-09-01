@@ -7,6 +7,8 @@ import pytest
 from agentic_dynamics.control.queue_reinterleave import reinterleave_cells
 
 
+pytestmark = pytest.mark.fast
+
 def _cell(provider: str, idx: int) -> dict:
     """Build a job cell with a provider-scoped model id."""
     return {

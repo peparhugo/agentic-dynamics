@@ -68,6 +68,14 @@ jobs:
           pip install -e ".[admin]"
           pip install neo4j chromadb ollama duckdb pyarrow
 
+      - name: Run the fast path (the smoke the guards run on every change)
+        run: |
+          # test_suite_speed p3-d wiring: the fast path is CI's fast smoke — the `fast`-marked
+          # subset (the sub-minute guard family + the audited pure-unit families: no real
+          # subprocesses, no Redis/stores/ports, no real git worktrees). It must stay green AND
+          # under its 180s budget (the slow-regression trip wire in tests/test_fast_path_gate.py).
+          bash scripts/test_fast.sh
+
       - name: Run deterministic test suite (external-service tests excluded)
         run: |
           # --timeout: a hanging test is a failure, never an infinite block

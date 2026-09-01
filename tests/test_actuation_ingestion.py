@@ -19,6 +19,8 @@ from agentic_dynamics.control import actuation_ingestion as ai
 from agentic_dynamics.knowledge.knowledge import Authority
 from agentic_dynamics.knowledge.knowledge_ingestion import record_to_artifact
 
+pytestmark = pytest.mark.fast
+
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
 

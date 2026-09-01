@@ -8,6 +8,9 @@ shared event fixtures in ``test_admin_server.py``.
 
 from pathlib import Path
 
+import pytest
+pytestmark = pytest.mark.fast
+
 STATIC = Path(__file__).resolve().parent.parent / "apps" / "control_room" / "static"
 
 

@@ -103,19 +103,6 @@ def _git_init(workdir: Path) -> None:
     _git("config", "user.name", "t", cwd=workdir)
 
 
-def _materialize_commit_tree(commit: str, target: Path) -> str:
-    """Materialize ``commit``'s full tree into ``target`` (fresh repo) and commit it.
-
-    git trees are content-addressed, so the hermetic copy is byte-identical to the real
-    revamp3 p2 commit's tree (including its unsigned approval template). Returns the tree hash.
-    """
-    archive = subprocess.run(["git", "archive", commit], cwd=REPO, capture_output=True, check=True)
-    subprocess.run(["tar", "-x", "-C", str(target)], input=archive.stdout, check=True)
-    _git_init(target)
-    _git("add", "-Af", cwd=target)
-    _git("commit", "-qm", "attempt A", cwd=target)
-    return _git("rev-parse", "HEAD^{tree}", cwd=target).stdout.strip()
-
 
 def _approval_text(*, operator: str = "jane@example.com", date: str = "2026-08-27") -> str:
     return (
@@ -128,40 +115,41 @@ def _approval_text(*, operator: str = "jane@example.com", date: str = "2026-08-2
 # ── the revamp3 REPLAY (the regression proof) ────────────────────────────────
 
 
-def test_revamp3_unsigned_template_is_refused():
+def test_revamp3_unsigned_template_is_refused(tmp_path):
     """The revamp3 p2 state replayed on the REAL artifact: the checkpoint committed its work
     AND the unsigned approval template together — the contract refuses (the template was
     authored AT the checkpoint commit, not after it), so the "runner proceeds to p3-p6 anyway"
-    shape is impossible."""
-    import shutil
-    import tempfile
+    shape is impossible.
 
-    wd = Path(tempfile.mkdtemp(prefix="revamp3_replay_", dir="/tmp")) / "wd"
+    The real artifact is the real unsigned template content, pulled verbatim from the revamp3
+    commit (``git show ee12c9c5b:...``) and committed together with the checkpoint's work in a
+    minimal worktree. The contract check inspects that artifact + the commit order — the
+    298MB full-tree replica contributed nothing to the proof (test_suite_speed p2 scoping)."""
+    wd = tmp_path / "wd"
     wd.mkdir()
-    try:
-        # reconstruct the revamp3 p2 state hermetically: the real commit's tree (design doc +
-        # phase log + the actual unsigned template content, now at the canonical contract path
-        # approvals/<spec>/<phase>_approval.md), committed together as the checkpoint.
-        _materialize_commit_tree(REVAMP3_P2_COMMIT, wd)
-        real_template = subprocess.run(
-            ["git", "show", f"{REVAMP3_P2_COMMIT}:approvals/cap_site_revamp3_design_approval.md"],
-            cwd=REPO, capture_output=True, text=True, check=True,
-        ).stdout
-        ap = wd / "approvals" / "cap_site_revamp3"
-        ap.mkdir(parents=True)
-        (ap / "p2_design_with_human_checkpoint_approval.md").write_text(real_template)
-        _git("add", "-Af", cwd=wd)
-        _git("commit", "-qm", "p2 checkpoint: delta preview + unsigned approval template", cwd=wd)
-        head = _git("rev-parse", "HEAD", cwd=wd).stdout.strip()
+    # reconstruct the revamp3 p2 state hermetically: minimal work + the ACTUAL unsigned template
+    # content (now at the canonical contract path approvals/<spec>/<phase>_approval.md),
+    # committed together as the checkpoint.
+    (wd / "design.md").write_text("delta preview")
+    _git_init(wd)
+    real_template = subprocess.run(
+        ["git", "show", f"{REVAMP3_P2_COMMIT}:approvals/cap_site_revamp3_design_approval.md"],
+        cwd=REPO, capture_output=True, text=True, check=True,
+    ).stdout
+    assert "<required:" in real_template  # the real artifact really is the unsigned template
+    ap = wd / "approvals" / "cap_site_revamp3"
+    ap.mkdir(parents=True)
+    (ap / "p2_design_with_human_checkpoint_approval.md").write_text(real_template)
+    _git("add", "-Af", cwd=wd)
+    _git("commit", "-qm", "p2 checkpoint: delta preview + unsigned approval template", cwd=wd)
+    head = _git("rev-parse", "HEAD", cwd=wd).stdout.strip()
 
-        valid, evidence = _checkpoint_approval_valid(
-            wd, "cap_site_revamp3", "p2_design_with_human_checkpoint", head
-        )
-        assert valid is False
-        # the template was committed WITH the work → not a descendant-authored approval
-        assert "authored_after_checkpoint" in evidence["failed_checks"]
-    finally:
-        shutil.rmtree(wd.parent, ignore_errors=True)
+    valid, evidence = _checkpoint_approval_valid(
+        wd, "cap_site_revamp3", "p2_design_with_human_checkpoint", head
+    )
+    assert valid is False
+    # the template was committed WITH the work → not a descendant-authored approval
+    assert "authored_after_checkpoint" in evidence["failed_checks"]
 
 
 def test_revamp3_template_signature_fields_are_placeholders():

@@ -2,6 +2,9 @@
 
 import json
 
+import pytest
+pytestmark = pytest.mark.fast
+
 from agentic_dynamics.reporting.review import (
     CommitReview,
     StoryReview,

@@ -87,6 +87,26 @@ def main():
     )
     _write(root / "scripts" / "CONTEXT.md", _manifest(["run_workflow.py"]))
 
+    # ── the fast path (the fast_path axis's referents) ───────────────────────────────────────
+    _write(
+        root / "scripts" / "test_fast.sh",
+        '#!/usr/bin/env bash\n'
+        '# The fast-path smoke: the `fast`-marked subset (test_suite_speed p3).\n'
+        'set -euo pipefail\n'
+        'cd "$(dirname "$0")/.."\n'
+        'python3 -m pytest tests/ -m fast -q -p no:cacheprovider "$@"\n',
+    )
+    _write(
+        root / "tests" / "test_fast_path_gate.py",
+        '"""The fast-path budget gate (test_suite_speed p4)."""\n'
+        "FAST_BUDGET_SECONDS = 180\n",
+    )
+    _write(
+        root / "tests" / "test_dependency_direction.py",
+        '"""A pure-unit guard family member."""\n'
+        "pytestmark = pytest.mark.fast\n",
+    )
+
     # ── the package planes ───────────────────────────────────────────────────────────────────
     for plane in ("core", "control"):
         _write(root / "src" / "agentic_dynamics" / plane / "__init__.py", '"""plane."""\n')
@@ -216,7 +236,11 @@ def _resolve(argv):
 
 
 def _manifest(names: list[str]) -> str:
-    """A scripts/CONTEXT.md carrying a well-formed classification manifest."""
+    """A scripts/CONTEXT.md carrying a well-formed classification manifest + the fast-path section.
+
+    The fixture is written BEFORE the fast-path files are added, so the ``fast_path`` axis's
+    claims have a referent at scan time (the clean-fixture control demands zero drift).
+    """
     return (
         "# scripts\n\n"
         "<!-- scripts-classification: start -->\n"
@@ -224,7 +248,12 @@ def _manifest(names: list[str]) -> str:
         "historical:\n"
         "one-time:\n"
         "fleet:\n"
-        "<!-- scripts-classification: end -->\n"
+        "<!-- scripts-classification: end -->\n\n"
+        "**The fast path** — `bash scripts/test_fast.sh`: the `fast`-marked subset (the "
+        "sub-minute guards + the audited pure-unit families). Target: sub-3-minutes. "
+        "**Budget gate** — `tests/test_fast_path_gate.py`: the fast path must stay under "
+        "budget 180s, and the fast path must be a subset of the suite (never a new parallel "
+        "suite).\n"
     )
 
 
@@ -550,6 +579,51 @@ def test_seeded_double_classified_script_is_caught(fake_repo):
     )
 
 
+def test_seeded_fast_path_budget_drift_is_caught(fake_repo):
+    """(g) A CONTEXT.md budget that disagrees with the gate's constant is ``stale``.
+
+    The fast-path budget is the rail's live claim: the doc says "under 180s", the gate enforces
+    ``FAST_BUDGET_SECONDS = 180``. A doc that drifts from the gate is exactly the stale-claim
+    class this axis exists to catch.
+    """
+    context = fake_repo / "scripts" / "CONTEXT.md"
+    context.write_text(
+        context.read_text(encoding="utf-8").replace("180s", "999s"),
+        encoding="utf-8",
+    )
+    report, by_axis = _run(("fast_path",))
+    assert report.errors == {}
+    assert any(
+        f.status == "stale" and "budget" in f.check_id
+        for f in by_axis.get("fast_path", [])
+    )
+
+
+def test_seeded_fast_path_command_removed_is_caught(fake_repo):
+    """(g) A missing fast-path command is ``missing`` — the doc names a script that is gone."""
+    (fake_repo / "scripts" / "test_fast.sh").unlink()
+    report, by_axis = _run(("fast_path",))
+    assert report.errors == {}
+    assert any(
+        f.status == "missing" and "command" in f.check_id
+        for f in by_axis.get("fast_path", [])
+    )
+
+
+def test_seeded_fast_path_empty_subset_is_caught(fake_repo):
+    """(g) A fast subset with no marked module is ``stale`` — the marker set silently emptied."""
+    (fake_repo / "tests" / "test_dependency_direction.py").write_text(
+        '"""A pure-unit guard family member."""\n',
+        encoding="utf-8",
+    )
+    report, by_axis = _run(("fast_path",))
+    assert report.errors == {}
+    assert any(
+        f.status == "stale" and "subset" in f.check_id
+        for f in by_axis.get("fast_path", [])
+    )
+
+
 # ─────────────────────────────────────────────────────────────────────────────────────────────
 # Report contract — the shape the watchdog (p2), the gate (p3) and the portal (p4) consume
 # ─────────────────────────────────────────────────────────────────────────────────────────────
@@ -595,12 +669,15 @@ def test_unmeasurable_scan_exits_2_not_0(fake_repo):
     """
     assert scanner.main(["--quiet"]) == 0, "the clean fixture should exit 0"
 
-    # Break the manifest so its axis cannot run; the tree is otherwise unchanged and drift-free.
+    # Break scripts/CONTEXT.md so its axes cannot run; the tree is otherwise unchanged and
+    # drift-free. The manifest axis errors on the missing markers; the fast_path axis errors on
+    # the missing fast-path section (the same source doc — neither can measure, neither is
+    # scored clean).
     (fake_repo / "scripts" / "CONTEXT.md").write_text("no markers here\n", encoding="utf-8")
     report, _ = _run()
-    assert report.errors, "expected the manifest axis to error"
+    assert report.errors, "expected the CONTEXT.md-driven axes to error"
     assert report.score()["drift"] == 0, "an errored axis must not inflate the drift score"
-    assert report.score()["axes_errored"] == ["manifest_counts"]
+    assert report.score()["axes_errored"] == ["fast_path", "manifest_counts"]
 
     # Exit 2 regardless of --fail-on-drift: an unmeasured axis is never reported as a pass.
     assert scanner.main(["--quiet"]) == 2

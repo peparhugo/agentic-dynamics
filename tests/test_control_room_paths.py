@@ -17,6 +17,9 @@ from agentic_dynamics.core.paths import PROJECT_ROOT
 from apps.control_room import server
 
 
+import pytest
+pytestmark = pytest.mark.fast
+
 def test_root_equals_project_root() -> None:
     """The module's ROOT is the single source of truth, not a sibling-relative guess."""
     assert server.ROOT == PROJECT_ROOT

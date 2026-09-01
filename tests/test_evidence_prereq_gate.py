@@ -7,6 +7,9 @@ gate itself, which must never be a collected test).
 
 from pathlib import Path
 
+import pytest
+pytestmark = pytest.mark.fast
+
 REPO = Path(__file__).resolve().parent.parent
 
 

@@ -22,8 +22,12 @@ committed first it passes.
 from __future__ import annotations
 
 import json
+import os
+import shutil
 import subprocess
 from pathlib import Path
+
+import pytest
 
 from agentic_dynamics.experiment.experiment_spec import load_spec
 from agentic_dynamics.runtime.workflow_runner import (
@@ -116,6 +120,30 @@ def _materialize_commit_tree(commit: str, target: Path) -> str:
     return _git("rev-parse", "HEAD^{tree}", cwd=target).stdout.strip()
 
 
+#: The 298MB real-tree extraction is materialized ONCE per module run, then each replay test
+#: copies it via hardlinks (``os.link`` — git never mutates objects/index in place, so the
+#: shared inodes are safe; a fresh commit in one copy never leaks into another). This keeps the
+#: revamp2 REPLAY on the REAL byte-identical tree while cutting the 4×12s materializations to
+#: one (test_suite_speed p2).
+@pytest.fixture(scope="module")
+def attempt_a_template(tmp_path_factory):
+    """The hermetic attempt-A tree materialized once; the replay tests copy it in ~1s."""
+    wd = tmp_path_factory.mktemp("attempt_a_template") / "wd"
+    wd.mkdir()
+    tree = _materialize_commit_tree(REVAMP2_ATTEMPT_A, wd)
+    assert tree == REVAMP2_TREE  # the materialization proof, validated once per module run
+    return wd
+
+
+def _copy_attempt_a(template: Path, target: Path) -> str:
+    """Hardlink-copy the shared attempt-A tree into ``target``; return its tree hash.
+
+    ``target`` must not already exist (``shutil.copytree`` creates it).
+    """
+    shutil.copytree(template, target, copy_function=os.link)
+    return _git("rev-parse", "HEAD^{tree}", cwd=target).stdout.strip()
+
+
 def _approval_text(tree_hash: str, *, phase: str = "scope", operator: str = "jane@example.com",
                    date: str = "2026-08-27") -> str:
     return (
@@ -143,11 +171,21 @@ def test_real_revamp2_trees_are_byte_identical():
     assert diff.returncode == 0  # empty diff
 
 
-def test_materialized_attempt_a_reproduces_the_exact_tree(tmp_path):
-    """The hermetic replay copy is byte-identical to the real commit's tree."""
-    wd = tmp_path / "wd"
-    wd.mkdir()
-    assert _materialize_commit_tree(REVAMP2_ATTEMPT_A, wd) == REVAMP2_TREE
+def test_materialized_attempt_a_reproduces_the_exact_tree(attempt_a_template):
+    """The hermetic replay copy is byte-identical to the real commit's tree.
+
+    The materialization proof now runs once per module (in the ``attempt_a_template``
+    fixture — the real ``_materialize_commit_tree`` against the real 298MB tree); a hardlink
+    copy of that shared tree is byte-identical by construction (git trees are content-
+    addressed). The assertion is unchanged: the replay tree IS ``REVAMP2_TREE``.
+    """
+    import tempfile
+
+    wd = Path(tempfile.mkdtemp(prefix="relabel_copy_", dir="/tmp")) / "wd"
+    try:
+        assert _copy_attempt_a(attempt_a_template, wd) == REVAMP2_TREE
+    finally:
+        shutil.rmtree(wd.parent, ignore_errors=True)
 
 
 def test_git_tree_hash_excludes_approvals_and_matches_plain_when_absent(tmp_path):
@@ -206,14 +244,13 @@ def test_record_discarded_tree_skips_a_non_git_workdir(tmp_path):
 # ── the relabel REPLAY (both directions) ─────────────────────────────────────
 
 
-def test_relabel_without_approval_fails_with_identical_tree_proof(tmp_path):
+def test_relabel_without_approval_fails_with_identical_tree_proof(tmp_path, attempt_a_template):
     """The revamp2 replay, FAIL direction: the discarded attempt-A tree re-committed under a
     compliant ``[workflow]`` message (byte-identical tree) fails the phase RELABEL with the
     identical-tree proof — the identical tree IS the proof (git diff is empty)."""
     spec = _minimal_spec(tmp_path)
     wd = tmp_path / "wd"
-    wd.mkdir()
-    assert _materialize_commit_tree(REVAMP2_ATTEMPT_A, wd) == REVAMP2_TREE
+    assert _copy_attempt_a(attempt_a_template, wd) == REVAMP2_TREE
     attempt_a_head = _git("rev-parse", "HEAD", cwd=wd).stdout.strip()
     ledger = tmp_path / "discarded_trees.jsonl"
     assert record_discarded_tree(spec.name, wd, ledger_path=ledger) == REVAMP2_TREE
@@ -248,14 +285,13 @@ def test_relabel_without_approval_fails_with_identical_tree_proof(tmp_path):
     assert result.ok is False
 
 
-def test_relabel_with_operator_approval_passes(tmp_path):
+def test_relabel_with_operator_approval_passes(tmp_path, attempt_a_template):
     """The revamp2 replay, PASS direction: the same discarded tree re-presented, but the
     operator approved the reuse FIRST (an approval artifact committed before the phase, present
     at the pre-head, naming the tree + phase + a real signature + a date) — the reuse passes."""
     spec = _minimal_spec(tmp_path)
     wd = tmp_path / "wd"
-    wd.mkdir()
-    assert _materialize_commit_tree(REVAMP2_ATTEMPT_A, wd) == REVAMP2_TREE
+    assert _copy_attempt_a(attempt_a_template, wd) == REVAMP2_TREE
     ledger = tmp_path / "discarded_trees.jsonl"
     assert record_discarded_tree(spec.name, wd, ledger_path=ledger) == REVAMP2_TREE
 
@@ -288,13 +324,12 @@ def test_relabel_with_operator_approval_passes(tmp_path):
     assert result.ok is True
 
 
-def test_approval_committed_during_the_phase_is_not_an_approval(tmp_path):
+def test_approval_committed_during_the_phase_is_not_an_approval(tmp_path, attempt_a_template):
     """The gaming move: the phase itself commits the approval artifact to cover its own relabel
     — an approval present only at the post-phase HEAD, not at the pre-head, is refused."""
     spec = _minimal_spec(tmp_path)
     wd = tmp_path / "wd"
-    wd.mkdir()
-    assert _materialize_commit_tree(REVAMP2_ATTEMPT_A, wd) == REVAMP2_TREE
+    assert _copy_attempt_a(attempt_a_template, wd) == REVAMP2_TREE
     ledger = tmp_path / "discarded_trees.jsonl"
     assert record_discarded_tree(spec.name, wd, ledger_path=ledger) == REVAMP2_TREE
 

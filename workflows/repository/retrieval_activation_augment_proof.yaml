@@ -62,6 +62,10 @@ workflow:
       - name: test
         kind: test
         timeout: 600
+        # test_suite_speed p2 scoping: run THIS spec's tests, never the whole multi-thousand-
+        # test tree (the augment-proof's test phase previously died at its 600s wall running
+        # the full suite). The implement phase above creates test_calc.py in the worktree.
+        tests: [test_calc.py]
 factors:
   - {name: model, levels: [deepseek/deepseek-v4-flash]}
 design: factorial

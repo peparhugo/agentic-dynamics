@@ -5,6 +5,8 @@ from unittest.mock import patch
 
 import pytest
 
+pytestmark = pytest.mark.fast
+
 from agentic_dynamics.control.model_policy import (
     FLASH_MODEL,
     PRO_MODEL,
