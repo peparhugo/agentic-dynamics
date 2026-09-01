@@ -5,7 +5,7 @@ an experiment run never fails because the dashboard is down. Channels mirror
 ``scripts/monitor.py``:
 
     - status hash:      ``story_status``         (cell_id -> queued|running|done|failed|timeout)
-    - phase hash:       ``story_phase``          (cell_id -> {name,index,total})
+    - phase hash:       ``story_phase``          (cell_id -> {name,index,total,published_at})
     - pub/sub channel:  ``status``               (status transitions)
     - pub/sub channel:  ``events:{cell_id}``     (per-cell session event stream)
 """
@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import json
 import os
+from datetime import datetime, timezone
 from typing import Any
 
 from agentic_dynamics.control.supervisor import register_event_mapping, register_session_mapping
@@ -28,6 +29,11 @@ STATUS_CHANNEL = "status"
 EVENT_CHANNEL_PREFIX = "events:"
 EVENT_LOG_PREFIX = "events_log:"
 EVENT_LOG_MAX = 500
+
+
+def _phase_stamp() -> str:
+    """Return the canonical UTC published-at stamp for a phase write."""
+    return datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
 
 
 def _connect() -> Any:
@@ -100,13 +106,17 @@ class LivePublisher:
 
         Written to the ``story_phase`` hash (``cell_id -> JSON``) so the portal's
         matrix poll can render a live phase badge without scanning the event log.
-        Display-only: it never feeds status, ledger, or control decisions, so a
-        failure here only disables the badge, never the run.
+        The write is stamped with ``published_at`` (server UTC) so the board can
+        tell a freshly-published phase from a stale one — the liveness window the
+        Control Room's LIVE NOW section is keyed off. Display-only: it never feeds
+        status, ledger, or control decisions, so a failure here only disables the
+        badge, never the run.
         """
         if not self.enabled:
             return
+        payload = {**phase, "published_at": _phase_stamp()}
         try:
-            self._r.hset(PHASE_KEY, self.cell_id, json.dumps(phase))
+            self._r.hset(PHASE_KEY, self.cell_id, json.dumps(payload))
         except Exception:
             self._disabled = True
 

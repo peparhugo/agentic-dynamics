@@ -162,6 +162,21 @@
   }
 
   /**
+   * Format a server-computed age (whole seconds since the last published phase) as a label.
+   *
+   * `null` (or any non-finite value) is the age-unknown state — a run with no published-phase
+   * timestamp and no runner-telemetry tail. It is its own word, never a number: age-unknown
+   * must not be readable as "0s ago".
+   */
+  function formatAgeSeconds(seconds) {
+    if (seconds === null || !Number.isFinite(seconds)) return "age unknown"
+    if (seconds < 60) return `${Math.floor(seconds)}s ago`
+    if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`
+    if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`
+    return `${Math.floor(seconds / 86400)}d ago`
+  }
+
+  /**
    * Keep heuristic supervisor statuses separate from fleet lifecycle states.
    *
    * The two axes must never be confusable (design §2.2), so this resolves the ATTENTION
@@ -371,6 +386,12 @@
   /** The mounted empty/no-match placeholder, when the grid has no cards to show. */
   let fleetPlaceholder = null
 
+  /** Live-card handles for the LIVE NOW section, keyed by cell id (the live board). */
+  const liveNowRows = new Map()
+
+  /** The mounted empty placeholder for the LIVE NOW section. */
+  let liveNowPlaceholder = null
+
   /**
    * Build the DOM for one cell card.
    *
@@ -472,6 +493,20 @@
     return `${index !== null ? `${index}/${total ?? "?"}` : ""} ${phase.name}`.trim()
   }
 
+  /** Format the phase badge WITH its age for the historical list and LIVE NOW rows.
+   *
+   * Every card in the current list carries its age so a stalled run "leaves LIVE NOW and shows
+   * its age in the historical list" — the badge is the one place the age belongs next to the
+   * i-of-N phase without adding a second line. The detail glance keeps the bare ``phaseLabel``
+   * because the Detail surface has a dedicated space for recency.
+   */
+  function phaseBadgeLabel(cellId) {
+    const phase = state.phases[cellId]
+    if (!phase || typeof phase !== "object" || typeof phase.name !== "string" || !phase.name) return ""
+    const label = phaseLabel(cellId)
+    return `${label} · ${formatAgeSeconds(phase.age_seconds)}`
+  }
+
   /** Mount, retitle, or remove the "nothing to show" placeholder for the grid. */
   function renderFleetPlaceholder(grid, text) {
     if (!text) {
@@ -489,8 +524,85 @@
     setText(fleetPlaceholder, text)
   }
 
+  /* ── LIVE NOW (the live board) ───────────────────────────────────────────────────────────
+     The live dimension of the phases board, rendered above the full fleet. LIVE NOW lists the
+     runs whose last phase was published within the live window (10 minutes, the watchdog
+     horizon) or whose runner telemetry is still active — newest first, each with the i-of-N
+     phase and its age. Past the window a run leaves LIVE NOW and shows its age in the grid
+     below; a run with no timestamp renders "age unknown", never mislabeled. The section is a
+     read-only highlight: rows drill into the same detail surface as fleet cards, and the grid
+     underneath stays the full list. */
+
+  /** Build one LIVE NOW row: cell id, the i-of-N phase badge, and the age. */
+  function createLiveNowRow(cellId) {
+    const button = element("button", "live-now-row")
+    button.type = "button"
+    button.dataset.cellId = cellId
+    button.appendChild(element("span", "cell-id", cellId))
+    const phaseBadge = element("span", "phase-badge")
+    button.appendChild(phaseBadge)
+    const age = element("span", "live-age")
+    button.appendChild(age)
+    return { node: button, button, phaseBadge, age, signature: null }
+  }
+
+  /** Refresh one LIVE NOW row, writing only the fields whose text actually changed. */
+  function updateLiveNowRow(entry, cellId) {
+    const phase = state.phases[cellId]
+    if (!phase) return
+    const selected = state.selectedType === "cell" && state.selectedId === cellId
+    const badge = phaseLabel(cellId)
+    const age = formatAgeSeconds(phase.age_seconds)
+    const signature = `${badge}|${age}|${selected ? 1 : 0}`
+    if (entry.signature === signature) return
+    entry.signature = signature
+    setClassName(entry.button, `live-now-row${selected ? " selected" : ""}`)
+    setAttr(entry.button, "aria-pressed", String(selected))
+    setAttr(entry.button, "aria-label", `${badge || cellId} · ${age}`)
+    setText(entry.phaseBadge, badge)
+    setText(entry.age, age)
+  }
+
+  /** Mount, retitle, or remove the LIVE NOW section's empty placeholder. */
+  function renderLiveNowPlaceholder(container, text) {
+    liveNowPlaceholder = adoptPlaceholder(container, liveNowPlaceholder)
+    if (!text) {
+      liveNowPlaceholder?.remove()
+      liveNowPlaceholder = null
+      return
+    }
+    if (!liveNowPlaceholder) {
+      liveNowPlaceholder = element("p", "empty-state", text)
+      container.appendChild(liveNowPlaceholder)
+    }
+    setText(liveNowPlaceholder, text)
+  }
+
+  /** Render LIVE NOW: the live runs, newest first, with i-of-N + age (see section header). */
+  function renderLiveNow() {
+    const section = $("#live-now")
+    const container = $("#live-now-list")
+    if (!section || !container) return
+    const entries = fleet.livePhaseEntries(state.phases)
+    setText($("#live-now-count"), entries.length)
+    // The section hides when nothing is live UNLESS the operator is explicitly viewing live
+    // runs — under the "live" filter, an empty LIVE NOW is the whole story and must stay.
+    setHidden(section, entries.length === 0 && state.filter !== "live")
+    renderLiveNowPlaceholder(container, entries.length === 0 ? "No runs are live within the window." : "")
+    list.reconcile({
+      container,
+      keys: entries.map(([cellId]) => cellId),
+      entries: liveNowRows,
+      create: createLiveNowRow,
+      update: updateLiveNowRow,
+    })
+  }
+
   /** Render urgency-sorted fleet cards without interpolating untrusted IDs. */
   function renderFleet() {
+    // LIVE NOW is part of the fleet render: it depends on the same matrix snapshot and the
+    // same filter chip, so it must re-render whenever either one moves.
+    renderLiveNow()
     const grid = $("#fleet-grid")
     // Re-setting an attribute to the value it already holds still queues a mutation record,
     // which is enough to make a screen reader re-announce a busy region every 5 seconds. Write
@@ -505,7 +617,14 @@
     // first real render, and never re-created.
     for (const skeleton of Array.from(grid.querySelectorAll(".skeleton-card"))) skeleton.remove()
 
-    const ids = fleet.visibleCellIds(state.cells, { filter: state.filter, search: state.search }, core.sortCellIds)
+    // The `live` filter is keyed off the API's phase liveness, not the lifecycle vocabulary:
+    // the set of cells whose last phase (or runner telemetry) falls within the live window.
+    const liveIds = new Set(fleet.livePhaseEntries(state.phases).map(([cellId]) => cellId))
+    const ids = fleet.visibleCellIds(
+      state.cells,
+      { filter: state.filter, search: state.search, liveIds },
+      core.sortCellIds,
+    )
     const retained = Object.keys(state.cells).length
 
     renderFleetPlaceholder(
@@ -533,7 +652,7 @@
           vocabulary,
           selected,
           sampleList,
-          phase: phaseLabel(cellId),
+          phase: phaseBadgeLabel(cellId),
           cost: costs.length ? `${formatCost(costs.at(-1))} latest reported step` : "no cost yet",
           samples: fleet.sampleSignature(sampleList),
         }
@@ -2923,6 +3042,13 @@
     })
     $("#fleet-grid").addEventListener("click", (event) => {
       const button = event.target instanceof Element ? event.target.closest(".cell-select") : null
+      const cellId = button?.dataset.cellId
+      if (cellId) selectCell(cellId, true)
+    })
+    // LIVE NOW rows are the same read-only drill-down as fleet cards: one tap opens the Detail
+    // surface for that run, nothing more (the live board is a highlight, never a control).
+    $("#live-now-list").addEventListener("click", (event) => {
+      const button = event.target instanceof Element ? event.target.closest(".live-now-row") : null
       const cellId = button?.dataset.cellId
       if (cellId) selectCell(cellId, true)
     })

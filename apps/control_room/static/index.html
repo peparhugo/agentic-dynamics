@@ -412,9 +412,31 @@
           </div>
         </section>
 
+        <!-- LIVE NOW — the phases board's live dimension (the live-board audit p2). Sits above
+             the full fleet board and lists the runs whose last phase was published within the
+             live window (10 minutes, the watchdog horizon) or whose runner telemetry is still
+             active, newest first, with the i-of-N phase and its age. Past the window a run
+             leaves LIVE NOW and shows its age in the historical list below; a run with no
+             timestamp at all renders age-unknown, never mislabeled. The section is a read-only
+             highlight, not a second grid: every row drills into the same detail surface as a
+             fleet card, and the grid underneath remains the full list. -->
+        <section id="live-now" class="live-now" aria-labelledby="live-now-title" hidden>
+          <header class="live-now-header">
+            <div class="live-now-heading">
+              <span class="eyebrow">Live board</span>
+              <h3 id="live-now-title"><span id="live-now-count" class="live-now-count">0</span> LIVE NOW</h3>
+            </div>
+            <span class="live-now-window last-update">window: 10m · last published phase</span>
+          </header>
+          <div id="live-now-list" class="live-now-list" aria-busy="true">
+            <p class="empty-state">No runs are live within the window.</p>
+          </div>
+        </section>
+
         <div class="fleet-controls" aria-label="Fleet filters">
           <div class="filter-group" role="group" aria-label="Status filter">
             <button class="filter-chip active" type="button" data-filter="all" aria-pressed="true">All</button>
+            <button class="filter-chip" type="button" data-filter="live" aria-pressed="false">Live</button>
             <button class="filter-chip" type="button" data-filter="running" aria-pressed="false">Running</button>
             <button class="filter-chip" type="button" data-filter="risk" aria-pressed="false">Risk</button>
           </div>

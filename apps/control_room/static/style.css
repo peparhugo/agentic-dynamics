@@ -789,6 +789,67 @@ pre {
   color: var(--accent-ink);
 }
 
+/* LIVE NOW — the phases board's live dimension (the live board). Rows read like fleet cards
+   (cell id, phase badge, age); the section is a highlight ABOVE the full grid, never a second
+   grid — every row drills into the same detail surface a fleet card does. */
+.live-now {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  padding: var(--sp-3);
+  border: 1px solid var(--border-strong);
+  border-left: 3px solid var(--status-running);
+  border-radius: var(--radius-md);
+  background: var(--bg-1);
+}
+
+.live-now-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--sp-2);
+  flex-wrap: wrap;
+}
+
+.live-now-header h3 {
+  margin: 0;
+  font-size: var(--fs-small);
+  letter-spacing: 0.08em;
+}
+
+.live-now-count { font-variant-numeric: tabular-nums; }
+
+.live-now-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+}
+
+.live-now-row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-height: var(--touch-target);
+  padding: var(--sp-2);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--status-running);
+  border-radius: var(--radius-md);
+  background: var(--bg-1);
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: var(--fs-small);
+  cursor: pointer;
+  text-align: left;
+}
+
+.live-now-row.selected { border-color: var(--accent); }
+
+.live-now-row .live-age {
+  margin-left: auto;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
 .search-label { flex: 1 1 160px; min-width: 0; }
 
 #cell-search {
@@ -2382,6 +2443,35 @@ h3, h4 {
   background: var(--cr-accent-wash);
   color: var(--cr-accent-hover);
 }
+
+/* LIVE NOW — refresh-layer surfaces: the section reads as a running-accented panel above the
+   grid, and its rows inherit the fleet card's hover/selection language. */
+.live-now {
+  border-color: var(--cr-line-subtle);
+  border-left-color: color-mix(in srgb, var(--cr-accent) 70%, transparent);
+  background: color-mix(in srgb, var(--cr-surface-1) 76%, var(--cr-surface-inset));
+}
+
+.live-now-row {
+  border-color: var(--cr-line-subtle);
+  background: var(--cr-surface-2);
+  transition: border-color var(--cr-motion-fast) var(--cr-ease-standard),
+    background var(--cr-motion-fast) var(--cr-ease-standard),
+    transform var(--cr-motion-fast) var(--cr-ease-standard);
+}
+
+.live-now-row:hover {
+  border-color: var(--cr-line-strong);
+  background: var(--cr-surface-3);
+  transform: translateY(-1px);
+}
+
+.live-now-row.selected {
+  border-color: var(--cr-accent);
+  box-shadow: var(--cr-shadow-1), inset 0 0 0 1px var(--cr-accent);
+}
+
+.live-now-row .live-age { color: var(--cr-text-secondary); }
 
 #cell-search {
   border-color: transparent;

@@ -279,7 +279,7 @@ def test_docs_health_panel_renders_three_states_and_never_colour_alone():
 
     # The client obeys the server's verdict rather than deriving a colour from a drift count.
     assert "panel.dataset.condition = String(data.condition" in app
-    assert 'word.textContent = String(data.word' in app
+    assert "word.textContent = String(data.word" in app
     # The approve affordance is hidden unless the server says the proposal is approvable.
     assert "form.hidden = !proposal.approvable" in app
 
@@ -295,8 +295,8 @@ def test_docs_health_approve_goes_through_the_mutation_trust_gate():
     app = (STATIC / "app.js").read_text()
 
     assert '"/api/docs-health/approve"' in app
-    assert '`docs-approve:${proposalId}`' in app
-    assert '`docs-approve:${proposalId}:${mutationKey()}`' in app
+    assert "`docs-approve:${proposalId}`" in app
+    assert "`docs-approve:${proposalId}:${mutationKey()}`" in app
     assert '"Idempotency-Key": key' in app
     # A poll landing mid-approval must not repaint the form under the operator's hands.
     assert "if (state.docsHealthApprovePending) return" in app
@@ -308,7 +308,7 @@ def test_docs_health_panel_never_falls_back_to_green_on_failure():
     """A fetch failure paints the unmeasured state, not a clean one."""
     app = (STATIC / "app.js").read_text()
 
-    unavailable = app[app.index("function renderDocsHealthUnavailable"):]
+    unavailable = app[app.index("function renderDocsHealthUnavailable") :]
     unavailable = unavailable[: unavailable.index("\n  }\n")]
     assert 'condition: "unmeasured"' in unavailable
     assert 'health: "red"' in unavailable
@@ -337,5 +337,88 @@ def test_docs_health_panel_ids_queried_by_the_client_all_exist_in_the_shell():
     defined = set(re.findall(r'id="(docs-health[a-z-]*)"', html))
 
     assert queried, "the client no longer queries the docs-health panel at all"
-    assert queried <= defined, f"client queries ids the page does not define: {sorted(queried - defined)}"
+    assert queried <= defined, (
+        f"client queries ids the page does not define: {sorted(queried - defined)}"
+    )
     assert defined - queried == {"docs-health-title"}, sorted(defined - queried)
+
+
+# ── live board (the phases board distinguishes LIVE runs from history) ──
+#
+# The four states the spec names — fresh-phase live, old-phase historical with age, no-timestamp
+# historical age-unknown, and the live/all filter — are all structural here: the browser-free
+# guard is that the shell mounts the LIVE NOW section above the board, the client renders it from
+# the API's live dimension, the pure fleet vocabulary handles the live filter + newest-first
+# order, and the styles exist. The behavioral half (which timestamp yields which state) is covered
+# in ``tests/test_admin_server.py`` against the real route.
+
+
+def test_live_now_section_mounted_above_the_full_board():
+    """LIVE NOW renders above the board: the section precedes the filter controls and grid."""
+    html = (STATIC / "index.html").read_text()
+
+    for required in (
+        'id="live-now"',
+        'id="live-now-title"',
+        'id="live-now-count"',
+        'id="live-now-list"',
+        "window: 10m · last published phase",
+        "No runs are live within the window.",
+    ):
+        assert required in html, required
+    assert html.index('id="live-now"') < html.index('class="fleet-controls"')
+    assert html.index('class="fleet-controls"') < html.index('id="fleet-grid"')
+    # The live/all filter chip joins the existing status chips.
+    assert 'data-filter="live"' in html
+    assert 'data-filter="all"' in html
+
+
+def test_client_renders_live_now_from_the_api_live_dimension():
+    """app.js consumes the live dimension and renders LIVE NOW + card ages."""
+    app = (STATIC / "app.js").read_text()
+
+    # The phase entries now carry the live dimension the API emits.
+    assert "age_seconds" in app
+    assert "renderLiveNow" in app
+    assert "liveNowRows" in app
+    assert "fleet.livePhaseEntries" in app
+    # The live/all filter passes the live cell set into the fleet facet.
+    assert "liveIds" in app
+    assert "filter: state.filter" in app
+    # Card badges carry their age ("4/7 rerun_contaminated · 2m ago"), and age-unknown is its
+    # own word, never a number that could be read as fresh.
+    assert "phaseBadgeLabel" in app
+    assert "age unknown" in app
+    assert "formatAgeSeconds" in app
+    # LIVE NOW rows are the same read-only drill-down as fleet cards.
+    assert '$("#live-now-list").addEventListener("click"' in app
+    assert 'closest(".live-now-row")' in app
+
+
+def test_board_fleet_handles_live_filter_and_orders_live_newest_first():
+    """The pure fleet vocabulary owns the live filter and the newest-first order."""
+    fleet = (STATIC / "board-fleet.js").read_text()
+
+    # The live filter consults the phase-liveness set the client passes in the facet.
+    assert 'filter === "live"' in fleet
+    assert "facet?.liveIds?.has(cellId)" in fleet
+    # LIVE NOW content is ordered newest first by the normalized last_phase_ts.
+    assert "livePhaseEntries" in fleet
+    assert "last_phase_ts" in fleet
+    assert "live === true" in fleet
+
+
+def test_live_now_styles_are_present():
+    """The LIVE NOW section and rows have their own presentation."""
+    css = (STATIC / "style.css").read_text()
+
+    for selector in (
+        ".live-now",
+        ".live-now-header",
+        ".live-now-count",
+        ".live-now-list",
+        ".live-now-row",
+        ".live-now-row.selected",
+        ".live-now-row .live-age",
+    ):
+        assert selector in css, selector

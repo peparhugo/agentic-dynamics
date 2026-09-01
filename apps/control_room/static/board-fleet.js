@@ -29,6 +29,7 @@
  *   lifecycle(status) / attention(status)  — the vocabularies
  *   visibleCellIds(cells, facet, sortIds)  — urgency-first, then filtered   [design §2.1]
  *   matchesFacet(cellId, status, facet)    — the filter chips + search box
+ *   livePhaseEntries(phases)               — LIVE phase entries, newest first [live board]
  *   statusCounts(cells) / countsSummary()  — the footer line               [design §2.5]
  *   cellSignature(fields) / sampleSignature(samples) — change detection    [design §2.5]
  *   orderChanged(currentIds, nextIds)      — reorder only on a real change
@@ -96,6 +97,10 @@
    * Search is a plain case-insensitive substring test against the full cell id: the ids are
    * long and compound (`wf_retry_gpt_5_6_sol`), so substring beats prefix, and anything fuzzier
    * would make "why is this card here?" unanswerable at a glance.
+   *
+   * The `live` filter consults `facet.liveIds` — the set of cells the API marked LIVE within
+   * the phase window. It is a set, not a status, because liveness is a phase-board property
+   * the status vocabulary cannot express; the caller builds it from the matrix's `phases`.
    */
   function matchesFacet(cellId, status, facet) {
     const filter = facet?.filter || "all"
@@ -103,6 +108,7 @@
     const passesFilter = filter === "all"
       || (filter === "running" && status === "running")
       || (filter === "risk" && RISK_STATUSES.has(status))
+      || (filter === "live" && Boolean(facet?.liveIds?.has(cellId)))
     return passesFilter && String(cellId).toLowerCase().includes(search)
   }
 
@@ -117,6 +123,22 @@
   function visibleCellIds(cells, facet, sortIds) {
     const sorted = typeof sortIds === "function" ? sortIds(cells) : Object.keys(cells || {})
     return sorted.filter((cellId) => matchesFacet(cellId, lifecycle(cells[cellId]).key, facet))
+  }
+
+  /**
+   * Return the LIVE phase entries, newest first — the content of the LIVE NOW section.
+   *
+   * A run is live when the API says so (its last phase, or its runner-telemetry tail, falls
+   * within the live window). `last_phase_ts` is normalized to a UTC ISO string server-side, so
+   * a descending string compare is exactly a newest-first sort. Age-unknown runs (no timestamp)
+   * are never live and therefore never appear here.
+   */
+  function livePhaseEntries(phases) {
+    return Object.entries(phases || {})
+      .filter(([, phase]) => Boolean(phase && phase.live === true))
+      .sort((left, right) =>
+        String(right[1].last_phase_ts || "").localeCompare(String(left[1].last_phase_ts || "")),
+      )
   }
 
   /** Count every retained cell by lifecycle state, including the states at zero. */
@@ -192,6 +214,7 @@
     attention,
     matchesFacet,
     visibleCellIds,
+    livePhaseEntries,
     statusCounts,
     countsSummary,
     cellSignature,

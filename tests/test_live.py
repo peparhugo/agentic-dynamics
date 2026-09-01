@@ -62,6 +62,7 @@ def test_publish_status_and_event(monkeypatch):
 
 def test_set_phase_writes_phase_hash(monkeypatch):
     """The workflow phase badge writes to the ``story_phase`` hash, keyed by cell."""
+
     class PhaseRedis:
         def __init__(self):
             self.phases = {}
@@ -74,13 +75,42 @@ def test_set_phase_writes_phase_hash(monkeypatch):
 
     fake = PhaseRedis()
     monkeypatch.setattr(live_module, "_connect", lambda: fake)
+    monkeypatch.setattr(live_module, "_phase_stamp", lambda: "2026-09-01T12:00:00Z")
     pub = LivePublisher("cell_abc")
 
     pub.set_phase({"name": "rerun_contaminated", "index": 4, "total": 7})
 
-    assert fake.phases[("story_phase", "cell_abc")] == json.dumps(
-        {"name": "rerun_contaminated", "index": 4, "total": 7}
-    )
+    written = json.loads(fake.phases[("story_phase", "cell_abc")])
+    assert written["name"] == "rerun_contaminated"
+    assert written["index"] == 4 and written["total"] == 7
+    # The write carries the server-side published-at stamp the board's live window reads.
+    assert written["published_at"] == "2026-09-01T12:00:00Z"
+
+
+def test_set_phase_stamps_every_write(monkeypatch):
+    """Every phase write is stamped, so the board never mistakes stale for fresh."""
+
+    class PhaseRedis:
+        def __init__(self):
+            self.phases = {}
+
+        def ping(self):
+            return True
+
+        def hset(self, key, field, value):
+            self.phases[(key, field)] = value
+
+    fake = PhaseRedis()
+    monkeypatch.setattr(live_module, "_connect", lambda: fake)
+    stamps = iter(["2026-09-01T12:00:00Z", "2026-09-01T12:03:00Z"])
+    monkeypatch.setattr(live_module, "_phase_stamp", lambda: next(stamps))
+    pub = LivePublisher("cell_abc")
+
+    pub.set_phase({"name": "implement", "index": 1, "total": 3})
+    pub.set_phase({"name": "rework", "index": 2, "total": 3})
+
+    first = json.loads(fake.phases[("story_phase", "cell_abc")])
+    assert first["published_at"] == "2026-09-01T12:03:00Z"
 
 
 def test_publish_event_maintains_history_log(monkeypatch):
