@@ -418,6 +418,39 @@ def test_egress_proxy_is_the_single_policy_point_on_fleet_net():
     assert egress.get("networks") == ["fleet-net"]
 
 
+# F1 close-out (2026-09-01): the network-policy guard above only checked the egress service's
+# OWN network membership — it never asserted that anything actually ROUTES through it. The
+# adversarial pass (docs/reviews/fleet_ladder_implementation_adversary.md, finding F1) caught
+# this: fleet-net is a normal bridge, so with no HTTP(S)_PROXY set the cells reached the
+# internet directly via NAT and the proxy saw zero traffic. This guard is the regression test
+# for the fix (HTTP_PROXY/HTTPS_PROXY/NO_PROXY added to x-ladder-env) — every ladder-env
+# consumer must carry the proxy pointed at egress:8888, the by-name data-plane hosts must be
+# NO_PROXY-exempted (the proxy only allowlists model endpoints — it must never sit between a
+# cell and the queue/graph/vector store), and egress itself must never proxy through itself.
+def test_every_ladder_env_consumer_routes_through_egress():
+    compose = _compose()
+    services = compose["services"]
+    egress_target = "http://egress:8888"
+    required_no_proxy = {"finops-queue", "neo4j", "chromadb", "localhost", "127.0.0.1"}
+
+    for name, svc in services.items():
+        env = _env(svc)
+        if name == "egress":
+            assert "HTTP_PROXY" not in env and "HTTPS_PROXY" not in env, (
+                "egress must not proxy through itself"
+            )
+            continue
+        assert env.get("HTTP_PROXY") == egress_target, (
+            f"{name}: HTTP_PROXY must point at {egress_target}"
+        )
+        assert env.get("HTTPS_PROXY") == egress_target, (
+            f"{name}: HTTPS_PROXY must point at {egress_target}"
+        )
+        no_proxy = {h.strip() for h in env.get("NO_PROXY", "").split(",") if h.strip()}
+        missing = required_no_proxy - no_proxy
+        assert not missing, f"{name}: NO_PROXY is missing the by-name data-plane hosts {missing}"
+
+
 # ── guard 8 — the submit-isolation guard (fleet_job_submission, p4_isolation_guards) ────────
 #
 # "submit" is the one place a caller-supplied string (spec/workdir/model) reaches the mount/

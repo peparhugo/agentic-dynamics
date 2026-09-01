@@ -69,3 +69,23 @@ F1 must be closed before the operator's smoke test gates production: either (a) 
 scope `env` (§5) + the compose `ladder-env`, or (b) record a documented, operator-signed
 deferral. F2 is cosmetic — wire `x-supervisor-base.image: fleet/supervisor` and build the
 target, or delete the dead `supervisor` stage.
+
+**F1 — CLOSED (2026-09-01, option (a)).** `x-ladder-env` in
+`infrastructure/docker-compose.ladder.yml` now carries `HTTP_PROXY=http://egress:8888`,
+`HTTPS_PROXY=http://egress:8888`, and `NO_PROXY=finops-queue,neo4j,chromadb,localhost,
+127.0.0.1` (the by-name data-plane hosts, so the proxy — which only allowlists model
+endpoints — never sits between a cell and the queue/graph/vector store). The affected
+long-lived pools (`fleet-manager`, `kb-neo4j`, `orphan-sweep`) were recreated to pick up the
+env; all three came back healthy (binary probe PASS, heartbeats resumed). Traffic evidence
+from a one-shot cell run through the recreated env: the egress log recorded
+`ALLOW api.anthropic.com:443 (CONNECT)` for an allowlisted host and
+`DENY example.com (not in allowlist)` for a non-allowlisted one — the policy point is now
+actually consulted, not bypassed. Reachability check in the other direction: `finops-queue:6379`,
+`neo4j:7687`, and `chromadb:8000` all connected directly (NO_PROXY-exempted, unaffected by the
+new proxy env) — no data-plane regression. New regression guard:
+`tests/test_fleet_guards.py::test_every_ladder_env_consumer_routes_through_egress` (every
+ladder-env consumer carries the proxy pointed at egress, egress itself never self-proxies, and
+NO_PROXY always carries the by-name data-plane hosts). `fleet-net` was left as a normal bridge
+(not flipped to `internal: true`) — the proxy-env route plus the allowlist is the enforcement;
+making the network internal too is a stronger, separable hardening step, not required to close
+this finding. F2 remains open (cosmetic, unrelated to this fix).

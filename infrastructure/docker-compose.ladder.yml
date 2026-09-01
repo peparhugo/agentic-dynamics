@@ -45,6 +45,13 @@ x-ladder-env: &ladder-env
   # workflows (and the kb-* consumers) — inert for the plain worker cells.
   CHROMA_HOST: chromadb
   FINOPS_NEO4J_URI: bolt://neo4j:7687
+  # F1 close-out (D-17, the single internet policy point): every ladder-env consumer routes
+  # its outbound model-API traffic through the egress proxy — no bypass via the bridge NAT.
+  # NO_PROXY carries the by-name data-plane hosts (+ localhost/127.0.0.1) so the proxy, which
+  # only allowlists model endpoints, never sits between a cell and the queue/graph/vector store.
+  HTTP_PROXY: http://egress:8888
+  HTTPS_PROXY: http://egress:8888
+  NO_PROXY: finops-queue,neo4j,chromadb,localhost,127.0.0.1
 
 # The four-mount contract (the isolation constant, §3) + the D-2 auth set (D-18), REVISED
 # by the smoke test (2026-08-30 — the five findings): the results OVERLAY at
