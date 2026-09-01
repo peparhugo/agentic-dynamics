@@ -29,7 +29,7 @@ except ImportError:  # imported as scripts.<name> — repo root is on sys.path
 # `_bootstrap` above: a direct `python scripts/run_workflow.py` run has `scripts/` itself on
 # `sys.path[0]` (the bare `import` resolves); a test or caller that imports this file as
 # `scripts.run_workflow` has the repo ROOT on `sys.path` instead (the `scripts.`-qualified
-# fallback resolves). Imported here, not lazily inside `_emit_workflow_facts`, because the hook
+# fallback resolves). Imported here, not lazily inside `_fact_payloads`, because the hook
 # is default-ON (§4 of the design doc) — it is the common path, not a conditional CAP opt-in like
 # `control.rules`/`control.context_compiler` below.
 try:
@@ -37,6 +37,14 @@ try:
 except ImportError:  # imported as scripts.run_workflow — repo root is on sys.path
     from scripts import kb_produce_facts  # noqa: E402
 
+from agentic_dynamics.control import fact_ingestion as fi  # noqa: E402
+from agentic_dynamics.control import outbox as ob  # noqa: E402
+from agentic_dynamics.control.control_db import (  # noqa: E402
+    ControlDB,
+    ControlDBError,
+    RunState,
+    run_state_from_ledger_state,
+)
 from agentic_dynamics.control.live import LivePublisher  # noqa: E402
 from agentic_dynamics.control.reducers._common import REVISION_FALLBACK  # noqa: E402
 from agentic_dynamics.control.reducers._common import cell_id as _reducer_cell_id  # noqa: E402
@@ -44,10 +52,9 @@ from agentic_dynamics.control.signal_store import build_signal_store, load_resul
 from agentic_dynamics.control.step_routing import ModelSignals, route_step  # noqa: E402
 from agentic_dynamics.experiment.experiment_spec import ExperimentSpec, load_spec  # noqa: E402
 from agentic_dynamics.experiment.spec_status import refresh_spec_status  # noqa: E402
-from agentic_dynamics.knowledge import knowledge_stream as ks  # noqa: E402
+from agentic_dynamics.knowledge import spec_ingestion as si  # noqa: E402
 from agentic_dynamics.knowledge.knowledge_ingestion import _authorized_kb_write  # noqa: E402
 from agentic_dynamics.knowledge.record_factory import _now_iso  # noqa: E402
-from agentic_dynamics.knowledge.spec_ingestion import emit_spec_record  # noqa: E402
 from agentic_dynamics.runtime.workflow_runner import cell_scope, run_workflow  # noqa: E402
 
 #: CAP fact auto-emit (docs/architecture/current/cap_fact_auto_emit_design.md §4): the disable-flag
@@ -539,6 +546,14 @@ def _run_workflow_cli(
     # runner's seam is inert and the run is byte-identical to the pre-admission behaviour.
     phase_admission = _build_phase_admission(spec, args)
 
+    # The control database's record of THIS run (control_db_publication p2). Opened BEFORE the
+    # engine starts, not after it finishes, and that ordering is the point: a run whose row is
+    # only written at the end leaves *nothing at all* behind when the runner is killed — the
+    # exact hole `control_db` exists to close. A killed run now leaves a `running` row that the
+    # control packet and the lease watchdog can see. Returns None in child mode or when the
+    # database is unavailable, in which case every control-plane step below is a no-op.
+    control_run_id = _control_open_run(spec, args)
+
     try:
         result = run_workflow(
             spec,
@@ -591,9 +606,12 @@ def _run_workflow_cli(
         print(f"cost: ${result.total_cost_usd:.4f}  ok: {result.ok}", file=sys.stderr)
 
     _refresh_index(spec.name)
-    _emit_spec_record(spec.name, revision=result.git_sha)
-    if _fact_auto_emit_enabled(args):
-        _emit_workflow_facts(spec, args, result)
+    # THE emission path (control_db_publication p2). One transaction records the run's terminal
+    # transition, its result envelope, and every knowledge event it owes; a publisher then
+    # drains the outbox with at-least-once delivery. The two former fire-and-forget calls
+    # (`_emit_spec_record` / `_emit_workflow_facts`) are gone — their DERIVATION survives as
+    # `_spec_payload` / `_fact_payloads` below, but nothing publishes directly any more.
+    _control_terminal_write(spec, args, result, run_id=control_run_id, ledger_path=out_path)
 
     # P0-1 exit-code contract (control-plane stabilization): in CHILD mode (--only-phase —
     # the sibling the orchestrator spawns) the process exit code maps the run outcome so
@@ -629,43 +647,249 @@ def _fact_auto_emit_enabled(args: argparse.Namespace) -> bool:
     return os.environ.get(FACT_AUTO_EMIT_ENV) != "0"
 
 
-def _emit_workflow_facts(spec: ExperimentSpec, args: argparse.Namespace, result) -> None:
-    """Derive and emit this run's own facts into the KB. Best-effort — never fails the run.
+def _fact_payloads(spec: ExperimentSpec, args: argparse.Namespace, result) -> list[dict]:
+    """Derive this run's own fact records and render them as OUTBOX payloads. No I/O, no emit.
 
-    The CAP fact-auto-emit hook (design: ``docs/architecture/current/cap_fact_auto_emit_design.md``).
-    Runs AFTER ``_emit_spec_record`` on purpose — the ledger is already on disk and the spec's
-    lifecycle record is already current, so this call adds nothing new to the *run's* outcome; it
-    can only add facts to the KB. Mirrors ``_emit_spec_record``'s two-layer posture exactly (see
-    its own docstring): ``derive_run_facts`` does no I/O beyond what ``spec``/``result`` already
-    hold in memory (so it essentially cannot raise on its own), and the emission half
-    (``ks.connect`` / ``ks.publish_event``, which need a live Redis) is wrapped so a downed
-    stream, a missing ``FINOPS_KB_WRITE`` authorization, or a corrupt registry row degrades to a
-    printed warning — NEVER an exception that could change this run's exit status.
+    The derivation half of the former ``_emit_workflow_facts`` (the CAP fact-auto-emit hook,
+    design: ``docs/architecture/current/cap_fact_auto_emit_design.md``), unchanged: the same
+    ``derive_run_facts`` call over the same evidence, with the same ``repository_id`` — which
+    must stay ``cell_scope(args.workdir)`` so the facts this run emits share their
+    ``scope_path``'s ``org:`` root with whatever THIS run's routing calls query, or
+    ``context_compiler.scope_visible``'s ancestor-prefix match silently excludes them.
 
-    ``repository_id=cell_scope(args.workdir)`` reuses EXACTLY the value the ``--cap-snapshot``/
-    ``--cap-shadow``/``control_route`` router seams above already pass for this same ``workdir``
-    (design §3): the facts this hook emits must share their ``scope_path``'s ``org:`` root with
-    whatever THIS run's own routing calls query, or ``context_compiler.scope_visible``'s
-    ancestor-prefix match silently excludes them.
+    What changed is only what happens NEXT. This function no longer opens Redis and publishes;
+    it returns payloads for the outbox, and delivery becomes the publisher's at-least-once job.
+    The pointer events are built by the producer's OWN builder (``kb_produce_facts.build_event``,
+    which dispatches pattern projections to ``fi.pattern_projection_event`` and everything else
+    to ``fi.fact_event``) and stored verbatim, so the envelope that reaches the stream is
+    byte-identical to the one the direct path produced — only the route differs.
+
+    ``checkpoint=True`` and the registry lines mirror ``kb_produce_facts.emit_records`` exactly,
+    including the F2 emit-time registry materialization: the fact producer has always
+    checkpointed each ``knowledge_id`` and appended its registry row, and routing the emission
+    through the outbox must not quietly drop either.
+
+    Derivation is deliberately NOT wrapped in a try/except here — the caller
+    (:func:`_control_terminal_write`) owns the "never fail a finished run" guarantee for the
+    whole control-plane step, and burying a second swallow here would hide which half failed.
+    """
+    records = kb_produce_facts.derive_run_facts(
+        result,
+        spec,
+        repository_id=cell_scope(args.workdir),
+        revision=result.git_sha or REVISION_FALLBACK,
+        now=_now_iso(),
+    )
+    payloads = []
+    for record in records:
+        # Producer-specific operation/reason: a pattern projection is not a raw fact, and the
+        # registry line's `reason` fingerprint is what the NEXT producer run reads back to
+        # decide whether the fact actually changed.
+        if record.source_type == fi.PATTERN_SOURCE_TYPE:
+            operation = "supersede" if record.supersedes else "upsert"
+            reason = fi.pattern_projection_reason(record)
+        else:
+            operation = fi.fact_operation(record)
+            reason = fi.fact_reason(record)
+        payloads.append(
+            ob.knowledge_payload(
+                record,
+                kb_produce_facts.build_event(record),
+                checkpoint=True,
+                registry_lines=ob.registry_lines_for(record, operation=operation, reason=reason),
+            )
+        )
+    return payloads
+
+
+def _spec_payload(spec_name: str, *, revision: str) -> dict | None:
+    """Derive this spec's lifecycle record as an OUTBOX payload, or ``None`` if unchanged.
+
+    The derivation half of the former ``_emit_spec_record``. It must run AFTER
+    :func:`_refresh_index`, because the record is derived from ``experiments/specs/index.json``
+    and that index has to already reflect the run that just finished.
+
+    ``None`` is the ordinary, non-exceptional answer in two cases: the spec is not in the index,
+    or ``derive_spec_records`` found its lifecycle unchanged since the last registered version.
+    Neither is a failure — there is genuinely nothing to say.
+
+    ``checkpoint=False`` and no registry lines, because that is what ``emit_spec_record`` did:
+    the spec producer decides "unchanged?" from the registry HEAD (``registry_head`` +
+    ``lifecycle_fingerprint``), not from the consumer checkpoint hash, and it has never
+    materialized its own registry row. Routing the emission through the outbox changes the
+    delivery path only — it is not the place to widen a producer's behaviour.
+    """
+    entries = [e for e in si.load_index_entries(root=ROOT) if e.name == spec_name]
+    if not entries:
+        return None
+    records = si.derive_spec_records(entries, revision=revision or "workflow-run")
+    if not records:
+        return None
+    record = records[0]
+    return ob.knowledge_payload(record, si.spec_event(record), checkpoint=False)
+
+
+def _control_db() -> ControlDB | None:
+    """Open the orchestrator's control database, or ``None`` when it cannot be opened.
+
+    Returns ``None`` rather than raising for the same reason every other post-run step here is
+    best-effort: a completed run's outcome may not change because a bookkeeping store was
+    unavailable. The difference from the pre-outbox world is what a failure now costs — the
+    events stay underived rather than being derived, published into the void, and forgotten.
     """
     try:
-        records = kb_produce_facts.derive_run_facts(
-            result,
-            spec,
-            repository_id=cell_scope(args.workdir),
-            revision=result.git_sha or REVISION_FALLBACK,
-            now=_now_iso(),
-        )
-        if not records:
-            print("workflow facts: nothing to emit (unchanged or no phases)", file=sys.stderr)
-            return
-        with _authorized_kb_write():
-            r = ks.connect()
-            emitted, skipped = kb_produce_facts.emit_records(r, records)
-        print(f"workflow facts: emitted={emitted} skipped={skipped} total={len(records)}",
+        return ControlDB.open()
+    except (ControlDBError, OSError) as exc:
+        print(f"warning: control db unavailable ({exc}) — control-plane record skipped",
               file=sys.stderr)
-    except Exception as exc:  # noqa: BLE001 — progressive path, never a gate on the run
-        print(f"warning: workflow fact emit failed ({exc}) — run itself unaffected", file=sys.stderr)
+        return None
+
+
+def _control_open_run(spec: ExperimentSpec, args: argparse.Namespace) -> str | None:
+    """Record this run in the control database as ``running``; return its run id.
+
+    Returns ``None`` — and records nothing — in CHILD mode. That is the P0-2 contract held
+    exactly where it belongs: **children never emit; the parent aggregates.** A ``--only-phase``
+    sibling is one phase of the parent's run, not a run of its own, so minting a second run row
+    (and a second set of outbox events) for it would double-count the work and emit each phase's
+    facts twice. The parent's terminal write covers every phase the children executed.
+    """
+    if args.only_phase:
+        return None
+    db = _control_db()
+    if db is None:
+        return None
+    try:
+        run = db.create_run(
+            spec_name=spec.name,
+            model=args.model,
+            state=RunState.RUNNING,
+            reason="workflow run started",
+        )
+        print(f"control: run {run.run_id} ({run.state.value})", file=sys.stderr)
+        return run.run_id
+    except (ControlDBError, OSError) as exc:
+        print(f"warning: control db run creation failed ({exc}) — run itself unaffected",
+              file=sys.stderr)
+        return None
+    finally:
+        db.close()
+
+
+def _derived(label: str, derive) -> list[dict]:
+    """Run one producer's derivation, returning its payloads — or none, loudly, on failure.
+
+    The per-producer fence. ``derive`` may return a single payload, a list, or ``None`` (the
+    ordinary "nothing changed, nothing to say" answer, which is reported as a no-op rather than
+    a warning because it is not one).
+    """
+    try:
+        produced = derive()
+    except Exception as exc:  # noqa: BLE001 — one producer's failure, not the run's
+        print(f"warning: {label} derivation failed ({exc}) — run itself unaffected",
+              file=sys.stderr)
+        return []
+    if produced is None:
+        print(f"{label}: nothing to emit (unchanged or not indexed)", file=sys.stderr)
+        return []
+    payloads = produced if isinstance(produced, list) else [produced]
+    print(f"{label}: {len(payloads)} event(s) queued", file=sys.stderr)
+    return payloads
+
+
+def _control_terminal_write(
+    spec: ExperimentSpec,
+    args: argparse.Namespace,
+    result,
+    *,
+    run_id: str | None,
+    ledger_path: Path,
+) -> None:
+    """The parent's ATOMIC terminal write, then a drain of the outbox. Never fails the run.
+
+    One transaction (:func:`agentic_dynamics.control.outbox.record_terminal_run`) records all
+    three facts that used to be scattered across a ledger file, a Redis publish, and nothing at
+    all:
+
+    1. **the run state transition** — ``running`` → the control state this run's ledger outcome
+       maps to (``run_state_from_ledger_state``: succeeded → ``promotable``, because phases that
+       passed authorise a promotion, they do not *are* one);
+    2. **the run result envelope** — the ledger path (the pointer to the envelope JSON just
+       written), the total cost, and the candidate SHA, all stamped onto the run row. They are
+       passed to the terminal transition rather than written after it because a terminal state
+       is immutable: that transition is the last moment they can be recorded at all;
+    3. **the knowledge events this run owes** — the spec-lifecycle record and (unless
+       ``--no-fact-emit`` / ``FINOPS_FACT_AUTO_EMIT=0``) the run's own facts, queued as
+       ``pending`` outbox rows.
+
+    Then :class:`~agentic_dynamics.control.outbox.OutboxPublisher` drains what it can. A drain
+    that reaches nothing leaves the rows ``pending`` — which is the entire improvement: the
+    obligation survives a downed stream instead of evaporating into a printed warning.
+
+    The whole step is wrapped: derivation, transaction, and drain alike. A finished run's exit
+    status may not depend on the control plane's health. What it no longer does is *forget*.
+    """
+    if run_id is None:
+        # Child mode, or the database was unavailable at run start. Either way there is no run
+        # row to transition and no aggregation to do here — see _control_open_run.
+        if args.only_phase:
+            print("control: child mode — parent aggregates, child emits nothing", file=sys.stderr)
+        return
+
+    db = _control_db()
+    if db is None:
+        return
+    try:
+        # Derivation is fenced OFF from the state record, one producer at a time. A corrupt
+        # registry row or a reducer bug costs THAT producer's events and nothing else: the run
+        # still terminates in the control database with an honest state. The opposite coupling —
+        # a derivation failure leaving the run stuck in `running` forever — would turn a
+        # knowledge-plane bug into a phantom in-flight run that the packet and the watchdog
+        # would both have to reason about.
+        payloads = []
+        payloads.extend(
+            _derived("spec record", lambda: _spec_payload(spec.name, revision=result.git_sha))
+        )
+        if _fact_auto_emit_enabled(args):
+            payloads.extend(
+                _derived("workflow facts", lambda: _fact_payloads(spec, args, result))
+            )
+
+        write = ob.record_terminal_run(
+            db,
+            run_id,
+            state=run_state_from_ledger_state(result.state),
+            payloads=payloads,
+            reason=f"workflow run ended ({result.state})",
+            cost_usd=result.total_cost_usd,
+            ledger_path=str(ledger_path),
+            candidate_sha=result.git_sha,
+            ended_at=result.ended_at or None,
+        )
+        print(
+            f"control: run {run_id} -> {write.run.state.value}  "
+            f"outbox queued {len(write.events)}",
+            file=sys.stderr,
+        )
+
+        # Delivery. `_authorized_kb_write()` is the SAME authorization the two direct-publish
+        # call sites used, applied for the duration of the drain and no longer: the write guard
+        # is unchanged, it has simply moved behind the one emission path.
+        with _authorized_kb_write():
+            report = ob.OutboxPublisher(db, authorized=True).drain()
+        if report.stream_error:
+            print(
+                f"outbox: stream unreachable ({report.stream_error}) — "
+                f"{len(write.events)} event(s) stay pending for the next drain",
+                file=sys.stderr,
+            )
+        else:
+            print(f"outbox: {json.dumps(report.to_dict())}", file=sys.stderr)
+    except Exception as exc:  # noqa: BLE001 — a finished run's outcome never depends on this
+        print(f"warning: control-plane terminal write failed ({exc}) — run itself unaffected",
+              file=sys.stderr)
+    finally:
+        db.close()
 
 
 def _refresh_index(spec_name: str) -> None:
@@ -692,33 +916,6 @@ def _refresh_index(spec_name: str) -> None:
             f"warning: spec index refresh failed ({exc}) — run itself unaffected",
             file=sys.stderr,
         )
-
-
-def _emit_spec_record(spec_name: str, *, revision: str) -> None:
-    """Publish this spec's lifecycle record to the knowledge base. Best-effort.
-
-    Runs AFTER ``_refresh_index`` on purpose: the record is derived from
-    ``experiments/specs/index.json``, so the index must already reflect the run that just
-    finished. ``emit_spec_record`` swallows every failure internally (Redis down, the
-    ``FINOPS_KB_WRITE`` guard, a missing index) and returns ``None`` — the ``emit_self``
-    pattern from ``workflow_runner.py:254-267``. The extra ``try`` here is belt-and-braces
-    for the import/logging path itself: nothing after a completed run may change its outcome.
-
-    A ``None`` return is also the ordinary "lifecycle unchanged, nothing to say" case, so it
-    is reported as a no-op rather than as a warning.
-    """
-    try:
-        record = emit_spec_record(spec_name, root=ROOT, revision=revision or "workflow-run")
-        if record is None:
-            print("spec record: nothing to emit (unchanged or KB unreachable)", file=sys.stderr)
-        else:
-            print(
-                f"spec record: {record.entity_id} {record.knowledge_id[:12]} "
-                f"({'supersede' if record.supersedes else 'upsert'})",
-                file=sys.stderr,
-            )
-    except Exception as exc:  # noqa: BLE001 — progressive path, never a gate
-        print(f"warning: spec record emit failed ({exc}) — run itself unaffected", file=sys.stderr)
 
 
 if __name__ == "__main__":

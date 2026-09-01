@@ -251,50 +251,134 @@ def test_failed_run_still_emits_attempt_facts(kpf, tmp_path):
     assert by["workflow_status"]["value"] == "failed"  # the aggregate agrees (job_status dominates)
 
 
-# ── 4. `_emit_workflow_facts`: registry-unreachable / Redis-down degrades to a warning ──
+# ── 4. `_control_terminal_write`: the ONE emission path degrades, never propagates ──
+#
+# control_db_publication p2 moved emission behind the transactional outbox: `_emit_workflow_facts`
+# and `_emit_spec_record` are gone, and `_control_terminal_write` records the run's terminal
+# transition + its result envelope + the events it owes in ONE control-db transaction, then drains
+# the outbox. The guarantees these tests encode are UNCHANGED — a finished run's exit status may
+# never depend on the knowledge plane's health — but two of them are now strictly stronger: a
+# downed stream leaves the events PENDING (owed, retryable) instead of losing them, and a
+# derivation failure no longer costs the run its state record.
 
 
-def test_emit_workflow_facts_degrades_to_warning_when_redis_unreachable(rw, kpf, monkeypatch, capsys):
-    """`ks.connect()` raising (Redis down) must never propagate out of `_emit_workflow_facts` —
-    it must print a warning and return `None`, leaving the run's own exit status untouched."""
+class _Args:
+    """The argparse namespace `_control_terminal_write` actually reads."""
+
+    workdir = "/tmp/x"
+    model = "deepseek/deepseek-v4-pro"
+    only_phase = None
+    no_fact_emit = False
+
+
+@pytest.fixture
+def control_db(rw, tmp_path, monkeypatch):
+    """Redirect EVERY durable path the emission path writes to, then hand back the db location.
+
+    Three redirections, and all three are load-bearing for hermeticity — the publisher writes
+    real files, so a test that patches only some of them silently commits fixture data into the
+    repo (which is exactly what an earlier draft of this suite did: 34 registry lines and 17 KB
+    artifacts for a spec named ``demo_spec``).
+
+    ``core.paths`` is patched rather than ``outbox``'s own names because the publisher resolves
+    both paths at CALL time, precisely so they can be redirected.
+    """
+    monkeypatch.setenv("FINOPS_CONTROL_DB", str(tmp_path / "control" / "control.db"))
+    monkeypatch.setattr("agentic_dynamics.core.paths.KB_ARTIFACT_DIR", tmp_path / "kb")
+    monkeypatch.setattr(
+        "agentic_dynamics.core.paths.REGISTRY_INDEX_PATH", tmp_path / "registry_index.jsonl"
+    )
+    # `_spec_payload` reads the REAL experiments/specs index; stub it so these tests stay
+    # hermetic and exercise the fact path only.
+    monkeypatch.setattr(rw.si, "load_index_entries", lambda **kw: [])
+    return tmp_path / "control" / "control.db"
+
+
+def _open_run(rw, control_db):
+    """Create the `running` run row the terminal write transitions out of."""
+    return rw._control_open_run(_spec(), _Args())
+
+
+def test_terminal_write_degrades_to_warning_when_redis_unreachable(
+    rw, kpf, control_db, monkeypatch, capsys
+):
+    """A downed stream must never propagate — and must LEAVE THE EVENTS OWED.
+
+    The pre-outbox path printed a warning and dropped the events on the floor. Now the drain
+    reports the stream unreachable and the rows stay `pending`, so the next drain delivers them.
+    That is the whole point of the phase: the obligation survives the outage.
+    """
+    from agentic_dynamics.knowledge import knowledge_stream as real_ks
 
     def _raise_connect(*a, **kw):
         raise ConnectionError("Redis refused connection")
 
-    monkeypatch.setattr(rw.ks, "connect", _raise_connect)
+    monkeypatch.setattr(real_ks, "connect", _raise_connect)
+    run_id = _open_run(rw, control_db)
+    assert run_id is not None
 
-    class _Args:
-        workdir = "/tmp/x"
-
-    result = rw._emit_workflow_facts(_spec(), _Args(), _result())
-    assert result is None  # never raises
+    rw._control_terminal_write(  # never raises
+        _spec(), _Args(), _result(), run_id=run_id, ledger_path=Path("/tmp/ledger.json")
+    )
 
     captured = capsys.readouterr()
-    assert "warning: workflow fact emit failed" in captured.err
-    assert "run itself unaffected" in captured.err
+    assert "outbox: stream unreachable" in captured.err
+
+    from agentic_dynamics.control.control_db import ControlDB, RunState
+    from agentic_dynamics.control.outbox import summarize
+
+    db = ControlDB.open_read_only(control_db)
+    try:
+        # The run terminated honestly...
+        assert db.get_run(run_id).state is RunState.PROMOTABLE
+        # ...and its events are OWED, not lost.
+        assert summarize(db, run_id=run_id).pending > 0
+    finally:
+        db.close()
 
 
-def test_emit_workflow_facts_degrades_to_warning_when_derivation_itself_raises(rw, kpf, monkeypatch, capsys):
-    """A defensive check on the OTHER half of the try/except: even if `derive_run_facts` itself
-    raised (a corrupt registry row, a reducer bug), the hook must still degrade, not propagate."""
+def test_terminal_write_degrades_when_derivation_itself_raises(
+    rw, kpf, control_db, monkeypatch, capsys
+):
+    """A corrupt registry row or a reducer bug costs that producer's events — and nothing else.
+
+    Strengthened from the pre-outbox version: the run's terminal STATE must still be recorded.
+    Coupling the state record to a fact reducer would turn a knowledge-plane bug into a phantom
+    in-flight run that the control packet and the lease watchdog both have to reason about.
+    """
 
     def _raise_derive(*a, **kw):
         raise RuntimeError("simulated corrupt registry row")
 
     monkeypatch.setattr(kpf, "derive_run_facts", _raise_derive)
 
-    class _Args:
-        workdir = "/tmp/x"
+    run_id = _open_run(rw, control_db)
+    rw._control_terminal_write(
+        _spec(), _Args(), _result(), run_id=run_id, ledger_path=Path("/tmp/ledger.json")
+    )
 
-    result = rw._emit_workflow_facts(_spec(), _Args(), _result())
-    assert result is None
-    assert "warning: workflow fact emit failed" in capsys.readouterr().err
+    assert "warning: workflow facts derivation failed" in capsys.readouterr().err
+
+    from agentic_dynamics.control.control_db import ControlDB, RunState
+    from agentic_dynamics.control.outbox import summarize
+
+    db = ControlDB.open_read_only(control_db)
+    try:
+        assert db.get_run(run_id).state is RunState.PROMOTABLE  # the state survived
+        assert summarize(db, run_id=run_id).pending == 0  # the failed producer queued nothing
+    finally:
+        db.close()
 
 
-def test_emit_workflow_facts_happy_path_emits_and_checkpoints(rw, kpf, tmp_path, monkeypatch, capsys):
-    """The success path, with a fake Redis handle standing in for `ks.connect()` — proves the
-    hook reaches `kb_produce_facts.emit_records` (artifact write + checkpoint) end to end, still
-    without touching a real Redis or the real KB_ARTIFACT_DIR."""
+def test_terminal_write_happy_path_delivers_and_checkpoints(
+    rw, kpf, control_db, tmp_path, monkeypatch, capsys
+):
+    """The success path end to end: transition, queue, deliver, artifact, checkpoint.
+
+    Still hermetic — a fake Redis handle stands in for `ks.connect()` and `publish_event` is
+    stubbed, so nothing here touches a live stream or the real KB_ARTIFACT_DIR.
+    """
+    from agentic_dynamics.knowledge import knowledge_stream as real_ks
 
     class _FakeRedis:
         def __init__(self):
@@ -307,23 +391,61 @@ def test_emit_workflow_facts_happy_path_emits_and_checkpoints(rw, kpf, tmp_path,
             self._checkpoint[field] = value
 
     fake_redis = _FakeRedis()
-    monkeypatch.setattr(rw.ks, "connect", lambda *a, **kw: fake_redis)
-    # publish_event needs FINOPS_KB_WRITE, which _authorized_kb_write() arms for the call's
-    # duration — stub it out entirely so this test never depends on knowledge_stream's real
-    # SOURCE_TYPE_INDEX_KEY bookkeeping or a live Redis pipeline.
-    monkeypatch.setattr(rw.ks, "publish_event", lambda *a, **kw: None)
-    monkeypatch.setattr(kpf, "KB_ARTIFACT_DIR", tmp_path / "kb")
+    published: list = []
+    monkeypatch.setattr(real_ks, "connect", lambda *a, **kw: fake_redis)
+    monkeypatch.setattr(real_ks, "publish_event", lambda r, e, **kw: published.append(e))
 
-    class _Args:
-        workdir = "/tmp/x"
-
-    rw._emit_workflow_facts(_spec(), _Args(), _result())
+    run_id = _open_run(rw, control_db)
+    rw._control_terminal_write(
+        _spec(), _Args(), _result(), run_id=run_id,
+        ledger_path=Path("/tmp/ledger.json"),
+    )
 
     captured = capsys.readouterr()
-    assert "workflow facts: emitted=" in captured.err
-    assert "warning" not in captured.err
-    # The durable artifacts landed on disk before/alongside the (stubbed) pointer events.
+    assert "outbox:" in captured.err
+    assert "stream unreachable" not in captured.err
+    assert published, "the events reached the (stubbed) stream"
+    # The durable artifacts landed BEFORE the pointer events, as every producer requires.
     assert list((tmp_path / "kb").glob("*.json"))
+    # ...and each delivered knowledge_id is checkpointed, so a re-drain will not duplicate it.
+    assert fake_redis._checkpoint
+
+    from agentic_dynamics.control.control_db import ControlDB, resolve_db_path
+    from agentic_dynamics.control.outbox import summarize
+
+    db = ControlDB.open_read_only(control_db)
+    try:
+        summary = summarize(db, run_id=run_id)
+        assert summary.delivered > 0 and summary.pending == 0 and summary.dead == 0
+    finally:
+        db.close()
+
+    # Hermeticity, asserted rather than assumed: every durable write landed under tmp_path.
+    # The publisher appends real registry lines and writes real artifacts, so a redirection that
+    # silently stopped working would otherwise surface only as a dirty working tree.
+    assert (tmp_path / "registry_index.jsonl").exists()
+    assert tmp_path in resolve_db_path(None).parents
+
+
+def test_a_child_run_emits_nothing_and_records_no_run(rw, control_db, capsys):
+    """P0-2, held at the composition root: **children never emit; the parent aggregates.**
+
+    A `--only-phase` sibling is one phase of the parent's run, not a run of its own. Minting a
+    second run row (and a second set of outbox events) for it would double-count the work and
+    emit each phase's facts twice — once from the child, once from the parent's aggregate.
+    """
+
+    class _ChildArgs(_Args):
+        only_phase = "p2_outbox"
+
+    assert rw._control_open_run(_spec(), _ChildArgs()) is None
+    rw._control_terminal_write(
+        _spec(), _ChildArgs(), _result(), run_id=None, ledger_path=Path("/tmp/ledger.json")
+    )
+
+    assert "child mode" in capsys.readouterr().err
+    # The child never even created the database — nothing to aggregate, nothing to emit.
+    assert not control_db.exists()
 
 
 # ── 5. Flag precedence: --no-fact-emit > FINOPS_FACT_AUTO_EMIT=0 > default-ON ──
