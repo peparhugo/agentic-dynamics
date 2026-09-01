@@ -136,6 +136,12 @@ PHASE_SCOPE_AUTHORIZATION: dict[str, str] = {
     "p3_base_image_caching": "implementation",
     "p4_isolation_guards": "implementation",
     "p5_egress_proxy_enforcement": "implementation",
+    # the docs_refresh_remediation workflow's phases (the drift rail's remediation — the
+    # submit gate refused the queued remediation because these were missing, 2026-09-01)
+    "p1_doc_findings": "implementation",
+    "p2_context_claim": "implementation",
+    "p3_mount_guard": "implementation",
+    "p4_acceptance_gate": "research_readonly",
     # p2_launch_handler's own dry-run proof fixture (workflows/repository/
     # launch_handler_dry_run.yaml) — a trivial single no-op phase used to exercise the
     # submit -> validate -> launch -> board lifecycle end-to-end without spending a real
