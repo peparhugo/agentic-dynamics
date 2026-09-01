@@ -78,7 +78,9 @@ workflow:
         authority. The control database must be the ONE durable state; the outbox the
         ONE emission path; the control packet the ONE thing the master reads; the
         publication receipt the ONE source for every public number.
-        deliberation: [the control db schema + run-state vocabulary first (p1 — every
+        deliberation: [the pin FIRST (p0 — preregister the spec revision + verify the
+        current-state claims against reality BEFORE any implementation), then the
+        control db schema + run-state vocabulary (p1 — every
         later phase reads or writes it), then the outbox (p2 — the emission path the
         engine and the knowledge plane both use), then the projection watermarks
         (p3 — the visibility a publication gate needs), then the control packet
@@ -149,6 +151,34 @@ workflow:
         (or as many commits as that phase's own work needs, ALL prefixed with THIS
         phase's name), then stop. The next phase is a SEPARATE session.
     phases:
+      - name: p0_pin_spec
+        kind: agent
+        scope: implementation
+        timeout: 3600
+        prompt: |
+          GOAL: {goal}
+          ROLE: verification — the preregistration is the mandate (the house pin
+          convention: the pin lands BEFORE any implementation phase runs, so the run
+          is anchored to an exact spec revision and the current-state claims are
+          verified against reality, not asserted). Write
+          docs/reviews/control_db_publication_preregistration.md carrying: (a) this
+          spec's file SHA256 (compute it: sha256sum workflows/repository/
+          control_db_publication.yaml — the EXACT bytes the run executes) + the git
+          sha of the worktree head; (b) the current-state claims this run depends on,
+          each VERIFIED against the actual repo, not copied from the spec:
+          (1) no experiments/results/control/control.db exists; (2) no 'control
+          status' CLI surface (agentic-dynamics control does not resolve);
+          (3) scripts/_gen_instructions.py renders .opencode/ + .claude/ but NOT
+          root AGENTS.md; (4) apps/website/index.html hard-codes 1,067 sessions
+          while apps/website/data.js says 1027 (or whatever the current contradiction
+          is — record the ACTUAL numbers); (5) the outbox does not exist (children
+          emit best-effort); (6) no projection watermark surface exists. A claim
+          that does not hold is a FAILED finding — record the deviation and fail.
+          The ONLY files this phase may create: the preregistration doc. The ONLY
+          edit allowed: none to existing files.
+          DELIVER: the preregistration with the verified claims, committed with the
+          '[workflow] p0_pin_spec — <goal prefix>' subject.
+          LOG: PASS/FAIL per claim; commit.
       - name: p1_control_db
         kind: agent
         scope: implementation
@@ -400,10 +430,15 @@ factors:
   - {name: model, levels: [anthropic/claude-opus-5]}
 design: factorial
 rules:
+  - name: spec_pinned
+    plane: measurement
+    evidence_class: "[M]"
+    requires: []
+    produces: [revision_pinned, current_state_verified]
   - name: control_db_durable
     plane: measurement
     evidence_class: "[C]"
-    requires: []
+    requires: [revision_pinned]
     produces: [run_events_immutable, state_vocabulary_exact]
   - name: outbox_atomic
     plane: measurement
@@ -441,6 +476,7 @@ rules:
     requires: [test_executed_success]
     produces: [independent_gate_recorded]
 metrics:
+  - {name: revision_pinned, agg: mean, over: cell}
   - {name: run_events_immutable, agg: mean, over: cell}
   - {name: outbox_delivered_at_least_once, agg: mean, over: cell}
   - {name: projection_lag_visible, agg: mean, over: cell}
@@ -452,6 +488,6 @@ metrics:
   - {name: independent_gate_recorded, agg: mean, over: cell}
 writeup:
   format: lab_book
-  sections: [question, p1_control_db, p2_outbox, p3_projection_watermarks, p4_control_packet, p5_instruction_surfaces, p6_publication_receipt, p7_adversarial, p8_test_gate]
+  sections: [question, p0_pin_spec, p1_control_db, p2_outbox, p3_projection_watermarks, p4_control_packet, p5_instruction_surfaces, p6_publication_receipt, p7_adversarial, p8_test_gate]
 stop: {budget_usd: 12.0, max_attempts: 1}
 adapt: {strategy: manual, selection: highest_regret}
