@@ -1,0 +1,196 @@
+name: test_suite_speed
+question: >-
+  Make the test suite run fast enough to be a real gate instead of a backlog
+  generator. The measured pain: the deterministic suite is 2,615 tests / 15+ minutes
+  (admission_leases p5's closure measurement), test_workflow_runner alone is 187s with
+  71% of it ONE test (the change-analysis root-commit test: 132s), the runner's test
+  phases run the WHOLE tree via run_suite (the augment-proof's test phase died at its
+  600s wall because the full framework suite cannot fit), and the suite currently has
+  live failures on main (2 reds observed during the 2026-09-01 full-suite scan). This
+  workflow profiles the suite into a fat-test table with a per-family budget, fixes the
+  fat tests surgically (bounded git walks, shortened real-subprocess windows, and the
+  runner's test-phase TARGETING — run_suite runs the spec's tests, not 2,615), builds
+  the fast path (a `fast` marker + a sub-3-minute smoke that the guards actually run),
+  and gates on the budget. Speed is a measurement problem first: profile, then fix.
+version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: false
+repeatable: false
+# NOTE (execution path): profiling + surgical test/runner fixes — in-process per the
+# skill's fallback.
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: false
+    context:
+      domain_context: >-
+        canonical_sources: [tests/ (the suite — 2,615 tests per the admission_leases p5
+        closure: "full deterministic suite green (2615 passed / 0 failed)"),
+        tests/test_workflow_runner.py (187s; the 2026-09-01 durations: ONE test —
+        test_run_workflow_change_analysis_root_commit_never_fails — is 132.04s of the
+        187.04s, 71%; the watchdog family 2-5.6s each, real subprocess agents),
+        src/agentic_dynamics/runtime/workflow_runner.py (run_suite — the test-phase
+        runner that executes the WHOLE worktree's suite: the augment-proof's test phase
+        hit its 600s wall exactly this way), src/agentic_dynamics/runtime/test_runner.py
+        (run_suite/_run_pytest — the whole-tree scope), the conftest + the guard family
+        (test_doc_lifecycle, test_dependency_direction, test_script_classification,
+        test_spec_status, test_agent_config_render — the sub-minute guards),
+        tests/test_admission*.py + test_lease_registry.py + test_docs_health.py (the
+        big test files, ~800-980 lines each), pytest.ini/pyproject (the pytest config —
+        addopts, markers, the unknown 'timeout' option warning), scripts/CONTEXT.md
+        (the classification manifest), the 2026-09-01 full-suite scan (the durations
+        census + 2 reds — triage inputs)].
+        policies: [speed_is_a_measurement_problem, surgical_not_structural,
+        real_subprocess_stays_real, budget_then_gate, regenerate_never_hand_edit].
+      challenge_context: >-
+        challenge: the suite's slowness is concentrated — one test is 71% of its family,
+        and the runner's whole-tree test phases make every spec's test phase pay the
+        full 15-minute suite. The risk in speeding it up: (a) "fast" via weakened
+        assertions (a mock that hides the real behavior — e.g., replacing the 132s test's
+        real change-analysis walk with a stub that no longer proves the degradation), or
+        (b) parallelization that breaks on shared state (tests using real temp worktrees,
+        Redis, the stores). The discipline: profile first (the fat-test table), fix
+        surgically (bounded + targeted, semantics preserved), then parallelize only
+        what a shared-state audit clears.
+        deliberation: [profile + triage, surgical fixes, the fast path, the gate].
+        session_policy: {default: continue}
+      current_state: >-
+        MEASURED (2026-09-01): test_workflow_runner.py = 187.04s total with
+        test_run_workflow_change_analysis_root_commit_never_fails at 132.04s (the runner's
+        change-analysis seam does something O(slow) even on a fresh tmp repo — to be
+        profiled) and the watchdog family at 2-5.6s each (real subprocess agents with real
+        timeouts — inherent but reducible). The deterministic suite = 2,615 tests, 15+
+        minutes (admission_leases p5). The runner's test phase runs the WHOLE worktree via
+        run_suite — every spec's test phase pays the full suite (the augment-proof test
+        phase timed out at 600s exactly this way; the proof is being fixed with a targeted
+        run). The suite on main has 2 live failures observed during the 2026-09-01 full
+        scan (at ~58% and ~60% — to be triaged). The sub-minute guard family exists and is
+        green; no `fast` marker or fast-path command exists.
+      hard_rules: >-
+        (1) PROFILE FIRST: the fat-test table (durations over the whole suite) precedes
+        any fix; a fix without a profile line is not merged.
+        (2) SURGICAL, NOT STRUCTURAL: fix the fat tests by bounding what they exercise
+        (bounded git walks, scoped suites, shorter real windows) — never by weakening the
+        assertion (a mock that stops proving the behavior is a violation).
+        (3) REAL SUBPROCESS STAYS REAL: the watchdog/stall tests keep real subprocesses
+        with real timeouts — shorter thresholds only where the semantics still hold.
+        (4) THE FAST PATH IS A SUBSET, NOT A NEW SUITE: the `fast` marker selects the
+        sub-minute guards + the pure-unit families; the full suite stays runnable on
+        demand and stays green.
+        (5) REGENERATE, NEVER HAND-EDIT: derived surfaces go through their generators;
+        scripts/CONTEXT.md follows its contract.
+    phases:
+      - name: p1_profile_triage
+        kind: agent
+        scope: research_readonly
+        timeout: 7200
+        prompt: |
+          GOAL: {goal}
+          SHAPE: the fat-test table + the triage. Run the durations census over the whole
+          suite (python3 -m pytest tests/ -q --durations=40 -p no:cacheprovider) and
+          produce: (a) the fat-test table — every test over ~10s with its family share
+          (like the 132s change-analysis root-commit test, 71% of test_workflow_runner);
+          (b) the per-family time budget (which files dominate: workflow_runner, the
+          admission family, docs_health, the watchdog family, anything store/subprocess
+          heavy); (c) TRIAGE THE REDS — the 2 failures observed on main (reproduce,
+          classify: inherited/flaky/real, and record the classification — do NOT fix in
+          this phase); (d) profile the 132s test (cProfile or line-level) to name the
+          O(slow) step (the change-analysis seam on a fresh tmp repo — git walk? graph
+          contact? evidence context?).
+          DELIVER: the fat-test table + budgets + the red triage + the 132s profile
+          (docs/architecture/current/2026-09-01_test_suite_profile.md), committed.
+          LOG: PASS/FAIL with the table + the reds' classification; commit.
+      - name: p2_surgical_fixes
+        kind: agent
+        scope: implementation
+        timeout: 10800
+        prompt: |
+          GOAL: {goal}
+          SHAPE: fix the fat tests per the p1 table, surgically. Expected: (a) the 132s
+          change-analysis root-commit test — bound whatever p1 names (a limited git walk,
+          an injected fast evidence-context, a bounded rev-list) while KEEPING the
+          assertion's proof (root-commit phases degrade gracefully, never fail);
+          (b) the watchdog family's real-subprocess windows — shorter thresholds where the
+          stall semantics still hold (a stalled agent that fails in 5s instead of 15s,
+          when the test's purpose is the stall classification, not the wall length);
+          (c) the runner's test-phase TARGETING — run_suite gains a scoped mode so a
+          spec's test phase runs the spec-declared test target (tests/test_<spec>.py or
+          the phase's `tests:` field), never the whole 2,615-test tree (the augment-proof
+          wall); (d) any store/subprocess tests p1 flags as reducible. Every fix keeps
+          its assertion's semantic force — a weakened test is a violation.
+          VERIFY (both directions): the fixed tests pass AND still fail on a deliberately
+          broken input (the proof survives); the scoped run_suite runs a spec's tests in
+          seconds.
+          DELIVER: the fixes + the both-directions verification, committed.
+          LOG: PASS/FAIL with the before/after durations per fixed test; commit.
+      - name: p3_fast_path
+        kind: agent
+        scope: implementation
+        timeout: 7200
+        prompt: |
+          GOAL: {goal}
+          SHAPE: the fast path. (a) the `fast` marker on the sub-minute guard family +
+          the pure-unit families (dependency/classification/doc-lifecycle/spec-status/
+          renderer + the unit families the p1 table shows as sub-minute); (b) the
+          fast-path command (e.g. `pytest -m fast` or a scripts/test_fast.sh wrapper) with
+          a documented budget (target: sub-3-minutes); (c) the parallel-safety audit —
+          tests touching real temp worktrees, Redis, the stores, or the ports are
+          excluded from `fast` (or made parallel-safe ONLY where the audit clears them —
+          never a forced xdist over shared state); (d) wire the fast path into the guard
+          cadence (the docs-drift rail's / the CI's expectations reference the fast path).
+          VERIFY: the fast path runs green under the budget (measured, recorded);
+          the full suite still collects + runs on demand.
+          DELIVER: the marker + command + audit + wiring, committed.
+          LOG: PASS/FAIL with the fast-path time under budget; commit.
+      - name: p4_gate
+        kind: agent
+        scope: implementation
+        timeout: 3600
+        prompt: |
+          GOAL: {goal}
+          SHAPE: the budget gate. Document the per-family budgets + the fast-path budget
+          (scripts/CONTEXT.md + the profile doc: before/after table), and add the gate —
+          a guard test that the fast path stays under its budget (a slow-regression trip
+          wire, not a flaky wall: a generous ceiling, e.g. 3x the measured fast time).
+          The full suite stays runnable + green on demand (run it once at the end of the
+          phase and record the before/after total). The spec index must carry
+          test_suite_speed after the run.
+          DELIVER: the budgets + the gate + the before/after totals, committed.
+          LOG: PASS/FAIL with the totals; commit.
+factors:
+  - {name: model, levels: [deepseek/deepseek-v4-flash]}
+design: factorial
+rules:
+  - name: profile_delivered
+    plane: measurement
+    evidence_class: "[M]"
+    requires: []
+    produces: [fat_test_table, red_triage, per_family_budget]
+  - name: fat_tests_fixed
+    plane: measurement
+    evidence_class: "[M]"
+    requires: [fat_test_table]
+    produces: [durations_down, assertions_intact, scoped_run_suite]
+  - name: fast_path_built
+    plane: measurement
+    evidence_class: "[M]"
+    requires: [durations_down]
+    produces: [fast_under_budget, parallel_safety_audited]
+  - name: gate_landed
+    plane: measurement
+    evidence_class: "[M]"
+    requires: [fast_under_budget]
+    produces: [budget_documented, slow_regression_trip]
+metrics:
+  - {name: durations_down, agg: mean, over: cell}
+  - {name: assertions_intact, agg: mean, over: cell}
+  - {name: fast_under_budget, agg: mean, over: cell}
+writeup:
+  format: lab_book
+  sections: [question, p1_profile_triage, p2_surgical_fixes, p3_fast_path, p4_gate]
+stop: {budget_usd: 4.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}
