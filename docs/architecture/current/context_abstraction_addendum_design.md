@@ -396,7 +396,7 @@ not operator-declared policy. The `DERIVED`/`[C]` pairing is already the repo's 
 existing `derived` row extends its meaning rather than inventing one (review §3b.1). The nominal
 `SOURCE_TYPES` authority column remains documentation-only (`knowledge.py:110-113`); the real values
 come from this map at construction time (the same arrangement the frozen verify cleared for `fact`,
-`verify.md:258-262`).
+`docs/verification/context_abstraction_verify.md:253-263`).
 
 ### 3.2 `PatternPayload` (NEW — the typed body of every `pattern` fact)
 

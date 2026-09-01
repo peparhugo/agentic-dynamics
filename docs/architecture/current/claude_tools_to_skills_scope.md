@@ -139,17 +139,17 @@ this script implicitly re-validates the spec each call; a prior `compile_experim
 
 ### 2.2 `control-room` skill
 
-**`control_room.ts`** — read-only GET against a running `admin/server.py`. All 6 endpoint
+**`control_room.ts`** — read-only GET against a running `apps/control_room/server.py`. All 6 endpoint
 values confirmed to exist as `@app.get(...)` routes, not `POST`:
 ```
-admin/server.py:738  @app.get("/api/matrix")
-admin/server.py:779  @app.get("/api/status")           # SSE — see hazard note below
-admin/server.py:805  @app.get("/api/flags")
-admin/server.py:860  @app.get("/api/routing")
-admin/server.py:903  @app.get("/api/design-sessions")
-admin/server.py:1094 @app.get("/api/claude-agents")
+apps/control_room/routes/telemetry.py:375  app.get("/api/matrix")
+apps/control_room/routes/telemetry.py:376  app.get("/api/status")           # SSE — see hazard note below
+apps/control_room/routes/flags.py:90      app.get("/api/flags")
+apps/control_room/routes/telemetry.py:378  app.get("/api/routing")
+apps/control_room/routes/design_sessions.py:159  app.get("/api/design-sessions")
+apps/control_room/routes/claude_agents.py:283  app.get("/api/claude-agents")
 ```
-Port confirmed: `admin/server.py:1365`, `port = int(os.environ.get("FINOPS_PORT", "8000"))`.
+Port confirmed: `apps/control_room/server.py:214`, `port = int(os.environ.get("FINOPS_PORT", "8000"))`.
 
 Exact invocation:
 ```bash
@@ -308,14 +308,14 @@ python3 scripts/finalize_reviews.py              # merge per-session review file
    Folding it would duplicate, not add, content.
 
 2. **`control_room.ts`'s default endpoint (`status`) is unusable through a plain HTTP
-   GET+read.** `/api/status` is a Flask SSE endpoint (`admin/server.py:779-802`) whose
-   generator loop (`while True: ... yield ": ping\n\n"`) never terminates on its own — it
+   GET+read.** `/api/status` is a Flask SSE endpoint (`apps/control_room/routes/telemetry.py:137-160`) whose
+   generator loop (`while True: ... yield ": ping\n\n"`, `apps/control_room/routes/telemetry.py:146-152`) never terminates on its own — it
    only stops when the client disconnects. `control_room.ts`'s `execute()` does
    `await fetch(url)` then `await res.text()`, which will block until the connection is
    closed by something else — in practice, hang. This isn't a hypothesis gap, it's a bug
    discovered by reading the tool against the live route it targets. The `control-room`
    skill must **not** default its example invocation to `/api/status`; lead with
-   `/api/matrix` (confirmed plain `jsonify(...)`, `admin/server.py:738-776`) and, if
+   `/api/matrix` (confirmed plain `jsonify(...)`, `apps/control_room/routes/telemetry.py:66-134`) and, if
    `/api/status` is documented at all, flag it as "use `curl --max-time N` or a real SSE
    client, not a bare GET."
 

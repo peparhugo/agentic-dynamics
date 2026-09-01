@@ -417,5 +417,5 @@ routing policy may consume `edge_case_coverage` only after a measurement rule pr
 
 **Reuse, not re-derive:** `routing.py` stays the per-task signal aggregator; the step router is a
 thin eligibility + preference layer on top, and `compute_routing()`/`recommend_route()` remain
-intact (their consumers in `scripts/build_data.py:1112` and `admin/server.py:860-877` must keep
+intact (their consumers in `scripts/build_data.py:1112` and `apps/control_room/routes/telemetry.py:205-219` must keep
 working — `workflow_step_routing.yaml:144-146`).
