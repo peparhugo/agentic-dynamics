@@ -118,11 +118,41 @@ open fix" (`ARCHITECTURE.md:294-298`). No cell scope configures `HTTP_PROXY`/`HT
 (verified by `grep` over the compose — only the comments and the `EGRESS_ALLOWLIST` env
 reference the proxy).
 
+## Docs-drift inventory closure (the 9 findings — the run's goal context)
+
+The `docs_refresh_remediation` run (this branch, p1 `4f788191c` + p2 `1bbe2919a` + p3
+`6a651c8b8` + p4) was dispatched from the docs-drift proposal gate against the drift
+inventory (`experiments/results/docs_drift/proposal.json`, 9 findings: 5 `anchor_integrity`
+stale, 4 `cli_surface` missing). The p1 phase closed all nine; the p4 gate re-verified them.
+Per-finding closure evidence:
+
+| Finding | Closure evidence |
+|---|---|
+| `cli_surface/mental_model_full_cli/complete/--campaign-budget-usd` | [M] `--campaign-budget-usd` now enumerated in the mental-model FULL CLI marker block (`agent_config/mental-model.md:433-437`), re-rendered to both derived surfaces by the generator (`.opencode/instructions/mental-model.md:433-437`, `.claude/rules/mental-model.md:433-437`); `python3 scripts/run_workflow.py --help` lists it (scripts/run_workflow.py argparse). |
+| `cli_surface/mental_model_full_cli/complete/--campaign-concurrency` | [M] same block + generator re-render; `--help` lists it. |
+| `cli_surface/mental_model_full_cli/complete/--cell-image` | [M] same block + generator re-render; `--help` lists it. |
+| `cli_surface/mental_model_full_cli/complete/--no-admission` | [M] same block + generator re-render; `--help` lists it. |
+| `anchor_integrity/…/claude_tools_to_skills_scope.md:152/admin/server.py:1365` | [M] the port claim re-pointed to `apps/control_room/server.py:214`; the route listing to `apps/control_room/routes/{telemetry.py:375-378,flags.py:90,design_sessions.py:159,claude_agents.py:283}` (`docs/architecture/current/claude_tools_to_skills_scope.md:145-157`). |
+| `anchor_integrity/…/claude_tools_to_skills_scope.md:311/admin/server.py:779-802` | [M] the `/api/status` SSE anchor re-pointed to `apps/control_room/routes/telemetry.py:137-160` (`:305-313`) with the generator loop at `telemetry.py:146-152`. |
+| `anchor_integrity/…/claude_tools_to_skills_scope.md:318/admin/server.py:738-776` | [M] the `/api/matrix` jsonify anchor re-pointed to `apps/control_room/routes/telemetry.py:66-134` (`:318`). |
+| `anchor_integrity/…/context_abstraction_addendum_design.md:399/verify.md:258-262` | [M] the fact-clearance anchor re-pointed to `docs/verification/context_abstraction_verify.md:253-263` (`:399`). |
+| `anchor_integrity/…/routing_design.md:420/admin/server.py:860-877` | [M] the `compute_routing`/`recommend_route` consumer anchor re-pointed to `apps/control_room/routes/telemetry.py:205-219` (`:420`). |
+
+[M] Every re-pointed target resolves (the cited files carry the cited lines); the deleted
+`admin/server.py:NNN` / `verify.md:NNN` anchors appear nowhere in `docs/architecture/current/`
+(`git grep` clean); `docs scan --fail-on-drift` for `anchor_integrity` (571/571 current) +
+`cli_surface` (160/160 current) is clean on this branch. The four cli_surface fixes were made
+in the SOURCE doc (`agent_config/mental-model.md`) and propagated by the generator — derived
+surfaces were never hand-edited (gate 4's diff-clean re-run is the proof).
+
 ## Acceptance gate (re-verification before merge)
 
 **Result: PASS — all five steps re-verified on the remediated branch (2026-09-01, the
 `docs_refresh_remediation` p4 phase).** Every gate re-run happened on the committed
-remediation state (`cbb0b06a1` + `6b768a952`), not on the pre-fix tree.
+remediation state (this branch's p1 `4f788191c` + p2 `1bbe2919a` + p3 `6a651c8b8`,
+building on the earlier closure commits `cbb0b06a1` + `6b768a952`), not on the pre-fix
+tree — and additionally covered the docs-drift inventory's 9 findings
+([§ Docs-drift inventory closure](#docs-drift-inventory-closure-the-9-findings)).
 
 1. **The five adversary checks (a)-(e) re-run clean — PASS.**
    - (a) every cited anchor resolves and says what the doc claims — [M] a scripted scan over
@@ -130,11 +160,17 @@ remediation state (`cbb0b06a1` + `6b768a952`), not on the pre-fix tree.
      patterns were brace-expansion (`src/agentic_dynamics/{core,...}/__init__.py:1`) and
      doc-relative references with an implied `docs/fleet/` prefix (slice-log anchors), all of
      which resolve by construction. The F1 re-points, F2 tags, F3 seam anchors, F4 scope, and
-     F5 guard anchors were each spot-verified against source.
+     F5 guard anchors were each spot-verified against source, as were the nine docs-drift
+     re-points (the `admin/server.py:NNN` / `verify.md:NNN` anchors now cite
+     `apps/control_room/{server.py,routes/*}` and `docs/verification/context_abstraction_verify.md`
+     — § Docs-drift inventory closure). `docs scan --fail-on-drift` is clean on this branch
+     (anchor_integrity 571/571, cli_surface 160/160 current, drift 0).
    - (b) no invented flags, paths, or models — [M] `python3 scripts/run_workflow.py --help`
      lists `--orchestrator`, `--cap-snapshot`, `--cap-shadow`, `--no-fact-emit`,
-     `--change-analysis`, `--only-phase`, and the rest; the `agentic-dynamics` CLI surface
-     matches the documented dispatcher. No invented interface appears in the remediated claims.
+     `--change-analysis`, `--only-phase`, `--cell-image`, `--no-admission`,
+     `--campaign-budget-usd`, `--campaign-concurrency`, and the rest; the `agentic-dynamics`
+     CLI surface matches the documented dispatcher. No invented interface appears in the
+     remediated claims.
    - (c) doc-lifecycle vocabulary holds — [M] the doc-lifecycle guard passes (gate 3); the
      touched docs carry `status:` from the enforced vocabulary (`ARCHITECTURE.md` `accepted`,
      the fleet design `implemented` + `implemented_by`, the fleet docs `proposed` + the
@@ -147,7 +183,7 @@ remediation state (`cbb0b06a1` + `6b768a952`), not on the pre-fix tree.
    - (e) derived surfaces regenerated, not hand-edited — [M] gate 4's renderer re-run is
      diff-clean; the spec index/STATUS were regenerated by `scripts/spec_status.py` (gate 5).
 2. **`tests/test_fleet_guards.py` passes (F5 closed) and the authority's "open enforcement
-   gap" line is removed — PASS.** [M] 23 passed (including the new
+   gap" line is removed — PASS.** [M] 24 passed (including the new
    `test_mount_guard_rejects_a_foreign_target`); `git grep "open enforcement gap"`
    `ARCHITECTURE.md` + `docs/designs/implemented/fleet_ladder_architecture.md` returns nothing
    (the historical mention survives only in the adversary review's recorded finding, as it
@@ -160,11 +196,15 @@ remediation state (`cbb0b06a1` + `6b768a952`), not on the pre-fix tree.
    [M] 38 surfaces written, both schemas validated OK, `git diff --exit-code` exit 0.
 5. **The spec index is regenerated and both specs read correctly — PASS.** [M]
    `python3 scripts/spec_status.py` regenerates `experiments/specs/index.json` + `STATUS.md`
-   (166 specs; the branch's copy of `docs_refresh_remediation.yaml` is indexed). [C]
-   `docs_architecture_refresh` reads `runnable` and `supersedes: opencode_docs_refresh`
-   (the chain holds — `opencode_docs_refresh` is `completed`); `docs_refresh_remediation`
-   reads `runnable` with an empty supersedes row. The merge re-runs `sync_surfaces.py` +
-   `spec_status.py` on the merged tree per the beta-lab merge pattern.
+   (177 specs; the branch's copy of `docs_refresh_remediation.yaml` is indexed). [C]
+   `docs_architecture_refresh` reads `completed` (its run ledger
+   `experiments/results/workflows/docs_architecture_refresh/20260831T235230Z.json`) with
+   `supersedes: opencode_docs_refresh` (the chain holds — `opencode_docs_refresh` is
+   `completed`); `docs_refresh_remediation` reads `completed` (its run ledger
+   `experiments/results/workflows/docs_refresh_remediation/20260901T010140Z.json`) with an
+   empty supersedes row. The prior record's `runnable` reads reflected the pre-ledger tree;
+   the current reads post-date both run ledgers and the chain is consistent. The merge re-runs
+   `sync_surfaces.py` + `spec_status.py` on the merged tree per the beta-lab merge pattern.
 
 ## New findings recorded (not fixed — per the phase contract)
 
@@ -175,3 +215,14 @@ remediation state (`cbb0b06a1` + `6b768a952`), not on the pre-fix tree.
   guard now passes on the declared targets and still fails on a foreign one. The row is
   historical review evidence; updating it was not in the operator's five-finding scope, so it
   is recorded here rather than edited.
+
+- **[C] The docs-drift watchdog's machine artifacts still carry the raised flag for the
+  pre-fix scan** — `experiments/results/docs_drift/{latest.json,proposal.json,flag_state.json}`
+  and `history.jsonl` record drift 9 at git_sha `ec4b7bda` with `state: raised`, and
+  `proposal.json` is `state: warranted` with `approval: {}`. Those are derived
+  rail artifacts rewritten by the next `docs_drift_watchdog.py` pass (which reads the current
+  tree — drift 0 — and clears the flag as an EDGE transition); the run's scan evidence is
+  committed as `experiments/results/docs_drift/scan_now.json` (p2) + `gate_scan.json` (p4).
+  Clearing the flag / releasing the proposal is the proposal gate's terminal transition, owned
+  by the workflow's completion — out of the p4 gate-record scope, so recorded here rather than
+  edited.
