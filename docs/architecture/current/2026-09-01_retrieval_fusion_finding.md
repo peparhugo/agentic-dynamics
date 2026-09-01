@@ -127,3 +127,48 @@ because the two legs' top-K candidate sets are genuinely disjoint (0 same-conten
 id level AND at the content level), and that two-view outcome is now measured and documented
 above (H2 verdict). The gate is PASSED on the documented-two-view branch, with the before/after
 table and the no-fix decision recorded here. Retrieval + census tests green (79 passed).
+
+## p4 writeup — the campaign close
+
+**Hypothesis verdicts (the join numbers).** The cross-leg content join — instrumented for the
+first time — answers the finding's original question: across the 15-query census set,
+**0 dense candidates share a content hash with a lexical candidate** (`content_pairs = 0`,
+`distinct_content_hashes = 0`). Per hypothesis:
+
+1. **Id-namespace disjointness — FALSE.** The stores share the id namespace: all 812 dense
+   ids exist in Neo4j under the same `knowledge_id` with byte-identical text. The fusion's
+   id check would fire if the same record co-surfaced; it never does.
+2. **Content granularity — the observed verdict (a two-view ranking divergence).** The stores
+   index the same units (deep id/text overlap, 437/812 at full depth), but each query's top-40
+   semantic and top-40 full-text candidate sets are disjoint. The RRF is a union because the
+   two legs rank the shared corpus disjointly — a healthy two-view system at the fusion cutoff,
+   not a unit mismatch and not an id mismatch.
+3. **Content-hash gaps — PARTIAL, not causal.** The dense leg persists `content_hash` for every
+   candidate; the lexical leg persists it only for `code` records (the kb-neo4j-v1 SET clause
+   omits it for findings/story/review/observation/spec). Closing the gap by deriving the text
+   hash changes nothing: still 0 pairs.
+
+**The fusion change (or none).** No fusion change was made. The join does not warrant a
+content-hash dedupe before the RRF — there are 0 same-content pairs to merge, and a forced
+merge would be a no-op on genuinely distinct-per-query candidate sets (hard rule 2: never force
+a merge of distinct records). The RRF, id-based merge, `deduplicate`, and `collapse_redundant`
+are byte-identical to before the campaign; the instrument (`join_content_hash`, `legs`,
+`leg_overlap`) is observational only, and a test pins the fusion-off path unchanged.
+
+**The gated census before/after.** See the p3 table: fused stayed 0 across all three runs
+(70→549 dense growth, 336→373 lexical, fused 0), and the instrumented run additionally proves
+`content_pairs = 0`. The campaign closes on the documented-two-view branch of the gate.
+
+**Meaning for the augmentation path.** With the two-view system now MEASURED (not assumed), the
+evidence-card layer can state it precisely: a candidate carries either dense-leg or lexical-leg
+evidence, never both-leg evidence, because the legs' top-K sets do not intersect at the current
+corpus/weights — so the RRF never arbitrates and no evidence card gets a fused citation. Two
+operational consequences are now visible and actionable rather than invisible: (a) the dense leg
+is dramatically under-populated vs the lexical (812 vs 33,961 records) — as the Chroma corpus
+grows toward parity, the same-content join is instrumented and any future fused count will
+surface and be visible; (b) the kb-neo4j-v1 producer's `content_hash` omission for non-code
+records is a latent hash-gap that a future content-join consumer would hit — recorded here,
+not silently.
+
+**Spec index:** `retrieval_fusion_quality` now derives `completed` (this run's ledger,
+`experiments/results/workflows/retrieval_fusion_quality/<ts>.json`, `ok: true`).
