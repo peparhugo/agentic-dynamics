@@ -9,12 +9,19 @@ from __future__ import annotations
 
 import json
 import math
+from datetime import datetime, timezone
 from typing import Any
 
 from flask import Response
 
 from agentic_dynamics.control.live import EVENT_LOG_PREFIX
 from apps.control_room import server
+
+#: The live window (seconds) — the watchdog horizon the Control Room's LIVE NOW section
+#: keys off. A phase published within this window (or a runner-telemetry tail stamp of that
+#: age) marks a run LIVE; past it, the run leaves LIVE NOW and shows its age in history.
+#: The window, never the publishing process, decides liveness.
+LIVE_WINDOW_SECONDS = 600
 
 
 def _sse(generator) -> Response:
@@ -203,13 +210,108 @@ def _retained_telemetry(redis_client, cell_ids) -> dict[str, Any]:
         "cells": cells,
     }
 
-def _parse_phases(payloads) -> dict[str, dict[str, Any]]:
-    """Decode the ``story_phase`` hash into ``{cell_id: {name, index, total}}``.
+def _stamp_to_datetime(value):
+    """Parse a telemetry stamp into an aware UTC datetime, or ``None``.
+
+    Accepts ISO-8601 strings (``Z`` or ``+00:00``, with or without sub-second
+    precision) and numeric epochs. A number >= 1e11 is treated as milliseconds
+    (the opencode event timestamps), anything smaller as seconds. A naive ISO
+    string is assumed UTC so it can be compared against the server clock.
+    """
+    if value is None or isinstance(value, bool):
+        return None
+    if isinstance(value, (int, float)):
+        number = float(value)
+        if not math.isfinite(number) or number < 0:
+            return None
+        epoch_seconds = number / 1000.0 if number >= 1e11 else number
+        try:
+            return datetime.fromtimestamp(epoch_seconds, tz=timezone.utc)
+        except (OverflowError, OSError, ValueError):
+            return None
+    text = str(value).strip()
+    if not text:
+        return None
+    try:
+        parsed = datetime.fromisoformat(text.replace("Z", "+00:00"))
+    except ValueError:
+        parsed = None
+    if parsed is not None:
+        return parsed if parsed.tzinfo is not None else parsed.replace(tzinfo=timezone.utc)
+    try:
+        number = float(text)
+    except ValueError:
+        return None
+    epoch_seconds = number / 1000.0 if number >= 1e11 else number
+    try:
+        return datetime.fromtimestamp(epoch_seconds, tz=timezone.utc)
+    except (OverflowError, OSError, ValueError):
+        return None
+
+
+def _tail_stamps(redis_client, cell_ids) -> dict[str, Any]:
+    """Read the newest retained event per cell and return its timestamp (the runner-telemetry signal).
+
+    One non-transactional pipeline costs a single round trip regardless of fleet size, and
+    each log is independently optional: a per-cell read failure degrades that cell to no
+    timestamp (age-unknown), never to a 503. The head of the tail is the natural
+    last-activity proxy — the raw opencode session events carry a top-level ``timestamp``
+    (ms epoch) that ``_event_timestamp`` already knows how to read.
+    """
+    keys = [f"{EVENT_LOG_PREFIX}{cell_id}" for cell_id in cell_ids]
+    try:
+        pipe = redis_client.pipeline(transaction=False)
+        for key in keys:
+            pipe.lrange(key, 0, 0)
+        heads = pipe.execute()
+    except Exception:
+        heads = [None] * len(cell_ids)
+
+    stamps: dict[str, Any] = {}
+    for cell_id, head in zip(cell_ids, heads, strict=False):
+        stamp = None
+        if head:
+            try:
+                event = json.loads(head[0]) if isinstance(head[0], str) else head[0]
+            except (TypeError, json.JSONDecodeError):
+                event = None
+            if isinstance(event, dict):
+                stamp = _event_timestamp(event, event)
+        stamps[cell_id] = stamp
+    return stamps
+
+
+def _phase_published_at(parsed) -> Any:
+    """Return the phase's own published-at stamp, tolerating legacy field names."""
+    for key in ("published_at", "timestamp", "ts", "created_at"):
+        value = parsed.get(key)
+        if isinstance(value, (str, int, float)) and not isinstance(value, bool):
+            return value
+    return None
+
+
+def _parse_phases(payloads, *, tails=None, now=None) -> dict[str, dict[str, Any]]:
+    """Decode the ``story_phase`` hash into live-dimension phase entries.
 
     Each value is a JSON object written by ``LivePublisher.set_phase``. A malformed
     or empty entry is dropped (the badge is display-only), so a partial write can
     never affect the matrix status contract.
+
+    Every surviving entry gains the live dimension:
+
+      * ``last_phase_ts`` — the newer of the phase's own ``published_at`` stamp and
+        the runner-telemetry tail timestamp (``tails``), normalized to UTC ISO, or
+        ``None`` when neither exists (age-unknown).
+      * ``age_seconds`` — whole seconds since ``last_phase_ts`` (0 for a future
+        stamp), or ``None`` when no timestamp exists.
+      * ``live`` — ``True`` exactly when a timestamp exists AND it falls within
+        ``LIVE_WINDOW_SECONDS``. The window, not the publishing process, decides.
     """
+    if now is None:
+        now = _stamp_to_datetime(server._utc_now())
+    if now is None:
+        now = datetime.now(timezone.utc)
+    tails = tails or {}
     phases: dict[str, dict[str, Any]] = {}
     for cell_id, raw in payloads.items():
         try:
@@ -218,9 +320,29 @@ def _parse_phases(payloads) -> dict[str, dict[str, Any]]:
             continue
         if not isinstance(parsed, dict) or not parsed.get("name"):
             continue
+        candidates = [
+            _stamp_to_datetime(_phase_published_at(parsed)),
+            _stamp_to_datetime(tails.get(cell_id)),
+        ]
+        dated = [candidate for candidate in candidates if candidate is not None]
+        last_dt = max(dated) if dated else None
+
+        if last_dt is None:
+            last_phase_ts = None
+            age_seconds = None
+        else:
+            last_phase_ts = last_dt.isoformat(timespec="seconds").replace("+00:00", "Z")
+            age_seconds = max(0, int((now - last_dt).total_seconds()))
         phases[cell_id] = {
             "name": parsed.get("name"),
             "index": parsed.get("index"),
             "total": parsed.get("total"),
+            "live": (
+                last_phase_ts is not None
+                and age_seconds is not None
+                and age_seconds <= LIVE_WINDOW_SECONDS
+            ),
+            "last_phase_ts": last_phase_ts,
+            "age_seconds": age_seconds,
         }
     return phases

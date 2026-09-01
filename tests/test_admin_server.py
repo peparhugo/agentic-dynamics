@@ -74,9 +74,19 @@ class FakePubSub:
 class FakeRedis:
     """Implement only the Redis operations used by the admin routes."""
 
-    def __init__(self, *, statuses=None, results=None, logs=None, messages=None,
-                 analysis_statuses=None, review_statuses=None,
-                 analysis_queue=0, review_queue=0, phases=None):
+    def __init__(
+        self,
+        *,
+        statuses=None,
+        results=None,
+        logs=None,
+        messages=None,
+        analysis_statuses=None,
+        review_statuses=None,
+        analysis_queue=0,
+        review_queue=0,
+        phases=None,
+    ):
         self.statuses = statuses or {}
         self.results = results or {}
         self.analysis_statuses = analysis_statuses or {}
@@ -111,9 +121,10 @@ class FakeRedis:
         raise AssertionError(f"unexpected hgetall key: {key}")
 
     def lrange(self, key, start, end):
-        assert (start, end) == (0, -1)
+        assert start == 0
         self.requested_logs.append(key)
-        return self.logs.get(key, [])
+        values = self.logs.get(key, [])
+        return values if end == -1 else values[:1]
 
     def pubsub(self):
         return self.pubsub_client
@@ -128,16 +139,19 @@ class FakePipeline:
 
     def __init__(self, redis):
         self._redis = redis
-        self._keys = []
+        self._reads = []
 
     def lrange(self, key, start, end):
-        assert (start, end) == (0, -1)
+        assert start == 0
         self._redis.requested_logs.append(key)
-        self._keys.append(key)
+        self._reads.append((key, end))
         return self
 
     def execute(self):
-        return [self._redis.logs.get(key, []) for key in self._keys]
+        return [
+            self._redis.logs.get(key, []) if end == -1 else self._redis.logs.get(key, [])[:1]
+            for key, end in self._reads
+        ]
 
 
 class QueuePipeline:
@@ -219,10 +233,21 @@ def test_matrix_preserves_legacy_fields_and_adds_retained_telemetry(monkeypatch)
 
     assert response.status_code == 200
     body = response.get_json()
-    assert {key: body[key] for key in (
-        "total", "remaining_in_queue", "queued", "running", "done", "failed",
-        "timeout", "completed", "results_saved", "cells",
-    )} == {
+    assert {
+        key: body[key]
+        for key in (
+            "total",
+            "remaining_in_queue",
+            "queued",
+            "running",
+            "done",
+            "failed",
+            "timeout",
+            "completed",
+            "results_saved",
+            "cells",
+        )
+    } == {
         "total": 3,
         "remaining_in_queue": 2,
         "queued": 0,
@@ -258,12 +283,148 @@ def test_matrix_surfaces_live_workflow_phases(monkeypatch):
 
     body = server.app.test_client().get("/api/matrix").get_json()
 
-    assert body["phases"] == {"alpha": {"name": "rerun_contaminated", "index": 4, "total": 7}}
+    assert set(body["phases"]) == {"alpha"}
     # The phase is keyed by the same cell id as the fleet status, so the running
     # cell "alpha" carries the badge "4/7 rerun_contaminated".
     assert body["cells"]["alpha"] == "running"
     phase = body["phases"]["alpha"]
     assert phase["index"] == 4 and phase["total"] == 7 and phase["name"] == "rerun_contaminated"
+    # No published-at stamp and no runner-telemetry tail: age-unknown, never mislabeled live.
+    assert phase["live"] is False
+    assert phase["last_phase_ts"] is None
+    assert phase["age_seconds"] is None
+
+
+# ── live dimension (the phases board distinguishes LIVE runs from history) ──
+#
+# The window (LIVE_WINDOW_SECONDS, default 600) decides, never the publishing process: a
+# phase stamped within the window is LIVE; a stamped-old phase is historical with its age; a
+# phase with no timestamp at all is historical and age-unknown. All tests pin ``server._utc_now``
+# so the wall clock cannot move between the fixture and the assertion.
+
+
+def _phase(cell_id, **fields):
+    return json.dumps({"name": "test", "index": 2, "total": 2, **fields})
+
+
+def test_matrix_marks_fresh_phase_live(monkeypatch):
+    """A phase published within the window renders LIVE with its age."""
+    monkeypatch.setattr(server, "_utc_now", lambda: "2026-09-01T12:00:00Z")
+    redis = FakeRedis(
+        statuses={"alpha": "running"},
+        phases={"alpha": _phase("alpha", published_at="2026-09-01T11:58:00Z")},
+    )
+    monkeypatch.setattr(server, "_redis", lambda: redis)
+
+    phase = server.app.test_client().get("/api/matrix").get_json()["phases"]["alpha"]
+
+    assert phase["live"] is True
+    assert phase["last_phase_ts"] == "2026-09-01T11:58:00Z"
+    assert phase["age_seconds"] == 120
+
+
+def test_matrix_marks_old_phase_historical_with_age(monkeypatch):
+    """A phase published past the window is historical and shows its age."""
+    monkeypatch.setattr(server, "_utc_now", lambda: "2026-09-01T12:00:00Z")
+    redis = FakeRedis(
+        statuses={"alpha": "done"},
+        phases={"alpha": _phase("alpha", published_at="2026-09-01T11:30:00Z")},
+    )
+    monkeypatch.setattr(server, "_redis", lambda: redis)
+
+    phase = server.app.test_client().get("/api/matrix").get_json()["phases"]["alpha"]
+
+    assert phase["live"] is False
+    assert phase["age_seconds"] == 1800
+    assert phase["last_phase_ts"] == "2026-09-01T11:30:00Z"
+
+
+def test_matrix_marks_no_timestamp_run_historical_age_unknown(monkeypatch):
+    """A phase with no published-at and no telemetry tail renders age-unknown, never live."""
+    monkeypatch.setattr(server, "_utc_now", lambda: "2026-09-01T12:00:00Z")
+    redis = FakeRedis(
+        statuses={"alpha": "running"},
+        phases={"alpha": _phase("alpha")},
+        logs={},
+    )
+    monkeypatch.setattr(server, "_redis", lambda: redis)
+
+    phase = server.app.test_client().get("/api/matrix").get_json()["phases"]["alpha"]
+
+    assert phase["live"] is False
+    assert phase["last_phase_ts"] is None
+    assert phase["age_seconds"] is None
+
+
+def test_matrix_runner_telemetry_tail_dates_an_unstamped_phase(monkeypatch):
+    """A phase without its own stamp is dated by the newest runner-telemetry event (age-unknown
+    only when neither exists)."""
+    monkeypatch.setattr(server, "_utc_now", lambda: "2026-09-01T12:00:00Z")
+    redis = FakeRedis(
+        statuses={"alpha": "running"},
+        phases={"alpha": _phase("alpha")},
+        logs={"events_log:alpha": [_step(0.01, 1, 1, timestamp="2026-09-01T11:59:00Z")]},
+    )
+    monkeypatch.setattr(server, "_redis", lambda: redis)
+
+    phase = server.app.test_client().get("/api/matrix").get_json()["phases"]["alpha"]
+
+    assert phase["live"] is True
+    assert phase["last_phase_ts"] == "2026-09-01T11:59:00Z"
+    assert phase["age_seconds"] == 60
+
+
+def test_matrix_liveness_uses_the_newer_of_phase_and_telemetry(monkeypatch):
+    """The runner's live telemetry keeps a stale-stamped run LIVE (phase OR telemetry)."""
+    monkeypatch.setattr(server, "_utc_now", lambda: "2026-09-01T12:00:00Z")
+    redis = FakeRedis(
+        statuses={"alpha": "running"},
+        phases={"alpha": _phase("alpha", published_at="2026-09-01T10:00:00Z")},
+        logs={"events_log:alpha": [_step(0.01, 1, 1, timestamp="2026-09-01T11:59:00Z")]},
+    )
+    monkeypatch.setattr(server, "_redis", lambda: redis)
+
+    phase = server.app.test_client().get("/api/matrix").get_json()["phases"]["alpha"]
+
+    assert phase["live"] is True
+    assert phase["age_seconds"] == 60
+
+
+def test_matrix_marks_exactly_the_window_says(monkeypatch):
+    """LIVE is exactly the window predicate: age <= 600s, regardless of who wrote the phase."""
+    monkeypatch.setattr(server, "_utc_now", lambda: "2026-09-01T12:00:00Z")
+    redis = FakeRedis(
+        statuses={"a": "running", "b": "running", "c": "running"},
+        phases={
+            "a": _phase("a", published_at="2026-09-01T11:50:01Z"),  # age 599 -> LIVE
+            "b": _phase("b", published_at="2026-09-01T11:49:59Z"),  # age 601 -> historical
+            "c": _phase("c"),  # no stamp -> age-unknown
+        },
+    )
+    monkeypatch.setattr(server, "_redis", lambda: redis)
+
+    phases = server.app.test_client().get("/api/matrix").get_json()["phases"]
+
+    assert phases["a"]["live"] is True and phases["a"]["age_seconds"] == 599
+    assert phases["b"]["live"] is False and phases["b"]["age_seconds"] == 601
+    assert phases["c"]["live"] is False and phases["c"]["age_seconds"] is None
+
+
+def test_matrix_phase_from_dead_process_not_live_past_window(monkeypatch):
+    """VERIFY: a phase published by a now-dead process is not live — the window, not the
+    process, decides. The stamp is 11 minutes old (past the 10-minute horizon); the run has no
+    live telemetry, so it leaves LIVE NOW and shows its age in history."""
+    monkeypatch.setattr(server, "_utc_now", lambda: "2026-09-01T12:00:00Z")
+    redis = FakeRedis(
+        statuses={"alpha": "running"},  # the frozen "running" a crashed worker leaves behind
+        phases={"alpha": _phase("alpha", published_at="2026-09-01T11:49:00Z")},
+    )
+    monkeypatch.setattr(server, "_redis", lambda: redis)
+
+    phase = server.app.test_client().get("/api/matrix").get_json()["phases"]["alpha"]
+
+    assert phase["live"] is False
+    assert phase["age_seconds"] == 660
 
 
 def test_matrix_ignores_invalid_telemetry_but_preserves_reported_zero(monkeypatch):
@@ -274,9 +435,12 @@ def test_matrix_ignores_invalid_telemetry_but_preserves_reported_zero(monkeypatc
         "not-json",
     ]
     zero = _step(0, 0, 0)
-    redis = FakeRedis(statuses={"alpha": "running", "empty": "queued"}, logs={
-        "events_log:alpha": invalid + [zero],
-    })
+    redis = FakeRedis(
+        statuses={"alpha": "running", "empty": "queued"},
+        logs={
+            "events_log:alpha": invalid + [zero],
+        },
+    )
     monkeypatch.setattr(server, "_redis", lambda: redis)
 
     telemetry = server.app.test_client().get("/api/matrix").get_json()["telemetry"]
@@ -457,8 +621,7 @@ def test_control_room_services_requires_a_review_authority():
     """
     live = telemetry_routes._services
     kwargs = {
-        field.name: getattr(live, field.name)
-        for field in dataclasses.fields(ControlRoomServices)
+        field.name: getattr(live, field.name) for field in dataclasses.fields(ControlRoomServices)
     }
 
     # The full kwargs set still builds a valid context...
@@ -512,6 +675,7 @@ def test_index_and_existing_static_asset_routes_remain_available():
 
 def test_matrix_pipeline_failure_keeps_telemetry_additive(monkeypatch):
     """A whole-connection pipeline failure degrades without dropping the matrix."""
+
     class FailingPipeline:
         def lrange(self, _key, _start, _end):
             return self
@@ -684,10 +848,13 @@ def _write_manifest(path, rows):
 
 def test_api_registry_returns_filtered_table(tmp_path, monkeypatch):
     manifest_path = tmp_path / "data_manifest.json"
-    _write_manifest(manifest_path, [
-        _registry_row(knowledge_id="kid_story", source_type="story"),
-        _registry_row(knowledge_id="kid_review", entity_id="eid_review", source_type="review"),
-    ])
+    _write_manifest(
+        manifest_path,
+        [
+            _registry_row(knowledge_id="kid_story", source_type="story"),
+            _registry_row(knowledge_id="kid_review", entity_id="eid_review", source_type="review"),
+        ],
+    )
     monkeypatch.setattr(server, "DATA_MANIFEST_PATH", manifest_path)
 
     response = server.app.test_client().get("/api/registry?record_type=story")
@@ -700,10 +867,13 @@ def test_api_registry_returns_filtered_table(tmp_path, monkeypatch):
 
 def test_api_registry_with_no_filters_returns_everything(tmp_path, monkeypatch):
     manifest_path = tmp_path / "data_manifest.json"
-    _write_manifest(manifest_path, [
-        _registry_row(knowledge_id="kid_a", entity_id="eid_a"),
-        _registry_row(knowledge_id="kid_b", entity_id="eid_b"),
-    ])
+    _write_manifest(
+        manifest_path,
+        [
+            _registry_row(knowledge_id="kid_a", entity_id="eid_a"),
+            _registry_row(knowledge_id="kid_b", entity_id="eid_b"),
+        ],
+    )
     monkeypatch.setattr(server, "DATA_MANIFEST_PATH", manifest_path)
 
     body = server.app.test_client().get("/api/registry").get_json()
@@ -712,19 +882,34 @@ def test_api_registry_with_no_filters_returns_everything(tmp_path, monkeypatch):
 
 def test_api_registry_filters_by_lifecycle_and_since(tmp_path, monkeypatch):
     manifest_path = tmp_path / "data_manifest.json"
-    _write_manifest(manifest_path, [
-        _registry_row(knowledge_id="kid_old", entity_id="eid_old",
-                       lifecycle_state="current", observed_at="2026-01-01T00:00:00+00:00"),
-        _registry_row(knowledge_id="kid_new", entity_id="eid_new",
-                       lifecycle_state="current", observed_at="2026-08-15T00:00:00+00:00"),
-        _registry_row(knowledge_id="kid_dead", entity_id="eid_dead",
-                       lifecycle_state="tombstoned", observed_at="2026-08-15T00:00:00+00:00"),
-    ])
+    _write_manifest(
+        manifest_path,
+        [
+            _registry_row(
+                knowledge_id="kid_old",
+                entity_id="eid_old",
+                lifecycle_state="current",
+                observed_at="2026-01-01T00:00:00+00:00",
+            ),
+            _registry_row(
+                knowledge_id="kid_new",
+                entity_id="eid_new",
+                lifecycle_state="current",
+                observed_at="2026-08-15T00:00:00+00:00",
+            ),
+            _registry_row(
+                knowledge_id="kid_dead",
+                entity_id="eid_dead",
+                lifecycle_state="tombstoned",
+                observed_at="2026-08-15T00:00:00+00:00",
+            ),
+        ],
+    )
     monkeypatch.setattr(server, "DATA_MANIFEST_PATH", manifest_path)
 
-    body = server.app.test_client().get(
-        "/api/registry?lifecycle=current&since=2026-06-01"
-    ).get_json()
+    body = (
+        server.app.test_client().get("/api/registry?lifecycle=current&since=2026-06-01").get_json()
+    )
 
     assert body["count"] == 1
     assert body["registry"][0]["knowledge_id"] == "kid_new"
@@ -770,12 +955,16 @@ def test_api_registry_lineage_returns_the_matched_entity(tmp_path, monkeypatch):
 def test_api_registry_lineage_renders_causes_for_actuation_records(tmp_path, monkeypatch):
     manifest_path = tmp_path / "data_manifest.json"
     observation = _registry_row(
-        knowledge_id="kid_observation_1", entity_id="eid_observation_1",
-        source_type="observation", logical_locator="assessment_xyz",
+        knowledge_id="kid_observation_1",
+        entity_id="eid_observation_1",
+        source_type="observation",
+        logical_locator="assessment_xyz",
     )
     actuation = _registry_row(
-        knowledge_id="kid_actuation_1", entity_id="eid_actuation_1",
-        source_type="actuation", logical_locator="actuation_xyz",
+        knowledge_id="kid_actuation_1",
+        entity_id="eid_actuation_1",
+        source_type="actuation",
+        logical_locator="actuation_xyz",
         causes="kid_observation_1",
     )
     _write_manifest(manifest_path, [observation, actuation])
@@ -792,8 +981,10 @@ def test_api_registry_lineage_renders_causes_for_actuation_records(tmp_path, mon
 def test_api_registry_lineage_actuation_with_unresolvable_causes(tmp_path, monkeypatch):
     manifest_path = tmp_path / "data_manifest.json"
     actuation = _registry_row(
-        knowledge_id="kid_actuation_2", entity_id="eid_actuation_2",
-        source_type="actuation", causes="kid_never_registered",
+        knowledge_id="kid_actuation_2",
+        entity_id="eid_actuation_2",
+        source_type="actuation",
+        causes="kid_never_registered",
     )
     _write_manifest(manifest_path, [actuation])
     monkeypatch.setattr(server, "DATA_MANIFEST_PATH", manifest_path)
@@ -965,7 +1156,9 @@ def test_route_inventory_covers_all_registered_routes():
     catches a route shipped without its inventory entry, so a bump here must always be paired
     with the doc update (never the other way round).
     """
-    rules = [rule for rule in server.app.url_map.iter_rules() if not rule.rule.startswith("/static")]
+    rules = [
+        rule for rule in server.app.url_map.iter_rules() if not rule.rule.startswith("/static")
+    ]
 
     # GET and POST on the same path register two Rule objects; count them
     # (31), then dedupe for path-membership assertions below.
@@ -1027,20 +1220,26 @@ def test_api_registry_cache_invalidates_on_rewrite(tmp_path, monkeypatch):
     client = server.app.test_client()
     assert client.get("/api/registry").get_json()["count"] == 1
 
-    _write_manifest(manifest_path, [
-        _registry_row(knowledge_id="kid_v1"),
-        _registry_row(knowledge_id="kid_v2", entity_id="eid_v2"),
-    ])
+    _write_manifest(
+        manifest_path,
+        [
+            _registry_row(knowledge_id="kid_v1"),
+            _registry_row(knowledge_id="kid_v2", entity_id="eid_v2"),
+        ],
+    )
     assert client.get("/api/registry").get_json()["count"] == 2
 
 
 def test_api_registry_lineage_flags_ambiguity(tmp_path, monkeypatch):
     """F5: duplicate entity rows surface an ambiguity, never a silent first pick."""
     manifest_path = tmp_path / "data_manifest.json"
-    _write_manifest(manifest_path, [
-        _registry_row(knowledge_id="kid_dup_a", entity_id="eid_dup"),
-        _registry_row(knowledge_id="kid_dup_b", entity_id="eid_dup"),
-    ])
+    _write_manifest(
+        manifest_path,
+        [
+            _registry_row(knowledge_id="kid_dup_a", entity_id="eid_dup"),
+            _registry_row(knowledge_id="kid_dup_b", entity_id="eid_dup"),
+        ],
+    )
     monkeypatch.setattr(server, "DATA_MANIFEST_PATH", manifest_path)
     server._REGISTRY_CACHE.clear()
 
@@ -1091,7 +1290,8 @@ def test_supervisor_steer_emits_exactly_one_actuation_record(monkeypatch):
 
     flag = _flagged_session()
     monkeypatch.setattr(
-        server, "_authorize_supervisor_action",
+        server,
+        "_authorize_supervisor_action",
         lambda session_id, cell_id: (flag, None),
     )
 
@@ -1138,7 +1338,8 @@ def test_supervisor_interrupt_emits_exactly_one_actuation_record(monkeypatch):
 
     flag = _flagged_session()
     monkeypatch.setattr(
-        server, "_authorize_supervisor_action",
+        server,
+        "_authorize_supervisor_action",
         lambda session_id, cell_id: (flag, None),
     )
 
@@ -1152,7 +1353,8 @@ def test_supervisor_interrupt_emits_exactly_one_actuation_record(monkeypatch):
 
     emitted = []
     monkeypatch.setattr(
-        server, "_emit_actuation_record",
+        server,
+        "_emit_actuation_record",
         lambda f, **kw: emitted.append((f, kw)),
     )
 
@@ -1180,7 +1382,8 @@ def test_actuation_emit_is_best_effort_and_never_blocks_the_steer(monkeypatch):
 
     flag = _flagged_session()
     monkeypatch.setattr(
-        server, "_authorize_supervisor_action",
+        server,
+        "_authorize_supervisor_action",
         lambda session_id, cell_id: (flag, None),
     )
 
@@ -1208,6 +1411,7 @@ def test_actuation_emit_is_best_effort_and_never_blocks_the_steer(monkeypatch):
 
 def test_get_only_paths_never_emit_actuation(tmp_path, monkeypatch):
     """Observation surfaces (flags, registry, matrix) never emit an actuation record."""
+
     def _explode(*_args, **_kwargs):
         raise AssertionError("read-only path must never emit an actuation record")
 
@@ -1220,7 +1424,8 @@ def test_get_only_paths_never_emit_actuation(tmp_path, monkeypatch):
 
     monkeypatch.setattr(server, "_redis", lambda: FakeRedis(statuses={"a": "running"}))
     monkeypatch.setattr(
-        server, "_load_supervisor_flags",
+        server,
+        "_load_supervisor_flags",
         lambda limit: ({"flags": [], "warnings": [], "degraded": False}, 200),
     )
 

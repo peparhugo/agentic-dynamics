@@ -52,7 +52,12 @@ from apps.control_room.services.subscription_usage import (
     history_summary,
     load_or_refresh,
 )
-from apps.control_room.services.telemetry import _parse_phases, _retained_telemetry, _sse
+from apps.control_room.services.telemetry import (
+    _parse_phases,
+    _retained_telemetry,
+    _sse,
+    _tail_stamps,
+)
 
 #: The injected application context, bound by ``register()`` before any request is served.
 _services: ControlRoomServices | None = None
@@ -76,6 +81,11 @@ def api_matrix() -> Response:
     # Keep the legacy flat fields (``total``, ``queued``, ``cells``, …) derived
     # from the execute stage so existing clients keep working; the three-stage
     # ``stages`` block and the ``phases`` block are purely additive.
+    # The live dimension of the phases board: each phase entry gains {live, last_phase_ts,
+    # age_seconds}. `_tail_stamps` reads the newest retained event per phase cell (one pipeline,
+    # best-effort) so a phase without its own published-at stamp can still be dated by the
+    # runner's telemetry — and a run with neither renders age-unknown, never mislabeled.
+    tails = _tail_stamps(r, list(phase_payloads))
     response = {
         "total": execute["total"],
         "remaining_in_queue": execute["remaining_in_queue"],
@@ -87,7 +97,7 @@ def api_matrix() -> Response:
         "completed": execute["completed"],
         "results_saved": execute["results_saved"],
         "cells": execute["cells"],
-        "phases": _parse_phases(phase_payloads),
+        "phases": _parse_phases(phase_payloads, tails=tails),
     }
     response["stages"] = {"execute": execute, "analyze": analyze, "review": review}
     design_stream_ids: list[str] = []

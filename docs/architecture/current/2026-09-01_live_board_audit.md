@@ -152,3 +152,41 @@ LIVE NOW and shows its age" behavior (hard rule 3). Add the live/all filter + LI
 section per the spec, and test the four states (fresh-phase live / old-phase historical /
 no-timestamp age-unknown / filter) in `tests/test_admin_frontend.py` +
 `tests/test_admin_server.py`.
+
+## p2 Implementation Verification (2026-09-01)
+
+**LOG: PASS — the live dimension is implemented and verified; committed on the
+`control_room_live_board` workflow. The window, never the publishing process, decides
+liveness.**
+
+The handoff's design is implemented with one deliberate strengthening: `LivePublisher.set_phase`
+now stamps every phase write with `published_at` (`src/agentic_dynamics/control/live.py:104`,
+stamp at `:34`), so "a phase published within the live window" is literal for every new write;
+the events-log tail remains the fallback (`services/telemetry.py:_tail_stamps`) for legacy
+phases and is the "runner's live telemetry" signal. `_parse_phases` takes the newer of the two
+(phase stamp OR telemetry tail) as `last_phase_ts`, so a stale-stamped run whose telemetry is
+still fresh stays LIVE, and a run with neither renders `age-unknown`.
+
+| Spec item | Implementation | Tests | Result |
+|---|---|---|---|
+| (a) API marks each run `{live, last_phase_ts, age_seconds}`; age-unknown when no timestamp | `_parse_phases(payloads, *, tails, now)` (`services/telemetry.py:293`) — `live = ts exists AND age <= LIVE_WINDOW_SECONDS` (600s, `:24`); `age_seconds = max(0, floor(now − last_dt))`; route wires `_tail_stamps` (`routes/telemetry.py:88`, one pipelined head read per phase cell) | `test_matrix_marks_fresh_phase_live`, `test_matrix_marks_old_phase_historical_with_age`, `test_matrix_marks_no_timestamp_run_historical_age_unknown`, `test_matrix_runner_telemetry_tail_dates_an_unstamped_phase`, `test_matrix_liveness_uses_the_newer_of_phase_and_telemetry`, `test_matrix_marks_exactly_the_window_says`, `test_matrix_phase_from_dead_process_not_live_past_window` | PASS |
+| (b) LIVE NOW section above the board (live runs, newest first, i-of-N + age) + live/all filter; historical section = current list with ages | `#live-now` section above `#fleet-controls` (`index.html`), `renderLiveNow`/`liveNowRows`/`phaseBadgeLabel` (`app.js`) over `fleet.livePhaseEntries` (newest-first, `board-fleet.js`), `data-filter="live"` chip feeding `facet.liveIds` into `matchesFacet`; card badges carry `· <age>` | `test_live_now_section_mounted_above_the_full_board`, `test_client_renders_live_now_from_the_api_live_dimension`, `test_board_fleet_handles_live_filter_and_orders_live_newest_first`, `test_live_now_styles_are_present` | PASS |
+| (c) Stalled-run rule: past the window a run leaves LIVE NOW and shows its age in history | `live = age <= 600s`; a 660s run is historical with `age_seconds: 660` and its card shows `11m ago` | `test_matrix_phase_from_dead_process_not_live_past_window` | PASS |
+| (d) Four states + filter + exact-window API | 7 API tests (above) + 4 frontend structural tests (above); all pinned to `server._utc_now` for determinism | `tests/test_admin_server.py`, `tests/test_admin_frontend.py` | PASS |
+| VERIFY both directions: fresh phase → LIVE; old-only → not; dead-process phase → not live (window, not process) | the window predicate is the only decision; the dead-process case pins `published_at` 11 min old under a frozen `running` status | `test_matrix_marks_fresh_phase_live` (fresh → live), `test_matrix_marks_old_phase_historical_with_age` (old → not), `test_matrix_phase_from_dead_process_not_live_past_window` (dead → not) | PASS |
+
+State matrix (pinned at `_utc_now = 2026-09-01T12:00:00Z`, `LIVE_WINDOW_SECONDS = 600`):
+
+| State | Fixture | `live` | `last_phase_ts` | `age_seconds` |
+|---|---|---|---|---|
+| fresh-phase run | `published_at = 11:58:00Z` (120s) | True | `2026-09-01T11:58:00Z` | 120 |
+| old-phase run | `published_at = 11:30:00Z` (1800s) | False | `2026-09-01T11:30:00Z` | 1800 |
+| no-timestamp run | no stamp, empty tail | False | None | None (age-unknown) |
+| window boundary | 11:50:01Z (599s) / 11:49:59Z (601s) | True / False | — | 599 / 601 |
+| dead process, past window | `published_at = 11:49:00Z` (660s), status frozen `running` | False | `2026-09-01T11:49:00Z` | 660 |
+| unstamped + fresh tail | no stamp, tail `11:59:00Z` | True | `2026-09-01T11:59:00Z` | 60 |
+
+Full-suite run: 2967 passed, 9 skipped, 3 pre-existing failures unrelated to this change
+(README By-the-Numbers drift + conflict markers in `docs/reviews/docs_architecture_refresh_remediation.md`
+— both reproduce on the pre-p2 tree). Targeted suites
+(`test_live.py`, `test_admin_server.py`, `test_admin_frontend.py`, `test_docs_health.py`): 134 passed.
