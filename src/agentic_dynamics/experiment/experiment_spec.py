@@ -136,6 +136,13 @@ PHASE_SCOPE_AUTHORIZATION: dict[str, str] = {
     "p3_base_image_caching": "implementation",
     "p4_isolation_guards": "implementation",
     "p5_egress_proxy_enforcement": "implementation",
+    # the 2026-09-01 gate restoration: the kind: test gate phases the recent specs regained
+    # (degradation-review 3b.1 fix — a harness-run run_suite recording test_executed_success).
+    # They verify the implementation's output inside the worktree, so they carry the
+    # implementation scope like the phases they gate.
+    "p3_test_gate": "implementation",
+    "p5_test_gate": "implementation",
+    "p6_test_gate": "implementation",
     # the docs_refresh_remediation workflow's phases (the drift rail's remediation — the
     # submit gate refused the queued remediation because these were missing, 2026-09-01)
     "p1_doc_findings": "implementation",

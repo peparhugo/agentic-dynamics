@@ -15,12 +15,12 @@ from pathlib import Path
 import pytest
 
 from agentic_dynamics.experiment.experiment_spec import (
-    PHASE_SCOPE_AUTHORIZATION,
     SCOPE_VOCABULARY,
     phase_scope,
     validate_spec,
 )
 from scripts.fleet.spawn_wrapper import (
+    AUTH_DIRS,
     COMMANDS_KEY,
     COMPOSE_ALLOWLIST,
     CONTRACT_TARGETS,
@@ -66,8 +66,10 @@ def _valid_submit_request(**overrides) -> dict:
     return request
 
 # A valid spawn request: p1_slice1_base_supervisor is authorized for "implementation"
-# (the authorization table), the mounts are the full four + D-2, results rw (implementation),
-# the network is fleet-net, and the implementation scope authorizes the write flag.
+# (the authorization table), the mounts are the full four + D-2 + the P0-3 per-attempt state
+# namespace (/state rw) + the credential FILE mount (/auth/opencode_auth.json ro), results rw
+# (implementation), the network is fleet-net, and the implementation scope authorizes the
+# write flag.
 VALID_REQUEST = {
     "phase": "p1_slice1_base_supervisor",
     "scope": "implementation",
@@ -76,10 +78,11 @@ VALID_REQUEST = {
         {"target": "/app/experiments/results", "mode": "rw"},
         {"target": "/repo", "mode": "ro"},
         {"target": "/home/drseuss/.claude", "mode": "ro"},
-        {"target": "/home/drseuss/.local/share/opencode", "mode": "ro"},
         {"target": "/home/drseuss/.local/bin", "mode": "ro"},
         {"target": "/home/drseuss/.local/share/claude", "mode": "ro"},
         {"target": "/home/drseuss/.opencode/bin", "mode": "ro"},
+        {"target": "/state", "mode": "rw"},
+        {"target": "/auth/opencode_auth.json", "mode": "ro"},
     ],
     "network": "fleet-net",
     "env": {"FINOPS_KB_WRITE": "1"},
@@ -130,6 +133,82 @@ def test_unknown_phase_is_unauthorized():
 
 
 # ── step 3 — the mount contract ──────────────────────────────────────────────
+
+
+# ── P0-3 — the per-attempt state namespace (control-plane stabilization) ──────
+
+
+def test_state_target_is_in_the_contract_as_rw():
+    """P0-3: /state is the ONE writable CLI-state namespace a cell may mount — the shared
+    pool directory is never a valid mount target."""
+    assert CONTRACT_TARGETS["/state"] == ("state", "rw")
+
+
+def test_host_opencode_state_dir_is_out_of_contract():
+    """P0-3: the host's LIVE opencode state directory must never enter a cell in ANY mode —
+    the credential is a file mount, the writable state is the per-attempt namespace."""
+    assert "/home/drseuss/.local/share/opencode" not in AUTH_DIRS
+    assert CONTRACT_TARGETS.get("/home/drseuss/.local/share/opencode") is None
+
+
+def test_credential_file_mount_is_in_the_contract_as_ro():
+    assert CONTRACT_TARGETS["/auth/opencode_auth.json"] == ("auth-file", "ro")
+
+
+def test_build_phase_request_mints_a_unique_state_namespace(tmp_path, _canonical_repo_env):
+    """P0-3: every phase request carries its OWN writable state namespace at /state (rw) plus
+    the XDG redirects, so two concurrent cells can never share a session DB. Two requests for
+    the same phase share a namespace (the retry), two for different phases never do."""
+    from scripts.fleet.spawn_wrapper import (
+        STATE_ROOT,
+        STATE_TARGET,
+        build_phase_request,
+        validate_spawn,
+    )
+
+    phase_a = {"name": "p1_slice1_base_supervisor", "kind": "agent", "scope": "implementation"}
+    phase_b = {"name": "p2_slice1_workers_live", "kind": "agent", "scope": "implementation"}
+    req_a = build_phase_request(phase_a, goal="g", workdir="/tmp/wt", model="m", spec_name="spec_x")
+    req_b = build_phase_request(phase_b, goal="g", workdir="/tmp/wt", model="m", spec_name="spec_x")
+
+    mounts_a = {m["target"]: m for m in req_a["mounts"]}
+    mounts_b = {m["target"]: m for m in req_b["mounts"]}
+
+    # Both carry the state mount (rw) and the credential file (ro)...
+    assert mounts_a[STATE_TARGET]["mode"] == "rw"
+    assert mounts_a["/auth/opencode_auth.json"]["mode"] == "ro"
+    assert mounts_b[STATE_TARGET]["mode"] == "rw"
+
+    # ...but they point at DIFFERENT host namespaces — never one shared pool directory.
+    assert mounts_a[STATE_TARGET]["source"] != mounts_b[STATE_TARGET]["source"]
+    assert str(Path(STATE_ROOT) / "spec_x" / "p1_slice1_base_supervisor") == mounts_a[STATE_TARGET]["source"]
+    assert str(Path(STATE_ROOT) / "spec_x" / "p2_slice1_workers_live") == mounts_b[STATE_TARGET]["source"]
+
+    # The XDG redirects land the CLI's writable state inside the per-attempt namespace.
+    assert req_a["env"]["XDG_DATA_HOME"] == f"{STATE_TARGET}/data"
+    assert req_a["env"]["XDG_CONFIG_HOME"] == f"{STATE_TARGET}/config"
+    assert req_a["env"]["XDG_CACHE_HOME"] == f"{STATE_TARGET}/cache"
+
+    # And a request assembled this way passes the full validation gate.
+    request = {
+        "phase": "p1_slice1_base_supervisor",
+        "scope": "implementation",
+        "mounts": req_a["mounts"],
+        "network": "fleet-net",
+        "env": req_a["env"],
+    }
+    assert validate_spawn(request) == []
+
+
+def test_state_namespace_cannot_escape_the_state_root():
+    """P0-3: a hostile state_namespace (.., absolute path) must be neutralized — it can never
+    walk the state root to a shared or host directory."""
+    from scripts.fleet.spawn_wrapper import _sanitize_namespace
+
+    assert _sanitize_namespace("../../etc") == "etc"
+    assert _sanitize_namespace("/abs/path") == "abs/path"
+    assert _sanitize_namespace("..") == "unnamed"
+    assert _sanitize_namespace("spec_x/phase 1") == "spec_x/phase 1"
 
 
 def test_bad_mount_target_fails_step_3():
@@ -352,7 +431,7 @@ def test_scope_field_valid_member_validates_clean():
 
 
 def test_scope_field_round_trips_through_yaml(tmp_path):
-    from agentic_dynamics.experiment.experiment_spec import ExperimentSpec, load_spec
+    from agentic_dynamics.experiment.experiment_spec import load_spec
 
     yaml_path = tmp_path / "spec.yaml"
     yaml_path.write_text(

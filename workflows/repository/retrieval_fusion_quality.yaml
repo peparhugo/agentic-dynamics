@@ -143,6 +143,7 @@ workflow:
           LOG: PASS/FAIL; commit.
       - name: p5_test_gate
         kind: test
+        scope: implementation
         timeout: 900
         # The independent test gate (degradation-review 3b.1 restoration): the harness runs
         # run_suite itself and records test_executed_success — never the agent's self-report.

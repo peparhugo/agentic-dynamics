@@ -21,6 +21,7 @@ import os
 import subprocess
 import sys
 import time
+from pathlib import Path
 
 import redis
 
@@ -55,10 +56,26 @@ def _connect() -> redis.Redis:
 def _run_reviews(raw: str) -> int:
     print(f"[review-unit] got trigger {raw} — running review_all.py --only-missing ...",
           flush=True)
+    # P0-3 (control-plane stabilization): a FRESH CLI-state namespace per review run —
+    # <state_root>/jobs/review-<ts>/, XDG_* pointed into it. The review daemon must never
+    # share a writable opencode/claude state directory across runs (session IDs, SQLite/WAL).
+    state_root = Path(os.environ.get("FINOPS_OPENCODE_STATE_ROOT", "/state"))
+    job_state = state_root / "jobs" / f"review-{int(time.time())}"
+    job_state.mkdir(parents=True, exist_ok=True)
+    env = dict(os.environ)
+    env.update(
+        {
+            "XDG_DATA_HOME": str(job_state / "data"),
+            "XDG_CONFIG_HOME": str(job_state / "config"),
+            "XDG_CACHE_HOME": str(job_state / "cache"),
+            "FINOPS_OPENCODE_STATE_DIR": str(job_state / "data"),
+        }
+    )
     try:
         proc = subprocess.run(
             [sys.executable, "scripts/review_all.py", "--only-missing"],
             check=False,
+            env=env,
         )
     except OSError as exc:
         print(f"[review-unit] failed to launch review_all.py: {exc}", flush=True)

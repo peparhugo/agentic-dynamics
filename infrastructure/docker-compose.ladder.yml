@@ -70,7 +70,11 @@ x-ladder-mounts: &ladder-mounts
   - ${FINOPS_REPO_DIR:-/home/drseuss/ai-finops-framework}:/home/drseuss/ai-finops-framework:ro
   - ${FINOPS_REPO_DIR:-/home/drseuss/ai-finops-framework}/.git:/home/drseuss/ai-finops-framework/.git:rw
   - ${FINOPS_REPO_DIR:-..}/experiments/results:/repo/experiments/results:rw
-  - ${FINOPS_WORKTREE_ROOT:-/tmp}/opencode_state:/home/drseuss/.local/share/opencode:rw
+  # P0-3 (control-plane stabilization): the CLI-state ROOT mount. Each scaled worker mints a
+  # FRESH per-job namespace under it (worker.py: <root>/jobs/<cell_id>/) and points
+  # XDG_DATA_HOME/XDG_CONFIG_HOME/XDG_CACHE_HOME at it — the root itself is never shared as a
+  # writable state directory, and no two replicas ever read/write the same opencode session DB.
+  - ${FINOPS_WORKTREE_ROOT:-/tmp}/opencode_state:/state:rw
   - ${AUTH_HOME:-/home/drseuss}/.local/share/opencode/auth.json:/auth/opencode_auth.json:ro
   - ${AUTH_HOME:-/home/drseuss}/.local/share/claude:/home/drseuss/.local/share/claude:ro
   # (the claude binary's symlink target rides here — an isolated claude STATE dir is the
@@ -127,7 +131,10 @@ x-orchestrator-mounts: &orchestrator-mounts
   - ${FINOPS_REPO_DIR:-/home/drseuss/ai-finops-framework}:/home/drseuss/ai-finops-framework:ro
   - ${FINOPS_REPO_DIR:-/home/drseuss/ai-finops-framework}/.git:/home/drseuss/ai-finops-framework/.git:rw
   - ${FINOPS_REPO_DIR:-..}/experiments/results:/repo/experiments/results:rw
-  - ${FINOPS_WORKTREE_ROOT:-/tmp}/opencode_state:/home/drseuss/.local/share/opencode:rw
+  # P0-3 (control-plane stabilization): the CLI-state ROOT mount. Siblings get their OWN
+  # per-attempt namespace (<root>/<spec>/<phase>/) mounted at /state via spawn_wrapper —
+  # never a shared pool directory.
+  - ${FINOPS_WORKTREE_ROOT:-/tmp}/opencode_state:/state:rw
   - ${AUTH_HOME:-/home/drseuss}/.local/share/opencode/auth.json:/auth/opencode_auth.json:ro
   - ${AUTH_HOME:-/home/drseuss}/.local/share/claude:/home/drseuss/.local/share/claude:ro
   - ${AUTH_HOME:-/home/drseuss}/.claude:/home/drseuss/.claude:ro

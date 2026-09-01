@@ -58,6 +58,83 @@ from agentic_dynamics.runtime.workflow_runner import cell_scope, run_workflow  #
 #: every run. Set to the literal string "0" to disable; any other value (including unset) is ON.
 FACT_AUTO_EMIT_ENV = "FINOPS_FACT_AUTO_EMIT"
 
+# P0-1 exit-code contract (control-plane stabilization): one process, one final machine
+# envelope + one explicit exit code, so a parent (the orchestrator, a shell, CI) can tell
+# succeeded / awaiting / failed apart WITHOUT parsing the child's stdout. The child prints
+# the envelope (``WorkflowRunResult.to_dict()``) as its last JSON document; the exit code
+# is the secondary signal a parent uses before (or instead of) parsing it.
+EXIT_OK = 0
+EXIT_AWAITING_APPROVAL = 10
+EXIT_FAILED = 20
+EXIT_INVALID_REQUEST = 30
+EXIT_CANCELLED = 40
+
+
+def exit_code_for_result(result: Any) -> int:
+    """Map a run result to the P0-1 exit-code contract.
+
+    Precedence: ``awaiting`` (a designed stop, never a failure) maps to 10 BEFORE the
+    ``ok`` check — ``awaiting`` carries ``ok: False`` by construction, and collapsing it
+    to 20 would misreport a checkpoint pause as a definitive failure.
+    """
+    if getattr(result, "awaiting", False):
+        return EXIT_AWAITING_APPROVAL
+    if not getattr(result, "ok", False):
+        return EXIT_FAILED
+    return EXIT_OK
+
+
+def parse_child_envelope(stdout: str) -> dict[str, Any] | None:
+    """Parse the child's final result envelope from its stdout (best effort).
+
+    The child prints ``json.dumps(result.to_dict(), indent=2)`` as its last JSON
+    document. Robust to preceding output AND to nested ``{`` lines inside the envelope:
+    scan candidate opening braces from the END, trying each as the envelope's first line
+    until one parses. Returns ``None`` when no envelope is found (an old child, a crash
+    before the print) — the caller must then fall back to the exit code.
+    """
+    if not stdout:
+        return None
+    lines = stdout.splitlines()
+    for i in range(len(lines) - 1, -1, -1):
+        if lines[i].strip() != "{":
+            continue
+        try:
+            obj = json.loads("\n".join(lines[i:]))
+        except json.JSONDecodeError:
+            continue
+        if isinstance(obj, dict) and "ok" in obj:
+            return obj
+    return None
+
+
+def classify_child_outcome(
+    returncode: int | None, stdout: str
+) -> dict[str, Any]:
+    """Classify a spawned sibling's outcome: the P0-1 fail-closed decision.
+
+    Precedence, fail-closed on conflict:
+    1. the contract exit code is AUTHORITATIVE for a contract child — 10 means awaiting
+       (a designed stop), anything other than 0/10 means failed. A child that wrote an
+       ``awaiting`` envelope but exited 20 broke AFTER writing it: failed.
+    2. the envelope is the fallback for a PRE-CONTRACT child (exit 0 with ``ok: false``
+       or ``awaiting: true``) — the exact false-success shape P0-1 removes.
+    Never trust ``returncode == 0`` alone: a pre-contract child exits 0 with a failed or
+    awaiting result, and the envelope is the only thing that says so.
+    """
+    envelope = parse_child_envelope(stdout)
+    if returncode == EXIT_AWAITING_APPROVAL:
+        return {"state": "awaiting", "envelope": envelope}
+    if returncode not in (None, EXIT_OK):
+        return {"state": "failed", "envelope": envelope}
+    if envelope is not None:
+        if envelope.get("awaiting") is True:
+            return {"state": "awaiting", "envelope": envelope}
+        if envelope.get("ok") is False:
+            return {"state": "failed", "envelope": envelope}
+    return {"state": "ok", "envelope": envelope}
+
+
 
 def _spec_declares_routing(spec: ExperimentSpec) -> bool:
     """True when the spec activates per-step routing (mirrors ``validate_workflow_routing``).
@@ -471,7 +548,9 @@ def main() -> None:
     # (no ``awaiting`` field) keep working unchanged.
     if getattr(result, "awaiting", False):
         # cap_runner_hardening2 §Gap 3 — a designed stop, not a failure: the operator's tools
-        # read "awaiting operator approval", never a bare ok/failed. Exits 0 (a designed stop).
+        # read "awaiting operator approval", never a bare ok/failed. Exits 10 under the
+        # P0-1 contract (a designed stop has its OWN exit code — 0 would make a parent
+        # classify it as success, which is exactly the false-success path P0-1 removes).
         print(
             f"awaiting_operator_approval: phase '{getattr(result, 'awaiting_phase', '?')}' "
             f"(reason: {getattr(result, 'awaiting_reason', '?')})  cost: ${result.total_cost_usd:.4f}",
@@ -484,6 +563,21 @@ def main() -> None:
     _emit_spec_record(spec.name, revision=result.git_sha)
     if _fact_auto_emit_enabled(args):
         _emit_workflow_facts(spec, args, result)
+
+    # P0-1 exit-code contract (control-plane stabilization): in CHILD mode (--only-phase —
+    # the sibling the orchestrator spawns) the process exit code maps the run outcome so
+    # the parent can classify the child WITHOUT parsing the envelope — 0 succeeded /
+    # 10 awaiting_approval / 20 failed. This is the parent-child boundary where a false
+    # success previously lived: a child that wrote ok:false still exited 0, and the
+    # orchestrator's `returncode == 0` check mistook it for success.
+    #
+    # Deliberately scoped to child mode: the full in-process path's consumers (the
+    # cap_2c/2d/2e grids, run_cap_grit_grid) read the ledger JSON and treat a recorded
+    # ok:false as a designed outcome, not an abort — changing THEIR exit codes would
+    # turn recorded failures into grid aborts. The exit code is the parent-child
+    # handshake, not a universal success signal.
+    if args.only_phase:
+        raise SystemExit(exit_code_for_result(result))
 
 
 def _run_orchestrator(spec: ExperimentSpec, args: argparse.Namespace) -> None:
@@ -511,13 +605,20 @@ def _run_orchestrator(spec: ExperimentSpec, args: argparse.Namespace) -> None:
           flush=True)
 
     failures = 0
+    awaiting_stop = False
     for phase_def in phases:
         name = str(phase_def.get("name", "?"))
         kind = str(phase_def.get("kind", "agent"))
         if kind == "test":
-            print(f"[orchestrator] {name}: skipping test phase in orchestrator mode (run "
-                  f"in-process or as its own cell)", flush=True)
-            continue
+            # P0-1 fail-closed (control-plane stabilization): the container path has NO
+            # verifier executor — silently skipping a declared independent verification
+            # is exactly the false-success path this branch exists to remove. A hard
+            # refusal is safer than a skipped gate; the phase's suite was never run.
+            raise SystemExit(
+                f"[orchestrator] {name}: REFUSED — kind: test phases have no Docker verifier "
+                "executor; skipping is forbidden (P0-1 fail-closed). Run this spec "
+                "in-process, or land the verifier executor first."
+            )
 
         sibling_cmd = [
             sys.executable, "scripts/run_workflow.py",
@@ -546,6 +647,11 @@ def _run_orchestrator(spec: ExperimentSpec, args: argparse.Namespace) -> None:
                     spec_name=spec.name,
                     command=sibling_cmd,
                     admission=admission.context() if admission is not None else None,
+                    # P0-3 (control-plane stabilization): a per-attempt state namespace —
+                    # <spec>/<phase>/<run-ish> — so retries and concurrent phases never share a
+                    # writable CLI-state directory. The default inside build_phase_request is
+                    # <spec>/<phase>; this finer value isolates attempts within a phase too.
+                    state_namespace=f"{spec.name}/{name}",
                 )
                 # build_phase_request resolves the scope; a phase with NO declared scope and no
                 # authorization-table entry resolves to "" and spawn_sibling refuses it at
@@ -559,21 +665,46 @@ def _run_orchestrator(spec: ExperimentSpec, args: argparse.Namespace) -> None:
             print(f"[orchestrator] {name}: ADMISSION DENIED — no container was spawned:\n{exc}",
                   flush=True)
             failures += 1
-            continue
+            break  # P0-1 stop-on-failure: a refused phase must never start the next
         except spawn_wrapper.SpawnValidationError as exc:
             print(f"[orchestrator] {name}: REFUSED before the socket call:\n{exc}", flush=True)
             failures += 1
-            continue
-        if not outcome["ok"]:
+            break  # P0-1 stop-on-failure: a refused phase must never start the next
+        if not outcome["ok"] and outcome.get("returncode") not in (EXIT_OK, EXIT_AWAITING_APPROVAL):
             print(f"[orchestrator] {name}: sibling exited {outcome.get('returncode')}\n"
                   f"{outcome.get('stderr', '')[-800:]}", flush=True)
             failures += 1
-        else:
-            print(f"[orchestrator] {name}: ok", flush=True)
+            break  # P0-1 stop-on-failure: a failed phase must never start the next
+        # P0-1 (control-plane stabilization): classify the child by its result ENVELOPE
+        # first (the machine-readable ok/awaiting the child prints), the exit code as the
+        # secondary signal. `returncode == 0` alone proved false-success: a pre-contract
+        # child exits 0 with ok:false or awaiting:true. The envelope decides; the exit
+        # code is the fallback when no envelope is present.
+        decision = classify_child_outcome(
+            outcome.get("returncode"), outcome.get("stdout", "")
+        )
+        if decision["state"] == "awaiting":
+            awaiting_stop = True
+            envelope = decision.get("envelope") or {}
+            reason = envelope.get("awaiting_reason", "checkpoint")
+            print(f"[orchestrator] {name}: AWAITING operator approval (reason: {reason}) — "
+                  f"run stopped; approve + --resume to continue", flush=True)
+            break  # P0-1: an approval checkpoint must stop the sequence
+        if decision["state"] == "failed":
+            envelope = decision.get("envelope") or {}
+            error = (envelope.get("error") or outcome.get("stderr", ""))[-800:]
+            print(f"[orchestrator] {name}: FAILED ({error or 'no envelope, no detail'})",
+                  flush=True)
+            failures += 1
+            break  # P0-1 stop-on-failure: a failed phase must never start the next
+        print(f"[orchestrator] {name}: ok", flush=True)
 
+    if awaiting_stop:
+        print("[orchestrator] done: stopped for operator approval (awaiting)", flush=True)
+        raise SystemExit(EXIT_AWAITING_APPROVAL)
     print(f"[orchestrator] done: {failures} failure(s) across {len(phases)} phase(s)", flush=True)
     if failures:
-        raise SystemExit(1)
+        raise SystemExit(EXIT_FAILED)
 
 
 @contextlib.contextmanager
