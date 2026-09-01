@@ -186,6 +186,12 @@ class PhaseResult:
     spec_id: str = ""
     model: str = ""
     duration_s: float = 0.0
+    #: Runner truth (retrieval review, 2026-09-01): True when the phase consumed its full
+    #: configured timeout window — the phase hit the wall whether or not its turn "completed"
+    #: at the boundary. A clean ok must never mask a wall-burning run (the retrieval p4
+    #: masked its lost background evidence exactly this way: 1800.16s in a 1800s window,
+    #: ok=True).
+    timed_out: bool = False
     commit_hash: str = ""
     error: str = ""
     # agent phases
@@ -255,6 +261,7 @@ class PhaseResult:
             "spec_id": self.spec_id,
             "model": self.model,
             "duration_s": self.duration_s,
+            "timed_out": self.timed_out,
             "commit_hash": self.commit_hash,
             "error": self.error,
             "tokens": self.tokens,
@@ -3043,6 +3050,11 @@ def run_workflow(
             _enforce_doc_contract(pr, wd, pre_head)
 
         pr.duration_s = round(time.time() - t0, 2)
+        # The wall marker (runner truth): a phase that consumed its full configured timeout
+        # window records timed_out even when its turn ended cleanly at the boundary — the
+        # retrieval p4 lost its background evidence this way (1800.16s in a 1800s window,
+        # ok=True), and a clean ok must not mask a wall-burning run.
+        pr.timed_out = pr.duration_s >= phase_timeout - 0.5
         if commit and pr.status == "ok":
             pr.commit_hash = _git_commit(wd, name, goal)
             # Phase-boundary evidence (design §5.7 — e6): when a ChangeAnalyzer is injected,

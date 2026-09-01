@@ -65,6 +65,10 @@ class AugmentationOutcome:
     token_counts: dict[str, int] = field(default_factory=dict)
     cost_usd: float = 0.0
     latency_ms: float = 0.0
+    #: The swallowed exception on the no_rag fallback (retrieve/construct failure), so a
+    #: degraded phase is distinguishable from a seam that never ran — the ledger records
+    #: the error instead of erasing it. Empty when the augmentation completed.
+    error: str = ""
 
 
 def _evidence_from_attempt(attempt: Any) -> list[Any]:
@@ -192,10 +196,11 @@ def augment_prompt(
         outcome.cost_usd = float(getattr(augmented, "cost_usd", 0.0) or 0.0)
         if constructor_fell_back:
             outcome.versions = {**outcome.versions, "constructor": "deterministic-fallback"}
-    except Exception:
+    except Exception as exc:  # noqa: BLE001 — the fallback must never block the phase
         outcome.prompt = base_prompt
         outcome.fallback = True
         outcome.fallback_mode = "no_rag"
+        outcome.error = f"{type(exc).__name__}: {exc}"
     finally:
         outcome.latency_ms = round((time.time() - t0) * 1000.0, 2)
     return outcome
