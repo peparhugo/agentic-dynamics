@@ -106,6 +106,7 @@ _COMMANDS: dict[tuple[str, ...], str] = {
     ("surfaces", "snapshot"): "system_snapshot.py",
     # docs (the docs-drift rail — deterministic source-doc drift scan, zero model calls)
     ("docs", "scan"): "scan_docs_drift.py",
+    ("docs", "watch"): "docs_drift_watchdog.py",
 }
 
 #: ``_COMMANDS`` keys ordered longest-first. ``_resolve`` iterates THIS list rather than
