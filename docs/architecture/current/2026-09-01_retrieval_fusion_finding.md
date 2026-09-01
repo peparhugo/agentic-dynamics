@@ -62,3 +62,35 @@ by content hash before the RRF so same-content documents actually fuse. The meas
 Provenance: [C] computed — `scripts/fleet/retrieval_census.py` over the live Chroma + Neo4j
 stores; artifacts `experiments/results/retrieval_census/20260901T022132Z.json` +
 `20260901T023603Z.json`.
+
+## p1 measurement (the fusion-quality campaign) — the join answer + hypothesis verdict
+
+**Instrument landed.** `Candidate` now carries `join_content_hash` (the sha256 of the stored
+text, derived identically on both legs via `knowledge.compute_content_hash`) + a `legs`
+property (`dense` / `lexical` / `both` / `expansion`), and `RetrievalAttempt.leg_overlap()`
+answers the content join per query (artifact persisted in `RetrievalAttempt.to_dict()`).
+The census rows carry per-candidate legs + content hashes, and `content_join_totals` +
+`hypothesis_split` report the answer over the whole set. The join is observational only:
+`join_content_hash` never feeds `deduplicate`/`collapse_redundant`/fusion, so the fusion-off
+path is byte-identical (no-regression). Artifact:
+`experiments/results/retrieval_census/20260901T035547Z.json`.
+
+**The join answer.** Across the same 15-query census set (same weights `retrieval-weights/v1`,
+same stores): **fused = 0, content_pairs = 0, distinct_content_hashes = 0.** Not one dense
+candidate shares a content hash with a lexical candidate — including after deriving the text
+hash on the lexical leg, where the store does not persist it.
+
+**Per-hypothesis split:**
+
+| Hypothesis | Verdict | Measured basis |
+|---|---|---|
+| 1. Id-namespace disjointness | **FALSE** | The stores share the id namespace: all 812 `knowledge_chunks_v1` ids exist in Neo4j under the SAME `knowledge_id` with byte-identical text (812/812). A same-content pair carries the same id, so the id-based fusion check would fire if the same record co-surfaced — it never does. |
+| 2. Content granularity mismatch | **TRUE (as a two-view ranking divergence)** | 0 same-content pairs in the fused candidate sets. The stores hold the same units (deep overlap: 437/812 id overlaps at full depth for `context_abstraction_implement`, all with identical text) — but the top-40 semantic and top-40 full-text sets never intersect on any of the 15 queries. The disjointness is in the per-query top-K selection, not in the indexed units. |
+| 3. Content-hash gaps | **PARTIAL (present, not causal)** | The dense leg persists `content_hash` for all candidates (549/549); the lexical leg persists it only for `code` records (32,001/33,961 nodes — the kb-neo4j-v1 SET clause omits `content_hash` for findings/story/review/observation/spec). Closing the gap (deriving the text hash) does not change the join answer: still 0 pairs. |
+
+**Verdict (the campaign's deliberate outcome).** The join does NOT warrant a content-hash dedupe
+before the RRF: there are 0 same-content pairs to merge, and forcing a merge would be a no-op on
+genuinely distinct-per-query candidate sets. The campaign takes the hypothesis-2 path: the two
+legs are a healthy two-view system at the fusion cutoff (semantic top-K vs lexical top-K rank
+the shared corpus disjointly), and **fused = 0 is the documented, deliberate two-view outcome** —
+not a defect to be "fixed" by a merge that nothing would join.
