@@ -976,7 +976,17 @@ def consume_fleet_commands(
 
     print(f"[spawn-wrapper] consuming {COMMANDS_KEY} (compose {compose_file})", flush=True)
     while True:
-        result = client.brpop(COMMANDS_KEY, timeout=10)
+        try:
+            result = client.brpop(COMMANDS_KEY, timeout=10)
+        except (TimeoutError, ConnectionError, OSError) as exc:
+            # A transient Redis socket timeout (the client's socket timeout can trip before
+            # the BRPOP's own 10s) must not kill the orchestrator's hands — retry the read.
+            # The 2026-09-01 crash: an unhandled socket TimeoutError exited the consume loop
+            # mid-fleet, leaving a queued submit marked "launching" with no consumer.
+            print(f"[spawn-wrapper] redis read interrupted ({type(exc).__name__}); retrying", flush=True)
+            if once:
+                return
+            continue
         if result is None:
             if once:
                 return
