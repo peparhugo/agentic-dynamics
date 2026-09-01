@@ -59,6 +59,13 @@ DEFAULT_SEED_COUNT = 12
 DEFAULT_RAG_TOKEN_LIMIT = 8000
 DEFAULT_EXECUTOR_RAG_RATIO = 0.20
 REDUNDANCY_THRESHOLD = 0.92
+#: The cosine-collapse embeds only the top-K candidates (by list order — the fused list is
+#: score-ordered). Pairs beyond the cap default to 0.0 in the collapse (no dedupe), which is
+#: semantically safe — a tail candidate is kept, it just never collapses a top candidate's
+#: near-duplicate. The cap exists because the embed fan-out dominated the retrieve profile
+#: (73 sequential HTTP embeds ≈ 29s of a 31.5s pass); without it every retrieve paid O(N)
+#: round-trips for a dedupe that rarely fires beyond the head of the list.
+COLLAPSE_EMBED_CAP = 24
 DENSE_QUERY_MAX_TOKENS = 512  # [H] truncate the dense query at a recorded limit.
 
 #: Authority trust multipliers for *retrieval fusion* (not a ranking of relevance).
@@ -578,12 +585,16 @@ def _pairwise_similarities(
     if len(candidates) < 2 or embedder is None:
         return {}, "none"
     try:
-        embeddings = [embedder.embed(c.text) for c in candidates]
+        embedded = candidates[:COLLAPSE_EMBED_CAP]
+        with ThreadPoolExecutor(max_workers=8) as pool:
+            embeddings = list(
+                pool.map(embedder.embed, [c.text for c in embedded])
+            )
         sims: dict[tuple[str, str], float] = {}
-        for i in range(len(candidates)):
-            for j in range(i + 1, len(candidates)):
+        for i in range(len(embedded)):
+            for j in range(i + 1, len(embedded)):
                 dist = embedder.cosine_distance(embeddings[i], embeddings[j])
-                sims[(candidates[i].id, candidates[j].id)] = 1.0 - dist
+                sims[(embedded[i].id, embedded[j].id)] = 1.0 - dist
         return sims, "embedding"
     except Exception:
         # Embedding infra unavailable (Ollama down, embedder missing, etc.) — the
