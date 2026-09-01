@@ -6,6 +6,7 @@ derivation — all without requiring Chroma/Neo4j/Ollama (the store-dependent
 orchestration is exercised only through its pure helpers).
 """
 
+import json
 from datetime import datetime, timedelta, timezone
 
 import pytest
@@ -31,8 +32,10 @@ from agentic_dynamics.knowledge.retrieval import (
     deduplicate,
     exact_identifier_hit,
     freshness_multiplier,
+    fuse_candidates,
     graph_boost,
     is_conflict_relationship,
+    pattern_uncertainty_multiplier,
     resolve_fallback_mode,
     retrieve,
     rrf_base,
@@ -142,6 +145,7 @@ def test_planner_does_not_rewrite_raw():
 
 # ── Fusion math ─────────────────────────────────────────────────
 
+
 def test_rrf_base_both_legs():
     expected = 1.2 / 60.0 + 1.0 / 60.0
     assert rrf_base(0, 0) == pytest.approx(expected)
@@ -176,14 +180,46 @@ def test_fused_score_applies_all_multipliers():
 
 def test_fused_score_conflict_penalty():
     no_conflict = compute_fused_score(
-        lexical_rank=0, dense_rank=0, authority=Authority.SOURCE,
-        freshness=1.0, exact_identifier_match=False, conflict=False,
+        lexical_rank=0,
+        dense_rank=0,
+        authority=Authority.SOURCE,
+        freshness=1.0,
+        exact_identifier_match=False,
+        conflict=False,
     )
     with_conflict = compute_fused_score(
-        lexical_rank=0, dense_rank=0, authority=Authority.SOURCE,
-        freshness=1.0, exact_identifier_match=False, conflict=True,
+        lexical_rank=0,
+        dense_rank=0,
+        authority=Authority.SOURCE,
+        freshness=1.0,
+        exact_identifier_match=False,
+        conflict=True,
     )
     assert with_conflict == pytest.approx(no_conflict * CONFLICT_MULTIPLIER)
+
+
+def test_pattern_uncertainty_multiplier_prefers_low_uncertainty():
+    assert pattern_uncertainty_multiplier(0.10) > pattern_uncertainty_multiplier(0.80)
+    assert pattern_uncertainty_multiplier(None) == pytest.approx(1.0)
+
+
+def test_pattern_fusion_uses_uncertainty_at_equal_relevance():
+    low = _cand(
+        "pattern-low",
+        authority=Authority.DERIVED,
+        dense_rank=0,
+        source_type="pattern",
+        pattern_payload={"uncertainty": 0.10},
+    )
+    high = _cand(
+        "pattern-high",
+        authority=Authority.DERIVED,
+        dense_rank=0,
+        source_type="pattern",
+        pattern_payload={"uncertainty": 0.80},
+    )
+    fused = fuse_candidates([high, low], exact_terms=[])
+    assert [c.id for c in fused] == ["pattern-low", "pattern-high"]
 
 
 def test_freshness_exact_commit_and_source():
@@ -192,17 +228,23 @@ def test_freshness_exact_commit_and_source():
         authority=Authority.SOURCE, commit_sha="abc", observed_at=None, current_commit="abc"
     ) == pytest.approx(EXACT_COMMIT_MULTIPLIER)
     # A different, non-empty commit is a HARD exclusion (the safety rationale).
-    assert freshness_multiplier(
-        authority=Authority.SOURCE, commit_sha="xyz", observed_at=None, current_commit="abc"
-    ) is None
+    assert (
+        freshness_multiplier(
+            authority=Authority.SOURCE, commit_sha="xyz", observed_at=None, current_commit="abc"
+        )
+        is None
+    )
 
 
 def test_freshness_non_matching_commit_excluded_for_all_non_advisory():
     # SOURCE / MEASURED / DERIVED are all hard-excluded on a different commit.
     for authority in (Authority.SOURCE, Authority.MEASURED, Authority.DERIVED):
-        assert freshness_multiplier(
-            authority=authority, commit_sha="xyz", observed_at=None, current_commit="abc"
-        ) is None
+        assert (
+            freshness_multiplier(
+                authority=authority, commit_sha="xyz", observed_at=None, current_commit="abc"
+            )
+            is None
+        )
 
 
 def test_freshness_empty_commit_is_eligible():
@@ -225,8 +267,11 @@ def test_freshness_advisory_ignores_commit_scope():
     # does not hard-exclude it — its freshness window still applies (unchanged).
     observed = (NOW - timedelta(days=10)).isoformat()
     assert freshness_multiplier(
-        authority=Authority.ADVISORY, commit_sha="xyz", observed_at=observed,
-        current_commit="abc", now=NOW,
+        authority=Authority.ADVISORY,
+        commit_sha="xyz",
+        observed_at=observed,
+        current_commit="abc",
+        now=NOW,
     ) == pytest.approx(ADVISORY_FRESH_30D)
 
 
@@ -260,15 +305,25 @@ def test_freshness_advisory_age_buckets():
         authority=Authority.ADVISORY, commit_sha="", observed_at=obs(60), current_commit="", now=NOW
     ) == pytest.approx(ADVISORY_FRESH_90D)
     # >90 days old advisory evidence is excluded.
-    assert freshness_multiplier(
-        authority=Authority.ADVISORY, commit_sha="", observed_at=obs(100), current_commit="", now=NOW
-    ) is None
+    assert (
+        freshness_multiplier(
+            authority=Authority.ADVISORY,
+            commit_sha="",
+            observed_at=obs(100),
+            current_commit="",
+            now=NOW,
+        )
+        is None
+    )
 
 
 def test_freshness_policy_is_never_retrieved():
-    assert freshness_multiplier(
-        authority=Authority.POLICY, commit_sha="abc", observed_at=None, current_commit="abc"
-    ) is None
+    assert (
+        freshness_multiplier(
+            authority=Authority.POLICY, commit_sha="abc", observed_at=None, current_commit="abc"
+        )
+        is None
+    )
 
 
 def test_exact_identifier_hit():
@@ -278,6 +333,7 @@ def test_exact_identifier_hit():
 
 
 # ── Graph decay ─────────────────────────────────────────────────
+
 
 def test_graph_boost_decays_with_depth():
     assert graph_boost(1.0, 0, "DEFINES") == pytest.approx(1.0)
@@ -304,22 +360,32 @@ def test_conflict_relationship_flag():
 
 # ── Budget cap + whole-chunk selection ──────────────────────────
 
+
 def test_token_budget_is_min_of_all_limits():
-    assert compute_token_budget(
-        executor_context_tokens=200_000, remaining_input_tokens=200_000, rag_token_limit=8000
-    ) == 8000
+    assert (
+        compute_token_budget(
+            executor_context_tokens=200_000, remaining_input_tokens=200_000, rag_token_limit=8000
+        )
+        == 8000
+    )
     # 20% of a 10k context = 2000, and remaining input 5000 → 2000.
-    assert compute_token_budget(
-        executor_context_tokens=10_000, remaining_input_tokens=5_000, rag_token_limit=8000
-    ) == 2000
+    assert (
+        compute_token_budget(
+            executor_context_tokens=10_000, remaining_input_tokens=5_000, rag_token_limit=8000
+        )
+        == 2000
+    )
     # Tight remaining input dominates.
-    assert compute_token_budget(
-        executor_context_tokens=200_000, remaining_input_tokens=100, rag_token_limit=8000
-    ) == 100
+    assert (
+        compute_token_budget(
+            executor_context_tokens=200_000, remaining_input_tokens=100, rag_token_limit=8000
+        )
+        == 100
+    )
 
 
 def test_select_evidence_never_splits_a_chunk():
-    a = _cand("a", text="x", token_count=4, dense_rank=0)   # highest score
+    a = _cand("a", text="x", token_count=4, dense_rank=0)  # highest score
     b = _cand("b", text="y", token_count=7, dense_rank=1)
     c = _cand("c", text="z", token_count=3, dense_rank=2)
     # score order: a, b, c. budget 10 → a (4), skip b (7 > 6), c (3).
@@ -348,12 +414,13 @@ def test_select_evidence_source_diversity_cap():
 
 # ── Dedupe + conflict retention ─────────────────────────────────
 
+
 def test_deduplicate_collapses_identical_content():
     c1 = _cand("k1", content_hash="h", authority=Authority.ADVISORY, locator="locA")
     c2 = _cand("k2", content_hash="h", authority=Authority.SOURCE, locator="locB")
     out = deduplicate([c1, c2])
     assert len(out) == 1
-    assert out[0].id == "k2"            # higher authority survives
+    assert out[0].id == "k2"  # higher authority survives
     assert out[0].authority is Authority.SOURCE
     assert set(out[0].provenance) == {"locA", "locB"}  # provenance merged
 
@@ -383,6 +450,7 @@ def test_collapse_redundant_below_threshold_keeps_both():
 
 # ── Fallback modes (monotonic degradation) ──────────────────────
 
+
 def test_fallback_modes_monotonic():
     assert resolve_fallback_mode(dense_ok=True, lexical_ok=True, graph_ok=True) is FallbackMode.FULL
     assert (
@@ -401,11 +469,15 @@ def test_fallback_modes_monotonic():
 
 def test_fallback_modes_are_named_distinct_values():
     assert {m.value for m in FallbackMode} == {
-        "full", "lexical_graph_only", "dense_local_exact", "no_rag",
+        "full",
+        "lexical_graph_only",
+        "dense_local_exact",
+        "no_rag",
     }
 
 
 # ── Evidence card derivation ────────────────────────────────────
+
 
 def _run(**kw) -> dict:
     base = {
@@ -439,12 +511,16 @@ def test_build_evidence_cards_derives_offline():
 
 
 def test_build_evidence_cards_skips_narration_failure():
-    cards = build_evidence_cards([_run(worktree_name="a"), _run(worktree_name="b", narration_failure=True)])
+    cards = build_evidence_cards(
+        [_run(worktree_name="a"), _run(worktree_name="b", narration_failure=True)]
+    )
     assert [c.run_id for c in cards] == ["a"]
 
 
 def test_build_evidence_cards_skips_negative_correctness():
-    cards = build_evidence_cards([_run(worktree_name="ok"), _run(worktree_name="bad", correctness=-1)])
+    cards = build_evidence_cards(
+        [_run(worktree_name="ok"), _run(worktree_name="bad", correctness=-1)]
+    )
     assert [c.run_id for c in cards] == ["ok"]
 
 
@@ -485,11 +561,33 @@ def test_build_evidence_cards_renders_present_signals():
     assert "tests pass" in card.text
 
 
+def test_build_evidence_cards_preserves_pattern_surface_when_present():
+    payload = {
+        "claim": "recovers_under_objective_mutation",
+        "population": "finding:task_manager",
+        "conditions": ["test_executed_success=true"],
+        "support": 3,
+        "uncertainty": 0.25,
+        "validity_window": "abc123",
+        "source_experiment": "finding:entity:k1",
+    }
+    card = build_evidence_cards(
+        [_run(source_type="pattern", pattern_payload=json.dumps(payload, sort_keys=True))]
+    )[0]
+    assert card.source_type == "pattern"
+    assert card.pattern_payload == payload
+
+
 def test_build_evidence_cards_nan_treated_as_unmeasured():
     # NaN must behave exactly like an absent value: not crash, not render a number.
     card = build_evidence_cards(
-        [_run(confidence=float("nan"), perturbation_strength=float("nan"),
-              test_executed_success=float("nan"))]
+        [
+            _run(
+                confidence=float("nan"),
+                perturbation_strength=float("nan"),
+                test_executed_success=float("nan"),
+            )
+        ]
     )[0]
     assert card.confidence is None
     assert card.perturbation_strength is None
@@ -502,9 +600,7 @@ def test_build_evidence_cards_flags_failed_suite_unverified():
     # A run whose independent suite failed must be flagged so it never reads as a
     # verified finding — the card is kept (the data point is still measured) but the
     # text carries an explicit UNVERIFIED marker.
-    card = build_evidence_cards(
-        [_run(confidence=0.91, test_executed_success=False)]
-    )[0]
+    card = build_evidence_cards([_run(confidence=0.91, test_executed_success=False)])[0]
     assert card.test_executed_success is False
     assert "tests FAIL (unverified)" in card.text
     assert "tests pass" not in card.text
@@ -521,12 +617,14 @@ def test_build_evidence_cards_skips_unmeasured_correctness():
 
 # ── RetrievalAttempt sanity (recorded before any LLM call) ──────
 
+
 def test_candidate_citation_format():
     c = _cand("k1", locator="symbol:foo", commit_sha="abc")
     assert c.citation() == "[K:k1@abc:symbol:foo]"
 
 
 # ── Graph-expansion leg wiring (real seed score × weight × decay) ──
+
 
 class _FakeDenseStore:
     """Minimal dense store: returns scripted hits, or raises (simulates a down leg)."""
@@ -585,15 +683,46 @@ def _dense_hit(cid, text, *, authority="source", content_hash="", distance=0.1):
     }
 
 
+def _pattern_dense_hit(cid="pattern-1", *, uncertainty=0.25, repository_id=""):
+    payload = {
+        "claim": "recovers_under_objective_mutation",
+        "population": "finding:task=task_manager,perturbation_class=objective_mutation",
+        "conditions": ["test_executed_success=true"],
+        "support": 3,
+        "uncertainty": uncertainty,
+        "validity_window": "abc123",
+        "source_experiment": "finding:entity:k1",
+    }
+    return {
+        "id": cid,
+        "document": json.dumps(payload, sort_keys=True),
+        "metadata": {
+            "authority": "derived",
+            "source_type": "pattern",
+            "pattern_payload": json.dumps(payload, sort_keys=True),
+            "content_hash": f"hash:{cid}",
+            "repository_id": repository_id,
+        },
+        "distance": 0.1,
+    }
+
+
 def _lexical_hit(cid="doc_lex", text="lexical websocket reload hit"):
     return {
         "id": "elem:lex",
-        "properties": {"text": text, "authority": "source", "content_hash": "hash_lex", "doc_id": cid},
+        "properties": {
+            "text": text,
+            "authority": "source",
+            "content_hash": "hash_lex",
+            "doc_id": cid,
+        },
         "score": 0.9,
     }
 
 
-def _knowledge_lexical_hit(cid="k_kb", text="task manager api building finding", authority="measured"):
+def _knowledge_lexical_hit(
+    cid="k_kb", text="task manager api building finding", authority="measured"
+):
     return {
         "id": "elem:knowledge",
         "properties": {
@@ -637,7 +766,7 @@ def test_retrieve_expansion_scores_with_real_seed_and_rel_type():
 
     # The expansion hop is scored with the seed's REAL fused score (not a hardcoded
     # 1.0), the traversed relationship weight, and the decay at the returned depth.
-    expected = seed.fused_score * RELATIONSHIP_WEIGHTS["DEFINES"] * (0.7 ** 1)
+    expected = seed.fused_score * RELATIONSHIP_WEIGHTS["DEFINES"] * (0.7**1)
     assert expanded.fused_score == pytest.approx(expected)
     assert expanded.graph_depth == 1
     assert expanded.graph_path == ["k_seed", "k_expanded"]
@@ -669,14 +798,26 @@ def test_retrieve_expansion_skips_orphan_origin():
 
 # ── End-to-end pipeline wiring (fuse → dedupe → collapse → expand → select) ──
 
+
 def test_retrieve_end_to_end_pipeline():
     # Two dense hits sharing a content_hash (deduplicate collapses the advisory one)
     # plus a distinct third hit; the graph leg contributes one expanded neighbor.
-    dense = _FakeDenseStore([
-        _dense_hit("k1", "websocket live reload protocol", authority="source", content_hash="dup"),
-        _dense_hit("k2", "websocket live reload protocol", authority="advisory", content_hash="dup"),
-        _dense_hit("k3", "quantum entanglement of distant particles", authority="source", content_hash="distinct"),
-    ])
+    dense = _FakeDenseStore(
+        [
+            _dense_hit(
+                "k1", "websocket live reload protocol", authority="source", content_hash="dup"
+            ),
+            _dense_hit(
+                "k2", "websocket live reload protocol", authority="advisory", content_hash="dup"
+            ),
+            _dense_hit(
+                "k3",
+                "quantum entanglement of distant particles",
+                authority="source",
+                content_hash="distinct",
+            ),
+        ]
+    )
     graph = _FakeGraph([_expanded_node("k1", cid="k_expanded")])
 
     attempt = retrieve("websocket reload", dense_store=dense, graph_client=graph)
@@ -717,6 +858,7 @@ def test_retrieve_collapse_redundant_wired(monkeypatch):
 
         def cosine_distance(self, a, b):
             import math
+
             dot = sum(x * y for x, y in zip(a, b, strict=False))
             ma = math.sqrt(sum(x * x for x in a))
             mb = math.sqrt(sum(y * y for y in b))
@@ -728,11 +870,13 @@ def test_retrieve_collapse_redundant_wired(monkeypatch):
 
     # Distinct content hashes → deduplicate keeps all three; only the embedding-based
     # collapse (similarity 1.0 > 0.92) drops the lower-authority near-duplicate.
-    dense = _FakeDenseStore([
-        _dense_hit("k1", "near duplicate text one", authority="source"),
-        _dense_hit("k2", "near duplicate text two", authority="advisory"),
-        _dense_hit("k3", "completely different topic", authority="source"),
-    ])
+    dense = _FakeDenseStore(
+        [
+            _dense_hit("k1", "near duplicate text one", authority="source"),
+            _dense_hit("k2", "near duplicate text two", authority="advisory"),
+            _dense_hit("k3", "completely different topic", authority="source"),
+        ]
+    )
 
     attempt = retrieve("near duplicate text one", dense_store=dense)
 
@@ -801,9 +945,112 @@ def test_retrieve_lexical_leg_never_calls_step_search():
         def expand_candidates(self, seeds, **kwargs):
             return []
 
-    attempt = retrieve(
-        "build a task manager api", dense_store=None, graph_client=_KBOnlyGraph()
-    )
+    attempt = retrieve("build a task manager api", dense_store=None, graph_client=_KBOnlyGraph())
     ids = {c.id for c in attempt.candidates}
     assert "k_kb" in ids
     assert next(c for c in attempt.candidates if c.id == "k_kb").authority is Authority.MEASURED
+
+
+def test_pattern_projection_is_opt_in_and_facts_stay_out_of_candidates():
+    ordinary = _dense_hit("ordinary", "ordinary knowledge", authority="source")
+    fact = _dense_hit("raw-fact", '{"predicate":"pattern"}', authority="derived")
+    fact["metadata"]["source_type"] = "fact"
+    pattern = _pattern_dense_hit()
+
+    off = retrieve(
+        "ordinary knowledge",
+        dense_store=_FakeDenseStore([pattern, ordinary, fact]),
+        pattern_projection=False,
+    )
+    baseline = retrieve(
+        "ordinary knowledge",
+        dense_store=_FakeDenseStore([ordinary]),
+        pattern_projection=False,
+    )
+    enabled = retrieve(
+        "ordinary knowledge",
+        dense_store=_FakeDenseStore([pattern, ordinary, fact]),
+        pattern_projection=True,
+    )
+
+    assert [c.id for c in off.candidates] == [c.id for c in baseline.candidates]
+    assert off.ranks == baseline.ranks
+    assert off.raw_scores == baseline.raw_scores
+    assert all(c.source_type != "fact" for c in off.candidates + enabled.candidates)
+    projected = next(c for c in enabled.candidates if c.id == "pattern-1")
+    assert projected.is_pattern is True
+    assert projected.pattern_payload is not None
+    assert projected.pattern_payload["support"] == 3
+    assert enabled.query_plan.pattern_projection is True
+
+
+def test_pattern_projection_preserves_scope_filter():
+    pattern = _pattern_dense_hit(repository_id="other-cell")
+    attempt = retrieve(
+        "ordinary knowledge",
+        dense_store=_FakeDenseStore([pattern]),
+        repository_id="this-cell",
+        pattern_projection=True,
+    )
+    assert attempt.candidates == []
+
+
+def test_advisory_pattern_proposal_is_not_a_derived_candidate():
+    hit = _pattern_dense_hit()
+    hit["metadata"]["authority"] = "advisory"
+    hit["metadata"]["evidence_class"] = "[H]"
+    attempt = retrieve(
+        "ordinary knowledge",
+        dense_store=_FakeDenseStore([hit]),
+        pattern_projection=True,
+    )
+    assert attempt.candidates == []
+
+
+# ── Lucene escaping (p4_activation_gate — the retrieval census measured the lexical leg ────
+# silently dying on real, punctuation-heavy work-item text) ─────────────────────────────────
+
+
+class TestLuceneEscape:
+    """``_lucene_escape`` (``agentic_dynamics.knowledge.graph``) neutralizes Lucene classic
+    QueryParser syntax so ``search_fulltext``/``search_knowledge_fulltext`` matches free text
+    literally instead of raising a parser error on a file path, a call, or a CLI flag — the
+    exact shape of a real ``QueryPlan.lexical_query`` (see ``build_query_plan``).
+    """
+
+    def test_plain_words_are_unchanged(self):
+        from agentic_dynamics.knowledge.graph import _lucene_escape
+
+        assert _lucene_escape("task manager api story") == "task manager api story"
+
+    def test_file_path_slashes_are_escaped(self):
+        from agentic_dynamics.knowledge.graph import _lucene_escape
+
+        escaped = _lucene_escape("src/agentic_dynamics/knowledge/retrieval.py")
+        assert escaped == r"src\/agentic_dynamics\/knowledge\/retrieval.py"
+
+    def test_parens_and_colon_are_escaped(self):
+        from agentic_dynamics.knowledge.graph import _lucene_escape
+
+        escaped = _lucene_escape("retrieve() fallback_mode: full")
+        assert escaped == r"retrieve\(\) fallback_mode\: full"
+
+    def test_a_literal_backslash_is_escaped_exactly_once(self):
+        from agentic_dynamics.knowledge.graph import _lucene_escape
+
+        assert _lucene_escape(r"a\b") == r"a\\b"
+
+    def test_search_fulltext_escapes_before_sending_the_query(self, monkeypatch):
+        """``search_fulltext`` must send the ESCAPED query as the Cypher ``$query`` param."""
+        from agentic_dynamics.knowledge import graph as graph_module
+
+        client = graph_module.Neo4jClient.__new__(graph_module.Neo4jClient)
+        captured: dict = {}
+
+        def _fake_run(query_str, params):
+            captured["params"] = params
+            return []
+
+        monkeypatch.setattr(client, "_run", _fake_run)
+        client.search_fulltext("knowledge_text_ft", "retrieve() RRF")
+        assert captured["params"]["query"] == r"retrieve\(\) RRF"

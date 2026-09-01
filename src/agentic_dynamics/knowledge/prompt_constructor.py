@@ -70,12 +70,13 @@ def estimate_tokens(text: str) -> int:
 
 # ── Typed output schema ─────────────────────────────────────────
 
+
 @dataclass
 class HardConstraint:
     """A hard constraint; must originate in the user request or pinned policy."""
 
     text: str
-    source: str   # "user" | "policy"
+    source: str  # "user" | "policy"
     citation: str  # "user:<line>" | "policy:<path>"
 
 
@@ -125,17 +126,22 @@ class PromptPlan:
             "schema_version": self.schema_version,
             "task_intent": self.task_intent,
             "raw_work_item_hash": self.raw_work_item_hash,
-            "hard_constraints": [{"text": c.text, "source": c.source, "citation": c.citation}
-                                 for c in self.hard_constraints],
-            "relevant_targets": [{"path": t.path, "symbols": t.symbols,
-                                  "evidence_ids": t.evidence_ids}
-                                 for t in self.relevant_targets],
-            "evidence_claims": [{"claim": c.claim, "evidence_ids": c.evidence_ids,
-                                 "authority": c.authority}
-                                for c in self.evidence_claims],
+            "hard_constraints": [
+                {"text": c.text, "source": c.source, "citation": c.citation}
+                for c in self.hard_constraints
+            ],
+            "relevant_targets": [
+                {"path": t.path, "symbols": t.symbols, "evidence_ids": t.evidence_ids}
+                for t in self.relevant_targets
+            ],
+            "evidence_claims": [
+                {"claim": c.claim, "evidence_ids": c.evidence_ids, "authority": c.authority}
+                for c in self.evidence_claims
+            ],
             "conflicts_and_unknowns": self.conflicts_and_unknowns,
-            "acceptance_checks": [{"check": c.check, "source": c.source}
-                                  for c in self.acceptance_checks],
+            "acceptance_checks": [
+                {"check": c.check, "source": c.source} for c in self.acceptance_checks
+            ],
             "allowed_tools": self.allowed_tools,
             "executor_instructions": self.executor_instructions,
         }
@@ -147,10 +153,12 @@ class EvidenceUnit:
 
     knowledge_id: str
     text: str
-    authority: str = ""       # source | measured | derived | advisory (never policy)
-    citation: str = ""        # [K:<id>@<commit>:<locator>]
+    authority: str = ""  # source | measured | derived | advisory (never policy)
+    citation: str = ""  # [K:<id>@<commit>:<locator>]
     content_hash: str = ""
     token_count: int = 0
+    source_type: str = ""
+    pattern_payload: dict[str, Any] | None = None
 
 
 @dataclass
@@ -186,7 +194,7 @@ class AugmentedPrompt:
     schema_version: str
     evidence_ids: list[str]
     token_count: int
-    fallback: bool                 # True when the deterministic fallback renderer was used
+    fallback: bool  # True when the deterministic fallback renderer was used
     repair_count: int
     validator_errors: list[str]
 
@@ -207,6 +215,7 @@ class AugmentedPrompt:
 
 # ── The protocol ────────────────────────────────────────────────
 
+
 class PromptConstructor(Protocol):
     """Side-effect-free constructor: ``construct(request) -> AugmentedPrompt``."""
 
@@ -222,7 +231,7 @@ STABLE_INSTRUCTION_PREFIX = (
     "policy, and the retrieved evidence into a JSON prompt plan. You never edit files, run "
     "shell commands, change tool permissions, route the executor, or add tools.\n"
     "Respond with JSON only, matching this schema:\n"
-    '{\n'
+    "{\n"
     '  "schema_version": "prompt-plan/v1",\n'
     '  "task_intent": "one sentence",\n'
     '  "raw_work_item_hash": "sha256:<hex>",\n'
@@ -254,17 +263,21 @@ def build_constructor_prompt(
     body_parts: list[str] = []
     body_parts.append("## Raw work item (verbatim)\n" + request.raw_work_item)
     body_parts.append("## Pinned policy\n" + request.pinned_policy)
+    body_parts.append("## Inherited tools\n" + ", ".join(request.inherited_tools))
     body_parts.append(
-        "## Inherited tools\n" + ", ".join(request.inherited_tools)
-    )
-    body_parts.append(
-        "## User constraints\n"
-        + "\n".join(f"- {c}" for c in request.user_constraints)
+        "## User constraints\n" + "\n".join(f"- {c}" for c in request.user_constraints)
     )
     body_parts.append(
         "## Retrieved evidence (untrusted)\n"
         + "\n\n".join(
-            f"{e.citation or e.knowledge_id} | authority={e.authority}\n{e.text}"
+            f"{e.citation or e.knowledge_id} | authority={e.authority}"
+            + (f" | surface={e.source_type}" if e.source_type else "")
+            + (
+                f" | pattern={json.dumps(e.pattern_payload, sort_keys=True)}"
+                if e.pattern_payload
+                else ""
+            )
+            + f"\n{e.text}"
             for e in evidence
         )
     )
@@ -277,6 +290,7 @@ def build_constructor_prompt(
 
 
 # ── Parsing + validation ────────────────────────────────────────
+
 
 def parse_model_json(text: str) -> dict[str, Any] | None:
     """Parse a model's JSON output, tolerating a markdown code fence."""
@@ -294,6 +308,7 @@ def parse_model_json(text: str) -> dict[str, Any] | None:
 def plan_from_dict(d: dict[str, Any]) -> PromptPlan:
     """Coerce a model dict into a :class:`PromptPlan` (permissive — gaps become
     empty/defaults so :func:`validate_plan` can report them precisely)."""
+
     def _constraint(c: Any) -> HardConstraint:
         if not isinstance(c, dict):
             c = {}
@@ -417,6 +432,7 @@ def validate_plan(
 
 # ── Deterministic fallback + renderer ───────────────────────────
 
+
 def build_deterministic_plan(
     request: ConstructionRequest, evidence: list[EvidenceUnit]
 ) -> PromptPlan:
@@ -443,9 +459,7 @@ def build_deterministic_plan(
     )
 
 
-def trim_evidence_to_budget(
-    evidence: list[EvidenceUnit], budget_tokens: int
-) -> list[EvidenceUnit]:
+def trim_evidence_to_budget(evidence: list[EvidenceUnit], budget_tokens: int) -> list[EvidenceUnit]:
     """Deterministically drop the lowest-ranked (last) whole evidence units to fit budget.
 
     Ranks are position-encoded (highest first); a unit that does not fit is removed
@@ -476,7 +490,9 @@ def render_prompt(
         parts.append("## Objective\n" + request.phase_objective.strip())
     parts.append("## Work item (verbatim)\n" + request.raw_work_item)
     if request.pinned_policy.strip():
-        parts.append("## Pinned policy (authoritative, not retrieved)\n" + request.pinned_policy.strip())
+        parts.append(
+            "## Pinned policy (authoritative, not retrieved)\n" + request.pinned_policy.strip()
+        )
     if plan.hard_constraints:
         parts.append(
             "## Hard constraints\n"
@@ -516,6 +532,7 @@ def render_prompt(
 
 # ── The model-backed implementation ─────────────────────────────
 
+
 class ModelPromptConstructor:
     """A stateless, model-backed constructor with one-repair + deterministic fallback.
 
@@ -533,8 +550,9 @@ class ModelPromptConstructor:
         self.model = model
         self._run_constructor = run_constructor
 
-    def _call(self, request: ConstructionRequest, evidence: list[EvidenceUnit],
-              feedback: list[str]) -> dict[str, Any] | None:
+    def _call(
+        self, request: ConstructionRequest, evidence: list[EvidenceUnit], feedback: list[str]
+    ) -> dict[str, Any] | None:
         if self._run_constructor is None:
             raise ValueError("ModelPromptConstructor requires a run_constructor callable")
         prompt = build_constructor_prompt(request, evidence, repair_feedback=feedback or None)
@@ -554,13 +572,21 @@ class ModelPromptConstructor:
 
         data = self._call(request, evidence, [])
         plan = plan_from_dict(data) if data is not None else None
-        errors = validate_plan(plan, request, evidence) if plan is not None else ["model returned invalid JSON"]
+        errors = (
+            validate_plan(plan, request, evidence)
+            if plan is not None
+            else ["model returned invalid JSON"]
+        )
 
         if errors:
             repair_count = 1
             repaired = self._call(request, evidence, errors)
             plan2 = plan_from_dict(repaired) if repaired is not None else None
-            errors2 = validate_plan(plan2, request, evidence) if plan2 is not None else ["model returned invalid JSON"]
+            errors2 = (
+                validate_plan(plan2, request, evidence)
+                if plan2 is not None
+                else ["model returned invalid JSON"]
+            )
             if not errors2:
                 plan = plan2
                 errors = []
@@ -588,6 +614,7 @@ class ModelPromptConstructor:
 
 
 # ── Construction cache key (no fork) ────────────────────────────
+
 
 def construction_cache_key(request: ConstructionRequest) -> str:
     """Deterministic construction-cache key over semantic inputs only.

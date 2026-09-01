@@ -1,0 +1,68 @@
+name: retrieval_activation_augment_proof
+question: >-
+  p4_activation_gate's product proof (retrieval_activation): run ONE real workflow phase with
+  rag_augment enabled — the opt-in retrieve->construct->render seam (default OFF everywhere
+  else) — end to end, so the retrieval-activation gate has a live, recorded fallback_mode and
+  augmented-prompt acceptance instead of the historical slice-3 single-query claim
+  (docs/fleet/06_slice3_neo4j_rrf_log.md) that the retrieval agenda and decision record
+  explicitly refused to treat as sufficient product proof
+  (docs/architecture/current/2026-09-01_retrieval_decisions.md §7 item 5). The work item itself
+  (a tiny symbol-level Python feature) is intentionally trivial and disposable — the measured
+  signal is the augmentation outcome (retrieval attempt, constructor acceptance, fallback mode),
+  not the feature.
+version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: true
+repeatable: true
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: false
+    rag_augment: true
+    context:
+      domain_context: >-
+        This cell exists ONLY to exercise the rag_augment seam
+        (src/agentic_dynamics/knowledge/augment.py augment_prompt, wired into
+        src/agentic_dynamics/runtime/workflow_runner.py's phase-prompt construction) against
+        the live dense (Chroma) + lexical (Neo4j) stores for real, once
+        (retrieval_activation p4_activation_gate). retrieve()'s per-leg try/except means a
+        store failure degrades the fallback_mode (full / lexical_graph_only /
+        dense_local_exact / no_rag) rather than blocking the phase; the constructor
+        (ModelPromptConstructor on DEFAULT_CONSTRUCTOR_MODEL) is similarly failure-tolerant.
+        The implement phase is a minimal, self-contained calc app (no external seeding step) —
+        write calc.py + test_calc.py from scratch, then add one function.
+    phases:
+      - name: implement
+        kind: agent
+        timeout: 1800
+        prompt: |
+          GOAL:
+          {goal}
+
+          This worktree is empty of application code. DO, in order:
+          1. Create `calc.py` with `add(a, b)` and `subtract(a, b)`.
+          2. Create `test_calc.py` with `test_add` and `test_subtract` covering them.
+          3. Add a `multiply(a, b)` function to `calc.py` and a `test_multiply` test to
+             `test_calc.py` asserting `multiply(2, 3) == 6`.
+
+          VERIFY: `python3 -m pytest test_calc.py -q` passes (3 tests).
+          DELIVER calc.py and test_calc.py, committed.
+      - name: test
+        kind: test
+        timeout: 600
+factors:
+  - {name: model, levels: [deepseek/deepseek-v4-flash]}
+design: factorial
+rules: []
+metrics:
+  - {name: rag_augment_proof, agg: mean, over: cell}
+comparison: null
+writeup:
+  format: lab_book
+  sections: [question, implement, test]
+stop: {budget_usd: 1.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}

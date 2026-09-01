@@ -98,6 +98,8 @@ def _evidence_from_attempt(attempt: Any) -> list[Any]:
                 citation=citation,
                 content_hash=getattr(c, "content_hash", "") or "",
                 token_count=int(getattr(c, "token_count", 0) or len(text.split())),
+                source_type=str(getattr(c, "source_type", "") or ""),
+                pattern_payload=getattr(c, "pattern_payload", None),
             )
         )
     return units
@@ -147,6 +149,7 @@ def augment_prompt(
             executor_context_tokens=int(rag_params.get("executor_context_tokens", 200_000)),
             remaining_input_tokens=int(rag_params.get("remaining_input_tokens", 200_000)),
             rag_token_limit=int(rag_params.get("rag_token_limit", 8000)),
+            pattern_projection=bool(rag_params.get("pattern_projection", False)),
         )
         if attempt is None:
             raise RuntimeError("retrieve returned no attempt")
@@ -180,9 +183,9 @@ def augment_prompt(
         constructor_fell_back = bool(getattr(augmented, "fallback", False))
         outcome.fallback = False
         outcome.fallback_mode = "full" if retrieval_mode == "full" else retrieval_mode
-        outcome.constructor_attempt_id = getattr(augmented, "constructor_attempt_id", "") or _attempt_id(
-            "constructor", base_prompt, commit_sha, constructor_model
-        )
+        outcome.constructor_attempt_id = getattr(
+            augmented, "constructor_attempt_id", ""
+        ) or _attempt_id("constructor", base_prompt, commit_sha, constructor_model)
         outcome.selected_evidence_ids = list(getattr(augmented, "evidence_ids", []) or [])
         outcome.versions = dict(getattr(augmented, "versions", {}) or {})
         outcome.token_counts = dict(getattr(augmented, "token_counts", {}) or {})
@@ -238,7 +241,9 @@ def default_retrieve_fn() -> Callable[..., Any]:
     return functools.partial(_retrieve, dense_store=dense_store, graph_client=graph_client)
 
 
-def default_construct_fn(rag_params: dict[str, Any], run_agent: Callable[..., Any]) -> Callable[..., Any]:
+def default_construct_fn(
+    rag_params: dict[str, Any], run_agent: Callable[..., Any]
+) -> Callable[..., Any]:
     """Build a default constructor whose model call reuses the injected executor ``run_agent``.
 
     The constructor runs on ``DEFAULT_CONSTRUCTOR_MODEL`` (cheapest), so the wiring has
@@ -266,4 +271,6 @@ def default_construct_fn(rag_params: dict[str, Any], run_agent: Callable[..., An
         )
         return str(getattr(ar, "final_response", "") or "")
 
-    return ModelPromptConstructor(model=constructor_model, run_constructor=run_constructor).construct
+    return ModelPromptConstructor(
+        model=constructor_model, run_constructor=run_constructor
+    ).construct

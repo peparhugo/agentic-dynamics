@@ -95,10 +95,10 @@ def test_entity_id_is_deterministic_across_call_sites():
 def test_entity_id_is_sha256_of_its_components():
     import hashlib
 
-    expected = hashlib.sha256(
-        b"repo-1|src/instrument/knowledge.py|compute_entity_id"
-    ).hexdigest()
-    assert compute_entity_id("repo-1", "src/instrument/knowledge.py", "compute_entity_id") == expected
+    expected = hashlib.sha256(b"repo-1|src/instrument/knowledge.py|compute_entity_id").hexdigest()
+    assert (
+        compute_entity_id("repo-1", "src/instrument/knowledge.py", "compute_entity_id") == expected
+    )
 
 
 def test_knowledge_id_is_deterministic():
@@ -121,8 +121,12 @@ def test_entity_id_stable_when_only_content_changes():
     # A modified symbol keeps the same entity_id (logical identity) but gets a new
     # knowledge_id (immutable version) because the content hash changes.
     entity_id = compute_entity_id("repo-1", "src/a.py", "f")
-    knowledge_v1 = compute_knowledge_id(entity_id, "rev-1", compute_content_hash("v1"), "extractor/v1")
-    knowledge_v2 = compute_knowledge_id(entity_id, "rev-2", compute_content_hash("v2"), "extractor/v1")
+    knowledge_v1 = compute_knowledge_id(
+        entity_id, "rev-1", compute_content_hash("v1"), "extractor/v1"
+    )
+    knowledge_v2 = compute_knowledge_id(
+        entity_id, "rev-2", compute_content_hash("v2"), "extractor/v1"
+    )
     assert knowledge_v1 != knowledge_v2
     # And the entity_id did not change because its three components did not.
     assert compute_entity_id("repo-1", "src/a.py", "f") == entity_id
@@ -158,7 +162,13 @@ def test_content_hash_change_produces_new_knowledge_id():
 
 
 def test_authority_ordering():
-    assert Authority.POLICY > Authority.SOURCE > Authority.MEASURED > Authority.DERIVED > Authority.ADVISORY
+    assert (
+        Authority.POLICY
+        > Authority.SOURCE
+        > Authority.MEASURED
+        > Authority.DERIVED
+        > Authority.ADVISORY
+    )
 
 
 def test_authority_sorted_ascending():
@@ -348,15 +358,28 @@ def test_actuation_types_is_a_single_member_allowlist():
 
 
 def test_source_types_is_the_single_vocabulary_owner():
-    # All sixteen source types — the four round-1 producer types, the round-2 registry
+    # All seventeen source types — the four round-1 producer types, the round-2 registry
     # types, the spec-lifecycle type, the CAP fact + context_snapshot types, and the
     # orphan-sweep type — are registered here. This is what closes the pre-R2 split where
     # OBSERVATION_TYPES silently omitted finding/code/report/policy.
     assert set(SOURCE_TYPES) == {
-        "finding", "code", "report", "policy",
-        "story", "review", "ledger_job", "ledger_attempt",
-        "observation", "flag", "meta_session", "actuation",
-        "spec", "fact", "context_snapshot", "orphan",
+        "finding",
+        "code",
+        "report",
+        "policy",
+        "story",
+        "review",
+        "ledger_job",
+        "ledger_attempt",
+        "observation",
+        "flag",
+        "meta_session",
+        "actuation",
+        "spec",
+        "fact",
+        "context_snapshot",
+        "orphan",
+        "pattern",
     }
 
 
@@ -373,12 +396,14 @@ def test_spec_source_type_is_a_policy_authority_observation():
 
 def test_observation_and_actuation_types_are_derived_from_source_types():
     # The two frozensets are pure projections of SOURCE_TYPES' message_family column.
-    assert frozenset(
-        n for n, s in SOURCE_TYPES.items() if s.message_family == "observation"
-    ) == OBSERVATION_TYPES
-    assert frozenset(
-        n for n, s in SOURCE_TYPES.items() if s.message_family == "actuation"
-    ) == ACTUATION_TYPES
+    assert (
+        frozenset(n for n, s in SOURCE_TYPES.items() if s.message_family == "observation")
+        == OBSERVATION_TYPES
+    )
+    assert (
+        frozenset(n for n, s in SOURCE_TYPES.items() if s.message_family == "actuation")
+        == ACTUATION_TYPES
+    )
 
 
 def test_source_type_spec_carries_nominal_provenance():
@@ -399,6 +424,7 @@ def test_source_type_spec_is_frozen():
     spec = SOURCE_TYPES["code"]
     with pytest.raises(FrozenInstanceError):
         spec.message_family = "actuation"  # type: ignore[misc]
+
 
 # ── `subject_id` / `subject_status` (record-fidelity addition) ──
 

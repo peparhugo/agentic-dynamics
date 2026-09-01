@@ -102,6 +102,26 @@ _KNOWLEDGE_FULLTEXT = [
 
 _IDENTIFIER_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 
+# Lucene classic QueryParser syntax characters (the parser ``db.index.fulltext.queryNodes``
+# uses under the hood). Unescaped, these do not degrade gracefully — a lone ``/`` opens
+# regex-query mode, ``:`` selects a field, ``()`` groups clauses, and an unbalanced or
+# unexpected occurrence raises a ``TokenMgrError``/``ParseException`` straight out of the
+# procedure call. Real retrieval queries are full of exactly these characters (file paths,
+# function calls, CLI flags), so the retrieval census (p4_activation_gate) measured real
+# work-item text silently losing the lexical leg on every such query.
+_LUCENE_SPECIAL_RE = re.compile(r'([+\-!(){}\[\]^"~*?:\\/&|])')
+
+
+def _lucene_escape(query: str) -> str:
+    """Backslash-escape Lucene query-syntax characters so free text matches literally.
+
+    Applied once, over the whole string: a single regex pass over the ORIGINAL text, so a
+    literal backslash in the input is itself escaped exactly once (no double-escaping from
+    re-scanning already-escaped output). Word characters and spaces are untouched, so the
+    existing "OR the terms" default-operator semantics (space-separated terms) are preserved.
+    """
+    return _LUCENE_SPECIAL_RE.sub(r"\\\1", query)
+
 
 def _validate_identifier(name: str, kind: str) -> None:
     """Reject anything that is not a plain identifier (Cypher injection guard).
@@ -1270,7 +1290,13 @@ class Neo4jClient:
         (back-compatible).
         """
         _validate_identifier(index_name, "index")
-        params: dict[str, Any] = {"index": index_name, "query": query, "limit": limit}
+        # ``db.index.fulltext.queryNodes`` parses ``query`` as a Lucene classic query string,
+        # not literal text — escape its special characters so a file path, a parenthesized
+        # call, or a CLI flag matches literally instead of raising a parser error (see
+        # ``_lucene_escape``'s docstring; measured live by the p4_activation_gate census).
+        params: dict[str, Any] = {
+            "index": index_name, "query": _lucene_escape(query), "limit": limit,
+        }
         query_str = "CALL db.index.fulltext.queryNodes($index, $query) YIELD node, score "
         if commit:
             # Hard commit pre-filter on the lexical leg — mirrors the dense leg's

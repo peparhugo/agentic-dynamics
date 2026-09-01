@@ -119,7 +119,11 @@ def _registration_line(record) -> dict:
         "indexed_at": record.indexed_at,
         "supersedes": record.supersedes,
         "causes": record.causes,
-        "reason": fi.fact_reason(record),
+        "reason": (
+            fi.pattern_projection_reason(record)
+            if record.source_type == fi.PATTERN_SOURCE_TYPE
+            else fi.fact_reason(record)
+        ),
     }
 
 
@@ -203,7 +207,8 @@ def test_end_to_end_ladder_round_trip(kpf, tmp_path):
     # ``derive_facts("workflow_facts/v1")`` returns the FULL ladder (lower_records + wf_records,
     # the p5 registered-id refactor), so pick the workflow-scope records out of it.
     wf_records_1 = [
-        r for r in workflow_records_1
+        r
+        for r in workflow_records_1
         if json.loads(r.text)["predicate"].startswith("workflow_")
         or json.loads(r.text)["predicate"] == "projected_budget_overrun"
     ]
@@ -271,12 +276,12 @@ def test_re_derivation_over_registered_multi_run_cell_is_idempotent(kpf, tmp_pat
     # A genuinely NEW run (newer still, cost 12) still supersedes the current head normally.
     _write_run(tmp_path, "demo", "20260824T000000Z", total_cost_usd=12.0)
     round_3 = kpf.derive_facts("job_facts/v1", REPO, REVISION, NOW)
-    cost_3 = [
-        r for r in round_3 if json.loads(r.text)["predicate"] == "job_accumulated_cost_usd"
-    ]
+    cost_3 = [r for r in round_3 if json.loads(r.text)["predicate"] == "job_accumulated_cost_usd"]
     assert len(cost_3) == 1
     # It supersedes round 1's current head (the newest run), not the stale older run.
-    current_head = [r for r in round_1 if json.loads(r.text)["predicate"] == "job_accumulated_cost_usd"][-1]
+    current_head = [
+        r for r in round_1 if json.loads(r.text)["predicate"] == "job_accumulated_cost_usd"
+    ][-1]
     assert cost_3[0].supersedes == current_head.knowledge_id
 
 
@@ -413,12 +418,10 @@ def test_fingerprint_ignores_run_identity_through_the_real_producer(kpf, tmp_pat
     # A third run, cost genuinely changes -> a real new version, correctly chained.
     _write_run(tmp_path, "demo", "20260824T000000Z", total_cost_usd=4.0)
     round_3 = kpf.derive_facts("job_facts/v1", REPO, REVISION, NOW)
-    cost_3 = [
-        r for r in round_3 if json.loads(r.text)["predicate"] == "job_accumulated_cost_usd"
+    cost_3 = [r for r in round_3 if json.loads(r.text)["predicate"] == "job_accumulated_cost_usd"]
+    cost_1 = [r for r in round_1 if json.loads(r.text)["predicate"] == "job_accumulated_cost_usd"][
+        0
     ]
-    cost_1 = [
-        r for r in round_1 if json.loads(r.text)["predicate"] == "job_accumulated_cost_usd"
-    ][0]
     assert len(cost_3) == 1
     assert cost_3[0].supersedes == cost_1.knowledge_id
 
@@ -464,7 +467,10 @@ def test_pattern_v1_producer_branch(kpf, tmp_path, monkeypatch):
     records = kpf.derive_facts("pattern/v1", REPO, REVISION, NOW)
     assert records, "the pattern/v1 branch must mint facts from measured finding evidence"
     assert all(r.supersedes is None for r in records)
-    for record in records:
+    fact_records = [r for r in records if r.source_type == "fact"]
+    projection_records = [r for r in records if r.source_type == "pattern"]
+    assert fact_records and projection_records
+    for record in fact_records:
         assert record.source_type == "fact"
         payload = json.loads(record.text)
         assert payload["predicate"] == "pattern"
@@ -477,6 +483,11 @@ def test_pattern_v1_producer_branch(kpf, tmp_path, monkeypatch):
         value = json.loads(payload["value"])
         assert value["conditions"] == ["test_executed_success=true"]
         assert value["source_experiment"] in payload["evidence_ids"]
+    for record in projection_records:
+        assert record.source_type == "pattern"
+        assert record.pattern_payload is not None
+        assert record.source_fact_id in {fact.knowledge_id for fact in fact_records}
+        assert "predicate" not in record.text
 
     # --- stable re-derivation over the still-empty registry: byte-identical ids ---
     records_b = kpf.derive_facts("pattern/v1", REPO, REVISION, NOW)
@@ -485,4 +496,3 @@ def test_pattern_v1_producer_branch(kpf, tmp_path, monkeypatch):
     # --- persist round 1, re-derive -> no republication of unchanged facts ---
     _persist(kpf.REGISTRY_INDEX_PATH, *records)
     assert kpf.derive_facts("pattern/v1", REPO, REVISION, NOW) == []
-

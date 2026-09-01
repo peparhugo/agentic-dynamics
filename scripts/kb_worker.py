@@ -43,7 +43,6 @@ except ImportError:  # imported as scripts.<name> — repo root is on sys.path
 sys.path.insert(0, str(PROJECT_ROOT / "scripts" / "fleet"))
 import heartbeat  # noqa: E402
 
-
 from agentic_dynamics.control import observation_ingestion as oi  # noqa: E402
 from agentic_dynamics.core.paths import KB_ARTIFACT_DIR, REGISTRY_INDEX_PATH  # noqa: E402
 from agentic_dynamics.knowledge import knowledge_ingestion as ki  # noqa: E402
@@ -155,7 +154,10 @@ def _clear_flag_record(flag_record, *, causes: str):
     provisional = _replace_record(flag_record, causes=causes, knowledge_id="", content_hash="")
     content_hash = hashlib.sha256(ki.record_to_artifact(provisional)).hexdigest()
     knowledge_id = compute_knowledge_id(
-        provisional.entity_id, oi.REVISION_FALLBACK, content_hash, oi.EXTRACTOR_VERSION,
+        provisional.entity_id,
+        oi.REVISION_FALLBACK,
+        content_hash,
+        oi.EXTRACTOR_VERSION,
     )
     return _replace_record(provisional, content_hash=content_hash, knowledge_id=knowledge_id)
 
@@ -215,7 +217,8 @@ def _maybe_autoclear_flag(observation_record, flag_by_session_id: dict, r) -> No
         artifact_path.write_bytes(artifact)
 
         event = ki.record_to_event(
-            cleared_record, operation="delete",
+            cleared_record,
+            operation="delete",
             reason="auto-cleared: subsequent observation was healthy",
         )
         ks.publish_event(r, event, authorized=True, source_type="flag")
@@ -235,6 +238,7 @@ def build_handler(group: str, r: redis.Redis):
     raise on failure so the caller leaves the entry pending (retry → dead-letter).
     """
     if group == "kb-ledger-v1":
+
         def handler(record):
             # The ledger consumer's destination is the checkpoint hash — it records
             # that this knowledge_id was observed and indexed_at (for freshness/lag).
@@ -343,6 +347,7 @@ def build_handler(group: str, r: redis.Redis):
         return handler
 
     if group == "kb-chroma-v1":
+
         def handler(record):
             # Facts are resolved by ADDRESS, never by relevance (CAP design §3.3): the dense leg
             # skips source_type == "fact" wholesale, so a fact's canonical JSON payload (not
@@ -356,24 +361,43 @@ def build_handler(group: str, r: redis.Redis):
             store.upsert(
                 [record.knowledge_id],
                 [record.text],
-                metadatas=[{
-                    "knowledge_id": record.knowledge_id,
-                    "entity_id": record.entity_id,
-                    "authority": record.authority.name,
-                    "source_uri": record.source_uri,
-                    "commit_sha": record.commit_sha,
-                    "content_hash": record.content_hash,
-                    # Scope isolation on the dense leg: retrieval.py's _dense_filter and
-                    # scope_excluded key off these, so the Chroma metadata MUST carry them or the
-                    # dense leg returns nothing under any non-empty repository scope.
-                    "repository_id": record.repository_id,
-                    "acl_scope": record.acl_scope,
-                }],
+                metadatas=[
+                    {
+                        "knowledge_id": record.knowledge_id,
+                        "entity_id": record.entity_id,
+                        "authority": record.authority.name,
+                        "evidence_class": record.evidence_class,
+                        "source_type": record.source_type,
+                        "source_uri": record.source_uri,
+                        "logical_locator": record.logical_locator,
+                        "commit_sha": record.commit_sha,
+                        "content_hash": record.content_hash,
+                        "observed_at": record.observed_at,
+                        # Scope isolation on the dense leg: retrieval.py's _dense_filter and
+                        # scope_excluded key off these, so the Chroma metadata MUST carry them or the
+                        # dense leg returns nothing under any non-empty repository scope.
+                        "repository_id": record.repository_id,
+                        "acl_scope": record.acl_scope,
+                        # Chroma metadata is scalar-oriented; retain the structured pattern surface
+                        # as canonical JSON while the document remains the citable body.
+                        "pattern_payload": (
+                            json.dumps(record.pattern_payload, sort_keys=True)
+                            if isinstance(record.pattern_payload, dict)
+                            else (
+                                json.dumps(record.pattern_payload.to_dict(), sort_keys=True)
+                                if record.pattern_payload is not None
+                                and hasattr(record.pattern_payload, "to_dict")
+                                else ""
+                            )
+                        ),
+                    }
+                ],
             )
 
         return handler
 
     if group == "kb-neo4j-v1":
+
         def handler(record, *, operation="upsert", reason=""):
             # Facts are resolved by ADDRESS, never by relevance (CAP design §3.3): the graph leg
             # skips source_type == "fact" wholesale, mirroring the dense leg above.
@@ -481,16 +505,26 @@ def process_batch(r, group, consumer, handler, *, once: bool) -> int:
     # Reclaim messages left behind by a crashed/lagging consumer after the lease.
     for entry in ks.claim_pending(r, group, consumer):
         outcome = ks.process_entry(
-            r, group, entry.entry_id, entry.event, handler,
+            r,
+            group,
+            entry.entry_id,
+            entry.event,
+            handler,
             extractor=ki.extract_record,
         )
         processed += 1
         log(f"claimed {entry.entry_id} {entry.event.knowledge_id[:12]} -> {outcome}")
 
     # Read new messages (block briefly so the loop is not a busy spin).
-    for entry in ks.read_events(r, group, consumer, count=ks.CLAIM_BATCH, block_ms=BLOCK_TIMEOUT_MS):
+    for entry in ks.read_events(
+        r, group, consumer, count=ks.CLAIM_BATCH, block_ms=BLOCK_TIMEOUT_MS
+    ):
         outcome = ks.process_entry(
-            r, group, entry.entry_id, entry.event, handler,
+            r,
+            group,
+            entry.entry_id,
+            entry.event,
+            handler,
             extractor=ki.extract_record,
         )
         processed += 1
@@ -501,8 +535,9 @@ def process_batch(r, group, consumer, handler, *, once: bool) -> int:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Run a knowledge-base consumer group")
-    parser.add_argument("--group", required=True, choices=ks.CONSUMER_GROUPS,
-                        help="consumer group to run")
+    parser.add_argument(
+        "--group", required=True, choices=ks.CONSUMER_GROUPS, help="consumer group to run"
+    )
     parser.add_argument("--consumer", default=None, help="consumer name (default hostname+pid)")
     parser.add_argument("--once", action="store_true", help="process one batch then exit")
     args = parser.parse_args()
@@ -523,7 +558,8 @@ def main() -> None:
     # manager's read-only watcher surfaces this consumer on the board. The thread owns its own
     # Redis connection (the main loop reconnects after store failures).
     heartbeat.HeartbeatThread(
-        group, f"{socket.gethostname()}:{os.getpid()}",
+        group,
+        f"{socket.gethostname()}:{os.getpid()}",
         jobs_counter=lambda: processed_total,
     ).start()
     log(f"heartbeat: worker:{group}")
