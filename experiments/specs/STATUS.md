@@ -3,8 +3,8 @@
 **Generated — do not edit by hand.** Regenerate with `python scripts/spec_status.py`;
 `scripts/run_workflow.py` also refreshes it at the end of every run.
 
-Generated at: `2026-09-01T00:13:57.373166+00:00`  ·  170 spec(s)
-**Work remaining:** 52 open · 118 completed/retired
+Generated at: `2026-09-01T00:19:04.056795+00:00`  ·  170 spec(s)
+**Work remaining:** 51 open · 119 completed/retired
 
 | name | kind | repeatable | status | version | supersedes | last_run | ok | model | cost | n_runs |
 |---|---|---|---|---|---|---|---|---|---|---|
@@ -36,7 +36,6 @@ Generated at: `2026-09-01T00:13:57.373166+00:00`  ·  170 spec(s)
 | `docs_architecture_refresh` | workflow | no | runnable | 0.1 | opencode_docs_refresh | — | — | — | — | 0 |
 | `explanation_tax` | experiment | yes | runnable | 0.2 | — | — | — | — | — | 0 |
 | `finding_economics_closure` | workflow | yes | runnable | 0.1 | — | 2026-08-22 17:22 | ok | deepseek/deepseek-v4-pro | $1.2820 | 1 |
-| `fleet_job_submission` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `labbook_refresh` | workflow | yes | runnable | 0.1 | — | 2026-08-17 18:14 | ok | deepseek/deepseek-v4-flash | $0.0275 | 1 |
 | `launch_handler_dry_run` | workflow | yes | runnable | 0.1 | — | — | — | — | — | 0 |
 | `ledger_instrumentation_probe` | workflow | yes | runnable | 0.1 | — | 2026-08-30 19:05 | fail | openai/gpt-5.6-sol | $0.0020 | 1 |
@@ -130,6 +129,7 @@ Generated at: `2026-09-01T00:13:57.373166+00:00`  ·  170 spec(s)
 | `evidence_narrative` | workflow | no | completed | 0.1 | — | 2026-08-14 15:04 | ok | openai/gpt-5.6-sol | $0.0000 | 2 |
 | `evidence_redesign` | workflow | no | completed | 0.1 | — | 2026-08-14 19:18 | ok | openai/gpt-5.6-sol | $5.9008 | 3 |
 | `fix_review_findings` | workflow | no | completed | 0.1 | — | 2026-08-14 13:48 | ok | deepseek/deepseek-v4-pro | $0.1504 | 1 |
+| `fleet_job_submission` | workflow | no | completed | 0.1 | — | — | — | — | — | 0 |
 | `fleet_ladder_implementation` | workflow | no | completed | 0.1 | — | 2026-08-30 19:13 | ok | deepseek/deepseek-v4-pro | $1.2924 | 4 |
 | `fleet_ladder_plan` | workflow | no | completed | 0.1 | — | 2026-08-29 15:33 | ok | deepseek/deepseek-v4-flash | $0.0836 | 1 |
 | `fleet_ladder_revision` | workflow | no | completed | 0.1 | — | 2026-08-29 17:02 | ok | deepseek/deepseek-v4-pro | $0.1724 | 2 |

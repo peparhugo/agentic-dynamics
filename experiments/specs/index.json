@@ -1,6 +1,6 @@
 {
   "schema_version": "spec-status/v2",
-  "generated_at": "2026-09-01T00:13:57.373166+00:00",
+  "generated_at": "2026-09-01T00:19:04.056795+00:00",
   "n_specs": 170,
   "specs": [
     {
@@ -508,24 +508,6 @@
       "latest_git_sha": "92374fb57",
       "results_pointer": "experiments/results/workflows/finding_economics_closure/20260822T172225Z.json",
       "n_runs": 1
-    },
-    {
-      "name": "fleet_job_submission",
-      "version": "0.1",
-      "status": "runnable",
-      "spec_path": "workflows/repository/fleet_job_submission.yaml",
-      "artifact_kind": "workflow",
-      "repeatable": false,
-      "supersedes": [],
-      "superseded_by": null,
-      "completed_at": null,
-      "last_run_at": null,
-      "latest_ok": null,
-      "latest_model": null,
-      "latest_cost_usd": null,
-      "latest_git_sha": null,
-      "results_pointer": null,
-      "n_runs": 0
     },
     {
       "name": "labbook_refresh",
@@ -2214,6 +2196,24 @@
       "latest_git_sha": "efac823cf",
       "results_pointer": "experiments/results/workflows/fix_review_findings/20260814T134837Z.json",
       "n_runs": 1
+    },
+    {
+      "name": "fleet_job_submission",
+      "version": "0.1",
+      "status": "completed",
+      "spec_path": "workflows/repository/fleet_job_submission.yaml",
+      "artifact_kind": "workflow",
+      "repeatable": false,
+      "supersedes": [],
+      "superseded_by": null,
+      "completed_at": null,
+      "last_run_at": null,
+      "latest_ok": null,
+      "latest_model": null,
+      "latest_cost_usd": null,
+      "latest_git_sha": null,
+      "results_pointer": null,
+      "n_runs": 0
     },
     {
       "name": "fleet_ladder_implementation",
