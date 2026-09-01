@@ -1,7 +1,7 @@
 {
   "schema_version": "spec-status/v2",
-  "generated_at": "2026-08-31T23:29:20.782739+00:00",
-  "n_specs": 165,
+  "generated_at": "2026-09-01T00:54:37.961312+00:00",
+  "n_specs": 166,
   "specs": [
     {
       "name": "admission_leases",
@@ -427,6 +427,24 @@
       "supersedes": [
         "opencode_docs_refresh"
       ],
+      "superseded_by": null,
+      "completed_at": null,
+      "last_run_at": null,
+      "latest_ok": null,
+      "latest_model": null,
+      "latest_cost_usd": null,
+      "latest_git_sha": null,
+      "results_pointer": null,
+      "n_runs": 0
+    },
+    {
+      "name": "docs_refresh_remediation",
+      "version": "0.1",
+      "status": "runnable",
+      "spec_path": "workflows/repository/docs_refresh_remediation.yaml",
+      "artifact_kind": "workflow",
+      "repeatable": false,
+      "supersedes": [],
       "superseded_by": null,
       "completed_at": null,
       "last_run_at": null,
