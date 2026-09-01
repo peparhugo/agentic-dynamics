@@ -1,0 +1,81 @@
+# docs-drift-scan.service — the cadence of the automatic docs-drift rail (automatic_docs_sync p2).
+#
+# A systemd USER unit, following the claude-cred-watch.service precedent
+# (~/.config/systemd/user/) rather than the system-wide fleet-bootstrap.service: this watchdog
+# needs the operator's checkout and the framework Redis on 6380, not root and not the docker
+# socket. It spends no model dollars and touches no branch.
+#
+# Type=oneshot (not simple/Restart=always like the credential watcher) because the cadence lives
+# in the paired .timer: the scan is a periodic measurement with an end, not a daemon. systemd
+# will not overlap runs of a oneshot unit with itself, which is what lets the watchdog treat its
+# durable flag-state file as single-writer.
+#
+# WHAT IT WRITES (and nothing else — spec hard rule 2, "drift is a finding, not a verdict"):
+#   experiments/results/docs_drift/latest.json      the current report
+#   experiments/results/docs_drift/history.jsonl    one trend line per pass
+#   experiments/results/docs_drift/flags.jsonl      one line per flag transition
+#   experiments/results/docs_drift/flag_state.json  the durable flag state
+#   redis 6380/db1: docs:drift:flag, fleet:docs_drift   the live mirrors
+# It never edits a document, never opens or reopens a branch, and never runs a remediation.
+#
+# Install (as the operator, NOT root):
+#   mkdir -p ~/.config/systemd/user
+#   cp infrastructure/docs-drift-scan.service ~/.config/systemd/user/
+#   cp infrastructure/docs-drift-scan.timer   ~/.config/systemd/user/
+#   systemctl --user daemon-reload
+#   systemctl --user enable --now docs-drift-scan.timer
+#   loginctl enable-linger "$USER"      # so the timer survives logout
+#
+# Inspect:
+#   systemctl --user list-timers docs-drift-scan.timer
+#   systemctl --user start docs-drift-scan.service     # force one pass now
+#   journalctl --user -u docs-drift-scan -n 50
+
+[Unit]
+Description=Docs-drift scan — deterministic source-doc drift measurement + flag lifecycle
+Documentation=file:///home/drseuss/ai-finops-framework/workflows/repository/automatic_docs_sync.yaml
+# Wants=, not Requires=: the scan's durable half (report, history, flag state) works with the
+# framework Redis down — only the live board/flag mirrors degrade. A hard dependency would turn
+# a missing optional surface into a skipped measurement.
+After=network-online.target
+
+[Service]
+Type=oneshot
+
+# The deployed checkout. Update REPO if the framework lives elsewhere on this host.
+Environment=REPO=/home/drseuss/ai-finops-framework
+WorkingDirectory=/home/drseuss/ai-finops-framework
+
+# The framework queue instance (6380/db1) — NEVER 6379, which is the story agents' Redis and
+# which they flushdb() while testing (AGENTS.md, "Redis isolation").
+Environment=FINOPS_REDIS_HOST=127.0.0.1
+Environment=FINOPS_REDIS_PORT=6380
+Environment=FINOPS_REDIS_DB=1
+
+# The one write this unit is authorized to make: registering a flag TRANSITION on the knowledge
+# rail (source_type=flag). Every write-time registration call site in this repo gates on this
+# variable, and the watchdog only ever reaches it on a raise or a clear — never on a repeat scan.
+# Set it to 0 to run the cadence with the knowledge rail switched off; the durable flag lifecycle
+# and the board row are unaffected.
+Environment=FINOPS_KB_WRITE=1
+
+# Note the deliberate absence of --fail-on-drift: finding drift is this unit SUCCEEDING. A
+# non-zero exit here would paint the unit red in `systemctl --user list-timers` for the one
+# outcome the rail exists to produce. The watchdog reserves exit 2 for "the scan could not
+# measure", which IS a real service failure and will show up red.
+ExecStart=/usr/bin/env python3 scripts/docs_drift_watchdog.py
+
+# A full six-axis scan over ~1200 claims takes minutes, not seconds; this ceiling is generous
+# enough for a cold cache on a loaded host while still bounding a wedged run.
+TimeoutStartSec=1800
+
+# Least privilege for a unit whose only job is to read the tree and write one results directory.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectControlGroups=true
+ProtectKernelTunables=true
+RestrictSUIDSGID=true
+
+# NO [Install] SECTION, deliberately: the .timer owns the cadence and pulls this unit in by
+# name (Unit=docs-drift-scan.service). Installing the service into default.target as well
+# would run a scan on every login, on top of the schedule.

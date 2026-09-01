@@ -15,6 +15,10 @@
   const REPLAY_RACE_WINDOW_MS = 250
   const MATRIX_POLL_MS = 5000
   const FLAGS_POLL_MS = 5000
+  // The docs-drift rail is driven by an HOURLY systemd timer, so anything faster than
+  // this would poll a file that cannot have changed. 60s keeps the panel honest within
+  // a minute of a scan landing without pretending the underlying cadence is live.
+  const DOCS_HEALTH_POLL_MS = 60000
   const DESIGN_LIST_POLL_MS = 10000
   const DRAFT_POLL_MS = 3000
   const BURN_WINDOW_MS = 60000
@@ -34,6 +38,11 @@
   const state = {
     cells: {},
     stages: {},
+    // The last docs-health envelope, plus the two flags that keep the approve
+    // affordance from racing itself (see loadDocsHealth / approveProposal).
+    docsHealth: null,
+    docsHealthApprovePending: false,
+    docsHealthRetry: false,
     phases: {},
     statusOverrides: new Map(),
     telemetry: { cells: {}, reported_cost: null, input_tokens: null, output_tokens: null },
@@ -591,6 +600,242 @@
       const stage = stages[name] && typeof stages[name] === "object" ? stages[name] : {}
       container.appendChild(stageCard(name, labels[name], stage))
     }
+  }
+
+  /* ── Docs health ─────────────────────────────────────────────────────────────────────────
+     The docs-drift rail's surface: "is the docs current?" as a number, beside the pipeline
+     strip. Four properties are deliberate here:
+
+       1. THE SERVER DECIDES THE COLOUR. `condition`/`health`/`word` all arrive on the envelope
+          from `services/docs_health.py`. This module never derives a colour from a drift count,
+          because the CLI, the supervisor board, and this panel must not be able to disagree
+          about what a score means — the same reason the watchdog computes its row's `health`
+          server-side rather than in the browser.
+       2. COLOUR IS NEVER THE ONLY SIGNAL. Every state paints a glyph AND a word AND a sentence.
+          `warranted` and `unmeasured` are both red and are told apart by their word, so the
+          state survives a monochrome display, a colour-vision difference, and a screen reader.
+       3. "COULD NOT MEASURE" IS NOT "CLEAN". The unmeasured state has its own copy and shows NO
+          approve affordance: there is no trustworthy inventory to sign off on. A fetch failure
+          is likewise its own state — it never blanks to green.
+       4. THE APPROVE KEY IS DERIVED FROM THE PROPOSAL, NOT RANDOM. See `approveProposal`. */
+
+  /** Format an ISO stamp as the compact `YYYY-MM-DD HH:MM` the rest of the portal uses. */
+  function docsHealthStamp(value) {
+    const text = String(value || "")
+    return text ? `${text.slice(0, 16).replace("T", " ")}Z` : "never"
+  }
+
+  /** Render one `axis N` definition pair; only axes with a nonzero count are painted. */
+  function docsHealthAxes(perAxis) {
+    const container = $("#docs-health-axes")
+    if (!container) return
+    container.replaceChildren()
+    const entries = Object.entries(perAxis || {})
+      .filter(([, count]) => Number(count) > 0)
+      .sort((a, b) => Number(b[1]) - Number(a[1]) || String(a[0]).localeCompare(String(b[0])))
+    for (const [axis, count] of entries) {
+      const term = element("dt", "docs-health-axis-name", axis.replace(/_/g, " "))
+      const value = element("dd", "docs-health-axis-count", String(count))
+      container.appendChild(term)
+      container.appendChild(value)
+    }
+  }
+
+  /**
+   * Render the finding inventory — the evidence half of the panel.
+   *
+   * Every row keeps its `basis`: the string naming how to re-derive the finding by hand. That is
+   * the scanner's hard rule 4 carried all the way to the browser, and it is what makes the
+   * approve button a decision rather than an act of faith — an operator about to authorise ~$3
+   * of remediation can check any row without trusting the machine that produced it.
+   */
+  function docsHealthInventory(data) {
+    const container = $("#docs-health-inventory")
+    if (!container) return
+    container.replaceChildren()
+    const rows = Array.isArray(data.inventory) ? data.inventory : []
+    if (!rows.length) return
+    for (const row of rows) {
+      const item = element("details", "docs-health-finding")
+      const summary = element("summary", "docs-health-finding-summary")
+      summary.appendChild(element("span", `docs-health-finding-status status-${row.status || "unknown"}`, String(row.status || "?").toUpperCase()))
+      summary.appendChild(element("span", "docs-health-finding-source", String(row.source || row.check_id || "?")))
+      item.appendChild(summary)
+      item.appendChild(element("p", "docs-health-finding-claim", `Doc claims: ${row.claim || "—"}`))
+      item.appendChild(element("p", "docs-health-finding-truth", `Code says: ${row.code_truth || "—"}`))
+      item.appendChild(element("p", "docs-health-finding-basis", `Re-derive: ${row.basis || "—"}`))
+      container.appendChild(item)
+    }
+    if (data.inventory_truncated) {
+      // Truncation is reported, never silent: a list that quietly stops is a list an operator
+      // reads as complete.
+      container.appendChild(element("p", "pane-note",
+        `Showing the first ${rows.length} findings of ${data.scan?.drift ?? "?"}. The full inventory is in ${data.scan?.report ?? "the scan report"}.`))
+    }
+  }
+
+  /**
+   * Render the proposal half, including whether the approve affordance is offered at all.
+   *
+   * `approvable` is computed server-side and simply obeyed here. Hiding the form is a caution
+   * against an honest mistake — the gate re-checks the proposal state and takes the atomic claim
+   * regardless, so a crafted request cannot get past it either way.
+   */
+  function docsHealthProposal(data) {
+    const panel = $("#docs-health-proposal")
+    const form = $("#docs-health-approve-form")
+    const detail = $("#docs-health-proposal-detail")
+    if (!panel || !form || !detail) return
+    const proposal = data.proposal || {}
+    const standing = proposal.proposal_id && proposal.state && proposal.state !== "none"
+    panel.hidden = !standing
+    if (!standing) {
+      form.hidden = true
+      detail.textContent = ""
+      return
+    }
+    const action = proposal.action || {}
+    const budget = Number(action.budget_usd || 0).toFixed(2)
+    const phases = Array.isArray(action.phases) ? action.phases.length : 0
+    detail.textContent =
+      `Proposal ${proposal.proposal_id} (${proposal.state}): ${action.name || "remediation"} ` +
+      `— ~$${budget}, ${phases} phases, ${action.model || "unknown model"}. ` +
+      `${proposal.detail || ""}`
+    form.hidden = !proposal.approvable
+    form.dataset.proposalId = proposal.proposal_id
+  }
+
+  /** Paint the whole panel from one envelope. Pure render: no fetching, no state mutation. */
+  function renderDocsHealth(data) {
+    const panel = $("#docs-health")
+    if (!panel) return
+    panel.dataset.condition = String(data.condition || "unknown")
+    const glyph = $("#docs-health-glyph")
+    const word = $("#docs-health-word")
+    const headline = $("#docs-health-headline")
+    const scanned = $("#docs-health-scanned")
+    if (glyph) glyph.textContent = String(data.glyph || "·")
+    if (word) word.textContent = String(data.word || "UNKNOWN")
+    if (headline) headline.textContent = String(data.headline || "")
+    if (scanned) {
+      const flag = data.flag || {}
+      scanned.textContent = data.available
+        ? `scanned ${docsHealthStamp(data.scan?.at)}` +
+          (flag.raised ? ` · flag raised since ${docsHealthStamp(flag.since)}` : "")
+        : "no scan on record"
+    }
+    docsHealthAxes(data.scan?.per_axis)
+    docsHealthInventory(data)
+    docsHealthProposal(data)
+  }
+
+  /** Paint the panel's own failure state. Never falls back to green. */
+  function renderDocsHealthUnavailable(message) {
+    renderDocsHealth({
+      condition: "unmeasured",
+      health: "red",
+      word: "UNAVAILABLE",
+      glyph: "?",
+      headline: `Docs-health rail unreachable: ${message}`,
+      available: false,
+      scan: {},
+      flag: {},
+      proposal: {},
+      inventory: [],
+    })
+  }
+
+  /** Poll `/api/docs-health`. A read-only GET — it never scans and never touches the proposal. */
+  async function loadDocsHealth() {
+    // A poll landing mid-approval would repaint the form (and its hidden state) underneath the
+    // operator's hands while their signature is in flight. Skip it; the next tick repaints.
+    if (state.docsHealthApprovePending) return
+    try {
+      const response = await fetch("/api/docs-health")
+      const data = await response.json()
+      if (!response.ok) throw new Error(data.error || "docs-health unavailable")
+      state.docsHealth = data
+      renderDocsHealth(data)
+    } catch (error) {
+      renderDocsHealthUnavailable(error.message || "request failed")
+    }
+  }
+
+  /**
+   * Send the controller's signature.
+   *
+   * THE IDEMPOTENCY KEY IS DERIVED FROM THE PROPOSAL ID, not minted fresh per click like the
+   * other portal mutations. That is the point: a double-click, an impatient second click while
+   * the request is in flight, or a page reload followed by another click all produce the SAME
+   * key, so the server replays its first answer instead of calling the gate twice. The gate's
+   * atomic claim would still make a second call a no-op — but "no second call" is a better
+   * property than "a second call that safely declines", and it costs one string to have.
+   *
+   * The exception is a RETRYABLE failure (the enqueue itself failed and the gate rolled its
+   * claim back). Replaying the derived key would replay the cached failure forever, so those get
+   * a fresh key — which is honest, because the rail is genuinely dispatchable again.
+   */
+  async function approveProposal(proposalId, by, reason, retry = false) {
+    const key = retry
+      ? `docs-approve:${proposalId}:${mutationKey()}`
+      : `docs-approve:${proposalId}`
+    const response = await fetch("/api/docs-health/approve", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Idempotency-Key": key },
+      body: JSON.stringify({ proposal_id: proposalId, by, reason }),
+    })
+    let data
+    try {
+      data = await response.json()
+    } catch (_error) {
+      data = { error: `approve failed with HTTP ${response.status}` }
+    }
+    return { ok: response.ok, status: response.status, data }
+  }
+
+  /** Wire the approve form. Bound once; the form itself is shown/hidden by the render. */
+  function bindDocsHealthControls() {
+    const form = $("#docs-health-approve-form")
+    if (!form) return
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault()
+      if (state.docsHealthApprovePending) return
+      const proposalId = form.dataset.proposalId || ""
+      const by = $("#docs-health-by").value.trim()
+      const reason = $("#docs-health-reason").value.trim()
+      const result = $("#docs-health-approve-result")
+      const button = $("#docs-health-approve-button")
+      if (!proposalId) {
+        result.textContent = "No proposal is currently rendered; refresh before approving."
+        return
+      }
+      if (!by) {
+        result.textContent = "Sign the approval: an unattributed approval is not an approval."
+        return
+      }
+      state.docsHealthApprovePending = true
+      button.disabled = true
+      result.textContent = "Recording the signature…"
+      try {
+        let outcome = await approveProposal(proposalId, by, reason, state.docsHealthRetry)
+        if (!outcome.ok && outcome.data?.retryable && !state.docsHealthRetry) {
+          // Arm the fresh-key retry for the operator's NEXT click rather than silently
+          // re-launching: a dispatch that failed once may have failed for a reason worth
+          // reading, and this rail never spends money on the machine's initiative.
+          state.docsHealthRetry = true
+        }
+        const data = outcome.data || {}
+        result.textContent = data.detail || data.error || `approve returned HTTP ${outcome.status}`
+        announce(`Docs remediation approve: ${data.outcome || outcome.status}`, true)
+        if (outcome.ok) state.docsHealthRetry = false
+      } catch (error) {
+        result.textContent = `Approve failed: ${error.message || error}`
+      } finally {
+        state.docsHealthApprovePending = false
+        button.disabled = false
+        loadDocsHealth()
+      }
+    })
   }
 
   /* ── Flags board ─────────────────────────────────────────────────────────────────────────
@@ -3025,6 +3270,7 @@
   }
 
   bindControls()
+  bindDocsHealthControls()
   renderFleet()
   renderPipelineStages()
   renderSelection()
@@ -3035,6 +3281,7 @@
   loadClaudeAgents()
   loadClaudeAgentDaemon()
   loadSubscriptionUsage()
+  loadDocsHealth()
   connectStatusStream()
   window.setInterval(loadMatrix, MATRIX_POLL_MS)
   window.setInterval(loadSupervisorFlags, FLAGS_POLL_MS)
@@ -3042,5 +3289,6 @@
   window.setInterval(loadClaudeAgents, CLAUDE_AGENTS_POLL_MS)
   window.setInterval(loadClaudeAgentDaemon, CLAUDE_AGENTS_DAEMON_POLL_MS)
   window.setInterval(() => loadSubscriptionUsage(), 60_000)
+  window.setInterval(loadDocsHealth, DOCS_HEALTH_POLL_MS)
   window.setInterval(tick, 1000)
 })(window.ControlRoomCore, window)

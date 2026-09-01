@@ -1,0 +1,142 @@
+{
+  "schema": "docs-drift/v1",
+  "root": "/tmp/wt_docs_sync",
+  "git_sha": "bf7e439823f56b4b08c6541c8d25a570e44216f8",
+  "score": {
+    "total_checked": 1181,
+    "total_current": 1172,
+    "total_stale": 5,
+    "total_missing": 4,
+    "drift": 9,
+    "per_axis": {
+      "cli_surface": {
+        "current": 156,
+        "stale": 0,
+        "missing": 4,
+        "checked": 160,
+        "drift": 4
+      },
+      "module_inventory": {
+        "current": 9,
+        "stale": 0,
+        "missing": 0,
+        "checked": 9,
+        "drift": 0
+      },
+      "spec_lifecycle": {
+        "current": 1,
+        "stale": 0,
+        "missing": 0,
+        "checked": 1,
+        "drift": 0
+      },
+      "status_vocabulary": {
+        "current": 473,
+        "stale": 0,
+        "missing": 0,
+        "checked": 473,
+        "drift": 0
+      },
+      "anchor_integrity": {
+        "current": 532,
+        "stale": 5,
+        "missing": 0,
+        "checked": 537,
+        "drift": 5
+      },
+      "manifest_counts": {
+        "current": 1,
+        "stale": 0,
+        "missing": 0,
+        "checked": 1,
+        "drift": 0
+      }
+    },
+    "axes_errored": []
+  },
+  "errors": {},
+  "findings": [
+    {
+      "check_id": "cli_surface/mental_model_full_cli/complete/--campaign-budget-usd",
+      "axis": "cli_surface",
+      "claim": "agent_config/mental-model.md claims to list the FULL CLI of scripts/run_workflow.py",
+      "code_truth": "--campaign-budget-usd is declared by argparse but absent from the doc",
+      "status": "missing",
+      "basis": "ast: add_argument(\"--\u2026\") in scripts/run_workflow.py minus the flags listed in the 'full CLI: scripts/run_workflow.py' block",
+      "source": "agent_config/mental-model.md"
+    },
+    {
+      "check_id": "cli_surface/mental_model_full_cli/complete/--campaign-concurrency",
+      "axis": "cli_surface",
+      "claim": "agent_config/mental-model.md claims to list the FULL CLI of scripts/run_workflow.py",
+      "code_truth": "--campaign-concurrency is declared by argparse but absent from the doc",
+      "status": "missing",
+      "basis": "ast: add_argument(\"--\u2026\") in scripts/run_workflow.py minus the flags listed in the 'full CLI: scripts/run_workflow.py' block",
+      "source": "agent_config/mental-model.md"
+    },
+    {
+      "check_id": "cli_surface/mental_model_full_cli/complete/--cell-image",
+      "axis": "cli_surface",
+      "claim": "agent_config/mental-model.md claims to list the FULL CLI of scripts/run_workflow.py",
+      "code_truth": "--cell-image is declared by argparse but absent from the doc",
+      "status": "missing",
+      "basis": "ast: add_argument(\"--\u2026\") in scripts/run_workflow.py minus the flags listed in the 'full CLI: scripts/run_workflow.py' block",
+      "source": "agent_config/mental-model.md"
+    },
+    {
+      "check_id": "cli_surface/mental_model_full_cli/complete/--no-admission",
+      "axis": "cli_surface",
+      "claim": "agent_config/mental-model.md claims to list the FULL CLI of scripts/run_workflow.py",
+      "code_truth": "--no-admission is declared by argparse but absent from the doc",
+      "status": "missing",
+      "basis": "ast: add_argument(\"--\u2026\") in scripts/run_workflow.py minus the flags listed in the 'full CLI: scripts/run_workflow.py' block",
+      "source": "agent_config/mental-model.md"
+    },
+    {
+      "check_id": "anchor_integrity/docs/architecture/current/claude_tools_to_skills_scope.md:152/admin/server.py:1365",
+      "axis": "anchor_integrity",
+      "claim": "docs/architecture/current/claude_tools_to_skills_scope.md:152 cites `admin/server.py:1365`",
+      "code_truth": "line 1365 is past EOF in every candidate (apps/control_room/server.py=214 lines)",
+      "status": "stale",
+      "basis": "wc -l admin/server.py  # must be >= 1365",
+      "source": "docs/architecture/current/claude_tools_to_skills_scope.md:152"
+    },
+    {
+      "check_id": "anchor_integrity/docs/architecture/current/claude_tools_to_skills_scope.md:311/admin/server.py:779-802",
+      "axis": "anchor_integrity",
+      "claim": "docs/architecture/current/claude_tools_to_skills_scope.md:311 cites `admin/server.py:779-802`",
+      "code_truth": "line 802 is past EOF in every candidate (apps/control_room/server.py=214 lines)",
+      "status": "stale",
+      "basis": "wc -l admin/server.py  # must be >= 802",
+      "source": "docs/architecture/current/claude_tools_to_skills_scope.md:311"
+    },
+    {
+      "check_id": "anchor_integrity/docs/architecture/current/claude_tools_to_skills_scope.md:318/admin/server.py:738-776",
+      "axis": "anchor_integrity",
+      "claim": "docs/architecture/current/claude_tools_to_skills_scope.md:318 cites `admin/server.py:738-776`",
+      "code_truth": "line 776 is past EOF in every candidate (apps/control_room/server.py=214 lines)",
+      "status": "stale",
+      "basis": "wc -l admin/server.py  # must be >= 776",
+      "source": "docs/architecture/current/claude_tools_to_skills_scope.md:318"
+    },
+    {
+      "check_id": "anchor_integrity/docs/architecture/current/context_abstraction_addendum_design.md:399/verify.md:258-262",
+      "axis": "anchor_integrity",
+      "claim": "docs/architecture/current/context_abstraction_addendum_design.md:399 cites `verify.md:258-262`",
+      "code_truth": "line 262 is past EOF in every candidate (docs/verification/verify.md=38 lines)",
+      "status": "stale",
+      "basis": "wc -l verify.md  # must be >= 262",
+      "source": "docs/architecture/current/context_abstraction_addendum_design.md:399"
+    },
+    {
+      "check_id": "anchor_integrity/docs/architecture/current/routing_design.md:420/admin/server.py:860-877",
+      "axis": "anchor_integrity",
+      "claim": "docs/architecture/current/routing_design.md:420 cites `admin/server.py:860-877`",
+      "code_truth": "line 877 is past EOF in every candidate (apps/control_room/server.py=214 lines)",
+      "status": "stale",
+      "basis": "wc -l admin/server.py  # must be >= 877",
+      "source": "docs/architecture/current/routing_design.md:420"
+    }
+  ],
+  "includes_current_rows": false
+}

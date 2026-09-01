@@ -27,3 +27,11 @@ SUPERVISOR_ACTIVE_WINDOW_SECONDS = int(os.environ.get("SUPERVISOR_ACTIVE_WINDOW"
 #: read. Same file scripts/registry.py's CLI reads (registry_cli.DATA_MANIFEST_PATH) — this is
 #: the Control Room's own copy of that constant so a test can monkeypatch it independently.
 DATA_MANIFEST_PATH = ROOT / "experiments" / "data_manifest.json"
+
+#: Where the docs-drift rail (``scan_docs_drift.py`` → ``docs_drift_watchdog.py`` →
+#: ``docs_proposal_gate.py``) keeps its durable state: ``latest.json``, ``flag_state.json``, and
+#: ``proposal.json``. Held here — as the Control Room's own constant, defaulting to the rail's
+#: own ``RESULTS_DIR`` — for the same reason as :data:`DATA_MANIFEST_PATH`: a test can point the
+#: ``/api/docs-health`` routes at a tmp tree by monkeypatching one name, without reaching into
+#: the scanner's module and mutating a constant three other scripts read.
+DOCS_DRIFT_RESULTS_DIR = ROOT / "experiments" / "results" / "docs_drift"

@@ -376,6 +376,42 @@
           <div class="pipeline-stage empty-stage"><span class="stage-name">REVIEW</span><span class="stage-counts">waiting for matrix</span></div>
         </section>
 
+        <!-- DOCS HEALTH — the docs-drift rail's answer to "is the docs current?", as a number.
+             Sits beside the pipeline strip because it is the same kind of thing: one line of
+             standing state an operator reads before deciding anything. Three conditions
+             (clean / findings / warranted, plus unmeasured) each carry a WORD as well as a
+             colour — colour is never the only signal (board-fleet.js's standing doctrine).
+             The approve affordance is hidden unless a proposal is actually approvable, and it
+             posts through the same mutation trust gate as every other Control Room mutation. -->
+        <section id="docs-health" class="docs-health" aria-labelledby="docs-health-title" data-condition="unknown">
+          <header class="docs-health-header">
+            <div class="docs-health-heading">
+              <span class="eyebrow">Docs health</span>
+              <h3 id="docs-health-title">
+                <span id="docs-health-glyph" class="docs-health-glyph" aria-hidden="true">·</span>
+                <span id="docs-health-word">CHECKING</span>
+              </h3>
+            </div>
+            <span id="docs-health-scanned" class="last-update">reading the rail</span>
+          </header>
+          <p id="docs-health-headline" class="docs-health-headline">Loading the last docs-drift scan…</p>
+          <dl id="docs-health-axes" class="docs-health-axes" aria-label="Drift findings by axis"></dl>
+          <div id="docs-health-inventory" class="docs-health-inventory" aria-label="Drift finding inventory"></div>
+
+          <!-- The proposal half. Hidden entirely when nothing stands: an empty approve box on a
+               green board is an invitation to click something that does not exist. -->
+          <div id="docs-health-proposal" class="docs-health-proposal" hidden>
+            <p id="docs-health-proposal-detail" class="docs-health-proposal-detail"></p>
+            <form id="docs-health-approve-form" class="docs-health-approve" hidden>
+              <p class="boundary-copy">The machine proposes; the controller decides. Approving records an attributed, durable signature and dispatches the remediation exactly once — a second approval while it runs is a no-op, never a second run.</p>
+              <label><span>Signing as</span><input id="docs-health-by" type="text" maxlength="200" placeholder="operator name" required></label>
+              <label><span>Reason (optional)</span><input id="docs-health-reason" type="text" maxlength="2000" placeholder="why this is being approved now"></label>
+              <button id="docs-health-approve-button" type="submit">Approve remediation</button>
+            </form>
+            <p id="docs-health-approve-result" class="docs-health-approve-result" role="status"></p>
+          </div>
+        </section>
+
         <div class="fleet-controls" aria-label="Fleet filters">
           <div class="filter-group" role="group" aria-label="Status filter">
             <button class="filter-chip active" type="button" data-filter="all" aria-pressed="true">All</button>

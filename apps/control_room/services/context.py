@@ -46,7 +46,14 @@ from typing import Any
 
 from agentic_dynamics.control.pipeline_status import review_stage_summary
 from apps.control_room import server
-from apps.control_room.services import design_sessions, mutations, registry, supervisor, telemetry
+from apps.control_room.services import (
+    design_sessions,
+    docs_health,
+    mutations,
+    registry,
+    supervisor,
+    telemetry,
+)
 
 #: An authority that answers "what is the review-stage population?".
 #:
@@ -67,6 +74,7 @@ class ControlRoomServices:
     supervisor: ModuleType
     design_sessions: ModuleType
     mutations: ModuleType
+    docs_health: ModuleType
 
     # -- stable configuration (copied once at build; never monkeypatched) --
     queue_key: str
@@ -131,6 +139,18 @@ class ControlRoomServices:
         """The manifest path (``server.DATA_MANIFEST_PATH``, monkeypatched in the registry tests)."""
         return server.DATA_MANIFEST_PATH
 
+    @property
+    def docs_drift_results_dir(self) -> Path:
+        """The docs-drift rail's state directory (``server.DOCS_DRIFT_RESULTS_DIR``).
+
+        A property rather than a copied field for exactly the reason ``data_manifest_path`` is
+        one: the ``/api/docs-health`` tests point it at a tmp tree, and a value snapshotted at
+        construction would leave the routes reading the repo's real rail state — which is
+        precisely the coupling that made the matrix tests red before ``review_stage_source``
+        was injected.
+        """
+        return server.DOCS_DRIFT_RESULTS_DIR
+
 
 def build_services() -> ControlRoomServices:
     """Build the application context from the server module's live configuration.
@@ -145,6 +165,7 @@ def build_services() -> ControlRoomServices:
         supervisor=supervisor,
         design_sessions=design_sessions,
         mutations=mutations,
+        docs_health=docs_health,
         queue_key=server.QUEUE_KEY,
         results_key=server.RESULTS_KEY,
         analysis_queue_key=server.ANALYSIS_QUEUE_KEY,

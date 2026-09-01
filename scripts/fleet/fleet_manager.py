@@ -66,6 +66,12 @@ COMMANDS_KEY = "fleet:commands"
 #: "launching" at submit time; the orchestrator/downstream tooling would write "running"/
 #: "completed"/"failed" as those are observed), not recomputed wholesale on each watch cycle.
 JOBS_KEY = "fleet:jobs"
+#: The docs-drift row (``automatic_docs_sync`` p2). Written by
+#: ``scripts/docs_drift_watchdog.py`` on its own cadence and merged into the board snapshot
+#: here, for exactly the reason JOBS_KEY is separate: this watcher rebuilds BOARD_KEY
+#: wholesale every cycle, so state owned by another observer must live in its own key or it
+#: would survive at most one tick.
+DOCS_DRIFT_KEY = "fleet:docs_drift"
 DEFAULT_INTERVAL = 15.0  # seconds between board refreshes
 
 # The queues the watcher surfaces (mirrors dlq.QUEUE_KEYS).
@@ -136,6 +142,31 @@ def _job_records(client: redis.Redis) -> list[dict]:
             continue
     jobs.sort(key=lambda j: j.get("ts", 0), reverse=True)
     return jobs
+
+
+def _docs_drift_row(client: redis.Redis) -> dict:
+    """Read the docs-drift row from ``fleet:docs_drift`` (empty dict when absent or malformed).
+
+    The docs-drift watchdog (``scripts/docs_drift_watchdog.py``) publishes one row per scan:
+    ``{ts, state, health, drift, per_axis, ...}`` — "are the docs current?" as a live number on
+    the supervisor tier, beside the queue depths and worker heartbeats.
+
+    Absent is the normal state on a host where the timer is not installed, and it is reported as
+    ``{}`` rather than a fabricated "clean" row: the board must never imply a scan happened when
+    none did. Same "pure read, never raises" contract ``build_board`` holds for queues, workers,
+    the DLQ, and jobs — a Redis blip or a corrupt row costs this section, not the board.
+    """
+    try:
+        raw = client.get(DOCS_DRIFT_KEY)
+    except Exception:  # noqa: BLE001 — the board must survive a Redis blip
+        return {}
+    if not raw:
+        return {}
+    try:
+        row = json.loads(raw)
+    except (TypeError, ValueError):
+        return {}
+    return row if isinstance(row, dict) else {}
 
 
 def record_job_launch(client: redis.Redis, command: dict) -> dict:
@@ -216,6 +247,7 @@ def build_board(client: redis.Redis) -> dict:
         "dead_workers": sum(1 for w in workers if not w["alive"]),
         "dlq": dlq.dead_counts(client),
         "jobs": _job_records(client),
+        "docs_drift": _docs_drift_row(client),
     }
 
 
