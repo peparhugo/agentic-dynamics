@@ -201,6 +201,20 @@ subprocesses / Redis / stores / ports / real git worktrees / sleeps; the audit i
 guard in `tests/test_fast_path_gate.py`. `pytest-timeout` installed — the `Unknown config option:
 timeout` warning is gone.
 
+**p3-d wiring — the fast path is now part of the guard cadence.** (1) **CI** — the `test` job in
+`.github/workflows/pytest.yml` runs `bash scripts/test_fast.sh` as the fast smoke on every push /
+PR (before the deterministic suite, so a regression fails in seconds); branch protection is
+unchanged (the smoke is a step in the existing `test` job, not a new required check). (2) **The
+docs-drift rail** — `scripts/scan_docs_drift.py` gains a seventh axis, `fast_path`, which
+re-derives the fast-path command (`scripts/test_fast.sh` runs `pytest … -m fast`), the budget
+(`FAST_BUDGET_SECONDS` in `tests/test_fast_path_gate.py` == the `budget 180s` this doc family
+documents), and the subset (≥1 `fast`-marked module) from the code and compares them against
+`scripts/CONTEXT.md`. A doc that drifts from the gate is a `stale` finding; a fast path the doc
+stops documenting errors the axis unmeasurable (exit 2), never clean. Verified on the real tree:
+`fast_path` checks 3 claims, all `current`, drift 0; the seeded-drift tests (`budget`/`command`/
+`subset` corruption) each produce their finding. The fast path was re-measured at the wiring
+commit: **509 passed, 24.51s** (two re-measurements: 24.24s and 25.27s) — green under the 180s budget.
+
 **p4 — the gate.** `tests/test_fast_path_gate.py`: the fast path must stay under 180s (3x the
 measured time — a slow-regression trip wire, not a flaky wall), every `fast`-marked module must
 pass the parallel-safety audit, and the full suite must still collect on demand. Budgets

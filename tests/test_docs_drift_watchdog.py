@@ -4,7 +4,7 @@ The scanner's own correctness is ``tests/test_scan_docs_drift.py``'s job. These 
 *rail*: given a report, does the flag lifecycle behave — raised by a finding, cleared by a clean
 scan, silent on a repeat, and never cleared by a scan that could not look?
 
-Reports are constructed directly rather than scanned. A real six-axis scan takes minutes and
+Reports are constructed directly rather than scanned. A real seven-axis scan takes minutes and
 depends on the tree's current drift, which would make these tests both slow and non-hermetic;
 the lifecycle is a pure function of the score, so injecting the score tests exactly the logic
 under test. ``test_lifecycle_end_to_end_against_the_real_tree`` closes the loop with a genuine

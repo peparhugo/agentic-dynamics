@@ -69,6 +69,13 @@ run `python3 -m pytest tests/ -q` on demand and keep it green.
 **Budget gate** — `tests/test_fast_path_gate.py`: the fast path must stay under 180s (a slow
 regression trips the wire) and every `fast`-marked module must pass the parallel-safety audit.
 
+**Wired into the guard cadence** (test_suite_speed p3-d): CI runs `bash scripts/test_fast.sh`
+as the fast smoke in the `test` job of `.github/workflows/pytest.yml` (before the deterministic
+suite), and the docs-drift rail's `fast_path` axis (`scripts/scan_docs_drift.py`) re-derives the
+command + budget this section documents from the code and compares them — a doc that drifts from
+the gate (`FAST_BUDGET_SECONDS`) is a docs-drift finding, and a fast path the doc stops
+documenting errors the axis unmeasurable (exit 2), never clean.
+
 ## Experiment Runners
 
 | Script | Lines | Purpose |

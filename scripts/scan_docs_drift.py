@@ -40,8 +40,8 @@ because they have their own regeneration rail: flagging them here would double-r
 drift that ``agentic-dynamics surfaces sync`` already fixes mechanically, and would make the score
 oscillate with regeneration timing rather than with real doc quality.
 
-THE SIX AXES
-------------
+THE SEVEN AXES
+--------------
 ====================  ====================================================================
 axis                  what it verifies
 ====================  ====================================================================
@@ -51,6 +51,10 @@ axis                  what it verifies
 ``status_vocabulary`` (d) every doc carries enforced status frontmatter (doc-lifecycle guard)
 ``anchor_integrity``  (e) every ``file:line`` anchor resolves to a file that has that line
 ``manifest_counts``   (f) ``scripts/CONTEXT.md``'s manifest covers ``scripts/`` with no orphans
+``fast_path``         (g) the fast-path command + budget that ``scripts/CONTEXT.md`` documents
+                           match the code (``scripts/test_fast.sh`` + the gate's
+                           ``FAST_BUDGET_SECONDS`` in ``tests/test_fast_path_gate.py``) and the
+                           ``fast``-marked subset is non-empty
 ====================  ====================================================================
 
 STATUS VOCABULARY
@@ -97,7 +101,7 @@ from pathlib import Path
 #: Repository root — this file lives at ``<root>/scripts/scan_docs_drift.py``.
 ROOT = Path(__file__).resolve().parent.parent
 
-#: The six axis identifiers, in the order the spec lists them (a)–(f). Used for stable report
+#: The seven axis identifiers, in the order the spec lists them (a)–(g). Used for stable report
 #: ordering and for ``--check`` validation.
 AXES = (
     "cli_surface",
@@ -106,6 +110,7 @@ AXES = (
     "status_vocabulary",
     "anchor_integrity",
     "manifest_counts",
+    "fast_path",
 )
 
 #: Path prefixes whose documents are DERIVED, not authored. Excluded per the scope rule above:
@@ -1240,6 +1245,178 @@ def check_manifest_counts(report: DriftReport) -> None:
 
 
 # ─────────────────────────────────────────────────────────────────────────────────────────────
+
+
+#: The fast-path command documented by ``scripts/CONTEXT.md`` (test_suite_speed p3-d wiring).
+FAST_PATH_COMMAND = "scripts/test_fast.sh"
+#: The gate module that enforces the fast-path budget (``FAST_BUDGET_SECONDS``).
+FAST_PATH_GATE = "tests/test_fast_path_gate.py"
+#: The ``scripts/CONTEXT.md`` budget phrasings the axis re-derives (``budget 180s …``).
+_FAST_BUDGET_RE = re.compile(r"budget (\d+)s")
+#: The gate constant the axis re-derives.
+_FAST_BUDGET_CONSTANT_RE = re.compile(r"FAST_BUDGET_SECONDS\s*=\s*(\d+)")
+#: The doc's fast-path section presence — the axis's source-doc precondition. When the doc no
+#: longer documents the fast path at all, the axis CANNOT measure (it errors, unmeasurable)
+#: rather than fabricate clean — the same contract as the manifest axis on a corrupted
+#: ``scripts/CONTEXT.md``.
+_FAST_PATH_DOC_RE = re.compile(r"test_fast\.sh|\bfast path\b|budget \d+s")
+
+
+def check_fast_path(report: DriftReport) -> None:
+    """Axis (g): the fast path that ``scripts/CONTEXT.md`` documents matches the code.
+
+    The fast path (test_suite_speed p3) is the ``fast``-marked smoke the guards run on every
+    change: ``scripts/CONTEXT.md`` documents the command (``scripts/test_fast.sh``) and the
+    budget (the ``FAST_BUDGET_SECONDS`` trip wire, currently 180s). The gate enforces them in
+    ``tests/test_fast_path_gate.py``. This axis re-derives both from the code and compares them
+    against the doc — a doc that drifts from the gate, a gate whose budget/command the doc no
+    longer names, or a marker set that silently empties, is caught by the same rail that scans
+    every other current-authority claim.
+    """
+    context = ROOT / "scripts" / "CONTEXT.md"
+    if not context.is_file():
+        report.errors["fast_path"] = "scripts/CONTEXT.md not found"
+        return
+    context_text = context.read_text(encoding="utf-8")
+    # The source doc is the fast-path section of scripts/CONTEXT.md. If the doc no longer
+    # documents the fast path at all, the axis cannot measure — it errors (unmeasurable,
+    # never scored clean) instead of reporting a fabricated clean.
+    if not _FAST_PATH_DOC_RE.search(context_text):
+        report.errors["fast_path"] = "scripts/CONTEXT.md does not document the fast path"
+        return
+
+    # ── (g1) the fast-path command ──────────────────────────────────────────
+    command = ROOT / FAST_PATH_COMMAND
+    command_text = command.read_text(encoding="utf-8") if command.is_file() else ""
+    runs_marked_subset = bool(re.search(r"\bm\s+fast\b", command_text))
+    if not command_text:
+        report.add(
+            Check(
+                check_id="fast_path/command",
+                axis="fast_path",
+                claim="scripts/CONTEXT.md documents `bash scripts/test_fast.sh` as the fast-path command",
+                code_truth=f"{FAST_PATH_COMMAND} does not exist",
+                status="missing",
+                basis="test -f scripts/test_fast.sh",
+                source="scripts/CONTEXT.md",
+            )
+        )
+    elif not runs_marked_subset:
+        report.add(
+            Check(
+                check_id="fast_path/command",
+                axis="fast_path",
+                claim="scripts/CONTEXT.md documents `bash scripts/test_fast.sh` as the fast-path command",
+                code_truth=f"{FAST_PATH_COMMAND} exists but does not invoke `pytest … -m fast`",
+                status="stale",
+                basis="grep -- '-m fast' scripts/test_fast.sh",
+                source="scripts/CONTEXT.md",
+            )
+        )
+    else:
+        report.add(
+            Check(
+                check_id="fast_path/command",
+                axis="fast_path",
+                claim="scripts/CONTEXT.md documents `bash scripts/test_fast.sh` as the fast-path command",
+                code_truth=f"{FAST_PATH_COMMAND} runs `pytest tests/ -m fast`",
+                status="current",
+                basis="grep -- '-m fast' scripts/test_fast.sh",
+                source="scripts/CONTEXT.md",
+            )
+        )
+
+    # ── (g2) the fast-path budget ──────────────────────────────────────────
+    gate = ROOT / FAST_PATH_GATE
+    gate_text = gate.read_text(encoding="utf-8") if gate.is_file() else ""
+    const = _FAST_BUDGET_CONSTANT_RE.search(gate_text)
+    doc = _FAST_BUDGET_RE.search(context_text)
+    if const is None:
+        report.add(
+            Check(
+                check_id="fast_path/budget",
+                axis="fast_path",
+                claim="scripts/CONTEXT.md documents the fast-path budget (180s) as a gate trip wire",
+                code_truth=f"FAST_BUDGET_SECONDS is not defined in {FAST_PATH_GATE}",
+                status="missing",
+                basis=f"grep FAST_BUDGET_SECONDS {FAST_PATH_GATE}",
+                source="scripts/CONTEXT.md",
+            )
+        )
+    elif doc is None:
+        report.add(
+            Check(
+                check_id="fast_path/budget",
+                axis="fast_path",
+                claim="scripts/CONTEXT.md documents the fast-path budget in seconds",
+                code_truth=f"scripts/CONTEXT.md does not state a `budget Ns`; the gate enforces {const.group(1)}s",
+                status="missing",
+                basis="grep -E 'budget [0-9]+s' scripts/CONTEXT.md",
+                source="scripts/CONTEXT.md",
+            )
+        )
+    elif int(const.group(1)) != int(doc.group(1)):
+        report.add(
+            Check(
+                check_id="fast_path/budget",
+                axis="fast_path",
+                claim=f"scripts/CONTEXT.md documents the fast-path budget as {doc.group(1)}s",
+                code_truth=f"the gate's FAST_BUDGET_SECONDS is {const.group(1)}s — the doc and the gate disagree",
+                status="stale",
+                basis=f"grep FAST_BUDGET_SECONDS {FAST_PATH_GATE} vs grep -E 'budget [0-9]+s' scripts/CONTEXT.md",
+                source="scripts/CONTEXT.md",
+            )
+        )
+    else:
+        report.add(
+            Check(
+                check_id="fast_path/budget",
+                axis="fast_path",
+                claim=f"scripts/CONTEXT.md documents the fast-path budget as {doc.group(1)}s",
+                code_truth=f"the gate's FAST_BUDGET_SECONDS is {const.group(1)}s — the doc and the gate agree",
+                status="current",
+                basis=f"grep FAST_BUDGET_SECONDS {FAST_PATH_GATE} vs grep -E 'budget [0-9]+s' scripts/CONTEXT.md",
+                source="scripts/CONTEXT.md",
+            )
+        )
+
+    # ── (g3) the fast-path subset is non-empty ──────────────────────────────────────────
+    tests_dir = ROOT / "tests"
+    marked = (
+        sorted(
+            p
+            for p in tests_dir.glob("test_*.py")
+            if re.search(r"^pytestmark\s*=\s*pytest\.mark\.fast\b", p.read_text(), re.M)
+        )
+        if tests_dir.is_dir()
+        else []
+    )
+    if marked:
+        report.add(
+            Check(
+                check_id="fast_path/subset",
+                axis="fast_path",
+                claim="scripts/CONTEXT.md documents the fast subset as the audited `fast`-marked families",
+                code_truth=f"{len(marked)} test modules carry `pytestmark = pytest.mark.fast`",
+                status="current",
+                basis="grep -l 'pytest.mark.fast' tests/test_*.py",
+                source="scripts/CONTEXT.md",
+            )
+        )
+    else:
+        report.add(
+            Check(
+                check_id="fast_path/subset",
+                axis="fast_path",
+                claim="scripts/CONTEXT.md documents the fast subset as the audited `fast`-marked families",
+                code_truth="no test module carries `pytestmark = pytest.mark.fast` — the fast path is empty",
+                status="stale",
+                basis="grep -l 'pytest.mark.fast' tests/test_*.py",
+                source="scripts/CONTEXT.md",
+            )
+        )
+
+
 # Orchestration
 # ─────────────────────────────────────────────────────────────────────────────────────────────
 
@@ -1251,6 +1428,7 @@ CHECKS = {
     "status_vocabulary": check_status_vocabulary,
     "anchor_integrity": check_anchor_integrity,
     "manifest_counts": check_manifest_counts,
+    "fast_path": check_fast_path,
 }
 
 
@@ -1258,7 +1436,7 @@ def scan(axes: tuple[str, ...] = AXES) -> DriftReport:
     """Run the requested axes and return the assembled report.
 
     A check that raises is recorded in ``report.errors`` rather than aborting the scan: a broken
-    axis must not hide the findings of the other five, and an errored axis is reported as
+    axis must not hide the findings of the other axes, and an errored axis is reported as
     unmeasured rather than scored clean.
     """
     report = DriftReport()
@@ -1329,7 +1507,7 @@ def main(argv: list[str] | None = None) -> int:
         "--check",
         action="append",
         choices=AXES,
-        help="run only this axis (repeatable); default: all six",
+        help="run only this axis (repeatable); default: all seven",
     )
     parser.add_argument(
         "--include-current",
