@@ -20,16 +20,19 @@ from agentic_dynamics.experiment.experiment_spec import (
     validate_spec,
 )
 from scripts.fleet.spawn_wrapper import (
+    AUTH_CRED_FILE,
     AUTH_DIRS,
     COMMANDS_KEY,
     COMPOSE_ALLOWLIST,
     CONTRACT_TARGETS,
     FLEET_ACTIONS,
     MODEL_WHITELIST,
+    STATE_TARGET,
     SpawnValidationError,
     build_phase_request,
     build_spawn_argv,
     build_submit_argv,
+    build_verifier_request,
     consume_fleet_commands,
     dispatch_submit,
     spawn_sibling,
@@ -386,6 +389,139 @@ def test_build_phase_request_without_authorization_yields_empty_scope():
         goal="g", workdir="/tmp/wt", model="deepseek/deepseek-v4-pro",
     )
     assert req["scope"] == ""  # no declared scope + no table entry → spawn will fail at step 2
+
+
+# ── build_verifier_request — the READ-ONLY-for-candidate contract (F1/g1_verifier_mount) ──
+
+
+def _verifier_phase_def(**overrides) -> dict:
+    phase = {
+        "name": "g3_test_gate", "kind": "test", "scope": "implementation",
+        "tests": ["tests/test_spec_x.py"],
+    }
+    phase.update(overrides)
+    return phase
+
+
+def _verifier_request(**overrides) -> dict:
+    return build_verifier_request(
+        _verifier_phase_def(),
+        goal="g", workdir="/tmp/wt_x", model="deepseek/deepseek-v4-flash",
+        spec_name="spec_x",
+        command=["python3", "scripts/run_workflow.py", "--only-phase", "g3_test_gate",
+                 "--no-commit"],
+        **overrides,
+    )
+
+
+def test_verifier_request_mounts_the_candidate_read_only(_canonical_repo_env):
+    """(a) a verifier request's worktree + .git mounts are READ-ONLY — the candidate the
+    verifier runs its suite against is mounted ro (or absent), never rw: the worktree
+    namespace, the repo, and both git dirs. Write protection is the mount contract, never a
+    behavioral --no-commit."""
+    req = _verifier_request()
+    by_target = {m.get("target"): m for m in req["mounts"]}
+
+    # the candidate surface: worktree namespace (/tmp), repo (/repo), git dirs (/repo/.git +
+    # the host-path alias .git) — all present, all ro.
+    assert by_target["/tmp"]["mode"] == "ro"
+    assert by_target["/repo"]["mode"] == "ro"
+    assert by_target["/repo/.git"]["mode"] == "ro"
+    assert by_target[_CANONICAL_REPO_DIR]["mode"] == "ro"
+    assert by_target[f"{_CANONICAL_REPO_DIR}/.git"]["mode"] == "ro"
+    # no remaining rw mount anywhere on the request
+    assert all(m.get("mode") == "ro" for m in req["mounts"])
+
+    # the verifier-forbidden surface is ABSENT (no credentials, no CLI state, no results)
+    targets = {m.get("target") for m in req["mounts"]}
+    assert not (targets & set(AUTH_DIRS))
+    assert AUTH_CRED_FILE not in targets
+    assert STATE_TARGET not in targets
+    assert not any(t.startswith("/app/experiments/results") for t in targets)
+    assert req.get("verifier") is True
+
+
+def test_verifier_request_passes_validation(_canonical_repo_env):
+    """A correctly-built verifier request (candidate ro, no forbidden surface) validates clean."""
+    req = _verifier_request()
+    assert validate_spawn(req, phase_scopes={"g3_test_gate": "implementation"}) == []
+
+
+def test_verifier_request_that_would_mount_candidate_rw_fails_validation(_canonical_repo_env):
+    """(b) a verifier request that would mount the candidate rw FAILS validation — before any
+    spawn. Each writable candidate surface (worktree /tmp, git dirs) is refused."""
+    for tampered_target in ("/tmp", "/repo/.git", f"{_CANONICAL_REPO_DIR}/.git"):
+        req = _verifier_request()
+        for m in req["mounts"]:
+            if m.get("target") == tampered_target:
+                m["mode"] = "rw"
+        errors = validate_spawn(req, phase_scopes={"g3_test_gate": "implementation"})
+        assert errors, f"{tampered_target}: expected a validation refusal"
+        assert any(
+            "step 3" in e and "verifier" in e and "ro" in e and tampered_target in e
+            for e in errors
+        ), f"{tampered_target}: {errors}"
+
+
+def test_verifier_request_rw_candidate_is_refused_before_any_spawn(_canonical_repo_env):
+    """(b) the refusal is enforced at validation time — spawn_sibling never reaches the socket
+    with a rw-candidate verifier request (docker path is bogus and would fail if invoked)."""
+    req = _verifier_request()
+    for m in req["mounts"]:
+        if m.get("target") == "/repo/.git":
+            m["mode"] = "rw"
+    with pytest.raises(SpawnValidationError) as exc:
+        spawn_sibling(
+            req, docker="/nonexistent/docker-should-never-run",
+            phase_scopes={"g3_test_gate": "implementation"},
+        )
+    assert any("step 3" in e and "verifier" in e for e in exc.value.errors)
+
+
+def test_verifier_request_with_forbidden_surface_fails_validation(_canonical_repo_env):
+    """A verifier request that carries a results/state/auth mount (a surface the builder never
+    adds) is refused — read-only-for-candidate means ONLY the candidate surface, ro."""
+    req = _verifier_request()
+    req["mounts"].append({"target": "/app/experiments/results", "mode": "ro"})
+    errors = validate_spawn(req, phase_scopes={"g3_test_gate": "implementation"})
+    assert any("step 3" in e and "verifier" in e and "results" in e for e in errors)
+
+
+def test_agent_phase_request_keeps_rw_candidate_mounts(_canonical_repo_env):
+    """(c) the agent-phase executor's mounts are UNCHANGED — the implementation scope still
+    gets rw worktree + rw git dirs (an agent phase COMMITS its work); the verifier is a
+    DIFFERENT contract, and only the verifier request carries the marker."""
+    agent = build_phase_request(
+        {"name": "p1_slice1_base_supervisor"},
+        goal="g", workdir="/tmp/wt_x", model="deepseek/deepseek-v4-flash",
+        spec_name="spec_x",
+    )
+    by_target = {m.get("target"): m for m in agent["mounts"]}
+    assert by_target["/tmp"]["mode"] == "rw"
+    assert by_target["/repo/.git"]["mode"] == "rw"
+    assert by_target[f"{_CANONICAL_REPO_DIR}/.git"]["mode"] == "rw"
+    assert agent.get("verifier") is None  # no marker: the agent contract, not the verifier's
+    # the implementation request validates clean with its rw candidate (unchanged behavior)
+    assert validate_spawn(agent) == []
+
+
+def test_verifier_request_keeps_the_in_process_suite_target(_canonical_repo_env):
+    """(d) the suite-target semantics are UNCHANGED — the verifier request runs the SAME
+    target list the in-process LocalVerifier path would run (the phase's tests are carried on
+    the phase def, never re-selected container-side)."""
+    phase_def = _verifier_phase_def()
+    req = build_verifier_request(
+        phase_def,
+        goal="g", workdir="/tmp/wt_x", model="deepseek/deepseek-v4-flash",
+        spec_name="spec_x",
+        command=["python3", "scripts/run_workflow.py", "--only-phase", "g3_test_gate",
+                 "--no-commit"],
+    )
+    cmd = " ".join(str(c) for c in req.get("command", []))
+    assert "--only-phase g3_test_gate" in cmd
+    # the phase's own def — the source of the target list for the in-process run_suite — is
+    # never rewritten or re-selected by the verifier request builder.
+    assert phase_def["tests"] == ["tests/test_spec_x.py"]
 
 
 # ── the scope field + authorization table (experiment_spec) ──────────────────
