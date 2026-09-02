@@ -11,8 +11,12 @@ Phase kinds (from ``workflow.params.phases``):
     ``test_gate: true`` to have the independent test_runner verify the worktree after the agent
     completes — its outcome lands on ``PhaseResult.test_executed_success`` (the CAP test-runner
     wiring seam, see docs/designs/current/cap_test_runner_wiring.md §1).
-  - ``test`` — run the language's suite independently (via ``test_runner.run_suite``)
-    and record ``test_executed_success``. No LLM involved.
+  - ``test`` — run the language's suite independently and record ``test_executed_success``.
+    No LLM involved. In-process via ``test_runner.run_suite`` by default (LocalVerifier); under
+    ``--orchestrator`` the injected verifier executor (the DockerVerifierExecutor, w1) runs the
+    SAME suite in a READ-ONLY verifier container bound to the candidate and returns the verdict
+    on the SAME fields — and a containerized run with no verifier REFUSES the phase loudly
+    (``VERIFIER_REFUSED``, never a skip). See the ``verifier_executor`` docstring below.
 
 Phase watchdog (cap_runner_hardening p1): each agent phase is wrapped in a stall monitor that
 polls the phase's session transcript (``<workdir>/.instrument/session.jsonl``, appended live
@@ -153,7 +157,12 @@ from agentic_dynamics.runtime.change_analyzer import (
     ChangeInput,
     run_change_analysis,
 )
-from agentic_dynamics.runtime.executor import LocalAgentExecutor, StepExecutor, StepRequest
+from agentic_dynamics.runtime.executor import (
+    LocalAgentExecutor,
+    StepExecutor,
+    StepRequest,
+    StepResult,
+)
 from agentic_dynamics.runtime.phase_evidence import (
     PhaseEvidence,
     PhaseEvidenceRecorder,
@@ -175,6 +184,24 @@ from agentic_dynamics.runtime.routing import (
 )
 from agentic_dynamics.runtime.telemetry import TelemetryPublisher
 from agentic_dynamics.runtime.test_runner import run_suite, suite_succeeded
+
+#: w1 (engine_gaps_verifier_revision) — the fail-closed refusal marker for a ``kind: test``
+#: phase in the CONTAINERIZED path with no injected verifier executor. The P0-1 contract: a
+#: declared independent verification must run somewhere isolated — it is NEVER silently run
+#: in-process in the orchestrator's privileged parent and NEVER skipped. Absent an injected
+#: verifier, the phase is refused loudly (failed, blocking the run like a failing suite) with
+#: this marker as the evidence.
+VERIFIER_REFUSED_MARKER = "VERIFIER_REFUSED"
+
+
+def _verifier_refused_error(phase_name: str) -> str:
+    """The loud refusal the engine records when a containerized path lacks a verifier."""
+    return (
+        f"{VERIFIER_REFUSED_MARKER}: kind:test phase '{phase_name}' cannot execute in the "
+        f"containerized path without an injected verifier executor — refusing (P0-1 "
+        f"fail-closed, never a skip). Inject a DockerVerifierExecutor under --orchestrator, "
+        f"or run the phase in-process (no step executor injected)."
+    )
 
 
 def _now() -> str:
@@ -910,6 +937,28 @@ def _run_test_gate(pr: PhaseResult, wd: Path, language: str, timeout: int,
     if suite.get("failed", 0) > 0 or suite.get("errors", 0) > 0:
         pr.status = "failed"
         pr.error = suite.get("tail", "")[-400:]
+
+
+def _apply_verifier_verdict(pr: PhaseResult, verdict: StepResult) -> None:
+    """Record a dispatched verifier's verdict onto the phase (w1, engine_gaps_verifier_revision).
+
+    The engine reads the SAME fields the in-process LocalVerifier branch writes
+    (``test_executed_success`` / ``tests_passed`` / ``tests_total``) from the SAME source
+    semantics — the independent runner's suite, executed by the verifier container; never the
+    agent's self-report. ``verdict.ok`` is the phase-success boolean (mirroring the in-process
+    branch's "failed/errors == 0" rule — an empty suite is NOT a phase failure even though
+    ``suite_succeeded`` is then False, so the executor's ``ok`` and ``test_executed_success``
+    are carried independently). A refused/failed verdict fails the phase exactly like a failing
+    in-process suite, so ``stop_on_error`` and the promotion gate treat both paths identically.
+    """
+    pr.tests_passed = int(getattr(verdict, "tests_passed", 0) or 0)
+    pr.tests_total = int(getattr(verdict, "tests_total", 0) or 0)
+    pr.test_executed_success = getattr(verdict, "test_executed_success", None)
+    if not bool(getattr(verdict, "ok", False)):
+        pr.status = "failed"
+        pr.error = str(getattr(verdict, "error", "") or "")[:400] or (
+            f"verifier suite failed ({pr.tests_passed}/{pr.tests_total} passed)"
+        )
 
 
 def _emit_self_finding(pr: PhaseResult, *, goal: str, scope: str) -> None:
@@ -2665,6 +2714,7 @@ def run_workflow(
     phase_total: int | None = None,
     phase_index: int | None = None,
     step_executor: StepExecutor | None = None,
+    verifier_executor: StepExecutor | None = None,
     phase_evidence_recorder: PhaseEvidenceRecorder | None = None,
 ) -> WorkflowRunResult:
     """Run a compiled ``agent_task`` spec against a goal in a git worktree.
@@ -2786,6 +2836,20 @@ def run_workflow(
     makes the packet's per-phase derivations real). Best-effort by construction — a control-db
     failure never fails the phase, and a failed write is a named warning, never silent.
     ``None`` (default) leaves the seam inert and the run byte-identical to the pre-e1 runner.
+
+    Verifier dispatch (``verifier_executor``, w1 of engine_gaps_verifier_revision): a
+    ``kind: test`` phase's suite runs in-process via ``test_runner.run_suite`` by default (the
+    LocalVerifier — unchanged). When a verifier executor is injected at the composition root
+    (the DockerVerifierExecutor under ``--orchestrator``), the engine instead dispatches the
+    phase through it: the executor runs the SAME suite inside a READ-ONLY verifier container
+    bound to the candidate and returns the verdict on the SAME fields
+    (``test_executed_success`` / ``tests_passed`` / ``tests_total``) from the SAME source
+    semantics (the independent runner's exit + report — never the agent's self-report). A
+    failing suite fails the phase and blocks the run in BOTH shapes. When a step executor was
+    injected (the containerized path) but NO verifier executor was, the engine REFUSES the
+    phase loudly with ``VERIFIER_REFUSED`` — a ``kind: test`` phase is never silently run
+    in-process in the containerized path and never skipped (the P0-1 fail-closed contract). The
+    in-process agent-phase ``test_gate`` seam is unchanged.
     """
     errors = validate_spec(spec)
     errors += validate_workflow_routing(spec, default_model=model)
@@ -2812,6 +2876,13 @@ def run_workflow(
     # aggregate ledger; the executor only answers "run this one step in this envelope".
     # Absent the injection, the default LocalAgentExecutor reproduces the historical
     # in-process call byte-for-byte.
+    #
+    # w1 (engine_gaps_verifier_revision): ``_containerized_path`` records WHETHER a step
+    # executor was injected BEFORE the default below replaces ``None`` — the kind:test
+    # branch needs to distinguish the containerized path (a ``kind: test`` phase must
+    # dispatch through the injected verifier, or REFUSE loudly when no verifier is
+    # injected) from the historical in-process path (run_suite, unchanged).
+    containerized_path = step_executor is not None
     step_executor = step_executor or LocalAgentExecutor(run_agent)
 
     # RAG augmentation seam. Default OFF — the prompt passed to the executor is then
@@ -2970,18 +3041,65 @@ def run_workflow(
 
         try:
             if kind == "test":
-                # test_suite_speed p2 scoping: a test phase may declare ``tests:`` (a file,
-                # node id, or list thereof — e.g. ``tests/test_<spec>.py``) so the phase runs
-                # the spec's own tests, never the whole multi-thousand-test tree. Without the
-                # field the historical whole-tree scope is preserved.
-                suite = run_suite(wd, language, timeout=phase_timeout,
-                                  target=phase_def.get("tests"))
-                pr.tests_passed = suite["passed"]
-                pr.tests_total = suite["total"]
-                pr.test_executed_success = suite_succeeded(suite)
-                if suite.get("failed", 0) > 0 or suite.get("errors", 0) > 0:
+                # w1 (engine_gaps_verifier_revision): the verifier dispatch seam. A
+                # ``kind: test`` phase is the DECLARED independent verification of the
+                # candidate — its suite must run, and its verdict must be the independent
+                # runner's, in EVERY execution shape. Three-way dispatch:
+                #
+                #   1. verifier executor injected (the DockerVerifierExecutor under
+                #      --orchestrator) → the suite runs inside a READ-ONLY verifier container
+                #      bound to the candidate; the verdict lands on the same fields
+                #      (test_executed_success) from the same source (the container's suite
+                #      exit + report — never the agent's self-report);
+                #   2. a step executor was injected but NO verifier (the containerized path
+                #      short a verifier) → REFUSED loudly (VERIFIER_REFUSED, the P0-1
+                #      fail-closed contract) — never a silent in-process run in the
+                #      orchestrator's privileged parent, never a skip;
+                #   3. otherwise → the in-process LocalVerifier (run_suite), unchanged.
+                #
+                # The phase receives the resolved test target + language so the suite the
+                # verifier runs is the SAME target list the in-process path uses (local
+                # parity — test_suite_speed p2 scoping preserved on both sides).
+                if verifier_executor is not None:
+                    test_request = StepRequest(
+                        phase_name=name,
+                        phase_kind="test",
+                        prompt="",
+                        model=model,
+                        goal=goal,
+                        spec_name=spec.name,
+                        workdir=str(wd),
+                        language=language,
+                        timeout=phase_timeout,
+                        phase_def=dict(phase_def),
+                    )
+                    try:
+                        verdict = verifier_executor.execute(test_request)
+                    except Exception as exc:  # a verifier failure is a state, never a crash
+                        pr.status = "failed"
+                        pr.error = f"VERIFIER_ERROR: {exc!r}"
+                    else:
+                        _apply_verifier_verdict(pr, verdict)
+                elif containerized_path:
+                    # The containerized path (a step executor was injected — the operator
+                    # asked for sibling-cell isolation) with no verifier to dispatch to.
+                    # Refuse loudly: a declared verification must not silently run in the
+                    # orchestrator's own privileged container, and must never be skipped.
                     pr.status = "failed"
-                    pr.error = suite.get("tail", "")[-400:]
+                    pr.error = _verifier_refused_error(name)
+                else:
+                    # test_suite_speed p2 scoping: a test phase may declare ``tests:`` (a file,
+                    # node id, or list thereof — e.g. ``tests/test_<spec>.py``) so the phase runs
+                    # the spec's own tests, never the whole multi-thousand-test tree. Without the
+                    # field the historical whole-tree scope is preserved.
+                    suite = run_suite(wd, language, timeout=phase_timeout,
+                                      target=phase_def.get("tests"))
+                    pr.tests_passed = suite["passed"]
+                    pr.tests_total = suite["total"]
+                    pr.test_executed_success = suite_succeeded(suite)
+                    if suite.get("failed", 0) > 0 or suite.get("errors", 0) > 0:
+                        pr.status = "failed"
+                        pr.error = suite.get("tail", "")[-400:]
             else:
                 prompt = _build_phase_prompt(phase_def, goal, prior)
                 # Point the agent's built-in publisher at this workflow's cell so the

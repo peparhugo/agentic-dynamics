@@ -39,7 +39,22 @@ from agentic_dynamics.runtime.executor import (  # noqa: E402
     StepRequest,
     StepResult,
 )
-from agentic_dynamics.runtime.workflow_runner import run_workflow  # noqa: E402
+from agentic_dynamics.runtime.test_runner import run_suite, suite_succeeded  # noqa: E402
+from agentic_dynamics.runtime.workflow_runner import (  # noqa: E402
+    VERIFIER_REFUSED_MARKER,
+    run_workflow,
+)
+
+# w1 (engine_gaps_verifier_revision): the verifier request/executor live on the composition
+# root side (scripts/fleet/), mirroring DockerAgentExecutor — import them for the verifier
+# parity cases. docker_verifier_executor pulls docker_executor + spawn_wrapper (stdlib +
+# the experiment plane only — no docker SDK, no Redis).
+_FLEET_DIR = str(_REPO_ROOT / "scripts" / "fleet")
+if _FLEET_DIR not in sys.path:
+    sys.path.insert(0, _FLEET_DIR)
+
+import spawn_wrapper  # noqa: E402
+from docker_verifier_executor import DockerVerifierExecutor  # noqa: E402
 
 # ── exit_code_for_result: the child's exit code mirrors the run outcome ──────────
 
@@ -169,6 +184,86 @@ def _fail_result(error: str = "boom") -> StepResult:
     return StepResult(ok=False, state="failed", error=error, exit_code=20)
 
 
+class FakeDockerVerifier(StepExecutor):
+    """A DockerVerifier-shaped executor with NO docker: it runs the suite locally.
+
+    Mirrors what the real DockerVerifierExecutor's verifier container does — the child runs
+    the SAME ``run_suite`` over the SAME workdir with the SAME ``tests`` target (carried on
+    the request's phase def), and returns the verdict on the SAME StepResult fields the
+    in-process LocalVerifier path records. ``ok`` mirrors the engine's phase-success rule
+    (failed/errors == 0 — an empty suite is NOT a phase failure), and ``test_executed_success``
+    mirrors ``suite_succeeded``, so the two shapes agree even in the empty-suite corner.
+    """
+
+    def __init__(self):
+        self.executed: list[str] = []
+
+    def execute(self, request: StepRequest) -> StepResult:
+        self.executed.append(request.phase_name)
+        suite = run_suite(
+            Path(request.workdir),
+            request.language or "python",
+            timeout=int(request.timeout or 300),
+            target=(request.phase_def or {}).get("tests"),
+        )
+        ok = suite.get("failed", 0) == 0 and suite.get("errors", 0) == 0
+        return StepResult(
+            ok=ok,
+            state="ok" if ok else "failed",
+            error="" if ok else suite.get("tail", "")[-400:],
+            exit_code=0 if ok else 1,
+            test_executed_success=suite_succeeded(suite),
+            tests_passed=int(suite.get("passed", 0)),
+            tests_total=int(suite.get("total", 0)),
+        )
+
+
+def _verifier_spec(path, test_target: str):
+    """A synthetic single-phase spec whose one phase is ``kind: test`` over a pytest target.
+
+    ``test_target`` is a relative filename that must exist under ``path`` (the workdir the
+    engine runs the suite in). Mirrors the launch_handler fixture's minimal shape.
+    """
+    spec_yaml = (
+        "name: verifier_parity\n"
+        'question: verifier dispatch parity fixture\n'
+        'version: "0.1"\n'
+        "artifact_kind: workflow\n"
+        "intent: mutate\n"
+        "side_effects:\n"
+        "  repository: false\n"
+        "  external_services: false\n"
+        "repeatable: true\n"
+        "workflow:\n"
+        "  kind: agent_task\n"
+        "  params:\n"
+        "    language: python\n"
+        "    phases:\n"
+        "      - name: gate\n"
+        "        kind: test\n"
+        "        scope: implementation\n"
+        "        timeout: 180\n"
+        f"        tests: ['{test_target}']\n"
+        "factors:\n"
+        "  - {name: model, levels: [deepseek/deepseek-v4-flash]}\n"
+        "design: factorial\n"
+        "rules: []\n"
+        "metrics: []\n"
+        "writeup: {format: lab_book, sections: [question]}\n"
+        "stop: {budget_usd: 0.1, max_attempts: 1}\n"
+        "adapt: {strategy: manual, selection: highest_regret}\n"
+    )
+    spec_path = Path(path) / "verifier_spec.yaml"
+    spec_path.write_text(spec_yaml)
+    return load_spec(spec_path)
+
+
+def _phase_outline(pr) -> tuple:
+    """The parent-state projection the parity cases compare across execution shapes."""
+    return (pr.phase, pr.kind, pr.status, pr.test_executed_success,
+            pr.tests_passed, pr.tests_total)
+
+
 # ── success → the same phases, the same ledger ────────────────────────────────
 
 
@@ -189,18 +284,28 @@ def test_success_parity_local_vs_executor(tmp_path):
 
     # the same engine, the executor seam injected instead
     executor = FakeDockerExecutor({p: _ok_result() for p in phases})
+    verifier = FakeDockerVerifier()
     docker = run_workflow(spec, goal="g", model="openai/gpt-5.6-sol",
-                          workdir=tmp_path, commit=False, step_executor=executor)
+                          workdir=tmp_path, commit=False, step_executor=executor,
+                          verifier_executor=verifier)
 
     assert [p.phase for p in docker.phases] == phases
     assert docker.ok is True
     assert docker.state == "succeeded"
     assert docker.total_cost_usd > 0
-    # the executor ran every AGENT phase, in order (test phases run in-process via
-    # run_suite — the engine owns test semantics, not the executor)
+    # the executor ran every AGENT phase, in order; the injected VERIFIER ran every TEST phase
+    # (w1 — kind:test dispatches through the injected verifier, never in-process in the
+    # containerized path, and never a skip)
     agent_phases = [p["name"] for p in spec.workflow.params["phases"]
                     if str(p.get("kind", "agent")) != "test"]
+    test_phases = [p["name"] for p in spec.workflow.params["phases"]
+                   if str(p.get("kind", "agent")) == "test"]
     assert executor.executed == agent_phases
+    assert verifier.executed == test_phases
+    # both shapes record the SAME phase outline (the empty-suite corner is a non-failure with
+    # test_executed_success False on both sides — parity, not a fabricated True)
+    assert [_phase_outline(p) for p in local_result.phases] == \
+        [_phase_outline(p) for p in docker.phases]
 
 
 # ── agent failure → later step NOT started (stop-on-failure parity) ───────────
@@ -312,14 +417,16 @@ def test_exit_code_contract_applies_to_engine_results(tmp_path):
 
     ok = run_workflow(spec, goal="g", model="openai/gpt-5.6-sol",
                       workdir=tmp_path, commit=False,
-                      step_executor=FakeDockerExecutor({p: _ok_result() for p in phases}))
+                      step_executor=FakeDockerExecutor({p: _ok_result() for p in phases}),
+                      verifier_executor=FakeDockerVerifier())
     assert exit_code_for_result(ok) == EXIT_OK
 
     spec2 = load_spec(SPEC)
     spec2.workflow.params["phases"][0]["checkpoint"] = True
     await_stop = run_workflow(spec2, goal="g", model="openai/gpt-5.6-sol",
                               workdir=tmp_path, commit=False,
-                              step_executor=FakeDockerExecutor({p: _ok_result() for p in phases}))
+                              step_executor=FakeDockerExecutor({p: _ok_result() for p in phases}),
+                              verifier_executor=FakeDockerVerifier())
     assert exit_code_for_result(await_stop) == EXIT_AWAITING_APPROVAL
 
     spec3 = load_spec(SPEC)
@@ -327,3 +434,149 @@ def test_exit_code_contract_applies_to_engine_results(tmp_path):
     failed = run_workflow(spec3, goal="g", model="openai/gpt-5.6-sol",
                           workdir=tmp_path, commit=False, step_executor=failing)
     assert exit_code_for_result(failed) == EXIT_FAILED
+
+
+# ══════════════════════════════════════════════════════════
+# w1 (engine_gaps_verifier_revision): the verifier dispatch — the SAME parent states
+# whether a kind:test suite ran in-process (LocalVerifier) or in a verifier container
+# (fake-DockerVerifier), plus the fail-closed refusal and the read-only request contract.
+# ══════════════════════════════════════════════════════════════
+
+def test_failing_suite_fails_phase_and_blocks_run_in_both_paths(tmp_path):
+    """(a) a kind:test phase with a FAILING suite fails the phase + blocks the run BOTH
+    in-process and through a (fake) DockerVerifier — identical parent state."""
+    (tmp_path / "test_gate_bad.py").write_text(
+        "def test_boom():\n    assert False\n"
+    )
+    spec = _verifier_spec(tmp_path, "test_gate_bad.py")
+
+    # in-process path (LocalVerifier — the default)
+    local = run_workflow(spec, goal="g", model="openai/gpt-5.6-sol",
+                         workdir=tmp_path, commit=False)
+    assert local.ok is False
+    assert local.state == "failed"
+    assert local.phases[0].status == "failed"
+    assert local.phases[0].test_executed_success is False
+
+    # the same engine, the verifier seam injected (the container path's dispatch)
+    verifier = FakeDockerVerifier()
+    docker = run_workflow(spec, goal="g", model="openai/gpt-5.6-sol",
+                          workdir=tmp_path, commit=False,
+                          verifier_executor=verifier)
+    assert docker.ok is False
+    assert docker.state == "failed"
+    assert docker.phases[0].status == "failed"
+    assert docker.phases[0].test_executed_success is False
+
+    # PARITY: the parent sees the same phase outline + run outcome in both shapes
+    assert verifier.executed == ["gate"]
+    assert [_phase_outline(p) for p in local.phases] == [_phase_outline(p) for p in docker.phases]
+
+
+def test_passing_suite_records_success_in_both_paths(tmp_path):
+    """(b) a PASSING suite records test_executed_success=True in both paths."""
+    (tmp_path / "test_gate_ok.py").write_text(
+        "def test_ok():\n    assert True\n"
+    )
+    spec = _verifier_spec(tmp_path, "test_gate_ok.py")
+
+    local = run_workflow(spec, goal="g", model="openai/gpt-5.6-sol",
+                         workdir=tmp_path, commit=False)
+    assert local.ok is True
+    assert local.state == "succeeded"
+    assert local.phases[0].status == "ok"
+    assert local.phases[0].test_executed_success is True
+    assert local.phases[0].tests_passed == 1
+    assert local.phases[0].tests_total == 1
+
+    verifier = FakeDockerVerifier()
+    docker = run_workflow(spec, goal="g", model="openai/gpt-5.6-sol",
+                          workdir=tmp_path, commit=False,
+                          verifier_executor=verifier)
+    assert docker.ok is True
+    assert docker.state == "succeeded"
+    assert docker.phases[0].status == "ok"
+    assert docker.phases[0].test_executed_success is True
+    assert docker.phases[0].tests_passed == 1
+    assert docker.phases[0].tests_total == 1
+
+    assert [_phase_outline(p) for p in local.phases] == [_phase_outline(p) for p in docker.phases]
+
+
+def test_container_path_without_verifier_refuses_loudly(tmp_path):
+    """(c) the containerized path WITHOUT an injected verifier refuses loudly (no silent
+    skip — the P0-1 contract): the kind:test phase is recorded as a refused failure that
+    blocks the run, never silently dropped, never run in-process in the parent."""
+    (tmp_path / "test_gate_ok.py").write_text(
+        "def test_ok():\n    assert True\n"
+    )
+    spec = _verifier_spec(tmp_path, "test_gate_ok.py")
+
+    # A step executor (agent-container shape) injected but NO verifier executor → the engine
+    # must refuse the test phase loudly, not execute it in-process, not skip it.
+    executor = FakeDockerExecutor({})
+    result = run_workflow(spec, goal="g", model="openai/gpt-5.6-sol",
+                          workdir=tmp_path, commit=False, step_executor=executor)
+    assert result.ok is False
+    assert result.state == "failed"
+    assert result.phases[0].status == "failed"
+    assert VERIFIER_REFUSED_MARKER in result.phases[0].error
+    # the phase was EXECUTED-and-refused (it is ON the ledger, failed) — a silent skip would
+    # have produced no phase record or an ok; and the test phase never reached the in-process
+    # run_suite (the executor was never handed the step and the suite file never ran to pass)
+    assert len(result.phases) == 1
+    assert executor.executed == []  # a test phase is not an agent phase — never dispatched
+    # the passing suite did NOT secretly pass: a refused verification is not a pass
+    assert result.phases[0].test_executed_success is None
+
+
+def test_verifier_request_carries_no_credentials_and_no_writable_state(tmp_path):
+    """(d) the verifier container request carries no credentials and no writable state:
+    the auth mounts + per-attempt CLI-state namespace are ABSENT, the write flags are gone,
+    and the candidate (repo) is read-only. Local parity: the child command targets the SAME
+    phase + suite the in-process path runs."""
+    executor = DockerVerifierExecutor(
+        spec_path="/repo/workflows/repository/x.yaml",
+        spec_name="spec_x",
+        goal="g",
+        model="deepseek/deepseek-v4-flash",
+        workdir="/tmp/wt_x",
+    )
+    request = StepRequest(
+        phase_name="gate_run",
+        phase_kind="test",
+        prompt="",
+        model="deepseek/deepseek-v4-flash",
+        goal="g",
+        spec_name="spec_x",
+        workdir="/tmp/wt_x",
+        language="python",
+        timeout=180,
+        phase_def={"name": "gate_run", "kind": "test", "tests": ["tests/test_spec_x.py"]},
+    )
+    req = executor.build_request(request)
+
+    targets = {m.get("target") for m in req.get("mounts", [])}
+    # no credentials: no D-2 auth dir mounts, no auth credential FILE mount
+    assert not (targets & set(spawn_wrapper.AUTH_DIRS))
+    assert spawn_wrapper.AUTH_CRED_FILE not in targets
+    # no writable state: the per-attempt CLI-state namespace is absent
+    assert spawn_wrapper.STATE_TARGET not in targets
+    # the candidate repo surface is read-only
+    repo_mounts = [m for m in req.get("mounts", []) if m.get("target") == "/repo"]
+    assert repo_mounts and all(m.get("mode") == "ro" for m in repo_mounts)
+    # env: no write flags, no writable-state redirect, no admission credential block
+    env = {str(k): str(v) for k, v in (req.get("env", {}) or {}).items()}
+    assert env.get("FINOPS_KB_WRITE", "0") not in ("1", "true", "True")
+    assert "FINOPS_ACTUATION_ARMED" not in env
+    assert not any(
+        k in ("XDG_DATA_HOME", "XDG_CONFIG_HOME", "XDG_CACHE_HOME")
+        or k == "FINOPS_OPENCODE_STATE_DIR" for k in env
+    )
+    assert not any(k.startswith("FINOPS_ADMISSION_") for k in env)
+    # local parity: the child runs the SAME phase and carries the SAME test target list the
+    # in-process LocalVerifier path would pass to run_suite (no container-side re-selection)
+    cmd = " ".join(str(c) for c in req.get("command", []))
+    assert "--only-phase gate_run" in cmd
+    assert "--no-commit" in cmd  # a verifier never commits — read-only by construction
+    assert request.phase_def.get("tests") == ["tests/test_spec_x.py"]
