@@ -457,6 +457,89 @@ def test_a_child_run_emits_nothing_and_records_no_run(rw, control_db, capsys):
     assert not control_db.exists()
 
 
+# ── 4b. g1 family link: a --resume continuation is a CHILD of the failed run it continues ──
+#
+# engine_gaps_followups g1 (F5): the split-run evidence gap. When --resume continues a run whose
+# terminal state was failed/timed-out (or whose phases are incomplete), the continuation is
+# recorded as a CHILD of the parent (parent_run_id + inherited family_id) in the control db — so
+# spec_status can later derive completion from the family UNION instead of the latest run alone.
+
+
+def test_resume_continuation_is_recorded_as_a_child_of_the_failed_parent(
+    rw, control_db, monkeypatch, capsys
+):
+    """A --resume after a failed run mints the child with parent_run_id + the parent's family."""
+    from agentic_dynamics.control.control_db import ControlDB, RunState
+
+    spec = _spec(name="g1_split")
+    db = ControlDB.open(control_db)
+    try:
+        parent = db.create_run(
+            spec_name="g1_split", model="m", state=RunState.RUNNING,
+            reason="parent attempt",
+        )
+        db.transition_run(parent.run_id, RunState.FAILED, reason="w2 timeout")
+    finally:
+        db.close()
+
+    class _ResumeArgs(_Args):
+        resume = True
+
+    run_id, db = rw._control_open_run(spec, _ResumeArgs())
+    try:
+        child = db.get_run(run_id)
+        assert child.parent_run_id == parent.run_id
+        assert child.family_id == parent.run_id  # inherited the family root
+        # The parent is its own root.
+        assert db.get_run(parent.run_id).family_id == parent.run_id
+    finally:
+        db.close()
+    captured = capsys.readouterr()
+    assert "child of" in captured.err and f"family {parent.run_id}" in captured.err
+
+
+def test_fresh_attempt_is_not_a_child_of_a_prior_failed_run(rw, control_db, monkeypatch):
+    """Without --resume, a genuinely new attempt is its own family root — never a child."""
+    from agentic_dynamics.control.control_db import ControlDB, RunState
+
+    db = ControlDB.open(control_db)
+    try:
+        db.create_run(spec_name="g1_split", model="m", state=RunState.RUNNING)
+    finally:
+        db.close()
+
+    run_id, db = rw._control_open_run(_spec(name="g1_split"), _Args())
+    try:
+        run = db.get_run(run_id)
+        assert run.parent_run_id == ""
+        assert run.family_id == run.run_id  # its own family root
+    finally:
+        db.close()
+
+
+def test_resume_after_a_successful_run_is_not_linked(rw, control_db):
+    """--resume only links when the NEWEST prior run was failed/incomplete — resuming past a
+    completed run is not a continuation of it (a genuinely fresh run's own family)."""
+    from agentic_dynamics.control.control_db import ControlDB, RunState
+
+    db = ControlDB.open(control_db)
+    try:
+        db.create_run(spec_name="g1_split", model="m", state=RunState.RUNNING)
+    finally:
+        db.close()
+
+    class _ResumeArgs(_Args):
+        resume = True
+
+    run_id, db = rw._control_open_run(_spec(name="g1_split"), _ResumeArgs())
+    try:
+        run = db.get_run(run_id)
+        assert run.parent_run_id == ""
+        assert run.family_id == run.run_id
+    finally:
+        db.close()
+
+
 # ── 5. Flag precedence: --no-fact-emit > FINOPS_FACT_AUTO_EMIT=0 > default-ON ──
 
 

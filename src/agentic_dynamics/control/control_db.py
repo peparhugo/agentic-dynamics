@@ -125,7 +125,13 @@ CONTROL_DB_ENV = "FINOPS_CONTROL_DB"
 #:   touched), so the same in-place forward migration applies: ``CREATE TABLE IF NOT EXISTS`` is
 #:   re-applied against a v2 database and the recorded version is bumped by the generic
 #:   ``CAST(value AS INTEGER) < 3`` guard in :meth:`ControlDB._ensure_schema`.
-SCHEMA_VERSION = 3
+#: * ``4`` — engine_gaps_followups g1 (F5): ``runs`` gains ``parent_run_id`` + ``family_id``,
+#:   the split-run family link. A ``--resume`` continuation is recorded as a CHILD of the run
+#:   it continues (``parent_run_id``), and every member of the resume lineage shares the family
+#:   ROOT's ``family_id`` so spec_status can derive completion from the family UNION. Column
+#:   ADDITION to an existing table — handled by the guarded ``_ensure_family_link_columns``
+#:   migration below (``CREATE TABLE IF NOT EXISTS`` cannot add columns to a v3 table).
+SCHEMA_VERSION = 4
 
 
 # ── The state vocabularies ───────────────────────────────────────────────────────────────────
@@ -471,6 +477,13 @@ class RunRecord:
     #: fallback source of truth. A run with no ledger is fully reconstructible from this db.
     ledger_path: str
     cost_usd: float
+    #: The split-run family link (engine_gaps_followups g1, F5). ``parent_run_id`` is the run
+    #: this run CONTINUES — a ``--resume`` child records its parent. ``family_id`` is the family
+    #: ROOT's run id, shared by every member of the resume lineage (a fresh run is its own
+    #: root: ``family_id == run_id``; legacy rows carry ``""``). Both are empty for runs that
+    #: predate the link.
+    parent_run_id: str = ""
+    family_id: str = ""
 
     @property
     def is_terminal(self) -> bool:
@@ -843,7 +856,9 @@ CREATE TABLE IF NOT EXISTS runs (
     started_at           TEXT NOT NULL DEFAULT '',
     ended_at             TEXT NOT NULL DEFAULT '',
     ledger_path          TEXT NOT NULL DEFAULT '',
-    cost_usd             REAL NOT NULL DEFAULT 0.0
+    cost_usd             REAL NOT NULL DEFAULT 0.0,
+    parent_run_id        TEXT NOT NULL DEFAULT '',
+    family_id            TEXT NOT NULL DEFAULT ''
 );
 CREATE INDEX IF NOT EXISTS idx_runs_state ON runs(state);
 CREATE INDEX IF NOT EXISTS idx_runs_spec_name ON runs(spec_name);
@@ -1282,6 +1297,12 @@ class ControlDB:
         those two rows must appear together or not at all.
         """
         self._conn.executescript(SCHEMA_SQL)
+        # v3 → v4 (engine_gaps_followups g1, F5): the runs table GAINS the split-run family
+        # link columns. ``CREATE TABLE IF NOT EXISTS`` cannot add columns to an existing v3
+        # table, so this is a real, guarded, idempotent migration: add the columns only when
+        # they are absent, then let the generic version bump below record v4. Column additions
+        # are additive — existing rows get the '' default (a pre-g1 run is its own family).
+        self._migrate_runs_family_columns()
         with self.transaction():
             self._conn.execute(
                 "INSERT OR IGNORE INTO control_meta(key, value) VALUES ('schema_version', ?)",
@@ -1310,6 +1331,39 @@ class ControlDB:
                 "WHERE key = 'schema_version' AND CAST(value AS INTEGER) < ?",
                 (str(SCHEMA_VERSION), SCHEMA_VERSION),
             )
+
+    def _migrate_runs_family_columns(self) -> None:
+        """Idempotently add the split-run family-link columns to ``runs`` (v3 → v4).
+
+        Runs is the ONE table whose mandate shape predates the g1 family link, so a v3
+        database needs ``ALTER TABLE`` (``CREATE TABLE IF NOT EXISTS`` only adds tables, never
+        columns). Guarded by column presence so re-opening a v4 database is a no-op, and
+        wrapped in ``BEGIN``/``COMMIT`` so a crash mid-migration leaves no half-applied schema.
+        The two lookups (by family root, by parent) get their own indexes here rather than in
+        :data:`SCHEMA_SQL` — on a v3 database the ``CREATE TABLE``/``CREATE INDEX`` block runs
+        BEFORE the ``ALTER`` and would fail on the not-yet-existing column.
+        """
+        existing = {
+            row["name"] for row in self._conn.execute("PRAGMA table_info(runs)").fetchall()
+        }
+        self._conn.execute("BEGIN IMMEDIATE")
+        try:
+            if "parent_run_id" not in existing:
+                self._conn.execute(
+                    "ALTER TABLE runs ADD COLUMN parent_run_id TEXT NOT NULL DEFAULT ''"
+                )
+            if "family_id" not in existing:
+                self._conn.execute(
+                    "ALTER TABLE runs ADD COLUMN family_id TEXT NOT NULL DEFAULT ''"
+                )
+            self._conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_runs_family_id ON runs(family_id)"
+            )
+            self._conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_runs_parent_run_id ON runs(parent_run_id)"
+            )
+        finally:
+            self._conn.execute("COMMIT")
 
     def _verify_schema_version(self) -> None:
         """Refuse a database written by a NEWER schema than this code understands.
@@ -1439,6 +1493,8 @@ class ControlDB:
         cost_usd: float = 0.0,
         reason: str = "",
         actor: str = "orchestrator",
+        parent_run_id: str = "",
+        family_id: str = "",
     ) -> RunRecord:
         """Record a new run and its creation transition.
 
@@ -1449,6 +1505,13 @@ class ControlDB:
 
         The row and its first transition are written in one transaction: a run that exists with
         no history would be a hole in exactly the record this table is for.
+
+        g1 family link (engine_gaps_followups, F5): ``parent_run_id`` names the run this run
+        CONTINUES (a ``--resume`` child records the run it resumes). ``family_id`` is the family
+        ROOT's run id, shared by every member of the lineage. When a parent is given and no
+        family id is, the child inherits the parent's family (or becomes the parent's family
+        when the parent predates the link); a fresh run with no parent is its own family root
+        (``family_id == run_id``).
         """
         self._require_writable()
         spec = _require(spec_name, "spec_name")
@@ -1460,16 +1523,30 @@ class ControlDB:
             )
         rid = run_id or _new_id("run")
         now = started_at or _now()
+        # Resolve the family root. A child inherits the parent's family id; a parent with no
+        # family id (pre-g1) becomes the root (its own run id). A fresh run (no parent) is its
+        # own root. The resolved family id is never empty for a new run, so spec_status can
+        # group every g1+ run into a family.
+        resolved_parent = parent_run_id or ""
+        resolved_family = family_id or ""
+        if not resolved_family:
+            if resolved_parent:
+                parent = self.get_run(resolved_parent)
+                if parent is not None:
+                    resolved_family = parent.family_id or parent.run_id
+            if not resolved_family:
+                resolved_family = rid
 
         with self.transaction() as conn:
             conn.execute(
                 """
                 INSERT INTO runs (run_id, spec_name, workflow_revision_id, candidate_sha,
-                                  state, model, started_at, ended_at, ledger_path, cost_usd)
-                VALUES (?, ?, ?, ?, ?, ?, ?, '', ?, ?)
+                                  state, model, started_at, ended_at, ledger_path, cost_usd,
+                                  parent_run_id, family_id)
+                VALUES (?, ?, ?, ?, ?, ?, ?, '', ?, ?, ?, ?)
                 """,
                 (rid, spec, workflow_revision_id, candidate_sha, initial.value, model, now,
-                 ledger_path, float(cost_usd)),
+                 ledger_path, float(cost_usd), resolved_parent, resolved_family),
             )
             conn.execute(
                 "INSERT INTO run_transitions (run_id, from_state, to_state, at, reason, actor) "
@@ -2462,7 +2539,14 @@ class ControlDB:
 
 
 def _run_from_row(row: sqlite3.Row) -> RunRecord:
-    """Build a :class:`RunRecord` from a ``runs`` row."""
+    """Build a :class:`RunRecord` from a ``runs`` row.
+
+    Family-link columns are read tolerantly: a READ-ONLY handle opened against a pre-v4
+    database (before the orchestrator's writer migrated it) has no ``parent_run_id`` /
+    ``family_id`` columns, and a reader must not crash on that — a pre-g1 run is its own
+    family (both default to ``""``).
+    """
+    cols = set(row.keys())
     return RunRecord(
         run_id=row["run_id"],
         spec_name=row["spec_name"],
@@ -2474,6 +2558,8 @@ def _run_from_row(row: sqlite3.Row) -> RunRecord:
         ended_at=row["ended_at"],
         ledger_path=row["ledger_path"],
         cost_usd=float(row["cost_usd"]),
+        parent_run_id=row["parent_run_id"] if "parent_run_id" in cols else "",
+        family_id=row["family_id"] if "family_id" in cols else "",
     )
 
 

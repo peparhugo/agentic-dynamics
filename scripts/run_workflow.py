@@ -581,6 +581,27 @@ def _run_workflow_cli(
     control_run_id, control_db = _control_open_run(spec, args)
     phase_evidence_recorder = make_phase_evidence_recorder(control_db, control_run_id)
 
+    # g1 (engine_gaps_followups, F5): capture this run's family identity from the run row the
+    # moment it is minted (the handle closes in the finally below, before the ledger is
+    # written). The control db and the run ledger must carry the SAME family link — a --resume
+    # continuation records parent_run_id + the inherited family_id here, and the ledger gets the
+    # same three fields stamped onto the result below.
+    run_identity: dict[str, str] = {}
+    if control_run_id is not None and control_db is not None:
+        try:
+            record = control_db.get_run(control_run_id)
+            if record is not None:
+                run_identity = {
+                    "run_id": record.run_id,
+                    "parent_run_id": record.parent_run_id,
+                    "family_id": record.family_id,
+                }
+        except (ControlDBError, OSError) as exc:
+            print(
+                f"warning: could not read run identity ({exc}) — ledger family link omitted",
+                file=sys.stderr,
+            )
+
     # e2 (control_db_evidence): while this process runs the engine, a daemon heartbeat thread
     # proves to the zombie-run sweep that the run is ALIVE. A killed orchestrator stops beating
     # (the thread dies with the process), so the sweep can later cancel the dangling 'running'
@@ -639,6 +660,11 @@ def _run_workflow_cli(
             with contextlib.suppress(Exception):
                 control_db.close()
 
+    # g1 (engine_gaps_followups, F5): stamp the family link onto the ledger-bearing result so
+    # the run ledger carries the same run_id/parent_run_id/family_id the control-db row does.
+    # spec_status reads these off the ledger to group a resume's split evidence into one family.
+    for key, value in run_identity.items():
+        setattr(result, key, value)
     print(json.dumps(result.to_dict(), indent=2))
 
     # P0-2 child contract (control_db_publication p2, held to the letter): in CHILD mode the
@@ -830,6 +856,15 @@ def _control_open_run(spec: ExperimentSpec, args: argparse.Namespace) -> tuple[s
     returns, before the terminal write opens its own handle. Returns ``(None, None)`` when the
     database is unavailable (the run itself is unaffected — every control-plane step degrades to
     a no-op, exactly the pre-e1 posture).
+
+    g1 family link (engine_gaps_followups, F5): when ``--resume`` continues a run whose
+    terminal state was failed/timed-out (or whose phases are incomplete), the continuation is
+    recorded as a CHILD of that run — ``create_run`` is given the parent's id, and resolves the
+    shared ``family_id`` from the parent (see ``control_db.create_run``). The parent is the
+    newest control-db run of the same spec that did NOT reach a success-forward state (failed /
+    cancelled / timed-out-swept / awaiting a checkpoint): the run this ``--resume`` continues.
+    A resume with no such predecessor, and a genuinely new attempt (no ``--resume``), is its own
+    family root (``family_id == run_id``) — never a child.
     """
     if args.only_phase:
         return None, None
@@ -837,6 +872,22 @@ def _control_open_run(spec: ExperimentSpec, args: argparse.Namespace) -> tuple[s
     if db is None:
         return None, None
     try:
+        parent_run_id = ""
+        if getattr(args, "resume", False):
+            # The run this --resume continues: the NEWEST prior run of the same spec, when
+            # that run is itself in a continuable state (failed / cancelled — a timed-out run
+            # the zombie sweep cancelled — / awaiting operator approval, a checkpoint stop
+            # with phases remaining). If the newest prior run reached a success-forward state
+            # (promotable/published/…), the resume is not continuing it — genuinely fresh
+            # work, its own family. Continuable-only gating keeps an old failed run from
+            # swallowing a genuinely new attempt that happens to reuse --resume.
+            prior = db.runs(spec_name=spec.name)
+            if prior and prior[0].state in (
+                RunState.FAILED,
+                RunState.CANCELLED,
+                RunState.AWAITING_APPROVAL,
+            ):
+                parent_run_id = prior[0].run_id
         run = db.create_run(
             spec_name=spec.name,
             # w2 (revision identity): record the canonical spec digest this run executes so
@@ -846,8 +897,13 @@ def _control_open_run(spec: ExperimentSpec, args: argparse.Namespace) -> tuple[s
             model=args.model,
             state=RunState.RUNNING,
             reason="workflow run started",
+            parent_run_id=parent_run_id,
         )
-        print(f"control: run {run.run_id} ({run.state.value})", file=sys.stderr)
+        print(
+            f"control: run {run.run_id} ({run.state.value})"
+            + (f" child of {run.parent_run_id} (family {run.family_id})" if run.parent_run_id else ""),
+            file=sys.stderr,
+        )
         return run.run_id, db
     except (ControlDBError, OSError) as exc:
         print(f"warning: control db run creation failed ({exc}) — run itself unaffected",

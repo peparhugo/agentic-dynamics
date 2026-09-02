@@ -937,3 +937,163 @@ def test_index_regeneration_is_deterministic_with_new_fields(tmp_path: Path):
     body1 = report1.index_path.read_text()
     report2 = refresh_spec_status(root=tmp_path, generated_at="2026-09-02T00:00:00+00:00")
     assert report2.index_path.read_text() == body1
+
+
+# ── g1 split-run evidence: the resume family link + the union derivation ──────────
+#
+# engine_gaps_followups g1 (F5): a --resume continuation is a CHILD of the run it continues,
+# recorded as parent_run_id/family_id on the control-db run row AND the run ledger. derive_status
+# must derive completion from the UNION of a run family's evidence — never from the latest run
+# alone when an earlier member failed or holds un-executed phases.
+
+
+def _family_run(
+    spec: ExperimentSpec,
+    *,
+    run_id: str,
+    family_id: str,
+    parent_run_id: str = "",
+    ok: bool = True,
+    phases: list[str],
+    timestamp: str,
+    awaiting: bool = False,
+) -> RunSummary:
+    """A post-g1 run ledger carrying the family link (run_id/parent/family keys)."""
+    return RunSummary(
+        path=f"experiments/results/workflows/{spec.name}/{timestamp}.json",
+        timestamp=timestamp,
+        ok=ok,
+        workflow_revision_id=spec.workflow_revision_id,
+        executed_phases=frozenset(phases),
+        awaiting=awaiting,
+        run_id=run_id,
+        parent_run_id=parent_run_id,
+        family_id=family_id,
+    )
+
+
+def _g1_spec_file(root: Path, name: str = "g1_split", phases: list[str] | None = None,
+                   **lifecycle: object) -> ExperimentSpec:
+    """Write a phase-declaring workflow spec under ``root`` and load it."""
+    from agentic_dynamics.experiment.experiment_spec import load_spec
+
+    specs = root / "workflows" / "repository"
+    specs.mkdir(parents=True, exist_ok=True)
+    path = specs / f"{name}.yaml"
+    path.write_text(_phase_spec_yaml(name, phases=phases or ["w1", "w2", "w3", "w4"],
+                                     **lifecycle))
+    return load_spec(path)
+
+
+def test_g1_split_run_union_family_completion(tmp_path: Path):
+    """VERIFY (a): a linked parent+child derives completed ONLY when the union covers the
+    revision AND the latest member succeeded — and derives NOT-completed when a member failed.
+
+    A clean split (parent w1+w2 ok + child w3+w4 ok, same family) reads completed: together
+    the family executed the full 4-phase revision, no member failed, and the latest member
+    (child) succeeded. The F5 live shape (parent FAILED, child ok) reads NOT-completed even
+    though the union still covers and the latest member succeeded — a failed member means the
+    failed phase was never re-executed to ok.
+    """
+    spec = _g1_spec_file(tmp_path, phases=["w1", "w2", "w3", "w4"])
+    parent = _family_run(spec, run_id="run-parent", family_id="fam-1", ok=True,
+                         phases=["w1", "w2"], timestamp="2026-09-02T10:00:00+00:00")
+    child = _family_run(spec, run_id="run-child", family_id="fam-1", parent_run_id="run-parent",
+                        ok=True, phases=["w3", "w4"], timestamp="2026-09-02T11:00:00+00:00")
+    # Clean split: union covers the full revision, latest member succeeded -> completed.
+    assert derive_status(spec, [parent, child]) == "completed"
+    # A partial union (w5 missing) is never completed.
+    spec5 = _g1_spec_file(tmp_path, name="g1_five", phases=["w1", "w2", "w3", "w4", "w5"])
+    p5 = _family_run(spec5, run_id="run-parent", family_id="fam-1", ok=True,
+                     phases=["w1", "w2"], timestamp="2026-09-02T10:00:00+00:00")
+    c5 = _family_run(spec5, run_id="run-child", family_id="fam-1", parent_run_id="run-parent",
+                     ok=True, phases=["w3", "w4"], timestamp="2026-09-02T11:00:00+00:00")
+    assert derive_status(spec5, [p5, c5]) == "blocked"
+    # The engine_gaps live shape: parent FAILED at w2 -> the family is never completed, even
+    # though the union covers and the child (latest) succeeded.
+    parent_failed = _family_run(spec, run_id="run-parent", family_id="fam-2", ok=False,
+                                phases=["w1", "w2"], timestamp="2026-09-02T10:00:00+00:00")
+    child_ok = _family_run(spec, run_id="run-child", family_id="fam-2",
+                           parent_run_id="run-parent", ok=True, phases=["w3", "w4"],
+                           timestamp="2026-09-02T11:00:00+00:00")
+    assert derive_status(spec, [parent_failed, child_ok]) == "failed"
+    # Awaiting members are designed stops, never failures: an awaiting parent + ok child
+    # (union covers) reads completed.
+    parent_await = _family_run(spec, run_id="run-parent", family_id="fam-3", ok=False,
+                               awaiting=True, phases=["w1", "w2"],
+                               timestamp="2026-09-02T10:00:00+00:00")
+    child_after_await = _family_run(spec, run_id="run-child", family_id="fam-3",
+                                    parent_run_id="run-parent", ok=True, phases=["w3", "w4"],
+                                    timestamp="2026-09-02T11:00:00+00:00")
+    assert derive_status(spec, [parent_await, child_after_await]) == "completed"
+
+
+def test_g1_unlinked_runs_are_separate_families(tmp_path: Path):
+    """VERIFY (b): an unlinked second run (a genuinely new attempt) does NOT union with the
+    first — two separate families never combine their partial phase coverage."""
+    spec = _g1_spec_file(tmp_path, phases=["w1", "w2", "w3", "w4"])
+    run_a = _family_run(spec, run_id="run-a", family_id="fam-a", ok=True,
+                        phases=["w1", "w2"], timestamp="2026-09-02T10:00:00+00:00")
+    # run-b has its OWN family id (a genuinely new attempt) — it must not union with run-a.
+    run_b = _family_run(spec, run_id="run-b", family_id="fam-b", ok=True,
+                        phases=["w3", "w4"], timestamp="2026-09-02T11:00:00+00:00")
+    # Each family alone covers only half the revision -> never completed.
+    assert derive_status(spec, [run_a, run_b]) == "blocked"
+    # The same two phase halves, family-linked, DO complete (the (a) clean-split shape).
+    run_c = _family_run(spec, run_id="run-a", family_id="fam-c", ok=True,
+                        phases=["w1", "w2"], timestamp="2026-09-02T10:00:00+00:00")
+    run_d = _family_run(spec, run_id="run-b", family_id="fam-c", parent_run_id="run-a",
+                        ok=True, phases=["w3", "w4"], timestamp="2026-09-02T11:00:00+00:00")
+    assert derive_status(spec, [run_c, run_d]) == "completed"
+
+
+def test_g1_single_run_derivations_unchanged(tmp_path: Path):
+    """VERIFY (c): existing single-run derivations are unchanged — a lone completed run (no
+    family fields, full coverage) still reads completed; a lone failed run reads failed."""
+    spec = _g1_spec_file(tmp_path, phases=["w1", "w2", "w3", "w4"])
+    full = _family_run(spec, run_id="", family_id="", ok=True,
+                       phases=["w1", "w2", "w3", "w4"], timestamp="2026-09-02T10:00:00+00:00")
+    assert derive_status(spec, [full]) == "completed"
+    failed = _family_run(spec, run_id="", family_id="", ok=False,
+                         phases=["w1", "w2", "w3", "w4"], timestamp="2026-09-02T10:00:00+00:00")
+    assert derive_status(spec, [failed]) == "failed"
+    unresolved = _family_run(spec, run_id="", family_id="", ok=None,
+                             phases=["w1", "w2", "w3", "w4"], timestamp="2026-09-02T10:00:00+00:00")
+    assert derive_status(spec, [unresolved]) == "blocked"
+
+
+def test_g1_ledger_family_link_round_trips(tmp_path: Path):
+    """VERIFY (d): the ledger's family link round-trips — spec_status reads the
+    run_id/parent_run_id/family_id keys a resume writes, and derives from the family union."""
+    spec = _g1_spec_file(tmp_path, name="g1_rt", phases=["w1", "w2", "w3", "w4"])
+    run_dir = tmp_path / "experiments" / "results" / "workflows" / "g1_rt"
+    run_dir.mkdir(parents=True, exist_ok=True)
+
+    def _ledger(stem: str, **fields: object) -> Path:
+        path = run_dir / f"{stem}.json"
+        payload = {
+            "spec_name": "g1_rt",
+            "goal": "close g1 split-run evidence",
+            "ok": True,
+            "workflow_revision_id": spec.workflow_revision_id,
+            "started_at": "2026-09-02T10:00:00+00:00",
+            "ended_at": "2026-09-02T11:00:00+00:00",
+            "phases": [],
+            **fields,
+        }
+        path.write_text(json.dumps(payload))
+        return path
+
+    _ledger("20260902T100000Z", run_id="run-parent", family_id="fam-rt", ok=True,
+            phases=[{"phase": "w1", "status": "ok"}, {"phase": "w2", "status": "ok"}])
+    _ledger("20260902T110000Z", run_id="run-child", family_id="fam-rt",
+            parent_run_id="run-parent", ok=True,
+            phases=[{"phase": "w3", "status": "ok"}, {"phase": "w4", "status": "ok"}])
+
+    runs = load_runs("g1_rt", results_dir=tmp_path / "experiments" / "results" / "workflows",
+                     root=tmp_path)
+    assert [r.run_id for r in runs] == ["run-parent", "run-child"]
+    assert [r.family_id for r in runs] == ["fam-rt", "fam-rt"]
+    assert [r.parent_run_id for r in runs] == ["", "run-parent"]
+    # The union derivation reads the link straight off the ledgers.
+    assert derive_status(spec, runs) == "completed"
