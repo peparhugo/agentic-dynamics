@@ -164,6 +164,17 @@ class RunSummary:
     #: OLDER one: if the current spec declares a phase no run ever executed (a gate appended
     #: after the last green run), the green runs predate it and cannot certify completion.
     executed_phases: frozenset[str] = frozenset()
+    #: The split-run family link (engine_gaps_followups g1, F5). ``run_id`` is the run's own
+    #: control-db identity (minted by ``scripts/run_workflow.py`` and stamped onto the ledger
+    #: at write time; ``""`` for pre-g1 ledgers). ``parent_run_id`` names the run this run
+    #: CONTINUES — a ``--resume`` child records its parent so a split run is one family, not
+    #: two unrelated runs. ``family_id`` is the family ROOT's ``run_id``, shared by every
+    #: member, so ``derive_status`` can group a resume's evidence into one unit. A run with an
+    #: empty ``family_id`` (legacy ledger, or a genuinely new attempt) is its own family: it
+    #: never unions with any other run.
+    run_id: str = ""
+    parent_run_id: str = ""
+    family_id: str = ""
     #: P1 (awaiting-approval fix): True when the run ledger carries ``awaiting: true`` — the
     #: run stopped at a mechanical human checkpoint (or a resume refused past an unsatisfied
     #: one). A designed stop, never a failure: the index derives ``awaiting_approval`` for a
@@ -193,6 +204,9 @@ class RunSummary:
             "awaiting": self.awaiting,
             "started_at": self.started_at,
             "open": self.open,
+            "run_id": self.run_id,
+            "parent_run_id": self.parent_run_id,
+            "family_id": self.family_id,
         }
 
 
@@ -230,6 +244,12 @@ def summarize_run(path: Path, payload: dict[str, Any], *, root: Path) -> RunSumm
         awaiting=payload.get("awaiting") is True,
         started_at=_iso(started) if started else None,
         open=(ended is None and started is not None),
+        # The split-run family link (engine_gaps_followups g1, F5) — stamped onto the ledger
+        # by scripts/run_workflow.py at write time (run_id/parent_run_id/family_id keys).
+        # Read defensively so pre-g1 ledgers parse unchanged (all three default to "").
+        run_id=str(payload.get("run_id") or ""),
+        parent_run_id=str(payload.get("parent_run_id") or ""),
+        family_id=str(payload.get("family_id") or ""),
     )
 
 
@@ -388,19 +408,40 @@ def _spec_phase_names(spec: ExperimentSpec) -> list[str]:
 
 
 def _is_definition_changed_after_runs(spec: ExperimentSpec, runs: list[RunSummary]) -> bool:
-    """True when the current spec declares a phase NO run of the spec ever executed.
+    """True when the run corpus cannot certify the CURRENT spec definition.
 
-    The w2 'gate added after completed' detector for LEGACY run ledgers (written before the
+    The w2 'edited after its runs' detector for LEGACY run ledgers (written before the
     revision digest existed, so they carry no ``workflow_revision_id`` to compare). A green
-    run that completed the spec executed every phase the spec declared at the time; if the
-    CURRENT spec declares a phase that appears in no run ledger (e.g. a ``kind: test`` gate
-    appended after the last green run), then the recorded runs predate the definition change
-    and cannot certify the current revision.
+    run that completed the spec executed every phase the spec declared at the time; when the
+    CURRENT spec's phases no longer match what the runs executed, the recorded runs predate
+    the definition change and cannot certify the current revision. Two shapes count
+    (engine_gaps_followups g1, F3/F4):
+
+    1. **Mid-list structural edit (name evidence)** — a phase the runs executed does not
+       exist in the current definition: the runs executed a phase that was RENAMED, or
+       REMOVED (from the middle or the tail), between the runs and the current definition.
+       The runs certify a definition that no longer exists — their executed_phase names do
+       not match the current list by name+position. The pre-g1 code could not see this: its
+       ``len(executed) >= len(spec_phases)`` early return let a same-count rename — and a
+       corpus LARGER than the current list after a removal — short-circuit to "not changed".
+    2. **Trailing append (unchanged)** — the runs executed every phase the current
+       definition declares EXCEPT its final one (``executed == spec_phases[:-1]``): the
+       shape of a single phase (typically a ``kind: test`` gate) appended after the last
+       full run (``fleet_job_submission``'s appended ``p6_test_gate``). Deliberately
+       narrower than 'any strict prefix': a partial-run corpus (``--only-phase`` runs whose
+       union is a SMALL strict prefix, e.g. p1-only runs over a ``p1..p5`` definition)
+       executed phases that exist in the current definition, in order — just not all of them
+       — and must NOT read as 'edited' when no edit occurred (the f4 false-positive). Firing
+       only at the one-gate depth keeps the real appended-gate corpus invalidating while a
+       partial corpus derives its own honest partial state (``blocked``/``runnable`` per its
+       union) instead.
 
     Only ever fires when a green (``ok``) run exists: a run that FAILED before reaching a
     later phase leaves that phase unexecuted too, but that is a failure, not a definition
     change, and must keep deriving ``failed`` rather than looking "never run of this
-    revision".
+    revision". Name-preserving edits (a pure REORDER, or a kind/scope/tests-only change with
+    no rename) are invisible to legacy ledgers — they record phase NAMES only — and are
+    caught exactly by the revision digest once a post-w2 run exists.
     """
     spec_phases = _spec_phase_names(spec)
     if not spec_phases:
@@ -409,14 +450,17 @@ def _is_definition_changed_after_runs(spec: ExperimentSpec, runs: list[RunSummar
     if not has_green:
         return False
     executed = set().union(*(run.executed_phases for run in runs)) if runs else set()
-    # Only the "trailing append" shape counts as a *definition changed after the runs*: the
-    # executed phases form a strict prefix of the current phase list (a gate was appended to
-    # the END after the last run). A phase missing from the FRONT or MIDDLE of the current
-    # list (a resumed run whose earlier ledger lives elsewhere) is not proof of an edit.
-    n = len(executed)
-    if n <= 0 or n >= len(spec_phases):
+    if not executed:
         return False
-    return executed == set(spec_phases[:n])
+    # (1) Mid-list structural edit: an executed phase no longer exists in the current
+    # definition (renamed or removed after the runs). Name evidence — exact where it speaks.
+    if executed - set(spec_phases):
+        return True
+    # (2) Trailing append: the runs executed the whole current list except its final phase —
+    # the fingerprint of ONE phase appended after the last full run. A strict prefix ALONE is
+    # not proof of an edit (that is the f4 false-positive on partial-run corpora); only the
+    # completion-shaped prefix missing exactly the trailing phase reads as an appended gate.
+    return executed == set(spec_phases[:-1])
 
 
 def _runs_of_current_revision(
@@ -446,6 +490,100 @@ def _runs_of_current_revision(
     if _is_definition_changed_after_runs(spec, runs):
         return [], True
     return runs, False
+
+
+def _certifying_families(certifying: list[RunSummary]) -> list[list[RunSummary]]:
+    """Split certifying runs into run FAMILIES (engine_gaps_followups g1, F5).
+
+    A family is the resume lineage: a parent run and every continuation run that records its
+    ``parent_run_id``/``family_id`` link on the ledger. Every member of a family shares the
+    family ROOT's ``family_id``, so grouping by that key re-unites the split run.
+
+    A run with an empty ``family_id`` is its own family — a genuinely new attempt (unlinked)
+    never unions with another run. That is the (b) invariant: two unlinked runs are two
+    separate families, and their executed phases never combine to fake full coverage.
+
+    Within a family, members keep the chronological order they appeared in ``certifying``
+    (oldest first), so ``family[-1]`` is always the family's LATEST member. Families are
+    returned ordered NEWEST-first — ordered by the position of their newest member in the
+    chronological ``certifying`` list (the list order is the time order; unlinked singletons
+    are ordered by their own position).
+    """
+    buckets: dict[str, list[RunSummary]] = {}
+    order: list[str] = []
+    newest_at: dict[str, int] = {}
+    for index, run in enumerate(certifying):
+        # A run with no family link is its own family: its group key is unique to its
+        # position, so two unlinked runs never merge even if their summaries are equal.
+        key = run.family_id or f"\x00self:{index}"
+        if key not in buckets:
+            buckets[key] = []
+            order.append(key)
+        buckets[key].append(run)
+        newest_at[key] = index
+    return [buckets[key] for key in sorted(order, key=newest_at.__getitem__, reverse=True)]
+
+
+def _family_executed_union(family: list[RunSummary]) -> set[str]:
+    """The union of every phase name the family's members executed, across all of them."""
+    union: set[str] = set()
+    for run in family:
+        union |= set(run.executed_phases)
+    return union
+
+
+def _family_status(spec: ExperimentSpec, family: list[RunSummary]) -> str | None:
+    """One family's union verdict, or ``None`` when the family is not decisive.
+
+    g1 split-run semantics (the family replaces the blunt any-failed block):
+
+    * ``"failed"`` — any member is a definitive failure (ok False, not awaiting). A failed
+      member means SOME phase in the family only ever failed — the union covering the phase
+      list by NAME is not enough, because the failed phase was never re-executed to ok. The
+      whole family reads failed: completion is NEVER derived from a later member alone when
+      an earlier member failed.
+    * ``"completed"`` — no member failed AND the family's executed-phase UNION covers the
+      current revision's full phase list AND the family's LATEST member succeeded. The union
+      is what lets a clean split certify: a resume parent (w1+w2, ok) + child (w3+w4, ok)
+      together executed the full revision, where neither alone did.
+    * ``None`` — no verdict (partial coverage with all-ok members, unresolved members, or
+      awaiting-only): the family cannot certify completion and does not read failed.
+    """
+    if any(member.ok is False and not member.awaiting for member in family):
+        return "failed"
+    latest = family[-1]
+    if latest.ok is not True:
+        return None
+    full_phases = set(_spec_phase_names(spec))
+    if full_phases <= _family_executed_union(family):
+        return "completed"
+    return None
+
+
+def _newest_decisive_family_status(
+    spec: ExperimentSpec, certifying: list[RunSummary]
+) -> str | None:
+    """The spec's overall verdict under family-union semantics, or ``None``.
+
+    Families are scanned NEWEST-first (see :func:`_certifying_families`) and the first
+    family with a DECISIVE union verdict (``failed`` or ``completed``) decides the spec.
+    Unresolved families — all members ok=None (started, never resolved), or an all-ok family
+    whose union does not yet cover the full revision — are not decisive and are deferred, so
+    a blocked attempt never erases an older decisive verdict:
+
+    * a later FAILED family un-completes an earlier completed one (the guard's shape: a
+      later failed re-run must not un-complete);
+    * a later genuine full-coverage family completes even when an earlier SEPARATE family
+      failed (the unlinked-second-run blind spot the guard could not see);
+    * an unresolved family in between defers to the decisive evidence behind it.
+
+    Returns ``None`` when no family is decisive (no verdict anywhere).
+    """
+    for family in _certifying_families(certifying):
+        status = _family_status(spec, family)
+        if status in ("failed", "completed"):
+            return status
+    return None
 
 
 def derive_status(
@@ -493,6 +631,20 @@ def derive_status(
     no revision id and are attributed to the current revision unless a definition change is
     detectable after them (see :func:`_runs_of_current_revision`).
 
+    **Completion follows the family UNION, never the latest run alone** (engine_gaps_followups
+    g1, F5). Certifying runs are grouped into families — the resume lineage a parent and its
+    ``--resume`` children share via ``parent_run_id``/``family_id`` (see :func:`_certifying_families`).
+    A spec is ``completed`` only when a family's *union* of executed phases covers the current
+    revision's full phase list, its latest member succeeded, and NO member is a definitive
+    failure. A family with any failed member reads ``failed`` — a failed member means some
+    phase in the family only ever failed, and no union of names can certify it. An incomplete
+    union (all-ok members that together did not execute the whole revision) is not completed.
+    A run with no family link is its own family: a genuinely NEW attempt never unions with an
+    older one, so a fresh full-coverage success can certify even after an earlier (separate)
+    family failed, while a split parent+child never fakes completion from their joined phases.
+    The overall status is the newest DECISIVE family's (newest-first scan, deferring past
+    unresolved families) — a later failed re-run un-completes, a later genuine full run completes.
+
     The ``awaiting_approval`` state is the P1 fix: a correctly-paused run (``ok: false`` +
     ``awaiting: true`` on the ledger — a checkpoint stop, or a resume refused past an
     unsatisfied checkpoint) must read as "waiting for the operator", NOT as ``failed``. The
@@ -522,19 +674,19 @@ def derive_status(
     # P1: the LATEST certifying run is awaiting operator approval — a designed pause.
     if certifying and certifying[-1].awaiting:
         return "awaiting_approval"
-    # The split-run guard (engine_gaps_followups g1, F5): completion is never derived
-    # from `any(ok is True)` alone. A run family whose evidence is split across a resume
-    # (parent failed/timed out at w2, child resumed w3+w4) has BOTH runs certifying the
-    # same revision — and a FAILED member means no single run executed the full revision
-    # successfully. A failed certifying run blocks completion: the spec reads failed (or
-    # the more specific blocked/runnable below) until a full-coverage run of the current
-    # revision succeeds with no failed member in the family. An AWAITING member (ok False
-    # + awaiting True) is a designed stop, not a failure — it never blocks completion on
-    # its own (a pause predating a later success is shadowed by that success).
-    if any(run.ok is False and not run.awaiting for run in certifying):
-        return "failed"
-    if any(run.ok is True for run in certifying):
-        return "completed"
+    # g1 (F5): completion is derived from the UNION of a run family's evidence, never from
+    # any single run's `ok` flag alone. The split-run shape (parent failed at w2 + a --resume
+    # child that ran w3+w4) must not read completed from the child's success: no single run
+    # executed the full revision. _family_status resolves one family's union verdict; the
+    # scan below walks families newest-first and returns the newest DECISIVE family (so a
+    # later genuine full-coverage run can certify, and a later failed re-run un-completes).
+    # A definitive failure anywhere in a family (any member ok False, not awaiting) blocks
+    # that family from ever reading completed — a phase that failed in one member was never
+    # re-executed to ok, and names alone cannot certify it. Awaiting members are designed
+    # stops, never failures (a pause predating a later success is shadowed by that success).
+    decisive = _newest_decisive_family_status(spec, certifying)
+    if decisive is not None:
+        return decisive
     if certifying:
         return "blocked"
     # No run certifies the current revision.

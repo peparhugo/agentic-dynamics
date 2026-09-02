@@ -157,6 +157,24 @@ WRITE_FLAG_ENVS: frozenset[str] = frozenset({"FINOPS_KB_WRITE", "FINOPS_ACTUATIO
 #: A write flag is "set" only on an explicit truthy value (the FINOPS_* convention: "1" or "true").
 _TRUTHY = {"1", "true", "True", "yes", "on"}
 
+#: The verifier request marker (g1_verifier_mount, 2026-09-02). ``build_verifier_request``
+#: stamps this on the request so :func:`validate_spawn` can enforce the READ-ONLY-for-candidate
+#: contract at validation time — a verifier request whose worktree/.git mounts are ``rw`` is
+#: refused BEFORE any spawn, never behaviorally via ``--no-commit``. An agent-phase request
+#: (no marker) keeps its ``rw`` candidate contract unchanged.
+VERIFIER_REQUEST_MARKER = "verifier"
+
+#: The mount CATEGORIES a verifier request may carry, every one READ-ONLY (F1/g1_verifier_mount).
+#: The candidate surface the verifier runs its suite against — the worktree namespace
+#: (``worktree``), the repo (``repo``) and both git dirs (``repo-git`` / ``repo-alias-git``),
+#: plus the host-path alias (``repo-alias``) — is mounted ``ro``: a verifier needs the
+#: candidate's TREE, never the ability to change it. Categories OUTSIDE this set (``results``,
+#: ``state``, the ``auth``/``auth-file`` credential mounts) are never on a verifier request —
+#: validation refuses them if present.
+VERIFIER_READONLY_CATEGORIES: frozenset[str] = frozenset(
+    {"worktree", "repo", "repo-git", "repo-alias", "repo-alias-git"}
+)
+
 #: Step 6's vocabulary (admission_leases p2), re-exported from the tier-0 admission contract so
 #: the wrapper's own callers and tests can name the block without reaching past this module.
 #: Owned by ``core.admission_context`` — one definition, shared by the fleet wrapper, the
@@ -330,6 +348,13 @@ def validate_spawn(
     cfg = _scope_config(scope)
 
     # Step 3 — every mount's target ∈ the four + D-2, and its mode matches the scope/contract.
+    # A VERIFIER request (the DockerVerifierExecutor's read-only cell — stamped by
+    # build_verifier_request) is a DIFFERENT contract: it may carry ONLY the read-only
+    # candidate surface (worktree/repo/repo-git/repo-alias/repo-alias-git, all ro), never the
+    # results/state/auth mounts of an agent cell. Read-only-for-candidate is enforced HERE, at
+    # validation time — a verifier request that would mount its candidate rw is refused before
+    # the socket call, never left to the child's --no-commit.
+    is_verifier = bool(request.get(VERIFIER_REQUEST_MARKER))
     for m in request.get("mounts", []) or []:
         target = str((m or {}).get("target", ""))
         mode = str((m or {}).get("mode", ""))
@@ -340,6 +365,20 @@ def validate_spawn(
             )
             continue
         category, contract_mode = CONTRACT_TARGETS[target]
+        if is_verifier:
+            # The verifier's mount contract (g1_verifier_mount): candidate surface only, ro.
+            if category not in VERIFIER_READONLY_CATEGORIES:
+                errors.append(
+                    f"step 3: verifier mount {target!r} (category {category!r}) is outside "
+                    f"the read-only candidate surface — a verifier carries no "
+                    f"results/state/auth mounts"
+                )
+            elif mode != "ro":
+                errors.append(
+                    f"step 3: verifier mount {target!r} mode {mode!r} != ro — the verifier "
+                    f"cannot write its candidate (read-only-for-candidate)"
+                )
+            continue
         if category == "results":
             expected = cfg.get("results_mode", "rw")
             if mode != expected:
@@ -891,12 +930,16 @@ def build_verifier_request(
     * any write-flag env (``FINOPS_KB_WRITE`` / ``FINOPS_ACTUATION_ARMED``) the phase's scope
       would otherwise authorize — a verifier never emits.
 
-    What REMAINS is the read-only candidate surface: ``/repo`` and the repo-alias at the host
-    path (ro — the candidate SHA the suite runs against), plus the contract-fixed shared
-    mounts (the ``/tmp`` worktree namespace and the repo-git dirs) that a real git-worktree
-    test run requires and that the in-process LocalVerifier path already touches identically.
-    The verifier's child command runs with ``--no-commit`` (a test phase never commits), so
-    the contract-fixed rw git dirs are read by the suite, never written by the verifier.
+    What REMAINS is the candidate surface the suite runs against — and it is mounted
+    READ-ONLY in its entirety (g1_verifier_mount, engine_gaps_followups F1): the worktree
+    namespace (``/tmp`` — the candidate workdir), the repo (``/repo``), and both git dirs
+    (``/repo/.git`` + the host-path ``.git`` alias). A verifier needs the candidate's TREE
+    to run the suite against, never the ability to change it — so the writable candidate
+    surfaces an agent phase mounts (``rw`` because it COMMITS its work) are flipped to ``ro``
+    HERE, at the mount contract, never left to the child's ``--no-commit``. The request is
+    stamped with :data:`VERIFIER_REQUEST_MARKER` so :func:`validate_spawn` enforces
+    read-only-for-candidate at validation time (a verifier request that would mount the
+    candidate ``rw`` is refused before the socket call).
 
     ``admission`` mirrors ``build_phase_request``'s contract: supplied when a lease context is
     in force; a verifier request deliberately has none when absent, because the verifier spends
@@ -922,6 +965,16 @@ def build_verifier_request(
         m for m in request["mounts"]
         if not str((m or {}).get("target", "")).startswith("/app/experiments/results")
     ]
+    # F1 (g1_verifier_mount): after the forbidden-surface drops the ONLY mounts left ARE the
+    # candidate surface (worktree /tmp, repo /repo + /repo/.git, the host-path repo-alias +
+    # its .git) — flip every one of them to READ-ONLY. The verifier container cannot write its
+    # candidate through any mount; if a writable scratch is ever genuinely needed it is a
+    # SEPARATE, empty, non-candidate volume (never the worktree, never .git), and validation
+    # refuses any non-candidate mount on a verifier request regardless. Marking the request
+    # lets validation REFUSE a request that would mount the candidate rw.
+    for m in request["mounts"]:
+        m["mode"] = "ro"
+    request[VERIFIER_REQUEST_MARKER] = True
     env = {k: v for k, v in (request.get("env", {}) or {}).items() if k not in STATE_ENV_KEYS}
     env.pop("FINOPS_OPENCODE_STATE_DIR", None)
     for flag in WRITE_FLAG_ENVS:

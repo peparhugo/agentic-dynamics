@@ -89,8 +89,10 @@ class DockerVerifierExecutor(StepExecutor):
             "--workdir", self._workdir,
             "--only-phase", request.phase_name,
             "--timeout", str(request.timeout or self._timeout),
-            # A test phase never commits: the verifier is read-only by construction, and the
-            # child's --no-commit guarantees the contract-fixed repo-git mounts are only read.
+            # A test phase never commits; --no-commit is belt-and-braces. The verifier's
+            # read-only-for-candidate contract is now ENFORCED at the mount (g1_verifier_mount:
+            # build_verifier_request mounts the candidate's worktree + git dirs ro and
+            # validate_spawn refuses any request that would mount them rw) — never behavioral.
             "--no-commit",
         ]
         if self._backend or request.backend:

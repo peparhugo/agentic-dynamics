@@ -394,6 +394,15 @@ class WorkflowRunResult:
     #: agent phase (the model invocation). Additive: a run that made no agent phases carries an
     #: empty list; old ledgers lack the key and parse unchanged via ``.get("attempts", [])``.
     attempts: list[AttemptRecord] = field(default_factory=list)
+    #: g1 (engine_gaps_followups F5) — the split-run family link. ``run_id`` is this run's
+    #: control-db identity, stamped by the CLI's composition root (the engine never knows the
+    #: control-plane id — Debt-2), so the run ledger and the control db carry the same link.
+    #: ``parent_run_id`` names the run this run CONTINUES (a ``--resume`` child); ``family_id``
+    #: is the family ROOT's run id, shared by every member of the lineage. Empty for runs that
+    #: predate the field (pre-g1 ledgers parse unchanged).
+    run_id: str = ""
+    parent_run_id: str = ""
+    family_id: str = ""
 
     @property
     def total_cost_usd(self) -> float:
@@ -473,6 +482,13 @@ class WorkflowRunResult:
             "total_cost_usd": self.total_cost_usd,
             "ok": self.ok,
             "phases": [p.to_dict() for p in self.phases],
+            # ADDED keys (g1, F5 — never renames an existing key): the split-run family link,
+            # stamped by the CLI's composition root (run_id/parent_run_id/family_id). Old
+            # ledgers lack these keys; spec_status reads them via ``.get(...)`` so pre-g1
+            # ledgers parse unchanged.
+            "run_id": self.run_id,
+            "parent_run_id": self.parent_run_id,
+            "family_id": self.family_id,
         }
 
 

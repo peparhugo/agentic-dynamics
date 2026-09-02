@@ -937,3 +937,290 @@ def test_index_regeneration_is_deterministic_with_new_fields(tmp_path: Path):
     body1 = report1.index_path.read_text()
     report2 = refresh_spec_status(root=tmp_path, generated_at="2026-09-02T00:00:00+00:00")
     assert report2.index_path.read_text() == body1
+
+
+# ── g1 split-run evidence: the resume family link + the union derivation ──────────
+#
+# engine_gaps_followups g1 (F5): a --resume continuation is a CHILD of the run it continues,
+# recorded as parent_run_id/family_id on the control-db run row AND the run ledger. derive_status
+# must derive completion from the UNION of a run family's evidence — never from the latest run
+# alone when an earlier member failed or holds un-executed phases.
+
+
+def _family_run(
+    spec: ExperimentSpec,
+    *,
+    run_id: str,
+    family_id: str,
+    parent_run_id: str = "",
+    ok: bool = True,
+    phases: list[str],
+    timestamp: str,
+    awaiting: bool = False,
+) -> RunSummary:
+    """A post-g1 run ledger carrying the family link (run_id/parent/family keys)."""
+    return RunSummary(
+        path=f"experiments/results/workflows/{spec.name}/{timestamp}.json",
+        timestamp=timestamp,
+        ok=ok,
+        workflow_revision_id=spec.workflow_revision_id,
+        executed_phases=frozenset(phases),
+        awaiting=awaiting,
+        run_id=run_id,
+        parent_run_id=parent_run_id,
+        family_id=family_id,
+    )
+
+
+def _g1_spec_file(root: Path, name: str = "g1_split", phases: list[str] | None = None,
+                   **lifecycle: object) -> ExperimentSpec:
+    """Write a phase-declaring workflow spec under ``root`` and load it."""
+    from agentic_dynamics.experiment.experiment_spec import load_spec
+
+    specs = root / "workflows" / "repository"
+    specs.mkdir(parents=True, exist_ok=True)
+    path = specs / f"{name}.yaml"
+    path.write_text(_phase_spec_yaml(name, phases=phases or ["w1", "w2", "w3", "w4"],
+                                     **lifecycle))
+    return load_spec(path)
+
+
+def test_g1_split_run_union_family_completion(tmp_path: Path):
+    """VERIFY (a): a linked parent+child derives completed ONLY when the union covers the
+    revision AND the latest member succeeded — and derives NOT-completed when a member failed.
+
+    A clean split (parent w1+w2 ok + child w3+w4 ok, same family) reads completed: together
+    the family executed the full 4-phase revision, no member failed, and the latest member
+    (child) succeeded. The F5 live shape (parent FAILED, child ok) reads NOT-completed even
+    though the union still covers and the latest member succeeded — a failed member means the
+    failed phase was never re-executed to ok.
+    """
+    spec = _g1_spec_file(tmp_path, phases=["w1", "w2", "w3", "w4"])
+    parent = _family_run(spec, run_id="run-parent", family_id="fam-1", ok=True,
+                         phases=["w1", "w2"], timestamp="2026-09-02T10:00:00+00:00")
+    child = _family_run(spec, run_id="run-child", family_id="fam-1", parent_run_id="run-parent",
+                        ok=True, phases=["w3", "w4"], timestamp="2026-09-02T11:00:00+00:00")
+    # Clean split: union covers the full revision, latest member succeeded -> completed.
+    assert derive_status(spec, [parent, child]) == "completed"
+    # A partial union (w5 missing) is never completed.
+    spec5 = _g1_spec_file(tmp_path, name="g1_five", phases=["w1", "w2", "w3", "w4", "w5"])
+    p5 = _family_run(spec5, run_id="run-parent", family_id="fam-1", ok=True,
+                     phases=["w1", "w2"], timestamp="2026-09-02T10:00:00+00:00")
+    c5 = _family_run(spec5, run_id="run-child", family_id="fam-1", parent_run_id="run-parent",
+                     ok=True, phases=["w3", "w4"], timestamp="2026-09-02T11:00:00+00:00")
+    assert derive_status(spec5, [p5, c5]) == "blocked"
+    # The engine_gaps live shape: parent FAILED at w2 -> the family is never completed, even
+    # though the union covers and the child (latest) succeeded.
+    parent_failed = _family_run(spec, run_id="run-parent", family_id="fam-2", ok=False,
+                                phases=["w1", "w2"], timestamp="2026-09-02T10:00:00+00:00")
+    child_ok = _family_run(spec, run_id="run-child", family_id="fam-2",
+                           parent_run_id="run-parent", ok=True, phases=["w3", "w4"],
+                           timestamp="2026-09-02T11:00:00+00:00")
+    assert derive_status(spec, [parent_failed, child_ok]) == "failed"
+    # Awaiting members are designed stops, never failures: an awaiting parent + ok child
+    # (union covers) reads completed.
+    parent_await = _family_run(spec, run_id="run-parent", family_id="fam-3", ok=False,
+                               awaiting=True, phases=["w1", "w2"],
+                               timestamp="2026-09-02T10:00:00+00:00")
+    child_after_await = _family_run(spec, run_id="run-child", family_id="fam-3",
+                                    parent_run_id="run-parent", ok=True, phases=["w3", "w4"],
+                                    timestamp="2026-09-02T11:00:00+00:00")
+    assert derive_status(spec, [parent_await, child_after_await]) == "completed"
+
+
+def test_g1_unlinked_runs_are_separate_families(tmp_path: Path):
+    """VERIFY (b): an unlinked second run (a genuinely new attempt) does NOT union with the
+    first — two separate families never combine their partial phase coverage."""
+    spec = _g1_spec_file(tmp_path, phases=["w1", "w2", "w3", "w4"])
+    run_a = _family_run(spec, run_id="run-a", family_id="fam-a", ok=True,
+                        phases=["w1", "w2"], timestamp="2026-09-02T10:00:00+00:00")
+    # run-b has its OWN family id (a genuinely new attempt) — it must not union with run-a.
+    run_b = _family_run(spec, run_id="run-b", family_id="fam-b", ok=True,
+                        phases=["w3", "w4"], timestamp="2026-09-02T11:00:00+00:00")
+    # Each family alone covers only half the revision -> never completed.
+    assert derive_status(spec, [run_a, run_b]) == "blocked"
+    # The same two phase halves, family-linked, DO complete (the (a) clean-split shape).
+    run_c = _family_run(spec, run_id="run-a", family_id="fam-c", ok=True,
+                        phases=["w1", "w2"], timestamp="2026-09-02T10:00:00+00:00")
+    run_d = _family_run(spec, run_id="run-b", family_id="fam-c", parent_run_id="run-a",
+                        ok=True, phases=["w3", "w4"], timestamp="2026-09-02T11:00:00+00:00")
+    assert derive_status(spec, [run_c, run_d]) == "completed"
+
+
+def test_g1_single_run_derivations_unchanged(tmp_path: Path):
+    """VERIFY (c): existing single-run derivations are unchanged — a lone completed run (no
+    family fields, full coverage) still reads completed; a lone failed run reads failed."""
+    spec = _g1_spec_file(tmp_path, phases=["w1", "w2", "w3", "w4"])
+    full = _family_run(spec, run_id="", family_id="", ok=True,
+                       phases=["w1", "w2", "w3", "w4"], timestamp="2026-09-02T10:00:00+00:00")
+    assert derive_status(spec, [full]) == "completed"
+    failed = _family_run(spec, run_id="", family_id="", ok=False,
+                         phases=["w1", "w2", "w3", "w4"], timestamp="2026-09-02T10:00:00+00:00")
+    assert derive_status(spec, [failed]) == "failed"
+    unresolved = _family_run(spec, run_id="", family_id="", ok=None,
+                             phases=["w1", "w2", "w3", "w4"], timestamp="2026-09-02T10:00:00+00:00")
+    assert derive_status(spec, [unresolved]) == "blocked"
+
+
+def test_g1_ledger_family_link_round_trips(tmp_path: Path):
+    """VERIFY (d): the ledger's family link round-trips — spec_status reads the
+    run_id/parent_run_id/family_id keys a resume writes, and derives from the family union."""
+    spec = _g1_spec_file(tmp_path, name="g1_rt", phases=["w1", "w2", "w3", "w4"])
+    run_dir = tmp_path / "experiments" / "results" / "workflows" / "g1_rt"
+    run_dir.mkdir(parents=True, exist_ok=True)
+
+    def _ledger(stem: str, **fields: object) -> Path:
+        path = run_dir / f"{stem}.json"
+        payload = {
+            "spec_name": "g1_rt",
+            "goal": "close g1 split-run evidence",
+            "ok": True,
+            "workflow_revision_id": spec.workflow_revision_id,
+            "started_at": "2026-09-02T10:00:00+00:00",
+            "ended_at": "2026-09-02T11:00:00+00:00",
+            "phases": [],
+            **fields,
+        }
+        path.write_text(json.dumps(payload))
+        return path
+
+    _ledger("20260902T100000Z", run_id="run-parent", family_id="fam-rt", ok=True,
+            phases=[{"phase": "w1", "status": "ok"}, {"phase": "w2", "status": "ok"}])
+    _ledger("20260902T110000Z", run_id="run-child", family_id="fam-rt",
+            parent_run_id="run-parent", ok=True,
+            phases=[{"phase": "w3", "status": "ok"}, {"phase": "w4", "status": "ok"}])
+
+    runs = load_runs("g1_rt", results_dir=tmp_path / "experiments" / "results" / "workflows",
+                     root=tmp_path)
+    assert [r.run_id for r in runs] == ["run-parent", "run-child"]
+    assert [r.family_id for r in runs] == ["fam-rt", "fam-rt"]
+    assert [r.parent_run_id for r in runs] == ["", "run-parent"]
+    # The union derivation reads the link straight off the ledgers.
+    assert derive_status(spec, runs) == "completed"
+
+
+# ── g1 revision invalidation: mid-list edits invalidate, partial corpora do not ───────
+#
+# engine_gaps_followups g1 (F3/F4): _is_definition_changed_after_runs detected only the
+# trailing-append shape — a same-count MID-LIST rename (f3) evaded it and certified a legacy
+# green run as completed, while a partial-run corpus whose union is a SMALL strict prefix
+# (f4, --only-phase p1 runs over p1..p5) false-positived as 'edited'. This family proves the
+# two fixes: mid-list structural edits (rename/removal) invalidate by name evidence, and a
+# partial-run corpus with no edit reads per its own union instead of 'never run of this
+# revision'. Trailing-append detection and full-coverage certification are unchanged.
+
+
+def _legacy_green_run(spec: ExperimentSpec, phases: list[str],
+                      timestamp: str = "2026-09-01T00:00:00+00:00") -> RunSummary:
+    """A pre-w2 green run ledger: no digest, no family link — legacy evidence."""
+    return RunSummary(
+        path=f"experiments/results/workflows/{spec.name}/20260901T000000Z.json",
+        timestamp=timestamp,
+        ok=True,
+        executed_phases=frozenset(phases),
+    )
+
+
+def test_g1_midlist_rename_invalidates_a_legacy_green_run(tmp_path: Path):
+    """VERIFY (a): a mid-list RENAME of a phase (same count) invalidates a legacy green run.
+
+    The f3 failure mode: a run of the OLD name set must not certify the renamed definition.
+    The run executed a phase (``w2_revision_identity``) the current definition no longer
+    declares, so the spec reads never-run-of-this-revision, NOT completed.
+    """
+    from agentic_dynamics.experiment.spec_status import (
+        _is_definition_changed_after_runs,
+        derive_status,
+    )
+
+    spec_old = _g1_spec_file(tmp_path, name="g1_ren",
+                             phases=["w1_pin_spec", "w2_revision_identity", "w3_adversarial"])
+    run = _legacy_green_run(spec_old, ["w1_pin_spec", "w2_revision_identity", "w3_adversarial"])
+    assert derive_status(spec_old, [run]) == "completed"  # certifies the def it ran
+
+    # rename w2 mid-list, SAME phase count — the f3 shape the old detector could not see.
+    spec_new = _g1_spec_file(tmp_path, name="g1_ren",
+                             phases=["w1_pin_spec", "w2_revision_invalidation", "w3_adversarial"])
+    assert spec_new.workflow_revision_id != spec_old.workflow_revision_id
+    assert _is_definition_changed_after_runs(spec_new, [run]) is True
+    assert derive_status(spec_new, [run]) == "runnable"  # never run of this revision, not completed
+
+
+def test_g1_removed_phase_invalidates_legacy_runs(tmp_path: Path):
+    """VERIFY (b): a phase REMOVED after the runs invalidates — the runs certify a
+    definition that no longer exists."""
+    from agentic_dynamics.experiment.spec_status import (
+        _is_definition_changed_after_runs,
+        derive_status,
+    )
+
+    # A full legacy green run of [p1..p4]; p4 is then removed (the definition SHRANK).
+    spec_old = _g1_spec_file(tmp_path, name="g1_del", phases=["p1", "p2", "p3", "p4"])
+    run = _legacy_green_run(spec_old, ["p1", "p2", "p3", "p4"])
+    assert derive_status(spec_old, [run]) == "completed"
+    spec_shrunk = _g1_spec_file(tmp_path, name="g1_del", phases=["p1", "p2", "p3"])
+    assert _is_definition_changed_after_runs(spec_shrunk, [run]) is True
+    assert derive_status(spec_shrunk, [run]) == "runnable"
+
+    # A MID-LIST removal: p2 deleted after the run, p4 stays — same name-evidence invalidates.
+    spec_mid = _g1_spec_file(tmp_path, name="g1_del2", phases=["p1", "p3", "p4"])
+    run_mid = _legacy_green_run(spec_mid, ["p1", "p2", "p3", "p4"])
+    assert _is_definition_changed_after_runs(spec_mid, [run_mid]) is True
+    assert derive_status(spec_mid, [run_mid]) == "runnable"
+
+
+def test_g1_partial_run_corpus_without_an_edit_is_not_edited(tmp_path: Path):
+    """VERIFY (c): a partial-run corpus with NO edit does NOT false-positive (the f4 shape).
+
+    A green legacy run that executed only ``p1`` over a ``p1..p5`` definition ran a phase
+    that EXISTS in the current definition, in order — it just did not run all of them. That
+    is partial, never 'edited': it must derive blocked (per its own union), not the
+    'never-run-of-this-revision' runnable an invented definition change would produce.
+    """
+    from agentic_dynamics.experiment.spec_status import (
+        _is_definition_changed_after_runs,
+        derive_status,
+    )
+
+    spec = _g1_spec_file(tmp_path, name="g1_partial", phases=["p1", "p2", "p3", "p4", "p5"])
+    p1_run = _legacy_green_run(spec, ["p1"])
+    assert _is_definition_changed_after_runs(spec, [p1_run]) is False
+    assert derive_status(spec, [p1_run]) == "blocked"  # partial evidence, never 'edited'
+
+    # A slightly larger prefix corpus (p1+p2 only) is equally partial, not edited.
+    p12_run = _legacy_green_run(spec, ["p1", "p2"], timestamp="2026-09-02T00:00:00+00:00")
+    assert _is_definition_changed_after_runs(spec, [p12_run]) is False
+    assert derive_status(spec, [p12_run]) == "blocked"
+
+
+def test_g1_trailing_append_still_invalidates(tmp_path: Path):
+    """VERIFY (d): a genuine trailing append still invalidates (unchanged).
+
+    The classic appended-gate shape (fleet_job_submission): a legacy green run executed
+    every phase the pre-gate definition declared; the current definition appends ONE final
+    phase (a test gate) no run ever executed. The runs cannot certify the current revision.
+    """
+    from agentic_dynamics.experiment.spec_status import (
+        _is_definition_changed_after_runs,
+        derive_status,
+    )
+
+    spec = _g1_spec_file(tmp_path, name="g1_append",
+                         phases=["p1", "p2", "p3", "p4", "p5_test_gate"])
+    pre_gate = _legacy_green_run(spec, ["p1", "p2", "p3", "p4"])
+    assert _is_definition_changed_after_runs(spec, [pre_gate]) is True
+    assert derive_status(spec, [pre_gate]) == "runnable"  # never run OF THIS REVISION
+
+
+def test_g1_full_coverage_legacy_run_still_certifies_completed(tmp_path: Path):
+    """VERIFY (e): a full-coverage run of the current definition still certifies completed
+    (no regression)."""
+    from agentic_dynamics.experiment.spec_status import (
+        _is_definition_changed_after_runs,
+        derive_status,
+    )
+
+    spec = _g1_spec_file(tmp_path, name="g1_full", phases=["w1", "w2", "w3", "w4"])
+    full = _legacy_green_run(spec, ["w1", "w2", "w3", "w4"])
+    assert _is_definition_changed_after_runs(spec, [full]) is False
+    assert derive_status(spec, [full]) == "completed"

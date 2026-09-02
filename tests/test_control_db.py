@@ -253,6 +253,55 @@ def test_a_newer_schema_version_is_refused(db_path):
         ControlDB.open(db_path)
 
 
+def test_a_v3_database_is_migrated_in_place_to_v4(db_path):
+    """A pre-g1 (v3) database gains the family-link columns on the next writer open."""
+    # Build a genuine v3 database: the runs table WITHOUT parent_run_id / family_id, at
+    # schema_version 3, with a legacy row already present.
+    db_path.parent.mkdir(parents=True, exist_ok=True)
+    conn = sqlite3.connect(str(db_path))
+    try:
+        conn.executescript(
+            """
+            CREATE TABLE control_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+            INSERT INTO control_meta(key, value) VALUES ('schema_version', '3');
+            INSERT INTO control_meta(key, value) VALUES ('control_epoch', '0');
+            CREATE TABLE runs (
+                run_id TEXT PRIMARY KEY, spec_name TEXT NOT NULL,
+                workflow_revision_id TEXT NOT NULL DEFAULT '', candidate_sha TEXT NOT NULL DEFAULT '',
+                state TEXT NOT NULL, model TEXT NOT NULL DEFAULT '', started_at TEXT NOT NULL DEFAULT '',
+                ended_at TEXT NOT NULL DEFAULT '', ledger_path TEXT NOT NULL DEFAULT '',
+                cost_usd REAL NOT NULL DEFAULT 0.0
+            );
+            CREATE TABLE run_transitions (
+                transition_id INTEGER PRIMARY KEY AUTOINCREMENT, run_id TEXT NOT NULL,
+                from_state TEXT, to_state TEXT NOT NULL, at TEXT NOT NULL,
+                reason TEXT NOT NULL DEFAULT '', actor TEXT NOT NULL DEFAULT ''
+            );
+            INSERT INTO runs (run_id, spec_name, state)
+            VALUES ('legacy-run', 'old_spec', 'failed');
+            """
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+    with ControlDB.open(db_path) as handle:
+        run = handle.get_run("legacy-run")
+        assert run.parent_run_id == ""
+        assert run.family_id == ""  # a pre-g1 run is its own family
+        assert handle.schema_version() == SCHEMA_VERSION
+
+    # A fresh child can now link to the legacy row (the legacy row becomes the family root).
+    with ControlDB.open(db_path) as handle:
+        child = handle.create_run(
+            spec_name="old_spec", model="m", state="running", parent_run_id="legacy-run"
+        )
+        assert child.parent_run_id == "legacy-run"
+        assert child.family_id == "legacy-run"
+        # Re-opening is idempotent — no duplicate columns.
+        assert handle.schema_version() == SCHEMA_VERSION
+
+
 # ── Path resolution ──────────────────────────────────────────────────────────────────────────
 
 
@@ -475,6 +524,65 @@ def test_runs_can_be_filtered_by_state_and_spec(db):
     assert [r.run_id for r in db.runs(state=RunState.AWAITING_APPROVAL)] == [second]
     assert {r.run_id for r in db.runs(states=["running", "awaiting_approval"])} == {first, second}
     assert [r.run_id for r in db.runs(spec_name="alpha")] == [first]
+
+
+# ── g1: the split-run family link (parent_run_id / family_id) ───────────────────────────────
+
+
+def test_a_fresh_run_is_its_own_family_root(db):
+    """A run with no parent is a family root: family_id == its own run_id (g1, F5)."""
+    run = db.create_run(spec_name="g1_split", model="m")
+    assert run.parent_run_id == ""
+    assert run.family_id == run.run_id
+
+
+def test_a_child_inherits_the_parents_family(db):
+    """A --resume continuation records its parent and inherits the family id (g1, F5)."""
+    parent = db.create_run(spec_name="g1_split", model="m", state=RunState.RUNNING)
+    db.transition_run(parent.run_id, RunState.FAILED, reason="w2 timeout")
+    child = db.create_run(
+        spec_name="g1_split",
+        model="m",
+        state=RunState.RUNNING,
+        parent_run_id=parent.run_id,
+    )
+    assert child.parent_run_id == parent.run_id
+    assert child.family_id == parent.family_id == parent.run_id
+    # Round trip: get_run returns the link.
+    fetched = db.get_run(child.run_id)
+    assert (fetched.parent_run_id, fetched.family_id) == (parent.run_id, parent.run_id)
+
+
+def test_a_child_of_a_pre_g1_parent_makes_the_parent_the_root(db):
+    """A parent row with no family id (a pre-g1 run, stored before the column existed)
+    becomes the root for its child."""
+    # Simulate a legacy row: the family columns predate it, so they are ''.
+    db._conn.execute(
+        "INSERT INTO runs (run_id, spec_name, workflow_revision_id, candidate_sha, state,"
+        " model, started_at, ended_at, ledger_path, cost_usd, parent_run_id, family_id)"
+        " VALUES ('legacy-parent', 'g1_split', '', '', 'failed', 'm',"
+        " '2026-09-02T10:00:00Z', '2026-09-02T11:00:00Z', '', 0.0, '', '')"
+    )
+    db._conn.execute(
+        "INSERT INTO run_transitions (run_id, from_state, to_state, at, reason, actor)"
+        " VALUES ('legacy-parent', NULL, 'failed', '2026-09-02T11:00:00Z', '', 'orchestrator')"
+    )
+    child = db.create_run(spec_name="g1_split", model="m", state=RunState.RUNNING,
+                          parent_run_id="legacy-parent")
+    assert child.family_id == "legacy-parent"
+
+
+def test_runs_can_be_grouped_by_family(db):
+    """runs() filters surface the family grouping (a family + an unrelated attempt)."""
+    parent = db.create_run(spec_name="g1_split", model="m", state=RunState.RUNNING)
+    child = db.create_run(spec_name="g1_split", model="m", state=RunState.RUNNING,
+                          parent_run_id=parent.run_id)
+    other = db.create_run(spec_name="g1_split", model="m", state=RunState.RUNNING)
+    family_ids = {r.run_id: r.family_id for r in db.runs(spec_name="g1_split")}
+    assert family_ids[parent.run_id] == family_ids[child.run_id] == parent.run_id
+    # The genuinely-new attempt is its own family.
+    assert family_ids[other.run_id] == other.run_id
+    assert len({family_ids[r] for r in (parent.run_id, child.run_id, other.run_id)}) == 2
 
 
 # ── Step attempts ────────────────────────────────────────────────────────────────────────────

@@ -826,6 +826,30 @@ def test_ledger_records_carry_spec_id(tmp_path):
     assert all(ph["spec_id"] == expected for ph in serialized["phases"])
 
 
+def test_result_to_dict_carries_the_split_run_family_link():
+    """The engine result is the ledger's serialization source; g1's family link (stamped by the
+    CLI composition root after run_workflow returns) must survive to_dict so spec_status can
+    read it off the ledger. Pre-g1 results (all three fields empty) serialize unchanged."""
+    from agentic_dynamics.runtime.workflow_runner import WorkflowRunResult
+
+    plain = WorkflowRunResult(spec_name="g1", model="m", workdir="/tmp/x", goal="g")
+    payload = plain.to_dict()
+    assert payload["run_id"] == ""
+    assert payload["parent_run_id"] == ""
+    assert payload["family_id"] == ""
+
+    child = WorkflowRunResult(spec_name="g1", model="m", workdir="/tmp/x", goal="g")
+    # The CLI stamps these after the engine returns (Debt-2: the engine never knows the
+    # control-plane id); to_dict must then carry them into the ledger.
+    child.run_id = "run-child"
+    child.parent_run_id = "run-parent"
+    child.family_id = "run-parent"
+    payload = child.to_dict()
+    assert payload["run_id"] == "run-child"
+    assert payload["parent_run_id"] == "run-parent"
+    assert payload["family_id"] == "run-parent"
+
+
 # ── --resume: git log first, the derived index as the fallback ──
 
 
