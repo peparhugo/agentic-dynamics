@@ -1,7 +1,7 @@
 {
   "schema_version": "spec-status/v2",
-  "generated_at": "2026-09-02T13:40:41.216307+00:00",
-  "n_specs": 180,
+  "generated_at": "2026-09-02T14:09:40.247039+00:00",
+  "n_specs": 181,
   "specs": [
     {
       "name": "auto_posthoc_wiring",
@@ -386,6 +386,24 @@
       "version": "0.1",
       "status": "runnable",
       "spec_path": "workflows/repository/delta_entropy_response_campaign.yaml",
+      "artifact_kind": "workflow",
+      "repeatable": false,
+      "supersedes": [],
+      "superseded_by": null,
+      "completed_at": null,
+      "last_run_at": null,
+      "latest_ok": null,
+      "latest_model": null,
+      "latest_cost_usd": null,
+      "latest_git_sha": null,
+      "results_pointer": null,
+      "n_runs": 0
+    },
+    {
+      "name": "engine_gaps_verifier_revision",
+      "version": "0.1",
+      "status": "runnable",
+      "spec_path": "workflows/repository/engine_gaps_verifier_revision.yaml",
       "artifact_kind": "workflow",
       "repeatable": false,
       "supersedes": [],

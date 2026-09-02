@@ -1,0 +1,278 @@
+name: engine_gaps_verifier_revision
+question: >-
+  Land the two remaining engine-level gaps from the deep-review acceptance
+  criteria (2026-09-02 re-measure: 12/15 — criteria 3 and 10 still open):
+  (w1) the DockerVerifierExecutor — `kind: test` phases execute in a READ-ONLY
+  verifier container bound to the candidate SHA, so a declared independent
+  verification can run in the reference containerized path (currently test
+  phases are in-process-only, and the orchestrator fail-closes on them — a
+  hard refusal is safer than a skip, but it is not yet a verification);
+  (w2) revision identity — a workflow's completion is keyed to its normalized
+  revision (workflow_revision_id = sha256(canonicalized spec definition)), so
+  editing a spec invalidates completion from earlier revisions, and the spec
+  index's derive_status stops letting an authored YAML `status:` override run
+  evidence (spec_status.py:385 currently returns the authored status first —
+  the deep review's 'fleet_job_submission completed with a never-run gate'
+  failure mode). Both are engine changes with parity tests: the same parent
+  states whether a test phase ran in-process (LocalVerifier) or in a container
+  (DockerVerifier), and completion follows the revision, never the prose.
+version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: false
+repeatable: false
+# NOTE: no authored operational status — the P2-1 principle; completion is derived.
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: false
+    context:
+      domain_context: >-
+        canonical_sources: [src/agentic_dynamics/runtime/workflow_runner.py (the ONE
+        engine — the kind:test branch runs run_suite in-process at :3214, the
+        test_gate seam at :3212-3217, _run_test_gate at :891, the step_executor seam
+        where agent phases route through Local/Docker executors),
+        src/agentic_dynamics/runtime/executor.py (StepRequest/StepResult/StepExecutor
+        + LocalAgentExecutor — where DockerVerifierExecutor joins),
+        scripts/fleet/docker_executor.py (DockerAgentExecutor — the sibling-cell
+        pattern the verifier mirrors), scripts/fleet/spawn_wrapper.py (the
+        scope-driven spawn request + validation + the state namespace),
+        src/agentic_dynamics/runtime/test_runner.py (run_suite — the in-process
+        verifier's engine), src/agentic_dynamics/experiment/spec_status.py
+        (derive_status — authored status wins at :385; the revision identity fix),
+        src/agentic_dynamics/experiment/experiment_spec.py (ExperimentSpec — where
+        the canonicalization for the revision digest lives), scripts/run_workflow.py
+        (the composition root that injects executors), tests/test_workflow_executor_
+        parity.py (the parity suite the new cases join), tests/test_spec_status.py
+        (the derive_status tests), and the merged control_db_* waves].
+        policies: [one_durable_state, outbox_before_emit, control_packet_every_turn,
+        publication_is_one_transaction, regenerate_never_hand_edit, authority_absolute].
+      challenge_context: >-
+        challenge: two engine seams still trust the wrong source. (1) A spec whose
+        declared verification is a kind:test phase CANNOT run in the reference
+        containerized path — the orchestrator refuses (fail-closed, good) but there
+        is no verifier executor, so 'the test gate can block promotion' is true only
+        in-process. (2) The spec index reports fleet_job_submission as completed
+        because its YAML says status: completed — even though a later gate was
+        appended and never run; and a successful run of spec revision A leaves
+        edited revision B looking completed. Both are 'prose or path decides what
+        evidence should decide' defects — the exact class the control-plane wave
+        exists to end.
+        deliberation: [the verifier executor first (w1 — the container path gains a
+        real verification; the orchestrator's fail-closed refusal becomes a
+        dispatch), then the revision identity (w2 — completion follows the digest)].
+        session_policy: {default: continue}
+      current_state: >-
+        MEASURED (2026-09-02): kind:test phases run in-process via run_suite; the
+        orchestrator fail-closes on them (no skip — P0-1, but also no container
+        verification); DockerAgentExecutor exists for agent phases; parity suite has
+        18 tests (no verifier cases); spec_status.py:385 returns authored status
+        first; no workflow_revision_id anywhere; the spec index has 180 entries with
+        authored-status-wins semantics for legacy specs.
+      hard_rules: >-
+        (1) THE GATE IS THE EVIDENCE: after w1, a kind:test phase's verdict is the
+        same object whether it ran in-process or in a verifier container — the
+        phase records test_executed_success from the independent runner, and a
+        failed suite fails the phase + blocks promotion in BOTH paths. The
+        orchestrator NEVER skips a test phase (unchanged) — it dispatches it to
+        the verifier.
+        (2) COMPLETION FOLLOWS THE REVISION: after w2, a workflow's derived status
+        is keyed to its normalized revision digest. Editing a spec changes the
+        digest and invalidates completion from earlier revisions (the index shows
+        the new revision's run state, never the old one's). Authored `status:` in
+        workflow YAML no longer overrides run evidence — legacy specs with authored
+        statuses are catalogued as such (an explicit 'authored' marker), but new
+        active specs derive completion from runs of their exact revision.
+        (3) REGENERATE, NEVER HAND-EDIT (unchanged). ONE DURABLE STATE (unchanged).
+        (4) BOUNDED VERIFICATION (the loop lesson): a claim not reproducible in
+        three attempts is a FAILED finding, never a puzzle to loop on.
+    phases:
+      - name: w1_pin_spec
+        kind: agent
+        scope: implementation
+        timeout: 3600
+        prompt: |
+          GOAL: {goal}
+          ROLE: verification — the house pin convention. Write
+          docs/reviews/engine_gaps_verifier_revision_preregistration.md carrying:
+          (a) this spec's file SHA256 + the worktree git sha; (b) the two gaps
+          VERIFIED against the actual code: (1) kind:test phases run in-process
+          (find the run_suite call) and the orchestrator fail-closes on them
+          (find the refusal); no verifier executor exists (grep StepExecutor
+          implementations); (2) spec_status.py returns the authored status first
+          (find the line) and no workflow_revision_id exists (grep). An edge that
+          does not hold is a FAILED finding — record the deviation and fail.
+          DB LOCATION: machine-local state lives at the MAIN checkout
+          (/home/drseuss/ai-finops-framework) — read it by absolute path. If a
+          claim cannot be reproduced after THREE attempts, record the deviation
+          and FAIL that claim — never loop.
+          DELIVER: the preregistration with the verified edges, committed with
+          the '[workflow] w1_pin_spec — <goal prefix>' subject.
+          LOG: PASS/FAIL per claim; commit.
+      - name: w1_verifier_executor
+        kind: agent
+        scope: implementation
+        timeout: 7200
+        prompt: |
+          GOAL: {goal}
+          SHAPE: the reference path gains a real verification. Add
+          DockerVerifierExecutor to src/agentic_dynamics/runtime/executor.py (or
+          the fleet module if it needs spawn_wrapper, mirroring DockerAgentExecutor):
+          it executes a kind:test phase's suite inside a READ-ONLY verifier
+          container bound to the candidate — no credentials, no model calls, no
+          writable state (the state namespace is read-only or absent), scope
+          verifier/read-only. The engine's kind:test branch dispatches through it
+          when injected (under --orchestrator); the in-process run_suite path
+          (LocalVerifier, the default) is unchanged. The verdict lands on the SAME
+          field (test_executed_success) from the SAME source semantics (the
+          container runs the suite; the exit + report are the verdict — never the
+          agent's self-report). The orchestrator's fail-closed refusal for
+          kind:test becomes a dispatch to the verifier when one is injected, and
+          stays a refusal (loud, never a skip) when absent.
+          SCOPE FENCE: the verifier executor + the engine's dispatch seam ONLY —
+          no revision-identity changes (w2), no changes to the in-process
+          run_suite semantics, no changes to agent-phase executors. Commits carry
+          '[workflow] w1_verifier_executor'.
+          VERIFY (both directions): unit tests prove (a) a kind:test phase with a
+          FAILING suite fails the phase and blocks the run in BOTH paths (parity:
+          in-process and fake-DockerVerifier produce the same parent state —
+          extend tests/test_workflow_executor_parity.py with the verifier cases);
+          (b) a passing suite records test_executed_success=True in both paths;
+          (c) the orchestrator without an injected verifier still refuses loudly
+          (no silent skip — the P0-1 contract holds); (d) the verifier container
+          carries no credentials and no writable state (assert the request's
+          mounts/env). Local parity: the suite the verifier would run is the same
+          target list the in-process path uses.
+          DELIVER: the executor + the dispatch + the parity tests, committed.
+          LOG: PASS/FAIL; commit.
+      - name: w2_revision_identity
+        kind: agent
+        scope: implementation
+        timeout: 7200
+        prompt: |
+          GOAL: {goal}
+          SHAPE: completion follows the revision. (a) Add the normalized revision
+          digest: workflow_revision_id = sha256(canonicalized spec definition) —
+          canonicalize by dropping the volatile fields (comments, whitespace,
+          generated_at) and hashing the structural YAML (name, version, phases,
+          factors, rules, stop, adapt). Expose it on the spec load (e.g.
+          spec.workflow_revision_id) and record it in run ledgers/control-db runs
+          where run evidence already lands. (b) spec_status's derive_status:
+          authored `status:` in WORKFLOW YAML no longer overrides run evidence —
+          the derived status for a workflow comes from runs of its EXACT revision
+          (a completed run of revision A does not mark edited revision B
+          completed; B shows its own run state or 'never run of this revision').
+          Legacy specs with authored statuses are catalogued with an explicit
+          'authored' marker so the catalogue stays honest about what it reports.
+          (c) The 'gate added but never run' failure mode dies: fleet_job_submission
+          (and any spec whose definition changed after its last green run) shows
+          its true state — definition changed since the last run of this revision.
+          SCOPE FENCE: the revision digest + derive_status semantics ONLY — no
+          verifier changes, no index schema migration beyond the new field (add
+          the field, don't break readers). Commits carry
+          '[workflow] w2_revision_identity'.
+          VERIFY (both directions): unit tests prove (a) the digest is stable
+          across cosmetic edits (comment/whitespace) and changes on structural
+          edits (a phase added, a gate appended) — the test_suite_speed/fleet_job_
+          submission 'gate added after completed' shape now shows the new revision
+          as never-run-of-this-revision, not completed; (b) a successful run of
+          revision A does NOT mark edited revision B completed; (c) derive_status
+          with no authored status and no runs returns draft/never-run (unchanged
+          semantics for the no-revision case); (d) existing spec_status tests
+          update cleanly — the legacy authored-status specs get the 'authored'
+          marker path, and the index regeneration stays deterministic.
+          DELIVER: the digest + the derive_status fix + the tests, committed.
+          LOG: PASS/FAIL; commit.
+      - name: w3_adversarial
+        kind: agent
+        scope: adversarial_readonly
+        requires_deliverable: true
+        run_model: deepseek/deepseek-v4-pro
+        timeout: 14400
+        prompt: |
+          GOAL: {goal}
+          ROLE: the INDEPENDENT adversarial reviewer — a DIFFERENT model and
+          session (pro vs the flash author, the house independence convention).
+          Falsify the wave, not certify it. Attack in order, re-verified against
+          the actual code (never asserted): (1) w1 — can a kind:test phase still
+          be skipped in ANY path? does a failing suite block the run in both the
+          in-process and the verifier paths (parity measured, not claimed)? does
+          the verifier container really carry no credentials and no writable
+          state? (2) w2 — does authored status STILL win anywhere (grep every
+          derive path)? does editing a spec really invalidate completion from
+          earlier revisions (probe: append a gate to a completed spec, regenerate,
+          observe)? is the digest stable across cosmetic edits? (3) cross — did
+          either change break the control-db evidence or the parity suite?
+          Every finding: FIX on the branch or RECORD as an accepted limitation
+          with reasoning. At least 3 findings or a clean sweep with
+          re-verification evidence — a bare PASS is a failed review.
+          RELEASE VERDICT: merge-ready to main? What must the operator do after
+          merge (name the P0 actions, do not do them)?
+          DELIVER: docs/reviews/engine_gaps_verifier_revision_adversarial.md
+          (finding table), committed.
+          LOG: finding table; PASS/FAIL; commit.
+      - name: w4_test_gate
+        kind: test
+        scope: implementation
+        timeout: 900
+        # The independent harness gate (fail-closed): run_suite records
+        # test_executed_success — never self-report.
+        tests:
+          - tests/test_workflow_executor_parity.py
+          - tests/test_workflow_runner.py
+          - tests/test_spec_status.py
+          - tests/test_experiment_spec.py
+          - tests/test_compile_experiment.py
+          - tests/test_control_status.py
+          - tests/test_control_db.py
+          - tests/test_spawn_wrapper.py
+          - tests/test_doc_lifecycle.py
+          - tests/test_script_classification.py
+          - tests/test_agent_config_render.py
+          - tests/test_cli_resolution.py
+factors:
+  - {name: model, levels: [deepseek/deepseek-v4-flash]}
+design: factorial
+rules:
+  - name: gaps_verified
+    plane: measurement
+    evidence_class: "[M]"
+    requires: []
+    produces: [two_gaps_confirmed]
+  - name: verifier_executes_in_container
+    plane: measurement
+    evidence_class: "[C]"
+    requires: [two_gaps_confirmed]
+    produces: [test_verdict_path_parity, no_skip_path]
+  - name: completion_follows_revision
+    plane: measurement
+    evidence_class: "[C]"
+    requires: [two_gaps_confirmed]
+    produces: [digest_stable_across_cosmetic, authored_status_no_longer_wins]
+  - name: wave_adversarial_reviewed
+    plane: measurement
+    evidence_class: "[M]"
+    requires: [test_verdict_path_parity, no_skip_path, digest_stable_across_cosmetic,
+               authored_status_no_longer_wins]
+    produces: [wave_adversarial_clean]
+  - name: test_gate_measured
+    plane: measurement
+    evidence_class: "[M]"
+    requires: [test_executed_success]
+    produces: [independent_gate_recorded]
+metrics:
+  - {name: two_gaps_confirmed, agg: mean, over: cell}
+  - {name: test_verdict_path_parity, agg: mean, over: cell}
+  - {name: no_skip_path, agg: mean, over: cell}
+  - {name: digest_stable_across_cosmetic, agg: mean, over: cell}
+  - {name: authored_status_no_longer_wins, agg: mean, over: cell}
+  - {name: wave_adversarial_clean, agg: mean, over: cell}
+  - {name: independent_gate_recorded, agg: mean, over: cell}
+writeup:
+  format: lab_book
+  sections: [question, w1_pin_spec, w1_verifier_executor, w2_revision_identity, w3_adversarial, w4_test_gate]
+stop: {budget_usd: 12.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}
