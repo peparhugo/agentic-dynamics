@@ -15,6 +15,7 @@ one-time: backfill_artifacts.py backfill_story_artifacts.py backfill_story_trans
 fleet: dlq.py docker_executor.py egress_proxy.py fleet_manager.py heartbeat.py probe_binaries.py review_unit.py spawn_wrapper.py dlq_triage.py retrieval_census.py
 maintained: promote.py scan_docs_drift.py docs_drift_watchdog.py docs_proposal_gate.py
 maintained: control_status.py
+maintained: publish_release.py
 <!-- scripts-classification: end -->
 
 - **maintained command** — reached via `agentic-dynamics <subcommand>` (the Stage 3 CLI).

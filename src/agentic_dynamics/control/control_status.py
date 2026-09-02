@@ -688,11 +688,26 @@ def build_packet(
         workers = unhealthy_workers(heartbeats, now=time.time() if now is None else now)
 
     # ── projections ──────────────────────────────────────────────────────────────────────
-    # p3's compact block, carried verbatim: `null` for a projection whose lag is unknown or that
-    # has never reported. The consumer must treat `null` as "do not proceed on this" — which is
-    # only possible because it is not silently 0.
+    # p3's compact block. A projection's lag is carried ONLY when the health verdict says the
+    # number is believable *now*: `CURRENT` (0) and `LAGGING` (>0) are live readings; `STALE`
+    # and `FAILING` describe old reality — p3's own rule is that a stale recorded zero must not
+    # be believed — so their lag renders as `null` (the consumer's "do not proceed on this")
+    # rather than as a reassuring 0. `UNKNOWN` (never reported / lag not computable) is already
+    # `null` by construction. The block the packet carries is therefore exactly the compact
+    # answer the mandate names, with the one correction that prevents a lagging-or-stale
+    # consumer from reading as "current".
     lag = pwm.projection_lag(db, projections=projections)
-    projection_lag = {projection: lag.get(projection) for projection in projections}
+    report = pwm.projection_report(db, projections=projections)
+    health_by_projection = {entry["projection"]: entry["health"] for entry in report}
+    projection_lag = {
+        projection: (
+            lag.get(projection)
+            if health_by_projection.get(projection) == pwm.ProjectionHealth.CURRENT.value
+            or health_by_projection.get(projection) == pwm.ProjectionHealth.LAGGING.value
+            else None
+        )
+        for projection in projections
+    }
     unknown = sorted(p for p, v in projection_lag.items() if v is None)
     if unknown:
         notes.append(

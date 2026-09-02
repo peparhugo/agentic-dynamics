@@ -584,12 +584,23 @@ def _run_workflow_cli(
 
     print(json.dumps(result.to_dict(), indent=2))
 
-    out_dir = ROOT / "experiments" / "results" / "workflows" / spec.name
-    out_dir.mkdir(parents=True, exist_ok=True)
-    ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-    out_path = out_dir / f"{ts}.json"
-    out_path.write_text(json.dumps(result.to_dict(), indent=2))
-    print(f"\nledger: {out_path}", file=sys.stderr)
+    # P0-2 child contract (control_db_publication p2, held to the letter): in CHILD mode the
+    # ledger write and the spec-index refresh are the PARENT's job. A `--only-phase` sibling
+    # is one phase of the parent's run, not a run of its own — writing a partial ledger (which
+    # `spec_status` would then read as run evidence) and refreshing the derived index would be
+    # exactly the "children write ledgers / refresh indexes independently" the contract forbids.
+    # The parent aggregates: it reads the child's result envelope from stdout and writes the ONE
+    # aggregate ledger + the ONE index refresh. `_control_terminal_write` below is already
+    # child-mode-inert (returns before doing anything) for the same reason, so ``out_path``
+    # stays the default below in child mode (never written, never referenced).
+    out_path: str = ""
+    if not args.only_phase:
+        out_dir = ROOT / "experiments" / "results" / "workflows" / spec.name
+        out_dir.mkdir(parents=True, exist_ok=True)
+        ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+        out_path = out_dir / f"{ts}.json"
+        out_path.write_text(json.dumps(result.to_dict(), indent=2))
+        print(f"\nledger: {out_path}", file=sys.stderr)
     # ``getattr`` so the composition-root tests that substitute a minimal result namespace
     # (no ``awaiting`` field) keep working unchanged.
     if getattr(result, "awaiting", False):
@@ -605,7 +616,8 @@ def _run_workflow_cli(
     else:
         print(f"cost: ${result.total_cost_usd:.4f}  ok: {result.ok}", file=sys.stderr)
 
-    _refresh_index(spec.name)
+    if not args.only_phase:
+        _refresh_index(spec.name)
     # THE emission path (control_db_publication p2). One transaction records the run's terminal
     # transition, its result envelope, and every knowledge event it owes; a publisher then
     # drains the outbox with at-least-once delivery. The two former fire-and-forget calls

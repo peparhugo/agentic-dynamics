@@ -652,6 +652,37 @@ def test_a_fully_reported_projection_set_produces_no_lag_degradation(db) -> None
     assert [n for n in packet[DEGRADED_KEY] if n["surface"] == "projection_lag"] == []
 
 
+def test_a_stale_projections_recorded_zero_lag_is_not_carried_as_zero(db) -> None:
+    """A STALE projector's recorded lag is not believable — the packet must not render it as 0.
+
+    p3's rule ("a zero recorded four hours ago describes four-hour-old reality") is carried
+    through to the ONE packet: a watermark whose ``last_success_at`` has aged past the staleness
+    window renders its lag as ``null`` and names the projection in ``degraded``. Rendering the
+    recorded ``0`` would let a dead projector read as "caught up" — exactly the false-current
+    answer the packet exists to prevent. (A live ``LAGGING`` projection keeps its number: being
+    behind *now* is the signal, not the failure.)
+    """
+    from datetime import datetime, timedelta, timezone
+
+    old = (datetime.now(timezone.utc) - timedelta(hours=2)).isoformat().replace("+00:00", "Z")
+    db.record_watermark(
+        "registry", last_event_id="5-0", source_head_event_id="5-0", lag_events=0,
+        last_success_at=old,
+    )
+    db.record_watermark(
+        "chroma", last_event_id="2-0", source_head_event_id="5-0", lag_events=3,
+        last_success_at=datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+    )
+    packet = build(db)
+    assert packet["projection_lag"]["registry"] is None, \
+        "a stale recorded 0 must not render as caught-up"
+    assert packet["projection_lag"]["chroma"] == 3, "a live lagging projection keeps its number"
+    assert any(
+        n["surface"] == "projection_lag" and "registry" in n["reason"]
+        for n in packet[DEGRADED_KEY]
+    )
+
+
 # ── Worker health ────────────────────────────────────────────────────────────────────────────
 
 
