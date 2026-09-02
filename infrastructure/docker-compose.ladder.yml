@@ -42,9 +42,9 @@ x-ladder-env: &ladder-env
   FINOPS_WORKTREE_ROOT: /tmp
   # The container auth home == the host user's home, so the claude symlink chain
   # (~/.local/bin/claude -> ~/.local/share/claude/versions/<v>) resolves unchanged (D-18).
-  HOME: /home/drseuss
-  OPENCODE_BIN: /home/drseuss/.opencode/bin/opencode
-  CLAUDE_BIN: /home/drseuss/.local/bin/claude
+  HOME: ${AUTH_HOME}
+  OPENCODE_BIN: ${AUTH_HOME}/.opencode/bin/opencode
+  CLAUDE_BIN: ${AUTH_HOME}/.local/bin/claude
   # RAG retrieval store endpoints (slice 3, D-17 by-name reachability): the two-leg fusion's
   # dense (chroma 8000) + lexical (neo4j 7687) stores. Consulted only by rag_augment-enabled
   # workflows (and the kb-* consumers) — inert for the plain worker cells.
@@ -67,40 +67,40 @@ x-ladder-env: &ladder-env
 # subset of these — nothing outside them is ever mounted.
 x-ladder-mounts: &ladder-mounts
   - ${FINOPS_WORKTREE_ROOT:-/tmp}:/tmp:rw
-  - ${FINOPS_REPO_DIR:-/home/drseuss/ai-finops-framework}:/repo:ro
+  - ${FINOPS_REPO_DIR:?FINOPS_REPO_DIR must be set (the repo root, no host-specific default)}:/repo:ro
   # D-16 fix (2026-08-31): the repo at its HOST path — worktree gitdir pointers resolve
   # identically in the host and the containers, and the .git overlay lets phase commits write
-  - ${FINOPS_REPO_DIR:-/home/drseuss/ai-finops-framework}:/home/drseuss/ai-finops-framework:ro
-  - ${FINOPS_REPO_DIR:-/home/drseuss/ai-finops-framework}/.git:/home/drseuss/ai-finops-framework/.git:rw
+  - ${FINOPS_REPO_DIR:?FINOPS_REPO_DIR must be set (the repo root, no host-specific default)}:${FINOPS_REPO_DIR}:ro
+  - ${FINOPS_REPO_DIR:?FINOPS_REPO_DIR must be set (the repo root, no host-specific default)}/.git:${FINOPS_REPO_DIR}/.git:rw
   - ${FINOPS_REPO_DIR:-..}/experiments/results:/repo/experiments/results:rw
   # P0-3 (control-plane stabilization): the CLI-state ROOT mount. Each scaled worker mints a
   # FRESH per-job namespace under it (worker.py: <root>/jobs/<cell_id>/) and points
   # XDG_DATA_HOME/XDG_CONFIG_HOME/XDG_CACHE_HOME at it — the root itself is never shared as a
   # writable state directory, and no two replicas ever read/write the same opencode session DB.
   - ${FINOPS_WORKTREE_ROOT:-/tmp}/opencode_state:/state:rw
-  - ${AUTH_HOME:-/home/drseuss}/.local/share/opencode/auth.json:/auth/opencode_auth.json:ro
-  - ${AUTH_HOME:-/home/drseuss}/.local/share/claude:/home/drseuss/.local/share/claude:ro
+  - ${AUTH_HOME:?AUTH_HOME must be set (the auth home, no host-specific default)}/.local/share/opencode/auth.json:/auth/opencode_auth.json:ro
+  - ${AUTH_HOME:?AUTH_HOME must be set (the auth home, no host-specific default)}/.local/share/claude:${AUTH_HOME}/.local/share/claude:ro
   # (the claude binary's symlink target rides here — an isolated claude STATE dir is the
   # recorded open item: the smoke test proved the binary chain needs this ro mount; the
   # claude CLI's own write-state isolation is a follow-up for the claude-model cells)
-  - ${AUTH_HOME:-/home/drseuss}/.claude:/home/drseuss/.claude:ro
-  - ${AUTH_HOME:-/home/drseuss}/.config:/home/drseuss/.config:ro
-  - ${AUTH_HOME:-/home/drseuss}/.local/bin:/home/drseuss/.local/bin:ro
-  - ${AUTH_HOME:-/home/drseuss}/.opencode:/home/drseuss/.opencode:ro
+  - ${AUTH_HOME:?AUTH_HOME must be set (the auth home, no host-specific default)}/.claude:${AUTH_HOME}/.claude:ro
+  - ${AUTH_HOME:?AUTH_HOME must be set (the auth home, no host-specific default)}/.config:${AUTH_HOME}/.config:ro
+  - ${AUTH_HOME:?AUTH_HOME must be set (the auth home, no host-specific default)}/.local/bin:${AUTH_HOME}/.local/bin:ro
+  - ${AUTH_HOME:?AUTH_HOME must be set (the auth home, no host-specific default)}/.opencode:${AUTH_HOME}/.opencode:ro
 
 # The supervisor tier's mount set (D-13): results rw / repo ro / auth ro + the fleet-logs
 # NAMED volume. NO worktree mount (the supervisor holds no worktree), NO socket.
 x-supervisor-mounts: &supervisor-mounts
-  - ${FINOPS_REPO_DIR:-/home/drseuss/ai-finops-framework}:/repo:ro
+  - ${FINOPS_REPO_DIR:?FINOPS_REPO_DIR must be set (the repo root, no host-specific default)}:/repo:ro
   # D-16 fix (2026-08-31): the repo at its HOST path — worktree gitdir pointers resolve
   # identically in the host and the containers, and the .git overlay lets phase commits write
-  - ${FINOPS_REPO_DIR:-/home/drseuss/ai-finops-framework}:/home/drseuss/ai-finops-framework:ro
-  - ${FINOPS_REPO_DIR:-/home/drseuss/ai-finops-framework}/.git:/home/drseuss/ai-finops-framework/.git:rw
+  - ${FINOPS_REPO_DIR:?FINOPS_REPO_DIR must be set (the repo root, no host-specific default)}:${FINOPS_REPO_DIR}:ro
+  - ${FINOPS_REPO_DIR:?FINOPS_REPO_DIR must be set (the repo root, no host-specific default)}/.git:${FINOPS_REPO_DIR}/.git:rw
   - ${FINOPS_REPO_DIR:-..}/experiments/results:/repo/experiments/results:rw
-  - ${AUTH_HOME:-/home/drseuss}/.claude:/home/drseuss/.claude:ro
-  - ${AUTH_HOME:-/home/drseuss}/.config:/home/drseuss/.config:ro
-  - ${AUTH_HOME:-/home/drseuss}/.local/bin:/home/drseuss/.local/bin:ro
-  - ${AUTH_HOME:-/home/drseuss}/.opencode:/home/drseuss/.opencode:ro
+  - ${AUTH_HOME:?AUTH_HOME must be set (the auth home, no host-specific default)}/.claude:${AUTH_HOME}/.claude:ro
+  - ${AUTH_HOME:?AUTH_HOME must be set (the auth home, no host-specific default)}/.config:${AUTH_HOME}/.config:ro
+  - ${AUTH_HOME:?AUTH_HOME must be set (the auth home, no host-specific default)}/.local/bin:${AUTH_HOME}/.local/bin:ro
+  - ${AUTH_HOME:?AUTH_HOME must be set (the auth home, no host-specific default)}/.opencode:${AUTH_HOME}/.opencode:ro
   - fleet-logs:/var/log/fleet
 
 x-cell-base: &cell-base
@@ -132,22 +132,22 @@ x-supervisor-base: &supervisor-base
 # F-1/F-2/P11 writes authorize in code.
 x-orchestrator-mounts: &orchestrator-mounts
   - ${FINOPS_WORKTREE_ROOT:-/tmp}:/tmp:rw
-  - ${FINOPS_REPO_DIR:-/home/drseuss/ai-finops-framework}:/repo:ro
+  - ${FINOPS_REPO_DIR:?FINOPS_REPO_DIR must be set (the repo root, no host-specific default)}:/repo:ro
   # D-16 fix (2026-08-31): the repo at its HOST path — worktree gitdir pointers resolve
   # identically in the host and the containers, and the .git overlay lets phase commits write
-  - ${FINOPS_REPO_DIR:-/home/drseuss/ai-finops-framework}:/home/drseuss/ai-finops-framework:ro
-  - ${FINOPS_REPO_DIR:-/home/drseuss/ai-finops-framework}/.git:/home/drseuss/ai-finops-framework/.git:rw
+  - ${FINOPS_REPO_DIR:?FINOPS_REPO_DIR must be set (the repo root, no host-specific default)}:${FINOPS_REPO_DIR}:ro
+  - ${FINOPS_REPO_DIR:?FINOPS_REPO_DIR must be set (the repo root, no host-specific default)}/.git:${FINOPS_REPO_DIR}/.git:rw
   - ${FINOPS_REPO_DIR:-..}/experiments/results:/repo/experiments/results:rw
   # P0-3 (control-plane stabilization): the CLI-state ROOT mount. Siblings get their OWN
   # per-attempt namespace (<root>/<spec>/<phase>/) mounted at /state via spawn_wrapper —
   # never a shared pool directory.
   - ${FINOPS_WORKTREE_ROOT:-/tmp}/opencode_state:/state:rw
-  - ${AUTH_HOME:-/home/drseuss}/.local/share/opencode/auth.json:/auth/opencode_auth.json:ro
-  - ${AUTH_HOME:-/home/drseuss}/.local/share/claude:/home/drseuss/.local/share/claude:ro
-  - ${AUTH_HOME:-/home/drseuss}/.claude:/home/drseuss/.claude:ro
-  - ${AUTH_HOME:-/home/drseuss}/.config:/home/drseuss/.config:ro
-  - ${AUTH_HOME:-/home/drseuss}/.local/bin:/home/drseuss/.local/bin:ro
-  - ${AUTH_HOME:-/home/drseuss}/.opencode:/home/drseuss/.opencode:ro
+  - ${AUTH_HOME:?AUTH_HOME must be set (the auth home, no host-specific default)}/.local/share/opencode/auth.json:/auth/opencode_auth.json:ro
+  - ${AUTH_HOME:?AUTH_HOME must be set (the auth home, no host-specific default)}/.local/share/claude:${AUTH_HOME}/.local/share/claude:ro
+  - ${AUTH_HOME:?AUTH_HOME must be set (the auth home, no host-specific default)}/.claude:${AUTH_HOME}/.claude:ro
+  - ${AUTH_HOME:?AUTH_HOME must be set (the auth home, no host-specific default)}/.config:${AUTH_HOME}/.config:ro
+  - ${AUTH_HOME:?AUTH_HOME must be set (the auth home, no host-specific default)}/.local/bin:${AUTH_HOME}/.local/bin:ro
+  - ${AUTH_HOME:?AUTH_HOME must be set (the auth home, no host-specific default)}/.opencode:${AUTH_HOME}/.opencode:ro
 
 x-orchestrator-base: &orchestrator-base
   image: fleet/orchestrator
