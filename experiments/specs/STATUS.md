@@ -3,8 +3,8 @@
 **Generated — do not edit by hand.** Regenerate with `python scripts/spec_status.py`;
 `scripts/run_workflow.py` also refreshes it at the end of every run.
 
-Generated at: `2026-09-02T14:09:40.247039+00:00`  ·  181 spec(s)
-**Work remaining:** 50 open · 131 completed/retired
+Generated at: `2026-09-02T16:50:56.267010+00:00`  ·  181 spec(s)
+**Work remaining:** 49 open · 132 completed/retired
 
 | name | kind | repeatable | status | version | supersedes | last_run | ok | model | cost | n_runs |
 |---|---|---|---|---|---|---|---|---|---|---|
@@ -30,7 +30,6 @@ Generated at: `2026-09-02T14:09:40.247039+00:00`  ·  181 spec(s)
 | `cap_session_routing_evidence` | experiment | yes | runnable | 0.2 | — | — | — | — | — | 0 |
 | `cap_shadow_comparison` | experiment | yes | runnable | 0.1 | — | — | — | — | — | 0 |
 | `delta_entropy_response_campaign` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
-| `engine_gaps_verifier_revision` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `explanation_tax` | experiment | yes | runnable | 0.2 | — | — | — | — | — | 0 |
 | `finding_economics_closure` | workflow | yes | runnable | 0.1 | — | 2026-08-22 17:22 | ok | deepseek/deepseek-v4-pro | $1.2820 | 1 |
 | `labbook_refresh` | workflow | yes | runnable | 0.1 | — | 2026-08-17 18:14 | ok | deepseek/deepseek-v4-flash | $0.0275 | 1 |
@@ -133,6 +132,7 @@ Generated at: `2026-09-02T14:09:40.247039+00:00`  ·  181 spec(s)
 | `deep_architecture_review` | workflow | no | completed | 0.1 | — | 2026-08-18 19:10 | ok | deepseek/deepseek-v4-pro | $0.1319 | 1 |
 | `docs_architecture_refresh` | workflow | no | completed | 0.1 | opencode_docs_refresh | 2026-08-31 23:52 | ok | openai/gpt-5.6-terra | $8.6779 | 1 |
 | `docs_refresh_remediation` | workflow | no | completed | 0.1 | — | 2026-09-01 13:33 | ok | deepseek/deepseek-v4-flash | $0.1655 | 2 |
+| `engine_gaps_verifier_revision` | workflow | no | completed | 0.1 | — | 2026-09-02 16:50 | ok | deepseek/deepseek-v4-flash | $0.0951 | 2 |
 | `entropy_beta_instruments` | workflow | no | completed | 0.1 | — | 2026-08-30 19:14 | ok | deepseek/deepseek-v4-pro | $0.2940 | 2 |
 | `evidence_narrative` | workflow | no | completed | 0.1 | — | 2026-08-14 15:04 | ok | openai/gpt-5.6-sol | $0.0000 | 2 |
 | `evidence_redesign` | workflow | no | completed | 0.1 | — | 2026-08-14 19:18 | ok | openai/gpt-5.6-sol | $5.9008 | 3 |
