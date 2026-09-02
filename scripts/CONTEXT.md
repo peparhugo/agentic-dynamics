@@ -16,6 +16,7 @@ fleet: dlq.py docker_executor.py egress_proxy.py fleet_manager.py heartbeat.py p
 maintained: promote.py scan_docs_drift.py docs_drift_watchdog.py docs_proposal_gate.py
 maintained: control_status.py
 maintained: control_drain_outbox.py control_sweep_zombies.py
+maintained: check_preexisting.py
 maintained: publish_release.py
 <!-- scripts-classification: end -->
 
@@ -112,6 +113,7 @@ documenting errors the axis unmeasurable (exit 2), never clean.
 | `analyze_trajectories.py` | 435 | Parses `session.jsonl` transcripts. Produces `_trajectory_summary.json` and `_trajectory_aggregate.json`. |
 | `validate_session.py` | 99 | Runs `pytest` on generated code in worktrees. Replaces heuristic correctness with actual test pass/fail. |
 | `verify_tests.py` | 140 | Independent test execution — runs each story cell's own test suite; sole source of truth for the `test_executed_success` ledger field. |
+| `check_preexisting.py` | ~260 | **The pre-existing-drift guard** (`control_db_evidence` e5) — "pre-existing" must be PROVEN, not claimed. Given a failing pytest node and a merge-base sha, checks out the base in a temp git worktree, runs the SAME node there, and compares base vs head outcomes. Verdicts: `pre-existing` (base FAIL + head FAIL — the author MAY cite the printed `preexisting-guard-evidence` line) / `branch-introduced` (base PASS or ABSENT + head FAIL — the mislabel is caught mechanically) / `not-failing` / `unverifiable` (fail-closed). Deterministic, single-test, ZERO model calls. `--doc <review.md>` flags review-doc "pre-existing" claims that carry no guard evidence citation. Logic in `agentic_dynamics/runtime/preexisting_guard.py`. CLI: `agentic-dynamics validate preexisting`. |
 | `review_all.py` | 156 | Review every story directly (ThreadPoolExecutor, no Redis). Writes `reviews/review_{story_id}.json`. Grounds reviews in AST/Sonar/convention mechanics. |
 | `review_stories.py` | 91 | Batch commit + story review runner. |
 | `review_worker.py` | 190 | [deprecated] Redis review-queue worker (SDK bridge). Superseded by `review_all.py`; retired in Stage 3. |

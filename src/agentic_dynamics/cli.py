@@ -93,6 +93,11 @@ _COMMANDS: dict[tuple[str, ...], str] = {
     ("validate", "session"): "validate_session.py",
     ("validate", "tests"): "verify_tests.py",
     ("validate", "prereq"): "evidence_prereq_gate.py",
+    # validate preexisting — the pre-existing-drift guard (control_db_evidence e5): a
+    # deterministic, model-free check that proves a failing test exists at a merge-base
+    # before an author may call it "pre-existing" (a temp worktree + a single pytest run).
+    # "pre-existing" in a review doc must cite its evidence; `--doc` flags uncited claims.
+    ("validate", "preexisting"): "check_preexisting.py",
     # supervise
     ("supervise",): "supervise.py",
     ("supervise", "claude-agents"): "claude_agents_supervisor.py",
@@ -156,7 +161,7 @@ Subcommands (each forwards to its backing script):
   registry    query|show|lineage
   review      all|stories|trigger|enqueue|finalize
   spec        status|pipeline
-  validate    session|tests|prereq
+  validate    session|tests|prereq|preexisting
   supervise   [claude-agents|orphans|leases]
   control     status|drain-outbox|sweep-zombies
   publish     release

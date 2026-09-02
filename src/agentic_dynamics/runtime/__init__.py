@@ -20,6 +20,7 @@ from . import (
     change_analyzer,
     phase_evidence,
     posthoc,
+    preexisting_guard,
     routing,
     story,
     telemetry,
@@ -28,6 +29,6 @@ from . import (
 )
 
 __all__ = [
-    'admission', 'change_analyzer', 'phase_evidence', 'posthoc', 'routing', 'story', 'telemetry',
-    'test_runner', 'workflow_runner',
+    'admission', 'change_analyzer', 'phase_evidence', 'posthoc', 'preexisting_guard',
+    'routing', 'story', 'telemetry', 'test_runner', 'workflow_runner',
 ]
