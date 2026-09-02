@@ -361,6 +361,14 @@ class WorkflowRunResult:
     #: ``"<name>@<version>"`` — the job-level ``spec_id`` of LEDGER_FIELDS. ``spec_name``
     #: alone cannot distinguish two runs of the same spec across a version bump; this can.
     spec_id: str = ""
+    #: w2 (revision identity): the ``sha256(canonicalized spec definition)`` this run
+    #: executed — the spec's :attr:`~agentic_dynamics.experiment.experiment_spec.ExperimentSpec.workflow_revision_id`
+    #: at launch. Completion follows the revision: ``spec_status`` only lets a run whose
+    #: recorded revision equals the current spec digest certify the current definition, so
+    #: editing a spec invalidates completion from earlier revisions. Legacy ledgers written
+    #: before this field existed carry ``""`` and are handled by ``spec_status``'s
+    #: legacy-compatibility path.
+    workflow_revision_id: str = ""
     git_sha: str = ""
     started_at: str = ""
     ended_at: str = ""
@@ -430,6 +438,10 @@ class WorkflowRunResult:
         return {
             "spec_name": self.spec_name,
             "spec_id": self.spec_id,
+            # ADDED key (w2 — never renames an existing key): the revision digest this run
+            # executed. Old ledgers lack the key; consumers read it via
+            # ``.get("workflow_revision_id", "")`` so pre-w2 ledgers parse unchanged.
+            "workflow_revision_id": self.workflow_revision_id,
             "model": self.model,
             "workdir": self.workdir,
             "goal": self.goal,
@@ -2913,6 +2925,10 @@ def run_workflow(
     result = WorkflowRunResult(
         spec_name=spec.name, spec_id=spec.spec_id, model=model, workdir=str(wd),
         goal=goal, started_at=_now(),
+        # w2 (revision identity): pin the canonical spec digest this run executes at
+        # construction, so a later edit to the spec file cannot retroactively re-key the
+        # ledger (completion follows the revision the run actually executed).
+        workflow_revision_id=spec.workflow_revision_id,
     )
 
     # Prefer the launch envelope's cell id (set by the Control Room via

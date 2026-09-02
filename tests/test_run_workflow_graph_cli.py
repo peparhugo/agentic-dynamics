@@ -186,6 +186,8 @@ def _stub_spec():
     return SimpleNamespace(
         name="demo",
         spec_id="demo@1.0",
+        # w2: the composition root records the canonical spec revision on the control-db run
+        workflow_revision_id="sha256:" + "ab" * 32,
         workflow=SimpleNamespace(params={}),
     )
 

@@ -597,6 +597,9 @@ def test_index_schema(repo: Path):
         "latest_git_sha",
         "results_pointer",
         "n_runs",
+        # w2 additive keys — present in every entry (never rename/remove a reader's key)
+        "workflow_revision_id",
+        "authored_status",
     }
     assert entry["spec_path"] == "experiments/definitions/alpha_v2.yaml"
 
@@ -750,3 +753,179 @@ def test_the_committed_spec_corpus_indexes_without_exceptions():
     md = render_status_md(entries)
     assert len(_table_rows(md)) == len(entries)
     assert all(e.status in STATUS_ORDER for e in entries)
+
+
+# ── w2: revision identity — completion follows the spec revision ───────────────
+
+
+def _phase_spec_yaml(name: str, *, phases: list[str], **lifecycle: object) -> str:
+    """A workflow spec whose phases carry names (agent/test), mirroring agent_task specs."""
+    lines = [
+        f"name: {name}",
+        "question: gate test?",
+        'version: "0.1"',
+        "artifact_kind: workflow",
+        "repeatable: false",
+        "workflow:",
+        "  kind: agent_task",
+        "  params:",
+        "    language: python",
+        "    phases:",
+    ]
+    for ph in phases:
+        kind = "test" if ph.endswith("_gate") else "agent"
+        lines.append(f"      - name: {ph}")
+        lines.append(f"        kind: {kind}")
+        lines.append(f"        prompt: do {ph}")
+    lines.append("factors:")
+    lines.append('  - {name: model, levels: [deepseek/deepseek-v4-pro]}')
+    lines.append("design: factorial")
+    for key, value in lifecycle.items():
+        lines.append(f"{key}: {json.dumps(value)}")
+    return "\n".join(lines) + "\n"
+
+
+def _revision_run(spec: ExperimentSpec, *, ok: bool = True, phases: list[str] | None = None,
+                  awaiting: bool = False) -> RunSummary:
+    """A run ledger carrying the spec's current revision digest — a post-w2 run."""
+    return RunSummary(
+        path=f"experiments/results/workflows/{spec.name}/20260902T000000Z.json",
+        timestamp="2026-09-02T00:00:00+00:00",
+        ok=ok,
+        workflow_revision_id=spec.workflow_revision_id,
+        executed_phases=frozenset(phases or []),
+        awaiting=awaiting,
+    )
+
+
+def test_gate_added_after_completed_shows_never_run_of_this_revision(tmp_path: Path):
+    """VERIFY (a): the 'gate added after completed' shape → not completed, never-run.
+
+    A run of the PRE-gate revision (recorded digest of the pre-gate spec) must not mark the
+    edited spec (with the appended gate) completed: the current revision has never been run.
+    """
+    from agentic_dynamics.experiment.experiment_spec import load_spec
+    from agentic_dynamics.experiment.spec_status import derive_status
+
+    specs = tmp_path / "workflows" / "repository"
+    specs.mkdir(parents=True)
+    path = specs / "fleet.yaml"
+    path.write_text(_phase_spec_yaml("fleet", phases=["p1", "p2", "p3", "p4", "p5"]))
+
+    # a completed run of revision A (pre-gate) — recorded against A's digest
+    spec_a = load_spec(path)
+    run_a = _revision_run(spec_a, phases=["p1", "p2", "p3", "p4", "p5"])
+    assert derive_status(spec_a, [run_a]) == "completed"
+
+    # append a gate -> revision B. The A-run certifies A only; B is never-run.
+    path.write_text(_phase_spec_yaml("fleet", phases=["p1", "p2", "p3", "p4", "p5", "p6_test_gate"]))
+    spec_b = load_spec(path)
+    assert spec_b.workflow_revision_id != spec_a.workflow_revision_id
+    assert derive_status(spec_b, [run_a]) == "runnable"
+
+
+def test_edited_spec_shows_its_own_revision_run_state(tmp_path: Path):
+    """VERIFY (b): a successful run of revision A does NOT mark edited revision B completed."""
+    from agentic_dynamics.experiment.experiment_spec import load_spec
+    from agentic_dynamics.experiment.spec_status import derive_status
+
+    specs = tmp_path / "workflows" / "repository"
+    specs.mkdir(parents=True)
+    path = specs / "ship.yaml"
+    path.write_text(_phase_spec_yaml("ship", phases=["survey", "design", "implement"]))
+    spec_a = load_spec(path)
+    run_a = _revision_run(spec_a, phases=["survey", "design", "implement"])
+    assert derive_status(spec_a, [run_a]) == "completed"
+
+    path.write_text(_phase_spec_yaml("ship", phases=["survey", "design", "implement_v2"]))
+    spec_b = load_spec(path)
+    assert derive_status(spec_b, [run_a]) == "runnable"
+
+    # once B itself is run green, B is completed
+    run_b = _revision_run(spec_b, phases=["survey", "design", "implement_v2"])
+    assert derive_status(spec_b, [run_a, run_b]) == "completed"
+
+
+def test_legacy_run_without_a_digest_predating_a_gate_does_not_certify(tmp_path: Path):
+    """Legacy ledgers (no recorded digest) whose executed phases predate an appended gate
+    cannot certify the current revision — the fleet_job_submission corpus shape."""
+    from agentic_dynamics.experiment.experiment_spec import load_spec
+    from agentic_dynamics.experiment.spec_status import derive_status
+
+    specs = tmp_path / "workflows" / "repository"
+    specs.mkdir(parents=True)
+    path = specs / "suite.yaml"
+    path.write_text(_phase_spec_yaml("suite", phases=["p1", "p2", "p3", "p4", "p5_test_gate"]))
+
+    # legacy run: executed p1..p4 (green) but records NO revision and never ran p5_test_gate
+    legacy = RunSummary(
+        path="experiments/results/workflows/suite/20260901T000000Z.json",
+        timestamp="2026-09-01T00:00:00+00:00",
+        ok=True,
+        executed_phases=frozenset({"p1", "p2", "p3", "p4"}),
+    )
+    assert derive_status(load_spec(path), [legacy]) == "runnable"
+
+
+def test_no_authored_status_and_no_runs_returns_never_run(tmp_path: Path):
+    """VERIFY (c): unchanged semantics for the no-revision case."""
+    from agentic_dynamics.experiment.spec_status import derive_status
+
+    spec = _workflow()
+    assert derive_status(spec) == "runnable"
+    assert derive_status(spec, runs=[]) == "runnable"
+
+
+def test_legacy_authored_status_is_catalogued_with_an_authored_marker(tmp_path: Path):
+    """VERIFY (d): legacy authored-status specs get the 'authored' marker path."""
+    from agentic_dynamics.experiment.spec_status import collect_entries
+
+    specs = tmp_path / "workflows" / "repository"
+    specs.mkdir(parents=True)
+    (specs / "done.yaml").write_text(
+        _phase_spec_yaml("done", phases=["p1"], status="completed")
+    )
+    entries = {e.name: e for e in collect_entries(root=tmp_path)}
+    entry = entries["done"]
+    # no run evidence exists anywhere: the authored claim is the only record, marked authored
+    assert entry.status == "completed"
+    assert entry.authored_status == "completed"
+    assert entry.workflow_revision_id  # non-empty current digest
+
+    # fleet-style: authored completed + run evidence of an OLDER revision -> NOT completed,
+    # and the authored claim is preserved as a marker, not silently dropped.
+    (specs / "auth.yaml").write_text(
+        _phase_spec_yaml("auth", phases=["p1", "p2", "p3", "p4", "p5", "p6_test_gate"], status="completed")
+    )
+    run_dir = tmp_path / "experiments" / "results" / "workflows" / "auth"
+    run_dir.mkdir(parents=True)
+    (run_dir / "20260901T000000Z.json").write_text(json.dumps({
+        "spec_name": "auth", "ok": True,
+        "ended_at": "2026-09-01T00:00:00+00:00",
+        "phases": [
+            {"phase": "p1", "status": "ok"}, {"phase": "p2", "status": "ok"},
+            {"phase": "p3", "status": "ok"}, {"phase": "p4", "status": "ok"},
+            {"phase": "p5", "status": "ok"},
+        ],
+    }))
+    from agentic_dynamics.experiment.spec_status import collect_entries as ce
+    auth_entry = {e.name: e for e in ce(root=tmp_path)}["auth"]
+    assert auth_entry.status == "runnable"  # never run OF THIS REVISION
+    assert auth_entry.authored_status == "completed"  # the claim is still visible
+    assert auth_entry.n_runs == 1
+    assert auth_entry.latest_ok is None  # no run certifies the current revision
+
+
+def test_index_regeneration_is_deterministic_with_new_fields(tmp_path: Path):
+    """VERIFY (d): index regeneration stays deterministic with the additive fields."""
+    from agentic_dynamics.experiment.spec_status import (
+        refresh_spec_status,
+    )
+
+    specs = tmp_path / "workflows" / "repository"
+    specs.mkdir(parents=True)
+    (specs / "ship.yaml").write_text(_phase_spec_yaml("ship", phases=["p1"]))
+    report1 = refresh_spec_status(root=tmp_path, generated_at="2026-09-02T00:00:00+00:00")
+    body1 = report1.index_path.read_text()
+    report2 = refresh_spec_status(root=tmp_path, generated_at="2026-09-02T00:00:00+00:00")
+    assert report2.index_path.read_text() == body1

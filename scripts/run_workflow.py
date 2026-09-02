@@ -839,6 +839,10 @@ def _control_open_run(spec: ExperimentSpec, args: argparse.Namespace) -> tuple[s
     try:
         run = db.create_run(
             spec_name=spec.name,
+            # w2 (revision identity): record the canonical spec digest this run executes so
+            # the control-db runs row carries the same revision identity the run ledger does.
+            # The column already existed (control_db_publication); this populates it.
+            workflow_revision_id=spec.workflow_revision_id,
             model=args.model,
             state=RunState.RUNNING,
             reason="workflow run started",
