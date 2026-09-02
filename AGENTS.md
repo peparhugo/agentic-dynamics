@@ -27,6 +27,15 @@ Design: `docs/architecture/current/2026-08-14_experiment-spec-and-compiler-desig
 **AUTHORITY (who may do what):** the machine proposes; the controller disposes. Two tiers, and
 neither is advisory.
 
+**VOCABULARY:** the delegated agent the controller operates through — the session with full
+information that acts on the controller's behalf (the deep reviews called this the "master
+OpenCode session" / "master controller") — is the **Logos Control Agent (LCA)**. The LCA is the
+controller's proxy: it reads the ONE control packet every turn, acts only on run_ids /
+candidate_shas returned there, routes every permanence verb through the verified commands
+(`promote.py`, `publish release`), and never bypasses the gates. "The controller" remains the
+human decision-maker; the LCA is its delegated hands. Historical documents that say "master"
+describe what was true when written.
+
 - **P0 — the controller alone.** Merging a worktree branch into `main` (the permanence gate: every
   `feature/*` / `wt_*` branch is an EPHEMERAL proposal until signed), deploying the website,
   approving a gated run, retiring or renaming a published URL, and raising a spend cap. An agent
