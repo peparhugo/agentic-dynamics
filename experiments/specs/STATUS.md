@@ -3,7 +3,7 @@
 **Generated — do not edit by hand.** Regenerate with `python scripts/spec_status.py`;
 `scripts/run_workflow.py` also refreshes it at the end of every run.
 
-Generated at: `2026-09-02T05:22:34.262296+00:00`  ·  180 spec(s)
+Generated at: `2026-09-02T12:47:52.490561+00:00`  ·  180 spec(s)
 **Work remaining:** 49 open · 131 completed/retired
 
 | name | kind | repeatable | status | version | supersedes | last_run | ok | model | cost | n_runs |
@@ -29,7 +29,6 @@ Generated at: `2026-09-02T05:22:34.262296+00:00`  ·  180 spec(s)
 | `cap_session_policy_cell` | workflow | yes | runnable | 0.1 | — | — | — | — | — | 0 |
 | `cap_session_routing_evidence` | experiment | yes | runnable | 0.2 | — | — | — | — | — | 0 |
 | `cap_shadow_comparison` | experiment | yes | runnable | 0.1 | — | — | — | — | — | 0 |
-| `control_db_evidence` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `delta_entropy_response_campaign` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `explanation_tax` | experiment | yes | runnable | 0.2 | — | — | — | — | — | 0 |
 | `finding_economics_closure` | workflow | yes | runnable | 0.1 | — | 2026-08-22 17:22 | ok | deepseek/deepseek-v4-pro | $1.2820 | 1 |
@@ -54,6 +53,7 @@ Generated at: `2026-09-02T05:22:34.262296+00:00`  ·  180 spec(s)
 | `cap_site_revamp4_diagrams` | workflow | no | failed | 0.1 | — | 2026-08-27 19:57 | fail | deepseek/deepseek-v4-flash | $0.0897 | 3 |
 | `claude_background_sessions` | workflow | no | failed | 0.1 | — | 2026-08-14 17:38 | fail | anthropic/claude-fable-5 | $15.4471 | 1 |
 | `concurrency_ladder` | workflow | no | failed | 0.1 | — | 2026-08-31 01:48 | fail | deepseek/deepseek-v4-pro | $0.4648 | 1 |
+| `control_db_evidence` | workflow | no | failed | 0.1 | — | 2026-09-02 08:22 | fail | deepseek/deepseek-v4-flash | $0.8491 | 1 |
 | `control_room_portal` | workflow | no | failed | 0.2 | — | 2026-08-14 03:36 | fail | openai/gpt-5.6-sol | $0.0000 | 3 |
 | `control_room_usage_wiring` | workflow | no | failed | 0.1 | — | 2026-09-01 00:31 | fail | openai/gpt-5.6-luna | $0.0000 | 2 |
 | `design_sessions` | workflow | no | failed | 0.1 | — | 2026-08-14 06:58 | fail | openai/gpt-5.6-sol | $0.0000 | 1 |

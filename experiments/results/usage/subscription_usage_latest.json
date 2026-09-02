@@ -1,25 +1,10 @@
 {
   "schema": "subscription-usage/v3",
-  "fetched_at": "2026-09-02T01:47:55.438872+00:00",
+  "fetched_at": "2026-09-02T12:42:05.334430+00:00",
   "providers": {
     "anthropic": {
-      "ok": true,
-      "plan": null,
-      "windows": [
-        {
-          "name": "five_hour",
-          "used_percent": 100.0,
-          "resets_at": "2026-09-02T02:50:00.219907+00:00",
-          "locked_reason": null
-        },
-        {
-          "name": "seven_day",
-          "used_percent": 8.0,
-          "resets_at": "2026-09-02T14:00:00.219928+00:00",
-          "locked_reason": null
-        }
-      ],
-      "metered_spend_usd": null
+      "ok": false,
+      "error": "no claude credentials found"
     },
     "openai": {
       "ok": false,
@@ -126,32 +111,32 @@
       },
       {
         "date": "2026-09-01",
-        "cost_usd": 2.4684376192000004,
+        "cost_usd": 2.754221450400001,
         "sessions": 126,
         "subagent_cost_usd": 0.0,
         "subagent_sessions": 0,
-        "tokens": 7923455
+        "tokens": 8595795
       },
       {
         "date": "2026-09-02",
-        "cost_usd": 0.10316727680000004,
-        "sessions": 1,
-        "subagent_cost_usd": 0.0,
-        "subagent_sessions": 0,
-        "tokens": 274416
+        "cost_usd": 1.5596855803999998,
+        "sessions": 18,
+        "subagent_cost_usd": 0.0294228256,
+        "subagent_sessions": 1,
+        "tokens": 3943160
       }
     ],
     "totals": {
-      "cost_usd": 178.881849,
-      "sessions": 1622,
-      "subagent_cost_usd": 1.205265,
-      "subagent_sessions": 32,
-      "tokens": 360596393,
-      "cache_read": 13864930560,
+      "cost_usd": 180.624151,
+      "sessions": 1639,
+      "subagent_cost_usd": 1.234688,
+      "subagent_sessions": 33,
+      "tokens": 364937477,
+      "cache_read": 14142381952,
       "models": {
-        "deepseek/deepseek-v4-flash": 35.131726,
+        "deepseek/deepseek-v4-flash": 36.649272,
         "deepseek/deepseek-v4-flash-vision-exp": 2.911644,
-        "deepseek/deepseek-v4-pro": 140.838479
+        "deepseek/deepseek-v4-pro": 141.063235
       }
     },
     "ok": true,
@@ -280,16 +265,16 @@
       },
       {
         "date": "2026-09-02",
-        "requests": 191,
-        "response_tokens": 80998,
-        "cache_hit_tokens": 54954240,
-        "cache_miss_tokens": 246682,
-        "estimated_cost_usd": 0.492408,
+        "requests": 1643,
+        "response_tokens": 1732121,
+        "cache_hit_tokens": 333636736,
+        "cache_miss_tokens": 2981825,
+        "estimated_cost_usd": 4.547641,
         "pricing_complete": true
       }
     ],
     "totals": {
-      "estimated_cost_usd": 161.217451,
+      "estimated_cost_usd": 165.272684,
       "pricing_complete": true,
       "unpriced_models": [],
       "deepseek-chat & deepseek-reasoner": {
@@ -300,11 +285,11 @@
         "estimated_cost_usd": 0.0
       },
       "deepseek-v4-flash": {
-        "requests": 21639,
-        "response_tokens": 15586220,
-        "cache_hit_tokens": 3556843520,
-        "cache_miss_tokens": 69232083,
-        "estimated_cost_usd": 50.4159
+        "requests": 22964,
+        "response_tokens": 17157527,
+        "cache_hit_tokens": 3822244480,
+        "cache_miss_tokens": 71720856,
+        "estimated_cost_usd": 53.8583
       },
       "deepseek-v4-flash-vision-exp": {
         "requests": 45,
@@ -314,19 +299,19 @@
         "estimated_cost_usd": 0.6372
       },
       "deepseek-v4-pro": {
-        "requests": 14506,
-        "response_tokens": 11513265,
-        "cache_hit_tokens": 2288445696,
-        "cache_miss_tokens": 56094471,
-        "estimated_cost_usd": 110.1644
+        "requests": 14633,
+        "response_tokens": 11593081,
+        "cache_hit_tokens": 2301727232,
+        "cache_miss_tokens": 56340841,
+        "estimated_cost_usd": 110.7773
       }
     },
     "ok": true,
     "source": "platform_meter",
     "wallet": {
       "ok": true,
-      "balance_usd": 87.617220948,
-      "lifetime_cost_usd": 332.382779052
+      "balance_usd": 80.59425392,
+      "lifetime_cost_usd": 339.40574608
     },
     "note": "authoritative meter token counts; dollars estimated at repo off-peak rates"
   }
