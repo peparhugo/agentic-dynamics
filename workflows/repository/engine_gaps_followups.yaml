@@ -1,0 +1,342 @@
+name: engine_gaps_followups
+question: >-
+  Close the five defects the Wave-1 adversarial review recorded as accepted
+  limitations (F1-F4) plus the split-run evidence gap found at the merge
+  (F5) — the controller chose to close them rather than accept them. The
+  defects: (f1) the DockerVerifierExecutor's container is NOT literally
+  read-only — build_verifier_request keeps the /tmp worktree namespace rw and
+  the .git dirs rw, so write protection on the candidate is behavioral
+  (--no-commit) rather than mount-enforced; a verifier that can write the
+  candidate it verifies is a verifier that can be coerced. (f2) true
+  container round-trip parity is unmeasured — the parity tests use a fake
+  verifier and the real execute→spawn→envelope→classify path is unexercised.
+  (f3) revision invalidation is prospective-only — pre-w2 ledgers carry no
+  digest and a mid-list structural edit (phase renamed, same count) still
+  certifies completed. (f4) _is_definition_changed_after_runs false-positives
+  on partial-run corpora. (f5) the resume-splits-the-run defect: a run that
+  times out at w2 plus its --resume continuation are TWO runs with TWO
+  candidates, each holding half the phases, and the spec index derives
+  'completed' from the latest run alone — no single run executed the full
+  revision, yet the index certifies it. f5 is the one the operator saw live
+  (engine_gaps_verifier_revision: n_runs 2, status completed, neither run
+  executed all four phases).
+version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: false
+repeatable: false
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: false
+    context:
+      domain_context: >-
+        canonical_sources: [scripts/fleet/docker_executor.py (DockerVerifierExecutor
+        + build_verifier_request — the f1 mount contract),
+        src/agentic_dynamics/runtime/executor.py (StepExecutor protocol),
+        tests/test_workflow_executor_parity.py (the f2 parity suite — fake verifier
+        only), src/agentic_dynamics/experiment/spec_status.py (derive_status +
+        _is_definition_changed_after_runs — the f3/f4/f5 derivation),
+        src/agentic_dynamics/runtime/workflow_runner.py (the resume path — where
+        f5's continuation run is created), scripts/run_workflow.py (the CLI --
+        resume), src/agentic_dynamics/control/control_db.py (runs + step_attempts
+        — where a continuation run could link to its parent), and the Wave-1
+        merge (9620ed605) + its adversarial review (engine_gaps_verifier_revision_
+        adversarial.md F1-F4)].
+        policies: [one_durable_state, the_gate_is_the_evidence, completion_follows_
+        the_revision, bounded_verification].
+      challenge_context: >-
+        challenge: five edges where evidence can lie. f1: a verifier that could
+        write its candidate cannot certify it — the mount must refuse before the
+        process starts. f2: a parity claim with no container round-trip is a claim
+        about a fake. f3/f4: revision invalidation that only catches trailing
+        appends misses renames and over-fires on partial runs. f5: a resume
+        creates a second run that inherits none of the first run's evidence —
+        the union of phases is never ONE run, and 'completed' becomes a lie about
+        a split. The split-run defect is the load-bearing one: it is the same
+        class as the original deep review's 'the workflow is complete can mean
+        eleven different things' — here the index says complete when the evidence
+        is half in one candidate and half in another.
+        deliberation: [the split-run evidence first (f5 — the derivation must see
+        a continuation run as part of its parent), then the mount enforcement
+        (f1), then the mid-list invalidation + false-positive fixes (f3/f4), then
+        the container parity measurement (f2)].
+        session_policy: {default: continue}
+      current_state: >-
+        MEASURED (2026-09-02): engine_gaps_verifier_revision has n_runs 2, status
+        completed — run-85f33d68de3b (failed, w1+w2 phases) + run-45c2c18f97c8
+        (promotable, w3+w4 phases), different candidates. build_verifier_request
+        keeps /tmp rw + .git dirs rw. Parity suite uses FakeDockerVerifier.
+        _is_definition_changed_after_runs detects trailing-append shape only.
+      hard_rules: >-
+        (1) ONE RUN, ONE CANDIDATE, FULL EVIDENCE: after f5, a resume is a
+        CONTINUATION of its parent run (linked in the control db), and the spec
+        index derives completion from the UNION of a run family's evidence —
+        never from the latest run alone when an earlier run of the same family
+        failed or holds other phases. A family whose union does not cover the
+        full revision is never 'completed'.
+        (2) THE VERIFIER CANNOT WRITE ITS CANDIDATE: after f1, the verifier
+        container's mount contract is read-only for the worktree + .git — the
+        mount refuses before the process starts, never after (no behavioral
+        reliance on --no-commit).
+        (3) COMPLETION FOLLOWS THE REVISION, FULLY: after f3/f4, revision
+        invalidation catches mid-list structural edits (not just trailing
+        appends) and does NOT false-positive on partial-run corpora whose phase
+        union is a genuine subset of the current definition.
+        (4) PARITY IS MEASURED, NOT CLAIMED: after f2, the container round-trip
+        (execute → spawn → envelope → classify) is exercised by a real or
+        container-less round-trip harness in CI — a fake-only parity claim is a
+        recorded limitation, never a pass.
+        (5) BOUNDED VERIFICATION (unchanged). REGENERATE, NEVER HAND-EDIT
+        (unchanged).
+    phases:
+      - name: g1_pin_spec
+        kind: agent
+        scope: implementation
+        timeout: 3600
+        prompt: |
+          GOAL: {goal}
+          ROLE: verification — the house pin convention. Write
+          docs/reviews/engine_gaps_followups_preregistration.md carrying:
+          (a) this spec's file SHA256 + the worktree git sha; (b) the five
+          defects VERIFIED against the actual code + the live control db:
+          (1) f5 — engine_gaps_verifier_revision has n_runs 2, neither covering
+          the full revision (query the control db + the two ledgers); (2) f1 —
+          build_verifier_request keeps /tmp and .git rw (read the mounts);
+          (3) f2 — parity tests use a fake verifier (grep the tests); (4) f3 —
+          a mid-list rename still certifies completed (read
+          _is_definition_changed_after_runs); (5) f4 — the partial-run
+          false-positive shape (read the same function). An edge that does not
+          hold is a FAILED finding. If a claim cannot be reproduced after THREE
+          attempts, record the deviation and FAIL — never loop.
+          DELIVER: the preregistration with the five verified defects, committed
+          with the '[workflow] g1_pin_spec — <goal prefix>' subject.
+          LOG: PASS/FAIL per claim; commit.
+      - name: g1_split_run_evidence
+        kind: agent
+        scope: implementation
+        timeout: 7200
+        prompt: |
+          GOAL: {goal}
+          SHAPE: one run family, full evidence. (a) In the control db + the
+          resume path: when --resume continues a run whose terminal state was
+          failed/timed-out (or whose phases are incomplete), the continuation is
+          recorded as a CHILD of the parent run (a parent_run_id / family_id
+          link) — the control db and the run ledgers both carry the family
+          link. (b) In spec_status's derive_status: completion is derived from
+          the UNION of a run family's evidence — a family whose executed-phase
+          union covers the current revision's full phase list with the latest
+          run succeeding reads completed; a family with any failed member or an
+          incomplete union reads failed/blocked/runnable accordingly — NEVER
+          completed from the latest run alone when an earlier member failed or
+          holds un-executed phases.
+          SCOPE FENCE: the family link + the union derivation ONLY — no changes
+          to the verifier (g1_f2/g1_f3 phases), no changes to the digest
+          computation. Commits carry '[workflow] g1_split_run_evidence'.
+          VERIFY (both directions): unit tests prove (a) a synthetic parent
+          (w1+w2, failed) + child (w3+w4, ok) with the family link derives
+          completed ONLY when the union covers the revision AND the latest
+          member succeeded — and derives NOT-completed when any member failed
+          (the engine_gaps_verifier_revision live shape must read failed or
+          blocked, never completed, until a full-coverage run exists); (b) an
+          unlinked second run (a genuinely new attempt) does NOT union with the
+          first (two separate families); (c) existing single-run derivations
+          are unchanged (a lone completed run still reads completed); (d) the
+          ledger's family link round-trips (resume writes it, spec_status reads
+          it).
+          DELIVER: the family link + the union derivation + the tests, committed.
+          LOG: PASS/FAIL; commit.
+      - name: g1_verifier_mount
+        kind: agent
+        scope: implementation
+        timeout: 7200
+        prompt: |
+          GOAL: {goal}
+          SHAPE: the verifier cannot write its candidate. In build_verifier_
+          request (scripts/fleet/docker_executor.py): the verifier container's
+          mounts become READ-ONLY for everything the candidate verification
+          touches — the worktree namespace (/tmp workdir) and the .git dirs
+          mount ro (or are replaced by a read-only snapshot of the candidate
+          commit). The verifier needs the candidate's TREE to run the suite
+          against, never the ability to change it. If the verifier genuinely
+          needs a writable scratch area, it is a separate, empty, non-candidate
+          volume (results/tmp only) — never the worktree, never .git. Keep the
+          no-credentials property (no auth mounts) and the no-model-calls
+          property (no admission, no CLI state). The contract rejects a
+          verifier request whose mounts violate read-only-for-candidate at
+          validation time (before the socket call).
+          SCOPE FENCE: the verifier mount contract + validation ONLY — no
+          changes to the agent-phase executors, no changes to run_suite. Commits
+          carry '[workflow] g1_verifier_mount'.
+          VERIFY (both directions): unit tests prove (a) a verifier request's
+          worktree + .git mounts are ro (or absent — a read-only candidate
+          snapshot) — assert the mount list; (b) a request that would mount the
+          candidate rw FAILS validation before any spawn; (c) the agent-phase
+          executor's mounts are UNCHANGED (implementation scopes still get rw —
+          the verifier is a different contract); (d) the suite-target semantics
+          are unchanged (the verifier runs the same target list the in-process
+          path uses).
+          DELIVER: the read-only verifier contract + the tests, committed.
+          LOG: PASS/FAIL; commit.
+      - name: g1_revision_invalidation
+        kind: agent
+        scope: implementation
+        timeout: 7200
+        prompt: |
+          GOAL: {goal}
+          SHAPE: invalidation catches mid-list edits, not just trailing appends.
+          _is_definition_changed_after_runs (spec_status.py) currently detects
+          only the trailing-append shape (a phase added after the last green
+          run). Extend it to detect MID-LIST structural edits: a phase renamed,
+          reordered, removed, or altered (kind/scope/tests changed) between the
+          runs and the current definition — the runs' executed_phase names no
+          longer match the current list by name+position. AND fix the
+          false-positive: a partial-run corpus (--only-phase runs whose union is
+          a strict prefix of the current list) must NOT read as 'edited' when no
+          edit occurred — the distinction is whether the current definition's
+          phase list, projected onto the runs' timestamps, could have produced
+          those runs (the runs executed phases that exist in the current
+          definition, in order — just not all of them).
+          SCOPE FENCE: _is_definition_changed_after_runs + its callers ONLY.
+          Commits carry '[workflow] g1_revision_invalidation'.
+          VERIFY (both directions): unit tests prove (a) a mid-list RENAME of a
+          phase (same count) invalidates a legacy green run — the spec reads
+          never-run-of-this-revision, not completed (the f3 failure mode);
+          (b) a phase REMOVED after the runs invalidates (the runs certify a
+          definition that no longer exists); (c) a partial-run corpus with NO
+          edit (p1-only runs over a p1..p5 definition) does NOT false-positive
+          (the f4 failure mode — it reads blocked/runnable per its own union,
+          not 'edited'); (d) a genuine trailing append still invalidates
+          (unchanged); (e) a full-coverage run of the current definition still
+          certifies completed (no regression).
+          DELIVER: the mid-list invalidation + the false-positive fix + the
+          tests, committed.
+          LOG: PASS/FAIL; commit.
+      - name: g1_parity_roundtrip
+        kind: agent
+        scope: implementation
+        timeout: 7200
+        prompt: |
+          GOAL: {goal}
+          SHAPE: parity is measured, not claimed. The parity suite's verifier
+          cases currently use FakeDockerVerifier (local run_suite) and assert
+          only build_request on the real executor. Build a round-trip harness
+          that exercises the real DockerVerifierExecutor's execute →
+          envelope → classify path WITHOUT requiring docker in CI: inject a
+          spawn function that returns a canned sibling outcome (the same shape
+          spawn_sibling returns) and assert the executor maps it to the correct
+          StepResult (test_executed_success, state, tokens, error) — the
+          envelope-classify contract is tested against the real executor code,
+          with the docker boundary the only injected seam. Where docker IS
+          available (a --run-docker marker the operator can enable), the same
+          harness runs the true container round-trip.
+          SCOPE FENCE: the round-trip harness + the parity cases ONLY — no
+          changes to the executor's production behavior. Commits carry
+          '[workflow] g1_parity_roundtrip'.
+          VERIFY (both directions): unit tests prove (a) the real executor with
+          an injected spawn maps a failed-suite envelope to a failed StepResult
+          (test_executed_success False, phase failed); (b) a passed-suite
+          envelope maps to ok; (c) an awaiting envelope maps to awaiting; (d) a
+          garbage/absent envelope fails closed (no envelope → not ok); (e) the
+          existing fake-verifier parity cases stay green; (f) the docker marker
+          run is documented (how the operator runs the true round-trip).
+          DELIVER: the round-trip harness + the tests, committed.
+          LOG: PASS/FAIL; commit.
+      - name: g2_adversarial
+        kind: agent
+        scope: adversarial_readonly
+        requires_deliverable: true
+        run_model: deepseek/deepseek-v4-pro
+        timeout: 14400
+        prompt: |
+          GOAL: {goal}
+          ROLE: the INDEPENDENT adversarial reviewer — a DIFFERENT model and
+          session (pro vs the flash author). Falsify the wave, not certify it.
+          Attack in order, re-verified against the actual code + the live
+          control db (never asserted): (1) g1_split_run_evidence — does the
+          engine_gaps_verifier_revision live shape now read NOT-completed
+          (family union with a failed member)? does an unlinked second run stay
+          a separate family? (2) g1_verifier_mount — can the verifier write its
+          candidate through ANY mount (probe the request)? (3) g1_revision_
+          invalidation — does a mid-list rename invalidate? does the partial-run
+          corpus still false-positive (the f4 shape)? (4) g1_parity_roundtrip —
+          is the envelope-classify contract actually exercised against the real
+          executor (not a fake)? Every finding: FIX on the branch or RECORD as
+          an accepted limitation with reasoning. At least 3 findings or a clean
+          sweep with re-verification evidence — a bare PASS is a failed review.
+          RELEASE VERDICT: merge-ready to main?
+          DELIVER: docs/reviews/engine_gaps_followups_adversarial.md (finding
+          table), committed.
+          LOG: finding table; PASS/FAIL; commit.
+      - name: g3_test_gate
+        kind: test
+        scope: implementation
+        timeout: 900
+        tests:
+          - tests/test_workflow_executor_parity.py
+          - tests/test_spec_status.py
+          - tests/test_workflow_runner.py
+          - tests/test_experiment_spec.py
+          - tests/test_spawn_wrapper.py
+          - tests/test_doc_lifecycle.py
+          - tests/test_script_classification.py
+          - tests/test_agent_config_render.py
+          - tests/test_cli_resolution.py
+factors:
+  - {name: model, levels: [deepseek/deepseek-v4-flash]}
+design: factorial
+rules:
+  - name: followup_defects_verified
+    plane: measurement
+    evidence_class: "[M]"
+    requires: []
+    produces: [five_defects_confirmed]
+  - name: split_run_union
+    plane: measurement
+    evidence_class: "[C]"
+    requires: [five_defects_confirmed]
+    produces: [family_union_derivation, resume_links_parent]
+  - name: verifier_readonly_mounts
+    plane: measurement
+    evidence_class: "[C]"
+    requires: [five_defects_confirmed]
+    produces: [candidate_write_refused_at_mount]
+  - name: invalidation_full_coverage
+    plane: measurement
+    evidence_class: "[C]"
+    requires: [five_defects_confirmed]
+    produces: [midlist_edit_invalidates, partial_run_no_false_positive]
+  - name: parity_roundtrip_measured
+    plane: measurement
+    evidence_class: "[C]"
+    requires: [five_defects_confirmed]
+    produces: [envelope_contract_exercised]
+  - name: followup_wave_adversarial_clean
+    plane: measurement
+    evidence_class: "[M]"
+    requires: [family_union_derivation, resume_links_parent,
+               candidate_write_refused_at_mount, midlist_edit_invalidates,
+               partial_run_no_false_positive, envelope_contract_exercised]
+    produces: [followup_wave_clean]
+  - name: test_gate_measured
+    plane: measurement
+    evidence_class: "[M]"
+    requires: [test_executed_success]
+    produces: [independent_gate_recorded]
+metrics:
+  - {name: five_defects_confirmed, agg: mean, over: cell}
+  - {name: family_union_derivation, agg: mean, over: cell}
+  - {name: candidate_write_refused_at_mount, agg: mean, over: cell}
+  - {name: midlist_edit_invalidates, agg: mean, over: cell}
+  - {name: partial_run_no_false_positive, agg: mean, over: cell}
+  - {name: envelope_contract_exercised, agg: mean, over: cell}
+  - {name: followup_wave_clean, agg: mean, over: cell}
+  - {name: independent_gate_recorded, agg: mean, over: cell}
+writeup:
+  format: lab_book
+  sections: [question, g1_pin_spec, g1_split_run_evidence, g1_verifier_mount, g1_revision_invalidation, g1_parity_roundtrip, g2_adversarial, g3_test_gate]
+stop: {budget_usd: 12.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}
