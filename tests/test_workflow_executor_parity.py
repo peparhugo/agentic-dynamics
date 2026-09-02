@@ -7,6 +7,19 @@ its result ENVELOPE first (the machine-readable ``WorkflowRunResult.to_dict()`` 
 child prints), with the exit code as the secondary signal when no envelope exists.
 ``returncode == 0`` alone is never trusted: a pre-contract child exits 0 with a failed
 or awaiting result.
+
+g1 (engine_gaps_followups F2): the parity suite's verifier cases use FakeDockerVerifier
+(a local ``run_suite`` shape) and assert only ``build_request`` on the real executor. The
+round-trip harness in the last section closes that gap WITHOUT docker: it drives the REAL
+``DockerVerifierExecutor.execute()`` with the docker boundary (``spawn_wrapper.spawn_sibling``)
+as the ONLY injected seam, returning canned sibling outcomes and asserting the
+envelope → classify → StepResult mapping. Where docker IS available the operator runs the
+TRUE container round-trip under the ``--run-docker`` opt-in marker:
+
+    python3 -m pytest tests/test_workflow_executor_parity.py --run-docker \
+        -k verifier_docker_roundtrip
+
+(skipped by default in every CI/default run — never silently passed).
 """
 
 from __future__ import annotations
@@ -15,6 +28,8 @@ import json
 import sys
 from pathlib import Path
 from types import SimpleNamespace
+
+import pytest
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 _SCRIPTS_DIR = str(_REPO_ROOT / "scripts")
@@ -580,3 +595,468 @@ def test_verifier_request_carries_no_credentials_and_no_writable_state(tmp_path)
     assert "--only-phase gate_run" in cmd
     assert "--no-commit" in cmd  # a verifier never commits — read-only by construction
     assert request.phase_def.get("tests") == ["tests/test_spec_x.py"]
+
+
+# ══════════════════════════════════════════════════════════════
+# g1 (engine_gaps_followups F2): the round-trip harness — the REAL executor's
+# execute → envelope → classify contract exercised with the docker boundary as the
+# ONLY injected seam (docker optional in CI).
+# ══════════════════════════════════════════════════════════════
+#
+# The parity cases above inject FakeDockerVerifier — a DockerVerifier-SHAPED executor that
+# runs run_suite locally — and assert only ``build_request`` on the real executor. F2 (the
+# Wave-1 adversarial review): the genuine container contract — real DockerVerifierExecutor
+# ``execute()`` → ``spawn_wrapper.spawn_sibling`` → the child's result envelope → ``_classify``
+# → ``_phase_from_envelope`` → ``StepResult`` — was never exercised, because ``docker`` is not
+# available in CI.
+#
+# The round-trip harness closes that gap WITHOUT docker: it drives the real executor's
+# ``execute()`` and replaces ONLY the docker boundary — the ``spawn_wrapper.spawn_sibling``
+# module attribute the executor calls (``docker_verifier_executor.py:133``) — with a function
+# that returns a canned sibling outcome in the exact shape ``spawn_sibling`` returns
+# (``{"ok", "argv", "returncode", "stdout", "stderr"}``). Everything the executor owns runs
+# for real: ``build_request`` → the spawned request, ``_classify`` over the child's envelope
+# (the indented ``WorkflowRunResult.to_dict()`` JSON a real child prints), and the StepResult
+# mapping. The docker boundary is the ONLY injected seam.
+#
+# (f) Where docker IS available, the same harness runs the TRUE container round-trip (the
+# real ``docker run`` → child ``run_workflow.py --only-phase`` → real envelope) under the
+# ``--run-docker`` opt-in marker:
+#
+#     python3 -m pytest tests/test_workflow_executor_parity.py --run-docker \
+#         -k verifier_docker_roundtrip
+#
+# Skipped by default in every CI/default run (never silently passed) — docker is optional.
+# Requirements for the operator's true round-trip: a working ``docker`` + the ``fleet-net``
+# network + a CURRENT ``fleet/base`` image (its baked ``/app`` copy must match the repo's
+# ``scripts/``) whose entrypoint can start a credential-less verifier cell. See
+# ``test_verifier_docker_roundtrip`` below.
+
+#: The child's run-envelope shape the real ``spawn_sibling`` outcome carries in ``stdout`` —
+#: one phase record per executed phase (a ``kind: test`` sibling runs exactly one).
+RT_PHASE = "gate"
+
+
+def _rt_executor(workdir, *, spec_name="spec_x", spec_path=None):
+    """A real DockerVerifierExecutor (the production composition-root shape)."""
+    return DockerVerifierExecutor(
+        spec_path=spec_path or "/repo/workflows/repository/spec_x.yaml",
+        spec_name=spec_name,
+        goal="g",
+        model="deepseek/deepseek-v4-flash",
+        workdir=str(workdir),
+    )
+
+
+def _rt_request(workdir, *, phase=RT_PHASE, tests=None, spec_name="spec_x"):
+    """The StepRequest the engine hands a verifier for one ``kind: test`` phase."""
+    return StepRequest(
+        phase_name=phase,
+        phase_kind="test",
+        prompt="",
+        model="deepseek/deepseek-v4-flash",
+        goal="g",
+        spec_name=spec_name,
+        workdir=str(workdir),
+        language="python",
+        timeout=180,
+        phase_def={"name": phase, "kind": "test", "tests": list(tests or ["tests/test_x.py"])},
+    )
+
+
+def _rt_phase(status, *, test_executed_success, tests_passed=0, tests_total=0, error=""):
+    """The child phase's ledger record inside its run envelope (PhaseResult.to_dict shape)."""
+    return {
+        "phase": RT_PHASE,
+        "kind": "test",
+        "status": status,
+        "test_executed_success": test_executed_success,
+        "tests_passed": tests_passed,
+        "tests_total": tests_total,
+        "error": error,
+    }
+
+
+def _rt_envelope(ok, state, phases, *, awaiting=False, awaiting_reason=""):
+    """The child's result envelope (WorkflowRunResult.to_dict shape — the top-level fields
+    the classify contract reads: ``ok`` / ``state`` / ``awaiting`` / ``phases``)."""
+    return {
+        "spec_name": "spec_x",
+        "state": state,
+        "ok": ok,
+        "awaiting": awaiting,
+        "awaiting_reason": awaiting_reason,
+        "phases": phases,
+    }
+
+
+def _rt_outcome(returncode, *, envelope=None, stderr="", stdout_noise="some noise line\n"):
+    """A canned sibling outcome in the EXACT shape ``spawn_sibling`` returns.
+
+    ``stdout`` mirrors a real child: noise first, then the indented result envelope (the
+    ``_parse_envelope`` parser scans for the envelope's opening ``{`` line, so the envelope
+    MUST be indented — a single-line dump would never parse and the classify contract would
+    not be exercised).
+    """
+    stdout = stdout_noise
+    if envelope is not None:
+        stdout += json.dumps(envelope, indent=2)
+    return {
+        "ok": returncode == 0,
+        "argv": ["docker", "run", "--rm", "-i"],
+        "returncode": returncode,
+        "stdout": stdout,
+        "stderr": stderr,
+    }
+
+
+def _rt_execute(executor, request, outcome, monkeypatch):
+    """Drive the REAL executor's ``execute()`` with the docker boundary injected.
+
+    Replaces ``spawn_wrapper.spawn_sibling`` (the exact module attribute the executor calls)
+    with a function that records the request the docker boundary received and returns the
+    canned outcome. Every executor-owned step — ``build_request``, the classify path, the
+    StepResult construction — runs for real.
+    """
+    captured: dict = {}
+
+    def fake_spawn(spawn_request, **kwargs):
+        captured["request"] = spawn_request
+        captured["kwargs"] = kwargs
+        return outcome
+
+    monkeypatch.setattr(spawn_wrapper, "spawn_sibling", fake_spawn)
+    sr = executor.execute(request)
+    return sr, captured
+
+
+# ── (a) a failed-suite envelope maps to a failed StepResult ────────────────────
+
+
+def test_roundtrip_failed_suite_envelope_maps_to_failed_stepresult(tmp_path, monkeypatch):
+    """(g1/F2-a) the real executor with an injected spawn maps a FAILED-suite envelope to a
+    failed StepResult (test_executed_success False, phase failed). The child exits 0 with an
+    ``ok:false`` envelope — the pre-contract false-success shape P0-1 exists to remove: the
+    envelope, not the exit code, is what fails the phase."""
+    request = _rt_request(tmp_path)
+    executor = _rt_executor(tmp_path)
+    env = _rt_envelope(
+        False,
+        "failed",
+        [_rt_phase("failed", test_executed_success=False, tests_passed=0,
+                   tests_total=2, error="boom")],
+    )
+    sr, captured = _rt_execute(
+        executor, request, _rt_outcome(EXIT_OK, envelope=env, stderr="boom"), monkeypatch
+    )
+    # the docker boundary received the READ-ONLY verifier request build_request produced
+    assert captured["kwargs"] == {"docker": "docker", "image": None}
+    spawn_req = captured["request"]
+    assert spawn_req.get(spawn_wrapper.VERIFIER_REQUEST_MARKER) is True
+    repo_mounts = [m for m in spawn_req.get("mounts", []) if m.get("target") == "/repo"]
+    assert repo_mounts and all(m.get("mode") == "ro" for m in repo_mounts)
+    assert not spawn_req.get("mounts") or all(
+        str(m.get("mode")) == "ro" for m in spawn_req["mounts"]
+    )
+    # the envelope-classify mapping: a failed-suite envelope is a failed verdict
+    assert sr.ok is False
+    assert sr.state == "failed"
+    assert sr.test_executed_success is False
+    assert sr.tests_passed == 0
+    assert sr.tests_total == 2
+    assert "boom" in sr.error
+
+
+def test_roundtrip_failed_suite_contract_child_is_failed(tmp_path, monkeypatch):
+    """(g1/F2-a, contract shape) the SAME failed-suite envelope with the child's contract
+    exit code (20) maps to the same failed StepResult — envelope and exit code agree."""
+    request = _rt_request(tmp_path)
+    executor = _rt_executor(tmp_path)
+    env = _rt_envelope(
+        False,
+        "failed",
+        [_rt_phase("failed", test_executed_success=False, tests_passed=1,
+                   tests_total=3)],
+    )
+    sr, _ = _rt_execute(executor, request, _rt_outcome(EXIT_FAILED, envelope=env), monkeypatch)
+    assert sr.ok is False
+    assert sr.state == "failed"
+    assert sr.test_executed_success is False
+    assert sr.exit_code == EXIT_FAILED
+    assert sr.tests_passed == 1
+    assert sr.tests_total == 3
+
+
+# ── (b) a passed-suite envelope maps to ok ─────────────────────────────────────
+
+
+def test_roundtrip_passed_suite_envelope_maps_to_ok(tmp_path, monkeypatch):
+    """(g1/F2-b) a PASSED-suite envelope maps to an ok StepResult with the verdict fields
+    carried from the child phase's own record (test_executed_success True, 2/2 passed)."""
+    request = _rt_request(tmp_path)
+    executor = _rt_executor(tmp_path)
+    env = _rt_envelope(
+        True,
+        "succeeded",
+        [_rt_phase("ok", test_executed_success=True, tests_passed=2, tests_total=2)],
+    )
+    sr, _ = _rt_execute(executor, request, _rt_outcome(EXIT_OK, envelope=env), monkeypatch)
+    assert sr.ok is True
+    assert sr.state == "ok"
+    assert sr.test_executed_success is True
+    assert sr.tests_passed == 2
+    assert sr.tests_total == 2
+    # a test phase makes no model call: the executor never fabricates a token/cost figure
+    # (the agent executor's token mapping is deliberately absent here — null-not-zero)
+    assert sr.total_tokens == 0
+    assert sr.estimated_cost_usd == 0.0
+    assert sr.session_id == ""
+
+
+# ── (c) an awaiting envelope maps to awaiting ──────────────────────────────────
+
+
+def test_roundtrip_awaiting_envelope_maps_to_awaiting(tmp_path, monkeypatch):
+    """(g1/F2-c) an ``awaiting`` envelope (a designed stop — checkpoint/approval) maps to an
+    awaiting StepResult, never a failure and never a success."""
+    request = _rt_request(tmp_path)
+    executor = _rt_executor(tmp_path)
+    env = _rt_envelope(
+        False,
+        "awaiting_approval",
+        [_rt_phase("awaiting", test_executed_success=None)],
+        awaiting=True,
+        awaiting_reason="checkpoint",
+    )
+    sr, _ = _rt_execute(
+        executor, request, _rt_outcome(EXIT_AWAITING_APPROVAL, envelope=env), monkeypatch
+    )
+    assert sr.ok is False
+    assert sr.state == "awaiting"
+    assert sr.test_executed_success is None
+
+
+def test_roundtrip_awaiting_envelope_pre_contract_child_is_awaiting(tmp_path, monkeypatch):
+    """(g1/F2-c, pre-contract shape) a pre-contract child that exits 0 with an
+    ``awaiting:true`` envelope is awaiting — the exit-code fallback must not collapse a
+    designed stop into ok."""
+    request = _rt_request(tmp_path)
+    executor = _rt_executor(tmp_path)
+    env = _rt_envelope(
+        False,
+        "awaiting_approval",
+        [_rt_phase("awaiting", test_executed_success=None)],
+        awaiting=True,
+        awaiting_reason="checkpoint",
+    )
+    sr, _ = _rt_execute(executor, request, _rt_outcome(EXIT_OK, envelope=env), monkeypatch)
+    assert sr.ok is False
+    assert sr.state == "awaiting"
+
+
+# ── (d) a garbage/absent envelope fails closed ─────────────────────────────────
+
+
+def test_roundtrip_absent_envelope_fails_closed(tmp_path, monkeypatch):
+    """(g1/F2-d) an ABSENT envelope fails closed: a verifier sibling that produced no verdict
+    is a failed verdict, never a pass. A real ``run_workflow.py --only-phase`` child exits
+    ``EXIT_FAILED`` (20) when its suite failed and a container that died before printing its
+    envelope exits nonzero — so a no-envelope outcome can never map to ok, and the executor
+    never fabricates a verdict field from an envelope that was never parsed."""
+    request = _rt_request(tmp_path)
+    executor = _rt_executor(tmp_path)
+    # the child exited 20 but printed no envelope (stdout is only noise)
+    sr, _ = _rt_execute(
+        executor, request, _rt_outcome(EXIT_FAILED, envelope=None, stderr="suite tail"),
+        monkeypatch,
+    )
+    assert sr.ok is False
+    assert sr.state == "failed"
+    assert sr.test_executed_success is None  # no verdict fabricated from no envelope
+    assert sr.tests_total == 0
+    assert "suite tail" in sr.error
+
+
+def test_roundtrip_garbage_envelope_fails_closed(tmp_path, monkeypatch):
+    """(g1/F2-d, garbage) a child that exited nonzero with unparseable stdout (a crash before
+    the envelope, a broken pre-contract child) is failed — the classify contract's exit-code
+    fallback fails closed, and no verdict field is invented."""
+    request = _rt_request(tmp_path)
+    executor = _rt_executor(tmp_path)
+    outcome = _rt_outcome(
+        EXIT_FAILED,
+        envelope=None,
+        stdout_noise="Traceback (most recent call last):\n  boom\n",
+    )
+    sr, _ = _rt_execute(executor, request, outcome, monkeypatch)
+    assert sr.ok is False
+    assert sr.state == "failed"
+    assert sr.test_executed_success is None
+
+
+def test_roundtrip_spawn_refusal_is_a_failed_verdict(tmp_path, monkeypatch):
+    """(g1/F2-d, spawn refusal) a spawn that REFUSES (the docker boundary raises — docker
+    unavailable, validation refused the request) is a failed verdict, never a crash and never
+    a skip: ``execute()`` catches the boundary error and maps it to a VERIFIER_ERROR failed
+    StepResult."""
+    request = _rt_request(tmp_path)
+    executor = _rt_executor(tmp_path)
+
+    def refusing(spawn_request, **kwargs):
+        raise RuntimeError("docker: command not found")
+
+    monkeypatch.setattr(spawn_wrapper, "spawn_sibling", refusing)
+    sr = executor.execute(request)
+    assert sr.ok is False
+    assert sr.state == "failed"
+    assert sr.exit_code == 20
+    assert "VERIFIER_ERROR" in sr.error
+
+
+# ── engine round trip: the verdict flows through run_workflow to the phase ledger ─
+
+
+def test_roundtrip_failed_suite_fails_phase_through_real_executor(tmp_path, monkeypatch):
+    """(g1/F2-a, engine shape) the full round trip through the engine: run_workflow
+    dispatches the kind:test phase to the REAL DockerVerifierExecutor (injected spawn), and
+    the engine records the failed phase exactly like the in-process path — parity now
+    measured through the real executor's execute → envelope → classify contract, not a fake."""
+    (tmp_path / "test_gate_bad.py").write_text(
+        "def test_boom():\n    assert False\n"
+    )
+    spec = _verifier_spec(tmp_path, "test_gate_bad.py")
+    executor = _rt_executor(tmp_path, spec_name="verifier_parity")
+    env = _rt_envelope(
+        False,
+        "failed",
+        [_rt_phase("failed", test_executed_success=False, tests_passed=0,
+                   tests_total=1, error="boom")],
+    )
+
+    def fake_spawn(spawn_request, **kwargs):
+        return _rt_outcome(EXIT_FAILED, envelope=env)
+
+    monkeypatch.setattr(spawn_wrapper, "spawn_sibling", fake_spawn)
+    result = run_workflow(spec, goal="g", model="openai/gpt-5.6-sol",
+                          workdir=tmp_path, commit=False, verifier_executor=executor)
+    assert result.ok is False
+    assert result.state == "failed"
+    assert result.phases[0].status == "failed"
+    assert result.phases[0].test_executed_success is False
+    assert result.phases[0].tests_passed == 0
+    assert result.phases[0].tests_total == 1
+
+
+def test_roundtrip_passed_suite_succeeds_phase_through_real_executor(tmp_path, monkeypatch):
+    """(g1/F2-b, engine shape) the passing-suite counterpart: the real executor's verdict
+    flows through to an ok phase with test_executed_success True recorded on the ledger."""
+    (tmp_path / "test_gate_ok.py").write_text(
+        "def test_ok():\n    assert True\n"
+    )
+    spec = _verifier_spec(tmp_path, "test_gate_ok.py")
+    executor = _rt_executor(tmp_path, spec_name="verifier_parity")
+    env = _rt_envelope(
+        True,
+        "succeeded",
+        [_rt_phase("ok", test_executed_success=True, tests_passed=1, tests_total=1)],
+    )
+
+    def fake_spawn(spawn_request, **kwargs):
+        return _rt_outcome(EXIT_OK, envelope=env)
+
+    monkeypatch.setattr(spawn_wrapper, "spawn_sibling", fake_spawn)
+    result = run_workflow(spec, goal="g", model="openai/gpt-5.6-sol",
+                          workdir=tmp_path, commit=False, verifier_executor=executor)
+    assert result.ok is True
+    assert result.state == "succeeded"
+    assert result.phases[0].status == "ok"
+    assert result.phases[0].test_executed_success is True
+    assert result.phases[0].tests_passed == 1
+    assert result.phases[0].tests_total == 1
+
+
+# ── (f) the TRUE container round-trip (opt-in: --run-docker) ───────────────────
+
+
+@pytest.mark.docker
+def test_verifier_docker_roundtrip(tmp_path):
+    """(g1/F2-f) the SAME harness against the REAL docker boundary — the true container
+    round-trip: ``execute`` → ``spawn_sibling`` (real ``docker run``) → the verifier child's
+    ``run_workflow.py --only-phase`` → its real result envelope → classify → StepResult.
+
+    Skipped in every default run (docker is optional in CI); the operator enables it:
+
+        python3 -m pytest tests/test_workflow_executor_parity.py --run-docker \
+            -k verifier_docker_roundtrip
+
+    Requirements (a working reference containerized path): ``docker`` + the ``fleet-net``
+    network + a CURRENT ``fleet/base`` image (its baked ``/app`` copy of ``scripts/`` must
+    match the repo) whose entrypoint can start a credential-less verifier cell (the D-18 CLI
+    probe is satisfied or the cell boots with it skipped — a verifier mounts no auth dirs by
+    construction). Run it from the MAIN checkout (``/home/drseuss/ai-finops-framework`` — the
+    canonical repo path the mount contract's ``repo-alias`` target is pinned to): the real
+    spawn's validation step 3 refuses a repo-alias mount at any OTHER host path, so a
+    ``/tmp/wt_*`` worktree checkout is refused before the socket call by design, never reaching
+    docker. The test builds a real candidate workdir under /tmp (a spec + a passing suite —
+    the verifier cell mounts the host /tmp namespace read-only at /tmp, so the workdir is
+    visible in the container at the same path), then drives the REAL executor and asserts the
+    envelope→StepResult contract end to end — the very contract the injected-seam tests above
+    prove by construction. A broken verifier-cell environment (stale image, unreachable
+    network, refused spawn) FAILS this test loudly — that is the operator's smoke, not a
+    silent skip.
+    """
+    # The gate phase is named after an implementation-authorized phase in the real
+    # PHASE_SCOPE_AUTHORIZATION table — the real spawn's validation step 2 authorizes by
+    # phase name (no per-spec phase_scopes is threaded through the executor), so a synthetic
+    # name like "gate" would be refused before the socket call, never reaching docker.
+    phase = "p5_test_gate"
+    wd = Path(tmp_path)
+    (wd / "tests").mkdir()
+    (wd / "tests" / "test_gate_ok.py").write_text(
+        "def test_ok():\n    assert True\n"
+    )
+    spec_yaml = (
+        "name: verifier_docker_roundtrip\n"
+        'question: true container round-trip fixture\n'
+        'version: "0.1"\n'
+        "artifact_kind: workflow\n"
+        "intent: mutate\n"
+        "side_effects:\n"
+        "  repository: false\n"
+        "  external_services: false\n"
+        "repeatable: true\n"
+        "workflow:\n"
+        "  kind: agent_task\n"
+        "  params:\n"
+        "    language: python\n"
+        "    phases:\n"
+        "      - name: p5_test_gate\n"
+        "        kind: test\n"
+        "        scope: implementation\n"
+        "        timeout: 180\n"
+        "        tests: ['tests/test_gate_ok.py']\n"
+        "factors:\n"
+        "  - {name: model, levels: [deepseek/deepseek-v4-flash]}\n"
+        "design: factorial\n"
+        "rules: []\n"
+        "metrics: []\n"
+        "writeup: {format: lab_book, sections: [question]}\n"
+        "stop: {budget_usd: 0.1, max_attempts: 1}\n"
+        "adapt: {strategy: manual, selection: highest_regret}\n"
+    )
+    spec_path = wd / "verifier_spec.yaml"
+    spec_path.write_text(spec_yaml)
+    load_spec(spec_path)  # the fixture must be a VALID spec before it drives the container
+
+    # The verifier cell sees the candidate workdir through the read-only /tmp namespace
+    # mount, so the host tmp_path and the container path are the SAME string.
+    executor = _rt_executor(wd, spec_name="verifier_docker_roundtrip",
+                            spec_path=str(spec_path))
+    request = _rt_request(wd, phase=phase, spec_name="verifier_docker_roundtrip",
+                          tests=["tests/test_gate_ok.py"])
+    sr = executor.execute(request)
+    assert sr.ok is True, f"true round-trip failed: state={sr.state} error={sr.error!r}"
+    assert sr.state == "ok"
+    assert sr.test_executed_success is True
+    assert sr.tests_passed == 1
+    assert sr.tests_total == 1

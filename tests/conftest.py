@@ -66,6 +66,19 @@ def requires_opencode(request):
         pytest.skip("opencode binary not available")
 
 
+def pytest_addoption(parser):
+    parser.addoption(
+        "--run-docker",
+        action="store_true",
+        default=False,
+        help="run the docker-marked tests (g1_parity_roundtrip's TRUE container round-trip, "
+        "the real DockerVerifierExecutor execute -> spawn -> envelope -> classify path). "
+        "Requires a working docker + the fleet-net network + a current fleet/base image "
+        "whose baked /app copy matches the repo. Skipped by default; docker is optional "
+        "in CI.",
+    )
+
+
 def pytest_configure(config):
     config.addinivalue_line(
         "markers",
@@ -78,6 +91,30 @@ def pytest_configure(config):
         "selected by `pytest -m fast` (test_suite_speed p3). A test added to this subset "
         "without passing the parallel-safety audit is a violation.",
     )
+    config.addinivalue_line(
+        "markers",
+        "docker: the TRUE container round-trip (g1_parity_roundtrip F2) — drives the real "
+        "DockerVerifierExecutor against the real docker boundary. Opt-in via `--run-docker`; "
+        "skipped (never silently passed) in every default run.",
+    )
+
+
+def pytest_collection_modifyitems(config, items):
+    """Skip the docker-marked round-trip tests unless the operator opted in with --run-docker.
+
+    The true container round-trip is a real docker smoke (image + network + the reference
+    containerized path); it must never run in the default/CI suite. Skipping on the option
+    (rather than at module import) keeps the docker tests visible as *skipped* in a default
+    run — a regression in their collection shows as an error, not a silent absence.
+    """
+    if config.getoption("--run-docker"):
+        return
+    skip_docker = pytest.mark.skip(
+        reason="docker round-trip opt-in: run with --run-docker (g1_parity_roundtrip F2)"
+    )
+    for item in items:
+        if "docker" in item.keywords:
+            item.add_marker(skip_docker)
 
 
 @pytest.fixture(autouse=True)
