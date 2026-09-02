@@ -1,7 +1,7 @@
 {
   "schema_version": "spec-status/v2",
-  "generated_at": "2026-09-01T15:22:36.393676+00:00",
-  "n_specs": 177,
+  "generated_at": "2026-09-02T01:50:04.639877+00:00",
+  "n_specs": 178,
   "specs": [
     {
       "name": "auto_posthoc_wiring",
@@ -1996,6 +1996,24 @@
       "latest_git_sha": "147931070",
       "results_pointer": "experiments/results/workflows/context_abstraction_plane/20260819T230335Z.json",
       "n_runs": 1
+    },
+    {
+      "name": "control_db_publication",
+      "version": "0.1",
+      "status": "completed",
+      "spec_path": "workflows/repository/control_db_publication.yaml",
+      "artifact_kind": "workflow",
+      "repeatable": false,
+      "supersedes": [],
+      "superseded_by": null,
+      "completed_at": null,
+      "last_run_at": "2026-09-02T01:37:04.861273+00:00",
+      "latest_ok": true,
+      "latest_model": "anthropic/claude-opus-5",
+      "latest_cost_usd": 0.103167,
+      "latest_git_sha": "edd0e928d",
+      "results_pointer": "experiments/results/workflows/control_db_publication/20260902T013704Z.json",
+      "n_runs": 6
     },
     {
       "name": "control_room_hardening",

@@ -3,8 +3,8 @@
 **Generated — do not edit by hand.** Regenerate with `python scripts/spec_status.py`;
 `scripts/run_workflow.py` also refreshes it at the end of every run.
 
-Generated at: `2026-09-01T15:22:36.393676+00:00`  ·  177 spec(s)
-**Work remaining:** 48 open · 129 completed/retired
+Generated at: `2026-09-02T01:50:04.639877+00:00`  ·  178 spec(s)
+**Work remaining:** 48 open · 130 completed/retired
 
 | name | kind | repeatable | status | version | supersedes | last_run | ok | model | cost | n_runs |
 |---|---|---|---|---|---|---|---|---|---|---|
@@ -118,6 +118,7 @@ Generated at: `2026-09-01T15:22:36.393676+00:00`  ·  177 spec(s)
 | `context_abstraction_closure` | workflow | no | completed | 0.1 | — | 2026-08-31 23:52 | ok | deepseek/deepseek-v4-flash | $0.0765 | 1 |
 | `context_abstraction_implement` | workflow | no | completed | 0.1 | — | 2026-08-23 19:16 | ok | anthropic/claude-sonnet-5 | $49.5218 | 4 |
 | `context_abstraction_plane` | workflow | no | completed | 0.1 | — | 2026-08-19 23:03 | ok | anthropic/claude-opus-5 | $10.3774 | 1 |
+| `control_db_publication` | workflow | no | completed | 0.1 | — | 2026-09-02 01:37 | ok | anthropic/claude-opus-5 | $0.1032 | 6 |
 | `control_room_hardening` | workflow | no | completed | 0.1 | — | 2026-08-18 23:56 | ok | deepseek/deepseek-v4-pro | $0.1898 | 1 |
 | `control_room_live_board` | workflow | no | completed | 0.1 | — | 2026-09-01 05:12 | ok | deepseek/deepseek-v4-flash | $0.1356 | 1 |
 | `control_room_posthoc_visibility` | workflow | no | completed | 0.1 | — | 2026-08-17 15:37 | ok | deepseek/deepseek-v4-pro | $0.2049 | 1 |

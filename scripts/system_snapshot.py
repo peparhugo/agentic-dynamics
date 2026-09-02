@@ -6,8 +6,14 @@ workers for orientation, the controller instead of triage, the supervisor as its
 baseline) from live state ONLY: git, Redis, the filesystem, the generated indices. The file
 is derived — a hand-edit is overwritten by design. Every subsystem is best-effort: Redis
 down, queue empty, a daemon absent — the section degrades gracefully, never blocks, never
-fails. The snapshot is then rendered into the agent surfaces by ``_gen_instructions.py``
-(INSTRUCTIONS includes ``system_snapshot.md``) and served read-only by the Control Room.
+fails.
+
+The board is read ON DEMAND — it is deliberately NOT rendered into the always-on agent surfaces
+(``control_db_publication`` p5 removed it from ``_gen_instructions.INSTRUCTIONS``). A snapshot is
+stale the moment it is written, and stale run state injected into every session's first token is
+worse than none, because an actor acts on it. Readers who need CURRENT state call
+``agentic-dynamics control status --json`` (``control-status/v1``); this file remains the
+controller's permanence-decision board and is served read-only by the Control Room.
 
 Usage: python3 scripts/system_snapshot.py [--out agent_config/system_snapshot.md]
 """

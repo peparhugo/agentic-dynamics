@@ -74,3 +74,10 @@ audit.md
 
 # Fleet image build context (the staged sonar client — a build artifact, not provenance)
 .build/
+
+# Control database — the orchestrator-owned SQLite control state
+# (`src/agentic_dynamics/control/control_db.py`, control_db_publication p1). Machine-local
+# runtime state, NOT provenance: a binary that every run mutates cannot be diffed, merged, or
+# reviewed, and the durable provenance projected from it (run ledgers, the registry index,
+# publication receipts) is already tracked. The `-wal`/`-shm` sidecars go with it.
+experiments/results/control/

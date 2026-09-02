@@ -56,10 +56,24 @@ def _resolve_claude_bin(
 
     Deployments either put ``claude`` on ``PATH`` or set ``CLAUDE_BIN``. The framework must not
     know a user's installer-specific directory layout.
+
+    Host fallback (mirrors ``opencode.py``'s binary resolution): when neither is present, fall
+    back to the framework's canonical install location ``~/.local/bin/claude`` (the claude
+    symlink chain — ``~/.local/share/claude/versions/<v>``) BEFORE giving up and emitting a
+    bare ``"claude"`` that cannot spawn. Without this, a shell whose PATH lacks ``~/.local/bin``
+    silently fails every anthropic cell with a spawn error whose real cause (``stream.error``)
+    the adapter never surfaces — the measured signature was ``exit_code=-2`` at ~5s, $0, empty
+    stderr, indistinguishable from a kill.
     """
     if configured:
         return configured
-    return find_executable("claude") or "claude"
+    resolved = find_executable("claude")
+    if resolved:
+        return resolved
+    home_claude = Path.home() / ".local" / "bin" / "claude"
+    if home_claude.exists():
+        return str(home_claude)
+    return "claude"  # last resort: rely on $PATH at spawn time
 
 
 # Resolve Claude CLI through the environment, never a host-specific installer path.
@@ -401,7 +415,11 @@ def run_claude_agentic(
         result.exit_code = -1
     else:
         result.exit_code = stream.exit_code
-        result.error = stream.stderr.strip() if stream.exit_code != 0 else ""
+        # Surface the spawn error (stream.error) when present — a failed spawn with an
+        # unresolvable binary previously reported only an empty stderr + exit_code=-2,
+        # indistinguishable from a kill (the silent-failure signature the host fallback
+        # above removes). stream.stderr is the fallback detail for nonzero exits.
+        result.error = (stream.error or stream.stderr).strip() if stream.exit_code != 0 else ""
 
     result.raw_transcript = "\n".join(translated_lines)
     if result.raw_transcript:

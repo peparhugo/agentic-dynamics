@@ -35,8 +35,10 @@ command.
 ```
 L0  THE GAME BOARD (live state — what is happening NOW)
     agent_config/system_snapshot.md  — GENERATED, auto-refreshed
-    → rendered to .opencode/instructions/system_snapshot.md
-      and .claude/rules/system_snapshot.md (same bytes, both platforms)
+    → NO LONGER rendered into the always-on agent surfaces (control_db_publication
+      p5): a snapshot is stale the moment it is written, and stale run state in every
+      session's first token is worse than none. Read the file on demand; for CURRENT
+      state call `agentic-dynamics control status --json` (control-status/v1).
     → served read-only by the Control Room
     → read by EVERY actor: workers (orientation), controller (triage → gone),
       supervisor (assessment baseline)

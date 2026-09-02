@@ -496,11 +496,17 @@ def spec_event(record: KnowledgeRecord, *, now: datetime | None = None) -> Knowl
 
 
 def load_index_entries(*, root: Path | str = PROJECT_ROOT) -> list[SpecStatusEntry]:
-    """Read ``experiments/specs/index.json`` and return its entries.
+    """Read the spec_catalog (``experiments/specs/index.json``) and return its entries.
 
-    Returns ``[]`` when the index is missing or unreadable — the index is a *generated*
-    artifact (``python scripts/spec_status.py``), so "not generated yet" is an ordinary state
-    a producer must survive, not an error.
+    ``spec_catalog`` is this artifact's name in the control-plane vocabulary
+    (``docs/architecture/current/control_plane_vocabulary.md``) — the derived index of what
+    specs exist and which are done. It is NOT the knowledge_registry_log this module's records
+    eventually land in, and not the run_state control database; all three are catalogs of
+    records, which is exactly why the bare word "index" is avoided here.
+
+    Returns ``[]`` when the spec_catalog is missing or unreadable — it is a *generated* artifact
+    (``python scripts/spec_status.py``), so "not generated yet" is an ordinary state a producer
+    must survive, not an error.
     """
     path = Path(root) / SPECS_DIR_REL / INDEX_FILENAME
     try:

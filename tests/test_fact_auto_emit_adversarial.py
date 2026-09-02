@@ -352,27 +352,37 @@ def test_attack3_missing_registry_file_and_missing_parent_directory_is_a_first_v
 # ── Attack 4: emit of a run whose phases changed after finalize ───────────────────────────
 #
 # ACCEPTED as verified-safe-by-construction, with a STRUCTURAL regression guard rather than a
-# behavioral test: `_emit_workflow_facts(spec, args, result)` is called synchronously, in the
-# SAME process, on the SAME `result` object `run_workflow()` just returned — there is no
-# intervening code that could mutate `result.phases` between "the run finished" and "the hook
-# read it" (unlike the manual batch job, which re-reads whatever is on disk at scan time and
-# COULD race a concurrent writer). This is a claim about the CALL SITE'S SHAPE, not about
-# `derive_run_facts`'s logic, so the strongest test available is a source-adjacency check that
-# fails loudly if a future change inserts phase-mutating code between the two calls.
+# behavioral test: `_control_terminal_write(spec, args, result, ...)` is called synchronously,
+# in the SAME process, on the SAME `result` object `run_workflow()` just returned, and it
+# derives the fact payloads inline before queueing them — there is no intervening code that
+# could mutate `result.phases` between "the run finished" and "the derivation read it" (unlike
+# the manual batch job, which re-reads whatever is on disk at scan time and COULD race a
+# concurrent writer). This is a claim about the CALL SITE'S SHAPE, not about `derive_run_facts`'s
+# logic, so the strongest test available is a source-adjacency check that fails loudly if a
+# future change inserts phase-mutating code between the two calls.
+#
+# control_db_publication p2 rewrote the call site (the two fire-and-forget emits became one
+# atomic control-db write plus an outbox drain). The claim is UNCHANGED — one synchronous call
+# on the live object — so the anchor is re-pinned to the new shape rather than deleted: the
+# guard's job is to notice the next change, not to have noticed this one.
 
 
 def test_attack4_no_mutation_window_between_run_completion_and_fact_emission():
     source = (PROJECT_ROOT / "scripts" / "run_workflow.py").read_text()
     anchor = (
-        "    _refresh_index(spec.name)\n"
-        "    _emit_spec_record(spec.name, revision=result.git_sha)\n"
-        "    if _fact_auto_emit_enabled(args):\n"
-        "        _emit_workflow_facts(spec, args, result)\n"
+        "    _control_terminal_write(spec, args, result, "
+        "run_id=control_run_id, ledger_path=out_path)\n"
     )
     assert anchor in source, (
-        "the fact-emit hook must fire immediately after the ledger/spec-record writes with no "
-        "intervening code that could mutate `result` — re-verify Attack 4's 'no mutation window' "
-        "claim in the design doc if this block changed"
+        "the control-plane terminal write must fire immediately after the ledger/index writes "
+        "with no intervening code that could mutate `result` — re-verify Attack 4's 'no mutation "
+        "window' claim in the design doc if this block changed"
+    )
+    # ...and it must be the LAST thing before the exit-code contract: nothing may read or
+    # rewrite `result` between the derivation and the process's final answer.
+    tail = source[source.index(anchor) + len(anchor):]
+    assert tail.lstrip().startswith("# P0-1 exit-code contract"), (
+        "code was inserted between the terminal write and the exit-code contract"
     )
 
 

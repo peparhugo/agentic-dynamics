@@ -1,6 +1,7 @@
 """Tests for the Claude CLI → opencode event adapter."""
 
 import json
+from pathlib import Path
 
 from agentic_dynamics.adapters import claude_adapter as module_under_test
 from agentic_dynamics.adapters.claude_adapter import (
@@ -60,8 +61,13 @@ def test_resolve_claude_bin_honors_explicit_override():
     assert _resolve_claude_bin(configured="/custom/claude") == "/custom/claude"
 
 
-def test_resolve_claude_bin_falls_back_to_command_name_when_path_is_missing():
-    assert _resolve_claude_bin(find_executable=lambda name: None) == "claude"
+def test_resolve_claude_bin_home_fallback_when_path_is_missing():
+    """P0-era fix (2026-09-01): a PATH without ~/.local/bin previously resolved to bare
+    'claude' — an unspawnable command whose failure (exit_code=-2 at ~5s, $0) was
+    indistinguishable from a kill. The framework's canonical install location is the
+    fallback BEFORE the bare command name, mirroring opencode.py's binary resolution."""
+    resolved = _resolve_claude_bin(find_executable=lambda name: None)
+    assert resolved == str(Path.home() / ".local" / "bin" / "claude")
 
 
 def test_adapter_full_sequence():

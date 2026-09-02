@@ -1,0 +1,493 @@
+name: control_db_publication
+question: >-
+  Establish the one durable control state and the one publication path for the
+  stabilized control plane (the deep-review P1/P2 wave). The P0 work removed the
+  false-success paths, unified the execution engine, isolated per-attempt state, and
+  separated promotion — but the control plane still has NO single durable state
+  machine: run state lives in ledgers + Redis + the spec index + the conversation,
+  knowledge projection has no operator-facing completion signal, the instruction
+  surfaces can drift from their neutral source, and the website's numbers can
+  contradict its own data.js. This spec lands: (p1) the orchestrator-owned SQLite
+  control database (runs / step_attempts / gate_results / approvals / promotions /
+  outbox / projection_watermarks) with a precise run-state vocabulary that never
+  overloads "completed"; (p2) the outbox — the parent run atomically writes its
+  state transition + result + knowledge events, and an outbox publisher retries
+  delivery to Redis until acknowledged (children never emit independently);
+  (p3) per-projection watermarks (registry/chroma/neo4j: last_event_id, lag, last
+  success/error) surfaced where the operator can read them; (p4) ONE control packet
+  — `agentic-dynamics control status --json` (control-status/v1: repo_head_sha,
+  control_epoch, active_runs, awaiting_approvals, promotable_runs, failed_runs,
+  unhealthy_workers, projection_lag, safe_actions) that the master controller
+  reloads every turn; (p5) the instruction surfaces collapsed onto one generator —
+  root AGENTS.md becomes a generator output, `--check` is a CI gate, and the default
+  master context carries only stable architecture + authority rules + control
+  commands + how to obtain dynamic state (never the run-state tables, the snapshot,
+  or the 177-spec table); (p6) ONE publication command
+  (`agentic-dynamics publish release --candidate-sha <sha>`) that verifies
+  projections → builds data → verifies HTML consistency against one publication
+  receipt → deploys BOTH Firebase hosts → records both outcomes, plus the
+  HTML-consistency test that rejects stale hard-coded corpus values.
+version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: false
+repeatable: false
+# NOTE: no authored operational status — the P2-1 principle this spec itself lands:
+# workflow definitions carry static identity + lifecycle only; completion is derived
+# from run evidence (the spec index derives `active` until a green run exists).
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: false
+    context:
+      domain_context: >-
+        canonical_sources: [src/agentic_dynamics/control/admission.py (the
+        AdmissionController + admitted() + make_phase_admission — the per-phase spend
+        gate whose leases the control db must record), src/agentic_dynamics/control/
+        supervisor.py (the Redis flag/session contracts), src/agentic_dynamics/
+        knowledge/knowledge_stream.py (the Redis Streams ingestion + the four
+        consumer groups kb-chroma-v1/kb-neo4j-v1/kb-ledger-v1/kb-registry-v1 + the
+        write guard), src/agentic_dynamics/knowledge/retrieval.py (RRF fusion),
+        scripts/run_workflow.py (the composition root that injects router/publisher/
+        admission/step_executor — where the parent run's outbox write lands),
+        scripts/spec_status.py (the derived spec index), scripts/_gen_instructions.py
+        (the surface generator: render_opencode + render_claude — the root AGENTS.md
+        is NOT yet an output), scripts/pipeline.py (the deploy plan — two firebase
+        commands, not one), scripts/build_data.py + scripts/generate_manifest.py (the
+        site data chain), apps/website/index.html + data.js (the publication surface),
+        tests/test_doc_lifecycle.py + tests/test_script_classification.py + tests/
+        test_agent_config_render.py (the surface guards the generator must stay
+        lockstep with), tests/test_spawn_wrapper.py (the spawn contract), and the
+        P0 stabilization code (runtime/executor.py StepExecutor, scripts/promote.py
+        the promotion boundary, the workflow-parity CI job)].
+        policies: [regenerate_never_hand_edit, one_durable_state, outbox_before_emit,
+        control_packet_every_turn, publication_is_one_transaction, authority_absolute].
+      challenge_context: >-
+        challenge: the control plane's state is conversational and multi-carrier —
+        "the workflow is complete" can mean the agent said so, the ledger says ok,
+        the YAML says completed, git contains the commits, Redis says done, the
+        registry consumed the result, or the site deployed. None is the unquestioned
+        source of truth, and the master session is asked to reconcile all of them from
+        chat context (the deep review's central diagnosis). The risk: a run that is
+        "merged but not projected", a projection that is behind but reads current, a
+        workflow whose authored status outlives its changed definition, or a website
+        whose hard-coded claims contradict its generated data — each is a false
+        authority. The control database must be the ONE durable state; the outbox the
+        ONE emission path; the control packet the ONE thing the master reads; the
+        publication receipt the ONE source for every public number.
+        deliberation: [the pin FIRST (p0 — preregister the spec revision + verify the
+        current-state claims against reality BEFORE any implementation), then the
+        control db schema + run-state vocabulary (p1 — every
+        later phase reads or writes it), then the outbox (p2 — the emission path the
+        engine and the knowledge plane both use), then the projection watermarks
+        (p3 — the visibility a publication gate needs), then the control packet
+        (p4 — the operator/master surface over the db), then the instruction-surface
+        collapse (p5 — the generator must not drift), then the one publication
+        command + receipt (p6 — the last mile, which consumes every earlier phase),
+        then the independent cross-model adversarial review (p7 — the house
+        mandatory, trying to falsify the whole control plane), then the harness test
+        gate (p8)].
+        session_policy: {default: continue}
+      current_state: >-
+        MEASURED (2026-09-01): no control.db exists; run state is the ledger JSON
+        under experiments/results/workflows/<spec>/ + Redis story_status + the derived
+        spec index; the knowledge plane has four consumer groups but no watermark
+        surface and no outbox (fact emission is best-effort from each child — the
+        P1 finding "each child publishes its own ledger, refreshes indexes, and emits
+        knowledge independently"); _gen_instructions.py renders .opencode/ + .claude/
+        but NOT root AGENTS.md (which can therefore drift — the P1 finding);
+        publication is two manual firebase commands from apps/website/ with no receipt
+        (the P2 finding — index.html hard-codes 1,067 while data.js says 1027);
+        `agentic-dynamics control status` does not exist (the master improvises from
+        chat context). The P0 wave is merged: ONE engine (runtime/executor.py +
+        StepExecutor injection), the exit-code contract, per-attempt state isolation,
+        strict-by-default commit gate, and scripts/promote.py as the only
+        push-to-main path.
+      hard_rules: >-
+        (1) ONE DURABLE STATE: the control db (SQLite, orchestrator-owned,
+        experiments/results/control/control.db) is the authoritative record of run
+        state, gate results, approvals, promotions, outbox events, and projection
+        watermarks. Ledgers, Redis, the spec index, and the website are projections of
+        it — never independent authorities. Run-state vocabulary is exact: queued,
+        running, awaiting_approval, verifying, promotable, promoting, merged,
+        projecting, published, failed, cancelled, quarantined — NEVER overloaded
+        "completed" (a run may be merged but not projected, succeeded but not
+        published).
+        (2) OUTBOX BEFORE EMIT: the parent run atomically writes its state transition
+        + result + knowledge events to the outbox; an outbox publisher retries
+        delivery to the knowledge stream until acknowledged. Children never emit
+        knowledge, refresh indexes, or write ledgers independently — the parent
+        aggregates (the P0-2 child-mode contract, now enforced durably).
+        (3) CONTROL PACKET EVERY TURN: `control status --json` (control-status/v1)
+        is the ONLY live-state surface the master controller reads; it is reloaded
+        every decision turn, never inferred from chat history.
+        (4) REGENERATE, NEVER HAND-EDIT: root AGENTS.md becomes a generator output
+        alongside .opencode/ and .claude/; `_gen_instructions.py --check` is a CI
+        gate; a drift in any generated surface fails CI.
+        (5) PUBLICATION IS ONE TRANSACTION: one command publishes both Firebase
+        hosts from one receipt; every public number (HTML body, metadata, OG, JSON-LD,
+        data.js, manifest) derives from the receipt; a stale hard-coded corpus value
+        fails the HTML-consistency test.
+        (6) AUTHORITY ABSOLUTE: the control db decides run state; the promoter
+        (scripts/promote.py) alone updates main; projectors consume committed events
+        and never change workflow outcome; the publisher releases only verified,
+        receipt-covered artifacts.
+        (7) ADVERSARIAL MANDATORY (the house convention): p7 is an independent
+        cross-model adversarial review (run_model: deepseek/deepseek-v4-flash — a
+        DIFFERENT model and session than the author, the cheapest proven
+        adversarial reviewer in this repo) that tries to falsify the
+        control plane — at least 3 findings or a clean sweep with re-verification
+        evidence; a bare PASS is a failed review; every finding is fixed on the
+        branch or recorded as an accepted limitation. The run is not complete until
+        the adversarial review lands.
+        (8) PHASE SCOPE IS A FENCE (the 2026-09-02 failed-run lesson): each phase
+        delivers ONLY its own phase's deliverable. NEVER start the next phase's work,
+        never edit the workflow runner or the spec, never hand-edit generated
+        surfaces (.opencode/, .claude/, agent_config/ outputs, the spec index) —
+        those regenerate through their generators. ONE phase, ONE commit range
+        (or as many commits as that phase's own work needs, ALL prefixed with THIS
+        phase's name), then stop. The next phase is a SEPARATE session.
+    phases:
+      - name: p0_pin_spec
+        kind: agent
+        scope: implementation
+        timeout: 3600
+        prompt: |
+          GOAL: {goal}
+          ROLE: verification — the preregistration is the mandate (the house pin
+          convention: the pin lands BEFORE any implementation phase runs, so the run
+          is anchored to an exact spec revision and the current-state claims are
+          verified against reality, not asserted). Write
+          docs/reviews/control_db_publication_preregistration.md carrying: (a) this
+          spec's file SHA256 (compute it: sha256sum workflows/repository/
+          control_db_publication.yaml — the EXACT bytes the run executes) + the git
+          sha of the worktree head; (b) the current-state claims this run depends on,
+          each VERIFIED against the actual repo, not copied from the spec:
+          (1) no experiments/results/control/control.db exists; (2) no 'control
+          status' CLI surface (agentic-dynamics control does not resolve);
+          (3) scripts/_gen_instructions.py renders .opencode/ + .claude/ but NOT
+          root AGENTS.md; (4) apps/website/index.html hard-codes 1,067 sessions
+          while apps/website/data.js says 1027 (or whatever the current contradiction
+          is — record the ACTUAL numbers); (5) the outbox does not exist (children
+          emit best-effort); (6) no projection watermark surface exists. A claim
+          that does not hold is a FAILED finding — record the deviation and fail.
+          The ONLY files this phase may create: the preregistration doc. The ONLY
+          edit allowed: none to existing files.
+          DELIVER: the preregistration with the verified claims, committed with the
+          '[workflow] p0_pin_spec — <goal prefix>' subject.
+          LOG: PASS/FAIL per claim; commit.
+      - name: p1_control_db
+        kind: agent
+        scope: implementation
+        timeout: 7200
+        prompt: |
+          GOAL: {goal}
+          SHAPE: land the ONE durable control state. Create the control-db module
+          under src/agentic_dynamics/control/ (e.g. control_db.py) owning a SQLite
+          database at experiments/results/control/control.db, with tables: runs
+          (run_id PK, spec_name, workflow_revision_id, candidate_sha, state, model,
+          started_at, ended_at, ledger_path, cost_usd), step_attempts (attempt_id,
+          run_id FK, step_id, attempt_no, model, state, started_at, ended_at,
+          tokens, cost_usd, exit_code, error), gate_results (gate_id, run_id FK,
+          step_id, verdict, evidence_json, executor, candidate_sha, started_at,
+          ended_at), approvals (approval_id, run_id FK, gate_id, candidate_sha,
+          operator, decided_at, artifact_path), promotions (run_id FK, candidate_sha,
+          base_sha, squash_sha, pushed_at, by), outbox (event_id PK, run_id FK,
+          payload_json, status pending|delivered|dead, attempts, next_retry_at,
+          created_at), projection_watermarks (projection PK, last_event_id,
+          source_head_event_id, lag_events, last_success_at, last_error). The run
+          STATE vocabulary is exact: queued, running, awaiting_approval, verifying,
+          promotable, promoting, merged, projecting, published, failed, cancelled,
+          quarantined — the db stores the state string, never a bool overload.
+          SCOPE FENCE: this phase delivers ONLY its own deliverable — never the next phase's work, never edits to the runner/spec, never hand-edited generated surfaces. All commits in this phase carry THIS phase's '[workflow] <phase>' prefix. Stop when the deliverable is committed.
+
+          SCOPE FENCE: this phase delivers ONLY its own deliverable — never the next phase's work, never edits to the runner/spec, never hand-edited generated surfaces. All commits in this phase carry THIS phase's '[workflow] <phase>' prefix. Stop when the deliverable is committed.
+
+          SCOPE FENCE: this phase delivers ONLY its own deliverable — never the next phase's work, never edits to the runner/spec, never hand-edited generated surfaces. All commits in this phase carry THIS phase's '[workflow] <phase>' prefix. Stop when the deliverable is committed.
+
+          SCOPE FENCE: this phase delivers ONLY its own deliverable — never the next phase's work, never edits to the runner/spec, never hand-edited generated surfaces. All commits in this phase carry THIS phase's '[workflow] <phase>' prefix. Stop when the deliverable is committed.
+
+          SCOPE FENCE: this phase delivers ONLY its own deliverable — never the next phase's work, never edits to the runner/spec, never hand-edited generated surfaces. All commits in this phase carry THIS phase's '[workflow] <phase>' prefix. Stop when the deliverable is committed.
+
+          SCOPE FENCE: this phase delivers ONLY its own deliverable — never the next phase's work, never edits to the runner/spec, never hand-edited generated surfaces. All commits in this phase carry THIS phase's '[workflow] <phase>' prefix. Stop when the deliverable is committed.
+
+          The orchestrator/engine is the ONLY writer (the composition root in
+          scripts/run_workflow.py opens the db and records run creation, per-phase
+          attempts + gate results, and the terminal transition).
+          VERIFY (both directions): unit tests prove the schema (tables + indexes +
+          the state vocabulary), a run's full lifecycle transitions (queued → running
+          → … → merged/failed/cancelled) are recorded immutably (an update of a
+          terminal state is refused), gate results carry their candidate_sha, and a
+          run can be reconstructed from the db alone (runs + step_attempts +
+          gate_results — the ledger becomes a projection, not the source).
+          DELIVER: the control-db module + schema + the lifecycle tests, committed.
+          LOG: PASS/FAIL; commit.
+      - name: p2_outbox
+        kind: agent
+        scope: implementation
+        timeout: 7200
+        prompt: |
+          GOAL: {goal}
+          SHAPE: the outbox — the ONE emission path. In src/agentic_dynamics/control/
+          (outbox.py), an outbox publisher that: (a) reads pending outbox rows; (b)
+          delivers each payload to the knowledge stream (the existing
+          knowledge.knowledge_stream.publish_event seam — the write guard still
+          applies); (c) marks the row delivered ONLY after the stream acknowledges;
+          (d) retries with backoff, escalating to dead after N attempts (the row
+          carries attempts + next_retry_at). Wire the PARENT run's atomic write in
+          scripts/run_workflow.py's composition root: when the run terminates, one
+          transaction writes the run state transition + the run result envelope + the
+          workflow-fact events into the outbox (control db) — the current
+          _emit_spec_record/_emit_workflow_facts calls become consumers of the outbox
+          (or are removed in favor of it). The P0-2 child mode stays: children never
+          emit; the parent aggregates. Fact emission stops being best-effort-fire-
+          and-forget and becomes at-least-once through the outbox.
+          VERIFY (both directions): unit tests prove a delivered row flips to
+          delivered only after the stream ack, a failed delivery retries with
+          backoff and goes dead after the cap, the parent's terminal write is atomic
+          (a crash mid-write leaves either the whole row or nothing), and the
+          existing knowledge consumer groups still consume the same event shape
+          (the pointer envelope is unchanged — only the delivery path differs).
+          DELIVER: the outbox module + the atomic parent write + the tests, committed.
+          LOG: PASS/FAIL; commit.
+      - name: p3_projection_watermarks
+        kind: agent
+        scope: implementation
+        timeout: 7200
+        prompt: |
+          GOAL: {goal}
+          SHAPE: make knowledge projection explicit. For each consumer group
+          (kb-registry-v1, kb-chroma-v1, kb-neo4j-v1 — and kb-ledger-v1), record a
+          projection watermark in the control db's projection_watermarks table:
+          last_event_id (the stream id the consumer last confirmed), source_head_event_id
+          (the stream head), lag_events, last_success_at, last_error. The consumers'
+          checkpoints (Redis XINFO GROUPS / XACK position) become the source of the
+          watermark, refreshed on each consumed batch (the kb_worker.py / consumer
+          loop lands the row). Surface the watermarks in the Control Room's status
+          surface AND in the control packet (p4): projection_lag {registry: 0, chroma:
+          3, neo4j: 3}. Rename/relabel the overloaded "the index" vocabulary in the
+          codebase where it conflates spec_catalog / run_state / knowledge_event_stream /
+          knowledge_registry_log / knowledge_manifest / chroma_projection /
+          neo4j_projection / publication_receipt — each distinct thing gets a distinct
+          name in docs and code comments (a doc pass, not a rewrite).
+          VERIFY (both directions): unit tests prove each watermark is readable,
+          updates when its consumer confirms a new event, reports lag correctly (a
+          consumer that has not run for N events shows lag N), and a stale projector
+          is VISIBLE (last_success_at old) rather than silently "current".
+          DELIVER: the watermark rows + the consumer-loop wiring + the relabel doc
+          pass + the tests, committed.
+          LOG: PASS/FAIL; commit.
+      - name: p4_control_packet
+        kind: agent
+        scope: implementation
+        timeout: 7200
+        prompt: |
+          GOAL: {goal}
+          SHAPE: ONE control packet. Add `agentic-dynamics control status --json`
+          (a new script scripts/control_status.py, wired in the CLI's control
+          namespace) emitting control-status/v1 from the control db:
+          {schema: "control-status/v1", repo_head_sha, control_epoch (a monotonic
+          counter the db bumps on every state transition), active_runs: [], awaiting_
+          approvals: [{run_id, gate_id, candidate_sha}], promotable_runs: [], failed_
+          runs: [], unhealthy_workers: [], projection_lag: {registry: 0, chroma: 0,
+          neo4j: 0}, safe_actions: [{action: approve|cancel|promote, run_id, gate_id}]}.
+          safe_actions are DERIVED from the db state (e.g. a run in awaiting_approval
+          with an approval gate yields approve; a promotable run yields promote) —
+          never from chat or prose. The Control Room portal, the supervisor, and the
+          master controller all read THIS surface (the portal's existing routes may
+          wrap it). The master's doctrine (p5) says: reload it every turn, act only on
+          run_ids/gate_ids/candidate_shas it returns, never infer live state from
+          history.
+          VERIFY (both directions): unit tests prove the packet is valid against the
+          schema (control-status/v1), safe_actions derive correctly from seeded db
+          states (awaiting → approve, promotable → promote, none → empty), control_
+          epoch advances on a transition, and the packet is deterministic for a fixed
+          db (same input → same output — the master can diff turns).
+          DELIVER: control_status.py + the CLI wiring + the packet tests, committed.
+          LOG: PASS/FAIL; commit.
+      - name: p5_instruction_surfaces
+        kind: agent
+        scope: implementation
+        timeout: 7200
+        prompt: |
+          GOAL: {goal}
+          SHAPE: collapse the instruction surfaces onto ONE generator. Extend
+          scripts/_gen_instructions.py so root AGENTS.md is a generator OUTPUT
+          (rendered from agent_config/ alongside .opencode/ + .claude/, validated the
+          same way) — the neutral source can no longer drift from the root surface.
+          Add `--check` mode: regenerates everything in-memory and exits nonzero on
+          any drift (wired as a CI gate in .github/workflows/pytest.yml, a new
+          surfaces check job or a step in lint). Then slim the DEFAULT master
+          context: the generated root AGENTS.md + the mental model carry only stable
+          architecture, the authority rules (P0/P1: who may do what), the available
+          control commands, and HOW to obtain dynamic state (control status --json).
+          Remove from the default context the run-state tables, the 177-spec status
+          table, the system snapshot, deployment history, worktree ownership, and
+          index progress — those are dynamic state the control packet serves.
+          VERIFY (both directions): --check fails when a generated surface is
+          stale (touch a source, do not regenerate, assert nonzero) and passes when
+          fresh; the generator's render_opencode/render_claude/render_root all emit
+          from the same agent_config sources; the surface guards (test_agent_config_
+          render, test_doc_lifecycle, test_script_classification) stay green; the
+          help text no longer documents the retired _results_summary.json as a live
+          source.
+          DELIVER: the AGENTS.md renderer + --check + the CI wiring + the slimmed
+          context, committed.
+          LOG: PASS/FAIL; commit.
+      - name: p6_publication_receipt
+        kind: agent
+        scope: implementation
+        timeout: 7200
+        prompt: |
+          GOAL: {goal}
+          SHAPE: publication is ONE transaction. Add `agentic-dynamics publish
+          release --candidate-sha <sha>` (scripts/publish_release.py): verify
+          projections (the p3 watermarks: registry/chroma/neo4j lag 0 or the
+          requested freshness policy) → build data (build_data.py) → verify HTML
+          consistency → produce a publication receipt (publication/v1:
+          {schema, repo_sha, data_manifest_sha256, data_js_sha256, sessions_total,
+          generated_at, source_event_watermarks {registry, chroma, neo4j}}) → deploy
+          BOTH Firebase hosts (canonical ai-finops-rulebook + mirror agentic-dynamics,
+          from apps/website/) → record both deployment identifiers in the control db
+          promotions/publication table (or a publication_receipts table) → post-deploy
+          checks. Add the HTML-consistency test: parse every HTML page in
+          apps/website/ and reject any hard-coded corpus number (sessions_total,
+          story_sessions, story counts) that disagrees with the receipt/data.js —
+          the 1,067-vs-1,027 contradiction becomes a test failure, not a drift
+          finding. The master must never run two firebase commands by hand again.
+          VERIFY (both directions): the HTML-consistency test fails on the CURRENT
+          committed index.html (it still hard-codes 1,067 vs data.js's 1027 — fix the
+          page to read from data.js or the receipt so the test passes), the receipt
+          schema validates, publish --dry-run prints the full plan without deploying,
+          and a stale projection (lag > 0) refuses publication.
+          DELIVER: publish_release.py + the HTML-consistency test + the receipt +
+          the fixed homepage, committed.
+          LOG: PASS/FAIL; commit.
+      - name: p7_adversarial
+        kind: agent
+        scope: adversarial_readonly
+        requires_deliverable: true
+        run_model: deepseek/deepseek-v4-flash
+        timeout: 14400
+        prompt: |
+          GOAL: {goal}
+          ROLE: the INDEPENDENT adversarial reviewer — a DIFFERENT model and session
+          (flash vs the opus-5 author, the house independence convention). You are
+          NOT the author: your job is to falsify the control plane, not to certify it.
+          Attack in order, each re-verified against the actual code (never asserted):
+          (1) the control db — is there ANY code path that still treats a ledger JSON,
+          Redis story_status, the spec index, or the website as the authoritative run
+          state? does the run-state vocabulary hold everywhere (a bool that overloads
+          "completed" anywhere)? are terminal states immutable (an update of a merged/
+          failed run refused)? (2) the outbox — can ANY child still emit knowledge,
+          refresh an index, or write a ledger independently (the P0-2 child contract
+          bypassed)? is the at-least-once claim re-derived (a crash between stream ack
+          and row mark must produce a redelivery, never a loss)? (3) the watermarks —
+          is a stale projector VISIBLE, or can a lagging consumer still read as
+          "current"? (4) the control packet — are safe_actions really DERIVED from the
+          db (a hard-coded action list anywhere)? does control_epoch actually advance
+          on every transition? (5) the surfaces — does the generated root AGENTS.md
+          match its agent_config source byte-for-byte (--check genuinely fails on
+          drift)? is any run-state table/snapshot/177-spec list still in the DEFAULT
+          master context? (6) the publication — can the website still contradict its
+          own data.js through ANY page (the HTML-consistency test covers every page,
+          not just index.html)? does publish release --dry-run touch anything?
+          Every finding: FIX on the branch or RECORD as an accepted limitation with
+          reasoning (the deep-review findings this wave closes may have residual
+          accepted scope — say so explicitly). At least 3 findings or a clean sweep
+          with re-verification evidence — a bare PASS is a failed review.
+          RELEASE VERDICT: state whether the control_db_publication branch is
+          merge-ready to main and what the operator must do after merge (e.g. arm the
+          publication gate, re-point the Control Room routes).
+          DELIVER: docs/reviews/control_db_publication_adversarial.md (finding table:
+          finding / attack / re-verification evidence / fix-or-record / residual
+          scope), committed.
+          LOG: finding table; PASS/FAIL; commit.
+      - name: p8_test_gate
+        kind: test
+        scope: implementation
+        timeout: 900
+        # The independent test gate (degradation-review 3b.1 restoration + P0-1
+        # fail-closed): the harness runs run_suite itself and records
+        # test_executed_success — never the agent's self-report. Scoped to the
+        # surfaces this spec touches: the new control-db/outbox/packet tests, the
+        # generator + surface guards, the CLI resolution, and the spawn contract.
+        tests:
+          - tests/test_control_db.py
+          - tests/test_outbox.py
+          - tests/test_projection_watermarks.py
+          - tests/test_control_status.py
+          - tests/test_agent_config_render.py
+          - tests/test_doc_lifecycle.py
+          - tests/test_script_classification.py
+          - tests/test_cli_resolution.py
+          - tests/test_publish_release.py
+          - tests/test_spawn_wrapper.py
+factors:
+  - {name: model, levels: [anthropic/claude-opus-5]}
+design: factorial
+rules:
+  - name: spec_pinned
+    plane: measurement
+    evidence_class: "[M]"
+    requires: []
+    produces: [revision_pinned, current_state_verified]
+  - name: control_db_durable
+    plane: measurement
+    evidence_class: "[C]"
+    requires: [revision_pinned]
+    produces: [run_events_immutable, state_vocabulary_exact]
+  - name: outbox_atomic
+    plane: measurement
+    evidence_class: "[C]"
+    requires: [run_events_immutable]
+    produces: [outbox_delivered_at_least_once, children_never_emit]
+  - name: watermarks_visible
+    plane: measurement
+    evidence_class: "[C]"
+    requires: [outbox_delivered_at_least_once]
+    produces: [projection_lag_visible, stale_projector_visible]
+  - name: control_packet_served
+    plane: measurement
+    evidence_class: "[C]"
+    requires: [projection_lag_visible, state_vocabulary_exact]
+    produces: [control_status_json, safe_actions_derived]
+  - name: surfaces_collapsed
+    plane: measurement
+    evidence_class: "[C]"
+    requires: [control_status_json]
+    produces: [agents_generated_from_one_source, check_gate_wired]
+  - name: publication_one_transaction
+    plane: measurement
+    evidence_class: "[C]"
+    requires: [control_status_json, projection_lag_visible, agents_generated_from_one_source]
+    produces: [publication_receipt, html_consistency_verified]
+  - name: adversarial_reviewed
+    plane: measurement
+    evidence_class: "[M]"
+    requires: [publication_receipt, html_consistency_verified]
+    produces: [control_plane_adversarial_clean]
+  - name: test_gate_measured
+    plane: measurement
+    evidence_class: "[M]"
+    requires: [test_executed_success]
+    produces: [independent_gate_recorded]
+metrics:
+  - {name: revision_pinned, agg: mean, over: cell}
+  - {name: run_events_immutable, agg: mean, over: cell}
+  - {name: outbox_delivered_at_least_once, agg: mean, over: cell}
+  - {name: projection_lag_visible, agg: mean, over: cell}
+  - {name: control_status_json, agg: mean, over: cell}
+  - {name: agents_generated_from_one_source, agg: mean, over: cell}
+  - {name: publication_receipt, agg: mean, over: cell}
+  - {name: html_consistency_verified, agg: mean, over: cell}
+  - {name: control_plane_adversarial_clean, agg: mean, over: cell}
+  - {name: independent_gate_recorded, agg: mean, over: cell}
+writeup:
+  format: lab_book
+  sections: [question, p0_pin_spec, p1_control_db, p2_outbox, p3_projection_watermarks, p4_control_packet, p5_instruction_surfaces, p6_publication_receipt, p7_adversarial, p8_test_gate]
+stop: {budget_usd: 12.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}

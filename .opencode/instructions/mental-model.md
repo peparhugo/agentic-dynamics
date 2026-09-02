@@ -38,6 +38,7 @@ control.admission ── the fail-closed spend gate: lease_registry (reserve) �
 ```
 control.supervisor ── Redis flag/session↔cell mapping contracts (no OpenCode client dep — observe only, see docs/architecture/current/supervisor_design.md)
 control.lease_watchdog ── sweeps expired leases into supervisor flags + quarantine marks (flag-only, never steers — same contract as the supervisor rail)
+control.projection_watermarks ── how far each knowledge consumer group (registry/chroma/neo4j/ledger) has CONFIRMED, its lag, and when it last reported — makes a stale projector visible instead of silently 'current' (see docs/architecture/current/control_plane_vocabulary.md)
 runtime.workflow_runner ── executes an agent_task workflow's phases inside a git worktree, committing + ledgering each
 runtime.test_runner ── independent pytest/jest/go-test/cargo-test runner; sole source of truth for test_executed_success
 ```
@@ -52,10 +53,13 @@ chain, `--verify` appends the guard suite). **`agentic-dynamics surfaces snapsho
 `agent_config/system_snapshot.md` — the **game board (L0)**: main HEAD + the last 12 commits of
 chronological history, spec lifecycle counts, registry + corpus counts, live machine state
 (Redis/queue/pipeline), campaigns in flight, and the worktrees awaiting the permanence
-decision. The snapshot is rendered into both agent surfaces (`.opencode/instructions/` +
-`.claude/rules/`) and read by every actor: workers for orientation, the supervisor as its
-assessment baseline (on-task/safety/budget/loops — `scripts/supervise.py`'s `MONITOR_ROLE`),
-the controller instead of chat triage.
+decision. The board is written to that ONE file and read ON DEMAND — it is deliberately no
+longer rendered into the always-on agent surfaces (`control_db_publication` p5): a snapshot is
+stale the moment it is written, and stale run state injected into every prompt is worse than no
+run state, because an actor acts on it. Readers who need the board open the file (the controller
+at the permanence gate; the supervisor as its assessment baseline — on-task/safety/budget/loops,
+`scripts/supervise.py`'s `MONITOR_ROLE`). Readers who need CURRENT state call the control packet
+instead.
 
 **The permanence gate.** Worktree branches (`feature/*`, `wt_*`) are EPHEMERAL proposals; the
 chronological history of the system is `main` plus the merges the controller signs. The
@@ -79,7 +83,7 @@ bounded planes (`ARCHITECTURE.md` §1; the dependency direction is enforced by
 | `runtime` | execution runtime — workflow_runner, test_runner, story, posthoc |
 | `adapters` | model backends — opencode, claude_adapter, backends |
 | `knowledge` | knowledge + augmentation — identity/authority, retrieval, prompt-construction, ingestion producers |
-| `control` | the implemented control plane — fact plane (`facts` + `fact_ingestion` + `reducers/`), context compiler, shadow-mode controller/validator, routing, supervisor, telemetry, queue steering, observation/actuation, the admission/lease gate (`lease_registry` + `admission` + `settlement` + `lease_watchdog` + `quarantine`) |
+| `control` | the implemented control plane — fact plane (`facts` + `fact_ingestion` + `reducers/`), context compiler, shadow-mode controller/validator, routing, supervisor, telemetry, queue steering, observation/actuation, the admission/lease gate (`lease_registry` + `admission` + `settlement` + `lease_watchdog` + `quarantine`), the durable control state (`control_db` + `outbox` + `projection_watermarks`) |
 | `reporting` | research output — game_report, review, analyzers |
 
 Tier map: `core` (0) ← `experiment/measurement/runtime/adapters/knowledge/reporting` (1) ←
@@ -292,6 +296,66 @@ admission record),
 (cost provenance at the run seam), and `adapters.backends.run_agentic` (the bypass guard —
 refuses under `FINOPS_ADMISSION_REQUIRED=1` with no lease context). `control.model_policy`'s
 class guard (`FINOPS_ALLOW_PRO=1`) stays as the backstop underneath.
+
+### Projection watermarks (the knowledge projection surface — WRITTEN, control_db_publication p3)
+
+Four consumer groups project ONE knowledge event stream (`kb:v1:changes`) into four
+destinations, each acking independently and each able to be down independently. Before p3 a
+projector that had not run for six hours looked exactly like one fully caught up: both were
+silent, and silence read as good news. A watermark row per projection inverts that.
+
+```
+# control.projection_watermarks — the refresh + read seam (Redis handle always INJECTED)
+PROJECTIONS = ("chroma", "ledger", "neo4j", "registry")   # derived from ks.CONSUMER_GROUPS
+projection_name(group) / group_name(projection)           # kb-chroma-v1 <-> chroma
+read_position(r, group, *, stream) -> ConsumerPosition    # XINFO GROUPS + XINFO STREAM + XPENDING
+unconfirmed_events(position) -> int | None
+  # Redis `lag` (undelivered) + XPENDING (delivered-but-unacked). NULL lag with a group that
+  # was delivered NOTHING falls back to stream_length; a partially-consumed group with NULL
+  # bookkeeping stays None. Every value is a LOWER BOUND — never a fabricated 0.
+confirmed_event_id(position, *, acked_event_id, previous) -> str
+  # acked id (first-hand, from the consumer loop) > last-delivered when nothing pending >
+  # the previous frontier. Delivered != confirmed: a pending entry was never projected.
+classify(watermark, *, max_age_seconds, now) -> ProjectionHealth
+  # no row -> UNKNOWN | last_error -> FAILING | STALE (dominates a recorded lag 0 — a zero
+  # recorded four hours ago describes four-hour-old reality) | lag None -> UNKNOWN |
+  # lag > 0 -> LAGGING | else CURRENT
+record_position / record_error / record_from_batch(db, r, group, *, acked_event_id, last_error)
+refresh_all(db, r, *, groups, stream) -> list[ProjectionWatermark]   # the observer's poll
+projection_report(db) / projection_lag(db) / unhealthy_projections(db) / read_report(path)
+  # projection_lag is the {registry: 0, chroma: 3, neo4j: 3} block the p4 packet carries
+DEFAULT_STALE_AFTER_S = 900   # [H]; override FINOPS_PROJECTION_STALE_S
+```
+
+Writers: `scripts/kb_worker.py` after every batch (first-hand — it reports the id it XACKed),
+and any observer via `refresh_all` (XINFO only, consumes nothing). `projection_watermarks` is
+the ONE documented exception to the control db's single-writer rule — each projector owns its
+own row, the table is partitioned by `projection`, and WAL serialises the writes.
+Read surfaces: `GET /api/projections` + the `projections` block on `GET /api/matrix`.
+
+### The control packet (the ONE dynamic-state surface — WRITTEN, control_db_publication p4)
+
+The instruction surfaces carry stable content only; everything that changes while you read it
+comes from here. Read-only by construction (`ControlDB.open_read_only`, SQLite `mode=ro`): an
+observer that auto-created an empty database would turn "the orchestrator has never run" into
+"there are no runs", which is a lie an actor would then act on.
+
+```
+# control.control_status — the packet's derivations (the CLI shell is scripts/control_status.py)
+SCHEMA_ID = "control-status/v1"
+build_packet(db, *, repo_head_sha, heartbeats, now) -> dict
+  # keys: schema, repo_head_sha, control_epoch, active_runs, awaiting_approvals,
+  #       promotable_runs, failed_runs, unhealthy_workers, projection_lag, safe_actions, degraded
+derive_safe_actions(*, awaiting, runs_by_state) -> list[dict]
+  # DERIVED from control_db.ALLOWED_TRANSITIONS — the same graph transition_run enforces, so an
+  # action the packet offers is an action the database accepts. Never a hand-written list.
+validate_packet(packet) -> list[str]        # the contract without the jsonschema dependency
+CONTROL_STATUS_SCHEMA                        # the same contract as JSON Schema (draft 2020-12)
+
+agentic-dynamics control status [--json] [--db PATH] [--compact]
+  # exit 0 = packet rendered | 2 = the packet failed its own schema (a builder bug) |
+  #      3 = there is NO control database (distinct from an empty packet, deliberately)
+```
 
 ### Spec/compiler signatures (written — agentic_dynamics/experiment/{experiment_spec,compile_experiment}.py)
 
@@ -535,7 +599,12 @@ agentic-dynamics
 ├─ review      all|stories|trigger|enqueue|finalize
 ├─ spec        status|pipeline
 ├─ validate    session|tests
-└─ supervise   [claude-agents|orphans]
+├─ supervise   [claude-agents|orphans]
+├─ control     status            # the ONE control packet (--json = control-status/v1)
+├─ surfaces    sync|snapshot     # regenerate the derived surfaces / the L0 game board
+├─ docs        scan|watch|gate   # the docs-drift rail (zero model calls)
+├─ release     check-protection
+└─ usage                         # subscription window usage
 ```
 
 ## Navigation

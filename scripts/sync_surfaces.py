@@ -6,7 +6,7 @@ reshapes itself after a boundary lands, a campaign phase commits, or the contrac
 (frontmatter / markers / status fields) changes:
 
     1. system_snapshot.py      → agent_config/system_snapshot.md   (L0 — the game board)
-    2. _gen_instructions.py    → .opencode/** + .claude/**         (L0 + L1 rendering)
+    2. _gen_instructions.py    → AGENTS.md + CLAUDE.md + .opencode/** + .claude/**  (rendering)
     3. spec_status.py          → experiments/specs/{index.json,STATUS.md}  (spec lifecycle)
     4. sync_data.py            → experiments/data/*.parquet
     5. build_data.py           → apps/website/data.js

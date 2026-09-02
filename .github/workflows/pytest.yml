@@ -6,11 +6,18 @@ on:
   pull_request:
     branches: [main]
 
-# Independent required jobs — lint, test, repro, packaging (cap_stabilization_release p4).
-# A lint failure must never hide test results: each job is its own status check, and branch
-# protection requires all four (docs/release/branch_protection_settings.md). The deterministic
-# suite is the test job's sole responsibility; lint owns ruff; repro owns the Docker
-# reproduction; packaging owns the wheel-honesty gates.
+# Independent jobs — a lint failure must never hide test results, so each concern is its own
+# status check (cap_stabilization_release p4). The deterministic suite is the test job's sole
+# responsibility; lint owns ruff; surfaces owns the generated-instruction drift gate; repro owns
+# the Docker reproduction; packaging owns the wheel-honesty gates; workflow-parity owns the
+# one-engine contract.
+#
+# REQUIRED vs PRESENT: branch protection currently requires lint / test / repro / packaging
+# (docs/release/branch_protection_settings.md, and the machine-readable twin in
+# scripts/check_branch_protection.py's EXPECTED). `workflow-parity` and `surfaces` run on every
+# push but are not yet in that required set — promoting a check is a change to LIVE branch
+# protection, which is the controller's call (a P0 action), not something a workflow edit can
+# assert. Until then they are loud-but-not-blocking, and this note is why.
 
 jobs:
   lint:
@@ -31,6 +38,29 @@ jobs:
           # workflows/ and scripts/archive/ are ALL kept lint-clean (archive policy:
           # lint-clean, not excluded — decided + documented in scripts/CONTEXT.md).
           ruff check .
+
+  # control_db_publication p5: the instruction surfaces are ONE generator's output — the root
+  # AGENTS.md/CLAUDE.md as much as .opencode/ and .claude/. This job is the drift gate: it
+  # re-renders everything in memory and fails on any surface that is stale, missing, or orphaned.
+  # Its own status check, and deliberately dependency-free (stdlib only, no install step), so
+  # "someone edited agent_config/ and forgot to regenerate" is a fast, unambiguous red — never a
+  # line buried in a job that needed a package index to be reachable.
+  surfaces:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
+
+      - name: Set up Python 3.10
+        uses: actions/setup-python@0b93645e9fea7318ecaed2b359559ac225c90a2b  # v5.3.0
+        with:
+          python-version: "3.10"
+
+      - name: Gate — generated instruction surfaces match agent_config/
+        run: |
+          # Writes nothing. Exit 1 means: edit agent_config/, run
+          # `python3 scripts/_gen_instructions.py`, and commit the regenerated surfaces.
+          python3 scripts/_gen_instructions.py --check
 
   test:
     runs-on: ubuntu-latest

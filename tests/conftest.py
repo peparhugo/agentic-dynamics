@@ -78,3 +78,25 @@ def pytest_configure(config):
         "selected by `pytest -m fast` (test_suite_speed p3). A test added to this subset "
         "without passing the parallel-safety audit is a violation.",
     )
+
+
+@pytest.fixture(autouse=True)
+def _isolate_control_db(tmp_path_factory, monkeypatch):
+    """Point every test's control database at a throwaway file — never the repo's.
+
+    ``control_db_publication`` p2 wired ``scripts/run_workflow.py``'s composition root to open
+    the orchestrator's control database at run start. Without this guard, any test that drives
+    ``main()`` (``test_run_workflow_graph_cli.py``, for one) creates a REAL
+    ``experiments/results/control/control.db`` in the checkout as a side effect. It is
+    gitignored, so it would never be committed — which is precisely why it needs a guard rather
+    than a reviewer: state that cannot show up in ``git status`` is state nobody notices
+    accumulating, and a test suite that mutates the machine's live control plane can also
+    corrupt a concurrent orchestrator run's view of it.
+
+    ``FINOPS_CONTROL_DB`` is the documented override (``control_db.resolve_db_path``), and an
+    explicit constructor argument still outranks it — so ``tests/test_control_db.py`` and
+    ``tests/test_outbox.py``, which pass their own ``tmp_path`` locations, are unaffected.
+    """
+    monkeypatch.setenv(
+        "FINOPS_CONTROL_DB", str(tmp_path_factory.mktemp("control_db") / "control.db")
+    )
