@@ -878,6 +878,7 @@ def build_phase_request(
     command: list[str] | None = None,
     admission: LeaseContext | None = None,
     state_namespace: str | None = None,
+    run_clone: str | Path | None = None,
     path_config: PathConfig | None = None,
 ) -> dict[str, Any]:
     """Build a scope-driven spawn request for one workflow phase (the campaign-wrapper mechanism).
@@ -919,6 +920,14 @@ def build_phase_request(
     refused at step 6 once it is armed. The wrapper never mints an admission itself — reserving
     against Redis is the controller's job, and a validator that could also grant would be a
     validator that could grant itself a pass.
+
+    ``run_clone`` (b2_ephemeral_clone, fleet_launch_boundary Wave 2) is the run's private
+    ephemeral clone path — ``PathConfig.runs_root/<run-id>/repo`` — stamped onto the request
+    as a top-level reference field when the caller carries one (a run executes its cells in
+    its own clone, never a shared worktree with a shared writable .git). It is a REFERENCE,
+    not a mount: the launch broker (b3) owns the mount, so the four-mount + D-2 contract and
+    its validation are unchanged here; an unknown top-level request field validates clean.
+    Absent (``None`` — the default) the request carries no clone, preserving the pre-b2 shape.
     """
     path_config = path_config or default_path_config()
     scope = phase_scope(phase_def)
@@ -1009,6 +1018,15 @@ def build_phase_request(
             "--workdir", "/tmp",
         ],
     }
+    # b2_ephemeral_clone (fleet_launch_boundary Wave 2): the run's private clone path, when
+    # the caller carries one. The request REFERENCEs the clone — runs_root/<run-id>/repo —
+    # so the launch broker (b3, which owns the mount) can bind its mount profile to it and a
+    # verifier can run its suite in the read-only clone. It is a top-level reference field,
+    # NOT a mount: the four-mount + D-2 contract and its validation are unchanged until b3
+    # adds the clone mount profile, and validate_spawn ignores unknown top-level fields, so a
+    # request carrying run_clone still validates under the same contract.
+    if run_clone:
+        request["run_clone"] = str(run_clone)
     if admission is not None:
         request.update(admission.to_request_fields())
     return request
@@ -1023,6 +1041,7 @@ def build_verifier_request(
     spec_name: str = "",
     command: list[str] | None = None,
     admission: LeaseContext | None = None,
+    run_clone: str | Path | None = None,
     path_config: PathConfig | None = None,
 ) -> dict[str, Any]:
     """Build the READ-ONLY verifier spawn request for a ``kind: test`` phase (w1, 2026-09-02).
@@ -1063,6 +1082,11 @@ def build_verifier_request(
     ``path_config`` (b1_path_config) is forwarded to :func:`build_phase_request`; the
     forbidden-surface drop removes exactly the auth dirs THAT config mounted, so a verifier
     request can never retain a credential mount the config did not add.
+
+    ``run_clone`` (b2_ephemeral_clone) is forwarded to :func:`build_phase_request` unchanged —
+    a verifier verifies against the run's private clone too (the suite runs in the read-only
+    clone), so when the caller carries the clone path the verifier request references it as
+    well. The reference field survives the forbidden-surface drop because it is not a mount.
     """
     path_config = path_config or default_path_config()
     request = build_phase_request(
@@ -1073,6 +1097,7 @@ def build_verifier_request(
         spec_name=spec_name,
         command=command,
         admission=admission,
+        run_clone=run_clone,
         path_config=path_config,
     )
     forbidden_mount_targets = {STATE_TARGET, AUTH_CRED_FILE, *(str(d) for d in path_config.auth_dirs)}

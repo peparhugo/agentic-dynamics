@@ -27,6 +27,7 @@ path is unchanged, and a containerized run with a step executor but NO verifier 
 
 from __future__ import annotations
 
+import os
 import sys
 from pathlib import Path
 from typing import Any
@@ -49,6 +50,12 @@ class DockerVerifierExecutor(StepExecutor):
     ``spec_path`` is the spec path AS THE SIBLING SEES IT (the orchestrator mounts the repo at
     ``/repo``, so ``/repo/<spec>``); ``spec_name`` is the workflow's name; ``cell_image`` is
     the sibling's image (``fleet/job-<name>`` or the default cell base).
+
+    ``run_clone`` (b2_ephemeral_clone, fleet_launch_boundary Wave 2) is the run's private
+    ephemeral clone path. When set, the verifier request references it too (a test phase
+    verifies against the run's clone — the suite runs in the read-only clone), so the launch
+    broker can mount the clone read-only for the verifier. It may be passed explicitly or
+    inherited from ``FINOPS_RUN_CLONE``; absent both, requests carry no clone (pre-b2 shape).
     """
 
     def __init__(
@@ -62,6 +69,7 @@ class DockerVerifierExecutor(StepExecutor):
         backend: str | None = None,
         timeout: int = 1800,
         cell_image: str | None = None,
+        run_clone: str | None = None,
     ):
         self._spec_path = spec_path
         self._spec_name = spec_name
@@ -71,6 +79,7 @@ class DockerVerifierExecutor(StepExecutor):
         self._backend = backend
         self._timeout = timeout
         self._cell_image = cell_image
+        self._run_clone = run_clone or os.environ.get("FINOPS_RUN_CLONE")
 
     def build_request(self, request: StepRequest) -> dict[str, Any]:
         """Build the READ-ONLY verifier spawn request for ``request`` (pure, no docker).
@@ -79,7 +88,9 @@ class DockerVerifierExecutor(StepExecutor):
         credentials and NO writable CLI-state namespace (see
         ``spawn_wrapper.build_verifier_request``), and its child command runs the SAME
         suite the in-process LocalVerifier path would run (same ``tests`` target, carried
-        on the phase def) inside the container — the local-parity target list.
+        on the phase def) inside the container — the local-parity target list. The run's
+        clone path (b2), when one is configured, is carried as a top-level reference for
+        the launch broker to mount read-only.
         """
         sibling_cmd = [
             sys.executable, "scripts/run_workflow.py",
@@ -108,6 +119,7 @@ class DockerVerifierExecutor(StepExecutor):
             model=self._model,
             spec_name=self._spec_name,
             command=sibling_cmd,
+            run_clone=self._run_clone,
         )
 
     def execute(self, request: StepRequest) -> StepResult:

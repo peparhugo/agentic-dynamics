@@ -469,6 +469,56 @@ def test_verifier_request_uses_the_configured_paths(tmp_path):
     ) == []
 
 
+def test_phase_request_references_the_run_clone_path(tmp_path):
+    """(b2 VERIFY d) the executor's phase request references the run's private clone path.
+
+    ``build_phase_request(run_clone=<path>)`` stamps the clone path on the request as a
+    top-level reference — the launch broker (b3) binds its mount profile to it. It is NOT a
+    mount (the four-mount + D-2 contract is unchanged), so the request still validates clean
+    under the SAME config. Omitted (the default), the request carries no clone key."""
+    repo, cfg = _make_config_repo(tmp_path)
+    clone_path = cfg.runs_root / "run-abc" / "repo"
+
+    req = build_phase_request(
+        {"name": "p1_slice1_base_supervisor", "scope": "implementation"},
+        goal="g", workdir="/tmp/wt", model="deepseek/deepseek-v4-pro",
+        spec_name="spec_x", path_config=cfg, run_clone=clone_path,
+    )
+    assert req["run_clone"] == str(clone_path)
+    # a request carrying the clone path still validates under the same contract
+    assert validate_spawn(
+        req, phase_scopes={"p1_slice1_base_supervisor": "implementation"}, path_config=cfg,
+    ) == []
+
+    bare = build_phase_request(
+        {"name": "p1_slice1_base_supervisor", "scope": "implementation"},
+        goal="g", workdir="/tmp/wt", model="deepseek/deepseek-v4-pro",
+        spec_name="spec_x", path_config=cfg,
+    )
+    assert "run_clone" not in bare
+
+
+def test_verifier_request_references_the_run_clone_path(tmp_path):
+    """(b2 VERIFY d) the verifier request references the run clone too — a test phase verifies
+    against the run's read-only clone. The reference survives the forbidden-surface drop (it
+    is not a mount), and the verifier request still validates clean."""
+    _repo, cfg = _make_config_repo(tmp_path)
+    clone_path = cfg.runs_root / "run-abc" / "repo"
+
+    req = build_verifier_request(
+        {"name": "g3_test_gate", "kind": "test", "scope": "implementation",
+         "tests": ["tests/test_spec_x.py"]},
+        goal="g", workdir="/tmp/wt_x", model="deepseek/deepseek-v4-flash",
+        spec_name="spec_x", path_config=cfg, run_clone=clone_path,
+    )
+    assert req["run_clone"] == str(clone_path)
+    # the verifier's read-only-for-candidate contract is intact alongside the reference
+    assert all(m.get("mode") == "ro" for m in req["mounts"])
+    assert validate_spawn(
+        req, phase_scopes={"g3_test_gate": "implementation"}, path_config=cfg,
+    ) == []
+
+
 def test_module_contract_snapshot_matches_the_default_config_contract():
     """The historical module-level CONTRACT_TARGETS snapshot is exactly the full contract of
     the default config (fixed container targets + the config-derived repo-alias/.git + D-2

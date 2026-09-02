@@ -17,6 +17,7 @@ pre-contract child that exits 0 with ``ok:false`` is failed, never success.
 from __future__ import annotations
 
 import json
+import os
 import sys
 from pathlib import Path
 from typing import Any
@@ -38,6 +39,13 @@ class DockerAgentExecutor(StepExecutor):
     repo at ``/repo``, so ``/repo/<spec>``); ``spec_name`` is the workflow's name used
     for the per-attempt state namespace; ``cell_image`` is the sibling's image
     (``fleet/job-<name>`` or the default cell base).
+
+    ``run_clone`` (b2_ephemeral_clone, fleet_launch_boundary Wave 2) is the run's private
+    ephemeral clone path (``PathConfig.runs_root/<run-id>/repo``). When set, every phase
+    request this executor builds references it (``build_phase_request(run_clone=...)``) so
+    the launch broker can mount the clone into the cell. It may be passed explicitly or
+    inherited from the ``FINOPS_RUN_CLONE`` env var (a host-side launcher exports it to the
+    workflow-runner tier); absent both, requests carry no clone — the pre-b2 shape unchanged.
     """
 
     def __init__(
@@ -51,6 +59,7 @@ class DockerAgentExecutor(StepExecutor):
         backend: str | None = None,
         timeout: int = 1800,
         cell_image: str | None = None,
+        run_clone: str | None = None,
     ):
         self._spec_path = spec_path
         self._spec_name = spec_name
@@ -60,13 +69,15 @@ class DockerAgentExecutor(StepExecutor):
         self._backend = backend
         self._timeout = timeout
         self._cell_image = cell_image
+        self._run_clone = run_clone or os.environ.get("FINOPS_RUN_CLONE")
 
-    def execute(self, request: StepRequest) -> StepResult:
-        """Spawn one sibling cell for ``request`` and classify its outcome.
+    def build_request(self, request: StepRequest) -> dict[str, Any]:
+        """Build the sibling-cell spawn request for ``request`` (pure, no docker).
 
-        The admission in force (the engine entered ``phase_admission_scope`` before
-        calling us) is stamped onto the spawn request as the lease block — a container
-        inherits an environment, not a ContextVar.
+        The admission in force (the engine entered ``phase_admission_scope`` before calling
+        us) is stamped onto the spawn request as the lease block — a container inherits an
+        environment, not a ContextVar. The run's clone path (b2), when one is configured, is
+        carried on the request as a top-level reference for the launch broker to mount.
         """
         from agentic_dynamics.core.admission_context import current_context
 
@@ -83,7 +94,7 @@ class DockerAgentExecutor(StepExecutor):
             sibling_cmd += ["--backend", self._backend or request.backend]
 
         admission = current_context()
-        phase_request = spawn_wrapper.build_phase_request(
+        return spawn_wrapper.build_phase_request(
             request.phase_def,
             goal=self._goal,
             workdir=self._workdir,
@@ -91,10 +102,15 @@ class DockerAgentExecutor(StepExecutor):
             spec_name=self._spec_name,
             command=sibling_cmd,
             admission=admission,
+            run_clone=self._run_clone,
             # P0-3: a per-attempt state namespace — <spec>/<phase>/ — so retries and
             # concurrent phases never share a writable CLI-state directory.
             state_namespace=f"{self._spec_name}/{request.phase_name}",
         )
+
+    def execute(self, request: StepRequest) -> StepResult:
+        """Spawn one sibling cell for ``request`` and classify its outcome."""
+        phase_request = self.build_request(request)
         outcome = spawn_wrapper.spawn_sibling(
             phase_request, docker="docker", image=self._cell_image,
         )

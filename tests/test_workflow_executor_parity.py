@@ -69,6 +69,7 @@ if _FLEET_DIR not in sys.path:
     sys.path.insert(0, _FLEET_DIR)
 
 import spawn_wrapper  # noqa: E402
+from docker_executor import DockerAgentExecutor  # noqa: E402
 from docker_verifier_executor import DockerVerifierExecutor  # noqa: E402
 
 # ── exit_code_for_result: the child's exit code mirrors the run outcome ──────────
@@ -595,6 +596,100 @@ def test_verifier_request_carries_no_credentials_and_no_writable_state(tmp_path)
     assert "--only-phase gate_run" in cmd
     assert "--no-commit" in cmd  # a verifier never commits — read-only by construction
     assert request.phase_def.get("tests") == ["tests/test_spec_x.py"]
+
+
+def _agent_step_request(phase_name: str = "p1_slice1_base_supervisor") -> StepRequest:
+    return StepRequest(
+        phase_name=phase_name,
+        phase_kind="agent",
+        prompt="",
+        model="deepseek/deepseek-v4-flash",
+        goal="g",
+        spec_name="spec_x",
+        workdir="/tmp/wt_x",
+        language="python",
+        timeout=180,
+        phase_def={"name": phase_name, "scope": "implementation"},
+    )
+
+
+def test_agent_executor_request_references_the_run_clone_path(tmp_path):
+    """(b2 VERIFY d) DockerAgentExecutor's phase request carries the run's private clone path
+    when the executor was given one — the request the broker will mount references
+    runs_root/<run-id>/repo."""
+    clone_path = tmp_path / "runs" / "run-abc" / "repo"
+    executor = DockerAgentExecutor(
+        spec_path="/repo/workflows/repository/x.yaml",
+        spec_name="spec_x",
+        goal="g",
+        model="deepseek/deepseek-v4-flash",
+        workdir="/tmp/wt_x",
+        run_clone=str(clone_path),
+    )
+    req = executor.build_request(_agent_step_request())
+    assert req.get("run_clone") == str(clone_path)
+    # the request is still a valid phase request (the clone is a reference, not a mount)
+    assert req["scope"] == "implementation"
+    assert req["phase"] == "p1_slice1_base_supervisor"
+
+
+def test_verifier_executor_request_references_the_run_clone_path(tmp_path):
+    """(b2 VERIFY d) DockerVerifierExecutor's request references the run clone too — a test
+    phase verifies against the run's read-only clone. The verifier's read-only + no-credential
+    contract is intact alongside the reference."""
+    clone_path = tmp_path / "runs" / "run-abc" / "repo"
+    executor = DockerVerifierExecutor(
+        spec_path="/repo/workflows/repository/x.yaml",
+        spec_name="spec_x",
+        goal="g",
+        model="deepseek/deepseek-v4-flash",
+        workdir="/tmp/wt_x",
+        run_clone=str(clone_path),
+    )
+    request = StepRequest(
+        phase_name="gate_run",
+        phase_kind="test",
+        prompt="",
+        model="deepseek/deepseek-v4-flash",
+        goal="g",
+        spec_name="spec_x",
+        workdir="/tmp/wt_x",
+        language="python",
+        timeout=180,
+        phase_def={"name": "gate_run", "kind": "test", "tests": ["tests/test_spec_x.py"]},
+    )
+    req = executor.build_request(request)
+    assert req.get("run_clone") == str(clone_path)
+    targets = {m.get("target") for m in req.get("mounts", [])}
+    assert not (targets & set(spawn_wrapper.AUTH_DIRS))
+    assert all(m.get("mode") == "ro" for m in req.get("mounts", []))
+
+
+def test_executor_inherits_the_run_clone_from_env(tmp_path, monkeypatch):
+    """(b2) the executors fall back to the FINOPS_RUN_CLONE env var (a host-side launcher
+    exports the provisioned clone to the workflow-runner tier); absent both, no clone key."""
+    clone_path = tmp_path / "runs" / "run-env" / "repo"
+    monkeypatch.setenv("FINOPS_RUN_CLONE", str(clone_path))
+
+    agent = DockerAgentExecutor(
+        spec_path="/repo/workflows/repository/x.yaml", spec_name="spec_x",
+        goal="g", model="deepseek/deepseek-v4-flash", workdir="/tmp/wt_x",
+    )
+    verifier = DockerVerifierExecutor(
+        spec_path="/repo/workflows/repository/x.yaml", spec_name="spec_x",
+        goal="g", model="deepseek/deepseek-v4-flash", workdir="/tmp/wt_x",
+    )
+    assert agent.build_request(_agent_step_request()).get("run_clone") == str(clone_path)
+    verifier_req = verifier.build_request(
+        StepRequest(
+            phase_name="gate_run", phase_kind="test", prompt="",
+            model="deepseek/deepseek-v4-flash", goal="g", spec_name="spec_x",
+            workdir="/tmp/wt_x", language="python", timeout=180,
+            phase_def={"name": "gate_run", "kind": "test",
+                       "tests": ["tests/test_spec_x.py"]},
+        )
+    )
+    assert verifier_req.get("run_clone") == str(clone_path)
 
 
 # ══════════════════════════════════════════════════════════════

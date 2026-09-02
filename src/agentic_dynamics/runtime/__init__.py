@@ -1,9 +1,11 @@
 """Runtime — the agent execution runtime (critique system 3).
 
 Ownership: phase execution inside a git worktree (``workflow_runner``), the independent test
-runner (``test_runner``), multi-session story orchestration (``story``), post-hoc job transport
-(``posthoc``), and the runtime-owned routing/telemetry/change-analyzer *contracts* (``routing`` /
-``telemetry`` / ``change_analyzer``).
+runner (``test_runner``), the ephemeral per-run clone lifecycle (``run_clone`` — the
+fleet_launch_boundary b2 private-clone-per-run rule), multi-session story orchestration
+(``story``), post-hoc job transport (``posthoc``), and the runtime-owned
+routing/telemetry/change-analyzer *contracts* (``routing`` / ``telemetry`` /
+``change_analyzer``).
 
 Dependency-inverted seam (refactor-repair Debt-2): ``workflow_runner`` no longer imports
 ``control`` — it consumes the ``Router`` and ``TelemetryPublisher`` protocols defined here, with
@@ -22,6 +24,7 @@ from . import (
     posthoc,
     preexisting_guard,
     routing,
+    run_clone,
     story,
     telemetry,
     test_runner,
@@ -30,5 +33,5 @@ from . import (
 
 __all__ = [
     'admission', 'change_analyzer', 'phase_evidence', 'posthoc', 'preexisting_guard',
-    'routing', 'story', 'telemetry', 'test_runner', 'workflow_runner',
+    'routing', 'run_clone', 'story', 'telemetry', 'test_runner', 'workflow_runner',
 ]
