@@ -265,3 +265,68 @@ def test_main_no_analyzer_no_client_without_flag(tmp_path, monkeypatch):
 
     assert seen["analyzer"] is None
     assert _FakeNeo4jClient.instances == []  # never constructed
+
+
+# ── Per-phase evidence recorder wiring (control_db_evidence e1) ──────────────────────────────
+
+
+def test_main_injects_a_phase_evidence_recorder_when_a_run_is_recorded(tmp_path, monkeypatch):
+    """The composition root binds the per-phase writer to the recorded run and hands it to the
+    engine — the e1 write side is actually wired, not merely implemented."""
+    module = _load_module()
+    seen = {}
+
+    def fake_run(spec, **kwargs):
+        seen["recorder"] = kwargs.get("phase_evidence_recorder")
+        return _stub_result()
+
+    _run_main(module, tmp_path, monkeypatch, fake_run=fake_run)
+
+    assert seen["recorder"] is not None
+    assert callable(seen["recorder"])
+
+
+def test_child_mode_records_no_run_and_injects_no_recorder(tmp_path, monkeypatch, capsys):
+    """(e) child mode (--only-phase) records NOTHING: no run row is minted, so no recorder is
+    injected and the engine's per-phase write seam stays inert — the parent aggregates."""
+    module = _load_module()
+    seen = {}
+
+    def fake_run(spec, **kwargs):
+        seen["recorder"] = kwargs.get("phase_evidence_recorder")
+        return _stub_result()
+
+    def spec_stub(p):
+        return SimpleNamespace(
+            name="demo", spec_id="demo@1.0",
+            workflow=SimpleNamespace(params={"phases": [{"name": "scope"}]}),
+        )
+
+    monkeypatch.setattr(module, "ROOT", tmp_path)
+    monkeypatch.setattr(module, "load_spec", spec_stub)
+    monkeypatch.setattr(module, "run_workflow", fake_run)
+    monkeypatch.setenv("FINOPS_FACT_AUTO_EMIT", "0")
+    monkeypatch.setattr(sys, "argv", [
+        "run_workflow.py", "--spec", "x.yaml", "--goal", "g", "--model", "m",
+        "--workdir", str(tmp_path), "--only-phase", "scope",
+    ])
+    with pytest.raises(SystemExit):
+        module.main()
+
+    assert seen["recorder"] is None
+    assert "child mode" in capsys.readouterr().err
+
+
+def test_control_open_run_child_mode_never_opens_the_control_db(monkeypatch):
+    """The run-row gate is enforced BEFORE any db open: a --only-phase sibling does not even
+    construct the database, so it structurally cannot record per-phase evidence."""
+    module = _load_module()
+    spec = SimpleNamespace(name="demo")
+    args = SimpleNamespace(only_phase="scope", model="m")
+
+    def boom():
+        raise AssertionError("child mode must never open the control db")
+
+    monkeypatch.setattr(module, "_control_db", boom)
+    run_id, db = module._control_open_run(spec, args)
+    assert (run_id, db) == (None, None)

@@ -357,6 +357,7 @@ workflow:
           - tests/test_outbox.py
           - tests/test_publish_release.py
           - tests/test_publication_singular_door.py
+          - tests/test_phase_evidence.py
           - tests/test_control_status.py
           - tests/test_preexisting_drift_guard.py
           - tests/test_workflow_runner.py

@@ -295,8 +295,17 @@ def control_db(rw, tmp_path, monkeypatch):
 
 
 def _open_run(rw, control_db):
-    """Create the `running` run row the terminal write transitions out of."""
-    return rw._control_open_run(_spec(), _Args())
+    """Create the `running` run row the terminal write transitions out of.
+
+    ``_control_open_run`` now returns ``(run_id, open_db)`` — the writer handle stays open
+    across the engine run for the per-phase evidence writer (e1). These tests only need the run
+    row, so the handle is closed immediately; the committed row survives and the terminal write
+    reopens its own handle.
+    """
+    run_id, db = rw._control_open_run(_spec(), _Args())
+    if db is not None:
+        db.close()
+    return run_id
 
 
 def test_terminal_write_degrades_to_warning_when_redis_unreachable(
@@ -438,7 +447,7 @@ def test_a_child_run_emits_nothing_and_records_no_run(rw, control_db, capsys):
     class _ChildArgs(_Args):
         only_phase = "p2_outbox"
 
-    assert rw._control_open_run(_spec(), _ChildArgs()) is None
+    assert rw._control_open_run(_spec(), _ChildArgs()) == (None, None)
     rw._control_terminal_write(
         _spec(), _ChildArgs(), _result(), run_id=None, ledger_path=Path("/tmp/ledger.json")
     )

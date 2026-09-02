@@ -18,6 +18,7 @@ again for the spend gate (``admission``): ``PhaseAdmission`` is the runtime-owne
 from . import (
     admission,
     change_analyzer,
+    phase_evidence,
     posthoc,
     routing,
     story,
@@ -27,6 +28,6 @@ from . import (
 )
 
 __all__ = [
-    'admission', 'change_analyzer', 'posthoc', 'routing', 'story', 'telemetry', 'test_runner',
-    'workflow_runner',
+    'admission', 'change_analyzer', 'phase_evidence', 'posthoc', 'routing', 'story', 'telemetry',
+    'test_runner', 'workflow_runner',
 ]

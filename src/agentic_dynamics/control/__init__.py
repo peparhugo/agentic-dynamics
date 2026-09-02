@@ -44,6 +44,7 @@ from . import (
     orphan_ingestion,
     orphan_sweep,
     outbox,
+    phase_evidence,
     pipeline_status,
     projection_watermarks,
     queue_reinterleave,
@@ -55,4 +56,4 @@ from . import (
     verify_proposal,
 )
 
-__all__ = ['actuation_ingestion', 'admission', 'control_db', 'control_status', 'evidence_analyzer', 'lease_registry', 'live', 'observation_ingestion', 'orphan_ingestion', 'orphan_sweep', 'outbox', 'pipeline_status', 'projection_watermarks', 'queue_reinterleave', 'routing', 'settlement', 'signal_store', 'step_routing', 'supervisor', 'verify_proposal']
+__all__ = ['actuation_ingestion', 'admission', 'control_db', 'control_status', 'evidence_analyzer', 'lease_registry', 'live', 'observation_ingestion', 'orphan_ingestion', 'orphan_sweep', 'outbox', 'phase_evidence', 'pipeline_status', 'projection_watermarks', 'queue_reinterleave', 'routing', 'settlement', 'signal_store', 'step_routing', 'supervisor', 'verify_proposal']

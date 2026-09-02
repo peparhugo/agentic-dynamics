@@ -154,6 +154,13 @@ from agentic_dynamics.runtime.change_analyzer import (
     run_change_analysis,
 )
 from agentic_dynamics.runtime.executor import LocalAgentExecutor, StepExecutor, StepRequest
+from agentic_dynamics.runtime.phase_evidence import (
+    PhaseEvidence,
+    PhaseEvidenceRecorder,
+    iso_from_epoch,
+    iso_now,
+    phase_gate_verdicts,
+)
 
 # Routing + telemetry are consumed through the runtime-owned contracts (refactor-repair
 # Debt-2): the ``Router`` decision and the ``TelemetryPublisher`` are injected at the
@@ -919,6 +926,52 @@ def _emit_self_finding(pr: PhaseResult, *, goal: str, scope: str) -> None:
         emit_phase_finding(pr, goal=goal, repository_id=scope, revision=pr.commit_hash)
     except Exception:
         pass  # progressive path — never block or fail the phase on emission
+
+
+def _emit_phase_evidence(
+    recorder: PhaseEvidenceRecorder,
+    pr: PhaseResult,
+    *,
+    kind: str,
+    started_at: str,
+    ended_at: str,
+    exit_code: int | None,
+    candidate_sha: str,
+) -> None:
+    """Hand one executed phase's evidence to the injected recorder — best-effort, loudly.
+
+    The engine calls this once per executed phase, at the very end of the phase's processing
+    (after every gate ran and after a checkpoint phase's ``awaiting`` flip), so the recorded
+    status is the phase's FINAL status and the ledger and the control db can never disagree.
+
+    The e1 contract is "best-effort like the terminal write, but a successful write is the norm
+    and a failure is loud": a control-db outage or a writer bug raises out of the recorder and is
+    caught HERE — the phase stands, and the loss is a NAMED warning on stderr, never silent. The
+    recorder receives only the value object; all row decisions (attempt numbering, the UNIQUE
+    index, candidate_sha enforcement) live in the control-side writer.
+    """
+    evidence = PhaseEvidence(
+        step_id=pr.phase,
+        kind=kind,
+        status=pr.status,
+        model=pr.model,
+        started_at=started_at,
+        ended_at=ended_at,
+        candidate_sha=candidate_sha,
+        tokens=int((pr.tokens or {}).get("total", 0) or 0),
+        cost_usd=float(pr.cost_usd or 0.0),
+        exit_code=exit_code,
+        error=pr.error,
+        gates=phase_gate_verdicts(pr),
+    )
+    try:
+        recorder(evidence)
+    except Exception as exc:  # noqa: BLE001 — a control-db failure is a state, never a gate
+        print(
+            f"warning: control-db per-phase evidence write failed for phase '{pr.phase}' "
+            f"({exc!r}) — the phase itself is unaffected",
+            file=sys.stderr,
+        )
 
 
 def _completed_phases_from_index(
@@ -2612,6 +2665,7 @@ def run_workflow(
     phase_total: int | None = None,
     phase_index: int | None = None,
     step_executor: StepExecutor | None = None,
+    phase_evidence_recorder: PhaseEvidenceRecorder | None = None,
 ) -> WorkflowRunResult:
     """Run a compiled ``agent_task`` spec against a goal in a git worktree.
 
@@ -2725,6 +2779,13 @@ def run_workflow(
     commit, with a non-placeholder operator signature + a date) BEFORE proceeding; an
     unsatisfied checkpoint stops the resume with ``awaiting_operator_approval`` (reason
     ``"approval_refused"``) and NO further phase runs.
+
+    Per-phase control-db evidence (``phase_evidence_recorder``, ``control_db_evidence`` e1): when
+    a recorder is injected at the composition root, the engine records, for every executed phase,
+    one step attempt + one gate result per gate verdict the phase produced (the write side that
+    makes the packet's per-phase derivations real). Best-effort by construction — a control-db
+    failure never fails the phase, and a failed write is a named warning, never silent.
+    ``None`` (default) leaves the seam inert and the run byte-identical to the pre-e1 runner.
     """
     errors = validate_spec(spec)
     errors += validate_workflow_routing(spec, default_model=model)
@@ -2902,6 +2963,10 @@ def run_workflow(
             display_index = (full_phase_index + 1) if full_phase_index is not None else phase_idx + 1
             publisher.set_phase({"name": name, "index": display_index, "total": total})
         t0 = time.time()
+        # e1 (control_db_evidence): the phase's process exit code, observed when the agent's
+        # result carries one. Defaults to None (unobserved — never coerced to 0, which would
+        # read as success); test phases run no agent process and keep None.
+        phase_exit_code: int | None = None
 
         try:
             if kind == "test":
@@ -3089,6 +3154,7 @@ def run_workflow(
                     else:
                         os.environ["FINOPS_CELL_ID"] = prev_cell
                 if stall is None and ar is not None:
+                    phase_exit_code = getattr(ar, "exit_code", None)
                     pr.tokens = {
                         "in": getattr(ar, "prompt_tokens", 0),
                         "out": getattr(ar, "completion_tokens", 0),
@@ -3245,9 +3311,6 @@ def run_workflow(
                 },
             })
 
-        if pr.status == "failed" and stop_on_error:
-            break
-
         # Mechanical human checkpoint (cap_runner_hardening2 §Gap 3) — the designed stop. A
         # phase declaring ``checkpoint: true`` that completes successfully (all gates passed, the
         # work committed) records the campaign state ``awaiting_operator_approval`` and EXITS
@@ -3255,6 +3318,7 @@ def run_workflow(
         # run result carries the awaiting state, and the phase loop breaks. The approval
         # contract is enforced on --resume: the resume refuses to proceed past an unsatisfied
         # checkpoint. Agent phases only.
+        checkpoint_stop = False
         if kind != "test" and phase_def.get(CHECKPOINT_MARKER) and pr.status == "ok":
             pr.status = AWAITING_STATUS
             result.awaiting = True
@@ -3286,6 +3350,28 @@ def run_workflow(
                     "type": "checkpoint", "sessionID": cell_id,
                     "part": result.checkpoints[-1].to_dict(),
                 })
+            checkpoint_stop = True
+
+        # e1 (control_db_evidence) — the per-phase evidence write. Runs for EVERY executed
+        # phase, whatever its outcome: a failed phase records a FAILED attempt (never skipped),
+        # and a checkpoint phase records AFTER the awaiting flip above, so the control-db row
+        # and the ledger agree on the phase's status. Best-effort by construction: a recorder
+        # failure (a control-db outage, a writer bug) can never fail the phase — the engine
+        # catches it and prints a NAMED warning, so a lost write is loud, never silent. Absent
+        # an injected recorder this is a no-op and the run is byte-identical to the pre-e1
+        # runner.
+        if phase_evidence_recorder is not None:
+            _emit_phase_evidence(
+                phase_evidence_recorder,
+                pr,
+                kind=kind,
+                started_at=iso_from_epoch(t0),
+                ended_at=iso_now(),
+                exit_code=phase_exit_code,
+                candidate_sha=pr.commit_hash or _git_head(wd),
+            )
+
+        if (pr.status == "failed" and stop_on_error) or checkpoint_stop:
             break
 
     # ledger_instrumentation p1 — the attempt-level emission. Built from the FINAL phase

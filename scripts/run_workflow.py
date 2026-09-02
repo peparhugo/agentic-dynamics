@@ -46,6 +46,7 @@ from agentic_dynamics.control.control_db import (  # noqa: E402
     run_state_from_ledger_state,
 )
 from agentic_dynamics.control.live import LivePublisher  # noqa: E402
+from agentic_dynamics.control.phase_evidence import make_phase_evidence_recorder  # noqa: E402
 from agentic_dynamics.control.reducers._common import REVISION_FALLBACK  # noqa: E402
 from agentic_dynamics.control.reducers._common import cell_id as _reducer_cell_id  # noqa: E402
 from agentic_dynamics.control.signal_store import build_signal_store, load_results  # noqa: E402
@@ -550,9 +551,17 @@ def _run_workflow_cli(
     # engine starts, not after it finishes, and that ordering is the point: a run whose row is
     # only written at the end leaves *nothing at all* behind when the runner is killed — the
     # exact hole `control_db` exists to close. A killed run now leaves a `running` row that the
-    # control packet and the lease watchdog can see. Returns None in child mode or when the
-    # database is unavailable, in which case every control-plane step below is a no-op.
-    control_run_id = _control_open_run(spec, args)
+    # control packet and the lease watchdog can see. Returns (None, None) in child mode or when
+    # the database is unavailable, in which case every control-plane step below is a no-op.
+    #
+    # e1 (control_db_evidence): the writer handle stays OPEN across the engine run and becomes
+    # the per-phase evidence recorder — every executed phase records its step_attempts +
+    # gate_results rows LIVE (the write side that makes the packet's per-phase derivations
+    # real), instead of nothing-at-all-until-the-terminal-write. The recorder is None in child
+    # mode (no run row to bind to), so a `--only-phase` sibling records nothing — the parent
+    # aggregates. Closed in the finally below, before the terminal write opens its own handle.
+    control_run_id, control_db = _control_open_run(spec, args)
+    phase_evidence_recorder = make_phase_evidence_recorder(control_db, control_run_id)
 
     try:
         result = run_workflow(
@@ -576,11 +585,15 @@ def _run_workflow_cli(
             phase_index=only_phase_index,
             phase_admission=phase_admission,
             step_executor=step_executor,
+            phase_evidence_recorder=phase_evidence_recorder,
         )
     finally:
         if graph_client is not None:
             with contextlib.suppress(Exception):
                 graph_client.close()
+        if control_db is not None:
+            with contextlib.suppress(Exception):
+                control_db.close()
 
     print(json.dumps(result.to_dict(), indent=2))
 
@@ -757,20 +770,28 @@ def _control_db() -> ControlDB | None:
         return None
 
 
-def _control_open_run(spec: ExperimentSpec, args: argparse.Namespace) -> str | None:
-    """Record this run in the control database as ``running``; return its run id.
+def _control_open_run(spec: ExperimentSpec, args: argparse.Namespace) -> tuple[str | None, ControlDB | None]:
+    """Record this run in the control database as ``running``; return ``(run_id, db)``.
 
-    Returns ``None`` — and records nothing — in CHILD mode. That is the P0-2 contract held
+    Returns ``(None, None)`` — and records nothing — in CHILD mode. That is the P0-2 contract held
     exactly where it belongs: **children never emit; the parent aggregates.** A ``--only-phase``
     sibling is one phase of the parent's run, not a run of its own, so minting a second run row
     (and a second set of outbox events) for it would double-count the work and emit each phase's
     facts twice. The parent's terminal write covers every phase the children executed.
+
+    The writer handle is returned OPEN: e1 (control_db_evidence) keeps it alive for the whole
+    engine run so every executed phase's step_attempts/gate_results rows are written LIVE, not
+    back-filled at the end (a killed run leaves per-phase rows behind, not just a dangling
+    ``running`` row). The caller closes it in a ``finally`` immediately after ``run_workflow``
+    returns, before the terminal write opens its own handle. Returns ``(None, None)`` when the
+    database is unavailable (the run itself is unaffected — every control-plane step degrades to
+    a no-op, exactly the pre-e1 posture).
     """
     if args.only_phase:
-        return None
+        return None, None
     db = _control_db()
     if db is None:
-        return None
+        return None, None
     try:
         run = db.create_run(
             spec_name=spec.name,
@@ -779,13 +800,12 @@ def _control_open_run(spec: ExperimentSpec, args: argparse.Namespace) -> str | N
             reason="workflow run started",
         )
         print(f"control: run {run.run_id} ({run.state.value})", file=sys.stderr)
-        return run.run_id
+        return run.run_id, db
     except (ControlDBError, OSError) as exc:
         print(f"warning: control db run creation failed ({exc}) — run itself unaffected",
               file=sys.stderr)
-        return None
-    finally:
         db.close()
+        return None, None
 
 
 def _derived(label: str, derive) -> list[dict]:
