@@ -139,18 +139,18 @@ def _wrapper_contract_targets() -> frozenset[str]:
 
 
 # The ladder's compose-ONLY surface — targets the wrapper's sibling-spawn contract does not
-# govern, so they cannot come from the wrapper's runtime contract: the D-3 socket (the wrapper
-# never spawns a sibling with the socket), the D-13 fleet-logs NAMED volume, the provider
-# config (~/.config — the wrapper's auth set is narrower), the compose's results OVERLAY at the
-# /repo path (the wrapper mounts results at /app/experiments/results instead), and the
-# compose-wide opencode dir (~/.opencode — the wrapper's auth set is the narrower
-# ~/.opencode/bin). The two auth-home-relative entries derive from the compose's own
-# ``AUTH_HOME`` default.
+# govern, so they cannot come from the wrapper's runtime contract: the D-13 fleet-logs NAMED
+# volume, the provider config (~/.config — the wrapper's auth set is narrower), the compose's
+# results OVERLAY at the /repo path (the wrapper mounts results at /app/experiments/results
+# instead), and the compose-wide opencode dir (~/.opencode — the wrapper's auth set is the
+# narrower ~/.opencode/bin). The two auth-home-relative entries derive from the compose's own
+# ``AUTH_HOME`` default. NOTE (b3_launch_broker): the D-3 docker socket is NOT here — the
+# socket leaves every container; the host-side launch broker owns it, so no compose target may
+# ever name it again.
 def _compose_only_targets() -> frozenset[str]:
     cfg = _compose_config()
     return frozenset(
         {
-            "/var/run/docker.sock",  # the socket (orchestrator only, D-3)
             "/var/log/fleet",  # the fleet-logs NAMED volume (D-13, not a host path)
             str(cfg.auth_home / ".config"),  # the provider config (ro — smoke finding #4)
             "/repo/experiments/results",  # results OVERLAY (rw — the worker's relative paths)
@@ -226,20 +226,23 @@ def test_mount_guard_rejects_a_foreign_target():
     )
 
 
-def test_socket_appears_in_exactly_one_tier():
+def test_no_service_mounts_the_docker_socket():
+    """b3_launch_broker hard rule 1: the socket leaves EVERY container.
+
+    No ladder service may mount /var/run/docker.sock — the host-side launch broker owns the
+    socket and is the ONLY Docker API caller. Before b3 the invariant was "exactly the
+    orchestrator tier"; the wave's mandate is stronger: the socket appears in NO service.
+    """
     compose = _compose()
     socket_holders = {
         name
         for name, svc in compose["services"].items()
         if any(t == "/var/run/docker.sock" for t, _m in _volume_targets(svc))
     }
-    assert socket_holders == ORCHESTRATOR_SERVICES, (
-        f"the socket must appear in exactly the orchestrator tier, got {sorted(socket_holders)}"
+    assert socket_holders == set(), (
+        f"the socket must appear in NO compose service after b3 (the host-side launch broker "
+        f"owns it), got {sorted(socket_holders)}"
     )
-    for name in socket_holders:
-        for target, mode in _volume_targets(compose["services"][name]):
-            if target == "/var/run/docker.sock":
-                assert mode == "ro", f"{name}: the socket must be read-only"
 
 
 def test_supervisor_has_no_socket_and_no_worktree_mount():

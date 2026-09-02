@@ -11,10 +11,12 @@ or awaiting result.
 g1 (engine_gaps_followups F2): the parity suite's verifier cases use FakeDockerVerifier
 (a local ``run_suite`` shape) and assert only ``build_request`` on the real executor. The
 round-trip harness in the last section closes that gap WITHOUT docker: it drives the REAL
-``DockerVerifierExecutor.execute()`` with the docker boundary (``spawn_wrapper.spawn_sibling``)
-as the ONLY injected seam, returning canned sibling outcomes and asserting the
-envelope → classify → StepResult mapping. Where docker IS available the operator runs the
-TRUE container round-trip under the ``--run-docker`` opt-in marker:
+``DockerVerifierExecutor.execute()`` with the broker boundary
+(``spawn_wrapper.spawn_sibling`` — which validates and delegates the typed request to the
+host-side launch broker, b3_launch_broker) as the ONLY injected seam, returning canned
+sibling outcomes and asserting the envelope → classify → StepResult mapping. Where docker IS
+available the operator runs the TRUE container round-trip under the ``--run-docker`` opt-in
+marker:
 
     python3 -m pytest tests/test_workflow_executor_parity.py --run-docker \
         -k verifier_docker_roundtrip
@@ -694,25 +696,26 @@ def test_executor_inherits_the_run_clone_from_env(tmp_path, monkeypatch):
 
 # ══════════════════════════════════════════════════════════════
 # g1 (engine_gaps_followups F2): the round-trip harness — the REAL executor's
-# execute → envelope → classify contract exercised with the docker boundary as the
+# execute → envelope → classify contract exercised with the broker boundary as the
 # ONLY injected seam (docker optional in CI).
 # ══════════════════════════════════════════════════════════════
 #
 # The parity cases above inject FakeDockerVerifier — a DockerVerifier-SHAPED executor that
 # runs run_suite locally — and assert only ``build_request`` on the real executor. F2 (the
 # Wave-1 adversarial review): the genuine container contract — real DockerVerifierExecutor
-# ``execute()`` → ``spawn_wrapper.spawn_sibling`` → the child's result envelope → ``_classify``
+# ``execute()`` → ``spawn_wrapper.spawn_sibling`` (validate → broker delegation, b3) →
+# the child's result envelope → ``_classify``
 # → ``_phase_from_envelope`` → ``StepResult`` — was never exercised, because ``docker`` is not
 # available in CI.
 #
 # The round-trip harness closes that gap WITHOUT docker: it drives the real executor's
-# ``execute()`` and replaces ONLY the docker boundary — the ``spawn_wrapper.spawn_sibling``
-# module attribute the executor calls (``docker_verifier_executor.py:133``) — with a function
+# ``execute()`` and replaces ONLY the broker boundary — the ``spawn_wrapper.spawn_sibling``
+# module attribute the executor calls (``docker_verifier_executor.py:148``) — with a function
 # that returns a canned sibling outcome in the exact shape ``spawn_sibling`` returns
 # (``{"ok", "argv", "returncode", "stdout", "stderr"}``). Everything the executor owns runs
-# for real: ``build_request`` → the spawned request, ``_classify`` over the child's envelope
+# for real: ``build_request`` → the typed spawn request, ``_classify`` over the child's envelope
 # (the indented ``WorkflowRunResult.to_dict()`` JSON a real child prints), and the StepResult
-# mapping. The docker boundary is the ONLY injected seam.
+# mapping. The broker boundary is the ONLY injected seam.
 #
 # (f) Where docker IS available, the same harness runs the TRUE container round-trip (the
 # real ``docker run`` → child ``run_workflow.py --only-phase`` → real envelope) under the
@@ -844,10 +847,15 @@ def test_roundtrip_failed_suite_envelope_maps_to_failed_stepresult(tmp_path, mon
     sr, captured = _rt_execute(
         executor, request, _rt_outcome(EXIT_OK, envelope=env, stderr="boom"), monkeypatch
     )
-    # the docker boundary received the READ-ONLY verifier request build_request produced
-    assert captured["kwargs"] == {"docker": "docker", "image": None}
+    # the docker boundary received the READ-ONLY verifier request build_request produced.
+    # b3_launch_broker: spawn_sibling takes ONLY the typed request — the docker/image args left
+    # the wrapper, so the request itself carries the image (image_digest) and the broker's
+    # mount profile.
+    assert captured["kwargs"] == {}
     spawn_req = captured["request"]
     assert spawn_req.get(spawn_wrapper.VERIFIER_REQUEST_MARKER) is True
+    assert spawn_req.get("mount_profile") == "verifier_readonly"
+    assert spawn_req.get("image_digest") in ("fleet/base", None)
     repo_mounts = [m for m in spawn_req.get("mounts", []) if m.get("target") == "/repo"]
     assert repo_mounts and all(m.get("mode") == "ro" for m in repo_mounts)
     assert not spawn_req.get("mounts") or all(

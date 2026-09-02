@@ -510,12 +510,17 @@ def test_step_6_runs_after_the_scope_checks(armed):
 
 
 def test_spawn_sibling_never_reaches_docker_without_a_lease(armed, monkeypatch):
-    """The socket is never touched by an unbudgeted spawn — the same guarantee as steps 1-5."""
-    from scripts.fleet import spawn_wrapper
+    """The broker is never reached by an unbudgeted spawn — the same guarantee as steps 1-5.
+
+    b3_launch_broker: the docker call now lives in launch_broker, so the "never reaches docker"
+    assertion patches the broker's launch (the ONLY docker caller) — an unbudgeted spawn must
+    refuse at step 6 before the broker is even asked.
+    """
+    from scripts.fleet import launch_broker, spawn_wrapper
 
     monkeypatch.setattr(
-        spawn_wrapper.subprocess, "run",
-        lambda *a, **k: pytest.fail("an unbudgeted spawn must never reach the docker socket"),
+        launch_broker, "launch",
+        lambda *a, **k: pytest.fail("an unbudgeted spawn must never reach the docker broker"),
     )
     with pytest.raises(spawn_wrapper.SpawnValidationError, match="step 6"):
         spawn_wrapper.spawn_sibling(_valid_request())

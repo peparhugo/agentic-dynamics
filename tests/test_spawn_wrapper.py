@@ -20,6 +20,10 @@ from agentic_dynamics.experiment.experiment_spec import (
     phase_scope,
     validate_spec,
 )
+from scripts.fleet.launch_broker import (
+    build_launch_argv,
+    build_submit_argv,
+)
 from scripts.fleet.spawn_wrapper import (
     AUTH_CRED_FILE,
     AUTH_DIRS,
@@ -31,8 +35,6 @@ from scripts.fleet.spawn_wrapper import (
     STATE_TARGET,
     SpawnValidationError,
     build_phase_request,
-    build_spawn_argv,
-    build_submit_argv,
     build_verifier_request,
     consume_fleet_commands,
     contract_targets,
@@ -75,6 +77,10 @@ def _valid_submit_request(**overrides) -> dict:
 # (implementation), the network is fleet-net, and the implementation scope authorizes the
 # write flag. The D-2 auth targets are the default config's ``auth_dirs`` (b1_path_config:
 # derived, never host literals) — the same config validation derives its contract from.
+# b3_launch_broker: the request also carries the TYPED launch fields (image_digest /
+# mount_profile / state_namespace / timeout_seconds; command is added per test where the
+# broker path is exercised) so it satisfies the broker's closed typed contract as well as the
+# wrapper's scope checks.
 VALID_REQUEST = {
     "phase": "p1_slice1_base_supervisor",
     "scope": "implementation",
@@ -88,6 +94,10 @@ VALID_REQUEST = {
     ],
     "network": "fleet-net",
     "env": {"FINOPS_KB_WRITE": "1"},
+    "image_digest": "fleet/base",
+    "mount_profile": "implementation_rw",
+    "state_namespace": "spec_x/p1_slice1_base_supervisor",
+    "timeout_seconds": 0,
 }
 
 
@@ -293,25 +303,35 @@ def test_valid_request_passes():
 
 
 def test_spawn_sibling_refuses_before_socket_call():
-    # A request failing step 1 raises SpawnValidationError and NEVER builds/executes a docker
-    # argv — even with a docker binary path that would fail if invoked.
+    # A request failing step 1 raises SpawnValidationError and NEVER reaches the broker — even
+    # with a docker path that would fail if invoked (the broker is never called).
     with pytest.raises(SpawnValidationError) as exc:
         spawn_sibling(
             {**VALID_REQUEST, "scope": "admin_everything"},
-            docker="/nonexistent/docker-should-never-run",
         )
     assert any("step 1" in e for e in exc.value.errors)
 
 
-def test_spawn_sibling_dry_run_builds_argv_only_after_validation():
-    result = spawn_sibling(VALID_REQUEST, docker="docker", dry_run=True)
+def test_spawn_sibling_dry_run_builds_the_broker_argv_only_after_validation():
+    # b3_launch_broker: spawn_sibling validates, then hands the typed request to the broker,
+    # which builds the docker argv (dry_run builds it only, nothing is executed).
+    request = {**VALID_REQUEST, "command": ["python3", "-c", "pass"]}
+    result = spawn_sibling(request, dry_run=True)
     assert result["ok"] is True
     assert result["argv"][0] == "docker" and "run" in result["argv"]
     assert result["returncode"] is None
 
 
-def test_build_spawn_argv_carries_mounts_network_env():
-    argv = build_spawn_argv(VALID_REQUEST, docker="docker", image="fleet/base", command=["echo", "hi"])
+def test_broker_launch_argv_carries_mounts_network_env():
+    # The docker argv construction now lives in the launch broker (the ONLY docker caller):
+    # build_launch_argv assembles the -v mounts / --network / -e / image / command from a
+    # validated request. The wrapper no longer builds docker argv.
+    request = {**VALID_REQUEST, "command": ["echo", "hi"]}
+    mounts = build_phase_request(
+        {"name": "p1_slice1_base_supervisor", "scope": "implementation"},
+        goal="g", workdir="/tmp/wt", model="m", spec_name="spec_x",
+    )["mounts"]
+    argv = build_launch_argv(request, docker="docker", mounts=mounts)
     joined = "\n".join(argv)
     assert "--network" in argv and "fleet-net" in argv
     assert "/tmp:rw" in joined  # the worktree mount, rw
@@ -601,15 +621,15 @@ def test_verifier_request_that_would_mount_candidate_rw_fails_validation():
 
 
 def test_verifier_request_rw_candidate_is_refused_before_any_spawn():
-    """(b) the refusal is enforced at validation time — spawn_sibling never reaches the socket
-    with a rw-candidate verifier request (docker path is bogus and would fail if invoked)."""
+    """(b) the refusal is enforced at validation time — spawn_sibling never reaches the broker
+    with a rw-candidate verifier request (the broker is never called)."""
     req = _verifier_request()
     for m in req["mounts"]:
         if m.get("target") == "/repo/.git":
             m["mode"] = "rw"
     with pytest.raises(SpawnValidationError) as exc:
         spawn_sibling(
-            req, docker="/nonexistent/docker-should-never-run",
+            req,
             phase_scopes={"g3_test_gate": "implementation"},
         )
     assert any("step 3" in e and "verifier" in e for e in exc.value.errors)

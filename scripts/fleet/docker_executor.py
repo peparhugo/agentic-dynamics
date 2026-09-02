@@ -35,17 +35,18 @@ import spawn_wrapper  # noqa: E402
 class DockerAgentExecutor(StepExecutor):
     """Run each agent phase as a sibling cell container with its scope config.
 
-    ``spec_path`` is the spec path AS THE SIBLING SEES IT (the orchestrator mounts the
-    repo at ``/repo``, so ``/repo/<spec>``); ``spec_name`` is the workflow's name used
-    for the per-attempt state namespace; ``cell_image`` is the sibling's image
-    (``fleet/job-<name>`` or the default cell base).
+    ``spec_path`` is the spec path AS THE SIBLING SEES IT (the launch broker mounts the repo
+    at ``/repo`` per the request's mount profile, so ``/repo/<spec>``); ``spec_name`` is the
+    workflow's name used for the per-attempt state namespace; ``cell_image`` is the sibling's
+    image (``fleet/job-<name>`` or the default cell base), carried on the typed request.
 
     ``run_clone`` (b2_ephemeral_clone, fleet_launch_boundary Wave 2) is the run's private
     ephemeral clone path (``PathConfig.runs_root/<run-id>/repo``). When set, every phase
-    request this executor builds references it (``build_phase_request(run_clone=...)``) so
-    the launch broker can mount the clone into the cell. It may be passed explicitly or
-    inherited from the ``FINOPS_RUN_CLONE`` env var (a host-side launcher exports it to the
-    workflow-runner tier); absent both, requests carry no clone — the pre-b2 shape unchanged.
+    request this executor builds references it (``build_phase_request(run_clone=...)``) so the
+    launch broker can validate the reference and a later wave can bind the clone mount into the
+    cell surface. It may be passed explicitly or inherited from the ``FINOPS_RUN_CLONE`` env
+    var (a host-side launcher exports it to the workflow-runner tier); absent both, requests
+    carry no clone — the pre-b2 shape unchanged.
     """
 
     def __init__(
@@ -106,14 +107,17 @@ class DockerAgentExecutor(StepExecutor):
             # P0-3: a per-attempt state namespace — <spec>/<phase>/ — so retries and
             # concurrent phases never share a writable CLI-state directory.
             state_namespace=f"{self._spec_name}/{request.phase_name}",
+            # b3_launch_broker: the cell image + docker-side timeout ride on the TYPED request
+            # (image_digest / timeout_seconds) — the executor no longer passes them to a docker
+            # call of its own; the broker validates + executes them.
+            image=self._cell_image,
+            timeout_seconds=request.timeout or self._timeout or 0,
         )
 
     def execute(self, request: StepRequest) -> StepResult:
-        """Spawn one sibling cell for ``request`` and classify its outcome."""
+        """Spawn one sibling cell for ``request`` (via the launch broker) and classify its outcome."""
         phase_request = self.build_request(request)
-        outcome = spawn_wrapper.spawn_sibling(
-            phase_request, docker="docker", image=self._cell_image,
-        )
+        outcome = spawn_wrapper.spawn_sibling(phase_request)
         decision = _classify(outcome)
         state = decision["state"]
         envelope = decision.get("envelope") or {}

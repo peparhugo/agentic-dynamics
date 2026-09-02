@@ -9,9 +9,12 @@
 # wiring). `finops-redis` (6379) is deliberately NEVER attached: the cells hold no network
 # path to the story-agent sandbox (the two-channel rule made topological).
 #
-# The socket (D-3/D-14) appears in the ORCHESTRATOR tier only — slice 2. The supervisor tier
-# below holds NO socket: its restart authority is the compose policies it owns + the
-# orchestrator as its hands over Redis `fleet:commands` (db1 / 6380).
+# The socket (D-3/D-14) lives on the HOST ONLY — the launch broker (b3_launch_broker) is the
+# host-side (non-container) component that holds the Docker socket and is the ONLY Docker
+# API caller. No service in this file mounts the socket; the supervisor tier's restart
+# authority is the compose policies it owns + the orchestrator as its hands over Redis
+# `fleet:commands` (db1 / 6380), and every docker call the orchestrator needs is delegated to
+# the broker as a typed launch/fleet request.
 #
 # Scale (static pools, D-14):  docker-compose up -d --scale story-worker=4 \
 #                              --scale analysis-worker=4 --scale review-unit=2
@@ -118,11 +121,15 @@ x-supervisor-base: &supervisor-base
     FLEET_SKIP_PROBE: "1"         # the supervisor services invoke no CLI
   volumes: *supervisor-mounts
 
-# The orchestrator tier (slice 2, D-3/D-14/D-16): the cell mount set PLUS the docker socket
-# (ro) — the ONE escalation in the ladder. The socket is gated by the sibling-spawn wrapper
-# (scripts/fleet/spawn_wrapper.py), which validates every spawn against the scope model before
-# the socket call. Env (D-15): the cell env MINUS FINOPS_KB_WRITE — the orchestrator never
-# carries the write flag at the container level; its F-1/F-2/P11 writes authorize in code.
+# The orchestrator tier (slice 2, D-3/D-14/D-16): the cell mount set. The Docker socket is NOT
+# here (b3_launch_broker, fleet_launch_boundary Wave 2 hard rule 1: the socket leaves the
+# container) — no ladder service mounts the socket anymore. The launch broker
+# (scripts/fleet/launch_broker.py) is the host-side (non-container) component that owns the
+# socket and is the ONLY Docker API caller: the wrapper validates a typed launch request and the
+# broker executes it. The orchestrator services below therefore run where the broker is
+# reachable (host-side), never with the socket mounted in. Env (D-15): the cell env MINUS
+# FINOPS_KB_WRITE — the orchestrator never carries the write flag at the container level; its
+# F-1/F-2/P11 writes authorize in code.
 x-orchestrator-mounts: &orchestrator-mounts
   - ${FINOPS_WORKTREE_ROOT:-/tmp}:/tmp:rw
   - ${FINOPS_REPO_DIR:-/home/drseuss/ai-finops-framework}:/repo:ro
@@ -141,7 +148,6 @@ x-orchestrator-mounts: &orchestrator-mounts
   - ${AUTH_HOME:-/home/drseuss}/.config:/home/drseuss/.config:ro
   - ${AUTH_HOME:-/home/drseuss}/.local/bin:/home/drseuss/.local/bin:ro
   - ${AUTH_HOME:-/home/drseuss}/.opencode:/home/drseuss/.opencode:ro
-  - /var/run/docker.sock:/var/run/docker.sock:ro
 
 x-orchestrator-base: &orchestrator-base
   image: fleet/orchestrator
@@ -287,8 +293,9 @@ services:
       EGRESS_ALLOWLIST: "api.deepseek.com,api.anthropic.com,api.openai.com,*.anthropic.com,*.deepseek.com,*.openai.com"
 
   # =========================================================================
-  # fleet/orchestrator — the campaign wrapper + the workflow runner. The ONE
-  # socket-holder tier (D-3): /var/run/docker.sock ro, gated by the spawn-wrapper.
+  # fleet/orchestrator — the campaign wrapper + the workflow runner. NO docker
+  # socket (b3_launch_broker): the socket lives ONLY where the broker runs (host);
+  # these services build typed launch requests and the host-side broker executes them.
   # =========================================================================
   campaign-wrapper:
     <<: *orchestrator-base

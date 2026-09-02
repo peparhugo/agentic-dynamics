@@ -47,15 +47,17 @@ from docker_executor import _classify, _phase_from_envelope  # noqa: E402
 class DockerVerifierExecutor(StepExecutor):
     """Run each ``kind: test`` phase as a READ-ONLY sibling verifier container.
 
-    ``spec_path`` is the spec path AS THE SIBLING SEES IT (the orchestrator mounts the repo at
-    ``/repo``, so ``/repo/<spec>``); ``spec_name`` is the workflow's name; ``cell_image`` is
-    the sibling's image (``fleet/job-<name>`` or the default cell base).
+    ``spec_path`` is the spec path AS THE SIBLING SEES IT (the launch broker mounts the repo at
+    ``/repo`` read-only per the verifier mount profile, so ``/repo/<spec>``); ``spec_name`` is
+    the workflow's name; ``cell_image`` is the sibling's image (``fleet/job-<name>`` or the
+    default cell base), carried on the typed request.
 
     ``run_clone`` (b2_ephemeral_clone, fleet_launch_boundary Wave 2) is the run's private
     ephemeral clone path. When set, the verifier request references it too (a test phase
     verifies against the run's clone — the suite runs in the read-only clone), so the launch
-    broker can mount the clone read-only for the verifier. It may be passed explicitly or
-    inherited from ``FINOPS_RUN_CLONE``; absent both, requests carry no clone (pre-b2 shape).
+    broker can validate the reference and a later wave can bind the clone mount read-only for
+    the verifier. It may be passed explicitly or inherited from ``FINOPS_RUN_CLONE``; absent
+    both, requests carry no clone (pre-b2 shape).
     """
 
     def __init__(
@@ -111,7 +113,8 @@ class DockerVerifierExecutor(StepExecutor):
 
         # The verifier has NO admission context by construction: kind:test phases run outside
         # the engine's per-phase admission scope (there is no model call to reserve spend for),
-        # so no lease block is stamped and none is read.
+        # so no lease block is stamped and none is read. The cell image + docker-side timeout
+        # ride on the typed request (b3_launch_broker) like the agent executor's.
         return spawn_wrapper.build_verifier_request(
             request.phase_def,
             goal=self._goal,
@@ -120,6 +123,8 @@ class DockerVerifierExecutor(StepExecutor):
             spec_name=self._spec_name,
             command=sibling_cmd,
             run_clone=self._run_clone,
+            image=self._cell_image,
+            timeout_seconds=request.timeout or self._timeout or 0,
         )
 
     def execute(self, request: StepRequest) -> StepResult:
@@ -142,9 +147,7 @@ class DockerVerifierExecutor(StepExecutor):
 
         verifier_request = self.build_request(request)
         try:
-            outcome = spawn_wrapper.spawn_sibling(
-                verifier_request, docker="docker", image=self._cell_image,
-            )
+            outcome = spawn_wrapper.spawn_sibling(verifier_request)
         except Exception as exc:  # noqa: BLE001 — a spawn refusal is a failed verdict, never a crash
             return StepResult(
                 ok=False,

@@ -399,11 +399,13 @@ def main() -> None:
                          "beta_tokens=0.80 puts the knee at 6): the coordination tax is paid "
                          "in throughput, not dollars.")
     ap.add_argument("--orchestrator", action="store_true",
-                    help="slice 2 (D-3/D-14/D-16): run each agent phase as a SIBLING cell "
-                         "container with its scope config (via scripts/fleet/spawn_wrapper.py) "
-                         "instead of in-process. OPT-IN — the default path is unchanged. The "
-                         "orchestrator container mounts the docker socket (ro); a phase whose "
-                         "scope fails validation refuses BEFORE the socket call.")
+                    help="slice 2 (D-3/D-14/D-16, b3_launch_broker): run each agent phase as a "
+                         "SIBLING cell container with its scope config (via "
+                         "scripts/fleet/spawn_wrapper.py + the host-side launch broker) instead "
+                         "of in-process. OPT-IN — the default path is unchanged. The wrapper "
+                         "validates a typed launch request and the broker (the ONLY Docker API "
+                         "caller) executes it; a phase whose scope fails validation refuses "
+                         "BEFORE the broker is reached.")
     ap.add_argument("--only-phase", default=None, metavar="NAME",
                     help="run a SINGLE phase (name) only — the sibling-cell entrypoint the "
                          "--orchestrator mode spawns for each phase. When set, the spec's phase "
@@ -416,7 +418,8 @@ def main() -> None:
                          "the only namespace the submit contract's `image` field accepts "
                          "(scripts/fleet/spawn_wrapper.py:JOB_IMAGE_PATTERN). Never changes the "
                          "orchestrator/workflow-runner container's OWN image (fleet/orchestrator "
-                         "— the one socket-holder, unaffected by this flag).")
+                         "— validated against the broker's closed image namespace; a phase-cell "
+                         "image override never reaches the broker unless it is in the namespace).")
     args = ap.parse_args()
 
     spec = load_spec(Path(args.spec))

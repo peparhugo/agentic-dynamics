@@ -235,11 +235,15 @@ units. The fleet manager exposes heartbeats and per-queue dead-letter counts; th
 cutover recorded both surfaces and a no-double-processing probe
 (`docs/fleet/04_slice1_live_cutover_log.md:12-18`, `45-77`).
 
-[M] The Docker socket is mounted read-only only by the orchestrator tier
-(`infrastructure/docker-compose.ladder.yml:108-137`); `scripts/fleet/spawn_wrapper.py:355-640`
-validates a sibling request's scope, phase authorization, mounts, network, and write flags before
-building a Docker command. The slice-2 log records that pre-socket validation and the orchestrator
-image build (`docs/fleet/05_slice2_orchestrator_log.md:12-17`, `34-67`).
+[M] The Docker socket is NOT mounted into any container (b3_launch_broker, fleet_launch_boundary
+Wave 2): the launch broker — a host-side, non-container component
+(`scripts/fleet/launch_broker.py:529`) — is the ONLY Docker API caller. The spawn wrapper
+(`scripts/fleet/spawn_wrapper.py:375`) validates a sibling request's scope, phase
+authorization, mounts, network, and write flags, then hands the TYPED launch request to the
+broker, which re-validates it (`scripts/fleet/launch_broker.py:333`) before the docker call.
+The slice-2 log records the pre-broker validation + orchestrator image build
+(`docs/fleet/05_slice2_orchestrator_log.md:12-17`, `34-67`); the orchestrator services now
+carry the cell mount set with no socket (`infrastructure/docker-compose.ladder.yml:124-155`).
 
 [M] The compose mount inventory includes the worktree, read-only repository aliases plus writable
 `.git` overlays, results, a shared OpenCode-state directory, and read-only credentials/configuration
