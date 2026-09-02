@@ -993,11 +993,13 @@ def test_verifier_docker_roundtrip(tmp_path):
     network + a CURRENT ``fleet/base`` image (its baked ``/app`` copy of ``scripts/`` must
     match the repo) whose entrypoint can start a credential-less verifier cell (the D-18 CLI
     probe is satisfied or the cell boots with it skipped — a verifier mounts no auth dirs by
-    construction). Run it from the MAIN checkout (``/home/drseuss/ai-finops-framework`` — the
-    canonical repo path the mount contract's ``repo-alias`` target is pinned to): the real
-    spawn's validation step 3 refuses a repo-alias mount at any OTHER host path, so a
-    ``/tmp/wt_*`` worktree checkout is refused before the socket call by design, never reaching
-    docker. The test builds a real candidate workdir under /tmp (a spec + a passing suite —
+    construction). Run it from the MAIN checkout — the config's ``repo_root`` (the mount
+    contract's ``repo-alias`` target is that config's host path, b1_path_config; the deployed
+    ladder's own ``FINOPS_REPO_DIR`` is the host repo path): the real spawn's validation step 3
+    accepts a repo-alias mount only at the config's derived repo root, so a ``/tmp/wt_*``
+    worktree checkout (a DIFFERENT ``repo_root`` than the compose mount target) is refused
+    before the socket call by design, never reaching docker. The test builds a real candidate
+    workdir under /tmp (a spec + a passing suite —
     the verifier cell mounts the host /tmp namespace read-only at /tmp, so the workdir is
     visible in the container at the same path), then drives the REAL executor and asserts the
     envelope→StepResult contract end to end — the very contract the injected-seam tests above

@@ -19,13 +19,21 @@ set -euo pipefail
 if [ -f /auth/opencode_auth.json ]; then
     if [ -n "${XDG_DATA_HOME:-}" ]; then
         AUTH_STATE_DIR="${XDG_DATA_HOME}/opencode"
+    elif [ -n "${HOME:-}" ]; then
+        # b1_path_config: the historical fixed path was the container auth home spelled out
+        # literally; derive it from $HOME (the compose sets HOME to the auth home) so no
+        # host-user literal lives in the fleet code.
+        AUTH_STATE_DIR="${HOME}/.local/share/opencode"
     else
-        AUTH_STATE_DIR="/home/drseuss/.local/share/opencode"
+        echo "fleet-entrypoint: auth.json present but HOME/XDG_DATA_HOME unset — skipping seed" >&2
+        AUTH_STATE_DIR=""
     fi
-    mkdir -p "$AUTH_STATE_DIR"
-    if [ ! -f "$AUTH_STATE_DIR/auth.json" ]; then
-        cp /auth/opencode_auth.json "$AUTH_STATE_DIR/auth.json"
-        chmod 600 "$AUTH_STATE_DIR/auth.json"
+    if [ -n "${AUTH_STATE_DIR}" ]; then
+        mkdir -p "$AUTH_STATE_DIR"
+        if [ ! -f "$AUTH_STATE_DIR/auth.json" ]; then
+            cp /auth/opencode_auth.json "$AUTH_STATE_DIR/auth.json"
+            chmod 600 "$AUTH_STATE_DIR/auth.json"
+        fi
     fi
 fi
 

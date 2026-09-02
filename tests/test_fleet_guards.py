@@ -33,13 +33,15 @@ The seven guards:
 from __future__ import annotations
 
 import importlib
-import os
+import re
 import sys
 import time
 from pathlib import Path
 
 import pytest
 import yaml
+
+from agentic_dynamics.core.paths import PathConfig
 
 ROOT = Path(__file__).resolve().parent.parent
 COMPOSE_PATH = ROOT / "infrastructure" / "docker-compose.ladder.yml"
@@ -83,54 +85,86 @@ def _fleet_module(name: str):
     return importlib.import_module(name)
 
 
-# ── The mount contract — the single source is the wrapper's runtime CONTRACT_TARGETS ──
+# ── The mount contract — the single source is the wrapper's runtime contract ──
 #
 # F5 (the mount-contract guard gap, docs/reviews/docs_architecture_refresh_remediation.md): the
 # guard's allowlist used to be a hand-copied mirror of the wrapper's runtime contract, and it
 # went stale — the compose's repo-alias + `.git` overlay targets (docker-compose.ladder.yml:70-71)
 # were missing from the guard while the wrapper already allowed them
-# (scripts/fleet/spawn_wrapper.py:103-121). The fix is to CONSUME the wrapper's CONTRACT_TARGETS
-# as the single source (never a copy that can drift again): the guard's allowlist is the wrapper's
-# runtime contract unioned with the ladder's OWN compose-only surface (the D-3 socket, the D-13
-# named log volume, the credential file, the provider config, the compose results overlay, and the
-# compose-wide opencode dir) — targets the wrapper's sibling-spawn contract deliberately does not
-# govern. An unexpected target still fails (the negative test proves it).
+# (scripts/fleet/spawn_wrapper.py). The fix is to CONSUME the wrapper's runtime contract as the
+# single source (never a copy that can drift again).
+#
+# b1_path_config (fleet_launch_boundary Wave 2): the wrapper's contract is now derived from a
+# PathConfig — its repo-alias/.git pair and D-2 auth dirs track the config's repo_root/git_dir/
+# auth_home, so the guard must evaluate the wrapper contract under the SAME env the compose
+# declares. It therefore reads the compose file's own `${VAR:-default}` indirections
+# (FINOPS_REPO_DIR / FINOPS_WORKTREE_ROOT / AUTH_HOME) and builds the config from those defaults
+# — the guard is env-independent (a runner checkout / CI box has no ambient FINOPS_* vars) and
+# literal-free (the defaults are read from the file, never hard-coded). The guard's allowlist is
+# the wrapper's runtime contract for that config unioned with the ladder's OWN compose-only
+# surface (the D-3 socket, the D-13 named log volume, the provider config, the compose results
+# overlay, and the compose-wide opencode dir) — targets the wrapper's sibling-spawn contract
+# deliberately does not govern. An unexpected target still fails (the negative test proves it).
+
+
+def _compose_env_defaults() -> dict[str, str]:
+    """The compose file's own ``${VAR:-default}`` indirections — first occurrence per var.
+
+    Read from the YAML text (never hard-coded): ``FINOPS_WORKTREE_ROOT`` (default ``/tmp``),
+    ``FINOPS_REPO_DIR`` (the repo's host path), ``AUTH_HOME`` (the host auth home). This is the
+    env the ladder would actually be brought up under when no operator override is exported.
+    """
+    defaults: dict[str, str] = {}
+    for name, default in re.findall(r"\$\{([A-Z_][A-Z0-9_]*):-([^}]*)\}", COMPOSE_PATH.read_text()):
+        defaults.setdefault(name, default)
+    return defaults
+
+
+def _compose_config() -> PathConfig:
+    """The PathConfig the compose declares by its own env defaults (structural, no fs checks)."""
+    return PathConfig.from_env(_compose_env_defaults(), require_existing=False)
 
 
 def _wrapper_contract_targets() -> frozenset[str]:
-    """The spawn-wrapper's runtime CONTRACT_TARGETS (scripts/fleet/spawn_wrapper.py:103-121).
+    """The spawn-wrapper's runtime mount contract for the compose's own config.
 
-    Imported, never copied — the single source for the shared four-mount + D-2-auth surface.
-    A copy is exactly the staleness class F5 closed: the guard drifted from the wrapper's
-    runtime allowlist once; consuming it removes the copy entirely, so the two cannot diverge
-    again (a future wrapper addition is allowed here by construction, not by re-sync).
+    Consumed, never copied — the single source for the shared four-mount + D-2-auth surface. A
+    copy is exactly the staleness class F5 closed: the guard drifted from the wrapper's runtime
+    allowlist once; consuming it removes the copy entirely, so the two cannot diverge again (a
+    future wrapper addition is allowed here by construction, not by re-sync). The wrapper's
+    repo-alias/.git + D-2 auth entries are config-derived (b1_path_config), so the guard
+    evaluates them under the config the compose file itself declares.
     """
-    return frozenset(_fleet_module("spawn_wrapper").CONTRACT_TARGETS)
+    return frozenset(_fleet_module("spawn_wrapper").contract_targets(_compose_config()))
 
 
 # The ladder's compose-ONLY surface — targets the wrapper's sibling-spawn contract does not
-# govern, so they cannot come from CONTRACT_TARGETS: the D-3 socket (the wrapper never spawns a
-# sibling with the socket), the D-13 fleet-logs NAMED volume, the credential FILE, the provider
-# config, the compose's results OVERLAY at the /repo path (the wrapper mounts results at
-# /app/experiments/results instead), and the compose-wide opencode config dir (the wrapper's
-# auth set is the narrower ~/.opencode/bin).
-COMPOSE_ONLY_MOUNT_TARGETS = frozenset(
-    {
-        "/var/run/docker.sock",  # the socket (orchestrator only, D-3)
-        "/var/log/fleet",  # the fleet-logs NAMED volume (D-13, not a host path)
-        "/auth/opencode_auth.json",  # the credential FILE (ro) — seeded by the entrypoint
-        "/home/drseuss/.config",  # the provider config (ro — smoke finding #4)
-        "/repo/experiments/results",  # results OVERLAY (rw — the worker's relative paths)
-        "/home/drseuss/.opencode",  # the opencode config + bin (ro)
-    }
-)
+# govern, so they cannot come from the wrapper's runtime contract: the D-3 socket (the wrapper
+# never spawns a sibling with the socket), the D-13 fleet-logs NAMED volume, the provider
+# config (~/.config — the wrapper's auth set is narrower), the compose's results OVERLAY at the
+# /repo path (the wrapper mounts results at /app/experiments/results instead), and the
+# compose-wide opencode dir (~/.opencode — the wrapper's auth set is the narrower
+# ~/.opencode/bin). The two auth-home-relative entries derive from the compose's own
+# ``AUTH_HOME`` default.
+def _compose_only_targets() -> frozenset[str]:
+    cfg = _compose_config()
+    return frozenset(
+        {
+            "/var/run/docker.sock",  # the socket (orchestrator only, D-3)
+            "/var/log/fleet",  # the fleet-logs NAMED volume (D-13, not a host path)
+            str(cfg.auth_home / ".config"),  # the provider config (ro — smoke finding #4)
+            "/repo/experiments/results",  # results OVERLAY (rw — the worker's relative paths)
+            str(cfg.auth_home / ".opencode"),  # the opencode config + bin (ro)
+        }
+    )
 
-# The wrapper's CONTRACT_TARGETS carries the four-mount contract (worktree /tmp rw, repo /repo
-# ro, results /app/experiments/results, the /repo/.git + repo-alias + repo-alias/.git overlays)
-# and the D-2 auth set (~/.claude, ~/.local/share/{opencode,claude}, ~/.local/bin,
-# ~/.opencode/bin — ro). Unioned with the compose-only surface above, every target the runtime
-# contract allows is permitted here, and nothing outside it is.
-ALLOWED_MOUNT_TARGETS = _wrapper_contract_targets() | COMPOSE_ONLY_MOUNT_TARGETS
+
+# The wrapper's runtime contract carries the four-mount contract (worktree /tmp rw, repo /repo
+# ro, results /app/experiments/results, the /repo/.git + config repo-alias + repo-alias/.git
+# overlays) and the config-derived D-2 auth set (~/.claude, ~/.local/share/claude,
+# ~/.local/bin, ~/.opencode/bin — ro). Unioned with the compose-only surface above, every
+# target the compose declares is permitted here, and nothing outside it is.
+ALLOWED_MOUNT_TARGETS = _wrapper_contract_targets() | _compose_only_targets()
 
 ORCHESTRATOR_SERVICES = {"campaign-wrapper", "workflow-runner"}
 SUPERVISOR_SERVICES = {
@@ -175,9 +209,9 @@ def test_mount_contract_holds_no_unexpected_target():
 def test_mount_guard_rejects_a_foreign_target():
     """Both-directions evidence (F5): the guard still fails on an invented foreign mount.
 
-    The allowlist was aligned with the wrapper's runtime ``CONTRACT_TARGETS``
-    (repo-alias + ``.git`` overlays), never weakened — an unexpected target must still
-    fail. The compose's volume anchors are shared across the cell services, so a deep
+    The allowlist is aligned with the wrapper's runtime contract for the compose's own config
+    (repo-alias + ``.git`` overlays + the D-2 auth set), never weakened — an unexpected target
+    must still fail. The compose's volume anchors are shared across the cell services, so a deep
     copy is injected with a genuinely foreign target to prove the guard bites.
     """
     import copy
@@ -258,7 +292,6 @@ def test_board_surfaces_heartbeats_and_dlq_counts():
     dlq = _fleet_module("dlq")
 
     r = _FakeRedis()
-    now = time.time()
     heartbeat.publish(r, "story", "a", jobs=3, pid=100)
     heartbeat.publish(r, "analysis", "b", jobs=0, pid=101)
     dlq.record_dead(r, "analysis_jobs", {"job": "x"}, "worktree missing")
@@ -457,9 +490,11 @@ def test_probe_non_executable_target_fails_loudly(tmp_path):
 
 
 def test_probe_all_resolves_the_two_clis():
+    from agentic_dynamics.core.paths import PathConfig
     from scripts.fleet import probe_binaries
 
-    results = probe_binaries.probe_all(home="/home/drseuss")
+    # The probe's auth home is the config's auth_home (derived from env, never a literal).
+    results = probe_binaries.probe_all(home=str(PathConfig.from_env().auth_home))
     assert {r.name for r in results} == {"opencode", "claude"}
 
 
