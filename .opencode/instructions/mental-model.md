@@ -53,10 +53,13 @@ chain, `--verify` appends the guard suite). **`agentic-dynamics surfaces snapsho
 `agent_config/system_snapshot.md` — the **game board (L0)**: main HEAD + the last 12 commits of
 chronological history, spec lifecycle counts, registry + corpus counts, live machine state
 (Redis/queue/pipeline), campaigns in flight, and the worktrees awaiting the permanence
-decision. The snapshot is rendered into both agent surfaces (`.opencode/instructions/` +
-`.claude/rules/`) and read by every actor: workers for orientation, the supervisor as its
-assessment baseline (on-task/safety/budget/loops — `scripts/supervise.py`'s `MONITOR_ROLE`),
-the controller instead of chat triage.
+decision. The board is written to that ONE file and read ON DEMAND — it is deliberately no
+longer rendered into the always-on agent surfaces (`control_db_publication` p5): a snapshot is
+stale the moment it is written, and stale run state injected into every prompt is worse than no
+run state, because an actor acts on it. Readers who need the board open the file (the controller
+at the permanence gate; the supervisor as its assessment baseline — on-task/safety/budget/loops,
+`scripts/supervise.py`'s `MONITOR_ROLE`). Readers who need CURRENT state call the control packet
+instead.
 
 **The permanence gate.** Worktree branches (`feature/*`, `wt_*`) are EPHEMERAL proposals; the
 chronological history of the system is `main` plus the merges the controller signs. The
@@ -330,6 +333,30 @@ the ONE documented exception to the control db's single-writer rule — each pro
 own row, the table is partitioned by `projection`, and WAL serialises the writes.
 Read surfaces: `GET /api/projections` + the `projections` block on `GET /api/matrix`.
 
+### The control packet (the ONE dynamic-state surface — WRITTEN, control_db_publication p4)
+
+The instruction surfaces carry stable content only; everything that changes while you read it
+comes from here. Read-only by construction (`ControlDB.open_read_only`, SQLite `mode=ro`): an
+observer that auto-created an empty database would turn "the orchestrator has never run" into
+"there are no runs", which is a lie an actor would then act on.
+
+```
+# control.control_status — the packet's derivations (the CLI shell is scripts/control_status.py)
+SCHEMA_ID = "control-status/v1"
+build_packet(db, *, repo_head_sha, heartbeats, now) -> dict
+  # keys: schema, repo_head_sha, control_epoch, active_runs, awaiting_approvals,
+  #       promotable_runs, failed_runs, unhealthy_workers, projection_lag, safe_actions, degraded
+derive_safe_actions(*, awaiting, runs_by_state) -> list[dict]
+  # DERIVED from control_db.ALLOWED_TRANSITIONS — the same graph transition_run enforces, so an
+  # action the packet offers is an action the database accepts. Never a hand-written list.
+validate_packet(packet) -> list[str]        # the contract without the jsonschema dependency
+CONTROL_STATUS_SCHEMA                        # the same contract as JSON Schema (draft 2020-12)
+
+agentic-dynamics control status [--json] [--db PATH] [--compact]
+  # exit 0 = packet rendered | 2 = the packet failed its own schema (a builder bug) |
+  #      3 = there is NO control database (distinct from an empty packet, deliberately)
+```
+
 ### Spec/compiler signatures (written — agentic_dynamics/experiment/{experiment_spec,compile_experiment}.py)
 
 ```
@@ -572,7 +599,12 @@ agentic-dynamics
 ├─ review      all|stories|trigger|enqueue|finalize
 ├─ spec        status|pipeline
 ├─ validate    session|tests
-└─ supervise   [claude-agents|orphans]
+├─ supervise   [claude-agents|orphans]
+├─ control     status            # the ONE control packet (--json = control-status/v1)
+├─ surfaces    sync|snapshot     # regenerate the derived surfaces / the L0 game board
+├─ docs        scan|watch|gate   # the docs-drift rail (zero model calls)
+├─ release     check-protection
+└─ usage                         # subscription window usage
 ```
 
 ## Navigation

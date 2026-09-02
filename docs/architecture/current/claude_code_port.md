@@ -6,6 +6,16 @@ status: accepted
 Living spec for porting this repo's OpenCode file-based configuration
 (`AGENTS.md`, `.opencode/*`, `opencode.json`) to the Claude Code CLI taxonomy
 (`CLAUDE.md`, `.claude/*`, `.mcp.json`), and back again after either side changes.
+**Current-state note (control_db_publication p5, 2026-09-02):** the port is no longer a
+hand-executed procedure for the ROOT documents either. `AGENTS.md` and `CLAUDE.md` are now
+RENDERED by `scripts/_gen_instructions.py` (`render_root()`) from `agent_config/rules.md` and
+`agent_config/claude-code.md`, alongside the `.opencode/` and `.claude/` trees, and
+`_gen_instructions.py --check` is a CI gate that fails on any stale surface. The mapping tables
+below remain the authority for WHAT maps to what; they are simply executed by the generator now
+rather than by hand. One removal is worth flagging against §2: `system_snapshot.md` is no longer
+rendered into `.claude/rules/` (or `.opencode/instructions/`) — the L0 game board is dynamic state,
+served on demand by `agentic-dynamics control status --json`, not injected into every session.
+
 This is the fourth phase-doc in the opencode-docs-refresh chain
 (`docs/website/opencode_docs_scope.md` → `docs/website/opencode_docs_challenge.md` →
 `docs/website/opencode_docs_spec.md` §4 → this doc), and supersedes `docs/website/opencode_docs_spec.md`

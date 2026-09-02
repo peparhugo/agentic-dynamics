@@ -68,6 +68,12 @@ ALLOWLIST: dict[str, frozenset[str]] = {
     ),
     "docs/reviews/restructure.md": frozenset({"src/instrument/"}),
     "docs/reviews/semantic_integrity_review.md": frozenset({"admin/server.py"}),
+    # The docs-refresh remediation REPORT records the anchors it repointed, so it necessarily
+    # quotes the OLD `admin/server.py:NNN` anchors beside their `apps/control_room/**`
+    # replacements. Every occurrence is a before-side citation in a fix log — the exact shape this
+    # allowlist exists for. (Added by control_db_publication p5: the doc landed with the
+    # remediation and the guard has been red since.)
+    "docs/reviews/docs_architecture_refresh_remediation.md": frozenset({"admin/server.py"}),
     "docs/reviews/semantic_monolith_review.md": frozenset({"src/instrument/"}),
     "docs/reviews/website.md": frozenset({"src/instrument/", "firebase/public/"}),
     # --- Control Room surface material (documents the admin/server.py mapping) ---

@@ -63,7 +63,12 @@ from agentic_dynamics.control.control_status import (
     worker_stale_after_seconds,
 )
 
-pytestmark = pytest.mark.fast
+# NOT ``pytest.mark.fast``. The module-level fast mark this file shipped with (p4) violated the
+# fast-path contract that ``tests/test_fast_path_gate.py`` enforces: the end-to-end cases below run
+# the real ``scripts/control_status.py`` through ``subprocess``, which the fast smoke excludes by
+# design (no real processes, no shared state). The whole module runs in the deterministic suite;
+# only the sub-minute smoke skips it. Marking individual pure-unit cases fast would be a follow-up,
+# not a silent re-mark of the module.
 
 ROOT = Path(__file__).resolve().parent.parent
 

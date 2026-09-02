@@ -22,7 +22,7 @@ Add a new perturbation operator to `src/agentic_dynamics/measurement/perturb.py`
 Multi-session stories live in `src/agentic_dynamics/runtime/story.py` (`BUILTIN_STORIES`); the spec/compiler layer (`experiments/definitions/*.yaml` + `workflows/**/*.yaml`) declares `workflow`, `factors`, `rules`, and `adapt`. Note the load-bearing rule: a control rule (policy arm) whose `requires` are not instrumented will be refused by the compiler — instrument the fields first.
 
 ### I Want to Add a Lab Book
-Lab books are `experiments/lab_books/lab_*.md` (the plan) + `scripts/lab_*.py` (the implementation), consuming `_results_summary.json` and trajectory data.
+Lab books are `experiments/lab_books/lab_*.md` (the plan) + `scripts/lab_*.py` (the implementation), consuming the canonical registry corpus (`agentic_dynamics.reporting.canonical_corpus`) and trajectory data. `experiments/results/_results_summary.json` is retired — a lab that reaches it is quarantined by `tests/test_lab_manifest.py`, never published.
 
 ### I Found a Bug or Have a Feature Idea
 Open a GitHub issue. Be specific: what you expected, what happened, and how to reproduce it.
