@@ -522,10 +522,19 @@ def derive_status(
     # P1: the LATEST certifying run is awaiting operator approval — a designed pause.
     if certifying and certifying[-1].awaiting:
         return "awaiting_approval"
+    # The split-run guard (engine_gaps_followups g1, F5): completion is never derived
+    # from `any(ok is True)` alone. A run family whose evidence is split across a resume
+    # (parent failed/timed out at w2, child resumed w3+w4) has BOTH runs certifying the
+    # same revision — and a FAILED member means no single run executed the full revision
+    # successfully. A failed certifying run blocks completion: the spec reads failed (or
+    # the more specific blocked/runnable below) until a full-coverage run of the current
+    # revision succeeds with no failed member in the family. An AWAITING member (ok False
+    # + awaiting True) is a designed stop, not a failure — it never blocks completion on
+    # its own (a pause predating a later success is shadowed by that success).
+    if any(run.ok is False and not run.awaiting for run in certifying):
+        return "failed"
     if any(run.ok is True for run in certifying):
         return "completed"
-    if any(run.ok is False for run in certifying):
-        return "failed"
     if certifying:
         return "blocked"
     # No run certifies the current revision.

@@ -340,8 +340,16 @@ def test_awaiting_approval_is_a_distinct_open_status_in_the_table(tmp_path: Path
 
 def test_nonrepeatable_workflow_with_a_successful_run_is_completed():
     assert derive_status(_workflow(), runs=[_run(True)]) == "completed"
-    # Once completed, a later failed re-run must not un-complete the one-shot.
-    assert derive_status(_workflow(), runs=[_run(True), _run(False)]) == "completed"
+    # The split-run guard (engine_gaps_followups g1, F5): a later FAILED re-run of the
+    # same revision is evidence the workflow failed — it must NOT stay completed. The old
+    # `any(ok is True)` semantic let a failed member hide under an earlier success; a
+    # non-repeatable workflow whose latest evidence includes a definitive failure reads
+    # failed until a full-coverage run succeeds with no failed member.
+    assert derive_status(_workflow(), runs=[_run(True), _run(False)]) == "failed"
+    # An awaiting pause predating a later success is shadowed by that success (unchanged).
+    assert derive_status(
+        _workflow(), runs=[_run(False, awaiting=True), _run(True)]
+    ) == "completed"
 
 
 def test_nonrepeatable_workflow_respects_authored_status_and_supersession():
