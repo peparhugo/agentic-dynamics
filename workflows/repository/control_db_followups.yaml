@@ -1,0 +1,379 @@
+name: control_db_followups
+question: >-
+  Close the accepted residual scope of the control_db_publication wave (the deep-review
+  P1/P2 work, merged 2026-09-02 as PR #11). The wave's own adversarial review (p7,
+  flash) recorded three residuals and the operator verdict added two re-points. This
+  spec lands them: (f1) re-point the `--resume` fallback from the run LEDGER to the
+  control db's step_attempts — the last ledger-as-authority path in the run-state
+  chain (review F4); (f2) route the opt-in `emit_self` phase-emit through the OUTBOX
+  instead of publishing to the knowledge stream directly — at-least-once everywhere,
+  no dormant bypass (review F6); (f3) make `publish release --dry-run` default to a
+  no-touch rehearsal (skip the data.js regeneration unless --build is explicit) and
+  snapshot/restore data.js when a build IS requested — a dry run must never dirty the
+  tree (review F5); (f4) re-point the Control Room's status routes and supervise.py's
+  assessment inputs to the ONE control packet (control-status/v1) — the portal reads
+  the same authoritative surface the master controller reads, never a parallel
+  Redis/session reading (the review verdict's operator item 2, engine-side half);
+  (f5) prove the control packet is the single source for the portal by making the
+  Control Room's /api/status (or its equivalent) a thin wrapper over
+  `agentic-dynamics control status --json` with the packet's schema validation —
+  a portal route and the packet cannot disagree because they are the same code path.
+version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: false
+repeatable: false
+# NOTE: no authored operational status — derived from run evidence (the P2-1 principle
+# this wave's spec landed).
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: false
+    context:
+      domain_context: >-
+        canonical_sources: [src/agentic_dynamics/control/control_db.py (the
+        orchestrator-owned SQLite control db — step_attempts is the authoritative
+        per-phase run record), src/agentic_dynamics/control/outbox.py (the at-least-once
+        emission path — the parent's terminal write + the publisher's ack-then-mark),
+        src/agentic_dynamics/control/control_status.py (the ONE control packet,
+        control-status/v1 + CONTROL_STATUS_SCHEMA + validate_packet),
+        src/agentic_dynamics/runtime/workflow_runner.py (the ONE engine —
+        `_completed_phases_from_index` at workflow_runner.py:924 is the --resume
+        ledger fallback F4 targets; `_emit_self_finding` at workflow_runner.py:908 is
+        the direct-emit path F2 targets), src/agentic_dynamics/control/control_db.py
+        step_attempts + reconstruct_run (the fallback's replacement source),
+        scripts/publish_release.py (the ONE publication command — the --dry-run build
+        side effect F3 targets), scripts/publish_release.py main() step 3 (the build
+        call), apps/control_room/routes/telemetry.py (the portal's /api/projections is
+        already on the watermark surface — the status routes are not yet),
+        scripts/supervise.py (the supervisor's MONITOR_ROLE inputs), the control_db_
+        publication adversarial review (docs/reviews/control_db_publication_adversarial.md:
+        F4/F5/F6 + the operator verdict), and the merged control_db_publication spec].
+        policies: [one_durable_state, outbox_before_emit, control_packet_every_turn,
+        regenerate_never_hand_edit, publication_is_one_transaction, authority_absolute].
+      challenge_context: >-
+        challenge: the wave's own adversarial review proved the control db is
+        authoritative for the runs it records — but three ledger/Redis-bypass edges
+        survive, and each is a small authority leak: `--resume` decides what to skip
+        from the run LEDGER (a partial child ledger from a pre-fix run, or an edited
+        one, would steer a resume); the opt-in emit_self path publishes to the
+        knowledge stream without the outbox's ack-then-mark (at-least-once is only
+        "everywhere" if the dormant path also uses it); `publish release --dry-run`
+        regenerates the TRACKED data.js (a rehearsal that dirties the tree is a
+        rehearsal no operator can trust — and the suite's injected fakes hide it);
+        and the Control Room's status routes + the supervisor read Redis/session
+        files while the master reads the packet — the same run state, two readings,
+        the exact disagreement class the wave exists to end.
+        deliberation: [the resume re-point first (f1 — the one engine reads the one
+        db), then the emit_self outbox route (f2 — no dormant bypass), then the
+        no-touch dry run (f3 — the publication command's rehearsal contract), then
+        the portal re-point (f4 + f5 — the packet as the single surface)].
+        session_policy: {default: continue}
+      current_state: >-
+        MEASURED (2026-09-02): control_db_publication merged to main at ec3eb1c13;
+        `agentic-dynamics control status --json` exists and renders control-status/v1;
+        the p8 test gate ran 401 green; the adversarial review is committed
+        (docs/reviews/control_db_publication_adversarial.md) recording F4-F6 + the
+        operator verdict. The four edges this spec closes are all present: the --resume
+        fallback reads the ledger via the spec index's results_pointer; emit_self
+        publishes directly (default OFF, dormant); publish release --dry-run builds
+        unless --skip-build (dirtying tracked data.js); the portal's status routes and
+        supervise.py still read Redis/session files.
+      hard_rules: >-
+        (1) ONE DURABLE STATE: the control db decides run state. f1 removes the LAST
+        ledger-as-authority path in the run-state chain — after this spec, no
+        run-state decision reads the run ledger (the ledger remains an archival
+        projection, never a source).
+        (2) OUTBOX BEFORE EMIT: after f2, every knowledge emission in the codebase —
+        terminal, opt-in, or dormant — goes through the outbox's at-least-once path
+        or is explicitly documented as bypassing it with a reason. No silent direct
+        publish_event calls in run-state code.
+        (3) CONTROL PACKET EVERY TURN: after f4/f5, the Control Room's status routes
+        and the supervisor's assessment inputs read control-status/v1 — the same
+        schema-validated surface the master reads. A portal route and the packet
+        cannot disagree because they share the code path.
+        (4) PUBLICATION REHEARSAL IS NO-TOUCH: after f3, `publish release --dry-run`
+        leaves the working tree byte-identical (verified by the test: git status
+        before == after). --build is the explicit opt-in to regenerate data.js, and
+        even then the tree is restored before the dry run ends.
+        (5) REGENERATE, NEVER HAND-EDIT (unchanged): generated surfaces regenerate
+        through their generators; `_gen_instructions.py --check` stays green.
+        (6) AUTHORITY ABSOLUTE (unchanged): the promoter alone updates main; the
+        publisher deploys only receipt-covered artifacts.
+    phases:
+      - name: f0_pin_spec
+        kind: agent
+        scope: implementation
+        timeout: 3600
+        prompt: |
+          GOAL: {goal}
+          ROLE: verification — the house pin convention (the wave's own p0 pattern).
+          Write docs/reviews/control_db_followups_preregistration.md carrying:
+          (a) this spec's file SHA256 (sha256sum workflows/repository/
+          control_db_followups.yaml) + the worktree git sha; (b) the four current-state
+          edges VERIFIED against the actual code, not copied from the spec:
+          (1) workflow_runner._completed_phases_from_index reads the run ledger via
+          the spec index's results_pointer (find the line); (2) _emit_self_finding
+          calls publish_event directly (find the call); (3) publish release --dry-run
+          runs build() unless --skip-build (find the branch); (4) the Control Room's
+          status routes + supervise.py read Redis/session files, not the packet (find
+          the reads). An edge that does not hold as described is a FAILED finding —
+          record the deviation and fail.
+          DELIVER: the preregistration with the four verified edges, committed with
+          the '[workflow] f0_pin_spec — <goal prefix>' subject.
+          LOG: PASS/FAIL per claim; commit.
+      - name: f1_resume_repoint
+        kind: agent
+        scope: implementation
+        timeout: 7200
+        prompt: |
+          GOAL: {goal}
+          SHAPE: the ONE engine reads the ONE db. Re-point the --resume fallback:
+          _completed_phases_from_index (workflow_runner.py:924) currently reads the
+          latest run ledger via the spec index's results_pointer to decide which
+          phases are ok/skippable. Replace the ledger read with the control db's
+          step_attempts: a phase is skippable when the control db records a
+          succeeded step_attempt for (spec, phase) in the latest run of this
+          candidate, or — when the control db has no run for this worktree — the
+          existing git-log primary path applies unchanged. The fallback chain becomes:
+          git-log commits (primary, unchanged) -> control-db step_attempts (the
+          replacement) — the run ledger is NEVER consulted for a resume decision.
+          SCOPE FENCE: this phase delivers ONLY the resume re-point — no other
+          ledger reads, no portal work, no publication changes. All commits carry
+          '[workflow] f1_resume_repoint'.
+          VERIFY (both directions): unit tests prove (a) a run recorded in the control
+          db (succeeded step_attempts) resumes past those phases WITHOUT the ledger
+          file existing (delete it — the old path would have refused or skipped
+          wrongly); (b) with no control-db run and no git-log commits, resume starts
+          from the first phase; (c) a FAILED step_attempt is NOT skipped; (d) the
+          ledger file is never opened by the resume path (assert via a missing-file
+          probe: resume succeeds with the ledger absent). Existing resume tests stay
+          green.
+          DELIVER: the re-point + the tests, committed.
+          LOG: PASS/FAIL; commit.
+      - name: f2_emit_self_outbox
+        kind: agent
+        scope: implementation
+        timeout: 7200
+        prompt: |
+          GOAL: {goal}
+          SHAPE: no dormant bypass. Route the opt-in emit_self path through the
+          outbox: _emit_self_finding (workflow_runner.py:908) currently calls
+          knowledge_ingestion.emit_phase_finding -> publish_event directly when
+          rag_params.emit_self is true. Change it to enqueue the same event into the
+          outbox (the parent's emission path) so the publisher's ack-then-mark
+          applies — at-least-once everywhere. The event payload and the pointer
+          envelope are unchanged (the consumer groups see the same shape); only the
+          delivery path differs. emit_self stays opt-in and default OFF, but when it
+          IS enabled it is no longer fire-and-forget.
+          SCOPE FENCE: ONLY the emit_self delivery path — no changes to the outbox
+          publisher itself, no changes to other emission call sites (those already
+          route through the outbox after the wave). Commits carry
+          '[workflow] f2_emit_self_outbox'.
+          VERIFY (both directions): unit tests prove (a) with emit_self on, the
+          finding lands in the outbox (a pending row exists) and is delivered
+          at-least-once (ack-then-mark: a crash between ack and mark redelivers —
+          reuse the wave's redelivery test pattern); (b) with emit_self off (default),
+          nothing is enqueued; (c) the knowledge consumer groups still receive the
+          same event shape (the pointer envelope unchanged).
+          DELIVER: the outbox route + the tests, committed.
+          LOG: PASS/FAIL; commit.
+      - name: f3_dry_run_no_touch
+        kind: agent
+        scope: implementation
+        timeout: 7200
+        prompt: |
+          GOAL: {goal}
+          SHAPE: a rehearsal never dirties the tree. publish_release.main() step 3
+          currently runs build() unless --skip-build — so `--dry-run` (no flags)
+          regenerates the TRACKED apps/website/data.js. Flip the default: `--dry-run`
+          performs NO build unless --build is explicit; and when a build IS run
+          (--build or a real publication), snapshot data.js + the manifest before
+          and restore them after the dry run ends (the dry run is a rehearsal, not a
+          publish). Real publications (with --operator) build normally and ship the
+          built artifacts — no restore. The flag vocabulary: --dry-run (no-touch by
+          default), --dry-run --build (build, verify, restore), real publish (build
+          and ship). Remove --skip-build or keep it as a deprecated alias of the new
+          default — your call, documented.
+          SCOPE FENCE: ONLY the publish_release dry-run/build semantics — no receipt
+          changes, no deploy changes, no other commands. Commits carry
+          '[workflow] f3_dry_run_no_touch'.
+          VERIFY (both directions): unit tests prove (a) `--dry-run` with no build
+          flag leaves the working tree byte-identical (git status + data.js sha256
+          before == after); (b) `--dry-run --build` regenerates then RESTORES (sha256
+          after == before, even though the build ran); (c) a real publish (--operator)
+          ships the built data.js (no restore — the deployed tree is the built tree);
+          (d) the suite's injected-builder tests still pass (the fake builder's
+          output is snapshotted and restored like the real one).
+          DELIVER: the no-touch default + the snapshot/restore + the tests, committed.
+          LOG: PASS/FAIL; commit.
+      - name: f4_portal_repoint
+        kind: agent
+        scope: implementation
+        timeout: 7200
+        prompt: |
+          GOAL: {goal}
+          SHAPE: the portal reads the ONE packet. Re-point the Control Room's status
+          routes and supervise.py's assessment inputs to control-status/v1:
+          (a) apps/control_room/routes/telemetry.py's status route (and any other
+          run-state route that still reads Redis/session files) becomes a thin
+          wrapper over the packet — build the packet (control_status.build_packet)
+          and render it; the route and `agentic-dynamics control status --json`
+          share the code path by construction; (b) scripts/supervise.py's
+          MONITOR_ROLE assessment inputs read the packet for run-state facts
+          (active_runs, awaiting_approvals, failed_runs, unhealthy_workers,
+          projection_lag) instead of Redis/session files — the supervisor's
+          on-task/safety/budget/loops assessment uses packet facts. Keep the
+          packet read-only (the supervisor remains observe-only — it never steers).
+          SCOPE FENCE: the portal routes + supervise.py inputs ONLY — no packet
+          schema changes, no supervisor verdict semantics changes, no other portal
+          routes (design sessions / claude agents stay as they are). Commits carry
+          '[workflow] f4_portal_repoint'.
+          VERIFY (both directions): unit tests prove (a) the portal status route
+          returns the packet's fields (a seeded control db -> the route renders
+          active_runs/awaiting_approvals/projection_lag from the db, and a missing
+          db renders the distinct unavailable state, not an empty packet); (b)
+          supervise.py's assessment reads packet fields (injected packet -> the
+          assessment cites active_runs/awaiting counts); (c) the existing portal
+          route tests stay green (the route's OUTPUT shape is unchanged, only its
+          source).
+          DELIVER: the re-point + the tests, committed.
+          LOG: PASS/FAIL; commit.
+      - name: f5_packet_single_surface
+        kind: agent
+        scope: implementation
+        timeout: 7200
+        prompt: |
+          GOAL: {goal}
+          SHAPE: prove the packet is the single surface. The f4 re-point made the
+          portal read the packet's internals; f5 makes the SHARING structural: the
+          Control Room's /api/status route (or the route f4 re-pointed) must
+          validate its render against CONTROL_STATUS_SCHEMA via validate_packet —
+          the same validation `control status --json` applies — so a portal render
+          that violates the contract is a 500, not a silent drift. Add a guard test:
+          the portal route and the packet builder, seeded identically, cannot
+          disagree (render both, validate both, diff the run-state fields).
+          SCOPE FENCE: the schema validation + the guard test ONLY — no route
+          behavior changes beyond the validation, no new endpoints. Commits carry
+          '[workflow] f5_packet_single_surface'.
+          VERIFY (both directions): unit tests prove (a) a deliberately broken
+          packet (mutate a field the schema constrains, e.g. schema id) fails
+          validate_packet in BOTH the CLI path and the portal route path (the shared
+          validation is actually shared — monkeypatch one, the other fails too);
+          (b) the seeded-db guard test: portal render fields == packet fields for
+          active_runs / awaiting_approvals / projection_lag / safe_actions.
+          DELIVER: the shared validation + the guard test, committed.
+          LOG: PASS/FAIL; commit.
+      - name: f6_adversarial
+        kind: agent
+        scope: adversarial_readonly
+        requires_deliverable: true
+        run_model: deepseek/deepseek-v4-flash
+        timeout: 14400
+        prompt: |
+          GOAL: {goal}
+          ROLE: the INDEPENDENT adversarial reviewer — a DIFFERENT model and session
+          (flash vs the author, the house independence convention). You are NOT the
+          author: your job is to falsify the follow-up wave, not certify it. Attack
+          in order, each re-verified against the actual code (never asserted):
+          (1) f1 — is the run ledger STILL consulted anywhere in a resume decision?
+          does a missing ledger file with a control-db run resume correctly? a
+          failed step_attempt is never skipped? (2) f2 — does ANY code path still
+          call publish_event directly for a run-state emission? is the emit_self
+          event's pointer envelope byte-compatible with what the consumer groups
+          expect? (3) f3 — does --dry-run leave the tree byte-identical (probe:
+          git status + data.js sha256 before/after)? does a real publish still ship
+          the BUILT data.js? (4) f4/f5 — does ANY portal status route or supervisor
+          input still read Redis/session files for run-state facts? does a broken
+          packet 500 in BOTH paths (the shared validation is actually shared)?
+          Every finding: FIX on the branch or RECORD as an accepted limitation with
+          reasoning. At least 3 findings or a clean sweep with re-verification
+          evidence — a bare PASS is a failed review.
+          RELEASE VERDICT: is the follow-up branch merge-ready to main, and what
+          must the operator do after merge (the publication-gate arming + the CI
+          check promotion are P0 controller actions — name them, do not do them).
+          DELIVER: docs/reviews/control_db_followups_adversarial.md (finding table:
+          finding / attack / re-verification evidence / fix-or-record / residual
+          scope), committed.
+          LOG: finding table; PASS/FAIL; commit.
+      - name: f7_test_gate
+        kind: test
+        scope: implementation
+        timeout: 900
+        # The independent harness test gate (fail-closed): run_suite records
+        # test_executed_success — never self-report. Scoped to the surfaces this
+        # spec touches: the follow-up fixes' tests, the wave's control surfaces,
+        # the generator + surface guards, the CLI resolution, and the spawn contract.
+        tests:
+          - tests/test_workflow_runner.py
+          - tests/test_outbox.py
+          - tests/test_publish_release.py
+          - tests/test_control_status.py
+          - tests/test_control_room_paths.py
+          - tests/test_supervise.py
+          - tests/test_agent_config_render.py
+          - tests/test_doc_lifecycle.py
+          - tests/test_script_classification.py
+          - tests/test_cli_resolution.py
+          - tests/test_spawn_wrapper.py
+factors:
+  - {name: model, levels: [anthropic/claude-opus-5]}
+design: factorial
+rules:
+  - name: followup_spec_pinned
+    plane: measurement
+    evidence_class: "[M]"
+    requires: []
+    produces: [edges_verified]
+  - name: resume_reads_control_db
+    plane: measurement
+    evidence_class: "[C]"
+    requires: [edges_verified]
+    produces: [ledger_never_consulted_for_resume]
+  - name: emit_self_via_outbox
+    plane: measurement
+    evidence_class: "[C]"
+    requires: [edges_verified]
+    produces: [no_direct_emit_in_run_state]
+  - name: dry_run_no_touch
+    plane: measurement
+    evidence_class: "[C]"
+    requires: [edges_verified]
+    produces: [rehearsal_tree_byte_identical]
+  - name: portal_reads_packet
+    plane: measurement
+    evidence_class: "[C]"
+    requires: [ledger_never_consulted_for_resume, no_direct_emit_in_run_state, rehearsal_tree_byte_identical]
+    produces: [portal_supervisor_on_packet]
+  - name: packet_single_surface
+    plane: measurement
+    evidence_class: "[C]"
+    requires: [portal_supervisor_on_packet]
+    produces: [shared_validation_structural]
+  - name: followup_adversarial_reviewed
+    plane: measurement
+    evidence_class: "[M]"
+    requires: [shared_validation_structural]
+    produces: [followup_wave_adversarial_clean]
+  - name: test_gate_measured
+    plane: measurement
+    evidence_class: "[M]"
+    requires: [test_executed_success]
+    produces: [independent_gate_recorded]
+metrics:
+  - {name: edges_verified, agg: mean, over: cell}
+  - {name: ledger_never_consulted_for_resume, agg: mean, over: cell}
+  - {name: no_direct_emit_in_run_state, agg: mean, over: cell}
+  - {name: rehearsal_tree_byte_identical, agg: mean, over: cell}
+  - {name: portal_supervisor_on_packet, agg: mean, over: cell}
+  - {name: shared_validation_structural, agg: mean, over: cell}
+  - {name: followup_wave_adversarial_clean, agg: mean, over: cell}
+  - {name: independent_gate_recorded, agg: mean, over: cell}
+writeup:
+  format: lab_book
+  sections: [question, f0_pin_spec, f1_resume_repoint, f2_emit_self_outbox, f3_dry_run_no_touch, f4_portal_repoint, f5_packet_single_surface, f6_adversarial, f7_test_gate]
+stop: {budget_usd: 12.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}
