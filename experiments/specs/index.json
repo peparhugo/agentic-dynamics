@@ -1,6 +1,6 @@
 {
   "schema_version": "spec-status/v2",
-  "generated_at": "2026-09-02T16:50:56.267010+00:00",
+  "generated_at": "2026-09-02T16:53:17.526736+00:00",
   "n_specs": 181,
   "specs": [
     {
@@ -19,7 +19,29 @@
       "latest_cost_usd": 0.147052,
       "latest_git_sha": "01517934f",
       "results_pointer": "experiments/results/workflows/auto_posthoc_wiring/20260817T161730Z.json",
-      "n_runs": 1
+      "n_runs": 1,
+      "workflow_revision_id": "8e96bc83ce0abe3ae062469ee4dce4cd6f88232800cafc42f597ed94961b3f35",
+      "authored_status": null
+    },
+    {
+      "name": "automatic_docs_sync",
+      "version": "0.1",
+      "status": "runnable",
+      "spec_path": "workflows/repository/automatic_docs_sync.yaml",
+      "artifact_kind": "workflow",
+      "repeatable": false,
+      "supersedes": [],
+      "superseded_by": null,
+      "completed_at": null,
+      "last_run_at": null,
+      "latest_ok": null,
+      "latest_model": null,
+      "latest_cost_usd": null,
+      "latest_git_sha": null,
+      "results_pointer": null,
+      "n_runs": 1,
+      "workflow_revision_id": "ed327d9f665f1ec7f0516189c4712f83820d829306c355fdfc2d310c4de1e76f",
+      "authored_status": null
     },
     {
       "name": "cap_2a_calibration_cell",
@@ -37,7 +59,9 @@
       "latest_cost_usd": null,
       "latest_git_sha": null,
       "results_pointer": null,
-      "n_runs": 0
+      "n_runs": 0,
+      "workflow_revision_id": "9bf077b867a0beb2947cb7e764ae96e7837823a19d5db7c26b7dbb10e5137688",
+      "authored_status": null
     },
     {
       "name": "cap_2a_calibration_cell_divide",
@@ -55,7 +79,9 @@
       "latest_cost_usd": null,
       "latest_git_sha": null,
       "results_pointer": null,
-      "n_runs": 0
+      "n_runs": 0,
+      "workflow_revision_id": "49c5022b6356e36ecf4c6f46e6a908d2be0ad2afe99886f61f05d70ea6312af4",
+      "authored_status": null
     },
     {
       "name": "cap_2a_cell_clean",
@@ -73,7 +99,9 @@
       "latest_cost_usd": null,
       "latest_git_sha": null,
       "results_pointer": null,
-      "n_runs": 0
+      "n_runs": 0,
+      "workflow_revision_id": "37561af2784a916f0210d96ab04a578b066209e02cf520c5692db5fd6e4f2a6b",
+      "authored_status": null
     },
     {
       "name": "cap_2a_cell_critical",
@@ -91,7 +119,9 @@
       "latest_cost_usd": null,
       "latest_git_sha": null,
       "results_pointer": null,
-      "n_runs": 0
+      "n_runs": 0,
+      "workflow_revision_id": "4fb42d512dea55165a968ba975b531a6247386e88fe4e765c9ca7f3d9651f8cb",
+      "authored_status": null
     },
     {
       "name": "cap_2a_cell_style",
@@ -109,7 +139,9 @@
       "latest_cost_usd": null,
       "latest_git_sha": null,
       "results_pointer": null,
-      "n_runs": 0
+      "n_runs": 0,
+      "workflow_revision_id": "41cbcedc612a38dc085177d96a134778ca3e1af6dcb2f5ce28a169de139f091e",
+      "authored_status": null
     },
     {
       "name": "cap_2c_cell_absent",
@@ -127,7 +159,9 @@
       "latest_cost_usd": null,
       "latest_git_sha": null,
       "results_pointer": null,
-      "n_runs": 0
+      "n_runs": 0,
+      "workflow_revision_id": "06bc281a06b0cc16746474f7d464927363ecb4b2b06c26969e44c29b0fbe7a84",
+      "authored_status": null
     },
     {
       "name": "cap_2c_cell_competing",
@@ -145,7 +179,9 @@
       "latest_cost_usd": null,
       "latest_git_sha": null,
       "results_pointer": null,
-      "n_runs": 0
+      "n_runs": 0,
+      "workflow_revision_id": "111a51a9c2bfedbf4eb73cb52f233b3553f362b56905ff2281ded818c20181c4",
+      "authored_status": null
     },
     {
       "name": "cap_2c_cell_incorrect",
@@ -163,7 +199,9 @@
       "latest_cost_usd": null,
       "latest_git_sha": null,
       "results_pointer": null,
-      "n_runs": 0
+      "n_runs": 0,
+      "workflow_revision_id": "40835a6a46a873d00f8fd8d5eb7ce1f42a3470ee5d40ac310ba61924fd9e99d8",
+      "authored_status": null
     },
     {
       "name": "cap_2c_cell_unseen_family",
@@ -181,7 +219,9 @@
       "latest_cost_usd": null,
       "latest_git_sha": null,
       "results_pointer": null,
-      "n_runs": 0
+      "n_runs": 0,
+      "workflow_revision_id": "eceec59f7c3ae611b1569b44182046c2ef1e970f72666558fa81e16e41731f87",
+      "authored_status": null
     },
     {
       "name": "cap_2d_cell_harmful_partial",
@@ -199,7 +239,9 @@
       "latest_cost_usd": null,
       "latest_git_sha": null,
       "results_pointer": null,
-      "n_runs": 0
+      "n_runs": 0,
+      "workflow_revision_id": "d68de9f8ad590b1f66565164aa64f56d19e5c7de7a443fd8e4efd284a32ffe9a",
+      "authored_status": null
     },
     {
       "name": "cap_2d_cell_incorrect_rebuilt",
@@ -217,7 +259,9 @@
       "latest_cost_usd": null,
       "latest_git_sha": null,
       "results_pointer": null,
-      "n_runs": 0
+      "n_runs": 0,
+      "workflow_revision_id": "acaae0313c6f6877afc32310ad84423c8cde7e432e1d56920793730dab1e5f73",
+      "authored_status": null
     },
     {
       "name": "cap_2e_cell_unseen_family",
@@ -235,7 +279,9 @@
       "latest_cost_usd": null,
       "latest_git_sha": null,
       "results_pointer": null,
-      "n_runs": 0
+      "n_runs": 0,
+      "workflow_revision_id": "589e442e1710977692f4209d4cbd488fe0e26ed1c7f6ecfbf3941b74a728be04",
+      "authored_status": null
     },
     {
       "name": "cap_2f_cell_trivial_clean",
@@ -253,7 +299,9 @@
       "latest_cost_usd": null,
       "latest_git_sha": null,
       "results_pointer": null,
-      "n_runs": 0
+      "n_runs": 0,
+      "workflow_revision_id": "1effe001c6a29091d7b8912a585ef518ef76af047bfc95d07356ba5629a4e876",
+      "authored_status": null
     },
     {
       "name": "cap_confidence_cascade",
@@ -271,7 +319,9 @@
       "latest_cost_usd": null,
       "latest_git_sha": null,
       "results_pointer": null,
-      "n_runs": 0
+      "n_runs": 0,
+      "workflow_revision_id": "de4fdd8e03b2841a563116f642c87789d2eb630ba30e36c2509abc232b604008",
+      "authored_status": null
     },
     {
       "name": "cap_coverage_routing_impact",
@@ -289,7 +339,9 @@
       "latest_cost_usd": null,
       "latest_git_sha": null,
       "results_pointer": null,
-      "n_runs": 0
+      "n_runs": 0,
+      "workflow_revision_id": "c4f939eff90ddb8b591ea765407eefc1ff047a05724a34cd7ed85dd597262569",
+      "authored_status": null
     },
     {
       "name": "cap_escalation_fix",
@@ -307,7 +359,9 @@
       "latest_cost_usd": null,
       "latest_git_sha": null,
       "results_pointer": null,
-      "n_runs": 0
+      "n_runs": 0,
+      "workflow_revision_id": "117cc336c379e168b0aecfe3bcbb383bea10d034492aaea90dcf1502f950aa4f",
+      "authored_status": null
     },
     {
       "name": "cap_grit_strength_grid",
@@ -325,7 +379,9 @@
       "latest_cost_usd": null,
       "latest_git_sha": null,
       "results_pointer": null,
-      "n_runs": 0
+      "n_runs": 0,
+      "workflow_revision_id": "07b758420c1571ae554ea68269bb87ed59b5fe0544c556506dc4056d9df4d363",
+      "authored_status": null
     },
     {
       "name": "cap_session_policy_cell",
@@ -343,7 +399,9 @@
       "latest_cost_usd": null,
       "latest_git_sha": null,
       "results_pointer": null,
-      "n_runs": 0
+      "n_runs": 0,
+      "workflow_revision_id": "42964f44d6f27a0577281029e05f945988093e22eceebf964afa94c7d160837c",
+      "authored_status": null
     },
     {
       "name": "cap_session_routing_evidence",
@@ -361,7 +419,9 @@
       "latest_cost_usd": null,
       "latest_git_sha": null,
       "results_pointer": null,
-      "n_runs": 0
+      "n_runs": 0,
+      "workflow_revision_id": "ab88abd77765b3b162ec72a4f0774552110058b5ccfa3551c78a814b2ea26a88",
+      "authored_status": null
     },
     {
       "name": "cap_shadow_comparison",
@@ -379,7 +439,29 @@
       "latest_cost_usd": null,
       "latest_git_sha": null,
       "results_pointer": null,
-      "n_runs": 0
+      "n_runs": 0,
+      "workflow_revision_id": "bb30eaab8878da9aad79862bda102f34255fa323d18c2af88b0c3e722525e67c",
+      "authored_status": null
+    },
+    {
+      "name": "control_room_live_board",
+      "version": "0.1",
+      "status": "runnable",
+      "spec_path": "workflows/repository/control_room_live_board.yaml",
+      "artifact_kind": "workflow",
+      "repeatable": false,
+      "supersedes": [],
+      "superseded_by": null,
+      "completed_at": null,
+      "last_run_at": null,
+      "latest_ok": null,
+      "latest_model": null,
+      "latest_cost_usd": null,
+      "latest_git_sha": null,
+      "results_pointer": null,
+      "n_runs": 1,
+      "workflow_revision_id": "34b1b082c219c1e093a409abb753204d6adac926c9ca0fa6c3f80ce5829e0a1b",
+      "authored_status": null
     },
     {
       "name": "delta_entropy_response_campaign",
@@ -397,7 +479,29 @@
       "latest_cost_usd": null,
       "latest_git_sha": null,
       "results_pointer": null,
-      "n_runs": 0
+      "n_runs": 0,
+      "workflow_revision_id": "7d5c48c87a98b92bb73e4c3533845a4eca20e7bd3dbd0773010b29c724f2ed36",
+      "authored_status": null
+    },
+    {
+      "name": "docs_refresh_remediation",
+      "version": "0.1",
+      "status": "runnable",
+      "spec_path": "workflows/repository/docs_refresh_remediation.yaml",
+      "artifact_kind": "workflow",
+      "repeatable": false,
+      "supersedes": [],
+      "superseded_by": null,
+      "completed_at": null,
+      "last_run_at": null,
+      "latest_ok": null,
+      "latest_model": null,
+      "latest_cost_usd": null,
+      "latest_git_sha": null,
+      "results_pointer": null,
+      "n_runs": 2,
+      "workflow_revision_id": "77622a5f2200e11ed048b6cf6dfe0441ae6911c5bcf5bbce206d8cd75f21b22a",
+      "authored_status": null
     },
     {
       "name": "explanation_tax",
@@ -415,7 +519,9 @@
       "latest_cost_usd": null,
       "latest_git_sha": null,
       "results_pointer": null,
-      "n_runs": 0
+      "n_runs": 0,
+      "workflow_revision_id": "e78ea1e00b6cd6ab0c1e898e65bf55bdf74399cdf6de75c30c0aa58395ea5688",
+      "authored_status": null
     },
     {
       "name": "finding_economics_closure",
@@ -433,7 +539,49 @@
       "latest_cost_usd": 1.282006,
       "latest_git_sha": "92374fb57",
       "results_pointer": "experiments/results/workflows/finding_economics_closure/20260822T172225Z.json",
-      "n_runs": 1
+      "n_runs": 1,
+      "workflow_revision_id": "41894b66b07f931028376406fa3dedbc898287939375e757fdd789896411252e",
+      "authored_status": null
+    },
+    {
+      "name": "fleet_job_submission",
+      "version": "0.1",
+      "status": "runnable",
+      "spec_path": "workflows/repository/fleet_job_submission.yaml",
+      "artifact_kind": "workflow",
+      "repeatable": false,
+      "supersedes": [],
+      "superseded_by": null,
+      "completed_at": null,
+      "last_run_at": null,
+      "latest_ok": null,
+      "latest_model": null,
+      "latest_cost_usd": null,
+      "latest_git_sha": null,
+      "results_pointer": null,
+      "n_runs": 3,
+      "workflow_revision_id": "cf93e0622d640d161befd79913d18a97861c66de37f971541ed8f8b22901c422",
+      "authored_status": "completed"
+    },
+    {
+      "name": "green_main_closure",
+      "version": "0.1",
+      "status": "runnable",
+      "spec_path": "workflows/repository/green_main_closure.yaml",
+      "artifact_kind": "workflow",
+      "repeatable": false,
+      "supersedes": [],
+      "superseded_by": null,
+      "completed_at": null,
+      "last_run_at": null,
+      "latest_ok": null,
+      "latest_model": null,
+      "latest_cost_usd": null,
+      "latest_git_sha": null,
+      "results_pointer": null,
+      "n_runs": 4,
+      "workflow_revision_id": "c1a723661b7468811d44b16d1ee95e3497c2103fd1c3edd50859a6fea3e141b2",
+      "authored_status": null
     },
     {
       "name": "labbook_refresh",
@@ -451,7 +599,9 @@
       "latest_cost_usd": 0.027463,
       "latest_git_sha": "df84d28a1",
       "results_pointer": "experiments/results/workflows/labbook_refresh/20260817T181452Z.json",
-      "n_runs": 1
+      "n_runs": 1,
+      "workflow_revision_id": "2e1d5c5596d32349f0cb09ed7453aedb6331fc8f373d83e0f089274fd2a26f09",
+      "authored_status": null
     },
     {
       "name": "launch_handler_dry_run",
@@ -469,7 +619,9 @@
       "latest_cost_usd": null,
       "latest_git_sha": null,
       "results_pointer": null,
-      "n_runs": 0
+      "n_runs": 0,
+      "workflow_revision_id": "dcf4d07767a116a93f1e262e55a7002f03959b7ed32b2faf684d8c0019159a2a",
+      "authored_status": null
     },
     {
       "name": "ledger_instrumentation_probe",
@@ -487,7 +639,9 @@
       "latest_cost_usd": 0.002,
       "latest_git_sha": "91d4546",
       "results_pointer": "experiments/results/workflows/ledger_instrumentation_probe/20260830T190548Z.json",
-      "n_runs": 1
+      "n_runs": 1,
+      "workflow_revision_id": "d4e3caa624cff4cb50aa2588785c0dbb2676d56e678f8969d8beb55bb868bbfc",
+      "authored_status": null
     },
     {
       "name": "posthoc_pipeline",
@@ -505,7 +659,9 @@
       "latest_cost_usd": null,
       "latest_git_sha": null,
       "results_pointer": null,
-      "n_runs": 0
+      "n_runs": 0,
+      "workflow_revision_id": "13be95143c6f1f9bab72eb504a9c34820c40328f626560aecd1854c4de248e8a",
+      "authored_status": null
     },
     {
       "name": "process_perturbation_resample",
@@ -523,7 +679,9 @@
       "latest_cost_usd": null,
       "latest_git_sha": null,
       "results_pointer": null,
-      "n_runs": 0
+      "n_runs": 0,
+      "workflow_revision_id": "c340c7e80cbefcf5a8ddd188baa5e2442d6dd3481c9f27de182bfed0ffcf4d4c",
+      "authored_status": null
     },
     {
       "name": "public_truth_closure",
@@ -541,7 +699,9 @@
       "latest_cost_usd": 2.048454,
       "latest_git_sha": "174e5c290",
       "results_pointer": "experiments/results/workflows/public_truth_closure/20260821T220319Z.json",
-      "n_runs": 1
+      "n_runs": 1,
+      "workflow_revision_id": "e2b8d4a37b340f46cc6e06128d99e73c495f1c5726be8a530f7f199e0ecfc53b",
+      "authored_status": null
     },
     {
       "name": "queue_steer",
@@ -559,7 +719,9 @@
       "latest_cost_usd": 0.03296,
       "latest_git_sha": "6ddbdc29e",
       "results_pointer": "experiments/results/workflows/queue_steer/20260815T193237Z.json",
-      "n_runs": 1
+      "n_runs": 1,
+      "workflow_revision_id": "154913ed239e695915ffcc8b95000699e7bd5bced5139d1404a373a8a8f29543",
+      "authored_status": null
     },
     {
       "name": "rag_bare_vs_augmented",
@@ -577,7 +739,9 @@
       "latest_cost_usd": null,
       "latest_git_sha": null,
       "results_pointer": null,
-      "n_runs": 0
+      "n_runs": 0,
+      "workflow_revision_id": "dacb1f39ee45fca1e334837c5cb240a3014cbf5399e87fa5f77bdd5dcd3f699c",
+      "authored_status": null
     },
     {
       "name": "registry_canonicalize",
@@ -595,7 +759,29 @@
       "latest_cost_usd": 0.187197,
       "latest_git_sha": "701219316",
       "results_pointer": "experiments/results/workflows/registry_canonicalize/20260819T134254Z.json",
-      "n_runs": 1
+      "n_runs": 1,
+      "workflow_revision_id": "0ae3c511703094801e5ea717efdecaacfe5be4d0ff4942508d03c0be82202943",
+      "authored_status": null
+    },
+    {
+      "name": "retrieval_activation",
+      "version": "0.1",
+      "status": "runnable",
+      "spec_path": "workflows/repository/retrieval_activation.yaml",
+      "artifact_kind": "workflow",
+      "repeatable": false,
+      "supersedes": [],
+      "superseded_by": null,
+      "completed_at": null,
+      "last_run_at": null,
+      "latest_ok": null,
+      "latest_model": null,
+      "latest_cost_usd": null,
+      "latest_git_sha": null,
+      "results_pointer": null,
+      "n_runs": 2,
+      "workflow_revision_id": "cfd6fb33b8f15c30021ea3b073ff504ddb1cdfde0e2375d5e6795b83b7c05c91",
+      "authored_status": null
     },
     {
       "name": "retrieval_activation_augment_proof",
@@ -613,7 +799,29 @@
       "latest_cost_usd": 0.001582,
       "latest_git_sha": "877708cd9",
       "results_pointer": "experiments/results/workflows/retrieval_activation_augment_proof/20260901T044549Z.json",
-      "n_runs": 5
+      "n_runs": 5,
+      "workflow_revision_id": "6682d41eacdf9ab3e83c3875f0fe8a370896d821cfb78d73f2edcc8dd8f76306",
+      "authored_status": null
+    },
+    {
+      "name": "retrieval_fusion_quality",
+      "version": "0.1",
+      "status": "runnable",
+      "spec_path": "workflows/repository/retrieval_fusion_quality.yaml",
+      "artifact_kind": "workflow",
+      "repeatable": false,
+      "supersedes": [],
+      "superseded_by": null,
+      "completed_at": null,
+      "last_run_at": null,
+      "latest_ok": null,
+      "latest_model": null,
+      "latest_cost_usd": null,
+      "latest_git_sha": null,
+      "results_pointer": null,
+      "n_runs": 2,
+      "workflow_revision_id": "7f10b4a60cdf906c2e021bc4269dd58697af43486632bd37a80325d7c390004f",
+      "authored_status": null
     },
     {
       "name": "routing_kb_dispatch",
@@ -631,7 +839,9 @@
       "latest_cost_usd": null,
       "latest_git_sha": null,
       "results_pointer": null,
-      "n_runs": 0
+      "n_runs": 0,
+      "workflow_revision_id": "cbeb16e4bee8e2fcbbf660bfb23c08eb357c6280058bb33ade0edfa5f1087cc9",
+      "authored_status": null
     },
     {
       "name": "routing_kb_experiment_design",
@@ -649,7 +859,9 @@
       "latest_cost_usd": 3.066924,
       "latest_git_sha": "e848e6b57",
       "results_pointer": "experiments/results/workflows/routing_kb_experiment_design/20260817T182824Z.json",
-      "n_runs": 7
+      "n_runs": 7,
+      "workflow_revision_id": "4dde2354b7055aeec0273b49652723dbb2bee26a7c2851e45c8e9b1ec0e8246d",
+      "authored_status": null
     },
     {
       "name": "routing_kb_experiment_design_research",
@@ -667,7 +879,9 @@
       "latest_cost_usd": 0.220304,
       "latest_git_sha": "fbcf0f0a1",
       "results_pointer": "experiments/results/workflows/routing_kb_experiment_design_research/20260817T181255Z.json",
-      "n_runs": 1
+      "n_runs": 1,
+      "workflow_revision_id": "fc57da52ba13a0148835b838b727998b934155ab73dfb6021138ee2cb6a003ae",
+      "authored_status": null
     },
     {
       "name": "routing_regret_under_degradation",
@@ -685,7 +899,9 @@
       "latest_cost_usd": null,
       "latest_git_sha": null,
       "results_pointer": null,
-      "n_runs": 0
+      "n_runs": 0,
+      "workflow_revision_id": "70fbe88a1937fb58492db660bc39227ae3039c5aba9a1efb3dafb27f7744481b",
+      "authored_status": null
     },
     {
       "name": "self_recommending_experiment",
@@ -703,7 +919,29 @@
       "latest_cost_usd": null,
       "latest_git_sha": null,
       "results_pointer": null,
-      "n_runs": 0
+      "n_runs": 0,
+      "workflow_revision_id": "83fc132b6361347f115c5866ed1fa6129e74a23807e389a17a0887d05cf3662d",
+      "authored_status": null
+    },
+    {
+      "name": "test_suite_speed",
+      "version": "0.1",
+      "status": "runnable",
+      "spec_path": "workflows/repository/test_suite_speed.yaml",
+      "artifact_kind": "workflow",
+      "repeatable": false,
+      "supersedes": [],
+      "superseded_by": null,
+      "completed_at": null,
+      "last_run_at": null,
+      "latest_ok": null,
+      "latest_model": null,
+      "latest_cost_usd": null,
+      "latest_git_sha": null,
+      "results_pointer": null,
+      "n_runs": 1,
+      "workflow_revision_id": "56310e8867eefbd0614d9906c2914caadc5c294e571e6351ff43c445560bc1f8",
+      "authored_status": null
     },
     {
       "name": "test_suite_tiering",
@@ -721,7 +959,9 @@
       "latest_cost_usd": null,
       "latest_git_sha": null,
       "results_pointer": null,
-      "n_runs": 0
+      "n_runs": 0,
+      "workflow_revision_id": "5d3d700afa3246aac57ac222f65184547203b2b428273c06515aef30b4afa605",
+      "authored_status": null
     },
     {
       "name": "agentic_dynamics_rebrand",
@@ -739,7 +979,9 @@
       "latest_cost_usd": 7.734139,
       "latest_git_sha": "2f3cbbbbc",
       "results_pointer": "experiments/results/workflows/agentic_dynamics_rebrand/20260814T220247Z.json",
-      "n_runs": 2
+      "n_runs": 2,
+      "workflow_revision_id": "14587d3b77887fa792839ea8ff747f8ef995a4f9e7ba32ba96e255e5819e714c",
+      "authored_status": null
     },
     {
       "name": "cap_adaptive_2d",
@@ -757,7 +999,9 @@
       "latest_cost_usd": 0.049646,
       "latest_git_sha": "6427cc1c0",
       "results_pointer": "experiments/results/workflows/cap_adaptive_2d/20260828T130210Z.json",
-      "n_runs": 3
+      "n_runs": 3,
+      "workflow_revision_id": "dcaf72ddf1363ff5451bf97a3991f474472ab9d109d1a3c1837737f44b1bd493",
+      "authored_status": null
     },
     {
       "name": "cap_site_revamp4_diagrams",
@@ -775,7 +1019,9 @@
       "latest_cost_usd": 0.089742,
       "latest_git_sha": "5eaac84ab",
       "results_pointer": "experiments/results/workflows/cap_site_revamp4_diagrams/20260827T195707Z.json",
-      "n_runs": 3
+      "n_runs": 3,
+      "workflow_revision_id": "1e919a3b0ca981e2e7905080502f85883bbfa881a38ae6510452cab3c6de0a61",
+      "authored_status": null
     },
     {
       "name": "claude_background_sessions",
@@ -793,7 +1039,9 @@
       "latest_cost_usd": 15.447095,
       "latest_git_sha": "0b69db16b",
       "results_pointer": "experiments/results/workflows/claude_background_sessions/20260814T173806Z.json",
-      "n_runs": 1
+      "n_runs": 1,
+      "workflow_revision_id": "e31b146a3595092a48cb42473eb2da99fa068d742ee76bf31b713cf57cdfb345",
+      "authored_status": null
     },
     {
       "name": "concurrency_ladder",
@@ -811,7 +1059,9 @@
       "latest_cost_usd": 0.464847,
       "latest_git_sha": "27a959fd1",
       "results_pointer": "experiments/results/workflows/concurrency_ladder/20260831T014836Z.json",
-      "n_runs": 1
+      "n_runs": 1,
+      "workflow_revision_id": "dd16feefd517c0ee054f5ff2a939714ace8514f1549bddfbb4366d360b1d2561",
+      "authored_status": null
     },
     {
       "name": "control_db_evidence",
@@ -829,7 +1079,9 @@
       "latest_cost_usd": 0.236667,
       "latest_git_sha": "fc1498b62",
       "results_pointer": "experiments/results/workflows/control_db_evidence/20260902T133429Z.json",
-      "n_runs": 2
+      "n_runs": 2,
+      "workflow_revision_id": "428c6c36ac6e0dbf88d9bb85f43472e8a37f620a78110ebf7eceee0d6cfe4a31",
+      "authored_status": null
     },
     {
       "name": "control_room_portal",
@@ -847,7 +1099,9 @@
       "latest_cost_usd": 0.0,
       "latest_git_sha": "d0d82237d",
       "results_pointer": "experiments/results/workflows/control_room_portal/20260814T033630Z.json",
-      "n_runs": 3
+      "n_runs": 3,
+      "workflow_revision_id": "6794906feb37f91d2c6e5b04bc9dfb66fe22ef2b7f771adef34ac5e892cc20ef",
+      "authored_status": null
     },
     {
       "name": "control_room_usage_wiring",
@@ -865,7 +1119,9 @@
       "latest_cost_usd": 0.0,
       "latest_git_sha": "ce0a26c8a",
       "results_pointer": "experiments/results/workflows/control_room_usage_wiring/20260901T003153Z.json",
-      "n_runs": 2
+      "n_runs": 2,
+      "workflow_revision_id": "476fa51efa6a7e4576ca6467987101cde3628614939695dafcd4fe6638ea460a",
+      "authored_status": null
     },
     {
       "name": "design_sessions",
@@ -883,7 +1139,9 @@
       "latest_cost_usd": 0.0,
       "latest_git_sha": "d5f85126b",
       "results_pointer": "experiments/results/workflows/design_sessions/20260814T065812Z.json",
-      "n_runs": 1
+      "n_runs": 1,
+      "workflow_revision_id": "3c8a1586c91aa3810d40ae3177203fe3b421c6c585cea5ce2f3cd0a45d9d6b94",
+      "authored_status": null
     },
     {
       "name": "admission_leases",
@@ -901,25 +1159,9 @@
       "latest_cost_usd": 7.791965,
       "latest_git_sha": "110d297f6",
       "results_pointer": "experiments/results/workflows/admission_leases/20260901T003719Z.json",
-      "n_runs": 5
-    },
-    {
-      "name": "automatic_docs_sync",
-      "version": "0.1",
-      "status": "completed",
-      "spec_path": "workflows/repository/automatic_docs_sync.yaml",
-      "artifact_kind": "workflow",
-      "repeatable": false,
-      "supersedes": [],
-      "superseded_by": null,
-      "completed_at": null,
-      "last_run_at": "2026-09-01T03:43:12.692667+00:00",
-      "latest_ok": true,
-      "latest_model": "anthropic/claude-opus-5",
-      "latest_cost_usd": 47.516709,
-      "latest_git_sha": "f6ef98353",
-      "results_pointer": "experiments/results/workflows/automatic_docs_sync/20260901T034312Z.json",
-      "n_runs": 1
+      "n_runs": 5,
+      "workflow_revision_id": "89072fc0963e8c9407867e96369ecf3471e0fb082093bbddf9747313ddbcedce",
+      "authored_status": null
     },
     {
       "name": "beta_lab_execution",
@@ -937,7 +1179,9 @@
       "latest_cost_usd": 1.400021,
       "latest_git_sha": "cdce97eb6",
       "results_pointer": "experiments/results/workflows/beta_lab_execution/20260831T223804Z.json",
-      "n_runs": 1
+      "n_runs": 1,
+      "workflow_revision_id": "f1f542378319f318754f3fed7f59d328b2092b1b2652ecc929e6808b7a12c0a9",
+      "authored_status": null
     },
     {
       "name": "canonical_publication_closure",
@@ -955,7 +1199,9 @@
       "latest_cost_usd": 1.447518,
       "latest_git_sha": "86ef9a34c",
       "results_pointer": "experiments/results/workflows/canonical_publication_closure/20260821T170639Z.json",
-      "n_runs": 1
+      "n_runs": 1,
+      "workflow_revision_id": "647857851f7d73364d47733c1a8d7307e4a41c80c48f9a2f274aab410cd78834",
+      "authored_status": null
     },
     {
       "name": "canonical_state_design",
@@ -973,7 +1219,9 @@
       "latest_cost_usd": 0.07979,
       "latest_git_sha": "bb923f927",
       "results_pointer": "experiments/results/workflows/canonical_state_design/20260818T154839Z.json",
-      "n_runs": 5
+      "n_runs": 5,
+      "workflow_revision_id": "da047195253391f691b4df9703bdeee47f14fd6d13685bd8aafd01976935fcb9",
+      "authored_status": null
     },
     {
       "name": "canonical_state_finalize",
@@ -991,7 +1239,9 @@
       "latest_cost_usd": 14.589061,
       "latest_git_sha": "3881991c9",
       "results_pointer": "experiments/results/workflows/canonical_state_finalize/20260818T203840Z.json",
-      "n_runs": 1
+      "n_runs": 1,
+      "workflow_revision_id": "ec9ee29e425d33bb8177e1fcd7889c7a958cc404079da8a3abb518c6f0c38978",
+      "authored_status": null
     },
     {
       "name": "canonical_state_implement",
@@ -1009,7 +1259,9 @@
       "latest_cost_usd": 51.420388,
       "latest_git_sha": "aadfa59c8",
       "results_pointer": "experiments/results/workflows/canonical_state_implement/20260818T195113Z.json",
-      "n_runs": 1
+      "n_runs": 1,
+      "workflow_revision_id": "ea30e1c02100aed5a766226dd421772bff213b7122be6b5c2c07dac91fd84002",
+      "authored_status": null
     },
     {
       "name": "canonical_state_round2",
@@ -1027,7 +1279,9 @@
       "latest_cost_usd": 4.843306,
       "latest_git_sha": "bfe6ca28e",
       "results_pointer": "experiments/results/workflows/canonical_state_round2/20260818T175555Z.json",
-      "n_runs": 2
+      "n_runs": 2,
+      "workflow_revision_id": "7c9da22f417d5c649108b8b9f8db5cc52f53ebd824972ce6e63dc0bccd2a3ee6",
+      "authored_status": null
     },
     {
       "name": "cap_2a_rerun",
@@ -1047,7 +1301,9 @@
       "latest_cost_usd": 0.978392,
       "latest_git_sha": "085cee475",
       "results_pointer": "experiments/results/workflows/cap_2a_rerun/20260826T001947Z.json",
-      "n_runs": 1
+      "n_runs": 1,
+      "workflow_revision_id": "ad7f946c1fdd69819590b3fb60094d2dc873812f4f44596a60635de7e7232f30",
+      "authored_status": null
     },
     {
       "name": "cap_2a_rerun2",
@@ -1067,7 +1323,9 @@
       "latest_cost_usd": 1.077358,
       "latest_git_sha": "9c3ea4fac",
       "results_pointer": "experiments/results/workflows/cap_2a_rerun2/20260826T020736Z.json",
-      "n_runs": 1
+      "n_runs": 1,
+      "workflow_revision_id": "f9e7761e3bdd9f45c7b1a8df778e0e99fc0fd83652e6ba1cae01c133a76b737d",
+      "authored_status": null
     },
     {
       "name": "cap_2a_rerun3",
@@ -1087,7 +1345,9 @@
       "latest_cost_usd": 0.493568,
       "latest_git_sha": "1c168c72e",
       "results_pointer": "experiments/results/workflows/cap_2a_rerun3/20260826T051311Z.json",
-      "n_runs": 1
+      "n_runs": 1,
+      "workflow_revision_id": "596212afd29da2c35a2d7e3ccd56b7e0d12fd93b2a28842859b3032c3a0d6947",
+      "authored_status": null
     },
     {
       "name": "cap_2a_shadow_calibration",
@@ -1105,7 +1365,9 @@
       "latest_cost_usd": 0.82512,
       "latest_git_sha": "f4e83c51d",
       "results_pointer": "experiments/results/workflows/cap_2a_shadow_calibration/20260825T223656Z.json",
-      "n_runs": 1
+      "n_runs": 1,
+      "workflow_revision_id": "5b07eaea0cd5f892fe9d37f58f18ea876bd759c218d2862608ba0e4d6940b1c7",
+      "authored_status": null
     },
     {
       "name": "cap_2b",
@@ -1125,7 +1387,9 @@
       "latest_cost_usd": 0.230296,
       "latest_git_sha": "bb1051e3d",
       "results_pointer": "experiments/results/workflows/cap_2b/20260826T160447Z.json",
-      "n_runs": 1
+      "n_runs": 1,
+      "workflow_revision_id": "7155623df0226d53b8adeaddd35c089de7a77a8578886ba21a04f70d3f936c35",
+      "authored_status": null
     },
     {
       "name": "cap_adaptive_2c",
@@ -1143,7 +1407,9 @@
       "latest_cost_usd": 0.241951,
       "latest_git_sha": "2fd537242",
       "results_pointer": "experiments/results/workflows/cap_adaptive_2c/20260827T181805Z.json",
-      "n_runs": 2
+      "n_runs": 2,
+      "workflow_revision_id": "81baa8d7f1e33f6a690f4f950b5182f98b0105ccd00bef510707fc3daccd63e9",
+      "authored_status": null
     },
     {
       "name": "cap_adaptive_2e",
@@ -1161,7 +1427,9 @@
       "latest_cost_usd": 0.198878,
       "latest_git_sha": "3f0a6be31",
       "results_pointer": "experiments/results/workflows/cap_adaptive_2e/20260828T145532Z.json",
-      "n_runs": 1
+      "n_runs": 1,
+      "workflow_revision_id": "07bf9a76c7171fedba7f9cc81a9d918ecff80fa7039d4734f172fce56433e73a",
+      "authored_status": null
     },
     {
       "name": "cap_adaptive_2f",
@@ -1179,7 +1447,9 @@
       "latest_cost_usd": 0.07743,
       "latest_git_sha": "c3946886b",
       "results_pointer": "experiments/results/workflows/cap_adaptive_2f/20260829T143703Z.json",
-      "n_runs": 2
+      "n_runs": 2,
+      "workflow_revision_id": "89c7f18794fe52004c3034fcad5cff477ae784d8070e3b424e4c9f22582744e2",
+      "authored_status": null
     },
     {
       "name": "cap_addendum_design",
@@ -1197,7 +1467,9 @@
       "latest_cost_usd": 0.466694,
       "latest_git_sha": "2a15aa918",
       "results_pointer": "experiments/results/workflows/cap_addendum_design/20260822T181500Z.json",
-      "n_runs": 1
+      "n_runs": 1,
+      "workflow_revision_id": "bb6e63a47ba276451aa74c37ad74082fc2c81da7a8959a72f878583f5c1fcb04",
+      "authored_status": null
     },
     {
       "name": "cap_addendum_implement",
@@ -1215,7 +1487,9 @@
       "latest_cost_usd": 27.986663,
       "latest_git_sha": "3ef4cf47d",
       "results_pointer": "experiments/results/workflows/cap_addendum_implement/20260824T140755Z.json",
-      "n_runs": 2
+      "n_runs": 2,
+      "workflow_revision_id": "1881928cda342ad81902917566a7b819ff056ec8194f9b9fceaf7e0a27abfb38",
+      "authored_status": null
     },
     {
       "name": "cap_e2_cascade_run",
@@ -1233,7 +1507,9 @@
       "latest_cost_usd": 0.107522,
       "latest_git_sha": "f6274020b",
       "results_pointer": "experiments/results/workflows/cap_e2_cascade_run/20260824T235509Z.json",
-      "n_runs": 1
+      "n_runs": 1,
+      "workflow_revision_id": "a89064af70697dd35587201bdd534495cbebffbe793a1ef132fbaaa389c4238e",
+      "authored_status": null
     },
     {
       "name": "cap_escalation_measurement",
@@ -1251,7 +1527,9 @@
       "latest_cost_usd": 0.081711,
       "latest_git_sha": "e5a16a61c",
       "results_pointer": "experiments/results/workflows/cap_escalation_measurement/20260826T130126Z.json",
-      "n_runs": 1
+      "n_runs": 1,
+      "workflow_revision_id": "a4f09922bc61f0288f0011fc9c89caedc89d64e44d1ecb2d02c034e927a4a126",
+      "authored_status": null
     },
     {
       "name": "cap_evidence_adversary",
@@ -1269,7 +1547,9 @@
       "latest_cost_usd": 0.109289,
       "latest_git_sha": "083589775",
       "results_pointer": "experiments/results/workflows/cap_evidence_adversary/20260825T153018Z.json",
-      "n_runs": 2
+      "n_runs": 2,
+      "workflow_revision_id": "5e4d37c76a42b61c8961242c8aaf6ea402dd472d6b74e627f7349084ca1e08d2",
+      "authored_status": null
     },
     {
       "name": "cap_evidence_integrity",
@@ -1287,7 +1567,9 @@
       "latest_cost_usd": 0.363991,
       "latest_git_sha": "96301d90c",
       "results_pointer": "experiments/results/workflows/cap_evidence_integrity/20260825T143310Z.json",
-      "n_runs": 1
+      "n_runs": 1,
+      "workflow_revision_id": "4e05d2620977551db00efb70e3971ac5cf0309a12306c9b82e17fd7a537c5ac3",
+      "authored_status": null
     },
     {
       "name": "cap_fact_auto_emit",
@@ -1305,7 +1587,9 @@
       "latest_cost_usd": 6.256375,
       "latest_git_sha": "2bdba509d",
       "results_pointer": "experiments/results/workflows/cap_fact_auto_emit/20260824T000620Z.json",
-      "n_runs": 1
+      "n_runs": 1,
+      "workflow_revision_id": "0cc70dcc92f074ec4ae7ae504d4235b764d306eafe5e81182199223a68e70221",
+      "authored_status": null
     },
     {
       "name": "cap_fact_backfill",
@@ -1323,7 +1607,9 @@
       "latest_cost_usd": 0.355326,
       "latest_git_sha": "cc26b302e",
       "results_pointer": "experiments/results/workflows/cap_fact_backfill/20260824T230123Z.json",
-      "n_runs": 1
+      "n_runs": 1,
+      "workflow_revision_id": "d80109672438f6e4a7e3ffc3b5e97245b29943e24875d82dbcbb28c78d471ba4",
+      "authored_status": null
     },
     {
       "name": "cap_gate_migration",
@@ -1341,7 +1627,9 @@
       "latest_cost_usd": 13.771993,
       "latest_git_sha": "8fb436822",
       "results_pointer": "experiments/results/workflows/cap_gate_migration/20260824T003043Z.json",
-      "n_runs": 1
+      "n_runs": 1,
+      "workflow_revision_id": "be1c0c5dcf69539c9e1a918e2da1ab15b6cd0d384954b7d607b154290ec64bf9",
+      "authored_status": null
     },
     {
       "name": "cap_gate_scan",
@@ -1359,7 +1647,9 @@
       "latest_cost_usd": 7.248182,
       "latest_git_sha": "ade880fe0",
       "results_pointer": "experiments/results/workflows/cap_gate_scan/20260823T232410Z.json",
-      "n_runs": 1
+      "n_runs": 1,
+      "workflow_revision_id": "621f4bde093801eeaf3a9988543de8009cfb6b93c7355fa8dca71a0dc450f907",
+      "authored_status": null
     },
     {
       "name": "cap_grit_grid_execute",
@@ -1377,7 +1667,9 @@
       "latest_cost_usd": 0.133047,
       "latest_git_sha": "e8c4cfa8e",
       "results_pointer": "experiments/results/workflows/cap_grit_grid_execute/20260824T155410Z.json",
-      "n_runs": 1
+      "n_runs": 1,
+      "workflow_revision_id": "74796db69f30cf54284b364c5013706e7eb234f5a97eff686e460df66894a210",
+      "authored_status": null
     },
     {
       "name": "cap_i0_i3_remediation",
@@ -1395,7 +1687,9 @@
       "latest_cost_usd": 32.788824,
       "latest_git_sha": "e563a2814",
       "results_pointer": "experiments/results/workflows/cap_i0_i3_remediation/20260823T154508Z.json",
-      "n_runs": 2
+      "n_runs": 2,
+      "workflow_revision_id": "5d41275936677702d0f9f923afc0a511545cd12e23216b445d2ba63c1ab7824f",
+      "authored_status": null
     },
     {
       "name": "cap_implement_repair",
@@ -1413,7 +1707,9 @@
       "latest_cost_usd": 0.265181,
       "latest_git_sha": "297cd31c7",
       "results_pointer": "experiments/results/workflows/cap_implement_repair/20260822T181655Z.json",
-      "n_runs": 1
+      "n_runs": 1,
+      "workflow_revision_id": "516abdb4be2bf9602296f8db69dceac9d28de0899dcc2c2d0bb23861673f91c2",
+      "authored_status": null
     },
     {
       "name": "cap_luna_probe",
@@ -1431,7 +1727,9 @@
       "latest_cost_usd": 0.147027,
       "latest_git_sha": "8a7f06516",
       "results_pointer": "experiments/results/workflows/cap_luna_probe/20260828T214224Z.json",
-      "n_runs": 1
+      "n_runs": 1,
+      "workflow_revision_id": "ad86960fc2a5f0dbc84a6d752b0f87c20d829bd753ef4c6218ff33ae66ca69a7",
+      "authored_status": null
     },
     {
       "name": "cap_pattern_minting",
@@ -1449,7 +1747,9 @@
       "latest_cost_usd": 0.168998,
       "latest_git_sha": "0e79c155a",
       "results_pointer": "experiments/results/workflows/cap_pattern_minting/20260824T235745Z.json",
-      "n_runs": 1
+      "n_runs": 1,
+      "workflow_revision_id": "7b41e2b8f6c7cd904ba4ef77a7dfe81cb5fa495f430cdd478c6cb295af9ef967",
+      "authored_status": null
     },
     {
       "name": "cap_routing_evidence_specs",
@@ -1467,7 +1767,9 @@
       "latest_cost_usd": 13.631042,
       "latest_git_sha": "5220c279e",
       "results_pointer": "experiments/results/workflows/cap_routing_evidence_specs/20260824T003558Z.json",
-      "n_runs": 1
+      "n_runs": 1,
+      "workflow_revision_id": "6642f2ab8cc0e90804a954ab3d5b508f93c2553eda5ae26b03eed35f474cd12f",
+      "authored_status": null
     },
     {
       "name": "cap_runner_hardening",
@@ -1485,7 +1787,9 @@
       "latest_cost_usd": 0.247412,
       "latest_git_sha": "1c08ecc71",
       "results_pointer": "experiments/results/workflows/cap_runner_hardening/20260827T003723Z.json",
-      "n_runs": 1
+      "n_runs": 1,
+      "workflow_revision_id": "532cb0ad2ddeca09a34527b140a6c2825c10c64289eade22d22fc44cfaed0d45",
+      "authored_status": null
     },
     {
       "name": "cap_runner_hardening2",
@@ -1503,7 +1807,9 @@
       "latest_cost_usd": 0.465125,
       "latest_git_sha": "3c48c4b88",
       "results_pointer": "experiments/results/workflows/cap_runner_hardening2/20260827T054459Z.json",
-      "n_runs": 5
+      "n_runs": 5,
+      "workflow_revision_id": "75338603ae588c2b0db74b6e7d1d01c79ebc74a63e344a366244fb5e60a82da2",
+      "authored_status": null
     },
     {
       "name": "cap_session_routing_prospective",
@@ -1521,7 +1827,9 @@
       "latest_cost_usd": 0.188215,
       "latest_git_sha": "98b3db3f4",
       "results_pointer": "experiments/results/workflows/cap_session_routing_prospective/20260826T161250Z.json",
-      "n_runs": 1
+      "n_runs": 1,
+      "workflow_revision_id": "edcb1a0debbe801ee7cb6409c8dd8972b7dd834762db0ed4bc23e113b64a013e",
+      "authored_status": null
     },
     {
       "name": "cap_session_routing_spec",
@@ -1539,7 +1847,9 @@
       "latest_cost_usd": 0.142971,
       "latest_git_sha": "8d61b5d29",
       "results_pointer": "experiments/results/workflows/cap_session_routing_spec/20260822T175914Z.json",
-      "n_runs": 1
+      "n_runs": 1,
+      "workflow_revision_id": "658528ed24d16fcc08a6b1a975a7976c69f5aef41f81f1592ae8a276580f5e96",
+      "authored_status": null
     },
     {
       "name": "cap_shadow_campaign",
@@ -1557,7 +1867,9 @@
       "latest_cost_usd": 6.798861,
       "latest_git_sha": "7e97e526d",
       "results_pointer": "experiments/results/workflows/cap_shadow_campaign/20260824T000708Z.json",
-      "n_runs": 1
+      "n_runs": 1,
+      "workflow_revision_id": "630cc8b6bc28eef81c8e624cf152f767d032b8d3fc3371e24e3f971faffa926c",
+      "authored_status": null
     },
     {
       "name": "cap_shadow_fact_disposition",
@@ -1575,7 +1887,9 @@
       "latest_cost_usd": 0.204488,
       "latest_git_sha": "ba48a7f58",
       "results_pointer": "experiments/results/workflows/cap_shadow_fact_disposition/20260824T004425Z.json",
-      "n_runs": 1
+      "n_runs": 1,
+      "workflow_revision_id": "fd6fbe5b465748abbe281a85e10e0860fea7ebe5a8b2b45432b36a4b9cf28af8",
+      "authored_status": null
     },
     {
       "name": "cap_site_regression_analysis",
@@ -1593,7 +1907,9 @@
       "latest_cost_usd": 0.17721,
       "latest_git_sha": "8fe48330f",
       "results_pointer": "experiments/results/workflows/cap_site_regression_analysis/20260826T230412Z.json",
-      "n_runs": 1
+      "n_runs": 1,
+      "workflow_revision_id": "bb8881e9e50a1bcba7b12b97864f9776179dfcea5d13f33cfdce6ac38c15e7f8",
+      "authored_status": null
     },
     {
       "name": "cap_site_revamp",
@@ -1611,7 +1927,9 @@
       "latest_cost_usd": 26.659067,
       "latest_git_sha": "edeb2a7e5",
       "results_pointer": "experiments/results/workflows/cap_site_revamp/20260826T194916Z.json",
-      "n_runs": 1
+      "n_runs": 1,
+      "workflow_revision_id": "1b28a7aa8b9204320024064698fbb81f27ecfcf9e81d3f41540ceac371a2a5a6",
+      "authored_status": null
     },
     {
       "name": "cap_site_revamp2",
@@ -1631,7 +1949,9 @@
       "latest_cost_usd": 7.999771,
       "latest_git_sha": "f13161f3b",
       "results_pointer": "experiments/results/workflows/cap_site_revamp2/20260826T222806Z.json",
-      "n_runs": 3
+      "n_runs": 3,
+      "workflow_revision_id": "5d464e3a72f09ef9e91eb78665d90b6c0eb84011e20066817bdde756cf634062",
+      "authored_status": null
     },
     {
       "name": "cap_site_revamp3",
@@ -1651,7 +1971,9 @@
       "latest_cost_usd": 1.426952,
       "latest_git_sha": "f2d9f35dc",
       "results_pointer": "experiments/results/workflows/cap_site_revamp3/20260827T154411Z.json",
-      "n_runs": 9
+      "n_runs": 9,
+      "workflow_revision_id": "a552c46004da9c8dcf09f2f0a9ebd62ad433c2c4161acc5de3d9e163a59fc3e0",
+      "authored_status": null
     },
     {
       "name": "cap_site_revamp4",
@@ -1671,7 +1993,9 @@
       "latest_cost_usd": 0.032248,
       "latest_git_sha": "f4de64787",
       "results_pointer": "experiments/results/workflows/cap_site_revamp4/20260827T170204Z.json",
-      "n_runs": 4
+      "n_runs": 4,
+      "workflow_revision_id": "7cf7863f299c731c116bbbea240426a2ea86962c745f4e26bc8dc7ff840b49b1",
+      "authored_status": null
     },
     {
       "name": "cap_sonnet_adversary",
@@ -1689,7 +2013,9 @@
       "latest_cost_usd": 18.131214,
       "latest_git_sha": "cb7ca48a7",
       "results_pointer": "experiments/results/workflows/cap_sonnet_adversary/20260825T022008Z.json",
-      "n_runs": 2
+      "n_runs": 2,
+      "workflow_revision_id": "a25a92e2d6f0c5acd2a08b7c32d9c6ed32b6f8cb1390298206796229bcd04d0b",
+      "authored_status": null
     },
     {
       "name": "cap_stabilization_release",
@@ -1707,7 +2033,9 @@
       "latest_cost_usd": 0.237681,
       "latest_git_sha": "f1585656c",
       "results_pointer": "experiments/results/workflows/cap_stabilization_release/20260826T223434Z.json",
-      "n_runs": 4
+      "n_runs": 4,
+      "workflow_revision_id": "0e1480b6b83dd83e20b1583de7813f5e150e1c7891794045c10cf0d6cd6d50b6",
+      "authored_status": null
     },
     {
       "name": "cap_story_bridge",
@@ -1725,7 +2053,9 @@
       "latest_cost_usd": 0.091705,
       "latest_git_sha": "d68752aee",
       "results_pointer": "experiments/results/workflows/cap_story_bridge/20260825T005329Z.json",
-      "n_runs": 1
+      "n_runs": 1,
+      "workflow_revision_id": "712e22151697ef296c55a3dd7c13c456bf26a1bc530c70f6d219b25650e9b7c7",
+      "authored_status": null
     },
     {
       "name": "cap_terra_postmortem",
@@ -1743,7 +2073,9 @@
       "latest_cost_usd": 0.551453,
       "latest_git_sha": "2d6f8beea",
       "results_pointer": "experiments/results/workflows/cap_terra_postmortem/20260827T000559Z.json",
-      "n_runs": 1
+      "n_runs": 1,
+      "workflow_revision_id": "bebe3062630261b5c015dfd6de8878f3c8422c83d1c9900a197c8b97f2d097ce",
+      "authored_status": null
     },
     {
       "name": "cap_test_runner_wiring",
@@ -1761,7 +2093,9 @@
       "latest_cost_usd": 0.073715,
       "latest_git_sha": "3d4149664",
       "results_pointer": "experiments/results/workflows/cap_test_runner_wiring/20260825T000311Z.json",
-      "n_runs": 1
+      "n_runs": 1,
+      "workflow_revision_id": "5440ef532de0173a6ff380dbff1a181a8012299cea647742efaa6a519e2d8ebd",
+      "authored_status": null
     },
     {
       "name": "claude_tools_to_skills",
@@ -1779,7 +2113,9 @@
       "latest_cost_usd": 8.358163,
       "latest_git_sha": "f36c2d449",
       "results_pointer": "experiments/results/workflows/claude_tools_to_skills/20260814T222931Z.json",
-      "n_runs": 1
+      "n_runs": 1,
+      "workflow_revision_id": "cd50318d370e057918f3006339d90ffcd0cd7f1fe564001a12408fdf7d288187",
+      "authored_status": null
     },
     {
       "name": "code_review",
@@ -1797,7 +2133,9 @@
       "latest_cost_usd": 0.16476,
       "latest_git_sha": "4b3f2aca1",
       "results_pointer": "experiments/results/workflows/code_review/20260824T011845Z.json",
-      "n_runs": 3
+      "n_runs": 3,
+      "workflow_revision_id": "ee7614596d70982da6bb7d4b7c040a6f53a2643ff4a0a2b672dc35ee3f1874eb",
+      "authored_status": null
     },
     {
       "name": "consolidation_release",
@@ -1815,7 +2153,9 @@
       "latest_cost_usd": 0.175627,
       "latest_git_sha": "d8f2f1d8e",
       "results_pointer": "experiments/results/workflows/consolidation_release/20260820T131014Z.json",
-      "n_runs": 1
+      "n_runs": 1,
+      "workflow_revision_id": "04033ee6f960dc5865bcc0cbd90b33665c4bf1cce947caa243191b2763c537d1",
+      "authored_status": "completed"
     },
     {
       "name": "consolidation_release_execute",
@@ -1833,7 +2173,9 @@
       "latest_cost_usd": 4.769496,
       "latest_git_sha": "371beb82b",
       "results_pointer": "experiments/results/workflows/consolidation_release_execute/20260820T172843Z.json",
-      "n_runs": 1
+      "n_runs": 1,
+      "workflow_revision_id": "d53d0f329fe2cea62af0240b0b83abaa614bbd03adf777661b3ec35ab6ffda74",
+      "authored_status": "completed"
     },
     {
       "name": "consolidation_stage_0_architecture_spine",
@@ -1851,7 +2193,9 @@
       "latest_cost_usd": null,
       "latest_git_sha": null,
       "results_pointer": null,
-      "n_runs": 0
+      "n_runs": 0,
+      "workflow_revision_id": "8674750102b1c0dbcc9780c380d849a4d471e7ba255798d3203cb2dba1cba208",
+      "authored_status": "completed"
     },
     {
       "name": "consolidation_stage_1_package_move",
@@ -1869,7 +2213,9 @@
       "latest_cost_usd": null,
       "latest_git_sha": null,
       "results_pointer": null,
-      "n_runs": 0
+      "n_runs": 0,
+      "workflow_revision_id": "1b6efe4f5f05d32ae69b9010292e7d5bfd001e9569850c16b30a1ad05fbaf22c",
+      "authored_status": "completed"
     },
     {
       "name": "consolidation_stage_2_experiments_workflows_split",
@@ -1887,7 +2233,9 @@
       "latest_cost_usd": null,
       "latest_git_sha": null,
       "results_pointer": null,
-      "n_runs": 0
+      "n_runs": 0,
+      "workflow_revision_id": "ed3677d57c56d16c91009f236de147f11bcf8c9b30e8029055b4927dd2989d7d",
+      "authored_status": "completed"
     },
     {
       "name": "consolidation_stage_3_cli_classification",
@@ -1905,7 +2253,9 @@
       "latest_cost_usd": null,
       "latest_git_sha": null,
       "results_pointer": null,
-      "n_runs": 0
+      "n_runs": 0,
+      "workflow_revision_id": "f2d321b50c8f2be4e382aaed5f65d49fa8dbfbe36ed397d5ad3180c81724ba48",
+      "authored_status": "completed"
     },
     {
       "name": "consolidation_stage_4_instruction_surfaces",
@@ -1923,7 +2273,9 @@
       "latest_cost_usd": null,
       "latest_git_sha": null,
       "results_pointer": null,
-      "n_runs": 0
+      "n_runs": 0,
+      "workflow_revision_id": "4b35bd104c730ac25ae213a8a8689cb84a10eabee3176676b1667b2ca97637e2",
+      "authored_status": "completed"
     },
     {
       "name": "consolidation_stage_5_apps_realignment",
@@ -1941,7 +2293,9 @@
       "latest_cost_usd": null,
       "latest_git_sha": null,
       "results_pointer": null,
-      "n_runs": 0
+      "n_runs": 0,
+      "workflow_revision_id": "75cd740159d08e46263450a9660997b820b61ba0814252f33e2d91272add3358",
+      "authored_status": "completed"
     },
     {
       "name": "consolidation_stage_6_verification_release",
@@ -1959,7 +2313,9 @@
       "latest_cost_usd": null,
       "latest_git_sha": null,
       "results_pointer": null,
-      "n_runs": 0
+      "n_runs": 0,
+      "workflow_revision_id": "2dacfc133d8b944ae815ec5bcfb7e71cc1f5a8e389eeafe119a1e7d8ad575220",
+      "authored_status": "completed"
     },
     {
       "name": "context_abstraction_closure",
@@ -1977,7 +2333,9 @@
       "latest_cost_usd": 0.076516,
       "latest_git_sha": "8a51d2de9",
       "results_pointer": "experiments/results/workflows/context_abstraction_closure/20260831T235219Z.json",
-      "n_runs": 1
+      "n_runs": 1,
+      "workflow_revision_id": "aefa96e8b7649570f2d19a14ed3fa092d269174499e24319cbe09ff88dda56ef",
+      "authored_status": null
     },
     {
       "name": "context_abstraction_implement",
@@ -1995,7 +2353,9 @@
       "latest_cost_usd": 49.521826,
       "latest_git_sha": "5d1cfe4cf",
       "results_pointer": "experiments/results/workflows/context_abstraction_implement/20260823T191652Z.json",
-      "n_runs": 4
+      "n_runs": 4,
+      "workflow_revision_id": "7a6a3c20efbfabd7466c56ec87dca2e657b77949ea180231b26a541ce3c69818",
+      "authored_status": "completed"
     },
     {
       "name": "context_abstraction_plane",
@@ -2013,7 +2373,9 @@
       "latest_cost_usd": 10.377369,
       "latest_git_sha": "147931070",
       "results_pointer": "experiments/results/workflows/context_abstraction_plane/20260819T230335Z.json",
-      "n_runs": 1
+      "n_runs": 1,
+      "workflow_revision_id": "85530cfaa86e2546fb86e41e0f672a9b49443dd5b395e3bbb250e250ecfb546f",
+      "authored_status": null
     },
     {
       "name": "control_db_followups",
@@ -2031,7 +2393,9 @@
       "latest_cost_usd": 0.402973,
       "latest_git_sha": "ca0248992",
       "results_pointer": "experiments/results/workflows/control_db_followups/20260902T031150Z.json",
-      "n_runs": 1
+      "n_runs": 1,
+      "workflow_revision_id": "73d338253eb6b7a171106f0bd686162dc4c2c885cd7801c96bbfe6588871fa98",
+      "authored_status": null
     },
     {
       "name": "control_db_publication",
@@ -2049,7 +2413,9 @@
       "latest_cost_usd": 0.103167,
       "latest_git_sha": "edd0e928d",
       "results_pointer": "experiments/results/workflows/control_db_publication/20260902T013704Z.json",
-      "n_runs": 6
+      "n_runs": 6,
+      "workflow_revision_id": "77e96581cf9e72ff01b41b964110f62b139c97240c6e0fc4bb8328dacff44858",
+      "authored_status": null
     },
     {
       "name": "control_room_hardening",
@@ -2067,25 +2433,9 @@
       "latest_cost_usd": 0.189817,
       "latest_git_sha": "9a6aae4ea",
       "results_pointer": "experiments/results/workflows/control_room_hardening/20260818T235609Z.json",
-      "n_runs": 1
-    },
-    {
-      "name": "control_room_live_board",
-      "version": "0.1",
-      "status": "completed",
-      "spec_path": "workflows/repository/control_room_live_board.yaml",
-      "artifact_kind": "workflow",
-      "repeatable": false,
-      "supersedes": [],
-      "superseded_by": null,
-      "completed_at": null,
-      "last_run_at": "2026-09-01T05:12:58.874009+00:00",
-      "latest_ok": true,
-      "latest_model": "deepseek/deepseek-v4-flash",
-      "latest_cost_usd": 0.13557,
-      "latest_git_sha": "349f06753",
-      "results_pointer": "experiments/results/workflows/control_room_live_board/20260901T051258Z.json",
-      "n_runs": 1
+      "n_runs": 1,
+      "workflow_revision_id": "8ac0ffc6abb86ddb6495aca07ddd80317bcbca30a7d69c5563208b47ce470057",
+      "authored_status": null
     },
     {
       "name": "control_room_posthoc_visibility",
@@ -2103,7 +2453,9 @@
       "latest_cost_usd": 0.204921,
       "latest_git_sha": "fd20ae599",
       "results_pointer": "experiments/results/workflows/control_room_posthoc_visibility/20260817T153722Z.json",
-      "n_runs": 1
+      "n_runs": 1,
+      "workflow_revision_id": "9253b233d3db7244e674116188fc59241dfa04d9904ef66a0776b99db17a54f3",
+      "authored_status": null
     },
     {
       "name": "control_room_refresh",
@@ -2121,7 +2473,9 @@
       "latest_cost_usd": 15.401668,
       "latest_git_sha": "7fd00bd2a",
       "results_pointer": "experiments/results/workflows/control_room_refresh/20260823T160811Z.json",
-      "n_runs": 1
+      "n_runs": 1,
+      "workflow_revision_id": "c2b3fff84d6cc69dd58f1c4cfcaf2ae4bd00a45b5ace19a41dc918a77259f15b",
+      "authored_status": null
     },
     {
       "name": "control_room_ui_implement",
@@ -2139,7 +2493,9 @@
       "latest_cost_usd": 0.608558,
       "latest_git_sha": "65db44c2d",
       "results_pointer": "experiments/results/workflows/control_room_ui_implement/20260819T144809Z.json",
-      "n_runs": 1
+      "n_runs": 1,
+      "workflow_revision_id": "18b13abf5d114386f55a78ab8b24e94c8c78521fbfaeff1019ea3410e2d8b0d6",
+      "authored_status": null
     },
     {
       "name": "control_room_ui_rebuild",
@@ -2157,7 +2513,9 @@
       "latest_cost_usd": 28.212494,
       "latest_git_sha": "059461d83",
       "results_pointer": "experiments/results/workflows/control_room_ui_rebuild/20260819T160319Z.json",
-      "n_runs": 1
+      "n_runs": 1,
+      "workflow_revision_id": "832bd686711346c41d248716bf2b376897374e25aa686a455c38e9f3fa7f65ff",
+      "authored_status": null
     },
     {
       "name": "control_room_ui_redesign",
@@ -2175,7 +2533,9 @@
       "latest_cost_usd": 0.124456,
       "latest_git_sha": "cc32ba3fe",
       "results_pointer": "experiments/results/workflows/control_room_ui_redesign/20260819T135335Z.json",
-      "n_runs": 1
+      "n_runs": 1,
+      "workflow_revision_id": "6144b3a620548fd1ea82a23c592ecaf2ac379563cefa1c735f7af13da3e6f3b8",
+      "authored_status": null
     },
     {
       "name": "control_room_workflow_phase",
@@ -2193,7 +2553,9 @@
       "latest_cost_usd": 0.168182,
       "latest_git_sha": "e6bf6cbfd",
       "results_pointer": "experiments/results/workflows/control_room_workflow_phase/20260817T154428Z.json",
-      "n_runs": 1
+      "n_runs": 1,
+      "workflow_revision_id": "4d3c1d54ed28cd06daac02f07aa15931a5159d6a04fd39c09d97faae5148fbd4",
+      "authored_status": null
     },
     {
       "name": "deep_architecture_review",
@@ -2211,7 +2573,9 @@
       "latest_cost_usd": 0.131869,
       "latest_git_sha": "b24f05c83",
       "results_pointer": "experiments/results/workflows/deep_architecture_review/20260818T191020Z.json",
-      "n_runs": 1
+      "n_runs": 1,
+      "workflow_revision_id": "0e462ec980d8bc7e7e9e86e700e40f946d95261845fa86ea79ceb2141b5ebf04",
+      "authored_status": null
     },
     {
       "name": "docs_architecture_refresh",
@@ -2231,25 +2595,9 @@
       "latest_cost_usd": 8.677939,
       "latest_git_sha": "806c0d344",
       "results_pointer": "experiments/results/workflows/docs_architecture_refresh/20260831T235230Z.json",
-      "n_runs": 1
-    },
-    {
-      "name": "docs_refresh_remediation",
-      "version": "0.1",
-      "status": "completed",
-      "spec_path": "workflows/repository/docs_refresh_remediation.yaml",
-      "artifact_kind": "workflow",
-      "repeatable": false,
-      "supersedes": [],
-      "superseded_by": null,
-      "completed_at": null,
-      "last_run_at": "2026-09-01T13:33:13.077676+00:00",
-      "latest_ok": true,
-      "latest_model": "deepseek/deepseek-v4-flash",
-      "latest_cost_usd": 0.165529,
-      "latest_git_sha": "846ca1279",
-      "results_pointer": "experiments/results/workflows/docs_refresh_remediation/20260901T133313Z.json",
-      "n_runs": 2
+      "n_runs": 1,
+      "workflow_revision_id": "caaa421271ed67f65b087b96ec494a2f4dcb6c042fdc5f8a1132637a5f1658c5",
+      "authored_status": null
     },
     {
       "name": "engine_gaps_verifier_revision",
@@ -2267,7 +2615,9 @@
       "latest_cost_usd": 0.09515,
       "latest_git_sha": "3c34c5bf4",
       "results_pointer": "experiments/results/workflows/engine_gaps_verifier_revision/20260902T165056Z.json",
-      "n_runs": 2
+      "n_runs": 2,
+      "workflow_revision_id": "c2a92bbc1bdff9a41949f24d52378762b32bb8b9cee246764f1685b29446ada7",
+      "authored_status": null
     },
     {
       "name": "entropy_beta_instruments",
@@ -2285,7 +2635,9 @@
       "latest_cost_usd": 0.293977,
       "latest_git_sha": "9ad80cfb0",
       "results_pointer": "experiments/results/workflows/entropy_beta_instruments/20260830T191433Z.json",
-      "n_runs": 2
+      "n_runs": 2,
+      "workflow_revision_id": "6286873c71f009e436d69242ebabd3e4d88109062cce6d355f5c48dd2b459d18",
+      "authored_status": null
     },
     {
       "name": "evidence_narrative",
@@ -2303,7 +2655,9 @@
       "latest_cost_usd": 0.0,
       "latest_git_sha": "c7019dc75",
       "results_pointer": "experiments/results/workflows/evidence_narrative/20260814T150446Z.json",
-      "n_runs": 2
+      "n_runs": 2,
+      "workflow_revision_id": "31e111693efbfdb66b59488cd689f1dabd9b3f8de0b7f22fa860871692ae0fd6",
+      "authored_status": null
     },
     {
       "name": "evidence_redesign",
@@ -2321,7 +2675,9 @@
       "latest_cost_usd": 5.900797,
       "latest_git_sha": "58fdcd7bd",
       "results_pointer": "experiments/results/workflows/evidence_redesign/20260814T191814Z.json",
-      "n_runs": 3
+      "n_runs": 3,
+      "workflow_revision_id": "19e300ee8c562498f4bf8b0f28355faca8f97e72c89bd07a0f88806fbf750af5",
+      "authored_status": null
     },
     {
       "name": "fix_review_findings",
@@ -2339,25 +2695,9 @@
       "latest_cost_usd": 0.15037,
       "latest_git_sha": "efac823cf",
       "results_pointer": "experiments/results/workflows/fix_review_findings/20260814T134837Z.json",
-      "n_runs": 1
-    },
-    {
-      "name": "fleet_job_submission",
-      "version": "0.1",
-      "status": "completed",
-      "spec_path": "workflows/repository/fleet_job_submission.yaml",
-      "artifact_kind": "workflow",
-      "repeatable": false,
-      "supersedes": [],
-      "superseded_by": null,
-      "completed_at": null,
-      "last_run_at": "2026-09-01T00:28:27.825779+00:00",
-      "latest_ok": true,
-      "latest_model": "anthropic/claude-sonnet-5",
-      "latest_cost_usd": 2.914613,
-      "latest_git_sha": "c74333391",
-      "results_pointer": "experiments/results/workflows/fleet_job_submission/20260901T002827Z.json",
-      "n_runs": 3
+      "n_runs": 1,
+      "workflow_revision_id": "436e8c9047265531393c86027a257501420c7d247d55b98f036317c1707d363d",
+      "authored_status": null
     },
     {
       "name": "fleet_ladder_implementation",
@@ -2375,7 +2715,9 @@
       "latest_cost_usd": 1.292377,
       "latest_git_sha": "53a74e1ca",
       "results_pointer": "experiments/results/workflows/fleet_ladder_implementation/20260830T191351Z.json",
-      "n_runs": 4
+      "n_runs": 4,
+      "workflow_revision_id": "cbcc79454d8cd381c3a718e775790ae4d6e1d32580aef7a4a6d667d43edb626a",
+      "authored_status": null
     },
     {
       "name": "fleet_ladder_plan",
@@ -2393,7 +2735,9 @@
       "latest_cost_usd": 0.08362,
       "latest_git_sha": "27cd12b9f",
       "results_pointer": "experiments/results/workflows/fleet_ladder_plan/20260829T153331Z.json",
-      "n_runs": 1
+      "n_runs": 1,
+      "workflow_revision_id": "1a319de8ef10827798b9f70b22b831c9986f82d9131e2f757f920450ae67fa98",
+      "authored_status": null
     },
     {
       "name": "fleet_ladder_revision",
@@ -2411,7 +2755,9 @@
       "latest_cost_usd": 0.172358,
       "latest_git_sha": "5bae2881b",
       "results_pointer": "experiments/results/workflows/fleet_ladder_revision/20260829T170204Z.json",
-      "n_runs": 2
+      "n_runs": 2,
+      "workflow_revision_id": "ba16c92091ec594a6af41d9ec795d40a5d65ff8d327fa9bb50a6703ecfcc6a0e",
+      "authored_status": null
     },
     {
       "name": "framework_facelift",
@@ -2429,25 +2775,9 @@
       "latest_cost_usd": 0.0,
       "latest_git_sha": "69182e561",
       "results_pointer": "experiments/results/workflows/framework_facelift/20260814T151812Z.json",
-      "n_runs": 1
-    },
-    {
-      "name": "green_main_closure",
-      "version": "0.1",
-      "status": "completed",
-      "spec_path": "workflows/repository/green_main_closure.yaml",
-      "artifact_kind": "workflow",
-      "repeatable": false,
-      "supersedes": [],
-      "superseded_by": null,
-      "completed_at": null,
-      "last_run_at": "2026-08-31T20:16:27.535499+00:00",
-      "latest_ok": true,
-      "latest_model": "anthropic/claude-opus-5",
-      "latest_cost_usd": 10.749674,
-      "latest_git_sha": "9a72f00d6",
-      "results_pointer": "experiments/results/workflows/green_main_closure/20260831T201627Z.json",
-      "n_runs": 4
+      "n_runs": 1,
+      "workflow_revision_id": "c28166955fc1be23a413cf256c60ff9a8232c6544b739cb0c1fcff7e167c9909",
+      "authored_status": null
     },
     {
       "name": "grit_calibration_design",
@@ -2465,7 +2795,9 @@
       "latest_cost_usd": 0.024953,
       "latest_git_sha": "810a3532a",
       "results_pointer": "experiments/results/workflows/grit_calibration_design/20260828T150551Z.json",
-      "n_runs": 1
+      "n_runs": 1,
+      "workflow_revision_id": "dfdad4a45c4004e99b5a0744d632a7c3f7908fbc4d6154d8143262243e57534c",
+      "authored_status": null
     },
     {
       "name": "i10_typed_checkpoint",
@@ -2483,7 +2815,9 @@
       "latest_cost_usd": 0.008492,
       "latest_git_sha": "d510794b3",
       "results_pointer": "experiments/results/workflows/i10_typed_checkpoint/20260828T170011Z.json",
-      "n_runs": 3
+      "n_runs": 3,
+      "workflow_revision_id": "9c0a1d8a42d157a3daa7d2c50ece8bd795632ab1d22751eceba7b2a9b13dcefe",
+      "authored_status": null
     },
     {
       "name": "investing_domain_audit",
@@ -2501,7 +2835,9 @@
       "latest_cost_usd": 0.200991,
       "latest_git_sha": "cbb414512",
       "results_pointer": "experiments/results/workflows/investing_domain_audit/20260822T180911Z.json",
-      "n_runs": 1
+      "n_runs": 1,
+      "workflow_revision_id": "45abfff3297c00f896e4f0f04503096e9ff7d7fe05c96bf8cb83922c8711946a",
+      "authored_status": null
     },
     {
       "name": "kb_event_typing",
@@ -2519,7 +2855,9 @@
       "latest_cost_usd": 0.266086,
       "latest_git_sha": "a9b983db7",
       "results_pointer": "experiments/results/workflows/kb_event_typing/20260819T003828Z.json",
-      "n_runs": 1
+      "n_runs": 1,
+      "workflow_revision_id": "728622ae8448b2a871ca311b175f7079c4d9fa30cd7861af82ad872228e1d0a7",
+      "authored_status": null
     },
     {
       "name": "kb_lineage_reconcile",
@@ -2537,7 +2875,9 @@
       "latest_cost_usd": 0.3715,
       "latest_git_sha": "a3d22c949",
       "results_pointer": "experiments/results/workflows/kb_lineage_reconcile/20260819T003125Z.json",
-      "n_runs": 1
+      "n_runs": 1,
+      "workflow_revision_id": "0592a6a920cb25a5b5813fb6ef230292aaf3543d47e24882479df308748148b4",
+      "authored_status": null
     },
     {
       "name": "kb_producer_factory",
@@ -2555,7 +2895,9 @@
       "latest_cost_usd": 0.474424,
       "latest_git_sha": "5f4a32eb1",
       "results_pointer": "experiments/results/workflows/kb_producer_factory/20260818T235821Z.json",
-      "n_runs": 1
+      "n_runs": 1,
+      "workflow_revision_id": "66329f368f6209273f873f74c20449208927a411febd2fc18ad7c88b8cc5891e",
+      "authored_status": null
     },
     {
       "name": "kb_record_fidelity",
@@ -2573,7 +2915,9 @@
       "latest_cost_usd": 0.166226,
       "latest_git_sha": "5be71c33a",
       "results_pointer": "experiments/results/workflows/kb_record_fidelity/20260818T235006Z.json",
-      "n_runs": 1
+      "n_runs": 1,
+      "workflow_revision_id": "fa1a52b2ff2ad5108bd4b86fdb684aae46023322609042fdb5d84228bf7e29ee",
+      "authored_status": null
     },
     {
       "name": "kb_write_path",
@@ -2591,7 +2935,9 @@
       "latest_cost_usd": 0.242495,
       "latest_git_sha": "b2b1f86f1",
       "results_pointer": "experiments/results/workflows/kb_write_path/20260818T234822Z.json",
-      "n_runs": 1
+      "n_runs": 1,
+      "workflow_revision_id": "76b2ca28702cacc4167cf9f54c93a19929d1133341cd88374aa5a4605ebd5ff0",
+      "authored_status": null
     },
     {
       "name": "ledger_instrumentation",
@@ -2609,7 +2955,9 @@
       "latest_cost_usd": 0.708458,
       "latest_git_sha": "18197df62",
       "results_pointer": "experiments/results/workflows/ledger_instrumentation/20260830T192039Z.json",
-      "n_runs": 1
+      "n_runs": 1,
+      "workflow_revision_id": "8691b71fafbcf63108cf5d4c6e146b88913773b5e35b423d7240f8e479d9350a",
+      "authored_status": null
     },
     {
       "name": "measurement_bug_fixes",
@@ -2627,7 +2975,9 @@
       "latest_cost_usd": 0.101108,
       "latest_git_sha": "7f40d9a10",
       "results_pointer": "experiments/results/workflows/measurement_bug_fixes/20260818T233938Z.json",
-      "n_runs": 1
+      "n_runs": 1,
+      "workflow_revision_id": "96f0768eb3949c622ca2d23ebae212366ee0afde6e3cfd0176c8b2142e7d54ac",
+      "authored_status": null
     },
     {
       "name": "measurement_contribution_closure",
@@ -2645,7 +2995,9 @@
       "latest_cost_usd": 1.901813,
       "latest_git_sha": "d765b25c2",
       "results_pointer": "experiments/results/workflows/measurement_contribution_closure/20260822T012343Z.json",
-      "n_runs": 1
+      "n_runs": 1,
+      "workflow_revision_id": "96c39633eeb2e263e67ea97a53453adef23ca725b02503d9799500c6f0535189",
+      "authored_status": null
     },
     {
       "name": "opencode_docs_refresh",
@@ -2663,7 +3015,9 @@
       "latest_cost_usd": 23.182931,
       "latest_git_sha": "c34496c65",
       "results_pointer": "experiments/results/workflows/opencode_docs_refresh/20260814T213337Z.json",
-      "n_runs": 1
+      "n_runs": 1,
+      "workflow_revision_id": "a05926bb25fbaf7f6e32dcba14e79f78b867b7407a5a852b513c534b90298d9f",
+      "authored_status": null
     },
     {
       "name": "persistent_code_graph",
@@ -2681,7 +3035,9 @@
       "latest_cost_usd": 0.482366,
       "latest_git_sha": "9bd44f7fa",
       "results_pointer": "experiments/results/workflows/persistent_code_graph/20260831T003550Z.json",
-      "n_runs": 1
+      "n_runs": 1,
+      "workflow_revision_id": "bc283d3b3dbdfd1a657879ecf59507d661d436b52f587372a7037507dfc6a6d5",
+      "authored_status": null
     },
     {
       "name": "perturbation_operators_fix",
@@ -2699,7 +3055,9 @@
       "latest_cost_usd": 0.182237,
       "latest_git_sha": "41fbd1f13",
       "results_pointer": "experiments/results/workflows/perturbation_operators_fix/20260815T163212Z.json",
-      "n_runs": 1
+      "n_runs": 1,
+      "workflow_revision_id": "1898220600a008419a5c541e0a99bd9c144b7f8722bbddb48f79f88979f6103c",
+      "authored_status": null
     },
     {
       "name": "qualitative_routing_analysis",
@@ -2717,7 +3075,9 @@
       "latest_cost_usd": 0.330811,
       "latest_git_sha": "d324325d5",
       "results_pointer": "experiments/results/workflows/qualitative_routing_analysis/20260829T174001Z.json",
-      "n_runs": 1
+      "n_runs": 1,
+      "workflow_revision_id": "5ece5d7158d3f0716e8103261fd1884e70036c7cd62f231b2bb04cedaa7d1895",
+      "authored_status": null
     },
     {
       "name": "rag_knowledge_base",
@@ -2735,7 +3095,9 @@
       "latest_cost_usd": 5.421503,
       "latest_git_sha": "f1a5af24f",
       "results_pointer": "experiments/results/workflows/rag_knowledge_base/20260814T233748Z.json",
-      "n_runs": 4
+      "n_runs": 4,
+      "workflow_revision_id": "5cf914c90226fdeff7a59542ab6a05e0aaf066016b5e371128b29991c34ea2ad",
+      "authored_status": null
     },
     {
       "name": "rag_knowledge_base_build",
@@ -2753,7 +3115,9 @@
       "latest_cost_usd": 0.758744,
       "latest_git_sha": "6e6ff40e6",
       "results_pointer": "experiments/results/workflows/rag_knowledge_base_build/20260815T005852Z.json",
-      "n_runs": 1
+      "n_runs": 1,
+      "workflow_revision_id": "0b414fdcadd3215d444785bd02bf1cb80c2597c83c96202dcfd52d2442f50809",
+      "authored_status": null
     },
     {
       "name": "rag_knowledge_base_reconcile",
@@ -2771,7 +3135,9 @@
       "latest_cost_usd": 0.344878,
       "latest_git_sha": "8f4c81337",
       "results_pointer": "experiments/results/workflows/rag_knowledge_base_reconcile/20260815T193145Z.json",
-      "n_runs": 1
+      "n_runs": 1,
+      "workflow_revision_id": "b63581f87287ca479cbdaf0f582f70d2eec82e3063dee6699818c9f665414b4d",
+      "authored_status": null
     },
     {
       "name": "rag_knowledge_base_wire",
@@ -2789,7 +3155,9 @@
       "latest_cost_usd": 0.382072,
       "latest_git_sha": "1d030c15f",
       "results_pointer": "experiments/results/workflows/rag_knowledge_base_wire/20260815T161708Z.json",
-      "n_runs": 1
+      "n_runs": 1,
+      "workflow_revision_id": "713a9b0120f6080fb7d6a1c15769822943a80cc1b671a8c4b2908e978b5fad29",
+      "authored_status": null
     },
     {
       "name": "rag_knowledge_produce",
@@ -2807,7 +3175,9 @@
       "latest_cost_usd": 0.355472,
       "latest_git_sha": "11cec18d1",
       "results_pointer": "experiments/results/workflows/rag_knowledge_produce/20260815T201634Z.json",
-      "n_runs": 1
+      "n_runs": 1,
+      "workflow_revision_id": "3c634441a38c70ffad0409cd9501da1a587406bd3dee4e84d9c4e06083babf6c",
+      "authored_status": null
     },
     {
       "name": "rag_knowledge_produce_fix",
@@ -2825,7 +3195,9 @@
       "latest_cost_usd": 0.36929,
       "latest_git_sha": "16193909d",
       "results_pointer": "experiments/results/workflows/rag_knowledge_produce_fix/20260815T211149Z.json",
-      "n_runs": 1
+      "n_runs": 1,
+      "workflow_revision_id": "07574c6d8ede4fc09419080bc64c91caf2fe0c16c659d54572cf0c2cc9698543",
+      "authored_status": null
     },
     {
       "name": "rag_knowledge_sources",
@@ -2843,7 +3215,9 @@
       "latest_cost_usd": 0.769027,
       "latest_git_sha": "251604fea",
       "results_pointer": "experiments/results/workflows/rag_knowledge_sources/20260816T013911Z.json",
-      "n_runs": 1
+      "n_runs": 1,
+      "workflow_revision_id": "313b61d5cde02ddd4d23826828c121b9d2ed88d44b4e8775ef4faf062ca8e7a1",
+      "authored_status": null
     },
     {
       "name": "rag_scope_emit",
@@ -2861,7 +3235,9 @@
       "latest_cost_usd": 0.758712,
       "latest_git_sha": "5c57e0853",
       "results_pointer": "experiments/results/workflows/rag_scope_emit/20260817T152845Z.json",
-      "n_runs": 1
+      "n_runs": 1,
+      "workflow_revision_id": "75bfb3776ad1e56e8758050cf906812dcd981973d65d2b16686cca08895dcb98",
+      "authored_status": null
     },
     {
       "name": "rag_seam_split",
@@ -2879,7 +3255,9 @@
       "latest_cost_usd": 0.29579,
       "latest_git_sha": "c3a975cc2",
       "results_pointer": "experiments/results/workflows/rag_seam_split/20260818T234435Z.json",
-      "n_runs": 1
+      "n_runs": 1,
+      "workflow_revision_id": "680ebc637f626a1481ac96bd04085d165dc0df9e72e4ec06041ef8752d43a2e5",
+      "authored_status": null
     },
     {
       "name": "refactor_master_plan",
@@ -2897,7 +3275,9 @@
       "latest_cost_usd": 0.542285,
       "latest_git_sha": "e07938790",
       "results_pointer": "experiments/results/workflows/refactor_master_plan/20260820T024426Z.json",
-      "n_runs": 1
+      "n_runs": 1,
+      "workflow_revision_id": "3c0b7fa4fc9a92a40f44fee2a3e739a63d1a75d6eb17bc6ddba4ab3da4adff0c",
+      "authored_status": null
     },
     {
       "name": "refactor_repair_release",
@@ -2915,7 +3295,9 @@
       "latest_cost_usd": 3.523192,
       "latest_git_sha": "c674abe49",
       "results_pointer": "experiments/results/workflows/refactor_repair_release/20260820T221036Z.json",
-      "n_runs": 1
+      "n_runs": 1,
+      "workflow_revision_id": "10d4641391199156d721f8d9c2b04987461a5e0a28b2ed5bee6d8d1c7bf5cb0d",
+      "authored_status": null
     },
     {
       "name": "remediation_data_integrity",
@@ -2933,7 +3315,9 @@
       "latest_cost_usd": 0.62933,
       "latest_git_sha": "d1adc0cbd",
       "results_pointer": "experiments/results/workflows/remediation_data_integrity/20260815T203106Z.json",
-      "n_runs": 1
+      "n_runs": 1,
+      "workflow_revision_id": "e4fa3dcc53329310d09d43c629551b33b5c3d64764e4a5d6c0a69762f32da89a",
+      "authored_status": null
     },
     {
       "name": "repo_review_fable",
@@ -2951,43 +3335,9 @@
       "latest_cost_usd": 0.56588,
       "latest_git_sha": "8d17a7135",
       "results_pointer": "experiments/results/workflows/repo_review_fable/20260818T232411Z.json",
-      "n_runs": 2
-    },
-    {
-      "name": "retrieval_activation",
-      "version": "0.1",
-      "status": "completed",
-      "spec_path": "workflows/repository/retrieval_activation.yaml",
-      "artifact_kind": "workflow",
-      "repeatable": false,
-      "supersedes": [],
-      "superseded_by": null,
-      "completed_at": null,
-      "last_run_at": "2026-09-01T01:59:21.012287+00:00",
-      "latest_ok": true,
-      "latest_model": "anthropic/claude-sonnet-5",
-      "latest_cost_usd": 10.385829,
-      "latest_git_sha": "469b15559",
-      "results_pointer": "experiments/results/workflows/retrieval_activation/20260901T015921Z.json",
-      "n_runs": 2
-    },
-    {
-      "name": "retrieval_fusion_quality",
-      "version": "0.1",
-      "status": "completed",
-      "spec_path": "workflows/repository/retrieval_fusion_quality.yaml",
-      "artifact_kind": "workflow",
-      "repeatable": false,
-      "supersedes": [],
-      "superseded_by": null,
-      "completed_at": null,
-      "last_run_at": "2026-09-01T04:20:12.027115+00:00",
-      "latest_ok": true,
-      "latest_model": "deepseek/deepseek-v4-flash",
-      "latest_cost_usd": 0.140816,
-      "latest_git_sha": "ee875703a",
-      "results_pointer": "experiments/results/workflows/retrieval_fusion_quality/20260901T042012Z.json",
-      "n_runs": 2
+      "n_runs": 2,
+      "workflow_revision_id": "f3c0c6892bb3ed1b51453c74d92a11e125491c84f8ac1ce5d9b804e898567d30",
+      "authored_status": null
     },
     {
       "name": "retry_observational_analysis",
@@ -3005,7 +3355,9 @@
       "latest_cost_usd": 0.332094,
       "latest_git_sha": "834de8b33",
       "results_pointer": "experiments/results/workflows/retry_observational_analysis/20260830T215929Z.json",
-      "n_runs": 1
+      "n_runs": 1,
+      "workflow_revision_id": "5401586742d8e77ff013656f91a17a5c03e7af5b6b74968165e279180b235bc3",
+      "authored_status": null
     },
     {
       "name": "routing_follow_up",
@@ -3023,7 +3375,9 @@
       "latest_cost_usd": 0.25109,
       "latest_git_sha": "c97aa5a0c",
       "results_pointer": "experiments/results/workflows/routing_follow_up/20260814T222659Z.json",
-      "n_runs": 1
+      "n_runs": 1,
+      "workflow_revision_id": "164e7f4f46d2a81a187a6e1cf1f64e1f36a27ab072f8e42f8743ba8e49f905ae",
+      "authored_status": null
     },
     {
       "name": "routing_kb_more_itertools",
@@ -3041,7 +3395,9 @@
       "latest_cost_usd": 0.033728,
       "latest_git_sha": "a9410ca",
       "results_pointer": "experiments/results/workflows/routing_kb_more_itertools/20260817T183852Z.json",
-      "n_runs": 1
+      "n_runs": 1,
+      "workflow_revision_id": "df4fde076cd354c4b68de6e417dc893ad543f9a5bea0e4c6ac2d1a2fa35ec58b",
+      "authored_status": null
     },
     {
       "name": "routing_kb_wiring",
@@ -3059,7 +3415,9 @@
       "latest_cost_usd": 1.378887,
       "latest_git_sha": "534300f3c",
       "results_pointer": "experiments/results/workflows/routing_kb_wiring/20260817T195222Z.json",
-      "n_runs": 1
+      "n_runs": 1,
+      "workflow_revision_id": "a82c73f35ea4f2eb3fc7e4eed9ff8d3bd38becd1b39ba096527f4f8aee726839",
+      "authored_status": null
     },
     {
       "name": "semantic_integrity_release",
@@ -3077,7 +3435,9 @@
       "latest_cost_usd": 1.689773,
       "latest_git_sha": "7b9e3fad4",
       "results_pointer": "experiments/results/workflows/semantic_integrity_release/20260821T052534Z.json",
-      "n_runs": 4
+      "n_runs": 4,
+      "workflow_revision_id": "2c78c2958edc6dce926955495be04ed6e90e244e739accee0ad5db90a598b127",
+      "authored_status": null
     },
     {
       "name": "site_golden_circle",
@@ -3095,7 +3455,9 @@
       "latest_cost_usd": 0.0,
       "latest_git_sha": "a87688dc1",
       "results_pointer": "experiments/results/workflows/site_golden_circle/20260814T073700Z.json",
-      "n_runs": 1
+      "n_runs": 1,
+      "workflow_revision_id": "ad4326c8ac81502a67bbd6072f14a36fb88ed091886b851a002872bf6f720c5a",
+      "authored_status": null
     },
     {
       "name": "spec_lifecycle",
@@ -3113,7 +3475,9 @@
       "latest_cost_usd": 0.471,
       "latest_git_sha": "a166a08f9",
       "results_pointer": "experiments/results/workflows/spec_lifecycle/20260819T225333Z.json",
-      "n_runs": 2
+      "n_runs": 2,
+      "workflow_revision_id": "405a8ce2ce3b45e335eb1e0ccc0d2c5e1bcb2176f7ea97d7bd58f41dd226d49c",
+      "authored_status": null
     },
     {
       "name": "supervisor_control_room",
@@ -3131,7 +3495,9 @@
       "latest_cost_usd": 10.822051,
       "latest_git_sha": "f6f28d1dd",
       "results_pointer": "experiments/results/workflows/supervisor_control_room/20260814T160913Z.json",
-      "n_runs": 2
+      "n_runs": 2,
+      "workflow_revision_id": "774e4b371e3b96c648595ae9349e558bfba066109bcd4c92dbf896b960855686",
+      "authored_status": null
     },
     {
       "name": "task_vocabulary_unify",
@@ -3149,25 +3515,9 @@
       "latest_cost_usd": 0.142842,
       "latest_git_sha": "c743f6407",
       "results_pointer": "experiments/results/workflows/task_vocabulary_unify/20260818T234126Z.json",
-      "n_runs": 1
-    },
-    {
-      "name": "test_suite_speed",
-      "version": "0.1",
-      "status": "completed",
-      "spec_path": "workflows/repository/test_suite_speed.yaml",
-      "artifact_kind": "workflow",
-      "repeatable": false,
-      "supersedes": [],
-      "superseded_by": null,
-      "completed_at": null,
-      "last_run_at": "2026-09-01T06:55:59.391041+00:00",
-      "latest_ok": true,
-      "latest_model": "deepseek/deepseek-v4-flash",
-      "latest_cost_usd": 0.364984,
-      "latest_git_sha": "3028750a6",
-      "results_pointer": "experiments/results/workflows/test_suite_speed/20260901T065559Z.json",
-      "n_runs": 1
+      "n_runs": 1,
+      "workflow_revision_id": "961de0995869a3679f2c603648f616019fd7a9a253f82145496942dae7422216",
+      "authored_status": null
     },
     {
       "name": "website_data_pipeline",
@@ -3185,7 +3535,9 @@
       "latest_cost_usd": 0.136359,
       "latest_git_sha": "348e37da2",
       "results_pointer": "experiments/results/workflows/website_data_pipeline/20260817T200809Z.json",
-      "n_runs": 1
+      "n_runs": 1,
+      "workflow_revision_id": "5e9ee278564d1334d25eb95612c75b5e3c9890e3c9a438077b4a9c7741555d6b",
+      "authored_status": null
     },
     {
       "name": "website_registry_repoint",
@@ -3203,7 +3555,9 @@
       "latest_cost_usd": 0.354167,
       "latest_git_sha": "3925c66e4",
       "results_pointer": "experiments/results/workflows/website_registry_repoint/20260819T222652Z.json",
-      "n_runs": 1
+      "n_runs": 1,
+      "workflow_revision_id": "9ef25a43cc4f2cf069dc1939dd03bfdc81f0fca24c2817c35b8597ff02d3ee06",
+      "authored_status": null
     },
     {
       "name": "website_repoint",
@@ -3221,7 +3575,9 @@
       "latest_cost_usd": 0.330363,
       "latest_git_sha": "89f181723",
       "results_pointer": "experiments/results/workflows/website_repoint/20260819T230845Z.json",
-      "n_runs": 2
+      "n_runs": 2,
+      "workflow_revision_id": "7e4f90f226f460b6e0eea76d6f4fb3eec1f029633d47e3f24bb5dc55829de067",
+      "authored_status": null
     },
     {
       "name": "website_rewrite",
@@ -3239,7 +3595,9 @@
       "latest_cost_usd": 12.628669,
       "latest_git_sha": "c324aab5b",
       "results_pointer": "experiments/results/workflows/website_rewrite/20260817T210037Z.json",
-      "n_runs": 3
+      "n_runs": 3,
+      "workflow_revision_id": "1e06abf4ab6161089ecf64bddc00b466085250c87f7771062f9d0273b87aef58",
+      "authored_status": null
     },
     {
       "name": "workflow_metrics",
@@ -3257,7 +3615,9 @@
       "latest_cost_usd": 0.623031,
       "latest_git_sha": "97d9e423c",
       "results_pointer": "experiments/results/workflows/workflow_metrics/20260830T180647Z.json",
-      "n_runs": 1
+      "n_runs": 1,
+      "workflow_revision_id": "fad73e6048d845378848725258a90a07a39f837fd8c428257c1ae306435c68c2",
+      "authored_status": null
     },
     {
       "name": "workflow_step_routing",
@@ -3275,7 +3635,9 @@
       "latest_cost_usd": 0.079642,
       "latest_git_sha": "8536ad664",
       "results_pointer": "experiments/results/workflows/workflow_step_routing/20260814T214546Z.json",
-      "n_runs": 1
+      "n_runs": 1,
+      "workflow_revision_id": "140ae472473e0201e55bb007960ba0501e452227a463c12c636a97d7b705a462",
+      "authored_status": null
     }
   ]
 }

@@ -12,6 +12,8 @@ Design: ``code_reviews/2026-08-14_experiment-spec-and-compiler-design.md``.
 
 from __future__ import annotations
 
+import hashlib
+import json
 import re
 import warnings
 from dataclasses import dataclass, field
@@ -206,6 +208,72 @@ SPEC_STATUSES = frozenset(
         "tombstoned",
     }
 )
+
+# ── Revision identity (w2 — completion follows the revision) ─────────────────
+#
+# ``workflow_revision_id`` is the canonicalized digest of a spec's *definition* — the
+# structural YAML that says what work the spec does and how (name, version, the workflow
+# block with its phases, factors, rules, stop, adapt, …). It deliberately EXCLUDES the
+# lifecycle/metadata layer (``status``, supersedes pointers, run stamps, git/pricing pins):
+# those are prose-or-bookkeeping, and the w2 rule is that prose never decides completion.
+#
+# Canonicalization drops comments and whitespace implicitly (YAML parse) and every
+# authored-but-not-definitional key explicitly, then hashes a deterministic (sorted,
+# compact) JSON rendering of what remains. A cosmetic edit (comment/whitespace) therefore
+# leaves the digest untouched; a structural edit (a phase added, a gate appended, a rule
+# changed) changes it — so an edited spec shows its own run state, never the earlier
+# revision's completion.
+
+#: Top-level spec keys that do NOT define the work and therefore never change the revision
+#: digest. Authored lifecycle (the seed), authoring provenance, and generated stamps are
+#: volatile; a revision is what the spec WOULD DO, which none of these keys change.
+REVISION_VOLATILE_KEYS: frozenset[str] = frozenset(
+    {
+        "status",
+        "supersedes",
+        "superseded_by",
+        "completed_at",
+        "last_run_at",
+        "results_pointer",
+        "git_sha",
+        "pricing_version",
+        "generated_at",
+    }
+)
+
+
+def _canonical_json(mapping: dict[str, Any]) -> str:
+    """Deterministic compact JSON for a mapping: keys sorted at every level, no spaces.
+
+    The one canonical text a given spec definition maps to, so the digest is stable across
+    comment/whitespace/key-order edits and only changes when the definition itself does.
+    """
+    return json.dumps(mapping, sort_keys=True, separators=(",", ":"), default=str)
+
+
+def canonical_spec_definition(spec: ExperimentSpec) -> dict[str, Any]:
+    """The spec's *definitional* mapping — ``to_dict()`` minus the volatile/lifecycle keys.
+
+    This is the canonicalization the revision digest hashes. Everything that defines what the
+    workflow does is retained (name, question, version, workflow with its phases, factors,
+    design, rules, metrics, comparison, writeup, stop, adapt, artifact identity, …); the
+    lifecycle/authoring keys in :data:`REVISION_VOLATILE_KEYS` are dropped so editing them
+    never re-keys a revision.
+    """
+    return {k: v for k, v in spec.to_dict().items() if k not in REVISION_VOLATILE_KEYS}
+
+
+def compute_workflow_revision_id(spec: ExperimentSpec) -> str:
+    """``sha256(canonicalized spec definition)`` — the identity a run's digest is keyed to.
+
+    Stable across cosmetic edits (comments/whitespace vanish at parse, keys are sorted),
+    changed by structural edits (a phase added, a gate appended). Exposed on the spec object
+    as :attr:`ExperimentSpec.workflow_revision_id` and recorded on run ledgers + control-db
+    runs, so completion can follow the revision rather than the prose.
+    """
+    text = _canonical_json(canonical_spec_definition(spec))
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
 
 #: Every top-level key a spec YAML may carry. ``from_dict`` warns (loudly, via
 #: :mod:`warnings`) about anything outside this set rather than dropping it silently —
@@ -650,6 +718,17 @@ class ExperimentSpec:
         it, so job and attempt records cannot drift into two different formats.
         """
         return f"{self.name}@{self.version}"
+
+    @property
+    def workflow_revision_id(self) -> str:
+        """``sha256(canonicalized spec definition)`` — this spec's current revision digest.
+
+        See :func:`compute_workflow_revision_id`. Completion follows this digest: a run
+        ledger records the revision it executed, and ``spec_status`` only lets runs whose
+        recorded revision equals the current digest certify the current definition.
+        Computed on demand so it is always correct for any construction path.
+        """
+        return compute_workflow_revision_id(self)
 
     def to_dict(self) -> dict[str, Any]:
         out: dict[str, Any] = {

@@ -14,6 +14,17 @@ run state, the aggregate ledger, promotion eligibility. Docker answers exactly o
 question: *"execute this one step inside this exact isolation envelope and return a
 structured result."* It never reimplements workflow semantics.
 
+Test semantics (w1, engine_gaps_verifier_revision): the engine owns the VERDICT too.
+A ``kind: test`` phase is executed either in-process by ``test_runner.run_suite``
+(LocalVerifier — the default) or, under ``--orchestrator``, dispatched through an
+injected verifier executor (``scripts/fleet/docker_verifier_executor.py`` — the
+DockerVerifierExecutor) which runs the suite in a READ-ONLY verifier container bound to
+the candidate. The verdict lands on the SAME :class:`StepResult` fields
+(``test_executed_success`` / ``tests_passed`` / ``tests_total``) in both shapes, from the
+SAME source semantics — the suite run by the independent runner, never the agent's
+self-report. ``StepResult`` therefore carries those three test-verdict fields (additive —
+an agent executor never fills them).
+
 Mirrors the Debt-2 pattern (``runtime/routing.py``, ``runtime/telemetry.py``,
 ``runtime/admission.py``): runtime owns the protocol; the composition root
 (``scripts/run_workflow.py``) supplies the implementation — the local agent call by
@@ -43,6 +54,7 @@ class StepRequest:
     goal: str
     spec_name: str
     workdir: str
+    language: str = ""
     backend: str | None = None
     thinking_effort: str = "high"
     thinking_budget_tokens: int = 0
@@ -86,6 +98,15 @@ class StepResult:
     files_created: list[str] = field(default_factory=list)
     files_modified: list[str] = field(default_factory=list)
     final_response: str = ""
+    # test-verdict fields (w1, engine_gaps_verifier_revision): filled ONLY by a verifier
+    # executor — the object a ``kind: test`` phase's dispatch returns. The engine reads the
+    # SAME fields whether the suite ran in-process (LocalVerifier) or in a verifier container
+    # (DockerVerifierExecutor), and the source is always the independent runner's suite
+    # (exit + report), never the agent's self-report. An agent executor never fills them —
+    # they stay ``None``/``0`` (null-not-zero, never a fabricated verdict).
+    test_executed_success: bool | None = None
+    tests_passed: int = 0
+    tests_total: int = 0
 
 
 class StepExecutor(Protocol):
@@ -170,4 +191,10 @@ def _result_from_agentic(ar: Any) -> StepResult:
         files_created=list(getattr(ar, "files_created", []) or []),
         files_modified=list(getattr(ar, "files_modified", []) or []),
         final_response=getattr(ar, "final_response", "") or "",
+        # Test-verdict fields ride through when the adapted object carries them (an agentic
+        # result normally does not — an agent executor produces no test verdict); absent
+        # fields stay None/0, never fabricated.
+        test_executed_success=getattr(ar, "test_executed_success", None),
+        tests_passed=int(getattr(ar, "tests_passed", 0) or 0),
+        tests_total=int(getattr(ar, "tests_total", 0) or 0),
     )

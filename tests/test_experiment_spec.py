@@ -14,6 +14,7 @@ from agentic_dynamics.experiment.experiment_spec import (
     MetricSpec,
     RuleSpec,
     Workflow,
+    compute_workflow_revision_id,
     load_spec,
     validate_rules,
     validate_spec,
@@ -534,3 +535,103 @@ def test_committed_spec_corpus_passes_the_prose_safety_gate():
         errors = validate_spec(spec)
         assert errors == [], f"{path} fails validation: {errors}"
 
+
+
+# ── w2: workflow_revision_id — canonicalized spec revision digest ──────────────
+
+
+def _agent_spec(**overrides) -> dict:
+    """A structural agent_task spec mapping (dict form, like a parsed YAML)."""
+    base = {
+        "name": "ship",
+        "question": "does it work?",
+        "version": "0.1",
+        "workflow": {
+            "kind": "agent_task",
+            "params": {
+                "language": "python",
+                "phases": [
+                    {"name": "p1_build", "kind": "agent", "prompt": "build it"},
+                    {"name": "p2_verify", "kind": "test", "tests": ["tests/test_x.py"]},
+                ],
+            },
+        },
+        "factors": [{"name": "model", "levels": ["deepseek/deepseek-v4-pro"]}],
+        "design": "factorial",
+        "rules": [{"name": "r", "plane": "measurement", "evidence_class": "[M]"}],
+        "stop": {"budget_usd": 10.0},
+        "adapt": {"strategy": "manual", "selection": "highest_regret"},
+    }
+    base.update(overrides)
+    return base
+
+
+def test_workflow_revision_id_is_exposed_on_the_spec_object():
+    spec = ExperimentSpec.from_dict(_agent_spec())
+    assert spec.workflow_revision_id == compute_workflow_revision_id(spec)
+    assert len(spec.workflow_revision_id) == 64  # sha256 hexdigest
+
+
+def test_revision_digest_is_stable_across_cosmetic_edits(tmp_path: Path):
+    """VERIFY (a) first direction: comment/whitespace edits leave the digest untouched."""
+    import yaml
+
+    path = tmp_path / "ship.yaml"
+    path.write_text(yaml.dump(_agent_spec()))
+    before = load_spec(path).workflow_revision_id
+
+    # cosmetic: comments, blank lines, indentation — none change the parsed structure
+    path.write_text("# leading comment\n" + yaml.dump(_agent_spec()) + "\n\n# trailing\n")
+    assert load_spec(path).workflow_revision_id == before
+
+    # lifecycle/volatile keys are NOT part of the definition and never re-key a revision
+    with_lifecycle = _agent_spec()
+    with_lifecycle["status"] = "completed"
+    with_lifecycle["completed_at"] = "2026-09-02T00:00:00+00:00"
+    assert (
+        ExperimentSpec.from_dict(with_lifecycle).workflow_revision_id
+        == ExperimentSpec.from_dict(_agent_spec()).workflow_revision_id
+    )
+
+
+def test_revision_digest_changes_on_structural_edits():
+    """VERIFY (a) second direction: adding a phase / a gate changes the digest."""
+    base = _agent_spec()
+    base_digest = ExperimentSpec.from_dict(base).workflow_revision_id
+
+    appended_gate = dict(base)
+    appended_gate["workflow"]["params"]["phases"] = list(base["workflow"]["params"]["phases"]) + [
+        {"name": "p3_gate", "kind": "test", "tests": ["tests/test_gate.py"]}
+    ]
+    assert ExperimentSpec.from_dict(appended_gate).workflow_revision_id != base_digest
+
+    edited_phase = dict(base)
+    edited_phase["workflow"]["params"]["phases"] = [
+        {**base["workflow"]["params"]["phases"][0], "name": "p1_build_renamed"}
+    ] + base["workflow"]["params"]["phases"][1:]
+    assert ExperimentSpec.from_dict(edited_phase).workflow_revision_id != base_digest
+
+
+def test_revision_digest_is_deterministic_across_construction_paths(tmp_path: Path):
+    """The same definition hashes the same whether built by dict or loaded from YAML."""
+    import yaml
+
+    path = tmp_path / "ship.yaml"
+    path.write_text(yaml.dump(_agent_spec()))
+    assert load_spec(path).workflow_revision_id == ExperimentSpec.from_dict(_agent_spec()).workflow_revision_id
+
+
+def test_revision_digest_ignores_key_order_within_a_definition(tmp_path: Path):
+    """Structural YAML key order is not definitional — the digest is canonicalized."""
+    import yaml
+
+    a = _agent_spec()
+    # round-trip through YAML text with keys reordered at the top level
+    txt = yaml.dump(a)
+    shuffled = yaml.safe_load(txt)
+    reordered = {"adapt": shuffled["adapt"], "name": shuffled["name"],
+                 "workflow": shuffled["workflow"], "rules": shuffled["rules"],
+                 "stop": shuffled["stop"], "factors": shuffled["factors"],
+                 "design": shuffled["design"], "question": shuffled["question"],
+                 "version": shuffled["version"]}
+    assert ExperimentSpec.from_dict(reordered).workflow_revision_id == ExperimentSpec.from_dict(a).workflow_revision_id

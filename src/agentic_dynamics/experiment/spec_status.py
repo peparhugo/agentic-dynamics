@@ -154,6 +154,16 @@ class RunSummary:
     model: str | None = None
     cost_usd: float | None = None
     git_sha: str | None = None
+    #: w2 (revision identity): the run ledger's recorded ``workflow_revision_id`` — the
+    #: ``sha256(canonicalized spec definition)`` the run executed. ``""`` for legacy ledgers
+    #: written before the field existed; ``spec_status`` then attributes them to the current
+    #: spec only through the phase-coverage compatibility check in ``derive_status``.
+    workflow_revision_id: str = ""
+    #: The phase names this run's ledger records as executed (``phases[].phase``). Used by
+    #: ``derive_status`` to tell a legacy run of the CURRENT definition from a run of an
+    #: OLDER one: if the current spec declares a phase no run ever executed (a gate appended
+    #: after the last green run), the green runs predate it and cannot certify completion.
+    executed_phases: frozenset[str] = frozenset()
     #: P1 (awaiting-approval fix): True when the run ledger carries ``awaiting: true`` — the
     #: run stopped at a mechanical human checkpoint (or a resume refused past an unsatisfied
     #: one). A designed stop, never a failure: the index derives ``awaiting_approval`` for a
@@ -178,6 +188,8 @@ class RunSummary:
             "model": self.model,
             "cost_usd": self.cost_usd,
             "git_sha": self.git_sha,
+            "workflow_revision_id": self.workflow_revision_id,
+            "executed_phases": sorted(self.executed_phases),
             "awaiting": self.awaiting,
             "started_at": self.started_at,
             "open": self.open,
@@ -204,6 +216,17 @@ def summarize_run(path: Path, payload: dict[str, Any], *, root: Path) -> RunSumm
         model=str(payload["model"]) if payload.get("model") else None,
         cost_usd=float(cost) if isinstance(cost, (int, float)) else None,
         git_sha=str(payload["git_sha"]) if payload.get("git_sha") else None,
+        # w2 (revision identity): the digest the run executed — "" for legacy ledgers.
+        # Read defensively (``.get``) so pre-w2 ledgers and unknown shapes parse unchanged.
+        workflow_revision_id=str(payload.get("workflow_revision_id") or ""),
+        # The phase names this run's ledger lists as executed, for the revision-coverage
+        # check in derive_status (a gate appended after the last green run is a phase no
+        # run ever executed).
+        executed_phases=frozenset(
+            str(p.get("phase"))
+            for p in (payload.get("phases") or [])
+            if isinstance(p, dict) and p.get("phase")
+        ),
         awaiting=payload.get("awaiting") is True,
         started_at=_iso(started) if started else None,
         open=(ended is None and started is not None),
@@ -272,6 +295,17 @@ class SpecStatusEntry:
     latest_git_sha: str | None = None
     results_pointer: str | None = None  # repo-relative path to the latest run ledger
     n_runs: int = 0
+    #: w2 (revision identity): this spec's CURRENT ``workflow_revision_id`` (sha256 of the
+    #: canonicalized definition). The catalogue reports the revision's run state — a reader
+    #: comparing it with a run ledger's recorded revision can see whether that run certifies
+    #: the current definition.
+    workflow_revision_id: str = ""
+    #: w2 ('authored' marker): the ``status:`` the spec's own YAML authors, when it authors
+    #: one. For a legacy authored-status spec this is a PROSE CLAIM, not a measurement —
+    #: ``status`` above is derived from runs of the current revision (or, with no run
+    #: evidence at all, carries the authored value). Recording it separately lets readers see
+    #: the claim the file makes distinct from the state the run evidence supports.
+    authored_status: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -291,6 +325,11 @@ class SpecStatusEntry:
             "latest_git_sha": self.latest_git_sha,
             "results_pointer": self.results_pointer,
             "n_runs": self.n_runs,
+            # ADDED keys (w2 — additive, never renames an existing key): revision identity +
+            # the authored-status provenance marker. Readers that predate w2 read the entry
+            # via ``.get``/field defaults and are unaffected.
+            "workflow_revision_id": self.workflow_revision_id,
+            "authored_status": self.authored_status,
         }
 
     @classmethod
@@ -313,6 +352,10 @@ class SpecStatusEntry:
             latest_git_sha=d.get("latest_git_sha"),
             results_pointer=d.get("results_pointer"),
             n_runs=int(d.get("n_runs", 0)),
+            workflow_revision_id=str(d.get("workflow_revision_id") or ""),
+            authored_status=(
+                str(d["authored_status"]) if d.get("authored_status") is not None else None
+            ),
         )
 
 
@@ -338,6 +381,73 @@ def _is_currently_running(
     return False
 
 
+def _spec_phase_names(spec: ExperimentSpec) -> list[str]:
+    """The phase names the spec's current definition declares, in workflow order."""
+    phases = spec.workflow.params.get("phases") or []
+    return [str(p.get("name")) for p in phases if isinstance(p, dict) and p.get("name")]
+
+
+def _is_definition_changed_after_runs(spec: ExperimentSpec, runs: list[RunSummary]) -> bool:
+    """True when the current spec declares a phase NO run of the spec ever executed.
+
+    The w2 'gate added after completed' detector for LEGACY run ledgers (written before the
+    revision digest existed, so they carry no ``workflow_revision_id`` to compare). A green
+    run that completed the spec executed every phase the spec declared at the time; if the
+    CURRENT spec declares a phase that appears in no run ledger (e.g. a ``kind: test`` gate
+    appended after the last green run), then the recorded runs predate the definition change
+    and cannot certify the current revision.
+
+    Only ever fires when a green (``ok``) run exists: a run that FAILED before reaching a
+    later phase leaves that phase unexecuted too, but that is a failure, not a definition
+    change, and must keep deriving ``failed`` rather than looking "never run of this
+    revision".
+    """
+    spec_phases = _spec_phase_names(spec)
+    if not spec_phases:
+        return False
+    has_green = any(run.ok is True for run in runs)
+    if not has_green:
+        return False
+    executed = set().union(*(run.executed_phases for run in runs)) if runs else set()
+    # Only the "trailing append" shape counts as a *definition changed after the runs*: the
+    # executed phases form a strict prefix of the current phase list (a gate was appended to
+    # the END after the last run). A phase missing from the FRONT or MIDDLE of the current
+    # list (a resumed run whose earlier ledger lives elsewhere) is not proof of an edit.
+    n = len(executed)
+    if n <= 0 or n >= len(spec_phases):
+        return False
+    return executed == set(spec_phases[:n])
+
+
+def _runs_of_current_revision(
+    spec: ExperimentSpec, runs: list[RunSummary]
+) -> tuple[list[RunSummary], bool]:
+    """Split ``runs`` into those that certify the CURRENT spec revision.
+
+    Returns ``(certifying, changed)``:
+
+    * ``certifying`` — the subset of runs whose recorded ``workflow_revision_id`` equals the
+      current spec digest. Only these may mark the current definition complete.
+    * ``changed`` — True when runs EXIST but none of them certifies the current revision:
+      the spec was edited after its last run (a gate appended, a phase changed), so the
+      current revision has never been run and earlier completion does not carry over.
+
+    Legacy runs (no recorded digest — the pre-w2 corpus) certify the current revision only
+    when no definition change is detectable after them (see
+    :func:`_is_definition_changed_after_runs`). Runs recording an older digest never certify.
+    """
+    if not runs:
+        return [], False
+    digest = spec.workflow_revision_id
+    recorded = [r for r in runs if r.workflow_revision_id]
+    if recorded:
+        certifying = [r for r in recorded if r.workflow_revision_id == digest]
+        return certifying, not certifying
+    if _is_definition_changed_after_runs(spec, runs):
+        return [], True
+    return runs, False
+
+
 def derive_status(
     spec: ExperimentSpec,
     runs: list[RunSummary] | None = None,
@@ -349,61 +459,87 @@ def derive_status(
 
     The precedence is fixed by the spec-lifecycle design:
 
-    1. the YAML's ``status``, when the operator authored one (an explicit ``draft`` or
-       ``tombstoned`` is a claim only a human can make);
+    1. an authored ``draft``/``tombstoned`` — a claim only a human can make, which no run
+       can express (an explicit ``draft`` or ``tombstoned`` wins over every derivation);
     2. otherwise ``superseded`` when ``superseded_by`` is set — a spec that names its
        replacement has, by definition, been replaced;
     3. otherwise, **per-kind**:
        * a *repeatable* spec (an experiment, or an idempotent operation) is always
          ``runnable`` — it is re-runnable by construction;
-       * a *non-repeatable* workflow derives its state from the run ledgers: ``running``
-         when a run is *currently* executing (an open run within ``running_window``),
-         ``awaiting_approval`` when the LATEST run stopped at a mechanical human
-         checkpoint (the ledger carries ``awaiting: true`` — a designed pause for the
-         operator, never a failure), ``completed`` when any run succeeded,
-         ``failed`` when a run recorded a definitive failure and none is running,
-         ``blocked`` when runs exist but none resolved (no verdict and nothing in
-         flight), and ``runnable`` when it has never been run.
+       * a *non-repeatable* workflow derives its state from runs of its EXACT revision
+         (w2 revision identity): ``running`` when a run is *currently* executing (an open
+         run within ``running_window``), ``awaiting_approval`` when the LATEST run of the
+         current revision stopped at a mechanical human checkpoint (the ledger carries
+         ``awaiting: true``), ``completed`` when a run of the current revision succeeded,
+         ``failed`` when a run of the current revision recorded a definitive failure,
+         ``blocked`` when runs of the current revision exist but none resolved (no verdict
+         and nothing in flight), and ``runnable`` when the current revision has never been
+         run (never run at all, or edited after its last green run).
 
-    ``running`` is the one state that REQUIRES positive evidence of current execution — a
-    historical failed or abandoned run never stays ``running`` indefinitely. This is the P2
-    fix: "attempts but no success" is ``failed``/``blocked``, not a permanent ``running``.
+    **Authored ``status:`` no longer overrides run evidence for workflows** (w2). An
+    authored ``completed``/``failed``/etc. on a WORKFLOW YAML is a legacy prose claim, not a
+    measurement: it is reported only when the spec has NO run ledgers at all (nothing to
+    override — the catalogue carries it as an explicit ``authored_status`` marker), and run
+    evidence decides whenever it exists. ``draft``/``tombstoned`` are exempt: they are not
+    run-evidence claims, they are operator lifecycle claims.
+
+    **Completion follows the revision.** ``running`` requires positive evidence of current
+    execution — a historical failed or abandoned run never stays ``running`` indefinitely
+    (the P2 fix). A run ledger that records a ``workflow_revision_id`` certifies only its
+    own digest: a completed run of revision A does NOT mark edited revision B completed; B
+    shows its own run state or "never run of this revision" (a gate appended after the last
+    green run leaves the current definition with a phase no run ever executed — those runs
+    predate it and cannot certify it). Legacy ledgers written before the digest existed carry
+    no revision id and are attributed to the current revision unless a definition change is
+    detectable after them (see :func:`_runs_of_current_revision`).
 
     The ``awaiting_approval`` state is the P1 fix: a correctly-paused run (``ok: false`` +
     ``awaiting: true`` on the ledger — a checkpoint stop, or a resume refused past an
     unsatisfied checkpoint) must read as "waiting for the operator", NOT as ``failed``. The
-    check keys the LATEST run only: an awaiting run that predates a later success (or a later
-    genuine failure) is shadowed by the more recent verdict, and a pause that IS the latest
-    run reads as ``awaiting_approval`` even when an earlier run succeeded (a re-run stopped
-    for the operator is active work). A definitive ``ok: false`` + ``awaiting: false`` latest
-    run still derives ``failed``.
+    check keys the LATEST run of the current revision only.
 
     Note what is deliberately *absent*: run history never demotes a *repeatable* spec to
     ``draft``. "Never run" and "draft" are different facts, and the table shows the first
     one directly (``n_runs``/``last_run``) rather than folding it into the status column.
     """
-    if spec.status:
+    # Authored human-only claims: draft/tombstoned are claims only a human can make, and no
+    # run ledger can express them — they win over every derivation, on any spec kind.
+    if spec.status in ("draft", "tombstoned"):
         return spec.status
     if spec.superseded_by:
         return "superseded"
-    if not spec.repeatable:
-        runs = runs or []
-        if _is_currently_running(runs, now=now, window=running_window):
-            return "running"
-        # P1: the LATEST run is awaiting operator approval — a designed pause, distinct from
-        # a definitive failure. The check keys the latest run ONLY: an awaiting run that
-        # predates a later success is shadowed by that later verdict (completed), while a
-        # pause that is itself the latest signal reads as awaiting_approval even if an
-        # earlier run succeeded (a re-run stopped for the operator IS active work).
-        if runs and runs[-1].awaiting:
-            return "awaiting_approval"
-        if any(run.ok is True for run in runs):
-            return "completed"
-        if any(run.ok is False for run in runs):
-            return "failed"
-        if runs:
-            return "blocked"
+    runs = runs or []
+    if spec.repeatable:
+        # A repeatable spec (experiment/idempotent operation) is re-runnable by
+        # construction and never derives a work-order state from runs. Authored lifecycle
+        # claims (draft/tombstone above, and any authored value) remain the report; the w2
+        # demotion of authored ``status:`` targets WORKFLOW (non-repeatable) completion.
+        return spec.status or "runnable"
+    # ── Non-repeatable workflow — derive from runs of the EXACT current revision ──────────
+    certifying, changed = _runs_of_current_revision(spec, runs)
+    if _is_currently_running(certifying, now=now, window=running_window):
+        return "running"
+    # P1: the LATEST certifying run is awaiting operator approval — a designed pause.
+    if certifying and certifying[-1].awaiting:
+        return "awaiting_approval"
+    if any(run.ok is True for run in certifying):
+        return "completed"
+    if any(run.ok is False for run in certifying):
+        return "failed"
+    if certifying:
+        return "blocked"
+    # No run certifies the current revision.
+    if changed:
+        # Runs exist but none is of the current revision — the definition changed after
+        # the last run (a gate appended, a phase changed). The current revision has never
+        # been run: it is runnable, and the catalogue's definition-changed marker explains
+        # why a spec with historical runs reads as not-completed.
         return "runnable"
+    if not runs:
+        # Never run at all. A legacy authored run-evidence status (e.g. `completed` on a
+        # consolidation spec with no ledger anywhere) is the ONLY record — report it as a
+        # catalogue marker rather than silently erasing it; run evidence would override it.
+        return spec.status or "runnable"
     return "runnable"
 
 
@@ -415,8 +551,23 @@ def build_entry(
     Seed-vs-evidence rule: where the YAML asserted ``last_run_at``/``results_pointer`` and
     a real run ledger also exists, the *measured* run wins; the YAML value survives only
     as the fallback for a spec whose runs live outside this checkout.
+
+    w2 (revision identity — hard rule: *the index shows the new revision's run state, never
+    the old one's*): for a non-repeatable workflow the run-evidence columns describe the
+    latest run that certifies the CURRENT definition (see :func:`_runs_of_current_revision`),
+    and ``workflow_revision_id`` records that digest. When the definition changed after the
+    last green run (a gate appended), no run certifies the current revision: the columns
+    report no current-revision evidence, ``status`` derives ``runnable`` (never run of this
+    revision), and the YAML's authored ``status:`` — if any — is carried separately as the
+    explicit ``authored_status`` marker rather than silently overriding the evidence.
     """
-    latest = runs[-1] if runs else None
+    if spec.repeatable:
+        # Repeatable specs (experiments/operations) never derive a work-order state; the run
+        # columns stay a plain record of the ledgers present.
+        certifying = runs
+    else:
+        certifying, _changed = _runs_of_current_revision(spec, runs)
+    latest = certifying[-1] if certifying else None
     return SpecStatusEntry(
         name=spec.name,
         version=spec.version,
@@ -433,7 +584,12 @@ def build_entry(
         latest_cost_usd=latest.cost_usd if latest else None,
         latest_git_sha=latest.git_sha if latest else None,
         results_pointer=(latest.path if latest else spec.results_pointer),
+        # ``n_runs`` stays the count of run ledgers PRESENT for the spec (historical fact);
+        # the derived status + the columns above reflect only runs that certify the current
+        # revision, so a ledger of an edited older revision never reads as current evidence.
         n_runs=len(runs),
+        workflow_revision_id=spec.workflow_revision_id,
+        authored_status=spec.status or None,
     )
 
 
@@ -604,24 +760,28 @@ def render_status_md(entries: list[SpecStatusEntry], *, generated_at: str | None
         "",
         "## Legend",
         "",
-        "**Status** — authored in the spec YAML's `status:` when the operator asserted one,",
-        "otherwise derived: `superseded` when the spec names a `superseded_by:`; for a",
-        "non-repeatable workflow, `completed` when any run succeeded, `awaiting_approval`",
-        "when the latest run stopped at a mechanical human checkpoint (`awaiting: true` on",
-        "the ledger — a designed pause, never a failure), `failed` when a run",
-        "recorded a definitive failure, `blocked` when runs exist but none resolved, `running`",
-        "when a run is currently executing (an open, recent run), `runnable` when never run;",
-        "else (a repeatable spec) `runnable`.",
+        "**Status** — authored in the spec YAML's `status:` only when the operator asserted one",
+        "and no run evidence exists to decide otherwise (draft/tombstoned are claims only a",
+        "human can make); otherwise derived: `superseded` when the spec names a",
+        "`superseded_by:`; for a non-repeatable workflow, `completed`/`failed`/`blocked`/",
+        "`running`/`awaiting_approval`/`runnable` come from runs of its EXACT revision",
+        "(w2 revision identity). A completed run of revision A does NOT mark an edited",
+        "revision B completed: editing a spec (a gate appended, a phase changed) changes its",
+        "`workflow_revision_id`, and B shows its own run state — `runnable` (never run of",
+        "this revision) until a run of B certifies it. `awaiting_approval` is the latest run",
+        "of the current revision stopped at a mechanical human checkpoint (`awaiting: true`",
+        "on the ledger — a designed pause, never a failure). `running` requires an open,",
+        "recent run; `runnable` = never run of the current revision, or a repeatable spec.",
         "",
         "| status | meaning |",
         "|---|---|",
-        "| `runnable` | never run (a non-repeatable workflow), or a repeatable spec — ready to run |",
+        "| `runnable` | never run (of the current revision — possibly edited after its last green run), or a repeatable spec — ready to run |",
         "| `running` | a non-repeatable workflow currently executing — an open run within the window |",
-        "| `awaiting_approval` | the latest run stopped at a human checkpoint (`awaiting: true`) — the operator must approve before it continues |",
-        "| `failed` | a non-repeatable workflow whose run(s) recorded a definitive failure |",
+        "| `awaiting_approval` | the latest run of the current revision stopped at a human checkpoint (`awaiting: true`) — the operator must approve before it continues |",
+        "| `failed` | a non-repeatable workflow whose run(s) of the current revision recorded a definitive failure |",
         "| `blocked` | a non-repeatable workflow with runs that started but never resolved |",
         "| `draft` | authored, not yet run to completion; not yet a claim about anything |",
-        "| `completed` | a non-repeatable workflow whose run succeeded (derived from the "
+        "| `completed` | a non-repeatable workflow whose current revision succeeded (derived from the "
         "run ledgers) |",
         "| `superseded` | a later spec took over its question (see that spec's "
         "`supersedes` column) |",
@@ -645,8 +805,14 @@ def render_status_md(entries: list[SpecStatusEntry], *, generated_at: str | None
         f"`{MISSING}` means **no evidence**, not failure — the run-ledger directory",
         f"(`{WORKFLOW_RESULTS_DIR_REL}/`) is untracked, so a fresh checkout shows an em-dash",
         "for every run-derived column. The machine-readable form of this table, including",
-        f"`results_pointer` (path to the latest run ledger), is `{INDEX_FILENAME}` beside"
+        f"`results_pointer` (path to the latest run ledger), is `{INDEX_FILENAME}` beside",
         " this file.",
+        "",
+        "**Revision identity (w2)** — `index.json` entries carry the spec's current",
+        "`workflow_revision_id` (sha256 of the canonicalized definition) and, when the spec's",
+        "YAML authors a `status:` that run evidence did not confirm, the `authored_status`",
+        "marker. A row whose status is `runnable` while older run columns exist means the",
+        "definition changed after its last green run (a gate added, never run).",
         "",
     ]
     return "\n".join(lines)

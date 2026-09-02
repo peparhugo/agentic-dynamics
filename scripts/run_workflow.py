@@ -429,14 +429,31 @@ def main() -> None:
     # executor reads the phase's admission (bound to the ContextVar by the engine's
     # ``phase_admission_scope``) and stamps it onto the SPAWN REQUEST — a container inherits
     # an environment, not a call stack.
+    #
+    # w1 (engine_gaps_verifier_revision): the SAME engine ALSO injects a DockerVerifierExecutor
+    # for its ``kind: test`` phases, so a declared independent verification runs in its own
+    # READ-ONLY verifier cell bound to the candidate instead of in-process in the orchestrator's
+    # privileged container. The engine dispatches test phases through it (verifier_executor=),
+    # and refuses loudly if a containerized path ever lacks one (never a skip).
     if args.orchestrator:
         sys.path.insert(0, str(Path(__file__).resolve().parent / "fleet"))
         from fleet.docker_executor import DockerAgentExecutor  # noqa: E402
+        from fleet.docker_verifier_executor import DockerVerifierExecutor  # noqa: E402
 
         spec_path = f"/repo/{args.spec}"  # the sibling's view (the orchestrator mounts /repo)
         return _run_workflow_cli(
             spec, args,
             step_executor=DockerAgentExecutor(
+                spec_path=spec_path,
+                spec_name=spec.name,
+                goal=args.goal,
+                model=args.model,
+                workdir=args.workdir,
+                backend=args.backend,
+                timeout=args.timeout,
+                cell_image=args.cell_image,
+            ),
+            verifier_executor=DockerVerifierExecutor(
                 spec_path=spec_path,
                 spec_name=spec.name,
                 goal=args.goal,
@@ -452,7 +469,7 @@ def main() -> None:
 
 
 def _run_workflow_cli(
-    spec: ExperimentSpec, args: argparse.Namespace, *, step_executor=None
+    spec: ExperimentSpec, args: argparse.Namespace, *, step_executor=None, verifier_executor=None
 ) -> None:
     """The ONE engine's CLI wrapper (P0-2): build the composition root and run the engine.
 
@@ -609,6 +626,7 @@ def _run_workflow_cli(
             phase_index=only_phase_index,
             phase_admission=phase_admission,
             step_executor=step_executor,
+            verifier_executor=verifier_executor,
             phase_evidence_recorder=phase_evidence_recorder,
         )
     finally:
@@ -821,6 +839,10 @@ def _control_open_run(spec: ExperimentSpec, args: argparse.Namespace) -> tuple[s
     try:
         run = db.create_run(
             spec_name=spec.name,
+            # w2 (revision identity): record the canonical spec digest this run executes so
+            # the control-db runs row carries the same revision identity the run ledger does.
+            # The column already existed (control_db_publication); this populates it.
+            workflow_revision_id=spec.workflow_revision_id,
             model=args.model,
             state=RunState.RUNNING,
             reason="workflow run started",

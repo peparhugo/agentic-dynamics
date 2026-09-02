@@ -3,12 +3,13 @@
 **Generated — do not edit by hand.** Regenerate with `python scripts/spec_status.py`;
 `scripts/run_workflow.py` also refreshes it at the end of every run.
 
-Generated at: `2026-09-02T16:50:56.267010+00:00`  ·  181 spec(s)
-**Work remaining:** 49 open · 132 completed/retired
+Generated at: `2026-09-02T16:53:17.526736+00:00`  ·  181 spec(s)
+**Work remaining:** 57 open · 124 completed/retired
 
 | name | kind | repeatable | status | version | supersedes | last_run | ok | model | cost | n_runs |
 |---|---|---|---|---|---|---|---|---|---|---|
 | `auto_posthoc_wiring` | workflow | yes | runnable | 0.1 | — | 2026-08-17 16:17 | ok | deepseek/deepseek-v4-pro | $0.1471 | 1 |
+| `automatic_docs_sync` | workflow | no | runnable | 0.1 | — | — | — | — | — | 1 |
 | `cap_2a_calibration_cell` | workflow | yes | runnable | 0.1 | — | — | — | — | — | 0 |
 | `cap_2a_calibration_cell_divide` | workflow | yes | runnable | 0.1 | — | — | — | — | — | 0 |
 | `cap_2a_cell_clean` | workflow | yes | runnable | 0.1 | — | — | — | — | — | 0 |
@@ -29,9 +30,13 @@ Generated at: `2026-09-02T16:50:56.267010+00:00`  ·  181 spec(s)
 | `cap_session_policy_cell` | workflow | yes | runnable | 0.1 | — | — | — | — | — | 0 |
 | `cap_session_routing_evidence` | experiment | yes | runnable | 0.2 | — | — | — | — | — | 0 |
 | `cap_shadow_comparison` | experiment | yes | runnable | 0.1 | — | — | — | — | — | 0 |
+| `control_room_live_board` | workflow | no | runnable | 0.1 | — | — | — | — | — | 1 |
 | `delta_entropy_response_campaign` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
+| `docs_refresh_remediation` | workflow | no | runnable | 0.1 | — | — | — | — | — | 2 |
 | `explanation_tax` | experiment | yes | runnable | 0.2 | — | — | — | — | — | 0 |
 | `finding_economics_closure` | workflow | yes | runnable | 0.1 | — | 2026-08-22 17:22 | ok | deepseek/deepseek-v4-pro | $1.2820 | 1 |
+| `fleet_job_submission` | workflow | no | runnable | 0.1 | — | — | — | — | — | 3 |
+| `green_main_closure` | workflow | no | runnable | 0.1 | — | — | — | — | — | 4 |
 | `labbook_refresh` | workflow | yes | runnable | 0.1 | — | 2026-08-17 18:14 | ok | deepseek/deepseek-v4-flash | $0.0275 | 1 |
 | `launch_handler_dry_run` | workflow | yes | runnable | 0.1 | — | — | — | — | — | 0 |
 | `ledger_instrumentation_probe` | workflow | yes | runnable | 0.1 | — | 2026-08-30 19:05 | fail | openai/gpt-5.6-sol | $0.0020 | 1 |
@@ -41,12 +46,15 @@ Generated at: `2026-09-02T16:50:56.267010+00:00`  ·  181 spec(s)
 | `queue_steer` | workflow | yes | runnable | 0.1 | — | 2026-08-15 19:32 | ok | deepseek/deepseek-v4-flash | $0.0330 | 1 |
 | `rag_bare_vs_augmented` | experiment | yes | runnable | 0.1 | — | — | — | — | — | 0 |
 | `registry_canonicalize` | workflow | yes | runnable | 0.1 | — | 2026-08-19 13:42 | ok | deepseek/deepseek-v4-pro | $0.1872 | 1 |
+| `retrieval_activation` | workflow | no | runnable | 0.1 | — | — | — | — | — | 2 |
 | `retrieval_activation_augment_proof` | workflow | yes | runnable | 0.1 | — | 2026-09-01 04:45 | fail | deepseek/deepseek-v4-flash | $0.0016 | 5 |
+| `retrieval_fusion_quality` | workflow | no | runnable | 0.1 | — | — | — | — | — | 2 |
 | `routing_kb_dispatch` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `routing_kb_experiment_design` | experiment | yes | runnable | 0.1 | — | 2026-08-17 18:28 | ok | openai/gpt-5.6-sol | $3.0669 | 7 |
 | `routing_kb_experiment_design_research` | experiment | yes | runnable | 0.1 | — | 2026-08-17 18:12 | ok | deepseek/deepseek-v4-pro | $0.2203 | 1 |
 | `routing_regret_under_degradation` | experiment | yes | runnable | 0.2 | — | — | — | — | — | 0 |
 | `self_recommending_experiment` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
+| `test_suite_speed` | workflow | no | runnable | 0.1 | — | — | — | — | — | 1 |
 | `test_suite_tiering` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `agentic_dynamics_rebrand` | workflow | no | failed | 0.1 | — | 2026-08-14 22:02 | fail | openai/gpt-5.6-sol | $7.7341 | 2 |
 | `cap_adaptive_2d` | workflow | no | failed | 0.1 | — | 2026-08-28 13:02 | fail | deepseek/deepseek-v4-flash | $0.0496 | 3 |
@@ -58,7 +66,6 @@ Generated at: `2026-09-02T16:50:56.267010+00:00`  ·  181 spec(s)
 | `control_room_usage_wiring` | workflow | no | failed | 0.1 | — | 2026-09-01 00:31 | fail | openai/gpt-5.6-luna | $0.0000 | 2 |
 | `design_sessions` | workflow | no | failed | 0.1 | — | 2026-08-14 06:58 | fail | openai/gpt-5.6-sol | $0.0000 | 1 |
 | `admission_leases` | workflow | no | completed | 0.1 | — | 2026-09-01 00:37 | ok | anthropic/claude-opus-5 | $7.7920 | 5 |
-| `automatic_docs_sync` | workflow | no | completed | 0.1 | — | 2026-09-01 03:43 | ok | anthropic/claude-opus-5 | $47.5167 | 1 |
 | `beta_lab_execution` | workflow | no | completed | 0.1 | — | 2026-08-31 22:38 | ok | openai/gpt-5.6-terra | $1.4000 | 1 |
 | `canonical_publication_closure` | workflow | no | completed | 0.1 | — | 2026-08-21 17:06 | ok | deepseek/deepseek-v4-pro | $1.4475 | 1 |
 | `canonical_state_design` | workflow | no | completed | 0.1 | — | 2026-08-18 15:48 | fail | openai/gpt-5.6-sol | $0.0798 | 5 |
@@ -122,7 +129,6 @@ Generated at: `2026-09-02T16:50:56.267010+00:00`  ·  181 spec(s)
 | `control_db_followups` | workflow | no | completed | 0.1 | — | 2026-09-02 03:11 | ok | deepseek/deepseek-v4-flash | $0.4030 | 1 |
 | `control_db_publication` | workflow | no | completed | 0.1 | — | 2026-09-02 01:37 | ok | anthropic/claude-opus-5 | $0.1032 | 6 |
 | `control_room_hardening` | workflow | no | completed | 0.1 | — | 2026-08-18 23:56 | ok | deepseek/deepseek-v4-pro | $0.1898 | 1 |
-| `control_room_live_board` | workflow | no | completed | 0.1 | — | 2026-09-01 05:12 | ok | deepseek/deepseek-v4-flash | $0.1356 | 1 |
 | `control_room_posthoc_visibility` | workflow | no | completed | 0.1 | — | 2026-08-17 15:37 | ok | deepseek/deepseek-v4-pro | $0.2049 | 1 |
 | `control_room_refresh` | workflow | no | completed | 0.1 | — | 2026-08-23 16:08 | ok | openai/gpt-5.6-terra | $15.4017 | 1 |
 | `control_room_ui_implement` | workflow | no | completed | 0.1 | — | 2026-08-19 14:48 | ok | deepseek/deepseek-v4-pro | $0.6086 | 1 |
@@ -131,18 +137,15 @@ Generated at: `2026-09-02T16:50:56.267010+00:00`  ·  181 spec(s)
 | `control_room_workflow_phase` | workflow | no | completed | 0.1 | — | 2026-08-17 15:44 | ok | deepseek/deepseek-v4-pro | $0.1682 | 1 |
 | `deep_architecture_review` | workflow | no | completed | 0.1 | — | 2026-08-18 19:10 | ok | deepseek/deepseek-v4-pro | $0.1319 | 1 |
 | `docs_architecture_refresh` | workflow | no | completed | 0.1 | opencode_docs_refresh | 2026-08-31 23:52 | ok | openai/gpt-5.6-terra | $8.6779 | 1 |
-| `docs_refresh_remediation` | workflow | no | completed | 0.1 | — | 2026-09-01 13:33 | ok | deepseek/deepseek-v4-flash | $0.1655 | 2 |
 | `engine_gaps_verifier_revision` | workflow | no | completed | 0.1 | — | 2026-09-02 16:50 | ok | deepseek/deepseek-v4-flash | $0.0951 | 2 |
 | `entropy_beta_instruments` | workflow | no | completed | 0.1 | — | 2026-08-30 19:14 | ok | deepseek/deepseek-v4-pro | $0.2940 | 2 |
 | `evidence_narrative` | workflow | no | completed | 0.1 | — | 2026-08-14 15:04 | ok | openai/gpt-5.6-sol | $0.0000 | 2 |
 | `evidence_redesign` | workflow | no | completed | 0.1 | — | 2026-08-14 19:18 | ok | openai/gpt-5.6-sol | $5.9008 | 3 |
 | `fix_review_findings` | workflow | no | completed | 0.1 | — | 2026-08-14 13:48 | ok | deepseek/deepseek-v4-pro | $0.1504 | 1 |
-| `fleet_job_submission` | workflow | no | completed | 0.1 | — | 2026-09-01 00:28 | ok | anthropic/claude-sonnet-5 | $2.9146 | 3 |
 | `fleet_ladder_implementation` | workflow | no | completed | 0.1 | — | 2026-08-30 19:13 | ok | deepseek/deepseek-v4-pro | $1.2924 | 4 |
 | `fleet_ladder_plan` | workflow | no | completed | 0.1 | — | 2026-08-29 15:33 | ok | deepseek/deepseek-v4-flash | $0.0836 | 1 |
 | `fleet_ladder_revision` | workflow | no | completed | 0.1 | — | 2026-08-29 17:02 | ok | deepseek/deepseek-v4-pro | $0.1724 | 2 |
 | `framework_facelift` | workflow | no | completed | 0.2 | — | 2026-08-14 15:18 | ok | openai/gpt-5.6-sol | $0.0000 | 1 |
-| `green_main_closure` | workflow | no | completed | 0.1 | — | 2026-08-31 20:16 | ok | anthropic/claude-opus-5 | $10.7497 | 4 |
 | `grit_calibration_design` | workflow | no | completed | 0.1 | — | 2026-08-28 15:05 | ok | deepseek/deepseek-v4-flash | $0.0250 | 1 |
 | `i10_typed_checkpoint` | workflow | no | completed | 0.1 | — | 2026-08-28 17:00 | ok | deepseek/deepseek-v4-flash | $0.0085 | 3 |
 | `investing_domain_audit` | workflow | no | completed | 0.1 | — | 2026-08-22 18:09 | ok | deepseek/deepseek-v4-pro | $0.2010 | 1 |
@@ -171,8 +174,6 @@ Generated at: `2026-09-02T16:50:56.267010+00:00`  ·  181 spec(s)
 | `refactor_repair_release` | workflow | no | completed | 0.1 | — | 2026-08-20 22:10 | ok | deepseek/deepseek-v4-pro | $3.5232 | 1 |
 | `remediation_data_integrity` | workflow | no | completed | 0.1 | — | 2026-08-15 20:31 | ok | deepseek/deepseek-v4-pro | $0.6293 | 1 |
 | `repo_review_fable` | workflow | no | completed | 0.1 | — | 2026-08-18 23:24 | ok | deepseek/deepseek-v4-pro | $0.5659 | 2 |
-| `retrieval_activation` | workflow | no | completed | 0.1 | — | 2026-09-01 01:59 | ok | anthropic/claude-sonnet-5 | $10.3858 | 2 |
-| `retrieval_fusion_quality` | workflow | no | completed | 0.1 | — | 2026-09-01 04:20 | ok | deepseek/deepseek-v4-flash | $0.1408 | 2 |
 | `retry_observational_analysis` | workflow | no | completed | 0.1 | — | 2026-08-30 21:59 | ok | deepseek/deepseek-v4-pro | $0.3321 | 1 |
 | `routing_follow_up` | workflow | no | completed | 0.1 | — | 2026-08-14 22:26 | ok | deepseek/deepseek-v4-pro | $0.2511 | 1 |
 | `routing_kb_more_itertools` | workflow | no | completed | 0.1 | — | 2026-08-17 18:38 | ok | deepseek/deepseek-v4-pro | $0.0337 | 1 |
@@ -182,7 +183,6 @@ Generated at: `2026-09-02T16:50:56.267010+00:00`  ·  181 spec(s)
 | `spec_lifecycle` | workflow | no | completed | 0.1 | — | 2026-08-19 22:53 | ok | deepseek/deepseek-v4-pro | $0.4710 | 2 |
 | `supervisor_control_room` | workflow | no | completed | 0.1 | — | 2026-08-14 16:09 | ok | openai/gpt-5.6-sol | $10.8221 | 2 |
 | `task_vocabulary_unify` | workflow | no | completed | 0.1 | — | 2026-08-18 23:41 | ok | deepseek/deepseek-v4-pro | $0.1428 | 1 |
-| `test_suite_speed` | workflow | no | completed | 0.1 | — | 2026-09-01 06:55 | ok | deepseek/deepseek-v4-flash | $0.3650 | 1 |
 | `website_data_pipeline` | workflow | no | completed | 0.1 | — | 2026-08-17 20:08 | ok | deepseek/deepseek-v4-pro | $0.1364 | 1 |
 | `website_registry_repoint` | workflow | no | completed | 0.1 | — | 2026-08-19 22:26 | ok | deepseek/deepseek-v4-pro | $0.3542 | 1 |
 | `website_repoint` | workflow | no | completed | 0.1 | — | 2026-08-19 23:08 | ok | deepseek/deepseek-v4-pro | $0.3304 | 2 |
@@ -192,24 +192,28 @@ Generated at: `2026-09-02T16:50:56.267010+00:00`  ·  181 spec(s)
 
 ## Legend
 
-**Status** — authored in the spec YAML's `status:` when the operator asserted one,
-otherwise derived: `superseded` when the spec names a `superseded_by:`; for a
-non-repeatable workflow, `completed` when any run succeeded, `awaiting_approval`
-when the latest run stopped at a mechanical human checkpoint (`awaiting: true` on
-the ledger — a designed pause, never a failure), `failed` when a run
-recorded a definitive failure, `blocked` when runs exist but none resolved, `running`
-when a run is currently executing (an open, recent run), `runnable` when never run;
-else (a repeatable spec) `runnable`.
+**Status** — authored in the spec YAML's `status:` only when the operator asserted one
+and no run evidence exists to decide otherwise (draft/tombstoned are claims only a
+human can make); otherwise derived: `superseded` when the spec names a
+`superseded_by:`; for a non-repeatable workflow, `completed`/`failed`/`blocked`/
+`running`/`awaiting_approval`/`runnable` come from runs of its EXACT revision
+(w2 revision identity). A completed run of revision A does NOT mark an edited
+revision B completed: editing a spec (a gate appended, a phase changed) changes its
+`workflow_revision_id`, and B shows its own run state — `runnable` (never run of
+this revision) until a run of B certifies it. `awaiting_approval` is the latest run
+of the current revision stopped at a mechanical human checkpoint (`awaiting: true`
+on the ledger — a designed pause, never a failure). `running` requires an open,
+recent run; `runnable` = never run of the current revision, or a repeatable spec.
 
 | status | meaning |
 |---|---|
-| `runnable` | never run (a non-repeatable workflow), or a repeatable spec — ready to run |
+| `runnable` | never run (of the current revision — possibly edited after its last green run), or a repeatable spec — ready to run |
 | `running` | a non-repeatable workflow currently executing — an open run within the window |
-| `awaiting_approval` | the latest run stopped at a human checkpoint (`awaiting: true`) — the operator must approve before it continues |
-| `failed` | a non-repeatable workflow whose run(s) recorded a definitive failure |
+| `awaiting_approval` | the latest run of the current revision stopped at a human checkpoint (`awaiting: true`) — the operator must approve before it continues |
+| `failed` | a non-repeatable workflow whose run(s) of the current revision recorded a definitive failure |
 | `blocked` | a non-repeatable workflow with runs that started but never resolved |
 | `draft` | authored, not yet run to completion; not yet a claim about anything |
-| `completed` | a non-repeatable workflow whose run succeeded (derived from the run ledgers) |
+| `completed` | a non-repeatable workflow whose current revision succeeded (derived from the run ledgers) |
 | `superseded` | a later spec took over its question (see that spec's `supersedes` column) |
 | `tombstoned` | retired; kept for lineage, never to be run again |
 
@@ -229,4 +233,11 @@ else (a repeatable spec) `runnable`.
 `—` means **no evidence**, not failure — the run-ledger directory
 (`experiments/results/workflows/`) is untracked, so a fresh checkout shows an em-dash
 for every run-derived column. The machine-readable form of this table, including
-`results_pointer` (path to the latest run ledger), is `index.json` beside this file.
+`results_pointer` (path to the latest run ledger), is `index.json` beside
+ this file.
+
+**Revision identity (w2)** — `index.json` entries carry the spec's current
+`workflow_revision_id` (sha256 of the canonicalized definition) and, when the spec's
+YAML authors a `status:` that run evidence did not confirm, the `authored_status`
+marker. A row whose status is `runnable` while older run columns exist means the
+definition changed after its last green run (a gate added, never run).

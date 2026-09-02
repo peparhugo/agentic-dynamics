@@ -861,6 +861,75 @@ def build_phase_request(
     return request
 
 
+def build_verifier_request(
+    phase_def: dict[str, Any],
+    *,
+    goal: str,
+    workdir: str | Path,
+    model: str,
+    spec_name: str = "",
+    command: list[str] | None = None,
+    admission: LeaseContext | None = None,
+) -> dict[str, Any]:
+    """Build the READ-ONLY verifier spawn request for a ``kind: test`` phase (w1, 2026-09-02).
+
+    The reference containerized path's verifier cell (the DockerVerifierExecutor) is NOT an
+    agent cell: it runs a declared independent verification against the candidate and makes
+    NO model call. It therefore carries NO credentials and NO writable CLI state — the two
+    writable/secret surfaces the P0-3 per-attempt state namespace exists to isolate from agent
+    cells are simply ABSENT here, and the write flags an emitting phase may carry are dropped.
+
+    The request is the phase's normal spawn request (same scope/network/env of record, so the
+    isolation contract's scope model still governs it) MINUS the verifier-forbidden surface:
+
+    * the per-attempt CLI-state namespace (``/state`` + the ``XDG_*`` /
+      ``FINOPS_OPENCODE_STATE_DIR`` redirect env) — absent (a verifier runs no CLI session);
+    * the credential mounts — the D-2 auth dirs and the ``/auth/opencode_auth.json`` credential
+      FILE mount (no model call, no credential needed);
+    * the results mount — the verifier writes nothing to ``experiments/results`` (a ``kind:
+      test`` phase produces only its verdict, which the PARENT aggregates); and
+    * any write-flag env (``FINOPS_KB_WRITE`` / ``FINOPS_ACTUATION_ARMED``) the phase's scope
+      would otherwise authorize — a verifier never emits.
+
+    What REMAINS is the read-only candidate surface: ``/repo`` and the repo-alias at the host
+    path (ro — the candidate SHA the suite runs against), plus the contract-fixed shared
+    mounts (the ``/tmp`` worktree namespace and the repo-git dirs) that a real git-worktree
+    test run requires and that the in-process LocalVerifier path already touches identically.
+    The verifier's child command runs with ``--no-commit`` (a test phase never commits), so
+    the contract-fixed rw git dirs are read by the suite, never written by the verifier.
+
+    ``admission`` mirrors ``build_phase_request``'s contract: supplied when a lease context is
+    in force; a verifier request deliberately has none when absent, because the verifier spends
+    no model dollars (a budget lease reserves model spend — the verifier has none to reserve).
+    """
+    request = build_phase_request(
+        phase_def,
+        goal=goal,
+        workdir=workdir,
+        model=model,
+        spec_name=spec_name,
+        command=command,
+        admission=admission,
+    )
+    forbidden_mount_targets = {STATE_TARGET, AUTH_CRED_FILE, *AUTH_DIRS}
+    request["mounts"] = [
+        m for m in (request.get("mounts") or [])
+        if str((m or {}).get("target", "")) not in forbidden_mount_targets
+    ]
+    # The verifier writes nothing to the results mount — drop it (its mode is scope-derived
+    # and read-only-for-a-verifier would otherwise fail the scope's own mode check).
+    request["mounts"] = [
+        m for m in request["mounts"]
+        if not str((m or {}).get("target", "")).startswith("/app/experiments/results")
+    ]
+    env = {k: v for k, v in (request.get("env", {}) or {}).items() if k not in STATE_ENV_KEYS}
+    env.pop("FINOPS_OPENCODE_STATE_DIR", None)
+    for flag in WRITE_FLAG_ENVS:
+        env.pop(flag, None)
+    request["env"] = env
+    return request
+
+
 def build_submit_argv(
     command: dict[str, Any],
     *,
