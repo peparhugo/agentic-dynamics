@@ -3,8 +3,8 @@
 **Generated — do not edit by hand.** Regenerate with `python scripts/spec_status.py`;
 `scripts/run_workflow.py` also refreshes it at the end of every run.
 
-Generated at: `2026-09-02T01:52:49.169927+00:00`  ·  179 spec(s)
-**Work remaining:** 49 open · 130 completed/retired
+Generated at: `2026-09-02T04:20:12.518507+00:00`  ·  180 spec(s)
+**Work remaining:** 49 open · 131 completed/retired
 
 | name | kind | repeatable | status | version | supersedes | last_run | ok | model | cost | n_runs |
 |---|---|---|---|---|---|---|---|---|---|---|
@@ -29,7 +29,7 @@ Generated at: `2026-09-02T01:52:49.169927+00:00`  ·  179 spec(s)
 | `cap_session_policy_cell` | workflow | yes | runnable | 0.1 | — | — | — | — | — | 0 |
 | `cap_session_routing_evidence` | experiment | yes | runnable | 0.2 | — | — | — | — | — | 0 |
 | `cap_shadow_comparison` | experiment | yes | runnable | 0.1 | — | — | — | — | — | 0 |
-| `control_db_followups` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
+| `control_db_evidence` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `delta_entropy_response_campaign` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `explanation_tax` | experiment | yes | runnable | 0.2 | — | — | — | — | — | 0 |
 | `finding_economics_closure` | workflow | yes | runnable | 0.1 | — | 2026-08-22 17:22 | ok | deepseek/deepseek-v4-pro | $1.2820 | 1 |
@@ -119,6 +119,7 @@ Generated at: `2026-09-02T01:52:49.169927+00:00`  ·  179 spec(s)
 | `context_abstraction_closure` | workflow | no | completed | 0.1 | — | 2026-08-31 23:52 | ok | deepseek/deepseek-v4-flash | $0.0765 | 1 |
 | `context_abstraction_implement` | workflow | no | completed | 0.1 | — | 2026-08-23 19:16 | ok | anthropic/claude-sonnet-5 | $49.5218 | 4 |
 | `context_abstraction_plane` | workflow | no | completed | 0.1 | — | 2026-08-19 23:03 | ok | anthropic/claude-opus-5 | $10.3774 | 1 |
+| `control_db_followups` | workflow | no | completed | 0.1 | — | 2026-09-02 03:11 | ok | deepseek/deepseek-v4-flash | $0.4030 | 1 |
 | `control_db_publication` | workflow | no | completed | 0.1 | — | 2026-09-02 01:37 | ok | anthropic/claude-opus-5 | $0.1032 | 6 |
 | `control_room_hardening` | workflow | no | completed | 0.1 | — | 2026-08-18 23:56 | ok | deepseek/deepseek-v4-pro | $0.1898 | 1 |
 | `control_room_live_board` | workflow | no | completed | 0.1 | — | 2026-09-01 05:12 | ok | deepseek/deepseek-v4-flash | $0.1356 | 1 |

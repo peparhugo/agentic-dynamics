@@ -1,7 +1,7 @@
 {
   "schema_version": "spec-status/v2",
-  "generated_at": "2026-09-02T01:52:49.169927+00:00",
-  "n_specs": 179,
+  "generated_at": "2026-09-02T04:20:12.518507+00:00",
+  "n_specs": 180,
   "specs": [
     {
       "name": "auto_posthoc_wiring",
@@ -382,10 +382,10 @@
       "n_runs": 0
     },
     {
-      "name": "control_db_followups",
+      "name": "control_db_evidence",
       "version": "0.1",
       "status": "runnable",
-      "spec_path": "workflows/repository/control_db_followups.yaml",
+      "spec_path": "workflows/repository/control_db_evidence.yaml",
       "artifact_kind": "workflow",
       "repeatable": false,
       "supersedes": [],
@@ -2013,6 +2013,24 @@
       "latest_cost_usd": 10.377369,
       "latest_git_sha": "147931070",
       "results_pointer": "experiments/results/workflows/context_abstraction_plane/20260819T230335Z.json",
+      "n_runs": 1
+    },
+    {
+      "name": "control_db_followups",
+      "version": "0.1",
+      "status": "completed",
+      "spec_path": "workflows/repository/control_db_followups.yaml",
+      "artifact_kind": "workflow",
+      "repeatable": false,
+      "supersedes": [],
+      "superseded_by": null,
+      "completed_at": null,
+      "last_run_at": "2026-09-02T03:11:50.213035+00:00",
+      "latest_ok": true,
+      "latest_model": "deepseek/deepseek-v4-flash",
+      "latest_cost_usd": 0.402973,
+      "latest_git_sha": "ca0248992",
+      "results_pointer": "experiments/results/workflows/control_db_followups/20260902T031150Z.json",
       "n_runs": 1
     },
     {

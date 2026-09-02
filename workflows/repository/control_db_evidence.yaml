@@ -1,0 +1,395 @@
+name: control_db_evidence
+question: >-
+  Close the deep-review findings F1-F5 on the control plane (2026-09-02): the control
+  db is directionally sound and production-wired, but its central claim is not yet
+  true — "the control db is the authoritative per-phase record". The engine records
+  the run's terminal row + transitions but NEVER the per-phase evidence:
+  step_attempts: 0 and gate_results: 0 for a run that executed 8 phases
+  (control_db_followups, run-2bc253a8d87a), because record_gate_result has zero
+  production callers. The outbox held 68 pending rows because nothing drains it in
+  the normal run path. The git history carries 13 test-artifact receipts
+  (repo_sha deadbeef, operator-test) committed across 7 commits in both waves —
+  write_receipt ignores the --db override and the suite writes into the production
+  RECEIPT_DIR. control_epoch advanced only 2 for 8 phases (run-state transitions
+  only), so a master diffing epochs cannot see per-phase progress. And the
+  "pre-existing drift" mislabeling recurred (the f4/f5 commits blamed pre-existing
+  drift for a wave-introduced break) — the guard that proves a failure is
+  pre-existing BEFORE the author may call it so does not exist. This spec lands:
+  (e1) the engine writes step_attempts + gate_results per phase in the phase loop —
+  the write side of the resume re-point, making the packet's failed_runs/awaiting/
+  promotable derivations real; (e2) the outbox drains in the normal run path
+  (drain-on-terminal-write with retry + a drain command) so the knowledge events a
+  run owes actually land; (e3) hermetic publication tests (receipt directory
+  injectable, never the production dir) + purge the 13 committed deadbeef artifacts
+  from history where they are noise; (e4) control_epoch advances per PHASE
+  transition, not just per run-state transition — a turn-to-turn diff sees phase
+  progress; (e5) the pre-existing-drift guard: a named test that proves a new
+  failure exists at the wave's merge-base before the author may call it
+  pre-existing, wired so the mislabeling pattern fails loudly.
+version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: false
+repeatable: false
+# NOTE: no authored operational status — derived from run evidence.
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: false
+    context:
+      domain_context: >-
+        canonical_sources: [src/agentic_dynamics/control/control_db.py (the
+        orchestrator-owned SQLite control db — step_attempts table + the INSERT in
+        transition_run at :1670, attempts() reader at :1730, record_gate_result at
+        :1742 with ZERO production callers, runs() at :1570, transition_run at
+        :1431), src/agentic_dynamics/control/outbox.py (record_terminal_run at :327,
+        OutboxPublisher at :392, drain at :484), scripts/run_workflow.py (the
+        composition root — _control_open_run, _control_terminal_write, the phase
+        loop where per-phase evidence must be recorded), src/agentic_dynamics/
+        runtime/workflow_runner.py (the ONE engine — the phase loop's per-phase
+        result, the step_executor seam, PhaseResult with status/cost/tokens/
+        commit_gate), src/agentic_dynamics/control/control_status.py (build_packet —
+        the failed_runs/awaiting_approvals/promotable_runs derivations, the epoch),
+        src/agentic_dynamics/control/publication.py (write_receipt — RECEIPT_DIR at
+        :80, the --db override that does not reach it), tests/test_publish_release.py
+        (the operator-test fixtures that write into production RECEIPT_DIR),
+        docs/reviews/control_db_followups_adversarial.md + the deep review
+        (2026-09-02 findings F1-F5), and the merged control_db_publication +
+        control_db_followups specs].
+        policies: [one_durable_state, outbox_before_emit, control_packet_every_turn,
+        publication_is_one_transaction, regenerate_never_hand_edit, authority_absolute].
+      challenge_context: >-
+        challenge: the control plane's authority claim is code-complete but
+        data-empty. The db says the run is promotable — but nothing recorded the 8
+        phases' outcomes, so the packet's phase-derived fields (failed_runs
+        breakdown, gate evidence, per-phase cost) are projections over empty tables.
+        The outbox's at-least-once promise holds only if something drains; 68
+        pending rows say the promise is kept in the library and broken in the run
+        path. The history's deadbeef receipts are test noise dressed as provenance.
+        And the recurring "pre-existing drift" mislabel is the one defect that
+        erodes trust in every finding: without a guard, an author can always call
+        the wave's own break pre-existing.
+        deliberation: [the per-phase write side first (e1 — the evidence tables get
+        real rows), then the drain (e2 — the outbox's promise in the run path), then
+        the hermetic receipts + history purge (e3 — provenance becomes provenance
+        again), then the per-phase epoch (e4 — turn-to-turn visibility), then the
+        pre-existing guard (e5 — the trust defect)].
+        session_policy: {default: continue}
+      current_state: >-
+        MEASURED (2026-09-02, the deep review): control.db live — runs: 1,
+        step_attempts: 0, gate_results: 0, outbox: 68 pending, run_transitions: 2,
+        publication_receipts: 0. record_gate_result has zero production callers.
+        write_receipt writes into the module-level RECEIPT_DIR regardless of --db
+        (publish_release.py:515); 13 deadbeef/operator-test receipts are committed
+        across 7 commits (both waves). control_epoch advanced 2 for 8 phases.
+        The f4/f5 "pre-existing drift" claim was disproven at the merge base
+        (README was in sync at ec3eb1c13).
+      hard_rules: >-
+        (1) ONE DURABLE STATE: after e1, the control db records the per-phase
+        evidence for every phase of every run — step_attempts (one row per
+        invocation, the retry contract) + gate_results (one row per gate verdict,
+        bound to the candidate). The packet's failed_runs/awaiting/promotable
+        derivations are projections over REAL rows, never over empty tables.
+        (2) OUTBOX DRAINS IN THE RUN PATH: after e2, a run's terminal write either
+        drains the outbox (with retry) or leaves the rows pending AND the run path
+        provides a drain command that makes the obligation land. 68 pending rows
+        must not recur in normal operation.
+        (3) TESTS ARE HERMETIC: after e3, no test writes into a production path —
+        the receipt directory is injectable, tests write into tmp dirs, and the
+        production experiments/results/publication/ contains only real receipts.
+        (4) EPOCH SEES PHASE PROGRESS: after e4, control_epoch advances per phase
+        transition (attempt start/end), so a turn-to-turn packet diff shows phase
+        progress, not just run-state changes.
+        (5) PRE-EXISTING MUST BE PROVEN: after e5, calling a failure "pre-existing"
+        requires the named guard to pass — the failure exists at the wave's
+        merge-base — or the claim fails loudly. The mislabeling pattern is a
+        review finding, not a get-out clause.
+        (6) REGENERATE, NEVER HAND-EDIT (unchanged). AUTHORITY ABSOLUTE (unchanged).
+    phases:
+      - name: e0_pin_spec
+        kind: agent
+        scope: implementation
+        timeout: 3600
+        prompt: |
+          GOAL: {goal}
+          ROLE: verification — the house pin convention. Write
+          docs/reviews/control_db_evidence_preregistration.md carrying:
+          (a) this spec's file SHA256 (sha256sum workflows/repository/
+          control_db_evidence.yaml) + the worktree git sha; (b) the five
+          current-state edges VERIFIED against the actual code + the live control
+          db, not copied from the spec: (1) step_attempts/gate_results are 0 in
+          the production db for run-2bc253a8d87a and record_gate_result has no
+          production caller (grep the callers); (2) the outbox holds 68 pending
+          rows and nothing in the run path drains (find the drain call sites);
+          (3) 13 deadbeef/operator-test receipts are committed (git log them) and
+          write_receipt ignores --db (read the call at publish_release.py:515);
+          (4) control_epoch is 2 for an 8-phase run (read the control db + the
+          epoch derivation); (5) no pre-existing-drift guard exists (grep for
+          it). An edge that does not hold is a FAILED finding — record the
+          deviation and fail.
+          DELIVER: the preregistration with the five verified edges, committed
+          with the '[workflow] e0_pin_spec — <goal prefix>' subject.
+          LOG: PASS/FAIL per claim; commit.
+      - name: e1_phase_evidence
+        kind: agent
+        scope: implementation
+        timeout: 7200
+        prompt: |
+          GOAL: {goal}
+          SHAPE: the engine writes the per-phase evidence. In the phase loop of
+          run_workflow (the composition root) — or the engine seam if the loop
+          lives there — record, for every executed phase, one step_attempts row
+          (run_id, step_id, attempt_no, model, state, started_at, ended_at,
+          tokens, cost_usd, exit_code, error) and one gate_results row per gate
+          verdict (commit_gate, relabel_gate, deploy_gate — the verdicts the
+          PhaseResult already carries), bound to the candidate. Reuse the
+          control db's existing writers (the INSERT path transition_run uses;
+          record_gate_result). Best-effort like the terminal write: a control-db
+          failure must never fail the phase — but unlike the pre-e1 world, a
+          successful write is the norm and a failure is loud (a named warning,
+          never silent). The parent aggregates (child mode stays inert).
+          SCOPE FENCE: ONLY the per-phase write side — no drain changes (e2),
+          no packet changes (e4), no test-hermeticity changes (e3). Commits
+          carry '[workflow] e1_phase_evidence'.
+          VERIFY (both directions): unit tests prove (a) after a run of a
+          synthetic 2-phase spec with a fake agent, the control db holds 2
+          step_attempts rows + the gate_results the phases produced (state/
+          tokens/cost populated); (b) a FAILED phase records a failed
+          step_attempt (never skipped); (c) a retried phase records attempt_no 1
+          and 2 (the UNIQUE index contract); (d) a control-db outage during the
+          phase write does not fail the run (the phase succeeds, the warning is
+          named); (e) child mode (--only-phase) records nothing.
+          DELIVER: the write side + the tests, committed.
+          LOG: PASS/FAIL; commit.
+      - name: e2_outbox_drain
+        kind: agent
+        scope: implementation
+        timeout: 7200
+        prompt: |
+          GOAL: {goal}
+          SHAPE: the outbox's promise in the run path. (a) In run_workflow's
+          terminal write, after record_terminal_run enqueues, drain the outbox
+          (OutboxPublisher.drain) — bounded, with the existing retry semantics —
+          so the knowledge events a run owes land in normal operation. (b) Add a
+          drain command (e.g. agentic-dynamics control drain-outbox, wired in
+          the CLI's control namespace) that drains the outbox to empty, so an
+          operator can clear pending rows when the stream was down. The drain is
+          best-effort (a downed stream leaves rows pending — the obligation
+          survives — but it is no longer the NORMAL state). Record drain
+          outcomes (delivered/dead/pending counts) somewhere readable (the
+          packet's health surface or a control-db row).
+          SCOPE FENCE: the drain-in-run-path + the drain command ONLY — no
+          changes to record_terminal_run's enqueue shape, no changes to the
+          publisher's ack-then-mark. Commits carry '[workflow] e2_outbox_drain'.
+          VERIFY (both directions): unit tests prove (a) a run whose terminal
+          write enqueues N events and whose stream is up drains to 0 pending in
+          the run path (no separate command needed); (b) a run whose stream is
+          down leaves the rows pending AND the drain command then delivers them
+          when the stream returns (the operator path); (c) the drain command
+          reports delivered/dead/pending honestly; (d) a drain failure never
+          fails the run.
+          DELIVER: the run-path drain + the command + the tests, committed.
+          LOG: PASS/FAIL; commit.
+      - name: e3_hermetic_publication
+        kind: agent
+        scope: implementation
+        timeout: 7200
+        prompt: |
+          GOAL: {goal}
+          SHAPE: provenance becomes provenance again. (a) Make the receipt
+          directory injectable end-to-end: write_receipt (and publish_release's
+          call at :515) honor the same override the --db flag already provides —
+          the receipt archive path follows the db path's tmp override in tests,
+          never the production RECEIPT_DIR. (b) Fix the test suite: the
+          operator-test receipts must land in tmp dirs, and a hermeticity guard
+          test asserts the production experiments/results/publication/ contains
+          NO deadbeef/operator-test artifacts after the suite runs. (c) PURGE
+          the 13 committed deadbeef/operator-test receipts from the git history
+          of BOTH waves (the f1/f3/f4/f5/f6/f7 commits + the p7 commits of the
+          prior wave) — a filter-repo-style rewrite or, if the operator prefers,
+          a documented deletion commit that removes them from the tree with a
+          clear record (the operator decides the rewrite vs deletion approach;
+          the spec must record which and why). The purge is the ONLY part of
+          this phase that touches history — everything else is forward code.
+          SCOPE FENCE: the receipt-path injection + the hermetic tests + the
+          purge ONLY. Commits carry '[workflow] e3_hermetic_publication'.
+          VERIFY (both directions): unit tests prove (a) running the
+          publish_release suite leaves the production receipt dir untouched
+          (before/after ls identical); (b) write_receipt honors the injected
+          directory; (c) the guard test fails if a deadbeef receipt appears in
+          the production dir; (d) after the purge, no committed receipt carries
+          deadbeef/operator-test (grep the history).
+          DELIVER: the injection + the tests + the purge, committed.
+          LOG: PASS/FAIL; commit.
+      - name: e4_phase_epoch
+        kind: agent
+        scope: implementation
+        timeout: 7200
+        prompt: |
+          GOAL: {goal}
+          SHAPE: a turn-to-turn diff sees phase progress. control_epoch currently
+          advances only on run-state transitions (create→running→promotable = 2
+          for 8 phases). Advance it on PER-PHASE transitions too: each
+          step_attempt's start and end bumps the epoch (or a per-phase counter
+          the packet carries alongside the epoch — the packet must expose phase
+          progress explicitly, e.g. phases_completed / phases_total for the
+          active run). The packet keeps its existing fields; the epoch's meaning
+          is documented as "any durable state change, run-level or phase-level".
+          SCOPE FENCE: the epoch/phase-progress derivation ONLY — no changes to
+          what the db records (e1 owns the rows), no drain changes. Commits
+          carry '[workflow] e4_phase_epoch'.
+          VERIFY (both directions): unit tests prove (a) a synthetic 2-phase run
+          with recorded attempts advances the epoch at least 4 (attempt start/
+          end per phase) — a turn-to-turn diff now shows phase progress; (b) the
+          packet exposes phases_completed/phases_total for the active run from
+          the step_attempts rows; (c) the existing epoch tests (run-state
+          transitions) stay green; (d) a run with NO control db still exits
+          cleanly (the epoch is a control-plane feature, never a run gate).
+          DELIVER: the per-phase epoch + the packet's phase-progress fields +
+          the tests, committed.
+          LOG: PASS/FAIL; commit.
+      - name: e5_preexisting_guard
+        kind: agent
+        scope: implementation
+        timeout: 7200
+        prompt: |
+          GOAL: {goal}
+          SHAPE: "pre-existing" must be proven, not claimed. Add the guard: a
+          named check (e.g. tests/test_preexisting_drift_guard.py or a
+          scripts/check_preexisting.py invoked by the review rail) that, given a
+          failing test and a merge-base, proves the failure exists at the
+          merge-base (checkout the base in a temp worktree, run the failing
+          test, observe the same failure) BEFORE the author may call it
+          pre-existing. Wire it so the review phases (and the operator's review
+          of any branch) can invoke it: the claim "pre-existing" in a review doc
+          must cite the guard's evidence (base sha, test, before/after outcome).
+          The guard itself is deterministic and fast (a single test, a temp
+          worktree, no model calls).
+          SCOPE FENCE: the guard + its wiring ONLY — no changes to how findings
+          are recorded beyond requiring the citation. Commits carry
+          '[workflow] e5_preexisting_guard'.
+          VERIFY (both directions): unit tests prove (a) the guard passes when
+          the failure genuinely exists at the merge-base (synthetic: a test that
+          fails at base and on the branch); (b) the guard FAILS when the failure
+          is branch-introduced (synthetic: a test that passes at base, fails on
+          the branch) — the mislabeling pattern is caught mechanically; (c) the
+          guard runs without model calls (deterministic, sub-minute); (d) a
+          review doc citing the guard's evidence is accepted, one claiming
+          "pre-existing" without it is flagged.
+          DELIVER: the guard + the wiring + the tests, committed.
+          LOG: PASS/FAIL; commit.
+      - name: e6_adversarial
+        kind: agent
+        scope: adversarial_readonly
+        requires_deliverable: true
+        run_model: deepseek/deepseek-v4-pro
+        timeout: 14400
+        prompt: |
+          GOAL: {goal}
+          ROLE: the INDEPENDENT adversarial reviewer — a DIFFERENT model and
+          session (pro vs the flash author, the house independence convention).
+          You are NOT the author: falsify the evidence wave, not certify it.
+          Attack in order, each re-verified against the actual code + the live
+          control db (never asserted): (1) e1 — after a REAL run (or the
+          strongest synthetic), does the control db hold per-phase step_attempts
+          + gate_results? is the write side actually called in the phase loop
+          (not just testable)? (2) e2 — does the run path drain the outbox, and
+          does the drain command exist + work? (3) e3 — is the production
+          receipt dir hermetic against the suite? are the deadbeef artifacts
+          really gone from history (grep both waves)? (4) e4 — does the epoch
+          see phase progress in the live db? (5) e5 — can the guard be fooled
+          (a branch-introduced failure labeled pre-existing passes the guard)?
+          Every finding: FIX on the branch or RECORD as an accepted limitation
+          with reasoning. At least 3 findings or a clean sweep with
+          re-verification evidence — a bare PASS is a failed review.
+          RELEASE VERDICT: merge-ready to main? What must the operator do after
+          merge (the history purge decision, the publication-gate arming — P0
+          actions, named not done).
+          DELIVER: docs/reviews/control_db_evidence_adversarial.md (finding
+          table: finding / attack / re-verification evidence / fix-or-record /
+          residual scope), committed.
+          LOG: finding table; PASS/FAIL; commit.
+      - name: e7_test_gate
+        kind: test
+        scope: implementation
+        timeout: 900
+        # The independent harness test gate (fail-closed): run_suite records
+        # test_executed_success — never self-report. Scoped to the surfaces this
+        # spec touches.
+        tests:
+          - tests/test_control_db.py
+          - tests/test_outbox.py
+          - tests/test_publish_release.py
+          - tests/test_publication_singular_door.py
+          - tests/test_control_status.py
+          - tests/test_preexisting_drift_guard.py
+          - tests/test_workflow_runner.py
+          - tests/test_agent_config_render.py
+          - tests/test_doc_lifecycle.py
+          - tests/test_script_classification.py
+          - tests/test_cli_resolution.py
+          - tests/test_spawn_wrapper.py
+factors:
+  - {name: model, levels: [deepseek/deepseek-v4-flash]}
+design: factorial
+rules:
+  - name: evidence_spec_pinned
+    plane: measurement
+    evidence_class: "[M]"
+    requires: []
+    produces: [five_edges_verified]
+  - name: phase_evidence_written
+    plane: measurement
+    evidence_class: "[C]"
+    requires: [five_edges_verified]
+    produces: [per_phase_rows_recorded]
+  - name: outbox_drains_in_run_path
+    plane: measurement
+    evidence_class: "[C]"
+    requires: [per_phase_rows_recorded]
+    produces: [pending_rows_not_normal]
+  - name: publication_tests_hermetic
+    plane: measurement
+    evidence_class: "[C]"
+    requires: [five_edges_verified]
+    produces: [prod_receipt_dir_clean, deadbeef_artifacts_purged]
+  - name: epoch_sees_phase_progress
+    plane: measurement
+    evidence_class: "[C]"
+    requires: [per_phase_rows_recorded]
+    produces: [phase_progress_visible]
+  - name: preexisting_must_be_proven
+    plane: measurement
+    evidence_class: "[C]"
+    requires: [five_edges_verified]
+    produces: [mislabel_caught_mechanically]
+  - name: evidence_adversarial_reviewed
+    plane: measurement
+    evidence_class: "[M]"
+    requires: [per_phase_rows_recorded, pending_rows_not_normal,
+               prod_receipt_dir_clean, deadbeef_artifacts_purged,
+               phase_progress_visible, mislabel_caught_mechanically]
+    produces: [evidence_wave_adversarial_clean]
+  - name: test_gate_measured
+    plane: measurement
+    evidence_class: "[M]"
+    requires: [test_executed_success]
+    produces: [independent_gate_recorded]
+metrics:
+  - {name: five_edges_verified, agg: mean, over: cell}
+  - {name: per_phase_rows_recorded, agg: mean, over: cell}
+  - {name: pending_rows_not_normal, agg: mean, over: cell}
+  - {name: prod_receipt_dir_clean, agg: mean, over: cell}
+  - {name: deadbeef_artifacts_purged, agg: mean, over: cell}
+  - {name: phase_progress_visible, agg: mean, over: cell}
+  - {name: mislabel_caught_mechanically, agg: mean, over: cell}
+  - {name: evidence_wave_adversarial_clean, agg: mean, over: cell}
+  - {name: independent_gate_recorded, agg: mean, over: cell}
+writeup:
+  format: lab_book
+  sections: [question, e0_pin_spec, e1_phase_evidence, e2_outbox_drain, e3_hermetic_publication, e4_phase_epoch, e5_preexisting_guard, e6_adversarial, e7_test_gate]
+stop: {budget_usd: 12.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}
