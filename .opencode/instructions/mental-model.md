@@ -346,6 +346,11 @@ SCHEMA_ID = "control-status/v1"
 build_packet(db, *, repo_head_sha, heartbeats, now) -> dict
   # keys: schema, repo_head_sha, control_epoch, active_runs, awaiting_approvals,
   #       promotable_runs, failed_runs, unhealthy_workers, projection_lag, safe_actions, degraded
+  # control_epoch = ANY durable state change, run-level (transition_run/create_run) OR
+  #   phase-level (each step_attempt's start/end — control_db_evidence e4), so a turn-to-turn
+  #   diff sees phase progress, not only run-state moves. Every non-terminal active_runs /
+  #   promotable_runs entry additionally carries phases_completed/phases_total derived from the
+  #   run's step_attempts rows (what e1 records); failed entries keep the narrow identifier shape.
 derive_safe_actions(*, awaiting, runs_by_state) -> list[dict]
   # DERIVED from control_db.ALLOWED_TRANSITIONS — the same graph transition_run enforces, so an
   # action the packet offers is an action the database accepts. Never a hand-written list.

@@ -438,6 +438,34 @@ def test_control_epoch_advances_on_every_transition_and_not_on_reads(db):
     assert db.control_epoch() == after_create + 1
 
 
+def test_control_epoch_advances_on_attempt_start_and_finish(db):
+    """e4: the epoch sees PHASE progress — a step attempt's start AND end are durable changes.
+
+    The whole point of the per-phase bump: an 8-phase run moves the epoch 16 times while it
+    executes, so a master diffing turn-to-turn packets sees the work actually happening, not
+    only the run's two top-level transitions (create → running → promotable).
+    """
+    run_id = make_run(db)
+    base = db.control_epoch()  # after create_run's own bump
+
+    first = db.start_attempt(run_id, step_id="p1", model="m")
+    assert db.control_epoch() == base + 1  # the attempt START is itself a durable state change
+
+    db.finish_attempt(first.attempt_id, AttemptState.OK)
+    assert db.control_epoch() == base + 2  # ... and so is its OUTCOME
+
+    # Reads still do not move it — the per-phase bump must not make observation an event.
+    db.attempts(run_id)
+    db.transitions(run_id)
+    assert db.control_epoch() == base + 2
+
+    # A second phase bumps twice more: 2 phases = 4 phase-level changes, end to end.
+    second = db.start_attempt(run_id, step_id="p2", model="m")
+    assert db.control_epoch() == base + 3
+    db.finish_attempt(second.attempt_id, AttemptState.OK)
+    assert db.control_epoch() == base + 4
+
+
 def test_runs_can_be_filtered_by_state_and_spec(db):
     """The control packet's queries: what is in flight, what is awaiting, what failed."""
     first = make_run(db, spec_name="alpha")

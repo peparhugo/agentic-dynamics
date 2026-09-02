@@ -44,6 +44,14 @@ down, git unavailable — is named in the additive :data:`DEGRADED_KEY` list rat
 as an empty, healthy-looking result. An empty ``unhealthy_workers`` must mean "the workers were
 observed and all are alive", never "nobody could look".
 
+**4. The packet shows phase progress, not only run-state movement** (control_db_evidence e4). The
+``control_epoch`` counts *every* durable state change — a run-level transition OR a step
+attempt's start/end — so two packets from different turns differ while an 8-phase run executes,
+not only when the run's top-level state moves. Alongside the counter, each non-terminal entry in
+``active_runs``/``promotable_runs`` carries ``phases_completed``/``phases_total`` derived from the
+run's ``step_attempts`` rows, so the diff says *what* moved ("phase 3 of 8 finished"), not just
+*that* something did.
+
 What this phase does NOT do
 ---------------------------
 The phase scope fence is real. p4 owns this module, its CLI shell, and its tests. It does not
@@ -186,6 +194,12 @@ def worker_stale_after_seconds() -> float:
 #: Every entry carries ``candidate_sha`` alongside ``run_id``, because the doctrine tells actors
 #: to act only on identifiers the packet returns — and an action against a run without naming the
 #: tree it is about is exactly how a verdict gets re-attached to different code.
+#:
+#: ``phases_completed`` / ``phases_total`` (control_db_evidence e4) ride on the NON-terminal
+#: entries only: they are the run's phase progress derived from its ``step_attempts`` rows — the
+#: number of phases whose latest attempt reached a terminal outcome, out of the phases that have
+#: recorded at least one attempt. Optional in the schema: a terminal (failed) entry carries the
+#: identifiers alone, since phase progress is the in-flight run's signal.
 _RUN_REF_SCHEMA: dict[str, Any] = {
     "type": "object",
     "required": ["run_id", "spec_name", "state", "candidate_sha", "model", "started_at"],
@@ -198,6 +212,8 @@ _RUN_REF_SCHEMA: dict[str, Any] = {
         "model": {"type": "string"},
         "started_at": {"type": "string"},
         "workflow_revision_id": {"type": "string"},
+        "phases_completed": {"type": "integer", "minimum": 0},
+        "phases_total": {"type": "integer", "minimum": 0},
     },
 }
 
@@ -333,6 +349,50 @@ def run_ref(run: RunRecord) -> dict[str, Any]:
         "started_at": run.started_at,
         "workflow_revision_id": run.workflow_revision_id,
     }
+
+
+def run_phase_progress(db: ControlDB, run_id: str) -> tuple[int, int]:
+    """A run's phase progress from its ``step_attempts`` rows: ``(phases_completed, phases_total)``.
+
+    Both numbers are derived from what e1 actually records — one attempt row per executed phase
+    (a retried phase is attempt_no 1, then 2, on the SAME step) — so the derivation never
+    invents a phase the engine did not record:
+
+    * ``phases_total`` — the number of distinct phases (step_ids) with at least one attempt row.
+      Monotonic within a run: append-only rows mean a started phase is never un-started.
+    * ``phases_completed`` — the number of those phases whose LATEST attempt (highest
+      ``attempt_no``) reached a terminal outcome (:class:`~AttemptState.OK`/``failed``/
+      ``awaiting``/``skipped``/``cancelled``). A phase whose latest attempt is still ``running``
+      is in flight — it counts toward the total but not the completed.
+
+    A queued run with no phase recorded yet is ``(0, 0)``: no rows, no invented progress. The
+    epoch is the "did anything move?" signal; this is the "what moved?" detail that turns a
+    run-state-only epoch into a phase-visible one (control_db_evidence e4) — two packets from
+    different turns show the run's completed count growing toward its total.
+    """
+    latest_by_step: dict[str, Any] = {}
+    for attempt in db.attempts(run_id):
+        previous = latest_by_step.get(attempt.step_id)
+        if previous is None or attempt.attempt_no >= previous.attempt_no:
+            latest_by_step[attempt.step_id] = attempt
+    phases_total = len(latest_by_step)
+    phases_completed = sum(1 for a in latest_by_step.values() if a.is_terminal)
+    return phases_completed, phases_total
+
+
+def active_run_ref(db: ControlDB, run: RunRecord) -> dict[str, Any]:
+    """A non-terminal run reference, carrying the run's phase progress (e4).
+
+    The packet's ``active_runs``/``promotable_runs`` entries name an in-flight run, so they add
+    the run's ``phases_completed``/``phases_total`` — the progress a turn-to-turn diff reads.
+    Terminal (failed) entries keep :func:`run_ref`'s narrow shape; a failed run is no longer in
+    flight, and "how far it got" is a reconstruction query, not a per-turn signal.
+    """
+    ref = run_ref(run)
+    completed, total = run_phase_progress(db, run.run_id)
+    ref["phases_completed"] = completed
+    ref["phases_total"] = total
+    return ref
 
 
 def awaiting_approval_entries(db: ControlDB, runs: Sequence[RunRecord]) -> list[dict[str, Any]]:
@@ -722,9 +782,9 @@ def build_packet(
         "schema": SCHEMA_ID,
         "repo_head_sha": repo_head_sha,
         "control_epoch": db.control_epoch(),
-        "active_runs": [run_ref(r) for r in active],
+        "active_runs": [active_run_ref(db, r) for r in active],
         "awaiting_approvals": awaiting,
-        "promotable_runs": [run_ref(r) for r in runs_by_state.get(RunState.PROMOTABLE, [])],
+        "promotable_runs": [active_run_ref(db, r) for r in runs_by_state.get(RunState.PROMOTABLE, [])],
         "failed_runs": [run_ref(r) for r in failed],
         "unhealthy_workers": workers,
         "projection_lag": projection_lag,
@@ -797,6 +857,18 @@ def validate_packet(packet: Any) -> list[str]:
             )
             if isinstance(entry, Mapping) and entry.get("state") not in run_states:
                 errors.append(f"{block}[{i}].state is not a known run state: {entry.get('state')!r}")
+            # Phase progress is optional (terminal entries omit it); when present it must be a
+            # non-negative int — `True` is an int subclass and must not pass as a phase count.
+            if isinstance(entry, Mapping):
+                for field in ("phases_completed", "phases_total"):
+                    value_count = entry.get(field)
+                    if value_count is not None and (
+                        not isinstance(value_count, int) or isinstance(value_count, bool)
+                        or value_count < 0
+                    ):
+                        errors.append(
+                            f"{block}[{i}].{field} must be a non-negative integer"
+                        )
 
     awaiting = packet.get("awaiting_approvals")
     if not isinstance(awaiting, list):
@@ -915,9 +987,12 @@ def format_packet(packet: Mapping[str, Any]) -> str:
     lines.append(f"  projection lag: {rendered_lag or '(none)'}")
 
     for run in packet.get("active_runs", []):
+        progress = ""
+        if "phases_completed" in run:
+            progress = f"  phases {run['phases_completed']}/{run['phases_total']}"
         lines.append(
             f"  [{run['state']}] {run['run_id']}  {run['spec_name']}  "
-            f"{(run.get('candidate_sha') or '(no sha)')[:12]}"
+            f"{(run.get('candidate_sha') or '(no sha)')[:12]}{progress}"
         )
 
     actions = packet.get("safe_actions", [])
@@ -943,6 +1018,7 @@ __all__ = [
     "WORKER_STALE_AFTER_S",
     "WORKER_STALE_ENV",
     "SafeAction",
+    "active_run_ref",
     "awaiting_approval_entries",
     "build_packet",
     "derive_safe_actions",
@@ -950,6 +1026,7 @@ __all__ = [
     "packet_json",
     "read_repo_head_sha",
     "read_worker_heartbeats",
+    "run_phase_progress",
     "run_ref",
     "unhealthy_workers",
     "validate_packet",

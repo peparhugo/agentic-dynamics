@@ -341,3 +341,39 @@ def test_engine_is_byte_identical_without_a_recorder(tmp_path):
                           commit=False, run_agentic_fn=lambda *a, **k: _fake_agent())
     assert result.ok is True
     assert [p.status for p in result.phases] == ["ok", "ok"]
+
+
+def test_two_phases_advance_the_epoch_by_attempt_start_plus_finish_each(db):
+    """(a) e4: a synthetic 2-phase run advances the epoch at least 4 — attempt start/end per phase.
+
+    A turn-to-turn packet diff now sees phase progress: two recorded phases move the epoch by
+    4 phase-level changes (each attempt's start + its finish), where a run-state-only epoch
+    would not have moved at all.
+    """
+    run_id = _make_run(db)
+    epoch0 = db.control_epoch()
+
+    record_phase_evidence(db, run_id, _evidence(step_id="p1"))
+    assert db.control_epoch() == epoch0 + 2  # start + finish of phase 1
+
+    record_phase_evidence(db, run_id, _evidence(step_id="p2"))
+    assert db.control_epoch() >= epoch0 + 4  # at least start + finish of phase 2 as well
+
+
+def test_a_run_without_a_control_db_still_exits_cleanly(tmp_path):
+    """(d) e4: the epoch is a control-plane feature, never a run gate.
+
+    With no control database (no run row to bind a recorder to, so the seam is inert), the run
+    completes exactly as a pre-e4 run would — nothing to record, nothing to bump, clean exit.
+    """
+    spec = _spec_with_phases(2)
+    repo = tmp_path / "work"
+    repo.mkdir()
+    _git_init(repo)
+
+    assert make_phase_evidence_recorder(None, None) is None  # no db, no run row
+    result = run_workflow(spec, goal="g", model="m", workdir=repo,
+                          run_agentic_fn=lambda *a, **k: _fake_agent(),
+                          phase_evidence_recorder=make_phase_evidence_recorder(None, None))
+    assert result.ok is True
+    assert [p.status for p in result.phases] == ["ok", "ok"]

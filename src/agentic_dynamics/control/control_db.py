@@ -823,6 +823,9 @@ class ReconstructedRun:
 SCHEMA_SQL = f"""
 -- Housekeeping: the schema version and the monotonic control epoch. A key/value table rather
 -- than PRAGMA user_version because the epoch needs to live somewhere transactional anyway.
+-- The epoch counts EVERY durable state change (control_db_evidence e4): a run-level transition
+-- (runs.state moving) OR a phase-level one (a step_attempt's start/end), each of which bumps it
+-- inside its own transaction.
 CREATE TABLE IF NOT EXISTS control_meta (
     key   TEXT PRIMARY KEY,
     value TEXT NOT NULL
@@ -1381,11 +1384,19 @@ class ControlDB:
     def _bump_epoch(self) -> int:
         """Increment and return the monotonic control epoch.
 
-        Bumped inside the same transaction as every state transition, so an observer that
+        Bumped inside the same transaction as every durable state change, so an observer that
         caches a packet can tell "nothing changed" from "I have not looked" by comparing one
         integer — which is what lets the master controller diff turns instead of re-reading
         prose. p4 renders it; the database owns it, because only the database sees every
         transition.
+
+        The epoch's meaning (control_db_evidence e4): **any durable state change, run-level or
+        phase-level**. Run-level changes are the run-state transitions (:meth:`transition_run`,
+        :meth:`create_run`'s creation edge); phase-level changes are a step attempt's *start*
+        and *end* (:meth:`start_attempt`/:meth:`finish_attempt` — a phase moving into flight and
+        then recording its outcome are both facts a turn-to-turn diff must see). A *heartbeat*
+        is deliberately neither — :meth:`record_run_heartbeat` never bumps, because a beat every
+        few seconds is not a state change and must not read as one.
         """
         self._conn.execute(
             "UPDATE control_meta SET value = CAST(CAST(value AS INTEGER) + 1 AS TEXT) "
@@ -1394,7 +1405,12 @@ class ControlDB:
         return self.control_epoch()
 
     def control_epoch(self) -> int:
-        """The current control epoch (0 on a fresh database)."""
+        """The current control epoch (0 on a fresh database).
+
+        Counts durable state changes: run-level (a run's state transitions) and phase-level (a
+        step attempt's start/end). Two packets built at different times over an unchanged
+        database carry the same value; any run-level or phase-level change moves it.
+        """
         row = self._conn.execute(
             "SELECT value FROM control_meta WHERE key = 'control_epoch'"
         ).fetchone()
@@ -1741,6 +1757,10 @@ class ControlDB:
         Before, not after, is the whole point: an attempt that crashes the orchestrator still
         leaves a ``running`` row, which is how a killed run becomes visible as *stuck at step X*
         instead of vanishing — today's failure, where the ledger is only written at the end.
+
+        A phase moving from "not started" to "in flight" is a durable state change (e4): the
+        row's existence is a fact a turn-to-turn packet diff must see, so the epoch bumps in the
+        same transaction that inserts the ``running`` row.
         """
         self._require_writable()
         step = _require(step_id, "step_id")
@@ -1759,6 +1779,7 @@ class ControlDB:
                 """,
                 (aid, run_id, step, number, model, attempt_state.value, started_at or _now()),
             )
+            self._bump_epoch()
         record = self.get_attempt(aid)
         assert record is not None
         return record
@@ -1779,6 +1800,9 @@ class ControlDB:
         Refuses a second finish (:class:`TerminalStateError`): the first recorded outcome of an
         invocation is the outcome. A retry is a NEW attempt row with the next ``attempt_no`` —
         which is the difference between a measurable retry rate and an overwritten one.
+
+        Recording the outcome is a durable state change (e4): the phase's result is exactly what
+        a turn-to-turn packet diff must see move, so the epoch bumps in the same transaction.
         """
         self._require_writable()
         final = _coerce_attempt_state(state)
@@ -1801,6 +1825,7 @@ class ControlDB:
                 (final.value, ended_at or _now(), int(tokens), float(cost_usd),
                  exit_code, error, attempt_id),
             )
+            self._bump_epoch()
         updated = self.get_attempt(attempt_id)
         assert updated is not None
         return updated

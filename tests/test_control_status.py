@@ -40,6 +40,7 @@ import pytest
 from agentic_dynamics.control.control_db import (
     ALLOWED_TRANSITIONS,
     TERMINAL_RUN_STATES,
+    AttemptState,
     ControlDB,
     GateVerdict,
     RunState,
@@ -57,6 +58,7 @@ from agentic_dynamics.control.control_status import (
     format_packet,
     packet_json,
     read_repo_head_sha,
+    run_phase_progress,
     run_ref,
     unhealthy_workers,
     validate_packet,
@@ -553,6 +555,91 @@ def test_control_epoch_is_monotonic_across_many_transitions(db) -> None:
         db.transition_run(run.run_id, state, actor="test")
         epochs.append(build(db)["control_epoch"])
     assert epochs == sorted(set(epochs)), f"epoch must strictly increase, got {epochs}"
+
+
+# ── 5. Phase progress (e4): the packet shows per-phase movement ──────────────────────────────
+
+
+def test_active_run_carries_phase_progress_derived_from_step_attempts(db) -> None:
+    """(b) the packet exposes phases_completed/phases_total for an active run, from its rows.
+
+    Phase 1 finished (a terminal attempt) and phase 2 is mid-flight (a running attempt): the
+    entry reads ``1/2`` — the completed count is what a turn-to-turn diff sees grow. The fields
+    ride the SAME run entry (no new block), and the packet still validates against both the
+    dependency-free checker and the JSON Schema.
+    """
+    run = seed_run(db, state=RunState.RUNNING)
+    jsonschema = pytest.importorskip("jsonschema")
+
+    p1 = db.start_attempt(run.run_id, step_id="p1", model="m")
+    db.finish_attempt(p1.attempt_id, AttemptState.OK)
+    db.start_attempt(run.run_id, step_id="p2", model="m")  # left running — in flight
+
+    packet = build(db)
+    entry = packet["active_runs"][0]
+    assert entry["run_id"] == run.run_id
+    assert entry["phases_completed"] == 1
+    assert entry["phases_total"] == 2
+    assert validate_packet(packet) == []
+    jsonschema.validate(packet, CONTROL_STATUS_SCHEMA)
+
+    # Finish phase 2: the next packet shows 2/2 — the diff between the two packets IS progress.
+    db.finish_attempt(db.attempts(run.run_id, step_id="p2")[0].attempt_id, AttemptState.OK)
+    after = build(db)["active_runs"][0]
+    assert (after["phases_completed"], after["phases_total"]) == (2, 2)
+
+
+def test_a_retried_phase_counts_once_and_by_its_latest_outcome(db) -> None:
+    """Retries are attempt_no 1 then 2 on the SAME step — progress counts the phase once, by the
+    LATEST attempt's terminal state (a retried-then-ok phase is completed, not double-counted)."""
+    run = seed_run(db, state=RunState.RUNNING)
+    first = db.start_attempt(run.run_id, step_id="p1", model="m")
+    db.finish_attempt(first.attempt_id, AttemptState.FAILED, error="boom")
+    second = db.start_attempt(run.run_id, step_id="p1", model="m")
+    db.finish_attempt(second.attempt_id, AttemptState.OK)
+
+    assert run_phase_progress(db, run.run_id) == (1, 1)
+    entry = build(db)["active_runs"][0]
+    assert (entry["phases_completed"], entry["phases_total"]) == (1, 1)
+
+
+def test_promotable_run_carries_its_completed_phase_count(db) -> None:
+    """A promotable run's phases are all done — its progress block is full (2/2), and the entry
+    is byte-shaped for both blocks it appears in (active_runs and promotable_runs)."""
+    run = seed_run(db, state=RunState.PROMOTABLE)
+    for step in ("p1", "p2"):
+        attempt = db.start_attempt(run.run_id, step_id=step, model="m")
+        db.finish_attempt(attempt.attempt_id, AttemptState.OK)
+
+    packet = build(db)
+    assert packet["active_runs"][0]["phases_completed"] == 2
+    assert packet["promotable_runs"][0]["phases_total"] == 2
+    assert validate_packet(packet) == []
+
+
+def test_a_run_with_no_recorded_phases_reports_zero_zero(db) -> None:
+    """No step_attempts rows -> 0/0, never an invented number or an absent key on an active run."""
+    seed_run(db, state=RunState.RUNNING)
+    entry = build(db)["active_runs"][0]
+    assert (entry["phases_completed"], entry["phases_total"]) == (0, 0)
+
+
+def test_failed_run_entries_keep_the_narrow_identifier_shape(db) -> None:
+    """Phase progress is the in-flight run's signal — a failed (terminal) entry carries the
+    identifiers alone, not a 0/0 that would read as "finished zero phases" for a finished run."""
+    seed_run(db, state=RunState.FAILED)
+    entry = build(db)["failed_runs"][0]
+    assert "phases_completed" not in entry
+    assert "phases_total" not in entry
+
+
+def test_phase_progress_entries_are_byte_identical_for_a_fixed_database(db) -> None:
+    """The phase fields join the determinism guarantee: same db, same injected inputs, same JSON."""
+    run = seed_run(db, state=RunState.RUNNING)
+    attempt = db.start_attempt(run.run_id, step_id="p1", model="m")
+    db.finish_attempt(attempt.attempt_id, AttemptState.OK)
+
+    assert packet_json(build(db)) == packet_json(build(db))
 
 
 # ── 4. Determinism ───────────────────────────────────────────────────────────────────────────
