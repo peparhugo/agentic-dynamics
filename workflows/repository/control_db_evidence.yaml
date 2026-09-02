@@ -108,6 +108,14 @@ workflow:
         merge-base — or the claim fails loudly. The mislabeling pattern is a
         review finding, not a get-out clause.
         (6) REGENERATE, NEVER HAND-EDIT (unchanged). AUTHORITY ABSOLUTE (unchanged).
+        (7) BOUNDED VERIFICATION (the 2026-09-02 e0-loop lesson): a claim that
+        cannot be reproduced after THREE attempts is a FINDING — record the
+        deviation and fail that claim. Never treat an unverifiable claim as a
+        puzzle to solve in a loop; a loop that keeps emitting transcript steps is
+        invisible to the phase watchdog. The machine-local control db lives at the
+        MAIN checkout (gitignored, absent from this worktree) — read it by
+        absolute path or ControlDB.open_read_only(), which resolves from the
+        package root.
     phases:
       - name: e0_pin_spec
         kind: agent
@@ -122,14 +130,26 @@ workflow:
           current-state edges VERIFIED against the actual code + the live control
           db, not copied from the spec: (1) step_attempts/gate_results are 0 in
           the production db for run-2bc253a8d87a and record_gate_result has no
-          production caller (grep the callers); (2) the outbox holds 68 pending
+          production caller (grep the callers); (2) the outbox holds pending
           rows and nothing in the run path drains (find the drain call sites);
-          (3) 13 deadbeef/operator-test receipts are committed (git log them) and
-          write_receipt ignores --db (read the call at publish_release.py:515);
-          (4) control_epoch is 2 for an 8-phase run (read the control db + the
-          epoch derivation); (5) no pre-existing-drift guard exists (grep for
-          it). An edge that does not hold is a FAILED finding — record the
-          deviation and fail.
+          (3) 13 deadbeef/operator-test receipts are committed (git log them)
+          and write_receipt ignores --db (read the call at
+          publish_release.py:515); (4) control_epoch is 2 for an 8-phase run
+          (read the control db + the epoch derivation); (5) no pre-existing-drift
+          guard exists (grep for it). An edge that does not hold is a FAILED
+          finding — record the deviation and fail.
+          DB LOCATION (the 2026-09-02 loop lesson): the live control db is NOT in
+          this worktree — it is gitignored and machine-local, and it lives at the
+          MAIN checkout: /home/drseuss/ai-finops-framework/experiments/results/
+          control/control.db. This worktree has no experiments/results/control/
+          directory. Read it with an ABSOLUTE path:
+          python3 -c "import sqlite3; c=sqlite3.connect(
+          '/home/drseuss/ai-finops-framework/experiments/results/control/
+          control.db'); print(c.execute('SELECT COUNT(*) FROM step_attempts').
+          fetchone())" — or via ControlDB.open_read_only() which resolves to the
+          same path from the package root. If a claim cannot be reproduced after
+          THREE attempts, record the deviation and FAIL that claim — never loop.
+          A claim you cannot verify is a finding, not a puzzle to solve.
           DELIVER: the preregistration with the five verified edges, committed
           with the '[workflow] e0_pin_spec — <goal prefix>' subject.
           LOG: PASS/FAIL per claim; commit.
