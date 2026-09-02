@@ -1,6 +1,6 @@
 {
   "schema": "subscription-usage/v3",
-  "fetched_at": "2026-09-02T13:28:40.854215+00:00",
+  "fetched_at": "2026-09-02T16:39:42.654385+00:00",
   "providers": {
     "anthropic": {
       "ok": false,
@@ -111,32 +111,32 @@
       },
       {
         "date": "2026-09-01",
-        "cost_usd": 2.8830322584000014,
+        "cost_usd": 3.1602190032000013,
         "sessions": 126,
         "subagent_cost_usd": 0.0,
         "subagent_sessions": 0,
-        "tokens": 9263766
+        "tokens": 10378236
       },
       {
         "date": "2026-09-02",
-        "cost_usd": 1.7707409639999998,
-        "sessions": 25,
+        "cost_usd": 2.6324892074000004,
+        "sessions": 29,
         "subagent_cost_usd": 0.0294228256,
         "subagent_sessions": 1,
-        "tokens": 4671561
+        "tokens": 6198921
       }
     ],
     "totals": {
-      "cost_usd": 180.964017,
-      "sessions": 1646,
+      "cost_usd": 182.102952,
+      "sessions": 1650,
       "subagent_cost_usd": 1.234688,
       "subagent_sessions": 33,
-      "tokens": 366333849,
-      "cache_read": 14172273024,
+      "tokens": 368975679,
+      "cache_read": 14382736512,
       "models": {
-        "deepseek/deepseek-v4-flash": 36.944092,
+        "deepseek/deepseek-v4-flash": 38.005476,
         "deepseek/deepseek-v4-flash-vision-exp": 2.911644,
-        "deepseek/deepseek-v4-pro": 141.108282
+        "deepseek/deepseek-v4-pro": 141.185833
       }
     },
     "ok": true,
@@ -265,16 +265,16 @@
       },
       {
         "date": "2026-09-02",
-        "requests": 1895,
-        "response_tokens": 1951516,
-        "cache_hit_tokens": 363443968,
-        "cache_miss_tokens": 4118459,
-        "estimated_cost_usd": 5.173317,
+        "requests": 2382,
+        "response_tokens": 2894204,
+        "cache_hit_tokens": 573103232,
+        "cache_miss_tokens": 5766160,
+        "estimated_cost_usd": 7.715671,
         "pricing_complete": true
       }
     ],
     "totals": {
-      "estimated_cost_usd": 165.898359,
+      "estimated_cost_usd": 168.440713,
       "pricing_complete": true,
       "unpriced_models": [],
       "deepseek-chat & deepseek-reasoner": {
@@ -285,11 +285,11 @@
         "estimated_cost_usd": 0.0
       },
       "deepseek-v4-flash": {
-        "requests": 23209,
-        "response_tokens": 17374893,
-        "cache_hit_tokens": 3851847296,
-        "cache_miss_tokens": 72820172,
-        "estimated_cost_usd": 54.4508
+        "requests": 23670,
+        "response_tokens": 18292271,
+        "cache_hit_tokens": 4059175424,
+        "cache_miss_tokens": 74418567,
+        "estimated_cost_usd": 56.8592
       },
       "deepseek-v4-flash-vision-exp": {
         "requests": 45,
@@ -299,19 +299,19 @@
         "estimated_cost_usd": 0.6372
       },
       "deepseek-v4-pro": {
-        "requests": 14640,
-        "response_tokens": 11595110,
-        "cache_hit_tokens": 2301931648,
-        "cache_miss_tokens": 56378159,
-        "estimated_cost_usd": 110.8104
+        "requests": 14666,
+        "response_tokens": 11620420,
+        "cache_hit_tokens": 2304262784,
+        "cache_miss_tokens": 56427465,
+        "estimated_cost_usd": 110.9443
       }
     },
     "ok": true,
     "source": "platform_meter",
     "wallet": {
       "ok": true,
-      "balance_usd": 79.968578676,
-      "lifetime_cost_usd": 340.031421324
+      "balance_usd": 77.426224648,
+      "lifetime_cost_usd": 342.573775352
     },
     "note": "authoritative meter token counts; dollars estimated at repo off-peak rates"
   }
