@@ -73,6 +73,7 @@ schema, never a replacement for it.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import sqlite3
@@ -111,7 +112,15 @@ CONTROL_DB_ENV = "FINOPS_CONTROL_DB"
 #: at creation and verified on open — an unknown (future) version is refused rather than
 #: silently misread, because a control plane that half-understands its own state is worse than
 #: one that stops.
-SCHEMA_VERSION = 1
+#:
+#: History:
+#:
+#: * ``1`` — the p1 mandate: runs / run_transitions / step_attempts / gate_results / approvals /
+#:   promotions / outbox / projection_watermarks.
+#: * ``2`` — p6 adds ``publication_receipts`` + ``publication_deployments``: the publication
+#:   transaction's durable record. Purely ADDITIVE (two new tables, no column touched), which is
+#:   what makes :meth:`ControlDB._ensure_schema`'s in-place forward migration safe — see there.
+SCHEMA_VERSION = 2
 
 
 # ── The state vocabularies ───────────────────────────────────────────────────────────────────
@@ -559,6 +568,65 @@ class PromotionRecord:
 
 
 @dataclass(frozen=True)
+class PublicationReceiptRecord:
+    """One row of ``publication_receipts`` — what was published, from which tree, by whom (p6).
+
+    The receipt is the site's evidence chain in one object: the tree (``repo_sha``), the two
+    build artifacts it produced (``data_manifest_sha256``/``data_js_sha256``), the headline
+    number those artifacts assert (``sessions_total``), and the projection frontier the data was
+    derived from (inside :attr:`receipt_json`). Every public number on the website is supposed
+    to trace to one of these rows, which is only meaningful because the row cannot be edited.
+    """
+
+    receipt_id: str
+    repo_sha: str
+    #: The full ``publication/v1`` document. The authority; the columns are a projection of it.
+    receipt_json: str
+    generated_at: str
+    #: Empty when the publication was an operator action rather than a workflow run.
+    run_id: str = ""
+    data_manifest_sha256: str = ""
+    data_js_sha256: str = ""
+    #: ``None`` when the build could not report it — unknown, never a fabricated ``0`` (a zero
+    #: session count that reads as measured is exactly the class of lie this table exists to end).
+    sessions_total: int | None = None
+    receipt_sha256: str = ""
+    operator: str = ""
+
+    @property
+    def receipt(self) -> Any:
+        """The parsed :attr:`receipt_json`."""
+        return _loads(self.receipt_json)
+
+
+@dataclass(frozen=True)
+class DeploymentRecord:
+    """One row of ``publication_deployments`` — one host's outcome for one receipt (p6).
+
+    Two rows per healthy publication: the canonical host and the mirror. Recording them
+    separately is the point — the dual-host rule is checkable ("does this receipt have a
+    succeeded row for BOTH roles?") instead of being an instruction someone has to remember to
+    follow twice.
+    """
+
+    deployment_id: str
+    receipt_id: str
+    #: ``canonical`` or ``mirror`` — the ROLE, so the pair is checkable without knowing today's
+    #: project names.
+    host_role: str
+    firebase_project: str
+    #: The provider's deployment identifier (a Firebase Hosting release/version id). Without it,
+    #: "we deployed" is an assertion no one can check against the provider.
+    release_id: str
+    hosting_url: str
+    #: ``succeeded`` or ``failed``. A failed host is RECORDED, not omitted: a publication that
+    #: reached one host and not the other must be visible, and an absent row cannot say that.
+    status: str
+    deployed_at: str
+    detail: str = ""
+
+
+@dataclass(frozen=True)
 class OutboxRecord:
     """One row of ``outbox`` — an event awaiting at-least-once delivery to the knowledge stream.
 
@@ -862,6 +930,60 @@ CREATE TABLE IF NOT EXISTS projection_watermarks (
     last_error            TEXT NOT NULL DEFAULT ''
 );
 
+-- publication_receipts — the publication transaction's durable record (p6). ONE row per
+-- executed publication: the receipt document itself, plus the four fields a later reader most
+-- often wants to filter on lifted out into columns. The receipt is the SINGLE source for every
+-- public number on the site, so it is append-only: a receipt that could be edited after the
+-- fact would let the record of what was published drift from what actually was.
+CREATE TABLE IF NOT EXISTS publication_receipts (
+    receipt_id           TEXT PRIMARY KEY,
+    -- Nullable-by-convention (empty string): a publication is normally an operator action at
+    -- the permanence gate, not a workflow run, so most receipts have no run to point at. When
+    -- one does, the FK ties the release back to the run that produced the candidate.
+    run_id               TEXT     REFERENCES runs(run_id),
+    -- The exact tree that was published. Empty is refused: a receipt for an unnamed tree is
+    -- the stale-PASS bug in publication form.
+    repo_sha             TEXT NOT NULL CHECK (repo_sha <> ''),
+    data_manifest_sha256 TEXT NOT NULL DEFAULT '',
+    data_js_sha256       TEXT NOT NULL DEFAULT '',
+    sessions_total       INTEGER,
+    generated_at         TEXT NOT NULL,
+    -- The whole publication/v1 document, verbatim. The columns above are a projection of it;
+    -- this is the authority, so a future field added to the schema is not lost by this table.
+    receipt_json         TEXT NOT NULL,
+    receipt_sha256       TEXT NOT NULL DEFAULT '',
+    operator             TEXT NOT NULL DEFAULT ''
+);
+CREATE INDEX IF NOT EXISTS idx_publication_receipts_repo_sha
+    ON publication_receipts(repo_sha);
+CREATE INDEX IF NOT EXISTS idx_publication_receipts_run ON publication_receipts(run_id);
+
+-- publication_deployments — one row per HOST per receipt. The dual-host rule (canonical
+-- ai-finops-rulebook + mirror agentic-dynamics) is enforced by recording each host separately:
+-- "both hosts deployed" becomes a countable fact rather than an assertion, so a publication
+-- that reached one host and not the other is visible in the database instead of in someone's
+-- memory of which of the two commands they ran.
+CREATE TABLE IF NOT EXISTS publication_deployments (
+    deployment_id    TEXT PRIMARY KEY,
+    receipt_id       TEXT NOT NULL REFERENCES publication_receipts(receipt_id),
+    -- The role this host plays: 'canonical' or 'mirror'. Stored as the role rather than only
+    -- the project id so the pair can be checked without knowing today's project names.
+    host_role        TEXT NOT NULL CHECK (host_role <> ''),
+    firebase_project TEXT NOT NULL CHECK (firebase_project <> ''),
+    -- The deployment identifier the provider returned (a Firebase Hosting release/version id).
+    -- This is the thing the mandate asks to be recorded: without it, "we deployed" cannot be
+    -- checked against the provider.
+    release_id       TEXT NOT NULL DEFAULT '',
+    hosting_url      TEXT NOT NULL DEFAULT '',
+    status           TEXT NOT NULL CHECK (status IN ('succeeded', 'failed')),
+    deployed_at      TEXT NOT NULL,
+    detail           TEXT NOT NULL DEFAULT ''
+);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_publication_deployments_receipt_host
+    ON publication_deployments(receipt_id, host_role);
+CREATE INDEX IF NOT EXISTS idx_publication_deployments_receipt
+    ON publication_deployments(receipt_id);
+
 -- ── Immutability triggers ───────────────────────────────────────────────────────────────────
 -- Python-level checks protect callers who use this API. These triggers protect the database
 -- from callers who do not — a sqlite3 shell, a future script, a well-meaning fix. History that
@@ -940,6 +1062,30 @@ BEFORE DELETE ON run_transitions
 BEGIN
     SELECT RAISE(ABORT, 'control_db: the transition log is append-only');
 END;
+
+CREATE TRIGGER IF NOT EXISTS publication_receipts_no_update
+BEFORE UPDATE ON publication_receipts
+BEGIN
+    SELECT RAISE(ABORT, 'control_db: publication receipts are append-only evidence');
+END;
+
+CREATE TRIGGER IF NOT EXISTS publication_receipts_no_delete
+BEFORE DELETE ON publication_receipts
+BEGIN
+    SELECT RAISE(ABORT, 'control_db: publication receipts are append-only evidence');
+END;
+
+CREATE TRIGGER IF NOT EXISTS publication_deployments_no_update
+BEFORE UPDATE ON publication_deployments
+BEGIN
+    SELECT RAISE(ABORT, 'control_db: deployment records are append-only evidence');
+END;
+
+CREATE TRIGGER IF NOT EXISTS publication_deployments_no_delete
+BEFORE DELETE ON publication_deployments
+BEGIN
+    SELECT RAISE(ABORT, 'control_db: deployment records are append-only evidence');
+END;
 """
 
 #: The tables this schema guarantees — exported so the schema test asserts against a named
@@ -953,6 +1099,8 @@ CONTROL_TABLES: tuple[str, ...] = (
     "promotions",
     "outbox",
     "projection_watermarks",
+    "publication_receipts",
+    "publication_deployments",
     "control_meta",
 )
 
@@ -1101,13 +1249,36 @@ class ControlDB:
             self._conn.execute(
                 "INSERT OR IGNORE INTO control_meta(key, value) VALUES ('control_epoch', '0')"
             )
+            # Forward migration for an OLDER database, in place.
+            #
+            # Every statement in SCHEMA_SQL is CREATE ... IF NOT EXISTS, so executing it against
+            # a v1 database has already added the v2 tables above — the database is now, in
+            # fact, v2. What is left is to say so: the ``INSERT OR IGNORE`` cannot update the
+            # existing row, so without this the recorded version would stay at 1 while the
+            # tables were at 2, and a reader checking the version would draw the wrong
+            # conclusion about what it may query.
+            #
+            # This is only sound because v1 → v2 is purely additive. A future version that
+            # changes or drops a column must NOT extend this UPDATE; it needs a real migration
+            # step (guarded per-version), because "re-apply the DDL" no longer reaches the
+            # target shape. The ``< ?`` guard also keeps the write monotonic: a database from a
+            # newer schema is never quietly downgraded — ``_verify_schema_version`` refuses it
+            # outright a moment later.
+            self._conn.execute(
+                "UPDATE control_meta SET value = ? "
+                "WHERE key = 'schema_version' AND CAST(value AS INTEGER) < ?",
+                (str(SCHEMA_VERSION), SCHEMA_VERSION),
+            )
 
     def _verify_schema_version(self) -> None:
         """Refuse a database written by a NEWER schema than this code understands.
 
-        An older version would be a migration question (there are none yet, at v1). A *newer*
-        one means this process would read columns it does not know about and write rows a newer
-        reader considers malformed — so it stops instead.
+        An older version is handled by :meth:`_ensure_schema`'s additive forward migration for
+        a writer, and is harmless for a reader (v1 tables are a subset of v2's; a query against
+        a missing publication table raises where it is used, rather than returning a wrong
+        answer here). A *newer* version is the dangerous direction: this process would read
+        columns it does not know about and write rows a newer reader considers malformed — so
+        it stops instead.
         """
         row = self._conn.execute(
             "SELECT value FROM control_meta WHERE key = 'schema_version'"
@@ -1757,6 +1928,166 @@ class ControlDB:
             for row in self._conn.execute(sql, params).fetchall()
         ]
 
+    # ── publication (the p6 publication transaction's durable record) ────────────────────
+
+    def record_publication_receipt(
+        self,
+        *,
+        repo_sha: str,
+        receipt: Mapping[str, Any] | str,
+        receipt_id: str | None = None,
+        run_id: str = "",
+        operator: str = "",
+        receipt_sha256: str = "",
+    ) -> PublicationReceiptRecord:
+        """Append a ``publication/v1`` receipt (append-only).
+
+        The receipt document is stored verbatim in ``receipt_json``; the columns that callers
+        filter on are *derived from it here* rather than accepted as separate arguments. That
+        asymmetry is deliberate: two sources for one number is how a row comes to disagree with
+        the document it summarises, and this table's whole job is to be the number nobody can
+        argue with.
+
+        :param repo_sha: the exact tree published. Empty is refused (by ``_require`` and again
+            by the table's CHECK) — a receipt for an unnamed tree cannot be verified later.
+        :param receipt: the ``publication/v1`` document, as a mapping or an already-serialised
+            JSON string.
+        :param run_id: the run that produced the candidate, when there is one. ``""`` is stored
+            as SQL NULL so the foreign key is satisfied by absence rather than by a fake run.
+        :param operator: who ran the publication. Deploying the site is a P0 (controller-only)
+            action, so the record carries a name.
+        """
+        self._require_writable()
+        sha = _require(repo_sha, "repo_sha")
+        payload = receipt if isinstance(receipt, str) else json.dumps(receipt, sort_keys=True)
+        parsed = _loads(payload) if isinstance(receipt, str) else receipt
+        if not isinstance(parsed, Mapping):
+            raise ControlFieldError(
+                "control_db: publication receipt must be a JSON object (publication/v1)"
+            )
+        watermarks = parsed.get("source_event_watermarks")
+        generated_at = str(parsed.get("generated_at") or _now())
+        sessions_total = parsed.get("sessions_total")
+        if sessions_total is not None and not isinstance(sessions_total, int):
+            # A string "1,027" here would be recorded as an unqueryable number. Refuse loudly
+            # rather than coerce: the coercion is where the corpus count would silently change.
+            raise ControlFieldError(
+                f"control_db: sessions_total must be an int or None, got {sessions_total!r}"
+            )
+        rid = receipt_id or _new_id("pub")
+        with self.transaction() as conn:
+            if run_id and self.get_run(run_id) is None:
+                raise UnknownRunError(f"control_db: no run {run_id!r}")
+            conn.execute(
+                """
+                INSERT INTO publication_receipts (
+                    receipt_id, run_id, repo_sha, data_manifest_sha256, data_js_sha256,
+                    sessions_total, generated_at, receipt_json, receipt_sha256, operator
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    rid,
+                    run_id or None,
+                    sha,
+                    str(parsed.get("data_manifest_sha256") or ""),
+                    str(parsed.get("data_js_sha256") or ""),
+                    sessions_total,
+                    generated_at,
+                    payload,
+                    receipt_sha256 or hashlib.sha256(payload.encode("utf-8")).hexdigest(),
+                    operator,
+                ),
+            )
+        del watermarks  # Carried inside receipt_json; no column duplicates it (see above).
+        record = self.get_publication_receipt(rid)
+        assert record is not None  # Just inserted inside this transaction.
+        return record
+
+    def record_deployment(
+        self,
+        receipt_id: str,
+        *,
+        host_role: str,
+        firebase_project: str,
+        release_id: str = "",
+        hosting_url: str = "",
+        status: str = "succeeded",
+        detail: str = "",
+        deployed_at: str | None = None,
+        deployment_id: str | None = None,
+    ) -> DeploymentRecord:
+        """Append one host's deployment outcome for a receipt (append-only).
+
+        Called once per host, so a publication that reached the canonical site but failed on the
+        mirror leaves TWO rows — one ``succeeded``, one ``failed`` — rather than one row and a
+        gap. The unique index on ``(receipt_id, host_role)`` makes re-recording the same host
+        for the same receipt an ``IntegrityError``: a retry must produce a new receipt, because
+        the tree it deploys has to be re-verified anyway.
+        """
+        self._require_writable()
+        role = _require(host_role, "host_role")
+        project = _require(firebase_project, "firebase_project")
+        if status not in ("succeeded", "failed"):
+            raise ControlFieldError(
+                f"control_db: deployment status must be 'succeeded' or 'failed', got {status!r}"
+            )
+        did = deployment_id or _new_id("dep")
+        with self.transaction() as conn:
+            if self.get_publication_receipt(receipt_id) is None:
+                raise ControlDBError(f"control_db: no publication receipt {receipt_id!r}")
+            conn.execute(
+                """
+                INSERT INTO publication_deployments (
+                    deployment_id, receipt_id, host_role, firebase_project, release_id,
+                    hosting_url, status, deployed_at, detail
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    did,
+                    receipt_id,
+                    role,
+                    project,
+                    release_id,
+                    hosting_url,
+                    status,
+                    deployed_at or _now(),
+                    detail,
+                ),
+            )
+        return [d for d in self.deployments(receipt_id) if d.deployment_id == did][0]
+
+    def get_publication_receipt(self, receipt_id: str) -> PublicationReceiptRecord | None:
+        """One receipt by id, or ``None``."""
+        row = self._conn.execute(
+            "SELECT * FROM publication_receipts WHERE receipt_id = ?", (receipt_id,)
+        ).fetchone()
+        return _receipt_from_row(row) if row else None
+
+    def publication_receipts(
+        self, *, repo_sha: str | None = None, limit: int | None = None
+    ) -> list[PublicationReceiptRecord]:
+        """Receipts, NEWEST first (the useful order — "what is live?" is the common question)."""
+        sql = "SELECT * FROM publication_receipts"
+        params: list[Any] = []
+        if repo_sha:
+            sql += " WHERE repo_sha = ?"
+            params.append(repo_sha)
+        sql += " ORDER BY generated_at DESC, receipt_id DESC"
+        if limit is not None:
+            sql += " LIMIT ?"
+            params.append(int(limit))
+        return [_receipt_from_row(row) for row in self._conn.execute(sql, params).fetchall()]
+
+    def deployments(self, receipt_id: str | None = None) -> list[DeploymentRecord]:
+        """Deployment rows, oldest first, optionally for one receipt."""
+        sql = "SELECT * FROM publication_deployments"
+        params: list[Any] = []
+        if receipt_id:
+            sql += " WHERE receipt_id = ?"
+            params.append(receipt_id)
+        sql += " ORDER BY deployed_at ASC, deployment_id ASC"
+        return [_deployment_from_row(row) for row in self._conn.execute(sql, params).fetchall()]
+
     # ── outbox (storage primitives; the PUBLISHER is p2's deliverable) ───────────────────
 
     def enqueue_outbox_event(
@@ -2082,6 +2413,37 @@ def _outbox_from_row(row: sqlite3.Row) -> OutboxRecord:
         created_at=row["created_at"],
         delivered_at=row["delivered_at"],
         last_error=row["last_error"],
+    )
+
+
+def _receipt_from_row(row: sqlite3.Row) -> PublicationReceiptRecord:
+    """Map a ``publication_receipts`` row to its record (NULL run_id → ``""``)."""
+    return PublicationReceiptRecord(
+        receipt_id=row["receipt_id"],
+        run_id=row["run_id"] or "",
+        repo_sha=row["repo_sha"],
+        data_manifest_sha256=row["data_manifest_sha256"],
+        data_js_sha256=row["data_js_sha256"],
+        sessions_total=row["sessions_total"],
+        generated_at=row["generated_at"],
+        receipt_json=row["receipt_json"],
+        receipt_sha256=row["receipt_sha256"],
+        operator=row["operator"],
+    )
+
+
+def _deployment_from_row(row: sqlite3.Row) -> DeploymentRecord:
+    """Map a ``publication_deployments`` row to its record."""
+    return DeploymentRecord(
+        deployment_id=row["deployment_id"],
+        receipt_id=row["receipt_id"],
+        host_role=row["host_role"],
+        firebase_project=row["firebase_project"],
+        release_id=row["release_id"],
+        hosting_url=row["hosting_url"],
+        status=row["status"],
+        deployed_at=row["deployed_at"],
+        detail=row["detail"],
     )
 
 

@@ -102,6 +102,10 @@ _COMMANDS: dict[tuple[str, ...], str] = {
     # renders control-status/v1 from the orchestrator-owned control database, and is the surface
     # the Control Room, the supervisor, and the master controller all read live state from.
     ("control", "status"): "control_status.py",
+    # publication (the ONE publication transaction — control_db_publication p6). Deploying the
+    # website is a P0 controller-only action: `publish release` refuses without --operator and
+    # records both hosts + the publication/v1 receipt in the control database.
+    ("publish", "release"): "publish_release.py",
     # usage (subscription quota check — read-only provider endpoints)
     ("usage",): "subscription_usage.py",
     # release
@@ -150,6 +154,7 @@ Subcommands (each forwards to its backing script):
   validate    session|tests|prereq
   supervise   [claude-agents|orphans|leases]
   control     status
+  publish     release
   release     check-protection
   surfaces    sync|snapshot
   docs        scan|watch|gate

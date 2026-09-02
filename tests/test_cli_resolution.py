@@ -102,6 +102,8 @@ DOCUMENTED_RESOLUTIONS: list[tuple[tuple[str, ...], str, tuple[str, ...]]] = [
     (("supervise", "orphans"), "orphan_sweep.py", ()),
     # control — the ONE control packet (control_db_publication p4).
     (("control", "status"), "control_status.py", ()),
+    # publish — the ONE publication transaction (control_db_publication p6).
+    (("publish", "release"), "publish_release.py", ()),
     # release
     (("release", "check-protection"), "check_branch_protection.py", ()),
     # surfaces — the self-maintenance command (design: system_knowledge_abstraction)
