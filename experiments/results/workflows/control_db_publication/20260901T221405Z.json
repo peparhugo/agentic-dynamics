@@ -1,0 +1,118 @@
+{
+  "spec_name": "control_db_publication",
+  "spec_id": "control_db_publication@0.1",
+  "model": "anthropic/claude-opus-5",
+  "workdir": "/tmp/wt_control_db",
+  "goal": "Land the P1/P2 control-plane wave: the orchestrator-owned SQLite control db (runs/step_attempts/gate_results/approvals/promotions/outbox/projection_watermarks) with the exact 12-state run vocabulary; the outbox (parent-run atomic write, at-least-once delivery to the knowledge stream, children never emit); per-projection watermarks surfaced; the ONE control packet (agentic-dynamics control status --json, control-status/v1 with derived safe_actions); the instruction surfaces collapsed onto one generator (root AGENTS.md an output, --check a CI gate, slimmed master context); and ONE publication transaction (publish release --candidate-sha: verify projections, build data, HTML-consistency test, publication receipt, both Firebase hosts, both deployments recorded) \u2014 then the independent flash adversarial review and the harness test gate.",
+  "git_sha": "2565d47b9",
+  "started_at": "2026-09-01T22:00:26.183916+00:00",
+  "ended_at": "2026-09-01T22:14:05.068296+00:00",
+  "awaiting": false,
+  "awaiting_phase": "",
+  "awaiting_reason": "",
+  "checkpoints": [],
+  "state": "failed",
+  "attempts": [
+    {
+      "attempt_id": "wf_control_db_publication_anthropic_claude_opus_5_p1_control_db_a1",
+      "job_id": "wf_control_db_publication_anthropic_claude_opus_5",
+      "phase": "p1_control_db",
+      "attempt_number": 1,
+      "parent_attempt_id": null,
+      "retry_reason": "",
+      "first_pass": false,
+      "accepted": false,
+      "escalation_from": null,
+      "escalation_to": null,
+      "model": "anthropic/claude-opus-5",
+      "status": "failed",
+      "cost_usd": 7.191349500000002,
+      "tokens": {
+        "in": 0,
+        "out": 0,
+        "reasoning": 0,
+        "answer": 0,
+        "explanation": 0,
+        "total": 71259
+      },
+      "test_executed_success": null,
+      "confidence": 0.4681
+    }
+  ],
+  "attempt_count": 1,
+  "total_cost_usd": 7.19135,
+  "ok": false,
+  "phases": [
+    {
+      "phase": "p1_control_db",
+      "kind": "agent",
+      "status": "failed",
+      "spec_id": "control_db_publication@0.1",
+      "model": "anthropic/claude-opus-5",
+      "duration_s": 818.53,
+      "timed_out": false,
+      "commit_hash": "",
+      "error": "COMMIT_PREFIX \u2014 commits made during phase 'p1_control_db' do not match '[workflow] p1_control_db \u2014 Land the P1/P2 control-plane wave: the o': '[workflow] p2_outbox \u2014 Land the P1/P2 control-plane wave: the o' (2565d47b937b) (note: the separator is an EM-DASH U+2014 '\u2014', not a hyphen; the resume machinery matches the exact byte pattern)",
+      "tokens": {
+        "in": 0,
+        "out": 0,
+        "reasoning": 0,
+        "answer": 0,
+        "explanation": 0,
+        "total": 71259
+      },
+      "cost_usd": 7.191349500000002,
+      "cost_source": "metered",
+      "estimation_method": null,
+      "reported_cost_usd": 7.191349500000002,
+      "cache_read_tokens": 6786641,
+      "cache_write_tokens": 201696,
+      "cache_hit_rate": 0.9896,
+      "session_id": "ddef1e68-605c-4e16-b19b-6faa8a09e881",
+      "files_created": [
+        "src/agentic_dynamics/control/outbox.py",
+        "tests/test_control_db.py",
+        "tests/test_control_db_wiring.py"
+      ],
+      "files_modified": [
+        ".instrument/session.jsonl",
+        "README.md",
+        "scripts/run_workflow.py",
+        "src/agentic_dynamics/control/__init__.py",
+        "src/agentic_dynamics/control/control_db.py",
+        "tests/conftest.py"
+      ],
+      "confidence": 0.4681,
+      "raw_prompt_hash": "",
+      "pre_phase_commit": "",
+      "retrieval_attempt_id": "",
+      "constructor_attempt_id": "",
+      "selected_evidence_ids": [],
+      "augmentation_versions": {},
+      "augmentation_tokens": {},
+      "augmentation_cost_usd": 0.0,
+      "augmentation_latency_ms": 0.0,
+      "fallback_mode": "",
+      "test_executed_success": null,
+      "tests_passed": 0,
+      "tests_total": 0,
+      "change_analysis": null,
+      "stall_evidence": null,
+      "deploy_gate": null,
+      "commit_gate": {
+        "reason": "COMMIT_PREFIX",
+        "subjects": [
+          "[workflow] p2_outbox \u2014 Land the P1/P2 control-plane wave: the o"
+        ],
+        "offenders": [
+          {
+            "sha": "2565d47b937b8cd53c64b73fbe20d503760e8de4",
+            "subject": "[workflow] p2_outbox \u2014 Land the P1/P2 control-plane wave: the o"
+          }
+        ],
+        "expected_prefix": "[workflow] p1_control_db \u2014 Land the P1/P2 control-plane wave: the o"
+      },
+      "relabel_gate": null
+    }
+  ]
+}

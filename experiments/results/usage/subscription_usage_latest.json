@@ -1,6 +1,6 @@
 {
   "schema": "subscription-usage/v3",
-  "fetched_at": "2026-09-01T15:08:12.965088+00:00",
+  "fetched_at": "2026-09-02T01:47:55.438872+00:00",
   "providers": {
     "anthropic": {
       "ok": true,
@@ -8,58 +8,26 @@
       "windows": [
         {
           "name": "five_hour",
-          "used_percent": 0.0,
-          "resets_at": null,
+          "used_percent": 100.0,
+          "resets_at": "2026-09-02T02:50:00.219907+00:00",
           "locked_reason": null
         },
         {
           "name": "seven_day",
-          "used_percent": 26.0,
-          "resets_at": "2026-09-02T14:00:00.004719+00:00",
+          "used_percent": 8.0,
+          "resets_at": "2026-09-02T14:00:00.219928+00:00",
           "locked_reason": null
         }
       ],
       "metered_spend_usd": null
     },
     "openai": {
-      "ok": true,
-      "plan": "prolite",
-      "windows": [
-        {
-          "name": "primary",
-          "used_percent": 6,
-          "limit_seconds": 604800,
-          "resets_at": "2026-09-07T03:30:15+00:00",
-          "allowed": true
-        },
-        {
-          "name": "GPT-5.3-Codex-Spark/primary",
-          "used_percent": 0,
-          "limit_seconds": 18000,
-          "resets_at": "2026-09-01T20:08:12+00:00",
-          "allowed": true
-        },
-        {
-          "name": "GPT-5.3-Codex-Spark/secondary",
-          "used_percent": 0,
-          "limit_seconds": 604800,
-          "resets_at": "2026-09-08T15:08:12+00:00",
-          "allowed": true
-        }
-      ],
-      "metered_spend_usd": null
+      "ok": false,
+      "error": "http 401: {\n  \"error\": {\n    \"message\": \"Provided authentication token is expired. Please try signing in again.\",\n    \"type\": null,\n    \"code\": \"token_expired\",\n    \"param\": null\n  },\n  \"status\": 401,\n  \"detail"
     }
   },
   "deepseek": {
     "days": [
-      {
-        "date": "2026-08-19",
-        "cost_usd": 9.663072668200002,
-        "sessions": 37,
-        "subagent_cost_usd": 0.061232629999999996,
-        "subagent_sessions": 1,
-        "tokens": 15397663
-      },
       {
         "date": "2026-08-20",
         "cost_usd": 71.9439516596,
@@ -158,24 +126,32 @@
       },
       {
         "date": "2026-09-01",
-        "cost_usd": 1.3721650432,
-        "sessions": 106,
+        "cost_usd": 2.4684376192000004,
+        "sessions": 126,
         "subagent_cost_usd": 0.0,
         "subagent_sessions": 0,
-        "tokens": 4552769
+        "tokens": 7923455
+      },
+      {
+        "date": "2026-09-02",
+        "cost_usd": 0.10316727680000004,
+        "sessions": 1,
+        "subagent_cost_usd": 0.0,
+        "subagent_sessions": 0,
+        "tokens": 274416
       }
     ],
     "totals": {
-      "cost_usd": 187.345482,
-      "sessions": 1638,
-      "subagent_cost_usd": 1.266498,
-      "subagent_sessions": 33,
-      "tokens": 372348954,
-      "cache_read": 14164001280,
+      "cost_usd": 178.881849,
+      "sessions": 1622,
+      "subagent_cost_usd": 1.205265,
+      "subagent_sessions": 32,
+      "tokens": 360596393,
+      "cache_read": 13864930560,
       "models": {
-        "deepseek/deepseek-v4-flash": 33.953727,
+        "deepseek/deepseek-v4-flash": 35.131726,
         "deepseek/deepseek-v4-flash-vision-exp": 2.911644,
-        "deepseek/deepseek-v4-pro": 150.480111
+        "deepseek/deepseek-v4-pro": 140.838479
       }
     },
     "ok": true,
@@ -185,15 +161,6 @@
   },
   "deepseek_platform": {
     "days": [
-      {
-        "date": "2026-08-19",
-        "requests": 1433,
-        "response_tokens": 1433819,
-        "cache_hit_tokens": 433263616,
-        "cache_miss_tokens": 6052670,
-        "estimated_cost_usd": 16.190668,
-        "pricing_complete": true
-      },
       {
         "date": "2026-08-20",
         "requests": 2298,
@@ -304,16 +271,25 @@
       },
       {
         "date": "2026-09-01",
-        "requests": 2356,
-        "response_tokens": 1619084,
-        "cache_hit_tokens": 369054976,
-        "cache_miss_tokens": 5272128,
-        "estimated_cost_usd": 4.811848,
+        "requests": 3111,
+        "response_tokens": 1965714,
+        "cache_hit_tokens": 539903104,
+        "cache_miss_tokens": 8247307,
+        "estimated_cost_usd": 6.891101,
+        "pricing_complete": true
+      },
+      {
+        "date": "2026-09-02",
+        "requests": 191,
+        "response_tokens": 80998,
+        "cache_hit_tokens": 54954240,
+        "cache_miss_tokens": 246682,
+        "estimated_cost_usd": 0.492408,
         "pricing_complete": true
       }
     ],
     "totals": {
-      "estimated_cost_usd": 174.836458,
+      "estimated_cost_usd": 161.217451,
       "pricing_complete": true,
       "unpriced_models": [],
       "deepseek-chat & deepseek-reasoner": {
@@ -324,11 +300,11 @@
         "estimated_cost_usd": 0.0
       },
       "deepseek-v4-flash": {
-        "requests": 20776,
-        "response_tokens": 15203726,
-        "cache_hit_tokens": 3333920640,
-        "cache_miss_tokens": 66174054,
-        "estimated_cost_usd": 47.9302
+        "requests": 21639,
+        "response_tokens": 15586220,
+        "cache_hit_tokens": 3556843520,
+        "cache_miss_tokens": 69232083,
+        "estimated_cost_usd": 50.4159
       },
       "deepseek-v4-flash-vision-exp": {
         "requests": 45,
@@ -338,19 +314,19 @@
         "estimated_cost_usd": 0.6372
       },
       "deepseek-v4-pro": {
-        "requests": 15856,
-        "response_tokens": 12901950,
-        "cache_hit_tokens": 2718829824,
-        "cache_miss_tokens": 61983309,
-        "estimated_cost_usd": 126.2691
+        "requests": 14506,
+        "response_tokens": 11513265,
+        "cache_hit_tokens": 2288445696,
+        "cache_miss_tokens": 56094471,
+        "estimated_cost_usd": 110.1644
       }
     },
     "ok": true,
     "source": "platform_meter",
     "wallet": {
       "ok": true,
-      "balance_usd": 90.681289824,
-      "lifetime_cost_usd": 329.318710176
+      "balance_usd": 87.617220948,
+      "lifetime_cost_usd": 332.382779052
     },
     "note": "authoritative meter token counts; dollars estimated at repo off-peak rates"
   }
