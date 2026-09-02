@@ -408,19 +408,40 @@ def _spec_phase_names(spec: ExperimentSpec) -> list[str]:
 
 
 def _is_definition_changed_after_runs(spec: ExperimentSpec, runs: list[RunSummary]) -> bool:
-    """True when the current spec declares a phase NO run of the spec ever executed.
+    """True when the run corpus cannot certify the CURRENT spec definition.
 
-    The w2 'gate added after completed' detector for LEGACY run ledgers (written before the
+    The w2 'edited after its runs' detector for LEGACY run ledgers (written before the
     revision digest existed, so they carry no ``workflow_revision_id`` to compare). A green
-    run that completed the spec executed every phase the spec declared at the time; if the
-    CURRENT spec declares a phase that appears in no run ledger (e.g. a ``kind: test`` gate
-    appended after the last green run), then the recorded runs predate the definition change
-    and cannot certify the current revision.
+    run that completed the spec executed every phase the spec declared at the time; when the
+    CURRENT spec's phases no longer match what the runs executed, the recorded runs predate
+    the definition change and cannot certify the current revision. Two shapes count
+    (engine_gaps_followups g1, F3/F4):
+
+    1. **Mid-list structural edit (name evidence)** — a phase the runs executed does not
+       exist in the current definition: the runs executed a phase that was RENAMED, or
+       REMOVED (from the middle or the tail), between the runs and the current definition.
+       The runs certify a definition that no longer exists — their executed_phase names do
+       not match the current list by name+position. The pre-g1 code could not see this: its
+       ``len(executed) >= len(spec_phases)`` early return let a same-count rename — and a
+       corpus LARGER than the current list after a removal — short-circuit to "not changed".
+    2. **Trailing append (unchanged)** — the runs executed every phase the current
+       definition declares EXCEPT its final one (``executed == spec_phases[:-1]``): the
+       shape of a single phase (typically a ``kind: test`` gate) appended after the last
+       full run (``fleet_job_submission``'s appended ``p6_test_gate``). Deliberately
+       narrower than 'any strict prefix': a partial-run corpus (``--only-phase`` runs whose
+       union is a SMALL strict prefix, e.g. p1-only runs over a ``p1..p5`` definition)
+       executed phases that exist in the current definition, in order — just not all of them
+       — and must NOT read as 'edited' when no edit occurred (the f4 false-positive). Firing
+       only at the one-gate depth keeps the real appended-gate corpus invalidating while a
+       partial corpus derives its own honest partial state (``blocked``/``runnable`` per its
+       union) instead.
 
     Only ever fires when a green (``ok``) run exists: a run that FAILED before reaching a
     later phase leaves that phase unexecuted too, but that is a failure, not a definition
     change, and must keep deriving ``failed`` rather than looking "never run of this
-    revision".
+    revision". Name-preserving edits (a pure REORDER, or a kind/scope/tests-only change with
+    no rename) are invisible to legacy ledgers — they record phase NAMES only — and are
+    caught exactly by the revision digest once a post-w2 run exists.
     """
     spec_phases = _spec_phase_names(spec)
     if not spec_phases:
@@ -429,14 +450,17 @@ def _is_definition_changed_after_runs(spec: ExperimentSpec, runs: list[RunSummar
     if not has_green:
         return False
     executed = set().union(*(run.executed_phases for run in runs)) if runs else set()
-    # Only the "trailing append" shape counts as a *definition changed after the runs*: the
-    # executed phases form a strict prefix of the current phase list (a gate was appended to
-    # the END after the last run). A phase missing from the FRONT or MIDDLE of the current
-    # list (a resumed run whose earlier ledger lives elsewhere) is not proof of an edit.
-    n = len(executed)
-    if n <= 0 or n >= len(spec_phases):
+    if not executed:
         return False
-    return executed == set(spec_phases[:n])
+    # (1) Mid-list structural edit: an executed phase no longer exists in the current
+    # definition (renamed or removed after the runs). Name evidence — exact where it speaks.
+    if executed - set(spec_phases):
+        return True
+    # (2) Trailing append: the runs executed the whole current list except its final phase —
+    # the fingerprint of ONE phase appended after the last full run. A strict prefix ALONE is
+    # not proof of an edit (that is the f4 false-positive on partial-run corpora); only the
+    # completion-shaped prefix missing exactly the trailing phase reads as an appended gate.
+    return executed == set(spec_phases[:-1])
 
 
 def _runs_of_current_revision(

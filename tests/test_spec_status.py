@@ -1097,3 +1097,130 @@ def test_g1_ledger_family_link_round_trips(tmp_path: Path):
     assert [r.parent_run_id for r in runs] == ["", "run-parent"]
     # The union derivation reads the link straight off the ledgers.
     assert derive_status(spec, runs) == "completed"
+
+
+# ── g1 revision invalidation: mid-list edits invalidate, partial corpora do not ───────
+#
+# engine_gaps_followups g1 (F3/F4): _is_definition_changed_after_runs detected only the
+# trailing-append shape — a same-count MID-LIST rename (f3) evaded it and certified a legacy
+# green run as completed, while a partial-run corpus whose union is a SMALL strict prefix
+# (f4, --only-phase p1 runs over p1..p5) false-positived as 'edited'. This family proves the
+# two fixes: mid-list structural edits (rename/removal) invalidate by name evidence, and a
+# partial-run corpus with no edit reads per its own union instead of 'never run of this
+# revision'. Trailing-append detection and full-coverage certification are unchanged.
+
+
+def _legacy_green_run(spec: ExperimentSpec, phases: list[str],
+                      timestamp: str = "2026-09-01T00:00:00+00:00") -> RunSummary:
+    """A pre-w2 green run ledger: no digest, no family link — legacy evidence."""
+    return RunSummary(
+        path=f"experiments/results/workflows/{spec.name}/20260901T000000Z.json",
+        timestamp=timestamp,
+        ok=True,
+        executed_phases=frozenset(phases),
+    )
+
+
+def test_g1_midlist_rename_invalidates_a_legacy_green_run(tmp_path: Path):
+    """VERIFY (a): a mid-list RENAME of a phase (same count) invalidates a legacy green run.
+
+    The f3 failure mode: a run of the OLD name set must not certify the renamed definition.
+    The run executed a phase (``w2_revision_identity``) the current definition no longer
+    declares, so the spec reads never-run-of-this-revision, NOT completed.
+    """
+    from agentic_dynamics.experiment.spec_status import (
+        _is_definition_changed_after_runs,
+        derive_status,
+    )
+
+    spec_old = _g1_spec_file(tmp_path, name="g1_ren",
+                             phases=["w1_pin_spec", "w2_revision_identity", "w3_adversarial"])
+    run = _legacy_green_run(spec_old, ["w1_pin_spec", "w2_revision_identity", "w3_adversarial"])
+    assert derive_status(spec_old, [run]) == "completed"  # certifies the def it ran
+
+    # rename w2 mid-list, SAME phase count — the f3 shape the old detector could not see.
+    spec_new = _g1_spec_file(tmp_path, name="g1_ren",
+                             phases=["w1_pin_spec", "w2_revision_invalidation", "w3_adversarial"])
+    assert spec_new.workflow_revision_id != spec_old.workflow_revision_id
+    assert _is_definition_changed_after_runs(spec_new, [run]) is True
+    assert derive_status(spec_new, [run]) == "runnable"  # never run of this revision, not completed
+
+
+def test_g1_removed_phase_invalidates_legacy_runs(tmp_path: Path):
+    """VERIFY (b): a phase REMOVED after the runs invalidates — the runs certify a
+    definition that no longer exists."""
+    from agentic_dynamics.experiment.spec_status import (
+        _is_definition_changed_after_runs,
+        derive_status,
+    )
+
+    # A full legacy green run of [p1..p4]; p4 is then removed (the definition SHRANK).
+    spec_old = _g1_spec_file(tmp_path, name="g1_del", phases=["p1", "p2", "p3", "p4"])
+    run = _legacy_green_run(spec_old, ["p1", "p2", "p3", "p4"])
+    assert derive_status(spec_old, [run]) == "completed"
+    spec_shrunk = _g1_spec_file(tmp_path, name="g1_del", phases=["p1", "p2", "p3"])
+    assert _is_definition_changed_after_runs(spec_shrunk, [run]) is True
+    assert derive_status(spec_shrunk, [run]) == "runnable"
+
+    # A MID-LIST removal: p2 deleted after the run, p4 stays — same name-evidence invalidates.
+    spec_mid = _g1_spec_file(tmp_path, name="g1_del2", phases=["p1", "p3", "p4"])
+    run_mid = _legacy_green_run(spec_mid, ["p1", "p2", "p3", "p4"])
+    assert _is_definition_changed_after_runs(spec_mid, [run_mid]) is True
+    assert derive_status(spec_mid, [run_mid]) == "runnable"
+
+
+def test_g1_partial_run_corpus_without_an_edit_is_not_edited(tmp_path: Path):
+    """VERIFY (c): a partial-run corpus with NO edit does NOT false-positive (the f4 shape).
+
+    A green legacy run that executed only ``p1`` over a ``p1..p5`` definition ran a phase
+    that EXISTS in the current definition, in order — it just did not run all of them. That
+    is partial, never 'edited': it must derive blocked (per its own union), not the
+    'never-run-of-this-revision' runnable an invented definition change would produce.
+    """
+    from agentic_dynamics.experiment.spec_status import (
+        _is_definition_changed_after_runs,
+        derive_status,
+    )
+
+    spec = _g1_spec_file(tmp_path, name="g1_partial", phases=["p1", "p2", "p3", "p4", "p5"])
+    p1_run = _legacy_green_run(spec, ["p1"])
+    assert _is_definition_changed_after_runs(spec, [p1_run]) is False
+    assert derive_status(spec, [p1_run]) == "blocked"  # partial evidence, never 'edited'
+
+    # A slightly larger prefix corpus (p1+p2 only) is equally partial, not edited.
+    p12_run = _legacy_green_run(spec, ["p1", "p2"], timestamp="2026-09-02T00:00:00+00:00")
+    assert _is_definition_changed_after_runs(spec, [p12_run]) is False
+    assert derive_status(spec, [p12_run]) == "blocked"
+
+
+def test_g1_trailing_append_still_invalidates(tmp_path: Path):
+    """VERIFY (d): a genuine trailing append still invalidates (unchanged).
+
+    The classic appended-gate shape (fleet_job_submission): a legacy green run executed
+    every phase the pre-gate definition declared; the current definition appends ONE final
+    phase (a test gate) no run ever executed. The runs cannot certify the current revision.
+    """
+    from agentic_dynamics.experiment.spec_status import (
+        _is_definition_changed_after_runs,
+        derive_status,
+    )
+
+    spec = _g1_spec_file(tmp_path, name="g1_append",
+                         phases=["p1", "p2", "p3", "p4", "p5_test_gate"])
+    pre_gate = _legacy_green_run(spec, ["p1", "p2", "p3", "p4"])
+    assert _is_definition_changed_after_runs(spec, [pre_gate]) is True
+    assert derive_status(spec, [pre_gate]) == "runnable"  # never run OF THIS REVISION
+
+
+def test_g1_full_coverage_legacy_run_still_certifies_completed(tmp_path: Path):
+    """VERIFY (e): a full-coverage run of the current definition still certifies completed
+    (no regression)."""
+    from agentic_dynamics.experiment.spec_status import (
+        _is_definition_changed_after_runs,
+        derive_status,
+    )
+
+    spec = _g1_spec_file(tmp_path, name="g1_full", phases=["w1", "w2", "w3", "w4"])
+    full = _legacy_green_run(spec, ["w1", "w2", "w3", "w4"])
+    assert _is_definition_changed_after_runs(spec, [full]) is False
+    assert derive_status(spec, [full]) == "completed"
