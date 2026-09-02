@@ -54,7 +54,7 @@ from pathlib import Path
 from typing import Any
 
 from agentic_dynamics.control import projection_watermarks as pw
-from agentic_dynamics.control.control_db import ControlDB
+from agentic_dynamics.control.control_db import CONTROL_DB_PATH, ControlDB
 from agentic_dynamics.core.paths import PROJECT_ROOT
 
 # ── Identity and locations ───────────────────────────────────────────────────────────────────
@@ -993,13 +993,48 @@ def serialise_receipt(receipt: Mapping[str, Any]) -> str:
     return json.dumps(receipt, indent=2, sort_keys=True) + "\n"
 
 
-def write_receipt(receipt: Mapping[str, Any], *, directory: Path | str | None = None) -> Path:
+def receipt_dir_for_db(db_path: str | Path | None = None) -> Path:
+    """The receipt archive directory for a publication whose control db may be overridden.
+
+    Receipts are archived where the control database that records them lives. With no
+    ``--db`` override the database is at :data:`CONTROL_DB_PATH` and the archive is the
+    production :data:`RECEIPT_DIR` (unchanged behaviour). When an explicit ``--db`` points
+    the database elsewhere — a test's tmp db or an operator's restored copy — the receipt
+    archive follows the redirect: a sibling ``publication`` directory beside the redirected
+    database, NEVER the production archive. That is the e3 hermeticity rule: a suite run
+    archives its operator-test receipts next to its tmp db, and the production
+    ``experiments/results/publication/`` can never grow test noise.
+
+    Deliberately keyed on the EXPLICIT ``--db`` argument, not on the ``FINOPS_CONTROL_DB``
+    env override: the env override redirects a containerized orchestrator's whole session
+    without meaning "this is not a real publication", so receipts must not silently move
+    with it.
+    """
+    if db_path is None:
+        return RECEIPT_DIR
+    resolved = Path(db_path).expanduser().resolve()
+    if resolved == CONTROL_DB_PATH.expanduser().resolve():
+        return RECEIPT_DIR
+    return resolved.parent / "publication"
+
+
+def write_receipt(
+    receipt: Mapping[str, Any],
+    *,
+    directory: Path | str | None = None,
+    db_path: str | Path | None = None,
+) -> Path:
     """Archive a receipt on disk, named by its own digest. Returns the path written.
 
     Content-addressed, so re-writing an identical receipt is idempotent and two different
     publications can never collide on a filename.
+
+    ``directory`` wins when given. Otherwise the archive directory is derived from
+    ``db_path`` via :func:`receipt_dir_for_db` — the same override ``--db`` provides — so
+    a caller pointing the control db at a tmp location archives its receipts beside it
+    (never the production :data:`RECEIPT_DIR`).
     """
-    target_dir = Path(directory) if directory is not None else RECEIPT_DIR
+    target_dir = Path(directory) if directory is not None else receipt_dir_for_db(db_path)
     target_dir.mkdir(parents=True, exist_ok=True)
     path = target_dir / f"publication_{receipt_sha256(receipt)[:16]}.json"
     path.write_text(serialise_receipt(receipt), encoding="utf-8")
@@ -1100,6 +1135,7 @@ __all__ = [
     "format_consistency_report",
     "format_projection_gate",
     "load_data_js",
+    "receipt_dir_for_db",
     "receipt_sha256",
     "resolve_stat",
     "serialise_receipt",

@@ -433,8 +433,13 @@ def main(
     # ── Step 7: record — receipt first, then one row per host ────────────────────────────
     # Recorded even when a deploy failed. A failed host that left no row would be invisible; a
     # failed host with a row is a fact the next operator can see and act on.
-    receipt_path = pub.write_receipt(receipt)
-    _emit(f"[7/8] receipt archived at {receipt_path.relative_to(ROOT)}", quiet=quiet)
+    receipt_path = pub.write_receipt(receipt, db_path=args.db)
+    try:
+        _emit(f"[7/8] receipt archived at {receipt_path.relative_to(ROOT)}", quiet=quiet)
+    except ValueError:
+        # A --db override may point the receipt archive outside the repo (a tmp db in
+        # tests); an absolute path is still honest.
+        _emit(f"[7/8] receipt archived at {receipt_path}", quiet=quiet)
     try:
         with ControlDB.open(args.db) as db:
             record = db.record_publication_receipt(
