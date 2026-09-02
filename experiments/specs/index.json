@@ -1,6 +1,6 @@
 {
   "schema_version": "spec-status/v2",
-  "generated_at": "2026-09-02T12:47:52.490561+00:00",
+  "generated_at": "2026-09-02T13:40:41.216307+00:00",
   "n_specs": 180,
   "specs": [
     {
@@ -823,13 +823,13 @@
       "supersedes": [],
       "superseded_by": null,
       "completed_at": null,
-      "last_run_at": "2026-09-02T08:22:18.668294+00:00",
+      "last_run_at": "2026-09-02T13:34:29.339650+00:00",
       "latest_ok": false,
       "latest_model": "deepseek/deepseek-v4-flash",
-      "latest_cost_usd": 0.849073,
-      "latest_git_sha": "27f5d4dbc",
-      "results_pointer": "experiments/results/workflows/control_db_evidence/20260902T082218Z.json",
-      "n_runs": 1
+      "latest_cost_usd": 0.236667,
+      "latest_git_sha": "fc1498b62",
+      "results_pointer": "experiments/results/workflows/control_db_evidence/20260902T133429Z.json",
+      "n_runs": 2
     },
     {
       "name": "control_room_portal",
