@@ -3,8 +3,8 @@
 **Generated — do not edit by hand.** Regenerate with `python scripts/spec_status.py`;
 `scripts/run_workflow.py` also refreshes it at the end of every run.
 
-Generated at: `2026-09-02T22:27:21.954140+00:00`  ·  182 spec(s)
-**Work remaining:** 74 open · 108 completed/retired
+Generated at: `2026-09-02T22:28:47.471123+00:00`  ·  183 spec(s)
+**Work remaining:** 75 open · 108 completed/retired
 
 | name | kind | repeatable | status | version | supersedes | last_run | ok | model | cost | n_runs |
 |---|---|---|---|---|---|---|---|---|---|---|
@@ -36,6 +36,7 @@ Generated at: `2026-09-02T22:27:21.954140+00:00`  ·  182 spec(s)
 | `explanation_tax` | experiment | yes | runnable | 0.2 | — | — | — | — | — | 0 |
 | `finding_economics_closure` | workflow | yes | runnable | 0.1 | — | 2026-08-22 17:22 | ok | deepseek/deepseek-v4-pro | $1.2820 | 1 |
 | `fleet_job_submission` | workflow | no | runnable | 0.1 | — | — | — | — | — | 3 |
+| `fleet_launch_boundary` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `green_main_closure` | workflow | no | runnable | 0.1 | — | — | — | — | — | 4 |
 | `labbook_refresh` | workflow | yes | runnable | 0.1 | — | 2026-08-17 18:14 | ok | deepseek/deepseek-v4-flash | $0.0275 | 1 |
 | `launch_handler_dry_run` | workflow | yes | runnable | 0.1 | — | — | — | — | — | 0 |

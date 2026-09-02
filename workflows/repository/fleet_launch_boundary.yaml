@@ -1,0 +1,312 @@
+name: fleet_launch_boundary
+question: >-
+  Land the two fleet-level security gaps from the deep-review residuals (the
+  original review's P0 security finding + P0-3 residual + criterion 14, planned
+  as Wave 2): (b1) the LAUNCH BROKER — the raw Docker API becomes reachable only
+  through a narrowly-typed launch boundary. Today the orchestrator container
+  mounts /var/run/docker.sock:ro and the spawn wrapper (validation + submit +
+  lease + mount generation + docker invocation) lives in one large trusted
+  module — and :ro on the filesystem mount does not constrain Docker API
+  authority. The broker is a host-side (non-container) component that accepts
+  ONLY a typed launch request {image_digest, network, mount_profile,
+  state_namespace, command, timeout_seconds}, validates it against the fixed
+  profiles, performs the Docker call itself, and NEVER exposes arbitrary Docker
+  CLI capability. The wrapper stops holding the socket; the broker does. The
+  socket-holder is treated as privileged host-control, never as a container
+  made safe by :ro. (b2) EPHEMERAL CLONES + path-config — execution moves from
+  shared host worktrees with writable .git overlays to a private ephemeral
+  clone per run (/var/lib/agentic-dynamics/runs/<run-id>/repo), and the
+  hard-coded /home/drseuss/ai-finops-framework contract is removed from
+  spawn_wrapper.py / compose / tests — path configuration becomes ONE typed
+  object (a PathConfig dataclass) validated once, derived from env with no
+  host-specific literals in the fleet code.
+version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: false
+repeatable: false
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: false
+    context:
+      domain_context: >-
+        canonical_sources: [scripts/fleet/spawn_wrapper.py (the large trusted
+        module — validation + submit + lease + mount generation + docker
+        invocation; the /home/drseuss/ai-finops-framework repo-alias + repo-
+        alias-git contract at :142-143; the AUTH_DIRS host-home set at :98-101),
+        infrastructure/docker-compose.ladder.yml (the socket-holder tier at
+        :121/:144 — the orchestrator mounts /var/run/docker.sock ro; the
+        x-ladder-mounts anchors), scripts/fleet/docker_executor.py +
+        docker_verifier_executor.py (the executors that build requests),
+        scripts/fleet/fleet_manager.py (the fleet lifecycle), tests/
+        test_spawn_wrapper.py (the spawn contract tests), tests/
+        test_docker_executor.py (if present), the deep-review P0-3 residual +
+        criterion 14, and the merged control-plane waves].
+        policies: [one_durable_state, the_gate_is_the_evidence, authority_
+        absolute, bounded_verification].
+      challenge_context: >-
+        challenge: the last raw-authority seam. Every other authority boundary
+        is now typed (promoter, publisher, executors) — but the Docker socket
+        is still mounted :ro into the orchestrator container, and one module
+        both validates and invokes arbitrary docker commands. Compromise of the
+        orchestrator tier grants Docker Engine control: the isolation boundary
+        the ladder exists to provide is defeated by the very tier that should
+        enforce it. Separately, shared host worktrees + writable .git overlays
+        mean a bad cell can pollute the shared git metadata another cell reads,
+        and the /home/drseuss/ai-finops-framework literals tie the fleet to one
+        host identity.
+        deliberation: [the path-config object first (b2a — every other change
+        consumes it), then the ephemeral clone per run (b2b — execution leaves
+        the shared worktree), then the launch broker (b1 — the socket leaves
+        the container)].
+        session_policy: {default: continue}
+      current_state: >-
+        MEASURED (2026-09-02): spawn_wrapper.py contains the /home/drseuss/
+        ai-finops-framework repo-alias literals; docker-compose.ladder.yml
+        mounts /var/run/docker.sock ro into the orchestrator tier; the spawn
+        wrapper builds and invokes docker subprocesses directly; cells execute
+        in shared host worktrees (/tmp namespace) with the repo's .git mounted
+        rw via the overlay; tests reference the host path.
+      hard_rules: >-
+        (1) THE SOCKET LEAVES THE CONTAINER: after b1, no container mounts the
+        Docker socket. The launch broker (host-side) is the ONLY component that
+        calls the Docker API, and it accepts ONLY the typed launch request —
+        arbitrary docker CLI capability is never exposed to any tier.
+        (2) ONE TYPED PATH OBJECT: after b2a, no fleet code contains a
+        host-specific path literal. PathConfig (dataclass) is derived from env
+        (defaults are the repo's own paths relative to the package root),
+        validated once, and every consumer takes it as a parameter — never
+        re-derives or hardcodes.
+        (3) PRIVATE CLONE PER RUN: after b2b, a cell executes in its own
+        ephemeral clone (/var/lib/agentic-dynamics/runs/<run-id>/repo or the
+        PathConfig equivalent) — never in a shared worktree with a writable
+        shared .git. Two concurrent cells never share git metadata.
+        (4) THE EXECUTORS SPEAK THE TYPED REQUEST: build_phase_request /
+        build_verifier_request emit the typed launch request the broker
+        accepts; the wrapper's validation logic moves INTO the broker (the
+        validator and the caller separate — the wrapper validates what it
+        intends to submit, the broker validates what it will execute, both
+        against the same profiles).
+        (5) BOUNDED VERIFICATION (unchanged). REGENERATE, NEVER HAND-EDIT
+        (unchanged).
+    phases:
+      - name: b0_pin_spec
+        kind: agent
+        scope: implementation
+        timeout: 3600
+        prompt: |
+          GOAL: {goal}
+          ROLE: verification — the house pin convention. Write
+          docs/reviews/fleet_launch_boundary_preregistration.md carrying:
+          (a) this spec's file SHA256 + the worktree git sha; (b) the three
+          edges VERIFIED against the actual code: (1) the socket is mounted
+          into a container (find the compose line) and spawn_wrapper invokes
+          docker directly (find the subprocess call); (2) /home/drseuss/
+          ai-finops-framework literals exist in spawn_wrapper.py + tests (grep
+          them); (3) cells execute in shared host worktrees with .git rw
+          (find the mount). An edge that does not hold is a FAILED finding.
+          If a claim cannot be reproduced after THREE attempts, record the
+          deviation and FAIL — never loop. DB LOCATION: machine-local state is
+          at the MAIN checkout; read by absolute path.
+          DELIVER: the preregistration with the verified edges, committed with
+          the '[workflow] b0_pin_spec — <goal prefix>' subject.
+          LOG: PASS/FAIL per claim; commit.
+      - name: b1_path_config
+        kind: agent
+        scope: implementation
+        timeout: 7200
+        prompt: |
+          GOAL: {goal}
+          SHAPE: ONE typed path object. Add a PathConfig dataclass (in a
+          runtime or core module — tier-0/1, importable by scripts/fleet
+          without crossing into control): fields for repo_root, git_dir,
+          worktrees_root, runs_root, results_dir, state_root, auth_home. Derive
+          defaults from the package root + env (FINOPS_REPO_DIR /
+          FINOPS_WORKTREE_ROOT / FINOPS_OPENCODE_STATE_ROOT etc. — the existing
+          env contract), validate once (existence/type checks), and refuse to
+          instantiate with a host-specific literal. Replace the
+          /home/drseuss/ai-finops-framework literals in spawn_wrapper.py (the
+          repo-alias + repo-alias-git contract at :142-143) and any other fleet
+          module with PathConfig-derived values — no host path remains in the
+          fleet code. Update the tests that referenced the host path to use
+          PathConfig defaults.
+          SCOPE FENCE: the PathConfig object + its adoption in spawn_wrapper
+          ONLY — no clone changes (b2), no broker changes (b3). Commits carry
+          '[workflow] b1_path_config'.
+          VERIFY (both directions): unit tests prove (a) PathConfig derives the
+          expected paths from env with sane defaults (no host literals in the
+          code — grep the module); (b) PathConfig refuses an invalid
+          configuration (missing root); (c) spawn_wrapper's request-building
+          uses PathConfig values (assert the mounts resolve to the configured
+          paths, not literals); (d) existing spawn-contract tests stay green.
+          DELIVER: PathConfig + the adoption + the tests, committed.
+          LOG: PASS/FAIL; commit.
+      - name: b2_ephemeral_clone
+        kind: agent
+        scope: implementation
+        timeout: 7200
+        prompt: |
+          GOAL: {goal}
+          SHAPE: private clone per run. In the spawn/executor path: each run's
+          cells execute in an EPHEMERAL CLONE at PathConfig.runs_root/<run-id>/
+          repo — created fresh (git clone of the candidate/base sha), mounted
+          into the cell ro (or rw ONLY for the cell's own scratch, never the
+          shared repo), and discarded after the run. The shared host worktree
+          + writable .git overlay pattern is replaced: two concurrent cells
+          never share git metadata, and a bad cell cannot pollute another
+          cell's view. The executor's request carries the clone path; the
+          broker (b3) mounts it. Test phases verify against the clone too
+          (a verifier runs the suite in the read-only clone). The commit path
+          changes: a cell's commits land in ITS clone (the candidate), and the
+          promoter (already separate) promotes from the clone's candidate sha —
+          execution produces a candidate, never a shared-tree mutation.
+          SCOPE FENCE: the ephemeral-clone creation/discard + the executor
+          request carrying the clone path ONLY — the broker (b3) owns the
+          mount; PathConfig (b1) owns the paths. Commits carry
+          '[workflow] b2_ephemeral_clone'.
+          VERIFY (both directions): unit tests prove (a) a run's clone is
+          created at PathConfig.runs_root/<run-id>/repo from the base sha and
+          contains the expected head; (b) two run ids produce two distinct
+          clones (never shared); (c) discard removes the clone after the run
+          (or is documented as pending-cleanup with a sweep); (d) the
+          executor's request references the clone path; (e) the existing
+          executor tests (docker_executor / verifier) stay green with the
+          clone-path request shape.
+          DELIVER: the clone lifecycle + the request shape + the tests,
+          committed.
+          LOG: PASS/FAIL; commit.
+      - name: b3_launch_broker
+        kind: agent
+        scope: implementation
+        timeout: 7200
+        prompt: |
+          GOAL: {goal}
+          SHAPE: the socket leaves the container. Add the launch broker — a
+          host-side (non-container) component (scripts/fleet/launch_broker.py
+          or similar) that is the ONLY Docker API caller. It accepts a TYPED
+          LaunchRequest {image_digest, network, mount_profile,
+          state_namespace, command, timeout_seconds} — no arbitrary docker CLI
+          — validates it against the fixed profiles (the mount profiles the
+          ladder already defines: the read-only repo profile, the
+          implementation rw profile, the verifier read-only profile), performs
+          the docker call, and returns the outcome. The spawn wrapper stops
+          invoking docker: it builds the typed request, and the broker (which
+          owns the socket) executes it. docker-compose.ladder.yml stops
+          mounting the socket into the orchestrator tier — the socket lives
+          ONLY where the broker runs (host). The wrapper's validation logic is
+          shared with the broker (both validate against the same profiles — the
+          wrapper validates what it intends to submit, the broker validates
+          what it will execute). Executors' build_phase_request /
+          build_verifier_request emit the typed LaunchRequest shape.
+          SCOPE FENCE: the broker + the socket removal + the request shape
+          ONLY — no clone changes beyond what b2 already did, no changes to
+          the executor verdict semantics. Commits carry
+          '[workflow] b3_launch_broker'.
+          VERIFY (both directions): unit tests prove (a) the broker refuses an
+          untyped/arbitrary request (a raw docker command string is rejected —
+          the typed contract holds); (b) the broker validates mount_profile
+          against the fixed profiles (an unknown profile refuses); (c) the
+          broker invokes docker ONLY through its typed path (assert the only
+          docker call site is inside the broker); (d) spawn_wrapper contains
+          NO docker invocation after the change (grep); (e) the compose no
+          longer mounts the socket into a container (grep the yml); (f) the
+          existing spawn-contract tests stay green (the validation shared
+          between wrapper and broker keeps the same refusals).
+          DELIVER: the broker + the socket removal + the shared validation +
+          the tests, committed.
+          LOG: PASS/FAIL; commit.
+      - name: b4_adversarial
+        kind: agent
+        scope: adversarial_readonly
+        requires_deliverable: true
+        run_model: deepseek/deepseek-v4-pro
+        timeout: 14400
+        prompt: |
+          GOAL: {goal}
+          ROLE: the INDEPENDENT adversarial reviewer — a DIFFERENT model and
+          session (pro vs the flash author). Falsify the boundary wave, not
+          certify it. Attack in order, re-verified against the actual code
+          (never asserted): (1) b1 — does ANY host-specific path literal
+          remain in the fleet code (grep the full scripts/fleet tree + compose
+          + tests)? (2) b2 — can two concurrent runs share git metadata
+          through ANY remaining path? is the clone truly per-run and discarded?
+          (3) b3 — can the broker be bypassed (a docker call reachable outside
+          the broker)? does an arbitrary docker command reach the engine
+          through ANY seam? is the socket really absent from every container
+          (grep compose + the broker's own mount)? (4) cross — do the executors
+          still produce the same verdicts (the parity suite green)? Every
+          finding: FIX on the branch or RECORD as an accepted limitation with
+          reasoning. At least 3 findings or a clean sweep with re-verification
+          evidence — a bare PASS is a failed review.
+          RELEASE VERDICT: merge-ready to main?
+          DELIVER: docs/reviews/fleet_launch_boundary_adversarial.md (finding
+          table), committed.
+          LOG: finding table; PASS/FAIL; commit.
+      - name: b5_test_gate
+        kind: test
+        scope: implementation
+        timeout: 900
+        tests:
+          - tests/test_spawn_wrapper.py
+          - tests/test_docker_executor.py
+          - tests/test_path_config.py
+          - tests/test_launch_broker.py
+          - tests/test_workflow_executor_parity.py
+          - tests/test_workflow_runner.py
+          - tests/test_script_classification.py
+          - tests/test_doc_lifecycle.py
+          - tests/test_agent_config_render.py
+          - tests/test_cli_resolution.py
+factors:
+  - {name: model, levels: [deepseek/deepseek-v4-flash]}
+design: factorial
+rules:
+  - name: boundary_edges_verified
+    plane: measurement
+    evidence_class: "[M]"
+    requires: []
+    produces: [three_edges_confirmed]
+  - name: paths_typed_once
+    plane: measurement
+    evidence_class: "[C]"
+    requires: [three_edges_confirmed]
+    produces: [no_host_literals, path_config_validated]
+  - name: clone_private_per_run
+    plane: measurement
+    evidence_class: "[C]"
+    requires: [no_host_literals]
+    produces: [no_shared_git_metadata]
+  - name: broker_owns_socket
+    plane: measurement
+    evidence_class: "[C]"
+    requires: [no_host_literals, no_shared_git_metadata]
+    produces: [typed_launch_only, socket_out_of_containers]
+  - name: wave_adversarial_clean
+    plane: measurement
+    evidence_class: "[M]"
+    requires: [no_host_literals, path_config_validated, no_shared_git_metadata,
+               typed_launch_only, socket_out_of_containers]
+    produces: [boundary_wave_clean]
+  - name: test_gate_measured
+    plane: measurement
+    evidence_class: "[M]"
+    requires: [test_executed_success]
+    produces: [independent_gate_recorded]
+metrics:
+  - {name: three_edges_confirmed, agg: mean, over: cell}
+  - {name: no_host_literals, agg: mean, over: cell}
+  - {name: path_config_validated, agg: mean, over: cell}
+  - {name: no_shared_git_metadata, agg: mean, over: cell}
+  - {name: typed_launch_only, agg: mean, over: cell}
+  - {name: socket_out_of_containers, agg: mean, over: cell}
+  - {name: boundary_wave_clean, agg: mean, over: cell}
+  - {name: independent_gate_recorded, agg: mean, over: cell}
+writeup:
+  format: lab_book
+  sections: [question, b0_pin_spec, b1_path_config, b2_ephemeral_clone, b3_launch_broker, b4_adversarial, b5_test_gate]
+stop: {budget_usd: 12.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}
