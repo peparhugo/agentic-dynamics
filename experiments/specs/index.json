@@ -1,6 +1,6 @@
 {
   "schema_version": "spec-status/v2",
-  "generated_at": "2026-09-01T21:42:15.323697+00:00",
+  "generated_at": "2026-09-02T01:50:04.639877+00:00",
   "n_specs": 178,
   "specs": [
     {
@@ -370,24 +370,6 @@
       "spec_path": "experiments/definitions/cap_shadow_comparison.yaml",
       "artifact_kind": "experiment",
       "repeatable": true,
-      "supersedes": [],
-      "superseded_by": null,
-      "completed_at": null,
-      "last_run_at": null,
-      "latest_ok": null,
-      "latest_model": null,
-      "latest_cost_usd": null,
-      "latest_git_sha": null,
-      "results_pointer": null,
-      "n_runs": 0
-    },
-    {
-      "name": "control_db_publication",
-      "version": "0.1",
-      "status": "runnable",
-      "spec_path": "workflows/repository/control_db_publication.yaml",
-      "artifact_kind": "workflow",
-      "repeatable": false,
       "supersedes": [],
       "superseded_by": null,
       "completed_at": null,
@@ -2014,6 +1996,24 @@
       "latest_git_sha": "147931070",
       "results_pointer": "experiments/results/workflows/context_abstraction_plane/20260819T230335Z.json",
       "n_runs": 1
+    },
+    {
+      "name": "control_db_publication",
+      "version": "0.1",
+      "status": "completed",
+      "spec_path": "workflows/repository/control_db_publication.yaml",
+      "artifact_kind": "workflow",
+      "repeatable": false,
+      "supersedes": [],
+      "superseded_by": null,
+      "completed_at": null,
+      "last_run_at": "2026-09-02T01:37:04.861273+00:00",
+      "latest_ok": true,
+      "latest_model": "anthropic/claude-opus-5",
+      "latest_cost_usd": 0.103167,
+      "latest_git_sha": "edd0e928d",
+      "results_pointer": "experiments/results/workflows/control_db_publication/20260902T013704Z.json",
+      "n_runs": 6
     },
     {
       "name": "control_room_hardening",
