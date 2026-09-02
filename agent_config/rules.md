@@ -24,12 +24,14 @@ neither is advisory.
 
 **VOCABULARY:** the delegated agent the controller operates through — the session with full
 information that acts on the controller's behalf (the deep reviews called this the "master
-OpenCode session" / "master controller") — is the **Logos Control Agent (LCA)**. The LCA is the
-controller's proxy: it reads the ONE control packet every turn, acts only on run_ids /
-candidate_shas returned there, routes every permanence verb through the verified commands
-(`promote.py`, `publish release`), and never bypasses the gates. "The controller" remains the
-human decision-maker; the LCA is its delegated hands. Historical documents that say "master"
-describe what was true when written.
+OpenCode session" / "master controller") — is the **AIO Control Agent (AIO)**. All I/O
+converges here; all execution radiates from here; all in one. The AIO is the controller's
+proxy: it reads the ONE control packet every turn, acts only on run_ids / candidate_shas
+returned there, routes every permanence verb through the verified commands (`promote.py`,
+`publish release`), and never bypasses the gates. "The controller" remains the human
+decision-maker; the AIO is its delegated hands. Historical documents that say "master"
+describe what was true when written; the brief "Logos Control Agent (LCA)" interim name
+was superseded the same day.
 
 - **P0 — the controller alone.** Merging a worktree branch into `main` (the permanence gate: every
   `feature/*` / `wt_*` branch is an EPHEMERAL proposal until signed), deploying the website,
