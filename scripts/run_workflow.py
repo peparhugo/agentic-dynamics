@@ -49,6 +49,7 @@ from agentic_dynamics.control.live import LivePublisher  # noqa: E402
 from agentic_dynamics.control.phase_evidence import make_phase_evidence_recorder  # noqa: E402
 from agentic_dynamics.control.reducers._common import REVISION_FALLBACK  # noqa: E402
 from agentic_dynamics.control.reducers._common import cell_id as _reducer_cell_id  # noqa: E402
+from agentic_dynamics.control.run_lifecycle import RunHeartbeatThread  # noqa: E402
 from agentic_dynamics.control.signal_store import build_signal_store, load_results  # noqa: E402
 from agentic_dynamics.control.step_routing import ModelSignals, route_step  # noqa: E402
 from agentic_dynamics.experiment.experiment_spec import ExperimentSpec, load_spec  # noqa: E402
@@ -563,6 +564,29 @@ def _run_workflow_cli(
     control_run_id, control_db = _control_open_run(spec, args)
     phase_evidence_recorder = make_phase_evidence_recorder(control_db, control_run_id)
 
+    # e2 (control_db_evidence): while this process runs the engine, a daemon heartbeat thread
+    # proves to the zombie-run sweep that the run is ALIVE. A killed orchestrator stops beating
+    # (the thread dies with the process), so the sweep can later cancel the dangling 'running'
+    # row via the legitimate transition API instead of leaving it to manual cancellation. The
+    # thread is started only when there is a run row to beat for (never in child mode) and is
+    # stopped in the finally below BEFORE the writer handle closes — best-effort by contract: a
+    # failed beat is logged and swallowed, never a reason a run fails. One beat is also recorded
+    # SYNCHRONOUSLY here, before the thread starts, so a run that dies in the subsecond between
+    # its row's creation and the thread's first beat still leaves a heartbeat row behind — the
+    # sweep's 'unknown' bucket (no heartbeat row) then means "pre-e2 legacy run", not "died in
+    # the creation window".
+    run_heartbeat: RunHeartbeatThread | None = None
+    if control_run_id is not None and control_db is not None:
+        try:
+            control_db.record_run_heartbeat(control_run_id)
+        except (ControlDBError, OSError) as exc:
+            print(
+                f"warning: run heartbeat seed failed ({exc}) — thread will retry",
+                file=sys.stderr,
+            )
+        run_heartbeat = RunHeartbeatThread(control_db.path, control_run_id)
+        run_heartbeat.start()
+
     try:
         result = run_workflow(
             spec,
@@ -588,6 +612,8 @@ def _run_workflow_cli(
             phase_evidence_recorder=phase_evidence_recorder,
         )
     finally:
+        if run_heartbeat is not None:
+            run_heartbeat.stop()
         if graph_client is not None:
             with contextlib.suppress(Exception):
                 graph_client.close()

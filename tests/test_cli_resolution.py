@@ -100,8 +100,11 @@ DOCUMENTED_RESOLUTIONS: list[tuple[tuple[str, ...], str, tuple[str, ...]]] = [
     (("supervise",), "supervise.py", ()),
     (("supervise", "claude-agents"), "claude_agents_supervisor.py", ()),
     (("supervise", "orphans"), "orphan_sweep.py", ()),
-    # control — the ONE control packet (control_db_publication p4).
+    # control — the ONE control packet (control_db_publication p4) + the two operator recovery
+    # commands (control_db_evidence e2: the outbox drain + the zombie-run sweep).
     (("control", "status"), "control_status.py", ()),
+    (("control", "drain-outbox"), "control_drain_outbox.py", ()),
+    (("control", "sweep-zombies"), "control_sweep_zombies.py", ()),
     # publish — the ONE publication transaction (control_db_publication p6).
     (("publish", "release"), "publish_release.py", ()),
     # release

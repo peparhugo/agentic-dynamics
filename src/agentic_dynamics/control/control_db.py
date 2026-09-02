@@ -120,7 +120,12 @@ CONTROL_DB_ENV = "FINOPS_CONTROL_DB"
 #: * ``2`` — p6 adds ``publication_receipts`` + ``publication_deployments``: the publication
 #:   transaction's durable record. Purely ADDITIVE (two new tables, no column touched), which is
 #:   what makes :meth:`ControlDB._ensure_schema`'s in-place forward migration safe — see there.
-SCHEMA_VERSION = 2
+#: * ``3`` — control_db_evidence e2 adds ``run_heartbeats`` (one row per run: the last proof of
+#:   life the zombie-run sweep judges staleness from). Purely ADDITIVE (one new table, no column
+#:   touched), so the same in-place forward migration applies: ``CREATE TABLE IF NOT EXISTS`` is
+#:   re-applied against a v2 database and the recorded version is bumped by the generic
+#:   ``CAST(value AS INTEGER) < 3`` guard in :meth:`ControlDB._ensure_schema`.
+SCHEMA_VERSION = 3
 
 
 # ── The state vocabularies ───────────────────────────────────────────────────────────────────
@@ -474,6 +479,24 @@ class RunRecord:
 
 
 @dataclass(frozen=True)
+class RunHeartbeat:
+    """One row of ``run_heartbeats`` — a run's last proof of life.
+
+    Read by the zombie-run sweep (control_db_evidence e2) to tell a genuinely-live ``running``
+    run from a dangling one: the orchestrator's composition root beats this row while its
+    process is alive, and a killed runner stops beating, so an expired ``last_seen_at`` is the
+    positive evidence of death the sweep is allowed to act on.
+    """
+
+    run_id: str
+    #: UTC ISO-8601 with a ``Z`` suffix — the same stamp shape as every other column, so the
+    #: sweep's staleness comparison is a string compare over one format (see ``outbox._iso``).
+    last_seen_at: str
+    beat_count: int
+    actor: str
+
+
+@dataclass(frozen=True)
 class StepAttemptRecord:
     """One row of ``step_attempts`` — a single invocation of a single step.
 
@@ -822,6 +845,21 @@ CREATE TABLE IF NOT EXISTS runs (
 CREATE INDEX IF NOT EXISTS idx_runs_state ON runs(state);
 CREATE INDEX IF NOT EXISTS idx_runs_spec_name ON runs(spec_name);
 CREATE INDEX IF NOT EXISTS idx_runs_candidate_sha ON runs(candidate_sha);
+
+-- run_heartbeats — one row per run: the last time a LIVE orchestrator proved it was alive.
+-- The runs table's `state = 'running'` means "the orchestrator started work", not "the
+-- orchestrator is still alive": a killed runner leaves a dangling 'running' row (proven
+-- 2026-09-02 — two killed runs needed manual cancellation). The zombie-run sweep
+-- (control_db_evidence e2) cancels a 'running' run ONLY when this row's last_seen_at is old
+-- enough — never a run whose heartbeat is fresh, and never a run with no heartbeat row at all
+-- (no liveness information is not evidence of death). Heartbeats are NOT state transitions: a
+-- beat upserts this row without touching `runs`, `run_transitions`, or the control epoch.
+CREATE TABLE IF NOT EXISTS run_heartbeats (
+    run_id       TEXT PRIMARY KEY REFERENCES runs(run_id),
+    last_seen_at TEXT NOT NULL,
+    beat_count   INTEGER NOT NULL DEFAULT 0,
+    actor        TEXT NOT NULL DEFAULT ''
+);
 
 -- run_transitions — the append-only lifecycle history (additive to the mandate; see the module
 -- docstring). AUTOINCREMENT so ids are strictly increasing even across deletes-that-cannot-
@@ -1606,6 +1644,53 @@ class ControlDB:
             params.append(int(limit))
         return [_run_from_row(row) for row in self._conn.execute(sql, params).fetchall()]
 
+    # ── run_heartbeats (control_db_evidence e2) ──────────────────────────────────────────
+
+    def record_run_heartbeat(
+        self,
+        run_id: str,
+        *,
+        actor: str = "orchestrator",
+        at: str | None = None,
+    ) -> RunHeartbeat:
+        """Upsert a run's heartbeat: this orchestrator process is alive, right now.
+
+        The liveness proof the zombie-run sweep (``control_db_evidence`` e2) judges staleness
+        from. Deliberately NOT a state transition: the beat upserts this row only — it does not
+        touch ``runs``/``run_transitions`` and does not bump the control epoch, because a
+        heartbeat every few seconds is not a durable state *change* and must not read as one to
+        a master diffing packets.
+
+        Refuses an unknown run (the foreign key is the backstop; the typed error is the point) —
+        a beat for a run that was never recorded would be a proof of life for a phantom.
+        """
+        self._require_writable()
+        if self.get_run(run_id) is None:
+            raise UnknownRunError(f"control_db: no run {run_id!r} — cannot record a heartbeat")
+        stamp = at or _now()
+        with self.transaction() as conn:
+            conn.execute(
+                """
+                INSERT INTO run_heartbeats (run_id, last_seen_at, beat_count, actor)
+                VALUES (?, ?, 1, ?)
+                ON CONFLICT(run_id) DO UPDATE SET
+                    last_seen_at = excluded.last_seen_at,
+                    beat_count = beat_count + 1,
+                    actor = excluded.actor
+                """,
+                (run_id, stamp, actor),
+            )
+        record = self.run_heartbeat(run_id)
+        assert record is not None  # just upserted, inside the same connection
+        return record
+
+    def run_heartbeat(self, run_id: str) -> RunHeartbeat | None:
+        """One run's heartbeat row, or ``None`` when the run has never been seen beating."""
+        row = self._conn.execute(
+            "SELECT * FROM run_heartbeats WHERE run_id = ?", (run_id,)
+        ).fetchone()
+        return _heartbeat_from_row(row) if row else None
+
     def transitions(self, run_id: str) -> list[StateTransition]:
         """A run's lifecycle history, oldest first."""
         rows = self._conn.execute(
@@ -2364,6 +2449,16 @@ def _run_from_row(row: sqlite3.Row) -> RunRecord:
         ended_at=row["ended_at"],
         ledger_path=row["ledger_path"],
         cost_usd=float(row["cost_usd"]),
+    )
+
+
+def _heartbeat_from_row(row: sqlite3.Row) -> RunHeartbeat:
+    """Build a :class:`RunHeartbeat` from a ``run_heartbeats`` row."""
+    return RunHeartbeat(
+        run_id=row["run_id"],
+        last_seen_at=row["last_seen_at"],
+        beat_count=int(row["beat_count"]),
+        actor=row["actor"],
     )
 
 

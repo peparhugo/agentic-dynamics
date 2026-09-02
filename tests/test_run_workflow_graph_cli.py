@@ -330,3 +330,61 @@ def test_control_open_run_child_mode_never_opens_the_control_db(monkeypatch):
     monkeypatch.setattr(module, "_control_db", boom)
     run_id, db = module._control_open_run(spec, args)
     assert (run_id, db) == (None, None)
+
+
+def test_main_starts_and_stops_a_run_heartbeat_for_a_recorded_run(tmp_path, monkeypatch):
+    """The composition root wires the run heartbeat (control_db_evidence e2): when a run row is
+    recorded, a RunHeartbeatThread is started around the engine and stopped in the finally —
+    child mode (no run row) starts nothing."""
+    module = _load_module()
+    events = {"started": 0, "stopped": 0}
+
+    class FakeHeartbeat:
+        def __init__(self, *args, **kwargs):
+            self.stopped = False
+
+        def start(self):
+            events["started"] += 1
+
+        def stop(self):
+            events["stopped"] += 1
+
+    monkeypatch.setattr(module, "RunHeartbeatThread", FakeHeartbeat)
+    _run_main(module, tmp_path, monkeypatch, fake_run=lambda spec, **kw: _stub_result())
+
+    assert events == {"started": 1, "stopped": 1}  # started before the engine, stopped after
+
+
+def test_child_mode_starts_no_run_heartbeat(tmp_path, monkeypatch):
+    """--only-phase (no run row to beat for) must not start a heartbeat thread — the parent is
+    the only process that owns a run row and therefore the only one that beats."""
+    module = _load_module()
+    events = {"started": 0, "stopped": 0}
+
+    class FakeHeartbeat:
+        def start(self):
+            events["started"] += 1
+
+        def stop(self):
+            events["stopped"] += 1
+
+    monkeypatch.setattr(module, "RunHeartbeatThread", FakeHeartbeat)
+    monkeypatch.setattr(module, "ROOT", tmp_path)
+
+    def spec_stub(p):
+        return SimpleNamespace(
+            name="demo", spec_id="demo@1.0",
+            workflow=SimpleNamespace(params={"phases": [{"name": "scope"}]}),
+        )
+
+    monkeypatch.setattr(module, "load_spec", spec_stub)
+    monkeypatch.setattr(module, "run_workflow", lambda spec, **kw: _stub_result())
+    monkeypatch.setenv("FINOPS_FACT_AUTO_EMIT", "0")
+    monkeypatch.setattr(sys, "argv", [
+        "run_workflow.py", "--spec", "x.yaml", "--goal", "g", "--model", "m",
+        "--workdir", str(tmp_path), "--only-phase", "scope",
+    ])
+    with pytest.raises(SystemExit):
+        module.main()
+
+    assert events == {"started": 0, "stopped": 0}
