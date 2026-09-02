@@ -271,12 +271,12 @@ workflow:
         kind: agent
         scope: adversarial_readonly
         requires_deliverable: true
-        run_model: deepseek/deepseek-v4-flash
+        run_model: deepseek/deepseek-v4-pro
         timeout: 14400
         prompt: |
           GOAL: {goal}
           ROLE: the INDEPENDENT adversarial reviewer — a DIFFERENT model and session
-          (flash vs the author, the house independence convention). You are NOT the
+          (pro vs the flash author, the house independence convention). You are NOT the
           author: your job is to falsify the follow-up wave, not certify it. Attack
           in order, each re-verified against the actual code (never asserted):
           (1) f1 — is the run ledger STILL consulted anywhere in a resume decision?
@@ -320,7 +320,7 @@ workflow:
           - tests/test_cli_resolution.py
           - tests/test_spawn_wrapper.py
 factors:
-  - {name: model, levels: [anthropic/claude-opus-5]}
+  - {name: model, levels: [deepseek/deepseek-v4-flash]}
 design: factorial
 rules:
   - name: followup_spec_pinned
