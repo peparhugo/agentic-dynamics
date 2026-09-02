@@ -6,8 +6,11 @@ question: >-
   the run's terminal row + transitions but NEVER the per-phase evidence:
   step_attempts: 0 and gate_results: 0 for a run that executed 8 phases
   (control_db_followups, run-2bc253a8d87a), because record_gate_result has zero
-  production callers. The outbox held 68 pending rows because nothing drains it in
-  the normal run path. The git history carries 13 test-artifact receipts
+  production callers. The outbox delivered its 68 rows at the followups run's terminal
+  write (the drain WORKS in the run path — the deep review's '68 pending, never drains'
+  claim was a misread of a row count for a status) — but no drain COMMAND exists for
+  operator recovery, and a KILLED run leaves a zombie 'running' row (proven 2026-09-02:
+  two killed runs left dangling rows needing manual cancellation). The git history carries 13 test-artifact receipts
   (repo_sha deadbeef, operator-test) committed across 7 commits in both waves —
   write_receipt ignores the --db override and the suite writes into the production
   RECEIPT_DIR. control_epoch advanced only 2 for 8 phases (run-state transitions
@@ -66,22 +69,25 @@ workflow:
         data-empty. The db says the run is promotable — but nothing recorded the 8
         phases' outcomes, so the packet's phase-derived fields (failed_runs
         breakdown, gate evidence, per-phase cost) are projections over empty tables.
-        The outbox's at-least-once promise holds only if something drains; 68
-        pending rows say the promise is kept in the library and broken in the run
-        path. The history's deadbeef receipts are test noise dressed as provenance.
+        The outbox's at-least-once promise HOLDS — 68/68 rows delivered at the
+        followups run's terminal write. The real gaps: no operator drain command,
+        and a killed run leaves a zombie 'running' row (proven: two killed runs
+        left dangling rows needing manual cancellation on 2026-09-02). The history's deadbeef receipts are test noise dressed as provenance.
         And the recurring "pre-existing drift" mislabel is the one defect that
         erodes trust in every finding: without a guard, an author can always call
         the wave's own break pre-existing.
         deliberation: [the per-phase write side first (e1 — the evidence tables get
-        real rows), then the drain (e2 — the outbox's promise in the run path), then
+        real rows), then the drain command + zombie sweep (e2 — the operator path
+        + the killed-run lifecycle), then
         the hermetic receipts + history purge (e3 — provenance becomes provenance
         again), then the per-phase epoch (e4 — turn-to-turn visibility), then the
         pre-existing guard (e5 — the trust defect)].
         session_policy: {default: continue}
       current_state: >-
         MEASURED (2026-09-02, the deep review): control.db live — runs: 1,
-        step_attempts: 0, gate_results: 0, outbox: 68 pending, run_transitions: 2,
-        publication_receipts: 0. record_gate_result has zero production callers.
+        step_attempts: 0, gate_results: 0, outbox: 68 DELIVERED (the drain works),
+        run_transitions: 2 for the promotable run + 2 cancelled zombie runs (killed
+        2026-09-02, cancelled via transition_run), publication_receipts: 0. record_gate_result has zero production callers.
         write_receipt writes into the module-level RECEIPT_DIR regardless of --db
         (publish_release.py:515); 13 deadbeef/operator-test receipts are committed
         across 7 commits (both waves). control_epoch advanced 2 for 8 phases.
@@ -93,10 +99,10 @@ workflow:
         invocation, the retry contract) + gate_results (one row per gate verdict,
         bound to the candidate). The packet's failed_runs/awaiting/promotable
         derivations are projections over REAL rows, never over empty tables.
-        (2) OUTBOX DRAINS IN THE RUN PATH: after e2, a run's terminal write either
-        drains the outbox (with retry) or leaves the rows pending AND the run path
-        provides a drain command that makes the obligation land. 68 pending rows
-        must not recur in normal operation.
+        (2) OUTBOX + RUN LIFECYCLE: the run-path drain (verified working) stays; e2 adds
+        the operator drain command for recovery AND the zombie-run sweep — a run
+        killed mid-flight must be cancelled or flagged promptly, never left as a
+        dangling 'running' row that pollutes active_runs and the epoch.
         (3) TESTS ARE HERMETIC: after e3, no test writes into a production path —
         the receipt directory is injectable, tests write into tmp dirs, and the
         production experiments/results/publication/ contains only real receipts.
@@ -130,8 +136,9 @@ workflow:
           current-state edges VERIFIED against the actual code + the live control
           db, not copied from the spec: (1) step_attempts/gate_results are 0 in
           the production db for run-2bc253a8d87a and record_gate_result has no
-          production caller (grep the callers); (2) the outbox holds pending
-          rows and nothing in the run path drains (find the drain call sites);
+          production caller (grep the callers); (2) the outbox's 68 rows are all DELIVERED
+          (the run-path drain works — verify the statuses) AND no drain COMMAND
+          exists (grep for it) AND no zombie-run sweep exists (grep);
           (3) 13 deadbeef/operator-test receipts are committed (git log them)
           and write_receipt ignores --db (read the call at
           publish_release.py:515); (4) control_epoch is 2 for an 8-phase run
@@ -184,34 +191,39 @@ workflow:
           named); (e) child mode (--only-phase) records nothing.
           DELIVER: the write side + the tests, committed.
           LOG: PASS/FAIL; commit.
-      - name: e2_outbox_drain
+      - name: e2_drain_and_lifecycle
         kind: agent
         scope: implementation
         timeout: 7200
         prompt: |
           GOAL: {goal}
-          SHAPE: the outbox's promise in the run path. (a) In run_workflow's
-          terminal write, after record_terminal_run enqueues, drain the outbox
-          (OutboxPublisher.drain) — bounded, with the existing retry semantics —
-          so the knowledge events a run owes land in normal operation. (b) Add a
-          drain command (e.g. agentic-dynamics control drain-outbox, wired in
-          the CLI's control namespace) that drains the outbox to empty, so an
-          operator can clear pending rows when the stream was down. The drain is
-          best-effort (a downed stream leaves rows pending — the obligation
-          survives — but it is no longer the NORMAL state). Record drain
-          outcomes (delivered/dead/pending counts) somewhere readable (the
-          packet's health surface or a control-db row).
-          SCOPE FENCE: the drain-in-run-path + the drain command ONLY — no
-          changes to record_terminal_run's enqueue shape, no changes to the
-          publisher's ack-then-mark. Commits carry '[workflow] e2_outbox_drain'.
-          VERIFY (both directions): unit tests prove (a) a run whose terminal
-          write enqueues N events and whose stream is up drains to 0 pending in
-          the run path (no separate command needed); (b) a run whose stream is
-          down leaves the rows pending AND the drain command then delivers them
-          when the stream returns (the operator path); (c) the drain command
-          reports delivered/dead/pending honestly; (d) a drain failure never
-          fails the run.
-          DELIVER: the run-path drain + the command + the tests, committed.
+          SHAPE: the outbox's operator path + the run lifecycle. The run-path
+          drain ALREADY WORKS (verified 2026-09-02: the followups run's terminal
+          write delivered all 68 rows) — do NOT rebuild it. This phase delivers
+          the two real gaps: (a) a drain COMMAND (e.g. agentic-dynamics control
+          drain-outbox, wired in the CLI's control namespace) that drains the
+          outbox to empty, so an operator can clear pending rows when the stream
+          was down — reporting delivered/dead/pending counts honestly (the
+          packet's health surface or a control-db row); (b) a ZOMBIE-RUN SWEEP:
+          a killed run leaves a dangling 'running' row (proven 2026-09-02 — two
+          killed runs needed manual cancellation). Add a sweep (a
+          control-drain/status-adjacent command or a watchdog integration) that
+          finds runs in 'running' whose heartbeat/lease expired and transitions
+          them to CANCELLED with a reason — via the LEGITIMATE transition API
+          (transition_run + ALLOWED_TRANSITIONS), never raw SQL (the transition
+          log is append-only by design). The sweep is flag/transition-only, never
+          steers live runs with a fresh heartbeat.
+          SCOPE FENCE: the drain command + the zombie sweep ONLY — no changes to
+          record_terminal_run's enqueue shape, no changes to the publisher's
+          ack-then-mark (it works). Commits carry '[workflow] e2_drain_and_lifecycle'.
+          VERIFY (both directions): unit tests prove (a) the drain command
+          delivers pending rows when the stream returns (the operator path) and
+          reports delivered/dead/pending honestly; (b) the sweep transitions a
+          synthetic zombie 'running' row (no heartbeat for N minutes) to
+          CANCELLED via transition_run (the append-only log gains the row); (c) a
+          live run with a fresh heartbeat is NOT touched; (d) a drain/sweep
+          failure never fails the run.
+          DELIVER: the drain command + the zombie sweep + the tests, committed.
           LOG: PASS/FAIL; commit.
       - name: e3_hermetic_publication
         kind: agent
@@ -316,8 +328,9 @@ workflow:
           control db (never asserted): (1) e1 — after a REAL run (or the
           strongest synthetic), does the control db hold per-phase step_attempts
           + gate_results? is the write side actually called in the phase loop
-          (not just testable)? (2) e2 — does the run path drain the outbox, and
-          does the drain command exist + work? (3) e3 — is the production
+          (not just testable)? (2) e2 — does the drain command exist + work, and
+          does the zombie sweep cancel a dangling 'running' row via the legitimate
+          transition API? (3) e3 — is the production
           receipt dir hermetic against the suite? are the deadbeef artifacts
           really gone from history (grep both waves)? (4) e4 — does the epoch
           see phase progress in the live db? (5) e5 — can the guard be fooled
@@ -366,11 +379,11 @@ rules:
     evidence_class: "[C]"
     requires: [five_edges_verified]
     produces: [per_phase_rows_recorded]
-  - name: outbox_drains_in_run_path
+  - name: drain_command_and_lifecycle
     plane: measurement
     evidence_class: "[C]"
     requires: [per_phase_rows_recorded]
-    produces: [pending_rows_not_normal]
+    produces: [operator_drain_path, zombie_runs_cancelled]
   - name: publication_tests_hermetic
     plane: measurement
     evidence_class: "[C]"
@@ -389,7 +402,7 @@ rules:
   - name: evidence_adversarial_reviewed
     plane: measurement
     evidence_class: "[M]"
-    requires: [per_phase_rows_recorded, pending_rows_not_normal,
+    requires: [per_phase_rows_recorded, operator_drain_path, zombie_runs_cancelled,
                prod_receipt_dir_clean, deadbeef_artifacts_purged,
                phase_progress_visible, mislabel_caught_mechanically]
     produces: [evidence_wave_adversarial_clean]
@@ -401,7 +414,7 @@ rules:
 metrics:
   - {name: five_edges_verified, agg: mean, over: cell}
   - {name: per_phase_rows_recorded, agg: mean, over: cell}
-  - {name: pending_rows_not_normal, agg: mean, over: cell}
+  - {name: zombie_runs_cancelled, agg: mean, over: cell}
   - {name: prod_receipt_dir_clean, agg: mean, over: cell}
   - {name: deadbeef_artifacts_purged, agg: mean, over: cell}
   - {name: phase_progress_visible, agg: mean, over: cell}
@@ -410,6 +423,6 @@ metrics:
   - {name: independent_gate_recorded, agg: mean, over: cell}
 writeup:
   format: lab_book
-  sections: [question, e0_pin_spec, e1_phase_evidence, e2_outbox_drain, e3_hermetic_publication, e4_phase_epoch, e5_preexisting_guard, e6_adversarial, e7_test_gate]
+  sections: [question, e0_pin_spec, e1_phase_evidence, e2_drain_and_lifecycle, e3_hermetic_publication, e4_phase_epoch, e5_preexisting_guard, e6_adversarial, e7_test_gate]
 stop: {budget_usd: 12.0, max_attempts: 1}
 adapt: {strategy: manual, selection: highest_regret}
