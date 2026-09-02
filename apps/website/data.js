@@ -1,8 +1,8 @@
-/* Generated 2026-09-02 16:26:51 UTC by build_data.py */
+/* Generated 2026-09-02 22:29:22 UTC by build_data.py */
 /* DO NOT EDIT — regenerate with: python scripts/build_data.py */
 window.DYNAMICS_DATA = {
   "_meta": {
-    "generated_at": "2026-09-02T16:26:47.884895+00:00",
+    "generated_at": "2026-09-02T22:29:19.152566+00:00",
     "provenance_note": "All values tagged [M]easured, [C]omputed, [H]euristic, or e[X]ternal. See methodology.html."
   },
   "summary": {
@@ -62,7 +62,7 @@ window.DYNAMICS_DATA = {
   },
   "publication_contract": {
     "registry_identity": "dfff942e34e5143e94ef238550994330059bbf4010e1c64555b5f72d59e75406",
-    "resolved_input_identity": "6d8329d4c4aea32bf4555410ea0c332f6685a1a108d9d5472015c8366c656a18",
+    "resolved_input_identity": "ceb34869d5699a53c4b929cf03006ac9222e65f4e181722142e91e2fea2e0901",
     "data_integrity_policy_version": "data-integrity/v1",
     "normalization_version": "canonical-projection/v2",
     "waiver_digest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
@@ -78,7 +78,7 @@ window.DYNAMICS_DATA = {
     "providers": 3,
     "experiment_configs": 0,
     "experiment_specs": 11,
-    "workflow_specs": 170,
+    "workflow_specs": 172,
     "perturbation_operators": 10,
     "lab_books": 21,
     "lab_books_canonical": 8,
@@ -138,8 +138,8 @@ window.DYNAMICS_DATA = {
       "avg_energy_j_per_loc": 54.89,
       "narration_rate": null,
       "avg_narration_penalty": null,
-      "strategy_cons": 0,
-      "strategy_expl": 22,
+      "strategy_cons": 1,
+      "strategy_expl": 30,
       "strategy_waste": 0,
       "strategy_efficient": 0,
       "reports": 31,
@@ -180,7 +180,7 @@ window.DYNAMICS_DATA = {
       "narration_rate": null,
       "avg_narration_penalty": null,
       "strategy_cons": 0,
-      "strategy_expl": 24,
+      "strategy_expl": 34,
       "strategy_waste": 0,
       "strategy_efficient": 0,
       "reports": 34,
@@ -221,7 +221,7 @@ window.DYNAMICS_DATA = {
       "narration_rate": null,
       "avg_narration_penalty": null,
       "strategy_cons": 0,
-      "strategy_expl": 37,
+      "strategy_expl": 39,
       "strategy_waste": 0,
       "strategy_efficient": 0,
       "reports": 39,
@@ -262,7 +262,7 @@ window.DYNAMICS_DATA = {
       "narration_rate": null,
       "avg_narration_penalty": null,
       "strategy_cons": 0,
-      "strategy_expl": 20,
+      "strategy_expl": 30,
       "strategy_waste": 0,
       "strategy_efficient": 0,
       "reports": 30,
@@ -302,8 +302,8 @@ window.DYNAMICS_DATA = {
       "avg_energy_j_per_loc": 11.7,
       "narration_rate": null,
       "avg_narration_penalty": null,
-      "strategy_cons": 2,
-      "strategy_expl": 12,
+      "strategy_cons": 3,
+      "strategy_expl": 17,
       "strategy_waste": 0,
       "strategy_efficient": 0,
       "reports": 20,
@@ -344,7 +344,7 @@ window.DYNAMICS_DATA = {
       "narration_rate": null,
       "avg_narration_penalty": null,
       "strategy_cons": 0,
-      "strategy_expl": 23,
+      "strategy_expl": 30,
       "strategy_waste": 0,
       "strategy_efficient": 0,
       "reports": 30,
@@ -384,8 +384,8 @@ window.DYNAMICS_DATA = {
       "avg_energy_j_per_loc": 12.67,
       "narration_rate": null,
       "avg_narration_penalty": null,
-      "strategy_cons": 2,
-      "strategy_expl": 14,
+      "strategy_cons": 3,
+      "strategy_expl": 20,
       "strategy_waste": 0,
       "strategy_efficient": 0,
       "reports": 23,
@@ -3993,7 +3993,7 @@ window.DYNAMICS_DATA = {
       "successful": 1007,
       "failed": 20
     },
-    "generated_at": "2026-09-02T16:26:48.033226+00:00"
+    "generated_at": "2026-09-02T22:29:19.308251+00:00"
   },
   "reviews": {
     "models": [
@@ -4170,153 +4170,222 @@ window.DYNAMICS_DATA = {
       {
         "model": "deepseek-v4-pro",
         "label": "DeepSeek v4 Pro",
-        "commits": 179,
-        "lines_added": 121407,
-        "lines_removed": 9090,
-        "functions_added": 3021,
-        "classes_added": 258,
-        "imports_added": 9083,
-        "sonar_available": 179,
+        "commits": 189,
+        "lines_added": 125134,
+        "lines_removed": 9526,
+        "functions_added": 3286,
+        "classes_added": 269,
+        "imports_added": 9274,
+        "sonar_available": 189,
         "sonar_bugs_delta": 12,
-        "sonar_smells_delta": 267,
-        "sonar_complexity_delta": 4414,
-        "avg_convention": 0.712,
-        "deep_cells": 37,
+        "sonar_smells_delta": 321,
+        "sonar_complexity_delta": 4731,
+        "avg_convention": 0.717,
+        "deep_cells": 39,
         "lsp_available": 0,
         "lsp_errors_per_cell": {
           "value": null,
           "n_available": 0,
-          "n_total": 37,
+          "n_total": 39,
           "coverage": 0.0
         },
         "lsp_warnings_per_cell": {
           "value": null,
           "n_available": 0,
-          "n_total": 37,
+          "n_total": 39,
           "coverage": 0.0
         },
         "solution_correctness": {
           "value": 1.0,
-          "n_available": 37,
-          "n_total": 37,
+          "n_available": 39,
+          "n_total": 39,
           "coverage": 1.0
         },
         "solution_constraints": {
           "value": 1.0,
-          "n_available": 37,
-          "n_total": 37,
+          "n_available": 39,
+          "n_total": 39,
           "coverage": 1.0
         },
         "solution_quality": {
-          "value": 0.045,
-          "n_available": 37,
-          "n_total": 37,
+          "value": 0.044,
+          "n_available": 39,
+          "n_total": 39,
           "coverage": 1.0
         },
         "solution_novelty": {
           "value": 0.845,
-          "n_available": 37,
-          "n_total": 37,
+          "n_available": 39,
+          "n_total": 39,
           "coverage": 1.0
         },
         "solution_composite": {
           "value": 0.786,
-          "n_available": 37,
-          "n_total": 37,
+          "n_available": 39,
+          "n_total": 39,
           "coverage": 1.0
         },
         "basin_escape": {
-          "value": 0.712,
-          "n_available": 37,
-          "n_total": 37,
+          "value": 0.713,
+          "n_available": 39,
+          "n_total": 39,
           "coverage": 1.0
         },
         "strategies": {
-          "exploratory": 37
+          "exploratory": 39
         }
       },
       {
         "model": "deepseek-v4-flash",
         "label": "DeepSeek v4 Flash",
-        "commits": 107,
-        "lines_added": 77501,
-        "lines_removed": 5723,
-        "functions_added": 2450,
-        "classes_added": 119,
-        "imports_added": 6715,
-        "sonar_available": 107,
-        "sonar_bugs_delta": 20,
-        "sonar_smells_delta": 158,
-        "sonar_complexity_delta": 3395,
-        "avg_convention": 0.683,
-        "deep_cells": 22,
+        "commits": 152,
+        "lines_added": 112407,
+        "lines_removed": 8761,
+        "functions_added": 3554,
+        "classes_added": 167,
+        "imports_added": 9850,
+        "sonar_available": 152,
+        "sonar_bugs_delta": 27,
+        "sonar_smells_delta": 207,
+        "sonar_complexity_delta": 4927,
+        "avg_convention": 0.687,
+        "deep_cells": 31,
         "lsp_available": 0,
         "lsp_errors_per_cell": {
           "value": null,
           "n_available": 0,
-          "n_total": 22,
+          "n_total": 31,
           "coverage": 0.0
         },
         "lsp_warnings_per_cell": {
           "value": null,
           "n_available": 0,
-          "n_total": 22,
+          "n_total": 31,
           "coverage": 0.0
         },
         "solution_correctness": {
-          "value": 1.0,
-          "n_available": 22,
-          "n_total": 22,
+          "value": 0.968,
+          "n_available": 31,
+          "n_total": 31,
           "coverage": 1.0
         },
         "solution_constraints": {
-          "value": 0.985,
-          "n_available": 22,
-          "n_total": 22,
+          "value": 0.989,
+          "n_available": 31,
+          "n_total": 31,
           "coverage": 1.0
         },
         "solution_quality": {
-          "value": 0.039,
-          "n_available": 22,
-          "n_total": 22,
+          "value": 0.038,
+          "n_available": 31,
+          "n_total": 31,
           "coverage": 1.0
         },
         "solution_novelty": {
-          "value": 0.87,
-          "n_available": 22,
-          "n_total": 22,
+          "value": 0.88,
+          "n_available": 31,
+          "n_total": 31,
           "coverage": 1.0
         },
         "solution_composite": {
-          "value": 0.784,
-          "n_available": 22,
-          "n_total": 22,
+          "value": 0.775,
+          "n_available": 31,
+          "n_total": 31,
           "coverage": 1.0
         },
         "basin_escape": {
-          "value": 0.735,
-          "n_available": 22,
-          "n_total": 22,
+          "value": 0.743,
+          "n_available": 31,
+          "n_total": 31,
           "coverage": 1.0
         },
         "strategies": {
-          "exploratory": 22
+          "exploratory": 30,
+          "conservative": 1
         }
       },
       {
         "model": "gpt-5.6-sol",
         "label": "gpt-5.6-sol",
-        "commits": 114,
-        "lines_added": 64264,
-        "lines_removed": 9317,
-        "functions_added": 1539,
-        "classes_added": 106,
-        "imports_added": 5842,
-        "sonar_available": 114,
+        "commits": 149,
+        "lines_added": 77716,
+        "lines_removed": 12012,
+        "functions_added": 2196,
+        "classes_added": 150,
+        "imports_added": 6877,
+        "sonar_available": 149,
         "sonar_bugs_delta": 3,
-        "sonar_smells_delta": 80,
-        "sonar_complexity_delta": 2834,
-        "avg_convention": 0.674,
+        "sonar_smells_delta": 97,
+        "sonar_complexity_delta": 3648,
+        "avg_convention": 0.68,
+        "deep_cells": 30,
+        "lsp_available": 0,
+        "lsp_errors_per_cell": {
+          "value": null,
+          "n_available": 0,
+          "n_total": 30,
+          "coverage": 0.0
+        },
+        "lsp_warnings_per_cell": {
+          "value": null,
+          "n_available": 0,
+          "n_total": 30,
+          "coverage": 0.0
+        },
+        "solution_correctness": {
+          "value": 1.0,
+          "n_available": 30,
+          "n_total": 30,
+          "coverage": 1.0
+        },
+        "solution_constraints": {
+          "value": 1.0,
+          "n_available": 30,
+          "n_total": 30,
+          "coverage": 1.0
+        },
+        "solution_quality": {
+          "value": 0.054,
+          "n_available": 30,
+          "n_total": 30,
+          "coverage": 1.0
+        },
+        "solution_novelty": {
+          "value": 0.916,
+          "n_available": 30,
+          "n_total": 30,
+          "coverage": 1.0
+        },
+        "solution_composite": {
+          "value": 0.798,
+          "n_available": 30,
+          "n_total": 30,
+          "coverage": 1.0
+        },
+        "basin_escape": {
+          "value": 0.786,
+          "n_available": 30,
+          "n_total": 30,
+          "coverage": 1.0
+        },
+        "strategies": {
+          "exploratory": 30
+        }
+      },
+      {
+        "model": "claude-sonnet-5",
+        "label": "Claude Sonnet 5",
+        "commits": 115,
+        "lines_added": 62819,
+        "lines_removed": 4128,
+        "functions_added": 2591,
+        "classes_added": 116,
+        "imports_added": 4731,
+        "sonar_available": 115,
+        "sonar_bugs_delta": 11,
+        "sonar_smells_delta": 124,
+        "sonar_complexity_delta": 2214,
+        "avg_convention": 0.717,
         "deep_cells": 23,
         "lsp_available": 0,
         "lsp_errors_per_cell": {
@@ -4332,265 +4401,60 @@ window.DYNAMICS_DATA = {
           "coverage": 0.0
         },
         "solution_correctness": {
-          "value": 1.0,
+          "value": 0.87,
           "n_available": 23,
           "n_total": 23,
           "coverage": 1.0
         },
         "solution_constraints": {
-          "value": 1.0,
+          "value": 0.971,
           "n_available": 23,
           "n_total": 23,
           "coverage": 1.0
         },
         "solution_quality": {
-          "value": 0.054,
+          "value": 0.048,
           "n_available": 23,
           "n_total": 23,
           "coverage": 1.0
         },
         "solution_novelty": {
-          "value": 0.917,
+          "value": 0.81,
           "n_available": 23,
           "n_total": 23,
           "coverage": 1.0
         },
         "solution_composite": {
-          "value": 0.798,
+          "value": 0.727,
           "n_available": 23,
           "n_total": 23,
           "coverage": 1.0
         },
         "basin_escape": {
-          "value": 0.783,
+          "value": 0.664,
           "n_available": 23,
           "n_total": 23,
           "coverage": 1.0
         },
         "strategies": {
-          "exploratory": 23
-        }
-      },
-      {
-        "model": "claude-sonnet-5",
-        "label": "Claude Sonnet 5",
-        "commits": 80,
-        "lines_added": 36187,
-        "lines_removed": 2266,
-        "functions_added": 1901,
-        "classes_added": 88,
-        "imports_added": 2283,
-        "sonar_available": 80,
-        "sonar_bugs_delta": 5,
-        "sonar_smells_delta": 98,
-        "sonar_complexity_delta": 1505,
-        "avg_convention": 0.732,
-        "deep_cells": 16,
-        "lsp_available": 0,
-        "lsp_errors_per_cell": {
-          "value": null,
-          "n_available": 0,
-          "n_total": 16,
-          "coverage": 0.0
-        },
-        "lsp_warnings_per_cell": {
-          "value": null,
-          "n_available": 0,
-          "n_total": 16,
-          "coverage": 0.0
-        },
-        "solution_correctness": {
-          "value": 0.875,
-          "n_available": 16,
-          "n_total": 16,
-          "coverage": 1.0
-        },
-        "solution_constraints": {
-          "value": 0.958,
-          "n_available": 16,
-          "n_total": 16,
-          "coverage": 1.0
-        },
-        "solution_quality": {
-          "value": 0.052,
-          "n_available": 16,
-          "n_total": 16,
-          "coverage": 1.0
-        },
-        "solution_novelty": {
-          "value": 0.789,
-          "n_available": 16,
-          "n_total": 16,
-          "coverage": 1.0
-        },
-        "solution_composite": {
-          "value": 0.722,
-          "n_available": 16,
-          "n_total": 16,
-          "coverage": 1.0
-        },
-        "basin_escape": {
-          "value": 0.641,
-          "n_available": 16,
-          "n_total": 16,
-          "coverage": 1.0
-        },
-        "strategies": {
-          "exploratory": 14,
-          "conservative": 2
+          "exploratory": 20,
+          "conservative": 3
         }
       },
       {
         "model": "claude-haiku-4-5",
         "label": "claude-haiku-4-5",
-        "commits": 69,
-        "lines_added": 31263,
-        "lines_removed": 2438,
-        "functions_added": 1316,
-        "classes_added": 173,
-        "imports_added": 980,
-        "sonar_available": 69,
-        "sonar_bugs_delta": 1,
-        "sonar_smells_delta": 113,
-        "sonar_complexity_delta": 1183,
-        "avg_convention": 0.754,
-        "deep_cells": 14,
-        "lsp_available": 0,
-        "lsp_errors_per_cell": {
-          "value": null,
-          "n_available": 0,
-          "n_total": 14,
-          "coverage": 0.0
-        },
-        "lsp_warnings_per_cell": {
-          "value": null,
-          "n_available": 0,
-          "n_total": 14,
-          "coverage": 0.0
-        },
-        "solution_correctness": {
-          "value": 0.857,
-          "n_available": 14,
-          "n_total": 14,
-          "coverage": 1.0
-        },
-        "solution_constraints": {
-          "value": 0.976,
-          "n_available": 14,
-          "n_total": 14,
-          "coverage": 1.0
-        },
-        "solution_quality": {
-          "value": 0.038,
-          "n_available": 14,
-          "n_total": 14,
-          "coverage": 1.0
-        },
-        "solution_novelty": {
-          "value": 0.841,
-          "n_available": 14,
-          "n_total": 14,
-          "coverage": 1.0
-        },
-        "solution_composite": {
-          "value": 0.727,
-          "n_available": 14,
-          "n_total": 14,
-          "coverage": 1.0
-        },
-        "basin_escape": {
-          "value": 0.705,
-          "n_available": 14,
-          "n_total": 14,
-          "coverage": 1.0
-        },
-        "strategies": {
-          "exploratory": 12,
-          "conservative": 2
-        }
-      },
-      {
-        "model": "gpt-5.6-luna",
-        "label": "GPT-5.6 Luna",
-        "commits": 120,
-        "lines_added": 19442,
-        "lines_removed": 6657,
-        "functions_added": 1192,
-        "classes_added": 81,
-        "imports_added": 3364,
-        "sonar_available": 120,
-        "sonar_bugs_delta": 9,
-        "sonar_smells_delta": 128,
-        "sonar_complexity_delta": 2476,
-        "avg_convention": 0.693,
-        "deep_cells": 24,
-        "lsp_available": 0,
-        "lsp_errors_per_cell": {
-          "value": null,
-          "n_available": 0,
-          "n_total": 24,
-          "coverage": 0.0
-        },
-        "lsp_warnings_per_cell": {
-          "value": null,
-          "n_available": 0,
-          "n_total": 24,
-          "coverage": 0.0
-        },
-        "solution_correctness": {
-          "value": 1.0,
-          "n_available": 24,
-          "n_total": 24,
-          "coverage": 1.0
-        },
-        "solution_constraints": {
-          "value": 0.986,
-          "n_available": 24,
-          "n_total": 24,
-          "coverage": 1.0
-        },
-        "solution_quality": {
-          "value": 0.087,
-          "n_available": 24,
-          "n_total": 24,
-          "coverage": 1.0
-        },
-        "solution_novelty": {
-          "value": 0.876,
-          "n_available": 24,
-          "n_total": 24,
-          "coverage": 1.0
-        },
-        "solution_composite": {
-          "value": 0.795,
-          "n_available": 24,
-          "n_total": 24,
-          "coverage": 1.0
-        },
-        "basin_escape": {
-          "value": 0.694,
-          "n_available": 24,
-          "n_total": 24,
-          "coverage": 1.0
-        },
-        "strategies": {
-          "exploratory": 24
-        }
-      },
-      {
-        "model": "gpt-5.6-terra",
-        "label": "gpt-5.6-terra",
-        "commits": 100,
-        "lines_added": 17263,
-        "lines_removed": 6550,
-        "functions_added": 1103,
-        "classes_added": 84,
-        "imports_added": 3137,
-        "sonar_available": 100,
+        "commits": 99,
+        "lines_added": 62391,
+        "lines_removed": 4321,
+        "functions_added": 1690,
+        "classes_added": 206,
+        "imports_added": 2896,
+        "sonar_available": 99,
         "sonar_bugs_delta": 3,
-        "sonar_smells_delta": 42,
-        "sonar_complexity_delta": 1740,
-        "avg_convention": 0.695,
+        "sonar_smells_delta": 200,
+        "sonar_complexity_delta": 1797,
+        "avg_convention": 0.707,
         "deep_cells": 20,
         "lsp_available": 0,
         "lsp_errors_per_cell": {
@@ -4606,7 +4470,7 @@ window.DYNAMICS_DATA = {
           "coverage": 0.0
         },
         "solution_correctness": {
-          "value": 1.0,
+          "value": 0.85,
           "n_available": 20,
           "n_total": 20,
           "coverage": 1.0
@@ -4618,37 +4482,174 @@ window.DYNAMICS_DATA = {
           "coverage": 1.0
         },
         "solution_quality": {
-          "value": 0.088,
+          "value": 0.036,
           "n_available": 20,
           "n_total": 20,
           "coverage": 1.0
         },
         "solution_novelty": {
-          "value": 0.901,
+          "value": 0.86,
           "n_available": 20,
           "n_total": 20,
           "coverage": 1.0
         },
         "solution_composite": {
-          "value": 0.798,
+          "value": 0.729,
           "n_available": 20,
           "n_total": 20,
           "coverage": 1.0
         },
         "basin_escape": {
-          "value": 0.741,
+          "value": 0.733,
           "n_available": 20,
           "n_total": 20,
           "coverage": 1.0
         },
         "strategies": {
-          "exploratory": 20
+          "exploratory": 17,
+          "conservative": 3
+        }
+      },
+      {
+        "model": "gpt-5.6-luna",
+        "label": "GPT-5.6 Luna",
+        "commits": 170,
+        "lines_added": 27729,
+        "lines_removed": 9605,
+        "functions_added": 1730,
+        "classes_added": 115,
+        "imports_added": 4817,
+        "sonar_available": 170,
+        "sonar_bugs_delta": 15,
+        "sonar_smells_delta": 180,
+        "sonar_complexity_delta": 3559,
+        "avg_convention": 0.694,
+        "deep_cells": 34,
+        "lsp_available": 0,
+        "lsp_errors_per_cell": {
+          "value": null,
+          "n_available": 0,
+          "n_total": 34,
+          "coverage": 0.0
+        },
+        "lsp_warnings_per_cell": {
+          "value": null,
+          "n_available": 0,
+          "n_total": 34,
+          "coverage": 0.0
+        },
+        "solution_correctness": {
+          "value": 1.0,
+          "n_available": 34,
+          "n_total": 34,
+          "coverage": 1.0
+        },
+        "solution_constraints": {
+          "value": 0.99,
+          "n_available": 34,
+          "n_total": 34,
+          "coverage": 1.0
+        },
+        "solution_quality": {
+          "value": 0.087,
+          "n_available": 34,
+          "n_total": 34,
+          "coverage": 1.0
+        },
+        "solution_novelty": {
+          "value": 0.88,
+          "n_available": 34,
+          "n_total": 34,
+          "coverage": 1.0
+        },
+        "solution_composite": {
+          "value": 0.796,
+          "n_available": 34,
+          "n_total": 34,
+          "coverage": 1.0
+        },
+        "basin_escape": {
+          "value": 0.7,
+          "n_available": 34,
+          "n_total": 34,
+          "coverage": 1.0
+        },
+        "strategies": {
+          "exploratory": 34
+        }
+      },
+      {
+        "model": "gpt-5.6-terra",
+        "label": "gpt-5.6-terra",
+        "commits": 150,
+        "lines_added": 26281,
+        "lines_removed": 9714,
+        "functions_added": 1718,
+        "classes_added": 115,
+        "imports_added": 5110,
+        "sonar_available": 150,
+        "sonar_bugs_delta": 13,
+        "sonar_smells_delta": 109,
+        "sonar_complexity_delta": 2840,
+        "avg_convention": 0.689,
+        "deep_cells": 30,
+        "lsp_available": 0,
+        "lsp_errors_per_cell": {
+          "value": null,
+          "n_available": 0,
+          "n_total": 30,
+          "coverage": 0.0
+        },
+        "lsp_warnings_per_cell": {
+          "value": null,
+          "n_available": 0,
+          "n_total": 30,
+          "coverage": 0.0
+        },
+        "solution_correctness": {
+          "value": 1.0,
+          "n_available": 30,
+          "n_total": 30,
+          "coverage": 1.0
+        },
+        "solution_constraints": {
+          "value": 0.989,
+          "n_available": 30,
+          "n_total": 30,
+          "coverage": 1.0
+        },
+        "solution_quality": {
+          "value": 0.086,
+          "n_available": 30,
+          "n_total": 30,
+          "coverage": 1.0
+        },
+        "solution_novelty": {
+          "value": 0.91,
+          "n_available": 30,
+          "n_total": 30,
+          "coverage": 1.0
+        },
+        "solution_composite": {
+          "value": 0.8,
+          "n_available": 30,
+          "n_total": 30,
+          "coverage": 1.0
+        },
+        "basin_escape": {
+          "value": 0.752,
+          "n_available": 30,
+          "n_total": 30,
+          "coverage": 1.0
+        },
+        "strategies": {
+          "exploratory": 30
         }
       }
     ],
-    "stories_analyzed": 156,
-    "commits_analyzed": 769,
-    "sonar_commits_available": 769
+    "stories_analyzed": 207,
+    "commits_analyzed": 1024,
+    "sonar_commits_available": 1024
   },
   "labs": {
     "cache_economics": {
@@ -5271,275 +5272,6 @@ window.DYNAMICS_DATA = {
         "requires_external_service": null,
         "contract_version": "lab-contract/v6",
         "generated_at": "2026-08-31T19:55:52.985209+00:00"
-      }
-    },
-    "quality_frontier": {
-      "experiment_id": "lab_quality_frontier",
-      "generated_at": "2026-08-31T19:55:53.662309",
-      "summary": {
-        "models": 7,
-        "stories": 207,
-        "analyses": 156,
-        "lsp_available_cells": 0
-      },
-      "models": [
-        {
-          "model": "deepseek-v4-flash",
-          "cells": 22,
-          "avg_cost": 0.06814,
-          "avg_captured_cost": 0.06814,
-          "total_captured_cost": 1.499069,
-          "cost_captured_records": 22,
-          "total_records": 22,
-          "cost_coverage": 1.0,
-          "lsp_errors_per_cell": null,
-          "lsp_cells": 0,
-          "code_quality_score": 0.039,
-          "code_quality_score_coverage": {
-            "value": 0.039,
-            "n_available": 22,
-            "n_total": 22,
-            "coverage": 1.0
-          },
-          "cyclomatic_complexity": 453.182,
-          "cyclomatic_complexity_coverage": {
-            "value": 453.182,
-            "n_available": 22,
-            "n_total": 22,
-            "coverage": 1.0
-          },
-          "novelty_score": 0.87,
-          "novelty_score_coverage": {
-            "value": 0.87,
-            "n_available": 22,
-            "n_total": 22,
-            "coverage": 1.0
-          }
-        },
-        {
-          "model": "gpt-5.6-luna",
-          "cells": 24,
-          "avg_cost": 0.091854,
-          "avg_captured_cost": 0.091854,
-          "total_captured_cost": 2.204489,
-          "cost_captured_records": 24,
-          "total_records": 24,
-          "cost_coverage": 1.0,
-          "lsp_errors_per_cell": null,
-          "lsp_cells": 0,
-          "code_quality_score": 0.087,
-          "code_quality_score_coverage": {
-            "value": 0.087,
-            "n_available": 24,
-            "n_total": 24,
-            "coverage": 1.0
-          },
-          "cyclomatic_complexity": 262.583,
-          "cyclomatic_complexity_coverage": {
-            "value": 262.583,
-            "n_available": 24,
-            "n_total": 24,
-            "coverage": 1.0
-          },
-          "novelty_score": 0.876,
-          "novelty_score_coverage": {
-            "value": 0.876,
-            "n_available": 24,
-            "n_total": 24,
-            "coverage": 1.0
-          }
-        },
-        {
-          "model": "deepseek-v4-pro",
-          "cells": 37,
-          "avg_cost": 0.158801,
-          "avg_captured_cost": 0.158801,
-          "total_captured_cost": 5.875648,
-          "cost_captured_records": 37,
-          "total_records": 37,
-          "cost_coverage": 1.0,
-          "lsp_errors_per_cell": null,
-          "lsp_cells": 0,
-          "code_quality_score": 0.045,
-          "code_quality_score_coverage": {
-            "value": 0.045,
-            "n_available": 37,
-            "n_total": 37,
-            "coverage": 1.0
-          },
-          "cyclomatic_complexity": 309.378,
-          "cyclomatic_complexity_coverage": {
-            "value": 309.378,
-            "n_available": 37,
-            "n_total": 37,
-            "coverage": 1.0
-          },
-          "novelty_score": 0.845,
-          "novelty_score_coverage": {
-            "value": 0.845,
-            "n_available": 37,
-            "n_total": 37,
-            "coverage": 1.0
-          }
-        },
-        {
-          "model": "gpt-5.6-terra",
-          "cells": 20,
-          "avg_cost": 1.015182,
-          "avg_captured_cost": 1.015182,
-          "total_captured_cost": 20.303648,
-          "cost_captured_records": 20,
-          "total_records": 20,
-          "cost_coverage": 1.0,
-          "lsp_errors_per_cell": null,
-          "lsp_cells": 0,
-          "code_quality_score": 0.088,
-          "code_quality_score_coverage": {
-            "value": 0.088,
-            "n_available": 20,
-            "n_total": 20,
-            "coverage": 1.0
-          },
-          "cyclomatic_complexity": 233.8,
-          "cyclomatic_complexity_coverage": {
-            "value": 233.8,
-            "n_available": 20,
-            "n_total": 20,
-            "coverage": 1.0
-          },
-          "novelty_score": 0.901,
-          "novelty_score_coverage": {
-            "value": 0.901,
-            "n_available": 20,
-            "n_total": 20,
-            "coverage": 1.0
-          }
-        },
-        {
-          "model": "claude-haiku-4-5",
-          "cells": 14,
-          "avg_cost": 1.536913,
-          "avg_captured_cost": 1.536913,
-          "total_captured_cost": 21.516785,
-          "cost_captured_records": 14,
-          "total_records": 14,
-          "cost_coverage": 1.0,
-          "lsp_errors_per_cell": null,
-          "lsp_cells": 0,
-          "code_quality_score": 0.038,
-          "code_quality_score_coverage": {
-            "value": 0.038,
-            "n_available": 14,
-            "n_total": 14,
-            "coverage": 1.0
-          },
-          "cyclomatic_complexity": 357.571,
-          "cyclomatic_complexity_coverage": {
-            "value": 357.571,
-            "n_available": 14,
-            "n_total": 14,
-            "coverage": 1.0
-          },
-          "novelty_score": 0.841,
-          "novelty_score_coverage": {
-            "value": 0.841,
-            "n_available": 14,
-            "n_total": 14,
-            "coverage": 1.0
-          }
-        },
-        {
-          "model": "gpt-5.6-sol",
-          "cells": 23,
-          "avg_cost": 3.98668,
-          "avg_captured_cost": 3.98668,
-          "total_captured_cost": 91.693651,
-          "cost_captured_records": 23,
-          "total_records": 23,
-          "cost_coverage": 1.0,
-          "lsp_errors_per_cell": null,
-          "lsp_cells": 0,
-          "code_quality_score": 0.054,
-          "code_quality_score_coverage": {
-            "value": 0.054,
-            "n_available": 23,
-            "n_total": 23,
-            "coverage": 1.0
-          },
-          "cyclomatic_complexity": 297.348,
-          "cyclomatic_complexity_coverage": {
-            "value": 297.348,
-            "n_available": 23,
-            "n_total": 23,
-            "coverage": 1.0
-          },
-          "novelty_score": 0.917,
-          "novelty_score_coverage": {
-            "value": 0.917,
-            "n_available": 23,
-            "n_total": 23,
-            "coverage": 1.0
-          }
-        },
-        {
-          "model": "claude-sonnet-5",
-          "cells": 16,
-          "avg_cost": 4.776119,
-          "avg_captured_cost": 4.776119,
-          "total_captured_cost": 76.417905,
-          "cost_captured_records": 16,
-          "total_records": 16,
-          "cost_coverage": 1.0,
-          "lsp_errors_per_cell": null,
-          "lsp_cells": 0,
-          "code_quality_score": 0.052,
-          "code_quality_score_coverage": {
-            "value": 0.052,
-            "n_available": 16,
-            "n_total": 16,
-            "coverage": 1.0
-          },
-          "cyclomatic_complexity": 375.375,
-          "cyclomatic_complexity_coverage": {
-            "value": 375.375,
-            "n_available": 16,
-            "n_total": 16,
-            "coverage": 1.0
-          },
-          "novelty_score": 0.789,
-          "novelty_score_coverage": {
-            "value": 0.789,
-            "n_available": 16,
-            "n_total": 16,
-            "coverage": 1.0
-          }
-        }
-      ],
-      "lab_contract": {
-        "lab": "lab_quality_frontier.py",
-        "input_dataset_id": "canonical_registry/story+analysis",
-        "registry_identity_sha256": "dfff942e34e5143e94ef238550994330059bbf4010e1c64555b5f72d59e75406",
-        "resolved_input_sha256": "a5d0fe60f7cc35a87673b480f9e12b6f969797277dbde35bce7729a233990dd3",
-        "registry_version": "data-manifest/1.0+14911rows",
-        "metric_definition_version": "quality_frontier/v2",
-        "metric_source_sha256": "4bf5e2c7953d5ffe68ed0499541f12143991be7b4ebbf25dd8622f1cadcf4d1c",
-        "n_resolved_records": 363,
-        "n_eligible_records": 312,
-        "n_used_records": 312,
-        "n_excluded_records": 51,
-        "n_unused_eligible_records": 0,
-        "used_record_refs_sha256": "c608df293f9bfc025ec7e0898bd73573335f6903c910ae18a23a1194d72d5535",
-        "excluded_record_refs_sha256": "8303d45c827642a29b548d711dd43788c02dc2c61b9fe1920b11863376dcb22e",
-        "used_unique_records": 312,
-        "used_contributions": 312,
-        "review_without_current_story": 0,
-        "story_without_review": 0,
-        "missing_required_field": 0,
-        "outside_analysis_population": 51,
-        "data_integrity_policy": "docs/data_integrity_findings.md",
-        "requires_external_service": null,
-        "contract_version": "lab-contract/v6",
-        "generated_at": "2026-08-31T19:55:53.663035+00:00"
       }
     },
     "story_arc": {
