@@ -3,11 +3,12 @@
 **Generated — do not edit by hand.** Regenerate with `python scripts/spec_status.py`;
 `scripts/run_workflow.py` also refreshes it at the end of every run.
 
-Generated at: `2026-09-02T22:28:47.471123+00:00`  ·  183 spec(s)
-**Work remaining:** 75 open · 108 completed/retired
+Generated at: `2026-09-03T12:27:58.970173+00:00`  ·  187 spec(s)
+**Work remaining:** 76 open · 111 completed/retired
 
 | name | kind | repeatable | status | version | supersedes | last_run | ok | model | cost | n_runs |
 |---|---|---|---|---|---|---|---|---|---|---|
+| `authoring_product_aio` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `auto_posthoc_wiring` | workflow | yes | runnable | 0.1 | — | 2026-08-17 16:17 | ok | deepseek/deepseek-v4-pro | $0.1471 | 1 |
 | `automatic_docs_sync` | workflow | no | runnable | 0.1 | — | — | — | — | — | 1 |
 | `cap_2a_calibration_cell` | workflow | yes | runnable | 0.1 | — | — | — | — | — | 0 |
@@ -36,7 +37,7 @@ Generated at: `2026-09-02T22:28:47.471123+00:00`  ·  183 spec(s)
 | `explanation_tax` | experiment | yes | runnable | 0.2 | — | — | — | — | — | 0 |
 | `finding_economics_closure` | workflow | yes | runnable | 0.1 | — | 2026-08-22 17:22 | ok | deepseek/deepseek-v4-pro | $1.2820 | 1 |
 | `fleet_job_submission` | workflow | no | runnable | 0.1 | — | — | — | — | — | 3 |
-| `fleet_launch_boundary` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
+| `fleet_launch_container_smoke` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `green_main_closure` | workflow | no | runnable | 0.1 | — | — | — | — | — | 4 |
 | `labbook_refresh` | workflow | yes | runnable | 0.1 | — | 2026-08-17 18:14 | ok | deepseek/deepseek-v4-flash | $0.0275 | 1 |
 | `launch_handler_dry_run` | workflow | yes | runnable | 0.1 | — | — | — | — | — | 0 |
@@ -152,6 +153,9 @@ Generated at: `2026-09-02T22:28:47.471123+00:00`  ·  183 spec(s)
 | `fix_review_findings` | workflow | no | completed | 0.1 | — | 2026-08-14 13:48 | ok | deepseek/deepseek-v4-pro | $0.1504 | 1 |
 | `fleet_ladder_plan` | workflow | no | completed | 0.1 | — | 2026-08-29 15:33 | ok | deepseek/deepseek-v4-flash | $0.0836 | 1 |
 | `fleet_ladder_revision` | workflow | no | completed | 0.1 | — | 2026-08-29 17:02 | ok | deepseek/deepseek-v4-pro | $0.1724 | 2 |
+| `fleet_launch_boundary` | workflow | no | completed | 0.1 | — | 2026-09-02 23:49 | ok | deepseek/deepseek-v4-flash | $0.5536 | 1 |
+| `fleet_launch_boundary_followups` | workflow | no | completed | 0.1 | — | 2026-09-03 03:36 | ok | deepseek/deepseek-v4-flash | $0.6404 | 1 |
+| `fleet_launch_smoke` | workflow | no | completed | 0.1 | — | 2026-09-03 07:41 | ok | deepseek/deepseek-v4-flash | $1.1008 | 1 |
 | `framework_facelift` | workflow | no | completed | 0.2 | — | 2026-08-14 15:18 | ok | openai/gpt-5.6-sol | $0.0000 | 1 |
 | `grit_calibration_design` | workflow | no | completed | 0.1 | — | 2026-08-28 15:05 | ok | deepseek/deepseek-v4-flash | $0.0250 | 1 |
 | `i10_typed_checkpoint` | workflow | no | completed | 0.1 | — | 2026-08-28 17:00 | ok | deepseek/deepseek-v4-flash | $0.0085 | 3 |

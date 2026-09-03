@@ -1,0 +1,379 @@
+name: authoring_product_aio
+question: >-
+  Land Wave 3 — the two product-layer gaps from the deep review + the controller's
+  naming decision: (a) the WORKFLOW AUTHORING PRODUCT (P2-1) — a real authoring
+  surface instead of copying one of 181 historical YAMLs: workflows/schema/
+  workflow-v1.schema.json, workflows/examples/ (minimal-agent-workflow,
+  approval-workflow, research-workflow, publication-workflow), a linter
+  (workflow lint) that rejects authored operational status in workflow
+  definitions, mutating steps without downstream verification, promotion
+  without required gates, unknown step kinds, missing concurrency policy, gates
+  not bound to a candidate, and prompt-text-as-gate-evidence; and the authoring
+  command surface (workflow new / workflow lint / workflow plan --json) so a
+  new workflow is scaffolded, not copied. (b) The AIO Control Agent — the
+  delegated controller agent (All I/O converges here; all execution radiates
+  from here; all in one): .opencode/agents/aio-control.md defining the AIO's
+  contract — reload the control packet every turn, act only on run_ids /
+  candidate_shas returned there, route every permanence verb through the
+  verified commands (promote.py, publish release), never bypass the gates — and
+  the AIO's emission path (its decisions — approvals, promote requests — emit
+  into the knowledge base through the existing producers so the AIO is
+  observable, never a silent authority). The AIO is the controller's delegated
+  hands, with the doctrine's vocabulary section as its charter.
+version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: false
+repeatable: false
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: false
+    context:
+      domain_context: >-
+        canonical_sources: [src/agentic_dynamics/experiment/experiment_spec.py
+        (ExperimentSpec — the fields the schema validates), scripts/
+        run_workflow.py (the runner the lint/plan surfaces describe),
+        src/agentic_dynamics/cli.py (the command map — where workflow new/lint/
+        plan join run/discard-tree/promote), agent_config/rules.md (the AIO
+        vocabulary section — the agent's charter), .opencode/agents/ (the
+        subagent dir — data-analysis/instrument-dev/pipeline-ops exist; no
+        aio-control), src/agentic_dynamics/control/observation_ingestion.py +
+        actuation_ingestion.py (the emission producers the AIO's decisions
+        route through), scripts/promote.py + publish_release.py (the verified
+        permanence commands the AIO may call), workflows/repository/*.yaml (the
+        181-spec corpus the schema must not break), the AIO naming commit
+        (4a4ed76e7), and the deep-review P2-1 + criterion 15].
+        policies: [one_durable_state, the_gate_is_the_evidence, authority_
+        absolute, completion_follows_the_revision, regenerate_never_hand_edit,
+        bounded_verification].
+      challenge_context: >-
+        challenge: the last two product gaps. A new workflow is copied from a
+        historical YAML carrying whatever conventions that file happened to use
+        — no schema, no examples, no linter, no scaffold. And the AIO — the
+        controller's delegated agent — exists only as a vocabulary paragraph:
+        no agent definition, no emission path, so the agent that routes
+        permanence is itself unobservable. The linter must reject the exact
+        failure modes the waves fought: authored status (the P2-1 principle
+        this corpus now follows), mutating-without-verification, unbound
+        gates, prompt-as-evidence. The AIO must be defined so it CAN be the
+        controller's proxy: the packet every turn, the verified commands for
+        permanence, its own decisions emitted and auditable.
+        deliberation: [the schema + linter first (a1 — the authoring contract),
+        then the examples (a2 — the four canonical shapes), then the command
+        surface (a3 — new/lint/plan), then the AIO agent definition (a4), then
+        the AIO emission (a5)].
+        session_policy: {default: continue}
+      current_state: >-
+        MEASURED (2026-09-02): no workflows/schema/, no workflows/examples/;
+        the corpus is 181 YAMLs with mixed conventions; the CLI has workflow
+        run/discard-tree/promote but no new/lint/plan; the AIO exists only in
+        agent_config/rules.md's vocabulary section; .opencode/agents/ has three
+        subagents but no aio-control; observation/actuation producers exist
+        with the actuation path having ZERO call sites (nothing fires it).
+      hard_rules: >-
+        (1) THE SCHEMA IS THE CONTRACT: workflow-v1.schema.json is the single
+        source a new workflow validates against. The linter rejects an authored
+        operational status in a workflow definition (status: completed etc. —
+        the P2-1 principle), a mutating step without downstream verification, a
+        promotion without required gates, an unknown step kind, a missing
+        concurrency policy, a gate not bound to a candidate sha, and prompt
+        text as the sole evidence for a required gate.
+        (2) THE 181 ARE THE LAB, NOT THE TEMPLATE: the schema + linter must
+        not break the historical corpus (they validate NEW and touched
+        workflows; the corpus stays as-is — a migration is out of scope).
+        (3) THE AIO IS THE CONTROLLER'S PROXY: aio-control.md defines the
+        contract — read the ONE control packet every turn, act only on
+        run_ids/candidate_shas returned there, route permanence through the
+        verified commands, never bypass the gates, never treat chat memory as
+        state. The AIO's decisions emit through the producers (observable,
+        never a silent authority).
+        (4) BOUNDED VERIFICATION (unchanged). REGENERATE, NEVER HAND-EDIT
+        (unchanged — the AIO agent definition goes through the generator if it
+        is a generated surface; if .opencode/agents/ is not generated, it is
+        authored directly and the generator's --check stays green).
+    phases:
+      - name: a0_pin_spec
+        kind: agent
+        scope: implementation
+        timeout: 3600
+        prompt: |
+          GOAL: {goal}
+          ROLE: verification — the house pin convention. Write
+          docs/reviews/authoring_product_aio_preregistration.md carrying:
+          (a) this spec's file SHA256 + the worktree git sha; (b) the five
+          edges VERIFIED against the actual repo: (1) no workflows/schema/ +
+          no workflows/examples/ (ls); (2) the CLI has workflow run/discard-
+          tree/promote but no new/lint/plan (grep the cli map); (3) no
+          .opencode/agents/aio-control.md (ls the agents dir); (4) the AIO
+          exists only as the vocabulary section in agent_config/rules.md (grep
+          AIO Control Agent); (5) actuation_ingestion has zero call sites
+          (grep). An edge that does not hold is a FAILED finding. If a claim
+          cannot be reproduced after THREE attempts, record the deviation and
+          FAIL — never loop. DB LOCATION: machine-local state at the MAIN
+          checkout.
+          DELIVER: the preregistration with the verified edges, committed with
+          the '[workflow] a0_pin_spec — <goal prefix>' subject.
+          LOG: PASS/FAIL per claim; commit.
+      - name: a1_schema_linter
+        kind: agent
+        scope: implementation
+        timeout: 7200
+        prompt: |
+          GOAL: {goal}
+          SHAPE: the authoring contract. Add workflows/schema/workflow-v1.
+          schema.json (JSON Schema, draft 2020-12) describing the operational
+          workflow shape: apiVersion/kind/metadata (name/revision/lifecycle —
+          NO operational status field), spec (baseRef, concurrency group+
+          policy, workspace mode, steps[] each with id/executor/image/scope/
+          needs/candidateFrom/gate{blocking}, promotion with candidateFrom/
+          strategy/requiredGates). Add the linter (workflows/lint_workflow.py
+          or a scripts/ module): rejects authored operational status in a
+          workflow definition, a mutating step without downstream verification,
+          promotion without required gates, an unknown step kind, a missing
+          concurrency policy, a gate not bound to a candidate sha, and prompt
+          text as the sole evidence for a required gate. The linter validates
+          the schema fields AND the semantic rules above (schema alone cannot
+          express 'a mutating step needs downstream verification').
+          SCOPE FENCE: the schema + linter ONLY — the examples are a2's, the
+          CLI surface a3's. Commits carry '[workflow] a1_schema_linter'.
+          VERIFY (both directions): unit tests prove (a) the schema validates
+          a canonical workflow and rejects an authored status / unknown step
+          kind / missing concurrency (json schema assertions); (b) the linter
+          rejects each semantic violation with a named error: mutating-without-
+          verification, promotion-without-gates, unbound gate, prompt-as-
+          evidence; (c) a clean workflow passes with no errors; (d) the 181-
+          spec corpus is UNTOUCHED (the linter targets new/touched workflows —
+          running it against the corpus must not be required to pass).
+          DELIVER: the schema + the linter + the tests, committed.
+          LOG: PASS/FAIL; commit.
+      - name: a2_examples
+        kind: agent
+        scope: implementation
+        timeout: 7200
+        prompt: |
+          GOAL: {goal}
+          SHAPE: the four canonical shapes. Add workflows/examples/: (1)
+          minimal-agent-workflow.yaml — the smallest valid workflow (one agent
+          step + one test gate); (2) approval-workflow.yaml — an agent step +
+          a verifier gate + an approval checkpoint + promotion with the gates
+          required; (3) research-workflow.yaml — a measurement/research shape
+          (repeatable, runnable); (4) publication-workflow.yaml — build + HTML
+          consistency + receipt + deploy gates. Every example validates
+          against the a1 schema + passes the a1 linter (they ARE the positive
+          cases). Each example carries the minimal prompt the schema requires
+          (prompt text is scaffolded, never the sole gate evidence — the gate
+          evidence is the kind:test/verifier executor).
+          SCOPE FENCE: the four examples ONLY. Commits carry
+          '[workflow] a2_examples'.
+          VERIFY (both directions): unit tests prove (a) all four examples
+          validate against workflow-v1.schema.json; (b) all four pass the
+          linter with zero errors; (c) each example is structurally distinct
+          (the four shapes differ as documented); (d) the corpus is untouched.
+          DELIVER: the four examples + the tests, committed.
+          LOG: PASS/FAIL; commit.
+      - name: a3_command_surface
+        kind: agent
+        scope: implementation
+        timeout: 7200
+        prompt: |
+          GOAL: {goal}
+          SHAPE: the authoring commands. Add to the CLI (src/agentic_dynamics/
+          cli.py + their scripts): (1) workflow new <name> — scaffold a
+          minimal valid workflow from the minimal-agent example into
+          workflows/repository/<name>.yaml, validate it against the schema +
+          linter as it is written; (2) workflow lint <file> — run the a1
+          linter on a workflow file (the CI-able surface); (3) workflow plan
+          <file> --json — render the workflow's step DAG (needs/edges, the
+          gates, the promotion contract) as JSON so a human or the AIO can see
+          the plan before running. The existing workflow run/discard-tree/
+          promote stay unchanged. New workflows scaffold through `workflow
+          new` — no more copying a historical YAML.
+          SCOPE FENCE: the three command surfaces + their wiring ONLY.
+          Commits carry '[workflow] a3_command_surface'.
+          VERIFY (both directions): unit tests prove (a) workflow new creates
+          a schema-valid, linter-clean workflow (assert the file + the
+          validation); (b) workflow lint reports the semantic violations on a
+          bad file (named errors) and silence on a good one; (c) workflow plan
+          --json renders the DAG edges + gates + promotion contract; (d) the
+          CLI resolution guard passes with the new subcommands.
+          DELIVER: the commands + the tests, committed.
+          LOG: PASS/FAIL; commit.
+      - name: a4_aio_agent
+        kind: agent
+        scope: implementation
+        timeout: 7200
+        prompt: |
+          GOAL: {goal}
+          SHAPE: the AIO Control Agent is defined. Add .opencode/agents/
+          aio-control.md — the delegated controller agent (All I/O converges
+          here; all execution radiates from here; all in one). Its contract:
+          (1) at the start of every decision turn, read `agentic-dynamics
+          control status --json` (the ONE control packet); (2) act only on
+          run_ids / candidate_shas / gate_ids returned there; (3) never infer
+          live workflow state from chat history (compaction-safe: reload the
+          packet); (4) route every permanence verb through the verified
+          commands (workflow promote via promote.py, publish release via
+          publish_release.py) — never raw git push to main, never a bypass of
+          the gates; (5) never hand-edit generated surfaces; (6) the AIO's
+          decisions are emitted (see a5) so it is observable — never a silent
+          authority. The agent definition states its role as the controller's
+          delegated hands (the human is the controller; the AIO is the proxy —
+          permanence actions still carry the operator's name via the verified
+          commands). Check whether .opencode/agents/ is a generated surface
+          (the generator's manifest) — if generated, add it to agent_config's
+          source and regenerate; if not, author it directly and keep
+          `_gen_instructions.py --check` green either way.
+          SCOPE FENCE: the aio-control agent definition ONLY (emission is
+          a5's). Commits carry '[workflow] a4_aio_agent'.
+          VERIFY (both directions): unit tests or checks prove (a) the agent
+          definition exists and states the contract (read the file — the six
+          points present); (b) the generator's --check stays green (a
+          generated surface was regenerated OR the agents dir is not
+          generated — verified which); (c) the definition names the verified
+          permanence commands (promote.py, publish_release.py) and the packet
+          command (control status --json).
+          DELIVER: the AIO agent definition + the surface handling, committed.
+          LOG: PASS/FAIL; commit.
+      - name: a5_aio_emission
+        kind: agent
+        scope: implementation
+        timeout: 7200
+        prompt: |
+          GOAL: {goal}
+          SHAPE: the AIO is observable. The AIO's decisions — the permanence
+          verbs it routes (a promote request, a publish request, an approval)
+          — emit into the knowledge base through the existing producers: an
+          observation record (via observation_ingestion) for each decision,
+          and — for the permanence acts themselves — an actuation record (via
+          actuation_ingestion's derive_actuation_record, which has ZERO call
+          sites today) linking causes to the observation that justified it.
+          The emission is at the call site: when the AIO invokes workflow
+          promote or publish release (or an equivalent verified-command
+          wrapper), the decision emits BEFORE/AFTER the act with the run_id /
+          candidate_sha / operator name. Best-effort (a failed emit is a
+          warning, never a blocked promotion) — but the path exists and is
+          exercised, so the AIO is never a silent authority.
+          SCOPE FENCE: the emission call sites + the first actuation caller
+          ONLY — no changes to the producers' contracts. Commits carry
+          '[workflow] a5_aio_emission'.
+          VERIFY (both directions): unit tests prove (a) a promote decision
+          emits an observation with the run_id + candidate_sha; (b) a promote
+          act emits an actuation record whose causes link to that observation
+          (the lineage gate passes — derive_actuation_record's causes
+          resolution); (c) the emission is best-effort (a producer failure
+          does not block the act); (d) actuation_ingestion now has a real call
+          site (grep — the zero-call-site gap is closed).
+          DELIVER: the emission call sites + the tests, committed.
+          LOG: PASS/FAIL; commit.
+      - name: a6_adversarial
+        kind: agent
+        scope: adversarial_readonly
+        requires_deliverable: true
+        run_model: deepseek/deepseek-v4-pro
+        timeout: 14400
+        prompt: |
+          GOAL: {goal}
+          ROLE: the INDEPENDENT adversarial reviewer — a DIFFERENT model and
+          session (pro vs the flash author). Falsify the product wave, not
+          certify it. Attack in order, re-verified against the actual code
+          (never asserted): (1) a1 — does the linter ACTUALLY reject each
+          named violation (run it against crafted bad workflows — authored
+          status, mutating-without-verification, unbound gate, prompt-as-
+          evidence)? can a violating workflow slip through? (2) a3 — does
+          workflow new scaffold a genuinely valid workflow (schema + linter
+          both pass)? (3) a4 — is the AIO definition consistent with the
+          doctrine (the vocabulary section)? does it state the six contract
+          points? is it loadable as an agent (the surface is real)? (4) a5 —
+          does a promote decision actually emit (run the path)? is the
+          actuation causes-linkage real (the lineage gate)? (5) cross — the
+          181-spec corpus is untouched; the gate suite green. Every finding:
+          FIX on the branch or RECORD as an accepted limitation with
+          reasoning. At least 3 findings or a clean sweep with
+          re-verification evidence — a bare PASS is a failed review.
+          RELEASE VERDICT: merge-ready to main?
+          DELIVER: docs/reviews/authoring_product_aio_adversarial.md (finding
+          table), committed.
+          LOG: finding table; PASS/FAIL; commit.
+      - name: a7_test_gate
+        kind: test
+        scope: implementation
+        timeout: 900
+        tests:
+          - tests/test_workflow_schema.py
+          - tests/test_workflow_linter.py
+          - tests/test_workflow_auth_cli.py
+          - tests/test_aio_agent.py
+          - tests/test_aio_emission.py
+          - tests/test_workflow_runner.py
+          - tests/test_experiment_spec.py
+          - tests/test_cli_resolution.py
+          - tests/test_script_classification.py
+          - tests/test_doc_lifecycle.py
+          - tests/test_agent_config_render.py
+          - tests/test_control_status.py
+factors:
+  - {name: model, levels: [deepseek/deepseek-v4-flash]}
+design: factorial
+rules:
+  - name: product_edges_verified
+    plane: measurement
+    evidence_class: "[M]"
+    requires: []
+    produces: [five_edges_confirmed]
+  - name: authoring_contract_lands
+    plane: measurement
+    evidence_class: "[C]"
+    requires: [five_edges_confirmed]
+    produces: [schema_validates, linter_rejects_each_violation]
+  - name: canonical_shapes_land
+    plane: measurement
+    evidence_class: "[C]"
+    requires: [schema_validates]
+    produces: [four_examples_clean]
+  - name: command_surface_lands
+    plane: measurement
+    evidence_class: "[C]"
+    requires: [schema_validates, linter_rejects_each_violation]
+    produces: [new_lint_plan_wired]
+  - name: aio_defined
+    plane: measurement
+    evidence_class: "[C]"
+    requires: [five_edges_confirmed]
+    produces: [aio_contract_stated]
+  - name: aio_observable
+    plane: measurement
+    evidence_class: "[C]"
+    requires: [aio_contract_stated]
+    produces: [decisions_emit, actuation_has_caller]
+  - name: product_wave_adversarial_clean
+    plane: measurement
+    evidence_class: "[M]"
+    requires: [schema_validates, linter_rejects_each_violation,
+               four_examples_clean, new_lint_plan_wired, aio_contract_stated,
+               decisions_emit, actuation_has_caller]
+    produces: [product_wave_clean]
+  - name: test_gate_measured
+    plane: measurement
+    evidence_class: "[M]"
+    requires: [test_executed_success]
+    produces: [independent_gate_recorded]
+metrics:
+  - {name: five_edges_confirmed, agg: mean, over: cell}
+  - {name: schema_validates, agg: mean, over: cell}
+  - {name: linter_rejects_each_violation, agg: mean, over: cell}
+  - {name: four_examples_clean, agg: mean, over: cell}
+  - {name: new_lint_plan_wired, agg: mean, over: cell}
+  - {name: aio_contract_stated, agg: mean, over: cell}
+  - {name: decisions_emit, agg: mean, over: cell}
+  - {name: actuation_has_caller, agg: mean, over: cell}
+  - {name: product_wave_clean, agg: mean, over: cell}
+  - {name: independent_gate_recorded, agg: mean, over: cell}
+writeup:
+  format: lab_book
+  sections: [question, a0_pin_spec, a1_schema_linter, a2_examples, a3_command_surface, a4_aio_agent, a5_aio_emission, a6_adversarial, a7_test_gate]
+stop: {budget_usd: 12.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}
