@@ -121,15 +121,17 @@ x-supervisor-base: &supervisor-base
     FLEET_SKIP_PROBE: "1"         # the supervisor services invoke no CLI
   volumes: *supervisor-mounts
 
-# The orchestrator tier (slice 2, D-3/D-14/D-16): the cell mount set. The Docker socket is NOT
+# The orchestrator tier (slice 2, D-3/D-14/D-16): the cell mount set. The DOCKER socket is NOT
 # here (b3_launch_broker, fleet_launch_boundary Wave 2 hard rule 1: the socket leaves the
-# container) — no ladder service mounts the socket anymore. The launch broker
-# (scripts/fleet/launch_broker.py) is the host-side (non-container) component that owns the
-# socket and is the ONLY Docker API caller: the wrapper validates a typed launch request and the
-# broker executes it. The orchestrator services below therefore run where the broker is
-# reachable (host-side), never with the socket mounted in. Env (D-15): the cell env MINUS
-# FINOPS_KB_WRITE — the orchestrator never carries the write flag at the container level; its
-# F-1/F-2/P11 writes authorize in code.
+# container) — no ladder service mounts the docker socket. The launch broker
+# (scripts/fleet/launch_broker.py, deployed host-side by the agentic-dynamics-launch-broker
+# systemd user unit) is the component that owns the socket and is the ONLY Docker API caller:
+# the wrapper validates a typed launch request and emits it over the broker's IPC seam, and the
+# broker executes it. The orchestrator services below therefore reach the broker over the SEAM
+# socket (x-orchestrator-mounts mounts it at /run/launch-broker.sock — the typed seam, NOT the
+# docker socket); a socketless cell tier still never calls docker. Env (D-15): the cell env
+# MINUS FINOPS_KB_WRITE — the orchestrator never carries the write flag at the container level;
+# its F-1/F-2/P11 writes authorize in code.
 x-orchestrator-mounts: &orchestrator-mounts
   - ${FINOPS_WORKTREE_ROOT:-/tmp}:/tmp:rw
   - ${FINOPS_REPO_DIR:?FINOPS_REPO_DIR must be set (the repo root, no host-specific default)}:/repo:ro
@@ -148,6 +150,14 @@ x-orchestrator-mounts: &orchestrator-mounts
   - ${AUTH_HOME:?AUTH_HOME must be set (the auth home, no host-specific default)}/.config:${AUTH_HOME}/.config:ro
   - ${AUTH_HOME:?AUTH_HOME must be set (the auth home, no host-specific default)}/.local/bin:${AUTH_HOME}/.local/bin:ro
   - ${AUTH_HOME:?AUTH_HOME must be set (the auth home, no host-specific default)}/.opencode:${AUTH_HOME}/.opencode:ro
+  # fb2_broker_hostside: the broker SEAM socket — NOT the docker socket (the docker socket's
+  # only home is the host-side launch-broker unit). The orchestrator tier reaches the host
+  # broker over its unix-socket seam: this bind mounts the host socket file (export
+  # FINOPS_LAUNCH_BROKER_SOCKET where docker compose runs; fail-closed if absent) read-only at
+  # the fixed container target /run/launch-broker.sock, and x-orchestrator-base points the
+  # seam client at that target. Only the ORCHESTRATOR tier mounts any socket — no cell or
+  # supervisor service does; no in-container code calls docker (only the typed seam is spoken).
+  - ${FINOPS_LAUNCH_BROKER_SOCKET:?FINOPS_LAUNCH_BROKER_SOCKET must name the host launch-broker seam socket (e.g. the unit's %t/launch-broker.sock)}:/run/launch-broker.sock:ro
 
 x-orchestrator-base: &orchestrator-base
   image: fleet/orchestrator
@@ -156,6 +166,10 @@ x-orchestrator-base: &orchestrator-base
   networks: [fleet-net]
   environment:
     <<: *ladder-env
+    # fb2_broker_hostside: the seam socket's CONTAINER path (the mount target above). The
+    # orchestrator's spawn path reads this env and talks to the host broker over the seam —
+    # never the docker socket, never an in-container docker call.
+    FINOPS_LAUNCH_BROKER_SOCKET: /run/launch-broker.sock
   volumes: *orchestrator-mounts
 
 services:
@@ -294,8 +308,10 @@ services:
 
   # =========================================================================
   # fleet/orchestrator — the campaign wrapper + the workflow runner. NO docker
-  # socket (b3_launch_broker): the socket lives ONLY where the broker runs (host);
-  # these services build typed launch requests and the host-side broker executes them.
+  # socket (b3_launch_broker, fb2_broker_hostside): the docker socket lives ONLY where the
+  # broker runs (the host-side launch-broker systemd unit). These services build typed launch
+  # requests and emit them to the host broker over the SEAM socket (x-orchestrator-mounts →
+  # /run/launch-broker.sock); the host broker executes them. NO in-container code calls docker.
   # =========================================================================
   campaign-wrapper:
     <<: *orchestrator-base

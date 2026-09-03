@@ -7,16 +7,21 @@ authorization) and the mount contract (the four + the D-2 auth set) **before** a
 launched. A phase requesting an undeclared scope, an unauthorized scope, a mount outside the
 contract, an undeclared network, or an undeclared write flag fails here — never at the socket.
 
-**b3_launch_broker (fleet_launch_boundary Wave 2): the socket left this module.** The wrapper no
-longer invokes docker. It builds the TYPED launch request (``image_digest`` / ``network`` /
-``mount_profile`` / ``state_namespace`` / ``command`` / ``timeout_seconds`` + the scope-model
-context), validates it, and hands it to the launch broker (``launch_broker.py``) — the host-side
-component that owns the Docker socket and is the ONLY Docker API caller. The broker validates the
-request again (both sides run the same shared checks: :func:`validate_launch_request` +
-:func:`validate_spawn`) and performs the docker call itself. ``docker-compose.ladder.yml`` no
-longer mounts the socket into any container; the socket lives ONLY where the broker runs (host).
-The fleet:commands dispatch (scale/drain/restart/submit) delegates its ``docker compose`` calls
-to the broker the same way (:func:`launch_broker.run_fleet_command`).
+**b3_launch_broker + fb2_broker_hostside: the socket left this module, and so did the broker
+import.** The wrapper no longer invokes docker — and after fb2 it no longer imports the broker
+module and calls it in-process either. It builds the TYPED launch request (``image_digest`` /
+``network`` / ``mount_profile`` / ``state_namespace`` / ``command`` / ``timeout_seconds`` +
+the scope-model context), validates it, and emits it over the IPC seam to the launch broker —
+a genuinely host-side systemd user unit (``infrastructure/
+agentic-dynamics-launch-broker.service``) that owns the Docker socket and is the ONLY Docker
+API caller. The wrapper speaks the seam through ``broker_client.BrokerClient`` (a unix socket,
+one framed request per connection); the broker re-validates the request (both sides run the
+same shared checks: :func:`broker_contract.validate_launch_request` + :func:`validate_spawn`)
+and performs the docker call itself. ``docker-compose.ladder.yml`` mounts no docker socket into
+any container; the docker socket lives ONLY where the broker runs (host). The fleet:commands
+dispatch (scale/drain/restart/submit) delegates its ``docker compose`` calls over the SAME
+seam (:func:`_broker_client` → the broker's ``fleet-command`` verb). NO in-container code
+calls docker, and a spawn path that cannot reach the host broker fails loudly — never silently.
 
 Two jobs, both read-only with respect to *what* is allowed (the compose + the scope model are the
 fixed contract this module enforces):
@@ -47,11 +52,15 @@ fixed contract this module enforces):
 This module is a script (``scripts/fleet/``), not a package plane. Its package imports are the
 scope model from the experiment plane (tier 1 — ``agentic_dynamics.experiment.experiment_spec``),
 which is the source of truth for the vocabulary + authorization + configs, the tier-0 admission
-vocabulary (``agentic_dynamics.core.admission_context``) for step 6's pure lease-block check, and
-the sibling launch broker (``launch_broker`` — tier-0/1 only, same invariant). It never imports
-``control``/``runtime``/``adapters`` — the admission *decision* stays in ``control.admission``;
-what lands here is only the structural validator, which is stdlib-only and so preserves this
-module's invariant that validation never requires ``redis``.
+vocabulary (``agentic_dynamics.core.admission_context``) for step 6's pure lease-block check, the
+pure shared contract (``broker_contract`` — tier-0/1 only, the profiles/expansion/validation this
+module validates against), and the seam client (``broker_client`` — stdlib-only). It never
+imports ``control``/``runtime``/``adapters`` and NEVER imports the broker module
+(``launch_broker``) — the admission *decision* stays in ``control.admission``; the docker call
+stays in the host-side broker's process, reached only over the seam. The structural validators
+above remain pure and stdlib-only (validation never requires ``redis``); only the
+fleet:commands BRPOP consumer and the seam client touch a socket, and the seam client
+(``broker_client``) is itself stdlib-only.
 """
 
 from __future__ import annotations
@@ -72,16 +81,20 @@ _SRC = _REPO_ROOT / "src"
 if str(_SRC) not in sys.path:
     sys.path.insert(0, str(_SRC))
 
-# scripts/fleet/ is a dir, not a package — add it beside src/ so the SIBLING launch broker
-# (the module that now owns the docker call) imports as a top-level module. Same convention as
-# docker_executor.py's own bootstrap; the wrapper is the broker's caller, so the two must agree
-# on one module path.
+# scripts/fleet/ is a dir, not a package — add it beside src/ so the SHARED pure contract
+# (broker_contract — the profiles/expansion/validation this module validates against) and the
+# seam client (broker_client — the module this module reaches the HOST-side broker through)
+# import as top-level modules.
+#
+# fb2_broker_hostside: this module NO LONGER imports the broker (launch_broker) at all. The
+# broker's docker-executing code is not importable from the orchestrator's spawn path; the
+# spawn path talks to the host-side broker over the unix-socket seam (broker_client).
 _FLEET_DIR = Path(__file__).resolve().parent
 if str(_FLEET_DIR) not in sys.path:
     sys.path.insert(0, str(_FLEET_DIR))
 
-import launch_broker  # noqa: E402
-from launch_broker import (  # noqa: E402
+from broker_client import BrokerClient, BrokerError  # noqa: E402
+from broker_contract import (  # noqa: E402
     AUTH_CRED_FILE,
     LAUNCH_NETWORK,
     MOUNT_PROFILES,
@@ -89,8 +102,8 @@ from launch_broker import (  # noqa: E402
     RESULTS_TARGET,
     STATE_TARGET,
     WORKTREE_TARGET,
-    LaunchRequestError,
     mounts_for_profile,
+    sanitize_namespace,
     validate_launch_request,
 )
 
@@ -167,11 +180,11 @@ AUTH_DIRS: frozenset[str] = frozenset(
 )
 
 #: P0-3: the credential FILE mount (ro) + the per-attempt CLI-state target (rw). Both are now
-#: defined ONCE in the launch broker (``launch_broker.AUTH_CRED_FILE`` /
-#: ``launch_broker.STATE_TARGET`` — imported above and re-exported here for this module's
+#: defined ONCE in the pure shared contract (``broker_contract.AUTH_CRED_FILE`` /
+#: ``broker_contract.STATE_TARGET`` — imported above and re-exported here for this module's
 #: historical import surface): the broker's profile expansion mounts them, so a credential/state
 #: constant that drifted between the wrapper and the broker would be a mount the wrapper
-#: validated but the broker did not mount. One definition — the broker's.
+#: validated but the broker did not mount. One definition — the contract's.
 STATE_ROOT = str(PathConfig.from_env(require_existing=False).state_root)
 
 #: The XDG redirect vars the state namespace sets, so the CLI's writable state lands in the
@@ -918,7 +931,49 @@ def validate_submit_request(
     return errors
 
 
-# ── The spawn mechanism (validate THEN the broker) ───────────────────────────
+# ── The spawn mechanism (validate THEN the broker over the seam) ─────────────
+
+
+def _broker_client() -> BrokerClient:
+    """The seam client for this spawn path, bound to the configured broker socket.
+
+    The socket path is resolved from the environment at call time (``FINOPS_LAUNCH_BROKER_SOCKET``,
+    else the user runtime dir) so a test or an operator can re-point the seam between requests.
+    The broker itself — the host-side systemd unit — is never imported here; this module only
+    ever speaks the seam.
+    """
+    return BrokerClient()
+
+
+def _broker_outcome_or_raise(outcome: dict[str, Any]) -> dict[str, Any]:
+    """Map a broker outcome's NAMED ``state`` onto this module's refusal contract.
+
+    The host broker replies to every request with a complete outcome carrying a ``state``:
+
+    * ``REFUSED`` — the broker re-validated what it will execute and refused. Mapped to
+      :class:`SpawnValidationError` with the broker's errors, the SAME refusal type the old
+      in-process ``LaunchRequestError`` mapping produced (callers keep one refusal type).
+    * ``DOCKER_UNAVAILABLE`` / ``SERVER_ERROR`` — the broker cannot reach docker, or faulted.
+      Raised as a :class:`SpawnValidationError` carrying the named state — a LOUD failure,
+      never a silent pass (fb2 VERIFY e: docker-unavailable fails loudly, never silently).
+    * ``DRY_RUN`` / ``OK`` / ``RUN_FAILED`` / ``PONG`` — returned as-is; the caller classifies
+      the docker outcome (a nonzero ``returncode`` is a normal cell outcome, not a refusal).
+    """
+    state = str(outcome.get("state", ""))
+    if state == "REFUSED":
+        raise SpawnValidationError(
+            outcome.get("errors") or ["the launch broker refused the request"]
+        )
+    if state == "DOCKER_UNAVAILABLE":
+        raise SpawnValidationError(
+            [outcome.get("stderr") or "the host-side broker cannot reach docker (state "
+             "DOCKER_UNAVAILABLE)"]
+        )
+    if state == "SERVER_ERROR":
+        raise SpawnValidationError(
+            [outcome.get("stderr") or "the launch broker faulted (state SERVER_ERROR)"]
+        )
+    return outcome
 
 
 def spawn_sibling(
@@ -930,24 +985,30 @@ def spawn_sibling(
     require_lease: bool | None = None,
     path_config: PathConfig | None = None,
 ) -> dict[str, Any]:
-    """Validate a typed launch request, then hand it to the broker (which runs the container).
+    """Validate a typed launch request, then emit it to the broker over the seam.
 
     The ordering is the load-bearing guarantee: :func:`validate_spawn` runs FIRST, and any error
     raises :class:`SpawnValidationError` before anything is launched — a compromised phase can
     never reach the broker with a request it was not authorized for, and (since admission_leases
     p2) never with a request it has no lease for. The typed contract is then checked with the
-    SHARED :func:`validate_launch_request` (the wrapper validates what it intends to submit
-    against the same profiles the broker validates what it will execute against), and the request
-    is delegated to :func:`launch_broker.launch` — the ONLY docker caller. The wrapper never
-    builds or runs a docker argv itself (b3_launch_broker).
+    SHARED :func:`broker_contract.validate_launch_request` (the wrapper validates what it intends
+    to submit against the same profiles the broker validates what it will execute against), and
+    the request is emitted to the host-side launch broker over the seam
+    (:func:`_broker_client` → ``BrokerClient.launch``). The wrapper never builds a docker argv
+    and never calls docker (b3_launch_broker), and it never imports the broker module either
+    (fb2_broker_hostside — the docker call executes only in the broker's host process).
 
-    On success returns ``{"ok", "argv", "returncode", "stdout", "stderr"}`` — the argv is the
-    broker's (a ``dry_run`` builds it only). A broker refusal is mapped onto this module's
-    :class:`SpawnValidationError` so callers keep one refusal type.
+    On success returns ``{"ok", "argv", "returncode", "stdout", "stderr", "state"}`` — the argv
+    is the broker's (a ``dry_run`` builds it only). A broker refusal (``state == REFUSED``) and
+    a broker-side failure (``DOCKER_UNAVAILABLE`` / ``SERVER_ERROR``) are mapped onto this
+    module's :class:`SpawnValidationError` so callers keep one loud refusal type
+    (:func:`_broker_outcome_or_raise`). A seam that cannot be reached (the broker unit is down)
+    raises :class:`SpawnValidationError` with the socket path — never a silent pass.
 
-    ``path_config`` (b1_path_config) is forwarded to :func:`validate_spawn` + the broker — the
-    contract the request was built against is the contract it is validated against (default:
-    derived from the environment at call time).
+    ``path_config`` (b1_path_config) is the :class:`PathConfig` the LOCAL validation derives its
+    mount contract from (default: derived from the environment at call time). The broker
+    re-validates + executes against ITS OWN host config, derived from the same env in
+    deployment — a client never sends host paths or a config over the seam.
     """
     errors = validate_spawn(
         request, phase_scopes=phase_scopes, now=now, require_lease=require_lease,
@@ -961,20 +1022,18 @@ def spawn_sibling(
         raise SpawnValidationError(typed_errors)
 
     try:
-        return launch_broker.launch(
-            request, dry_run=dry_run, path_config=path_config,
-        )
-    except LaunchRequestError as exc:
-        # The broker re-validated what it will execute and refused — the wrapper's contract is
-        # that a refusal is a SpawnValidationError (never a silent skip, never a socket call).
-        raise SpawnValidationError(exc.errors) from exc
+        outcome = _broker_client().launch(request, dry_run=dry_run)
+    except BrokerError as exc:
+        # The SEAM itself failed (the host broker unit is down / the socket is absent) — loud.
+        raise SpawnValidationError([str(exc)]) from exc
+    return _broker_outcome_or_raise(outcome)
 
 
-#: P0-3: state-namespace sanitization is defined ONCE in the launch broker
-#: (``launch_broker.sanitize_namespace`` — the broker mints the same namespace it validates).
+#: P0-3: state-namespace sanitization is defined ONCE in the pure shared contract
+#: (``broker_contract.sanitize_namespace`` — the broker mints the same namespace it validates).
 #: This alias preserves this module's historical private name for its callers/tests; it never
 #: re-implements the rule, so the wrapper and the broker cannot drift.
-_sanitize_namespace = launch_broker.sanitize_namespace
+_sanitize_namespace = sanitize_namespace
 
 
 def build_phase_request(
@@ -1003,11 +1062,12 @@ def build_phase_request(
     ``mount_profile`` / ``state_namespace`` / ``command`` / ``timeout_seconds`` ride on the
     request alongside the scope-model context (``phase`` / ``scope`` / ``env`` / the lease
     block / ``run_clone``) that the shared validation consumes. The request's ``mounts`` are the
-    broker's OWN profile expansion (:func:`launch_broker.mounts_for_profile`) — the wrapper
-    validates the same mount set the broker will execute, and neither side can assemble a mount
-    the other does not derive. The result feeds :func:`spawn_sibling`, which re-validates it
-    before handing it to the broker. ``command`` is the sibling container's entrypoint
-    (defaults to the phase-runner; see ``phase_runner.py``).
+    SHARED profile expansion (:func:`broker_contract.mounts_for_profile` — the ONE expansion the
+    wrapper AND the broker derive) — the wrapper validates the same mount set the broker will
+    execute, and neither side can assemble a mount the other does not derive. The result feeds
+    :func:`spawn_sibling`, which re-validates it before emitting it to the broker over the seam.
+    ``command`` is the sibling container's entrypoint (defaults to the phase-runner; see
+    ``phase_runner.py``).
 
     ``path_config`` (b1_path_config) is the :class:`PathConfig` every host path on the request
     derives from — the worktree/results/repo mounts' SOURCES, the repo-alias + its ``.git``
@@ -1084,7 +1144,7 @@ def build_phase_request(
     # minted by the profile expansion (mkdir -p, best-effort) and is unique to this request:
     # <spec>/<phase> by default, or a finer run/step/attempt value the orchestrator passes.
     namespace = state_namespace or f"{spec_name or 'spec'}/{phase_def.get('name', 'phase')}"
-    ns_safe = launch_broker.sanitize_namespace(namespace)
+    ns_safe = sanitize_namespace(namespace)
     mounts = mounts_for_profile(
         profile,
         path_config=path_config,
@@ -1222,7 +1282,7 @@ def build_verifier_request(
 
     ``image`` / ``timeout_seconds`` (b3_launch_broker) are forwarded to
     :func:`build_phase_request`. The typed request's ``mount_profile`` is overridden to
-    :data:`verifier_readonly <launch_broker.MOUNT_PROFILES>` — the broker's fixed verifier
+    :data:`verifier_readonly <broker_contract.MOUNT_PROFILES>` — the broker's fixed verifier
     profile — and the request's ``mounts`` become THAT profile's expansion (the reduced,
     all-``ro`` candidate surface), so the wrapper validates the exact mount set the broker will
     execute for a verifier.
@@ -1268,9 +1328,11 @@ def build_verifier_request(
     return request
 
 
-#: NOTE (b3_launch_broker): ``build_submit_argv`` now lives in the launch broker
-#: (``launch_broker.build_submit_argv``) — the wrapper never builds docker/compose argv. The
-#: wrapper validates a submit and delegates the compose call to :func:`launch_broker.submit_run`.
+#: NOTE (b3_launch_broker + fb2_broker_hostside): the compose argv builders live in the launch
+#: broker module (its ``build_submit_argv`` / ``build_fleet_action_argv``) — the wrapper
+#: never builds docker/compose argv. The wrapper validates a submit and emits it over the seam;
+#: the HOST broker performs the ``docker compose run`` with its own compose config (a client
+#: never chooses the broker's compose file — that is host-side state).
 
 
 def dispatch_submit(
@@ -1279,22 +1341,22 @@ def dispatch_submit(
     repo_root: Path | str | None = None,
     phase_scopes: dict[str, str] | None = None,
     path_config: PathConfig | None = None,
-    compose: str = "docker-compose",
-    compose_file: str | None = None,
     dry_run: bool = False,
 ) -> dict[str, Any]:
-    """Validate a submit command, then (if valid) delegate the ``docker compose run`` to the broker.
+    """Validate a submit command, then emit it to the host broker over the seam.
 
     Mirrors :func:`spawn_sibling`'s ordering guarantee: :func:`validate_submit_request` runs
     FIRST, and any error raises :class:`SpawnValidationError` before anything is submitted — an
     invalid submit (a bad scope, an unlisted model, a host-service workdir, an undeclared write
-    flag) never reaches the broker. The compose call itself is performed by
-    :func:`launch_broker.submit_run` — the ONLY docker caller (b3_launch_broker), which
-    re-validates the submit with the same :func:`validate_submit_request` before executing.
-    ``consume_fleet_commands`` uses :func:`launch_broker.run_fleet_command` the same way for the
-    live BRPOP loop; this function exists so the ordering itself is unit-testable without Redis.
+    flag) never reaches the broker. The compose call itself is performed by the HOST broker over
+    the seam (:func:`_broker_client` → ``BrokerClient.submit``), which re-validates the submit
+    with the same :func:`validate_submit_request` before executing — the ONLY docker caller
+    (b3_launch_broker), reached only over the seam (fb2_broker_hostside).
+    ``consume_fleet_commands`` emits ``fleet-command`` over the SAME seam for the live BRPOP
+    loop; this function exists so the ordering itself is unit-testable without Redis.
 
-    ``path_config`` (b1_path_config) is forwarded to :func:`validate_submit_request`.
+    ``path_config`` (b1_path_config) is forwarded to :func:`validate_submit_request` for the
+    local validation; the broker validates + executes against its own host config.
     """
     errors = validate_submit_request(
         command, repo_root=repo_root, phase_scopes=phase_scopes, path_config=path_config,
@@ -1303,17 +1365,11 @@ def dispatch_submit(
         raise SpawnValidationError(errors)
 
     try:
-        return launch_broker.submit_run(
-            command,
-            repo_root=repo_root,
-            phase_scopes=phase_scopes,
-            path_config=path_config,
-            compose=compose,
-            compose_file=compose_file,
-            dry_run=dry_run,
-        )
-    except LaunchRequestError as exc:
-        raise SpawnValidationError(exc.errors) from exc
+        outcome = _broker_client().submit(command, dry_run=dry_run)
+    except BrokerError as exc:
+        # The SEAM itself failed (the host broker unit is down / the socket is absent) — loud.
+        raise SpawnValidationError([str(exc)]) from exc
+    return _broker_outcome_or_raise(outcome)
 
 
 # ── The fleet:commands BRPOP consumer (D-14) ─────────────────────────────────
@@ -1381,7 +1437,6 @@ def _latest_ledger(spec_name: str) -> str | None:
 def consume_fleet_commands(
     *,
     client: Any | None = None,
-    compose_file: str | None = None,
     dry_run: bool = False,
     once: bool = False,
 ) -> None:
@@ -1389,15 +1444,17 @@ def consume_fleet_commands(
 
     Each popped command is validated against :func:`validate_fleet_command` BEFORE anything is
     dispatched; an invalid command is logged and dropped (never acted on). This is the
-    orchestrator's "hands" — the supervisor LPUSHes, this consumer validates + delegates.
+    orchestrator's "hands" — the supervisor LPUSHes, this consumer validates + emits.
 
-    Every ``docker compose`` call is performed by the launch broker
-    (:func:`launch_broker.run_fleet_command` — b3_launch_broker: the ONLY docker caller), which
-    re-validates the command with the same :func:`validate_fleet_command` before executing.
-    ``submit`` is dispatched the same way as scale/drain/restart (validate, then delegate) but
-    through the broker's submit path (:func:`launch_broker.submit_run`) instead of the
-    service-shaped actions — and, per the isolation-over-coordination design, dispatching one
-    submit never blocks or refuses another: there is no lock here, only per-request validation.
+    Every ``docker compose`` call is performed by the HOST launch broker over the seam
+    (:func:`_broker_client` → the broker's ``fleet-command`` verb), which re-validates the
+    command with the same :func:`validate_fleet_command` before executing. ``submit`` is
+    dispatched the same way as scale/drain/restart (validate, then emit) but through the
+    broker's submit path (the ``submit`` verb) instead of the service-shaped actions — and,
+    per the isolation-over-coordination design, dispatching one submit never blocks or refuses
+    another: there is no lock here, only per-request validation. NO in-container code calls
+    docker and NO container mounts the docker socket (fb2_broker_hostside); the broker's own
+    compose file is host-side state the client never chooses.
 
     A submit's ``job_id`` additionally drives the board lifecycle (p2_launch_handler,
     :func:`fleet_manager.record_job_status`): a refusal here (never reaching the broker) writes
@@ -1405,9 +1462,11 @@ def consume_fleet_commands(
     ``docker compose`` call, and the observed exit code resolves it to "completed" or "failed" —
     a nonzero exit (or a pre-broker refusal) is ALSO filed onto the ``fleet_jobs`` dead-letter
     list (``scripts/fleet/dlq.py``), reusing the existing per-queue DLQ surface rather than
-    adding a new one. ``client`` is an injectable redis connection (tests pass a fake; the real
-    consumer loop leaves it ``None`` and connects via :func:`_connect_redis`) — the same "the
-    caller may own the connection" shape ``fleet_manager.py``'s own functions already use.
+    adding a new one. A seam that cannot be reached (the host broker unit is down) marks the
+    job failed with the socket path in the reason — a loud failure, never a silent pass.
+    ``client`` is an injectable redis connection (tests pass a fake; the real consumer loop
+    leaves it ``None`` and connects via :func:`_connect_redis`) — the same "the caller may own
+    the connection" shape ``fleet_manager.py``'s own functions already use.
     """
     # Sibling script modules (scripts/fleet/ is a dir, not a package — no __init__.py, so a
     # bare "import dlq" only resolves once this dir is on sys.path; this module may itself be
@@ -1422,10 +1481,8 @@ def consume_fleet_commands(
     import fleet_manager  # noqa: PLC0415
 
     client = client if client is not None else _connect_redis()
-    compose_file = compose_file or str(_REPO_ROOT / "infrastructure" / "docker-compose.ladder.yml")
-    compose = os.environ.get("DOCKER_COMPOSE", "docker-compose")
 
-    print(f"[spawn-wrapper] consuming {COMMANDS_KEY} (compose {compose_file})", flush=True)
+    print(f"[spawn-wrapper] consuming {COMMANDS_KEY}", flush=True)
     while True:
         try:
             result = client.brpop(COMMANDS_KEY, timeout=10)
@@ -1467,18 +1524,36 @@ def consume_fleet_commands(
             fleet_manager.record_job_status(client, job_id, "running")
         if not dry_run:
             try:
-                outcome = launch_broker.run_fleet_command(
-                    command, compose=compose, compose_file=compose_file,
-                )
-            except LaunchRequestError as exc:
+                outcome = _broker_client().fleet_command(command, dry_run=False)
+            except BrokerError as exc:
+                # The SEAM itself failed (the host broker unit is down / the socket is absent) —
+                # record the job failed with the socket path; never a silent pass.
+                print(f"[spawn-wrapper] BROKER UNREACHABLE {command}: {exc}", flush=True)
+                if job_id:
+                    reason = f"launch broker unreachable: {exc}"
+                    fleet_manager.record_job_status(client, job_id, "failed", error=reason)
+                    dlq.record_dead(client, "fleet_jobs", command, reason)
+                if once:
+                    return
+                continue
+            state = outcome.get("state")
+            if state == "REFUSED":
                 # The broker re-validated what it will execute and refused (should not fire
                 # after the wrapper's own validation — fail-closed anyway).
-                print(f"[spawn-wrapper] BROKER REFUSED {command}: {exc}", flush=True)
+                errors = outcome.get("errors") or ["the launch broker refused the command"]
+                print(f"[spawn-wrapper] BROKER REFUSED {command}: {errors}", flush=True)
                 if job_id:
-                    reason = "; ".join(exc.errors)
-                    fleet_manager.record_job_status(
-                        client, job_id, "failed", error=reason,
-                    )
+                    reason = "; ".join(errors)
+                    fleet_manager.record_job_status(client, job_id, "failed", error=reason)
+                    dlq.record_dead(client, "fleet_jobs", command, reason)
+                if once:
+                    return
+                continue
+            if state in ("DOCKER_UNAVAILABLE", "SERVER_ERROR"):
+                reason = outcome.get("stderr") or f"broker state {state}"
+                print(f"[spawn-wrapper] {state} {command}: {reason}", flush=True)
+                if job_id:
+                    fleet_manager.record_job_status(client, job_id, "failed", error=reason)
                     dlq.record_dead(client, "fleet_jobs", command, reason)
                 if once:
                     return
@@ -1500,9 +1575,16 @@ def consume_fleet_commands(
                     )
                     dlq.record_dead(client, "fleet_jobs", command, reason)
         else:
-            argv = launch_broker.run_fleet_command(
-                command, compose=compose, compose_file=compose_file, dry_run=True,
-            ).get("argv", [])
+            try:
+                argv = _broker_client().fleet_command(command, dry_run=True).get("argv", [])
+            except BrokerError as exc:
+                print(
+                    f"[spawn-wrapper] BROKER UNREACHABLE {command}: {exc} (dry-run)",
+                    flush=True,
+                )
+                if once:
+                    return
+                continue
             print(f"[spawn-wrapper] DISPATCH {action} {service or job_id}: {argv} (dry-run)",
                   flush=True)
         if once:
@@ -1517,7 +1599,6 @@ def main(argv: list[str] | None = None) -> int:
     p_consume = sub.add_parser("consume", help="BRPOP fleet:commands and dispatch")
     p_consume.add_argument("--once", action="store_true")
     p_consume.add_argument("--dry-run", action="store_true")
-    p_consume.add_argument("--compose-file", default=None)
     args = parser.parse_args(argv)
 
     if args.command == "validate":
@@ -1529,7 +1610,7 @@ def main(argv: list[str] | None = None) -> int:
         print("spawn valid")
         return 0
 
-    consume_fleet_commands(compose_file=args.compose_file, dry_run=args.dry_run, once=args.once)
+    consume_fleet_commands(dry_run=args.dry_run, once=args.once)
     return 0
 
 

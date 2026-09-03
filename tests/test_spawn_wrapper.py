@@ -312,9 +312,10 @@ def test_spawn_sibling_refuses_before_socket_call():
     assert any("step 1" in e for e in exc.value.errors)
 
 
-def test_spawn_sibling_dry_run_builds_the_broker_argv_only_after_validation():
-    # b3_launch_broker: spawn_sibling validates, then hands the typed request to the broker,
-    # which builds the docker argv (dry_run builds it only, nothing is executed).
+def test_spawn_sibling_dry_run_builds_the_broker_argv_only_after_validation(broker_seam):
+    # fb2_broker_hostside: spawn_sibling validates, then emits the typed request to the host
+    # broker OVER THE SEAM, which builds the docker argv (dry_run builds it only, nothing is
+    # executed).
     request = {**VALID_REQUEST, "command": ["python3", "-c", "pass"]}
     result = spawn_sibling(request, dry_run=True)
     assert result["ok"] is True
@@ -975,7 +976,7 @@ def test_valid_submit_passes_validation():
     assert errors == []
 
 
-def test_valid_submit_dispatch_builds_the_compose_run_argv():
+def test_valid_submit_dispatch_builds_the_compose_run_argv(broker_seam):
     result = dispatch_submit(_valid_submit_request(), dry_run=True)
     assert result["ok"] is True
     argv = result["argv"]
@@ -1244,7 +1245,7 @@ def test_build_submit_argv_omits_cell_image_when_absent():
     assert argv[-1] == "--orchestrator"
 
 
-def test_valid_submit_dispatch_with_image_reaches_the_compose_run_argv():
+def test_valid_submit_dispatch_with_image_reaches_the_compose_run_argv(broker_seam):
     result = dispatch_submit(_valid_submit_request(image="fleet/job-example"), dry_run=True)
     assert result["ok"] is True
     assert "--cell-image" in result["argv"]
@@ -1364,7 +1365,7 @@ def _fleet_manager_module():
 
 
 def test_consume_fleet_commands_valid_submit_reaches_running_then_completed_with_ledger(
-    _noop_spec, monkeypatch,
+    _noop_spec, monkeypatch, broker_seam,
 ):
     fleet_manager = _fleet_manager_module()
     spec_path, ledger_dir = _noop_spec
@@ -1402,7 +1403,7 @@ def test_consume_fleet_commands_valid_submit_reaches_running_then_completed_with
 
 
 def test_consume_fleet_commands_nonzero_exit_marks_failed_and_files_the_dlq(
-    _noop_spec, monkeypatch,
+    _noop_spec, monkeypatch, broker_seam,
 ):
     fleet_manager = _fleet_manager_module()
     r = _FakeCommandsRedis()
@@ -1462,7 +1463,8 @@ def test_consume_fleet_commands_invalid_submit_is_refused_before_any_subprocess_
     assert dead[0]["job"]["job_id"] == cmd["job_id"]
 
 
-def test_consume_fleet_commands_dry_run_never_calls_subprocess(_noop_spec, monkeypatch):
+def test_consume_fleet_commands_dry_run_never_calls_subprocess(_noop_spec, monkeypatch,
+                                                               broker_seam):
     r = _FakeCommandsRedis()
     fleet_manager = _fleet_manager_module()
     fleet_manager._send_submit_command(

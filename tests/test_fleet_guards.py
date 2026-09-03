@@ -142,6 +142,10 @@ def _compose_env_defaults() -> dict[str, str]:
         defaults["FINOPS_REPO_DIR"] = str((COMPOSE_PATH.parent / repo_default).resolve())
     defaults.setdefault("FINOPS_WORKTREE_ROOT", "/tmp")
     defaults.setdefault("AUTH_HOME", str(Path.home()))
+    # fb2_broker_hostside: the broker SEAM socket's HOST path. The compose declares the seam
+    # socket with the fail-closed ``${FINOPS_LAUNCH_BROKER_SOCKET:?…}`` form (like AUTH_HOME);
+    # the guard simulates the operator exporting it so the volume target can be checked.
+    defaults.setdefault("FINOPS_LAUNCH_BROKER_SOCKET", "/run/agentic-dynamics-launch-broker.sock")
     return defaults
 
 
@@ -192,7 +196,10 @@ def _wrapper_contract_targets() -> frozenset[str]:
 # narrower ~/.opencode/bin). The two auth-home-relative entries derive from the compose's own
 # ``AUTH_HOME`` default. NOTE (b3_launch_broker): the D-3 docker socket is NOT here — the
 # socket leaves every container; the host-side launch broker owns it, so no compose target may
-# ever name it again.
+# ever name it again. NOTE (fb2_broker_hostside): the broker SEAM socket target IS here — the
+# orchestrator tier binds the host broker's unix socket (NOT the docker socket) at
+# /run/launch-broker.sock so the containerized orchestrator can reach the host broker over the
+# typed seam.
 def _compose_only_targets() -> frozenset[str]:
     cfg = _compose_config()
     return frozenset(
@@ -201,6 +208,8 @@ def _compose_only_targets() -> frozenset[str]:
             str(cfg.auth_home / ".config"),  # the provider config (ro — smoke finding #4)
             "/repo/experiments/results",  # results OVERLAY (rw — the worker's relative paths)
             str(cfg.auth_home / ".opencode"),  # the opencode config + bin (ro)
+            "/run/launch-broker.sock",  # the broker SEAM socket (fb2 — orchestrator tier only,
+                                        # never the docker socket)
         }
     )
 
@@ -298,6 +307,32 @@ def test_supervisor_has_no_socket_and_no_worktree_mount():
         targets = {t for t, _m in _volume_targets(svc)}
         assert "/var/run/docker.sock" not in targets, f"{name}: supervisor must not hold the socket"
         assert "/tmp" not in targets, f"{name}: supervisor must not mount the worktree"
+
+
+def test_only_the_orchestrator_tier_mounts_the_broker_seam_socket():
+    """fb2_broker_hostside: the ONLY ``*.sock`` mounted anywhere is the broker SEAM socket, and
+    it appears ONLY in the orchestrator tier (campaign-wrapper / workflow-runner).
+
+    The seam socket is the typed unix-socket channel to the HOST-side launch broker — NOT the
+    docker socket (whose absence from every container is asserted separately). Cells and the
+    supervisor must never carry ANY socket: a cell that could reach the broker seam would be a
+    cell with the broker's launch authority behind a typed request, which is the orchestrator's
+    privilege alone.
+    """
+    compose = _compose()
+    holders: dict[str, set[str]] = {}
+    for name, svc in compose["services"].items():
+        targets = {t for t, _m in _volume_targets(svc)}
+        sock_targets = {t for t in targets if t.endswith(".sock")}
+        if sock_targets:
+            holders[name] = sock_targets
+    assert holders == {
+        "campaign-wrapper": {"/run/launch-broker.sock"},
+        "workflow-runner": {"/run/launch-broker.sock"},
+    }, (
+        "the broker seam socket (/run/launch-broker.sock) must be mounted by the orchestrator "
+        f"tier ONLY — no cell/supervisor service may carry any socket; got {holders}"
+    )
 
 
 def test_fleet_logs_is_a_named_volume_not_a_host_path():

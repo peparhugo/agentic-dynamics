@@ -399,11 +399,21 @@ def test_spawn_wrapper_contains_no_docker_invocation():
     src = _fleet_py_sources()["spawn_wrapper.py"]
     assert not any(marker in src for marker in _DOCKER_CALL_MARKERS)
     assert "import subprocess" not in src
-    # the wrapper's docker-touching entry points delegate to the broker (no argv builders).
-    assert "launch_broker.launch" in src
-    assert "launch_broker.run_fleet_command" in src
+    # fb2_broker_hostside: the wrapper's docker-touching entry points delegate to the host
+    # broker OVER THE SEAM — the in-process broker import is gone (the wrapper no longer
+    # imports launch_broker or calls launch_broker.launch/submit_run/run_fleet_command; it
+    # speaks the unix-socket seam through broker_client).
+    assert "import launch_broker" not in src
+    assert "launch_broker." not in src
+    assert "from broker_client import BrokerClient" in src
+    # the call sites are the seam client's typed verbs (assert the call site, fb2 VERIFY b).
+    assert "_broker_client().launch(" in src
+    assert "_broker_client().submit(" in src
+    assert "_broker_client().fleet_command(" in src
+    # no argv builders in the wrapper (they live in the broker module).
     assert "def build_spawn_argv" not in src
     assert "def build_submit_argv" not in src
+    assert "def build_launch_argv" not in src
 
 
 # ── (e) the compose no longer mounts the socket into a container ─────────────
