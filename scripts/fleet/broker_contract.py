@@ -138,6 +138,10 @@ LAUNCH_REQUEST_FIELDS: frozenset[str] = frozenset(
         VERIFIER_MARKER,
         "run_clone",  # fb1 clone-mount reference: the broker validates runs_root/<run-id>/repo
                       # (step 5b) AND mounts the clone as the cell's /repo (mounts_for_profile)
+        # ws2_broker_pathview — the VIEW of the PathConfig the mounts were built against
+        # (host | container): the broker validates a request against the view it carries, never
+        # refusing a request for the D-16 repo-alias split a caller cannot see. Absent = host.
+        "view",
         # the lease block (step 6 / admission_leases p2):
         "reserved_cost_usd",
         "hard_cap_usd",
@@ -155,6 +159,83 @@ RESULTS_TARGET = "/app/experiments/results"
 REPO_TARGET = "/repo"
 STATE_TARGET = "/state"
 AUTH_CRED_FILE = "/auth/opencode_auth.json"
+
+# ── The request's VIEW — the path config a request's mounts were built against ─
+# (ws2_broker_pathview, fleet_launch_smoke). A launch request is built by a caller on ONE
+# side of the D-16 repo-alias split and carries the VIEW of the :class:`PathConfig` it derived
+# its mounts from. The HOST view is the broker's own launch view (the operator's env — the
+# repo at its host path). The CONTAINER view is what a container-tier caller derives:
+# ``FINOPS_REPO_DIR`` is absent from the container env, so its ``repo_root`` defaults to the
+# image's baked code root, ``/app`` — the container's D-16 alias targets are the /app-in-
+# container paths, NOT the host path the mounts were really built for. The broker validates a
+# request against the view it carries — never refusing a request for a path split the caller
+# cannot see — while the broker's OWN launch argv always uses the host view (a docker bind
+# source is a host path, whatever view a request claims).
+
+#: The two views a request may carry. A request whose view is neither value is refused.
+VIEW_HOST = "host"
+VIEW_CONTAINER = "container"
+VIEWS: frozenset[str] = frozenset({VIEW_HOST, VIEW_CONTAINER})
+
+#: The in-container repo root of the fleet images (``Containerfile.fleet`` ``WORKDIR /app``) —
+#: the container-tier caller's ``repo_root`` when ``FINOPS_REPO_DIR`` is absent from the
+#: container env. It is the same fixed container-path vocabulary as :data:`RESULTS_TARGET`
+#: (``/app/experiments/results``) — a container-path constant of the images this repo builds,
+#: never a host-specific literal.
+CONTAINER_REPO_ROOT = "/app"
+
+
+def container_view_config(host_config: PathConfig) -> PathConfig:
+    """The container-view :class:`PathConfig` — the config a container-tier request was built against.
+
+    A container-tier caller derives its config from the container env: ``FINOPS_REPO_DIR`` /
+    ``FINOPS_GIT_DIR`` / ``FINOPS_RESULTS_DIR`` are absent there, so its ``repo_root`` /
+    ``git_dir`` / ``results_dir`` re-root to the image's baked ``/app`` layout
+    (``CONTAINER_REPO_ROOT``), while every other field resolves from the shared env contract
+    (``FINOPS_WORKTREE_ROOT`` / ``FINOPS_RUNS_ROOT`` / ``HOME``) to the same values the host
+    config holds. This function derives THAT config from a host config, so the broker can
+    validate a container-view request against the /app-path expectations its mounts were built
+    with. The result is used for VALIDATION ONLY — the broker's own launch argv is always the
+    host view (the broker's :func:`~launch_broker.launch` expands the mounts it executes from
+    its host config), because a docker bind source is a host path.
+
+    ``host_config``'s repo-rooted fields are deliberately NOT copied: the container view re-roots
+    them to the in-image layout by construction. Everything else (the shared worktree/runs/state
+    roots and the auth home) carries over unchanged — both views agree on them by the env contract.
+    """
+    repo_root = Path(CONTAINER_REPO_ROOT)
+    return PathConfig(
+        repo_root=repo_root,
+        git_dir=repo_root / ".git",
+        worktrees_root=host_config.worktrees_root,
+        runs_root=host_config.runs_root,
+        results_dir=repo_root / "experiments" / "results",
+        state_root=host_config.state_root,
+        auth_home=host_config.auth_home,
+    )
+
+
+def config_view(path_config: PathConfig) -> str:
+    """The VIEW a :class:`PathConfig` represents — container when it is rooted at the in-image
+    ``/app`` code root (a container-tier derivation), host otherwise. A request built against a
+    config carries exactly this value, so the broker re-derives the SAME config from the view a
+    request declares (``container_view_config`` on its host config) and the two cannot disagree
+    about which repo-alias targets are in contract."""
+    if str(path_config.repo_root) == CONTAINER_REPO_ROOT:
+        return VIEW_CONTAINER
+    return VIEW_HOST
+
+
+def request_view(request: Any) -> str:
+    """The view a (validated) request declares — :data:`VIEW_HOST` when it carries none (a
+    host-side caller that predates the view field) or is not a typed request object at all.
+    Callers run this only after :func:`validate_launch_request` has accepted the request, so an
+    unknown view value is already a refusal, never silently re-mapped to host."""
+    if isinstance(request, Mapping):
+        view = request.get("view")
+        if view in VIEWS:
+            return view
+    return VIEW_HOST
 
 
 class LaunchRequestError(ValueError):
@@ -375,7 +456,8 @@ def validate_launch_request(
 
     1. the request is a JSON object with NO field outside :data:`LAUNCH_REQUEST_FIELDS` — an
        untyped/arbitrary payload (a raw docker command string, a ``docker run`` argv, a random
-       dict) is refused here, never interpreted;
+       dict) is refused here, never interpreted; an explicit ``view`` is one of the two known
+       views (``host`` / ``container`` — ws2_broker_pathview; absent = host);
     2. ``image_digest`` is in the closed fleet image namespace;
     3. ``network`` is exactly :data:`LAUNCH_NETWORK`;
     4. ``mount_profile`` is one of the fixed :data:`MOUNT_PROFILES` AND is consistent with the
@@ -408,6 +490,18 @@ def validate_launch_request(
     for name in required:
         if request.get(name) in (None, ""):
             errors.append(f"launch request is missing the typed field {name!r}")
+
+    # Step 1b — the VIEW is one of the two known views (ws2_broker_pathview). Absent = host
+    # (a host-side caller that predates the view field); an explicit value outside {host,
+    # container} is refused — the broker validates a request against the view it carries, and
+    # an unknown view is a request the broker cannot classify.
+    view = request.get("view")
+    if view not in (None, "") and view not in VIEWS:
+        errors.append(
+            f"view {view!r} is not one of {sorted(VIEWS)} — the broker validates a launch "
+            f"request against the view it carries (host = the broker's own config, container "
+            f"= the /app-in-container config a container-tier caller derives)"
+        )
 
     # Step 2 — the image is in the closed fleet namespace.
     if request.get("image_digest") not in (None, "") and not _valid_image_digest(

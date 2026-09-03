@@ -23,6 +23,7 @@ from agentic_dynamics.experiment.experiment_spec import (
 from scripts.fleet.launch_broker import (
     build_launch_argv,
     build_submit_argv,
+    container_view_config,
 )
 from scripts.fleet.spawn_wrapper import (
     AUTH_CRED_FILE,
@@ -468,6 +469,47 @@ def test_build_phase_request_resolves_mounts_to_the_configured_paths(tmp_path):
     assert validate_spawn(
         req, phase_scopes={"p1_slice1_base_supervisor": "implementation"}, path_config=cfg,
     ) == []
+
+
+def test_build_phase_request_stamps_the_view_of_the_config_it_built_against(tmp_path):
+    """(ws2 VERIFY, builder half) every builder-made request carries the VIEW of the PathConfig
+    its mounts were built against: host for a checkout-rooted config, container for a config
+    rooted at the image's /app (the container-tier derivation). The broker validates the request
+    against that view, so the builder and the broker can never disagree about which repo-alias
+    targets are in contract."""
+    _repo, cfg = _make_config_repo(tmp_path)
+    host_req = build_phase_request(
+        {"name": "p1_slice1_base_supervisor", "scope": "implementation"},
+        goal="g", workdir="/tmp/wt", model="deepseek/deepseek-v4-pro",
+        spec_name="spec_x", path_config=cfg,
+    )
+    assert host_req["view"] == "host"
+    # the container view of the SAME host config re-roots the repo to the /app-in-container path
+    container_cfg = container_view_config(cfg)
+    assert str(container_cfg.repo_root) == "/app"
+    container_req = build_phase_request(
+        {"name": "p1_slice1_base_supervisor", "scope": "implementation"},
+        goal="g", workdir="/tmp/wt", model="deepseek/deepseek-v4-pro",
+        spec_name="spec_x", path_config=container_cfg,
+    )
+    assert container_req["view"] == "container"
+    # its alias targets are the /app paths; validating under the SAME (container) config passes,
+    # so the request is coherent with the view it declares.
+    alias_targets = {m["target"] for m in container_req["mounts"]} & {"/app", "/app/.git"}
+    assert alias_targets == {"/app", "/app/.git"}
+    assert validate_spawn(
+        container_req,
+        phase_scopes={"p1_slice1_base_supervisor": "implementation"},
+        path_config=container_cfg,
+    ) == []
+    # a verifier request built against the container config carries the container view too
+    verifier_req = build_verifier_request(
+        {"name": "g3_test_gate", "kind": "test", "scope": "implementation",
+         "tests": ["tests/test_spec_x.py"]},
+        goal="g", workdir="/tmp/wt_x", model="deepseek/deepseek-v4-flash",
+        spec_name="spec_x", path_config=container_cfg,
+    )
+    assert verifier_req["view"] == "container"
 
 
 def test_verifier_request_uses_the_configured_paths(tmp_path):

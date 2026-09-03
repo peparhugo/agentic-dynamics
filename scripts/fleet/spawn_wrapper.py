@@ -103,6 +103,7 @@ from broker_contract import (  # noqa: E402
     RESULTS_TARGET,
     STATE_TARGET,
     WORKTREE_TARGET,
+    config_view,
     mounts_for_profile,
     sanitize_namespace,
     validate_launch_request,
@@ -1114,6 +1115,14 @@ def build_phase_request(
     default — a caller that has not provisioned a clone), the request keeps the pre-clone
     shared-worktree shape and carries no ``run_clone`` key.
 
+    ``view`` (ws2_broker_pathview, fleet_launch_smoke): every request this builder returns
+    carries the VIEW of ``path_config`` — the config whose paths the request's mounts were
+    built against. A config rooted at the image's ``/app`` (a container-tier derivation,
+    ``FINOPS_REPO_DIR`` absent) stamps ``container``; a checkout-rooted config stamps ``host``.
+    The broker validates the request against the view it carries (a container-view request
+    against the container-view PathConfig), so the D-16 repo-alias split never becomes a
+    refusal for a request the container tier legitimately built.
+
     ``image`` (b3_launch_broker) is the sibling's image reference (``fleet/base`` /
     ``fleet/orchestrator`` / ``fleet/job-<name>``) carried on the request as
     ``image_digest``. Defaults to :data:`CELL_IMAGE`. ``timeout_seconds`` bounds the broker's
@@ -1214,6 +1223,13 @@ def build_phase_request(
     # worktree/.git surface), which validate_spawn's step 3 enforces at the mount contract.
     if run_clone:
         request["run_clone"] = str(run_clone)
+    # ws2_broker_pathview (fleet_launch_smoke): the request carries the VIEW of the PathConfig
+    # its mounts were built against (config_view — host for a checkout-rooted config, container
+    # for a config rooted at the image's /app). The broker validates the request against that
+    # view, so a container-tier request's /app D-16 alias mounts are never refused for a path
+    # split the caller cannot see. Absent (a hand-built legacy request) the broker defaults to
+    # host; every builder-made request carries its view explicitly.
+    request["view"] = config_view(path_config)
     if admission is not None:
         request.update(admission.to_request_fields())
     return request

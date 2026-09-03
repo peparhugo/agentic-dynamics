@@ -62,6 +62,25 @@ def _default_cfg():
     return spawn_wrapper.default_path_config()
 
 
+def _scratch_host_cfg(tmp_path):
+    """A hermetic HOST-view PathConfig (a scratch repo under ``tmp_path``), like the wrapper
+    suite's ``_make_config_repo`` — no dependence on the real checkout or the host env."""
+    repo = tmp_path / "repo"
+    (repo / ".git").mkdir(parents=True)
+    (repo / "experiments" / "results").mkdir(parents=True)
+    auth = tmp_path / "auth"
+    (auth / ".local" / "share" / "opencode").mkdir(parents=True)
+    return spawn_wrapper.PathConfig(
+        repo_root=repo,
+        git_dir=repo / ".git",
+        worktrees_root=tmp_path / "worktrees",
+        runs_root=tmp_path / "runs",
+        results_dir=repo / "experiments" / "results",
+        state_root=tmp_path / "state",
+        auth_home=auth,
+    )
+
+
 # ── (a) the typed contract holds — an arbitrary/untyped request refuses ──────
 
 
@@ -312,6 +331,137 @@ def test_broker_launch_argv_for_a_clone_request_mounts_the_clone_only(tmp_path):
     assert f"-v {cfg.worktrees_root}:" not in joined
     assert ":/tmp:rw" not in joined and ":/repo/.git:" not in joined
     assert str(cfg.git_dir) not in joined
+
+
+# ── ws2_broker_pathview — the broker validates the view it executes ──────────
+#
+# fleet_launch_smoke ws2: a launch request carries the VIEW (host | container) of the
+# PathConfig its mounts were built against. A container-tier caller derives a config rooted at
+# the image's /app (FINOPS_REPO_DIR is absent from the container env), so its D-16 repo-alias
+# mounts target the /app-in-container paths — which a HOST-view validation refuses ("mount
+# target '/app' is outside the four-mount contract"), the w2 refusal shape. The broker now
+# validates a request against the view it carries (container-view requests against the
+# container-view PathConfig, host-view against the host config) while its OWN launch argv
+# always stays the host view.
+
+
+def test_container_view_request_is_accepted_and_the_w2_refusal_shape_dies(tmp_path):
+    """(ws2 VERIFY a) a container-view request — mounts built against a container-view config,
+    its D-16 repo-alias targets the /app in-container paths — validates against the container
+    view and is ACCEPTED by the broker: the w2 refusal shape dies for the view it carries."""
+    host_cfg = _scratch_host_cfg(tmp_path)
+    container_cfg = launch_broker.container_view_config(host_cfg)
+    assert str(container_cfg.repo_root) == launch_broker.CONTAINER_REPO_ROOT
+
+    request = spawn_wrapper.build_phase_request(
+        _PHASE,
+        goal="g", workdir="/tmp/wt", model="m", spec_name="spec_x",
+        image="fleet/base", path_config=container_cfg,
+    )
+    # the request's D-16 alias targets are the /app-in-container paths, and it carries the
+    # container view (the builder stamps the view of the config it built against).
+    alias_targets = {m["target"] for m in request["mounts"]} & {"/app", "/app/.git"}
+    assert alias_targets == {"/app", "/app/.git"}
+    assert request["view"] == "container"
+
+    # the OLD w2 refusal shape is real: validating this /app request against the HOST view
+    # refuses it for the split a container-tier caller cannot see.
+    old_errors = spawn_wrapper.validate_spawn({**request, "view": "host"}, path_config=host_cfg)
+    assert any("outside" in e for e in old_errors), old_errors
+
+    # the broker validates the request against the view it carries -> ACCEPTED.
+    outcome = launch_broker.launch(request, dry_run=True, path_config=host_cfg)
+    assert outcome["ok"] is True
+    assert launch_broker.validate_launch_request(request, path_config=host_cfg) == []
+
+
+def test_host_view_request_validates_against_the_host_config(tmp_path):
+    """(ws2 VERIFY b) a host-view request validates against the host config — the broker's own
+    launch view. A request built against the host config carries the host view and launches
+    clean; a legacy request that carries no view at all defaults to host (unchanged behavior)."""
+    host_cfg = _scratch_host_cfg(tmp_path)
+    request = spawn_wrapper.build_phase_request(
+        _PHASE,
+        goal="g", workdir="/tmp/wt", model="m", spec_name="spec_x",
+        image="fleet/base", path_config=host_cfg,
+    )
+    assert request["view"] == "host"
+    assert launch_broker.launch(request, dry_run=True, path_config=host_cfg)["ok"] is True
+
+    # absent view (a legacy host-side caller) = host view, still accepted.
+    del request["view"]
+    assert launch_broker.validate_launch_request(request, path_config=host_cfg) == []
+    assert launch_broker.launch(request, dry_run=True, path_config=host_cfg)["ok"] is True
+
+
+def test_an_unknown_view_refuses(tmp_path):
+    """(ws2 VERIFY c) a request whose view is neither host nor container refuses — the broker
+    validates a request against the view it carries, and an unknown view is one it cannot
+    classify. Refused at the typed gate and at the launch path, before any docker argv."""
+    host_cfg = _scratch_host_cfg(tmp_path)
+    request = spawn_wrapper.build_phase_request(
+        _PHASE,
+        goal="g", workdir="/tmp/wt", model="m", spec_name="spec_x",
+        image="fleet/base", path_config=host_cfg,
+    )
+    request["view"] = "k8s-cluster"
+    errors = launch_broker.validate_launch_request(request, path_config=host_cfg)
+    assert any("view" in e and "not one of" in e for e in errors)
+    with pytest.raises(launch_broker.LaunchRequestError) as exc:
+        launch_broker.launch(request, dry_run=True, path_config=host_cfg)
+    assert any("view" in e and "not one of" in e for e in exc.value.errors)
+
+
+def test_broker_argv_still_uses_the_host_docker_path_for_a_container_view_request(tmp_path):
+    """(ws2 VERIFY d) the broker's own launch argv is the HOST view even when it validates a
+    container-view request: the /repo source and the D-16 host-path alias bind the HOST repo
+    paths — never /app. The container-view mounts are validated, never executed."""
+    host_cfg = _scratch_host_cfg(tmp_path)
+    container_cfg = launch_broker.container_view_config(host_cfg)
+    request = spawn_wrapper.build_phase_request(
+        _PHASE,
+        goal="g", workdir="/tmp/wt", model="m", spec_name="spec_x",
+        image="fleet/base", path_config=container_cfg,
+    )
+    outcome = launch_broker.launch(request, dry_run=True, path_config=host_cfg)
+    joined = " ".join(outcome["argv"])
+    assert f"-v {host_cfg.repo_root}:/repo:ro" in joined
+    assert f"-v {host_cfg.repo_root}:{host_cfg.repo_root}:ro" in joined  # D-16 host alias
+    assert "-v /app:" not in joined
+    assert str(container_cfg.git_dir) not in joined
+
+
+def test_container_view_clone_world_request_validates_and_mounts_the_host_clone(tmp_path):
+    """(ws2, the ws1+w2 composition) the clone world too: a container-tier request naming the
+    run clone validates against the container view and the broker's argv binds the HOST clone at
+    /repo (the executed source is always a host path)."""
+    host_cfg = _scratch_host_cfg(tmp_path)
+    container_cfg = launch_broker.container_view_config(host_cfg)
+    clone = host_cfg.runs_root / "run-abc" / "repo"
+    request = spawn_wrapper.build_phase_request(
+        _PHASE,
+        goal="g", workdir="/tmp/wt", model="m", spec_name="spec_x",
+        image="fleet/base", path_config=container_cfg, run_clone=str(clone),
+    )
+    assert request["view"] == "container"
+    outcome = launch_broker.launch(request, dry_run=True, path_config=host_cfg)
+    assert outcome["ok"] is True
+    assert f"-v {clone}:/repo:rw" in " ".join(outcome["argv"])
+
+
+def test_existing_refusals_are_unchanged_with_the_view_field():
+    """(ws2 VERIFY e) the existing validation refusals are unchanged for a request that carries
+    its view — a bad mount profile and an untyped/shell command still refuse at the typed gate
+    and at the launch path, exactly as before the view field existed."""
+    bad_profile = _built_request(mount_profile="hypervisor_root")
+    assert any("not one of the fixed profiles" in e
+               for e in launch_broker.validate_launch_request(bad_profile))
+    shell_command = _built_request(command="docker run ubuntu bash")
+    assert any("command must be a non-empty list" in e
+               for e in launch_broker.validate_launch_request(shell_command))
+    for bad in (bad_profile, shell_command):
+        with pytest.raises(launch_broker.LaunchRequestError):
+            launch_broker.launch(bad, dry_run=True)
 
 
 # ── (f) the shared validation keeps the same refusals ────────────────────────

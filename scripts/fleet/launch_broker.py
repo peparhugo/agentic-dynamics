@@ -46,6 +46,21 @@ expansion from the SAME profile (that module is the single source), so the two c
 disagree about what a cell may mount. The broker executes from its OWN expansion, never from a
 caller-supplied mount list — a forged or partial mount set cannot reach the socket.
 
+**The broker validates the view it executes** (ws2_broker_pathview, fleet_launch_smoke). The
+D-16 repo-alias split means the container tier and the host derive different repo paths: a
+container-tier caller (``FINOPS_REPO_DIR`` absent from its env) roots its config at the
+image's ``/app``, so the mounts it builds target the /app-in-container paths, while the broker
+derives its contract from the operator's host env (the repo at its host path). Before ws2 the
+broker re-validated those container-built mounts against its own host config and REFUSED every
+containerized spawn for a path split the caller cannot see. A launch request now carries the
+VIEW of the config it was built against (``host`` or ``container``, absent = host):
+:func:`launch` validates a container-view request against the container-view
+:class:`PathConfig` (:func:`broker_contract.container_view_config` — the /app paths) and a
+host-view request against the host config — the same shared checks, the same refusals for a
+request that is genuinely wrong, but never a refusal for the split itself. The broker's OWN
+launch argv is always expanded from the host config: a docker bind source is a host path, and
+the container-view mounts are validated, never executed.
+
 This module is a script (``scripts/fleet/``), not a package plane. Its package imports are the
 tier-0 path object (``agentic_dynamics.core.paths.PathConfig``) and the tier-1 scope config
 table (``agentic_dynamics.experiment.experiment_spec.SCOPE_CONFIGS``) — the same tier-0/1
@@ -97,6 +112,7 @@ from broker_client import recv_frame, send_frame  # noqa: E402
 # Importing these names never invokes docker — only the execution functions below do.
 from broker_contract import (  # noqa: E402
     AUTH_CRED_FILE,
+    CONTAINER_REPO_ROOT,
     IMAGE_NAMESPACE,
     JOB_IMAGE_PATTERN,
     LAUNCH_NETWORK,
@@ -108,9 +124,14 @@ from broker_contract import (  # noqa: E402
     RESULTS_TARGET,
     STATE_TARGET,
     VERIFIER_MARKER,
+    VIEW_CONTAINER,
+    VIEW_HOST,
+    VIEWS,
     WORKTREE_TARGET,
     LaunchRequestError,
+    container_view_config,
     mounts_for_profile,
+    request_view,
     sanitize_namespace,
     validate_launch_request,
 )
@@ -119,6 +140,7 @@ from agentic_dynamics.core.paths import PathConfig  # noqa: E402
 
 __all__ = [
     "AUTH_CRED_FILE",
+    "CONTAINER_REPO_ROOT",
     "IMAGE_NAMESPACE",
     "JOB_IMAGE_PATTERN",
     "LAUNCH_NETWORK",
@@ -127,12 +149,17 @@ __all__ = [
     "RESULTS_TARGET",
     "STATE_TARGET",
     "VERIFIER_MARKER",
+    "VIEWS",
+    "VIEW_CONTAINER",
+    "VIEW_HOST",
     "WORKTREE_TARGET",
     "LaunchRequestError",
     "LAUNCH_REQUEST_FIELDS",
     "MAX_LAUNCH_TIMEOUT_SECONDS",
     "MIN_LAUNCH_TIMEOUT_SECONDS",
+    "container_view_config",
     "mounts_for_profile",
+    "request_view",
     "sanitize_namespace",
     "validate_launch_request",
     # docker-executing surface (this module):
@@ -152,6 +179,26 @@ def _bounded_timeout(timeout_seconds: Any) -> float | None:
     if not timeout_seconds:
         return None
     return float(timeout_seconds)
+
+
+def validation_config_for_request(
+    request: dict[str, Any],
+    host_config: PathConfig,
+) -> PathConfig:
+    """The :class:`PathConfig` a request's mounts must be validated against — its declared VIEW.
+
+    ws2_broker_pathview (fleet_launch_smoke): a launch request carries the VIEW of the path
+    config its mounts were built against. A HOST-view request validates against the broker's
+    host config; a CONTAINER-view request validates against the container-view config (the
+    /app-in-container repo paths its mounts target — ``container_view_config``) derived from
+    that same host config. The broker therefore never refuses a request for the D-16 repo-alias
+    split (the container tier's /app alias targets vs the host path) that the caller cannot
+    see. ``host_config`` is the broker's own launch config (the docker bind sources); it is
+    ALWAYS the config the launch argv is expanded from, whatever view a request declares.
+    """
+    if request_view(request) == VIEW_CONTAINER:
+        return container_view_config(host_config)
+    return host_config
 
 
 # ── The docker call — the ONLY call site in the runtime code ────────────────
@@ -205,29 +252,47 @@ def launch(
        import cycle with the wrapper. The broker validates what it will execute with the SAME
        refusals the wrapper applied when it validated what it intended to submit.
 
+    **The broker validates the view it executes** (ws2_broker_pathview, fleet_launch_smoke):
+    the request carries the VIEW (host | container) of the path config its mounts were built
+    against. Both validations run against that view's config (:func:`validation_config_for_request`)
+    — a container-view request (its D-16 repo-alias mounts target the /app-in-container paths a
+    container-tier caller derives) validates against the container-view :class:`PathConfig`,
+    a host-view request against the host config — never refusing a request for a path split the
+    caller cannot see. The broker's OWN launch argv is ALWAYS the host view
+    (:func:`mounts_for_profile` on ``host_config``): a docker bind source is a host path, and
+    the request's container-view mounts are validated, never executed.
+
     A refusal raises :class:`LaunchRequestError` BEFORE any docker argv is built. On success
     returns ``{"ok", "argv", "returncode", "stdout", "stderr"}`` (``dry_run`` builds the argv
     only). ``timeout_seconds`` on the request bounds the docker subprocess when positive.
     """
-    errors = validate_launch_request(request, path_config=path_config)
+    # The shared scope-model checks below live in spawn_wrapper — imported lazily so this
+    # module never imports spawn_wrapper at module scope (spawn_wrapper imports the pure
+    # contract module broker_contract, never this module — the fb2 seam boundary).
+    import spawn_wrapper  # noqa: PLC0415
+
+    # The broker's own launch config (docker bind sources) — the HOST view, whatever view a
+    # request declares. The argv is expanded from it below.
+    host_config = path_config or spawn_wrapper.default_path_config()
+    # ws2_broker_pathview: the mount contract + the scope model are validated against the view
+    # the request carries (container-view requests validate against the /app-in-container paths
+    # their mounts were built with). An unknown view was already refused by the typed check.
+    cfg = validation_config_for_request(request, host_config)
+    errors = validate_launch_request(request, path_config=cfg)
     if errors:
         raise LaunchRequestError(errors)
 
-    # The shared scope-model validation (the same six checks the wrapper runs) — lazily, so
-    # launch_broker never imports spawn_wrapper at module scope (spawn_wrapper imports the
-    # pure contract module broker_contract, never this module — the fb2 seam boundary).
-    import spawn_wrapper  # noqa: PLC0415
-
-    cfg = path_config or spawn_wrapper.default_path_config()
     scope_errors = spawn_wrapper.validate_spawn(request, path_config=cfg)
     if scope_errors:
         raise LaunchRequestError(scope_errors)
 
-    # The broker mounts ITS OWN profile expansion — never a caller-supplied mount list.
+    # The broker mounts ITS OWN profile expansion — never a caller-supplied mount list. The
+    # expansion is the HOST view (host_config): the request's container-view mounts were
+    # validated above; what docker actually bind-mounts are the host paths.
     profile = str(request.get("mount_profile", ""))
     mounts = mounts_for_profile(
         profile,
-        path_config=cfg,
+        path_config=host_config,
         state_namespace=str(request.get("state_namespace", "")),
         run_clone=request.get("run_clone"),
     )
