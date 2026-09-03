@@ -2543,11 +2543,36 @@ def test_checkpoint_ledger_round_trips_spec_status_style(tmp_path):
     assert plain.to_dict()["checkpoints"] == []
 
 
+def test_deploy_gate_ignores_argument_position_firebase_mentions(tmp_path):
+    """The a2/a4 false-positive fix (2026-09-03): the deploy gate fires only when firebase
+    is the EXECUTED command, never when the string appears inside an argument — a commit
+    message quoting 'firebase deploy', a grep pattern, or a doc write are not deploys.
+    The OUTPUT tier still catches real indirection (a script that reaches firebase prints
+    the deploy banner)."""
+    spec = load_spec(SPEC)
+    mention = json.dumps({
+        "type": "tool_use", "sessionID": "s",
+        "part": {"type": "tool", "tool": "bash",
+                 "state": {"input": {"command":
+                     "git commit -m \"[workflow] a4 — the AIO definition states: firebase deploy *: ask\""}}},
+    })
+
+    def agent(prompt, *, model, backend, workdir, **kwargs):
+        _watchdog_transcript(workdir).parent.mkdir(parents=True, exist_ok=True)
+        _watchdog_transcript(workdir).write_text(mention + "\n")
+        return _fake_agent()
+
+    result = run_workflow(spec, goal="g", model="m", workdir=tmp_path, commit=False,
+                          run_agentic_fn=agent)
+    assert result.ok
+    assert all(p.deploy_gate is None for p in result.phases)
+
+
 def test_test_phase_with_phantom_target_is_a_false_green_guard(tmp_path):
-    """The b5 phantom-target lesson (fleet_launch_boundary F5): a kind:test phase whose
-    ``tests:`` target resolves to NO collected tests (a nonexistent file) must FAIL the
-    phase — a zero-test run is never a pass. The old check failed the phase only on
-    suite failed/errors, so total 0 / failed 0 / errors 0 read ok while
+    """The b5 phantom-target lesson (fleet_launch_boundary F5, ported to the wave3 branch):
+    a kind:test phase whose tests: target resolves to NO collected tests (a nonexistent
+    file) must FAIL the phase — a zero-test run is never a pass. The old check failed the
+    phase only on suite failed/errors, so total 0 / failed 0 / errors 0 read ok while
     test_executed_success was False: the phase record contradicted itself."""
     spec = load_spec(SPEC)
     for p in spec.workflow.params["phases"]:

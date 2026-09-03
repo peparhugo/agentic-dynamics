@@ -1,0 +1,202 @@
+{
+  "spec_name": "authoring_product_aio",
+  "spec_id": "authoring_product_aio@0.1",
+  "workflow_revision_id": "156bb169abd099e606546911c96a31024f74ea433e83ac6e2ed67fc43411ee65",
+  "model": "deepseek/deepseek-v4-flash",
+  "workdir": "/tmp/wt_wave3",
+  "goal": "Land Wave 3 \u2014 the authoring product + the AIO Control Agent: (a5) the AIO emission \u2014 its decisions (promote/publish/approval) emit through the observation/actuation producers so the AIO is observable, the actuation path gains its first real caller; then the independent pro adversarial review and the harness gate. NOTE: a1-a4 are committed (a4 includes the deploy-gate false-positive fix) \u2014 resume past them.",
+  "git_sha": "292055f5f",
+  "started_at": "2026-09-03T13:49:51.976227+00:00",
+  "ended_at": "2026-09-03T14:21:42.123712+00:00",
+  "awaiting": false,
+  "awaiting_phase": "",
+  "awaiting_reason": "",
+  "checkpoints": [],
+  "state": "failed",
+  "attempts": [
+    {
+      "attempt_id": "wf_authoring_product_aio_deepseek_deepseek_v4_flash_a5_aio_emission_a1",
+      "job_id": "wf_authoring_product_aio_deepseek_deepseek_v4_flash",
+      "phase": "a5_aio_emission",
+      "attempt_number": 1,
+      "parent_attempt_id": null,
+      "retry_reason": "",
+      "first_pass": true,
+      "accepted": true,
+      "escalation_from": null,
+      "escalation_to": null,
+      "model": "deepseek/deepseek-v4-flash",
+      "status": "ok",
+      "cost_usd": 0.10916379600000006,
+      "tokens": {
+        "in": 0,
+        "out": 0,
+        "reasoning": 0,
+        "answer": 0,
+        "explanation": 0,
+        "total": 238181
+      },
+      "test_executed_success": null,
+      "confidence": 1.0
+    },
+    {
+      "attempt_id": "wf_authoring_product_aio_deepseek_deepseek_v4_flash_a6_adversarial_a1",
+      "job_id": "wf_authoring_product_aio_deepseek_deepseek_v4_flash",
+      "phase": "a6_adversarial",
+      "attempt_number": 1,
+      "parent_attempt_id": null,
+      "retry_reason": "",
+      "first_pass": false,
+      "accepted": false,
+      "escalation_from": null,
+      "escalation_to": null,
+      "model": "deepseek/deepseek-v4-flash",
+      "status": "failed",
+      "cost_usd": 0.12176525799999999,
+      "tokens": {
+        "in": 0,
+        "out": 0,
+        "reasoning": 0,
+        "answer": 0,
+        "explanation": 0,
+        "total": 191432
+      },
+      "test_executed_success": null,
+      "confidence": 1.0
+    }
+  ],
+  "attempt_count": 2,
+  "total_cost_usd": 0.230929,
+  "ok": false,
+  "phases": [
+    {
+      "phase": "a5_aio_emission",
+      "kind": "agent",
+      "status": "ok",
+      "spec_id": "authoring_product_aio@0.1",
+      "model": "deepseek/deepseek-v4-flash",
+      "duration_s": 1116.04,
+      "timed_out": false,
+      "commit_hash": "fb027f2d9",
+      "error": "",
+      "tokens": {
+        "in": 0,
+        "out": 0,
+        "reasoning": 0,
+        "answer": 0,
+        "explanation": 0,
+        "total": 238181
+      },
+      "cost_usd": 0.10916379600000006,
+      "cost_source": "metered",
+      "estimation_method": null,
+      "reported_cost_usd": 0.10916379600000006,
+      "cache_read_tokens": 21915520,
+      "cache_write_tokens": 0,
+      "cache_hit_rate": 0.9892,
+      "session_id": "ses_f987775ebffebinLYyG7cEeN6z",
+      "files_created": [
+        "src/agentic_dynamics/control/aio_emission.py",
+        "tests/test_aio_emission.py"
+      ],
+      "files_modified": [
+        ".instrument/session.jsonl",
+        ".ruff_cache/0.16.2/10716635647864033886",
+        ".ruff_cache/0.16.2/9869670769325881905",
+        ".ruff_cache/0.16.2/9923255700259519132",
+        "scripts/promote.py",
+        "scripts/publish_release.py",
+        "src/agentic_dynamics/control/__init__.py",
+        "tests/test_publish_release.py"
+      ],
+      "confidence": 1.0,
+      "raw_prompt_hash": "",
+      "pre_phase_commit": "",
+      "retrieval_attempt_id": "",
+      "constructor_attempt_id": "",
+      "selected_evidence_ids": [],
+      "augmentation_versions": {},
+      "augmentation_tokens": {},
+      "augmentation_cost_usd": 0.0,
+      "augmentation_latency_ms": 0.0,
+      "fallback_mode": "",
+      "test_executed_success": null,
+      "tests_passed": 0,
+      "tests_total": 0,
+      "change_analysis": null,
+      "stall_evidence": null,
+      "deploy_gate": null,
+      "commit_gate": null,
+      "relabel_gate": null
+    },
+    {
+      "phase": "a6_adversarial",
+      "kind": "agent",
+      "status": "failed",
+      "spec_id": "authoring_product_aio@0.1",
+      "model": "deepseek/deepseek-v4-flash",
+      "duration_s": 793.27,
+      "timed_out": false,
+      "commit_hash": "",
+      "error": "DEPLOY_GATE \u2014 firebase production deploy in phase not marked deploy_allowed: 'cd /tmp/wt_wave3 && grep -n \"DEPLOY_PATTERNS\\|_deploy_pattern_match\\|DEPLOY_GATE\\|deploy_allowed\\|deploy\" src/agentic_dynamics/runtime/workflow_runner.py | head -40'; 'cd /tmp/wt_wave3 && python3 -c \"\nimport sys; sys.path.insert(0, 'src')\nfrom agentic_dynamics.runtime.workflow_runner import _deploy_pattern_match\ncases = [\n    'firebase deploy --only hosting',\n    'git commit -m \\\"firebase deploy *: ask\\\"',\n    'npx firebase-tools deploy',\n    'sh -c \\\"firebase deploy --only hosting\\\"',\n    'bash -c \\\"firebase deploy\\\"',\n    'cd apps/website && firebase deploy',\n    'build; firebase deploy',\n    'eval \\\"firebase deploy\\\"',\n    'VAR=x firebase deploy',\n    'sudo firebase deploy',\n]\nfor c in cases:\n    print(repr(c), '->', _deploy_pattern_match(c))\n\"'",
+      "tokens": {
+        "in": 0,
+        "out": 0,
+        "reasoning": 0,
+        "answer": 0,
+        "explanation": 0,
+        "total": 191432
+      },
+      "cost_usd": 0.12176525799999999,
+      "cost_source": "metered",
+      "estimation_method": null,
+      "reported_cost_usd": 0.12176525799999999,
+      "cache_read_tokens": 5276416,
+      "cache_write_tokens": 0,
+      "cache_hit_rate": 0.965,
+      "session_id": "ses_f98666b25ffeGBZt5jGCWiN5Ej",
+      "files_created": [
+        "docs/reviews/authoring_product_aio_adversarial.md"
+      ],
+      "files_modified": [
+        ".instrument/session.jsonl"
+      ],
+      "confidence": 1.0,
+      "raw_prompt_hash": "",
+      "pre_phase_commit": "",
+      "retrieval_attempt_id": "",
+      "constructor_attempt_id": "",
+      "selected_evidence_ids": [],
+      "augmentation_versions": {},
+      "augmentation_tokens": {},
+      "augmentation_cost_usd": 0.0,
+      "augmentation_latency_ms": 0.0,
+      "fallback_mode": "",
+      "test_executed_success": null,
+      "tests_passed": 0,
+      "tests_total": 0,
+      "change_analysis": null,
+      "stall_evidence": null,
+      "deploy_gate": {
+        "reason": "DEPLOY_GATE",
+        "violations": [
+          {
+            "command": "cd /tmp/wt_wave3 && grep -n \"DEPLOY_PATTERNS\\|_deploy_pattern_match\\|DEPLOY_GATE\\|deploy_allowed\\|deploy\" src/agentic_dynamics/runtime/workflow_runner.py | head -40",
+            "pattern": "firebase deploy output (Deploy complete!)",
+            "line": "{\"type\":\"tool_use\",\"timestamp\":1788444912226,\"sessionID\":\"ses_f98666b25ffeGBZt5jGCWiN5Ej\",\"part\":{\"type\":\"tool\",\"tool\":\"bash\",\"callID\":\"call_00_pPYCyUcVLCiAeDMKR7m80983\",\"state\":{\"status\":\"completed\",\"input\":{\"command\":\"cd /tmp/wt_wave3 && grep -n \\\"DEPLOY_PATTERNS\\\\|_deploy_pattern_match\\\\|DEPLOY_GATE\\\\|deploy_allowed\\\\|deploy\\\" src/agentic_dynamics/runtime/workflow_runner.py | head -40\"},\"output\":\"30:session transcript for firebase production-deploy commands. A phase not marked\\n31:``deploy_allowed: true`` (an optional per-phase marker, default false) that deployed fails with\\n32:reason ``DEPLOY_GATE`` + the offending command + its transcript line as evidence, recorded on\\n33:``PhaseResult.deploy_gate`` and the ledger \u2014 a deploy violation can never be committed.\\n274:    #: cap_runner_hardening p2: when the deploy gate fired \u2014 the phase is not marked\\n275:    #: ``deploy_allowed`` yet its session transcript shows a firebase production-deploy\\n278:    deploy_gate: dict[str, Any] | None = None\\n330:            \\\"deploy_gate\\\": self.deploy_gate,\\n1364:# The measured disease: terra ran ``firebase deploy`` from a non-deploy phase and silently\\n1366:# line whose bash input was ``firebase deploy --only hosting && firebase deploy --only hosting\\n1368:# phase, the runner scans the phase's session transcript for production-deploy commands; a hit\\n1369:# in a phase NOT marked ``deploy_allowed: true`` fails the phase with reason ``DEPLOY_GATE`` +\\n1374:#     - the COMMAND tier: the tool input contains a firebase production-deploy invocation \u2014\\n1375:#       ``firebase deploy`` (any flags), ``firebase --project <production-host>``, ``firebase\\n1376:#       hosting deploy``, including chained (``&&``/``;``), with any working directory, and the\\n1377:#       ``npx firebase-tools deploy`` form (the ``firebase``-token boundary still matches before\\n1379:#     - the OUTPUT tier: the tool's captured output carries firebase's production-deploy banner\\n1381:#       https://\u2026web.app``)."
+          },
+          {
+            "command": "cd /tmp/wt_wave3 && python3 -c \"\nimport sys; sys.path.insert(0, 'src')\nfrom agentic_dynamics.runtime.workflow_runner import _deploy_pattern_match\ncases = [\n    'firebase deploy --only hosting',\n    'git commit -m \\\"firebase deploy *: ask\\\"',\n    'npx firebase-tools deploy',\n    'sh -c \\\"firebase deploy --only hosting\\\"',\n    'bash -c \\\"firebase deploy\\\"',\n    'cd apps/website && firebase deploy',\n    'build; firebase deploy',\n    'eval \\\"firebase deploy\\\"',\n    'VAR=x firebase deploy',\n    'sudo firebase deploy',\n]\nfor c in cases:\n    print(repr(c), '->', _deploy_pattern_match(c))\n\"",
+            "pattern": "firebase deploy",
+            "line": "{\"type\":\"tool_use\",\"timestamp\":1788444987324,\"sessionID\":\"ses_f98666b25ffeGBZt5jGCWiN5Ej\",\"part\":{\"type\":\"tool\",\"tool\":\"bash\",\"callID\":\"call_00_83Q14tQMrDd5td8KBgr93224\",\"state\":{\"status\":\"completed\",\"input\":{\"command\":\"cd /tmp/wt_wave3 && python3 -c \\\"\\nimport sys; sys.path.insert(0, 'src')\\nfrom agentic_dynamics.runtime.workflow_runner import _deploy_pattern_match\\ncases = [\\n    'firebase deploy --only hosting',\\n    'git commit -m \\\\\\\"firebase deploy *: ask\\\\\\\"',\\n    'npx firebase-tools deploy',\\n    'sh -c \\\\\\\"firebase deploy --only hosting\\\\\\\"',\\n    'bash -c \\\\\\\"firebase deploy\\\\\\\"',\\n    'cd apps/website && firebase deploy',\\n    'build; firebase deploy',\\n    'eval \\\\\\\"firebase deploy\\\\\\\"',\\n    'VAR=x firebase deploy',\\n    'sudo firebase deploy',\\n]\\nfor c in cases:\\n    print(repr(c), '->', _deploy_pattern_match(c))\\n\\\"\"},\"output\":\"'firebase deploy --only hosting' -> firebase deploy\\n'git commit -m \\\"firebase deploy *: ask\\\"' -> None\\n'npx firebase-tools deploy' -> firebase deploy\\n'sh -c \\\"firebase deploy --only hosting\\\"' -> None\\n'bash -c \\\"firebase deploy\\\"' -> None\\n'cd apps/website && firebase deploy' -> firebase deploy\\n'build; firebase deploy' -> firebase deploy\\n'eval \\\"firebase deploy\\\"' -> None\\n'VAR=x firebase deploy' -> firebase deploy\\n'sudo firebase deploy' -> firebase deploy\\n\",\"metadata\":{\"output\":\"'firebase deploy --only hosting' -> firebase deploy\\n'git commit -m \\\"firebase deploy *: ask\\\"' -> None\\n'npx firebase-tools deploy' -> firebase deploy\\n'sh -c \\\"firebase deploy --only hosting\\\"' -> None\\n'bash -c \\\"firebase deploy\\\"' -> None\\n'cd apps/website && firebase deploy' -> firebase deploy\\n'build; firebase deploy' -> firebase deploy\\n'eval \\\"firebase deploy\\\"' -> None\\n'VAR=x firebase deploy' -> firebase deploy\\n'sudo firebase deploy' -> firebase deploy\\n\",\"exit\":0,\"truncated\":false},\"title\":\"cd /tmp/wt_wave3 && python3 -c \\\"\\nimport sys; sys.path.insert(0, 'src')\\nfrom agentic_dynamics.runtime.workflow_runner import _deploy_pattern"
+          }
+        ]
+      },
+      "commit_gate": null,
+      "relabel_gate": null
+    }
+  ],
+  "run_id": "run-29e658e4a011",
+  "parent_run_id": "run-8cc5f04ac947",
+  "family_id": "run-f0844b583ef3"
+}

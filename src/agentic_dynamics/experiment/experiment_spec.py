@@ -835,6 +835,44 @@ def load_spec(path: Path) -> ExperimentSpec:
     return ExperimentSpec.from_yaml(Path(path))
 
 
+#: The top-level keys that mark a committed YAML as a workflow-v1 definition (the Wave-3
+#: authoring contract, validated against ``workflows/schema/workflow-v1.schema.json``) rather
+#: than an ExperimentSpec. Mirrors the shape check in ``workflows/lint_workflow.py``.
+_WORKFLOW_V1_KEYS = ("apiVersion", "kind", "metadata", "spec")
+
+
+def committed_spec_paths(root_path: Path | str = Path(".")) -> list[Path]:
+    """Every committed ExperimentSpec YAML across the split spec layout, deterministically sorted.
+
+    Experiment definitions live at the top level of ``experiments/definitions/``; work-order
+    ExperimentSpecs live under ``workflows/`` (recursively). The measurement configs
+    (``experiments/definitions/configs/``) and grid/sweep configs (``experiments/campaigns/``)
+    are configs, not ExperimentSpecs, and are deliberately excluded.
+
+    workflow-v1 definitions — the Wave-3 authoring contract documents carrying
+    ``apiVersion``/``kind``/``metadata``/``spec``, whose canonical examples live under
+    ``workflows/examples/`` — are a DIFFERENT document kind: they are not ExperimentSpecs,
+    are never loadable as one (``load_spec`` raises on them), and must never enter the
+    ExperimentSpec corpus or its lifecycle index. Such documents are therefore excluded.
+    """
+    root = Path(root_path)
+    paths = sorted((root / "experiments" / "definitions").glob("*.yaml"))
+    for path in sorted((root / "workflows").rglob("*.yaml")):
+        if _is_workflow_v1_document(path):
+            continue
+        paths.append(path)
+    return paths
+
+
+def _is_workflow_v1_document(path: Path) -> bool:
+    """True when a committed YAML file is a workflow-v1 definition, not an ExperimentSpec."""
+    try:
+        document = yaml.safe_load(path.read_text(encoding="utf-8"))
+    except Exception:  # noqa: BLE001 — unreadable/unsafe YAML is not a workflow-v1 document
+        return False
+    return isinstance(document, dict) and all(key in document for key in _WORKFLOW_V1_KEYS)
+
+
 def phase_scope(phase: dict[str, Any], *, phase_name: str | None = None) -> str | None:
     """Resolve a phase's authorized scope: its declared ``scope:``, else the authorization table.
 

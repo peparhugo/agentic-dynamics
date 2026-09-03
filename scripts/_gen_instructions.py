@@ -110,8 +110,11 @@ ROOT_BANNER = (
 #: The seven skills (name/description frontmatter — the schema is SHARED by both platforms).
 SKILLS = ("analyze", "control-room", "instrument", "lab-books", "queue", "review", "run-workflow")
 
-#: The subagent definitions (schema DIVERGES between platforms — see the renderers).
-AGENTS = ("data-analysis", "instrument-dev", "pipeline-ops")
+#: The agent definitions (schema DIVERGES between platforms — see the renderers).
+#: ``aio-control`` — the AIO Control Agent (Wave-3 a4) — is the controller's delegated
+#: hands and, unlike the three domain subagents, is a PRIMARY opencode agent (the human
+#: operator's proxy session, per ``agent_config/rules.md``'s vocabulary section).
+AGENTS = ("aio-control", "data-analysis", "instrument-dev", "pipeline-ops")
 
 #: The command definitions (schema + positional-arg indexing diverge — see the renderers).
 COMMANDS = ("analyze", "lab", "new-exp", "pipeline", "run-exp")

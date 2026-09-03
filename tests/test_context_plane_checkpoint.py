@@ -879,11 +879,10 @@ def test_no_committed_spec_opts_a_control_route_into_session_routing():
     """
     from pathlib import Path
 
-    from agentic_dynamics.experiment.experiment_spec import load_spec
+    from agentic_dynamics.experiment.experiment_spec import committed_spec_paths, load_spec
 
     repo_root = Path(__file__).resolve().parent.parent
-    paths = sorted((repo_root / "experiments" / "definitions").glob("*.yaml"))
-    paths += sorted((repo_root / "workflows").rglob("*.yaml"))
+    paths = committed_spec_paths(repo_root)
     offenders = [
         p for p in paths if bool(load_spec(p).workflow.params.get("control_route", False))
     ]

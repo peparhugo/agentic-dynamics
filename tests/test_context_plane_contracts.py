@@ -448,9 +448,13 @@ def test_committed_spec_corpus_gains_zero_new_refusals_from_the_i5_gate():
     """Design §9 I5's own acceptance criterion, restated: the I5 gate must not regress a single
     one of the ~88 committed specs, none of which declare requires_facts/decision_type yet."""
     from agentic_dynamics.control.context_compiler import validate_spec_fact_contracts
+    from agentic_dynamics.experiment.experiment_spec import committed_spec_paths
 
-    paths = sorted((REPO_ROOT / "experiments" / "definitions").glob("*.yaml"))
-    paths += sorted((REPO_ROOT / "workflows").rglob("*.yaml"))
+    # A4 fix (authoring_product_aio, 2026-09-03): use the exclusion-aware discovery —
+    # committed_spec_paths covers both definitions + workflows AND skips the workflow-v1
+    # namespace (workflows/examples/*.yaml, workflows/schema/), which the raw rglob
+    # below would feed to load_spec and fail on (workflow-v1 docs are NOT ExperimentSpecs).
+    paths = sorted(committed_spec_paths(REPO_ROOT))
     assert len(paths) >= 63
     for path in paths:
         spec = load_spec(path)

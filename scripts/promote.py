@@ -16,8 +16,14 @@ The authority rules (the deep review's P0-4):
 
 Usage:
     python scripts/promote.py --spec <name> --workdir <worktree> [--ledger <path>]
-                              [--approval <path>] [--dry-run]
+                              [--approval <path>] [--operator <name>] [--dry-run]
     agentic-dynamics workflow promote --spec <name> --workdir <worktree>
+
+AIO emission (Wave-3 a5): promoting is the AIO's strongest permanence verb, so the decision
+and the act are emitted into the knowledge base at this call site — an observation of the
+promote decision (with the run identity + candidate sha + operator name) before the push, and
+an actuation record whose ``causes`` cites that observation after the push lands. Emission is
+BEST-EFFORT: a downed knowledge stream is a warning, never a blocked promotion.
 
 Exit codes (the same vocabulary as run_workflow.py):
     0   promoted (or dry-run: would promote)
@@ -33,6 +39,11 @@ import json
 import subprocess
 import sys
 from pathlib import Path
+
+try:
+    import _bootstrap  # noqa: F401  # direct run: scripts/ is sys.path[0] (adds src/)
+except ImportError:  # imported as scripts.promote — repo root is on sys.path
+    from scripts import _bootstrap  # noqa: F401
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -51,6 +62,9 @@ def main() -> None:
     ap.add_argument("--approval", default=None,
                     help="operator-signed approval artifact for an awaiting run (approvals/<spec>/<phase>_approval.md)")
     ap.add_argument("--base", default="main", help="promotion base branch (default: main)")
+    ap.add_argument("--operator", default="",
+                    help="who is promoting (the AIO carries the operator's name; recorded on the "
+                         "aio emission, never inferred)")
     ap.add_argument("--dry-run", action="store_true",
                     help="verify everything, print the plan, write nothing, push nothing")
     args = ap.parse_args()
@@ -73,7 +87,98 @@ class _PromoteAwaitingError(Exception):
     """The run stopped awaiting approval and no valid approval binds the candidate."""
 
 
-def _run_promotion(args: argparse.Namespace) -> None:
+# ── a5 AIO emission (Wave-3 a5_aio_emission) ─────────────────────────────────
+# Promoting is the AIO's strongest permanence verb, so the decision and the act emit into the
+# knowledge base AT THIS CALL SITE — an observation (observation_ingestion) before the push and
+# an actuation (actuation_ingestion's derive_actuation_record, the first permanence caller)
+# whose causes cite that observation after the push lands. Emission is BEST-EFFORT by contract:
+# every wrapper swallows its failures and prints a warning — a downed knowledge stream can
+# never block a verified promotion.
+
+
+def _promote_decision(
+    args: argparse.Namespace,
+    ledger: dict,
+    candidate: str,
+    *,
+    status: str,
+    requested_action: dict | None = None,
+) -> dict:
+    """The promote decision/act dict the emission seam consumes (verb/run/candidate/operator).
+
+    ``run_id`` is the ledger's run identity — the ``spec_id`` when the ledger carries one
+    (``<name>@<version>``), else the spec name: the identifier the ledger that produced this
+    candidate was filed under. The candidate sha is the verified worktree HEAD.
+    """
+    run_id = str(ledger.get("spec_id") or "") or str(ledger.get("spec_name") or "") or args.spec
+    decision = {
+        "verb": "promote",
+        "run_id": run_id,
+        "candidate_sha": candidate,
+        "operator": args.operator,
+        "status": status,
+        "why": f"workflow {args.spec} → {args.base}",
+    }
+    if requested_action:
+        decision["requested_action"] = requested_action
+    return decision
+
+
+def _emit_best_effort(label: str, fn) -> dict | None:
+    """Run an emission step, swallowing ANY failure (best-effort is structural, not incidental).
+
+    Even an injected emitter that raises must never block a verified promotion — the a5
+    contract is that a failed emit is a warning, never a blocked act.
+    """
+    try:
+        return fn()
+    except Exception as exc:  # noqa: BLE001 - best-effort by contract
+        print(f"promote: WARNING — {label} emission failed ({exc}); "
+              "proceeding (best-effort, never a blocked promotion)", file=sys.stderr)
+        return None
+
+
+def _aio_emit_decision(decision: dict) -> dict:
+    """Default emit_decision: build + publish the promote-decision observation (best-effort).
+
+    Returns ``{"observation_id": ..., "entry_ids": [...]}`` — the observation id survives a
+    downed stream (it is derived offline) so the act emission can still cite it. Never raises
+    (the publish path swallows its failures; the call site's ``_emit_best_effort`` is the
+    backstop).
+    """
+    from agentic_dynamics.control import aio_emission
+
+    out = aio_emission.emit_decision(decision)
+    return {"observation_id": out["observation"].knowledge_id, "entry_ids": out["entry_ids"]}
+
+
+def _aio_emit_act(decision: dict, *, causes: str) -> dict:
+    """Default emit_act: build + publish the promote-act actuation (best-effort). Never raises."""
+    from agentic_dynamics.control import aio_emission
+
+    out = aio_emission.emit_act(decision, causes=causes)
+    return {"actuation_id": out["actuation"].knowledge_id, "entry_ids": out["entry_ids"]}
+
+
+def _run_promotion(
+    args: argparse.Namespace,
+    *,
+    push=None,
+    emit_decision=None,
+    emit_act=None,
+) -> None:
+    """Verify and promote a candidate. The three side-effecting/emitting steps are injectable.
+
+    ``push`` (the squash-merge + ``git push``) and the two a5 emission steps
+    (``emit_decision`` — the promote-decision observation before the push, ``emit_act`` — the
+    actuation after a successful push) default to the real implementations; the tests inject
+    fakes so the whole transaction is testable without a remote or a live knowledge stream —
+    the same injectable pattern ``publish_release.main`` uses for its deployer/builder.
+    """
+    push = push or _push_squashed
+    emit_decision = emit_decision or _aio_emit_decision
+    emit_act = emit_act or _aio_emit_act
+
     workdir = Path(args.workdir).resolve()
     if not workdir.is_dir():
         raise _PromoteRefusedError(f"workdir not found: {workdir}")
@@ -144,8 +249,30 @@ def _run_promotion(args: argparse.Namespace) -> None:
     if not diff:
         raise _PromoteRefusedError("candidate has no changes vs the base — nothing to promote")
 
-    pushed = _push_squashed(workdir, base, subject, candidate)
+    # 5 ── the AIO's decision emits BEFORE the act (best-effort, never blocking): an
+    # observation of the promote decision with the run identity + candidate sha + operator.
+    # The status reflects what actually authorized this promotion: a run that stopped
+    # awaiting operator approval and is now bound by a valid approval promotes as "approved";
+    # a straight verified run promotes as "requested" (routed on the packet's promotable_runs).
+    decision = _promote_decision(args, ledger, candidate, status="approved" if awaiting else "requested")
+    emitted = _emit_best_effort("promote decision", lambda: emit_decision(decision))
+    observation_id = (emitted or {}).get("observation_id")
+
+    pushed = push(workdir, base, subject, candidate)
     print(f"promote: pushed {base} → {pushed[:12]} (squash of {candidate[:12]})")
+
+    # 6 ── the act emits AFTER it lands: an actuation record whose ``causes`` links back to
+    # the decision observation above (the lineage gate), carrying the pushed sha as the outcome.
+    _emit_best_effort(
+        "promote act",
+        lambda: emit_act(
+            _promote_decision(
+                args, ledger, candidate, status="approved" if awaiting else "requested",
+                requested_action={"outcome": "pushed", "pushed_sha": pushed, "base": base},
+            ),
+            causes=observation_id or "",
+        ),
+    )
 
 
 # ── verification helpers ──────────────────────────────────────────────────────

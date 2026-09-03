@@ -35,6 +35,7 @@ Control consumes facts, not arbitrary retrieved text (rec 8): it must not import
 from . import (
     actuation_ingestion,
     admission,
+    aio_emission,
     control_db,
     control_status,
     evidence_analyzer,
@@ -57,4 +58,4 @@ from . import (
     verify_proposal,
 )
 
-__all__ = ['actuation_ingestion', 'admission', 'control_db', 'control_status', 'evidence_analyzer', 'lease_registry', 'live', 'observation_ingestion', 'orphan_ingestion', 'orphan_sweep', 'outbox', 'phase_evidence', 'pipeline_status', 'projection_watermarks', 'queue_reinterleave', 'routing', 'run_lifecycle', 'settlement', 'signal_store', 'step_routing', 'supervisor', 'verify_proposal']
+__all__ = ['actuation_ingestion', 'admission', 'aio_emission', 'control_db', 'control_status', 'evidence_analyzer', 'lease_registry', 'live', 'observation_ingestion', 'orphan_ingestion', 'orphan_sweep', 'outbox', 'phase_evidence', 'pipeline_status', 'projection_watermarks', 'queue_reinterleave', 'routing', 'run_lifecycle', 'settlement', 'signal_store', 'step_routing', 'supervisor', 'verify_proposal']

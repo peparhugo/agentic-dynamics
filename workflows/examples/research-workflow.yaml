@@ -1,0 +1,53 @@
+# workflows/examples/research-workflow.yaml
+#
+# Canonical shape 3 of 4 (a2): a MEASUREMENT/RESEARCH run, not a change.
+#
+# The research shape produces no candidate to promote: it reads the base at a pinned
+# revision, harvests inputs, measures, and records a finding. The workspace is readonly and
+# every step is research_readonly, so nothing mutates and nothing needs a verification
+# gate — the workflow is verified by REPEATABILITY (same revision in, same measurements
+# out; serial policy; re-runnable). A read-only measurement run deliberately has no
+# promotion block: there is no candidate sha to advance toward baseRef.
+apiVersion: agentic-dynamics.io/v1
+kind: Workflow
+metadata:
+  name: research-workflow
+  revision: "1"
+  lifecycle: development
+  title: Measurement / research workflow
+  description: >-
+    A read-only measurement run: harvest the canonical inputs at the pinned revision,
+    run the registered measurement rules, and record the finding. Repeatable by
+    construction and deliberately absent from the promotion surface.
+spec:
+  baseRef: main
+  workspace:
+    mode: readonly
+  concurrency:
+    group: research-workflow
+    policy: serial
+  steps:
+    - id: harvest
+      kind: task
+      executor: command
+      scope: research_readonly
+      description: >-
+        Resolve the canonical corpus inputs at this revision (read-only, deterministic —
+        the same revision always yields the same input set, which is what makes the run
+        repeatable).
+    - id: measure
+      kind: agent
+      executor: agent
+      scope: research_readonly
+      needs: [harvest]
+      prompt: >-
+        Run the registered measurement rules over the harvested inputs and record the
+        measurements. This step reads and measures; it never edits the base.
+    - id: report
+      kind: agent
+      executor: agent
+      scope: research_readonly
+      needs: [measure]
+      prompt: >-
+        Compare the measurements across the arms and record the finding as an
+        observation. Read-only: the finding is emitted, never committed into the base.

@@ -59,6 +59,12 @@ ALLOWLIST: dict[str, frozenset[str]] = {
     # --- reviews (external/internal critiques of the pre-refactor tree) ---
     "docs/reviews/architecture_review.md": frozenset({"src/instrument/", "admin/server.py"}),
     "docs/reviews/bugs.md": frozenset({"src/instrument/", "experiments/configs/"}),
+    # authoring_product_aio wave reviews (2026-09-03): the preregistration + adversarial
+    # docs describe the legacy src/instrument/workflow_runner.py path as the SUBJECT of
+    # their findings (historical review prose about what no longer exists) — allowlisted
+    # per the guard's documented per-path mechanism, not a blanket exception.
+    "docs/reviews/authoring_product_aio_preregistration.md": frozenset({"src/instrument/"}),
+    "docs/reviews/authoring_product_aio_adversarial.md": frozenset({"src/instrument/"}),
     "docs/reviews/code_review.md": frozenset({"src/instrument/", "admin/server.py"}),
     "docs/reviews/context_abstraction_review.md": frozenset({"src/instrument/"}),
     "docs/reviews/control_room.md": frozenset({"src/instrument/", "admin/server.py"}),
