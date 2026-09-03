@@ -83,7 +83,43 @@ game history?* That requires the scoreboard to exist first.
 7. **Failure taxonomy with signatures** — the recurring classes (false-green gates,
    self-modifying runs, unwired seams, surface-sync drift) indexed so the AIO pre-detects
    rather than re-diagnoses.
-8. **The associative layer activated** — the graph leg populated (currently `graph_paths: 0`).
+ 8. **The associative layer activated** — the graph leg populated (currently `graph_paths: 0`).
+
+## Actor layering (the context abstraction dimension)
+
+The records are NOT one undifferentiated pool — they follow the repo's context abstraction
+(`context_compiler.py` + the context-abstraction waves): each record carries an actor
+dimension (who produced it, whose scope it lives in, who may see it), resolved by the scope
+hierarchy (`org:<id>/workload:<name>/job:<cell>`) and `scope_visible` ancestor-visibility.
+Three actor layers, three visibility rules:
+
+| Record type | Producer | Scope it lives in | Visible to | Hidden from |
+|---|---|---|---|---|
+| Session records | AIO | AIO scope (org:repo) | Controller, AIO (next session) | Agents, supervisor |
+| Decision records | AIO + verified commands | AIO scope | Controller, AIO | Agents |
+| Wave verdicts | The run | workload:<spec>/job:<cell> (its own) | Controller (root), AIO, supervisor (read) | Other workloads' agents |
+| Belief records | AIO (the Bayesian engine) | AIO scope | Controller, AIO | Agents |
+| Scoreboard | AIO | org:repo (aggregate) | Controller, AIO, supervisor (read) | Cell agents |
+| Reflections | AIO | AIO scope (private to the controller–AIO pair) | Controller, AIO | Agents, supervisor |
+| Failure taxonomy | AIO (derived from wave outcomes) | org:repo | Controller, AIO, agents (as warnings) | — |
+| Supervisor flags/assessments | Supervisor (observe-only rail) | supervisor scope | Controller, AIO (read) | Agents (never steers) |
+
+Rules that follow from the abstraction:
+
+- **The supervisor rail stays separate.** Supervisor observations never merge into the AIO's
+  pool and never steer — they are flags the AIO/controller read (the observe-only boundary,
+  `docs/supervisor_design.md`).
+- **A cell agent never sees the AIO's reflections or decisions** — a workload-scoped agent's
+  retrieval resolves only its own scope + ancestors, never the AIO's private records.
+- **The controller sees everything** (org root); the AIO sees its own scope + the workload
+  scopes it operates; agents see only their cell/workload context.
+- **Records carry their actor** (`producer: aio|supervisor|agent|controller|verified_command`)
+  as a first-class field so scope resolution and retrieval filtering are deterministic — the
+  AIO's retrieval asks "what did I decide, what did the controller prefer" and never receives
+  a cell agent's raw transcript.
+- **The controller model is a special belief class** — derived from the controller's decisions
+  (the s2 records), scoped to the org root, readable by the AIO only. It is the prior the AIO
+  applies before the controller corrects it.
 
 ## Producers (always-on, not opt-in)
 

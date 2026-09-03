@@ -110,7 +110,19 @@ workflow:
         (5) THE SCOREBOARD IS MEASURED, NEVER REMEMBERED: every completed wave
         appends its row (cost, phases, verdict, adversarial findings, merge
         state) from the ledger — no hand-written totals.
-        (6) BOUNDED VERIFICATION (unchanged). REGENERATE, NEVER HAND-EDIT
+        (6) RECORDS CARRY THEIR ACTOR + SCOPE (the context-abstraction
+        dimension, design §actor-layering): every record this wave produces
+        carries a first-class `producer` field (aio | supervisor | agent |
+        controller | verified_command) and lives in the scope its actor owns —
+        the AIO's records (sessions, decisions, beliefs, reflections) in the
+        AIO scope (org:repo), wave verdicts in their own
+        workload:<spec>/job:<cell> scope, the scoreboard at org:repo. The
+        supervisor rail stays separate (observe-only, never merged into the
+        AIO pool). A cell agent's retrieval never resolves the AIO's private
+        records (reflections, decisions) — scope_visible ancestor-visibility
+        is the mechanism, never a hand-written allowlist. The controller model
+        is an org-root belief class readable by the AIO only.
+        (7) BOUNDED VERIFICATION (unchanged). REGENERATE, NEVER HAND-EDIT
         (unchanged).
     phases:
       - name: s0_pin_spec
@@ -154,6 +166,7 @@ workflow:
           durable artifact + pointer event (the existing meta_session producer
           grows real content). The close record's knowledge_id keys on the
           session date + a session slug.
+          ACTOR + SCOPE (the context-abstraction dimension, hard rule 6): the session records live in the AIO scope (org:repo, producer: aio) — visible to the controller + the AIO's next session, never resolved by cell agents. The supervisor rail stays separate.
           SCOPE FENCE: the session open/close commands + the meta_session
           content ONLY. Commits carry '[workflow] s1_session_spine'.
           VERIFY (both directions): unit tests prove (a) session open with no
@@ -182,6 +195,7 @@ workflow:
           candidate_sha when bound}. Emitted through the observation producer
           (a decision IS an observation with intent) — durable artifact +
           pointer event, default-on.
+          ACTOR + SCOPE (the context-abstraction dimension, hard rule 6): the decision records live in the AIO scope (org:repo, producer: aio|verified_command) — visible to the controller + AIO, never resolved by cell agents. The supervisor rail stays separate.
           SCOPE FENCE: the decision command + the verified-command call sites
           ONLY. Commits carry '[workflow] s2_decision_records'.
           VERIFY (both directions): unit tests prove (a) the decision command
@@ -209,6 +223,7 @@ workflow:
           control-db row + the review artifact (never hand-written). The
           narrative text is the one-paragraph "what happened and why" the AIO
           currently reconstructs from ledgers + git + reviews. Default-on.
+          ACTOR + SCOPE (the context-abstraction dimension, hard rule 6): the wave-verdict records live in their OWN scope (workload:<spec>/job:<cell>, producer: run) — visible to the controller (org root) + the AIO + the supervisor (read-only), never to other workloads' agents. The supervisor rail stays separate.
           SCOPE FENCE: the wave-verdict emission at run completion ONLY.
           Commits carry '[workflow] s3_wave_verdicts'.
           VERIFY (both directions): unit tests prove (a) a synthetic completed
@@ -241,6 +256,7 @@ workflow:
           carries its evidence (the wave names that bear on it). The update
           trigger: the wave-outcome signal (the s3 wave-verdict emission)
           consults the belief index and updates the hypotheses it bears on.
+          ACTOR + SCOPE (the context-abstraction dimension, hard rule 6): the belief records live in the AIO scope (org:repo, producer: aio) — the controller model is an org-root belief class readable by the AIO only. The supervisor rail stays separate.
           SCOPE FENCE: the belief type + update protocol + the seeded set
           ONLY. Commits carry '[workflow] s4_belief_protocol'.
           VERIFY (both directions): unit tests prove (a) a confirm update
@@ -268,6 +284,7 @@ workflow:
           hand-written totals (hard rule 5). Emitted as a scoreboard-type
           record with a durable artifact; the AIO retrieves it when advising
           the next wave's shape (model choice, size, risk).
+          ACTOR + SCOPE (the context-abstraction dimension, hard rule 6): the scoreboard record lives at org:repo (producer: aio) — visible to the controller + AIO + supervisor (read), never to cell agents. The supervisor rail stays separate.
           SCOPE FENCE: the scoreboard command + its aggregation ONLY. Commits
           carry '[workflow] s5_scoreboard'.
           VERIFY (both directions): unit tests prove (a) given N synthetic
@@ -293,6 +310,7 @@ workflow:
           own meta-cognition made durable: multi-session contemplation is the
           accumulation, and the accumulated reflections feed the next session's
           open context (s1) and the belief seeds (s4).
+          ACTOR + SCOPE (the context-abstraction dimension, hard rule 6): the reflection records live in the AIO scope (org:repo, producer: aio) — private to the controller-AIO pair, never resolved by agents or the supervisor. The supervisor rail stays separate.
           SCOPE FENCE: the reflection type + the append/read paths ONLY.
           Commits carry '[workflow] s6_reflections'.
           VERIFY (both directions): unit tests prove (a) a close appends its
