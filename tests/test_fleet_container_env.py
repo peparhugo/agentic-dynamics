@@ -48,6 +48,15 @@ from scripts.fleet import launch_broker, spawn_wrapper  # noqa: E402
 REPO_DIR = "/repo"
 GIT_DIR = "/repo/.git"
 
+#: cs3_container_smoke — the shared RUNS root. A container orchestrator mints its per-run clone
+#: at this path (create_run_clone → runs_root/<run-id>/repo), so it must be the SHARED /tmp path
+#: the HOST broker validates and bind-mounts into the cell — never the container-local
+#: /var/lib/agentic-dynamics/runs default (a different namespace; the real-shape smoke proved a
+#: container orchestrator cannot spawn without the override in play). The compose env carries the
+#: operator's host override when exported, else this /tmp default.
+RUNS_ROOT = "/tmp/agentic-dynamics-runs"
+RUNS_ROOT_ENV = "FINOPS_RUNS_ROOT"
+
 _PHASE = {"name": "p1_slice1_base_supervisor", "scope": "implementation"}
 
 
@@ -111,6 +120,72 @@ def test_every_tier_derives_the_same_repo_view():
             f"{anchor} env: {env.get('FINOPS_REPO_DIR')!r}"
         )
         assert env.get("FINOPS_GIT_DIR") == GIT_DIR, f"{anchor} env: {env.get('FINOPS_GIT_DIR')!r}"
+
+
+# ── (cs3) the container tier carries the shared RUNS root (the real-shape smoke's fix) ─────────
+
+
+def _runs_root_default(raw: str) -> str:
+    """The concrete default behind a compose ``${FINOPS_RUNS_ROOT:-<default>}`` interpolation."""
+    return raw.split(":-", 1)[1].rstrip("}") if ":-" in raw else raw
+
+
+def test_x_ladder_env_carries_the_shared_runs_root():
+    """(cs3 VERIFY) ``x-ladder-env`` — merged into every tier — carries ``FINOPS_RUNS_ROOT`` whose
+    value is the SHARED /tmp runs root (an interpolation whose fallback is the ws4-era
+    ``/tmp/agentic-dynamics-runs`` override), never the container-local ``/var/lib/...`` default a
+    container orchestrator would otherwise derive."""
+    env = _compose()["x-ladder-env"]
+    raw = env.get(RUNS_ROOT_ENV)
+    assert raw is not None, "x-ladder-env must carry FINOPS_RUNS_ROOT"
+    assert ":-" in str(raw), "FINOPS_RUNS_ROOT must interpolate the host override with a fallback"
+    default = _runs_root_default(str(raw))
+    assert default == RUNS_ROOT, (
+        f"x-ladder-env FINOPS_RUNS_ROOT fallback must be the shared {RUNS_ROOT!r}, got {default!r}"
+    )
+    assert "/var/lib/agentic-dynamics" not in str(raw), (
+        "the container tier must not fall back to the container-local /var/lib runs root"
+    )
+
+
+def test_orchestrator_tier_env_carries_the_shared_runs_root():
+    """(cs3 VERIFY) the orchestrator tier carries the runs root EXPLICITLY — ``x-orchestrator-base``
+    AND both orchestrator services (``campaign-wrapper`` / ``workflow-runner``) declare
+    ``FINOPS_RUNS_ROOT`` with the same shared-/tmp fallback, so a container orchestrator's
+    create_run_clone lands where the host broker validates."""
+    compose = _compose()
+    for label, env in [("x-orchestrator-base", compose["x-orchestrator-base"]["environment"])] + [
+        (s, compose["services"][s]["environment"]) for s in ("campaign-wrapper", "workflow-runner")
+    ]:
+        raw = env.get(RUNS_ROOT_ENV)
+        assert raw is not None, f"{label} must carry FINOPS_RUNS_ROOT"
+        assert _runs_root_default(str(raw)) == RUNS_ROOT, (
+            f"{label} FINOPS_RUNS_ROOT fallback must be {RUNS_ROOT!r}"
+        )
+
+
+def test_every_tier_carries_the_same_runs_root():
+    """(hard rule 3) the runs root rides in ``x-ladder-env``, so the cell, supervisor and
+    orchestrator tier anchors all carry the same shared-/tmp ``FINOPS_RUNS_ROOT`` fallback."""
+    compose = _compose()
+    for anchor in ("x-cell-base", "x-supervisor-base", "x-orchestrator-base"):
+        raw = compose[anchor]["environment"].get(RUNS_ROOT_ENV)
+        assert raw is not None, f"{anchor} env must carry FINOPS_RUNS_ROOT"
+        assert _runs_root_default(str(raw)) == RUNS_ROOT, f"{anchor} runs-root fallback"
+
+
+def test_container_view_derivation_uses_the_shared_runs_root(tmp_path):
+    """(cs3 VERIFY) deriving the path config from the cs1+c3 container env yields the SHARED runs
+    root (``runs_root=/tmp/agentic-dynamics-runs``) — not the container-local
+    ``/var/lib/agentic-dynamics/runs`` default — so create_run_clone writes a host-broker-visible
+    clone path (``/tmp/agentic-dynamics-runs/<run-id>/repo``), exactly what the broker's
+    ``is_run_clone_dir`` accepts and bind-mounts."""
+    env = _container_env(tmp_path)
+    env[RUNS_ROOT_ENV] = RUNS_ROOT
+    cfg = PathConfig.from_env(env, require_existing=False)
+    assert str(cfg.runs_root) == RUNS_ROOT
+    clone = cfg.runs_root / "run-abc" / "repo"
+    assert cfg.is_run_clone_dir(clone) is True
 
 
 # ── (b) a container-view path derivation with those env vars → broker-expected view ─────────

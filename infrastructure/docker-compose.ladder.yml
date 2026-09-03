@@ -58,6 +58,19 @@ x-ladder-env: &ladder-env
   # substitutes and never exports).
   FINOPS_REPO_DIR: /repo
   FINOPS_GIT_DIR: /repo/.git
+  # cs3_container_smoke (fleet_launch_container_smoke, the real-shape smoke): the container tier
+  # also carries the RUNS root. cs1 gave the container the repo view (FINOPS_REPO_DIR/GIT_DIR) so
+  # a container orchestrator derives the repo the broker validates; the real-shape smoke proved
+  # that a container orchestrator ALSO derives its per-run clone root from this env, and without
+  # it the clone defaults to the container-local /var/lib/agentic-dynamics/runs — unwritable by
+  # the cell uid and, worse, a DIFFERENT namespace than the host runs root the broker binds. The
+  # container-visible runs root is the shared /tmp path (the /tmp:rw bind), so a container
+  # orchestrator's run clone lands at the SAME host path the broker validates and bind-mounts
+  # into the cell (hard rule 3 — no tier derives its clone root differently). Interpolated (not a
+  # literal) so an operator's host-side override flows through unchanged; the /tmp default is the
+  # smoke/ws4-era override that the fleet's runs root actually rides on this host (the host
+  # default /var/lib is not writable and not bind-mounted into the ladder).
+  FINOPS_RUNS_ROOT: ${FINOPS_RUNS_ROOT:-/tmp/agentic-dynamics-runs}
   # The container auth home == the host user's home, so the claude symlink chain
   # (~/.local/bin/claude -> ~/.local/share/claude/versions/<v>) resolves unchanged (D-18).
   HOME: ${AUTH_HOME}
@@ -199,6 +212,14 @@ x-orchestrator-base: &orchestrator-base
     # never the image's stale baked /app copy.
     FINOPS_REPO_DIR: /repo
     FINOPS_GIT_DIR: /repo/.git
+    # cs3_container_smoke (fleet_launch_container_smoke, real-shape smoke): the runs root rides
+    # in x-ladder-env above — declared again here so the orchestrator service env self-evidently
+    # carries it. A container orchestrator mints its per-run clone at this path (create_run_clone
+    # → runs_root/<run-id>/repo), so it MUST be the shared /tmp path the HOST broker validates
+    # and bind-mounts into the cell — the container-local /var/lib default is a different
+    # namespace and the real-shape smoke proved the container orchestrator cannot spawn without
+    # the override in play.
+    FINOPS_RUNS_ROOT: ${FINOPS_RUNS_ROOT:-/tmp/agentic-dynamics-runs}
   volumes: *orchestrator-mounts
 
 services:
