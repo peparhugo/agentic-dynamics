@@ -137,6 +137,15 @@ SOURCE_TYPES: dict[str, SourceTypeSpec] = {
     "observation": SourceTypeSpec("observation", Authority.ADVISORY, "[H]"),
     "flag": SourceTypeSpec("observation", Authority.ADVISORY, "[H]"),
     "meta_session": SourceTypeSpec("observation", Authority.ADVISORY, "[H]"),
+    # Self-knowledge layer (loop 2, s2a): the decision-record family. A decision IS an
+    # observation with intent — the AIO's own account of what was decided, why, and the
+    # alternatives weighed — registered as its own observation-family type so the registry
+    # census can distinguish decision rows from supervisor verdicts, the a5 aio-decision
+    # observations, and session closes. Minted BESIDE the a5 observation family (prereg D-1's
+    # second option) because the a5 verdict shape carries none of the s2 fields and is not
+    # retrievable by category; observation-family so a permanence actuation may cite a decision
+    # as its justifying `causes` (the s2b line).
+    "decision": SourceTypeSpec("observation", Authority.ADVISORY, "[H]"),
     # Spec-lifecycle addition: the experiment spec *document* and its derived lifecycle
     # (status / supersedes chain / last run). POLICY authority + "[P]" for the same reason
     # `policy` carries them — a spec is authored, pinned repository policy, read from the

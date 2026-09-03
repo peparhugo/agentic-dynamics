@@ -13,6 +13,7 @@ POLICY-authority facts (enforced by the Stage 1 data-flow tests).
 from . import (
     augment,
     code_ingestion,
+    decision_ingestion,
     embeddings,
     graph,
     knowledge,
@@ -30,4 +31,4 @@ from . import (
     story_ingestion,
 )
 
-__all__ = ['augment', 'code_ingestion', 'embeddings', 'graph', 'knowledge', 'knowledge_ingestion', 'knowledge_stream', 'ledger_ingestion', 'policy_ingestion', 'prompt_constructor', 'quality_ingestion', 'record_factory', 'retrieval', 'review_ingestion', 'session_ingestion', 'spec_ingestion', 'story_ingestion']
+__all__ = ['augment', 'code_ingestion', 'decision_ingestion', 'embeddings', 'graph', 'knowledge', 'knowledge_ingestion', 'knowledge_stream', 'ledger_ingestion', 'policy_ingestion', 'prompt_constructor', 'quality_ingestion', 'record_factory', 'retrieval', 'review_ingestion', 'session_ingestion', 'spec_ingestion', 'story_ingestion']

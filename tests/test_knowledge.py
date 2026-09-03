@@ -358,10 +358,10 @@ def test_actuation_types_is_a_single_member_allowlist():
 
 
 def test_source_types_is_the_single_vocabulary_owner():
-    # All seventeen source types — the four round-1 producer types, the round-2 registry
-    # types, the spec-lifecycle type, the CAP fact + context_snapshot types, and the
-    # orphan-sweep type — are registered here. This is what closes the pre-R2 split where
-    # OBSERVATION_TYPES silently omitted finding/code/report/policy.
+    # All source types — the round-1 producer types, the round-2 registry types, the
+    # spec-lifecycle type, the CAP fact + context_snapshot types, the orphan-sweep type, and the
+    # self-knowledge decision type — are registered here. This is what closes the pre-R2 split
+    # where OBSERVATION_TYPES silently omitted finding/code/report/policy.
     assert set(SOURCE_TYPES) == {
         "finding",
         "code",
@@ -374,6 +374,7 @@ def test_source_types_is_the_single_vocabulary_owner():
         "observation",
         "flag",
         "meta_session",
+        "decision",
         "actuation",
         "spec",
         "fact",

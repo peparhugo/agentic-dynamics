@@ -137,6 +137,11 @@ _COMMANDS: dict[tuple[str, ...], str] = {
     # a clear first-session bootstrap when no close exists.
     ("session", "close"): "session_close.py",
     ("session", "open"): "session_open.py",
+    # decision (the self-knowledge layer — loop 2). `decision record` (s2a) records a decision
+    # at the moment of decision — what was decided, why, the alternatives weighed — through the
+    # s2a decision record type (a decision IS an observation with intent). Rerun-safe and
+    # best-effort (an identical re-record is a no-op; a producer failure is a warning).
+    ("decision", "record"): "decision_record.py",
     # publication (the ONE publication transaction — control_db_publication p6). Deploying the
     # website is a P0 controller-only action: `publish release` refuses without --operator and
     # records both hosts + the publication/v1 receipt in the control database.
@@ -190,6 +195,7 @@ Subcommands (each forwards to its backing script):
   supervise   [claude-agents|orphans|leases]
   control     status|drain-outbox|sweep-zombies
   session     open|close
+  decision    record
   publish     release
   release     check-protection
   surfaces    sync|snapshot
