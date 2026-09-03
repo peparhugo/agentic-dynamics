@@ -1,15 +1,20 @@
 """Tests for the session-spine record type (session_ingestion) — s1a of the
-self_knowledge_layer wave.
+self_knowledge_layer wave, extended by the s1b session-close command cases.
 
-Covers the record-type cases ONLY (the s1a scope fence): the ``meta_session`` source-type
+Covers the record-type cases (the s1a scope fence): the ``meta_session`` source-type
 reuse, the AIO org-root actor/scope carriage, the seven content fields, the round trip through
 record_to_artifact / record_to_event / extract_record, rerun-safe identity (same input -> same
 knowledge_id), and the identity-namespace separation from the legacy ``ledger/v1`` meta_session
-lines. The close (s1b) and open (s1c) command cases extend this file in their own phases.
+lines. The close (s1b) command cases below extend this file in its own phase: ``session close``
+writes artifact + event into the KB, re-running close for the same session is a no-op, and a
+producer failure is a warning, never a crash. The open (s1c) command cases extend this file in
+their phase.
 """
 
 import hashlib
 import json
+import sys
+from pathlib import Path
 
 import pytest
 
@@ -25,6 +30,8 @@ from agentic_dynamics.knowledge.knowledge_ingestion import (
     record_to_artifact,
     record_to_event,
 )
+
+ROOT = Path(__file__).resolve().parent.parent
 
 
 def _session(**overrides) -> dict:
@@ -308,3 +315,268 @@ def test_revision_is_not_bound_to_a_commit_so_close_is_rerun_safe():
         record.entity_id, si.REVISION_FALLBACK, record.content_hash, si.EXTRACTOR_VERSION
     )
     assert record.knowledge_id == recomputed
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# s1b — the session CLOSE command cases (tests/test_session_spine.py is the gate)
+# ═════════════════════════════════════════════════════════════════════════════
+
+
+class _FakeRedis:
+    """In-memory stand-in for the knowledge-stream Redis (DB 2 on 6380).
+
+    Implements the surface ``knowledge_stream.publish_event`` + ``close_session`` touch:
+    ``hget``/``hset`` on the source-type index and the checkpoint hash, and ``xadd`` on the
+    change stream. A single flat hash is enough — the fields are the globally-unique
+    ``knowledge_id``s, so no key collision is possible across the two hashes.
+    """
+
+    def __init__(self):
+        self.hash: dict[str, str] = {}
+        self.stream: dict[str, dict] = {}
+        self._n = 0
+
+    def hset(self, key, field, value):  # noqa: A003 - redis-shaped surface
+        self.hash[field] = value
+
+    def hget(self, key, field):
+        return self.hash.get(field)
+
+    def xadd(self, stream, payload):
+        self._n += 1
+        entry_id = f"1-{self._n}"
+        self.stream[entry_id] = payload
+        return entry_id
+
+
+def _close(session: dict, tmp_path: Path, redis) -> si.SessionCloseResult:
+    """Run the close emission seam against a tmp artifact dir + a fake stream."""
+    return si.close_session(session, artifact_dir=tmp_path, connect_fn=lambda: redis)
+
+
+class TestSessionClose:
+    def test_close_writes_durable_artifact_and_pointer_event(self, tmp_path):
+        """DONE_WHEN (1): session close lands BOTH halves — the artifact and the event."""
+        session = _session()
+        redis = _FakeRedis()
+        result = _close(session, tmp_path, redis)
+
+        assert result.status == "closed"
+        assert result.warnings == []
+        record = result.record
+
+        # The durable per-record artifact is on disk at the canonical pointer path, and its
+        # bytes are exactly the producer's deterministic artifact (so a consumer's
+        # content_hash verification passes the moment the event lands).
+        assert result.artifact_path == tmp_path / f"{record.knowledge_id}.json"
+        assert result.artifact_path.is_file()
+        assert result.artifact_path.read_bytes() == record_to_artifact(record)
+
+        # The pointer event landed on the change stream, naming the same record, and the
+        # knowledge_id is checkpointed (the producers' shared idempotence ledger) so a re-close
+        # is a no-op rather than a double emit.
+        assert len(redis.stream) == 1
+        event = next(iter(redis.stream.values()))
+        assert event["knowledge_id"] == record.knowledge_id
+        assert event["entity_id"] == record.entity_id
+        assert event["operation"] == "upsert"
+        assert redis.hash.get(record.knowledge_id)
+
+        # The record that lands is the AIO's org-root session record — actor + scope ride in
+        # the body, scope rides structurally on the record.
+        payload = _payload(record)
+        assert payload["actor"] == "aio"
+        assert payload["scope"] == "org:agentic-dynamics"
+        assert record.acl_scope == payload["scope"]
+
+    def test_repeat_close_of_the_same_session_is_a_noop(self, tmp_path):
+        """DONE_WHEN (2): re-running close for the same session is a no-op (rerun-safe key)."""
+        session = _session()
+        redis = _FakeRedis()
+        first = _close(session, tmp_path, redis)
+        second = _close(session, tmp_path, redis)
+
+        assert first.status == "closed"
+        assert first.entry_id  # the first close published
+        assert second.status == "no-op"
+        assert second.entry_id == ""  # nothing published the second time
+        assert second.warnings == []
+        # No second event, no rewritten artifact, and the SAME knowledge_id throughout — a
+        # repeated close changes nothing (the s1a rerun-safe identity made this possible).
+        assert second.record.knowledge_id == first.record.knowledge_id
+        assert len(redis.stream) == 1
+        assert second.artifact_path.read_bytes() == first.artifact_path.read_bytes()
+
+    def test_close_of_a_changed_session_body_is_a_new_version_not_a_noop(self, tmp_path):
+        """A changed wave list is a changed body -> a new knowledge_id for the SAME entity.
+
+        The no-op is content-keyed, never slug-keyed: closing the same session slot with
+        different content publishes a new version (the supersede-capable spine's input), it is
+        never silently swallowed as "already closed".
+        """
+        redis = _FakeRedis()
+        first = _close(_session(), tmp_path, redis)
+        second = _close(_session(waves_run=["self_knowledge_layer/s0_pin_spec"]), tmp_path, redis)
+
+        assert first.status == "closed"
+        assert second.status == "closed"
+        assert second.record.entity_id == first.record.entity_id
+        assert second.record.knowledge_id != first.record.knowledge_id
+        assert len(redis.stream) == 2
+
+    def test_producer_failure_is_a_warning_never_a_crash(self, tmp_path):
+        """DONE_WHEN (3): a downed stream degrades to a warning — the record is never lost."""
+
+        def down():
+            raise ConnectionError("knowledge stream is down")
+
+        result = si.close_session(_session(), artifact_dir=tmp_path, connect_fn=down)
+
+        assert result.status == "degraded"
+        assert result.warnings  # the reason is surfaced, not swallowed
+        assert result.entry_id == ""
+        # The durable artifact still landed — the close is never lost to a stream outage.
+        assert result.artifact_path.is_file()
+        assert result.artifact_path.read_bytes() == record_to_artifact(result.record)
+
+    def test_reclose_repairs_a_partial_failure_once_the_stream_returns(self, tmp_path):
+        """A close that wrote the artifact but could not publish is COMPLETED by re-running.
+
+        The artifact-presence check alone would make the second close a no-op and strand the
+        record off the stream forever; the checkpoint hash is the publish ledger, so a re-close
+        sees the missing event and publishes it.
+        """
+
+        def down():
+            raise ConnectionError("knowledge stream is down")
+
+        degraded = si.close_session(_session(), artifact_dir=tmp_path, connect_fn=down)
+        assert degraded.status == "degraded"
+
+        redis = _FakeRedis()
+        repaired = si.close_session(_session(), artifact_dir=tmp_path, connect_fn=lambda: redis)
+
+        assert repaired.status == "closed"
+        assert repaired.record.knowledge_id == degraded.record.knowledge_id
+        assert len(redis.stream) == 1  # exactly one event — the repair, never a duplicate
+
+    def test_close_rejects_a_session_with_no_slug(self, tmp_path):
+        """The type's one hard requirement is honored at the close seam, not papered over."""
+        redis = _FakeRedis()
+        with pytest.raises(ValueError, match="slug"):
+            si.close_session(_session(slug=""), artifact_dir=tmp_path, connect_fn=lambda: redis)
+
+
+class TestSessionCloseCommand:
+    """The ``agentic-dynamics session close`` command (CLI shell over the emission seam)."""
+
+    def test_command_resolves_to_session_close_script(self):
+        from agentic_dynamics import cli
+
+        assert cli._resolve(["session", "close"]) == ("session_close.py", [])
+        assert (ROOT / "scripts" / "session_close.py").is_file()
+
+    def test_command_end_to_end_writes_into_the_kb(self, tmp_path, monkeypatch, capsys):
+        """Run the REAL command against a fake stream + tmp artifact dir: artifact + event land."""
+        from agentic_dynamics.core import paths as core_paths
+        from agentic_dynamics.knowledge import knowledge_stream as ks
+
+        scripts_dir = str(ROOT / "scripts")
+        if scripts_dir not in sys.path:
+            sys.path.insert(0, scripts_dir)
+        import session_close as sc
+
+        redis = _FakeRedis()
+        monkeypatch.setattr(ks, "connect", lambda: redis)
+        monkeypatch.setattr(core_paths, "KB_ARTIFACT_DIR", tmp_path)
+
+        rc = sc.main(
+            [
+                "--slug",
+                "wt_selfk_s1b_close_writer",
+                "--session-date",
+                "2026-09-03",
+                "--wave",
+                "self_knowledge_layer/s0_pin_spec",
+                "--wave",
+                "self_knowledge_layer/s1a",
+                "--merged",
+                "2026-08-14_experiment-spec-and-compiler-design",
+                "--parked",
+                "fleet ladder rung 2",
+                "--open-thread",
+                "session spine close command (s1b)",
+                "--self-notes",
+                "I re-derived the wave verdict by grep instead of reading a record.",
+            ]
+        )
+        assert rc == 0
+        assert len(redis.stream) == 1
+        artifacts = list(tmp_path.glob("*.json"))
+        assert len(artifacts) == 1
+
+        record = si.derive_session_record(
+            {
+                "session_date": "2026-09-03",
+                "slug": "wt_selfk_s1b_close_writer",
+                "waves_run": ["self_knowledge_layer/s0_pin_spec", "self_knowledge_layer/s1a"],
+                "merged": ["2026-08-14_experiment-spec-and-compiler-design"],
+                "parked": ["fleet ladder rung 2"],
+                "open_threads": ["session spine close command (s1b)"],
+                "self_notes": "I re-derived the wave verdict by grep instead of reading a record.",
+            }
+        )
+        assert artifacts[0].name == f"{record.knowledge_id}.json"
+        assert next(iter(redis.stream.values()))["knowledge_id"] == record.knowledge_id
+        assert "closed" in capsys.readouterr().out
+
+    def test_command_rerun_is_a_noop(self, tmp_path, monkeypatch):
+        from agentic_dynamics.core import paths as core_paths
+        from agentic_dynamics.knowledge import knowledge_stream as ks
+
+        scripts_dir = str(ROOT / "scripts")
+        if scripts_dir not in sys.path:
+            sys.path.insert(0, scripts_dir)
+        import session_close as sc
+
+        redis = _FakeRedis()
+        monkeypatch.setattr(ks, "connect", lambda: redis)
+        monkeypatch.setattr(core_paths, "KB_ARTIFACT_DIR", tmp_path)
+
+        argv = ["--slug", "wt_selfk_s1b_close_writer", "--session-date", "2026-09-03"]
+        assert sc.main(argv) == 0
+        assert sc.main(argv) == 0  # the identical re-close exits clean, emits nothing new
+        assert len(redis.stream) == 1
+        assert len(list(tmp_path.glob("*.json"))) == 1
+
+    def test_command_downed_stream_is_a_warning_and_exits_zero(self, tmp_path, monkeypatch, capsys):
+        from agentic_dynamics.core import paths as core_paths
+        from agentic_dynamics.knowledge import knowledge_stream as ks
+
+        scripts_dir = str(ROOT / "scripts")
+        if scripts_dir not in sys.path:
+            sys.path.insert(0, scripts_dir)
+        import session_close as sc
+
+        def down():
+            raise ConnectionError("knowledge stream is down")
+
+        monkeypatch.setattr(ks, "connect", down)
+        monkeypatch.setattr(core_paths, "KB_ARTIFACT_DIR", tmp_path)
+
+        rc = sc.main(["--slug", "wt_selfk_s1b_close_writer", "--session-date", "2026-09-03"])
+        assert rc == 0  # never a crash
+        captured = capsys.readouterr()
+        assert "warning" in captured.err.lower()
+        assert "degraded" in captured.out or "NOT published" in captured.out
+        assert len(list(tmp_path.glob("*.json"))) == 1  # the durable artifact still lands
+
+    def test_command_missing_slug_is_a_usage_error(self, capsys):
+        scripts_dir = str(ROOT / "scripts")
+        if scripts_dir not in sys.path:
+            sys.path.insert(0, scripts_dir)
+        import session_close as sc
+
+        with pytest.raises(SystemExit) as exc:
+            sc.main(["--session-date", "2026-09-03"])
+        assert exc.value.code == 2  # argparse usage error, not a close attempt

@@ -46,7 +46,11 @@ round-trips through ``extract_record`` like every other producer's.
 from __future__ import annotations
 
 import json
+from collections.abc import Callable
+from dataclasses import dataclass
+from dataclasses import field as _dataclass_field
 from datetime import datetime
+from pathlib import Path
 from typing import Any
 
 from agentic_dynamics.knowledge.knowledge import (
@@ -252,3 +256,148 @@ def derive_session_record(
     missing its ``slug``/``session_date`` is a genuine caller error, not a skip case.
     """
     return build_session_record(session, repository_id=repository_id, now=now)
+
+
+# ── Close emission (s1b — the ``session close`` command's write seam) ─────────
+
+
+@dataclass
+class SessionCloseResult:
+    """What one :func:`close_session` call did — the ``session close`` command's outcome.
+
+    ``record`` is the derived session record (always present — derivation happens before any
+    store access, so a call site can cite its ``knowledge_id`` even when every publish path
+    failed). ``artifact_path`` is the durable per-record artifact the call wrote (or confirmed
+    already present). ``entry_id`` is the stream entry the pointer event landed on, or ``""``
+    when nothing was published by this call.
+
+    ``status`` is one of:
+
+    * ``"closed"`` — the record now fully lands in the KB: its durable artifact is written and
+      its pointer event was published this call (including the repair of a prior partial close,
+      where the artifact existed but the event had never landed).
+    * ``"no-op"`` — re-running close for an already-closed session: the exact record (identical
+      bytes) was already durable AND its event was already checkpointed, so this call changed
+      nothing (rerun-safe).
+    * ``"degraded"`` — the durable artifact is written but the event could not be published or
+      its prior publication could not be confirmed (a downed or rejecting knowledge stream).
+      This is a WARNING, never a crash: ``warnings`` carries the reason, and re-running close
+      once the stream is back completes the publication.
+
+    ``warnings`` lists every producer failure this call swallowed (empty on a clean path).
+    """
+
+    record: KnowledgeRecord
+    status: str
+    artifact_path: Path
+    entry_id: str = ""
+    warnings: list[str] = _dataclass_field(default_factory=list)
+
+
+def close_session(
+    session: dict[str, Any],
+    *,
+    repository_id: str = REPOSITORY_ID,
+    artifact_dir: Path | None = None,
+    connect_fn: Callable[..., Any] | None = None,
+    now: datetime | None = None,
+) -> SessionCloseResult:
+    """Close ONE session: derive its record, land artifact + event in the KB, best-effort.
+
+    This is the write seam of the ``agentic-dynamics session close`` command (phase
+    ``s1b_close_writer`` of the ``self_knowledge_layer`` wave, design
+    ``docs/designs/proposed/self_knowledge_layer.md``). It follows the producers' canonical
+    pointer contract exactly as ``scripts/kb_produce.py`` does — write the durable per-record
+    artifact to ``<artifact_dir>/<knowledge_id>.json`` FIRST (so a consumer can read + verify
+    the bytes the event's ``content_hash`` covers the moment the pointer lands), then publish
+    the pointer event and checkpoint the ``knowledge_id``.
+
+    **Rerun-safe no-op.** ``knowledge_id`` is a pure function of the session body (s1a), so a
+    repeated close of the same session resolves to the same record. The close is a no-op when
+    the artifact is already on disk with byte-identical content AND the ``knowledge_id`` is
+    already checkpointed (its event was published); a prior partial failure (artifact written,
+    event never published) is REPAIRED by re-running close — the event is published and the
+    record reaches ``"closed"``. ``checkpoint`` reuse matches ``kb_produce``: the
+    ``CHECKPOINT_KEY`` hash is the producers' shared idempotence ledger, and session records
+    keyed by a globally-unique ``knowledge_id`` cannot collide with any other family's rows.
+
+    **A producer failure is a warning, never a crash.** A downed or rejecting knowledge stream
+    is caught, logged into ``warnings``, and reported as ``status="degraded"`` — the durable
+    artifact still lands (the record is never lost), and re-running the close when the stream
+    is back completes the publication. This is the one deliberate divergence from
+    ``kb_produce``'s fail-fast connect: closing a session sits at the end of the AIO's
+    operating cadence, where a loud crash would discard the very reflection the close exists
+    to persist.
+
+    ``artifact_dir`` defaults to the repo's durable KB artifact directory
+    (``core.paths.KB_ARTIFACT_DIR``); ``connect_fn`` defaults to ``knowledge_stream.connect``.
+    Both are injectable so tests can point at a tmp dir + a fake stream and so the command is
+    import-safe without Redis.
+    """
+    from agentic_dynamics.core.paths import KB_ARTIFACT_DIR
+    from agentic_dynamics.knowledge import knowledge_stream as ks
+    from agentic_dynamics.knowledge.knowledge_ingestion import (
+        record_to_artifact,
+        record_to_event,
+    )
+
+    record = derive_session_record(session, repository_id=repository_id, now=now)
+    artifact_dir = artifact_dir or KB_ARTIFACT_DIR
+    artifact_path = artifact_dir / f"{record.knowledge_id}.json"
+    artifact_bytes = record_to_artifact(record)
+    warnings: list[str] = []
+    already_durable = artifact_path.is_file() and artifact_path.read_bytes() == artifact_bytes
+
+    # 1 ── durable artifact first: a consumer can verify the bytes the pointer names as soon as
+    # the event lands. Rewriting byte-identical bytes is harmless, but skip it to keep the
+    # no-op path truly side-effect-free.
+    if not already_durable:
+        artifact_dir.mkdir(parents=True, exist_ok=True)
+        artifact_path.write_bytes(artifact_bytes)
+
+    # 2 ── pointer event, best-effort. The write guard is satisfied with authorized=True (this
+    # seam IS the AIO's authorized close writer); the checkpoint hash makes the publish
+    # idempotent so a re-close never double-emits.
+    connect = connect_fn or ks.connect
+    entry_id = ""
+    already_published = False
+    try:
+        r = connect()
+    except Exception as exc:  # noqa: BLE001 - a producer failure is a warning by contract
+        warnings.append(
+            f"knowledge stream unreachable ({type(exc).__name__}: {exc}); the durable record "
+            "is written but the pointer event was not published — re-run `session close` once "
+            "the stream is back to complete it"
+        )
+        r = None
+    if r is not None:
+        try:
+            if r.hget(ks.CHECKPOINT_KEY, record.knowledge_id) is None:
+                entry_id = ks.publish_event(
+                    r,
+                    record_to_event(record),
+                    authorized=True,
+                    source_type=record.source_type,
+                )
+                r.hset(ks.CHECKPOINT_KEY, record.knowledge_id, record.indexed_at)
+            else:
+                already_published = True
+        except Exception as exc:  # noqa: BLE001 - a producer failure is a warning by contract
+            warnings.append(
+                f"publish failed for {record.knowledge_id} ({type(exc).__name__}: {exc}); "
+                "re-run `session close` once the stream is healthy to complete it"
+            )
+
+    if already_durable and already_published and not warnings:
+        status = "no-op"
+    elif warnings:
+        status = "degraded"
+    else:
+        status = "closed"
+    return SessionCloseResult(
+        record=record,
+        status=status,
+        artifact_path=artifact_path,
+        entry_id=entry_id,
+        warnings=warnings,
+    )

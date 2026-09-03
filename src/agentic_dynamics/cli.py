@@ -128,6 +128,12 @@ _COMMANDS: dict[tuple[str, ...], str] = {
     ("control", "status"): "control_status.py",
     ("control", "drain-outbox"): "control_drain_outbox.py",
     ("control", "sweep-zombies"): "control_sweep_zombies.py",
+    # session (the self-knowledge layer, s1b — loop 2: the machine learning about itself
+    # operating). `session close` writes the AIO's session-spine record via the s1a
+    # meta_session type (what ran, what merged, what parked, open threads, self-notes) —
+    # rerun-safe (an identical re-close is a no-op) and best-effort (a producer failure is a
+    # warning, never a crash). The s1c `open` verb extends this group in its own phase.
+    ("session", "close"): "session_close.py",
     # publication (the ONE publication transaction — control_db_publication p6). Deploying the
     # website is a P0 controller-only action: `publish release` refuses without --operator and
     # records both hosts + the publication/v1 receipt in the control database.
@@ -180,6 +186,7 @@ Subcommands (each forwards to its backing script):
   validate    session|tests|prereq|preexisting
   supervise   [claude-agents|orphans|leases]
   control     status|drain-outbox|sweep-zombies
+  session     close
   publish     release
   release     check-protection
   surfaces    sync|snapshot
@@ -214,7 +221,7 @@ def _resolve(argv: list[str]) -> tuple[str | None, list[str]]:
     # True longest-prefix match over the static command table (longest prefixes first).
     for prefix in _SORTED_PREFIXES:
         if tuple(argv[: len(prefix)]) == prefix:
-            return _COMMANDS[prefix], argv[len(prefix):]
+            return _COMMANDS[prefix], argv[len(prefix) :]
     # ``registry query|show|lineage`` -> registry.py <subcommand> ...
     if argv[0] == "registry" and len(argv) >= 2 and argv[1] in _REGISTRY_SUBCOMMANDS:
         return "registry.py", argv[1:]

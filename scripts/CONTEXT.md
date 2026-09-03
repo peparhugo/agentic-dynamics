@@ -18,6 +18,7 @@ maintained: control_status.py
 maintained: control_drain_outbox.py control_sweep_zombies.py
 maintained: check_preexisting.py
 maintained: publish_release.py
+maintained: session_close.py
 maintained: workflow_new.py workflow_lint.py workflow_plan.py
 <!-- scripts-classification: end -->
 
@@ -71,6 +72,7 @@ maintained: workflow_new.py workflow_lint.py workflow_plan.py
 | `pipeline.py` (1267 lines) | YAML-driven phase orchestration (`experiments/definitions/configs/plans.yaml`) | Multi-phase DAG runs (ci, deploy, full_matrix, feature, ship_features, cross_models) |
 | `agentic_dynamics/experiment/compile_experiment.py` (not in scripts/) | spec → DAG compiler, **written**; no standalone CLI — invoke via the `compile_experiment` tool (§3.1) or the Python API directly | Compiling a spec into a DAG |
 | `check_branch_protection.py` | Release-time drift check: compares the live GitHub branch protection for `main` against the committed settings doc (`docs/release/branch_protection_settings.md`); exit 1 on drift | Before any release; run after any manual protection change |
+| `session_close.py` | ~200 | The session CLOSE command (self-knowledge layer s1b) — writes the AIO's session-spine record via `session_ingestion.close_session` (the s1a `meta_session` type): what ran (waves), what merged, what parked, open threads, self-notes. Rerun-safe (identical re-close = no-op, keyed by the deterministic `knowledge_id`) and best-effort (a producer failure is a warning, never a crash — the durable artifact still lands). CLI: `agentic-dynamics session close`. |
 
 ## Test-suite budget + the fast path (test_suite_speed p2-p4)
 
