@@ -142,6 +142,13 @@ _COMMANDS: dict[tuple[str, ...], str] = {
     # s2a decision record type (a decision IS an observation with intent). Rerun-safe and
     # best-effort (an identical re-record is a no-op; a producer failure is a warning).
     ("decision", "record"): "decision_record.py",
+    # scoreboard (the self-knowledge layer — loop 2). `scoreboard` (s5a) aggregates the s3
+    # wave-verdict records into the measured scoreboard rows (waves completed, merge rate,
+    # adversarial-finding rate, cost/wave, time-to-merge, phases/wave, per model) — recomputed
+    # from the records, never hand-written totals. `--recompute` re-aggregates + rewrites the
+    # durable document; without it a stored document is rendered when one exists. Producer aio,
+    # org:repo (controller + AIO + supervisor read; never cell agents).
+    ("scoreboard",): "scoreboard.py",
     # publication (the ONE publication transaction — control_db_publication p6). Deploying the
     # website is a P0 controller-only action: `publish release` refuses without --operator and
     # records both hosts + the publication/v1 receipt in the control database.
@@ -196,6 +203,7 @@ Subcommands (each forwards to its backing script):
   control     status|drain-outbox|sweep-zombies
   session     open|close
   decision    record
+  scoreboard
   publish     release
   release     check-protection
   surfaces    sync|snapshot
