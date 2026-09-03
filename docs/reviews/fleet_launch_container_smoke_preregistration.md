@@ -280,5 +280,6 @@ returned verdict) is executable on this host.
 | Pin integrity — spec SHA256 + worktree git sha recorded | 1 | **PASS** — `301ff0191f…` / `57774dfcbd3…`, spec committed at the pinned HEAD; run `workflow_revision_id` `c1f8286a46f…` equals a fresh `compute_workflow_revision_id` at the pin |
 
 No edge required more than one reproduction attempt; no failed finding; no deviation recorded.
-Preregistration committed as `[workflow] cs0_pin_spec — Smoke the container-tier orchestrator, the
-REAL fleet shape`.
+Preregistration committed with the subject `[workflow] cs0_pin_spec — Close the three findings of
+the fleet_launch_smoke adversarial review by smoking the REAL fleet deployment shape` (the spec's
+goal-prefix form; the stored subject is its 72-char head, as the commit-msg hook enforces).
