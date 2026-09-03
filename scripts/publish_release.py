@@ -61,6 +61,7 @@ except ImportError:  # imported as scripts.<name> — repo root is on sys.path
     from scripts import _bootstrap  # noqa: F401
 
 
+from agentic_dynamics.control import aio_emission  # noqa: E402
 from agentic_dynamics.control import publication as pub  # noqa: E402
 from agentic_dynamics.control.control_db import ControlDB, ControlDBError  # noqa: E402
 
@@ -70,6 +71,56 @@ EXIT_PRECONDITION_FAILED = 1
 EXIT_DEPLOY_FAILED = 2
 EXIT_NO_CONTROL_DB = 3
 EXIT_POST_DEPLOY_FAILED = 4
+
+
+# ── a5 AIO emission (Wave-3 a5_aio_emission) ─────────────────────────────────
+# Publishing is a P0 permanence verb the AIO routes, so the decision and the act emit into the
+# knowledge base AT THIS CALL SITE — an observation (observation_ingestion) before the deploys
+# and an actuation (actuation_ingestion's derive_actuation_record, the first permanence caller)
+# whose ``causes`` cites that observation once both hosts have deployed. Emission is
+# BEST-EFFORT by contract: a downed knowledge stream is a warning, never a blocked publication.
+
+
+def _default_emit_decision(decision: dict) -> dict:
+    """Default emit_decision: build + publish the publish-decision observation (best-effort)."""
+    out = aio_emission.emit_decision(decision)
+    return {"observation_id": out["observation"].knowledge_id, "entry_ids": out["entry_ids"]}
+
+
+def _default_emit_act(decision: dict, *, causes: str) -> dict:
+    """Default emit_act: build + publish the publish-act actuation (best-effort)."""
+    out = aio_emission.emit_act(decision, causes=causes)
+    return {"actuation_id": out["actuation"].knowledge_id, "entry_ids": out["entry_ids"]}
+
+
+def _emit_best_effort(label: str, fn) -> dict | None:
+    """Run an emission step, swallowing ANY failure (best-effort is structural, not incidental).
+
+    Even a buggy emitter must never block a verified publication — the a5 contract is that a
+    failed emit is a warning, never a blocked act.
+    """
+    try:
+        return fn()
+    except Exception as exc:  # noqa: BLE001 - best-effort by contract
+        print(f"publish: WARNING — {label} emission failed ({exc}); "
+              "proceeding (best-effort, never a blocked publication)", file=sys.stderr)
+        return None
+
+
+def _publish_decision(args: argparse.Namespace, receipt: dict[str, Any], *, requested_action: dict | None = None) -> dict:
+    """The publish decision/act dict the emission seam consumes."""
+    head = str(receipt.get("repo_sha") or "")
+    decision = {
+        "verb": "publish",
+        "run_id": args.run_id,
+        "candidate_sha": args.candidate_sha or head,
+        "operator": args.operator,
+        "status": "requested",
+        "why": f"publication receipt {pub.receipt_sha256(receipt)[:12]}",
+    }
+    if requested_action:
+        decision["requested_action"] = requested_action
+    return decision
 
 
 # ── Deployment ───────────────────────────────────────────────────────────────────────────────
@@ -294,6 +345,8 @@ def main(
     deployer: Callable[[pub.FirebaseHost], DeployOutcome] | None = None,
     builder: Callable[[], tuple[bool, str]] | None = None,
     live_checker: Callable[[pub.FirebaseHost, dict[str, Any]], str] | None = None,
+    emit_decision: Callable[[dict], dict] | None = None,
+    emit_act: Callable[..., dict] | None = None,
 ) -> int:
     """Run the publication transaction.
 
@@ -302,12 +355,18 @@ def main(
     implementations; the tests pass fakes. That is what makes the whole sequence, including the
     database writes and the ordering guarantees, testable without a Firebase project or a
     network — and an untested publication path is one nobody would dare run.
+
+    ``emit_decision`` / ``emit_act`` (a5) are the AIO-permanence emission steps, injectable for
+    the same reason: the tests pass no-op/capturing fakes so a hermetic suite never publishes
+    test candidates onto the live knowledge stream. Defaults are the real best-effort emitters.
     """
     args = build_parser().parse_args(argv)
     quiet = args.json
     deploy = deployer or (lambda host: firebase_deploy(host, site_root=pub.SITE_ROOT))
     build = builder or run_build_data
     live_check = live_checker or (lambda host, receipt: check_live_site(host, receipt))
+    emit_decision = emit_decision or _default_emit_decision
+    emit_act = emit_act or _default_emit_act
 
     # ── P0 guard ─────────────────────────────────────────────────────────────────────────
     # Named before any work is done, so an operator-less invocation fails in a second rather
@@ -419,6 +478,12 @@ def main(
     # ── Step 6: deploy BOTH hosts ────────────────────────────────────────────────────────
     # Both are attempted even if the first fails: the operator needs to know the state of both
     # hosts, and stopping early would leave the second one's status unknown as well as unchanged.
+    # The AIO's decision emits BEFORE the act (best-effort, never blocking): an observation of
+    # the publish decision with the run_id + candidate sha + operator. A dry run never emits —
+    # it deploys nothing, so there is no permanence decision to record.
+    emitted_decision = _emit_best_effort(
+        "publish decision", lambda: emit_decision(_publish_decision(args, receipt))
+    )
     outcomes = []
     for host in pub.FIREBASE_HOSTS:
         _emit(f"[6/8] deploying {host.role} ({host.project})…", quiet=quiet)
@@ -476,6 +541,24 @@ def main(
         if args.json:
             print(pub.serialise_receipt(receipt))
         return EXIT_DEPLOY_FAILED
+
+    # The act emits AFTER it lands: an actuation record whose ``causes`` links back to the
+    # decision observation emitted before the deploys (the lineage gate), carrying the per-host
+    # release ids. A partial deploy emits nothing — the publication did not complete, and the
+    # failed-host branch above already recorded the truth in the database.
+    requested_action = {
+        "outcome": "deployed",
+        "hosts": {o.host.role: o.release_id or "unknown" for o in outcomes},
+        "receipt_sha256": pub.receipt_sha256(receipt),
+    }
+    observation_id = (emitted_decision or {}).get("observation_id")
+    _emit_best_effort(
+        "publish act",
+        lambda: emit_act(
+            _publish_decision(args, receipt, requested_action=requested_action),
+            causes=observation_id or "",
+        ),
+    )
 
     # ── Step 8: post-deploy check ────────────────────────────────────────────────────────
     if args.no_post_deploy_check:
