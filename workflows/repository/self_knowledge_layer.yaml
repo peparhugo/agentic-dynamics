@@ -1,29 +1,17 @@
 name: self_knowledge_layer
 question: >-
   Build loop 2 — the machine learning about itself operating (design:
-  docs/designs/proposed/self_knowledge_layer.md, 2026-09-03). Loop 1 (the
-  instrument) is complete; the finding layer (kb_finding_layer) gives its
-  conclusions a durable home. Loop 2 does not exist: every AIO session starts
-  as a fresh prior — compaction erases the previous session's posterior, and
-  the doctrine carries stable rules but no situated decisions, accumulated
+  docs/designs/proposed/self_knowledge_layer.md). Every AIO session starts as a
+  fresh prior: compaction erases the previous session's posterior, and the
+  doctrine carries stable rules but no situated decisions, accumulated
   experience, or reflection. This wave builds the record types + the always-on
-  producers: (s1) the SESSION SPINE — each session opens by retrieving the last
-  session's close record (decisions, open threads, parked items) and closes by
-  writing its own (what ran, what merged, what parked, what the AIO got wrong);
-  (s2) DECISION RECORDS with rationale — parked fleet, flash-over-sonnet, the
-  AIO name: persisted so the next session never re-litigates them; (s3) WAVE
-  VERDICT narratives — run completion emits "what happened and why" (verdict,
-  cost, adversary findings, merge state) instead of the AIO re-deriving it from
-  ledgers + git; (s4) BELIEF RECORDS with the update protocol — hypotheses with
-  n_confirmations/n_disconfirmations/posterior_confidence, updated by each wave
-  outcome (the adversarial verdict is the outcome signal) — the Bayesian engine
-  the controller's frame demands; (s5) THE GAME SCOREBOARD — wave count, merge
-  rate, adversarial-finding rate, cost/wave, time-to-merge — the frequentist
-  base every prior updates against; (s6) REFLECTION RECORDS — a standing series
-  each session appends to; multi-session contemplation is their accumulation.
-  Success: the next AIO session is strictly better than the last because it
-  retrieves its accumulated posterior instead of starting from the doctrine
-  alone.
+  producers in SMALL task-card phases (one deliverable each — the construction
+  crew model: each worker gets the task, the ask, and the goal from the current
+  schematic, never the house history). Deliverables: session spine (open
+  retrieves the last close / close writes its own), decision records with
+  rationale, wave-verdict narratives, the belief-update protocol, the measured
+  scoreboard, the reflection series — each record carrying its actor + scope
+  per the context abstraction (design §actor-layering).
 version: "0.1"
 artifact_kind: workflow
 intent: mutate
@@ -37,93 +25,31 @@ workflow:
     language: python
     fork: false
     context:
-      domain_context: >-
-        canonical_sources: [docs/designs/proposed/self_knowledge_layer.md (the
-        design this wave implements — the two-loop frame, the memory layers,
-        the record types, the Bayesian-frequentist synthesis),
-        src/agentic_dynamics/knowledge/knowledge_ingestion.py (the producers —
-        derive_*_records + record_to_artifact + record_to_event; the
-        evidence_class authority ladder [P]/[M]/[C]/[H]),
-        src/agentic_dynamics/knowledge/knowledge_stream.py (the transport —
-        publish_event + the consumer groups),
-        src/agentic_dynamics/knowledge/observation_ingestion.py +
-        actuation_ingestion.py (the observation/actuation producers — the
-        decision records' home), src/agentic_dynamics/control/control_db.py
-        (the run rows — the wave-verdict source),
-        scripts/run_workflow.py (the composition root — where the wave-verdict
-        + scoreboard emissions hook in), scripts/promote.py + publish_release.py
-        (the verified commands — where decision records emit),
-        agent_config/rules.md (the AIO vocabulary section — the session-spine
-        mandate), scripts/spec_status.py (the narrator, kb_finding_layer k5 —
-        the belief-update trigger), experiments/results/kb/ + registry_index.
-        jsonl (the destination), and the kb_finding_layer wave (its k1 default-
-        on lesson — producers must be default-on, never opt-in)].
-        policies: [one_durable_state, the_gate_is_the_evidence, authority_
-        absolute, bounded_verification, outbox_before_emit,
-        producers_default_on_not_opt_in].
-      challenge_context: >-
-        challenge: the machine is amnesiac about itself. Loop 1 works — waves
-        produce findings, retrieval serves them. But the AIO — the delegated
-        agent the controller operates through — re-learns everything each
-        session: re-derives state by grep, re-litigates parked decisions,
-        re-learns the controller's preferences on correction. The finding layer
-        gave the WAVES a memory; nothing gives the SESSIONS one. The risk: an
-        amnesiac agent is a strategic liability in an iterated game — it cannot
-        improve its own next move because it cannot remember its own game
-        history. The Bayesian frame makes the requirement precise: beliefs need
-        an update protocol (n_confirm/n_disconfirm), not one-shot writes. The
-        controller's decisions need rationale attached at the moment of the
-        decision, not reconstructed later. The scoreboard must exist before
-        strategy can be learned.
-        deliberation: [the session spine first (s1 — the cadence), then the
-        decision records (s2), then the wave-verdict narratives (s3 — the
-        "what happened" the AIO re-derives today), then the belief protocol
-        (s4 — the Bayesian engine), then the scoreboard (s5 — the frequentist
-        base), then the reflections (s6)].
-        session_policy: {default: continue}
-      current_state: >-
-        MEASURED (2026-09-03): the finding layer (kb_finding_layer) is in
-        flight; docs/designs/proposed/self_knowledge_layer.md is written;
-        agent_config/rules.md's AIO section names the self-knowledge layer as
-        the AIO's continuity mechanism; meta_session records exist (27,
-        embryonic — no session-spine content); no decision records, no belief
-        records, no scoreboard, no reflection records exist; wave verdicts are
-        re-derived from ledgers + git; the graph leg is empty.
-      hard_rules: >-
-        (1) PRODUCERS ARE DEFAULT-ON (the k1 lesson): every record type this
-        wave builds emits by default on its trigger — the session close, the
-        wave completion, the decision, the wave outcome — never opt-in. An
-        opt-in producer is a producer that will not produce.
-        (2) THE SESSION THAT DOES NOT CLOSE HAS NOT CLOSED: the AIO's cadence
-        is open-retrieve → act → close-write. The close record names what ran,
-        what merged, what parked, and what the AIO got wrong. Retrieving the
-        last close is the first act of every session.
-        (3) BELIEFS UPDATE, THEY DO NOT ACCUMULATE: a belief record carries
-        n_confirmations/n_disconfirmations/last_updated/posterior_confidence
-        and is UPDATED by each wave outcome — never a second record written
-        alongside the first. The supersede chain is for content revision; the
-        update protocol is for confidence.
-        (4) DECISIONS CARRY THEIR RATIONALE AT THE MOMENT OF THE DECISION: a
-        parked fleet, a model choice, a naming — each emits a decision record
-        (what + why + the alternatives weighed) when it happens, so the next
-        session retrieves the reasoning, never reconstructs it.
-        (5) THE SCOREBOARD IS MEASURED, NEVER REMEMBERED: every completed wave
-        appends its row (cost, phases, verdict, adversarial findings, merge
-        state) from the ledger — no hand-written totals.
-        (6) RECORDS CARRY THEIR ACTOR + SCOPE (the context-abstraction
-        dimension, design §actor-layering): every record this wave produces
-        carries a first-class `producer` field (aio | supervisor | agent |
-        controller | verified_command) and lives in the scope its actor owns —
-        the AIO's records (sessions, decisions, beliefs, reflections) in the
-        AIO scope (org:repo), wave verdicts in their own
-        workload:<spec>/job:<cell> scope, the scoreboard at org:repo. The
-        supervisor rail stays separate (observe-only, never merged into the
-        AIO pool). A cell agent's retrieval never resolves the AIO's private
-        records (reflections, decisions) — scope_visible ancestor-visibility
-        is the mechanism, never a hand-written allowlist. The controller model
-        is an org-root belief class readable by the AIO only.
-        (7) BOUNDED VERIFICATION (unchanged). REGENERATE, NEVER HAND-EDIT
-        (unchanged).
+      schematic:
+        # The blueprint — stable references only. Task cards carry their own inputs/done_when.
+        design: docs/designs/proposed/self_knowledge_layer.md
+        record_model: >
+          src/agentic_dynamics/knowledge/knowledge.py — entity_id is
+          sha256(repository_id | source_uri | logical_locator); KnowledgeRecord
+          fields: repository_id, acl_scope, source_type, evidence_class,
+          logical_locator, supersedes, causes.
+        producers: >
+          src/agentic_dynamics/knowledge/knowledge_ingestion.py
+          (derive_*_records + record_to_artifact + record_to_event) +
+          src/agentic_dynamics/knowledge/knowledge_stream.py (publish_event,
+          FINOPS_KB_WRITE guard).
+        actors: >
+          agent_config/rules.md VOCABULARY (AIO) + docs/supervisor_design.md
+          (observe-only rail) + src/agentic_dynamics/control/context_compiler.py
+          (scope_visible ancestor-visibility).
+        commands: >
+          scripts/promote.py + publish_release.py (verified commands),
+          scripts/run_workflow.py (composition root),
+          src/agentic_dynamics/cli.py.
+        state: >
+          agent_config/rules.md (the AIO section names loop 2); the finding
+          layer (kb_finding_layer) is in flight — its k1 default-on lesson
+          applies.
     phases:
       - name: s0_pin_spec
         kind: agent
@@ -134,192 +60,294 @@ workflow:
           ROLE: verification — the house pin convention. Write
           docs/reviews/self_knowledge_layer_preregistration.md carrying:
           (a) this spec's file SHA256 + the worktree git sha; (b) the six
-          edges VERIFIED against the actual repo: (1) no session-spine content
-          (the meta_session records are embryonic — inspect one); (2) no
-          decision records (query the registry for a decision source_type or
-          the observation/actuation records); (3) wave verdicts are re-derived
-          (no narrative record — check what a run completion emits today);
-          (4) no belief records with n_confirm/n_disconfirm (grep the
-          registry); (5) no scoreboard (no aggregated wave-metrics record);
-          (6) no reflection series. An edge that does not hold is a FAILED
-          finding. If a claim cannot be reproduced after THREE attempts,
-          record the deviation and FAIL — never loop. DB LOCATION:
-          machine-local state at the MAIN checkout.
-          DELIVER: the preregistration with the verified edges, committed with
-          the '[workflow] s0_pin_spec — <goal prefix>' subject.
+          edges VERIFIED against the actual repo: (1) meta_session records
+          are embryonic (inspect one); (2) no decision records exist; (3)
+          wave verdicts are re-derived (no narrative record at run
+          completion); (4) no belief records with n_confirm/n_disconfirm;
+          (5) no scoreboard; (6) no reflection series. An edge that does not
+          hold is a FAILED finding. If a claim cannot be reproduced after
+          THREE attempts, record the deviation and FAIL — never loop. DB
+          LOCATION: machine-local state at the MAIN checkout.
+          DELIVER: the preregistration with the verified edges, committed.
           LOG: PASS/FAIL per claim; commit.
-      - name: s1_session_spine
+      # ── s1: the session spine (one deliverable per phase) ──────────────────────────
+      - name: s1a_session_record_type
         kind: agent
         scope: implementation
-        timeout: 7200
+        timeout: 3600
         prompt: |
           GOAL: {goal}
-          SHAPE: the session spine. Build the session-record producers: (a)
-          SESSION_OPEN — a command or CLI hook (agentic-dynamics session open)
-          that retrieves the LAST session's close record and renders it as the
-          session's opening context (decisions, open threads, parked items,
-          the AIO's last-session self-notes); (b) SESSION_CLOSE — a command
-          (agentic-dynamics session close) that writes this session's record:
-          what ran (the waves), what merged, what parked, the open threads,
-          and what the AIO got wrong (a self-notes field — the reflection
-          seed). The record is a meta_session-type knowledge record with a
-          durable artifact + pointer event (the existing meta_session producer
-          grows real content). The close record's knowledge_id keys on the
-          session date + a session slug.
-          ACTOR + SCOPE (the context-abstraction dimension, hard rule 6): the session records live in the AIO scope (org:repo, producer: aio) — visible to the controller + the AIO's next session, never resolved by cell agents. The supervisor rail stays separate.
-          SCOPE FENCE: the session open/close commands + the meta_session
-          content ONLY. Commits carry '[workflow] s1_session_spine'.
-          VERIFY (both directions): unit tests prove (a) session open with no
-          prior close renders the bootstrap context (no record → a clear
-          first-session message); (b) session open with a prior close renders
-          its decisions/open-threads/parked/self-notes; (c) session close
-          writes a record whose artifact + event land (the KB gains it); (d)
-          the record round-trips (open reads what close wrote); (e) the CLI
-          surface is wired (the resolution guard passes).
-          DELIVER: the open/close commands + the tests, committed.
+          DELIVERABLE: the session record TYPE — derive_session_record /
+          build_session_record in knowledge_ingestion (or a new
+          session_ingestion.py) producing a meta_session KnowledgeRecord with
+          content fields: {session_date, slug, waves_run[], merged[],
+          parked[], open_threads[], self_notes}. Producer: aio. Scope: the AIO
+          scope (org:repo). Carries the standard identity + artifact + event.
+          INPUTS: the record_model + producers pattern (schematic); inspect
+          ONE existing meta_session record for the legacy shape.
+          DONE_WHEN: a synthetic session dict derives a record whose fields
+          round-trip through record_to_artifact/record_to_event; the
+          knowledge_id is rerun-safe (same input -> same id).
+          GATES: tests/test_session_spine.py (the record-type cases).
+          SCOPE FENCE: the record type ONLY — no commands, no open/close
+          logic (s1b/s1c). Actor + scope: producer aio, org:repo scope.
+          DELIVER: the type + tests, committed.
           LOG: PASS/FAIL; commit.
-      - name: s2_decision_records
+      - name: s1b_close_writer
         kind: agent
         scope: implementation
-        timeout: 7200
+        timeout: 3600
         prompt: |
           GOAL: {goal}
-          SHAPE: decisions carry their rationale. Build the decision-record
-          producer: a command (agentic-dynamics decision record --what "X" --
-          why "Y" --alternatives "A,B" --category park|model|name|scope|...) +
-          automatic emission at the verified-command call sites (promote.py
-          and publish_release.py emit a decision record when invoked: what was
-          promoted/published, why per the operator's instruction, the
-          run_id/candidate_sha). The record type: {what, why, alternatives
-          weighed, category, decided_at, actor (controller|aio), run_id/
-          candidate_sha when bound}. Emitted through the observation producer
-          (a decision IS an observation with intent) — durable artifact +
-          pointer event, default-on.
-          ACTOR + SCOPE (the context-abstraction dimension, hard rule 6): the decision records live in the AIO scope (org:repo, producer: aio|verified_command) — visible to the controller + AIO, never resolved by cell agents. The supervisor rail stays separate.
-          SCOPE FENCE: the decision command + the verified-command call sites
-          ONLY. Commits carry '[workflow] s2_decision_records'.
-          VERIFY (both directions): unit tests prove (a) the decision command
-          writes a record with what/why/alternatives/category; (b) a promote
-          invocation emits a decision record bound to the run_id +
-          candidate_sha (the call site fires); (c) the record is retrievable
-          by category; (d) a failed emit is a warning, never a blocked
-          promote/publish.
-          DELIVER: the decision producer + the call sites + the tests,
-          committed.
+          DELIVERABLE: the session CLOSE command (agentic-dynamics session
+          close) — writes this session's record via the s1a type: what ran
+          (waves), what merged, what parked, open threads, and the AIO's
+          self-notes (what it got wrong — the reflection seed). Default-on at
+          session end.
+          INPUTS: the s1a type (committed); the CLI map pattern (schematic:
+          cli.py); how promote/publish emit (for the record-emission pattern).
+          DONE_WHEN: session close writes a record whose artifact + event
+          land in the KB; re-running close for the same session is a no-op
+          (rerun-safe key); a producer failure is a warning, never a crash.
+          GATES: tests/test_session_spine.py (the close cases).
+          SCOPE FENCE: the close command ONLY — open is s1c. Actor + scope:
+          producer aio, org:repo.
+          DELIVER: the close command + tests, committed.
           LOG: PASS/FAIL; commit.
-      - name: s3_wave_verdicts
+      - name: s1c_open_reader
         kind: agent
         scope: implementation
-        timeout: 7200
+        timeout: 3600
         prompt: |
           GOAL: {goal}
-          SHAPE: the "what happened and why" is emitted, not re-derived. At
-          the run-completion path (the composition root where the ledger +
-          control-db terminal write land): emit a WAVE-VERDICT narrative
-          record per completed spec run — {spec_name, run_id, verdict
-          (succeeded/failed), cost, phases_total, adversarial findings count
-          (when the review doc exists), merge state (merged/pending/deferred),
-          the residual list} — derived deterministically from the ledger + the
-          control-db row + the review artifact (never hand-written). The
-          narrative text is the one-paragraph "what happened and why" the AIO
-          currently reconstructs from ledgers + git + reviews. Default-on.
-          ACTOR + SCOPE (the context-abstraction dimension, hard rule 6): the wave-verdict records live in their OWN scope (workload:<spec>/job:<cell>, producer: run) — visible to the controller (org root) + the AIO + the supervisor (read-only), never to other workloads' agents. The supervisor rail stays separate.
-          SCOPE FENCE: the wave-verdict emission at run completion ONLY.
-          Commits carry '[workflow] s3_wave_verdicts'.
-          VERIFY (both directions): unit tests prove (a) a synthetic completed
-          run emits a wave-verdict record whose fields match the ledger (cost,
-          phases, verdict); (b) the adversarial-findings count is derived
-          from the review artifact when present, absent when not; (c) the
-          merge state reflects the control-db row; (d) a failed run still
-          emits its verdict (a failure is a verdict, not a silence).
-          DELIVER: the wave-verdict producer + the tests, committed.
+          DELIVERABLE: the session OPEN command (agentic-dynamics session
+          open) — retrieves the LAST session's close record and renders it as
+          the session's opening context (decisions, open threads, parked
+          items, self-notes). No prior close -> a clear first-session
+          bootstrap message.
+          INPUTS: the s1a type + the close command (committed); the retrieval
+          pattern (how records are read back — the registry or direct read).
+          DONE_WHEN: open with a prior close renders its content; open with
+          none renders the bootstrap; the round-trip (close then open) is
+          exact.
+          GATES: tests/test_session_spine.py (the open cases).
+          SCOPE FENCE: the open command ONLY. Actor + scope: producer aio,
+          org:repo — a cell agent's retrieval never resolves these records.
+          DELIVER: the open command + tests, committed.
           LOG: PASS/FAIL; commit.
-      - name: s4_belief_protocol
+      # ── s2: decision records ───────────────────────────────────────────────────────
+      - name: s2a_decision_command
         kind: agent
         scope: implementation
-        timeout: 7200
+        timeout: 3600
         prompt: |
           GOAL: {goal}
-          SHAPE: beliefs update. Build the belief-record type + the update
-          protocol: a belief record carries {hypothesis, prior_confidence,
-          n_confirmations, n_disconfirmations, last_updated,
-          posterior_confidence, evidence_class, domain} and the UPDATE
-          operation — when a wave outcome bears on a hypothesis, the record is
-          UPDATED in place (n_confirm +1 or n_disconfirm +1, posterior
-          recomputed by the update rule), never duplicated. Seed the initial
-          belief set from the measured history the waves already produced:
-          "flash converges in ~1 wave on in-process work" (the measured wave
-          records), "container seams take ~4 waves" (the fleet_launch series),
-          "findings were opt-in and never produced" (kb_finding_layer's
-          premise, now disconfirmed by its own success), "adversarial reviews
-          catch wiring gaps tests miss" (n>=6 by the fleet series). Each seed
-          carries its evidence (the wave names that bear on it). The update
-          trigger: the wave-outcome signal (the s3 wave-verdict emission)
-          consults the belief index and updates the hypotheses it bears on.
-          ACTOR + SCOPE (the context-abstraction dimension, hard rule 6): the belief records live in the AIO scope (org:repo, producer: aio) — the controller model is an org-root belief class readable by the AIO only. The supervisor rail stays separate.
-          SCOPE FENCE: the belief type + update protocol + the seeded set
-          ONLY. Commits carry '[workflow] s4_belief_protocol'.
-          VERIFY (both directions): unit tests prove (a) a confirm update
-          increments n_confirmations and recomputes posterior (assert the
-          number moves); (b) a disconfirm update increments n_disconfirmations
-          and lowers posterior; (c) the same hypothesis updated twice carries
-          n=2 in ONE record (never two records); (d) the seeded beliefs carry
-          their evidence citations; (e) a wave outcome with no bearing updates
+          DELIVERABLE: the decision-record command (agentic-dynamics decision
+          record --what X --why Y --alternatives A,B --category
+          park|model|name|scope|...) writing {what, why, alternatives,
+          category, decided_at, actor, run_id/candidate_sha when bound} via
+          the observation producer (a decision IS an observation with intent).
+          Producer: aio. Scope: org:repo, visible to the controller + AIO,
+          never resolved by cell agents.
+          INPUTS: observation_ingestion's build_observation_record; the CLI
+          map; how promote/publish emit.
+          DONE_WHEN: the command writes a retrievable-by-category record with
+          all fields; a failed emit is a warning.
+          GATES: tests/test_decision_records.py (the command cases).
+          SCOPE FENCE: the command ONLY — the call-site emissions are s2b.
+          DELIVER: the command + tests, committed.
+          LOG: PASS/FAIL; commit.
+      - name: s2b_verified_command_emission
+        kind: agent
+        scope: implementation
+        timeout: 3600
+        prompt: |
+          GOAL: {goal}
+          DELIVERABLE: automatic decision-record emission at the verified-
+          command call sites — promote.py and publish_release.py emit a
+          decision record when invoked (what was promoted/published, the
+          run_id/candidate_sha, actor verified_command). Default-on,
+          best-effort (a failed emit never blocks the promote/publish).
+          INPUTS: the s2a record type; the promote.py + publish_release.py
+          call sites.
+          DONE_WHEN: a promote invocation emits a decision record bound to
+          its run_id + candidate_sha; a publish invocation emits its own.
+          GATES: tests/test_decision_records.py (the emission cases).
+          SCOPE FENCE: the two call sites ONLY. Producer: verified_command.
+          DELIVER: the call sites + tests, committed.
+          LOG: PASS/FAIL; commit.
+      # ── s3: wave-verdict narratives ───────────────────────────────────────────────
+      - name: s3a_wave_verdict_type
+        kind: agent
+        scope: implementation
+        timeout: 3600
+        prompt: |
+          GOAL: {goal}
+          DELIVERABLE: the wave-verdict record TYPE — derive_wave_verdict
+          from a run ledger + the control-db row + the review artifact:
+          {spec_name, run_id, verdict, cost, phases_total, adversarial_
+          findings_count (when the review doc exists), merge_state, residuals
+          []}. The narrative text is the one-paragraph 'what happened and
+          why'. Producer: run. Scope: workload:<spec>/job:<cell> (its own).
+          INPUTS: a run ledger + its control-db row + its adversarial review
+          (pick the last completed wave's as the fixture); the record_model.
+          DONE_WHEN: the type derives correctly from a synthetic ledger with
+          and without a review artifact (findings count present/absent);
+          merge_state reflects the control-db row.
+          GATES: tests/test_wave_verdicts.py (the type cases).
+          SCOPE FENCE: the type ONLY — the emission hook is s3b.
+          DELIVER: the type + tests, committed.
+          LOG: PASS/FAIL; commit.
+      - name: s3b_wave_verdict_emission
+        kind: agent
+        scope: implementation
+        timeout: 3600
+        prompt: |
+          GOAL: {goal}
+          DELIVERABLE: the wave-verdict emission at the run-completion path
+          (the composition root where the ledger + control-db terminal write
+          land) — every completed spec run emits its wave-verdict narrative
+          via the s3a type. Default-on; a FAILED run still emits (a failure
+          is a verdict, not a silence).
+          INPUTS: the s3a type; scripts/run_workflow.py's terminal-write
+          path.
+          DONE_WHEN: a synthetic completed run emits its verdict with the
+          measured fields; a failed run emits its failed verdict.
+          GATES: tests/test_wave_verdicts.py (the emission cases).
+          SCOPE FENCE: the emission hook ONLY. Producer: run, workload scope.
+          DELIVER: the emission + tests, committed.
+          LOG: PASS/FAIL; commit.
+      # ── s4: the belief protocol ───────────────────────────────────────────────────
+      - name: s4a_belief_record_type
+        kind: agent
+        scope: implementation
+        timeout: 3600
+        prompt: |
+          GOAL: {goal}
+          DELIVERABLE: the belief record TYPE — derive_belief_record:
+          {hypothesis, prior_confidence, n_confirmations, n_disconfirmations,
+          last_updated, posterior_confidence, evidence_class, domain,
+          evidence_citations[]}. Producer: aio. Scope: org:repo (AIO +
+          controller visible; the controller model is an org-root belief
+          class readable by the AIO only).
+          INPUTS: the record_model; the evidence_class ladder
+          ([P]/[M]/[C]/[H] — the prior-authority ladder by construction).
+          DONE_WHEN: a synthetic hypothesis derives a belief record with all
+          fields + its citations.
+          GATES: tests/test_belief_protocol.py (the type cases).
+          SCOPE FENCE: the type ONLY — the update operation is s4b.
+          DELIVER: the type + tests, committed.
+          LOG: PASS/FAIL; commit.
+      - name: s4b_belief_update
+        kind: agent
+        scope: implementation
+        timeout: 3600
+        prompt: |
+          GOAL: {goal}
+          DELIVERABLE: the UPDATE operation — when a wave outcome bears on a
+          hypothesis, the record is UPDATED in place (n_confirm +1 or
+          n_disconfirm +1, posterior recomputed), NEVER duplicated. The
+          update rule: posterior moves toward the evidence with the
+          confirmation count; a disconfirm lowers it.
+          INPUTS: the s4a type; the s3b wave-verdict emission (the trigger —
+          a verdict consults the belief index and updates the hypotheses it
+          bears on).
+          DONE_WHEN: two confirm updates yield ONE record with n=2 (assert);
+          a disconfirm lowers the posterior; an unrelated outcome updates
           nothing.
-          DELIVER: the belief type + protocol + seeds + the tests, committed.
+          GATES: tests/test_belief_protocol.py (the update cases).
+          SCOPE FENCE: the update operation + its trigger ONLY.
+          DELIVER: the update + tests, committed.
           LOG: PASS/FAIL; commit.
-      - name: s5_scoreboard
+      - name: s4c_belief_seeds
         kind: agent
         scope: implementation
-        timeout: 7200
+        timeout: 3600
         prompt: |
           GOAL: {goal}
-          SHAPE: the frequentist base. Build the scoreboard: a command
-          (agentic-dynamics scoreboard [--recompute]) that aggregates the
-          wave-verdict records (s3) into the measured rows: waves completed,
-          merge rate, adversarial-finding rate (findings per wave), cost per
-          wave (mean/median), time-to-merge, phases per wave, false-positive
-          incidents, per-model rows (flash vs pro vs the historical opus run).
-          The scoreboard record is recomputed from the s3 records — never
-          hand-written totals (hard rule 5). Emitted as a scoreboard-type
-          record with a durable artifact; the AIO retrieves it when advising
-          the next wave's shape (model choice, size, risk).
-          ACTOR + SCOPE (the context-abstraction dimension, hard rule 6): the scoreboard record lives at org:repo (producer: aio) — visible to the controller + AIO + supervisor (read), never to cell agents. The supervisor rail stays separate.
-          SCOPE FENCE: the scoreboard command + its aggregation ONLY. Commits
-          carry '[workflow] s5_scoreboard'.
-          VERIFY (both directions): unit tests prove (a) given N synthetic
-          wave-verdict records, the scoreboard aggregates the correct rows
-          (count, rate, cost mean); (b) per-model rows split correctly; (c)
-          recompute is idempotent (same input → same output); (d) an empty
-          set produces an empty-but-valid scoreboard (no fabricated zeros).
-          DELIVER: the scoreboard + the tests, committed.
+          DELIVERABLE: the seeded initial belief set from the measured
+          history — each with its evidence citations (the wave names that
+          bear on it): 'flash converges in ~1 wave on in-process work';
+          'container seams take ~4 waves' (the fleet_launch series);
+          'findings were opt-in and never produced' (kb_finding_layer's
+          premise, now disconfirmed by its own success); 'adversarial reviews
+          catch wiring gaps tests miss' (n>=6 by the fleet series);
+          'phases that ask for too much time out or false-positive' (the
+          task-card lesson — the w2 timeout + the deploy-gate false
+          positive).
+          INPUTS: the s4a type; the wave records + reviews that are the
+          citations.
+          DONE_WHEN: each seed exists with its hypothesis + citations + an
+          initial confidence; the seeds are retrievable by domain.
+          GATES: tests/test_belief_protocol.py (the seed cases).
+          SCOPE FENCE: the seeds ONLY — no new types, no new operations.
+          DELIVER: the seeds + tests, committed.
           LOG: PASS/FAIL; commit.
-      - name: s6_reflections
+      # ── s5: the scoreboard ────────────────────────────────────────────────────────
+      - name: s5a_scoreboard_aggregation
         kind: agent
         scope: implementation
-        timeout: 7200
+        timeout: 3600
         prompt: |
           GOAL: {goal}
-          SHAPE: the contemplative series. Build the reflection-record type +
-          the append path: each session's close (s1) appends a reflection
-          entry — what the AIO got wrong, what surprised it, what it would
-          change about its own process — into the reflection series (a
-          session-keyed record family). A command (agentic-dynamics
-          reflect --read) renders the accumulated series so a session can
-          contemplate across its predecessors. The reflection is the AIO's
-          own meta-cognition made durable: multi-session contemplation is the
-          accumulation, and the accumulated reflections feed the next session's
-          open context (s1) and the belief seeds (s4).
-          ACTOR + SCOPE (the context-abstraction dimension, hard rule 6): the reflection records live in the AIO scope (org:repo, producer: aio) — private to the controller-AIO pair, never resolved by agents or the supervisor. The supervisor rail stays separate.
-          SCOPE FENCE: the reflection type + the append/read paths ONLY.
-          Commits carry '[workflow] s6_reflections'.
-          VERIFY (both directions): unit tests prove (a) a close appends its
-          self-notes to the series (the reflection record family grows);
-          (b) reflect --read renders the accumulated entries in order; (c)
-          each entry is session-keyed (never overwrites a prior session's);
-          (d) the series is retrievable as a family.
-          DELIVER: the reflection series + the tests, committed.
+          DELIVERABLE: the scoreboard aggregation command (agentic-dynamics
+          scoreboard [--recompute]) — aggregates the s3 wave-verdict records
+          into measured rows: waves completed, merge rate, adversarial-
+          finding rate (findings per wave), cost per wave (mean/median),
+          time-to-merge, phases per wave, per-model rows. Recomputed from the
+          s3 records — never hand-written totals.
+          INPUTS: the s3a type + its emitted records (the fixture set);
+          the CLI map.
+          DONE_WHEN: N synthetic verdict records aggregate to the correct
+          rows; per-model rows split correctly; recompute is idempotent; an
+          empty set yields an empty-but-valid scoreboard (no fabricated
+          zeros).
+          GATES: tests/test_scoreboard.py.
+          SCOPE FENCE: the aggregation command ONLY. Producer: aio, org:repo
+          (controller + AIO + supervisor read; never cell agents).
+          DELIVER: the command + tests, committed.
           LOG: PASS/FAIL; commit.
+      # ── s6: reflections ───────────────────────────────────────────────────────────
+      - name: s6a_reflection_type_append
+        kind: agent
+        scope: implementation
+        timeout: 3600
+        prompt: |
+          GOAL: {goal}
+          DELIVERABLE: the reflection record type + the append path — the
+          session close (s1b) appends its self-notes into a session-keyed
+          reflection series (a record family: one entry per session, never
+          overwriting a prior session's). Producer: aio. Scope: org:repo,
+          private to the controller-AIO pair — never resolved by agents or
+          the supervisor.
+          INPUTS: the s1a session type (the self-notes field feeds the
+          entry); the record family pattern (retrievable by key).
+          DONE_WHEN: a close appends its entry; a second session's close
+          appends a SECOND entry (the series grows, nothing overwrites); the
+          series is retrievable as a family.
+          GATES: tests/test_reflections.py.
+          SCOPE FENCE: the type + append ONLY — the read command is s6b.
+          DELIVER: the type + append + tests, committed.
+          LOG: PASS/FAIL; commit.
+      - name: s6b_reflection_read
+        kind: agent
+        scope: implementation
+        timeout: 3600
+        prompt: |
+          GOAL: {goal}
+          DELIVERABLE: the reflection READ command (agentic-dynamics
+          reflect --read) — renders the accumulated reflection series in
+          order, so a session can contemplate across its predecessors. The
+          accumulated reflections feed the next session's open context (s1c)
+          and the belief seeds (s4c).
+          INPUTS: the s6a series; the s1c open context (where the read hooks).
+          DONE_WHEN: reflect --read renders the accumulated entries in
+          chronological order; an empty series renders a clear empty state.
+          GATES: tests/test_reflections.py (the read cases).
+          SCOPE FENCE: the read command ONLY. Producer: aio, org:repo.
+          DELIVER: the read command + tests, committed.
+          LOG: PASS/FAIL; commit.
+      # ── the wave's verdict phases ────────────────────────────────────────────────
       - name: s7_adversarial
         kind: agent
         scope: adversarial_readonly
@@ -330,23 +358,24 @@ workflow:
           GOAL: {goal}
           ROLE: the INDEPENDENT adversarial reviewer — a DIFFERENT model and
           session (pro vs the flash author). Falsify the self-knowledge wave,
-          not certify it. Attack in order, re-verified against the actual code
-          + the live KB (never asserted): (1) s1 — does session open actually
-          retrieve the last close (run it)? does close write a retrievable
-          record? (2) s2 — does a promote invocation emit a decision record
-          (run the call site)? (3) s3 — does a completed run emit its wave
-          verdict with the measured fields (run a synthetic completion)? (4)
-          s4 — does a confirm update REALLY increment one record (probe: two
-          updates → one record, n=2)? does disconfirm lower the posterior?
-          (5) s5 — are the scoreboard rows measured from s3 records, never
-          hand-written (probe the aggregation)? (6) s6 — does the reflection
-          series accumulate session-keyed entries? (7) cross — is ANY of the
-          new producers opt-in (the k1 lesson — grep the defaults)? Every
-          finding: FIX on the branch or RECORD as an accepted limitation with
-          reasoning. At least 3 findings or a clean sweep with re-verification
-          evidence — a bare PASS is a failed review.
-          RELEASE VERDICT: merge-ready to main? Loop 2 is real — a session can
-          retrieve its own past?
+          not certify it. Attack in order, re-verified against the actual
+          code + the live KB (never asserted): (1) does session open retrieve
+          the last close (run it)? does close write a retrievable record?
+          (2) does a promote invocation emit a decision record (run the call
+          site)? (3) does a completed run emit its wave verdict (run a
+          synthetic completion)? (4) do two confirm updates yield ONE record
+          with n=2 (probe)? does disconfirm lower the posterior? (5) are the
+          scoreboard rows measured from s3 records (probe the aggregation)?
+          (6) does the reflection series accumulate session-keyed entries?
+          (7) ACTOR LAYERING: can a cell-scoped retrieval resolve the AIO's
+          private records (probe with a workload scope)? is the supervisor
+          rail separate? (8) is ANY producer opt-in (the k1 lesson — grep
+          the defaults)? Every finding: FIX on the branch or RECORD as an
+          accepted limitation with reasoning. At least 3 findings or a clean
+          sweep with re-verification evidence — a bare PASS is a failed
+          review.
+          RELEASE VERDICT: merge-ready to main? Loop 2 is real + correctly
+          layered?
           DELIVER: docs/reviews/self_knowledge_layer_adversarial.md (finding
           table), committed.
           LOG: finding table; PASS/FAIL; commit.
@@ -434,6 +463,6 @@ metrics:
   - {name: independent_gate_recorded, agg: mean, over: cell}
 writeup:
   format: lab_book
-  sections: [question, s0_pin_spec, s1_session_spine, s2_decision_records, s3_wave_verdicts, s4_belief_protocol, s5_scoreboard, s6_reflections, s7_adversarial, s8_test_gate]
+  sections: [question, s0_pin_spec, s1a_session_record_type, s1b_close_writer, s1c_open_reader, s2a_decision_command, s2b_verified_command_emission, s3a_wave_verdict_type, s3b_wave_verdict_emission, s4a_belief_record_type, s4b_belief_update, s4c_belief_seeds, s5a_scoreboard_aggregation, s6a_reflection_type_append, s6b_reflection_read, s7_adversarial, s8_test_gate]
 stop: {budget_usd: 12.0, max_attempts: 1}
 adapt: {strategy: manual, selection: highest_regret}
