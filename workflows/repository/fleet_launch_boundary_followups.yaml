@@ -1,0 +1,289 @@
+name: fleet_launch_boundary_followups
+question: >-
+  Complete the two half-deliveries the fleet_launch_boundary adversarial review
+  found NOT merge-ready (F2 + F3), plus the recorded stragglers (F4, F6). The
+  Wave-2 wave landed b1 (PathConfig — complete) and created the per-run clone
+  (b2) and the broker module (b3) — but: (f2) the per-run clone is created and
+  discarded but NEVER MOUNTED; cells still execute in shared worktrees (/tmp rw)
+  with the shared .git rw — two concurrent cells still share git metadata, the
+  exact defect the ephemeral clone was meant to kill. (f3) the broker is not
+  deployed host-side: the wrapper imports and calls it in-process, and with the
+  socket removed from the compose the in-container docker subprocess FAILS —
+  the Wave-2 change BROKE the containerized path rather than securing it. The
+  compose no longer mounts the socket anywhere and nothing host-side calls the
+  broker: the ladder's reference containerized execution is currently
+  non-functional. (f4) scripts/system_snapshot.py:175 runs `docker ps` — a
+  second Docker API caller outside the broker (benign read-only, but the broker
+  is supposed to be the ONLY caller). (f6) stale prose still describes the
+  pre-b3 socket-holder state. This wave: mounts the per-run clone into each
+  cell (read-only repo, private scratch), deploys the broker as a genuinely
+  host-side component (a systemd user unit or the documented host-launch seam)
+  so the containerized path works again with the socket living ONLY in the
+  broker tier, routes system_snapshot's docker ps through the broker or
+  documents its benign read-only exception, and fixes the stale prose.
+version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: false
+repeatable: false
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: false
+    context:
+      domain_context: >-
+        canonical_sources: [scripts/fleet/launch_broker.py (the Wave-2 broker
+        module — typed LaunchRequest, the single docker subprocess at :578,
+        run_fleet_command at :696), scripts/fleet/spawn_wrapper.py (the
+        request builder — imports the broker in-process; the /tmp rw worktree
+        mount cells still use), infrastructure/docker-compose.ladder.yml (the
+        Wave-2 socket removal — no socket mount remains anywhere),
+        scripts/system_snapshot.py:175 (the docker ps caller), the
+        fleet_launch_boundary wave + its adversarial review (F2/F3/F4/F6),
+        src/agentic_dynamics/core/paths.py (PathConfig — the Wave-2 path
+        object), scripts/fleet/docker_executor.py + docker_verifier_executor.py
+        (the executors whose requests must carry the clone mount)].
+        policies: [one_durable_state, the_gate_is_the_evidence, authority_
+        absolute, bounded_verification].
+      challenge_context: >-
+        challenge: two half-doors. Wave 2 built the clone and the broker but
+        stopped at the mount and the deployment boundary — the hardest two
+        inches. The containerized path is now BROKEN (socket gone, broker
+        in-process with nothing to call): the ladder's reference execution —
+        the thing the whole fleet architecture exists for — cannot run until the
+        broker is genuinely host-side. And the clone that was supposed to end
+        shared-git-metadata is decorative: cells still run in the shared
+        worktree. The risk: merging Wave 2 as-is would permanently strand a
+        non-functional containerized path, and the "not merge-ready" verdict is
+        the machine being honest about its own half-work.
+        deliberation: [the clone mount first (f2 — cells stop sharing git
+        metadata), then the host-side broker deployment (f3 — the containerized
+        path works again), then the stragglers (f4, f6)].
+        session_policy: {default: continue}
+      current_state: >-
+        MEASURED (2026-09-02): b1 PathConfig complete on the wave branch; the
+        per-run clone is created/discarded but never mounted (cells still use
+        /tmp rw + shared .git rw); the broker module exists but is imported
+        in-process; the compose has NO socket mount and nothing host-side
+        invokes the broker — the containerized path is non-functional;
+        system_snapshot.py:175 calls docker ps directly; stale socket-holder
+        prose remains in the Containerfile + agent surfaces.
+      hard_rules: >-
+        (1) THE CLONE IS THE CELL'S WORLD: after f2, every cell executes in its
+        per-run clone — the repo mounted read-only from the clone, scratch
+        private to the run — and NO cell mounts the shared worktree or the
+        shared .git. Two concurrent cells cannot share git metadata through any
+        path.
+        (2) THE BROKER RUNS WHERE THE SOCKET IS: after f3, the broker is
+        deployed host-side (a systemd user unit or the documented host-launch
+        seam) and the socket lives ONLY there. No container mounts the socket;
+        no in-container code calls docker. The containerized path WORKS again
+        (a broker-hosted smoke: a cell spawn succeeds end to end).
+        (3) ONE DOCKER CALLER: after f4, system_snapshot's docker ps either
+        routes through the broker or is documented as a benign read-only
+        exception with the reason. No second untyped caller appears.
+        (4) PROSE MATCHES REALITY: after f6, no committed prose describes the
+        pre-b3 socket-holder state.
+        (5) BOUNDED VERIFICATION (unchanged). REGENERATE, NEVER HAND-EDIT
+        (unchanged).
+    phases:
+      - name: fb0_pin_spec
+        kind: agent
+        scope: implementation
+        timeout: 3600
+        prompt: |
+          GOAL: {goal}
+          ROLE: verification — the house pin convention. Write
+          docs/reviews/fleet_launch_boundary_followups_preregistration.md
+          carrying: (a) this spec's file SHA256 + the worktree git sha; (b) the
+          four edges VERIFIED against the actual code: (1) f2 — the per-run
+          clone is created but never mounted (grep the mount assembly — cells
+          still mount /tmp rw + shared .git rw); (2) f3 — the compose has no
+          socket mount and nothing host-side invokes the broker (grep the yml
+          for the broker service/unit + the socket); (3) f4 —
+          system_snapshot.py:175 calls docker directly; (4) f6 — stale
+          socket-holder prose remains (grep Containerfile + agent surfaces). An
+          edge that does not hold is a FAILED finding. If a claim cannot be
+          reproduced after THREE attempts, record the deviation and FAIL —
+          never loop. DB LOCATION: machine-local state at the MAIN checkout.
+          DELIVER: the preregistration with the verified edges, committed with
+          the '[workflow] fb0_pin_spec — <goal prefix>' subject.
+          LOG: PASS/FAIL per claim; commit.
+      - name: fb1_clone_mounted
+        kind: agent
+        scope: implementation
+        timeout: 7200
+        prompt: |
+          GOAL: {goal}
+          SHAPE: the clone is the cell's world. In the spawn/executor path:
+          each cell's mounts now source the repo from its per-run clone —
+          PathConfig.runs_root/<run-id>/repo mounted read-only (or the cell's
+          private copy rw for its own scratch), the shared /tmp worktree mount
+          and the shared .git overlay are GONE from the cell contract, and the
+          cell's git operations happen against ITS clone. The request builder
+          (build_phase_request / build_verifier_request) carries the clone
+          path; validation refuses a request that would mount the shared
+          worktree or shared .git. A cell's commits land in its clone — the
+          candidate the promoter promotes from.
+          SCOPE FENCE: the clone-mount contract + its validation ONLY — the
+          broker deployment is fb2's. Commits carry '[workflow] fb1_clone_mounted'.
+          VERIFY (both directions): unit tests prove (a) a cell request's
+          mounts source the repo from the run clone (assert the mount source
+          path is under runs_root/<run-id>); (b) no cell request mounts the
+          shared worktree or shared .git (assert absent); (c) validation
+          REFUSES a request that would mount the shared .git; (d) two run ids
+          produce requests referencing two distinct clone paths (never shared);
+          (e) the verifier request is read-only against its clone.
+          DELIVER: the clone-mount contract + the tests, committed.
+          LOG: PASS/FAIL; commit.
+      - name: fb2_broker_hostside
+        kind: agent
+        scope: implementation
+        timeout: 7200
+        prompt: |
+          GOAL: {goal}
+          SHAPE: the broker runs where the socket is. Deploy the launch broker
+          as a genuinely host-side component: a systemd user unit
+          (agentic-dynamics-launch-broker.service, patterned on the existing
+          claude_cred_watch / docs-drift-scan units) that runs
+          scripts/fleet/launch_broker.py as a service with an IPC seam (a unix
+          socket or stdin/stdout request protocol — pick the simplest that is
+          genuinely host-side, not in-container). The orchestrator's spawn path
+          talks to the broker over that seam; NO container mounts the docker
+          socket; NO in-container code calls docker. The compose orchestrator
+          tier drops any residual socket reference; the broker unit is the
+          socket's only home. A broker-hosted SMOKE must pass: a synthetic cell
+          spawn request round-trips through the host broker and returns an
+          outcome (or a documented docker-unavailable path that fails loudly,
+          never silently).
+          SCOPE FENCE: the broker unit + the IPC seam + the spawn-path
+          rewire ONLY — the clone mount is fb1's. Commits carry
+          '[workflow] fb2_broker_hostside'.
+          VERIFY (both directions): unit tests prove (a) the broker service
+          file exists and names the broker module (systemd unit content
+          asserted); (b) the spawn path invokes the broker over the seam (the
+          in-process import is gone — assert the call site); (c) no compose
+          service mounts the socket (grep the yml); (d) a broker round-trip
+          test with a stubbed docker binary returns the expected outcome; (e)
+          docker-unavailable fails loudly with a named state (never a silent
+          pass).
+          DELIVER: the broker unit + the seam + the rewire + the tests,
+          committed.
+          LOG: PASS/FAIL; commit.
+      - name: fb3_stragglers
+        kind: agent
+        scope: implementation
+        timeout: 7200
+        prompt: |
+          GOAL: {goal}
+          SHAPE: the recorded stragglers. (a) f4 — system_snapshot.py:175's
+          docker ps: route it through the broker's typed read-only path OR
+          document it as a benign read-only exception with the reason (the
+          broker's ONLY-caller rule keeps one documented exception, not a
+          second untyped caller). (b) f6 — fix the stale prose: any committed
+          text describing the pre-b3 socket-holder state (Containerfile,
+          agent surfaces, docs) is updated to the broker reality. Surface
+          changes go through the generators (regenerate, never hand-edit).
+          SCOPE FENCE: the f4 route/documentation + the f6 prose fix ONLY.
+          Commits carry '[workflow] fb3_stragglers'.
+          VERIFY (both directions): unit tests prove (a) system_snapshot's
+          docker usage is either broker-routed or documented (grep the call
+          site + its docstring); (b) no committed prose describes the
+          socket-in-container state (grep the Containerfile + agent_config
+          sources); (c) the surfaces regenerate cleanly (--check green).
+          DELIVER: the f4/f6 closures + the tests, committed.
+          LOG: PASS/FAIL; commit.
+      - name: fb4_adversarial
+        kind: agent
+        scope: adversarial_readonly
+        requires_deliverable: true
+        run_model: deepseek/deepseek-v4-pro
+        timeout: 14400
+        prompt: |
+          GOAL: {goal}
+          ROLE: the INDEPENDENT adversarial reviewer — a DIFFERENT model and
+          session (pro vs the flash author). Falsify the follow-up wave, not
+          certify it. Attack in order, re-verified against the actual code
+          (never asserted): (1) fb1 — can two concurrent cells share git
+          metadata through ANY remaining path (grep every mount the request
+          builder can emit)? is the shared worktree/.git truly absent from the
+          cell contract? (2) fb2 — does the containerized path ACTUALLY work
+          again (a smoke through the host broker)? is the socket absent from
+          every container? can ANY in-container code reach docker? is the IPC
+          seam genuinely host-side (not a pretend seam)? (3) fb3 — is
+          system_snapshot's docker usage closed, and is the prose clean?
+          Every finding: FIX on the branch or RECORD as an accepted limitation
+          with reasoning. At least 3 findings or a clean sweep with
+          re-verification evidence — a bare PASS is a failed review.
+          RELEASE VERDICT: merge-ready to main?
+          DELIVER: docs/reviews/fleet_launch_boundary_followups_adversarial.md
+          (finding table), committed.
+          LOG: finding table; PASS/FAIL; commit.
+      - name: fb5_test_gate
+        kind: test
+        scope: implementation
+        timeout: 900
+        tests:
+          - tests/test_launch_broker.py
+          - tests/test_path_config.py
+          - tests/test_spawn_wrapper.py
+          - tests/test_workflow_executor_parity.py
+          - tests/test_workflow_runner.py
+          - tests/test_system_snapshot.py
+          - tests/test_script_classification.py
+          - tests/test_doc_lifecycle.py
+          - tests/test_agent_config_render.py
+          - tests/test_cli_resolution.py
+factors:
+  - {name: model, levels: [deepseek/deepseek-v4-flash]}
+design: factorial
+rules:
+  - name: fb_edges_verified
+    plane: measurement
+    evidence_class: "[M]"
+    requires: []
+    produces: [four_edges_confirmed]
+  - name: clone_is_cell_world
+    plane: measurement
+    evidence_class: "[C]"
+    requires: [four_edges_confirmed]
+    produces: [shared_git_unmounted]
+  - name: broker_hostside_deployed
+    plane: measurement
+    evidence_class: "[C]"
+    requires: [shared_git_unmounted]
+    produces: [containerized_path_works, socket_in_broker_tier_only]
+  - name: stragglers_closed
+    plane: measurement
+    evidence_class: "[C]"
+    requires: [four_edges_confirmed]
+    produces: [single_docker_caller_documented, prose_matches_reality]
+  - name: fb_wave_adversarial_clean
+    plane: measurement
+    evidence_class: "[M]"
+    requires: [shared_git_unmounted, containerized_path_works,
+               socket_in_broker_tier_only, single_docker_caller_documented,
+               prose_matches_reality]
+    produces: [fb_wave_clean]
+  - name: test_gate_measured
+    plane: measurement
+    evidence_class: "[M]"
+    requires: [test_executed_success]
+    produces: [independent_gate_recorded]
+metrics:
+  - {name: four_edges_confirmed, agg: mean, over: cell}
+  - {name: shared_git_unmounted, agg: mean, over: cell}
+  - {name: containerized_path_works, agg: mean, over: cell}
+  - {name: socket_in_broker_tier_only, agg: mean, over: cell}
+  - {name: single_docker_caller_documented, agg: mean, over: cell}
+  - {name: prose_matches_reality, agg: mean, over: cell}
+  - {name: fb_wave_clean, agg: mean, over: cell}
+  - {name: independent_gate_recorded, agg: mean, over: cell}
+writeup:
+  format: lab_book
+  sections: [question, fb0_pin_spec, fb1_clone_mounted, fb2_broker_hostside, fb3_stragglers, fb4_adversarial, fb5_test_gate]
+stop: {budget_usd: 12.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}
