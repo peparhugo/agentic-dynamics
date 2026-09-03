@@ -3,8 +3,8 @@
 **Generated — do not edit by hand.** Regenerate with `python scripts/spec_status.py`;
 `scripts/run_workflow.py` also refreshes it at the end of every run.
 
-Generated at: `2026-09-03T16:22:46.337630+00:00`  ·  189 spec(s)
-**Work remaining:** 78 open · 111 completed/retired
+Generated at: `2026-09-03T18:40:28.770365+00:00`  ·  189 spec(s)
+**Work remaining:** 77 open · 112 completed/retired
 
 | name | kind | repeatable | status | version | supersedes | last_run | ok | model | cost | n_runs |
 |---|---|---|---|---|---|---|---|---|---|---|
@@ -38,7 +38,6 @@ Generated at: `2026-09-03T16:22:46.337630+00:00`  ·  189 spec(s)
 | `fleet_job_submission` | workflow | no | runnable | 0.1 | — | — | — | — | — | 3 |
 | `fleet_launch_boundary` | workflow | no | runnable | 0.1 | — | — | — | — | — | 1 |
 | `green_main_closure` | workflow | no | runnable | 0.1 | — | — | — | — | — | 4 |
-| `kb_finding_layer` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `labbook_refresh` | workflow | yes | runnable | 0.1 | — | 2026-08-17 18:14 | ok | deepseek/deepseek-v4-flash | $0.0275 | 1 |
 | `launch_handler_dry_run` | workflow | yes | runnable | 0.1 | — | — | — | — | — | 0 |
 | `ledger_instrumentation_probe` | workflow | yes | runnable | 0.1 | — | 2026-08-30 19:05 | fail | openai/gpt-5.6-sol | $0.0020 | 1 |
@@ -163,6 +162,7 @@ Generated at: `2026-09-03T16:22:46.337630+00:00`  ·  189 spec(s)
 | `i10_typed_checkpoint` | workflow | no | completed | 0.1 | — | 2026-08-28 17:00 | ok | deepseek/deepseek-v4-flash | $0.0085 | 3 |
 | `investing_domain_audit` | workflow | no | completed | 0.1 | — | 2026-08-22 18:09 | ok | deepseek/deepseek-v4-pro | $0.2010 | 1 |
 | `kb_event_typing` | workflow | no | completed | 0.1 | — | 2026-08-19 00:38 | ok | deepseek/deepseek-v4-pro | $0.2661 | 1 |
+| `kb_finding_layer` | workflow | no | completed | 0.1 | — | 2026-09-03 18:40 | ok | deepseek/deepseek-v4-flash | $1.4697 | 1 |
 | `kb_lineage_reconcile` | workflow | no | completed | 0.1 | — | 2026-08-19 00:31 | ok | deepseek/deepseek-v4-pro | $0.3715 | 1 |
 | `kb_producer_factory` | workflow | no | completed | 0.1 | — | 2026-08-18 23:58 | ok | deepseek/deepseek-v4-pro | $0.4744 | 1 |
 | `kb_record_fidelity` | workflow | no | completed | 0.1 | — | 2026-08-18 23:50 | ok | deepseek/deepseek-v4-pro | $0.1662 | 1 |
