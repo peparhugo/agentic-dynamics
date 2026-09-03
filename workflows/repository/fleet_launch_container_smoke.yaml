@@ -1,0 +1,259 @@
+name: fleet_launch_container_smoke
+question: >-
+  Close the three findings of the fleet_launch_smoke adversarial review (F1-F3)
+  by smoking the ACTUAL fleet deployment shape — a container-tier orchestrator.
+  The smoke wave proved the host-view path (in-process orchestrator → broker →
+  container) but the adversary caught: (f1) the containerized orchestrator's
+  spawn path is still broken — the container env (x-ladder-env) never carries
+  FINOPS_REPO_DIR/FINOPS_GIT_DIR, so a container-tier orchestrator derives
+  repo_root=/repo, which mis-keys the path-view discriminator and collides with
+  REPO_TARGET (reproduced by the adversary); (f2) the container-view path was
+  never smoke-proven — only unit-proven; (f3) the mount-proof evidence was a
+  recorded --rm observation, not durably re-verifiable. This wave: sets the
+  env in the container tier (f1), smokes the container-tier orchestrator shape
+  end to end (f2 — the discriminator works when the orchestrator IS a
+  container), and makes the mount proof durable (f3 — a re-verifiable
+  artifact, not a --rm observation). The smoke drives the REAL fleet compose
+  orchestrator service (docker compose up the workflow-runner/orchestrator
+  tier) so the container-env shape is what is exercised.
+version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: true
+repeatable: false
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: false
+    context:
+      domain_context: >-
+        canonical_sources: [infrastructure/docker-compose.ladder.yml
+        (x-ladder-env at :31 — the container env missing FINOPS_REPO_DIR/
+        FINOPS_GIT_DIR — f1's fix; the workflow-runner/orchestrator services
+        the smoke drives), scripts/fleet/launch_broker.py (the path-view
+        discriminator the container env mis-keys), scripts/fleet/
+        spawn_wrapper.py (REPO_TARGET + _mounts_shared_surface), scripts/
+        run_workflow.py (the --orchestrator composition root), the
+        fleet_launch_smoke wave + its adversarial review (F1-F3), and the
+        prior fleet_launch_boundary waves].
+        policies: [one_durable_state, the_gate_is_the_evidence, authority_
+        absolute, bounded_verification].
+      challenge_context: >-
+        challenge: the fleet's REAL shape — the orchestrator as a container —
+        has never been smoked. Every smoke so far drove the host-view path
+        (in-process orchestrator). The adversary reproduced that a
+        container-tier orchestrator (no FINOPS_REPO_DIR in its env) derives the
+        wrong repo view and the broker refuses its own spawns. The fix is
+        environmental (set the vars) but the PROOF must be the actual compose
+        service launching a cell. f3 is evidence hygiene: the mount proof must
+        survive the container (write the inspect record to a durable artifact
+        before --rm, or run without --rm and record the id).
+        deliberation: [the env fix first (f1 — set FINOPS_REPO_DIR/FINOPS_GIT_
+        DIR in the container tier), then the durable mount proof (f3 — the
+        evidence survives), then the container-tier smoke (f2 — the real shape
+        proven end to end)].
+        session_policy: {default: continue}
+      current_state: >-
+        MEASURED (2026-09-02): x-ladder-env lacks FINOPS_REPO_DIR/FINOPS_GIT_DIR;
+        the host-view smoke passed (a real container spawned, clone mounted,
+        suite ran); the container-tier orchestrator shape is unit-tested but
+        never smoked; the mount proof was a --rm observation.
+      hard_rules: >-
+        (1) THE REAL SHAPE IS THE VERDICT: the wave is complete only when the
+        CONTAINER-TIER orchestrator (the compose service, with the fixed env)
+        spawns a cell end to end through the broker — never only the host-view
+        path. A host-only smoke is the exact half-proof the previous wave's
+        adversary caught.
+        (2) THE EVIDENCE SURVIVES: every smoke artifact (container id, mount
+        inspect, exit code, verdict) is written to a durable file before the
+        container is removed — a recorded observation that cannot be re-derived
+        is not evidence.
+        (3) THE CONTAINER ENV IS THE CONTRACT: the container tier carries
+        FINOPS_REPO_DIR/FINOPS_GIT_DIR so a container orchestrator derives the
+        same repo view the broker expects. No tier derives its view differently
+        than the broker validates.
+        (4) BOUNDED VERIFICATION (unchanged). REGENERATE, NEVER HAND-EDIT
+        (unchanged).
+    phases:
+      - name: cs0_pin_spec
+        kind: agent
+        scope: implementation
+        timeout: 3600
+        prompt: |
+          GOAL: {goal}
+          ROLE: verification — the house pin convention. Write
+          docs/reviews/fleet_launch_container_smoke_preregistration.md
+          carrying: (a) this spec's file SHA256 + the worktree git sha; (b) the
+          three edges VERIFIED against the actual code + this host: (1) f1 —
+          x-ladder-env lacks FINOPS_REPO_DIR/FINOPS_GIT_DIR (grep the yml);
+          (2) f2 — the container-tier orchestrator shape is not smoke-proven
+          (only unit tests — grep the smoke evidence); (3) f3 — the mount
+          proof was a --rm observation (read the smoke phase's evidence); (4)
+          docker + the fleet images work here (docker info + docker images).
+          An edge that does not hold is a FAILED finding. If a claim cannot
+          be reproduced after THREE attempts, record the deviation and FAIL —
+          never loop.
+          DELIVER: the preregistration with the verified edges, committed with
+          the '[workflow] cs0_pin_spec — <goal prefix>' subject.
+          LOG: PASS/FAIL per claim; commit.
+      - name: cs1_container_env
+        kind: agent
+        scope: implementation
+        timeout: 7200
+        prompt: |
+          GOAL: {goal}
+          SHAPE: the container tier carries the repo view. In
+          docker-compose.ladder.yml's x-ladder-env (and the orchestrator /
+          workflow-runner service env): set FINOPS_REPO_DIR and FINOPS_GIT_DIR
+          to the container-visible repo path (the /repo mount and its .git),
+          so a container-tier orchestrator derives the same repo view the
+          broker validates. No tier derives its view differently.
+          SCOPE FENCE: the env additions ONLY — the smoke is cs3's, the
+          evidence hygiene cs2's. Commits carry '[workflow] cs1_container_env'.
+          VERIFY (both directions): unit tests prove (a) the compose env
+          carries FINOPS_REPO_DIR/FINOPS_GIT_DIR for the orchestrator tier
+          (parse the yml, assert the keys); (b) a container-view path
+          derivation with those env vars produces the broker-expected view
+          (the ws2 discriminator keys correctly).
+          DELIVER: the env fix + the tests, committed.
+          LOG: PASS/FAIL; commit.
+      - name: cs2_durable_evidence
+        kind: agent
+        scope: implementation
+        timeout: 7200
+        prompt: |
+          GOAL: {goal}
+          SHAPE: the evidence survives. In the smoke harness (the ws4_smoke
+          phase's launch script or its successor): every smoke artifact —
+          container id, docker inspect mount proof (RW=false for the clone),
+          exit code, verdict — is written to a DURABLE file (e.g.
+          experiments/results/smoke/<spec>/<timestamp>.json) BEFORE the
+          container is removed; the container runs WITHOUT --rm (or the
+          inspect is captured and persisted before removal), so the evidence
+          is re-derivable from the artifact, not a memory.
+          SCOPE FENCE: the evidence-persistence in the smoke harness ONLY.
+          Commits carry '[workflow] cs2_durable_evidence'.
+          VERIFY (both directions): unit tests prove (a) the smoke harness
+          writes the evidence file with the container id + mount proof before
+          cleanup; (b) the evidence file round-trips (loadable JSON with the
+          expected keys); (c) the harness removes the container only after
+          persisting.
+          DELIVER: the durable-evidence harness + the tests, committed.
+          LOG: PASS/FAIL; commit.
+      - name: cs3_container_smoke
+        kind: agent
+        scope: implementation
+        timeout: 7200
+        prompt: |
+          GOAL: {goal}
+          SHAPE: THE SMOKE OF THE REAL SHAPE. On THIS host, launch the
+          container-tier orchestrator (the compose workflow-runner /
+          orchestrator service, with the fixed env from cs1) and drive ONE
+          cell through it end to end: the orchestrator (as a container, its
+          env carrying FINOPS_REPO_DIR/FINOPS_GIT_DIR) builds the request →
+          the broker accepts (the discriminator keys correctly — f1 fixed) →
+          the container spawns → the clone is mounted read-only → a trivial
+          suite runs → the verdict returns through the envelope. The mount
+          proof + all artifacts are persisted per cs2 (durable, re-verifiable).
+          If the smoke exposes a further gap, FIX IT IN THIS PHASE — the wave
+          is not complete until the container-tier shape passes. A host-view
+          only smoke is a failed wave (hard rule 1).
+          SCOPE FENCE: the container-tier smoke + any wiring it exposes ONLY.
+          Commits carry '[workflow] cs3_container_smoke'.
+          VERIFY: the smoke's durable evidence IS the verification — record
+          the container id, the mount inspect (RW=false), the exit code, and
+          the verdict, persisted per cs2.
+          DELIVER: the durable smoke evidence + any fixes, committed.
+          LOG: the evidence table; PASS/FAIL; commit.
+      - name: cs4_adversarial
+        kind: agent
+        scope: adversarial_readonly
+        requires_deliverable: true
+        run_model: deepseek/deepseek-v4-pro
+        timeout: 14400
+        prompt: |
+          GOAL: {goal}
+          ROLE: the INDEPENDENT adversarial reviewer — a DIFFERENT model and
+          session (pro vs the flash author). Falsify the container-smoke wave,
+          not certify it. Attack in order, re-verified against the actual code
+          + the durable smoke evidence (never asserted): (1) cs1 — does the
+          container tier carry the env (grep the yml)? does a container
+          orchestrator now derive the broker-expected view? (2) cs3 — is the
+          smoke evidence from the CONTAINER-TIER orchestrator (not a host-view
+          replay)? is the evidence durable (re-derivable from the artifact)?
+          can you find ANY path the container-tier smoke did not traverse?
+          (3) cross — reproduce the f1 failure shape yourself: a container
+          with the fixed env CAN spawn through the broker; without it CANNOT
+          (the discriminator refuses) — prove both. Every finding: FIX on the
+          branch or RECORD as an accepted limitation with reasoning. At least
+          3 findings or a clean sweep with re-verification evidence — a bare
+          PASS is a failed review.
+          RELEASE VERDICT: merge-ready to main? The container-tier path works
+          end to end?
+          DELIVER: docs/reviews/fleet_launch_container_smoke_adversarial.md
+          (finding table), committed.
+          LOG: finding table; PASS/FAIL; commit.
+      - name: cs5_test_gate
+        kind: test
+        scope: implementation
+        timeout: 900
+        tests:
+          - tests/test_launch_broker.py
+          - tests/test_smoke_harness.py
+          - tests/test_spawn_wrapper.py
+          - tests/test_path_config.py
+          - tests/test_workflow_executor_parity.py
+          - tests/test_workflow_runner.py
+          - tests/test_script_classification.py
+          - tests/test_doc_lifecycle.py
+          - tests/test_agent_config_render.py
+          - tests/test_cli_resolution.py
+factors:
+  - {name: model, levels: [deepseek/deepseek-v4-flash]}
+design: factorial
+rules:
+  - name: cs_edges_verified
+    plane: measurement
+    evidence_class: "[M]"
+    requires: []
+    produces: [three_edges_and_docker_confirmed]
+  - name: container_env_fixed
+    plane: measurement
+    evidence_class: "[C]"
+    requires: [three_edges_and_docker_confirmed]
+    produces: [container_derives_broker_view]
+  - name: evidence_durable
+    plane: measurement
+    evidence_class: "[C]"
+    requires: [three_edges_and_docker_confirmed]
+    produces: [smoke_artifacts_survive]
+  - name: container_tier_smoked
+    plane: measurement
+    evidence_class: "[M]"
+    requires: [container_derives_broker_view, smoke_artifacts_survive]
+    produces: [real_shape_proven]
+  - name: cs_wave_adversarial_clean
+    plane: measurement
+    evidence_class: "[M]"
+    requires: [real_shape_proven]
+    produces: [container_smoke_wave_clean]
+  - name: test_gate_measured
+    plane: measurement
+    evidence_class: "[M]"
+    requires: [test_executed_success]
+    produces: [independent_gate_recorded]
+metrics:
+  - {name: three_edges_and_docker_confirmed, agg: mean, over: cell}
+  - {name: container_derives_broker_view, agg: mean, over: cell}
+  - {name: smoke_artifacts_survive, agg: mean, over: cell}
+  - {name: real_shape_proven, agg: mean, over: cell}
+  - {name: container_smoke_wave_clean, agg: mean, over: cell}
+  - {name: independent_gate_recorded, agg: mean, over: cell}
+writeup:
+  format: lab_book
+  sections: [question, cs0_pin_spec, cs1_container_env, cs2_durable_evidence, cs3_container_smoke, cs4_adversarial, cs5_test_gate]
+stop: {budget_usd: 12.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}
