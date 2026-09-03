@@ -574,7 +574,10 @@ def _prompt_as_evidence_findings(
     """A gate that gates a candidate (it is bound, or it is a required promotion
     gate) must carry a MACHINE executor (test|command). Prompt text — or an LLM
     executor — is not evidence. A controller approval (kind: approval) is
-    legitimate human evidence."""
+    legitimate human evidence — but ONLY with a human/controller executor. An
+    ``approval`` step carrying an LLM (agent/task) executor is the A1 anti-pattern:
+    an author could make an LLM self-approval the candidate's ONLY required gate —
+    prompt text and LLM judgment are never independent gate evidence."""
     required_gate_ids: set[str] = set()
     promotion = spec.get("promotion")
     if isinstance(promotion, dict) and isinstance(promotion.get("requiredGates"), list):
@@ -582,7 +585,8 @@ def _prompt_as_evidence_findings(
 
     out: list[Finding] = []
     for step in steps:
-        if step.get("kind") != "gate":
+        kind = step.get("kind")
+        if kind not in ("gate", "approval"):
             continue
         step_id = step.get("id")
         if not isinstance(step_id, str):
@@ -591,6 +595,29 @@ def _prompt_as_evidence_findings(
         if not is_required:
             continue
         executor = step.get("executor")
+        if kind == "approval":
+            # A1 (authoring_product_aio, 2026-09-03): an approval is legitimate ONLY as a
+            # human/controller checkpoint. An LLM executor (agent/task) on an approval is
+            # not a human gate — it is a model judging its own work, the exact
+            # self-approval the rule forbids. The executor must be a human/controller
+            # form (or a machine gate executor, which makes it a gate, not an approval).
+            if executor in ("human", "controller", "operator"):
+                continue
+            if executor in MACHINE_GATE_EXECUTORS:
+                continue
+            out.append(
+                Finding(
+                    code=PROMPT_AS_EVIDENCE,
+                    message=(
+                        f"approval {step_id!r} carries an LLM executor "
+                        f"(executor={executor!r}): an approval is a human/controller "
+                        "checkpoint — a model executor makes it an LLM self-approval, "
+                        "which is never independent gate evidence"
+                    ),
+                    path=f"$.spec.steps[@{step_id}].executor",
+                )
+            )
+            continue
         if executor in MACHINE_GATE_EXECUTORS:
             continue
         out.append(

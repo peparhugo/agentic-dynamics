@@ -466,3 +466,54 @@ def test_linting_a_corpus_experiment_spec_does_not_pass_and_does_not_crash():
 )
 def test_is_workflow_v1_document_is_strict(document):
     assert lw.is_workflow_v1_document(document) is False
+
+
+def test_approval_with_agent_executor_is_rejected_prompt_as_evidence():
+    """A1 (authoring_product_aio adversarial, 2026-09-03): an approval step carrying an
+    LLM executor (agent/task) is NOT legitimate human evidence — it is an LLM
+    self-approval. An author must not be able to make a model judge its own work the
+    candidate's ONLY required gate. Only a human/controller executor (or a machine
+    gate executor, which makes it a gate not an approval) is legitimate on an approval."""
+    document = _workflow(
+        steps=[
+            _agent_step(),
+            {
+                "id": "approve",
+                "kind": "approval",
+                "executor": "agent",  # the A1 anti-pattern: an LLM self-approval
+                "needs": ["implement"],
+                "candidateFrom": "implement",
+            },
+        ],
+        promotion={
+            "candidateFrom": "implement",
+            "strategy": "squash-merge",
+            "requiredGates": ["approve"],
+        },
+    )
+    findings = lw.lint(document)
+    assert not findings.ok
+    assert findings.has(lw.PROMPT_AS_EVIDENCE)
+
+
+def test_approval_with_human_executor_still_passes_after_a1():
+    """The A1 tightening must not reject the legitimate shape: a human/controller
+    approval as the required gate stays clean."""
+    document = _workflow(
+        steps=[
+            _agent_step(),
+            {
+                "id": "approve",
+                "kind": "approval",
+                "executor": "human",
+                "needs": ["implement"],
+                "candidateFrom": "implement",
+            },
+        ],
+        promotion={
+            "candidateFrom": "implement",
+            "strategy": "squash-merge",
+            "requiredGates": ["approve"],
+        },
+    )
+    assert lw.lint(document).ok
