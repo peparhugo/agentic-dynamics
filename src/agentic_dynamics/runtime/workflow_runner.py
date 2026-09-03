@@ -1452,9 +1452,40 @@ def _output_from_event(event: dict[str, Any]) -> str:
 
 
 def _deploy_pattern_match(command: str) -> str | None:
-    """Return the label of the first deploy pattern ``command`` matches, or ``None``."""
+    """Return the label of the first deploy pattern ``command`` matches, or ``None``.
+
+    COMMAND-tier strictness (the a4/a2 false-positive fix, 2026-09-03): the tier fires
+    only when ``firebase`` is the command being EXECUTED, never when the string appears
+    inside an argument. A phase that legitimately QUOTES "firebase deploy" — a commit
+    message, a grep pattern, a doc write, an agent definition's permission model — must
+    not trip the gate; only an actual ``firebase deploy`` invocation is a deploy. The
+    match anchors on the command POSITION: firebase at the start, or after a shell
+    prefix (``npx``/``yarn``/``sudo``/env-assignment/``&&``/``;``/``|``), and the
+    deploy keyword within the same command. The OUTPUT tier (unchanged) catches real
+    indirection — a script that reaches firebase prints "Deploy complete!" / the
+    hosting banner regardless of how it was invoked.
+    """
+    # Strip a leading shell prefix so `npx firebase deploy`, `sudo firebase deploy`,
+    # `VAR=x firebase deploy`, `cmd && firebase deploy`, `cmd; firebase deploy`,
+    # `cmd | firebase deploy` all match at the command position — but `git commit
+    # -m "…firebase deploy…"` (firebase buried in an argument) never does.
+    head = command.lstrip()
+    # An argument-position mention: firebase preceded by a command word that is NOT a
+    # known launcher (the launchers below are the only legitimate command-position
+    # prefixes). Anything else — git, echo, grep, cat, python, cp, rg — means firebase
+    # is an argument, not the executed command.
+    known_launchers = ("npx ", "yarn ", "sudo ", "firebase ", "./firebase", "env ")
+    starts_at_command = head.startswith("firebase") or any(
+        head.startswith(l) for l in known_launchers
+    ) or bool(re.match(r"^[A-Za-z_][A-Za-z0-9_]*=[^\s]*\s+(?:npx\s+|sudo\s+)?firebase\b", head))
+    if not starts_at_command:
+        # Also allow a compound whose LAST command is firebase (a &&/;/| chain ending in
+        # the deploy): `build && firebase deploy` IS a deploy act.
+        chain_ok = bool(re.search(r"(?:&&|\|\||;)\s*(?:npx\s+|sudo\s+)?firebase\b", head))
+        if not chain_ok:
+            return None
     for pattern, label in DEPLOY_PATTERNS:
-        if pattern.search(command):
+        if pattern.search(head):
             return label
     return None
 

@@ -2541,3 +2541,28 @@ def test_checkpoint_ledger_round_trips_spec_status_style(tmp_path):
                          commit=False, run_agentic_fn=lambda *a, **k: _fake_agent())
     assert plain.checkpoints == []
     assert plain.to_dict()["checkpoints"] == []
+
+
+def test_deploy_gate_ignores_argument_position_firebase_mentions(tmp_path):
+    """The a2/a4 false-positive fix (2026-09-03): the deploy gate fires only when firebase
+    is the EXECUTED command, never when the string appears inside an argument — a commit
+    message quoting 'firebase deploy', a grep pattern, or a doc write are not deploys.
+    The OUTPUT tier still catches real indirection (a script that reaches firebase prints
+    the deploy banner)."""
+    spec = load_spec(SPEC)
+    mention = json.dumps({
+        "type": "tool_use", "sessionID": "s",
+        "part": {"type": "tool", "tool": "bash",
+                 "state": {"input": {"command":
+                     "git commit -m \"[workflow] a4 — the AIO definition states: firebase deploy *: ask\""}}},
+    })
+
+    def agent(prompt, *, model, backend, workdir, **kwargs):
+        _watchdog_transcript(workdir).parent.mkdir(parents=True, exist_ok=True)
+        _watchdog_transcript(workdir).write_text(mention + "\n")
+        return _fake_agent()
+
+    result = run_workflow(spec, goal="g", model="m", workdir=tmp_path, commit=False,
+                          run_agentic_fn=agent)
+    assert result.ok
+    assert all(p.deploy_gate is None for p in result.phases)
