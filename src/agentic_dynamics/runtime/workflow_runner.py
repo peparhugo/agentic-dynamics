@@ -1406,9 +1406,23 @@ DEPLOY_PATTERNS: list[tuple[re.Pattern[str], str]] = [
 #: The OUTPUT tier's signatures — firebase's production-deploy banner, printed regardless of how
 #: the deploy was invoked (direct, script file, alias, variable). Catches command indirection.
 DEPLOY_OUTPUT_PATTERNS: list[tuple[re.Pattern[str], str]] = [
-    (re.compile(r"Deploy\s+complete!"), "firebase deploy output (Deploy complete!)"),
+    # Banner-shaped only (the a6 false-positive fix, 2026-09-03): real firebase output
+    # prints "Deploy complete!" as a STANDALONE line. A grep of the gate's own source
+    # prints `re.compile(r"Deploy\s+complete!")` — an embedded source echo, not a
+    # banner — so the pattern excludes lines that carry source-code markers
+    # (compile(, r", print(, quote) before the banner text. MULTILINE so the banner
+    # matches as a standalone line anywhere in the output, not only at string end.
     (
-        re.compile(r"hosting\[(?:ai-finops-rulebook|agentic-dynamics)\]"),
+        re.compile(
+            r"(?m)^(?![^\"'\n]*(?:compile\(|r\"|print\())[^\"'\n]*Deploy\s+complete!$"
+        ),
+        "firebase deploy output (Deploy complete!)",
+    ),
+    # hosting[<host>] progress lines are real firebase output when they carry the
+    # deploy verb context ("beginning deploy" / "deploying") — a bare hosting[<host>]
+    # substring appears in source files (compose yml, docs) and is NOT a banner.
+    (
+        re.compile(r"hosting\[(?:ai-finops-rulebook|agentic-dynamics)\][^\n]*(?:beginning|deploying|Deploying|complete|Complete)"),
         "firebase hosting[<production-host>] output",
     ),
     (
