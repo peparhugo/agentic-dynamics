@@ -12,7 +12,7 @@ workflow:
   params:
     language: python
     phases:
-      - name: cs3_smoke_gate
+      - name: p5_test_gate
         kind: test
         scope: implementation
         timeout: 180
