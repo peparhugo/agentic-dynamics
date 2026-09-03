@@ -537,6 +537,10 @@ def validate_spawn(
         return errors
 
     # Step 2 — the phase must be AUTHORIZED for that scope (its declared allowed scope).
+    # A phase that DECLARED its scope in the spec is authorized by that declaration (the
+    # request's ``scope_declared`` — the declared scope wins per the resolution order; the
+    # static table cannot know a custom spec's phases, the F3 cs4 fix). Without a declaration,
+    # the table (or the caller's phase_scopes) is the authorization source.
     if phase_scopes is not None:
         authorized = phase_scopes.get(phase)
     else:

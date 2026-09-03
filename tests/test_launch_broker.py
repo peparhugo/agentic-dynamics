@@ -468,13 +468,19 @@ def test_existing_refusals_are_unchanged_with_the_view_field():
 
 
 def test_broker_re_runs_the_wrappers_scope_model_and_keeps_the_same_refusal():
-    """The broker validates what it will execute with the SAME checks the wrapper ran — a
-    scope-model violation (e.g. an unauthorized phase) refuses at the broker with the same
-    step message, before any docker argv is built."""
-    request = _built_request(phase="p6_adversarial", scope="implementation")
+    """The broker validates what it will execute with the SAME checks the wrapper ran.
+
+    F3 (fleet_launch_container_smoke cs4) refined the boundary: phase AUTHORIZATION is the
+    wrapper's gate (it alone has the spec's declared scopes — a custom spec's phases
+    legitimately declare their scope, which the static table cannot know); the broker
+    re-validates the LAUNCH MECHANICS (vocabulary membership, mount contract, lease, view)
+    against the request's own resolved scope. A scope OUTSIDE the closed vocabulary still
+    refuses at the broker (step 1) before any docker argv is built; a wrapper-validated
+    declared scope passes the broker's mechanics checks."""
+    request = _built_request(phase="p6_adversarial", scope="not-a-scope")
     with pytest.raises(launch_broker.LaunchRequestError) as exc:
         launch_broker.launch(request, dry_run=True)
-    assert any("step 2" in e and "not authorized" in e for e in exc.value.errors)
+    assert any("step 1" in e and "vocabulary" in e for e in exc.value.errors)
 
 
 def test_wrapper_and_broker_validate_with_the_same_profile_table():

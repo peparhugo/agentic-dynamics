@@ -114,6 +114,17 @@ class DockerAgentExecutor(StepExecutor):
             sibling_cmd += ["--backend", self._backend or request.backend]
 
         admission = current_context()
+        # F3 (fleet_launch_container_smoke cs4): pass the phase's OWN declared scope as its
+        # authorization. The phase_def carries ``scope: <vocabulary-member>`` (the declared
+        # scope wins per the resolution order), and the executor is the composition-root side
+        # that knows it — a custom spec's phases legitimately declare their scope, and the
+        # static PHASE_SCOPE_AUTHORIZATION table cannot know them. Without this, step 2 falls
+        # back to the table and REFUSES every custom-phase spawn (the F3 agent-cell gap: the
+        # containerized path could only ever run table-known phases).
+        phase_scopes = None
+        declared = request.phase_def.get("scope") if isinstance(request.phase_def, dict) else None
+        if declared in spawn_wrapper.SCOPE_VOCABULARY:
+            phase_scopes = {request.phase_name: declared}
         return spawn_wrapper.build_phase_request(
             request.phase_def,
             goal=self._goal,
@@ -123,6 +134,7 @@ class DockerAgentExecutor(StepExecutor):
             command=sibling_cmd,
             admission=admission,
             run_clone=self._run_clone,
+            phase_scopes=phase_scopes,
             # P0-3: a per-attempt state namespace — <spec>/<phase>/ — so retries and
             # concurrent phases never share a writable CLI-state directory.
             state_namespace=f"{self._spec_name}/{request.phase_name}",
@@ -136,7 +148,14 @@ class DockerAgentExecutor(StepExecutor):
     def execute(self, request: StepRequest) -> StepResult:
         """Spawn one sibling cell for ``request`` (via the launch broker) and classify its outcome."""
         phase_request = self.build_request(request)
-        outcome = spawn_wrapper.spawn_sibling(phase_request)
+        # F3 (fleet_launch_container_smoke cs4): the spawn-side re-validation needs the phase's
+        # own declared scope as its authorization (spawn_sibling's step-2 check) — a custom
+        # spec's phase legitimately declares its scope; the static table cannot know it.
+        auth_scopes = None
+        declared = request.phase_def.get("scope") if isinstance(request.phase_def, dict) else None
+        if declared in spawn_wrapper.SCOPE_VOCABULARY:
+            auth_scopes = {request.phase_name: declared}
+        outcome = spawn_wrapper.spawn_sibling(phase_request, phase_scopes=auth_scopes)
         decision = _classify(outcome)
         state = decision["state"]
         envelope = decision.get("envelope") or {}

@@ -109,9 +109,13 @@ def install(
     output: Path | str,
     *,
     repo_root: Path | None = None,
+    runs_root: Path | str | None = None,
     env: Mapping[str, str] | None = None,
 ) -> Path:
     """Render the unit from ``repo_root`` (derived from PathConfig when None) and write it.
+
+    ``runs_root`` (the per-run clone root the broker must share with the container tier)
+    derives from ``FINOPS_RUNS_ROOT`` when set, else the compose-matching default.
 
     Creates the target's parent directory (the user systemd dir is typically absent until the
     first user unit is installed). Returns the written path.

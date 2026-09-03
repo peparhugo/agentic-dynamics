@@ -284,7 +284,17 @@ def launch(
     if errors:
         raise LaunchRequestError(errors)
 
-    scope_errors = spawn_wrapper.validate_spawn(request, path_config=cfg)
+    scope_errors = spawn_wrapper.validate_spawn(
+        request, path_config=cfg,
+        # F3 (fleet_launch_container_smoke cs4): phase AUTHORIZATION was adjudicated
+        # wrapper-side (the wrapper's step 2 ran with the spec's declared scopes before the
+        # request crossed the seam — a compromised phase can never reach the broker). The
+        # broker re-validates the LAUNCH MECHANICS (contract, mounts, lease, view) against
+        # the request's own resolved scope — it cannot re-adjudicate phase authorization
+        # without the spec, and must not refuse a legitimately-declared scope because the
+        # static table cannot know a custom spec's phases.
+        phase_scopes={str(request.get("phase", "")): str(request.get("scope", ""))},
+    )
     if scope_errors:
         raise LaunchRequestError(scope_errors)
 
