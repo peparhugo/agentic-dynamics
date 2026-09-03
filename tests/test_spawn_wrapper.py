@@ -546,6 +546,208 @@ def test_module_contract_snapshot_matches_the_default_config_contract():
     assert contract_targets(_default_cfg()) == CONTRACT_TARGETS
 
 
+# ── fb1_clone_mounted — the clone is the cell's world (the mount contract + its validation) ──
+
+
+def _clone_phase_request(tmp_path, *, run_id="run-abc", verifier=False, scope="implementation"):
+    """Build a clone-world request (agent or verifier) against a scratch config + clone path."""
+    _repo, cfg = _make_config_repo(tmp_path)
+    clone = cfg.runs_root / run_id / "repo"
+    if verifier:
+        req = build_verifier_request(
+            {"name": "g3_test_gate", "kind": "test", "scope": scope,
+             "tests": ["tests/test_spec_x.py"]},
+            goal="g", workdir="/tmp/wt_x", model="deepseek/deepseek-v4-flash",
+            spec_name="spec_x", path_config=cfg, run_clone=clone,
+        )
+        phase_name = "g3_test_gate"
+    else:
+        req = build_phase_request(
+            {"name": "p1_slice1_base_supervisor", "scope": scope},
+            goal="g", workdir="/tmp/wt", model="deepseek/deepseek-v4-pro",
+            spec_name="spec_x", path_config=cfg, run_clone=clone,
+        )
+        phase_name = "p1_slice1_base_supervisor"
+    return req, cfg, clone, phase_name
+
+
+def test_clone_world_phase_request_sources_the_repo_from_the_run_clone(tmp_path):
+    """(fb1 VERIFY a) a clone-world cell request's repo mount sources from the run clone — the
+    mount source is runs_root/<run-id>/repo — and validates clean under the SAME config."""
+    req, cfg, clone, phase_name = _clone_phase_request(tmp_path)
+    assert req["run_clone"] == str(clone)
+    repo_mounts = [m for m in req["mounts"] if m.get("target") == "/repo"]
+    assert len(repo_mounts) == 1, f"expected exactly one /repo mount, got {req['mounts']}"
+    repo_mount = repo_mounts[0]
+    # the repo source is the run's clone: strictly under runs_root/<run-id>, never repo_root
+    source = Path(repo_mount["source"]).resolve()
+    assert source == clone.resolve()
+    assert cfg.runs_root.resolve() in source.parents
+    assert source.parent.name == "run-abc"
+    # a commit-capable implementation cell mounts its clone rw (commits land in ITS clone)
+    assert repo_mount["mode"] == "rw"
+    assert validate_spawn(
+        req, phase_scopes={phase_name: "implementation"}, path_config=cfg,
+    ) == []
+
+
+def test_clone_world_request_mounts_no_shared_worktree_or_shared_git(tmp_path):
+    """(fb1 VERIFY b) a clone-world cell request mounts NEITHER the shared worktree NOR the
+    shared .git — no /tmp namespace, no /repo/.git overlay, no D-16 host-path repo/.git alias,
+    and no mount sources the shared worktrees_root or git_dir."""
+    req, cfg, _clone, phase_name = _clone_phase_request(tmp_path)
+    targets = {m.get("target"): m for m in req["mounts"]}
+    sources = {str(m.get("source", "")) for m in req["mounts"]}
+
+    # shared-worktree target (/tmp) and both shared-git spellings (/repo/.git overlay + the
+    # host-path repo/.git aliases) are ABSENT
+    assert "/tmp" not in targets
+    assert "/repo/.git" not in targets
+    assert str(cfg.repo_root) not in targets
+    assert str(cfg.git_dir) not in targets
+    # the shared sources never appear either
+    assert str(cfg.worktrees_root) not in sources
+    assert str(cfg.git_dir) not in sources
+    assert str(cfg.repo_root) not in sources
+    # the results/auth/state credential surface is still there (a clone cell is a real cell)
+    assert "/app/experiments/results" in targets and targets["/app/experiments/results"]["mode"] == "rw"
+    assert "/state" in targets and targets["/state"]["mode"] == "rw"
+    assert validate_spawn(
+        req, phase_scopes={phase_name: "implementation"}, path_config=cfg,
+    ) == []
+
+
+def test_clone_world_validation_refuses_a_request_that_would_mount_the_shared_git(tmp_path):
+    """(fb1 VERIFY c) validation REFUSES a clone-world request that would mount the shared .git —
+    by overlay target, by host-path .git alias target, and by a source inside the shared git dir."""
+    req, cfg, _clone, phase_name = _clone_phase_request(tmp_path)
+    base = dict(req)
+
+    # (i) the shared /repo/.git overlay (a phase cell writing the SHARED git dir)
+    tampered = {**base, "mounts": list(base["mounts"]) + [
+        {"target": "/repo/.git", "source": str(cfg.git_dir), "mode": "rw"},
+    ]}
+    errors = validate_spawn(
+        tampered, phase_scopes={phase_name: "implementation"}, path_config=cfg,
+    )
+    assert errors and any("step 3" in e and "shared" in e for e in errors), errors
+
+    # (ii) the D-16 host-path .git alias (source + target = the shared git dir at its host path)
+    tampered = {**base, "mounts": list(base["mounts"]) + [
+        {"target": str(cfg.git_dir), "source": str(cfg.git_dir), "mode": "rw"},
+    ]}
+    errors = validate_spawn(
+        tampered, phase_scopes={phase_name: "implementation"}, path_config=cfg,
+    )
+    assert errors and any("step 3" in e and "shared" in e for e in errors), errors
+
+    # (iii) a source INSIDE the shared .git masked onto an otherwise-legal target
+    tampered = {**base, "mounts": list(base["mounts"]) + [
+        {"target": "/app/experiments/results", "source": str(cfg.git_dir / "objects"), "mode": "ro"},
+    ]}
+    errors = validate_spawn(
+        tampered, phase_scopes={phase_name: "implementation"}, path_config=cfg,
+    )
+    assert errors and any("step 3" in e and "shared" in e for e in errors), errors
+
+    # (iv) the whole shared worktree namespace mounted as /tmp is refused the same way
+    tampered = {**base, "mounts": list(base["mounts"]) + [
+        {"target": "/tmp", "source": str(cfg.worktrees_root), "mode": "rw"},
+    ]}
+    errors = validate_spawn(
+        tampered, phase_scopes={phase_name: "implementation"}, path_config=cfg,
+    )
+    assert errors and any("step 3" in e and "shared" in e for e in errors), errors
+
+
+def test_two_run_ids_produce_requests_with_distinct_clone_paths(tmp_path):
+    """(fb1 VERIFY d) two run ids produce two cell requests referencing two DISTINCT clone
+    paths — never the same runs_root/<run-id>/repo, so two concurrent cells never share git
+    metadata through the request contract."""
+    _repo, cfg = _make_config_repo(tmp_path)
+    clone_a = cfg.runs_root / "run-aaa" / "repo"
+    clone_b = cfg.runs_root / "run-bbb" / "repo"
+    req_a = build_phase_request(
+        {"name": "p1_slice1_base_supervisor", "scope": "implementation"},
+        goal="g", workdir="/tmp/wt", model="deepseek/deepseek-v4-pro",
+        spec_name="spec_x", path_config=cfg, run_clone=clone_a,
+    )
+    req_b = build_phase_request(
+        {"name": "p1_slice1_base_supervisor", "scope": "implementation"},
+        goal="g", workdir="/tmp/wt", model="deepseek/deepseek-v4-pro",
+        spec_name="spec_x", path_config=cfg, run_clone=clone_b,
+    )
+    assert clone_a != clone_b
+    assert req_a["run_clone"] != req_b["run_clone"]
+    src_a = [m for m in req_a["mounts"] if m.get("target") == "/repo"][0]["source"]
+    src_b = [m for m in req_b["mounts"] if m.get("target") == "/repo"][0]["source"]
+    assert src_a == str(clone_a) and src_b == str(clone_b)
+    assert src_a != src_b
+    # each clone lives under its OWN run's root
+    assert Path(src_a).parent == cfg.runs_root / "run-aaa"
+    assert Path(src_b).parent == cfg.runs_root / "run-bbb"
+
+
+def test_verifier_request_is_read_only_against_its_clone(tmp_path):
+    """(fb1 VERIFY e) the verifier request is READ-ONLY against its clone — the candidate mount
+    IS the run clone at /repo, every mount is ro, no shared surface, and it validates clean."""
+    req, cfg, clone, phase_name = _clone_phase_request(tmp_path, verifier=True)
+    assert req.get("verifier") is True
+    assert req["run_clone"] == str(clone)
+    assert all(m.get("mode") == "ro" for m in req["mounts"]), req["mounts"]
+    repo_mounts = [m for m in req["mounts"] if m.get("target") == "/repo"]
+    assert len(repo_mounts) == 1
+    assert repo_mounts[0]["source"] == str(clone)
+    assert cfg.runs_root.resolve() in Path(repo_mounts[0]["source"]).resolve().parents
+    # the verifier carries no credential/state/results surface and no shared worktree/.git
+    targets = {m.get("target") for m in req["mounts"]}
+    assert not (targets & set(AUTH_DIRS))
+    assert AUTH_CRED_FILE not in targets and STATE_TARGET not in targets
+    assert "/tmp" not in targets and "/repo/.git" not in targets
+    assert validate_spawn(
+        req, phase_scopes={phase_name: "implementation"}, path_config=cfg,
+    ) == []
+
+
+def test_clone_world_readonly_scope_mounts_its_clone_read_only(tmp_path):
+    """(fb1) a read-only-scope clone request (repo_readonly profile) mounts its clone ro — a
+    research/adversarial cell reads the run clone, never writes it."""
+    _repo, cfg = _make_config_repo(tmp_path)
+    clone = cfg.runs_root / "run-ro" / "repo"
+    req = build_phase_request(
+        {"name": "p1_research_infra", "scope": "research_readonly"},
+        goal="g", workdir="/tmp/wt", model="deepseek/deepseek-v4-pro",
+        spec_name="spec_x", path_config=cfg, run_clone=clone,
+    )
+    assert req["mount_profile"] == "repo_readonly"
+    repo_mounts = [m for m in req["mounts"] if m.get("target") == "/repo"]
+    assert len(repo_mounts) == 1 and repo_mounts[0]["mode"] == "ro"
+    assert repo_mounts[0]["source"] == str(clone)
+    assert validate_spawn(
+        req, phase_scopes={"p1_research_infra": "research_readonly"}, path_config=cfg,
+    ) == []
+
+
+def test_legacy_request_without_run_clone_keeps_the_shared_worktree_contract(tmp_path):
+    """(fb1) the PRE-clone shared-worktree shape is unchanged — a request WITHOUT a run clone
+    still mounts the shared worktree + shared .git overlays and validates under the legacy
+    contract (backward-compatible callers that have not provisioned a clone are unaffected)."""
+    _repo, cfg = _make_config_repo(tmp_path)
+    req = build_phase_request(
+        {"name": "p1_slice1_base_supervisor", "scope": "implementation"},
+        goal="g", workdir="/tmp/wt", model="deepseek/deepseek-v4-pro",
+        spec_name="spec_x", path_config=cfg,
+    )
+    assert "run_clone" not in req
+    targets = {m.get("target"): m for m in req["mounts"]}
+    assert "/tmp" in targets and targets["/tmp"]["mode"] == "rw"
+    assert "/repo/.git" in targets and targets["/repo/.git"]["mode"] == "rw"
+    assert targets["/repo"]["source"] == str(cfg.repo_root)
+    assert validate_spawn(
+        req, phase_scopes={"p1_slice1_base_supervisor": "implementation"}, path_config=cfg,
+    ) == []
+
+
 # ── build_verifier_request — the READ-ONLY-for-candidate contract (F1/g1_verifier_mount) ──
 
 

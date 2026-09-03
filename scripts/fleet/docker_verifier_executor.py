@@ -52,11 +52,11 @@ class DockerVerifierExecutor(StepExecutor):
     the workflow's name; ``cell_image`` is the sibling's image (``fleet/job-<name>`` or the
     default cell base), carried on the typed request.
 
-    ``run_clone`` (b2_ephemeral_clone, fleet_launch_boundary Wave 2) is the run's private
-    ephemeral clone path. When set, the verifier request references it too (a test phase
-    verifies against the run's clone — the suite runs in the read-only clone), so the launch
-    broker can validate the reference and a later wave can bind the clone mount read-only for
-    the verifier. It may be passed explicitly or inherited from ``FINOPS_RUN_CLONE``; absent
+    ``run_clone`` (fb1_clone_mounted — the clone is the cell's world) is the run's private
+    ephemeral clone path. When set, the verifier request carries it too (a test phase verifies
+    against the run's clone — the suite runs in the read-only clone, mounted at ``/repo``), so
+    the launch broker can bind the clone read-only and no shared worktree/``.git`` surface is
+    mounted. It may be passed explicitly or inherited from ``FINOPS_RUN_CLONE``; absent
     both, requests carry no clone (pre-b2 shape).
     """
 
@@ -91,15 +91,21 @@ class DockerVerifierExecutor(StepExecutor):
         ``spawn_wrapper.build_verifier_request``), and its child command runs the SAME
         suite the in-process LocalVerifier path would run (same ``tests`` target, carried
         on the phase def) inside the container — the local-parity target list. The run's
-        clone path (b2), when one is configured, is carried as a top-level reference for
-        the launch broker to mount read-only.
+        clone path (fb1_clone_mounted), when one is configured, is carried as the candidate
+        surface and the child runs INSIDE the read-only clone (its ``--workdir`` is the
+        clone's container mount point ``/repo``).
         """
+        # fb1_clone_mounted: with a run clone the verifier runs its suite inside the clone,
+        # mounted read-only at /repo (REPO_TARGET) — the shared /tmp worktree namespace is not
+        # mounted, so the candidate the suite runs against IS the clone. Without a clone the
+        # verifier keeps operating against the shared-worktree candidate (pre-b2 shape).
+        sibling_workdir = spawn_wrapper.REPO_TARGET if self._run_clone else self._workdir
         sibling_cmd = [
             sys.executable, "scripts/run_workflow.py",
             "--spec", self._spec_path,
             "--goal", self._goal,
             "--model", self._model,
-            "--workdir", self._workdir,
+            "--workdir", sibling_workdir,
             "--only-phase", request.phase_name,
             "--timeout", str(request.timeout or self._timeout),
             # A test phase never commits; --no-commit is belt-and-braces. The verifier's
@@ -118,7 +124,7 @@ class DockerVerifierExecutor(StepExecutor):
         return spawn_wrapper.build_verifier_request(
             request.phase_def,
             goal=self._goal,
-            workdir=self._workdir,
+            workdir=sibling_workdir,
             model=self._model,
             spec_name=self._spec_name,
             command=sibling_cmd,

@@ -212,6 +212,106 @@ def test_broker_validates_the_run_clone_reference_under_the_runs_root(tmp_path):
         assert errors, bad
 
 
+# ── fb1_clone_mounted — the broker mounts the run clone as the cell's repo ─────
+
+
+def test_agent_profile_with_a_run_clone_mounts_the_clone_and_no_shared_surface():
+    """(fb1) the broker's own profile expansion — the mounts it will ACTUALLY execute — sources
+    the cell's repo from the run clone when the request names one: /repo binds
+    runs_root/<run-id>/repo (rw for a commit-capable implementation cell), and the shared
+    worktree / .git surface (worktrees_root -> /tmp, the /repo/.git overlay, the D-16 host-path
+    repo + .git aliases) is absent from the expansion."""
+    cfg = _default_cfg()
+    clone = cfg.runs_root / "run-impl" / "repo"
+    mounts = launch_broker.mounts_for_profile(
+        "implementation_rw",
+        path_config=cfg,
+        state_namespace="spec_x/p1",
+        run_clone=str(clone),
+    )
+    by_target = {m["target"]: m for m in mounts}
+    assert by_target["/repo"]["source"] == str(clone)
+    assert by_target["/repo"]["mode"] == "rw"
+    assert cfg.runs_root in Path(by_target["/repo"]["source"]).parents
+    # the shared surfaces are GONE from the expansion
+    assert "/tmp" not in by_target
+    assert "/repo/.git" not in by_target
+    assert str(cfg.repo_root) not in by_target
+    assert str(cfg.git_dir) not in by_target
+    sources = {m["source"] for m in mounts}
+    assert str(cfg.worktrees_root) not in sources
+    assert str(cfg.git_dir) not in sources
+    # the rest of the agent-cell surface is unchanged (results + auth + state + credential)
+    assert "/app/experiments/results" in by_target
+    assert launch_broker.STATE_TARGET in by_target
+    assert "/auth/opencode_auth.json" in by_target
+
+
+def test_readonly_agent_profile_with_a_run_clone_mounts_the_clone_ro():
+    cfg = _default_cfg()
+    clone = cfg.runs_root / "run-ro" / "repo"
+    mounts = launch_broker.mounts_for_profile(
+        "repo_readonly",
+        path_config=cfg,
+        state_namespace="spec_x/p1",
+        run_clone=str(clone),
+    )
+    repo = [m for m in mounts if m["target"] == "/repo"]
+    assert len(repo) == 1 and repo[0]["source"] == str(clone) and repo[0]["mode"] == "ro"
+    assert not any(m["target"] in ("/tmp", "/repo/.git") for m in mounts)
+
+
+def test_verifier_profile_with_a_run_clone_mounts_the_clone_read_only():
+    """(fb1 VERIFY e, broker half) the verifier profile expansion for a run clone is the
+    clone itself, READ-ONLY, and nothing else — no shared worktree/.git, no results/state/auth."""
+    cfg = _default_cfg()
+    clone = cfg.runs_root / "run-verify" / "repo"
+    mounts = launch_broker.mounts_for_profile(
+        "verifier_readonly",
+        path_config=cfg,
+        state_namespace="verifier",
+        run_clone=str(clone),
+    )
+    assert mounts == [{"source": str(clone), "target": "/repo", "mode": "ro"}]
+
+
+def test_legacy_profile_expansion_is_unchanged_without_a_run_clone():
+    """(fb1) WITHOUT a run clone the broker's expansion is byte-identical to the pre-fb1
+    shared-worktree shape — the shared /tmp + .git overlays remain for the legacy contract."""
+    cfg = _default_cfg()
+    mounts = launch_broker.mounts_for_profile(
+        "implementation_rw", path_config=cfg, state_namespace="spec_x/p1",
+    )
+    by_target = {m["target"]: m for m in mounts}
+    assert by_target["/tmp"]["source"] == str(cfg.worktrees_root)
+    assert by_target["/repo"]["source"] == str(cfg.repo_root)
+    assert by_target["/repo/.git"]["source"] == str(cfg.git_dir)
+    assert by_target[str(cfg.repo_root)]["mode"] == "ro"  # D-16 host-path alias
+    assert by_target[str(cfg.git_dir)]["mode"] == "rw"
+
+
+def test_broker_launch_argv_for_a_clone_request_mounts_the_clone_only(tmp_path):
+    """(fb1) a broker launch of a clone-world request derives its -v flags from the clone
+    expansion — the argv mounts the run clone at /repo and carries no shared /tmp or .git bind."""
+    cfg = _default_cfg()
+    clone = cfg.runs_root / "run-z" / "repo"
+    request = spawn_wrapper.build_phase_request(
+        _PHASE,
+        goal="g",
+        workdir="/tmp/wt",
+        model="m",
+        spec_name="spec_x",
+        image="fleet/base",
+        run_clone=str(clone),
+    )
+    outcome = launch_broker.launch(request, dry_run=True, path_config=cfg)
+    joined = " ".join(outcome["argv"])
+    assert f"-v {clone}:/repo:rw" in joined
+    assert f"-v {cfg.worktrees_root}:" not in joined
+    assert ":/tmp:rw" not in joined and ":/repo/.git:" not in joined
+    assert str(cfg.git_dir) not in joined
+
+
 # ── (f) the shared validation keeps the same refusals ────────────────────────
 
 

@@ -85,7 +85,10 @@ from launch_broker import (  # noqa: E402
     AUTH_CRED_FILE,
     LAUNCH_NETWORK,
     MOUNT_PROFILES,
+    REPO_TARGET,
+    RESULTS_TARGET,
     STATE_TARGET,
+    WORKTREE_TARGET,
     LaunchRequestError,
     mounts_for_profile,
     validate_launch_request,
@@ -201,8 +204,11 @@ FIXED_CONTRACT_TARGETS: dict[str, tuple[str, str | None]] = {
 #: repo at the SAME path in the container makes one pointer valid in both views. The host path
 #: is the config's ``repo_root`` / ``git_dir`` — derived, never a literal (b1_path_config).
 #:
-#: The D-16 repo alias is the shared-host-worktree band-aid that b2 (ephemeral clone per run)
-#: removes entirely; until then it must track the config so a cell's gitdir pointers resolve.
+#: This shared-worktree surface (the D-16 alias + the ``/repo/.git`` overlay + the shared
+#: ``/tmp`` namespace in :data:`FIXED_CONTRACT_TARGETS`) belongs to the PRE-clone shared-worktree
+#: contract ONLY. fb1_clone_mounted's clone-world contract (:func:`clone_contract_targets`)
+#: excludes every one of them: a cell that mounts its per-run clone needs no worktree gitdir
+#: pointer and no shared ``.git`` — the clone has its own.
 
 
 def contract_targets(path_config: PathConfig) -> dict[str, tuple[str, str | None]]:
@@ -220,6 +226,41 @@ def contract_targets(path_config: PathConfig) -> dict[str, tuple[str, str | None
     targets[str(path_config.git_dir)] = ("repo-alias-git", "rw")
     targets.update({str(d): ("auth", "ro") for d in path_config.auth_dirs})
     targets[AUTH_CRED_FILE] = ("auth-file", "ro")
+    return targets
+
+
+#: The mount CATEGORY of the clone-sourced repo mount (fb1_clone_mounted). A clone-world
+#: request mounts its per-run clone at ``/repo`` — this category distinguishes that mount from
+#: the shared-worktree shape's ``repo`` (working tree of the SHARED repo) + ``repo-git``
+#: (overlay of the SHARED ``.git``), so validation can require a clone-world cell's repo to be
+#: its own clone and refuse the shared surfaces outright.
+REPO_CLONE_CATEGORY = "repo-clone"
+
+
+def clone_contract_targets(path_config: PathConfig) -> dict[str, tuple[str, str | None]]:
+    """The CLONE-world mount contract for ``path_config`` (fb1_clone_mounted).
+
+    When a spawn request names a run clone (``run_clone`` = ``runs_root/<run-id>/repo``), the
+    cell's world IS that clone — so the shared-host surfaces of the shared-worktree contract
+    are deliberately NOT part of this contract: no worktree namespace (``/tmp``), no shared
+    ``/repo/.git`` overlay, no D-16 host-path repo/``.git`` aliases. Two concurrent cells must
+    never share git metadata through ANY path, and the shared surfaces are the paths that
+    would reintroduce sharing.
+
+    The clone-world contract is the per-cell surface only: ``/repo`` (the run's clone — mode
+    ro|rw per the profile, validated separately), ``results`` (mode = the scope's
+    ``results_mode``), the per-attempt ``state`` namespace (rw), the D-2 ``auth`` dirs (ro) and
+    the credential ``auth-file`` (ro). ``validate_spawn`` derives THIS table (never the
+    shared-worktree :func:`contract_targets`) when the request under validation carries a run
+    clone, so a request that would mount the shared worktree or shared ``.git`` fails step 3.
+    """
+    targets: dict[str, tuple[str, str | None]] = {
+        REPO_TARGET: (REPO_CLONE_CATEGORY, None),
+        RESULTS_TARGET: ("results", None),
+        STATE_TARGET: ("state", "rw"),
+        AUTH_CRED_FILE: ("auth-file", "ro"),
+    }
+    targets.update({str(d): ("auth", "ro") for d in path_config.auth_dirs})
     return targets
 
 
@@ -253,9 +294,10 @@ VERIFIER_REQUEST_MARKER = "verifier"
 #: plus the host-path alias (``repo-alias``) — is mounted ``ro``: a verifier needs the
 #: candidate's TREE, never the ability to change it. Categories OUTSIDE this set (``results``,
 #: ``state``, the ``auth``/``auth-file`` credential mounts) are never on a verifier request —
-#: validation refuses them if present.
+#: validation refuses them if present. In the clone world (fb1_clone_mounted) the candidate
+#: surface is the run's own clone (``repo-clone``), which is a member of the same read-only set.
 VERIFIER_READONLY_CATEGORIES: frozenset[str] = frozenset(
-    {"worktree", "repo", "repo-git", "repo-alias", "repo-alias-git"}
+    {"worktree", "repo", "repo-git", "repo-alias", "repo-alias-git", "repo-clone"}
 )
 
 #: Step 6's vocabulary (admission_leases p2), re-exported from the tier-0 admission contract so
@@ -369,6 +411,36 @@ def _scope_config(scope: str) -> dict[str, Any]:
     return SCOPE_CONFIGS.get(scope, {})
 
 
+def _mounts_shared_surface(mount: Any, path_config: PathConfig) -> bool:
+    """True when a CLONE-world mount would expose the SHARED worktree or the SHARED ``.git``.
+
+    fb1_clone_mounted — a clone-world cell's repo is its per-run clone, so any mount that
+    reaches the shared-host surfaces is a sharing hazard and is refused. Checked by TARGET
+    (the shared ``/tmp`` worktree namespace, the shared ``/repo/.git`` overlay, and the D-16
+    host-path repo + ``.git`` aliases) and by SOURCE (the shared worktrees-root namespace root
+    itself, or the shared git dir — ``git_dir`` itself or anything under it). Sources UNDER the
+    worktrees root (e.g. the per-attempt state namespace, which lives at
+    ``worktrees_root/opencode_state``) are NOT shared surfaces — only the namespace ROOT
+    bind that would hand a cell every worktree is.
+    """
+    target = str((mount or {}).get("target", ""))
+    source = str((mount or {}).get("source", "") or "")
+    if target in (
+        WORKTREE_TARGET,
+        f"{REPO_TARGET}/.git",
+        str(path_config.repo_root),
+        str(path_config.git_dir),
+    ):
+        return True
+    if source:
+        src = Path(source).resolve()
+        worktrees_root = path_config.worktrees_root.resolve()
+        git_dir = path_config.git_dir.resolve()
+        if src in (worktrees_root, git_dir) or git_dir in src.parents:
+            return True
+    return False
+
+
 # ── The five-check validation (§5, D-16) ─────────────────────────────────────
 
 
@@ -438,24 +510,62 @@ def validate_spawn(
 
     cfg = _scope_config(scope)
 
-    # Step 3 — every mount's target ∈ the four + D-2, and its mode matches the scope/contract.
+    # Step 3 — every mount's target ∈ the contract, and its mode matches the scope/contract.
+    # The effective contract depends on whether the request names a run clone (fb1_clone_mounted
+    # — the clone is the cell's world):
+    #   * NO run_clone — the shared-worktree contract (:func:`contract_targets`: the four + D-2
+    #     + the D-16 host-path repo/.git alias), unchanged from before fb1.
+    #   * run_clone present — the CLONE-world contract (:func:`clone_contract_targets`): the
+    #     cell's repo IS its per-run clone (runs_root/<run-id>/repo), so the shared worktree
+    #     mount and the shared .git overlays/aliases are OUT of contract, and a request that
+    #     would mount them (by target or by source) is refused HERE, before the socket call.
     # A VERIFIER request (the DockerVerifierExecutor's read-only cell — stamped by
-    # build_verifier_request) is a DIFFERENT contract: it may carry ONLY the read-only
-    # candidate surface (worktree/repo/repo-git/repo-alias/repo-alias-git, all ro), never the
-    # results/state/auth mounts of an agent cell. Read-only-for-candidate is enforced HERE, at
-    # validation time — a verifier request that would mount its candidate rw is refused before
-    # the socket call, never left to the child's --no-commit.
+    # build_verifier_request) is a DIFFERENT contract on top: it may carry ONLY the read-only
+    # candidate surface (worktree/repo/repo-git/repo-alias/repo-alias-git/repo-clone, all ro),
+    # never the results/state/auth mounts of an agent cell. Read-only-for-candidate is enforced
+    # HERE, at validation time — a verifier request that would mount its candidate rw is
+    # refused before the socket call, never left to the child's --no-commit.
     is_verifier = bool(request.get(VERIFIER_REQUEST_MARKER))
-    for m in request.get("mounts", []) or []:
+    clone_ref = request.get("run_clone")
+    clone_world = bool(clone_ref)
+    mounts = request.get("mounts", []) or []
+    if clone_world:
+        if not path_config.is_run_clone_dir(str(clone_ref)):
+            errors.append(
+                f"step 3: run_clone {clone_ref!r} is not a runs_root/<run-id>/repo clone path "
+                f"— a clone-world request must name the run's private clone"
+            )
+        contract = clone_contract_targets(path_config)
+    for m in mounts:
         target = str((m or {}).get("target", ""))
         mode = str((m or {}).get("mode", ""))
-        if target not in contract:
+        source = str((m or {}).get("source", "") or "")
+        if clone_world and _mounts_shared_surface(m, path_config):
             errors.append(
-                f"step 3: mount target {target!r} is outside the four-mount contract + the "
-                f"D-2 auth set"
+                f"step 3: mount target {target!r} (source {source!r}) is the SHARED "
+                f"worktree/.git surface — a clone-world cell mounts its own run clone "
+                f"(runs_root/<run-id>/repo), never the shared worktree or the shared .git"
             )
             continue
+        if target not in contract:
+            if clone_world:
+                errors.append(
+                    f"step 3: mount target {target!r} is outside the clone-world contract "
+                    f"(the shared worktree/.git surface is not mountable by a run-clone cell)"
+                )
+            else:
+                errors.append(
+                    f"step 3: mount target {target!r} is outside the four-mount contract + the "
+                    f"D-2 auth set"
+                )
+            continue
         category, contract_mode = contract[target]
+        if clone_world and target == REPO_TARGET and source and source != str(clone_ref):
+            errors.append(
+                f"step 3: the /repo mount sources {source!r}, but a clone-world cell's repo "
+                f"must source from ITS run clone {clone_ref!r} (runs_root/<run-id>/repo)"
+            )
+            continue
         if is_verifier:
             # The verifier's mount contract (g1_verifier_mount): candidate surface only, ro.
             if category not in VERIFIER_READONLY_CATEGORIES:
@@ -477,10 +587,27 @@ def validate_spawn(
                     f"step 3: results mount mode {mode!r} != scope {scope} results_mode "
                     f"{expected!r}"
                 )
+        elif category == REPO_CLONE_CATEGORY:
+            # The clone mount is the cell's repo: ro for a read-only cell, rw for a
+            # commit-capable implementation cell (its commits land in ITS clone). Either is
+            # contract-legal; the shared surfaces are already excluded above.
+            if mode not in ("ro", "rw"):
+                errors.append(
+                    f"step 3: /repo clone mount mode {mode!r} not in ro/rw"
+                )
         elif mode != contract_mode:
             errors.append(
                 f"step 3: mount {target!r} mode {mode!r} != contract {contract_mode!r}"
             )
+    if clone_world and not any(
+        str((m or {}).get("target", "")) == REPO_TARGET
+        and str((m or {}).get("source", "") or "") == str(clone_ref)
+        for m in mounts
+    ):
+        errors.append(
+            f"step 3: a clone-world request must mount its repo from the run clone "
+            f"({clone_ref!r}) at {REPO_TARGET} — no /repo clone mount present"
+        )
 
     # Step 4 — the network must be exactly the scope's declared network.
     network = str(request.get("network", ""))
@@ -914,12 +1041,17 @@ def build_phase_request(
     against Redis is the controller's job, and a validator that could also grant would be a
     validator that could grant itself a pass.
 
-    ``run_clone`` (b2_ephemeral_clone, fleet_launch_boundary Wave 2) is the run's private
-    ephemeral clone path — ``PathConfig.runs_root/<run-id>/repo`` — stamped onto the request
-    as a top-level reference field when the caller carries one (a run executes its cells in
-    its own clone, never a shared worktree with a shared writable .git). It is a REFERENCE,
-    not a mount (b3's scope fence keeps the clone bind into the cell surface as a deferred
-    clone-execution change); the broker validates the reference resolves under the runs root.
+    ``run_clone`` (fb1_clone_mounted — the clone is the cell's world) is the run's private
+    ephemeral clone path — ``PathConfig.runs_root/<run-id>/repo`` — carried on the request so
+    the cell executes in ITS OWN clone, never a shared worktree with a shared writable ``.git``.
+    It is both a top-level typed REFERENCE (the broker validates it resolves to a genuine
+    runs_root clone) AND the mount source of the cell's repo: :func:`mounts_for_profile`
+    binds the clone at ``/repo`` (rw for a commit-capable implementation cell, ro for a
+    read-only cell) and drops the shared worktree/``.git`` surface from the expansion. The
+    request's ``mounts`` are that clone-world expansion, and :func:`validate_spawn` refuses a
+    clone-world request that would mount the shared worktree or shared ``.git``. Omitted (the
+    default — a caller that has not provisioned a clone), the request keeps the pre-clone
+    shared-worktree shape and carries no ``run_clone`` key.
 
     ``image`` (b3_launch_broker) is the sibling's image reference (``fleet/base`` /
     ``fleet/orchestrator`` / ``fleet/job-<name>``) carried on the request as
@@ -1014,12 +1146,11 @@ def build_phase_request(
         "state_namespace": ns_safe,
         "timeout_seconds": timeout_seconds or 0,
     }
-    # b2_ephemeral_clone (fleet_launch_boundary Wave 2): the run's private clone path, when
-    # the caller carries one. The request REFERENCEs the clone — runs_root/<run-id>/repo —
-    # so the launch broker (b3) can validate it and a later wave can bind its mount profile to
-    # it. It is a top-level reference field, NOT a mount: the mount contract and its validation
-    # are unchanged, and the broker's typed validation checks the reference resolves under the
-    # runs root (validate_launch_request step 5b).
+    # fb1_clone_mounted: the run's private clone path, when the caller carries one. The request
+    # carries the clone — runs_root/<run-id>/repo — as a typed reference (validate_launch_request
+    # step 5b checks it resolves under the runs root) AND its mount set is the clone-world
+    # expansion (mounts_for_profile bound the clone at /repo and dropped the shared
+    # worktree/.git surface), which validate_spawn's step 3 enforces at the mount contract.
     if run_clone:
         request["run_clone"] = str(run_clone)
     if admission is not None:
@@ -1062,10 +1193,13 @@ def build_verifier_request(
       would otherwise authorize — a verifier never emits.
 
     What REMAINS is the candidate surface the suite runs against — and it is mounted
-    READ-ONLY in its entirety (g1_verifier_mount, engine_gaps_followups F1): the worktree
-    namespace (``/tmp`` — the candidate workdir), the repo (``/repo``), and both git dirs
-    (``/repo/.git`` + the host-path ``.git`` alias). A verifier needs the candidate's TREE
-    to run the suite against, never the ability to change it — so the writable candidate
+    READ-ONLY in its entirety (g1_verifier_mount, engine_gaps_followups F1). In the
+    shared-worktree shape that surface is the worktree namespace (``/tmp`` — the candidate
+    workdir), the repo (``/repo``), and both git dirs (``/repo/.git`` + the host-path ``.git``
+    alias). In the clone world (fb1_clone_mounted) it is the run's own clone, mounted read-only
+    at ``/repo`` — the suite runs against the clone's TREE, and the clone's own ``.git`` rides
+    inside the mount (no shared git dir is mounted at all). A verifier needs the candidate's
+    TREE to run the suite against, never the ability to change it — so the writable candidate
     surfaces an agent phase mounts (``rw`` because it COMMITS its work) are flipped to ``ro``
     HERE, at the mount contract, never left to the child's ``--no-commit``. The request is
     stamped with :data:`VERIFIER_REQUEST_MARKER` so :func:`validate_spawn` enforces
@@ -1080,10 +1214,11 @@ def build_verifier_request(
     forbidden-surface drop removes exactly the auth dirs THAT config mounted, so a verifier
     request can never retain a credential mount the config did not add.
 
-    ``run_clone`` (b2_ephemeral_clone) is forwarded to :func:`build_phase_request` unchanged —
+    ``run_clone`` (fb1_clone_mounted) is forwarded to :func:`build_phase_request` unchanged —
     a verifier verifies against the run's private clone too (the suite runs in the read-only
-    clone), so when the caller carries the clone path the verifier request references it as
-    well. The reference field survives the verifier drop because it is not a mount.
+    clone), so when the caller carries the clone path the verifier request's candidate mount IS
+    the clone (read-only), and validation (step 3's verifier branch + the clone-world repo
+    binding) enforces that it stays read-only against the clone.
 
     ``image`` / ``timeout_seconds`` (b3_launch_broker) are forwarded to
     :func:`build_phase_request`. The typed request's ``mount_profile`` is overridden to

@@ -92,6 +92,22 @@ def test_env_overrides_each_field(tmp_path):
     assert cfg.auth_home == tmp_path / "auth"
 
 
+def test_is_run_clone_dir_accepts_only_runs_root_run_id_repo(tmp_path):
+    """(fb1) the ONE clone-shape test lives on the tier-0 path object so the pure fleet
+    validators and the runtime lifecycle share a single definition."""
+    cfg = PathConfig.from_env({"FINOPS_RUNS_ROOT": str(tmp_path / "runs")})
+    assert cfg.is_run_clone_dir(tmp_path / "runs" / "run-1" / "repo") is True
+    assert cfg.is_run_clone_dir(str(tmp_path / "runs" / "run-abc" / "repo")) is True
+    for bad in (
+        "/etc/passwd",
+        str(tmp_path / "runs" / "run-1" / "other"),
+        str(tmp_path / "runs" / "run-1"),
+        str(tmp_path / "runs" / "a" / "b" / "repo"),
+        str(tmp_path / "outside" / "runs" / "run-1" / "repo"),
+    ):
+        assert cfg.is_run_clone_dir(bad) is False, bad
+
+
 def test_git_dir_defaults_to_repo_root_dot_git(tmp_path):
     repo = _make_repo(tmp_path)
     cfg = PathConfig.from_env({"FINOPS_REPO_DIR": str(repo)})

@@ -23,15 +23,19 @@ This module owns the lifecycle **half** of that rule — clone CREATION and DISC
   been touched for ``max_age_seconds``. Discard is the primary cleanup; the sweep is the
   documented crash/abandonment backstop.
 
-The **mount** half of the rule belongs to the launch broker (``b3_launch_broker``): the
-clone is mounted into a cell (read-only, or rw only for the cell's own scratch) by the
-broker, which owns the Docker call. The **request** half is wired in
+The **mount** half of the rule is the clone-mount contract (``fb1_clone_mounted`` — the clone
+is the cell's world). The launch broker's profile expansion
+(``scripts/fleet/launch_broker.mounts_for_profile``) mounts the clone into a cell at ``/repo``
+(read-only for a read-only cell, rw for a commit-capable implementation cell whose commits land
+in ITS clone) and drops the shared worktree / shared ``.git`` surface from the cell contract;
+``scripts/fleet/spawn_wrapper.validate_spawn`` refuses a clone-world request that would mount
+the shared worktree or shared ``.git``. The **request** half is wired in
 ``scripts/fleet/spawn_wrapper.py``: :func:`~scripts.fleet.spawn_wrapper.build_phase_request`
 and :func:`~scripts.fleet.spawn_wrapper.build_verifier_request` carry the clone path on the
 spawn request (``run_clone``) so the broker can mount it and the verifier can run its suite
-in the read-only clone. Until the broker lands, the composition root / launch environment
-signals the clone path to the executors via the ``FINOPS_RUN_CLONE`` env var (see the
-``fleet.docker_executor`` / ``fleet.docker_verifier_executor`` constructors).
+in the read-only clone. A host-side launcher that provisions a run's clone exports it to the
+spawn tier via the ``FINOPS_RUN_CLONE`` env var (see the ``fleet.docker_executor`` /
+``fleet.docker_verifier_executor`` constructors).
 
 Deliberately a leaf module for its plane: it imports only the tier-0 :class:`PathConfig`
 (``core.paths``) plus the standard library — no ``redis``/``chromadb``/``neo4j``, no
@@ -125,6 +129,25 @@ def run_clone_dir(run_id: str, *, path_config: PathConfig | None = None) -> Path
     """
     cfg = path_config or PathConfig.from_env(require_existing=False)
     return cfg.runs_root / _safe_run_segment(run_id) / REPO_SUBDIR
+
+
+def is_clone_dir(path: str | Path, *, path_config: PathConfig | None = None) -> bool:
+    """True iff ``path`` is EXACTLY a ``runs_root/<run-id>/repo`` clone directory.
+
+    This is the ONE shape test the mount half of the wave relies on: a per-run clone lives at
+    ``PathConfig.runs_root/<run-id>/repo`` — two segments under the runs root, the last being
+    ``repo`` — and nothing else (a stray host path, a ``runs_root/<run-id>`` that is not a
+    ``repo`` dir, or a path that walks out of the runs root is not a clone). ``discard_run_clone``
+    applies the same invariant when removing; the launch broker and the spawn wrapper apply it
+    when a request names a ``run_clone`` reference. Purely structural — the directory need not
+    exist (a request may name a clone that a host-side launcher is still provisioning).
+
+    The shape rule itself lives ON the tier-0 path object (:meth:`PathConfig.is_run_clone_dir`)
+    so the pure fleet validators — which never import this runtime module — and the clone
+    lifecycle share one definition; this function is the lifecycle's own handle on it.
+    """
+    cfg = path_config or PathConfig.from_env(require_existing=False)
+    return cfg.is_run_clone_dir(path)
 
 
 def create_run_clone(

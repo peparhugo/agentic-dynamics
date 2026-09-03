@@ -665,6 +665,33 @@ def test_verifier_executor_request_references_the_run_clone_path(tmp_path):
     targets = {m.get("target") for m in req.get("mounts", [])}
     assert not (targets & set(spawn_wrapper.AUTH_DIRS))
     assert all(m.get("mode") == "ro" for m in req.get("mounts", []))
+    # fb1: with a clone the child runs INSIDE it (its --workdir is the clone mount /repo)
+    assert "--workdir /repo" in " ".join(str(c) for c in req.get("command", []))
+
+
+def test_agent_executor_runs_the_child_inside_the_clone_when_configured(tmp_path):
+    """(fb1) with a run clone the sibling cell's command workdir is the clone's container mount
+    point (/repo) — the cell's git operations + commits happen against ITS clone. Without a
+    clone the shared-worktree workdir is unchanged."""
+    clone_path = tmp_path / "runs" / "run-workdir" / "repo"
+    executor = DockerAgentExecutor(
+        spec_path="/repo/workflows/repository/x.yaml",
+        spec_name="spec_x", goal="g", model="deepseek/deepseek-v4-flash",
+        workdir="/tmp/wt_x", run_clone=str(clone_path),
+    )
+    cmd = " ".join(str(c) for c in executor.build_request(_agent_step_request()).get("command", []))
+    assert "--workdir /repo" in cmd
+    assert "/tmp/wt_x" not in cmd
+
+    legacy = DockerAgentExecutor(
+        spec_path="/repo/workflows/repository/x.yaml",
+        spec_name="spec_x", goal="g", model="deepseek/deepseek-v4-flash",
+        workdir="/tmp/wt_x",
+    )
+    legacy_cmd = " ".join(
+        str(c) for c in legacy.build_request(_agent_step_request()).get("command", [])
+    )
+    assert "--workdir /tmp/wt_x" in legacy_cmd
 
 
 def test_executor_inherits_the_run_clone_from_env(tmp_path, monkeypatch):

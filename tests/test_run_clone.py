@@ -33,6 +33,7 @@ from agentic_dynamics.runtime.run_clone import (
     RunCloneError,
     create_run_clone,
     discard_run_clone,
+    is_clone_dir,
     run_clone_dir,
     sweep_stale_clones,
 )
@@ -240,3 +241,20 @@ def test_run_clone_dir_sanitizes_a_hostile_run_id(tmp_path):
     assert len(path.relative_to(cfg.runs_root).parts) == 2
     assert path.name == REPO_SUBDIR
     assert path.parent.name == "escape-run-evil"
+
+
+def test_is_clone_dir_accepts_only_runs_root_run_id_repo(tmp_path):
+    """(fb1) the ONE clone-shape test: exactly ``runs_root/<run-id>/repo`` is a clone path —
+    nothing else (pure structural; the directory need not exist yet)."""
+    cfg = _make_cfg(tmp_path, tmp_path / "src-absent")
+    assert is_clone_dir(cfg.runs_root / "run-1" / "repo", path_config=cfg) is True
+    assert is_clone_dir(str(cfg.runs_root / "run-1" / "repo"), path_config=cfg) is True
+    assert is_clone_dir(cfg.runs_root / "run-abc" / REPO_SUBDIR, path_config=cfg) is True
+    for bad in (
+        "/etc/passwd",                     # a stray absolute host path
+        str(cfg.runs_root / "run-1" / "other"),  # runs_root/<run-id>/<not repo>
+        str(cfg.runs_root / "run-1"),      # the run dir itself, not the clone
+        str(cfg.runs_root / "a" / "b" / "repo"),  # nested too deep
+        str(tmp_path / "outside" / "run-1" / "repo"),  # outside runs_root
+    ):
+        assert is_clone_dir(bad, path_config=cfg) is False, bad

@@ -40,13 +40,14 @@ class DockerAgentExecutor(StepExecutor):
     workflow's name used for the per-attempt state namespace; ``cell_image`` is the sibling's
     image (``fleet/job-<name>`` or the default cell base), carried on the typed request.
 
-    ``run_clone`` (b2_ephemeral_clone, fleet_launch_boundary Wave 2) is the run's private
+    ``run_clone`` (fb1_clone_mounted — the clone is the cell's world) is the run's private
     ephemeral clone path (``PathConfig.runs_root/<run-id>/repo``). When set, every phase
-    request this executor builds references it (``build_phase_request(run_clone=...)``) so the
-    launch broker can validate the reference and a later wave can bind the clone mount into the
-    cell surface. It may be passed explicitly or inherited from the ``FINOPS_RUN_CLONE`` env
-    var (a host-side launcher exports it to the workflow-runner tier); absent both, requests
-    carry no clone — the pre-b2 shape unchanged.
+    request this executor builds carries it (``build_phase_request(run_clone=...)``) and mounts
+    the clone as the cell's repo — the launch broker binds ``runs_root/<run-id>/repo`` at
+    ``/repo`` (rw for this commit-capable cell) and the shared worktree/``.git`` surface is
+    absent from the request. It may be passed explicitly or inherited from the
+    ``FINOPS_RUN_CLONE`` env var (a host-side launcher exports it to the workflow-runner tier);
+    absent both, requests carry no clone — the pre-b2 shared-worktree shape unchanged.
     """
 
     def __init__(
@@ -77,17 +78,25 @@ class DockerAgentExecutor(StepExecutor):
 
         The admission in force (the engine entered ``phase_admission_scope`` before calling
         us) is stamped onto the spawn request as the lease block — a container inherits an
-        environment, not a ContextVar. The run's clone path (b2), when one is configured, is
-        carried on the request as a top-level reference for the launch broker to mount.
+        environment, not a ContextVar. The run's clone path (fb1_clone_mounted), when one is
+        configured, is carried on the request so the launch broker mounts the clone as the
+        cell's repo — and the child runs INSIDE the clone (its ``--workdir`` is the clone's
+        container mount point ``/repo``), so the cell's git operations and commits happen
+        against ITS clone, never the shared worktree.
         """
         from agentic_dynamics.core.admission_context import current_context
 
+        # fb1_clone_mounted: with a run clone the sibling operates in the clone, mounted at
+        # /repo (spawn_wrapper/launch_broker REPO_TARGET) — the shared /tmp worktree namespace
+        # is no longer mounted, so the cell's workdir IS the clone. Without a clone the cell
+        # keeps operating in the shared-worktree path (pre-b2 shape, unchanged).
+        sibling_workdir = spawn_wrapper.REPO_TARGET if self._run_clone else self._workdir
         sibling_cmd = [
             sys.executable, "scripts/run_workflow.py",
             "--spec", self._spec_path,
             "--goal", self._goal,
             "--model", self._model,
-            "--workdir", self._workdir,
+            "--workdir", sibling_workdir,
             "--only-phase", request.phase_name,
             "--timeout", str(request.timeout or self._timeout),
         ]
@@ -98,7 +107,7 @@ class DockerAgentExecutor(StepExecutor):
         return spawn_wrapper.build_phase_request(
             request.phase_def,
             goal=self._goal,
-            workdir=self._workdir,
+            workdir=sibling_workdir,
             model=self._model,
             spec_name=self._spec_name,
             command=sibling_cmd,

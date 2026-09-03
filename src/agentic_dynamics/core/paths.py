@@ -154,6 +154,25 @@ class PathConfig:
         """
         return tuple(self.auth_home / rel for rel in AUTH_DIR_RELATIVES)
 
+    def is_run_clone_dir(self, path: str | Path) -> bool:
+        """True iff ``path`` is EXACTLY a ``runs_root/<run-id>/repo`` clone directory.
+
+        The ONE shape test the fleet's clone-mount contract (fb1_clone_mounted) relies on: a
+        per-run clone lives at ``PathConfig.runs_root/<run-id>/repo`` — two segments under the
+        runs root, the last being ``repo`` — and nothing else. A stray host path, a
+        ``runs_root/<run-id>`` that is not a ``repo`` dir, or a path that walks out of the runs
+        root is not a clone. Purely structural (the directory need not exist — a request may
+        name a clone a host-side launcher is still provisioning). Defined here on the tier-0
+        path object so the pure fleet validators (``launch_broker`` / ``spawn_wrapper``, which
+        never import ``runtime``) and the clone lifecycle
+        (``agentic_dynamics.runtime.run_clone.is_clone_dir``) all share ONE shape rule.
+        """
+        try:
+            rel = Path(path).resolve().relative_to(self.runs_root.resolve())
+        except ValueError:
+            return False
+        return len(rel.parts) == 2 and rel.parts[-1] == "repo"
+
     @classmethod
     def from_env(
         cls,

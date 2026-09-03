@@ -61,20 +61,27 @@ def _env(service: dict) -> dict:
 def _volume_targets(service: dict) -> list[tuple[str, str]]:
     """Return ``[(target, mode)]`` for a service's volume mounts (both string + long syntax).
 
-    Mount sources carry ``${VAR:-default}`` substitutions whose braces contain a colon, so the
-    string is split from the RIGHT (``rsplit``) — the target + mode are the trailing fields and
-    the source is everything before them.
+    Mount sources/targets carry compose env indirections (``${VAR}`` / ``${VAR:-default}`` /
+    ``${VAR:?message}``), so the string is env-interpolated FIRST (the same values the guard's
+    config is derived from) and then split from the RIGHT (``rsplit``) — the target + mode are
+    the trailing fields and the source is everything before them.
     """
+    env = _compose_env()
     out: list[tuple[str, str]] = []
     for v in service.get("volumes") or []:
         if isinstance(v, str):
-            parts = v.rsplit(":", 2)
+            parts = _interpolate(v, env).rsplit(":", 2)
             target = parts[1] if len(parts) >= 2 else parts[0]
             mode = parts[2] if len(parts) >= 3 else "rw"
             out.append((target, mode))
         elif isinstance(v, dict):
             out.append((v.get("target", ""), "ro" if v.get("read_only") else "rw"))
     return out
+
+
+def _compose_env() -> dict[str, str]:
+    """The compose env simulation (module-level, computed once per process)."""
+    return _COMPOSE_ENV
 
 
 def _fleet_module(name: str):
@@ -113,11 +120,50 @@ def _compose_env_defaults() -> dict[str, str]:
     Read from the YAML text (never hard-coded): ``FINOPS_WORKTREE_ROOT`` (default ``/tmp``),
     ``FINOPS_REPO_DIR`` (the repo's host path), ``AUTH_HOME`` (the host auth home). This is the
     env the ladder would actually be brought up under when no operator override is exported.
+
+    Two adjustments keep the derived env faithful to how docker compose would resolve it:
+
+    * ``FINOPS_REPO_DIR``'s default is RELATIVE — ``${FINOPS_REPO_DIR:-..}/experiments/results``
+      (the results overlay). Docker resolves a relative bind source from the compose file's own
+      directory (``infrastructure/``), so ``..`` means the repository ROOT — never a literal
+      ``..``, which ``PathConfig`` correctly refuses as non-absolute. It is rewritten to the
+      absolute repo root so the derived config is the one the compose would actually mount.
+    * ``AUTH_HOME`` has NO ``:-`` default in the file (only the fail-closed ``${AUTH_HOME:?…}``
+      form), so the regex finds nothing for it; docker compose would refuse to start without it
+      exported. The guard simulates the operator exporting their home — the same fallback
+      ``PathConfig.from_env`` applies when no mapping value is present — so the guard stays
+      env-independent and literal-free.
     """
     defaults: dict[str, str] = {}
     for name, default in re.findall(r"\$\{([A-Z_][A-Z0-9_]*):-([^}]*)\}", COMPOSE_PATH.read_text()):
         defaults.setdefault(name, default)
+    repo_default = defaults.get("FINOPS_REPO_DIR")
+    if repo_default and not Path(repo_default).is_absolute():
+        defaults["FINOPS_REPO_DIR"] = str((COMPOSE_PATH.parent / repo_default).resolve())
+    defaults.setdefault("FINOPS_WORKTREE_ROOT", "/tmp")
+    defaults.setdefault("AUTH_HOME", str(Path.home()))
     return defaults
+
+
+def _interpolate(text: str, env: dict[str, str]) -> str:
+    """Resolve the compose ``${VAR}`` / ``${VAR:-default}`` / ``${VAR:?message}`` forms to the
+    value in ``env`` (the same simulation ``PathConfig.from_env`` is built from). b4's F1 fix
+    moved every host path into an env indirection, so a raw compose volume string like
+    ``${FINOPS_REPO_DIR}:${FINOPS_REPO_DIR}:ro`` must be resolved before its target can be
+    compared against the config-derived contract.
+    """
+    def _sub(match: re.Match[str]) -> str:
+        name = match.group(1)
+        if name in env:
+            return env[name]
+        return match.group(0)
+
+    return re.sub(r"\$\{([A-Z_][A-Z0-9_]*)(?::[-?][^}]*)?\}", _sub, text)
+
+
+#: The compose env simulation — one derivation, consumed by the config AND the volume-target
+#: interpolation, so the two sides of the guard can never disagree about a var's value.
+_COMPOSE_ENV: dict[str, str] = _compose_env_defaults()
 
 
 def _compose_config() -> PathConfig:

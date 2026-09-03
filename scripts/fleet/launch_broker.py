@@ -87,6 +87,11 @@ VERIFIER_MARKER = "verifier"
 #: (``experiment_spec``: "results_mode is the only mount that varies, ro vs rw"). The verifier
 #: profile is the reduced read-only candidate surface. A ``mount_profile`` outside this table is
 #: refused by :func:`validate_launch_request` — an unknown profile never reaches the socket.
+#:
+#: fb1_clone_mounted: each profile's EXPANSION (:func:`mounts_for_profile`) takes the run's
+#: ``run_clone`` when the request carries one and mounts the CLONE as the cell's repo (see the
+#: function's docstring). The profiles below declare the cell's writability; the expansion
+#: decides which host surface backs it.
 MOUNT_PROFILES: dict[str, dict[str, Any]] = {
     #: The read-only repo profile: a cell that only READS the repo + results (the
     #: ``research_readonly`` / ``adversarial_readonly`` scopes). Repo and results are ro; the
@@ -97,9 +102,10 @@ MOUNT_PROFILES: dict[str, dict[str, Any]] = {
         "description": "the read-only repo profile (research/adversarial read-only cells)",
     },
     #: The implementation rw profile: a cell that COMMITS + writes results (the
-    #: ``implementation`` / ``proposal_write`` / ``review_readonly`` scopes — results rw). The
-    #: gitdir overlay is rw so the cell's phase commit can write; the working tree of /repo
-    #: stays ro (b2's private clone replaces the shared-tree commit path).
+    #: ``implementation`` / ``proposal_write`` / ``review_readonly`` scopes — results rw). In
+    #: the shared-worktree shape the gitdir overlay is rw so the phase commit can write; in the
+    #: clone shape (fb1) the run's private clone is mounted rw so the cell's commits land in
+    #: ITS clone.
     "implementation_rw": {
         "results_mode": "rw",
         "verifier": False,
@@ -107,7 +113,8 @@ MOUNT_PROFILES: dict[str, dict[str, Any]] = {
     },
     #: The verifier read-only profile (g1_verifier_mount): the candidate surface ONLY, every
     #: mount ro — no results, no state namespace, no credentials (a verifier makes no model
-    #: call). A verifier request MUST carry this profile.
+    #: call). A verifier request MUST carry this profile. In the clone shape (fb1) the
+    #: candidate surface IS the run's clone, mounted read-only.
     "verifier_readonly": {
         "results_mode": None,
         "verifier": True,
@@ -156,7 +163,8 @@ LAUNCH_REQUEST_FIELDS: frozenset[str] = frozenset(
         "mounts",  # the wrapper's validated record of its profile expansion (step 3 checks it)
         "env",
         VERIFIER_MARKER,
-        "run_clone",  # b2 reference field — the broker validates the path, does not mount it yet
+        "run_clone",  # fb1 clone-mount reference: the broker validates runs_root/<run-id>/repo
+                      # (step 5b) AND mounts the clone as the cell's /repo (mounts_for_profile)
         # the lease block (step 6 / admission_leases p2):
         "reserved_cost_usd",
         "hard_cap_usd",
@@ -230,6 +238,9 @@ def mounts_for_profile(
     the same function against the same profile, so the isolation the wrapper validated is the
     isolation the broker mounts — a caller cannot smuggle a mount list past the profile.
 
+    Without ``run_clone`` (the pre-b2 shared-worktree shape) each profile expands to the
+    historical cell surface:
+
     * ``repo_readonly`` / ``implementation_rw`` — the agent-cell surface: the worktree
       namespace rw, results (mode = the profile's ``results_mode``), the repo ro + its gitdir
       overlay rw (a phase cell COMMITS), the repo at its host path (D-16 alias) + its git dir,
@@ -237,12 +248,24 @@ def mounts_for_profile(
     * ``verifier_readonly`` — the reduced read-only candidate surface: the worktree + repo +
       both git dirs, ALL ro; no results, no state namespace, no credentials.
 
-    ``run_clone`` (b2) is accepted and validated as a typed reference (it must resolve under
-    ``PathConfig.runs_root``), but is deliberately NOT yet mounted: binding the per-run clone
-    as the cell's execution surface is a clone-execution change (the cell's workdir/commit
-    path), which b3's scope fence defers — see the module docstring of
-    ``agentic_dynamics.runtime.run_clone``. The request names the clone so the mount can land
-    without another request-shape change.
+    With ``run_clone`` (fb1_clone_mounted — the clone is the cell's world) the expansion is the
+    CLONE-world contract instead: the shared host surfaces a shared-worktree cell needed are
+    GONE from the cell, and the repo the cell reads/commits comes from the run's OWN private
+    clone at ``PathConfig.runs_root/<run-id>/repo``:
+
+    * the repo source is the clone — ``/repo`` binds ``runs_root/<run-id>/repo``, read-only for
+      the ``repo_readonly`` / ``verifier_readonly`` profiles and rw for ``implementation_rw``
+      (an implementation cell COMMITS into its clone, so its clone is the cell's private
+      working copy);
+    * the shared worktree mount (``worktrees_root -> /tmp``), the shared ``/repo/.git``
+      overlay, and the D-16 host-path repo + ``.git`` aliases are ALL absent — the clone has
+      its OWN ``.git`` (inside the mounted clone), so no shared git metadata is reachable and
+      no worktree gitdir pointer needs resolving;
+    * the results / D-2 auth / per-attempt state / credential FILE mounts are unchanged.
+
+    Two concurrent cells therefore never share git metadata through any mount: distinct runs
+    have distinct clones (distinct ``runs_root/<run-id>`` paths) and each cell mounts only its
+    own run's clone.
     """
     cfg = path_config or PathConfig.from_env(require_existing=False)
     profile_def = MOUNT_PROFILES.get(profile)
@@ -256,7 +279,17 @@ def mounts_for_profile(
     state_src = cfg.state_root / ns
     state_src.mkdir(parents=True, exist_ok=True)
 
+    # fb1_clone_mounted: a request that names a run clone mounts the clone as the cell's repo.
+    clone = str(run_clone) if run_clone is not None else None
     if profile_def.get("verifier"):
+        if clone is not None:
+            # The verifier's candidate surface IS the run's clone, read-only: the suite runs
+            # against the clone's tree and its own .git rides inside the mount. No results /
+            # state / credential mounts (a verifier makes no model call), no shared worktree /
+            # shared .git (the candidate is the clone, never the shared repo).
+            return [
+                {"source": clone, "target": REPO_TARGET, "mode": "ro"},
+            ]
         return [
             {"source": str(cfg.worktrees_root), "target": WORKTREE_TARGET, "mode": "ro"},
             {"source": str(cfg.repo_root), "target": REPO_TARGET, "mode": "ro"},
@@ -266,6 +299,29 @@ def mounts_for_profile(
         ]
 
     results_mode = str(profile_def.get("results_mode") or "rw")
+    if clone is not None:
+        # The clone-world agent-cell surface: results + the repo from the run clone + the
+        # D-2 auth set + the per-attempt state namespace + the credential FILE. The shared
+        # worktree mount, the /repo/.git overlay, and the D-16 host-path repo/.git aliases are
+        # NOT part of this contract (fb1_clone_mounted) — a cell's git operations happen
+        # against ITS clone, never the shared repo's git dir.
+        repo_mode = "ro" if profile == "repo_readonly" else "rw"
+        mounts: list[dict[str, str]] = [
+            {"source": str(cfg.results_dir), "target": RESULTS_TARGET, "mode": results_mode},
+            {"source": clone, "target": REPO_TARGET, "mode": repo_mode},
+        ]
+        for d in cfg.auth_dirs:
+            mounts.append({"source": str(d), "target": str(d), "mode": "ro"})
+        mounts.append({"source": str(state_src), "target": STATE_TARGET, "mode": "rw"})
+        mounts.append(
+            {
+                "source": str(cfg.auth_home / ".local/share/opencode/auth.json"),
+                "target": AUTH_CRED_FILE,
+                "mode": "ro",
+            }
+        )
+        return mounts
+
     mounts: list[dict[str, str]] = [
         {"source": str(cfg.worktrees_root), "target": WORKTREE_TARGET, "mode": "rw"},
         {"source": str(cfg.results_dir), "target": RESULTS_TARGET, "mode": results_mode},
@@ -437,29 +493,23 @@ def validate_launch_request(
             f"(no absolute path, no '..' — a namespace cannot escape the state root)"
         )
 
-    # Step 5b — the run_clone reference (b2) must name a clone under the runs root. The clone
-    # bind into the cell surface is deferred (b3 scope fence), but the REFERENCE is validated
-    # now so a request can never name an arbitrary host path as its "clone" for a future mount.
+    # Step 5b — the run_clone reference (fb1_clone_mounted) must name a clone under the runs
+    # root: runs_root/<run-id>/repo, exactly (PathConfig.is_run_clone_dir — the ONE shape rule
+    # shared with run_clone's lifecycle and spawn_wrapper's clone-world mount check). A request
+    # can never name an arbitrary host path as its "clone" and have it mounted as the cell's
+    # repo.
     run_clone = request.get("run_clone")
     if run_clone not in (None, ""):
         if not isinstance(run_clone, str) or not run_clone or "\x00" in run_clone:
             errors.append(f"run_clone {run_clone!r} is not a valid clone path string")
         else:
             cfg = path_config or PathConfig.from_env(require_existing=False)
-            runs_root = cfg.runs_root.resolve()
-            try:
-                rel = Path(run_clone).resolve().relative_to(runs_root)
-            except ValueError:
+            runs_root = cfg.runs_root
+            if not cfg.is_run_clone_dir(run_clone):
                 errors.append(
-                    f"run_clone {run_clone!r} is outside the runs root {runs_root} — a clone "
-                    f"lives at runs_root/<run-id>/repo, never an arbitrary host path"
+                    f"run_clone {run_clone!r} is not a runs_root/<run-id>/repo clone path "
+                    f"(must be two segments under the runs root {runs_root}, the last 'repo')"
                 )
-            else:
-                if len(rel.parts) != 2 or rel.parts[-1] != "repo":
-                    errors.append(
-                        f"run_clone {run_clone!r} is not a runs_root/<run-id>/repo clone path "
-                        f"(relative {rel})"
-                    )
 
     # Step 6 — the command is a typed argv.
     if request.get("command") not in (None, []):
