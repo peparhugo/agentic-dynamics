@@ -570,3 +570,67 @@ def test_approval_is_a_supported_permanence_verb():
     assert "approve" in aio_emission.PERMANENCE_VERBS
     obs = aio_emission.build_observation(_decision(verb="approve", status="granted"))
     assert obs.subject_status == "approve:granted"
+
+
+# ── A2 closure: the approve verb has a real call site ─────────────────────────
+
+def test_approve_command_records_and_emits(tmp_path, monkeypatch):
+    """A2 (authoring_product_aio adversarial, 2026-09-03): the approve permanence verb
+    was declared but unwired. The workflow approve command now records the approval in
+    the control db (operator + candidate bound), writes the resume-path artifact, and
+    emits the decision through the AIO emission seam (verb=approve)."""
+    import importlib.util
+    from agentic_dynamics.control.control_db import ControlDB, RunState
+
+    db_path = tmp_path / "control.db"
+    with ControlDB.open(db_path) as db:
+        run = db.create_run(spec_name="t", model="m", state=RunState.RUNNING,
+                            reason="start", candidate_sha="abcd1234567890")
+        db.transition_run(run.run_id, RunState.AWAITING_APPROVAL, reason="checkpoint")
+
+    monkeypatch.setenv("FINOPS_CONTROL_DB", str(db_path))
+    spec = importlib.util.spec_from_file_location(
+        "approve_workflow", "scripts/approve_workflow.py")
+    m = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(m)
+    monkeypatch.setattr(
+        sys, "argv",
+        ["approve", "--run-id", run.run_id, "--gate-id", "approval",
+         "--candidate-sha", "abcd1234567890", "--spec", "t", "--phase", "p2",
+         "--operator", "Dr. Seuss", "--workdir", str(tmp_path)],
+    )
+    m.main()
+
+    with ControlDB.open_read_only(db_path) as db:
+        approvals = db.approvals(run_id=run.run_id)
+        assert len(approvals) == 1
+        assert approvals[0].operator == "Dr. Seuss"
+        assert approvals[0].candidate_sha == "abcd1234567890"
+    assert (tmp_path / "approvals" / "t" / "p2_approval.md").exists()
+
+
+def test_approve_placeholder_operator_refused(tmp_path, monkeypatch):
+    """An approval with no real approver is not an approval (exit 20)."""
+    import importlib.util
+    from agentic_dynamics.control.control_db import ControlDB, RunState
+
+    db_path = tmp_path / "control.db"
+    with ControlDB.open(db_path) as db:
+        run = db.create_run(spec_name="t", model="m", state=RunState.RUNNING,
+                            reason="start", candidate_sha="abcd1234567890")
+        db.transition_run(run.run_id, RunState.AWAITING_APPROVAL, reason="checkpoint")
+
+    monkeypatch.setenv("FINOPS_CONTROL_DB", str(db_path))
+    spec = importlib.util.spec_from_file_location(
+        "approve_workflow", "scripts/approve_workflow.py")
+    m = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(m)
+    monkeypatch.setattr(
+        sys, "argv",
+        ["approve", "--run-id", run.run_id, "--candidate-sha", "abcd1234567890",
+         "--spec", "t", "--phase", "p2", "--operator", "operator", "--workdir",
+         str(tmp_path)],
+    )
+    with pytest.raises(SystemExit) as exc:
+        m.main()
+    assert exc.value.code == 20

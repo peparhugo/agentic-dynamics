@@ -52,6 +52,7 @@ DOCUMENTED_RESOLUTIONS: list[tuple[tuple[str, ...], str, tuple[str, ...]]] = [
     (("workflow", "run"), "run_workflow.py", ()),
     (("workflow", "discard-tree"), "record_discarded_tree.py", ()),
     (("workflow", "promote"), "promote.py", ()),
+    (("workflow", "approve"), "approve_workflow.py", ()),
     # workflow authoring (Wave 3, a3 — the authoring product command surface)
     (("workflow", "new"), "workflow_new.py", ()),
     (("workflow", "lint"), "workflow_lint.py", ()),
