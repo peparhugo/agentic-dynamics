@@ -341,7 +341,8 @@ workflow:
         scope: implementation
         timeout: 900
         tests:
-          - tests/test_kb_emit_default.py
+          - tests/test_fact_auto_emit.py
+          - tests/test_fact_auto_emit_adversarial.py
           - tests/test_kb_backfill.py
           - tests/test_retrieval.py
           - tests/test_spec_status.py
