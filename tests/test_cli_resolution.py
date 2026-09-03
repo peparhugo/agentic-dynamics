@@ -125,6 +125,10 @@ DOCUMENTED_RESOLUTIONS: list[tuple[tuple[str, ...], str, tuple[str, ...]]] = [
     # records into the measured rows (waves/merge rate/adversarial/cost/time-to-merge/phases,
     # per model) — recomputed, never hand-written; `--recompute` re-aggregates + rewrites.
     (("scoreboard",), "scoreboard.py", ()),
+    # reflect — the self-knowledge layer: `reflect --read` (s6b) reads the accumulated
+    # reflection series (every session's self-notes entry, in session order) so a session can
+    # contemplate across its predecessors; an empty series renders a clear empty state.
+    (("reflect",), "reflect.py", ()),
     # release
     (("release", "check-protection"), "check_branch_protection.py", ()),
     # surfaces — the self-maintenance command (design: system_knowledge_abstraction)

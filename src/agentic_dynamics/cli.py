@@ -149,6 +149,12 @@ _COMMANDS: dict[tuple[str, ...], str] = {
     # durable document; without it a stored document is rendered when one exists. Producer aio,
     # org:repo (controller + AIO + supervisor read; never cell agents).
     ("scoreboard",): "scoreboard.py",
+    # reflect (the self-knowledge layer — loop 2). `reflect --read` (s6b) reads the accumulated
+    # reflection series — every session's self-notes entry, one per session, in the order the
+    # sessions happened — so a session can contemplate across its predecessors (the read half
+    # of the reflection series the session close's s6a append writes). An empty series renders
+    # a clear empty state. Producer aio, org:repo — private to the controller-AIO pair.
+    ("reflect",): "reflect.py",
     # publication (the ONE publication transaction — control_db_publication p6). Deploying the
     # website is a P0 controller-only action: `publish release` refuses without --operator and
     # records both hosts + the publication/v1 receipt in the control database.
@@ -204,6 +210,7 @@ Subcommands (each forwards to its backing script):
   session     open|close
   decision    record
   scoreboard
+  reflect
   publish     release
   release     check-protection
   surfaces    sync|snapshot

@@ -55,10 +55,13 @@ Contract reuse: identical to the other producers — :func:`record_factory.build
 :mod:`knowledge_ingestion`, published via ``knowledge_stream.publish_event`` under the
 authorized-writer seam, rerun-safe against the shared ``CHECKPOINT_KEY`` hash.
 
-Scope fence: the TYPE + the APPEND path ONLY — the read command (rendering the accumulated
-series) is s6b (``reflection_ingestion`` exposes only the family scan/resolution a read must
-build on, mirroring how s2a exposed ``scan_decision_records`` before its read command
-existed). Nothing here registers a CLI leaf or writes outside the append seam.
+s6b adds the READ seam (the ``reflect --read`` command's substrate): :func:`read_reflection_series`
+resolves the accumulated series (ONE current entry per session, chronologically ordered) and
+:func:`render_reflection_series` renders it for the human read — the read half of the series,
+where a session contemplates across its predecessors (the design's "multi-session contemplation
+is their accumulation"). Scope fence: the read seam + the append seam ONLY — nothing here
+registers a CLI leaf (the ``reflect`` command is the thin ``scripts/reflect.py`` shell over this
+seam) or writes outside the append seam.
 """
 
 from __future__ import annotations
@@ -567,3 +570,95 @@ def resolve_reflection_series(
         ),
         warnings,
     )
+
+
+# ── The read seam (s6b — the ``reflect --read`` command's substrate) ─
+
+
+@dataclass
+class ReflectionReadResult:
+    """What one :func:`read_reflection_series` call resolved — the s6b read command's outcome.
+
+    ``status`` is ``"read"`` when the accumulated series holds at least one entry and
+    ``"empty"`` when no session has closed with self-notes yet. ``entries`` is the resolved
+    series itself — ONE current entry per session, chronologically ordered by
+    :func:`resolve_reflection_series` — as the ``(path, artifact_fields, payload)`` triples the
+    family scan returns; ``count`` is ``len(entries)``. ``warnings`` names the scan's anomalies
+    (a ``reflection/v1`` artifact of this org that is not a readable AIO org-root record — see
+    :func:`scan_reflection_records`). ``repository_id`` echoes the org the read filtered on so
+    the report is self-describing.
+    """
+
+    status: str
+    entries: list[tuple[Path, dict[str, Any], dict[str, Any]]]
+    count: int
+    repository_id: str = REPOSITORY_ID
+    warnings: list[str] = _dataclass_field(default_factory=list)
+
+
+def read_reflection_series(
+    *,
+    repository_id: str = REPOSITORY_ID,
+    artifact_dir: Path | None = None,
+) -> ReflectionReadResult:
+    """Read the accumulated reflection series: ONE current entry per session, in order.
+
+    This is the read seam of the ``agentic-dynamics reflect --read`` command (phase
+    ``s6b_reflection_read`` of the ``self_knowledge_layer`` wave, design
+    ``docs/designs/proposed/self_knowledge_layer.md``). The AIO's operating cadence closes every
+    session it ends (s1b), and a close with self-notes appends its reflection entry (s6a), so
+    reading the series here renders the machine's accumulated posterior on itself — what it got
+    wrong across sessions, in the order the sessions happened — for the next session to
+    contemplate across its predecessors instead of re-learning by grep.
+
+    The read is a DIRECT read of the durable artifacts the append seam writes (filtered to the
+    AIO's org-root ``reflection/v1`` family, exactly as :func:`resolve_reflection_series`
+    resolves it) — never the registry projection, which requires a live consumer: the
+    round-trip (close then read) must be exact the moment the entry lands. An empty dir (or one
+    holding only other families / other repositories) resolves the clear ``"empty"`` state — no
+    session has closed with self-notes, which is the correct "nothing to contemplate across"
+    answer, never an error. ``artifact_dir`` defaults to the repo's durable KB artifact
+    directory and is injectable so tests can point at a tmp dir.
+    """
+    entries, warnings = resolve_reflection_series(
+        repository_id=repository_id, artifact_dir=artifact_dir
+    )
+    return ReflectionReadResult(
+        status="read" if entries else "empty",
+        entries=entries,
+        count=len(entries),
+        repository_id=repository_id,
+        warnings=warnings,
+    )
+
+
+def render_reflection_series(result: ReflectionReadResult) -> str:
+    """Render a :class:`ReflectionReadResult` as the human read of the accumulated series.
+
+    The rendering the ``reflect --read`` command prints: the resolved series in the order the
+    sessions happened — one block per session (its date, slug, and short ``knowledge_id``) over
+    its self-notes — so the reading session can contemplate across its predecessors. The
+    ``"empty"`` state renders the clear empty-series message naming the ``session close``
+    command that makes the first read meaningful (never an error, never a fabricated entry).
+    """
+    if result.status != "read" or not result.entries:
+        return (
+            "[reflect] No reflections yet — the accumulated series is empty.\n"
+            "  No session has closed with self-notes, so there is nothing to contemplate\n"
+            "  across yet. When a session ends, `agentic-dynamics session close` with\n"
+            "  --self-notes appends its reflection here; this read renders the entries in\n"
+            "  the order the sessions happened."
+        )
+    lines = [f"[reflect] {result.count} reflection(s), one per session, in session order:"]
+    for path, _artifact, payload in result.entries:
+        lines.append(
+            f"  {payload.get('session_date') or '?'}  {payload.get('slug') or '?'}  "
+            f"({path.stem[:12]})"
+        )
+        notes = str(payload.get("self_notes") or "").strip()
+        if notes:
+            lines.extend(f"      {line}" for line in notes.splitlines())
+    lines.append("")
+    lines.append("  the accumulated series feeds the next session's open context (s1c) and the")
+    lines.append("  belief seeds (s4c).")
+    return "\n".join(lines)

@@ -1,5 +1,5 @@
 """Tests for the reflection record type + append path (reflection_ingestion) — s6a of the
-self_knowledge_layer wave.
+self_knowledge_layer wave, extended by the s6b reflection-read command cases.
 
 Covers the s6a DONE_WHEN + type/append cases. The deliverable: the reflection record type and
 the append path — the session close (s1b) appends its self-notes into a session-keyed
@@ -8,6 +8,11 @@ self_notes}`` (the s1a session type's own self-notes field fed straight through)
 ``actor``/``scope``. Producer aio, org-root scope, private to the controller-AIO pair — never
 resolved by cell agents (the scope fence asserted via ``retrieval.scope_excluded``) or the
 supervisor rail.
+
+The s6b read cases below extend this file in their phase: ``reflect --read`` renders the
+accumulated reflection series in chronological order (the read seam
+``read_reflection_series``/``render_reflection_series`` over the same org-root family), and an
+empty series renders a clear empty state — never an error.
 
 Cases:
 
@@ -27,6 +32,11 @@ Cases:
 * the CLI wiring: the REAL ``agentic-dynamics session close`` command appends its reflection
   entry; a close with no self-notes appends nothing; an identical re-close appends nothing
   twice (rerun-safe).
+* the read command (s6b — DONE_WHEN): the REAL ``agentic-dynamics reflect --read`` renders the
+  accumulated entries in chronological order (sorted by session_date, never by append order);
+  an empty series renders a clear empty state; the machine reflect/v1 report carries the full
+  ordered series; anomalies are warned on stderr and foreign/other-family records are never
+  candidates.
 """
 
 import json
@@ -747,3 +757,229 @@ class TestSessionCloseAppends:
         entries, warnings = ri.resolve_reflection_series(artifact_dir=tmp_path)
         assert warnings == []
         assert len(entries) == 1  # ONE entry for the session, never two
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# The read command (s6b — reflect --read renders the accumulated series)
+# ═════════════════════════════════════════════════════════════════════════════
+
+
+class TestReflectReadCommand:
+    """The ``agentic-dynamics reflect --read`` command (CLI shell over the s6b read seam)."""
+
+    def test_command_resolves_to_reflect_script(self):
+        from agentic_dynamics import cli
+
+        assert cli._resolve(["reflect"]) == ("reflect.py", [])
+        assert cli._resolve(["reflect", "--read"]) == ("reflect.py", ["--read"])
+        assert cli._resolve(["reflect", "--json"]) == ("reflect.py", ["--json"])
+        assert (ROOT / "scripts" / "reflect.py").is_file()
+
+    def test_command_renders_the_accumulated_series_in_order(self, tmp_path, monkeypatch, capsys):
+        """DONE_WHEN (1): reflect --read renders the accumulated entries in chronological order —
+        the round-trip from the REAL close command: two sessions close, the read shows both, the
+        first is byte-for-byte the entry that session appended (never overwritten)."""
+        import session_close as sc
+
+        from agentic_dynamics.core import paths as core_paths
+        from agentic_dynamics.knowledge import knowledge_stream as ks
+
+        redis = _FakeRedis()
+        monkeypatch.setattr(ks, "connect", lambda: redis)
+        monkeypatch.setattr(core_paths, "KB_ARTIFACT_DIR", tmp_path)
+
+        first_session = _minimal_session(
+            "wt_selfk_s6a_session_one", "2026-09-03", "First session reflection."
+        )
+        second_session = _minimal_session(
+            "wt_selfk_s6b_session_two", "2026-09-04", "Second session reflection."
+        )
+        for session in (first_session, second_session):
+            assert (
+                sc.main(
+                    [
+                        "--slug",
+                        session["slug"],
+                        "--session-date",
+                        session["session_date"],
+                        "--self-notes",
+                        session["self_notes"],
+                    ]
+                )
+                == 0
+            )
+        capsys.readouterr()
+
+        import reflect as refl
+
+        assert refl.main(["--read"]) == 0
+        out = capsys.readouterr().out
+        # Both sessions' reflections render, in the order the sessions happened (09-03 before
+        # 09-04) — the accumulated series, not just the last close.
+        first_pos = out.index("wt_selfk_s6a_session_one")
+        second_pos = out.index("wt_selfk_s6b_session_two")
+        assert first_pos < second_pos
+        assert "2026-09-03" in out and "2026-09-04" in out
+        assert "First session reflection." in out
+        assert "Second session reflection." in out
+        # The durable entries both survived — the first session's entry was never overwritten.
+        assert (
+            tmp_path / f"{ri.derive_reflection_record(first_session).knowledge_id}.json"
+        ).is_file()
+
+    def test_command_sorts_by_session_date_never_by_append_order(self, tmp_path, monkeypatch, capsys):
+        """The order is the sessions' own dates (content), never the append/filesystem order: a
+        later-dated session appended FIRST still renders after the earlier-dated one."""
+        redis = _FakeRedis()
+        # Appended in reverse session order — the read must render chronological (09-03 first).
+        _append(
+            _session(slug="wt_selfk_s6b_session_two", session_date="2026-09-04"),
+            tmp_path,
+            redis,
+        )
+        _append(
+            _session(slug="wt_selfk_s6a_session_one", session_date="2026-09-03"),
+            tmp_path,
+            redis,
+        )
+
+        from agentic_dynamics.core import paths as core_paths
+
+        monkeypatch.setattr(core_paths, "KB_ARTIFACT_DIR", tmp_path)
+        import reflect as refl
+
+        assert refl.main(["--read"]) == 0
+        out = capsys.readouterr().out
+        assert out.index("wt_selfk_s6a_session_one") < out.index("wt_selfk_s6b_session_two")
+
+    def test_command_machine_report_carries_the_ordered_series(self, tmp_path, monkeypatch, capsys):
+        """The machine reflect/v1 report names every entry with its content + durable identity,
+        in session order, with the AIO actor/scope and an empty warning list."""
+        redis = _FakeRedis()
+        earlier = _append(
+            _session(slug="wt_selfk_s6a_session_one", session_date="2026-09-03"),
+            tmp_path,
+            redis,
+        )
+        later = _append(
+            _session(slug="wt_selfk_s6b_session_two", session_date="2026-09-04"),
+            tmp_path,
+            redis,
+        )
+
+        from agentic_dynamics.core import paths as core_paths
+
+        monkeypatch.setattr(core_paths, "KB_ARTIFACT_DIR", tmp_path)
+        import reflect as refl
+
+        assert refl.main(["--read", "--json"]) == 0
+        report = json.loads(capsys.readouterr().out)
+        assert report["schema"] == "reflect/v1"
+        assert report["status"] == "read"
+        assert report["count"] == 2
+        assert report["actor"] == "aio"
+        assert report["scope"] == "org:agentic-dynamics"
+        assert report["warnings"] == []
+        assert [entry["slug"] for entry in report["entries"]] == [
+            "wt_selfk_s6a_session_one",
+            "wt_selfk_s6b_session_two",
+        ]
+        assert [entry["session_date"] for entry in report["entries"]] == [
+            "2026-09-03",
+            "2026-09-04",
+        ]
+        assert report["entries"][0]["self_notes"] == json.loads(
+            earlier.record.text
+        )["self_notes"]
+        assert report["entries"][0]["knowledge_id"] == earlier.record.knowledge_id
+        assert report["entries"][1]["knowledge_id"] == later.record.knowledge_id
+        assert report["entries"][0]["entity_id"] == earlier.record.entity_id
+        assert report["entries"][1]["entity_id"] == later.record.entity_id
+        assert report["entries"][0]["actor"] == "aio"
+        assert report["entries"][0]["scope"] == "org:agentic-dynamics"
+
+    def test_command_empty_series_renders_a_clear_empty_state(self, tmp_path, monkeypatch, capsys):
+        """DONE_WHEN (2): no entries (a fresh checkout with no KB yet) renders a clear empty
+        state — human and machine, exit 0, never an error, never a fabricated entry."""
+        from agentic_dynamics.core import paths as core_paths
+
+        monkeypatch.setattr(core_paths, "KB_ARTIFACT_DIR", tmp_path)
+        import reflect as refl
+
+        assert refl.main(["--read"]) == 0
+        captured = capsys.readouterr()
+        out, err = captured.out, captured.err
+        assert "No reflections yet" in out
+        assert "empty" in out
+        assert "session close" in out  # the empty state names the command that seeds the series
+        assert err == ""  # a clean empty read warns nothing
+
+        assert refl.main(["--read", "--json"]) == 0
+        report = json.loads(capsys.readouterr().out)
+        assert report["schema"] == "reflect/v1"
+        assert report["status"] == "empty"
+        assert report["count"] == 0
+        assert report["entries"] == []
+        assert report["warnings"] == []
+
+    def test_command_read_seam_reports_an_empty_series(self, tmp_path):
+        """The module read seam mirrors the command: an empty dir resolves ``empty``."""
+        result = ri.read_reflection_series(artifact_dir=tmp_path)
+        assert result.status == "empty"
+        assert result.entries == []
+        assert result.count == 0
+        assert result.warnings == []
+        assert "No reflections yet" in ri.render_reflection_series(result)
+
+    def test_command_scope_fence_resolves_only_the_org_root_aio_series(self, tmp_path, monkeypatch, capsys):
+        """SCOPE FENCE: reflect reads ONLY the AIO's org-root reflection records — a foreign
+        repository's reflection, the session spine, and a decision artifact in the same dir are
+        never candidates; an org-scope artifact whose body actor is not the AIO's is a warning on
+        stderr, never part of the series."""
+        closed = _append(
+            _session(slug="wt_selfk_s6a_session_one", session_date="2026-09-03"),
+            tmp_path,
+            _FakeRedis(),
+        )
+
+        foreign = ri.derive_reflection_record(
+            _session(slug="cell-wt_03", session_date="2026-09-03"), repository_id="another-org"
+        )
+        (tmp_path / f"{foreign.knowledge_id}.json").write_bytes(record_to_artifact(foreign))
+        spine = si.derive_session_record(_session(session_date="2026-09-03"))
+        (tmp_path / f"{spine.knowledge_id}.json").write_bytes(record_to_artifact(spine))
+        from agentic_dynamics.knowledge import decision_ingestion as di
+
+        decision = di.derive_decision_record(
+            {
+                "what": "reflect at close",
+                "why": "to accumulate the series",
+                "category": "scope",
+                "decided_at": "2026-09-03T12:00:00+00:00",
+            }
+        )
+        (tmp_path / f"{decision.knowledge_id}.json").write_bytes(record_to_artifact(decision))
+
+        data = json.loads(
+            record_to_artifact(ri.derive_reflection_record(_session(slug="impostor")))
+        )
+        payload = json.loads(data["text"])
+        payload["actor"] = "supervisor"  # the supervisor rail never writes AIO reflections
+        data["text"] = json.dumps(payload)
+        (tmp_path / "impostor.json").write_bytes(json.dumps(data, sort_keys=True).encode())
+
+        from agentic_dynamics.core import paths as core_paths
+
+        monkeypatch.setattr(core_paths, "KB_ARTIFACT_DIR", tmp_path)
+        import reflect as refl
+
+        assert refl.main(["--read", "--json"]) == 0
+        captured = capsys.readouterr()
+        report = json.loads(captured.out)
+        assert report["status"] == "read"
+        assert report["count"] == 1  # exactly the org-root AIO reflection, nothing else
+        assert report["entries"][0]["slug"] == "wt_selfk_s6a_session_one"
+        assert report["entries"][0]["knowledge_id"] == closed.record.knowledge_id
+        assert "impostor.json" in captured.err  # the layering violation is a warning, never silent
+        assert any("impostor.json" in w for w in report["warnings"])
+
