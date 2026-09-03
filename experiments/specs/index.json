@@ -1,6 +1,6 @@
 {
   "schema_version": "spec-status/v2",
-  "generated_at": "2026-09-03T18:40:28.770365+00:00",
+  "generated_at": "2026-09-03T19:44:56.998407+00:00",
   "n_specs": 189,
   "specs": [
     {
@@ -601,6 +601,26 @@
       "results_pointer": null,
       "n_runs": 4,
       "workflow_revision_id": "c1a723661b7468811d44b16d1ee95e3497c2103fd1c3edd50859a6fea3e141b2",
+      "authored_status": null
+    },
+    {
+      "name": "kb_finding_layer",
+      "version": "0.1",
+      "status": "runnable",
+      "spec_path": "workflows/repository/kb_finding_layer.yaml",
+      "artifact_kind": "workflow",
+      "repeatable": false,
+      "supersedes": [],
+      "superseded_by": null,
+      "completed_at": null,
+      "last_run_at": null,
+      "latest_ok": null,
+      "latest_model": null,
+      "latest_cost_usd": null,
+      "latest_git_sha": null,
+      "results_pointer": null,
+      "n_runs": 1,
+      "workflow_revision_id": "69596b7504f60ef283b6cc29a6cdd5178fac6d71225592786f0932db6b0bf021",
       "authored_status": null
     },
     {
@@ -3097,26 +3117,6 @@
       "results_pointer": "experiments/results/workflows/kb_event_typing/20260819T003828Z.json",
       "n_runs": 1,
       "workflow_revision_id": "728622ae8448b2a871ca311b175f7079c4d9fa30cd7861af82ad872228e1d0a7",
-      "authored_status": null
-    },
-    {
-      "name": "kb_finding_layer",
-      "version": "0.1",
-      "status": "completed",
-      "spec_path": "workflows/repository/kb_finding_layer.yaml",
-      "artifact_kind": "workflow",
-      "repeatable": false,
-      "supersedes": [],
-      "superseded_by": null,
-      "completed_at": null,
-      "last_run_at": "2026-09-03T18:40:28.748198+00:00",
-      "latest_ok": true,
-      "latest_model": "deepseek/deepseek-v4-flash",
-      "latest_cost_usd": 1.469705,
-      "latest_git_sha": "00d15dbf3",
-      "results_pointer": "experiments/results/workflows/kb_finding_layer/20260903T184028Z.json",
-      "n_runs": 1,
-      "workflow_revision_id": "e241ca476c69a086020f0301258db0ce31a49c8e2116973e293f216a8e032a4f",
       "authored_status": null
     },
     {
