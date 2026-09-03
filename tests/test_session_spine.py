@@ -19,6 +19,7 @@ from pathlib import Path
 import pytest
 
 from agentic_dynamics.knowledge import ledger_ingestion as li
+from agentic_dynamics.knowledge import reflection_ingestion as ri
 from agentic_dynamics.knowledge import session_ingestion as si
 from agentic_dynamics.knowledge.knowledge import (
     SOURCE_TYPES,
@@ -477,7 +478,12 @@ class TestSessionCloseCommand:
         assert (ROOT / "scripts" / "session_close.py").is_file()
 
     def test_command_end_to_end_writes_into_the_kb(self, tmp_path, monkeypatch, capsys):
-        """Run the REAL command against a fake stream + tmp artifact dir: artifact + event land."""
+        """Run the REAL command against a fake stream + tmp artifact dir: artifact + event land.
+
+        Since s6a the close ALSO appends the session's reflection entry, so the command lands
+        TWO durable records in the KB: the session-spine record (the s1b deliverable) AND the
+        session-keyed reflection entry seeded from its self-notes (the s6a append path).
+        """
         from agentic_dynamics.core import paths as core_paths
         from agentic_dynamics.knowledge import knowledge_stream as ks
 
@@ -490,45 +496,47 @@ class TestSessionCloseCommand:
         monkeypatch.setattr(ks, "connect", lambda: redis)
         monkeypatch.setattr(core_paths, "KB_ARTIFACT_DIR", tmp_path)
 
-        rc = sc.main(
-            [
-                "--slug",
-                "wt_selfk_s1b_close_writer",
-                "--session-date",
-                "2026-09-03",
-                "--wave",
-                "self_knowledge_layer/s0_pin_spec",
-                "--wave",
-                "self_knowledge_layer/s1a",
-                "--merged",
-                "2026-08-14_experiment-spec-and-compiler-design",
-                "--parked",
-                "fleet ladder rung 2",
-                "--open-thread",
-                "session spine close command (s1b)",
-                "--self-notes",
-                "I re-derived the wave verdict by grep instead of reading a record.",
-            ]
-        )
-        assert rc == 0
-        assert len(redis.stream) == 1
-        artifacts = list(tmp_path.glob("*.json"))
-        assert len(artifacts) == 1
-
-        record = si.derive_session_record(
-            {
-                "session_date": "2026-09-03",
-                "slug": "wt_selfk_s1b_close_writer",
-                "waves_run": ["self_knowledge_layer/s0_pin_spec", "self_knowledge_layer/s1a"],
-                "merged": ["2026-08-14_experiment-spec-and-compiler-design"],
-                "parked": ["fleet ladder rung 2"],
-                "open_threads": ["session spine close command (s1b)"],
-                "self_notes": "I re-derived the wave verdict by grep instead of reading a record.",
-            }
-        )
-        assert artifacts[0].name == f"{record.knowledge_id}.json"
-        assert next(iter(redis.stream.values()))["knowledge_id"] == record.knowledge_id
-        assert "closed" in capsys.readouterr().out
+        session = {
+            "session_date": "2026-09-03",
+            "slug": "wt_selfk_s1b_close_writer",
+            "waves_run": ["self_knowledge_layer/s0_pin_spec", "self_knowledge_layer/s1a"],
+            "merged": ["2026-08-14_experiment-spec-and-compiler-design"],
+            "parked": ["fleet ladder rung 2"],
+            "open_threads": ["session spine close command (s1b)"],
+            "self_notes": "I re-derived the wave verdict by grep instead of reading a record.",
+        }
+        argv = [
+            "--slug",
+            session["slug"],
+            "--session-date",
+            session["session_date"],
+            "--wave",
+            "self_knowledge_layer/s0_pin_spec",
+            "--wave",
+            "self_knowledge_layer/s1a",
+            "--merged",
+            "2026-08-14_experiment-spec-and-compiler-design",
+            "--parked",
+            "fleet ladder rung 2",
+            "--open-thread",
+            "session spine close command (s1b)",
+            "--self-notes",
+            session["self_notes"],
+        ]
+        assert sc.main(argv) == 0
+        spine = si.derive_session_record(session)
+        reflection = ri.derive_reflection_record(session)
+        assert {path.name for path in tmp_path.glob("*.json")} == {
+            f"{spine.knowledge_id}.json",
+            f"{reflection.knowledge_id}.json",
+        }
+        events = [payload["knowledge_id"] for payload in redis.stream.values()]
+        assert len(events) == 2
+        assert {spine.knowledge_id, reflection.knowledge_id} <= set(events)
+        assert len(redis.stream) == 2
+        out = capsys.readouterr().out
+        assert "closed" in out
+        assert "reflection: appended" in out
 
     def test_command_rerun_is_a_noop(self, tmp_path, monkeypatch):
         from agentic_dynamics.core import paths as core_paths
@@ -828,7 +836,11 @@ class TestSessionOpenCommand:
 
     def test_command_round_trip_close_then_open_is_exact(self, tmp_path, monkeypatch, capsys):
         """The REAL close command then the REAL open command: the round-trip is exact (DONE_WHEN
-        1 + 3) — open renders precisely what close wrote, in the same durable artifact dir."""
+        1 + 3) — open renders precisely what close wrote, in the same durable artifact dir.
+
+        Since s6a the close also appends the session's reflection entry, so the dir holds TWO
+        records — but ``session open`` reads ONLY the AIO's ``session/v1`` spine family, so the
+        reflection record is foreign to it and the round-trip stays exact (candidates == 1)."""
         from agentic_dynamics.core import paths as core_paths
         from agentic_dynamics.knowledge import knowledge_stream as ks
 
@@ -842,11 +854,20 @@ class TestSessionOpenCommand:
         monkeypatch.setattr(ks, "connect", lambda: redis)
         monkeypatch.setattr(core_paths, "KB_ARTIFACT_DIR", tmp_path)
 
+        session = {
+            "session_date": "2026-09-03",
+            "slug": "wt_selfk_s1b_close_writer",
+            "waves_run": ["self_knowledge_layer/s0_pin_spec", "self_knowledge_layer/s1a"],
+            "merged": ["2026-08-14_experiment-spec-and-compiler-design"],
+            "parked": ["fleet ladder rung 2"],
+            "open_threads": ["open command (s1c)"],
+            "self_notes": "I re-derived the wave verdict by grep instead of reading a record.",
+        }
         argv = [
             "--slug",
-            "wt_selfk_s1b_close_writer",
+            session["slug"],
             "--session-date",
-            "2026-09-03",
+            session["session_date"],
             "--wave",
             "self_knowledge_layer/s0_pin_spec",
             "--wave",
@@ -858,12 +879,17 @@ class TestSessionOpenCommand:
             "--open-thread",
             "open command (s1c)",
             "--self-notes",
-            "I re-derived the wave verdict by grep instead of reading a record.",
+            session["self_notes"],
         ]
         assert sc.main(argv) == 0
         capsys.readouterr()  # drop the close command's report — the buffer below is open's own
-        artifacts = list(tmp_path.glob("*.json"))
-        assert len(artifacts) == 1
+        spine = si.derive_session_record(session)
+        reflection = ri.derive_reflection_record(session)
+        artifacts = {path.name for path in tmp_path.glob("*.json")}
+        assert artifacts == {
+            f"{spine.knowledge_id}.json",
+            f"{reflection.knowledge_id}.json",
+        }
 
         assert so.main(["--json"]) == 0
         report = json.loads(capsys.readouterr().out)
@@ -880,9 +906,9 @@ class TestSessionOpenCommand:
         assert report["self_notes"] == (
             "I re-derived the wave verdict by grep instead of reading a record."
         )
-        assert report["knowledge_id"] == artifacts[0].stem  # the record close just wrote
-        assert report["entity_id"]
-        assert report["candidates"] == 1
+        assert report["knowledge_id"] == spine.knowledge_id  # the record close just wrote
+        assert report["entity_id"] == spine.entity_id
+        assert report["candidates"] == 1  # the reflection entry is foreign to the spine read
         assert report["warnings"] == []
 
         assert so.main([]) == 0

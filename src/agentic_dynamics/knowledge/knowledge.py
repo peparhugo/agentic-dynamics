@@ -168,6 +168,16 @@ SOURCE_TYPES: dict[str, SourceTypeSpec] = {
     # self-elevates the writer). Producer: the AIO, scoped to its org root (org:agentic-dynamics)
     # — the controller + AIO see these records; cell agents never resolve them.
     "belief": SourceTypeSpec("observation", Authority.ADVISORY, "[H]"),
+    # Self-knowledge layer (loop 2, s6a): the reflection-record family. A reflection entry is
+    # the AIO's own self-notes appended at session close into a session-keyed reflection
+    # series — "what I got wrong, what surprised me, what I'd change about my own process"
+    # (design §record types 6); multi-session contemplation is their accumulation. It is an
+    # OBSERVATION (it states what a session reflected, never an instruction to act) with
+    # nominal ADVISORY/[H] provenance — self-reported like a session close, a decision, or a
+    # belief, so an entry can inform the next session but never override a MEASURED ledger row
+    # or pinned policy. Producer: the AIO, scoped to its org root (org:agentic-dynamics) —
+    # private to the controller-AIO pair, never resolved by cell agents or the supervisor rail.
+    "reflection": SourceTypeSpec("observation", Authority.ADVISORY, "[H]"),
     # Spec-lifecycle addition: the experiment spec *document* and its derived lifecycle
     # (status / supersedes chain / last run). POLICY authority + "[P]" for the same reason
     # `policy` carries them — a spec is authored, pinned repository policy, read from the

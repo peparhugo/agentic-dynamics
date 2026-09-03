@@ -360,7 +360,7 @@ def test_actuation_types_is_a_single_member_allowlist():
 def test_source_types_is_the_single_vocabulary_owner():
     # All source types — the round-1 producer types, the round-2 registry types, the
     # spec-lifecycle type, the CAP fact + context_snapshot types, the orphan-sweep type, and the
-    # self-knowledge decision/wave_verdict/belief types — are registered here. This is what
+    # self-knowledge decision/wave_verdict/belief/reflection types — are registered here. This is what
     # closes the pre-R2 split where OBSERVATION_TYPES silently omitted finding/code/report/policy.
     assert set(SOURCE_TYPES) == {
         "finding",
@@ -376,6 +376,7 @@ def test_source_types_is_the_single_vocabulary_owner():
         "meta_session",
         "decision",
         "belief",
+        "reflection",
         "actuation",
         "spec",
         "fact",
