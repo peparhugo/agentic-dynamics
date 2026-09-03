@@ -9,10 +9,16 @@ record still lands. Also covers the record type the command rides on: the ``deci
 source_type registered as an observation-family ADVISORY/[H] record (a decision IS an
 observation with intent), minted beside the a5 observation family (prereg D-1's second option)
 and org-root scoped so a cell agent's retrieval never resolves it.
+
+Also covers the s2b emission cases (the s2b DONE_WHEN): the verified-command call sites —
+``scripts/promote.py`` and ``scripts/publish_release.py`` — emit their own s2 decision record
+(actor: ``verified_command``, org-root scope) bound to the run_id + candidate_sha the permanence
+act acted on. Default-on and best-effort: a failed record never blocks the promote/publish.
 """
 
 import hashlib
 import json
+import subprocess
 import sys
 from pathlib import Path
 
@@ -33,6 +39,9 @@ from agentic_dynamics.knowledge.knowledge_ingestion import (
 from agentic_dynamics.knowledge.session_ingestion import aio_acl_scope
 
 ROOT = Path(__file__).resolve().parent.parent
+_SCRIPTS_DIR = str(ROOT / "scripts")
+if _SCRIPTS_DIR not in sys.path:
+    sys.path.insert(0, _SCRIPTS_DIR)
 
 
 def _decision(**overrides) -> dict:
@@ -663,3 +672,397 @@ class TestDecisionRecordCommand:
         assert payload["what"] == "flash over sonnet"
         assert payload["run_id"] == "run-c8d98f56a124"
         assert payload["candidate_sha"] == "0123456789abcdef0123456789abcdef01234567"
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# s2b — the verified-command call-site emission cases (promote.py + publish_release.py)
+# ═════════════════════════════════════════════════════════════════════════════
+
+# The s2b DONE_WHEN: a promote invocation emits a decision record bound to its run_id +
+# candidate_sha; a publish invocation emits its own. The emissions are DEFAULT-ON (wired inside
+# the verified commands, actor ``verified_command``, org-root scope) and BEST-EFFORT (a failed
+# record never blocks the promote/publish). The seams are injectable on purpose — the same
+# pattern the a5 emitters use — so the tests drive the REAL call-site functions while pointing
+# the record seam at a tmp artifact dir + a fake stream (hermetic: nothing touches the live KB).
+
+
+def _noop_emitter(label=""):
+    def emit_decision(decision):
+        return {"observation_id": f"{label}-obs", "entry_ids": []}
+
+    def emit_act(decision, *, causes):
+        return {"actuation_id": f"{label}-act", "entry_ids": []}
+
+    return emit_decision, emit_act
+
+
+class _RecordingRecordSeam:
+    """A record_decision seam that captures every decision AND lands it for real (tmp + fake).
+
+    The s2b tests need both halves: proof that the call site INVOKED the seam with a decision
+    bound to run_id + candidate_sha (the captured dict), and proof that such a decision is a
+    real org-root decision record (the durable artifact the seam's delegate writes). The
+    delegate is ``decision_ingestion.record_decision`` against a tmp artifact dir + fake redis,
+    exactly as the s2a seam tests use.
+    """
+
+    def __init__(self, artifact_dir: Path, redis):
+        self.artifact_dir = artifact_dir
+        self.redis = redis
+        self.decisions: list[dict] = []
+
+    def __call__(self, decision: dict) -> dict:
+        self.decisions.append(dict(decision))
+        result = di.record_decision(
+            decision, artifact_dir=self.artifact_dir, connect_fn=lambda: self.redis
+        )
+        return {
+            "status": result.status,
+            "knowledge_id": result.record.knowledge_id,
+            "artifact": str(result.artifact_path),
+            "warnings": list(result.warnings),
+        }
+
+
+def _candidate_worktree(tmp_path: Path) -> tuple[Path, str]:
+    """A real git worktree: main at a base commit + a feature branch with one [workflow] commit.
+
+    Mirrors ``test_aio_emission``'s fixture: the promote real path needs a candidate whose
+    base..HEAD diff is non-empty and whose HEAD is the ledger's ``git_sha``.
+    """
+    wt = tmp_path / "candidate"
+    wt.mkdir()
+    for argv in (
+        ["git", "init", "-q"],
+        ["git", "config", "user.email", "t@t"],
+        ["git", "config", "user.name", "t"],
+    ):
+        subprocess.run(argv, cwd=wt, check=True)
+    (wt / "base.py").write_text("BASE = 1\n")
+    subprocess.run(["git", "add", "-A"], cwd=wt, check=True)
+    subprocess.run(["git", "commit", "-q", "-m", "base"], cwd=wt, check=True)
+    subprocess.run(["git", "branch", "-m", "main"], cwd=wt, check=True)
+    subprocess.run(["git", "checkout", "-q", "-b", "feature"], cwd=wt, check=True)
+    (wt / "calc.py").write_text("def add(a, b): return a + b\n")
+    subprocess.run(["git", "add", "-A"], cwd=wt, check=True)
+    subprocess.run(["git", "commit", "-q", "-m", "[workflow] scope — g"], cwd=wt, check=True)
+    head = subprocess.run(
+        ["git", "rev-parse", "HEAD"], cwd=wt, capture_output=True, text=True, check=True
+    ).stdout.strip()
+    return wt, head
+
+
+def _promote_args(tmp_path: Path, wt: Path, ledger: dict, **overrides):
+    from types import SimpleNamespace
+
+    ledger_path = tmp_path / "ledger.json"
+    ledger_path.write_text(json.dumps(ledger))
+    args = {
+        "spec": "promote_emit_test",
+        "workdir": str(wt),
+        "ledger": str(ledger_path),
+        "approval": None,
+        "base": "main",
+        "operator": "drseuss",
+        "dry_run": False,
+    }
+    args.update(overrides)
+    return SimpleNamespace(**args)
+
+
+def _promote_ledger(head_sha: str, **overrides) -> dict:
+    data = {
+        "spec_name": "promote_emit_test",
+        "spec_id": "promote_emit_test@0.1",
+        "git_sha": head_sha,
+        "ok": True,
+        "state": "succeeded",
+        "total_cost_usd": 0.001,
+        "phases": [
+            {"phase": "scope", "kind": "agent", "status": "ok",
+             "commit_hash": head_sha, "test_executed_success": None},
+            {"phase": "verify", "kind": "test", "status": "ok",
+             "commit_hash": head_sha, "test_executed_success": True},
+        ],
+    }
+    data.update(overrides)
+    return data
+
+
+class TestPromoteEmission:
+    def test_promote_invocation_emits_a_decision_record_bound_to_run_and_candidate(self, tmp_path):
+        """s2b DONE_WHEN (promote): running the real promote path records an org-root decision.
+
+        The decision the seam receives must carry actor=verified_command and be bound to the
+        ledger's run_id + the candidate sha the promotion acted on; the durable artifact must be
+        a real ``decision``/``decision/v1`` record retrievable by category.
+        """
+        from promote import _run_promotion
+
+        wt, head = _candidate_worktree(tmp_path)
+        ledger = _promote_ledger(head)
+        redis = _FakeRedis()
+        seam = _RecordingRecordSeam(tmp_path / "kb", redis)
+        emit_decision, emit_act = _noop_emitter("promote")
+
+        pushes: list = []
+
+        def fake_push(workdir, base, subject, candidate):
+            pushes.append((str(workdir), base, subject, candidate))
+            return "feedfacefeedfacefeedface"
+
+        _run_promotion(
+            _promote_args(tmp_path, wt, ledger),
+            push=fake_push, emit_decision=emit_decision, emit_act=emit_act,
+            record_decision=seam,
+        )
+
+        assert len(pushes) == 1  # the promotion happened
+        # The emission seam was invoked exactly once, with a decision bound to the run + candidate.
+        assert len(seam.decisions) == 1
+        decision = seam.decisions[0]
+        assert decision["actor"] == "verified_command"
+        assert decision["run_id"] == "promote_emit_test@0.1"
+        assert decision["candidate_sha"] == head
+        assert decision["category"] == "promote"
+        assert "promote" in decision["what"]
+
+        # And the recorded record is a real org-root decision artifact, retrievable by category.
+        records, warnings = di.scan_decision_records(category="promote", artifact_dir=tmp_path / "kb")
+        assert warnings == []
+        assert len(records) == 1
+        payload = records[0][2]
+        assert payload["actor"] == "verified_command"
+        assert payload["run_id"] == "promote_emit_test@0.1"
+        assert payload["candidate_sha"] == head
+        assert payload["scope"] == aio_acl_scope(REPOSITORY_ID)
+
+    def test_failed_record_never_blocks_a_verified_promotion(self, tmp_path):
+        """s2b best-effort: a raising record seam cannot stop the push (the durable act)."""
+        from promote import _run_promotion
+
+        wt, head = _candidate_worktree(tmp_path)
+        ledger = _promote_ledger(head)
+        emit_decision, emit_act = _noop_emitter("promote")
+        pushes: list = []
+
+        def fake_push(workdir, base, subject, candidate):
+            pushes.append(candidate)
+            return "feedfacefeedfacefeedface"
+
+        def boom(decision):
+            raise RuntimeError("record seam exploded")
+
+        # must not raise — the promotion proceeds even though the record failed.
+        _run_promotion(
+            _promote_args(tmp_path, wt, ledger),
+            push=fake_push, emit_decision=emit_decision, emit_act=emit_act,
+            record_decision=boom,
+        )
+        assert len(pushes) == 1
+
+    def test_promote_dry_run_emits_no_decision_record(self, tmp_path):
+        """A dry run is a plan, not a permanence decision — no s2b record is emitted."""
+        from promote import _run_promotion
+
+        wt, head = _candidate_worktree(tmp_path)
+        ledger = _promote_ledger(head)
+        calls: list = []
+        emit_decision, emit_act = _noop_emitter("promote")
+
+        _run_promotion(
+            _promote_args(tmp_path, wt, ledger, dry_run=True),
+            push=lambda *a, **kw: (_ for _ in ()).throw(AssertionError("no push on dry run")),
+            emit_decision=emit_decision, emit_act=emit_act,
+            record_decision=lambda d: calls.append(d) or {},
+        )
+        assert calls == []  # nothing recorded, nothing emitted
+
+    def test_default_on_seam_is_the_real_producer(self, tmp_path, monkeypatch):
+        """Default-on proof: with NO record_decision injected, the promote still records.
+
+        The real default seam (``_default_decision_record`` → ``decision_ingestion.record_decision``)
+        runs; pointing the KB artifact dir + stream at a tmp dir + fake redis keeps it hermetic
+        while proving the emission is armed by default, not gated behind a flag or an injectable.
+        """
+        from promote import _run_promotion
+
+        from agentic_dynamics.core import paths as core_paths
+        from agentic_dynamics.knowledge import knowledge_stream as ks
+
+        wt, head = _candidate_worktree(tmp_path)
+        ledger = _promote_ledger(head)
+        redis = _FakeRedis()
+        monkeypatch.setattr(core_paths, "KB_ARTIFACT_DIR", tmp_path / "kb")
+        monkeypatch.setattr(ks, "connect", lambda: redis)
+        emit_decision, emit_act = _noop_emitter("promote")
+
+        pushes: list = []
+
+        def fake_push(workdir, base, subject, candidate):
+            pushes.append(candidate)
+            return "feedfacefeedfacefeedface"
+
+        # record_decision NOT injected → the default seam runs for real.
+        _run_promotion(
+            _promote_args(tmp_path, wt, ledger),
+            push=fake_push, emit_decision=emit_decision, emit_act=emit_act,
+        )
+        assert len(pushes) == 1
+        records, warnings = di.scan_decision_records(category="promote", artifact_dir=tmp_path / "kb")
+        assert warnings == []
+        assert len(records) == 1
+        payload = records[0][2]
+        assert payload["actor"] == "verified_command"
+        assert payload["run_id"] == "promote_emit_test@0.1"
+        assert payload["candidate_sha"] == head
+
+
+def _publish_env(tmp_path: Path, monkeypatch) -> Path:
+    """A ready real-publish-path environment (mirrors test_aio_emission's fixture)."""
+    import datetime
+
+    import publish_release as pr_mod
+
+    from agentic_dynamics.control import publication as pub
+    from agentic_dynamics.control.control_db import ControlDB
+
+    db_path = tmp_path / "control.db"
+    with ControlDB.open(db_path) as db:
+        for proj in ("registry", "chroma", "neo4j"):
+            db.record_watermark(
+                proj, last_event_id="e1", source_head_event_id="e1",
+                lag_events=0,
+                last_success_at=datetime.datetime.now(datetime.timezone.utc).isoformat(),
+            )
+    site = tmp_path / "site"
+    site.mkdir()
+    (site / "index.html").write_text("<p>1,027 story sessions</p>")
+    (site / "data.js").write_text(
+        "window.DYNAMICS_DATA = " + json.dumps({"public_statistics": {"story_sessions": 1027}}) + ";\n"
+    )
+    monkeypatch.setattr(pr_mod, "read_head_sha", lambda: "deadbeef1234567890abcdef")
+    monkeypatch.setattr(pub, "SITE_ROOT", site)
+    monkeypatch.setattr(pub, "DATA_JS", site / "data.js")
+    return db_path
+
+
+class TestPublishEmission:
+    def test_publish_invocation_emits_a_decision_record_bound_to_run_and_candidate(
+        self, tmp_path, monkeypatch
+    ):
+        """s2b DONE_WHEN (publish): a real publish path records its own org-root decision.
+
+        The decision the seam receives must carry actor=verified_command, the --run-id binding
+        and the candidate sha being published; the durable artifact is retrievable by category.
+        """
+        import publish_release as pr_mod
+
+        db_path = _publish_env(tmp_path, monkeypatch)
+        redis = _FakeRedis()
+        seam = _RecordingRecordSeam(tmp_path / "kb", redis)
+        emit_decision, emit_act = _noop_emitter("publish")
+
+        def deploy(host):
+            return pr_mod.DeployOutcome(host, True, f"rel-{host.role}", "")
+
+        rc = pr_mod.main(
+            ["--candidate-sha", "deadbeef", "--run-id", "publish_run_9",
+             "--operator", "operator-test", "--db", str(db_path)],
+            deployer=deploy, builder=lambda: (True, "built"),
+            live_checker=lambda host, receipt: "",
+            emit_decision=emit_decision, emit_act=emit_act,
+            record_decision=seam,
+        )
+        assert rc == pr_mod.EXIT_OK
+        assert len(seam.decisions) == 1
+        decision = seam.decisions[0]
+        assert decision["actor"] == "verified_command"
+        assert decision["run_id"] == "publish_run_9"
+        assert decision["candidate_sha"] == "deadbeef"
+        assert decision["category"] == "publish"
+        assert "publish" in decision["what"]
+
+        records, warnings = di.scan_decision_records(category="publish", artifact_dir=tmp_path / "kb")
+        assert warnings == []
+        assert len(records) == 1
+        payload = records[0][2]
+        assert payload["actor"] == "verified_command"
+        assert payload["run_id"] == "publish_run_9"
+        assert payload["candidate_sha"] == "deadbeef"
+        assert payload["scope"] == aio_acl_scope(REPOSITORY_ID)
+
+    def test_failed_record_never_blocks_a_verified_publish(self, tmp_path, monkeypatch):
+        """s2b best-effort: a raising record seam cannot stop the deploy."""
+        import publish_release as pr_mod
+
+        db_path = _publish_env(tmp_path, monkeypatch)
+        emit_decision, emit_act = _noop_emitter("publish")
+
+        def deploy(host):
+            return pr_mod.DeployOutcome(host, True, f"rel-{host.role}", "")
+
+        def boom(decision):
+            raise RuntimeError("record seam exploded")
+
+        rc = pr_mod.main(
+            ["--candidate-sha", "deadbeef", "--operator", "operator-test", "--db", str(db_path)],
+            deployer=deploy, builder=lambda: (True, "built"),
+            live_checker=lambda host, receipt: "",
+            emit_decision=emit_decision, emit_act=emit_act,
+            record_decision=boom,
+        )
+        assert rc == pr_mod.EXIT_OK  # published despite the record failure
+
+    def test_publish_dry_run_emits_no_decision_record(self, tmp_path, monkeypatch):
+        """A dry run is a plan, not a permanence decision — no s2b record is emitted."""
+        import publish_release as pr_mod
+
+        db_path = _publish_env(tmp_path, monkeypatch)
+        calls: list = []
+        emit_decision, emit_act = _noop_emitter("publish")
+
+        def deploy(host):
+            return pr_mod.DeployOutcome(host, True, "rel", "")
+
+        rc = pr_mod.main(
+            ["--candidate-sha", "deadbeef", "--dry-run", "--db", str(db_path)],
+            deployer=deploy, builder=lambda: (True, "built"),
+            live_checker=lambda host, receipt: "",
+            emit_decision=emit_decision, emit_act=emit_act,
+            record_decision=lambda d: calls.append(d) or {},
+        )
+        assert rc == pr_mod.EXIT_OK
+        assert calls == []  # nothing recorded on a dry run
+
+    def test_default_on_seam_is_the_real_producer(self, tmp_path, monkeypatch):
+        """Default-on proof: with NO record_decision injected, the publish still records."""
+        import publish_release as pr_mod
+
+        from agentic_dynamics.core import paths as core_paths
+        from agentic_dynamics.knowledge import knowledge_stream as ks
+
+        db_path = _publish_env(tmp_path, monkeypatch)
+        redis = _FakeRedis()
+        monkeypatch.setattr(core_paths, "KB_ARTIFACT_DIR", tmp_path / "kb")
+        monkeypatch.setattr(ks, "connect", lambda: redis)
+        emit_decision, emit_act = _noop_emitter("publish")
+
+        def deploy(host):
+            return pr_mod.DeployOutcome(host, True, f"rel-{host.role}", "")
+
+        rc = pr_mod.main(
+            ["--candidate-sha", "deadbeef", "--run-id", "publish_run_9",
+             "--operator", "operator-test", "--db", str(db_path)],
+            deployer=deploy, builder=lambda: (True, "built"),
+            live_checker=lambda host, receipt: "",
+            emit_decision=emit_decision, emit_act=emit_act,
+        )
+        assert rc == pr_mod.EXIT_OK
+        records, warnings = di.scan_decision_records(category="publish", artifact_dir=tmp_path / "kb")
+        assert warnings == []
+        assert len(records) == 1
+        payload = records[0][2]
+        assert payload["actor"] == "verified_command"
+        assert payload["run_id"] == "publish_run_9"
+        assert payload["candidate_sha"] == "deadbeef"
