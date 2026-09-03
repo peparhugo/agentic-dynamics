@@ -71,6 +71,10 @@ _COMMANDS: dict[tuple[str, ...], str] = {
     ("knowledge", "sources"): "kb_produce_sources.py",
     ("knowledge", "facts"): "kb_produce_facts.py",
     ("knowledge", "campaign-evidence"): "kb_produce_campaign_evidence.py",
+    # knowledge backfill-findings — the deterministic finding-layer backfill (kb_finding_layer
+    # k2): scans docs/reviews + run ledgers and emits ONE finding record per completed wave,
+    # no LLM, rerun-safe knowledge_ids.
+    ("knowledge", "backfill-findings"): "kb_backfill_findings.py",
     ("data", "site-census"): "site_census_check.py",
     ("knowledge", "worker"): "kb_worker.py",
     ("knowledge", "context-report"): "context_snapshot_report.py",
