@@ -439,21 +439,44 @@ def _mounts_shared_surface(mount: Any, path_config: PathConfig) -> bool:
     worktrees root (e.g. the per-attempt state namespace, which lives at
     ``worktrees_root/opencode_state``) are NOT shared surfaces — only the namespace ROOT
     bind that would hand a cell every worktree is.
+
+    cs1_container_env (fleet_launch_container_smoke, f1 close-out): the D-16 shared-repo
+    ``repo_root`` alias is a shared surface ONLY when it is a HOST path distinct from the fixed
+    clone target ``REPO_TARGET`` (``/repo``). A container-tier config carries the repo view
+    ``FINOPS_REPO_DIR=/repo`` (the compose ``/repo`` mount — cs1), so ``repo_root == /repo ==
+    REPO_TARGET`` there, and the cell's OWN clone mount (``target=/repo``, source under
+    ``runs_root``) would be mis-flagged as "the shared repo at its alias path" and the broker
+    would refuse every containerized clone-world spawn it was built for (the fleet_launch_smoke
+    adversarial F1(b) collision). When ``repo_root`` coincides with the clone target the shared
+    tree is never mountable through it anyway: the step-3 clone-source binding refuses any
+    ``/repo`` mount that does not source the run's own clone, and ``git_dir`` (``/repo/.git``
+    when rooted at ``/repo``) stays a shared surface by the ``/repo/.git`` overlay target below.
     """
     target = str((mount or {}).get("target", ""))
     source = str((mount or {}).get("source", "") or "")
     if target in (
         WORKTREE_TARGET,
         f"{REPO_TARGET}/.git",
-        str(path_config.repo_root),
         str(path_config.git_dir),
     ):
+        return True
+    # The D-16 shared-repo alias target — the shared repo TREE bound at its own host path.
+    # Excluded when the config's repo_root IS the fixed clone target (a container-view config
+    # rooted at /repo): there the /repo mount is the run clone, and the step-3 clone-source
+    # binding is the guard that keeps it honest.
+    if str(path_config.repo_root) != REPO_TARGET and target == str(path_config.repo_root):
         return True
     if source:
         src = Path(source).resolve()
         worktrees_root = path_config.worktrees_root.resolve()
         git_dir = path_config.git_dir.resolve()
         if src in (worktrees_root, git_dir) or git_dir in src.parents:
+            return True
+        # The shared repo TREE itself as a bind source (the D-16 alias shape) — refused for a
+        # clone-world cell whatever its target. A clone-world request never sources repo_root:
+        # its repo source is the run clone under runs_root, its results source is
+        # results_dir (a subdir of repo_root, not the root itself).
+        if src == path_config.repo_root.resolve():
             return True
     return False
 

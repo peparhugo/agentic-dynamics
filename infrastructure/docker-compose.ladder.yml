@@ -44,6 +44,20 @@ x-ladder-env: &ladder-env
   # field is a host /tmp/... path) resolve unchanged inside the container — the additive
   # cut-over (old host workers + new container workers) shares the same path namespace.
   FINOPS_WORKTREE_ROOT: /tmp
+  # cs1_container_env (fleet_launch_container_smoke, f1 close-out): the container tier carries
+  # the repo view. Every ladder container derives its PathConfig from this env, so the repo the
+  # container sees is EXPLICIT (the /repo mount + its .git — the compose working_dir + the :ro
+  # repo mount + the :rw results overlay at /repo/experiments/results), never an implicit
+  # PROJECT_ROOT fallback that silently changes with the image layout / sys.path. Setting the
+  # vars to the CONTAINER-VISIBLE path (not the host path) makes a container-tier orchestrator
+  # derive the SAME repo view the broker validates (its request's D-16 alias/overlay targets are
+  # the fixed /repo + /repo/.git container targets of the shared mount contract), so no tier
+  # derives its view differently (hard rule 3). These are LITERAL container paths — they are the
+  # env mappings docker compose exports INTO the container, distinct from the host-side
+  # ``${FINOPS_REPO_DIR}`` mount-source interpolations below (which the host's docker-compose
+  # substitutes and never exports).
+  FINOPS_REPO_DIR: /repo
+  FINOPS_GIT_DIR: /repo/.git
   # The container auth home == the host user's home, so the claude symlink chain
   # (~/.local/bin/claude -> ~/.local/share/claude/versions/<v>) resolves unchanged (D-18).
   HOME: ${AUTH_HOME}
@@ -177,6 +191,14 @@ x-orchestrator-base: &orchestrator-base
     # orchestrator's spawn path reads this env and talks to the host broker over the seam —
     # never the docker socket, never an in-container docker call.
     FINOPS_LAUNCH_BROKER_SOCKET: /run/launch-broker.sock
+    # cs1_container_env (fleet_launch_container_smoke, f1 close-out): the orchestrator tier
+    # carries the repo view EXPLICITLY (they ride in x-ladder-env above — declared again here so
+    # the orchestrator service env self-evidently carries them, whichever tier a reviewer reads):
+    # a container-tier orchestrator derives repo_root=/repo + git_dir=/repo/.git — the SAME repo
+    # view the broker validates its spawn requests against (fixed /repo + /repo/.git targets),
+    # never the image's stale baked /app copy.
+    FINOPS_REPO_DIR: /repo
+    FINOPS_GIT_DIR: /repo/.git
   volumes: *orchestrator-mounts
 
 services:

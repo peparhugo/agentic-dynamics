@@ -164,13 +164,22 @@ AUTH_CRED_FILE = "/auth/opencode_auth.json"
 # (ws2_broker_pathview, fleet_launch_smoke). A launch request is built by a caller on ONE
 # side of the D-16 repo-alias split and carries the VIEW of the :class:`PathConfig` it derived
 # its mounts from. The HOST view is the broker's own launch view (the operator's env — the
-# repo at its host path). The CONTAINER view is what a container-tier caller derives:
-# ``FINOPS_REPO_DIR`` is absent from the container env, so its ``repo_root`` defaults to the
-# image's baked code root, ``/app`` — the container's D-16 alias targets are the /app-in-
+# repo at its host path). The CONTAINER view is what a container-tier caller derives when the
+# repo view is NOT in its env: ``FINOPS_REPO_DIR`` absent means its ``repo_root`` defaults to
+# the image's baked code root, ``/app`` — the container's D-16 alias targets are the /app-in-
 # container paths, NOT the host path the mounts were really built for. The broker validates a
 # request against the view it carries — never refusing a request for a path split the caller
 # cannot see — while the broker's OWN launch argv always uses the host view (a docker bind
 # source is a host path, whatever view a request claims).
+#
+# cs1_container_env (fleet_launch_container_smoke): the compose container tier now CARRIES the
+# repo view — ``x-ladder-env`` / ``x-orchestrator-base`` export ``FINOPS_REPO_DIR=/repo`` +
+# ``FINOPS_GIT_DIR=/repo/.git`` (the container-visible repo path) — so the LIVE container tier
+# derives ``repo_root=/repo``, a config in the HOST-view family whose D-16 alias/overlay
+# targets are the FIXED container targets of the shared mount contract (``/repo`` +
+# ``/repo/.git``, configurable in ``FIXED_CONTRACT_TARGETS``). The /app CONTAINER keying below
+# remains for a config derived WITHOUT those vars (the legacy baked-image copy) — it is what
+# the ws2 machinery validates, not what the compose orchestrator produces after cs1.
 
 #: The two views a request may carry. A request whose view is neither value is refused.
 VIEW_HOST = "host"
@@ -179,7 +188,9 @@ VIEWS: frozenset[str] = frozenset({VIEW_HOST, VIEW_CONTAINER})
 
 #: The in-container repo root of the fleet images (``Containerfile.fleet`` ``WORKDIR /app``) —
 #: the container-tier caller's ``repo_root`` when ``FINOPS_REPO_DIR`` is absent from the
-#: container env. It is the same fixed container-path vocabulary as :data:`RESULTS_TARGET`
+#: container env (the LEGACY baked-image derivation — after cs1_container_env the compose
+#: container tier exports ``FINOPS_REPO_DIR=/repo`` and derives the /repo mount instead). It is
+#: the same fixed container-path vocabulary as :data:`RESULTS_TARGET`
 #: (``/app/experiments/results``) — a container-path constant of the images this repo builds,
 #: never a host-specific literal.
 CONTAINER_REPO_ROOT = "/app"
@@ -188,9 +199,11 @@ CONTAINER_REPO_ROOT = "/app"
 def container_view_config(host_config: PathConfig) -> PathConfig:
     """The container-view :class:`PathConfig` — the config a container-tier request was built against.
 
-    A container-tier caller derives its config from the container env: ``FINOPS_REPO_DIR`` /
-    ``FINOPS_GIT_DIR`` / ``FINOPS_RESULTS_DIR`` are absent there, so its ``repo_root`` /
-    ``git_dir`` / ``results_dir`` re-root to the image's baked ``/app`` layout
+    A container-tier caller derives its config from the container env: when ``FINOPS_REPO_DIR`` /
+    ``FINOPS_GIT_DIR`` / ``FINOPS_RESULTS_DIR`` are ABSENT there (the legacy baked-image
+    derivation — cs1_container_env now exports the repo view into the compose container tier,
+    so the live tier derives the /repo mount instead), its ``repo_root`` / ``git_dir`` /
+    ``results_dir`` re-root to the image's baked ``/app`` layout
     (``CONTAINER_REPO_ROOT``), while every other field resolves from the shared env contract
     (``FINOPS_WORKTREE_ROOT`` / ``FINOPS_RUNS_ROOT`` / ``HOME``) to the same values the host
     config holds. This function derives THAT config from a host config, so the broker can
