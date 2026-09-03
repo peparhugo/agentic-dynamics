@@ -72,10 +72,17 @@ AUTH_HOME = "AUTH_HOME"
 #: on this same default — the env contract, not a new invention.
 _DEFAULT_WORKTREES_ROOT = "/tmp"
 
-#: The per-run ephemeral-clone root default (fleet_launch_boundary b2 hard rule 3 names
-#: ``/var/lib/agentic-dynamics/runs/<run-id>/repo``). b2 owns clone creation/discard; b1 only
-#: models the path.
-_DEFAULT_RUNS_ROOT = "/var/lib/agentic-dynamics/runs"
+#: The per-run ephemeral-clone root default. The fleet_launch_boundary b2 design prose named
+#: ``/var/lib/agentic-dynamics/runs/<run-id>/repo`` — but the real-shape smoke
+#: (fleet_launch_container_smoke cs3) proved /var/lib is unwritable by the cell uid and a
+#: DIFFERENT namespace than the host runs root the broker binds; the operational root is the
+#: shared /tmp path (the ladder's /tmp:rw bind), and the compose x-ladder-env carries
+#: ``FINOPS_RUNS_ROOT: ${FINOPS_RUNS_ROOT:-/tmp/agentic-dynamics-runs}`` (cs3, interpolated so
+#: an operator override flows through). The PathConfig default MUST match the compose fallback
+#: — a drifted default makes the host orchestrator / broker / container tier mint clones in
+#: different namespaces (the F1/F2 cs4 failures: the broker refused the container's clone
+#: path; the host orchestrator crashed on the unwritable /var/lib).
+_DEFAULT_RUNS_ROOT = "/tmp/agentic-dynamics-runs"
 
 #: The D-2 auth-set relative dirs under :data:`PathConfig.auth_home` — the four read-only auth
 #: mounts a cell may carry (in the container the claude symlink chain
@@ -111,7 +118,9 @@ class PathConfig:
     * ``worktrees_root`` — the shared worktree namespace (``FINOPS_WORKTREE_ROOT``; default
       ``/tmp`` — the existing contract; b2 replaces shared worktrees with per-run clones).
     * ``runs_root`` — the per-run ephemeral-clone root (``FINOPS_RUNS_ROOT``; default
-      ``/var/lib/agentic-dynamics/runs`` — consumed by b2, not b1).
+      ``/tmp/agentic-dynamics-runs`` — matching the compose x-ladder-env fallback; the
+      /var/lib design default was proven unwritable + a different namespace by the
+      real-shape smoke).
     * ``results_dir`` — the durable experiment-results dir (``FINOPS_RESULTS_DIR``; default
       ``repo_root/experiments/results``).
     * ``state_root`` — the per-attempt CLI-state namespace root (``FINOPS_OPENCODE_STATE_ROOT``;

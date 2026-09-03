@@ -49,7 +49,7 @@ def test_defaults_are_package_relative_with_no_env():
     assert cfg.results_dir == PROJECT_ROOT / "experiments" / "results"
     assert cfg.state_root == cfg.worktrees_root / "opencode_state"
     # runs_root is the design's per-run clone root (consumed by b2, modeled here by b1)
-    assert cfg.runs_root == Path("/var/lib/agentic-dynamics/runs")
+    assert cfg.runs_root == Path("/tmp/agentic-dynamics-runs")
     # all seven are absolute host paths
     for name in ("repo_root", "git_dir", "worktrees_root", "runs_root", "results_dir",
                  "state_root", "auth_home"):
