@@ -34,7 +34,9 @@ Design: ``code_reviews/2026-08-14_experiment-spec-and-compiler-design.md`` (the 
 
 from __future__ import annotations
 
+import hashlib
 import json
+import os
 import warnings
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
@@ -805,6 +807,147 @@ def collect_entries(*, root: Path | str = PROJECT_ROOT) -> list[SpecStatusEntry]
     return sort_entries(entries)
 
 
+# ── The narrator (kb_finding_layer k5): a regeneration that shifts statuses narrates ──
+#
+# ``spec_catalog`` is derived — it is regenerated, never hand-edited — and a regeneration that
+# SHIFTS statuses is itself an event a later reader should be able to retrieve ("why did 17
+# specs change status? what moved?"). The pure derivation below turns a previous index + a
+# freshly derived entry set into the per-spec status diff, and :func:`refresh_spec_status`
+# emits ONE finding record narrating that shift (scoped, durable artifact + pointer event —
+# the same producer path as phase findings). Derivation is pure and unit-testable without a
+# knowledge stream; emission is a best-effort seam (a failed emit is a warning, never a failed
+# regeneration).
+
+#: Env var that disarms the narrator in the unit suite (set ``"0"``), mirroring the workflow-run
+#: finding disarm (``FINOPS_EMIT_SELF`` — the same disable-flag pattern conftest applies).
+NARRATOR_DISARM_ENV = "FINOPS_EMIT_SELF"
+
+
+@dataclass(frozen=True)
+class StatusShift:
+    """One spec whose derived status changed between two index generations."""
+
+    name: str
+    from_status: str
+    to_status: str
+
+
+def _entry_name_and_status(raw: Any) -> tuple[str, str] | None:
+    """``(name, status)`` from an index entry — a ``SpecStatusEntry`` or its ``index.json`` dict."""
+    if isinstance(raw, SpecStatusEntry):
+        return raw.name, raw.status
+    if isinstance(raw, dict):
+        name = raw.get("name")
+        status = raw.get("status")
+        if name and status:
+            return str(name), str(status)
+    return None
+
+
+def diff_statuses(previous_specs: list[Any], current_entries: list[SpecStatusEntry]) -> list[StatusShift]:
+    """The per-spec status diffs between a previous index's entries and a freshly derived set.
+
+    A spec counts as a shift only when it exists in BOTH generations with a DIFFERENT status —
+    a newly-added spec has no previous status to shift from, and a removed one has no current
+    status to shift to. Sorted by name so the shift signature and the rendered text are
+    deterministic.
+    """
+    previous: dict[str, str] = {}
+    for raw in previous_specs:
+        got = _entry_name_and_status(raw)
+        if got:
+            previous[got[0]] = got[1]
+    shifts: list[StatusShift] = []
+    for entry in current_entries:
+        prev = previous.get(entry.name)
+        if prev is not None and prev != entry.status:
+            shifts.append(StatusShift(name=entry.name, from_status=prev, to_status=entry.status))
+    shifts.sort(key=lambda s: s.name)
+    return shifts
+
+
+def shift_signature(shifts: list[StatusShift]) -> str:
+    """Deterministic sha256 over the per-spec diffs — the ``shift signature`` half of
+    the rerun-safe knowledge_id key (the regeneration timestamp is the other half).
+
+    Sorted internally so the same shift SET always yields the same signature regardless of
+    the order the caller passed (``diff_statuses`` returns name-sorted shifts, but a test or
+    a producer should not have to rely on that).
+    """
+    ordered = sorted(shifts, key=lambda s: (s.name, s.from_status, s.to_status))
+    canonical = "\n".join(f"{s.name}|{s.from_status}|{s.to_status}" for s in ordered)
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+def narrate_regeneration(
+    shifts: list[StatusShift], *, generated_at: str
+) -> str:
+    """Render ONE derived narration of a status-shifting regeneration.
+
+    The text is DERIVED from the actual per-spec diffs — direction counts grouped and summed —
+    never a hand-written summary::
+
+        spec-index regeneration <generated_at>: N specs changed (11 failed→completed; 6
+        completed→blocked)
+
+    Direction groups are listed in a deterministic order (descending count, then the arrow
+    string) so the same diff always renders identically. An empty diff returns ``""`` — there
+    is nothing to narrate (the regenerator emits nothing when no statuses shifted).
+    """
+    if not shifts:
+        return ""
+    counts: dict[tuple[str, str], int] = {}
+    for s in shifts:
+        key = (s.from_status, s.to_status)
+        counts[key] = counts.get(key, 0) + 1
+    groups = sorted(
+        counts.items(), key=lambda item: (-item[1], f"{item[0][0]}→{item[0][1]}")
+    )
+    clauses = "; ".join(f"{count} {f}→{t}" for (f, t), count in groups)
+    return f"spec-index regeneration {generated_at}: {len(shifts)} specs changed ({clauses})"
+
+
+def _narrator_disarmed() -> bool:
+    """True when the unit suite has disarmed finding emission (FINOPS_EMIT_SELF=0)."""
+    return os.environ.get(NARRATOR_DISARM_ENV) == "0"
+
+
+def _emit_index_shift_narration(
+    previous_specs: list[Any],
+    current_entries: list[SpecStatusEntry],
+    *,
+    generated_at: str,
+    root: Path,
+) -> str | None:
+    """Best-effort narrator seam: emit ONE finding record when a regeneration shifts statuses.
+
+    Returns the emitted record's ``knowledge_id`` (or ``None`` when nothing shifted / emission
+    is disarmed / the emit failed). Never raises — a failed emit is a warning, never a failed
+    regeneration. The KB work is delegated to ``knowledge.spec_ingestion.emit_index_shift`` so
+    ``experiment`` does not own the producer path (the same seam pattern as
+    ``workflow_runner._emit_self_finding``).
+    """
+    if _narrator_disarmed():
+        return None
+    shifts = diff_statuses(previous_specs, current_entries)
+    if not shifts:
+        return None
+    text = narrate_regeneration(shifts, generated_at=generated_at)
+    try:
+        from agentic_dynamics.knowledge.spec_ingestion import emit_index_shift
+
+        return emit_index_shift(
+            shifts, text=text, generated_at=generated_at, root=root
+        )
+    except Exception as exc:  # noqa: BLE001 — best-effort seam, documented above
+        warnings.warn(
+            f"spec_status: narrator emit failed (regeneration unaffected): {exc}",
+            UserWarning,
+            stacklevel=2,
+        )
+        return None
+
+
 # ── Rendering: index.json + STATUS.md ───────────────────────────
 
 
@@ -1015,7 +1158,20 @@ def refresh_spec_status(
     specs_dir.mkdir(parents=True, exist_ok=True)
 
     stamp = generated_at or _iso(_now())
+    # The PREVIOUS index (on disk, before this regeneration overwrites it) is the diff base
+    # for the narrator — "diff the newly derived statuses against the previous index".
+    previous_specs: list[Any] = []
+    previous_payload = load_index(root=root_path)
+    if previous_payload:
+        previous_specs = list(previous_payload.get("specs") or [])
     entries = collect_entries(root=root_path)
+
+    # The narrator (kb_finding_layer k5): when statuses SHIFT, emit ONE finding record
+    # narrating the shift — BEFORE the index is written. Best-effort: a failed emit is a
+    # warning, never a failed regeneration.
+    _emit_index_shift_narration(
+        previous_specs, entries, generated_at=stamp, root=root_path
+    )
 
     index_path = specs_dir / INDEX_FILENAME
     status_path = specs_dir / STATUS_FILENAME

@@ -56,6 +56,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import warnings
 from collections.abc import Iterable
 from contextlib import contextmanager
 from datetime import datetime
@@ -63,7 +64,13 @@ from pathlib import Path
 from typing import Any
 
 from agentic_dynamics.core.paths import KB_ARTIFACT_DIR, PROJECT_ROOT, REGISTRY_INDEX_PATH
-from agentic_dynamics.experiment.spec_status import INDEX_FILENAME, SPECS_DIR_REL, SpecStatusEntry
+from agentic_dynamics.experiment.spec_status import (
+    INDEX_FILENAME,
+    SPECS_DIR_REL,
+    SpecStatusEntry,
+    StatusShift,
+    shift_signature,
+)
 from agentic_dynamics.knowledge.knowledge import Authority, KnowledgeEvent, KnowledgeRecord
 from agentic_dynamics.knowledge.knowledge_ingestion import (
     REPOSITORY_ID,
@@ -593,3 +600,142 @@ def emit_spec_record(
     except Exception:
         # Progressive path — never block or fail the run on a KB emission problem.
         return None
+
+
+# ── The narrator: a regeneration that shifts statuses speaks (kb_finding_layer k5) ──
+#
+# ``spec_catalog`` is derived — regenerated, never hand-edited — and a regeneration that SHIFTS
+# statuses is an event a later reader should retrieve. The regenerator (spec_status.refresh)
+# computes the pure status diff and calls :func:`emit_index_shift` to persist ONE finding record
+# narrating the shift. This mirrors the sibling producers: durable artifact first, then a
+# registry row at emit time (immediate visibility without a live consumer), then a best-effort
+# pointer event. A failed event publish is a warning — never a failed regeneration.
+
+#: Extractor generation for spec-index regeneration records. Folds into ``knowledge_id``; a
+#: literal on purpose (same stability rule as every sibling extractor).
+INDEX_SHIFT_EXTRACTOR_VERSION = "spec-index-regeneration/v1"
+
+#: The record's ``source_uri`` — the regenerated artifact this record describes.
+INDEX_SHIFT_SOURCE_URI = f"file://{SPECS_DIR_REL}/{INDEX_FILENAME}"
+
+#: A regeneration is a whole-catalog event: the record is scoped to the repo's shared scope
+#: (like the per-spec lifecycle records), never a cell.
+INDEX_SHIFT_ACL_SCOPE = "public"
+
+#: Logical locator of a spec-index regeneration record. Includes the regeneration timestamp so
+#: each status-shifting regeneration is its OWN entity (a distinct event — like a wave backfill
+#: record), never a version chain on a shared entity. Rerun-safety still holds: the same
+#: regeneration (same timestamp + same shift set) derives the same locator + content, hence the
+#: same ``knowledge_id``, and a re-emit is a no-op.
+def _index_shift_locator(generated_at: str) -> str:
+    return f"spec-index-regeneration:{generated_at}"
+
+
+def derive_index_shift_record(
+    shifts: list[StatusShift],
+    *,
+    text: str,
+    generated_at: str,
+    repository_id: str = REPOSITORY_ID,
+    now: datetime | None = None,
+) -> KnowledgeRecord:
+    """Build the ONE finding record narrating a status-shifting regeneration.
+
+    ``text`` is the derived narration (direction counts, never a hand-written summary); a
+    structured payload (regeneration timestamp, the shift signature, and the per-spec diff
+    rows) rides after it so the record is self-describing and the content hash — and therefore
+    ``knowledge_id`` — is a pure function of (regeneration timestamp + shift signature), which
+    is what makes the record rerun-safe.
+    """
+    signature = shift_signature(shifts)
+    rows = [
+        {"spec": s.name, "from_status": s.from_status, "to_status": s.to_status}
+        for s in shifts
+    ]
+    payload = {
+        "regeneration": generated_at,
+        "shift_signature": signature,
+        "n_specs": len(shifts),
+        "shifts": rows,
+    }
+    body = f"{text} :: {json.dumps(payload, sort_keys=True)}"
+    return build_record_from_parts(
+        source_type="finding",
+        source_uri=INDEX_SHIFT_SOURCE_URI,
+        logical_locator=_index_shift_locator(generated_at),
+        repository_id=repository_id,
+        revision=f"spec-index-regeneration:{generated_at}",
+        authority=Authority.DERIVED,
+        evidence_class="[C]",
+        text=body,
+        extra_fields={
+            "extractor_version": INDEX_SHIFT_EXTRACTOR_VERSION,
+            "acl_scope": INDEX_SHIFT_ACL_SCOPE,
+            "observed_at": generated_at,
+            "outcome_id": f"spec-index-regeneration:{generated_at}",
+        },
+        now=now,
+    )
+
+
+def emit_index_shift(
+    shifts: list[StatusShift],
+    *,
+    text: str,
+    generated_at: str,
+    root: Path | str = PROJECT_ROOT,
+    repository_id: str = REPOSITORY_ID,
+    now: datetime | None = None,
+) -> str:
+    """Persist ONE narrator record for a status-shifting regeneration; return its knowledge_id.
+
+    Mirrors ``kb_backfill_findings.emit_record``: the durable artifact is written FIRST, then a
+    compact registry row is appended at emit time (the record is registry-visible immediately —
+    no dependency on a live kb-registry consumer), then the pointer event is published
+    best-effort. Rerun-safe: when the artifact for the derived knowledge_id already exists, the
+    emit is a no-op (same regeneration → same id). A downed stream never fails the emit.
+    """
+    record = derive_index_shift_record(
+        shifts, text=text, generated_at=generated_at, repository_id=repository_id, now=now
+    )
+    artifact_dir = Path(root) / "experiments" / "results" / "kb"
+    artifact_path = artifact_dir / f"{record.knowledge_id}.json"
+    if artifact_path.exists():
+        return record.knowledge_id
+
+    artifact = record_to_artifact(record)
+    artifact_dir.mkdir(parents=True, exist_ok=True)
+    artifact_path.write_bytes(artifact)
+
+    try:
+        from . import knowledge_stream as _ks
+
+        with _authorized_kb_write():
+            r = _ks.connect()
+            _ks.publish_event(r, record_to_event(record), source_type=record.source_type)
+    except Exception as exc:  # noqa: BLE001 — best-effort projection, never a failed regeneration
+        warnings.warn(
+            f"spec_ingestion: narrator pointer-event publish skipped for "
+            f"{record.knowledge_id[:12]}: {exc}",
+            UserWarning,
+            stacklevel=2,
+        )
+
+    line = {
+        "knowledge_id": record.knowledge_id,
+        "entity_id": record.entity_id,
+        "source_type": record.source_type,
+        "logical_locator": record.logical_locator,
+        "source_uri": record.source_uri,
+        "lifecycle_state": "current",
+        "observed_at": record.observed_at,
+        "indexed_at": record.indexed_at,
+        "supersedes": record.supersedes,
+        "causes": record.causes,
+        "reason": "",
+    }
+    reg = Path(root) / "experiments" / "results" / "registry_index.jsonl"
+    reg.parent.mkdir(parents=True, exist_ok=True)
+    with reg.open("a", encoding="utf-8") as fh:
+        fh.write(json.dumps(line) + "\n")
+    return record.knowledge_id
