@@ -11,7 +11,9 @@
 #
 # The socket (D-3/D-14) lives on the HOST ONLY — the launch broker (b3_launch_broker) is the
 # host-side (non-container) component that holds the Docker socket and is the ONLY Docker
-# API caller. No service in this file mounts the socket; the supervisor tier's restart
+# API caller (its one documented exception: the game board's read-only `docker ps`,
+# scripts/system_snapshot.py — fb3 f4, a display read, never a launch). No service in this
+# file mounts the socket; the supervisor tier's restart
 # authority is the compose policies it owns + the orchestrator as its hands over Redis
 # `fleet:commands` (db1 / 6380), and every docker call the orchestrator needs is delegated to
 # the broker as a typed launch/fleet request.
@@ -125,7 +127,9 @@ x-supervisor-base: &supervisor-base
 # here (b3_launch_broker, fleet_launch_boundary Wave 2 hard rule 1: the socket leaves the
 # container) — no ladder service mounts the docker socket. The launch broker
 # (scripts/fleet/launch_broker.py, deployed host-side by the agentic-dynamics-launch-broker
-# systemd user unit) is the component that owns the socket and is the ONLY Docker API caller:
+# systemd user unit) is the component that owns the socket and is the ONLY Docker API caller
+# (its one documented exception: the game board's read-only `docker ps`,
+# scripts/system_snapshot.py — fb3 f4):
 # the wrapper validates a typed launch request and emits it over the broker's IPC seam, and the
 # broker executes it. The orchestrator services below therefore reach the broker over the SEAM
 # socket (x-orchestrator-mounts mounts it at /run/launch-broker.sock — the typed seam, NOT the

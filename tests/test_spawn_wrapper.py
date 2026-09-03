@@ -1212,7 +1212,7 @@ def test_submit_with_a_valid_job_image_passes():
     "image",
     [
         "fleet/base",           # the ladder's own cache root — never a job's to pick directly
-        "fleet/orchestrator",   # the one socket-holder's own image
+        "fleet/orchestrator",   # the orchestrator's own image (socketless — the host broker holds the socket)
         "fleet/supervisor",
         "fleet/job-",           # no name after the prefix
         "fleet/job-Bad-Name",   # uppercase — outside JOB_IMAGE_PATTERN

@@ -3,9 +3,11 @@
 # A systemd USER unit, following the docs-drift-scan.service precedent
 # (~/.config/systemd/user/) rather than the system-wide fleet-bootstrap.service: the broker is
 # the operator's own host-side component that holds the Docker socket. It is the ONLY Docker
-# API caller in the fleet — every cell launch / fleet command the orchestrator needs is emitted
-# over the broker's unix-socket IPC seam (scripts/fleet/broker_client.py), and NO container
-# mounts the docker socket. This unit IS the docker socket's only home.
+# API caller in the fleet (its one documented exception: the game board's read-only `docker ps`
+# in scripts/system_snapshot.py — fb3 f4, a display read, never a launch) — every cell
+# launch / fleet command the orchestrator needs is emitted over the broker's unix-socket IPC
+# seam (scripts/fleet/broker_client.py), and NO container mounts the docker socket. This unit
+# IS the docker socket's only home.
 #
 # The unit runs `scripts/fleet/launch_broker.py serve` as a long-running daemon: it binds the
 # seam socket (a unix socket under the user runtime dir, %t = $XDG_RUNTIME_DIR), accepts one

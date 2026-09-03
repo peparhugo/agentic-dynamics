@@ -2,7 +2,9 @@
 
 The load-bearing guarantee this suite must catch: after b3, the Docker socket is NOT mounted
 into any container, and the launch broker (scripts/fleet/launch_broker.py) is the ONLY Docker
-API caller — it accepts ONLY a typed LaunchRequest {image_digest, network, mount_profile,
+API caller (its one documented exception — the game board's read-only docker ps in
+scripts/system_snapshot.py, fb3 f4, never a launch) — it accepts ONLY a typed LaunchRequest
+{image_digest, network, mount_profile,
 state_namespace, command, timeout_seconds}, validates it against the fixed mount profiles, and
 performs the docker call itself. A raw docker command string, an unknown mount_profile, an
 out-of-namespace image, or a request the wrapper's own scope model would refuse NEVER reaches

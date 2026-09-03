@@ -9,7 +9,10 @@ not the guard (the proposal's own rule).
 The seven guards:
 
   1. compose-contract (D-13/D-3)  — the mount contract holds (no unexpected mount target);
-                                    the socket appears in exactly ONE tier (the orchestrator).
+                                     no service mounts the docker socket (the host-side launch
+                                     broker owns it — b3/fb2; its one documented exception:
+                                     the game board's read-only docker ps,
+                                     scripts/system_snapshot.py, fb3 f4).
   2. fleet-health (D-14)           — the board surfaces worker heartbeats + per-queue DLQ counts;
                                     LIVE, scoped to kb-neo4j-v1 (retrieval_activation
                                     p4_activation_gate) — the consumer the neo4j-index guard
@@ -285,8 +288,10 @@ def test_no_service_mounts_the_docker_socket():
     """b3_launch_broker hard rule 1: the socket leaves EVERY container.
 
     No ladder service may mount /var/run/docker.sock — the host-side launch broker owns the
-    socket and is the ONLY Docker API caller. Before b3 the invariant was "exactly the
-    orchestrator tier"; the wave's mandate is stronger: the socket appears in NO service.
+    socket and is the ONLY Docker API caller (its one documented exception: the game board's
+    read-only docker ps in scripts/system_snapshot.py — fb3 f4, never a launch). Before b3 the
+    invariant was "exactly the orchestrator tier"; the wave's mandate is stronger: the socket
+    appears in NO service.
     """
     compose = _compose()
     socket_holders = {

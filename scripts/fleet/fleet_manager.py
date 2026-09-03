@@ -4,8 +4,10 @@
 The supervisor is the fleet manager, **not an execution container**. It holds NO docker
 socket (D-3/D-14): the pools are static (compose ``--scale`` counts), routine restarts are
 docker's own ``restart: on-failure`` policies, and a fleet-level resize/drain is the
-supervisor **commanding the orchestrator** (the socket-holder) over Redis ``fleet:commands``
-(db1 / 6380) — the orchestrator's spawn-wrapper validates the request before any socket call.
+supervisor **commanding the orchestrator** over Redis ``fleet:commands``
+(db1 / 6380) — the orchestrator's spawn-wrapper validates the request and emits it to the
+host-side launch broker (the docker socket's only home; fb2_broker_hostside) before any
+docker call happens.
 
 This daemon does three things, all **read-only** with respect to spawning:
 

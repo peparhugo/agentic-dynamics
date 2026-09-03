@@ -404,8 +404,9 @@ def main() -> None:
                          "scripts/fleet/spawn_wrapper.py + the host-side launch broker) instead "
                          "of in-process. OPT-IN — the default path is unchanged. The wrapper "
                          "validates a typed launch request and the broker (the ONLY Docker API "
-                         "caller) executes it; a phase whose scope fails validation refuses "
-                         "BEFORE the broker is reached.")
+                         "caller — its one documented exception: the game board's read-only "
+                         "docker ps, scripts/system_snapshot.py, fb3 f4) executes it; a phase "
+                         "whose scope fails validation refuses BEFORE the broker is reached.")
     ap.add_argument("--only-phase", default=None, metavar="NAME",
                     help="run a SINGLE phase (name) only — the sibling-cell entrypoint the "
                          "--orchestrator mode spawns for each phase. When set, the spec's phase "

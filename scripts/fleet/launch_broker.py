@@ -5,8 +5,10 @@ The socket leaves the container. Before this module the orchestrator tier mounte
 ``/var/run/docker.sock`` and one large trusted module (``spawn_wrapper.py``) both validated
 AND invoked arbitrary docker commands — and ``:ro`` on the filesystem mount does not
 constrain Docker Engine authority. This broker is the ONLY component that calls the Docker
-API, and it accepts ONLY a TYPED launch request — arbitrary docker CLI capability is never
-exposed to any tier:
+API (its ONE documented exception — a benign read-only status query, the game board's
+``docker ps`` in ``scripts/system_snapshot.py``, fb3 f4 — never a launch, never a write), and
+it accepts ONLY a TYPED launch request — arbitrary docker CLI capability is never exposed to
+any tier:
 
     LaunchRequest {image_digest, network, mount_profile, state_namespace,
                    command, timeout_seconds}
@@ -49,8 +51,9 @@ tier-0 path object (``agentic_dynamics.core.paths.PathConfig``) and the tier-1 s
 table (``agentic_dynamics.experiment.experiment_spec.SCOPE_CONFIGS``) — the same tier-0/1
 surface ``spawn_wrapper.py`` already imports. It never imports ``control`` / ``runtime`` /
 ``adapters``; the docker call is a plain ``subprocess`` over an argv this module builds (the
-project's fleet images carry the docker CLI for the operator's ``build.sh``; the broker is the
-only module that RUNS it).
+broker runs on the HOST and subprocesses the host's docker binary — ``FINOPS_DOCKER_BIN``;
+no fleet image carries a docker client, because no container holds a socket or calls docker,
+fb3_stragglers).
 """
 
 from __future__ import annotations
@@ -633,7 +636,9 @@ def main(argv: list[str] | None = None) -> int:
     systemd user unit starts: it binds the seam socket and serves typed requests indefinitely.
     """
     parser = argparse.ArgumentParser(
-        description="The host-side launch broker (the ONLY Docker API caller)."
+        description="The host-side launch broker (the ONLY Docker API caller — its one "
+                    "documented exception: the game board's read-only docker ps, "
+                    "scripts/system_snapshot.py)."
     )
     sub = parser.add_subparsers(dest="command", required=True)
     for name, handler in (

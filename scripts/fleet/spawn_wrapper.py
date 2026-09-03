@@ -14,7 +14,8 @@ module and calls it in-process either. It builds the TYPED launch request (``ima
 the scope-model context), validates it, and emits it over the IPC seam to the launch broker —
 a genuinely host-side systemd user unit (``infrastructure/
 agentic-dynamics-launch-broker.service``) that owns the Docker socket and is the ONLY Docker
-API caller. The wrapper speaks the seam through ``broker_client.BrokerClient`` (a unix socket,
+API caller (its one documented exception: the game board's read-only ``docker ps``,
+``scripts/system_snapshot.py`` — fb3 f4, never a launch). The wrapper speaks the seam through ``broker_client.BrokerClient`` (a unix socket,
 one framed request per connection); the broker re-validates the request (both sides run the
 same shared checks: :func:`broker_contract.validate_launch_request` + :func:`validate_spawn`)
 and performs the docker call itself. ``docker-compose.ladder.yml`` mounts no docker socket into
