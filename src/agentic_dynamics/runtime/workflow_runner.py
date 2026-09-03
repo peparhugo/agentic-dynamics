@@ -1481,8 +1481,12 @@ def _deploy_pattern_match(command: str) -> str | None:
     """
     # Strip a leading shell prefix so `npx firebase deploy`, `sudo firebase deploy`,
     # `VAR=x firebase deploy`, `cmd && firebase deploy`, `cmd; firebase deploy`,
-    # `cmd | firebase deploy` all match at the command position — but `git commit
-    # -m "…firebase deploy…"` (firebase buried in an argument) never does.
+    # `cmd | firebase deploy`, and the shell-wrap forms `sh -c "firebase deploy"` /
+    # `bash -c "firebase deploy"` / `eval "firebase deploy"` all match at the command
+    # position — but `git commit -m "…firebase deploy…"` (firebase buried in an
+    # argument) never does. The wrap forms carry firebase in the WRAPPED command
+    # string, which is still a deploy act (A3, the a4-fix regression the adversary
+    # caught — a wrapped deploy must not slip the command tier).
     head = command.lstrip()
     # An argument-position mention: firebase preceded by a command word that is NOT a
     # known launcher (the launchers below are the only legitimate command-position
@@ -1496,7 +1500,21 @@ def _deploy_pattern_match(command: str) -> str | None:
         # Also allow a compound whose LAST command is firebase (a &&/;/| chain ending in
         # the deploy): `build && firebase deploy` IS a deploy act.
         chain_ok = bool(re.search(r"(?:&&|\|\||;)\s*(?:npx\s+|sudo\s+)?firebase\b", head))
-        if not chain_ok:
+        # And a shell WRAP whose wrapped command is the deploy (A3): `sh -c "firebase
+        # deploy"`, `bash -c …`, `eval "firebase deploy"` — the wrapped string is the
+        # executed command, so firebase IS at command position inside the quotes. The
+        # wrap must itself be at COMMAND position (start, or after a &&/;/| chain) —
+        # `echo bash -c "firebase deploy" >> doc.md` mentions a wrap in an argument and
+        # is NOT a deploy.
+        wrap_at_command = re.match(
+            r"^(?:(?:[A-Za-z_][A-Za-z0-9_]*=[^\s]*\s+)?(?:&&|\|\||;)\s+)*"
+            r"(?:sh|bash)\s+-c\s+[\"']",
+            head,
+        ) or re.match(r"^(?:(?:[A-Za-z_][A-Za-z0-9_]*=[^\s]*\s+)?(?:&&|\|\||;)\s+)*eval\s+[\"']", head)
+        wrap_ok = bool(wrap_at_command) and bool(
+            re.search(r"firebase\b", head.split("&&")[-1].split("||")[-1].split(";")[-1])
+        )
+        if not (chain_ok or wrap_ok):
             return None
     for pattern, label in DEPLOY_PATTERNS:
         if pattern.search(head):
