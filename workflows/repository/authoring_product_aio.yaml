@@ -305,7 +305,7 @@ workflow:
         tests:
           - tests/test_workflow_schema.py
           - tests/test_workflow_linter.py
-          - tests/test_workflow_auth_cli.py
+          - tests/test_run_workflow_graph_cli.py
           - tests/test_aio_agent.py
           - tests/test_aio_emission.py
           - tests/test_workflow_runner.py
