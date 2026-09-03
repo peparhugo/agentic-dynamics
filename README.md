@@ -94,9 +94,9 @@ Efficiency (durable outcome value / total cost).
 | Model variants | 7 (3 providers: DeepSeek, Anthropic, OpenAI) |
 | Experiment configs | 0 |
 <<<<<<< HEAD
-| Experiment + workflow specs | 187 (11 experiments + 176 workflows) |
+| Experiment + workflow specs | 189 (11 experiments + 178 workflows) |
 =======
-| Experiment + workflow specs | 187 (11 experiments + 176 workflows) |
+| Experiment + workflow specs | 189 (11 experiments + 178 workflows) |
 >>>>>>> 734534b46
 | Perturbation operators | 10 (specification corruption, objective mutation, process perturbation) |
 | Lab books | 21 (8 canonical + 12 quarantined) |
