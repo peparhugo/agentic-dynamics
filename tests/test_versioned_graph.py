@@ -206,6 +206,36 @@ class TestVersionedPopulation:
         assert nodes and "SymbolVersion" in nodes[0]["labels"]
         assert nodes[0]["properties"]["repository_id"] == REPO
 
+    def test_expansion_returns_a_path_when_edges_exist(self, client):
+        # k4 graph-leg proof (the positive direction): when edges DO exist in the graph, the
+        # scoped expansion returns a depth>=1 path — the leg is functional, and a zero result
+        # elsewhere is a write-side/scope state, never a leg failure. Seeds two functions with
+        # a real CALLS edge, then expands from the caller and asserts a depth-1 callee path.
+        client.create_knowledge_schema()
+        snap = build_code_snapshot(
+            {
+                "math_utils.py": b"def add(a, b):\n    return a + b\n\ndef top():\n    return add(1, 2)\n",
+            },
+            revision="rev-1",
+            profile=PY,
+        )
+        counts = client.populate_versioned_graph(snap, revision="rev-1", repository_id=REPO, acl_scope="e4-public")
+        assert counts["calls"] >= 1
+
+        caller = next(s for s in snap.files["math_utils.py"] if s.qualified_name == "top")
+        caller_vid = symbol_version_id(
+            symbol_entity_id(REPO, "math_utils.py", "top", "function"),
+            "rev-1",
+            caller.content_hash,
+        )
+        nodes = client.expand_candidates(
+            [caller_vid], max_depth=2, repository_id=REPO, acl_scope="e4-public"
+        )
+        hops = [n for n in nodes if n["depth"] >= 1]
+        assert hops, "seeded CALLS edge must yield a depth>=1 path"
+        assert any(n.get("rel_type") == "CALLS" for n in hops)
+        assert all(len(n.get("path", [])) == n["depth"] + 1 for n in hops)
+
 
 class TestTraversalACL:
     def _two_repo_fixture(self, client) -> str:

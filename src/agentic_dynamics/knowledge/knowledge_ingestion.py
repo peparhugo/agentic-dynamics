@@ -447,6 +447,61 @@ def _authorized_kb_write():
             os.environ["FINOPS_KB_WRITE"] = prev
 
 
+def _phase_finding_tail(phase_result: Any, *, revision: str, success: bool | None) -> str:
+    """The enriched finding tail for a phase record (kb_finding_layer k1).
+
+    Rides after the canonical one-liner head (``<goal> phase <phase> -> test_executed_success
+    <bool>, cost $<c>, tokens <n>``) and carries the fields a phase finding should answer
+    about: the phase ``status``, the test-suite split ``tests <passed>/<total>`` (only when
+    ``success`` is a real ``bool`` — a suite actually ran; ``None`` stays null-not-zero, so an
+    unverified phase never reads as a measured ``0/0``), the ``commit`` sha (the record's own
+    ``revision`` — same value the structured ``commit_sha`` carries), and — when the phase
+    record carries one — the fired gate verdict (``commit_gate``/``relabel_gate``/
+    ``deploy_gate`` with a reason) or the phase's own conclusion line (last non-empty line of
+    ``final_response``, bounded). Returns ``""`` when there is nothing to append.
+    """
+    parts: list[str] = []
+    status = str(getattr(phase_result, "status", "") or "")
+    if status:
+        parts.append(f"status {status}")
+    if isinstance(success, bool):
+        passed = int(getattr(phase_result, "tests_passed", 0) or 0)
+        total = int(getattr(phase_result, "tests_total", 0) or 0)
+        parts.append(f"tests {passed}/{total}")
+    commit = str(revision or "") or str(getattr(phase_result, "commit_hash", "") or "")
+    if commit:
+        parts.append(f"commit {commit}")
+    # A fired gate verdict (when the phase record carries one) outranks the conclusion line —
+    # a gate that fired names a violation the conclusion would otherwise paper over.
+    gate = ""
+    for gate_name in ("commit_gate", "relabel_gate", "deploy_gate"):
+        evidence = getattr(phase_result, gate_name, None)
+        if isinstance(evidence, dict) and evidence.get("reason"):
+            gate = f"gate {gate_name} {evidence.get('reason')}"
+            break
+    if gate:
+        parts.append(gate)
+        return ", ".join(parts)
+    conclusion = str(getattr(phase_result, "conclusion", "") or "")
+    if not conclusion:
+        final = getattr(phase_result, "final_response", None)
+        if isinstance(final, str):
+            conclusion = next(
+                (line.strip() for line in reversed(final.splitlines()) if line.strip()), ""
+            )
+    if conclusion:
+        clipped = conclusion if len(conclusion) <= _CONCLUSION_CLIP else (
+            f"{conclusion[:_CONCLUSION_CLIP]}…"
+        )
+        parts.append(f"conclusion {clipped}")
+    return ", ".join(parts)
+
+
+#: Bounded length of a phase finding's embedded conclusion line — a phase's final message can
+#: run long, and the finding text is a retrieval surface, not a transcript dump.
+_CONCLUSION_CLIP = 200
+
+
 def derive_phase_record(
     phase_result: Any,
     *,
@@ -459,9 +514,14 @@ def derive_phase_record(
 
     The self-build ("progressive") producer path: after a phase commits, its outcome becomes a
     scoped finding in the cell's OWN knowledge scope — never the global summary corpus. The
-    finding text is the one-liner::
+    finding text keeps the canonical one-liner head::
 
         "<goal[:40]> phase <phase> -> test_executed_success <bool>, cost $<c>, tokens <n>"
+
+    and (kb_finding_layer k1) appends an enriched tail after ``"; "`` carrying the phase's
+    ``status``, the test-suite split ``tests <passed>/<total>``, the ``commit`` sha, and —
+    when the phase record carries one — the fired gate verdict or the phase's own conclusion
+    line. See :func:`_phase_finding_tail`.
 
     Authority is ``MEASURED`` when ``test_executed_success`` is a real ``bool`` (the independent
     test runner measured it) and ``ADVISORY`` when it is ``None`` (self-report, unverified) — an
@@ -486,6 +546,9 @@ def derive_phase_record(
         f"{goal[:40]} phase {phase} -> "
         f"test_executed_success {success}, cost ${cost:.4f}, tokens {tokens}"
     )
+    tail = _phase_finding_tail(phase_result, revision=revision, success=success)
+    if tail:
+        text = f"{text}; {tail}"
 
     # Delegate identity + the content-hash back-fill to the shared factory. Every scoping field
     # is the cell scope (== repository_id on the self-build path), never global.

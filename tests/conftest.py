@@ -226,3 +226,18 @@ def broker_seam_stub(tmp_path, monkeypatch):
     yield seam
     seam.stop_event.set()
     seam.thread.join(timeout=10)
+
+def _disarm_finding_emit(monkeypatch):
+    """Keep workflow-run finding emission out of the unit suite (kb_finding_layer k1).
+
+    emit_self now DEFAULTS ON: every successful committed phase of a workflow run emits a
+    scoped finding (a durable artifact under ``experiments/results/kb/`` plus a pointer onto
+    the live DB-2 knowledge stream). The unit suite drives synthetic git worktrees with
+    throwaway goals — real emissions would litter the canonical KB with a fake finding per
+    committed phase on every run. Disarm via the documented env override
+    (``FINOPS_EMIT_SELF=0``, the same disable-flag pattern as ``FINOPS_FACT_AUTO_EMIT``) for
+    every test; the finding-emission tests themselves opt back in explicitly
+    (``monkeypatch.delenv``) and stub the write seam, so the default-on behavior stays proven
+    without touching the live KB.
+    """
+    monkeypatch.setenv("FINOPS_EMIT_SELF", "0")

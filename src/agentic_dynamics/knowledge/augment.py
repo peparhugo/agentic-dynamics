@@ -3,7 +3,7 @@
 Extracted from ``workflow_runner.py`` (R7 of ``docs/review/restructure.md``) so the
 runtime-RAG knowledge base stays testable without a workflow run. :func:`augment_prompt`
 is the entire augmentation; ``workflow_runner`` keeps only phase execution plus the
-opt-in self-build emit.
+self-build finding emit (default ON since kb_finding_layer k1).
 
 The seam runs between ``route_step`` and ``run_agent`` (never before routing, so the
 augmentation sees the selected executor model), gated by ``rag_augment`` (default OFF).
@@ -12,8 +12,9 @@ failure reverts to ``base_prompt`` and records a named fallback mode, so augment
 never blocks a phase.
 
 Read-only by construction: this module references ``publish_event`` zero times. The
-sole KB writer is the opt-in ``emit_self`` path in ``workflow_runner``
-(``knowledge_ingestion.emit_phase_finding``). The dense/lexical store wiring here is
+sole KB writer is the self-build ``emit_self`` path in ``workflow_runner``
+(``knowledge_ingestion.emit_phase_finding`` — default ON for workflow runs since
+kb_finding_layer k1). The dense/lexical store wiring here is
 lazy (imports inside the default-wiring functions, never at import time) so the
 optional deps (chromadb / neo4j) stay optional and core startup never constructs a
 store.
@@ -207,6 +208,44 @@ def augment_prompt(
     return outcome
 
 
+def _durable_source_type_resolver() -> Callable[[str], str | None]:
+    """Build the k4 source-typing resolver: ``knowledge_id -> source_type`` from the durable
+    artifact layer.
+
+    The retrieval legs hand the resolver ONLY candidates whose store metadata carries no
+    ``source_type`` (an older projection — e.g. the pre-canonical-state Chroma population,
+    whose durable ``kb/<knowledge_id>.json`` artifact still carries the record's real type).
+    The resolver reads that authoritative artifact deterministically (never an LLM) so the
+    store-metadata gap is closed at query time instead of minting an untyped candidate.
+    Results are memoised per knowledge_id (bounded by the untyped population actually seen);
+    a missing/unreadable artifact returns ``None`` (the candidate then stays untyped and the
+    retrieval gate excludes it from the top-K with a recorded reason).
+    """
+    import json as _json
+
+    from agentic_dynamics.core.paths import KB_ARTIFACT_DIR
+
+    cache: dict[str, str | None] = {}
+
+    def _resolve(knowledge_id: str) -> str | None:
+        if knowledge_id in cache:
+            return cache[knowledge_id]
+        resolved: str | None = None
+        try:
+            path = KB_ARTIFACT_DIR / f"{knowledge_id}.json"
+            if path.exists():
+                with path.open(encoding="utf-8") as fh:
+                    rec = _json.load(fh)
+                st = str(rec.get("source_type") or "").strip().lower()
+                resolved = st or None
+        except Exception:  # noqa: BLE001 — a resolver miss must never fail retrieval
+            resolved = None
+        cache[knowledge_id] = resolved
+        return resolved
+
+    return _resolve
+
+
 def default_retrieve_fn() -> Callable[..., Any]:
     """Lazily construct the dense + graph stores and bind them to ``retrieve``.
 
@@ -241,10 +280,21 @@ def default_retrieve_fn() -> Callable[..., Any]:
     except Exception:
         graph_client = None
 
+    # k4 no-silent-empties: bind the durable-artifact source-type resolver so a candidate
+    # whose store metadata carries no source_type is typed from the authoritative kb/ layer
+    # (never an untyped participant in selection). The resolver is only consulted for
+    # silent-metadata candidates and memoises per knowledge_id.
+    source_type_resolver = _durable_source_type_resolver()
+
     # Bind whichever stores survived construction. ``retrieve`` already runs each leg
     # behind its own try/except, so a down store degrades to the surviving legs (and to
     # ``no_rag`` when both are down) rather than raising out of ``augment_prompt``.
-    return functools.partial(_retrieve, dense_store=dense_store, graph_client=graph_client)
+    return functools.partial(
+        _retrieve,
+        dense_store=dense_store,
+        graph_client=graph_client,
+        source_type_resolver=source_type_resolver,
+    )
 
 
 def default_construct_fn(
