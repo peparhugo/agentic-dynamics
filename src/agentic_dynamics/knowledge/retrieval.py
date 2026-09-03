@@ -33,6 +33,7 @@ import json
 import math
 import re
 import time
+from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field, replace
 from datetime import datetime, timezone
@@ -143,6 +144,17 @@ FINDINGS_QUERY_TYPE_PRIORS: dict[str, float] = {
 _FINDINGS_QUERY_TIERS: dict[str, int] = {"evidence": 0, "advisory": 1, "code": 2, "untyped": 3}
 _CODE_QUERY_TIERS: dict[str, int] = {"code": 0, "evidence": 1, "advisory": 2, "untyped": 3}
 _NEUTRAL_QUERY_TIERS: dict[str, int] = {"evidence": 1, "advisory": 1, "code": 1, "untyped": 2}
+
+#: The k4 no-silent-empties reason (hard rule 4): a candidate whose store metadata carries no
+#: ``source_type`` AND that no authoritative source typed (a ``source_type_resolver`` returned
+#: nothing) is excluded from the top-K whenever the pool holds a typed candidate — an untyped
+#: record never participates in selection ahead of a typed one. Recorded on the attempt so the
+#: exclusion is audible, never silent.
+UNTYPED_EXCLUDED_REASON = (
+    "empty source_type: store metadata carries no type and no authoritative resolver typed it; "
+    "excluded from selection because a typed candidate exists (hard rule 4 — an untyped record "
+    "never participates in selection ahead of a typed one)"
+)
 
 
 class QueryShape(str, Enum):
@@ -911,6 +923,11 @@ class RetrievalAttempt:
     cache_status: str
     fallback_mode: str
     dedup_path: str = ""  # "embedding" | "none" — which redundancy-collapse leg ran
+    # k4 no-silent-empties: candidates excluded from the top-K because their source_type was
+    # empty after both the store metadata and the resolver were consulted, while a typed
+    # candidate existed. Each entry is {"id", "reason"} — the exclusion is recorded, never
+    # silent (hard rule 4). Empty when nothing was excluded (all-typed or all-untyped pool).
+    untyped_excluded: list[dict[str, Any]] = field(default_factory=list)
     weights_version: str = WEIGHTS_VERSION
     timestamp: str = ""
 
@@ -1004,6 +1021,7 @@ class RetrievalAttempt:
             "cache_status": self.cache_status,
             "dedup_path": self.dedup_path,
             "fallback_mode": self.fallback_mode,
+            "untyped_excluded": self.untyped_excluded,
             "weights_version": self.weights_version,
             "timestamp": self.timestamp,
         }
@@ -1295,6 +1313,35 @@ def _candidate_allowed(
     )
 
 
+def _resolve_source_type(
+    metadata: dict[str, Any],
+    text: str,
+    cid: str,
+    *,
+    resolver: Callable[[str], str | None] | None = None,
+) -> str:
+    """Resolve a candidate's ``source_type``, consulting an authoritative resolver when the
+    store metadata is silent.
+
+    ``_source_type`` returns ``""`` whenever the store metadata carries no ``source_type``
+    (an older projection, e.g. the pre-canonical-state Chroma population). k4's
+    no-silent-empties rule types those candidates from an authoritative side channel when
+    one is available (``resolver(cid)``), so a store-metadata gap never fabricates an
+    untyped record that could outrank a typed one. The resolver is deterministic and
+    best-effort: a missing/raising resolver leaves the type empty, and the selection gate
+    then excludes the candidate with a recorded reason when a typed candidate exists.
+    """
+    source_type = _source_type(metadata, text)
+    if source_type or resolver is None:
+        return source_type
+    try:
+        resolved = resolver(cid)
+    except Exception:  # noqa: BLE001 — a resolver failure must never fail retrieval
+        return source_type
+    resolved = (resolved or "").strip().lower()
+    return resolved if resolved else source_type
+
+
 def retrieve(
     raw_work_item: str,
     *,
@@ -1311,6 +1358,7 @@ def retrieve(
     seed_count: int = DEFAULT_SEED_COUNT,
     now: datetime | None = None,
     pattern_projection: bool = False,
+    source_type_resolver: Callable[[str], str | None] | None = None,
 ) -> RetrievalAttempt:
     """Run the deterministic retrieval pipeline and record the attempt.
 
@@ -1320,6 +1368,13 @@ def retrieve(
     (``collapse_redundant``, embeddings optional), graph-expanded, token-budgeted,
     and selected. The ``RetrievalAttempt`` is returned *before* any LLM call so the
     trace survives construction/execution failures.
+
+    ``source_type_resolver`` is the k4 no-silent-empties side channel: a deterministic
+    ``candidate_id -> source_type`` lookup (never an LLM) consulted when a store's
+    metadata carries no ``source_type`` (an older projection), so such a candidate is
+    typed from the authoritative durable layer instead of entering selection untyped.
+    A candidate that remains untyped after resolution is excluded from the top-K with a
+    recorded reason whenever a typed candidate exists (see ``UNTYPED_EXCLUDED_REASON``).
     """
     t0 = time.monotonic()
     plan = build_query_plan(
@@ -1381,7 +1436,9 @@ def retrieve(
         cid = hit.get("id", "")
         meta = hit.get("metadata") or {}
         text = hit.get("document", "")
-        source_type = _source_type(meta, text)
+        source_type = _resolve_source_type(
+            meta, text, cid, resolver=source_type_resolver
+        )
         authority = _coerce_authority(meta.get("authority"))
         if not _candidate_allowed(
             source_type,
@@ -1425,7 +1482,9 @@ def retrieve(
         props = hit.get("properties") or {}
         cid = _canonical_id(props, hit.get("id", ""))
         text = props.get("text", "")
-        source_type = _source_type(props, text)
+        source_type = _resolve_source_type(
+            props, text, cid, resolver=source_type_resolver
+        )
         authority = _coerce_authority(props.get("authority"))
         if not _candidate_allowed(
             source_type,
@@ -1448,6 +1507,13 @@ def retrieve(
             if source_type == "pattern":
                 existing.source_type = source_type
                 existing.pattern_payload = payload
+            elif not existing.source_type and source_type:
+                # Cross-leg typing (k4): the SAME record surfaced by the dense leg with
+                # silent metadata and by the typed lexical leg must carry the typed
+                # source_type — an empty one can never outrank a typed record it ties.
+                existing.source_type = source_type
+                if not existing.evidence_class:
+                    existing.evidence_class = str(props.get("evidence_class", "") or "")
             ranks.setdefault(cid, {})["lexical"] = lexical_rank
             raw_scores.setdefault(cid, {})["lexical"] = hit.get("score")
             lexical_rank += 1
@@ -1533,7 +1599,12 @@ def retrieve(
                 cid = node.get("canonical_id") or _canonical_id(props, node.get("id", ""))
                 if cid in fused_ids:
                     continue  # already a direct seed candidate — never re-added
-                source_type = _source_type(props, props.get("text", ""))
+                source_type = _resolve_source_type(
+                    props,
+                    props.get("text", ""),
+                    cid,
+                    resolver=source_type_resolver,
+                )
                 authority = _coerce_authority(props.get("authority"))
                 if not _candidate_allowed(
                     source_type,
@@ -1594,7 +1665,27 @@ def retrieve(
         remaining_input_tokens=remaining_input_tokens,
         rag_token_limit=rag_token_limit,
     )
-    selected = select_evidence(fused, token_budget=budget, max_chunks_per_source=2)
+
+    # k4 no-silent-empties gate (hard rule 4): an untyped candidate (empty source_type after
+    # the store metadata AND the resolver were both consulted) never participates in selection
+    # ahead of a typed one. When the fused pool holds at least one typed candidate, the
+    # untyped survivors are excluded from the top-K and the exclusion is RECORDED with a
+    # reason — never silent. A pool that is entirely untyped (a legacy-only store) keeps its
+    # candidates selectable: there is no typed record for an untyped one to displace, and an
+    # empty answer would be worse than the legacy one (back-compat with the fusion fixtures).
+    typed_pool = [c for c in fused if (c.source_type or "").strip()]
+    untyped_excluded: list[dict[str, Any]] = []
+    if typed_pool and len(typed_pool) < len(fused):
+        selection_pool = typed_pool
+        untyped_excluded = [
+            {"id": c.id, "reason": UNTYPED_EXCLUDED_REASON}
+            for c in fused
+            if not (c.source_type or "").strip()
+        ]
+    else:
+        selection_pool = fused
+
+    selected = select_evidence(selection_pool, token_budget=budget, max_chunks_per_source=2)
 
     fallback = resolve_fallback_mode(dense_ok=dense_ok, lexical_ok=lexical_ok, graph_ok=graph_ok)
 
@@ -1612,6 +1703,7 @@ def retrieve(
         cache_status="unknown",
         dedup_path=dedup_path,
         fallback_mode=fallback.value,
+        untyped_excluded=untyped_excluded,
         timestamp=datetime.now(timezone.utc).isoformat(),
     )
     return attempt

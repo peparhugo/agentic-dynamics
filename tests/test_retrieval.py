@@ -21,6 +21,7 @@ from agentic_dynamics.knowledge.retrieval import (
     EXACT_COMMIT_MULTIPLIER,
     FINDINGS_QUERY_TYPE_PRIORS,
     RELATIONSHIP_WEIGHTS,
+    UNTYPED_EXCLUDED_REASON,
     WEIGHTS_VERSION,
     Candidate,
     EvidenceCard,
@@ -1465,3 +1466,108 @@ def test_untyped_typed_mixed_batch_keeps_untyped_last_at_equal_scores():
         fused = fuse_candidates([finding, code, untyped], exact_terms=[], query_shape=shape)
         assert fused[-1].id == "u"
         assert set(c.id for c in fused) == {"f", "c", "u"}
+
+
+# ── k4 no-silent-empties: source-type resolution + untyped exclusion (the finding-layer wave) ──
+#
+# The retrieval probe (2026-09-02) returned 40 empty-source_type candidates of 61 selected for a
+# findings query. Investigation: nothing CURRENT writes an untyped record (record_factory.build_record
+# requires source_type); the empties are STALE STORE METADATA — the dense leg's Chroma population was
+# written by an older projection (pre-637fd8455) that omitted the source_type property, while the same
+# records' durable artifacts (kb/<id>.json) carry the real type. k4 fixes retrieval two ways:
+#   1. TYPE them: a source_type_resolver side channel (durable-artifact-backed in default_retrieve_fn)
+#      types a candidate whose store metadata is silent, so it never enters selection untyped.
+#   2. EXCLUDE-with-reason: a candidate still untyped after resolution is excluded from the top-K when
+#      a typed candidate exists, with the exclusion recorded on the attempt (UNTYPED_EXCLUDED_REASON).
+# These tests are hermetic: they inject a resolver mapping a stale knowledge_id -> its real type.
+
+
+def _untyped_dense_hit(cid, text, *, authority="source"):
+    """A dense-leg hit whose metadata carries NO source_type (the pre-637fd8455 store shape)."""
+    return {
+        "id": cid,
+        "document": text,
+        "metadata": {"authority": authority, "content_hash": f"hash:{cid}"},
+        "distance": 0.1,
+    }
+
+
+def test_k4_resolver_types_stale_metadata_candidate():
+    # (a) A candidate whose store metadata is silent (an older projection) is TYPED from the
+    # authoritative resolver before it can participate: it carries the resolved type, never "".
+    resolver = {"stale-review-1": "review"}
+    attempt = retrieve(
+        "task manager api coherence review",
+        dense_store=_FakeDenseStore(
+            [_untyped_dense_hit("stale-review-1", "task_manager_api coherence review text")]
+        ),
+        source_type_resolver=lambda cid: resolver.get(cid),
+    )
+    cand = next(c for c in attempt.candidates if c.id == "stale-review-1")
+    assert cand.source_type == "review"
+    assert cand.id in [c.id for c in attempt.selected_evidence]
+    assert attempt.untyped_excluded == []  # typed, so never excluded
+
+
+def test_k4_still_untyped_candidate_is_excluded_with_recorded_reason_when_typed_exists():
+    # (b) A candidate that remains untyped AFTER the resolver was consulted never participates in
+    # selection ahead of a typed one: it is excluded from the top-K and the exclusion is recorded.
+    resolver = {}  # resolves nothing — the stale record stays untyped
+    typed = _typed_dense_hit(
+        "k_finding", "the control_db_evidence phase concluded records are reliable",
+        source_type="finding", authority="measured", evidence_class="[M]",
+    )
+    stale = _untyped_dense_hit("stale-1", "a matching but untyped stale record")
+    attempt = retrieve(
+        "control db evidence finding",
+        dense_store=_FakeDenseStore([stale, typed]),
+        source_type_resolver=lambda cid: resolver.get(cid),
+    )
+    selected_ids = {c.id for c in attempt.selected_evidence}
+    assert "k_finding" in selected_ids
+    assert "stale-1" not in selected_ids  # excluded from the top-K — never ahead of a typed one
+    assert {"id": "stale-1", "reason": UNTYPED_EXCLUDED_REASON} in attempt.untyped_excluded
+    # The exclusion is recorded, never silent: the attempt surfaces it in its audit dict.
+    assert any(e["id"] == "stale-1" for e in attempt.to_dict()["untyped_excluded"])
+
+
+def test_k4_untyped_exclusion_reason_is_deterministic_and_names_hard_rule():
+    assert UNTYPED_EXCLUDED_REASON.startswith("empty source_type:")
+    assert "hard rule 4" in UNTYPED_EXCLUDED_REASON
+
+
+def test_k4_all_untyped_legacy_pool_remains_selectable():
+    # Back-compat: a pool that is ENTIRELY untyped (a pure legacy store with no typed alternative)
+    # still selects — there is no typed record for an untyped one to displace.
+    attempt = retrieve(
+        "websocket reload",
+        dense_store=_FakeDenseStore([_seed_hit()]),
+    )
+    assert attempt.untyped_excluded == []
+    assert {c.id for c in attempt.selected_evidence} == {"k_seed"}
+
+
+def test_k4_lexical_leg_types_a_record_the_dense_leg_could_not():
+    # Cross-leg typing: the SAME record surfaced by the dense leg (silent metadata) and by the typed
+    # lexical leg (Neo4j carries source_type) must adopt the typed value on the shared candidate.
+    dense = _FakeDenseStore([_untyped_dense_hit("shared-kb", "control db evidence finding text")])
+    graph = _FakeGraph(
+        lexical_hits=[
+            {
+                "id": "elem:shared",
+                "properties": {
+                    "knowledge_id": "shared-kb",
+                    "entity_id": "ent_kb",
+                    "text": "control db evidence finding text",
+                    "authority": "measured",
+                    "source_type": "finding",
+                },
+                "score": 0.9,
+            }
+        ]
+    )
+    attempt = retrieve("control db evidence", dense_store=dense, graph_client=graph)
+    shared = next(c for c in attempt.candidates if c.id == "shared-kb")
+    assert shared.source_type == "finding"  # typed by the lexical leg, never left untyped
+    assert shared.id in [c.id for c in attempt.selected_evidence]
+
