@@ -3129,9 +3129,23 @@ def run_workflow(
                     pr.tests_passed = suite["passed"]
                     pr.tests_total = suite["total"]
                     pr.test_executed_success = suite_succeeded(suite)
-                    if suite.get("failed", 0) > 0 or suite.get("errors", 0) > 0:
+                    # A zero-test run is a FALSE GREEN only when a target was DECLARED but
+                    # resolved to nothing (the b5 phantom-target lesson, fleet_launch_boundary
+                    # F5): a ``tests:`` file/node-id that collects no tests means the declared
+                    # verification never ran — total 0 / failed 0 / errors 0 read ok under the
+                    # old failed/errors-only check while test_executed_success was False.
+                    # A phase with NO declared target runs the whole tree; an empty tree
+                    # (a fresh worktree with no test files) collecting 0 is honest, not a
+                    # false green — suite_succeeded(total>0) still records False, and the
+                    # phase status below honors it only when a target was declared.
+                    declared_target = phase_def.get("tests")
+                    if declared_target and not suite_succeeded(suite):
                         pr.status = "failed"
-                        pr.error = suite.get("tail", "")[-400:]
+                        pr.error = suite.get("tail", "")[-400:] or (
+                            "TEST_GATE: declared verification ran no tests "
+                            f"(total 0 — target {declared_target!r} resolved to "
+                            "nothing; a missing file or an empty collection)"
+                        )
             else:
                 prompt = _build_phase_prompt(phase_def, goal, prior)
                 # Point the agent's built-in publisher at this workflow's cell so the
