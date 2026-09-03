@@ -3,8 +3,8 @@
 **Generated — do not edit by hand.** Regenerate with `python scripts/spec_status.py`;
 `scripts/run_workflow.py` also refreshes it at the end of every run.
 
-Generated at: `2026-09-02T22:28:47.471123+00:00`  ·  183 spec(s)
-**Work remaining:** 75 open · 108 completed/retired
+Generated at: `2026-09-03T16:10:41.192073+00:00`  ·  186 spec(s)
+**Work remaining:** 79 open · 107 completed/retired
 
 | name | kind | repeatable | status | version | supersedes | last_run | ok | model | cost | n_runs |
 |---|---|---|---|---|---|---|---|---|---|---|
@@ -33,10 +33,13 @@ Generated at: `2026-09-02T22:28:47.471123+00:00`  ·  183 spec(s)
 | `control_room_live_board` | workflow | no | runnable | 0.1 | — | — | — | — | — | 1 |
 | `delta_entropy_response_campaign` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `docs_refresh_remediation` | workflow | no | runnable | 0.1 | — | — | — | — | — | 2 |
+| `engine_gaps_followups` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `explanation_tax` | experiment | yes | runnable | 0.2 | — | — | — | — | — | 0 |
 | `finding_economics_closure` | workflow | yes | runnable | 0.1 | — | 2026-08-22 17:22 | ok | deepseek/deepseek-v4-pro | $1.2820 | 1 |
 | `fleet_job_submission` | workflow | no | runnable | 0.1 | — | — | — | — | — | 3 |
 | `fleet_launch_boundary` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
+| `fleet_launch_boundary_followups` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
+| `fleet_launch_smoke` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `green_main_closure` | workflow | no | runnable | 0.1 | — | — | — | — | — | 4 |
 | `labbook_refresh` | workflow | yes | runnable | 0.1 | — | 2026-08-17 18:14 | ok | deepseek/deepseek-v4-flash | $0.0275 | 1 |
 | `launch_handler_dry_run` | workflow | yes | runnable | 0.1 | — | — | — | — | — | 0 |
@@ -75,6 +78,7 @@ Generated at: `2026-09-02T22:28:47.471123+00:00`  ·  183 spec(s)
 | `design_sessions` | workflow | no | failed | 0.1 | — | 2026-08-14 06:58 | fail | openai/gpt-5.6-sol | $0.0000 | 1 |
 | `engine_gaps_verifier_revision` | workflow | no | failed | 0.1 | — | 2026-09-02 16:50 | ok | deepseek/deepseek-v4-flash | $0.0951 | 2 |
 | `evidence_redesign` | workflow | no | failed | 0.1 | — | 2026-08-14 19:18 | ok | openai/gpt-5.6-sol | $5.9008 | 3 |
+| `fleet_launch_container_smoke` | workflow | no | failed | 0.1 | — | 2026-09-03 15:27 | fail | deepseek/deepseek-v4-flash | $0.0000 | 1 |
 | `rag_knowledge_base` | workflow | no | failed | 0.1 | — | 2026-08-14 23:37 | ok | openai/gpt-5.6-sol | $5.4215 | 4 |
 | `semantic_integrity_release` | workflow | no | failed | 0.1 | — | 2026-08-21 05:25 | ok | deepseek/deepseek-v4-pro | $1.6898 | 4 |
 | `admission_leases` | workflow | no | blocked | 0.1 | — | 2026-09-01 00:37 | ok | anthropic/claude-opus-5 | $7.7920 | 5 |
@@ -146,7 +150,6 @@ Generated at: `2026-09-02T22:28:47.471123+00:00`  ·  183 spec(s)
 | `control_room_workflow_phase` | workflow | no | completed | 0.1 | — | 2026-08-17 15:44 | ok | deepseek/deepseek-v4-pro | $0.1682 | 1 |
 | `deep_architecture_review` | workflow | no | completed | 0.1 | — | 2026-08-18 19:10 | ok | deepseek/deepseek-v4-pro | $0.1319 | 1 |
 | `docs_architecture_refresh` | workflow | no | completed | 0.1 | opencode_docs_refresh | 2026-08-31 23:52 | ok | openai/gpt-5.6-terra | $8.6779 | 1 |
-| `engine_gaps_followups` | workflow | no | completed | 0.1 | — | 2026-09-02 20:39 | ok | deepseek/deepseek-v4-flash | $1.1022 | 1 |
 | `entropy_beta_instruments` | workflow | no | completed | 0.1 | — | 2026-08-30 19:14 | ok | deepseek/deepseek-v4-pro | $0.2940 | 2 |
 | `evidence_narrative` | workflow | no | completed | 0.1 | — | 2026-08-14 15:04 | ok | openai/gpt-5.6-sol | $0.0000 | 2 |
 | `fix_review_findings` | workflow | no | completed | 0.1 | — | 2026-08-14 13:48 | ok | deepseek/deepseek-v4-pro | $0.1504 | 1 |
