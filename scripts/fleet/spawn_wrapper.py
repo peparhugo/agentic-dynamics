@@ -1343,6 +1343,16 @@ def build_verifier_request(
     env.pop("FINOPS_OPENCODE_STATE_DIR", None)
     for flag in WRITE_FLAG_ENVS:
         env.pop(flag, None)
+    # ws4_smoke (fleet_launch_smoke, exposed by THE SMOKE): a verifier cell runs a SUITE and
+    # makes NO model call, so it mounts no CLI/auth dirs (the D-18 probe's whole premise — the
+    # model CLIs attach through the D-2 auth mounts). Its container therefore boots with the
+    # entrypoint's binary-resolution probe SKIPPED — the same FLEET_SKIP_PROBE=1 the compose
+    # gives the supervisor services that invoke no CLI (docker-compose.ladder.yml "the
+    # supervisor services invoke no CLI"). Before this fix a real verifier cell always died at
+    # boot: the probe found no opencode/claude (they are not mounted) and FAILED the container
+    # before the suite ever ran. An agent cell (build_phase_request) does NOT set this — it
+    # mounts the CLI dirs and the probe legitimately asserts they resolve.
+    env["FLEET_SKIP_PROBE"] = "1"
     request["env"] = env
     return request
 

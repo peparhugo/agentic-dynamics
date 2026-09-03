@@ -908,6 +908,28 @@ def test_agent_phase_request_keeps_rw_candidate_mounts():
     assert validate_spawn(agent) == []
 
 
+def test_verifier_request_skips_the_d18_boot_probe_agent_does_not():
+    """(ws4_smoke — THE SMOKE's wiring fix) a VERIFIER cell runs a SUITE and makes NO model
+    call, so it mounts no CLI/auth dirs (the D-18 probe's whole premise) — its container boots
+    with the entrypoint probe SKIPPED (FLEET_SKIP_PROBE=1, the same env the compose gives
+    supervisor services that invoke no CLI). Before this fix a real verifier cell always died
+    at boot: the probe found no opencode/claude (they are not mounted) and FAILED the container
+    before the suite ever ran. An AGENT cell mounts the CLI dirs and must NOT skip the probe —
+    it legitimately asserts the model CLIs resolve."""
+    verifier = _verifier_request()
+    assert verifier["env"].get("FLEET_SKIP_PROBE") == "1", (
+        "a verifier cell (no credentials, no model CLI by construction) must skip the D-18 "
+        "boot probe or it can never boot"
+    )
+    # ... while the agent (implementation) request does not carry the skip — its probe is real.
+    agent = build_phase_request(
+        {"name": "p1_slice1_base_supervisor", "scope": "implementation"},
+        goal="g", workdir="/tmp/wt_x", model="deepseek/deepseek-v4-flash",
+        spec_name="spec_x",
+    )
+    assert agent["env"].get("FLEET_SKIP_PROBE") in (None, "0")
+
+
 def test_verifier_request_keeps_the_in_process_suite_target():
     """(d) the suite-target semantics are UNCHANGED — the verifier request runs the SAME
     target list the in-process LocalVerifier path would run (the phase's tests are carried on

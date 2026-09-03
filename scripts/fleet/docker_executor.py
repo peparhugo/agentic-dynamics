@@ -91,8 +91,18 @@ class DockerAgentExecutor(StepExecutor):
         # is no longer mounted, so the cell's workdir IS the clone. Without a clone the cell
         # keeps operating in the shared-worktree path (pre-b2 shape, unchanged).
         sibling_workdir = spawn_wrapper.REPO_TARGET if self._run_clone else self._workdir
+        # ws4_smoke (fleet_launch_smoke, exposed by THE SMOKE): the sibling command must name
+        # the interpreter the CONTAINER resolves on PATH ("python3" = the fleet image's
+        # /usr/local/bin/python3 — the interpreter the deps were installed under), never the
+        # executor process's own sys.executable. The executor may run on the HOST (this wave's
+        # in-process smoke drove it there), where sys.executable is the host's /usr/bin/python3
+        # — a DIFFERENT interpreter that the fleet/base image also carries but with NO project
+        # deps, so the child died at import before the suite ran. spawn_wrapper's own default
+        # cell command ("python3 scripts/fleet/phase_runner.py") and the compose workflow-runner
+        # command already use the PATH-resolved python3; the executors' sys.executable was the
+        # one spot that baked a host path into a container argv.
         sibling_cmd = [
-            sys.executable, "scripts/run_workflow.py",
+            "python3", "scripts/run_workflow.py",
             "--spec", self._spec_path,
             "--goal", self._goal,
             "--model", self._model,
