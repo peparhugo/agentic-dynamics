@@ -1,0 +1,306 @@
+name: fleet_launch_smoke
+question: >-
+  Close the wiring gaps the fleet_launch_boundary follow-up's adversarial review
+  found NOT merge-ready (F1-F3) by exercising the ACTUAL containerized path —
+  the systematic defect behind three waves of unwired code: no spec run ever
+  launches a container, so executor→broker→docker→container wiring gaps
+  survive every gate. This spec's CENTRAL phase is a real end-to-end smoke on
+  this host (docker is available; the fleet images exist): launch one cell
+  through the host-side broker into a fleet/base container, assert the per-run
+  clone is mounted read-only, assert the spawn succeeds, assert the verdict
+  returns, and FIX the wiring the smoke exposes. The known gaps to close:
+  (w1) create_run_clone has no caller — the executors read FINOPS_RUN_CLONE but
+  nothing exports it; the clone must be created per run and bound into the
+  executor + the broker request. (w2) the broker validates container-built
+  mounts against the HOST path config — the D-16 repo-alias split (/app
+  in-container vs host path) makes it refuse every containerized spawn; the
+  broker must validate against the container-view config for requests from the
+  container tier. (w3) backfill_sonar.py:110 runs docker run — a third untyped
+  caller outside the broker; and the launch-broker service embeds the host
+  path. The smoke phase proves the fixed path end to end: clone created →
+  executor bound → broker accepts → container spawns → suite runs in the
+  read-only clone → verdict returns.
+version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: true
+repeatable: false
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: false
+    context:
+      domain_context: >-
+        canonical_sources: [scripts/fleet/launch_broker.py (the broker —
+        validate_spawn against the HOST path_config at :227 — the w2 path-split
+        bug; the typed LaunchRequest; the single docker call), scripts/fleet/
+        spawn_wrapper.py (the request builder + validate_spawn +
+        default_path_config), src/agentic_dynamics/runtime/run_clone.py
+        (create_run_clone — w1: zero callers), scripts/fleet/docker_executor.py
+        + docker_verifier_executor.py (the executors that read FINOPS_RUN_CLONE
+        but receive no run_clone), scripts/run_workflow.py (the composition
+        root — where the clone must be created and bound under --orchestrator),
+        scripts/archive/backfill_sonar.py:110 (w3: the docker run caller),
+        the fleet_launch_boundary wave + its follow-up + both adversarial
+        reviews, infrastructure/docker-compose.ladder.yml (the fleet images:
+        fleet/base:latest etc.), and src/agentic_dynamics/core/paths.py
+        (PathConfig)].
+        policies: [one_durable_state, the_gate_is_the_evidence, authority_
+        absolute, bounded_verification].
+      challenge_context: >-
+        challenge: the wiring cannot be seen from inside a test. Three waves
+        produced clone-creation, broker, and executor code that pytest certifies
+        green while the real seam — executor → broker → docker → container —
+        remains disconnected (nothing exports the clone; the broker refuses the
+        container's own mounts; a third docker caller lurks in archive/). The
+        adversarial reviews catch the disconnects every time; the spec runs
+        cannot, because none of them ever launches a container. The fix is not
+        more code written blind — it is one real launch, observed, with the
+        wiring fixed against what the launch shows.
+        deliberation: [wire the clone end to end first (w1 — create + export +
+        bind), then the broker's path-view fix (w2 — validate against the
+        container view), then the stragglers (w3), then the SMOKE (w4 — the
+        phase that proves it by launching)].
+        session_policy: {default: continue}
+      current_state: >-
+        MEASURED (2026-09-02): create_run_clone exists with no callers; the
+        executors read FINOPS_RUN_CLONE (never exported); the broker validates
+        against the host path config (refuses container-built mounts);
+        backfill_sonar.py:110 calls docker run; docker works on this host and
+        the fleet/base:latest image exists.
+      hard_rules: >-
+        (1) THE SMOKE IS THE VERDICT: the wave is not complete until w4's real
+        end-to-end launch — clone created → executor bound → broker accepts →
+        container spawns → suite runs in the read-only clone → verdict returns —
+        PASSES on this host with docker. A green pytest suite without the smoke
+        is the exact lie this wave exists to end.
+        (2) ONE WIRING, OBSERVED: every fix in w1-w3 is verified by the smoke,
+        not by prose. If the smoke exposes a further gap, fix it in the phase,
+        do not record it for another wave.
+        (3) THE BROKER VALIDATES THE VIEW IT EXECUTES: a request from the
+        container tier is validated against the container-view config; the
+        host view is the broker's own launch view. No request is refused for a
+        path split the caller cannot see.
+        (4) BOUNDED VERIFICATION (unchanged). REGENERATE, NEVER HAND-EDIT
+        (unchanged).
+    phases:
+      - name: ws0_pin_spec
+        kind: agent
+        scope: implementation
+        timeout: 3600
+        prompt: |
+          GOAL: {goal}
+          ROLE: verification — the house pin convention. Write
+          docs/reviews/fleet_launch_smoke_preregistration.md carrying:
+          (a) this spec's file SHA256 + the worktree git sha; (b) the three
+          wiring gaps + the smoke precondition VERIFIED against the actual
+          code + this host: (1) create_run_clone has no callers (grep); (2)
+          the broker validates against the host path config (read
+          launch_broker's validate call); (3) backfill_sonar.py:110 calls
+          docker run; (4) docker works here (docker info) AND fleet/base:
+          latest exists (docker images). An edge that does not hold is a
+          FAILED finding. If a claim cannot be reproduced after THREE
+          attempts, record the deviation and FAIL — never loop.
+          DELIVER: the preregistration with the verified edges, committed
+          with the '[workflow] ws0_pin_spec — <goal prefix>' subject.
+          LOG: PASS/FAIL per claim; commit.
+      - name: ws1_clone_wired
+        kind: agent
+        scope: implementation
+        timeout: 7200
+        prompt: |
+          GOAL: {goal}
+          SHAPE: the clone is born and bound. In scripts/run_workflow.py's
+          --orchestrator composition root: create the per-run clone
+          (create_run_clone from runtime/run_clone.py) at
+          PathConfig.runs_root/<run-id>/repo BEFORE the executors are built,
+          export FINOPS_RUN_CLONE to the child environment, and pass run_clone
+          explicitly to both DockerAgentExecutor and DockerVerifierExecutor.
+          The executors' existing FINOPS_RUN_CLONE read becomes the fallback,
+          not the primary. The clone is the repo view the cell mounts.
+          SCOPE FENCE: the clone creation + binding ONLY — the broker path
+          fix is ws2's. Commits carry '[workflow] ws1_clone_wired'.
+          VERIFY (both directions): unit tests prove (a) under --orchestrator
+          a run creates its clone before the executors are built (assert
+          create_run_clone is called with the run id); (b) the executors
+          receive run_clone explicitly (assert the constructor arg, not the
+          env fallback); (c) the clone path is under runs_root/<run-id>;
+          (d) a non-orchestrator run creates no clone (no docker needed).
+          DELIVER: the wiring + the tests, committed.
+          LOG: PASS/FAIL; commit.
+      - name: ws2_broker_pathview
+        kind: agent
+        scope: implementation
+        timeout: 7200
+        prompt: |
+          GOAL: {goal}
+          SHAPE: the broker validates the view it executes. In
+          launch_broker.py: a request carries its VIEW (host or container);
+          the broker validates container-view requests against the
+          container-view PathConfig (the /app-in-container paths the mounts
+          were built with) and host-view requests against the host config —
+          never refusing a request for a path split the caller cannot see.
+          The broker's own launch argv uses the host view. The D-16
+          repo-alias split resolves correctly: a request whose mounts target
+          /app paths validates against /app-path expectations.
+          SCOPE FENCE: the broker's path-view validation ONLY — the clone
+          wiring is ws1's, the stragglers ws3's. Commits carry
+          '[workflow] ws2_broker_pathview'.
+          VERIFY (both directions): unit tests prove (a) a container-view
+          request (mounts targeting /app + the container repo path) validates
+          against the container view and is ACCEPTED (the w2 refusal shape
+          dies); (b) a host-view request validates against the host view; (c)
+          an unknown view refuses; (d) the broker's argv still uses the host
+          docker path; (e) the existing validation refusals (bad mount
+          profile, untyped command) are unchanged.
+          DELIVER: the path-view fix + the tests, committed.
+          LOG: PASS/FAIL; commit.
+      - name: ws3_stragglers
+        kind: agent
+        scope: implementation
+        timeout: 7200
+        prompt: |
+          GOAL: {goal}
+          SHAPE: the loose docker callers. (a) backfill_sonar.py:110's
+          docker run: route through the broker OR document as the second
+          benign read-only exception with the reason (archive/ is one-time
+          code — routing or documenting both acceptable, recorded). (b) the
+          launch-broker service: replace the embedded host path with
+          PathConfig-derived values.
+          SCOPE FENCE: the straggler closures ONLY. Commits carry
+          '[workflow] ws3_stragglers'.
+          VERIFY (both directions): unit tests prove (a) backfill_sonar's
+          docker usage is broker-routed or documented (grep + its docstring);
+          (b) the broker service file carries no host literal (grep the unit
+          content).
+          DELIVER: the closures + the tests, committed.
+          LOG: PASS/FAIL; commit.
+      - name: ws4_smoke
+        kind: agent
+        scope: implementation
+        timeout: 7200
+        prompt: |
+          GOAL: {goal}
+          SHAPE: THE SMOKE — the wave's verdict. On THIS host (docker works,
+          fleet/base:latest exists): launch ONE real cell end to end through
+          the fixed path and PROVE the wiring: (1) a run clone is created at
+          runs_root/<run-id>/repo; (2) the executor is bound to it; (3) the
+          broker ACCEPTS the request (the path-view fix holds); (4) the
+          container spawns (docker run of fleet/base or the job image with
+          the clone mounted read-only — assert the mount is present in the
+          container, e.g. docker inspect or a container-side ls that would
+          fail if the repo were absent); (5) the suite (a trivial one) runs
+          in the read-only clone; (6) the verdict returns through the
+          envelope. Record the smoke's evidence (container id, mount proof,
+          exit code, verdict) in the phase log. If the smoke exposes a wiring
+          gap beyond ws1-ws3, FIX IT IN THIS PHASE — the wave is not complete
+          until the smoke passes. A green pytest without the smoke is a
+          failed wave.
+          SCOPE FENCE: the smoke + any wiring it exposes ONLY — no new
+          features, no unrelated refactors. Commits carry
+          '[workflow] ws4_smoke'.
+          VERIFY: the smoke's own evidence IS the verification: container
+          spawned, clone mounted ro, suite ran, verdict returned. Record it.
+          DELIVER: the smoke evidence + any fixes, committed.
+          LOG: the smoke evidence table; PASS/FAIL; commit.
+      - name: ws5_adversarial
+        kind: agent
+        scope: adversarial_readonly
+        requires_deliverable: true
+        run_model: deepseek/deepseek-v4-pro
+        timeout: 14400
+        prompt: |
+          GOAL: {goal}
+          ROLE: the INDEPENDENT adversarial reviewer — a DIFFERENT model and
+          session (pro vs the flash author). Falsify the smoke wave, not
+          certify it. Attack in order, re-verified against the actual code +
+          the smoke evidence (never asserted): (1) ws1 — is the clone REALLY
+          created per run and bound (grep the call site — is create_run_clone
+          actually invoked, not just documented)? (2) ws2 — does a
+          container-view request actually validate and reach docker (run the
+          broker's own tests + read the path-view logic)? (3) ws4 — is the
+          smoke evidence REAL (a container id + mount proof + exit code, not a
+          recorded assertion)? can you find ANY wiring gap the smoke would
+          not have caught (a path the smoke didn't traverse)? (4) cross — the
+          parity suite + gate stay green. Every finding: FIX on the branch or
+          RECORD as an accepted limitation with reasoning. At least 3
+          findings or a clean sweep with re-verification evidence — a bare
+          PASS is a failed review.
+          RELEASE VERDICT: merge-ready to main? The containerized path WORKS
+          end to end?
+          DELIVER: docs/reviews/fleet_launch_smoke_adversarial.md (finding
+          table), committed.
+          LOG: finding table; PASS/FAIL; commit.
+      - name: ws6_test_gate
+        kind: test
+        scope: implementation
+        timeout: 900
+        tests:
+          - tests/test_launch_broker.py
+          - tests/test_run_clone.py
+          - tests/test_path_config.py
+          - tests/test_spawn_wrapper.py
+          - tests/test_workflow_executor_parity.py
+          - tests/test_workflow_runner.py
+          - tests/test_script_classification.py
+          - tests/test_doc_lifecycle.py
+          - tests/test_agent_config_render.py
+          - tests/test_cli_resolution.py
+factors:
+  - {name: model, levels: [deepseek/deepseek-v4-flash]}
+design: factorial
+rules:
+  - name: smoke_edges_verified
+    plane: measurement
+    evidence_class: "[M]"
+    requires: []
+    produces: [three_gaps_and_docker_confirmed]
+  - name: clone_bound_end_to_end
+    plane: measurement
+    evidence_class: "[C]"
+    requires: [three_gaps_and_docker_confirmed]
+    produces: [clone_created_per_run, clone_bound_in_executors]
+  - name: broker_pathview_fixed
+    plane: measurement
+    evidence_class: "[C]"
+    requires: [clone_created_per_run]
+    produces: [container_view_validates, host_view_launches]
+  - name: loose_callers_closed
+    plane: measurement
+    evidence_class: "[C]"
+    requires: [three_gaps_and_docker_confirmed]
+    produces: [docker_callers_bound_or_documented]
+  - name: smoke_passed
+    plane: measurement
+    evidence_class: "[M]"
+    requires: [clone_created_per_run, clone_bound_in_executors,
+               container_view_validates, host_view_launches]
+    produces: [containerized_path_proven]
+  - name: smoke_wave_adversarial_clean
+    plane: measurement
+    evidence_class: "[M]"
+    requires: [containerized_path_proven, docker_callers_bound_or_documented]
+    produces: [smoke_wave_clean]
+  - name: test_gate_measured
+    plane: measurement
+    evidence_class: "[M]"
+    requires: [test_executed_success]
+    produces: [independent_gate_recorded]
+metrics:
+  - {name: three_gaps_and_docker_confirmed, agg: mean, over: cell}
+  - {name: clone_created_per_run, agg: mean, over: cell}
+  - {name: clone_bound_in_executors, agg: mean, over: cell}
+  - {name: container_view_validates, agg: mean, over: cell}
+  - {name: host_view_launches, agg: mean, over: cell}
+  - {name: docker_callers_bound_or_documented, agg: mean, over: cell}
+  - {name: containerized_path_proven, agg: mean, over: cell}
+  - {name: smoke_wave_clean, agg: mean, over: cell}
+  - {name: independent_gate_recorded, agg: mean, over: cell}
+writeup:
+  format: lab_book
+  sections: [question, ws0_pin_spec, ws1_clone_wired, ws2_broker_pathview, ws3_stragglers, ws4_smoke, ws5_adversarial, ws6_test_gate]
+stop: {budget_usd: 12.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}
