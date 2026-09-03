@@ -36,7 +36,13 @@ returned there, routes every permanence verb through the verified commands (`pro
 `publish release`), and never bypasses the gates. "The controller" remains the human
 decision-maker; the AIO is its delegated hands. Historical documents that say "master"
 describe what was true when written; the brief "Logos Control Agent (LCA)" interim name
-was superseded the same day.
+was superseded the same day. The AIO's continuity across sessions — its own posterior —
+is the **self-knowledge layer** (loop 2: the machine learning about itself operating, not
+only about AI economics): session records as the spine, decision records with rationale,
+belief records with an update protocol, the controller model, the game scoreboard, and
+reflection records. Design: `docs/designs/proposed/self_knowledge_layer.md`. A session
+that does not write its close record has not closed.
+
 
 - **P0 — the controller alone.** Merging a worktree branch into `main` (the permanence gate: every
   `feature/*` / `wt_*` branch is an EPHEMERAL proposal until signed), deploying the website,

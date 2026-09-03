@@ -3,12 +3,11 @@
 **Generated — do not edit by hand.** Regenerate with `python scripts/spec_status.py`;
 `scripts/run_workflow.py` also refreshes it at the end of every run.
 
-Generated at: `2026-09-03T13:07:15.179133+00:00`  ·  188 spec(s)
-**Work remaining:** 77 open · 111 completed/retired
+Generated at: `2026-09-03T13:24:37.633814+00:00`  ·  189 spec(s)
+**Work remaining:** 78 open · 111 completed/retired
 
 | name | kind | repeatable | status | version | supersedes | last_run | ok | model | cost | n_runs |
 |---|---|---|---|---|---|---|---|---|---|---|
-| `authoring_product_aio` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `auto_posthoc_wiring` | workflow | yes | runnable | 0.1 | — | 2026-08-17 16:17 | ok | deepseek/deepseek-v4-pro | $0.1471 | 1 |
 | `automatic_docs_sync` | workflow | no | runnable | 0.1 | — | — | — | — | — | 1 |
 | `cap_2a_calibration_cell` | workflow | yes | runnable | 0.1 | — | — | — | — | — | 0 |
@@ -56,10 +55,12 @@ Generated at: `2026-09-03T13:07:15.179133+00:00`  ·  188 spec(s)
 | `routing_kb_experiment_design` | experiment | yes | runnable | 0.1 | — | 2026-08-17 18:28 | ok | openai/gpt-5.6-sol | $3.0669 | 7 |
 | `routing_kb_experiment_design_research` | experiment | yes | runnable | 0.1 | — | 2026-08-17 18:12 | ok | deepseek/deepseek-v4-pro | $0.2203 | 1 |
 | `routing_regret_under_degradation` | experiment | yes | runnable | 0.2 | — | — | — | — | — | 0 |
+| `self_knowledge_layer` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `self_recommending_experiment` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `test_suite_speed` | workflow | no | runnable | 0.1 | — | — | — | — | — | 1 |
 | `test_suite_tiering` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `agentic_dynamics_rebrand` | workflow | no | failed | 0.1 | — | 2026-08-14 22:02 | fail | openai/gpt-5.6-sol | $7.7341 | 2 |
+| `authoring_product_aio` | workflow | no | failed | 0.1 | — | 2026-09-03 13:11 | fail | deepseek/deepseek-v4-flash | $0.1671 | 1 |
 | `canonical_state_design` | workflow | no | failed | 0.1 | — | 2026-08-18 15:48 | fail | openai/gpt-5.6-sol | $0.0798 | 5 |
 | `cap_adaptive_2c` | workflow | no | failed | 0.1 | — | 2026-08-27 18:18 | ok | deepseek/deepseek-v4-flash | $0.2420 | 2 |
 | `cap_adaptive_2d` | workflow | no | failed | 0.1 | — | 2026-08-28 13:02 | fail | deepseek/deepseek-v4-flash | $0.0496 | 3 |
