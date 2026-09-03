@@ -1,7 +1,7 @@
 {
   "schema_version": "spec-status/v2",
-  "generated_at": "2026-09-03T12:27:58.970173+00:00",
-  "n_specs": 187,
+  "generated_at": "2026-09-03T13:07:15.179133+00:00",
+  "n_specs": 188,
   "specs": [
     {
       "name": "authoring_product_aio",
@@ -621,6 +621,26 @@
       "results_pointer": null,
       "n_runs": 4,
       "workflow_revision_id": "c1a723661b7468811d44b16d1ee95e3497c2103fd1c3edd50859a6fea3e141b2",
+      "authored_status": null
+    },
+    {
+      "name": "kb_finding_layer",
+      "version": "0.1",
+      "status": "runnable",
+      "spec_path": "workflows/repository/kb_finding_layer.yaml",
+      "artifact_kind": "workflow",
+      "repeatable": false,
+      "supersedes": [],
+      "superseded_by": null,
+      "completed_at": null,
+      "last_run_at": null,
+      "latest_ok": null,
+      "latest_model": null,
+      "latest_cost_usd": null,
+      "latest_git_sha": null,
+      "results_pointer": null,
+      "n_runs": 0,
+      "workflow_revision_id": "e241ca476c69a086020f0301258db0ce31a49c8e2116973e293f216a8e032a4f",
       "authored_status": null
     },
     {

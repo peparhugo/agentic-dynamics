@@ -1,0 +1,423 @@
+name: kb_finding_layer
+question: >-
+  Close the knowledge-base finding-layer gap (the retrieval test, 2026-09-02):
+  the KB holds 38,680 attempt-fact rows + code chunks but NO distilled findings —
+  the phase-finding producer (emit_phase_finding) exists but is opt-in and
+  default OFF (no wave ever enabled it); the 64 finding records are empty shells;
+  the completed waves' conclusions (adversarial verdicts, the 17-spec shift, the
+  evidence-wave results) are absent from the KB entirely; retrieval faithfully
+  returns flat code signatures for questions about measured findings; 40/61
+  selected records carry an empty source_type; and the graph leg returns zero
+  paths. This wave: (k1) flips emit_self to DEFAULT ON for spec runs so every
+  phase's outcome emits a scoped finding (and enriches the finding text beyond
+  the current one-liner — it carries status, tests, cost, commit, and the
+  adversarial verdict when one exists); (k2) backfills the finding layer
+  deterministically from the artifacts on disk (docs/reviews/*adversarial.md,
+  preregistrations, run ledgers) so the completed waves' conclusions enter the
+  KB; (k3) fixes retrieval order — findings/reviews (measured, distilled)
+  outrank bare code signatures for phase-objective queries while code stays
+  first for code questions; (k4) investigates and fixes the empty-source_type
+  records and the zero-path graph leg (or documents them down with reasons);
+  (k5) adds the narrator — spec_status emits a change record into the KB when a
+  regeneration shifts statuses ("17 specs changed, here's why") so a later
+  agent can retrieve the reason instead of re-deriving the mystery; and (k6)
+  the WITNESS — one minimal real phase run proving the emission lands end to
+  end (the finding for THIS wave's own phases must appear in the KB, retrievable
+  by the same query shape the earlier probe used). The retrieval test's verdict
+  — "flat, not rich" — must invert: a query about the control_db_evidence wave's
+  per-phase-evidence finding returns that finding in the top results.
+version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: false
+repeatable: false
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: false
+    context:
+      domain_context: >-
+        canonical_sources: [src/agentic_dynamics/runtime/workflow_runner.py
+        (:3421 — the emit_self gate, default OFF; _emit_self_finding at :992),
+        src/agentic_dynamics/knowledge/knowledge_ingestion.py (derive_phase_
+        record at :450 — the one-liner finding text; emit_phase_finding;
+        record_to_artifact/record_to_event), src/agentic_dynamics/knowledge/
+        retrieval.py (the fusion — source-type weighting for k3; the empty
+        source_type candidates), src/agentic_dynamics/knowledge/augment.py
+        (default_retrieve_fn — the store construction), scripts/spec_status.py
+        + src/agentic_dynamics/experiment/spec_status.py (the regenerator —
+        where the k5 narrator emits), docs/reviews/*adversarial.md +
+        *preregistration.md (the k2 backfill source — the completed waves'
+        conclusions), experiments/results/registry_index.jsonl (the 40,992-row
+        registry the backfill + k4 audit against), the retrieval test results
+        (2026-09-02: 21 code + 40 empty of 61 selected for a findings query),
+        and the KB producer/consumer architecture (knowledge_stream consumer
+        groups kb-registry/chroma/neo4j/ledger)].
+        policies: [one_durable_state, the_gate_is_the_evidence, authority_
+        absolute, bounded_verification, outbox_before_emit].
+      challenge_context: >-
+        challenge: the warehouse is full of facts and empty of findings. The
+        instrument (retrieval) works; the producers exist; but the distilled
+        layer — what a phase CONCLUDED, what a wave VERDICTED, why 17 specs
+        SHIFTED — was never emitted, because the emit path is opt-in and the
+        runs that would exercise it never enabled it. The earlier waves'
+        conclusions live in docs/reviews/*.md (rich, human-readable) and the
+        run ledgers — structured, but never projected into the KB. Closing the
+        gap is three moves: default-on emission (so it stops being opt-in),
+        deterministic backfill (so the past enters), and retrieval-order
+        honesty (so findings rank above code for findings questions). The
+        witness is the proof: a real phase emit that lands, retrievable.
+        deliberation: [the default-on flip + enriched text first (k1 — future
+        phases emit), then the backfill (k2 — the past enters), then the
+        retrieval order (k3 — findings rank), then the empty-type + graph
+        investigation (k4), then the narrator (k5), then the witness (k6 — the
+        proof)].
+        session_policy: {default: continue}
+      current_state: >-
+        MEASURED (2026-09-02): emit_self default OFF (workflow_runner.py:3421
+        gates on rag_params.get("emit_self")); the finding text is a one-liner
+        ("<goal> phase <phase> -> test_executed_success <bool>..."); 64 finding
+        records, near-empty shells; 0 hits for control_db_evidence / split-run
+        across the registry; retrieval returned 21 code + 40 empty-source_type
+        of 61 selected for a findings query; graph_paths 0 on both probes;
+        docs/reviews/ holds the completed waves' adversarial verdicts.
+      hard_rules: >-
+        (1) FINDINGS ARE THE DEFAULT, NOT THE OPT-IN: after k1, a spec-run
+        phase's outcome emits a scoped finding by default (emit_self default
+        ON). The finding carries the measured facts — status, tests verdict,
+        cost, commit — plus the phase's conclusion when derivable. A phase that
+        must NOT emit opts out explicitly (never silently).
+        (2) THE PAST ENTERS DETERMINISTICALLY: after k2, the completed waves'
+        conclusions are in the KB as finding records derived from the review
+        artifacts — no LLM distillation, no hand-authored summaries; the
+        backfill is a deterministic script with a rerun-safe key.
+        (3) FINDINGS OUTRANK CODE FOR FINDINGS QUESTIONS: after k3, a
+        phase-objective query returns measured/derived findings + reviews above
+        bare code signatures; a code question still returns code first. The
+        discriminator is the query shape + the record's source_type/evidence_
+        class, never a global code-suppression.
+        (4) NO SILENT EMPTY RECORDS: after k4, a candidate with an empty
+        source_type is either typed or excluded with a reason — an untyped
+        record never outranks a typed one. The graph leg either returns paths
+        or is documented down with the reason.
+        (5) THE REGENERATOR NARRATES: after k5, a spec_status regeneration that
+        shifts statuses emits a change record ("17 specs changed, here's why")
+        into the KB before the index is written.
+        (6) THE WITNESS IS THE VERDICT: the wave is not complete until k6's real
+        phase emit lands in the KB AND the same query shape the 2026-09-02
+        probe used returns THIS wave's finding in the top results. A green
+        pytest without the witness is the earlier waves' mistake repeated.
+        (7) BOUNDED VERIFICATION (unchanged). REGENERATE, NEVER HAND-EDIT
+        (unchanged).
+    phases:
+      - name: k0_pin_spec
+        kind: agent
+        scope: implementation
+        timeout: 3600
+        prompt: |
+          GOAL: {goal}
+          ROLE: verification — the house pin convention. Write
+          docs/reviews/kb_finding_layer_preregistration.md carrying: (a) this
+          spec's file SHA256 + the worktree git sha; (b) the five edges
+          VERIFIED against the actual code + the live KB: (1) emit_self
+          defaults OFF (read workflow_runner.py:3421 + the param default); (2)
+          the finding text is a one-liner (read derive_phase_record); (3) the
+          registry's finding records are empty shells + the wave conclusions
+          are absent (query the registry for control_db_evidence / split-run);
+          (4) retrieval returns code/empty-type records for a findings query
+          (run the same probe — repository_id '', phase_objective set); (5)
+          graph_paths 0 (run a probe + check the neo4j consumer state). An
+          edge that does not hold is a FAILED finding. If a claim cannot be
+          reproduced after THREE attempts, record the deviation and FAIL —
+          never loop. DB LOCATION: machine-local state at the MAIN checkout.
+          DELIVER: the preregistration with the verified edges, committed with
+          the '[workflow] k0_pin_spec — <goal prefix>' subject.
+          LOG: PASS/FAIL per claim; commit.
+      - name: k1_emit_default_on
+        kind: agent
+        scope: implementation
+        timeout: 7200
+        prompt: |
+          GOAL: {goal}
+          SHAPE: findings are the default. Flip emit_self to DEFAULT ON for
+          spec runs: workflow_runner's rag_params/emit_self gate (currently
+          opt-in at :3421, gated on rag_params.get("emit_self")) becomes
+          default-true for workflow runs — every successful committed phase
+          emits its scoped finding. A phase that must not emit opts out via an
+          explicit phase marker (never silently). Enrich the finding text
+          beyond the one-liner: derive_phase_record carries the phase's status,
+          test_executed_success verdict, tests_passed/total, cost, commit sha,
+          and — when the phase record carries one — the gate verdict or the
+          phase's own conclusion line. Authority stays MEASURED when the test
+          verdict is a real bool, ADVISORY when None (null-not-zero preserved).
+          SCOPE FENCE: the default flip + the finding-text enrichment ONLY —
+          the backfill is k2's, the retrieval order k3's. Commits carry
+          '[workflow] k1_emit_default_on'.
+          VERIFY (both directions): unit tests prove (a) a synthetic workflow
+          run with DEFAULT settings emits a finding per committed phase (the
+          emit path fires without any opt-in flag); (b) the finding text
+          carries status + tests verdict + cost + commit (assert the fields in
+          the derived record); (c) a phase with the explicit no-emit marker
+          does not emit; (d) a phase whose test verdict is None derives
+          ADVISORY authority (never MEASURED); (e) the existing emit_self
+          tests (opt-in path) stay green — the flag still works when set.
+          DELIVER: the default flip + the enriched text + the tests, committed.
+          LOG: PASS/FAIL; commit.
+      - name: k2_backfill
+        kind: agent
+        scope: implementation
+        timeout: 7200
+        prompt: |
+          GOAL: {goal}
+          SHAPE: the past enters deterministically. Add the backfill script
+          (e.g. scripts/kb_backfill_findings.py): it scans the review
+          artifacts on disk — docs/reviews/*adversarial.md (verdict lines,
+          finding tables), docs/reviews/*preregistration.md, and the run
+          ledgers under experiments/results/workflows/*/ — and derives ONE
+          finding record per completed wave: {wave name, spec sha, verdict
+          (merge-ready / not / clean), finding count, the recorded residual
+          list, the conclusions}. No LLM: the extraction is deterministic
+          (verdict line patterns, finding-table rows). The record's
+          knowledge_id is a rerun-safe key (wave name + artifact sha), so a
+          re-run is a no-op. The backfill fills the 64 empty shells' content
+          and adds the missing waves (control_db_publication, followups,
+          evidence, engine_gaps*, fleet_launch*, authoring_product_aio).
+          SCOPE FENCE: the backfill script + its output ONLY — no changes to
+          the producer contracts (they already accept these fields). Commits
+          carry '[workflow] k2_backfill'.
+          VERIFY (both directions): unit tests prove (a) the backfill derives
+          a finding for a synthetic adversarial doc (verdict + findings
+          count extracted); (b) the knowledge_id is rerun-safe (same input →
+          same id, second run is a no-op); (c) running the backfill against
+          the real docs/reviews/ produces N new finding records with
+          non-empty text (assert N >= the number of completed waves); (d) no
+          LLM is invoked (the script is deterministic — no model calls).
+          DELIVER: the backfill script + the emitted records + the tests,
+          committed.
+          LOG: PASS/FAIL with the count of waves backfilled; commit.
+      - name: k3_retrieval_order
+        kind: agent
+        scope: implementation
+        timeout: 7200
+        prompt: |
+          GOAL: {goal}
+          SHAPE: findings outrank code for findings questions. In retrieval's
+          fusion/selection: add a source-type-aware ordering signal — a
+          record whose source_type is finding/review/fact-with-evidence
+          (measured/derived/distilled content) ranks above a bare code
+          signature WHEN the query is a phase-objective/findings shape; a code
+          query (identifiers, signatures, structure words) still ranks code
+          first. The discriminator is a small query-shape heuristic + the
+          record's source_type + evidence_class — never a global
+          code-suppression. Untyped records (empty source_type) rank LAST, not
+          first (they cannot outrank a typed record — hard rule 4).
+          SCOPE FENCE: the fusion ordering + the empty-type ranking ONLY — no
+          changes to the producers, no changes to the store construction.
+          Commits carry '[workflow] k3_retrieval_order'.
+          VERIFY (both directions): unit tests prove (a) a synthetic corpus
+          (a finding record + a code record both matching a findings query)
+          returns the finding first; (b) a code-shaped query (a function name)
+          returns the code record first; (c) an untyped record never outranks
+          a typed one at equal scores; (d) the fusion scores for the
+          pre-existing retrieval tests are unchanged or improve (no
+          regression in the quality gates' fixtures).
+          DELIVER: the ordering fix + the tests, committed.
+          LOG: PASS/FAIL; commit.
+      - name: k4_graph_and_untyped
+        kind: agent
+        scope: implementation
+        timeout: 7200
+        prompt: |
+          GOAL: {goal}
+          SHAPE: no silent empties. (a) The empty-source_type candidates: find
+          what writes them (a leg, a projection, an older schema) and either
+          type them correctly or exclude them with a reason — an untyped
+          record never participates in selection ahead of a typed one. (b) The
+          graph leg: investigate why graph_paths is 0 despite neo4j being up —
+          the consumer group (kb-neo4j-v1) state, whether edges/relationships
+          are ever written, whether the query pattern matches. If the graph is
+          genuinely empty of edges (nothing ever projected relationships),
+          document that down with the reason + the consumer state + what would
+          populate it; if it is a query/leg bug, fix it. The pin's edge (5)
+          evidence is the baseline.
+          SCOPE FENCE: the untyped-record handling + the graph investigation/
+          fix ONLY. Commits carry '[workflow] k4_graph_and_untyped'.
+          VERIFY (both directions): unit tests prove (a) after the fix, a
+          retrieval probe returns NO untyped candidates in the top-K (or the
+          untyped are excluded with a recorded reason); (b) the graph leg
+          either returns a path in a synthetic seeded test (edges exist →
+          paths returned) or the down-state is documented with the consumer
+          evidence; (c) the retrieval quality fixtures stay green.
+          DELIVER: the untyped fix + the graph resolution + the tests,
+          committed.
+          LOG: PASS/FAIL with the graph-leg evidence; commit.
+      - name: k5_narrator
+        kind: agent
+        scope: implementation
+        timeout: 7200
+        prompt: |
+          GOAL: {goal}
+          SHAPE: the regenerator narrates. In spec_status's regeneration:
+          BEFORE the index is written, diff the newly derived statuses against
+          the previous index; when statuses SHIFT, emit ONE finding record
+          narrating the shift — "spec-index regeneration <ts>: N specs changed
+          (11 failed→completed because later full-coverage ok runs exist; 6
+          completed→blocked because no full-coverage ok run certifies the
+          current revision)" — derived from the actual per-spec diffs (never a
+          hand-written summary). The record's knowledge_id is rerun-safe
+          (regeneration timestamp + the shift signature). Emit through the
+          same producer path as phase findings (scoped, durable artifact +
+          pointer event); best-effort (a failed emit is a warning, never a
+          failed regeneration).
+          SCOPE FENCE: the narrator emit in the regenerator ONLY. Commits
+          carry '[workflow] k5_narrator'.
+          VERIFY (both directions): unit tests prove (a) a synthetic
+          regeneration that shifts statuses emits a change record whose text
+          names the shift direction + count (assert the derived text); (b) a
+          regeneration with NO shifts emits nothing; (c) the record is
+          rerun-safe; (d) a producer failure does not fail the regeneration.
+          DELIVER: the narrator + the tests, committed.
+          LOG: PASS/FAIL; commit.
+      - name: k6_witness
+        kind: agent
+        scope: implementation
+        timeout: 7200
+        prompt: |
+          GOAL: {goal}
+          SHAPE: THE WITNESS — the wave's verdict. Run ONE minimal real phase
+          on THIS worktree (a synthetic 1-phase spec — the spec's own
+          definition file as a test-run workflow, or the smallest committed
+          spec — flash model, one agent or test phase, ~$0.05) with DEFAULT
+          settings (no emit_self opt-in — the k1 default must carry it). Then
+          PROVE the emission landed: query the KB with the same query shape
+          the 2026-09-02 probe used (a phase-objective question about this
+          wave's finding) and assert the witness phase's finding record is in
+          the top results. Also re-run the ORIGINAL probe query ("what did the
+          control_db_evidence wave find about per-phase evidence") and assert
+          it NOW returns the k2-backfilled control_db_evidence finding in the
+          top results — the retrieval test's 'flat, not rich' verdict must
+          invert. If the witness exposes a gap (the emit didn't land, the
+          order didn't fix), FIX IT IN THIS PHASE.
+          SCOPE FENCE: the witness run + any gap it exposes ONLY. Commits
+          carry '[workflow] k6_witness'.
+          VERIFY: the witness's evidence IS the verification — the finding
+          landed + the original probe now returns rich results. Record both.
+          DELIVER: the witness evidence + any fixes, committed.
+          LOG: the evidence table (emitted finding id, probe results before/
+          after); PASS/FAIL; commit.
+      - name: k7_adversarial
+        kind: agent
+        scope: adversarial_readonly
+        requires_deliverable: true
+        run_model: deepseek/deepseek-v4-pro
+        timeout: 14400
+        prompt: |
+          GOAL: {goal}
+          ROLE: the INDEPENDENT adversarial reviewer — a DIFFERENT model and
+          session (pro vs the flash author). Falsify the finding-layer wave,
+          not certify it. Attack in order, re-verified against the actual code
+          + the live KB (never asserted): (1) k1 — does a run with DEFAULT
+          settings actually emit (not just the tests claiming it)? (2) k2 —
+          are the backfilled records REAL (query the KB for control_db_evidence
+          / split-run / the 17-spec shift — do they return with content)? (3)
+          k3 — does the original probe query now return findings above code?
+          (run it yourself); (4) k4 — are untyped records really gone from
+          top-K? is the graph leg resolved or honestly documented? (5) k5 —
+          does the narrator fire on a real shift? (6) cross — the quality
+          gates + the parity suite stay green. Every finding: FIX on the
+          branch or RECORD as an accepted limitation with reasoning. At least
+          3 findings or a clean sweep with re-verification evidence — a bare
+          PASS is a failed review.
+          RELEASE VERDICT: merge-ready to main? The finding layer is real —
+          retrieval answers findings questions with findings?
+          DELIVER: docs/reviews/kb_finding_layer_adversarial.md (finding
+          table), committed.
+          LOG: finding table; PASS/FAIL; commit.
+      - name: k8_test_gate
+        kind: test
+        scope: implementation
+        timeout: 900
+        tests:
+          - tests/test_kb_emit_default.py
+          - tests/test_kb_backfill.py
+          - tests/test_retrieval.py
+          - tests/test_spec_status.py
+          - tests/test_workflow_runner.py
+          - tests/test_knowledge_ingestion.py
+          - tests/test_script_classification.py
+          - tests/test_doc_lifecycle.py
+          - tests/test_agent_config_render.py
+          - tests/test_cli_resolution.py
+factors:
+  - {name: model, levels: [deepseek/deepseek-v4-flash]}
+design: factorial
+rules:
+  - name: kb_edges_verified
+    plane: measurement
+    evidence_class: "[M]"
+    requires: []
+    produces: [five_kb_edges_confirmed]
+  - name: emission_default_on
+    plane: measurement
+    evidence_class: "[C]"
+    requires: [five_kb_edges_confirmed]
+    produces: [phases_emit_by_default, findings_carry_measurements]
+  - name: past_backfilled
+    plane: measurement
+    evidence_class: "[C]"
+    requires: [five_kb_edges_confirmed]
+    produces: [wave_conclusions_in_kb, backfill_rerun_safe]
+  - name: retrieval_order_fixed
+    plane: measurement
+    evidence_class: "[C]"
+    requires: [wave_conclusions_in_kb]
+    produces: [findings_rank_above_code, untyped_never_rank_first]
+  - name: no_silent_empties
+    plane: measurement
+    evidence_class: "[C]"
+    requires: [five_kb_edges_confirmed]
+    produces: [untyped_resolved, graph_leg_resolved_or_documented]
+  - name: regenerator_narrates
+    plane: measurement
+    evidence_class: "[C]"
+    requires: [five_kb_edges_confirmed]
+    produces: [shifts_narrated]
+  - name: witness_passed
+    plane: measurement
+    evidence_class: "[M]"
+    requires: [phases_emit_by_default, findings_carry_measurements,
+               wave_conclusions_in_kb, findings_rank_above_code]
+    produces: [finding_layer_proven]
+  - name: kb_wave_adversarial_clean
+    plane: measurement
+    evidence_class: "[M]"
+    requires: [finding_layer_proven, untyped_resolved,
+               graph_leg_resolved_or_documented, shifts_narrated]
+    produces: [finding_layer_wave_clean]
+  - name: test_gate_measured
+    plane: measurement
+    evidence_class: "[M]"
+    requires: [test_executed_success]
+    produces: [independent_gate_recorded]
+metrics:
+  - {name: five_kb_edges_confirmed, agg: mean, over: cell}
+  - {name: phases_emit_by_default, agg: mean, over: cell}
+  - {name: findings_carry_measurements, agg: mean, over: cell}
+  - {name: wave_conclusions_in_kb, agg: mean, over: cell}
+  - {name: backfill_rerun_safe, agg: mean, over: cell}
+  - {name: findings_rank_above_code, agg: mean, over: cell}
+  - {name: untyped_never_rank_first, agg: mean, over: cell}
+  - {name: untyped_resolved, agg: mean, over: cell}
+  - {name: graph_leg_resolved_or_documented, agg: mean, over: cell}
+  - {name: shifts_narrated, agg: mean, over: cell}
+  - {name: finding_layer_proven, agg: mean, over: cell}
+  - {name: finding_layer_wave_clean, agg: mean, over: cell}
+  - {name: independent_gate_recorded, agg: mean, over: cell}
+writeup:
+  format: lab_book
+  sections: [question, k0_pin_spec, k1_emit_default_on, k2_backfill, k3_retrieval_order, k4_graph_and_untyped, k5_narrator, k6_witness, k7_adversarial, k8_test_gate]
+stop: {budget_usd: 12.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}

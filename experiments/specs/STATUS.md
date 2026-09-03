@@ -3,8 +3,8 @@
 **Generated — do not edit by hand.** Regenerate with `python scripts/spec_status.py`;
 `scripts/run_workflow.py` also refreshes it at the end of every run.
 
-Generated at: `2026-09-03T12:27:58.970173+00:00`  ·  187 spec(s)
-**Work remaining:** 76 open · 111 completed/retired
+Generated at: `2026-09-03T13:07:15.179133+00:00`  ·  188 spec(s)
+**Work remaining:** 77 open · 111 completed/retired
 
 | name | kind | repeatable | status | version | supersedes | last_run | ok | model | cost | n_runs |
 |---|---|---|---|---|---|---|---|---|---|---|
@@ -39,6 +39,7 @@ Generated at: `2026-09-03T12:27:58.970173+00:00`  ·  187 spec(s)
 | `fleet_job_submission` | workflow | no | runnable | 0.1 | — | — | — | — | — | 3 |
 | `fleet_launch_container_smoke` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `green_main_closure` | workflow | no | runnable | 0.1 | — | — | — | — | — | 4 |
+| `kb_finding_layer` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `labbook_refresh` | workflow | yes | runnable | 0.1 | — | 2026-08-17 18:14 | ok | deepseek/deepseek-v4-flash | $0.0275 | 1 |
 | `launch_handler_dry_run` | workflow | yes | runnable | 0.1 | — | — | — | — | — | 0 |
 | `ledger_instrumentation_probe` | workflow | yes | runnable | 0.1 | — | 2026-08-30 19:05 | fail | openai/gpt-5.6-sol | $0.0020 | 1 |
