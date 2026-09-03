@@ -1406,9 +1406,23 @@ DEPLOY_PATTERNS: list[tuple[re.Pattern[str], str]] = [
 #: The OUTPUT tier's signatures — firebase's production-deploy banner, printed regardless of how
 #: the deploy was invoked (direct, script file, alias, variable). Catches command indirection.
 DEPLOY_OUTPUT_PATTERNS: list[tuple[re.Pattern[str], str]] = [
-    (re.compile(r"Deploy\s+complete!"), "firebase deploy output (Deploy complete!)"),
+    # Banner-shaped only (the a6 false-positive fix, 2026-09-03): real firebase output
+    # prints "Deploy complete!" as a STANDALONE line. A grep of the gate's own source
+    # prints `re.compile(r"Deploy\s+complete!")` — an embedded source echo, not a
+    # banner — so the pattern excludes lines that carry source-code markers
+    # (compile(, r", print(, quote) before the banner text. MULTILINE so the banner
+    # matches as a standalone line anywhere in the output, not only at string end.
     (
-        re.compile(r"hosting\[(?:ai-finops-rulebook|agentic-dynamics)\]"),
+        re.compile(
+            r"(?m)^(?![^\"'\n]*(?:compile\(|r\"|print\())[^\"'\n]*Deploy\s+complete!$"
+        ),
+        "firebase deploy output (Deploy complete!)",
+    ),
+    # hosting[<host>] progress lines are real firebase output when they carry the
+    # deploy verb context ("beginning deploy" / "deploying") — a bare hosting[<host>]
+    # substring appears in source files (compose yml, docs) and is NOT a banner.
+    (
+        re.compile(r"hosting\[(?:ai-finops-rulebook|agentic-dynamics)\][^\n]*(?:beginning|deploying|Deploying|complete|Complete)"),
         "firebase hosting[<production-host>] output",
     ),
     (
@@ -1452,9 +1466,58 @@ def _output_from_event(event: dict[str, Any]) -> str:
 
 
 def _deploy_pattern_match(command: str) -> str | None:
-    """Return the label of the first deploy pattern ``command`` matches, or ``None``."""
+    """Return the label of the first deploy pattern ``command`` matches, or ``None``.
+
+    COMMAND-tier strictness (the a4/a2 false-positive fix, 2026-09-03): the tier fires
+    only when ``firebase`` is the command being EXECUTED, never when the string appears
+    inside an argument. A phase that legitimately QUOTES "firebase deploy" — a commit
+    message, a grep pattern, a doc write, an agent definition's permission model — must
+    not trip the gate; only an actual ``firebase deploy`` invocation is a deploy. The
+    match anchors on the command POSITION: firebase at the start, or after a shell
+    prefix (``npx``/``yarn``/``sudo``/env-assignment/``&&``/``;``/``|``), and the
+    deploy keyword within the same command. The OUTPUT tier (unchanged) catches real
+    indirection — a script that reaches firebase prints "Deploy complete!" / the
+    hosting banner regardless of how it was invoked.
+    """
+    # Strip a leading shell prefix so `npx firebase deploy`, `sudo firebase deploy`,
+    # `VAR=x firebase deploy`, `cmd && firebase deploy`, `cmd; firebase deploy`,
+    # `cmd | firebase deploy`, and the shell-wrap forms `sh -c "firebase deploy"` /
+    # `bash -c "firebase deploy"` / `eval "firebase deploy"` all match at the command
+    # position — but `git commit -m "…firebase deploy…"` (firebase buried in an
+    # argument) never does. The wrap forms carry firebase in the WRAPPED command
+    # string, which is still a deploy act (A3, the a4-fix regression the adversary
+    # caught — a wrapped deploy must not slip the command tier).
+    head = command.lstrip()
+    # An argument-position mention: firebase preceded by a command word that is NOT a
+    # known launcher (the launchers below are the only legitimate command-position
+    # prefixes). Anything else — git, echo, grep, cat, python, cp, rg — means firebase
+    # is an argument, not the executed command.
+    known_launchers = ("npx ", "yarn ", "sudo ", "firebase ", "./firebase", "env ")
+    starts_at_command = head.startswith("firebase") or any(
+        head.startswith(l) for l in known_launchers
+    ) or bool(re.match(r"^[A-Za-z_][A-Za-z0-9_]*=[^\s]*\s+(?:npx\s+|sudo\s+)?firebase\b", head))
+    if not starts_at_command:
+        # Also allow a compound whose LAST command is firebase (a &&/;/| chain ending in
+        # the deploy): `build && firebase deploy` IS a deploy act.
+        chain_ok = bool(re.search(r"(?:&&|\|\||;)\s*(?:npx\s+|sudo\s+)?firebase\b", head))
+        # And a shell WRAP whose wrapped command is the deploy (A3): `sh -c "firebase
+        # deploy"`, `bash -c …`, `eval "firebase deploy"` — the wrapped string is the
+        # executed command, so firebase IS at command position inside the quotes. The
+        # wrap must itself be at COMMAND position (start, or after a &&/;/| chain) —
+        # `echo bash -c "firebase deploy" >> doc.md` mentions a wrap in an argument and
+        # is NOT a deploy.
+        wrap_at_command = re.match(
+            r"^(?:(?:[A-Za-z_][A-Za-z0-9_]*=[^\s]*\s+)?(?:&&|\|\||;)\s+)*"
+            r"(?:sh|bash)\s+-c\s+[\"']",
+            head,
+        ) or re.match(r"^(?:(?:[A-Za-z_][A-Za-z0-9_]*=[^\s]*\s+)?(?:&&|\|\||;)\s+)*eval\s+[\"']", head)
+        wrap_ok = bool(wrap_at_command) and bool(
+            re.search(r"firebase\b", head.split("&&")[-1].split("||")[-1].split(";")[-1])
+        )
+        if not (chain_ok or wrap_ok):
+            return None
     for pattern, label in DEPLOY_PATTERNS:
-        if pattern.search(command):
+        if pattern.search(head):
             return label
     return None
 
@@ -3129,9 +3192,23 @@ def run_workflow(
                     pr.tests_passed = suite["passed"]
                     pr.tests_total = suite["total"]
                     pr.test_executed_success = suite_succeeded(suite)
-                    if suite.get("failed", 0) > 0 or suite.get("errors", 0) > 0:
+                    # A zero-test run is a FALSE GREEN only when a target was DECLARED but
+                    # resolved to nothing (the b5 phantom-target lesson, fleet_launch_boundary
+                    # F5): a ``tests:`` file/node-id that collects no tests means the declared
+                    # verification never ran — total 0 / failed 0 / errors 0 read ok under the
+                    # old failed/errors-only check while test_executed_success was False.
+                    # A phase with NO declared target runs the whole tree; an empty tree
+                    # (a fresh worktree with no test files) collecting 0 is honest, not a
+                    # false green — suite_succeeded(total>0) still records False, and the
+                    # phase status honors it only when a target was declared.
+                    declared_target = phase_def.get("tests")
+                    if declared_target and not suite_succeeded(suite):
                         pr.status = "failed"
-                        pr.error = suite.get("tail", "")[-400:]
+                        pr.error = suite.get("tail", "")[-400:] or (
+                            "TEST_GATE: declared verification ran no tests "
+                            f"(total 0 — target {declared_target!r} resolved to "
+                            "nothing; a missing file or an empty collection)"
+                        )
             else:
                 prompt = _build_phase_prompt(phase_def, goal, prior)
                 # Point the agent's built-in publisher at this workflow's cell so the
