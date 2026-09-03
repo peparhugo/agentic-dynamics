@@ -55,6 +55,7 @@ from agentic_dynamics.control.signal_store import build_signal_store, load_resul
 from agentic_dynamics.control.step_routing import ModelSignals, route_step  # noqa: E402
 from agentic_dynamics.experiment.experiment_spec import ExperimentSpec, load_spec  # noqa: E402
 from agentic_dynamics.experiment.spec_status import refresh_spec_status  # noqa: E402
+from agentic_dynamics.knowledge import belief_update as bu  # noqa: E402
 from agentic_dynamics.knowledge import spec_ingestion as si  # noqa: E402
 from agentic_dynamics.knowledge import wave_verdict_ingestion as wv  # noqa: E402
 from agentic_dynamics.knowledge.knowledge_ingestion import (  # noqa: E402
@@ -958,7 +959,7 @@ def _wave_verdict_review_text(spec_name: str, *, root: Path | None = None) -> st
     return doc.read_text(encoding="utf-8")
 
 
-def _wave_verdict_payload(
+def _wave_verdict_record(
     spec: ExperimentSpec,
     result,
     *,
@@ -966,27 +967,21 @@ def _wave_verdict_payload(
     control_state: str,
     ledger_path: Path,
     review_root: Path | None = None,
-) -> dict | None:
-    """Derive this run's wave-verdict record as an OUTBOX payload (or ``None`` when not a completion).
+):
+    """Derive this run's s3a wave-verdict RECORD (or ``None`` when the run is not a completion).
 
-    The derivation half of the s3b emission: the s3a record type consumes the three artifacts
-    that already exist at the terminal write — ``result`` IS the run ledger (the same
-    ``to_dict()`` the composition root just wrote to ``ledger_path``), the control-db row is
-    this run's terminal row (the state this write is about to record, plus the result envelope
-    fields passed to :func:`ob.record_terminal_run` below), and the adversarial review doc when
-    one exists (see :func:`_wave_verdict_review_text`). ``control_state`` is the control-vocabulary
-    terminal state (``promotable`` for a succeeded run — phases passing authorise a promotion,
-    they do not are one). The payload is enqueued unchanged; the publisher delivers artifact
-    first, then the pointer event, exactly as the spec/fact producers' payloads are.
-
-    ``checkpoint=False`` mirrors the spec-lifecycle emission at this same call site: a wave
-    verdict is derived exactly once, enqueued in the run's only terminal transaction (a terminal
-    state is immutable, so no re-run can double-enqueue it), and its registry row is the
-    consumer's job — the weaker dedup claim (consumers key on ``knowledge_id``) is the honest
-    one for a once-only emission.
+    The shared derivation half of the s3b emission AND the s4b belief-update trigger: the s3a
+    record type consumes the three artifacts that already exist at the terminal write —
+    ``result`` IS the run ledger (the same ``to_dict()`` the composition root just wrote to
+    ``ledger_path``), the control-db row is this run's terminal row (the state this write is
+    about to record), and the adversarial review doc when one exists. ``control_state`` is the
+    control-vocabulary terminal state (``promotable`` for a succeeded run — phases passing
+    authorise a promotion, they do not are one). ``None`` is the honest answer for a run that did
+    not COMPLETE (a designed awaiting_approval pause whose family continues, or a cancelled run
+    that ran no phases — neither is verdict-bearing).
     """
     if result.state not in _WAVE_VERDICT_LEDGER_STATES:
-        # Defense in depth — the call site gates on the same set; a direct caller that hands an
+        # Defense in depth — the call sites gate on the same set; a direct caller that hands an
         # awaiting/cancelled run here gets the honest None rather than a premature verdict.
         return None
     ledger = result.to_dict()
@@ -1001,8 +996,93 @@ def _wave_verdict_payload(
         "ended_at": result.ended_at or "",
     }
     review_text = _wave_verdict_review_text(spec.name, root=review_root)
-    record = wv.build_wave_verdict_record(ledger, control_row, review_text=review_text)
+    return wv.build_wave_verdict_record(ledger, control_row, review_text=review_text)
+
+
+def _wave_verdict_payload(
+    spec: ExperimentSpec,
+    result,
+    *,
+    run_id: str,
+    control_state: str,
+    ledger_path: Path,
+    review_root: Path | None = None,
+) -> dict | None:
+    """Derive this run's wave-verdict record as an OUTBOX payload (or ``None`` when not a completion).
+
+    The derivation half of the s3b emission: the s3a record is derived from the SAME artifacts
+    the s3b comment above describes (see :func:`_wave_verdict_record`) and wrapped as an outbox
+    knowledge payload. The payload is enqueued unchanged; the publisher delivers artifact
+    first, then the pointer event, exactly as the spec/fact producers' payloads are.
+
+    ``checkpoint=False`` mirrors the spec-lifecycle emission at this same call site: a wave
+    verdict is derived exactly once, enqueued in the run's only terminal transaction (a terminal
+    state is immutable, so no re-run can double-enqueue it), and its registry row is the
+    consumer's job — the weaker dedup claim (consumers key on ``knowledge_id``) is the honest
+    one for a once-only emission.
+    """
+    record = _wave_verdict_record(
+        spec,
+        result,
+        run_id=run_id,
+        control_state=control_state,
+        ledger_path=ledger_path,
+        review_root=review_root,
+    )
+    if record is None:
+        return None
     return ob.knowledge_payload(record, record_to_event(record))
+
+
+def _belief_update_payloads(
+    spec: ExperimentSpec,
+    result,
+    *,
+    run_id: str,
+    control_state: str,
+    ledger_path: Path,
+) -> list[dict]:
+    """s4b (self-knowledge layer, loop 2): this run's verdict vs the belief index — as outbox payloads.
+
+    The belief-update TRIGGER of the belief protocol: at the run-completion terminal write,
+    the wave verdict the run just emitted is consulted against the belief index — the AIO's
+    durable org-root beliefs (latest version per hypothesis, ``belief/v1``) — and every
+    hypothesis the verdict BEARS ON (the belief's own ``evidence_citations`` name this wave)
+    is UPDATED IN PLACE: one count +1, posterior recomputed, NEVER a duplicate — the new
+    version supersedes the current one (``operation=supersede``, the predecessor closed by the
+    registry lines). Default-ON, like the s3b verdict it rides on; a FAILED run still updates
+    (a disconfirming verdict is still evidence). An outcome no belief cites updates nothing —
+    the index is consulted, the hypotheses are updated, the rest is untouched.
+
+    The verdict record is derived ONCE per terminal write and shared by the two producers
+    (``_wave_verdict_record``); the belief trigger derives it a second time here — a
+    deterministic re-derivation of the same three immutable artifacts, so both producers stay
+    behind their own ``_derived`` fence (one producer's failure never costs the other's events).
+    """
+    record = _wave_verdict_record(
+        spec,
+        result,
+        run_id=run_id,
+        control_state=control_state,
+        ledger_path=ledger_path,
+    )
+    if record is None:
+        return []
+    verdict_payload = json.loads(record.text)
+    outcome = bu.apply_wave_verdict(verdict_payload, observed_at=record.observed_at)
+    payloads = []
+    for updated, signal in zip(outcome.updated, outcome.signals, strict=True):
+        reason = bu.supersede_reason(verdict_payload, signal)
+        payloads.append(
+            ob.knowledge_payload(
+                updated,
+                bu.update_event(updated, reason=reason),
+                registry_lines=ob.registry_lines_for(
+                    updated, operation="supersede", reason=reason
+                ),
+            )
+        )
+    return payloads
 
 
 def _control_db() -> ControlDB | None:
@@ -1180,6 +1260,22 @@ def _control_terminal_write(
                 _derived(
                     "wave verdict",
                     lambda: _wave_verdict_payload(
+                        spec,
+                        result,
+                        run_id=run_id,
+                        control_state=terminal_state.value,
+                        ledger_path=ledger_path,
+                    ),
+                )
+            )
+            # s4b (self-knowledge layer, loop 2): the belief protocol's TRIGGER — the emitted
+            # verdict consults the belief index and updates the hypotheses it bears on (each in
+            # place, one count +1, posterior recomputed; an unrelated outcome updates nothing).
+            # Same default-on, same atomic transaction, same _derived fence as the s3b verdict.
+            payloads.extend(
+                _derived(
+                    "belief updates",
+                    lambda: _belief_update_payloads(
                         spec,
                         result,
                         run_id=run_id,

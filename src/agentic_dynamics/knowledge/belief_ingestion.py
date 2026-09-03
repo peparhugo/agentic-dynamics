@@ -61,8 +61,11 @@ collide. ``revision`` is :data:`REVISION_FALLBACK` (the record is the AIO's org-
 posterior, not bound to one commit — folding HEAD in would re-key every belief as HEAD moves).
 
 Scope fence: the TYPE ONLY — derivation + record construction + the deterministic posterior
-rule. The UPDATE operation (mutating an existing belief when a wave outcome bears on it) is
-s4b; the seeded corpus is s4c; nothing here writes to the KB or registers a command.
+rule. The UPDATE operation (mutating an existing belief when a wave outcome bears on it) is s4b
+(``knowledge/belief_update.py`` — the in-place update + its wave-verdict trigger); the seeded
+corpus is s4c; nothing here writes to the KB or registers a command. ``build_belief_record``
+carries the one s4b affordance this type must own — the ``supersedes`` version link, folded
+into ``extra_fields`` before the content hash is computed (see its docstring).
 """
 
 from __future__ import annotations
@@ -225,14 +228,17 @@ def _evidence_class_value(belief: dict[str, Any]) -> str:
     return value
 
 
-def _belief_id(domain: str, hypothesis: str) -> str:
+def belief_id(domain: str, hypothesis: str) -> str:
     """Return a stable identity for ONE hypothesis (one belief entity).
 
     Folds ``domain`` deliberately — the same words under two domains are two different
     beliefs, and the domain is the s4c retrieval axis. Deliberately does NOT fold the counts
     or ``last_updated``: the identity names the hypothesis SLOT, so s4b's in-place update
     (counts change, ``last_updated`` advances) re-keys ``knowledge_id`` while ``entity_id``
-    holds — the "updated in place, never duplicated" version chain.
+    holds — the "updated in place, never duplicated" version chain. This is the ``belief_id``
+    the durable records' ``logical_locator`` carries; the s4b belief index re-derives it from
+    the payload's ``domain``/``hypothesis`` (the payload body has no ``logical_locator`` field),
+    so the update trigger groups versions by the SAME identity the type names.
     """
     return hashlib.sha256(f"{domain}|{hypothesis}".encode()).hexdigest()[:16]
 
@@ -345,6 +351,7 @@ def build_belief_record(
     *,
     repository_id: str = REPOSITORY_ID,
     now: datetime | None = None,
+    supersedes: str | None = None,
 ) -> KnowledgeRecord:
     """Derive ONE ``source_type=belief`` record from a belief dict.
 
@@ -383,13 +390,37 @@ def build_belief_record(
     belief's own ``last_updated`` — the real "when this belief was last revised" — while
     ``valid_from``/``indexed_at`` stay the derivation/consumer clocks.
 
+    ``supersedes`` (optional) names the predecessor ``knowledge_id`` this record is the new
+    VERSION of — the s4b in-place update link. It is folded into ``extra_fields`` BEFORE the
+    factory computes ``content_hash``, so the durable artifact (which serializes ``supersedes``
+    verbatim) is exactly the bytes the hash covers; a caller that appends the link after
+    construction would desynchronize the two. ``None`` (the default) omits the key, so a plain
+    derivation keeps byte-identical ids to the pre-s4b records.
+
     Raises ``ValueError`` when the belief carries no ``hypothesis``/``domain``/``last_updated``,
     an out-of-range or non-numeric confidence, a fractional/negative count, or an
     ``evidence_class`` outside the ladder.
     """
     payload = belief_payload(belief, repository_id=repository_id)
-    belief_key = _belief_id(payload["domain"], payload["hypothesis"])
+    belief_key = belief_id(payload["domain"], payload["hypothesis"])
     scope = aio_acl_scope(repository_id)
+
+    extra: dict[str, Any] = {
+        # The belief record is not tied to a commit of its own — mirror the session/decision
+        # producers, which pass commit_sha="" while folding their revision marker through the
+        # `revision` input (record_factory's contract).
+        "commit_sha": "",
+        "extractor_version": EXTRACTOR_VERSION,
+        "acl_scope": scope,
+        # observed_at is the belief's own last_updated (when the belief was last revised),
+        # not the derivation wall-clock; the artifact blanks it, so it never perturbs the
+        # rerun-safe content hash.
+        "observed_at": payload["last_updated"],
+    }
+    if supersedes is not None:
+        # The s4b version link: the artifact carries it, the hash covers it, and the registry
+        # closes the predecessor out at this record's valid_from (see outbox.registry_lines_for).
+        extra["supersedes"] = supersedes
 
     return build_record_from_parts(
         source_type=SOURCE_TYPE,
@@ -400,18 +431,7 @@ def build_belief_record(
         authority=Authority.ADVISORY,
         evidence_class="[H]",
         text=json.dumps(payload, sort_keys=True),
-        extra_fields={
-            # The belief record is not tied to a commit of its own — mirror the session/decision
-            # producers, which pass commit_sha="" while folding their revision marker through the
-            # `revision` input (record_factory's contract).
-            "commit_sha": "",
-            "extractor_version": EXTRACTOR_VERSION,
-            "acl_scope": scope,
-            # observed_at is the belief's own last_updated (when the belief was last revised),
-            # not the derivation wall-clock; the artifact blanks it, so it never perturbs the
-            # rerun-safe content hash.
-            "observed_at": payload["last_updated"],
-        },
+        extra_fields=extra,
         now=now,
     )
 
