@@ -146,6 +146,15 @@ SOURCE_TYPES: dict[str, SourceTypeSpec] = {
     # retrievable by category; observation-family so a permanence actuation may cite a decision
     # as its justifying `causes` (the s2b line).
     "decision": SourceTypeSpec("observation", Authority.ADVISORY, "[H]"),
+    # Self-knowledge layer (loop 2, s3a): the wave-verdict record family. A wave verdict is the
+    # run's own run-completion narrative — "what happened and why" — derived deterministically
+    # from its ledger + control-db row + (when present) the adversarial review doc. It is an
+    # OBSERVATION (it states what a run's completion was, never an instruction to act) with
+    # nominal DERIVED/[C] provenance: the record is a deterministic synthesis over measured
+    # ledger/control state + the advisory review, so it can feed the scoreboard (s5) and the
+    # belief layer (s4) but never masquerade as an independent measurement. Producer: the run,
+    # scoped to workload:<spec>/job:<cell> (its own) — NOT the AIO's org root.
+    "wave_verdict": SourceTypeSpec("observation", Authority.DERIVED, "[C]"),
     # Spec-lifecycle addition: the experiment spec *document* and its derived lifecycle
     # (status / supersedes chain / last run). POLICY authority + "[P]" for the same reason
     # `policy` carries them — a spec is authored, pinned repository policy, read from the

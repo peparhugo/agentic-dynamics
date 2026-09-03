@@ -381,6 +381,7 @@ def test_source_types_is_the_single_vocabulary_owner():
         "context_snapshot",
         "orphan",
         "pattern",
+        "wave_verdict",
     }
 
 
