@@ -1,0 +1,206 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agentic-dynamics.dev/schemas/workflow-v1.schema.json",
+  "$comment": "Operational workflow authoring contract (Wave 3, a1). A workflow definition DECLARES the shape a run takes: the base ref it targets, the concurrency it obeys, the workspace it runs in, the steps that produce + verify candidates, and the promotion contract that advances a candidate once its required gates pass. Operational STATUS is never authored here — a run's status (running/succeeded/awaiting approval/…) is derived from run evidence, never declared (completion follows the revision). The JSON Schema below expresses the structural contract; the semantic rules a schema alone cannot express (a mutating step needs downstream verification, a gate must be bound to a candidate, a required gate's evidence must be machine-executed, promotion needs required gates, prompt text is not evidence) are enforced by workflows/lint_workflow.py.",
+  "title": "Operational Workflow (workflow-v1)",
+  "description": "The authoring contract for a new operational workflow. Validate with JSON Schema draft 2020-12 and run workflows/lint_workflow.py for the semantic rules.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["apiVersion", "kind", "metadata", "spec"],
+  "properties": {
+    "apiVersion": {
+      "const": "agentic-dynamics.io/v1",
+      "description": "The versioned schema family this definition validates against."
+    },
+    "kind": {
+      "const": "Workflow",
+      "description": "The document kind. Only 'Workflow' is valid for this schema."
+    },
+    "metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "revision"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_-]*$",
+          "description": "The workflow's slug name (e.g. 'minimal-agent-workflow')."
+        },
+        "revision": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The definition's version identifier. A run certifies only its exact revision — an edited definition is a new revision, not a re-run of the old one."
+        },
+        "lifecycle": {
+          "enum": ["development", "stable", "deprecated"],
+          "description": "The authored lifecycle claim of the DEFINITION. This is not an operational run status — how far a run has progressed is derived from run evidence, never written here."
+        },
+        "title": {
+          "type": "string",
+          "description": "Optional human title."
+        },
+        "description": {
+          "type": "string",
+          "description": "Optional human description of what the workflow does."
+        }
+      },
+      "description": "Identity + lifecycle of the workflow definition. There is deliberately NO operational status field (status: running/completed/… is derived from run evidence, never authored)."
+    },
+    "spec": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["baseRef", "workspace", "concurrency", "steps"],
+      "properties": {
+        "baseRef": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The git ref (branch or sha) the workflow is rooted from and that a promotion advances candidates toward (promote.py's --base, conventionally 'main')."
+        },
+        "workspace": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["mode"],
+          "properties": {
+            "mode": {
+              "enum": ["isolated", "shared", "readonly"],
+              "description": "isolated: each run executes in its own throwaway worktree/clone off baseRef. shared: steps execute against a shared checkout. readonly: the run may only read (a measurement/research shape that produces no candidate to promote)."
+            },
+            "image": {
+              "type": "string",
+              "description": "Default container image for the workflow's steps when a step does not name its own."
+            }
+          }
+        },
+        "concurrency": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["group", "policy"],
+          "properties": {
+            "group": {
+              "type": "string",
+              "minLength": 1,
+              "description": "The concurrency group this workflow belongs to. Runs of workflows sharing a group are governed by the same policy."
+            },
+            "policy": {
+              "enum": ["serial", "bounded", "parallel"],
+              "description": "serial: at most one run of the group executes at a time. bounded: at most maxRuns concurrent runs (maxRuns required). parallel: no workflow-level cap (fleet-level leases still apply)."
+            },
+            "maxRuns": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Concurrency ceiling; REQUIRED when policy is 'bounded'."
+            }
+          },
+          "allOf": [
+            {
+              "if": {
+                "properties": { "policy": { "const": "bounded" } },
+                "required": ["policy"]
+              },
+              "then": { "required": ["maxRuns"] }
+            }
+          ]
+        },
+        "steps": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/step" },
+          "description": "The ordered plan of steps. Edges: 'needs' names the steps this step depends on; 'candidateFrom' names the step whose produced candidate this step consumes."
+        },
+        "promotion": { "$ref": "#/$defs/promotion" }
+      }
+    }
+  },
+  "$defs": {
+    "step": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "kind"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_-]*$",
+          "description": "Unique step id within the workflow (referenced by needs/candidateFrom/requiredGates)."
+        },
+        "kind": {
+          "enum": ["agent", "task", "gate", "approval"],
+          "description": "agent: an LLM-authored work step (produces a candidate). task: a deterministic command/image step (build, sync, measure — produces a candidate when it writes). gate: a verification checkpoint bound to a candidate, run by a machine executor. approval: a controller/human checkpoint bound to a candidate."
+        },
+        "executor": {
+          "enum": ["agent", "test", "command", "human"],
+          "description": "The mechanism that runs the step. agent: an LLM agent phase. test: the independent test-suite verifier (the sole source of truth for test_executed_success). command: a deterministic command/image execution. human: a controller/operator decision. Defaults per kind: agent->agent, task->command, approval->human; a gate must name a machine executor (test|command) when it is required."
+        },
+        "image": {
+          "type": "string",
+          "description": "Container image for the step (overrides the workspace default)."
+        },
+        "scope": {
+          "enum": ["research_readonly", "implementation", "review_readonly", "proposal_write", "adversarial_readonly"],
+          "description": "The step's capability scope (the machine's five-scope vocabulary). Default: implementation in a write workspace, research_readonly in a readonly workspace. Write-capable scopes (implementation/review_readonly/proposal_write) mark agent/task steps as MUTATING."
+        },
+        "needs": {
+          "type": "array",
+          "items": { "type": "string", "pattern": "^[a-z][a-z0-9_-]*$" },
+          "uniqueItems": true,
+          "description": "Step ids this step depends on (the workflow DAG edges)."
+        },
+        "candidateFrom": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_-]*$",
+          "description": "The id of the mutating step whose candidate sha this step consumes/gates. A gate or approval step resolves its candidate here, or from its single mutating upstream."
+        },
+        "gate": {
+          "$ref": "#/$defs/inline_gate",
+          "description": "An inline self-gate on a mutating step, bound to that step's OWN produced candidate. The executor is a machine check (test|command), so an inline gate can never be prose-only."
+        },
+        "prompt": {
+          "type": "string",
+          "description": "Instruction text for an agent/task step. Prompt text is scaffolded instructions — it is NEVER evidence for a required gate (a required gate's evidence comes from its executor)."
+        },
+        "description": {
+          "type": "string",
+          "description": "Optional human description of the step."
+        }
+      }
+    },
+    "inline_gate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["executor"],
+      "properties": {
+        "blocking": {
+          "type": "boolean",
+          "default": true,
+          "description": "Whether a failed gate blocks the step from completing (and its candidate from advancing). Default true."
+        },
+        "executor": {
+          "enum": ["test", "command"],
+          "description": "The machine check that produces the gate evidence. test: the test-suite verifier. command: a deterministic command."
+        }
+      }
+    },
+    "promotion": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["candidateFrom", "strategy", "requiredGates"],
+      "properties": {
+        "candidateFrom": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_-]*$",
+          "description": "The id of the mutating step whose final candidate this workflow promotes."
+        },
+        "strategy": {
+          "enum": ["squash-merge", "merge-commit", "fast-forward"],
+          "description": "How the candidate integrates into baseRef once its required gates pass. squash-merge is promote.py's implemented strategy; merge-commit/fast-forward declare intent for future executors."
+        },
+        "requiredGates": {
+          "type": "array",
+          "items": { "type": "string", "pattern": "^[a-z][a-z0-9_-]*$" },
+          "uniqueItems": true,
+          "minItems": 1,
+          "description": "The gate/approval step ids that must pass before promotion. Each entry must reference a real gate or approval step (never a mutating step, never prompt text)."
+        }
+      }
+    }
+  }
+}
