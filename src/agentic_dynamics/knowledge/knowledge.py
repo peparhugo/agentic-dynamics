@@ -155,6 +155,19 @@ SOURCE_TYPES: dict[str, SourceTypeSpec] = {
     # belief layer (s4) but never masquerade as an independent measurement. Producer: the run,
     # scoped to workload:<spec>/job:<cell> (its own) — NOT the AIO's org root.
     "wave_verdict": SourceTypeSpec("observation", Authority.DERIVED, "[C]"),
+    # Self-knowledge layer (loop 2, s4a): the belief-record family. A belief is a hypothesis
+    # the machine holds about itself operating — the Bayesian engine of loop 2, tracked with
+    # n_confirmations/n_disconfirmations and a posterior confidence (the s4b update protocol
+    # revises these in place; s4c seeds the corpus from the measured history). It is an
+    # OBSERVATION (a belief states what the machine holds, never an instruction to act) with
+    # nominal ADVISORY/[H] provenance — self-reported like a session close or a decision, so a
+    # belief can inform the AIO's next operating choice but never override a MEASURED ledger
+    # row or pinned policy. Each record's BODY carries the belief's own declared
+    # evidence_class from the [P]/[M]/[C]/[H] ladder as a REPORTED description of its backing
+    # evidence (the record's KB trust tier stays uniformly ADVISORY — a declared class never
+    # self-elevates the writer). Producer: the AIO, scoped to its org root (org:agentic-dynamics)
+    # — the controller + AIO see these records; cell agents never resolve them.
+    "belief": SourceTypeSpec("observation", Authority.ADVISORY, "[H]"),
     # Spec-lifecycle addition: the experiment spec *document* and its derived lifecycle
     # (status / supersedes chain / last run). POLICY authority + "[P]" for the same reason
     # `policy` carries them — a spec is authored, pinned repository policy, read from the
