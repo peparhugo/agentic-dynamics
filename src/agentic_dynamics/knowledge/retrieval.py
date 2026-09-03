@@ -43,7 +43,7 @@ from agentic_dynamics.knowledge.knowledge import Authority, compute_content_hash
 
 # ── Versioned weights (policy constants, [H]) ───────────────────
 
-WEIGHTS_VERSION = "retrieval-weights/v1"  # [H]
+WEIGHTS_VERSION = "retrieval-weights/v2"  # [H] v2 = k3 adds the intent-conditional source-type priors.
 
 RRF_K = 60.0  # [H] rank-smoothing constant in the RRF base.
 LEXICAL_LEG_WEIGHT = 1.2  # [H] lexical leg is weighted above dense in the base.
@@ -99,6 +99,65 @@ RELATIONSHIP_WEIGHTS: dict[str, float] = {
 }
 
 CONFLICT_RELATIONSHIPS = frozenset({"CONTRADICTS"})
+
+# ── Retrieval-ordering buckets (k3 — the finding-layer wave) ────
+#
+# The fusion ordering signal re-ranks *within comparable relevance* by query shape +
+# source_type + evidence_class: a distilled finding/review surfaces above a bare code
+# signature for a phase-objective/findings-shaped query, while a code-shaped query keeps
+# code first. The buckets below are the unit the priors apply to (see
+# :func:`source_ordering_bucket` for the mapping):
+#
+#   evidence  — typed distilled content carrying measured/derived evidence ([M]/[C]/[P]).
+#   advisory  — typed distilled content carrying heuristic weight ([H] or unmarked).
+#   code      — a bare code signature (``source_type == "code"``).
+#   untyped   — an EMPTY ``source_type`` only. A typed record of an unknown type is still
+#               a typed record and is never demoted into this bucket.
+#
+# The priors are intent-conditional (they only apply when the query classified as
+# FINDINGS or CODE) and finite — a re-rank, never a filter, so no type is suppressed.
+
+#: Code-shaped query priors ([H]): code stays first; distilled content is mildly de-ranked
+#: so a code question keeps returning code signatures at comparable relevance. The untyped
+#: bucket ties the LOWEST typed prior (0.85) so an empty-source_type record can never
+#: out-rank a typed record it ties with (hard rule 4 — the equal-score tie-break finishes it).
+CODE_QUERY_TYPE_PRIORS: dict[str, float] = {
+    "code": 1.00,
+    "evidence": 0.85,
+    "advisory": 0.85,
+    "untyped": 0.85,
+}
+
+#: Findings-shaped query priors ([H]): the untyped bucket ties ``code`` (the lowest typed
+#: prior), so an empty-source_type record can never out-rank a code signature it ties with;
+#: distilled content is boosted above both.
+FINDINGS_QUERY_TYPE_PRIORS: dict[str, float] = {
+    "evidence": 1.60,
+    "advisory": 1.40,
+    "code": 1.00,
+    "untyped": 1.00,
+}
+
+#: Equal-score tie-break tiers (hard rule 4: an untyped record never outranks a typed one
+#: at an equal fused score). Lower tier ranks first; tier 0 is the shape's preferred surface.
+_FINDINGS_QUERY_TIERS: dict[str, int] = {"evidence": 0, "advisory": 1, "code": 2, "untyped": 3}
+_CODE_QUERY_TIERS: dict[str, int] = {"code": 0, "evidence": 1, "advisory": 2, "untyped": 3}
+_NEUTRAL_QUERY_TIERS: dict[str, int] = {"evidence": 1, "advisory": 1, "code": 1, "untyped": 2}
+
+
+class QueryShape(str, Enum):
+    """The deterministic query-intent shape that conditions the source-type ordering signal.
+
+    ``FINDINGS`` = a phase-objective/findings-shaped question (what was concluded /
+    measured / decided); ``CODE`` = a code-shaped question (identifiers, signatures,
+    structure); ``NEUTRAL`` = neither clearly (the pre-existing behaviour — no
+    source-type re-rank, only the untyped tie-break). Derived by
+    :func:`classify_query_shape` with regexes + vocabulary only — never an LLM.
+    """
+
+    FINDINGS = "findings"
+    CODE = "code"
+    NEUTRAL = "neutral"
 
 
 class FallbackMode(str, Enum):
@@ -253,6 +312,124 @@ def build_query_plan(
         lexical_query=lexical_query,
         pattern_projection=pattern_projection,
     )
+
+
+# ── Query-shape classification + source-type ordering (k3) ──────
+#
+# The discriminator for the retrieval-ordering signal is deliberately small and
+# deterministic: a vocabulary + structured-term heuristic over the query plan
+# (``QueryShape``) plus the candidate's own ``source_type`` + ``evidence_class``
+# (``source_ordering_bucket``). It is never a global code-suppression — every type stays
+# retrievable, and a NEUTRAL query (or a caller that does not classify) keeps the exact
+# pre-existing fusion behaviour.
+
+#: Findings/phase-objective markers ([H]): words that ask what a phase/wave concluded,
+#: measured, or decided — matched as whole lower-cased tokens against the raw work item
+#: plus the phase objective.
+_FINDINGS_MARKERS = frozenset(
+    {
+        "what", "was", "were", "did", "does", "how", "why", "whether",
+        "conclusion", "conclusions", "conclude", "concluded", "verdict", "verdicts",
+        "finding", "findings", "evidence", "determine", "determined", "determining",
+        "outcome", "outcomes", "result", "results", "distilled", "summary",
+        "resolved", "resolution", "measured", "inferred",
+    }
+)
+
+#: Code-structure markers ([H]): the handful of natural-language words that signal a
+#: code-shaped question. Structured plan terms (file paths, stack frames, test names,
+#: CLI flags, dotted identifiers, identifier symbols) are the stronger code signals and
+#: are counted separately in :func:`_query_shape_scores`.
+_CODE_MARKERS = frozenset(
+    {
+        "function", "functions", "class", "classes", "method", "methods",
+        "signature", "signatures", "returns", "parameter", "parameters",
+        "argument", "arguments", "implement", "implementation", "refactor",
+        "def", "identifier", "identifiers", "variable", "struct", "symbol",
+        "symbols", "calls", "call", "invoke", "invoked",
+    }
+)
+
+
+def _query_shape_scores(plan: QueryPlan, phase_objective: str) -> tuple[int, int]:
+    """Return ``(findings_signals, code_signals)`` for a query plan + objective."""
+    tokens = re.findall(r"[a-z][a-z0-9_]*", f"{plan.raw}\n{phase_objective}".lower())
+    token_set = set(tokens)
+    findings = sum(1 for marker in _FINDINGS_MARKERS if marker in token_set)
+    code = 0
+    if plan.file_paths or plan.stack_frames:
+        code += 2
+    if plan.test_names or plan.cli_flags or plan.dotted_identifiers:
+        code += 1
+    code += sum(1 for s in plan.symbols if "_" in s)  # snake_case identifiers read code-shaped
+    code += sum(1 for marker in _CODE_MARKERS if marker in token_set)
+    return findings, code
+
+
+def classify_query_shape(
+    plan: QueryPlan, *, phase_objective: str = ""
+) -> QueryShape:
+    """Classify the deterministic query intent: FINDINGS / CODE / NEUTRAL.
+
+    A findings-shaped question is one dominated by conclusion/verdict/evidence
+    vocabulary (``what did the wave conclude``); a code-shaped question is one
+    dominated by structured code terms (paths, frames, test names, identifier
+    symbols, structure words). A tie between the two, or a query with neither,
+    is NEUTRAL — the shape that preserves the pre-existing fusion behaviour.
+    """
+    findings, code = _query_shape_scores(plan, phase_objective)
+    if findings and findings >= code:
+        return QueryShape.FINDINGS
+    if code and code > findings:
+        return QueryShape.CODE
+    return QueryShape.NEUTRAL
+
+
+def source_ordering_bucket(*, source_type: str, evidence_class: str = "") -> str:
+    """Map a candidate's ``source_type`` + ``evidence_class`` to its ordering bucket.
+
+    ``untyped`` means an EMPTY ``source_type`` only — a typed record of an unknown type
+    stays typed and is never demoted into the untyped bucket. ``code`` is the bare
+    code-signature surface. Every other typed record is distilled content, split into
+    ``evidence`` (measured/derived/computed evidence class, ``[M]``/``[C]``/``[P]``)
+    vs ``advisory`` (heuristic ``[H]`` or unmarked) by its evidence class.
+    """
+    st = (source_type or "").strip().lower()
+    if not st:
+        return "untyped"
+    if st == "code":
+        return "code"
+    ec = (evidence_class or "").strip().upper()
+    if ec.startswith("[M]") or ec.startswith("[C]") or ec.startswith("[P]"):
+        return "evidence"
+    return "advisory"
+
+
+def source_type_prior(bucket: str, query_shape: QueryShape | None) -> float:
+    """The intent-conditional source-type prior for a candidate's ordering bucket.
+
+    ``None`` and NEUTRAL both resolve to the identity (1.0) — an unclassified or
+    neutral query applies no source-type re-rank, preserving the pre-existing scores.
+    """
+    if query_shape is QueryShape.FINDINGS:
+        return FINDINGS_QUERY_TYPE_PRIORS.get(bucket, 1.0)
+    if query_shape is QueryShape.CODE:
+        return CODE_QUERY_TYPE_PRIORS.get(bucket, 1.0)
+    return 1.0
+
+
+def ordering_tiebreak_tier(bucket: str, query_shape: QueryShape | None) -> int:
+    """The equal-score tie-break tier for a bucket under a query shape.
+
+    Lower ranks first. Hard rule 4 lives here: under every shape (including NEUTRAL)
+    the ``untyped`` bucket ties after every typed bucket, so an untyped record never
+    outranks a typed one at an equal fused score.
+    """
+    if query_shape is QueryShape.FINDINGS:
+        return _FINDINGS_QUERY_TIERS.get(bucket, 2)
+    if query_shape is QueryShape.CODE:
+        return _CODE_QUERY_TIERS.get(bucket, 1)
+    return _NEUTRAL_QUERY_TIERS.get(bucket, 1)
 
 
 # ── Candidate + fusion ──────────────────────────────────────────
@@ -498,11 +675,19 @@ def fuse_candidates(
     exact_terms: list[str],
     current_commit: str = "",
     now: datetime | None = None,
+    query_shape: QueryShape | None = None,
 ) -> list[Candidate]:
     """Score every candidate and drop excluded (stale/policy) ones.
 
     Sets ``fused_score`` and ``exact_identifier_match``; returns only candidates
     with a valid freshness multiplier, in descending score order.
+
+    ``query_shape`` carries the k3 intent-conditional source-type ordering signal: the
+    candidate's ``fused_score`` is multiplied by its bucket's prior under the shape
+    (findings-shaped queries promote distilled content above bare code; code-shaped
+    queries keep code first), and equal scores are tie-broken by the shape's bucket
+    tiers so an untyped record never outranks a typed one. ``None`` (or a NEUTRAL
+    shape) applies the identity prior — the pre-existing fusion scores are unchanged.
     """
     scored: list[Candidate] = []
     for c in candidates:
@@ -516,6 +701,10 @@ def fuse_candidates(
         if freshness is None:
             continue
         exact = exact_identifier_hit(c, exact_terms)
+        bucket = source_ordering_bucket(
+            source_type=c.source_type, evidence_class=c.evidence_class
+        )
+        prior = source_type_prior(bucket, query_shape)
         score = compute_fused_score(
             lexical_rank=c.lexical_rank,
             dense_rank=c.dense_rank,
@@ -529,8 +718,20 @@ def fuse_candidates(
                 else None
             ),
         )
-        scored.append(replace(c, fused_score=score, exact_identifier_match=exact))
-    scored.sort(key=lambda c: c.fused_score, reverse=True)
+        scored.append(
+            replace(c, fused_score=score * prior, exact_identifier_match=exact)
+        )
+    scored.sort(
+        key=lambda c: (
+            -c.fused_score,
+            ordering_tiebreak_tier(
+                source_ordering_bucket(
+                    source_type=c.source_type, evidence_class=c.evidence_class
+                ),
+                query_shape,
+            ),
+        )
+    )
     return scored
 
 
@@ -1282,8 +1483,17 @@ def retrieve(
         candidates = [c for c in candidates if not scope_excluded(c.repository_id, requested_scope)]
 
     # Fuse, content-hash dedupe, then cosine-redundancy collapse (conflicts survive).
+    # The k3 source-type ordering signal is conditioned on the deterministic query shape:
+    # a phase-objective/findings-shaped query promotes distilled content above bare code,
+    # a code-shaped query keeps code first, and anything else (or an absent objective)
+    # applies the identity prior — the pre-existing fusion behaviour.
+    query_shape = classify_query_shape(plan, phase_objective=phase_objective)
     fused = fuse_candidates(
-        candidates, exact_terms=plan.exact_terms, current_commit=commit_sha, now=now
+        candidates,
+        exact_terms=plan.exact_terms,
+        current_commit=commit_sha,
+        now=now,
+        query_shape=query_shape,
     )
     fused = deduplicate(fused)
 

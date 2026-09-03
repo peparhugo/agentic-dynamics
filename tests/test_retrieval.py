@@ -16,16 +16,20 @@ from agentic_dynamics.knowledge.retrieval import (
     ADVISORY_FRESH_30D,
     ADVISORY_FRESH_90D,
     AUTHORITY_MULTIPLIER,
+    CODE_QUERY_TYPE_PRIORS,
     CONFLICT_MULTIPLIER,
     EXACT_COMMIT_MULTIPLIER,
+    FINDINGS_QUERY_TYPE_PRIORS,
     RELATIONSHIP_WEIGHTS,
     WEIGHTS_VERSION,
     Candidate,
     EvidenceCard,
     FallbackMode,
+    QueryShape,
     _dense_filter,
     build_evidence_cards,
     build_query_plan,
+    classify_query_shape,
     collapse_redundant,
     compute_fused_score,
     compute_token_budget,
@@ -35,11 +39,14 @@ from agentic_dynamics.knowledge.retrieval import (
     fuse_candidates,
     graph_boost,
     is_conflict_relationship,
+    ordering_tiebreak_tier,
     pattern_uncertainty_multiplier,
     resolve_fallback_mode,
     retrieve,
     rrf_base,
     select_evidence,
+    source_ordering_bucket,
+    source_type_prior,
 )
 
 NOW = datetime(2026, 8, 15, 12, 0, 0, tzinfo=timezone.utc)
@@ -1193,3 +1200,268 @@ class TestLuceneEscape:
         monkeypatch.setattr(client, "_run", _fake_run)
         client.search_fulltext("knowledge_text_ft", "retrieve() RRF")
         assert captured["params"]["query"] == r"retrieve\(\) RRF"
+
+
+# ── Query-shape classification + source-type ordering (k3 — the finding-layer wave) ──
+
+FINDINGS_QUERY = (
+    "what did the control database evidence wave conclude about per-phase finding records"
+)
+FINDINGS_OBJECTIVE = "determine what the control_db_evidence wave concluded"
+CODE_QUERY = "implement the function build_step_graph and return its graph structure"
+CODE_OBJECTIVE = ""
+
+
+def test_query_shape_classifier_is_deterministic_and_named():
+    shape = classify_query_shape(build_query_plan(FINDINGS_QUERY), phase_objective=FINDINGS_OBJECTIVE)
+    assert shape is QueryShape.FINDINGS
+    again = classify_query_shape(build_query_plan(FINDINGS_QUERY), phase_objective=FINDINGS_OBJECTIVE)
+    assert shape is again
+    assert {s.value for s in QueryShape} == {"findings", "code", "neutral"}
+    assert QueryShape.NEUTRAL.value == "neutral"
+
+
+def test_query_shape_classifier_distinguishes_code_and_neutral():
+    assert (
+        classify_query_shape(build_query_plan(CODE_QUERY), phase_objective=CODE_OBJECTIVE)
+        is QueryShape.CODE
+    )
+    # A plain task phrasing with neither findings vocabulary nor code structure stays neutral
+    # (the shape that preserves the pre-existing fusion behaviour).
+    assert classify_query_shape(build_query_plan("build a task manager api")) is QueryShape.NEUTRAL
+    assert classify_query_shape(build_query_plan("websocket reload")) is QueryShape.NEUTRAL
+
+
+def test_source_ordering_bucket_maps_source_type_and_evidence_class():
+    # A finding with measured evidence is distilled ``evidence`` content.
+    assert (
+        source_ordering_bucket(source_type="finding", evidence_class="[M]") == "evidence"
+    )
+    # A code record is always the bare ``code`` surface, regardless of its [C] class.
+    assert source_ordering_bucket(source_type="code", evidence_class="[C]") == "code"
+    # A review (heuristic [H]) is distilled ``advisory`` content — it still outranks code
+    # on a findings query (the SHAPE names reviews explicitly).
+    assert source_ordering_bucket(source_type="review", evidence_class="[H]") == "advisory"
+    # An empty source_type is ``untyped`` — and only an empty source_type is.
+    assert source_ordering_bucket(source_type="", evidence_class="[C]") == "untyped"
+    # A typed record of an unknown type is never demoted to the untyped bucket.
+    assert source_ordering_bucket(source_type="still_typed", evidence_class="") == "advisory"
+
+
+def test_source_type_priors_are_intent_conditional_and_finite():
+    # Findings shape: distilled content outranks code; code is never suppressed (1.0).
+    assert FINDINGS_QUERY_TYPE_PRIORS["evidence"] > 1.0
+    assert FINDINGS_QUERY_TYPE_PRIORS["advisory"] > FINDINGS_QUERY_TYPE_PRIORS["code"]
+    assert FINDINGS_QUERY_TYPE_PRIORS["code"] == 1.0
+    assert source_type_prior("evidence", QueryShape.FINDINGS) == FINDINGS_QUERY_TYPE_PRIORS["evidence"]
+    # Code shape: code stays first at comparable relevance.
+    assert CODE_QUERY_TYPE_PRIORS["code"] == 1.0
+    assert CODE_QUERY_TYPE_PRIORS["evidence"] < 1.0
+    # NEUTRAL / None resolve to the identity prior (pre-existing scores unchanged).
+    assert source_type_prior("evidence", QueryShape.NEUTRAL) == 1.0
+    assert source_type_prior("code", None) == 1.0
+    # The untyped bucket ties the lowest typed prior under each active shape (hard rule 4):
+    # it can never out-rank a typed record it ties with on score.
+    assert source_type_prior("untyped", QueryShape.CODE) == CODE_QUERY_TYPE_PRIORS["advisory"]
+    assert source_type_prior("untyped", QueryShape.FINDINGS) == FINDINGS_QUERY_TYPE_PRIORS["code"]
+    assert source_type_prior("untyped", QueryShape.NEUTRAL) == 1.0
+
+
+def test_untyped_tiebreak_tier_is_last_under_every_shape():
+    # Hard rule 4: at an equal fused score an untyped record sorts after every typed bucket,
+    # under every query shape (NEUTRAL included).
+    for shape in (None, QueryShape.NEUTRAL, QueryShape.FINDINGS, QueryShape.CODE):
+        untyped = ordering_tiebreak_tier("untyped", shape)
+        assert untyped > ordering_tiebreak_tier("evidence", shape)
+        assert untyped > ordering_tiebreak_tier("advisory", shape)
+        assert untyped > ordering_tiebreak_tier("code", shape)
+
+
+def _typed_dense_hit(
+    cid: str,
+    text: str,
+    *,
+    source_type: str,
+    authority: str,
+    evidence_class: str,
+    distance: float = 0.1,
+) -> dict:
+    hit = _dense_hit(cid, text, authority=authority, distance=distance)
+    hit["metadata"]["source_type"] = source_type
+    hit["metadata"]["evidence_class"] = evidence_class
+    return hit
+
+
+# A distilled finding (MEASURED [M]) and a bare code signature (SOURCE [C]) that both match
+# the same question. The code hit is returned by the store FIRST (dense_rank 0, the better raw
+# leg position) so the ordering test must overcome a relevance *disadvantage*, not coast on it.
+def _finding_and_code_hits():
+    finding = _typed_dense_hit(
+        "k_finding",
+        "the control_db_evidence phase concluded per-phase records are reliable evidence: "
+        "status, tests verdict, cost, and commit recorded on every phase",
+        source_type="finding",
+        authority="measured",
+        evidence_class="[M]",
+    )
+    code = _typed_dense_hit(
+        "k_code",
+        "def _record_phase_evidence(phase, attempt): return ledger.write(phase, attempt)",
+        source_type="code",
+        authority="source",
+        evidence_class="[C]",
+    )
+    return [code, finding]  # code first in raw leg order (rank 0), finding second (rank 1)
+
+
+def test_findings_query_returns_the_finding_above_code(monkeypatch):
+    # (a) A phase-objective/findings-shaped query over a synthetic corpus (a finding record +
+    # a code record both matching) returns the finding FIRST — the source-type prior overcomes
+    # the code record's better raw dense rank.
+    _no_embedder(monkeypatch)
+    attempt = retrieve(
+        FINDINGS_QUERY,
+        dense_store=_FakeDenseStore(_finding_and_code_hits()),
+        phase_objective=FINDINGS_OBJECTIVE,
+    )
+    assert attempt.query_plan.pattern_projection is False
+    ids = [c.id for c in attempt.candidates]
+    assert ids.index("k_finding") < ids.index("k_code")
+    assert attempt.candidates[0].id == "k_finding"
+    finding = next(c for c in attempt.candidates if c.id == "k_finding")
+    code = next(c for c in attempt.candidates if c.id == "k_code")
+    assert finding.fused_score > code.fused_score
+    # The code record is NOT suppressed — it still surfaces and remains selectable.
+    assert code in attempt.candidates
+    assert any(c.id == "k_code" for c in attempt.selected_evidence)
+    # The attempt records the weights version that introduced the ordering signal.
+    assert attempt.weights_version == WEIGHTS_VERSION
+
+
+def test_neutral_query_keeps_code_first_and_identity_scores(monkeypatch):
+    # The same corpus under a NEUTRAL-shaped query must NOT be re-ranked by source type: code
+    # keeps its better raw position and every fused score equals the pre-existing computation
+    # (no blanket code suppression, no source-type prior in neutral shape).
+    _no_embedder(monkeypatch)
+    attempt = retrieve(
+        "store the completed phase rows in the ledger store",
+        dense_store=_FakeDenseStore(_finding_and_code_hits()),
+    )
+    assert classify_query_shape(attempt.query_plan) is QueryShape.NEUTRAL
+    ids = [c.id for c in attempt.candidates]
+    assert ids.index("k_code") < ids.index("k_finding")
+    code = next(c for c in attempt.candidates if c.id == "k_code")
+    finding = next(c for c in attempt.candidates if c.id == "k_finding")
+    expected_code = compute_fused_score(
+        lexical_rank=None,
+        dense_rank=0,
+        authority=Authority.SOURCE,
+        freshness=1.0,
+        exact_identifier_match=False,
+        conflict=False,
+    )
+    expected_finding = compute_fused_score(
+        lexical_rank=None,
+        dense_rank=1,
+        authority=Authority.MEASURED,
+        freshness=1.0,
+        exact_identifier_match=False,
+        conflict=False,
+    )
+    assert code.fused_score == pytest.approx(expected_code)
+    assert finding.fused_score == pytest.approx(expected_finding)
+
+
+def test_code_query_keeps_code_first_even_when_finding_is_raw_better(monkeypatch):
+    # (b) A code-shaped query (a function name + structure words) returns the code record
+    # FIRST — even when the finding record occupies the better raw dense position.
+    _no_embedder(monkeypatch)
+    hits = list(reversed(_finding_and_code_hits()))  # finding@0 (raw better), code@1
+    attempt = retrieve(CODE_QUERY, dense_store=_FakeDenseStore(hits))
+    assert classify_query_shape(attempt.query_plan) is QueryShape.CODE
+    ids = [c.id for c in attempt.candidates]
+    assert ids.index("k_code") < ids.index("k_finding")
+    assert attempt.candidates[0].id == "k_code"
+    code = next(c for c in attempt.candidates if c.id == "k_code")
+    finding = next(c for c in attempt.candidates if c.id == "k_finding")
+    assert code.fused_score > finding.fused_score
+
+
+@pytest.mark.parametrize(
+    "shape, typed_source_type, typed_evidence_class",
+    [
+        (None, "code", "[C]"),
+        (QueryShape.NEUTRAL, "code", "[C]"),
+        (QueryShape.FINDINGS, "code", "[C]"),  # code ties untyped (both prior 1.0) in findings
+        (QueryShape.CODE, "finding", "[M]"),  # content ties untyped (both prior 0.85) in code
+    ],
+)
+def test_untyped_never_outranks_typed_at_equal_scores(
+    shape, typed_source_type, typed_evidence_class
+):
+    # (c) At EQUAL fused scores an untyped record (empty source_type) never outranks a typed
+    # one, under every query shape. The typed candidate's bucket is chosen so its prior ties
+    # the untyped prior under the shape → identical compute_fused_score; only the tie-break
+    # tier can separate them.
+    typed = _cand(
+        "k_typed",
+        text="a record that matches the query",
+        authority=Authority.SOURCE,
+        dense_rank=0,
+        source_type=typed_source_type,
+        evidence_class=typed_evidence_class,
+    )
+    untyped = _cand(
+        "k_untyped",
+        text="a record that matches the query",
+        authority=Authority.SOURCE,
+        dense_rank=0,
+        source_type="",
+        evidence_class="",
+    )
+    fused = fuse_candidates([untyped, typed], exact_terms=[], query_shape=shape)
+    assert [c.id for c in fused] == ["k_typed", "k_untyped"]
+    # The equal-score precondition holds: without the tie-break the two would be adjacent.
+    assert fused[0].fused_score == fused[1].fused_score
+
+
+def test_untyped_typed_mixed_batch_keeps_untyped_last_at_equal_scores():
+    # Three candidates at an equal fused score — a distilled finding, a code record, and an
+    # untyped one — sort by score then by the shape's tiers; untyped is always last.
+    base = dict(
+        text="equal relevance everywhere",
+        authority=Authority.MEASURED,
+        dense_rank=0,
+    )
+    finding = Candidate(
+        id="f",
+        text=base["text"],
+        authority=base["authority"],
+        dense_rank=base["dense_rank"],
+        source_type="finding",
+        evidence_class="[M]",
+        content_hash="h:eq1",
+        locator="f",
+    )
+    code = Candidate(
+        id="c",
+        text=base["text"],
+        authority=base["authority"],
+        dense_rank=base["dense_rank"],
+        source_type="code",
+        evidence_class="[C]",
+        content_hash="h:eq2",
+        locator="c",
+    )
+    untyped = Candidate(
+        id="u",
+        text=base["text"],
+        authority=base["authority"],
+        dense_rank=base["dense_rank"],
+        content_hash="h:eq3",
+        locator="u",
+    )
+    for shape in (QueryShape.NEUTRAL, QueryShape.FINDINGS, QueryShape.CODE):
+        fused = fuse_candidates([finding, code, untyped], exact_terms=[], query_shape=shape)
+        assert fused[-1].id == "u"
+        assert set(c.id for c in fused) == {"f", "c", "u"}
