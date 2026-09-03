@@ -3109,6 +3109,12 @@ def run_workflow(
         # result carries one. Defaults to None (unobserved — never coerced to 0, which would
         # read as success); test phases run no agent process and keep None.
         phase_exit_code: int | None = None
+        # The worktree HEAD before this phase ran. The commit block below adopts a
+        # self-committed phase's own HEAD as ``commit_hash`` when the tree is already clean
+        # (kb_finding_layer k6 — the witness gap, see the commit block); this pre-phase
+        # baseline is what distinguishes "the phase committed its own conforming work" from
+        # "the phase left nothing to commit".
+        phase_head_before = _git_head(wd)
 
         try:
             if kind == "test":
@@ -3442,6 +3448,20 @@ def run_workflow(
         pr.timed_out = pr.duration_s >= phase_timeout - 0.5
         if commit and pr.status == "ok":
             pr.commit_hash = _git_commit(wd, name, goal)
+            # Self-commit adoption (kb_finding_layer k6 — the witness gap). ``_git_commit``
+            # stages + commits the phase's *uncommitted* work and returns its short sha, but a
+            # phase whose agent ALREADY committed its own conforming work (the orchestration
+            # norm — the commit-prefix gate above certified every commit in the window) leaves
+            # a tree clean of staged changes, so ``_git_commit`` returns "" and the default-on
+            # finding emit (k1) silently never fires for exactly the phases this runner
+            # produces. Adopt the phase's own HEAD as ``commit_hash`` when the tree is clean
+            # AND the HEAD advanced past the pre-phase baseline: the phase DID produce a
+            # commit, and its finding must land like any other's. ``pr.commit_hash`` feeds the
+            # enriched finding text, the run ledger, and the emit's idempotence key.
+            if not pr.commit_hash:
+                phase_head = _git_head(wd)
+                if phase_head and phase_head != phase_head_before:
+                    pr.commit_hash = phase_head
             # Phase-boundary evidence (design §5.7 — e6): when a ChangeAnalyzer is injected,
             # hand the committed change to it (typed snapshots + delta materialized from git)
             # and record its analysis on the phase. Best-effort — never affects the phase.

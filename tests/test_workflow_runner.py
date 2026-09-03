@@ -949,6 +949,47 @@ def test_finding_emit_explicit_false_outranks_default_on(tmp_path, monkeypatch):
     assert emitted == []
 
 
+def test_finding_emit_fires_when_agent_self_commits(tmp_path, monkeypatch):
+    """(k6 witness gap) a phase whose agent commits its OWN conforming work still emits.
+
+    ``_git_commit`` stages + commits the phase's uncommitted work and returns its short sha,
+    but a phase whose agent ALREADY committed (the orchestration norm this wave runs under —
+    every k0-k5 phase committed its own work) leaves a tree clean of staged changes, so
+    ``_git_commit`` returns ``""`` and the k1 default-on gate (``and pr.commit_hash``) never
+    fires — the finding silently never lands for exactly the phases the runner produces. The
+    commit block now adopts the phase's own HEAD when the tree is clean and the HEAD advanced
+    past the pre-phase baseline, so the self-committed phase's finding still emits.
+    """
+    _git_init(tmp_path)
+    monkeypatch.delenv("FINOPS_EMIT_SELF", raising=False)
+    monkeypatch.delenv("FINOPS_CELL_ID", raising=False)
+    spec = _emit_synth_spec([{"name": "p1", "kind": "agent", "prompt": "do p1"}])
+
+    def _agent_self_commits(prompt, *, model, backend, workdir, **kwargs):
+        (Path(workdir) / "work.txt").write_text("agent's own committed work")
+        subprocess.run(["git", "add", "-A"], cwd=workdir, check=True)
+        subprocess.run(
+            ["git", "commit", "-q", "-m", "[workflow] p1 — g"],
+            cwd=workdir, check=True,
+        )
+        return _fake_agent()
+
+    emitted: list[tuple] = []
+    monkeypatch.setattr(
+        workflow_runner, "_emit_self_finding",
+        lambda pr, *, goal, scope: emitted.append((pr.phase, pr.commit_hash, scope)),
+    )
+
+    result = run_workflow(
+        spec, goal="g", model="m", workdir=tmp_path, run_agentic_fn=_agent_self_commits
+    )
+    phase = result.phases[0]
+    assert phase.status == "ok"
+    # The agent's own commit was ADOPTED as the phase commit — not left "" (the pre-fix gap).
+    assert phase.commit_hash
+    assert emitted == [("p1", phase.commit_hash, f"self-{tmp_path.name}")]
+
+
 def test_finding_emit_default_run_writes_enriched_records(tmp_path, monkeypatch):
     """(k1 a+b) a DEFAULT run emits one enriched finding per committed phase, end to end.
 

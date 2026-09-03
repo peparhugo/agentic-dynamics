@@ -75,6 +75,10 @@ _COMMANDS: dict[tuple[str, ...], str] = {
     # k2): scans docs/reviews + run ledgers and emits ONE finding record per completed wave,
     # no LLM, rerun-safe knowledge_ids.
     ("knowledge", "backfill-findings"): "kb_backfill_findings.py",
+    # knowledge project-findings — the deterministic finding-layer leg projection
+    # (kb_finding_layer k6, the witness): materializes durable finding artifacts into the
+    # retrieval legs (chroma/neo4j/registry) via the kb_worker handler bodies, idempotent.
+    ("knowledge", "project-findings"): "kb_project_findings.py",
     ("data", "site-census"): "site_census_check.py",
     ("knowledge", "worker"): "kb_worker.py",
     ("knowledge", "context-report"): "context_snapshot_report.py",
