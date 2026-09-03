@@ -3,7 +3,7 @@
 Extracted from ``workflow_runner.py`` (R7 of ``docs/review/restructure.md``) so the
 runtime-RAG knowledge base stays testable without a workflow run. :func:`augment_prompt`
 is the entire augmentation; ``workflow_runner`` keeps only phase execution plus the
-opt-in self-build emit.
+self-build finding emit (default ON since kb_finding_layer k1).
 
 The seam runs between ``route_step`` and ``run_agent`` (never before routing, so the
 augmentation sees the selected executor model), gated by ``rag_augment`` (default OFF).
@@ -12,8 +12,9 @@ failure reverts to ``base_prompt`` and records a named fallback mode, so augment
 never blocks a phase.
 
 Read-only by construction: this module references ``publish_event`` zero times. The
-sole KB writer is the opt-in ``emit_self`` path in ``workflow_runner``
-(``knowledge_ingestion.emit_phase_finding``). The dense/lexical store wiring here is
+sole KB writer is the self-build ``emit_self`` path in ``workflow_runner``
+(``knowledge_ingestion.emit_phase_finding`` — default ON for workflow runs since
+kb_finding_layer k1). The dense/lexical store wiring here is
 lazy (imports inside the default-wiring functions, never at import time) so the
 optional deps (chromadb / neo4j) stay optional and core startup never constructs a
 store.

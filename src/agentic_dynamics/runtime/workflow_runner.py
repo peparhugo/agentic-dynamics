@@ -95,7 +95,8 @@ later phases read them from the repo. Fails fast by default (``stop_on_error``).
 
 The ``retrieve -> construct -> render`` augmentation and its default store/constructor
 wiring live in :mod:`instrument.augment` (R7 split); this module keeps phase execution
-plus the opt-in self-build emit (``rag_params.emit_self``).
+plus the self-build finding emit (``rag_params.emit_self`` — DEFAULT ON since kb_finding_layer
+k1, see :func:`_finding_emit_enabled`).
 
 RAG scope isolation (the load-bearing invariant): by default the retrieval filter is
 scoped per cell — :func:`cell_scope` yields ``self-<worktree basename>`` (the cell
@@ -987,6 +988,29 @@ def _apply_verifier_verdict(pr: PhaseResult, verdict: StepResult) -> None:
         pr.error = str(getattr(verdict, "error", "") or "")[:400] or (
             f"verifier suite failed ({pr.tests_passed}/{pr.tests_total} passed)"
         )
+
+
+def _finding_emit_enabled(rag_params: dict[str, Any], phase_def: dict[str, Any]) -> bool:
+    """Resolve whether a committed phase emits its scoped finding (kb_finding_layer k1).
+
+    Findings are the DEFAULT for workflow runs: every successful committed phase emits unless
+    it opts out explicitly, in one of three escalating ways:
+
+    * the phase declares the no-emit marker (``no_emit: true`` — a phase never silently skips
+      its finding; the marker outranks every other setting);
+    * the run opts out (``rag_params["emit_self"] is False`` — the explicit run-level switch);
+    * the process disarms the default (``FINOPS_EMIT_SELF=0`` — the unit suite's flag, so
+      synthetic git worktrees never litter the live KB).
+
+    ``rag_params["emit_self"] is True`` keeps working as the explicit opt-in override it always
+    was — the flag still works when set (outranks the env disarm).
+    """
+    if phase_def.get(NO_EMIT_MARKER):
+        return False
+    explicit = rag_params.get("emit_self")
+    if explicit is not None:
+        return bool(explicit)
+    return os.environ.get(FINDING_EMIT_ENV, "1") != "0"
 
 
 def _emit_self_finding(pr: PhaseResult, *, goal: str, scope: str) -> None:
@@ -2393,6 +2417,17 @@ def _enforce_tree_gate(
 
 #: The phase-marker key: ``checkpoint: true`` declares a mechanical human stop.
 CHECKPOINT_MARKER = "checkpoint"
+#: The phase-marker key: ``no_emit: true`` opts a phase OUT of the default finding emit
+#: (kb_finding_layer k1 — findings are the default for workflow runs; a phase that must not
+#: emit declares the marker explicitly, never silently).
+NO_EMIT_MARKER = "no_emit"
+#: Env override for the finding-emit default (kb_finding_layer k1): ``"0"`` disables the
+#: default-on self-build emit for workflow runs (the unit suite's disarming flag —
+#: ``tests/conftest.py`` sets it so synthetic git worktrees never litter the live KB);
+#: unset/``"1"`` keeps findings the default. An explicit ``rag_params["emit_self"]`` outranks
+#: it, and ``no_emit: true`` on a phase outranks both. Mirrors ``FINOPS_FACT_AUTO_EMIT``'s
+#: disable-flag pattern (CLI > env > default-ON).
+FINDING_EMIT_ENV = "FINOPS_EMIT_SELF"
 #: The status value recorded when the run stops at (or refuses past) a checkpoint — a designed
 #: stop, never an error; the operator's tools read "waiting", not "failed".
 AWAITING_STATUS = "awaiting"
@@ -2769,11 +2804,15 @@ def run_workflow(
     ``user_constraints``. Test phases are never augmented; any retrieval/constructor
     failure falls back to the base prompt and records a named fallback mode.
 
-    Self-build producer (``rag_params.emit_self``): when true, each successful phase that
-    produced a commit also emits its one-line finding into the cell's OWN scope (default OFF).
-    The finding is scoped via ``repository_id``/``acl_scope`` = ``cell_scope(wd)`` (never
-    global) and keyed by ``f(goal, phase, commit, scope, extractor)``, so re-emitting is a
-    no-op.
+    Self-build producer (``rag_params.emit_self``): DEFAULT ON (kb_finding_layer k1) — every
+    successful committed phase emits its finding into the cell's OWN scope (default OFF before
+    k1). Opt-outs are explicit: ``rag_params["emit_self"] = False`` (run level),
+    ``no_emit: true`` on the phase (phase level — never silent), or ``FINOPS_EMIT_SELF=0``
+    (process/unit-suite disarm); ``rag_params["emit_self"] = True`` remains the explicit
+    opt-in override. The finding is scoped via ``repository_id``/``acl_scope`` =
+    ``cell_scope(wd)`` (never global) and keyed by ``f(goal, phase, commit, scope, extractor)``,
+    so re-emitting is a no-op. Best-effort by construction — a downed knowledge stream never
+    fails the phase.
 
     Per-step routing (``docs/routing_design.md``): when the spec declares
     ``workflow.params.model_pool``, each agent phase's model is chosen by the injected
@@ -3414,11 +3453,12 @@ def run_workflow(
                 # phase produced an analysis. No analyzer → prior unchanged → prompt identical.
                 if pr.change_analysis is not None:
                     prior.append(_evidence_context(pr))
-            # Self-build ("progressive") producer — opt-in via rag_params.emit_self. After the
-            # phase commits, emit its finding into the cell's OWN scope so the cell's retrieval
-            # filter can later read its own progress (default OFF: only the "self-built" arm
-            # opts in).
-            if rag_params.get("emit_self") and pr.commit_hash:
+            # Self-build ("progressive") producer — DEFAULT ON (kb_finding_layer k1). After a
+            # phase commits, its finding is emitted into the cell's OWN scope so the cell's
+            # retrieval filter can later read its own progress. Opt-outs are explicit only
+            # (the run via rag_params.emit_self=False / FINOPS_EMIT_SELF=0, the phase via the
+            # no_emit marker) — a phase never silently skips its finding.
+            if _finding_emit_enabled(rag_params, phase_def) and pr.commit_hash:
                 _emit_self_finding(pr, goal=goal, scope=cell_scope(wd))
 
         # Relabel tree-identity gate (cap_runner_hardening2 §Gap 2) — post-phase, agent phases

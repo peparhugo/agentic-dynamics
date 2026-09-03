@@ -1096,6 +1096,22 @@ def validate_spec(
                 f"(got {ph.get('checkpoint')!r})"
             )
 
+    # ── Phase-level gate: ``no_emit`` (kb_finding_layer k1) ─────────────
+    # Optional per-phase marker, default false. Findings are the DEFAULT for workflow runs
+    # (every successful committed phase emits its scoped finding); a phase that must not emit
+    # opts out with ``no_emit: true`` — explicitly, never silently. Same type-safety-only rule
+    # as ``deploy_allowed``/``checkpoint``: a typo'd ``no_emit: "false"`` is a truthy string
+    # that would silently suppress a phase's finding (a KB data loss), so the marker, when
+    # present, must be a real boolean.
+    for ph in spec.workflow.params.get("phases") or []:
+        if not isinstance(ph, dict):
+            continue
+        if "no_emit" in ph and not isinstance(ph.get("no_emit"), bool):
+            errors.append(
+                f'phase "{ph.get("name", "?")}": no_emit must be a boolean '
+                f"(got {ph.get('no_emit')!r})"
+            )
+
     # ── Phase-level gate: ``scope`` (D-16, proposal §5) ──────────────────
     # Optional per-phase scope from the closed five-scope vocabulary. A phase's declared scope
     # must be a real vocabulary member — a typo'd string is a scope the spawn-wrapper can never

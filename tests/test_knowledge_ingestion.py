@@ -646,6 +646,97 @@ def test_derive_phase_record_idempotent():
     assert derive_phase_record(_phase_result(), goal="g", repository_id="self-2", revision="abc").knowledge_id != a.knowledge_id
 
 
+def test_derive_phase_record_text_carries_enriched_fields():
+    """(k1 b) the finding text carries status + tests verdict split + cost + commit sha.
+
+    The canonical one-liner head is preserved (existing consumers keep matching it) and the
+    k1 enrichment tail adds ``status``, ``tests <passed>/<total>``, and ``commit`` — all
+    asserted here as fields of the derived record (text + the structured commit_sha and
+    test_executed_success).
+    """
+    rec = derive_phase_record(
+        _phase_result(
+            phase="implement",
+            status="ok",
+            cost_usd=0.0123,
+            tokens={"total": 30},
+            test_executed_success=True,
+            tests_passed=3,
+            tests_total=5,
+            commit_hash="abc1234",
+        ),
+        goal="build a task manager api",
+        repository_id="self-cell-1",
+        revision="deadbeef1234",
+    )
+    assert rec.text.startswith(
+        "build a task manager api phase implement -> test_executed_success True"
+    )
+    assert "status ok" in rec.text
+    assert "tests 3/5" in rec.text
+    assert "cost $0.0123" in rec.text
+    assert "commit deadbeef1234" in rec.text
+    # The structured record fields agree with the text tail.
+    assert rec.commit_sha == "deadbeef1234"
+    assert rec.test_executed_success is True
+    assert rec.authority is Authority.MEASURED
+    assert rec.evidence_class == "[M]"
+
+
+def test_derive_phase_record_text_carries_gate_verdict_and_conclusion():
+    """(k1 b) a fired gate verdict (when present) outranks, then conclusion follows."""
+    with_gate = derive_phase_record(
+        _phase_result(
+            phase="implement",
+            commit_gate={"reason": "COMMIT_PREFIX", "subjects": ["bad msg"]},
+            final_response="refactor the gate\ncommit message fixed",
+        ),
+        goal="g",
+        repository_id="self-1",
+        revision="abc1234",
+    )
+    assert "gate commit_gate COMMIT_PREFIX" in with_gate.text
+
+    with_conclusion = derive_phase_record(
+        _phase_result(
+            phase="implement",
+            final_response="finished the scope\nall acceptance checks pass",
+        ),
+        goal="g",
+        repository_id="self-1",
+        revision="abc1234",
+    )
+    assert "conclusion all acceptance checks pass" in with_conclusion.text
+
+
+def test_derive_phase_record_none_verdict_stays_advisory_no_tests_split():
+    """(k1 d) a phase whose test verdict is None derives ADVISORY, never MEASURED.
+
+    Null-not-zero is preserved in the text too: without a real bool verdict the tests split is
+    omitted (an unverified phase must not read as a measured ``tests 0/0``), while status and
+    commit still ride the tail.
+    """
+    rec = derive_phase_record(
+        _phase_result(
+            phase="implement",
+            status="ok",
+            test_executed_success=None,
+            tests_passed=0,
+            tests_total=0,
+        ),
+        goal="build a task manager api",
+        repository_id="self-1",
+        revision="abc1234",
+    )
+    assert rec.authority is Authority.ADVISORY
+    assert rec.evidence_class == "[H]"
+    assert rec.test_executed_success is None
+    assert "test_executed_success None" in rec.text
+    assert "tests " not in rec.text
+    assert "status ok" in rec.text
+    assert "commit abc1234" in rec.text
+
+
 def test_publish_event_write_guard(monkeypatch):
     import agentic_dynamics.knowledge.knowledge_stream as ks
 

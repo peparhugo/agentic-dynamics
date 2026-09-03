@@ -4,11 +4,18 @@ import json
 import subprocess
 import threading
 import time
+from collections.abc import Callable
 from pathlib import Path
 from types import SimpleNamespace
 
 from agentic_dynamics.experiment import spec_status
-from agentic_dynamics.experiment.experiment_spec import load_spec, validate_spec
+from agentic_dynamics.experiment.experiment_spec import (
+    ExperimentSpec,
+    Factor,
+    Workflow,
+    load_spec,
+    validate_spec,
+)
 from agentic_dynamics.experiment.spec_status import SpecStatusEntry
 from agentic_dynamics.knowledge.augment import default_retrieve_fn
 from agentic_dynamics.runtime import workflow_runner
@@ -775,13 +782,13 @@ def test_rag_explicit_repository_id_is_preserved(tmp_path, monkeypatch):
 
 
 def test_retrieve_construct_render_path_never_writes():
-    """The augmentation seam is read-only; the sole KB writer is the opt-in emit_self path.
+    """The augmentation seam is read-only; the sole KB writer is the emit_self path.
 
     ``retrieve -> construct -> render`` must reference ``publish_event`` ZERO times — the
     seam reads (dense + lexical retrieval) and constructs (one flash-model call), but it can
     never write the knowledge plane. The only write is the self-build producer
     (``emit_phase_finding``), reached exclusively through ``_emit_self_finding`` (gated by
-    ``rag_params.emit_self``).
+    ``_finding_emit_enabled`` — default ON since kb_finding_layer k1).
     """
     import inspect
 
@@ -802,6 +809,202 @@ def test_retrieve_construct_render_path_never_writes():
     # the emit_self helper — so an augmented phase can never write except through emit_self.
     assert "emit_phase_finding" in inspect.getsource(wr._emit_self_finding)
     assert "publish_event" not in inspect.getsource(wr._emit_self_finding)
+
+
+# ── finding emit: default ON (kb_finding_layer k1) ─────────────
+
+
+def _git_init(tmp_path):
+    subprocess.run(["git", "init", "-q"], cwd=tmp_path, check=True)
+    subprocess.run(["git", "config", "user.email", "t@t"], cwd=tmp_path, check=True)
+    subprocess.run(["git", "config", "user.name", "t"], cwd=tmp_path, check=True)
+
+
+def _emit_synth_spec(phase_defs: list[dict]) -> ExperimentSpec:
+    """A minimal agent_task spec whose agent phases write a file, so each one commits."""
+    return ExperimentSpec(
+        name="k1_emit_synth",
+        question="q",
+        version="1",
+        workflow=Workflow(
+            kind="agent_task",
+            params={"language": "python", "phases": phase_defs},
+        ),
+        factors=[Factor("model", ["m"])],
+        design="factorial",
+    )
+
+
+def _agent_writes_marker(counter: list) -> Callable:
+    """A fake agent that rewrites ``work.txt`` per call so every phase commits."""
+
+    def agent(prompt, *, model, backend, workdir, **kwargs):
+        counter.append(prompt)
+        (Path(workdir) / "work.txt").write_text(str(len(counter)))
+        return _fake_agent()
+
+    return agent
+
+
+def test_finding_emit_defaults_on_for_committed_phases(tmp_path, monkeypatch):
+    """(k1 a) DEFAULT settings emit a finding per committed phase — no opt-in flag.
+
+    With ``FINOPS_EMIT_SELF`` unset (the production default), no ``rag_params.emit_self``, and
+    no phase marker, every successful committed phase fires the emit path. The write seam is
+    stubbed to a recorder so the assertion targets the GATE (the default-on flip), not the
+    live KB.
+    """
+    _git_init(tmp_path)
+    monkeypatch.delenv("FINOPS_EMIT_SELF", raising=False)
+    monkeypatch.delenv("FINOPS_CELL_ID", raising=False)
+    spec = _emit_synth_spec(
+        [
+            {"name": "p1", "kind": "agent", "prompt": "do p1"},
+            {"name": "p2", "kind": "agent", "prompt": "do p2"},
+        ]
+    )
+    emitted: list[tuple] = []
+
+    def _recorder(pr, *, goal, scope):
+        emitted.append((pr.phase, pr.status, pr.commit_hash, scope))
+
+    monkeypatch.setattr(workflow_runner, "_emit_self_finding", _recorder)
+
+    result = run_workflow(
+        spec, goal="g", model="m", workdir=tmp_path,
+        run_agentic_fn=_agent_writes_marker([]),
+    )
+    assert [p.phase for p in result.phases] == ["p1", "p2"]
+    assert all(p.status == "ok" and p.commit_hash for p in result.phases)
+    # One finding per committed phase, scoped to the cell — without any opt-in flag.
+    assert [(e[0], e[1]) for e in emitted] == [("p1", "ok"), ("p2", "ok")]
+    assert all(e[2] for e in emitted)
+    assert all(e[3] == f"self-{tmp_path.name}" for e in emitted)
+
+
+def test_finding_emit_no_emit_marker_suppresses_phase(tmp_path, monkeypatch):
+    """(k1 c) a phase with the explicit no-emit marker does not emit — but still commits."""
+    _git_init(tmp_path)
+    monkeypatch.delenv("FINOPS_EMIT_SELF", raising=False)
+    monkeypatch.delenv("FINOPS_CELL_ID", raising=False)
+    spec = _emit_synth_spec(
+        [
+            {"name": "p1", "kind": "agent", "prompt": "do p1", "no_emit": True},
+            {"name": "p2", "kind": "agent", "prompt": "do p2"},
+        ]
+    )
+    emitted: list[str] = []
+    monkeypatch.setattr(
+        workflow_runner, "_emit_self_finding",
+        lambda pr, *, goal, scope: emitted.append(pr.phase),
+    )
+
+    result = run_workflow(
+        spec, goal="g", model="m", workdir=tmp_path,
+        run_agentic_fn=_agent_writes_marker([]),
+    )
+    assert [p.phase for p in result.phases] == ["p1", "p2"]
+    # p1 still committed (the marker suppresses only the finding, never the commit).
+    assert all(p.commit_hash for p in result.phases)
+    assert emitted == ["p2"]
+
+
+def test_finding_emit_explicit_true_outranks_env_disarm(tmp_path, monkeypatch):
+    """(k1 e) the emit_self flag still works when set: True re-enables under the env disarm."""
+    _git_init(tmp_path)
+    monkeypatch.delenv("FINOPS_CELL_ID", raising=False)
+    # conftest sets FINOPS_EMIT_SELF=0; an explicit rag_params.emit_self=True must win.
+    spec = _emit_synth_spec([{"name": "p1", "kind": "agent", "prompt": "do p1"}])
+    emitted: list[str] = []
+    monkeypatch.setattr(
+        workflow_runner, "_emit_self_finding",
+        lambda pr, *, goal, scope: emitted.append(pr.phase),
+    )
+    result = run_workflow(
+        spec, goal="g", model="m", workdir=tmp_path,
+        run_agentic_fn=_agent_writes_marker([]),
+        rag_params={"emit_self": True},
+    )
+    assert result.phases[0].status == "ok" and result.phases[0].commit_hash
+    assert emitted == ["p1"]
+
+
+def test_finding_emit_explicit_false_outranks_default_on(tmp_path, monkeypatch):
+    """(k1 e) the emit_self flag still works when set: False opts a run out of the default."""
+    _git_init(tmp_path)
+    monkeypatch.delenv("FINOPS_EMIT_SELF", raising=False)
+    monkeypatch.delenv("FINOPS_CELL_ID", raising=False)
+    spec = _emit_synth_spec([{"name": "p1", "kind": "agent", "prompt": "do p1"}])
+    emitted: list[str] = []
+    monkeypatch.setattr(
+        workflow_runner, "_emit_self_finding",
+        lambda pr, *, goal, scope: emitted.append(pr.phase),
+    )
+    result = run_workflow(
+        spec, goal="g", model="m", workdir=tmp_path,
+        run_agentic_fn=_agent_writes_marker([]),
+        rag_params={"emit_self": False},
+    )
+    assert result.phases[0].status == "ok" and result.phases[0].commit_hash
+    assert emitted == []
+
+
+def test_finding_emit_default_run_writes_enriched_records(tmp_path, monkeypatch):
+    """(k1 a+b) a DEFAULT run emits one enriched finding per committed phase, end to end.
+
+    The full self-build chain (``run_workflow`` -> ``_emit_self_finding`` ->
+    ``emit_phase_finding`` -> durable artifact) is exercised with the KB seam pointed at tmp
+    (PROJECT_ROOT) and the stream publish captured, so the assertion covers the default-on
+    gate AND the enriched finding text without touching the live KB.
+    """
+    import agentic_dynamics.knowledge.knowledge_ingestion as ki
+    import agentic_dynamics.knowledge.knowledge_stream as ks
+
+    _git_init(tmp_path)
+    monkeypatch.delenv("FINOPS_EMIT_SELF", raising=False)
+    monkeypatch.delenv("FINOPS_CELL_ID", raising=False)
+    spec = _emit_synth_spec(
+        [
+            {"name": "p1", "kind": "agent", "prompt": "do p1"},
+            {"name": "p2", "kind": "agent", "prompt": "do p2"},
+        ]
+    )
+    monkeypatch.setattr(ki, "PROJECT_ROOT", tmp_path)
+    published: list = []
+    monkeypatch.setattr(ks, "connect", lambda: object())
+    monkeypatch.setattr(
+        ks, "publish_event", lambda r, e, **kw: published.append(e) or "0-1"
+    )
+
+    result = run_workflow(
+        spec, goal="g", model="m", workdir=tmp_path,
+        run_agentic_fn=_agent_writes_marker([]),
+    )
+    assert [p.phase for p in result.phases] == ["p1", "p2"]
+    assert all(p.status == "ok" and p.commit_hash for p in result.phases)
+
+    # One durable artifact per committed phase, published to the (stubbed) stream.
+    artifact_paths = sorted((tmp_path / "experiments" / "results" / "kb").glob("*.json"))
+    assert len(artifact_paths) == 2
+    assert len(published) == 2
+
+    records = [json.loads(p.read_text()) for p in artifact_paths]
+    by_phase = {
+        "p1": next(r for r in records if r["text"].startswith("g phase p1 ->")),
+        "p2": next(r for r in records if r["text"].startswith("g phase p2 ->")),
+    }
+    for phase in ("p1", "p2"):
+        rec = by_phase[phase]
+        # The canonical head is preserved and the k1 tail rides after it: status + commit.
+        # No independent test suite ran in this synthetic run, so the verdict stays None ->
+        # ADVISORY (never MEASURED) and no tests split is fabricated.
+        assert rec["text"].startswith(f"g phase {phase} -> test_executed_success None")
+        assert "status ok" in rec["text"]
+        assert "commit " in rec["text"]
+        assert "tests " not in rec["text"]
+        assert rec["authority"] == "ADVISORY"
+        assert rec["evidence_class"] == "[H]"
+        assert rec["source_type"] == "finding"
 
 
 # ── spec_id on the ledger records ───────────────────────────────
