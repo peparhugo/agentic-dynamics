@@ -18,14 +18,35 @@ The fixtures model the last completed wave (kb_finding_layer, run-77f7b899f4f8):
 shape (state succeeded, cost, phase list), its control-db ``runs`` row (state promotable), and
 the shape of its adversarial review doc (docs/reviews/kb_finding_layer_adversarial.md) — all
 synthetic, so the tests are hermetic.
+
+The s3b emission cases (the bottom section) drive the run-completion EMISSION hook — the
+composition root's terminal write in ``scripts/run_workflow.py``, where the ledger + control-db
+terminal write land. Default-on (no flag arms it) and best-effort under the same ``_derived``
+fence as the spec/fact derivations. The s3b DONE_WHEN: a synthetic completed run emits its
+verdict with the measured fields; a failed run emits its failed verdict. These cases run the
+REAL ``_control_terminal_write`` hermetically: ``run_workflow`` is loaded fresh via ``importlib``
+(the same technique ``test_fact_auto_emit.py`` uses — it is not a package), the control db + KB
+artifact dir + registry index are redirected to ``tmp_path``, the knowledge stream is a fake,
+and the spec-index read is stubbed, so the only thing the terminal write can enqueue is the
+wave verdict.
 """
 
 import hashlib
+import importlib.util
 import json
 from pathlib import Path
 
 import pytest
 
+from agentic_dynamics.control.control_db import (
+    ControlDB,
+    RunState,
+)
+from agentic_dynamics.experiment.experiment_spec import (
+    ExperimentSpec,
+    StopSpec,
+    Workflow,
+)
 from agentic_dynamics.knowledge import wave_verdict_ingestion as wv
 from agentic_dynamics.knowledge.knowledge import (
     SOURCE_TYPES,
@@ -37,6 +58,10 @@ from agentic_dynamics.knowledge.knowledge_ingestion import (
     extract_record,
     record_to_artifact,
     record_to_event,
+)
+from agentic_dynamics.runtime.workflow_runner import (
+    PhaseResult,
+    WorkflowRunResult,
 )
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -459,3 +484,369 @@ def test_missing_measured_cost_raises_value_error():
     # would poison the scoreboard's per-wave average.
     with pytest.raises(ValueError, match="cost"):
         wv.derive_wave_verdict(_ledger(total_cost_usd=None), _control_row(cost_usd=None))
+
+
+# ── s3b — the run-completion emission cases (scripts/run_workflow.py's terminal write) ──
+# ════════════════════════════════════════════════════════════════════════════════════════════
+#
+# The s3b DONE_WHEN: every completed spec run emits its wave-verdict narrative at the
+# run-completion path (the composition root where the ledger + control-db terminal write land);
+# a FAILED run still emits (a failure is a verdict, not a silence). Default-on — no flag arms
+# it — and best-effort under the same ``_derived`` fence as the spec/fact derivations.
+#
+# These cases drive the REAL ``scripts/run_workflow._control_terminal_write`` hermetically:
+# the module is loaded fresh via ``importlib`` (the technique ``test_fact_auto_emit.py`` uses —
+# it is not a package), the control db + KB artifact dir + registry index are redirected under
+# ``tmp_path``, the knowledge stream is a fake, and the spec-index read is stubbed so the ONLY
+# payload the terminal write can enqueue is the wave verdict (``no_fact_emit`` is True). Nothing
+# touches the live KB or a real Redis.
+
+EMIT_NOW = "2026-09-03T18:40:28.748198+00:00"
+
+
+def _load_script(rel_path: str, name: str):
+    spec = importlib.util.spec_from_file_location(name, ROOT / rel_path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+@pytest.fixture
+def rw(tmp_path, monkeypatch):
+    """A fresh ``run_workflow`` module, hermetically re-rooted at ``tmp_path``.
+
+    ``ROOT`` is rebound so the s3b review-doc read (``docs/reviews/<spec>_adversarial.md``)
+    resolves under the test's own tree; every other ROOT consumer in the exercised path
+    (the spec index) is stubbed below.
+    """
+    module = _load_script("scripts/run_workflow.py", "run_workflow_under_test_wv")
+    monkeypatch.setattr(module, "ROOT", tmp_path)
+    return module
+
+
+def _emit_spec(name: str = "wave_emit_test") -> ExperimentSpec:
+    """A minimal in-memory ``ExperimentSpec`` — never loaded from a YAML file."""
+    return ExperimentSpec(
+        name=name,
+        question="does the s3b emission hook work",
+        version="0.1",
+        workflow=Workflow(
+            kind="agent_task", params={"model_pool": ["deepseek/deepseek-v4-flash"]}
+        ),
+        factors=[],
+        design="factorial",
+        stop=StopSpec(budget_usd=10.0, max_attempts=1),
+    )
+
+
+def _emit_result(
+    *,
+    spec_name: str = "wave_emit_test",
+    ok: bool = True,
+    awaiting: bool = False,
+    n_phases: int = 8,
+    cost_usd: float = 1.469705,
+    run_id: str = "run-77f7b899f4f8",
+    git_sha: str = "00d15dbf3",
+) -> WorkflowRunResult:
+    """A synthetic ``WorkflowRunResult`` shaped like the kb_finding_layer run's ledger.
+
+    Exactly what ``scripts/run_workflow.py`` holds after ``run_workflow()`` returns (BEFORE the
+    ledger write), which is what ``_control_terminal_write`` is actually handed. ``ok=False``
+    yields the failed-run shape; ``awaiting=True`` the checkpoint-pause shape; ``n_phases=0``
+    the nothing-ran/cancelled shape.
+    """
+    statuses = ["ok"] * n_phases
+    if not ok:
+        statuses[-1] = "failed"
+    phases = [
+        PhaseResult(
+            phase=f"p{i}",
+            kind="agent",
+            status=statuses[i],
+            model="deepseek/deepseek-v4-flash",
+            commit_hash=f"c{i}",
+            cost_usd=cost_usd / n_phases,
+        )
+        for i in range(n_phases)
+    ]
+    return WorkflowRunResult(
+        spec_name=spec_name,
+        spec_id=f"{spec_name}@0.1",
+        model="deepseek/deepseek-v4-flash",
+        workdir="/tmp/x",
+        goal="build it",
+        git_sha=git_sha,
+        started_at=EMIT_NOW,
+        ended_at=EMIT_NOW,
+        run_id=run_id,
+        parent_run_id="",
+        family_id=run_id,
+        awaiting=awaiting,
+        phases=phases,
+    )
+
+
+class _EmitArgs:
+    """The argparse namespace ``_control_terminal_write`` actually reads.
+
+    ``no_fact_emit=True`` deliberately skips the fact producer — these tests prove the wave
+    verdict path, and the fact path is exercised by ``test_fact_auto_emit.py``. The wave
+    verdict is NOT behind that flag (default-on is asserted by these tests emitting while it
+    is set).
+    """
+
+    workdir = "/tmp/x"
+    model = "deepseek/deepseek-v4-flash"
+    only_phase = None
+    no_fact_emit = True
+
+
+@pytest.fixture
+def emission_env(rw, tmp_path, monkeypatch):
+    """Redirect every durable path the terminal write touches, and stub the spec-index read."""
+    monkeypatch.setenv("FINOPS_CONTROL_DB", str(tmp_path / "control" / "control.db"))
+    monkeypatch.setattr("agentic_dynamics.core.paths.KB_ARTIFACT_DIR", tmp_path / "kb")
+    monkeypatch.setattr(
+        "agentic_dynamics.core.paths.REGISTRY_INDEX_PATH",
+        tmp_path / "registry_index.jsonl",
+    )
+    monkeypatch.setattr(rw.si, "load_index_entries", lambda **kw: [])
+    return tmp_path
+
+
+def _mint_run(rw, spec) -> str:
+    """Create the ``running`` run row the terminal write transitions out of."""
+    run_id, db = rw._control_open_run(spec, _EmitArgs())
+    if db is not None:
+        db.close()
+    return run_id
+
+
+class _FakeRedis:
+    """The minimal handle the publisher needs: a consumer-checkpoint hash."""
+
+    def __init__(self):
+        self._checkpoint: dict[str, str] = {}
+
+    def hget(self, key, field):
+        return self._checkpoint.get(field)
+
+    def hset(self, key, field, value):
+        self._checkpoint[field] = value
+
+
+def _run_terminal_write(
+    rw, emission_env, monkeypatch, spec, result, *, run_id, review_text=None
+) -> tuple[_FakeRedis, list]:
+    """Drive the real ``_control_terminal_write`` against the hermetic environment.
+
+    Returns ``(fake_redis, published)`` — the fake stream handle and the list of pointer
+    events the (stubbed) ``publish_event`` captured. ``review_text`` (when given) is written to
+    ``<emission_env>/docs/reviews/<spec>_adversarial.md`` first, modelling an adversarial phase
+    that already ran inside the workflow.
+    """
+    from agentic_dynamics.knowledge import knowledge_stream as real_ks
+
+    fake_redis = _FakeRedis()
+    published: list = []
+    monkeypatch.setattr(real_ks, "connect", lambda *a, **kw: fake_redis)
+    monkeypatch.setattr(real_ks, "publish_event", lambda r, e, **kw: published.append(e) or "1-0")
+    if review_text is not None:
+        doc = emission_env / "docs" / "reviews" / f"{spec.name}_adversarial.md"
+        doc.parent.mkdir(parents=True, exist_ok=True)
+        doc.write_text(review_text, encoding="utf-8")
+    rw._control_terminal_write(
+        spec, _EmitArgs(), result, run_id=run_id, ledger_path=Path("/tmp/ledger.json")
+    )
+    return fake_redis, published
+
+
+def _verdict_artifacts(emission_env) -> list[Path]:
+    """The durable ``wave-verdict`` artifacts the publisher wrote under the redirected KB dir."""
+    kb = emission_env / "kb"
+    out = []
+    for path in sorted(kb.glob("*.json")):
+        data = json.loads(path.read_text(encoding="utf-8"))
+        if data.get("extractor_version") == wv.EXTRACTOR_VERSION:
+            out.append(path)
+    return out
+
+
+def _verdict_payload(path: Path) -> dict:
+    return json.loads(json.loads(path.read_text(encoding="utf-8"))["text"])
+
+
+def _outbox_state(emission_env, run_id) -> tuple:
+    from agentic_dynamics.control.outbox import summarize
+
+    db = ControlDB.open_read_only(emission_env / "control" / "control.db")
+    try:
+        summary = summarize(db, run_id=run_id)
+        state = db.get_run(run_id).state
+    finally:
+        db.close()
+    return state, summary
+
+
+class TestTerminalWriteEmission:
+    """s3b DONE_WHEN: the run-completion path emits the wave verdict — completed + failed."""
+
+    def test_a_completed_run_emits_its_wave_verdict_with_the_measured_fields(
+        self, rw, emission_env, monkeypatch
+    ):
+        """A synthetic succeeded run emits ONE wave-verdict record with the measured fields.
+
+        The verdict is queued in the terminal write's atomic transaction and delivered
+        artifact-first by the drain; ``no_fact_emit=True`` proves it is NOT behind the fact
+        flag (default-on).
+        """
+        spec = _emit_spec()
+        result = _emit_result()
+        run_id = _mint_run(rw, spec)
+        # The composition root stamps the control run id onto the result before the terminal
+        # write (g1) — mirror it so the ledger's run_id is the run row's.
+        result.run_id = run_id
+
+        _run_terminal_write(rw, emission_env, monkeypatch, spec, result, run_id=run_id)
+
+        artifacts = _verdict_artifacts(emission_env)
+        assert len(artifacts) == 1
+        payload = _verdict_payload(artifacts[0])
+        assert payload["spec_name"] == "wave_emit_test"
+        assert payload["run_id"] == run_id
+        assert payload["verdict"] == "clean"  # no review doc → the run's own green disposition
+        assert payload["cost"] == pytest.approx(1.469705)
+        assert payload["phases_total"] == 8
+        assert payload["merge_state"] == "promotable"  # the control-db terminal row, verbatim
+        assert payload["actor"] == "run"
+        assert payload["scope"] == wv.wave_verdict_acl_scope("wave_emit_test", result.model)
+        assert "adversarial_findings_count" not in payload  # no review → never a fabricated 0
+        assert "wave_emit_test" in payload["narrative"] and run_id in payload["narrative"]
+
+        state, summary = _outbox_state(emission_env, run_id)
+        assert state is RunState.PROMOTABLE
+        assert summary.delivered == 1 and summary.pending == 0 and summary.dead == 0
+
+    def test_a_failed_run_emits_its_failed_wave_verdict(
+        self, rw, emission_env, monkeypatch
+    ):
+        """A failure is a verdict, not a silence: a failed run still emits — verdict ``not``."""
+        spec = _emit_spec()
+        result = _emit_result(ok=False)
+        assert result.state == "failed"
+        run_id = _mint_run(rw, spec)
+        result.run_id = run_id
+
+        _run_terminal_write(rw, emission_env, monkeypatch, spec, result, run_id=run_id)
+
+        artifacts = _verdict_artifacts(emission_env)
+        assert len(artifacts) == 1
+        payload = _verdict_payload(artifacts[0])
+        assert payload["run_id"] == run_id
+        assert payload["verdict"] == "not"
+        assert payload["merge_state"] == "failed"
+        assert payload["phases_total"] == 8
+        assert "adversarial_findings_count" not in payload
+        assert payload["actor"] == "run"
+        assert payload["scope"] == wv.wave_verdict_acl_scope("wave_emit_test", result.model)
+
+        state, summary = _outbox_state(emission_env, run_id)
+        assert state is RunState.FAILED
+        assert summary.delivered == 1 and summary.pending == 0
+
+    def test_a_review_doc_at_completion_flows_into_the_emitted_verdict(
+        self, rw, emission_env, monkeypatch
+    ):
+        """When the run's adversarial phase already committed its doc, the verdict reads it.
+
+        The emitted verdict carries the review's merge-ready signal and finding count — the
+        emission reads the doc that exists at completion, exactly as the s3a type does.
+        """
+        spec = _emit_spec()
+        result = _emit_result()
+        review = """---
+status: accepted
+kind: adversarial_review
+spec: wave_emit_test
+---
+# wave_emit_test — adversarial review
+
+**Verdict: PASS (merge-ready).** The claim held under independent probe.
+
+| # | Attack | Disposition | Reasoning |
+|---|---|---|---|
+| F1 | probe A | **RECORD** (accepted limitation) | corpus-sensitive |
+| F2 | probe B | **RECORD** (accepted limitation) | forward-only |
+"""
+        run_id = _mint_run(rw, spec)
+
+        _run_terminal_write(
+            rw, emission_env, monkeypatch, spec, result, run_id=run_id, review_text=review
+        )
+
+        artifacts = _verdict_artifacts(emission_env)
+        assert len(artifacts) == 1
+        payload = _verdict_payload(artifacts[0])
+        assert payload["verdict"] == "merge-ready"
+        assert payload["adversarial_findings_count"] == 2
+        assert payload["residuals"]  # the recorded limitations ride along
+        assert payload["merge_state"] == "promotable"
+
+    def test_an_awaiting_run_emits_no_wave_verdict(self, rw, emission_env, monkeypatch):
+        """A designed checkpoint pause is not a completion — no premature (negative) verdict.
+
+        The run's family continues; the verdict belongs to the run that finally terminates.
+        """
+        spec = _emit_spec()
+        result = _emit_result(awaiting=True)
+        assert result.state == "awaiting_approval"
+        run_id = _mint_run(rw, spec)
+
+        _run_terminal_write(rw, emission_env, monkeypatch, spec, result, run_id=run_id)
+
+        assert _verdict_artifacts(emission_env) == []
+        state, summary = _outbox_state(emission_env, run_id)
+        assert state is RunState.AWAITING_APPROVAL
+        assert summary.delivered == 0 and summary.pending == 0
+
+    def test_a_cancelled_run_that_ran_nothing_emits_no_wave_verdict(
+        self, rw, emission_env, monkeypatch
+    ):
+        """Nothing ran → nothing to judge: a zero-phase cancelled run emits no verdict."""
+        spec = _emit_spec()
+        result = _emit_result(n_phases=0)
+        assert result.state == "cancelled"
+        run_id = _mint_run(rw, spec)
+
+        _run_terminal_write(rw, emission_env, monkeypatch, spec, result, run_id=run_id)
+
+        assert _verdict_artifacts(emission_env) == []
+        state, summary = _outbox_state(emission_env, run_id)
+        assert state is RunState.CANCELLED
+        assert summary.delivered == 0 and summary.pending == 0
+
+    def test_a_wave_verdict_derivation_failure_never_fails_the_run(
+        self, rw, emission_env, monkeypatch, capsys
+    ):
+        """Best-effort under the same ``_derived`` fence as the spec/fact producers.
+
+        A raising verdict derivation costs THAT producer's event and nothing else: the run's
+        terminal state is still recorded. The patch is local to the fresh module under test.
+        """
+        spec = _emit_spec()
+        result = _emit_result()
+
+        def boom(*a, **kw):
+            raise RuntimeError("simulated wave-verdict derivation bug")
+
+        monkeypatch.setattr(rw, "_wave_verdict_review_text", boom)
+        run_id = _mint_run(rw, spec)
+        _run_terminal_write(rw, emission_env, monkeypatch, spec, result, run_id=run_id)
+
+        assert "warning: wave verdict derivation failed" in capsys.readouterr().err
+        assert _verdict_artifacts(emission_env) == []
+        state, summary = _outbox_state(emission_env, run_id)
+        assert state is RunState.PROMOTABLE  # the state survived the producer failure
+        assert summary.pending == 0  # the failed producer queued nothing
+

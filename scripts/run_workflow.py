@@ -56,7 +56,11 @@ from agentic_dynamics.control.step_routing import ModelSignals, route_step  # no
 from agentic_dynamics.experiment.experiment_spec import ExperimentSpec, load_spec  # noqa: E402
 from agentic_dynamics.experiment.spec_status import refresh_spec_status  # noqa: E402
 from agentic_dynamics.knowledge import spec_ingestion as si  # noqa: E402
-from agentic_dynamics.knowledge.knowledge_ingestion import _authorized_kb_write  # noqa: E402
+from agentic_dynamics.knowledge import wave_verdict_ingestion as wv  # noqa: E402
+from agentic_dynamics.knowledge.knowledge_ingestion import (  # noqa: E402
+    _authorized_kb_write,
+    record_to_event,
+)
 from agentic_dynamics.knowledge.record_factory import _now_iso  # noqa: E402
 from agentic_dynamics.runtime.run_clone import (  # noqa: E402
     RUN_CLONE_ENV,
@@ -918,6 +922,89 @@ def _spec_payload(spec_name: str, *, revision: str) -> dict | None:
     return ob.knowledge_payload(record, si.spec_event(record), checkpoint=False)
 
 
+# ── s3b wave-verdict emission (self-knowledge layer, loop 2) ─────────────────
+# At run completion the run emits its OWN wave-verdict narrative — the "what happened and
+# why" the AIO currently re-derives by grep (self_knowledge_layer prereg Edge 3) — via the
+# s3a wave-verdict record type (``knowledge/wave_verdict_ingestion.py``). The emission
+# lands HERE, on the terminal-write path: the record is derived from the SAME ledger +
+# control-db + review artifacts the run just produced and is enqueued in the SAME atomic
+# transaction that records the run's terminal state, so the verdict is as durable as the
+# run row itself. Default-ON (no flag arms it — a completed run's verdict is this path's
+# product, not a remembered chore) and a FAILED run still emits (a failure is a verdict,
+# not a silence). Scope follows the s3a context abstraction: producer run, own
+# workload:<spec>/job:<cell> scope (see ``wv.wave_verdict_acl_scope``).
+
+#: The ledger states that count as a COMPLETED run for the wave-verdict emission.
+#: ``awaiting_approval`` is a designed pause — the run's family continues and a verdict now
+#: would read as a false negative on a green-but-paused run — and ``cancelled`` means nothing
+#: ran (no measured cost, no phases to judge). Only a genuinely completed run — succeeded or
+#: failed — emits its verdict.
+_WAVE_VERDICT_LEDGER_STATES = frozenset({"succeeded", "failed"})
+
+
+def _wave_verdict_review_text(spec_name: str, *, root: Path | None = None) -> str | None:
+    """The spec's adversarial review artifact text, or ``None`` when no review doc exists.
+
+    A wave's adversarial review lives at ``docs/reviews/<spec>_adversarial.md`` (the s3a type's
+    documented artifact; the corpus convention since the k2 backfill). When the spec's workflow
+    declares an adversarial phase it has already run and committed that doc by the time the run
+    reaches its terminal write, so this read finds it in the tree the composition root writes
+    to. A missing doc is the ordinary ``None`` answer — the verdict then falls back to the run's
+    own disposition (clean/not), never a fabricated finding count.
+    """
+    doc = Path(root or ROOT) / "docs" / "reviews" / f"{spec_name}_adversarial.md"
+    if not doc.is_file():
+        return None
+    return doc.read_text(encoding="utf-8")
+
+
+def _wave_verdict_payload(
+    spec: ExperimentSpec,
+    result,
+    *,
+    run_id: str,
+    control_state: str,
+    ledger_path: Path,
+    review_root: Path | None = None,
+) -> dict | None:
+    """Derive this run's wave-verdict record as an OUTBOX payload (or ``None`` when not a completion).
+
+    The derivation half of the s3b emission: the s3a record type consumes the three artifacts
+    that already exist at the terminal write — ``result`` IS the run ledger (the same
+    ``to_dict()`` the composition root just wrote to ``ledger_path``), the control-db row is
+    this run's terminal row (the state this write is about to record, plus the result envelope
+    fields passed to :func:`ob.record_terminal_run` below), and the adversarial review doc when
+    one exists (see :func:`_wave_verdict_review_text`). ``control_state`` is the control-vocabulary
+    terminal state (``promotable`` for a succeeded run — phases passing authorise a promotion,
+    they do not are one). The payload is enqueued unchanged; the publisher delivers artifact
+    first, then the pointer event, exactly as the spec/fact producers' payloads are.
+
+    ``checkpoint=False`` mirrors the spec-lifecycle emission at this same call site: a wave
+    verdict is derived exactly once, enqueued in the run's only terminal transaction (a terminal
+    state is immutable, so no re-run can double-enqueue it), and its registry row is the
+    consumer's job — the weaker dedup claim (consumers key on ``knowledge_id``) is the honest
+    one for a once-only emission.
+    """
+    if result.state not in _WAVE_VERDICT_LEDGER_STATES:
+        # Defense in depth — the call site gates on the same set; a direct caller that hands an
+        # awaiting/cancelled run here gets the honest None rather than a premature verdict.
+        return None
+    ledger = result.to_dict()
+    control_row = {
+        "run_id": run_id,
+        "spec_name": spec.name,
+        "candidate_sha": result.git_sha or "",
+        "state": control_state,
+        "model": result.model,
+        "cost_usd": result.total_cost_usd,
+        "ledger_path": str(ledger_path),
+        "ended_at": result.ended_at or "",
+    }
+    review_text = _wave_verdict_review_text(spec.name, root=review_root)
+    record = wv.build_wave_verdict_record(ledger, control_row, review_text=review_text)
+    return ob.knowledge_payload(record, record_to_event(record))
+
+
 def _control_db() -> ControlDB | None:
     """Open the orchestrator's control database, or ``None`` when it cannot be opened.
 
@@ -1076,10 +1163,31 @@ def _control_terminal_write(
         # a derivation failure leaving the run stuck in `running` forever — would turn a
         # knowledge-plane bug into a phantom in-flight run that the packet and the watchdog
         # would both have to reason about.
+        terminal_state = run_state_from_ledger_state(result.state)
         payloads = []
         payloads.extend(
             _derived("spec record", lambda: _spec_payload(spec.name, revision=result.git_sha))
         )
+        # s3b (self-knowledge layer, loop 2): the run's wave-verdict narrative emits at THIS
+        # path — the composition root where the ledger + control-db terminal write land. The
+        # verdict is enqueued in the same atomic transaction as the terminal state below, so it
+        # is as durable as the run row itself. Default-ON (no flag arms it); a FAILED run still
+        # emits (a failure is a verdict, not a silence). A run that did not COMPLETE — a paused
+        # awaiting_approval checkpoint, or a cancelled run that ran no phases — is not
+        # verdict-bearing and enqueues nothing.
+        if result.state in _WAVE_VERDICT_LEDGER_STATES:
+            payloads.extend(
+                _derived(
+                    "wave verdict",
+                    lambda: _wave_verdict_payload(
+                        spec,
+                        result,
+                        run_id=run_id,
+                        control_state=terminal_state.value,
+                        ledger_path=ledger_path,
+                    ),
+                )
+            )
         if _fact_auto_emit_enabled(args):
             payloads.extend(
                 _derived("workflow facts", lambda: _fact_payloads(spec, args, result))
@@ -1088,7 +1196,7 @@ def _control_terminal_write(
         write = ob.record_terminal_run(
             db,
             run_id,
-            state=run_state_from_ledger_state(result.state),
+            state=terminal_state,
             payloads=payloads,
             reason=f"workflow run ended ({result.state})",
             cost_usd=result.total_cost_usd,
