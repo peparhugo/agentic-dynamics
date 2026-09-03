@@ -79,6 +79,14 @@ WorkingDirectory=@REPO_ROOT@
 Environment=FINOPS_DOCKER_BIN=docker
 Environment=FINOPS_DOCKER_COMPOSE_BIN=docker-compose
 
+# The per-run clone root (F1 closure, fleet_launch_container_smoke cs4): the broker must
+# validate + bind-mount the SAME runs root the container tier mints clones in
+# (docker-compose.ladder.yml x-ladder-env: FINOPS_RUNS_ROOT, shared-/tmp fallback) — a
+# deployed broker defaulting to /var/lib/agentic-dynamics would REFUSE the container's
+# /tmp clone path (reproduced in cs4). Rendered from the same PathConfig/env contract at
+# gen time (the compose default when unset: /tmp/agentic-dynamics-runs).
+Environment=FINOPS_RUNS_ROOT=@RUNS_ROOT@
+
 # The seam socket lives under the user runtime dir (%t = $XDG_RUNTIME_DIR) — the SAME path
 # broker_client.default_socket_path() resolves to for a host-side client in this user session.
 ExecStart=/usr/bin/env python3 scripts/fleet/launch_broker.py serve --socket %t/launch-broker.sock

@@ -45,6 +45,13 @@ UNIT_TEMPLATE = INFRA_DIR / "agentic-dynamics-launch-broker.service"
 UNIT_NAME = "agentic-dynamics-launch-broker.service"
 #: The token the template carries in place of every repo-dependent host path.
 REPO_TOKEN = "@REPO_ROOT@"
+#: The token for the per-run clone root the broker must share with the container tier
+#: (F1 closure, fleet_launch_container_smoke cs4 — the compose x-ladder-env default).
+RUNS_TOKEN = "@RUNS_ROOT@"
+#: The per-run clone root default — MUST match docker-compose.ladder.yml's
+#: x-ladder-env FINOPS_RUNS_ROOT fallback (a drifted default makes the broker refuse the
+#: container tier's clone path).
+DEFAULT_RUNS_ROOT = "/tmp/agentic-dynamics-runs"
 #: The default install target: the operator's systemd USER unit directory.
 DEFAULT_OUTPUT = Path.home() / ".config" / "systemd" / "user" / UNIT_NAME
 
@@ -55,9 +62,9 @@ if str(_REPO_ROOT / "src") not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT / "src"))
 
 #: The number of repo-dependent fields the template pins (Environment=REPO=, WorkingDirectory=,
-#: Documentation=file://) — a template that grows a fourth occurrence is a shape change this
-#: generator must not absorb silently.
-EXPECTED_TOKEN_COUNT = 3
+#: Documentation=file://, Environment=FINOPS_RUNS_ROOT=) — a template that grows a fifth
+#: occurrence is a shape change this generator must not absorb silently.
+EXPECTED_TOKEN_COUNT = 4
 
 
 def derive_repo_root(env: Mapping[str, str] | None = None) -> Path:
@@ -73,7 +80,8 @@ def derive_repo_root(env: Mapping[str, str] | None = None) -> Path:
     return PathConfig.from_env(env).repo_root
 
 
-def render_unit(repo_root: Path | str, template_text: str | None = None) -> str:
+def render_unit(repo_root: Path | str, template_text: str | None = None,
+                 runs_root: Path | str | None = None) -> str:
     """Substitute every ``@REPO_ROOT@`` token in the unit template with ``repo_root``.
 
     Pins the template shape first: exactly :data:`EXPECTED_TOKEN_COUNT` tokens must be present
@@ -82,15 +90,18 @@ def render_unit(repo_root: Path | str, template_text: str | None = None) -> str:
     unit. ``template_text`` is injectable for tests; the default reads the committed template.
     """
     text = UNIT_TEMPLATE.read_text() if template_text is None else template_text
-    if text.count(REPO_TOKEN) != EXPECTED_TOKEN_COUNT:
+    if text.count(REPO_TOKEN) + text.count(RUNS_TOKEN) != EXPECTED_TOKEN_COUNT:
         raise ValueError(
-            f"launch-broker unit template carries {text.count(REPO_TOKEN)} {REPO_TOKEN!r} "
-            f"tokens, expected {EXPECTED_TOKEN_COUNT} (Environment=REPO=, WorkingDirectory=, "
-            f"Documentation=file://) — a repo-dependent field changed shape; update the "
-            f"generator before rendering"
+            f"launch-broker unit template carries {text.count(REPO_TOKEN)} {REPO_TOKEN!r} + "
+            f"{text.count(RUNS_TOKEN)} {RUNS_TOKEN!r} tokens, expected {EXPECTED_TOKEN_COUNT} "
+            f"(Environment=REPO=, WorkingDirectory=, Documentation=file://, "
+            f"Environment=FINOPS_RUNS_ROOT=) — a repo-dependent field changed shape; update "
+            f"the generator before rendering"
         )
     rendered = text.replace(REPO_TOKEN, str(repo_root))
+    rendered = rendered.replace(RUNS_TOKEN, str(runs_root))
     assert REPO_TOKEN not in rendered, "every repo token must be substituted"
+    assert RUNS_TOKEN not in rendered, "every runs-root token must be substituted"
     return rendered
 
 
@@ -106,7 +117,10 @@ def install(
     first user unit is installed). Returns the written path.
     """
     root = Path(repo_root) if repo_root is not None else derive_repo_root(env)
-    rendered = render_unit(root)
+    runs = Path(runs_root) if runs_root is not None else Path(
+        env.get("FINOPS_RUNS_ROOT", DEFAULT_RUNS_ROOT) if env else DEFAULT_RUNS_ROOT
+    )
+    rendered = render_unit(root, runs_root=runs)
     out = Path(output)
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(rendered)
