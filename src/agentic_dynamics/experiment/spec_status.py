@@ -42,7 +42,11 @@ from pathlib import Path
 from typing import Any
 
 from agentic_dynamics.core.paths import PROJECT_ROOT
-from agentic_dynamics.experiment.experiment_spec import ExperimentSpec, load_spec
+from agentic_dynamics.experiment.experiment_spec import (
+    ExperimentSpec,
+    committed_spec_paths,
+    load_spec,
+)
 
 # ── Constants ───────────────────────────────────────────────────
 
@@ -767,16 +771,14 @@ def sort_entries(entries: list[SpecStatusEntry]) -> list[SpecStatusEntry]:
 
 
 def _spec_paths(root_path: Path) -> list[Path]:
-    """Every committed spec YAML across the split layout (design §4).
+    """Every committed ExperimentSpec YAML across the split spec layout (design §4).
 
-    Genuine experiment definitions live at the top level of ``experiments/definitions/``;
-    work-order specs live under ``workflows/`` (recursively). The measurement configs
-    (``experiments/definitions/configs/``) and grid/sweep configs (``experiments/campaigns/``)
-    are configs, not ExperimentSpecs, and are deliberately excluded.
+    Delegates to :func:`experiment_spec.committed_spec_paths`, which excludes workflow-v1
+    definitions (the Wave-3 authoring contract — the canonical examples under
+    ``workflows/examples/`` are a different document kind, never ExperimentSpecs and never
+    entries in this index).
     """
-    paths = sorted((root_path / "experiments" / "definitions").glob("*.yaml"))
-    paths += sorted((root_path / "workflows").rglob("*.yaml"))
-    return paths
+    return committed_spec_paths(root_path)
 
 
 def collect_entries(*, root: Path | str = PROJECT_ROOT) -> list[SpecStatusEntry]:

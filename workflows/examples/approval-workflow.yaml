@@ -1,0 +1,59 @@
+# workflows/examples/approval-workflow.yaml
+#
+# Canonical shape 2 of 4 (a2): a change that needs the CONTROLLER'S SIGN-OFF.
+#
+# implement (mutating agent) -> verify (machine test gate) -> approve (human approval
+# checkpoint bound to the same candidate). Promotion requires BOTH gates: machine evidence
+# first, then the controller's attributed approval. A human approval is legitimate gate
+# evidence (kind: approval, executor: human) — the one place the evidence is a person's
+# decision rather than a test verdict, and the reason this workflow carries no agent
+# executor on its checkpoint.
+apiVersion: agentic-dynamics.io/v1
+kind: Workflow
+metadata:
+  name: approval-workflow
+  revision: "1"
+  lifecycle: development
+  title: Approval-gated agent workflow
+  description: >-
+    An agent step, a machine verifier gate, and a human approval checkpoint; promotion
+    requires the gate and the approval.
+spec:
+  baseRef: main
+  workspace:
+    mode: isolated
+  concurrency:
+    group: approval-workflow
+    policy: serial
+  steps:
+    - id: implement
+      kind: agent
+      executor: agent
+      scope: implementation
+      prompt: >-
+        Implement the requested change in this worktree and commit it, with tests for
+        the behavior you add. Prompt text is scaffolded instructions only — the verify
+        gate's test verdict is the evidence for correctness, and the approve checkpoint
+        is the controller's call.
+    - id: verify
+      kind: gate
+      executor: test
+      scope: research_readonly
+      needs: [implement]
+      candidateFrom: implement
+      description: >-
+        Machine evidence: the independent test suite run against the implement step's
+        candidate sha. Required gate — its evidence is the executor's verdict.
+    - id: approve
+      kind: approval
+      executor: human
+      needs: [verify]
+      candidateFrom: implement
+      description: >-
+        The controller's checkpoint. A human approval is legitimate gate evidence for a
+        permanence decision — it binds the operator's name to this candidate sha and only
+        fires after the machine gate has passed.
+  promotion:
+    candidateFrom: implement
+    strategy: squash-merge
+    requiredGates: [verify, approve]

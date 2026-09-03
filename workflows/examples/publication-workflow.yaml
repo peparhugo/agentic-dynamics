@@ -1,0 +1,67 @@
+# workflows/examples/publication-workflow.yaml
+#
+# Canonical shape 4 of 4 (a2): PUBLISHING THE SITE as a gated pipeline.
+#
+# One deterministic task (build) regenerates the site and commits the built candidate; three
+# machine gates are bound to that candidate and required before promotion:
+#   - html-consistency: every published page's figures agree with data.js
+#   - receipt: produce + verify the publication/v1 receipt BEFORE anything deploys
+#   - deploy: deploy canonical + mirror Firebase hosts and post-deploy-check that the live
+#     sites serve the data.js the receipt names; the gate's pass IS the deploy evidence
+# There is no agent step: the whole pipeline is deterministic, and every gate's evidence is
+# its command executor's verdict — prompt text is never the gate evidence here.
+apiVersion: agentic-dynamics.io/v1
+kind: Workflow
+metadata:
+  name: publication-workflow
+  revision: "1"
+  lifecycle: development
+  title: Site publication workflow
+  description: >-
+    Build the site artifacts, then gate the candidate on HTML consistency, a publication
+    receipt, and a verified deploy of both Firebase hosts before the candidate is promoted.
+spec:
+  baseRef: main
+  workspace:
+    mode: isolated
+  concurrency:
+    group: publication-workflow
+    policy: serial
+  steps:
+    - id: build
+      kind: task
+      executor: command
+      scope: implementation
+      prompt: >-
+        Rebuild the site artifacts: regenerate apps/website/data.js and the HTML from the
+        current corpus, regenerate the manifest, and commit the built candidate.
+        Deterministic — this step's output is the candidate the gates verify.
+    - id: html-consistency
+      kind: gate
+      executor: command
+      needs: [build]
+      candidateFrom: build
+      description: >-
+        Verify every published page's figures agree with data.js — a page that contradicts
+        the data fails this gate.
+    - id: receipt
+      kind: gate
+      executor: command
+      needs: [build]
+      candidateFrom: build
+      description: >-
+        Produce and verify the publication/v1 receipt naming the built data.js hash before
+        anything is deployed. A receipt that does not match the candidate fails.
+    - id: deploy
+      kind: gate
+      executor: command
+      needs: [html-consistency, receipt]
+      candidateFrom: build
+      description: >-
+        Deploy the candidate to BOTH Firebase hosts (canonical + mirror) and run the
+        post-deploy check that the live sites serve the receipt's data.js. The gate passes
+        only when the deploy is verified.
+  promotion:
+    candidateFrom: build
+    strategy: squash-merge
+    requiredGates: [html-consistency, receipt, deploy]

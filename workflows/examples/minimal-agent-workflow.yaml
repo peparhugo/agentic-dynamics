@@ -1,0 +1,51 @@
+# workflows/examples/minimal-agent-workflow.yaml
+#
+# Canonical shape 1 of 4 (a2): the SMALLEST valid workflow-v1 definition.
+#
+# One mutating agent step (implement) produces a candidate sha; one test gate (verify)
+# is bound to that candidate; promotion requires the gate. This is the positive case a
+# `workflow new <name>` scaffold starts from and the base every other example grows.
+#
+# By construction none of the a1 rejections fire: no authored operational status (completion
+# follows the revision), a real concurrency policy, one mutating step that IS verified, a
+# promotion that names a real required gate, and a gate whose evidence is its test executor
+# — never prompt text.
+apiVersion: agentic-dynamics.io/v1
+kind: Workflow
+metadata:
+  name: minimal-agent-workflow
+  revision: "1"
+  lifecycle: development
+  title: Minimal agent workflow
+  description: >-
+    The smallest valid workflow: one agent step produces a candidate, a test gate
+    verifies it, and promotion requires that gate's pass.
+spec:
+  baseRef: main
+  workspace:
+    mode: isolated
+  concurrency:
+    group: minimal-agent-workflow
+    policy: serial
+  steps:
+    - id: implement
+      kind: agent
+      executor: agent
+      scope: implementation
+      prompt: >-
+        Implement the requested change in this worktree and commit it, with tests for
+        the behavior you add. This prompt is scaffolded instruction only — it is never
+        gate evidence; the verify gate's test verdict is the evidence.
+    - id: verify
+      kind: gate
+      executor: test
+      scope: research_readonly
+      needs: [implement]
+      candidateFrom: implement
+      description: >-
+        The independent test-suite verifier run against the implement step's candidate
+        sha. A required test gate's evidence IS its executor's verdict.
+  promotion:
+    candidateFrom: implement
+    strategy: squash-merge
+    requiredGates: [verify]

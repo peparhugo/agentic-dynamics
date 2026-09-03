@@ -14,6 +14,7 @@ from agentic_dynamics.experiment.experiment_spec import (
     MetricSpec,
     RuleSpec,
     Workflow,
+    committed_spec_paths,
     compute_workflow_revision_id,
     load_spec,
     validate_rules,
@@ -446,8 +447,7 @@ def test_committed_specs_all_load_without_unknown_key_warnings(recwarn):
     YAML that this dataclass does not know about would light up here rather than in a run.
     """
     specs_dir = Path(__file__).resolve().parent.parent
-    paths = sorted((specs_dir / "experiments" / "definitions").glob("*.yaml"))
-    paths += sorted((specs_dir / "workflows").rglob("*.yaml"))
+    paths = committed_spec_paths(specs_dir)
     assert len(paths) >= 63, f"expected the committed spec corpus, found {len(paths)}"
     for path in paths:
         spec = load_spec(path)
@@ -527,8 +527,7 @@ def test_committed_spec_corpus_passes_the_prose_safety_gate():
     deploys in prose must declare the mechanical markers, or this test fails.
     """
     specs_dir = Path(__file__).resolve().parent.parent
-    paths = sorted((specs_dir / "experiments" / "definitions").glob("*.yaml"))
-    paths += sorted((specs_dir / "workflows").rglob("*.yaml"))
+    paths = committed_spec_paths(specs_dir)
     assert len(paths) >= 63, f"expected the committed spec corpus, found {len(paths)}"
     for path in paths:
         spec = load_spec(path)

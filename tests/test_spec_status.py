@@ -15,7 +15,12 @@ from pathlib import Path
 
 import pytest
 
-from agentic_dynamics.experiment.experiment_spec import ExperimentSpec, Factor, Workflow
+from agentic_dynamics.experiment.experiment_spec import (
+    ExperimentSpec,
+    Factor,
+    Workflow,
+    committed_spec_paths,
+)
 pytestmark = pytest.mark.fast
 
 from agentic_dynamics.experiment.spec_status import (
@@ -747,10 +752,15 @@ def test_read_back_never_raises_on_a_missing_or_broken_index(tmp_path: Path):
 
 
 def test_the_committed_spec_corpus_indexes_without_exceptions():
-    """Every committed spec must appear in the index, derived from the real checkout."""
+    """Every committed ExperimentSpec must appear in the index, derived from the real checkout.
+
+    ``committed`` comes from the same discovery the index itself scans
+    (``experiment_spec.committed_spec_paths``), which excludes workflow-v1 definitions (the
+    Wave-3 authoring contract under ``workflows/examples/``) — a different document kind that
+    is never an ExperimentSpec index entry.
+    """
     entries = collect_entries(root=PROJECT_ROOT)
-    committed = sorted((PROJECT_ROOT / "experiments" / "definitions").glob("*.yaml"))
-    committed += sorted((PROJECT_ROOT / "workflows").rglob("*.yaml"))
+    committed = committed_spec_paths(PROJECT_ROOT)
     assert len(committed) >= 63, f"expected the committed corpus, found {len(committed)}"
     assert len(entries) == len(committed), "every committed spec must appear in the index"
     assert all(e.name and e.version for e in entries)
