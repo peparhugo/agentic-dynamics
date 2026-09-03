@@ -1,3 +1,7 @@
+---
+status: proposed
+---
+
 # The self-knowledge layer (loop 2) — design
 
 **Status:** proposed (2026-09-03). The finding layer (loop 1's distilled layer, `kb_finding_layer`

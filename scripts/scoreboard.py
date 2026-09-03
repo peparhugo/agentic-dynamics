@@ -96,6 +96,16 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _fmt(value: Any) -> str:
+    """Render a measured figure or ``n/a`` — an absent backing field is n/a, never ``None``.
+
+    The aggregation's "measured-or-absent" rule makes an empty/absent row ``None`` (never a
+    fabricated zero); the human renderer mirrors that rule so a reader sees ``n/a`` rather than
+    a literal ``None`` for a row the records do not back.
+    """
+    return "n/a" if value is None else str(value)
+
+
 def _render_human(doc: dict[str, Any], *, source: str) -> str:
     """Render the scoreboard's measured rows as the human summary.
 
@@ -107,17 +117,17 @@ def _render_human(doc: dict[str, Any], *, source: str) -> str:
     cov = body["coverage"]
     lines = [
         f"[scoreboard] {totals['waves_completed']} wave(s) completed "
-        f"({totals['waves_merged']} merged, merge rate "
-        f"{totals['merge_rate'] if totals['merge_rate'] is not None else 'n/a'})",
+        f"({totals['waves_merged']} merged, merge rate {_fmt(totals['merge_rate'])})",
         f"            adversarial: {totals['adversarial_findings_total']} finding(s) across "
         f"{totals['waves_reviewed']} reviewed wave(s), "
-        f"{totals['adversarial_findings_per_reviewed_wave'] if totals['adversarial_findings_per_reviewed_wave'] is not None else 'n/a'} per reviewed wave",
-        f"            cost/wave (mean {totals['cost_per_wave_usd']['mean']}, median "
-        f"{totals['cost_per_wave_usd']['median']})  phases/wave (mean "
-        f"{totals['phases_per_wave']['mean']}, median {totals['phases_per_wave']['median']})",
+        f"{_fmt(totals['adversarial_findings_per_reviewed_wave'])} per reviewed wave",
+        f"            cost/wave (mean {_fmt(totals['cost_per_wave_usd']['mean'])}, median "
+        f"{_fmt(totals['cost_per_wave_usd']['median'])})  phases/wave (mean "
+        f"{_fmt(totals['phases_per_wave']['mean'])}, median "
+        f"{_fmt(totals['phases_per_wave']['median'])})",
         f"            time-to-merge (mean "
-        f"{totals['time_to_merge_hours']['mean']}, median "
-        f"{totals['time_to_merge_hours']['median']}) over "
+        f"{_fmt(totals['time_to_merge_hours']['mean'])}, median "
+        f"{_fmt(totals['time_to_merge_hours']['median'])}) over "
         f"{totals['time_to_merge_hours']['merged_with_timing']}/{cov['merged_waves']} merged "
         f"wave(s) with timing",
         f"            recomputed from {sb.EXTRACTOR_VERSION} records — {source}",
@@ -125,7 +135,8 @@ def _render_human(doc: dict[str, Any], *, source: str) -> str:
     for row in body["per_model"]:
         lines.append(
             f"  [{row['model']}] {row['waves']} wave(s), {row['merged']} merged "
-            f"(rate {row['merge_rate']}), cost/wave mean {row['cost_per_wave_usd']['mean']}"
+            f"(rate {_fmt(row['merge_rate'])}), cost/wave mean "
+            f"{_fmt(row['cost_per_wave_usd']['mean'])}"
         )
     return "\n".join(lines)
 
