@@ -128,12 +128,15 @@ _COMMANDS: dict[tuple[str, ...], str] = {
     ("control", "status"): "control_status.py",
     ("control", "drain-outbox"): "control_drain_outbox.py",
     ("control", "sweep-zombies"): "control_sweep_zombies.py",
-    # session (the self-knowledge layer, s1b — loop 2: the machine learning about itself
-    # operating). `session close` writes the AIO's session-spine record via the s1a
-    # meta_session type (what ran, what merged, what parked, open threads, self-notes) —
-    # rerun-safe (an identical re-close is a no-op) and best-effort (a producer failure is a
-    # warning, never a crash). The s1c `open` verb extends this group in its own phase.
+    # session (the self-knowledge layer — loop 2: the machine learning about itself operating).
+    # `session close` (s1b) writes the AIO's session-spine record via the s1a meta_session type
+    # (what ran, what merged, what parked, open threads, self-notes) — rerun-safe (an identical
+    # re-close is a no-op) and best-effort (a producer failure is a warning, never a crash).
+    # `session open` (s1c) is the read half: it retrieves the LAST session's close record and
+    # renders it as the opening context (decisions, open threads, parked items, self-notes), or
+    # a clear first-session bootstrap when no close exists.
     ("session", "close"): "session_close.py",
+    ("session", "open"): "session_open.py",
     # publication (the ONE publication transaction — control_db_publication p6). Deploying the
     # website is a P0 controller-only action: `publish release` refuses without --operator and
     # records both hosts + the publication/v1 receipt in the control database.
@@ -186,7 +189,7 @@ Subcommands (each forwards to its backing script):
   validate    session|tests|prereq|preexisting
   supervise   [claude-agents|orphans|leases]
   control     status|drain-outbox|sweep-zombies
-  session     close
+  session     open|close
   publish     release
   release     check-protection
   surfaces    sync|snapshot

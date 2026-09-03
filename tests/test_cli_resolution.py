@@ -114,8 +114,10 @@ DOCUMENTED_RESOLUTIONS: list[tuple[tuple[str, ...], str, tuple[str, ...]]] = [
     (("control", "sweep-zombies"), "control_sweep_zombies.py", ()),
     # publish — the ONE publication transaction (control_db_publication p6).
     (("publish", "release"), "publish_release.py", ()),
-    # session — the self-knowledge layer (s1b): `close` writes the AIO's session-spine record.
+    # session — the self-knowledge layer: `close` (s1b) writes the AIO's session-spine record;
+    # `open` (s1c) retrieves the last close as the opening context (or the first-session bootstrap).
     (("session", "close"), "session_close.py", ()),
+    (("session", "open"), "session_open.py", ()),
     # release
     (("release", "check-protection"), "check_branch_protection.py", ()),
     # surfaces — the self-maintenance command (design: system_knowledge_abstraction)

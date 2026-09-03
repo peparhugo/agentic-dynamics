@@ -5,7 +5,8 @@ The session spine's record TYPE (phase ``s1a_session_record_type`` of the
 A session record is the machine's own posterior about a session of itself operating: what
 waves ran, what merged, what got parked, the open threads, and the AIO's self-notes on what it
 got wrong. Open retrieves the LAST close (s1c); close writes its own (s1b); this module is the
-record type both ride on.
+record type both ride on — the write seam (:func:`close_session`) and the read seam
+(:func:`open_session`, the ``session open`` command's retrieval).
 
 ``source_type`` is ``"meta_session"`` — the SAME type the ledger's embryonic per-attempt lines
 carry (27 rows, all 2026-08-19, verified at the s0 pin). This is deliberate, not a collision:
@@ -401,3 +402,293 @@ def close_session(
         entry_id=entry_id,
         warnings=warnings,
     )
+
+
+# ── Open retrieval (s1c — the ``session open`` command's read seam) ─────────
+
+
+def session_artifact_files(artifact_dir: Path) -> list[Path]:
+    """Every ``*.json`` file under the durable artifact dir, in filename order.
+
+    The artifact dir is shared by EVERY producer (19k+ records), so this is a *scan*, not a
+    read of one known file: the session spine family is found by content, never by guessable
+    filename. The filename order is the deterministic base scan; the resolver re-orders below.
+    A missing dir (a fresh checkout with no KB yet) is simply empty — the first-session state.
+    """
+    if not artifact_dir.is_dir():
+        return []
+    return sorted(artifact_dir.glob("*.json"), key=lambda path: path.name)
+
+
+_ARTIFACT_RECORD = "record"
+_ARTIFACT_FOREIGN = "foreign"
+_ARTIFACT_ANOMALY = "anomaly"
+
+
+def _classify_session_artifact(
+    path: Path, *, repository_id: str = REPOSITORY_ID
+) -> tuple[str, dict[str, Any] | None, dict[str, Any] | None]:
+    """Classify ONE durable artifact file into ``(kind, artifact_fields, payload)``.
+
+    The kind is one of:
+
+    * ``"record"`` — an AIO org-root session-spine record: ``(artifact, payload)`` is returned.
+    * ``"foreign"`` — NOT a session-spine record of this org scope: any other producer's
+      artifact (the ``extractor_version`` discriminator — the legacy ledger ``meta_session``
+      lines are ``ledger/v1`` and never match), a record from another repository (the scope
+      pre-filter), or an undecodable file. Skipped silently — the artifact dir holds every
+      producer's rows and only the spine family in THIS org is a candidate for ``session open``.
+    * ``"anomaly"`` — IS a ``session/v1`` artifact of this org but is NOT a readable AIO
+      org-root record: a corrupt spine artifact (a truncated close) or a record whose body
+      ``actor``/``scope`` are not the AIO's (the body keys travel in the payload so the record
+      is self-describing). Surfaced as a warning — an honest signal, never a silent skip.
+    """
+    try:
+        raw = path.read_bytes()
+    except OSError:
+        return _ARTIFACT_FOREIGN, None, None
+    try:
+        artifact = json.loads(raw.decode("utf-8"))
+    except (UnicodeDecodeError, ValueError):
+        return _ARTIFACT_FOREIGN, None, None
+    if not isinstance(artifact, dict):
+        return _ARTIFACT_FOREIGN, None, None
+    if artifact.get("extractor_version") != EXTRACTOR_VERSION:
+        return _ARTIFACT_FOREIGN, None, None
+    if artifact.get("repository_id") != repository_id:
+        # A session/v1 record of ANOTHER repository: legitimately not ours, skipped silently
+        # (a cell/workload repository never equals the org id — a shared-dir neighbor is not
+        # this read's business and warning on it would be noise at every scan).
+        return _ARTIFACT_FOREIGN, None, None
+    text = artifact.get("text")
+    if not isinstance(text, str):
+        return _ARTIFACT_ANOMALY, None, None
+    try:
+        payload = json.loads(text)
+    except ValueError:
+        return _ARTIFACT_ANOMALY, None, None
+    if not isinstance(payload, dict):
+        return _ARTIFACT_ANOMALY, None, None
+    if payload.get("actor") != ACTOR:
+        return _ARTIFACT_ANOMALY, None, None
+    if payload.get("scope") != aio_acl_scope(repository_id):
+        return _ARTIFACT_ANOMALY, None, None
+    return _ARTIFACT_RECORD, artifact, payload
+
+
+def parse_session_artifact(
+    path: Path, *, repository_id: str = REPOSITORY_ID
+) -> tuple[dict[str, Any], dict[str, Any]] | None:
+    """Parse ONE durable artifact file into ``(artifact_fields, payload)``.
+
+    ``artifact_fields`` is the parsed durable record (the on-disk rows blank
+    ``knowledge_id``/``content_hash``/volatile clocks — see :func:`close_session`), with
+    ``payload`` the decoded content body (``text``) that carries the seven session fields plus
+    ``actor``/``scope``.
+
+    Returns ``None`` — the file is SKIPPED, never an error — when it is not a readable AIO
+    org-root session-spine record (:func:`_classify_session_artifact`'s ``foreign`` and
+    ``anomaly`` kinds; callers who need the distinction use the classifier directly).
+
+    The read is a DIRECT read of the durable artifact — the same store ``close_session``
+    writes and every consumer verifies — never the registry projection, which requires a live
+    consumer: the round-trip (close then open) must be exact the moment the close lands, with
+    no kb-registry-v1 dependency.
+    """
+    kind, artifact, payload = _classify_session_artifact(path, repository_id=repository_id)
+    if kind != _ARTIFACT_RECORD:
+        return None
+    return artifact, payload
+
+
+def scan_session_records(
+    *, repository_id: str = REPOSITORY_ID, artifact_dir: Path | None = None
+) -> tuple[list[tuple[Path, dict[str, Any], dict[str, Any]]], list[str]]:
+    """Scan the durable artifact dir for every AIO org-root session record.
+
+    Returns ``(triples, warnings)`` where each triple is ``(path, artifact_fields, payload)``
+    for one session-spine record in the requested org scope, and ``warnings`` names the
+    ``session/v1`` artifacts of this org that are NOT readable AIO org-root records (the
+    classifier's ``anomaly`` kind — a corrupt spine artifact or a foreign-actor record).
+    ``artifact_dir`` defaults to the repo's durable KB artifact directory
+    (``core.paths.KB_ARTIFACT_DIR``).
+    """
+    from agentic_dynamics.core.paths import KB_ARTIFACT_DIR
+
+    artifact_dir = artifact_dir or KB_ARTIFACT_DIR
+    warnings: list[str] = []
+    triples: list[tuple[Path, dict[str, Any], dict[str, Any]]] = []
+    for path in session_artifact_files(artifact_dir):
+        kind, artifact, payload = _classify_session_artifact(path, repository_id=repository_id)
+        if kind == _ARTIFACT_RECORD:
+            triples.append((path, artifact, payload))
+        elif kind == _ARTIFACT_ANOMALY:
+            warnings.append(
+                f"{path.name}: a session/v1 artifact that is not a readable AIO org-root "
+                "session record — excluded from the spine read"
+            )
+    return triples, warnings
+
+
+def _selection_key(
+    triple: tuple[Path, dict[str, Any], dict[str, Any]],
+) -> tuple[str, str, float, str]:
+    """Deterministic "most recent close" ordering over one session-spine artifact triple.
+
+    The spine's time axis is the SESSION's own date (the record deliberately stamps
+    ``session_date``, and the artifact blanks volatile clocks so its bytes are rerun-safe), so
+    content — never the filesystem wall-clock alone — orders the candidates: greatest
+    ``session_date`` first. Within a date the ``slug`` tie-breaks deterministically (two
+    sessions closed the same day cannot be ordered by content — lexicographic slug order is
+    the documented, checkout-stable resolution), and within the same session slot (re-close of
+    a changed body) the newer write — file mtime, then the content-addressed filename — is the
+    newer version. This ordering survives a fresh checkout, where git resets every artifact's
+    mtime and only content survives.
+    """
+    _path, artifact, payload = triple
+    try:
+        mtime = _path.stat().st_mtime
+    except OSError:
+        mtime = 0.0
+    return (
+        str(payload.get("session_date") or ""),
+        str(payload.get("slug") or ""),
+        mtime,
+        _path.name,
+    )
+
+
+@dataclass
+class SessionOpenResult:
+    """What one :func:`open_session` call resolved — the ``session open`` command's outcome.
+
+    ``status`` is one of:
+
+    * ``"opened"`` — a prior close was found and resolved: ``slug`` names the session,
+      ``payload`` carries its seven content fields (the opening context), and ``artifact`` /
+      ``artifact_path`` / ``knowledge_id`` / ``entity_id`` identify the durable record.
+    * ``"bootstrap"`` — NO prior close exists (or none for the requested ``slug``): the
+      first-session state. ``payload`` is ``None`` and ``slug`` repeats the requested slug when
+      one was given (so a caller can see which session slot came up empty).
+
+    ``requested_slug`` records the optional slug filter the caller asked for (``None`` = the
+    default "last session" read). ``candidates`` counts every AIO org-root session record the
+    scan found before the slug filter / selection — a "last of N" context for the report.
+    ``warnings`` lists the scan's anomalies (see :func:`scan_session_records`).
+    """
+
+    status: str
+    slug: str | None = None
+    payload: dict[str, Any] | None = None
+    artifact: dict[str, Any] | None = None
+    artifact_path: Path | None = None
+    knowledge_id: str | None = None
+    entity_id: str | None = None
+    requested_slug: str | None = None
+    candidates: int = 0
+    warnings: list[str] = _dataclass_field(default_factory=list)
+
+
+def open_session(
+    *,
+    slug: str | None = None,
+    repository_id: str = REPOSITORY_ID,
+    artifact_dir: Path | None = None,
+) -> SessionOpenResult:
+    """Open a session: retrieve the LAST session's close record (or one named session's).
+
+    This is the read seam of the ``agentic-dynamics session open`` command (phase
+    ``s1c_open_reader`` of the ``self_knowledge_layer`` wave). The AIO's operating cadence
+    closes every session it ends, so opening the next session retrieves its predecessor's
+    posterior — decisions, open threads, parked items, self-notes — instead of starting from a
+    fresh prior.
+
+    **Direct read, org-scoped.** Candidates are the durable artifacts the s1b close writes
+    (``core.paths.KB_ARTIFACT_DIR``), filtered to the AIO org-root spine family
+    (``extractor_version`` ``session/v1``, ``repository_id`` the org id, body ``actor``/``scope``
+    the AIO's). A cell/workload repository never equals the org id, so this read is exactly the
+    explicit org-root read the scope fence reserves to the AIO — it resolves none of a cell's
+    records. The registry projection is deliberately NOT consulted: it needs a live consumer,
+    and the round-trip (close then open) must be exact the moment the close lands.
+
+    **Resolution.** ``slug=None`` (default) resolves the LAST session — the candidate that
+    maximizes ``(session_date, slug, mtime, filename)`` (see :func:`_selection_key`); with a
+    ``slug``, the most recent close OF THAT session slot. No candidates (or none matching the
+    slug) resolves ``status="bootstrap"`` — the clear first-session state, never an error.
+    ``artifact_dir`` defaults to the repo's durable KB artifact directory and is injectable so
+    tests can point at a tmp dir.
+    """
+    from agentic_dynamics.core.paths import KB_ARTIFACT_DIR
+
+    artifact_dir = artifact_dir or KB_ARTIFACT_DIR
+    requested = (slug or "").strip() or None
+    triples, warnings = scan_session_records(repository_id=repository_id, artifact_dir=artifact_dir)
+    candidates = len(triples)
+    if requested is not None:
+        triples = [triple for triple in triples if str(triple[2].get("slug") or "") == requested]
+    if not triples:
+        return SessionOpenResult(
+            status="bootstrap",
+            slug=requested,
+            requested_slug=requested,
+            candidates=candidates,
+            warnings=warnings,
+        )
+    path, artifact, payload = max(triples, key=_selection_key)
+    return SessionOpenResult(
+        status="opened",
+        slug=str(payload.get("slug") or ""),
+        payload=payload,
+        artifact=artifact,
+        artifact_path=path,
+        knowledge_id=path.stem,
+        entity_id=artifact.get("entity_id") or "",
+        requested_slug=requested,
+        candidates=candidates,
+        warnings=warnings,
+    )
+
+
+def _bullet_lines(title: str, items: list[str] | None) -> list[str]:
+    """Render one list-valued content field as a single indented line (or an explicit none)."""
+    items = items or []
+    if not items:
+        return [f"{title}: — none —"]
+    return [f"{title}: {', '.join(items)}"]
+
+
+def render_opening_context(result: SessionOpenResult) -> str:
+    """Render an :class:`SessionOpenResult` as the session's opening context.
+
+    The human rendering the ``session open`` command prints (and the AIO embeds at session
+    start): the resolved record's seven content fields — the opening context's decisions
+    (merged), open threads, parked items, and self-notes. ``bootstrap`` renders the clear
+    first-session message naming the ``session close`` command that makes the next open
+    meaningful.
+    """
+    if result.status != "opened" or result.payload is None:
+        if result.slug:
+            head = f"No prior close found for session {result.slug!r} — first-session bootstrap."
+        else:
+            head = "First session — no prior close record in the knowledge base."
+        return (
+            f"[session-open] {head}\n"
+            "  There is no last session to inherit: this session opens from a fresh prior\n"
+            "  (no decisions, open threads, parked items, or self-notes yet). When it ends,\n"
+            "  run `agentic-dynamics session close` so the next session opens with its context."
+        )
+    payload = result.payload
+    lines = [
+        f"[session-open] Last session close: {payload['slug']} ({payload['session_date']})",
+        f"  knowledge_id: {(result.knowledge_id or '')[:12]} (artifact {result.artifact_path.name})",
+    ]
+    for title, key in (
+        ("  waves run", "waves_run"),
+        ("  merged", "merged"),
+        ("  parked", "parked"),
+        ("  open threads", "open_threads"),
+    ):
+        lines.extend(_bullet_lines(title, payload.get(key)))
+    notes = str(payload.get("self_notes") or "").strip()
+    lines.append(f"  self-notes: {notes if notes else '(none)'}")
+    return "\n".join(lines)

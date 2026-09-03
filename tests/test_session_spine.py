@@ -580,3 +580,314 @@ class TestSessionCloseCommand:
         with pytest.raises(SystemExit) as exc:
             sc.main(["--session-date", "2026-09-03"])
         assert exc.value.code == 2  # argparse usage error, not a close attempt
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# s1c — the session OPEN command cases (tests/test_session_spine.py is the gate)
+# ═════════════════════════════════════════════════════════════════════════════
+
+
+def _open(session_dir: Path, **kwargs) -> si.SessionOpenResult:
+    """Run the open retrieval seam against a durable-artifact dir."""
+    return si.open_session(artifact_dir=session_dir, **kwargs)
+
+
+class TestSessionOpen:
+    """The ``session_ingestion.open_session`` read seam (the direct KB read)."""
+
+    def test_no_prior_close_is_bootstrap(self, tmp_path):
+        """DONE_WHEN (2): open with no prior close renders the bootstrap, never an error."""
+        result = _open(tmp_path)
+        assert result.status == "bootstrap"
+        assert result.slug is None
+        assert result.payload is None
+        assert result.artifact_path is None
+        assert result.candidates == 0
+        assert result.warnings == []
+        text = si.render_opening_context(result)
+        assert "First session" in text
+        assert "session close" in text  # the bootstrap names the command that ends it
+
+    def test_foreign_artifacts_do_not_break_the_bootstrap(self, tmp_path):
+        """A dir holding only other-org/other-family records is still the first-session state."""
+        (tmp_path / "not-a-session.json").write_bytes(b"{}")
+        foreign = si.derive_session_record(_session(slug="cell-wt_03"), repository_id="another-org")
+        (tmp_path / f"{foreign.knowledge_id}.json").write_bytes(record_to_artifact(foreign))
+        legacy = _ledger_meta_session_attempt()
+        (tmp_path / f"{legacy.knowledge_id}.json").write_bytes(record_to_artifact(legacy))
+
+        result = _open(tmp_path)
+        assert result.status == "bootstrap"
+        assert result.candidates == 0
+        assert result.warnings == []
+
+    def test_round_trip_close_then_open_is_exact(self, tmp_path):
+        """DONE_WHEN (3): the round-trip is exact — open reads back exactly what close wrote."""
+        session = _session()
+        closed = _close(session, tmp_path, _FakeRedis())
+
+        opened = _open(tmp_path)
+        assert opened.status == "opened"
+        assert opened.slug == session["slug"]
+        assert opened.knowledge_id == closed.record.knowledge_id
+        assert opened.entity_id == closed.record.entity_id
+        assert opened.candidates == 1
+        # The decoded body is byte-identical to the closed record's own canonical payload.
+        assert opened.payload == json.loads(closed.record.text)
+        for field in si.CONTENT_FIELDS:
+            assert opened.payload[field] == session[field]
+
+    def test_open_resolves_the_last_session_by_session_date(self, tmp_path):
+        """DONE_WHEN (1): the LAST session's close — greatest session_date — is resolved."""
+        redis = _FakeRedis()
+        earlier = _close(
+            _session(slug="wt_selfk_s1a_session_record_type", session_date="2026-09-02"),
+            tmp_path,
+            redis,
+        )
+        later = _close(
+            _session(slug="wt_selfk_s1b_close_writer", session_date="2026-09-03"),
+            tmp_path,
+            redis,
+        )
+        opened = _open(tmp_path)
+        assert opened.status == "opened"
+        assert opened.slug == later.record.logical_locator
+        assert opened.knowledge_id == later.record.knowledge_id
+        assert opened.knowledge_id != earlier.record.knowledge_id
+        assert opened.candidates == 2
+
+    def test_same_date_sessions_resolve_by_the_documented_slug_tie_break(self, tmp_path):
+        """Two sessions closed the same day: content cannot order them, so slug order is the
+        documented, checkout-stable resolution (mtime dies on a fresh git checkout)."""
+        redis = _FakeRedis()
+        _close(
+            _session(slug="wt_selfk_s1b_close_writer", session_date="2026-09-03"),
+            tmp_path,
+            redis,
+        )
+        later_named = _close(
+            _session(slug="wt_selfk_s1c_open_reader", session_date="2026-09-03"),
+            tmp_path,
+            redis,
+        )
+        opened = _open(tmp_path)
+        assert opened.status == "opened"
+        assert opened.slug == "wt_selfk_s1c_open_reader"
+        assert opened.knowledge_id == later_named.record.knowledge_id
+
+    def test_explicit_slug_selects_that_session_not_the_last(self, tmp_path):
+        """--slug opens one named session slot even when a later session exists."""
+        redis = _FakeRedis()
+        target = _close(
+            _session(slug="wt_selfk_s1b_close_writer", session_date="2026-09-03"),
+            tmp_path,
+            redis,
+        )
+        _close(
+            _session(slug="wt_selfk_s1c_open_reader", session_date="2026-09-04"),
+            tmp_path,
+            redis,
+        )
+        opened = _open(tmp_path, slug="wt_selfk_s1b_close_writer")
+        assert opened.status == "opened"
+        assert opened.slug == "wt_selfk_s1b_close_writer"
+        assert opened.knowledge_id == target.record.knowledge_id
+        assert opened.requested_slug == "wt_selfk_s1b_close_writer"
+
+    def test_explicit_slug_with_no_close_is_bootstrap(self, tmp_path):
+        """A named slot that was never closed is a bootstrap for THAT slot, not an error."""
+        _close(_session(), tmp_path, _FakeRedis())
+        result = _open(tmp_path, slug="never-closed")
+        assert result.status == "bootstrap"
+        assert result.slug == "never-closed"  # the requested slot is echoed, not lost
+        assert result.requested_slug == "never-closed"
+        assert result.candidates == 1  # the scan ran; nothing matched the slug
+        assert "never-closed" in si.render_opening_context(result)
+
+    def test_reclose_on_a_later_date_is_the_newer_version_of_the_slot(self, tmp_path):
+        """A changed-body re-close is a NEW version of the SAME slot; open returns the newest.
+        Content ordering (session_date) selects it — no mtime dependence, so a fresh checkout
+        resolves identically."""
+        redis = _FakeRedis()
+        first = _close(
+            _session(
+                slug="wt_selfk_s1b_close_writer",
+                session_date="2026-09-03",
+                waves_run=["self_knowledge_layer/s0_pin_spec"],
+            ),
+            tmp_path,
+            redis,
+        )
+        second = _close(
+            _session(
+                slug="wt_selfk_s1b_close_writer",
+                session_date="2026-09-04",
+                waves_run=["self_knowledge_layer/s0_pin_spec", "self_knowledge_layer/s1a"],
+            ),
+            tmp_path,
+            redis,
+        )
+        assert second.record.entity_id == first.record.entity_id  # same session slot
+        assert second.record.knowledge_id != first.record.knowledge_id  # new body -> new version
+
+        opened = _open(tmp_path)
+        assert opened.status == "opened"
+        assert opened.knowledge_id == second.record.knowledge_id
+        assert opened.payload["waves_run"] == [
+            "self_knowledge_layer/s0_pin_spec",
+            "self_knowledge_layer/s1a",
+        ]
+        assert opened.candidates == 2
+
+    def test_duplicate_same_day_closes_resolve_deterministically(self, tmp_path):
+        """Two versions of the SAME slot closed the same day: open is reproducible (same record
+        every time), never an error over the ambiguity."""
+        redis = _FakeRedis()
+        base = _session(slug="wt_selfk_s1c_open_reader", session_date="2026-09-03")
+        _close(base, tmp_path, redis)
+        _close({**base, "waves_run": ["self_knowledge_layer/s0_pin_spec"]}, tmp_path, redis)
+
+        first = _open(tmp_path)
+        second = _open(tmp_path)
+        assert first.status == "opened"
+        assert first.candidates == 2
+        assert first.knowledge_id == second.knowledge_id
+        assert first.payload == second.payload
+        assert first.artifact_path == second.artifact_path
+
+    def test_scope_excludes_foreign_repository_and_legacy_ledger_records(self, tmp_path):
+        """SCOPE FENCE: the org-root read resolves ONLY the AIO's org-root records — a
+        cell/workload repository's session/v1 record and a legacy ledger/v1 meta_session line
+        in the same dir are invisible (never candidates, never noise)."""
+        closed = _close(_session(slug="wt_selfk_s1b_close_writer"), tmp_path, _FakeRedis())
+
+        foreign = si.derive_session_record(_session(slug="cell-wt_03"), repository_id="another-org")
+        (tmp_path / f"{foreign.knowledge_id}.json").write_bytes(record_to_artifact(foreign))
+        legacy = _ledger_meta_session_attempt()
+        (tmp_path / f"{legacy.knowledge_id}.json").write_bytes(record_to_artifact(legacy))
+
+        opened = _open(tmp_path)
+        assert opened.status == "opened"
+        assert opened.slug == "wt_selfk_s1b_close_writer"
+        assert opened.knowledge_id == closed.record.knowledge_id
+        assert opened.candidates == 1  # exactly the org-root AIO record, nothing else
+        assert opened.warnings == []
+
+    def test_org_artifact_with_a_foreign_actor_is_warned_not_selected(self, tmp_path):
+        """A session/v1 artifact IN the org scope whose body actor is not the AIO's is surfaced
+        as a warning — the honest signal a layering violation happened — never silently picked."""
+        closed = _close(_session(slug="wt_selfk_s1b_close_writer"), tmp_path, _FakeRedis())
+
+        data = json.loads(record_to_artifact(si.derive_session_record(_session(slug="impostor"))))
+        payload = json.loads(data["text"])
+        payload["actor"] = "supervisor"  # not the AIO
+        data["text"] = json.dumps(payload)
+        (tmp_path / "impostor.json").write_bytes(json.dumps(data, sort_keys=True).encode())
+
+        opened = _open(tmp_path)
+        assert opened.status == "opened"
+        assert opened.knowledge_id == closed.record.knowledge_id  # the real close still wins
+        assert opened.candidates == 1
+        assert any("impostor.json" in warning for warning in opened.warnings)
+
+
+class TestSessionOpenCommand:
+    """The ``agentic-dynamics session open`` command (CLI shell over the read seam)."""
+
+    def test_command_resolves_to_session_open_script(self):
+        from agentic_dynamics import cli
+
+        assert cli._resolve(["session", "open"]) == ("session_open.py", [])
+        assert (ROOT / "scripts" / "session_open.py").is_file()
+
+    def test_command_no_prior_close_renders_bootstrap(self, tmp_path, monkeypatch, capsys):
+        """DONE_WHEN (2): open with no close renders the bootstrap — human and machine."""
+        from agentic_dynamics.core import paths as core_paths
+
+        scripts_dir = str(ROOT / "scripts")
+        if scripts_dir not in sys.path:
+            sys.path.insert(0, scripts_dir)
+        import session_open as so
+
+        monkeypatch.setattr(core_paths, "KB_ARTIFACT_DIR", tmp_path)
+
+        assert so.main(["--json"]) == 0
+        report = json.loads(capsys.readouterr().out)
+        assert report["schema"] == "session-open/v1"
+        assert report["status"] == "bootstrap"
+        assert report["slug"] is None
+        assert report["candidates"] == 0
+        assert report["warnings"] == []
+
+        assert so.main([]) == 0
+        out = capsys.readouterr().out
+        assert "First session" in out
+        assert "session close" in out
+        assert capsys.readouterr().err == ""  # a clean bootstrap warns nothing
+
+    def test_command_round_trip_close_then_open_is_exact(self, tmp_path, monkeypatch, capsys):
+        """The REAL close command then the REAL open command: the round-trip is exact (DONE_WHEN
+        1 + 3) — open renders precisely what close wrote, in the same durable artifact dir."""
+        from agentic_dynamics.core import paths as core_paths
+        from agentic_dynamics.knowledge import knowledge_stream as ks
+
+        scripts_dir = str(ROOT / "scripts")
+        if scripts_dir not in sys.path:
+            sys.path.insert(0, scripts_dir)
+        import session_close as sc
+        import session_open as so
+
+        redis = _FakeRedis()
+        monkeypatch.setattr(ks, "connect", lambda: redis)
+        monkeypatch.setattr(core_paths, "KB_ARTIFACT_DIR", tmp_path)
+
+        argv = [
+            "--slug",
+            "wt_selfk_s1b_close_writer",
+            "--session-date",
+            "2026-09-03",
+            "--wave",
+            "self_knowledge_layer/s0_pin_spec",
+            "--wave",
+            "self_knowledge_layer/s1a",
+            "--merged",
+            "2026-08-14_experiment-spec-and-compiler-design",
+            "--parked",
+            "fleet ladder rung 2",
+            "--open-thread",
+            "open command (s1c)",
+            "--self-notes",
+            "I re-derived the wave verdict by grep instead of reading a record.",
+        ]
+        assert sc.main(argv) == 0
+        capsys.readouterr()  # drop the close command's report — the buffer below is open's own
+        artifacts = list(tmp_path.glob("*.json"))
+        assert len(artifacts) == 1
+
+        assert so.main(["--json"]) == 0
+        report = json.loads(capsys.readouterr().out)
+        assert report["status"] == "opened"
+        assert report["slug"] == "wt_selfk_s1b_close_writer"
+        assert report["session_date"] == "2026-09-03"
+        assert report["waves_run"] == [
+            "self_knowledge_layer/s0_pin_spec",
+            "self_knowledge_layer/s1a",
+        ]
+        assert report["merged"] == ["2026-08-14_experiment-spec-and-compiler-design"]
+        assert report["parked"] == ["fleet ladder rung 2"]
+        assert report["open_threads"] == ["open command (s1c)"]
+        assert report["self_notes"] == (
+            "I re-derived the wave verdict by grep instead of reading a record."
+        )
+        assert report["knowledge_id"] == artifacts[0].stem  # the record close just wrote
+        assert report["entity_id"]
+        assert report["candidates"] == 1
+        assert report["warnings"] == []
+
+        assert so.main([]) == 0
+        out = capsys.readouterr().out
+        assert "Last session close: wt_selfk_s1b_close_writer (2026-09-03)" in out
+        assert "self_knowledge_layer/s0_pin_spec, self_knowledge_layer/s1a" in out
+        assert "open command (s1c)" in out
+        assert "I re-derived the wave verdict by grep instead of reading a record." in out

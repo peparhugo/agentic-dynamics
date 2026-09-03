@@ -19,6 +19,7 @@ maintained: control_drain_outbox.py control_sweep_zombies.py
 maintained: check_preexisting.py
 maintained: publish_release.py
 maintained: session_close.py
+maintained: session_open.py
 maintained: workflow_new.py workflow_lint.py workflow_plan.py
 <!-- scripts-classification: end -->
 
@@ -73,6 +74,7 @@ maintained: workflow_new.py workflow_lint.py workflow_plan.py
 | `agentic_dynamics/experiment/compile_experiment.py` (not in scripts/) | spec → DAG compiler, **written**; no standalone CLI — invoke via the `compile_experiment` tool (§3.1) or the Python API directly | Compiling a spec into a DAG |
 | `check_branch_protection.py` | Release-time drift check: compares the live GitHub branch protection for `main` against the committed settings doc (`docs/release/branch_protection_settings.md`); exit 1 on drift | Before any release; run after any manual protection change |
 | `session_close.py` | ~200 | The session CLOSE command (self-knowledge layer s1b) — writes the AIO's session-spine record via `session_ingestion.close_session` (the s1a `meta_session` type): what ran (waves), what merged, what parked, open threads, self-notes. Rerun-safe (identical re-close = no-op, keyed by the deterministic `knowledge_id`) and best-effort (a producer failure is a warning, never a crash — the durable artifact still lands). CLI: `agentic-dynamics session close`. |
+| `session_open.py` | ~130 | The session OPEN command (self-knowledge layer s1c) — retrieves the LAST session's close record via `session_ingestion.open_session` (the direct read over the durable KB artifacts, org-scoped to the AIO's `session/v1` family) and renders it as the session's opening context: decisions (merged), open threads, parked items, self-notes. No prior close renders a clear first-session bootstrap message (exit 0 — bootstrap is the correct answer, never an error). `--slug` opens one named session slot; `--json` emits the machine `session-open/v1` report. CLI: `agentic-dynamics session open`. |
 
 ## Test-suite budget + the fast path (test_suite_speed p2-p4)
 
