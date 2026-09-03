@@ -5,8 +5,10 @@ The socket leaves the container. Before this module the orchestrator tier mounte
 ``/var/run/docker.sock`` and one large trusted module (``spawn_wrapper.py``) both validated
 AND invoked arbitrary docker commands — and ``:ro`` on the filesystem mount does not
 constrain Docker Engine authority. This broker is the ONLY component that calls the Docker
-API (its ONE documented exception — a benign read-only status query, the game board's
-``docker ps`` in ``scripts/system_snapshot.py``, fb3 f4 — never a launch, never a write), and
+API (its two documented exceptions — the game board's read-only ``docker ps`` in
+``scripts/system_snapshot.py``, fb3 f4, and the archived one-time sonar-scanner docker run in
+``scripts/archive/backfill_sonar.py``, ws3_stragglers — frozen, never re-run; both are reads,
+never a launch, never a write into the fleet), and
 it accepts ONLY a TYPED launch request — arbitrary docker CLI capability is never exposed to
 any tier:
 
@@ -701,9 +703,10 @@ def main(argv: list[str] | None = None) -> int:
     systemd user unit starts: it binds the seam socket and serves typed requests indefinitely.
     """
     parser = argparse.ArgumentParser(
-        description="The host-side launch broker (the ONLY Docker API caller — its one "
-                    "documented exception: the game board's read-only docker ps, "
-                    "scripts/system_snapshot.py)."
+        description="The host-side launch broker (the ONLY Docker API caller — its two "
+                    "documented exceptions: the game board's read-only docker ps, "
+                    "scripts/system_snapshot.py, and the archived one-time sonar-scanner "
+                    "docker run, scripts/archive/backfill_sonar.py)."
     )
     sub = parser.add_subparsers(dest="command", required=True)
     for name, handler in (

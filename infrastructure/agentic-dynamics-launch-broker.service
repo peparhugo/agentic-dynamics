@@ -1,13 +1,32 @@
 # agentic-dynamics-launch-broker.service — the launch broker, running where the socket is (fb2_broker_hostside).
 #
+# *** THIS FILE IS A TEMPLATE — DO NOT INSTALL IT BY `cp`. ***
+#
+# Its three repo-dependent fields (Environment=REPO=, WorkingDirectory=, and the
+# Documentation=file:// URL) carry a repo placeholder token — NOT a host path. The operator's
+# checkout path is the b1 host-literal the fleet banished from committed code
+# (fleet_launch_boundary b1_path_config / fleet_launch_smoke ws3_stragglers): a unit that
+# hard-codes it must be hand-edited whenever the framework lives elsewhere, and no committed
+# unit may carry the operator's host path. Render the installable unit from the tier-0 path
+# object instead (never hand-edit, never cp):
+#
+#   python3 infrastructure/gen_launch_broker_service.py          # writes ~/.config/systemd/user/
+#
+# The generator derives the repo root ONCE from agentic_dynamics.core.paths.PathConfig
+# (FINOPS_REPO_DIR override, else the package root — never a literal) and substitutes it for
+# each token occurrence in the three fields below. The broker itself also self-locates its repo
+# from its module path at serve time, so the rendered WorkingDirectory is belt-and-braces: the
+# process is correct even if a stale unit set a wrong cwd.
+#
 # A systemd USER unit, following the docs-drift-scan.service precedent
 # (~/.config/systemd/user/) rather than the system-wide fleet-bootstrap.service: the broker is
 # the operator's own host-side component that holds the Docker socket. It is the ONLY Docker
-# API caller in the fleet (its one documented exception: the game board's read-only `docker ps`
-# in scripts/system_snapshot.py — fb3 f4, a display read, never a launch) — every cell
-# launch / fleet command the orchestrator needs is emitted over the broker's unix-socket IPC
-# seam (scripts/fleet/broker_client.py), and NO container mounts the docker socket. This unit
-# IS the docker socket's only home.
+# API caller in the fleet (its two documented exceptions — the game board's read-only `docker
+# ps` in scripts/system_snapshot.py (fb3 f4, a display read) and the archived one-time
+# sonar-scanner docker run in scripts/archive/backfill_sonar.py (ws3_stragglers, frozen, never
+# re-run); both are reads, never a launch) — every cell launch / fleet command the orchestrator
+# needs is emitted over the broker's unix-socket IPC seam (scripts/fleet/broker_client.py), and
+# NO container mounts the docker socket. This unit IS the docker socket's only home.
 #
 # The unit runs `scripts/fleet/launch_broker.py serve` as a long-running daemon: it binds the
 # seam socket (a unix socket under the user runtime dir, %t = $XDG_RUNTIME_DIR), accepts one
@@ -21,8 +40,7 @@
 # user, never root, and never a container.
 #
 # Install (as the operator, NOT root):
-#   mkdir -p ~/.config/systemd/user
-#   cp infrastructure/agentic-dynamics-launch-broker.service ~/.config/systemd/user/
+#   python3 infrastructure/gen_launch_broker_service.py      # render from PathConfig
 #   systemctl --user daemon-reload
 #   systemctl --user enable --now agentic-dynamics-launch-broker.service
 #   loginctl enable-linger "$USER"      # so the daemon survives logout
@@ -40,7 +58,7 @@
 
 [Unit]
 Description=Agentic-dynamics launch broker — the host-side Docker-socket holder + typed IPC seam
-Documentation=file:///home/drseuss/ai-finops-framework/workflows/repository/fleet_launch_boundary_followups.yaml
+Documentation=file://@REPO_ROOT@/workflows/repository/fleet_launch_boundary_followups.yaml
 # Wants=, not Requires=: the broker's validation + launch logic needs no other unit; it is the
 # socket's home and nothing upstream of it must gate its start. After=network-online.target
 # because the broker may launch cells that reach model APIs through the egress proxy.
@@ -51,9 +69,11 @@ Type=simple
 Restart=on-failure
 RestartSec=5
 
-# The deployed checkout. Update REPO if the framework lives elsewhere on this host.
-Environment=REPO=/home/drseuss/ai-finops-framework
-WorkingDirectory=/home/drseuss/ai-finops-framework
+# The deployed checkout, PathConfig-derived at render time (the repo placeholder in the three
+# fields below is substituted by infrastructure/gen_launch_broker_service.py from
+# agentic_dynamics.core.paths.PathConfig — never a hand-edited host path).
+Environment=REPO=@REPO_ROOT@
+WorkingDirectory=@REPO_ROOT@
 
 # The docker/compose binaries the broker executes (its own PATH is the unit's default).
 Environment=FINOPS_DOCKER_BIN=docker

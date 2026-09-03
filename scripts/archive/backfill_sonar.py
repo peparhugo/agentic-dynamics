@@ -10,6 +10,24 @@ Usage:
   python scripts/backfill_sonar.py --limit 20           # backfill 20
   python scripts/backfill_sonar.py                       # all worktrees
   python scripts/backfill_sonar.py --dry-run             # show what would run
+
+Docker usage — the broker's ONLY-caller rule's SECOND documented benign read-only exception
+(fleet_launch_smoke ws3_stragglers). The launch broker (``scripts/fleet/launch_broker.py``,
+deployed host-side by the ``agentic-dynamics-launch-broker.service`` systemd user unit) is the
+fleet's ONLY Docker API caller. This archived script's single ``docker run`` (in
+:func:`run_sonar_docker`) is RECORDED, not routed — a documented exception alongside the game
+board's read-only ``docker ps`` (``scripts/system_snapshot.py``, fb3 f4). The reasons it is not
+routed through the broker's typed seam: (1) this file lives in ``scripts/archive/`` — the
+one-time bucket (``scripts/CONTEXT.md``), IMMUTABLE HISTORICAL MATERIAL that no live path ever
+re-runs; (2) its docker run launches a dedicated third-party analysis image
+(``sonarsource/sonar-scanner-cli``) on the isolated ``infrastructure_sonar-net`` network against
+the local SonarQube — it never mounts the docker socket, never touches a fleet container or the
+fleet network, and reads the code directory (mounted READ-ONLY since ws3) to report metrics to
+the analyzer; and (3) routing a frozen one-time migration through the seam would mean widening
+the seam's closed launch/submit/fleet verb vocabulary (or maintaining this archived script) for
+an action that is never part of the containerized path. Running this script is a deliberate,
+operator-initiated analysis action. Any NEW docker caller in live code must route through the
+broker instead.
 """
 
 import json
@@ -106,10 +124,14 @@ def run_sonar_docker(project_key: str, code_dir: Path) -> bool:
     if not code_dir.exists() or not list(code_dir.iterdir()):
         return False
 
+    # Docker usage — the broker's ONLY-caller rule's SECOND documented benign read-only
+    # exception (see the module docstring): an archived one-time migration, sonar-scanner on
+    # the isolated sonar network, the code dir mounted READ-ONLY. Never routed (no live path,
+    # frozen file); recorded, not a second untyped caller.
     cmd = [
         "docker", "run", "--rm",
         "--network", SONAR_NETWORK,
-        "-v", f"{code_dir}:/usr/src",
+        "-v", f"{code_dir}:/usr/src:ro",
         "-w", "/usr/src",
         "sonarsource/sonar-scanner-cli:latest",
         f"-Dsonar.projectKey={project_key}",

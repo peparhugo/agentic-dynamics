@@ -30,9 +30,11 @@ maintained: publish_release.py
   `agentic-dynamics-launch-broker.service` systemd user unit, `fb2_broker_hostside` — the
   seam client it is reached over, `broker_client.py`, and the pure shared typed contract both
   sides import, `broker_contract.py` — and the P0-2 Docker step executor). The ONLY-caller
-  rule keeps one documented exception: the game board's read-only status query
+  rule keeps two documented exceptions: the game board's read-only status query
   (`scripts/system_snapshot.py` runs `docker ps` for the chromadb row — fb3 f4, a display
-  read, never a launch). Not CLI
+  read, never a launch) and the archived one-time sonar-scanner docker run
+  (`scripts/archive/backfill_sonar.py` — fleet_launch_smoke ws3_stragglers, a frozen one-time
+  migration, never re-run). Not CLI
   commands — they are invoked by the docker-compose services, by the host-side launch-broker
   unit, or injected by the workflow CLI's composition root.
 - **archive lint policy** (decided in `cap_stabilization_release` p2, hard rule 3) — the

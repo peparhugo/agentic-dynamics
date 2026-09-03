@@ -7,9 +7,12 @@ host-side broker (fb2):
 
 * **F4** — ``scripts/system_snapshot.py`` ran ``docker ps`` directly, a second Docker API
   caller outside the launch broker. The closure chosen here is the one the wave's hard rule 3
-  allows: DOCUMENT it as the broker's ONLY-caller rule's ONE benign read-only exception (a
-  host-side DISPLAY read for the game board's chromadb row — never a launch, never a write,
-  never reachable from a cell), not a second untyped caller.
+  allows: DOCUMENT it as the broker's ONLY-caller rule's FIRST of two documented benign
+  read-only exceptions (a host-side DISPLAY read for the game board's chromadb row — never a
+  launch, never a write, never reachable from a cell), not an untyped caller. (The SECOND
+  documented exception is the archived one-time sonar-scanner docker run in
+  ``scripts/archive/backfill_sonar.py`` — fleet_launch_smoke ws3_stragglers, frozen, never
+  re-run; the rule statements below name both.)
 * **F6** — committed prose still described the pre-b3 socket-holder state (the orchestrator
   container mounting ``/var/run/docker.sock`` ro). The Containerfile and the ``agent_config``
   sources are corrected to the broker reality; the agent surfaces are regenerated (never
@@ -42,8 +45,9 @@ SNAPSHOT = ROOT / "scripts" / "system_snapshot.py"
 CONTAINERFILE = ROOT / "Containerfile.fleet"
 AGENT_CONFIG = ROOT / "agent_config"
 
-#: The marker phrase the f4 documentation uses — module docstring AND the helper's docstring.
-DOCUMENTED_EXCEPTION_PHRASE = "ONLY-caller rule's ONE documented"
+#: The marker phrase the f4 documentation uses — module docstring AND the helper's docstring
+#: (the ws3_stragglers record made the carve-outs two; both statements name the count).
+DOCUMENTED_EXCEPTION_PHRASE = "two documented"
 BENIGN_READ_ONLY_PHRASE = "benign read-only exception"
 
 #: The docker invocation list-literal subcommands (a real docker CLI call, not the word
@@ -95,13 +99,14 @@ def _helper_docstring(src: str) -> str:
 
 
 def test_snapshot_module_docstring_documents_the_docker_exception():
-    """fb3 VERIFY (a): the call site's module documents the docker usage as the ONE recorded
-    benign read-only exception to the broker's ONLY-caller rule — never a second untyped
-    caller."""
+    """fb3 VERIFY (a): the call site's module documents the docker usage as one of the recorded
+    benign read-only exceptions to the broker's ONLY-caller rule (now two documented exceptions
+    — the other: the archived one-time backfill_sonar docker run, ws3_stragglers) — never an
+    untyped caller."""
     doc = _module_docstring(SNAPSHOT.read_text(encoding="utf-8"))
     assert DOCUMENTED_EXCEPTION_PHRASE in doc, (
-        "system_snapshot's module docstring must name the docker ps as the ONLY-caller rule's "
-        "ONE documented exception"
+        "system_snapshot's module docstring must name the docker ps as a documented exception "
+        "to the ONLY-caller rule"
     )
     assert BENIGN_READ_ONLY_PHRASE in doc
     assert "scripts/fleet/launch_broker.py" in doc
