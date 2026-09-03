@@ -33,6 +33,13 @@ belief updates it in the same terminal transaction that emits the verdict.
 The fixtures model the seeded hypotheses the s4c phase will mint from the measured history
 (design §"the Bayesian–frequentist synthesis"), e.g. "flash converges in ~1 wave on in-process
 work" — all synthetic, so the tests are hermetic.
+
+The s4c SEED cases (the final section) run the same assertions against the REAL seeded corpus
+(``knowledge/belief_seeds.py`` — the five measured-history hypotheses, minted once with their
+wave citations + counts): the corpus holds exactly the deliverable's five hypotheses, each
+derives a complete rerun-safe belief record whose initial confidence follows the deterministic
+posterior rule, the corpus is retrievable by domain (the DONE_WHEN), a cell scope can never
+resolve a seed, and the module is pure data over the s4a type — no new type, no new operation.
 """
 
 import hashlib
@@ -44,6 +51,7 @@ from pathlib import Path
 import pytest
 
 from agentic_dynamics.knowledge import belief_ingestion as bi
+from agentic_dynamics.knowledge import belief_seeds as bs
 from agentic_dynamics.knowledge import belief_update as bu
 from agentic_dynamics.knowledge.knowledge import (
     SOURCE_TYPES,
@@ -1092,3 +1100,207 @@ def test_an_unrelated_run_emits_its_verdict_but_updates_no_belief(emit_env, monk
     state, summary = _outbox_delivered(tmp_path, run_id)
     assert state is RunState.PROMOTABLE
     assert summary.delivered == 1 and summary.pending == 0  # the verdict only
+
+
+# ════════════════════════════════════════════════════════════════════════════════════════════
+# s4c — the seeded initial belief set (knowledge/belief_seeds.py): the corpus the fixtures model
+# ════════════════════════════════════════════════════════════════════════════════════════════
+#
+# DONE_WHEN (s4c): each seed exists with its hypothesis + citations + an initial confidence;
+# the seeds are retrievable by domain. Scope fence: the seeds ONLY — no new types, no new
+# operations. Every assertion is hermetic (the corpus is module data over the s4a type; nothing
+# touches a live KB). The fixtures above are synthetic twins of these seeds; these cases run the
+# same assertions against the REAL corpus minted from the measured history.
+
+#: The five measured-history hypotheses the deliverable names, in corpus order.
+SEED_HYPOTHESES = (
+    "flash converges in ~1 wave on in-process work",
+    "container seams take ~4 waves",
+    "findings were opt-in and never produced",
+    "adversarial reviews catch wiring gaps tests miss",
+    "phases that ask for too much time out or false-positive",
+)
+
+
+def _seed(hypothesis, *, domain=None) -> dict:
+    """The corpus's canonical dict for one hypothesis (optionally within ``domain``)."""
+    for seed in bs.SEEDS:
+        if seed["hypothesis"] == hypothesis and (domain is None or seed["domain"] == domain):
+            return seed
+    raise AssertionError(f"no seeded belief for {hypothesis!r} (domain={domain!r})")
+
+
+def test_the_seeded_corpus_holds_the_five_measured_history_hypotheses():
+    # DONE_WHEN: each of the deliverable's five seeds exists in the corpus, exactly once, each
+    # under its own hypothesis + domain. The two convergence claims share the workstream
+    # domain; no other domain is shared — a by-domain read returns coherent families, not a
+    # grab-bag.
+    assert len(bs.SEEDS) == 5
+    assert tuple(seed["hypothesis"] for seed in bs.SEEDS) == SEED_HYPOTHESES
+    assert len({id(seed) for seed in bs.SEEDS}) == 5
+    assert bs.seed_domains() == (
+        bs.DOMAIN_WORKSTREAM_CONVERGENCE,
+        bs.DOMAIN_PRODUCER_DEFAULTS,
+        bs.DOMAIN_ADVERSARIAL_VALUE,
+        bs.DOMAIN_PHASE_SCOPING,
+    )
+    counts: dict[str, int] = {}
+    for seed in bs.SEEDS:
+        counts[seed["domain"]] = counts.get(str(seed["domain"]), 0) + 1
+    assert counts[bs.DOMAIN_WORKSTREAM_CONVERGENCE] == 2
+    for domain in bs.seed_domains():
+        if domain != bs.DOMAIN_WORKSTREAM_CONVERGENCE:
+            assert counts[domain] == 1
+
+
+def test_each_seed_derives_a_complete_record_with_citations_and_initial_confidence():
+    # DONE_WHEN half: every seed derives a belief record carrying ALL content fields, its
+    # measured-history citations, and an initial confidence — the deterministic posterior the
+    # s4a rule derives from the seed's prior + counts (never a field left to the reader).
+    for seed in bs.SEEDS:
+        payload = _payload(bi.derive_belief_record(seed))
+        for field in bi.CONTENT_FIELDS:
+            assert field in payload, f"seed {seed['hypothesis']!r} missing content field {field!r}"
+        assert payload["hypothesis"] == seed["hypothesis"]
+        assert payload["domain"] == seed["domain"]
+        assert payload["evidence_class"] == "[M]"  # measured-history backing, declared not earned
+        assert payload["evidence_citations"], f"seed {seed['hypothesis']!r} carries no citations"
+        assert payload["prior_confidence"] == seed["prior_confidence"]
+        assert payload["n_confirmations"] == seed["n_confirmations"]
+        assert payload["n_disconfirmations"] == seed["n_disconfirmations"]
+        # The initial confidence is the posterior implied by the prior + the counted history.
+        assert payload["posterior_confidence"] == bi.compute_posterior(
+            payload["prior_confidence"],
+            payload["n_confirmations"],
+            payload["n_disconfirmations"],
+        )
+
+
+def test_the_seeded_records_are_rerun_safe_and_round_trip():
+    # The seeds are the AIO's org-root posterior, not wall-clock facts: re-deriving the corpus
+    # on any later day yields byte-identical records (the mint timestamp is the fixed
+    # SEED_TIMESTAMP, never the derivation clock), and the artifact/event round trip preserves
+    # the record exactly.
+    for seed in bs.SEEDS:
+        first = bi.derive_belief_record(seed)
+        second = bi.derive_belief_record(seed)
+        assert second.knowledge_id == first.knowledge_id
+        assert second.entity_id == first.entity_id
+        assert second.content_hash == first.content_hash
+        artifact = record_to_artifact(first)
+        event = record_to_event(first)
+        extracted = extract_record(event, artifact)
+        assert extracted.knowledge_id == first.knowledge_id
+        assert extracted.text == first.text
+
+
+def test_the_initial_confidences_are_the_documented_measured_counts():
+    # The counts are the measured history (not a fitted optimum), and the posterior the AIO
+    # stands on follows from them exactly. Spot-check each seed's documented basis.
+    adversarial = _seed("adversarial reviews catch wiring gaps tests miss")
+    assert adversarial["n_confirmations"] >= 6  # "n>=6 by the fleet series" (8 strict gaps)
+    assert adversarial["n_disconfirmations"] == 0
+    assert bi.compute_posterior(0.5, adversarial["n_confirmations"], 0) == 0.9
+
+    container = _seed("container seams take ~4 waves")
+    fleets = (
+        "fleet_launch_boundary",
+        "fleet_launch_boundary_followups",
+        "fleet_launch_smoke",
+        "fleet_launch_container_smoke",
+    )
+    # The four fleet wave verdicts are EXACTLY the citations that bear on the ~4-waves claim.
+    assert tuple(c.split(" wave verdict")[0] for c in container["evidence_citations"]) == fleets
+    assert container["n_confirmations"] == 1  # the one series converged at its fourth wave
+
+    premise = _seed("findings were opt-in and never produced")
+    # A pessimist seed: the premise held for loop 1's layer, then kb_finding_layer's own
+    # success (producers made default-on; findings produced) DISCONFIRMED it.
+    assert premise["n_confirmations"] == 0 and premise["n_disconfirmations"] == 1
+    assert "kb_finding_layer" in premise["evidence_citations"][0]
+    assert bi.compute_posterior(0.5, 0, 1) == 0.333333
+
+    pace = _seed("phases that ask for too much time out or false-positive")
+    # Four observations: the w2_revision_identity timeout + three deploy-gate false positives.
+    assert pace["n_confirmations"] == 4
+    assert bi.compute_posterior(0.5, 4, 0) == 0.833333
+
+    flash = _seed("flash converges in ~1 wave on in-process work")
+    assert flash["n_confirmations"] == 3 and flash["n_disconfirmations"] == 1
+    assert bi.compute_posterior(0.5, 3, 1) == 0.666667
+
+
+def test_seeds_are_retrievable_by_domain():
+    # DONE_WHEN half: "the seeds are retrievable by domain". A by-domain read resolves the
+    # beliefs that bear on one operating question; the two convergence seeds come back together.
+    convergence = bs.seeds_by_domain(bs.DOMAIN_WORKSTREAM_CONVERGENCE)
+    assert [seed["hypothesis"] for seed in convergence] == [
+        "flash converges in ~1 wave on in-process work",
+        "container seams take ~4 waves",
+    ]
+    assert len(bs.seeds_by_domain(bs.DOMAIN_PRODUCER_DEFAULTS)) == 1
+    assert len(bs.seeds_by_domain(bs.DOMAIN_ADVERSARIAL_VALUE)) == 1
+    assert len(bs.seeds_by_domain(bs.DOMAIN_PHASE_SCOPING)) == 1
+    # The union over every domain reconstructs the corpus exactly once — no seed is orphaned
+    # from its domain, none appears twice.
+    flat = [seed["hypothesis"] for d in bs.seed_domains() for seed in bs.seeds_by_domain(d)]
+    assert flat == list(SEED_HYPOTHESES)
+    # An unknown domain — including "", never a valid belief domain — resolves to nothing,
+    # never a fabricated row.
+    assert bs.seeds_by_domain("no-such-domain") == ()
+    assert bs.seeds_by_domain("") == ()
+
+
+def test_domain_retrieval_returns_copies_never_the_corpus_rows():
+    # A caller annotating a retrieved seed must never corrupt the corpus: retrieval hands back
+    # copies, and the canonical dicts + their derivations stay byte-stable.
+    retrieved = bs.seeds_by_domain(bs.DOMAIN_ADVERSARIAL_VALUE)[0]
+    retrieved["n_confirmations"] = 999
+    assert _seed("adversarial reviews catch wiring gaps tests miss")["n_confirmations"] == 8
+    payload = _payload(bi.derive_belief_record(bs.SEEDS[3]))
+    assert payload["n_confirmations"] == 8
+
+
+def test_seeds_are_distinct_org_root_aio_beliefs_a_cell_scope_cannot_resolve():
+    # Actor layering, on the real corpus: every seed is its own belief entity, producer aio,
+    # org-root scoped — the retrieval hard pre-filter excludes a seed from any cell/workload
+    # query, and only an explicit org-root read resolves it.
+    from agentic_dynamics.knowledge.retrieval import scope_excluded
+    from agentic_dynamics.knowledge.session_ingestion import aio_acl_scope
+
+    records = bs.derive_seed_records()
+    assert len({r.knowledge_id for r in records}) == 5
+    assert len({r.entity_id for r in records}) == 5
+    for record in records:
+        assert record.source_type == "belief"
+        assert record.authority is Authority.ADVISORY
+        assert record.evidence_class == "[H]"
+        assert record.acl_scope == aio_acl_scope(record.repository_id)
+        payload = _payload(record)
+        assert payload["actor"] == "aio"
+        assert payload["scope"] == record.acl_scope
+        assert scope_excluded(record.repository_id, requested_scope="self-wt_beliefs")
+        assert scope_excluded(
+            record.repository_id,
+            requested_scope="workload:some_other_spec/job:wf_some_other_spec_deepseek_deepseek_v4_flash",
+        )
+        assert not scope_excluded(record.repository_id, requested_scope="")
+        assert not scope_excluded(record.repository_id, requested_scope=record.repository_id)
+
+
+def test_the_corpus_is_data_only_reusing_the_s4a_type():
+    # Scope fence: the seeds ONLY — no new types, no new operations. The module re-exports the
+    # s4a constants (the corpus IS the belief/v1 family) and exposes no update/write/trigger
+    # surface; deriving the corpus is pure.
+    assert bs.SOURCE_TYPE == bi.SOURCE_TYPE == "belief"
+    assert bs.EXTRACTOR_VERSION == bi.EXTRACTOR_VERSION == "belief/v1"
+    assert bs.ACTOR == bi.ACTOR == "aio"
+    for operation in ("update_belief", "version_record", "apply_wave_verdict", "update_event"):
+        assert not hasattr(bs, operation), f"belief_seeds must not expose the s4b operation {operation}"
+    # derive_seed_records yields the corpus's records in order, identical to the per-seed
+    # derivation (no dedup, no batch pre-filter, no KB write).
+    records = bs.derive_seed_records()
+    assert len(records) == len(bs.SEEDS)
+    for record, seed in zip(records, bs.SEEDS):
+        assert record.knowledge_id == bi.derive_belief_record(seed).knowledge_id
+
