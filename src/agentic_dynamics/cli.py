@@ -45,6 +45,13 @@ _COMMANDS: dict[tuple[str, ...], str] = {
     ("workflow", "run"): "run_workflow.py",
     ("workflow", "discard-tree"): "record_discarded_tree.py",
     ("workflow", "promote"): "promote.py",
+    # workflow authoring (Wave 3, a3 — the authoring product command surface): `new`
+    # scaffolds a workflow-v1 definition (validated as written), `lint` runs the a1
+    # linter (the CI-able surface), `plan` renders the step DAG + gates + promotion
+    # contract as a plan (--json = the machine workflow-plan/v1 document).
+    ("workflow", "new"): "workflow_new.py",
+    ("workflow", "lint"): "workflow_lint.py",
+    ("workflow", "plan"): "workflow_plan.py",
     # queue
     ("queue", "enqueue"): "enqueue.py",
     ("queue", "worker"): "worker.py",
@@ -153,7 +160,7 @@ Subcommands (each forwards to its backing script):
 
   experiment run|sweep-parallel|sweep-silent|batch|remaining|multi-phase|cap-grit-grid|cap-grit-measure|cap-2c-grid|cap-2c-score|cap-2d-grid|cap-2d-score|cap-2e-grid|cap-2e-score|cap-2f-grid|cap-2f-score|delta-entropy|coordination-overhead
   story       run|batch
-  workflow    run|discard-tree|promote
+  workflow    run|discard-tree|promote|new|lint|plan
   queue       enqueue|worker|monitor|reinterleave|analysis-enqueue|analysis-worker
   analyze     worktrees|trajectories|stories|session-routing|workflow-metrics|lab <name>
   data        build|sync|manifest|inventory|bundle

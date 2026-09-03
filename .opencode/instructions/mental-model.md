@@ -594,7 +594,7 @@ each subcommand forwards argv to its backing script; the CLI composes, never re-
 agentic-dynamics
 ├─ experiment run|sweep-parallel|sweep-silent|batch|remaining|multi-phase
 ├─ story       run|batch
-├─ workflow    run|discard-tree|promote
+├─ workflow    run|discard-tree|promote|new|lint|plan   # new/lint/plan = the authoring surface (a3)
 ├─ queue       enqueue|worker|monitor|reinterleave|analysis-enqueue|analysis-worker
 ├─ analyze     worktrees|trajectories|stories|lab <name>
 ├─ data        build|sync|manifest|inventory
