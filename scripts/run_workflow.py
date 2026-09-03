@@ -14,6 +14,7 @@ import argparse
 import contextlib
 import json
 import os
+import subprocess
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -57,6 +58,10 @@ from agentic_dynamics.experiment.spec_status import refresh_spec_status  # noqa:
 from agentic_dynamics.knowledge import spec_ingestion as si  # noqa: E402
 from agentic_dynamics.knowledge.knowledge_ingestion import _authorized_kb_write  # noqa: E402
 from agentic_dynamics.knowledge.record_factory import _now_iso  # noqa: E402
+from agentic_dynamics.runtime.run_clone import (  # noqa: E402
+    RUN_CLONE_ENV,
+    create_run_clone,
+)
 from agentic_dynamics.runtime.workflow_runner import cell_scope, run_workflow  # noqa: E402
 
 #: CAP fact auto-emit (docs/architecture/current/cap_fact_auto_emit_design.md §4): the disable-flag
@@ -314,6 +319,85 @@ def _build_phase_admission(spec: ExperimentSpec, args: argparse.Namespace):
     )
 
 
+def _resolve_workdir_head(workdir: str | Path) -> str | None:
+    """Resolve the full HEAD sha of the git repo the run's workdir sits in, or ``None``.
+
+    The per-run clone is created FROM the run's starting commit — the sha the workflow's
+    phases build on top of. ``args.workdir`` is the worktree the (in-process) engine would
+    commit into, so its HEAD is the natural ``base_sha`` for ``create_run_clone``. Best
+    effort: a workdir that is not (yet) a git checkout — or a git failure — yields ``None``,
+    and ``create_run_clone`` then falls back to the source's default-branch head.
+    """
+    try:
+        proc = subprocess.run(
+            ["git", "-C", str(workdir), "rev-parse", "HEAD"],
+            capture_output=True, text=True, timeout=30,
+        )
+    except Exception:  # noqa: BLE001 — a missing/broken git is a fallback, not a crash
+        return None
+    if proc.returncode != 0 or not (proc.stdout or "").strip():
+        return None
+    return proc.stdout.strip()
+
+
+def _build_orchestrator_executors(
+    spec: ExperimentSpec,
+    args: argparse.Namespace,
+    *,
+    run_id: str,
+    path_config: Any | None = None,
+) -> tuple[Any, Any]:
+    """ws1 (fleet_launch_smoke ws1_clone_wired): compose the ``--orchestrator`` sibling executors.
+
+    The clone is born and bound HERE — at the one place the run id exists (minted by
+    ``_control_open_run`` in ``_run_workflow_cli``):
+
+    1. ``create_run_clone(run_id, …)`` — the per-run clone lands at
+       ``PathConfig.runs_root/<run-id>/repo`` (default source = the config's ``repo_root``,
+       default base = the workdir's HEAD, so the clone IS the repo view the cells mount).
+    2. ``FINOPS_RUN_CLONE`` is exported to the child environment.
+    3. BOTH executors are built with ``run_clone`` passed EXPLICITLY — the constructors'
+       own ``os.environ.get(FINOPS_RUN_CLONE)`` read becomes the fallback, not the primary.
+
+    ``path_config`` is injectable so tests can point ``runs_root`` at a scratch dir without
+    touching the host env. Returns ``(step_executor, verifier_executor)``.
+    """
+    fleet_dir = str(Path(__file__).resolve().parent / "fleet")
+    if fleet_dir not in sys.path:
+        sys.path.insert(0, fleet_dir)
+    from fleet.docker_executor import DockerAgentExecutor  # noqa: E402
+    from fleet.docker_verifier_executor import DockerVerifierExecutor  # noqa: E402
+
+    # 1. The clone is born FIRST — before either executor is constructed. Its path is the
+    #    explicit run_clone argument; an executor that read FINOPS_RUN_CLONE from the
+    #    environment instead would resolve whatever the ambient env held (NOT this path, which
+    #    is only exported AFTER construction — see below).
+    clone = create_run_clone(run_id, base_sha=_resolve_workdir_head(args.workdir), path_config=path_config)
+    run_clone = str(clone.path)
+
+    spec_path = f"/repo/{args.spec}"  # the sibling's view (the orchestrator mounts /repo)
+    common = dict(
+        spec_path=spec_path,
+        spec_name=spec.name,
+        goal=args.goal,
+        model=args.model,
+        workdir=args.workdir,
+        backend=args.backend,
+        timeout=args.timeout,
+        cell_image=args.cell_image,
+        run_clone=run_clone,
+    )
+    step_executor = DockerAgentExecutor(**common)
+    verifier_executor = DockerVerifierExecutor(**common)
+
+    # 2. NOW export the clone path to the child environment — after construction, so the
+    #    executors' run_clone provably came from the explicit constructor argument (ws1 VERIFY
+    #    (b): "the constructor arg, not the env fallback"). The env export is for the sibling
+    #    spawn tier that reads FINOPS_RUN_CLONE, not for the executors already bound above.
+    os.environ[RUN_CLONE_ENV] = run_clone
+    return step_executor, verifier_executor
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description="Run an agent_task workflow spec against a goal.")
     ap.add_argument("--spec", required=True, help="path to an ExperimentSpec YAML")
@@ -399,11 +483,16 @@ def main() -> None:
                          "beta_tokens=0.80 puts the knee at 6): the coordination tax is paid "
                          "in throughput, not dollars.")
     ap.add_argument("--orchestrator", action="store_true",
-                    help="slice 2 (D-3/D-14/D-16): run each agent phase as a SIBLING cell "
-                         "container with its scope config (via scripts/fleet/spawn_wrapper.py) "
-                         "instead of in-process. OPT-IN — the default path is unchanged. The "
-                         "orchestrator container mounts the docker socket (ro); a phase whose "
-                         "scope fails validation refuses BEFORE the socket call.")
+                    help="slice 2 (D-3/D-14/D-16, b3_launch_broker): run each agent phase as a "
+                         "SIBLING cell container with its scope config (via "
+                         "scripts/fleet/spawn_wrapper.py + the host-side launch broker) instead "
+                         "of in-process. OPT-IN — the default path is unchanged. The wrapper "
+                         "validates a typed launch request and the broker (the ONLY Docker API "
+                         "caller — its two documented exceptions: the game board's read-only "
+                         "docker ps, scripts/system_snapshot.py, fb3 f4, and the archived "
+                         "one-time sonar-scanner docker run, scripts/archive/backfill_sonar.py, "
+                         "ws3_stragglers) executes it; a phase "
+                         "whose scope fails validation refuses BEFORE the broker is reached.")
     ap.add_argument("--only-phase", default=None, metavar="NAME",
                     help="run a SINGLE phase (name) only — the sibling-cell entrypoint the "
                          "--orchestrator mode spawns for each phase. When set, the spec's phase "
@@ -416,7 +505,8 @@ def main() -> None:
                          "the only namespace the submit contract's `image` field accepts "
                          "(scripts/fleet/spawn_wrapper.py:JOB_IMAGE_PATTERN). Never changes the "
                          "orchestrator/workflow-runner container's OWN image (fleet/orchestrator "
-                         "— the one socket-holder, unaffected by this flag).")
+                         "— validated against the broker's closed image namespace; a phase-cell "
+                         "image override never reaches the broker unless it is in the namespace).")
     args = ap.parse_args()
 
     spec = load_spec(Path(args.spec))
@@ -435,36 +525,13 @@ def main() -> None:
     # READ-ONLY verifier cell bound to the candidate instead of in-process in the orchestrator's
     # privileged container. The engine dispatches test phases through it (verifier_executor=),
     # and refuses loudly if a containerized path ever lacks one (never a skip).
-    if args.orchestrator:
-        sys.path.insert(0, str(Path(__file__).resolve().parent / "fleet"))
-        from fleet.docker_executor import DockerAgentExecutor  # noqa: E402
-        from fleet.docker_verifier_executor import DockerVerifierExecutor  # noqa: E402
-
-        spec_path = f"/repo/{args.spec}"  # the sibling's view (the orchestrator mounts /repo)
-        return _run_workflow_cli(
-            spec, args,
-            step_executor=DockerAgentExecutor(
-                spec_path=spec_path,
-                spec_name=spec.name,
-                goal=args.goal,
-                model=args.model,
-                workdir=args.workdir,
-                backend=args.backend,
-                timeout=args.timeout,
-                cell_image=args.cell_image,
-            ),
-            verifier_executor=DockerVerifierExecutor(
-                spec_path=spec_path,
-                spec_name=spec.name,
-                goal=args.goal,
-                model=args.model,
-                workdir=args.workdir,
-                backend=args.backend,
-                timeout=args.timeout,
-                cell_image=args.cell_image,
-            ),
-        )
-
+    #
+    # ws1 (fleet_launch_smoke ws1_clone_wired): the executors are NOT constructed here. The
+    # per-run clone must be created at ``PathConfig.runs_root/<run-id>/repo`` keyed by the run's
+    # CONTROL-RUN id — and that id is minted by ``_control_open_run`` inside
+    # ``_run_workflow_cli``, AFTER this branch runs. So the executor composition (clone created,
+    # ``FINOPS_RUN_CLONE`` exported, ``run_clone`` passed explicitly to both executors) happens
+    # there, at the one place the run id exists. This branch is a plain dispatch.
     return _run_workflow_cli(spec, args)
 
 
@@ -474,9 +541,10 @@ def _run_workflow_cli(
     """The ONE engine's CLI wrapper (P0-2): build the composition root and run the engine.
 
     Shared by the in-process path (``step_executor=None`` → the engine's default
-    LocalAgentExecutor) and the ``--orchestrator`` path (the DockerAgentExecutor injected
-    above).     This is the single phase loop, ledger writer, and exit-code contract — the
-    second phase loop is gone.
+    LocalAgentExecutor) and the ``--orchestrator`` path (the Docker executors composed by
+    :func:`_build_orchestrator_executors` below, once the control-run id exists — ws1
+    ws1_clone_wired). This is the single phase loop, ledger writer, and exit-code contract —
+    the second phase loop is gone.
     """
     # --only-phase: filter the spec's phases to the named phase (the sibling-cell path). The
     # rest of the composition root (routing/signals/etc.) is unchanged — a single-phase run is
@@ -580,6 +648,32 @@ def _run_workflow_cli(
     # aggregates. Closed in the finally below, before the terminal write opens its own handle.
     control_run_id, control_db = _control_open_run(spec, args)
     phase_evidence_recorder = make_phase_evidence_recorder(control_db, control_run_id)
+
+    # ws1 (fleet_launch_smoke ws1_clone_wired): the --orchestrator composition root. The run's
+    # per-run clone is created HERE — the ONE place the control-run id exists (minted by
+    # `_control_open_run` above) and BEFORE the Docker executors are built. The clone is the
+    # repo view the sibling cells mount, so it must exist before the executors that reference it
+    # are constructed: create_run_clone(run_id) at PathConfig.runs_root/<run-id>/repo, export
+    # FINOPS_RUN_CLONE to the child environment, and pass run_clone explicitly to BOTH
+    # DockerAgentExecutor and DockerVerifierExecutor (their env read is the fallback, not the
+    # primary). Child mode (--only-phase) never composes executors: the parent orchestrator owns
+    # the clone; a sibling runs inside the already-mounted clone.
+    if (
+        getattr(args, "orchestrator", False)
+        and step_executor is None
+        and verifier_executor is None
+    ):
+        if control_run_id is None:
+            # No run row minted (control db down). The clone is keyed by the run id, so there is
+            # nothing to key it on — a containerized orchestrator without its run row cannot
+            # isolate its cells. Refuse loudly rather than silently running the pre-clone shape.
+            raise SystemExit(
+                "--orchestrator: no control-run id was minted (control db unavailable?) — "
+                "the per-run clone cannot be created; refusing the containerized path"
+            )
+        step_executor, verifier_executor = _build_orchestrator_executors(
+            spec, args, run_id=control_run_id,
+        )
 
     # g1 (engine_gaps_followups, F5): capture this run's family identity from the run row the
     # moment it is minted (the handle closes in the finally below, before the ledger is

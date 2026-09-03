@@ -8,7 +8,10 @@
 #                        The model CLIs (opencode / claude) are NOT baked — they attach via the
 #                        D-2 auth mounts (D-18), and the binary-resolution probe asserts the
 #                        chain at start. Runs as the non-root USER 1001.
-#   fleet/orchestrator — base + the docker CLI + the sibling-spawn wrapper (slice 2).
+#   fleet/orchestrator — base + the sibling-spawn wrapper (slice 2). SOCKETLESS by design
+#                        (fb2_broker_hostside): the docker socket lives only in the host-side
+#                        launch broker, so the image carries NO docker client — every spawn is
+#                        a typed request the orchestrator emits over the broker's seam.
 #   fleet/supervisor   — orchestrator + the fleet manager (the supervisor-tier daemon).
 #
 # The container user IS the host user (uid 1001 = the operator's uid): the worktree, results,
@@ -33,7 +36,8 @@
 # accepts an optional `image` field naming one of these — never a bare override of
 # fleet/base/orchestrator/supervisor — and threads it to the orchestrator's sibling-cell spawn
 # as `--cell-image` (`scripts/run_workflow.py`), so only the PHASE cells run the custom image;
-# the orchestrator/workflow-runner container itself (the one socket-holder) is unaffected.
+# the orchestrator/workflow-runner container itself never holds the docker socket
+# (fb2_broker_hostside: the host-side launch broker is the socket's only home) — unaffected.
 #
 # --- the isolation contract (docs/fleet/08_job_image_cache_root.md has the full writeup) -----
 # The docker layer exists for ISOLATION, not coordination: a cell (any image built off this
@@ -45,7 +49,8 @@
 # host credentials outside the D-2 auth set. `infrastructure/docker-compose.ladder.yml`'s mount
 # anchors (`x-ladder-mounts` / `x-orchestrator-mounts` / `x-supervisor-mounts`) are the
 # enforcement point; `tests/test_fleet_guards.py` asserts it holds (no unexpected mount target,
-# the socket in exactly one tier, every tier on fleet-net only).
+# no service mounts the docker socket — it lives only in the host-side launch broker,
+# fb2_broker_hostside — every tier on fleet-net only).
 
 # ---------------------------------------------------------------------------
 # fleet/base — the generic toolchain (the cell-tier + consumer image)
@@ -148,25 +153,27 @@ ENTRYPOINT ["/usr/local/bin/fleet-entrypoint"]
 CMD ["python3", "-c", "import os; print('fleet/base ready (uid %s)' % os.getuid())"]
 
 # ---------------------------------------------------------------------------
-# fleet/orchestrator — base + the docker CLI + the sibling-spawn wrapper (slice 2)
+# fleet/orchestrator — base + the sibling-spawn wrapper (slice 2). The container is
+# SOCKETLESS by design (fb2_broker_hostside): the docker socket lives ONLY in the host-side
+# launch broker (infrastructure/agentic-dynamics-launch-broker.service runs
+# scripts/fleet/launch_broker.py as a systemd USER unit on the host). The docker socket is
+# never mounted into any container and NO in-container code calls docker — the containerized
+# orchestrator validates a phase launch against the shared contract (scripts/fleet/broker_contract.py,
+# baked in base) and emits it over the broker's typed unix-socket seam
+# (scripts/fleet/broker_client.py); the broker performs the docker call where the socket is.
+# The image therefore carries NO docker client — nothing inside a container can reach a daemon.
 # ---------------------------------------------------------------------------
 FROM base AS orchestrator
 
-# The orchestrator is the ONE socket-holder (D-3): it mounts /var/run/docker.sock ro and its
-# spawn-wrapper (scripts/fleet/spawn_wrapper.py — baked in base via COPY scripts/) validates
-# every spawn against the mount contract + scope vocabulary before the socket call. It needs
-# only the docker CLIENT (`docker-cli` — talks to the host daemon over the socket); the Debian
-# `docker.io` package is the daemon, which the orchestrator must NOT run.
-USER root
-RUN apt-get update && apt-get install -y --no-install-recommends \
-        docker-cli \
-        && rm -rf /var/lib/apt/lists/*
-USER "${LADDER_UID}:${LADDER_GID}"
-
+# No extra layers: the wrapper + the seam client are baked in base via COPY scripts/, and the
+# socket-holder-era docker-cli install was removed in fb3_stragglers — the orchestrator never
+# calls docker, so there is nothing for a client to do. The stage exists to set the default
+# command below (the compose services run the same image).
+#
 # The orchestrator's default command is the fleet:commands consumer (D-14): it BRPOPs the
 # supervisor's resize/drain commands, validates them against the compose allowlist + bounded
-# counts, and dispatches only validated commands. The compose's campaign-wrapper /
-# workflow-runner services override this with run_workflow.py --orchestrator.
+# counts, and dispatches only validated commands over the broker seam. The compose's
+# campaign-wrapper / workflow-runner services override this with run_workflow.py --orchestrator.
 CMD ["python3", "scripts/fleet/spawn_wrapper.py", "consume"]
 
 # ---------------------------------------------------------------------------
@@ -177,5 +184,6 @@ FROM orchestrator AS supervisor
 # The fleet manager (watcher + heartbeats + DLQ + the fleet:commands channel) is baked here;
 # the compose configs ride the repo ro mount (D-13), not the image. The supervisor holds NO
 # socket at runtime (D-3/D-14) — its restart authority is the compose policies it owns plus
-# the orchestrator as its hands (fleet:commands).
+# the orchestrator as its hands (fleet:commands; the orchestrator's docker authority is itself
+# delegated to the host-side launch broker over the typed seam).
 CMD ["python3", "scripts/fleet/fleet_manager.py", "watch"]

@@ -1,0 +1,40 @@
+{
+  "schema": "fleet-smoke-evidence/v1",
+  "spec": "fleet_launch_container_smoke",
+  "run_id": "run-6bd836f71f01",
+  "phase": "cs3_container_smoke",
+  "started_at": "2026-09-03T14:25:41.466370+00:00",
+  "ended_at": "2026-09-03T14:26:14.135230+00:00",
+  "captured": true,
+  "container_id": "8001a5ae7d032e20a464d614e7ed8de000342f1c24fe314934d1b5c10027d166",
+  "image": "fleet/base",
+  "mount_proof": [
+    {
+      "source": "/tmp/agentic-dynamics-runs/run-c43b5ae19ceb/repo",
+      "target": "/repo",
+      "rw": false
+    }
+  ],
+  "exit_code": 0,
+  "verdict": {
+    "ok": true,
+    "state": "succeeded",
+    "test_executed_success": true,
+    "tests_passed": 1,
+    "tests_total": 1,
+    "error": null
+  },
+  "cleanup": {
+    "performed": true,
+    "method": "harness-cleanup",
+    "at": "2026-09-03T14:26:14.186353+00:00"
+  },
+  "persisted_at": "2026-09-03T14:26:14.186376+00:00",
+  "launch_context": {
+    "shape": "container-tier orchestrator (compose workflow-runner service, cs1 env)",
+    "spec": "experiments/results/smoke/fleet_launch_container_smoke/cs3_smoke_cell.yaml",
+    "compose": "/tmp/wt_wave2/infrastructure/docker-compose.ladder.yml",
+    "cell_spec": "experiments/results/smoke/fleet_launch_container_smoke/cs3_smoke_cell.yaml",
+    "runs_root": "/tmp/agentic-dynamics-runs"
+  }
+}

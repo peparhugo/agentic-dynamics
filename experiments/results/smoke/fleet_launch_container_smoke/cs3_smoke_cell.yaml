@@ -1,0 +1,27 @@
+name: cs3_smoke_cell
+question: cs3 container-tier smoke fixture - trivial verifier cell in the run clone
+version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: false
+  external_services: false
+repeatable: true
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    phases:
+      - name: p5_test_gate
+        kind: test
+        scope: implementation
+        timeout: 180
+        tests: ['experiments/results/smoke/fleet_launch_container_smoke/test_cs3_smoke_cell.py']
+factors:
+  - {name: model, levels: [deepseek/deepseek-v4-flash]}
+design: factorial
+rules: []
+metrics: []
+writeup: {format: lab_book, sections: [question]}
+stop: {budget_usd: 0.1, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}

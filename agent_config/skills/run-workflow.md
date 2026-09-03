@@ -121,8 +121,11 @@ p1/p2):
                               delta-only facts with graph_status (unavailable) — never a crash.
 --orchestrator                run each agent phase as a SIBLING cell container with its scope
                               config (scripts/fleet/spawn_wrapper.py) instead of in-process.
-                              OPT-IN. The container mounts the docker socket (ro); a phase
-                              whose scope fails validation refuses BEFORE the socket call.
+                              OPT-IN. The containerized orchestrator emits each launch as a
+                              TYPED request over the unix-socket seam to the HOST-side launch
+                              broker (the docker socket's only home; the broker performs the
+                              docker call). No container mounts the docker socket. A phase
+                              whose scope fails validation refuses BEFORE the request is emitted.
 --only-phase NAME             run a SINGLE phase only — the sibling-cell entrypoint that
                               --orchestrator mode spawns per phase; the spec's phase list is
                               filtered to this name before the run.
@@ -171,9 +174,11 @@ not a hard prerequisite the script itself checks for.
    python3 scripts/run_workflow.py --orchestrator --spec <spec> --goal "<goal>"
    --model <model> --workdir <path>` — each phase spawns as a validated sibling cell
    (scope ∈ the vocabulary, phase-authorized, mount contract, network, write flags — all
-   checked BEFORE the docker socket call). The fleet runs one orchestrator at a time (the
-   socket lives in exactly one tier), so don't start a second orchestrator while one is
-   running.
+   checked BEFORE the typed launch request is emitted). The container never holds the docker
+   socket: the orchestrator emits each launch over the host broker's unix-socket seam, and the
+   broker (the socket's only home, the ONLY Docker API caller) performs the docker call — no
+   in-container code calls docker. The fleet runs one orchestrator at a time, so don't start
+   a second orchestrator while one is running.
 4. In-process (`python3 scripts/run_workflow.py` without `--orchestrator`) is the
    **fallback**, not the default: use it only when the fleet is occupied (an orchestrator
    run is in flight) or the run is trivial (deterministic measurement execution, e.g. a

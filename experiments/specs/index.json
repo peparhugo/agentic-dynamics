@@ -1,6 +1,6 @@
 {
   "schema_version": "spec-status/v2",
-  "generated_at": "2026-09-03T13:36:12.108232+00:00",
+  "generated_at": "2026-09-03T16:17:03.952747+00:00",
   "n_specs": 189,
   "specs": [
     {
@@ -564,10 +564,10 @@
       "authored_status": "completed"
     },
     {
-      "name": "fleet_launch_container_smoke",
+      "name": "fleet_launch_boundary",
       "version": "0.1",
       "status": "runnable",
-      "spec_path": "workflows/repository/fleet_launch_container_smoke.yaml",
+      "spec_path": "workflows/repository/fleet_launch_boundary.yaml",
       "artifact_kind": "workflow",
       "repeatable": false,
       "supersedes": [],
@@ -579,8 +579,8 @@
       "latest_cost_usd": null,
       "latest_git_sha": null,
       "results_pointer": null,
-      "n_runs": 0,
-      "workflow_revision_id": "c1f8286a46f83221b250d8180bf1008719217df8396d36ddeb37d66b02936a82",
+      "n_runs": 1,
+      "workflow_revision_id": "347bd093e90d8e2654a54e54ab6b50222f1fc7da55fdaed8c882d1852f748585",
       "authored_status": null
     },
     {
@@ -1053,14 +1053,14 @@
       "supersedes": [],
       "superseded_by": null,
       "completed_at": null,
-      "last_run_at": "2026-09-03T13:11:34.980787+00:00",
-      "latest_ok": false,
+      "last_run_at": "2026-09-03T15:14:50.225790+00:00",
+      "latest_ok": true,
       "latest_model": "deepseek/deepseek-v4-flash",
-      "latest_cost_usd": 0.167139,
-      "latest_git_sha": "2c89a6e84",
-      "results_pointer": "experiments/results/workflows/authoring_product_aio/20260903T131134Z.json",
-      "n_runs": 1,
-      "workflow_revision_id": "156bb169abd099e606546911c96a31024f74ea433e83ac6e2ed67fc43411ee65",
+      "latest_cost_usd": 0.0,
+      "latest_git_sha": "734534b46",
+      "results_pointer": "experiments/results/workflows/authoring_product_aio/20260903T151450Z.json",
+      "n_runs": 7,
+      "workflow_revision_id": "f1ede783ae8f91c00cb8242793cc0f7650b305c229b7e541d067734aaf20d3e9",
       "authored_status": null
     },
     {
@@ -2960,26 +2960,6 @@
       "authored_status": null
     },
     {
-      "name": "fleet_launch_boundary",
-      "version": "0.1",
-      "status": "completed",
-      "spec_path": "workflows/repository/fleet_launch_boundary.yaml",
-      "artifact_kind": "workflow",
-      "repeatable": false,
-      "supersedes": [],
-      "superseded_by": null,
-      "completed_at": null,
-      "last_run_at": "2026-09-02T23:49:04.701702+00:00",
-      "latest_ok": true,
-      "latest_model": "deepseek/deepseek-v4-flash",
-      "latest_cost_usd": 0.553591,
-      "latest_git_sha": "7af8f7ff2",
-      "results_pointer": "experiments/results/workflows/fleet_launch_boundary/20260902T234904Z.json",
-      "n_runs": 1,
-      "workflow_revision_id": "1c1ce24780aaa506e967851a3f179b59de4e96c134109ae6744407ee6ea15d8c",
-      "authored_status": null
-    },
-    {
       "name": "fleet_launch_boundary_followups",
       "version": "0.1",
       "status": "completed",
@@ -2997,6 +2977,26 @@
       "results_pointer": "experiments/results/workflows/fleet_launch_boundary_followups/20260903T033651Z.json",
       "n_runs": 1,
       "workflow_revision_id": "d19a76af9b8f790dbc39d230e2c49793e00f1337d05f9a8be9f956944f7a7afd",
+      "authored_status": null
+    },
+    {
+      "name": "fleet_launch_container_smoke",
+      "version": "0.1",
+      "status": "completed",
+      "spec_path": "workflows/repository/fleet_launch_container_smoke.yaml",
+      "artifact_kind": "workflow",
+      "repeatable": false,
+      "supersedes": [],
+      "superseded_by": null,
+      "completed_at": null,
+      "last_run_at": "2026-09-03T14:47:22.369232+00:00",
+      "latest_ok": true,
+      "latest_model": "deepseek/deepseek-v4-flash",
+      "latest_cost_usd": 0.786868,
+      "latest_git_sha": "731d72acb",
+      "results_pointer": "experiments/results/workflows/fleet_launch_container_smoke/20260903T144722Z.json",
+      "n_runs": 1,
+      "workflow_revision_id": "c1f8286a46f83221b250d8180bf1008719217df8396d36ddeb37d66b02936a82",
       "authored_status": null
     },
     {

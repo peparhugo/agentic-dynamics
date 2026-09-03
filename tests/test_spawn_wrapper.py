@@ -14,10 +14,16 @@ from pathlib import Path
 
 import pytest
 
+from agentic_dynamics.core.paths import PathConfig
 from agentic_dynamics.experiment.experiment_spec import (
     SCOPE_VOCABULARY,
     phase_scope,
     validate_spec,
+)
+from scripts.fleet.launch_broker import (
+    build_launch_argv,
+    build_submit_argv,
+    container_view_config,
 )
 from scripts.fleet.spawn_wrapper import (
     AUTH_CRED_FILE,
@@ -30,10 +36,9 @@ from scripts.fleet.spawn_wrapper import (
     STATE_TARGET,
     SpawnValidationError,
     build_phase_request,
-    build_spawn_argv,
-    build_submit_argv,
     build_verifier_request,
     consume_fleet_commands,
+    contract_targets,
     dispatch_submit,
     spawn_sibling,
     validate_fleet_command,
@@ -41,21 +46,20 @@ from scripts.fleet.spawn_wrapper import (
     validate_submit_request,
 )
 
-# The canonical host repo path the mount contract's ``CONTRACT_TARGETS`` hardcodes for the
-# repo-alias mounts (``spawn_wrapper.py``'s D-16 fix). ``build_phase_request`` derives that
-# mount's target from ``FINOPS_REPO_DIR`` (default: wherever the checkout lives) — inside an
-# isolated worktree (as tests run), that differs from the canonical path, so every submit test
-# below pins ``FINOPS_REPO_DIR`` to the canonical value the contract expects (matching how the
-# deployed ladder actually runs: the repo checked out at this fixed host path).
-_CANONICAL_REPO_DIR = "/home/drseuss/ai-finops-framework"
-
+# The repo-alias contract (b1_path_config): the repo's host path is the config's
+# ``repo_root``/``git_dir`` — derived from the env (``FINOPS_REPO_DIR``) with the package root
+# as the default, never a host-specific literal. The wrapper's request builders and the
+# validator derive the SAME values from the SAME config, so the spawn-contract tests assert
+# against ``PathConfig`` values (the default config — wherever this checkout lives), not a
+# pinned host path. ``build_phase_request`` derives the alias mount targets from the
+# config; validation (step 3) accepts exactly those derived targets.
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 _SUBMIT_SPEC = "workflows/repository/fleet_job_submission.yaml"
 
 
-@pytest.fixture(autouse=False)
-def _canonical_repo_env(monkeypatch):
-    monkeypatch.setenv("FINOPS_REPO_DIR", _CANONICAL_REPO_DIR)
+def _default_cfg() -> PathConfig:
+    """The wrapper's default PathConfig (env-derived; no host literal)."""
+    return PathConfig.from_env()
 
 
 def _valid_submit_request(**overrides) -> dict:
@@ -72,7 +76,12 @@ def _valid_submit_request(**overrides) -> dict:
 # (the authorization table), the mounts are the full four + D-2 + the P0-3 per-attempt state
 # namespace (/state rw) + the credential FILE mount (/auth/opencode_auth.json ro), results rw
 # (implementation), the network is fleet-net, and the implementation scope authorizes the
-# write flag.
+# write flag. The D-2 auth targets are the default config's ``auth_dirs`` (b1_path_config:
+# derived, never host literals) — the same config validation derives its contract from.
+# b3_launch_broker: the request also carries the TYPED launch fields (image_digest /
+# mount_profile / state_namespace / timeout_seconds; command is added per test where the
+# broker path is exercised) so it satisfies the broker's closed typed contract as well as the
+# wrapper's scope checks.
 VALID_REQUEST = {
     "phase": "p1_slice1_base_supervisor",
     "scope": "implementation",
@@ -80,15 +89,16 @@ VALID_REQUEST = {
         {"target": "/tmp", "mode": "rw"},
         {"target": "/app/experiments/results", "mode": "rw"},
         {"target": "/repo", "mode": "ro"},
-        {"target": "/home/drseuss/.claude", "mode": "ro"},
-        {"target": "/home/drseuss/.local/bin", "mode": "ro"},
-        {"target": "/home/drseuss/.local/share/claude", "mode": "ro"},
-        {"target": "/home/drseuss/.opencode/bin", "mode": "ro"},
+        *[{"target": str(d), "mode": "ro"} for d in _default_cfg().auth_dirs],
         {"target": "/state", "mode": "rw"},
         {"target": "/auth/opencode_auth.json", "mode": "ro"},
     ],
     "network": "fleet-net",
     "env": {"FINOPS_KB_WRITE": "1"},
+    "image_digest": "fleet/base",
+    "mount_profile": "implementation_rw",
+    "state_namespace": "spec_x/p1_slice1_base_supervisor",
+    "timeout_seconds": 0,
 }
 
 
@@ -150,15 +160,17 @@ def test_state_target_is_in_the_contract_as_rw():
 def test_host_opencode_state_dir_is_out_of_contract():
     """P0-3: the host's LIVE opencode state directory must never enter a cell in ANY mode —
     the credential is a file mount, the writable state is the per-attempt namespace."""
-    assert "/home/drseuss/.local/share/opencode" not in AUTH_DIRS
-    assert CONTRACT_TARGETS.get("/home/drseuss/.local/share/opencode") is None
+    cfg = _default_cfg()
+    live_state_dir = str(cfg.auth_home / ".local/share/opencode")
+    assert live_state_dir not in AUTH_DIRS
+    assert CONTRACT_TARGETS.get(live_state_dir) is None
 
 
 def test_credential_file_mount_is_in_the_contract_as_ro():
     assert CONTRACT_TARGETS["/auth/opencode_auth.json"] == ("auth-file", "ro")
 
 
-def test_build_phase_request_mints_a_unique_state_namespace(tmp_path, _canonical_repo_env):
+def test_build_phase_request_mints_a_unique_state_namespace(tmp_path):
     """P0-3: every phase request carries its OWN writable state namespace at /state (rw) plus
     the XDG redirects, so two concurrent cells can never share a session DB. Two requests for
     the same phase share a namespace (the retry), two for different phases never do."""
@@ -292,25 +304,36 @@ def test_valid_request_passes():
 
 
 def test_spawn_sibling_refuses_before_socket_call():
-    # A request failing step 1 raises SpawnValidationError and NEVER builds/executes a docker
-    # argv — even with a docker binary path that would fail if invoked.
+    # A request failing step 1 raises SpawnValidationError and NEVER reaches the broker — even
+    # with a docker path that would fail if invoked (the broker is never called).
     with pytest.raises(SpawnValidationError) as exc:
         spawn_sibling(
             {**VALID_REQUEST, "scope": "admin_everything"},
-            docker="/nonexistent/docker-should-never-run",
         )
     assert any("step 1" in e for e in exc.value.errors)
 
 
-def test_spawn_sibling_dry_run_builds_argv_only_after_validation():
-    result = spawn_sibling(VALID_REQUEST, docker="docker", dry_run=True)
+def test_spawn_sibling_dry_run_builds_the_broker_argv_only_after_validation(broker_seam):
+    # fb2_broker_hostside: spawn_sibling validates, then emits the typed request to the host
+    # broker OVER THE SEAM, which builds the docker argv (dry_run builds it only, nothing is
+    # executed).
+    request = {**VALID_REQUEST, "command": ["python3", "-c", "pass"]}
+    result = spawn_sibling(request, dry_run=True)
     assert result["ok"] is True
     assert result["argv"][0] == "docker" and "run" in result["argv"]
     assert result["returncode"] is None
 
 
-def test_build_spawn_argv_carries_mounts_network_env():
-    argv = build_spawn_argv(VALID_REQUEST, docker="docker", image="fleet/base", command=["echo", "hi"])
+def test_broker_launch_argv_carries_mounts_network_env():
+    # The docker argv construction now lives in the launch broker (the ONLY docker caller):
+    # build_launch_argv assembles the -v mounts / --network / -e / image / command from a
+    # validated request. The wrapper no longer builds docker argv.
+    request = {**VALID_REQUEST, "command": ["echo", "hi"]}
+    mounts = build_phase_request(
+        {"name": "p1_slice1_base_supervisor", "scope": "implementation"},
+        goal="g", workdir="/tmp/wt", model="m", spec_name="spec_x",
+    )["mounts"]
+    argv = build_launch_argv(request, docker="docker", mounts=mounts)
     joined = "\n".join(argv)
     assert "--network" in argv and "fleet-net" in argv
     assert "/tmp:rw" in joined  # the worktree mount, rw
@@ -391,6 +414,383 @@ def test_build_phase_request_without_authorization_yields_empty_scope():
     assert req["scope"] == ""  # no declared scope + no table entry → spawn will fail at step 2
 
 
+def _make_config_repo(tmp_path) -> tuple[Path, PathConfig]:
+    """Scaffold a real repo root under ``tmp_path`` and the PathConfig pointing at it."""
+    repo = tmp_path / "repo"
+    (repo / ".git").mkdir(parents=True)
+    (repo / "experiments" / "results").mkdir(parents=True)
+    auth = tmp_path / "auth"
+    (auth / ".local" / "share" / "opencode").mkdir(parents=True)
+    cfg = PathConfig(
+        repo_root=repo,
+        git_dir=repo / ".git",
+        worktrees_root=tmp_path / "worktrees",
+        runs_root=tmp_path / "runs",
+        results_dir=repo / "experiments" / "results",
+        state_root=tmp_path / "state",
+        auth_home=auth,
+    )
+    return repo, cfg
+
+
+def test_build_phase_request_resolves_mounts_to_the_configured_paths(tmp_path):
+    """(b1 VERIFY c) the request's mounts resolve to the PathConfig's configured paths — never
+    a host literal. A request built against an explicit config mounts THAT config's repo_root /
+    git_dir / results_dir / worktrees_root / state_root / auth_home, and validates clean under
+    the SAME config (the validator derives the identical contract)."""
+    repo, cfg = _make_config_repo(tmp_path)
+    req = build_phase_request(
+        {"name": "p1_slice1_base_supervisor", "scope": "implementation"},
+        goal="g", workdir="/tmp/wt", model="deepseek/deepseek-v4-pro",
+        spec_name="spec_x", path_config=cfg,
+    )
+    by_target = {m["target"]: m for m in req["mounts"]}
+
+    # the four-mount sources are the configured paths, never literals
+    assert by_target["/tmp"]["source"] == str(cfg.worktrees_root)
+    assert by_target["/app/experiments/results"]["source"] == str(cfg.results_dir)
+    assert by_target["/repo"]["source"] == str(cfg.repo_root)
+    assert by_target["/repo/.git"]["source"] == str(cfg.git_dir)
+    # the D-16 host-path repo alias + its .git resolve to the configured repo_root/git_dir
+    assert by_target[str(cfg.repo_root)] == {"source": str(cfg.repo_root),
+                                             "target": str(cfg.repo_root), "mode": "ro"}
+    assert by_target[str(cfg.git_dir)]["mode"] == "rw"
+    # the D-2 auth set + the credential file derive from the configured auth_home
+    auth_targets = {str(d) for d in cfg.auth_dirs}
+    assert auth_targets <= set(by_target)
+    cred = by_target["/auth/opencode_auth.json"]
+    assert cred["source"] == str(cfg.auth_home / ".local/share/opencode/auth.json")
+    # the per-attempt state namespace lives under the configured state_root
+    assert by_target["/state"]["source"].startswith(str(cfg.state_root))
+    # no host literal anywhere on the request
+    joined = json.dumps(req)
+    assert "/home/" not in joined and "ai-finops-framework" not in joined
+    # and the request validates clean under the SAME config — contract and builder agree
+    assert validate_spawn(
+        req, phase_scopes={"p1_slice1_base_supervisor": "implementation"}, path_config=cfg,
+    ) == []
+
+
+def test_build_phase_request_stamps_the_view_of_the_config_it_built_against(tmp_path):
+    """(ws2 VERIFY, builder half) every builder-made request carries the VIEW of the PathConfig
+    its mounts were built against: host for a checkout-rooted config, container for a config
+    rooted at the image's /app (the container-tier derivation). The broker validates the request
+    against that view, so the builder and the broker can never disagree about which repo-alias
+    targets are in contract."""
+    _repo, cfg = _make_config_repo(tmp_path)
+    host_req = build_phase_request(
+        {"name": "p1_slice1_base_supervisor", "scope": "implementation"},
+        goal="g", workdir="/tmp/wt", model="deepseek/deepseek-v4-pro",
+        spec_name="spec_x", path_config=cfg,
+    )
+    assert host_req["view"] == "host"
+    # the container view of the SAME host config re-roots the repo to the /app-in-container path
+    container_cfg = container_view_config(cfg)
+    assert str(container_cfg.repo_root) == "/app"
+    container_req = build_phase_request(
+        {"name": "p1_slice1_base_supervisor", "scope": "implementation"},
+        goal="g", workdir="/tmp/wt", model="deepseek/deepseek-v4-pro",
+        spec_name="spec_x", path_config=container_cfg,
+    )
+    assert container_req["view"] == "container"
+    # its alias targets are the /app paths; validating under the SAME (container) config passes,
+    # so the request is coherent with the view it declares.
+    alias_targets = {m["target"] for m in container_req["mounts"]} & {"/app", "/app/.git"}
+    assert alias_targets == {"/app", "/app/.git"}
+    assert validate_spawn(
+        container_req,
+        phase_scopes={"p1_slice1_base_supervisor": "implementation"},
+        path_config=container_cfg,
+    ) == []
+    # a verifier request built against the container config carries the container view too
+    verifier_req = build_verifier_request(
+        {"name": "g3_test_gate", "kind": "test", "scope": "implementation",
+         "tests": ["tests/test_spec_x.py"]},
+        goal="g", workdir="/tmp/wt_x", model="deepseek/deepseek-v4-flash",
+        spec_name="spec_x", path_config=container_cfg,
+    )
+    assert verifier_req["view"] == "container"
+
+
+def test_verifier_request_uses_the_configured_paths(tmp_path):
+    """(b1 VERIFY c) the verifier's candidate surface (worktree /tmp, /repo, both git dirs)
+    resolves to the CONFIGURED paths too — the config is threaded through both request
+    builders, never a literal."""
+    _repo, cfg = _make_config_repo(tmp_path)
+    req = build_verifier_request(
+        {"name": "g3_test_gate", "kind": "test", "scope": "implementation",
+         "tests": ["tests/test_spec_x.py"]},
+        goal="g", workdir="/tmp/wt_x", model="deepseek/deepseek-v4-flash",
+        spec_name="spec_x", path_config=cfg,
+    )
+    by_target = {m["target"]: m for m in req["mounts"]}
+    assert by_target[str(cfg.git_dir)]["mode"] == "ro"  # read-only candidate
+    auth_targets = {str(d) for d in cfg.auth_dirs}
+    assert not (set(by_target) & auth_targets)  # verifier carries no credential surface
+    assert validate_spawn(
+        req, phase_scopes={"g3_test_gate": "implementation"}, path_config=cfg,
+    ) == []
+
+
+def test_phase_request_references_the_run_clone_path(tmp_path):
+    """(b2 VERIFY d) the executor's phase request references the run's private clone path.
+
+    ``build_phase_request(run_clone=<path>)`` stamps the clone path on the request as a
+    top-level reference — the launch broker (b3) binds its mount profile to it. It is NOT a
+    mount (the four-mount + D-2 contract is unchanged), so the request still validates clean
+    under the SAME config. Omitted (the default), the request carries no clone key."""
+    repo, cfg = _make_config_repo(tmp_path)
+    clone_path = cfg.runs_root / "run-abc" / "repo"
+
+    req = build_phase_request(
+        {"name": "p1_slice1_base_supervisor", "scope": "implementation"},
+        goal="g", workdir="/tmp/wt", model="deepseek/deepseek-v4-pro",
+        spec_name="spec_x", path_config=cfg, run_clone=clone_path,
+    )
+    assert req["run_clone"] == str(clone_path)
+    # a request carrying the clone path still validates under the same contract
+    assert validate_spawn(
+        req, phase_scopes={"p1_slice1_base_supervisor": "implementation"}, path_config=cfg,
+    ) == []
+
+    bare = build_phase_request(
+        {"name": "p1_slice1_base_supervisor", "scope": "implementation"},
+        goal="g", workdir="/tmp/wt", model="deepseek/deepseek-v4-pro",
+        spec_name="spec_x", path_config=cfg,
+    )
+    assert "run_clone" not in bare
+
+
+def test_verifier_request_references_the_run_clone_path(tmp_path):
+    """(b2 VERIFY d) the verifier request references the run clone too — a test phase verifies
+    against the run's read-only clone. The reference survives the forbidden-surface drop (it
+    is not a mount), and the verifier request still validates clean."""
+    _repo, cfg = _make_config_repo(tmp_path)
+    clone_path = cfg.runs_root / "run-abc" / "repo"
+
+    req = build_verifier_request(
+        {"name": "g3_test_gate", "kind": "test", "scope": "implementation",
+         "tests": ["tests/test_spec_x.py"]},
+        goal="g", workdir="/tmp/wt_x", model="deepseek/deepseek-v4-flash",
+        spec_name="spec_x", path_config=cfg, run_clone=clone_path,
+    )
+    assert req["run_clone"] == str(clone_path)
+    # the verifier's read-only-for-candidate contract is intact alongside the reference
+    assert all(m.get("mode") == "ro" for m in req["mounts"])
+    assert validate_spawn(
+        req, phase_scopes={"g3_test_gate": "implementation"}, path_config=cfg,
+    ) == []
+
+
+def test_module_contract_snapshot_matches_the_default_config_contract():
+    """The historical module-level CONTRACT_TARGETS snapshot is exactly the full contract of
+    the default config (fixed container targets + the config-derived repo-alias/.git + D-2
+    auth set) — importers of the snapshot can never disagree with the runtime derivation."""
+    assert contract_targets(_default_cfg()) == CONTRACT_TARGETS
+
+
+# ── fb1_clone_mounted — the clone is the cell's world (the mount contract + its validation) ──
+
+
+def _clone_phase_request(tmp_path, *, run_id="run-abc", verifier=False, scope="implementation"):
+    """Build a clone-world request (agent or verifier) against a scratch config + clone path."""
+    _repo, cfg = _make_config_repo(tmp_path)
+    clone = cfg.runs_root / run_id / "repo"
+    if verifier:
+        req = build_verifier_request(
+            {"name": "g3_test_gate", "kind": "test", "scope": scope,
+             "tests": ["tests/test_spec_x.py"]},
+            goal="g", workdir="/tmp/wt_x", model="deepseek/deepseek-v4-flash",
+            spec_name="spec_x", path_config=cfg, run_clone=clone,
+        )
+        phase_name = "g3_test_gate"
+    else:
+        req = build_phase_request(
+            {"name": "p1_slice1_base_supervisor", "scope": scope},
+            goal="g", workdir="/tmp/wt", model="deepseek/deepseek-v4-pro",
+            spec_name="spec_x", path_config=cfg, run_clone=clone,
+        )
+        phase_name = "p1_slice1_base_supervisor"
+    return req, cfg, clone, phase_name
+
+
+def test_clone_world_phase_request_sources_the_repo_from_the_run_clone(tmp_path):
+    """(fb1 VERIFY a) a clone-world cell request's repo mount sources from the run clone — the
+    mount source is runs_root/<run-id>/repo — and validates clean under the SAME config."""
+    req, cfg, clone, phase_name = _clone_phase_request(tmp_path)
+    assert req["run_clone"] == str(clone)
+    repo_mounts = [m for m in req["mounts"] if m.get("target") == "/repo"]
+    assert len(repo_mounts) == 1, f"expected exactly one /repo mount, got {req['mounts']}"
+    repo_mount = repo_mounts[0]
+    # the repo source is the run's clone: strictly under runs_root/<run-id>, never repo_root
+    source = Path(repo_mount["source"]).resolve()
+    assert source == clone.resolve()
+    assert cfg.runs_root.resolve() in source.parents
+    assert source.parent.name == "run-abc"
+    # a commit-capable implementation cell mounts its clone rw (commits land in ITS clone)
+    assert repo_mount["mode"] == "rw"
+    assert validate_spawn(
+        req, phase_scopes={phase_name: "implementation"}, path_config=cfg,
+    ) == []
+
+
+def test_clone_world_request_mounts_no_shared_worktree_or_shared_git(tmp_path):
+    """(fb1 VERIFY b) a clone-world cell request mounts NEITHER the shared worktree NOR the
+    shared .git — no /tmp namespace, no /repo/.git overlay, no D-16 host-path repo/.git alias,
+    and no mount sources the shared worktrees_root or git_dir."""
+    req, cfg, _clone, phase_name = _clone_phase_request(tmp_path)
+    targets = {m.get("target"): m for m in req["mounts"]}
+    sources = {str(m.get("source", "")) for m in req["mounts"]}
+
+    # shared-worktree target (/tmp) and both shared-git spellings (/repo/.git overlay + the
+    # host-path repo/.git aliases) are ABSENT
+    assert "/tmp" not in targets
+    assert "/repo/.git" not in targets
+    assert str(cfg.repo_root) not in targets
+    assert str(cfg.git_dir) not in targets
+    # the shared sources never appear either
+    assert str(cfg.worktrees_root) not in sources
+    assert str(cfg.git_dir) not in sources
+    assert str(cfg.repo_root) not in sources
+    # the results/auth/state credential surface is still there (a clone cell is a real cell)
+    assert "/app/experiments/results" in targets and targets["/app/experiments/results"]["mode"] == "rw"
+    assert "/state" in targets and targets["/state"]["mode"] == "rw"
+    assert validate_spawn(
+        req, phase_scopes={phase_name: "implementation"}, path_config=cfg,
+    ) == []
+
+
+def test_clone_world_validation_refuses_a_request_that_would_mount_the_shared_git(tmp_path):
+    """(fb1 VERIFY c) validation REFUSES a clone-world request that would mount the shared .git —
+    by overlay target, by host-path .git alias target, and by a source inside the shared git dir."""
+    req, cfg, _clone, phase_name = _clone_phase_request(tmp_path)
+    base = dict(req)
+
+    # (i) the shared /repo/.git overlay (a phase cell writing the SHARED git dir)
+    tampered = {**base, "mounts": list(base["mounts"]) + [
+        {"target": "/repo/.git", "source": str(cfg.git_dir), "mode": "rw"},
+    ]}
+    errors = validate_spawn(
+        tampered, phase_scopes={phase_name: "implementation"}, path_config=cfg,
+    )
+    assert errors and any("step 3" in e and "shared" in e for e in errors), errors
+
+    # (ii) the D-16 host-path .git alias (source + target = the shared git dir at its host path)
+    tampered = {**base, "mounts": list(base["mounts"]) + [
+        {"target": str(cfg.git_dir), "source": str(cfg.git_dir), "mode": "rw"},
+    ]}
+    errors = validate_spawn(
+        tampered, phase_scopes={phase_name: "implementation"}, path_config=cfg,
+    )
+    assert errors and any("step 3" in e and "shared" in e for e in errors), errors
+
+    # (iii) a source INSIDE the shared .git masked onto an otherwise-legal target
+    tampered = {**base, "mounts": list(base["mounts"]) + [
+        {"target": "/app/experiments/results", "source": str(cfg.git_dir / "objects"), "mode": "ro"},
+    ]}
+    errors = validate_spawn(
+        tampered, phase_scopes={phase_name: "implementation"}, path_config=cfg,
+    )
+    assert errors and any("step 3" in e and "shared" in e for e in errors), errors
+
+    # (iv) the whole shared worktree namespace mounted as /tmp is refused the same way
+    tampered = {**base, "mounts": list(base["mounts"]) + [
+        {"target": "/tmp", "source": str(cfg.worktrees_root), "mode": "rw"},
+    ]}
+    errors = validate_spawn(
+        tampered, phase_scopes={phase_name: "implementation"}, path_config=cfg,
+    )
+    assert errors and any("step 3" in e and "shared" in e for e in errors), errors
+
+
+def test_two_run_ids_produce_requests_with_distinct_clone_paths(tmp_path):
+    """(fb1 VERIFY d) two run ids produce two cell requests referencing two DISTINCT clone
+    paths — never the same runs_root/<run-id>/repo, so two concurrent cells never share git
+    metadata through the request contract."""
+    _repo, cfg = _make_config_repo(tmp_path)
+    clone_a = cfg.runs_root / "run-aaa" / "repo"
+    clone_b = cfg.runs_root / "run-bbb" / "repo"
+    req_a = build_phase_request(
+        {"name": "p1_slice1_base_supervisor", "scope": "implementation"},
+        goal="g", workdir="/tmp/wt", model="deepseek/deepseek-v4-pro",
+        spec_name="spec_x", path_config=cfg, run_clone=clone_a,
+    )
+    req_b = build_phase_request(
+        {"name": "p1_slice1_base_supervisor", "scope": "implementation"},
+        goal="g", workdir="/tmp/wt", model="deepseek/deepseek-v4-pro",
+        spec_name="spec_x", path_config=cfg, run_clone=clone_b,
+    )
+    assert clone_a != clone_b
+    assert req_a["run_clone"] != req_b["run_clone"]
+    src_a = [m for m in req_a["mounts"] if m.get("target") == "/repo"][0]["source"]
+    src_b = [m for m in req_b["mounts"] if m.get("target") == "/repo"][0]["source"]
+    assert src_a == str(clone_a) and src_b == str(clone_b)
+    assert src_a != src_b
+    # each clone lives under its OWN run's root
+    assert Path(src_a).parent == cfg.runs_root / "run-aaa"
+    assert Path(src_b).parent == cfg.runs_root / "run-bbb"
+
+
+def test_verifier_request_is_read_only_against_its_clone(tmp_path):
+    """(fb1 VERIFY e) the verifier request is READ-ONLY against its clone — the candidate mount
+    IS the run clone at /repo, every mount is ro, no shared surface, and it validates clean."""
+    req, cfg, clone, phase_name = _clone_phase_request(tmp_path, verifier=True)
+    assert req.get("verifier") is True
+    assert req["run_clone"] == str(clone)
+    assert all(m.get("mode") == "ro" for m in req["mounts"]), req["mounts"]
+    repo_mounts = [m for m in req["mounts"] if m.get("target") == "/repo"]
+    assert len(repo_mounts) == 1
+    assert repo_mounts[0]["source"] == str(clone)
+    assert cfg.runs_root.resolve() in Path(repo_mounts[0]["source"]).resolve().parents
+    # the verifier carries no credential/state/results surface and no shared worktree/.git
+    targets = {m.get("target") for m in req["mounts"]}
+    assert not (targets & set(AUTH_DIRS))
+    assert AUTH_CRED_FILE not in targets and STATE_TARGET not in targets
+    assert "/tmp" not in targets and "/repo/.git" not in targets
+    assert validate_spawn(
+        req, phase_scopes={phase_name: "implementation"}, path_config=cfg,
+    ) == []
+
+
+def test_clone_world_readonly_scope_mounts_its_clone_read_only(tmp_path):
+    """(fb1) a read-only-scope clone request (repo_readonly profile) mounts its clone ro — a
+    research/adversarial cell reads the run clone, never writes it."""
+    _repo, cfg = _make_config_repo(tmp_path)
+    clone = cfg.runs_root / "run-ro" / "repo"
+    req = build_phase_request(
+        {"name": "p1_research_infra", "scope": "research_readonly"},
+        goal="g", workdir="/tmp/wt", model="deepseek/deepseek-v4-pro",
+        spec_name="spec_x", path_config=cfg, run_clone=clone,
+    )
+    assert req["mount_profile"] == "repo_readonly"
+    repo_mounts = [m for m in req["mounts"] if m.get("target") == "/repo"]
+    assert len(repo_mounts) == 1 and repo_mounts[0]["mode"] == "ro"
+    assert repo_mounts[0]["source"] == str(clone)
+    assert validate_spawn(
+        req, phase_scopes={"p1_research_infra": "research_readonly"}, path_config=cfg,
+    ) == []
+
+
+def test_legacy_request_without_run_clone_keeps_the_shared_worktree_contract(tmp_path):
+    """(fb1) the PRE-clone shared-worktree shape is unchanged — a request WITHOUT a run clone
+    still mounts the shared worktree + shared .git overlays and validates under the legacy
+    contract (backward-compatible callers that have not provisioned a clone are unaffected)."""
+    _repo, cfg = _make_config_repo(tmp_path)
+    req = build_phase_request(
+        {"name": "p1_slice1_base_supervisor", "scope": "implementation"},
+        goal="g", workdir="/tmp/wt", model="deepseek/deepseek-v4-pro",
+        spec_name="spec_x", path_config=cfg,
+    )
+    assert "run_clone" not in req
+    targets = {m.get("target"): m for m in req["mounts"]}
+    assert "/tmp" in targets and targets["/tmp"]["mode"] == "rw"
+    assert "/repo/.git" in targets and targets["/repo/.git"]["mode"] == "rw"
+    assert targets["/repo"]["source"] == str(cfg.repo_root)
+    assert validate_spawn(
+        req, phase_scopes={"p1_slice1_base_supervisor": "implementation"}, path_config=cfg,
+    ) == []
+
+
 # ── build_verifier_request — the READ-ONLY-for-candidate contract (F1/g1_verifier_mount) ──
 
 
@@ -414,21 +814,22 @@ def _verifier_request(**overrides) -> dict:
     )
 
 
-def test_verifier_request_mounts_the_candidate_read_only(_canonical_repo_env):
+def test_verifier_request_mounts_the_candidate_read_only():
     """(a) a verifier request's worktree + .git mounts are READ-ONLY — the candidate the
     verifier runs its suite against is mounted ro (or absent), never rw: the worktree
     namespace, the repo, and both git dirs. Write protection is the mount contract, never a
     behavioral --no-commit."""
+    cfg = _default_cfg()
     req = _verifier_request()
     by_target = {m.get("target"): m for m in req["mounts"]}
 
     # the candidate surface: worktree namespace (/tmp), repo (/repo), git dirs (/repo/.git +
-    # the host-path alias .git) — all present, all ro.
+    # the config's host-path repo alias + its .git) — all present, all ro.
     assert by_target["/tmp"]["mode"] == "ro"
     assert by_target["/repo"]["mode"] == "ro"
     assert by_target["/repo/.git"]["mode"] == "ro"
-    assert by_target[_CANONICAL_REPO_DIR]["mode"] == "ro"
-    assert by_target[f"{_CANONICAL_REPO_DIR}/.git"]["mode"] == "ro"
+    assert by_target[str(cfg.repo_root)]["mode"] == "ro"
+    assert by_target[str(cfg.git_dir)]["mode"] == "ro"
     # no remaining rw mount anywhere on the request
     assert all(m.get("mode") == "ro" for m in req["mounts"])
 
@@ -441,16 +842,17 @@ def test_verifier_request_mounts_the_candidate_read_only(_canonical_repo_env):
     assert req.get("verifier") is True
 
 
-def test_verifier_request_passes_validation(_canonical_repo_env):
+def test_verifier_request_passes_validation():
     """A correctly-built verifier request (candidate ro, no forbidden surface) validates clean."""
     req = _verifier_request()
     assert validate_spawn(req, phase_scopes={"g3_test_gate": "implementation"}) == []
 
 
-def test_verifier_request_that_would_mount_candidate_rw_fails_validation(_canonical_repo_env):
+def test_verifier_request_that_would_mount_candidate_rw_fails_validation():
     """(b) a verifier request that would mount the candidate rw FAILS validation — before any
     spawn. Each writable candidate surface (worktree /tmp, git dirs) is refused."""
-    for tampered_target in ("/tmp", "/repo/.git", f"{_CANONICAL_REPO_DIR}/.git"):
+    cfg = _default_cfg()
+    for tampered_target in ("/tmp", "/repo/.git", str(cfg.git_dir)):
         req = _verifier_request()
         for m in req["mounts"]:
             if m.get("target") == tampered_target:
@@ -463,22 +865,22 @@ def test_verifier_request_that_would_mount_candidate_rw_fails_validation(_canoni
         ), f"{tampered_target}: {errors}"
 
 
-def test_verifier_request_rw_candidate_is_refused_before_any_spawn(_canonical_repo_env):
-    """(b) the refusal is enforced at validation time — spawn_sibling never reaches the socket
-    with a rw-candidate verifier request (docker path is bogus and would fail if invoked)."""
+def test_verifier_request_rw_candidate_is_refused_before_any_spawn():
+    """(b) the refusal is enforced at validation time — spawn_sibling never reaches the broker
+    with a rw-candidate verifier request (the broker is never called)."""
     req = _verifier_request()
     for m in req["mounts"]:
         if m.get("target") == "/repo/.git":
             m["mode"] = "rw"
     with pytest.raises(SpawnValidationError) as exc:
         spawn_sibling(
-            req, docker="/nonexistent/docker-should-never-run",
+            req,
             phase_scopes={"g3_test_gate": "implementation"},
         )
     assert any("step 3" in e and "verifier" in e for e in exc.value.errors)
 
 
-def test_verifier_request_with_forbidden_surface_fails_validation(_canonical_repo_env):
+def test_verifier_request_with_forbidden_surface_fails_validation():
     """A verifier request that carries a results/state/auth mount (a surface the builder never
     adds) is refused — read-only-for-candidate means ONLY the candidate surface, ro."""
     req = _verifier_request()
@@ -487,10 +889,11 @@ def test_verifier_request_with_forbidden_surface_fails_validation(_canonical_rep
     assert any("step 3" in e and "verifier" in e and "results" in e for e in errors)
 
 
-def test_agent_phase_request_keeps_rw_candidate_mounts(_canonical_repo_env):
+def test_agent_phase_request_keeps_rw_candidate_mounts():
     """(c) the agent-phase executor's mounts are UNCHANGED — the implementation scope still
     gets rw worktree + rw git dirs (an agent phase COMMITS its work); the verifier is a
     DIFFERENT contract, and only the verifier request carries the marker."""
+    cfg = _default_cfg()
     agent = build_phase_request(
         {"name": "p1_slice1_base_supervisor"},
         goal="g", workdir="/tmp/wt_x", model="deepseek/deepseek-v4-flash",
@@ -499,13 +902,35 @@ def test_agent_phase_request_keeps_rw_candidate_mounts(_canonical_repo_env):
     by_target = {m.get("target"): m for m in agent["mounts"]}
     assert by_target["/tmp"]["mode"] == "rw"
     assert by_target["/repo/.git"]["mode"] == "rw"
-    assert by_target[f"{_CANONICAL_REPO_DIR}/.git"]["mode"] == "rw"
+    assert by_target[str(cfg.git_dir)]["mode"] == "rw"
     assert agent.get("verifier") is None  # no marker: the agent contract, not the verifier's
     # the implementation request validates clean with its rw candidate (unchanged behavior)
     assert validate_spawn(agent) == []
 
 
-def test_verifier_request_keeps_the_in_process_suite_target(_canonical_repo_env):
+def test_verifier_request_skips_the_d18_boot_probe_agent_does_not():
+    """(ws4_smoke — THE SMOKE's wiring fix) a VERIFIER cell runs a SUITE and makes NO model
+    call, so it mounts no CLI/auth dirs (the D-18 probe's whole premise) — its container boots
+    with the entrypoint probe SKIPPED (FLEET_SKIP_PROBE=1, the same env the compose gives
+    supervisor services that invoke no CLI). Before this fix a real verifier cell always died
+    at boot: the probe found no opencode/claude (they are not mounted) and FAILED the container
+    before the suite ever ran. An AGENT cell mounts the CLI dirs and must NOT skip the probe —
+    it legitimately asserts the model CLIs resolve."""
+    verifier = _verifier_request()
+    assert verifier["env"].get("FLEET_SKIP_PROBE") == "1", (
+        "a verifier cell (no credentials, no model CLI by construction) must skip the D-18 "
+        "boot probe or it can never boot"
+    )
+    # ... while the agent (implementation) request does not carry the skip — its probe is real.
+    agent = build_phase_request(
+        {"name": "p1_slice1_base_supervisor", "scope": "implementation"},
+        goal="g", workdir="/tmp/wt_x", model="deepseek/deepseek-v4-flash",
+        spec_name="spec_x",
+    )
+    assert agent["env"].get("FLEET_SKIP_PROBE") in (None, "0")
+
+
+def test_verifier_request_keeps_the_in_process_suite_target():
     """(d) the suite-target semantics are UNCHANGED — the verifier request runs the SAME
     target list the in-process LocalVerifier path would run (the phase's tests are carried on
     the phase def, never re-selected container-side)."""
@@ -610,12 +1035,12 @@ def test_model_whitelist_matches_the_seven_models_in_use():
 # ── a valid submit passes ──────────────────────────────────────────────────────
 
 
-def test_valid_submit_passes_validation(_canonical_repo_env):
+def test_valid_submit_passes_validation():
     errors = validate_submit_request(_valid_submit_request())
     assert errors == []
 
 
-def test_valid_submit_dispatch_builds_the_compose_run_argv(_canonical_repo_env):
+def test_valid_submit_dispatch_builds_the_compose_run_argv(broker_seam):
     result = dispatch_submit(_valid_submit_request(), dry_run=True)
     assert result["ok"] is True
     argv = result["argv"]
@@ -688,13 +1113,13 @@ def test_submit_spec_that_fails_compile_validation_is_refused(tmp_path, monkeypa
 # ── model whitelist (step 2) ────────────────────────────────────────────────────
 
 
-def test_submit_model_outside_whitelist_fails(_canonical_repo_env):
+def test_submit_model_outside_whitelist_fails():
     errors = validate_submit_request(_valid_submit_request(model="openai/gpt-6-hypothetical"))
     assert any("not in the model whitelist" in e for e in errors)
 
 
 @pytest.mark.parametrize("model", sorted(MODEL_WHITELIST))
-def test_every_whitelisted_model_passes_the_model_check(_canonical_repo_env, model):
+def test_every_whitelisted_model_passes_the_model_check(model):
     errors = validate_submit_request(_valid_submit_request(model=model))
     assert not any("model" in e and "whitelist" in e for e in errors)
 
@@ -747,7 +1172,7 @@ def test_submit_blank_goal_fails():
 
 
 def test_submit_with_an_unauthorized_phase_scope_fails_before_any_docker_call(
-    tmp_path, monkeypatch, _canonical_repo_env
+    tmp_path, monkeypatch
 ):
     # A phase with no declared scope and no PHASE_SCOPE_AUTHORIZATION entry resolves to an
     # empty scope (build_phase_request's own documented behavior) — validate_spawn refuses it
@@ -775,7 +1200,7 @@ def test_submit_with_an_unauthorized_phase_scope_fails_before_any_docker_call(
         unauth_spec_path.unlink(missing_ok=True)
 
 
-def test_submit_mount_derivation_reuses_the_step_3_mount_contract_check(_canonical_repo_env):
+def test_submit_mount_derivation_reuses_the_step_3_mount_contract_check():
     # Every phase in the real submit-verb spec is scope: implementation — its derived mounts
     # (build_phase_request) must land squarely inside CONTRACT_TARGETS, the same four-mount +
     # D-2 auth set every other spawn is checked against.
@@ -786,12 +1211,12 @@ def test_submit_mount_derivation_reuses_the_step_3_mount_contract_check(_canonic
 # ── network = fleet-net (step 6) ────────────────────────────────────────────────
 
 
-def test_submit_network_mismatch_fails(_canonical_repo_env):
+def test_submit_network_mismatch_fails():
     errors = validate_submit_request(_valid_submit_request(network="ai-infra"))
     assert any("!= fleet-net" in e for e in errors)
 
 
-def test_submit_default_network_is_fleet_net(_canonical_repo_env):
+def test_submit_default_network_is_fleet_net():
     # fleet_manager submit never sets --network; the default must be the permitted value.
     errors = validate_submit_request(_valid_submit_request())
     assert not any("fleet-net" in e for e in errors)
@@ -800,7 +1225,7 @@ def test_submit_default_network_is_fleet_net(_canonical_repo_env):
 # ── write flags declared (step 7) — "an undeclared write flag failing" (VERIFY) ─
 
 
-def test_submit_actuation_armed_is_always_refused(_canonical_repo_env):
+def test_submit_actuation_armed_is_always_refused():
     request = _valid_submit_request(env={"FINOPS_ACTUATION_ARMED": "1"})
     errors = validate_submit_request(request)
     assert any("FINOPS_ACTUATION_ARMED is never set" in e for e in errors)
@@ -813,7 +1238,7 @@ def test_submit_actuation_armed_is_always_refused(_canonical_repo_env):
 def test_submit_kb_write_undeclared_without_an_implementation_phase_fails(tmp_path, monkeypatch):
     # A research_readonly-only spec never authorizes FINOPS_KB_WRITE — a request smuggling it
     # in must be refused, independent of the mount-contract checks (isolated via a scope that
-    # doesn't touch the /repo-alias mount, so this doesn't need _canonical_repo_env).
+    # doesn't touch the /repo-alias mount, so this doesn't need a configured repo root).
     ro_spec_dir = _REPO_ROOT / "workflows" / "repository"
     ro_spec_path = ro_spec_dir / "_test_submit_contract_research_only.yaml"
     ro_spec_path.write_text(
@@ -835,14 +1260,14 @@ def test_submit_kb_write_undeclared_without_an_implementation_phase_fails(tmp_pa
 # ── per-job image (step 8, p3_base_image_caching) ──────────────────────────────
 
 
-def test_submit_without_image_passes(_canonical_repo_env):
+def test_submit_without_image_passes():
     # image is optional — absent entirely is the common case (fleet_manager submit without
     # --image), and must not fail step 8.
     errors = validate_submit_request(_valid_submit_request())
     assert not any("image" in e for e in errors)
 
 
-def test_submit_with_a_valid_job_image_passes(_canonical_repo_env):
+def test_submit_with_a_valid_job_image_passes():
     errors = validate_submit_request(_valid_submit_request(image="fleet/job-example"))
     assert errors == []
 
@@ -851,7 +1276,7 @@ def test_submit_with_a_valid_job_image_passes(_canonical_repo_env):
     "image",
     [
         "fleet/base",           # the ladder's own cache root — never a job's to pick directly
-        "fleet/orchestrator",   # the one socket-holder's own image
+        "fleet/orchestrator",   # the orchestrator's own image (socketless — the host broker holds the socket)
         "fleet/supervisor",
         "fleet/job-",           # no name after the prefix
         "fleet/job-Bad-Name",   # uppercase — outside JOB_IMAGE_PATTERN
@@ -859,7 +1284,7 @@ def test_submit_with_a_valid_job_image_passes(_canonical_repo_env):
         "fleet/job-x; rm -rf /",  # shell-metacharacter smuggling attempt
     ],
 )
-def test_submit_image_outside_the_job_namespace_fails(_canonical_repo_env, image):
+def test_submit_image_outside_the_job_namespace_fails(image):
     errors = validate_submit_request(_valid_submit_request(image=image))
     assert any("fleet/job-<name>" in e for e in errors)
 
@@ -884,7 +1309,7 @@ def test_build_submit_argv_omits_cell_image_when_absent():
     assert argv[-1] == "--orchestrator"
 
 
-def test_valid_submit_dispatch_with_image_reaches_the_compose_run_argv(_canonical_repo_env):
+def test_valid_submit_dispatch_with_image_reaches_the_compose_run_argv(broker_seam):
     result = dispatch_submit(_valid_submit_request(image="fleet/job-example"), dry_run=True)
     assert result["ok"] is True
     assert "--cell-image" in result["argv"]
@@ -894,7 +1319,7 @@ def test_valid_submit_dispatch_with_image_reaches_the_compose_run_argv(_canonica
 # ── validate_fleet_command delegates "submit" whole (D-14 dispatch surface) ────
 
 
-def test_validate_fleet_command_delegates_submit_to_validate_submit_request(_canonical_repo_env):
+def test_validate_fleet_command_delegates_submit_to_validate_submit_request():
     assert validate_fleet_command(_valid_submit_request(action="submit")) == []
 
 
@@ -981,7 +1406,7 @@ def _push_submit(r: _FakeCommandsRedis, **overrides) -> dict:
 
 
 @pytest.fixture
-def _noop_spec(_canonical_repo_env):
+def _noop_spec():
     ledger_dir = _REPO_ROOT / "experiments" / "results" / "workflows" / _NOOP_SPEC_NAME
     try:
         yield _REPO_ROOT / _NOOP_SPEC_REL, ledger_dir
@@ -1004,7 +1429,7 @@ def _fleet_manager_module():
 
 
 def test_consume_fleet_commands_valid_submit_reaches_running_then_completed_with_ledger(
-    _noop_spec, monkeypatch,
+    _noop_spec, monkeypatch, broker_seam,
 ):
     fleet_manager = _fleet_manager_module()
     spec_path, ledger_dir = _noop_spec
@@ -1042,7 +1467,7 @@ def test_consume_fleet_commands_valid_submit_reaches_running_then_completed_with
 
 
 def test_consume_fleet_commands_nonzero_exit_marks_failed_and_files_the_dlq(
-    _noop_spec, monkeypatch,
+    _noop_spec, monkeypatch, broker_seam,
 ):
     fleet_manager = _fleet_manager_module()
     r = _FakeCommandsRedis()
@@ -1102,7 +1527,8 @@ def test_consume_fleet_commands_invalid_submit_is_refused_before_any_subprocess_
     assert dead[0]["job"]["job_id"] == cmd["job_id"]
 
 
-def test_consume_fleet_commands_dry_run_never_calls_subprocess(_noop_spec, monkeypatch):
+def test_consume_fleet_commands_dry_run_never_calls_subprocess(_noop_spec, monkeypatch,
+                                                               broker_seam):
     r = _FakeCommandsRedis()
     fleet_manager = _fleet_manager_module()
     fleet_manager._send_submit_command(

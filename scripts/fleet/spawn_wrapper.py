@@ -1,12 +1,30 @@
 #!/usr/bin/env python3
 """The sibling-spawn wrapper — the orchestrator's ONE escalation, validated (proposal §2/D-14, §5/D-16).
 
-The orchestrator tier is the only tier that mounts ``/var/run/docker.sock`` (ro, D-3/D-14).
-Everything that socket does is gated by this wrapper: a spawn request is validated against the
-per-step scope model (the closed five-scope vocabulary + the phase→scope authorization) and the
-mount contract (the four + the D-2 auth set) **before** the ``docker`` call. A phase requesting an
-undeclared scope, an unauthorized scope, a mount outside the contract, an undeclared network, or
-an undeclared write flag fails here — never at the socket.
+The wrapper is the ORCHESTRATOR side of the launch boundary: a spawn request is validated
+against the per-step scope model (the closed five-scope vocabulary + the phase→scope
+authorization) and the mount contract (the four + the D-2 auth set) **before** anything is
+launched. A phase requesting an undeclared scope, an unauthorized scope, a mount outside the
+contract, an undeclared network, or an undeclared write flag fails here — never at the socket.
+
+**b3_launch_broker + fb2_broker_hostside: the socket left this module, and so did the broker
+import.** The wrapper no longer invokes docker — and after fb2 it no longer imports the broker
+module and calls it in-process either. It builds the TYPED launch request (``image_digest`` /
+``network`` / ``mount_profile`` / ``state_namespace`` / ``command`` / ``timeout_seconds`` +
+the scope-model context), validates it, and emits it over the IPC seam to the launch broker —
+a genuinely host-side systemd user unit (``infrastructure/
+agentic-dynamics-launch-broker.service``) that owns the Docker socket and is the ONLY Docker
+API caller (its two documented exceptions: the game board's read-only ``docker ps``,
+``scripts/system_snapshot.py`` — fb3 f4 — and the archived one-time sonar-scanner docker run,
+``scripts/archive/backfill_sonar.py`` — ws3_stragglers, frozen, never re-run; both are reads,
+never a launch). The wrapper speaks the seam through ``broker_client.BrokerClient`` (a unix socket,
+one framed request per connection); the broker re-validates the request (both sides run the
+same shared checks: :func:`broker_contract.validate_launch_request` + :func:`validate_spawn`)
+and performs the docker call itself. ``docker-compose.ladder.yml`` mounts no docker socket into
+any container; the docker socket lives ONLY where the broker runs (host). The fleet:commands
+dispatch (scale/drain/restart/submit) delegates its ``docker compose`` calls over the SAME
+seam (:func:`_broker_client` → the broker's ``fleet-command`` verb). NO in-container code
+calls docker, and a spawn path that cannot reach the host broker fails loudly — never silently.
 
 Two jobs, both read-only with respect to *what* is allowed (the compose + the scope model are the
 fixed contract this module enforces):
@@ -23,22 +41,29 @@ fixed contract this module enforces):
     validate_fleet_command — the D-14 fleet:commands check (resize/drain/restart against the
                              compose allowlist + bounded counts).
 
-    spawn_sibling          — validate_spawn THEN build/run the ``docker run`` sibling command.
-    build_phase_request    — build a scope-driven spawn request from a workflow phase (the
-                             campaign-wrapper→sibling-cell mechanism, D-16).
+    spawn_sibling          — validate_spawn THEN emit the typed launch request to the broker
+                             (which builds + runs the ``docker run``).
+    build_phase_request    — build a scope-driven typed launch request from a workflow phase
+                             (the campaign-wrapper→sibling-cell mechanism, D-16); the request's
+                             mounts are the broker's profile expansion (shared).
     consume_fleet_commands — BRPOP ``fleet:commands`` (db1 / 6380) and dispatch validated
-                             resize/drain/restart/submit commands to ``docker compose``,
+                             resize/drain/restart/submit commands THROUGH the broker,
                              wiring a submitted job's board record through
                              launching -> running -> completed/failed (+ the ``fleet_jobs``
                              DLQ on refusal or a nonzero exit, p2_launch_handler).
 
 This module is a script (``scripts/fleet/``), not a package plane. Its package imports are the
 scope model from the experiment plane (tier 1 — ``agentic_dynamics.experiment.experiment_spec``),
-which is the source of truth for the vocabulary + authorization + configs, and the tier-0
-admission vocabulary (``agentic_dynamics.core.admission_context``) for step 6's pure lease-block
-check. It never imports ``control``/``runtime``/``adapters`` — the admission *decision* stays in
-``control.admission``; what lands here is only the structural validator, which is stdlib-only and
-so preserves this module's invariant that validation never requires ``redis``.
+which is the source of truth for the vocabulary + authorization + configs, the tier-0 admission
+vocabulary (``agentic_dynamics.core.admission_context``) for step 6's pure lease-block check, the
+pure shared contract (``broker_contract`` — tier-0/1 only, the profiles/expansion/validation this
+module validates against), and the seam client (``broker_client`` — stdlib-only). It never
+imports ``control``/``runtime``/``adapters`` and NEVER imports the broker module
+(``launch_broker``) — the admission *decision* stays in ``control.admission``; the docker call
+stays in the host-side broker's process, reached only over the seam. The structural validators
+above remain pure and stdlib-only (validation never requires ``redis``); only the
+fleet:commands BRPOP consumer and the seam client touch a socket, and the seam client
+(``broker_client``) is itself stdlib-only.
 """
 
 from __future__ import annotations
@@ -47,7 +72,6 @@ import argparse
 import json
 import os
 import re
-import subprocess
 import sys
 import time
 from pathlib import Path
@@ -60,11 +84,41 @@ _SRC = _REPO_ROOT / "src"
 if str(_SRC) not in sys.path:
     sys.path.insert(0, str(_SRC))
 
+# scripts/fleet/ is a dir, not a package — add it beside src/ so the SHARED pure contract
+# (broker_contract — the profiles/expansion/validation this module validates against) and the
+# seam client (broker_client — the module this module reaches the HOST-side broker through)
+# import as top-level modules.
+#
+# fb2_broker_hostside: this module NO LONGER imports the broker (launch_broker) at all. The
+# broker's docker-executing code is not importable from the orchestrator's spawn path; the
+# spawn path talks to the host-side broker over the unix-socket seam (broker_client).
+_FLEET_DIR = Path(__file__).resolve().parent
+if str(_FLEET_DIR) not in sys.path:
+    sys.path.insert(0, str(_FLEET_DIR))
+
+from broker_client import BrokerClient, BrokerError  # noqa: E402
+from broker_contract import (  # noqa: E402
+    AUTH_CRED_FILE,
+    LAUNCH_NETWORK,
+    MOUNT_PROFILES,
+    REPO_TARGET,
+    RESULTS_TARGET,
+    STATE_TARGET,
+    WORKTREE_TARGET,
+    config_view,
+    mounts_for_profile,
+    sanitize_namespace,
+    validate_launch_request,
+)
+
 from agentic_dynamics.core.admission_context import (  # noqa: E402
     LEASE_REQUEST_FIELDS,
     LeaseContext,
     admission_required,
     validate_lease_fields,
+)
+from agentic_dynamics.core.paths import (  # noqa: E402
+    PathConfig,
 )
 from agentic_dynamics.experiment.compile_experiment import (  # noqa: E402
     SpecError,
@@ -83,10 +137,42 @@ from agentic_dynamics.experiment.experiment_spec import (  # noqa: E402
 # The ONLY host paths a ladder container may mount, per category. ``results`` mode is
 # scope-dependent (rw for implementation/review_readonly/proposal_write, ro for
 # research_readonly/adversarial_readonly); every other category's mode is fixed.
+#
+# b1_path_config (fleet_launch_boundary Wave 2): the CONTAINER targets below are fixed
+# constants (the isolation contract — the worktree namespace, results, the repo + gitdir
+# overlays, the per-attempt state namespace, the credential FILE). The HOST paths that back
+# them (the repo at its host path, the git dir, the worktree root, the results dir, the auth
+# home + its D-2 auth dirs, the state root) are ALL derived from ONE :class:`PathConfig`
+# (``agentic_dynamics.core.paths``) — never from a host-specific literal. The host-specific
+# repo-alias contract (historically a hard-coded host-user repo pair in this map) is now the
+# config's ``repo_root`` / ``git_dir``: the request builders and the validator derive the SAME
+# values from the SAME config, so a spawn request can never name a repo alias the validator
+# does not also derive.
 
-#: The D-2 auth set (proposal §0/D-2) — the four read-only auth mounts. The container auth home
-#: is the host user's home (``HOME=/home/drseuss`` in the compose), so the claude symlink chain
+#: The default PathConfig the wrapper's request-builders and validators derive from when the
+#: caller does not pass one — the environment at call time, validated once (a missing repo root
+#: is refused). "Every consumer takes it as a parameter": a caller that cares about a specific
+#: config (tests, the composition root) passes it explicitly; these module functions accept it
+#: and fall back to this derivation only for backward-compatible callers that predate it.
+def default_path_config() -> PathConfig:
+    """The wrapper's :class:`PathConfig`, derived from the environment at call time.
+
+    Reads the existing ``FINOPS_REPO_DIR`` / ``FINOPS_WORKTREE_ROOT`` /
+    ``FINOPS_OPENCODE_STATE_ROOT`` / ``AUTH_HOME`` env contract (defaults are the repo's own
+    paths relative to the package root) and validates the config once — a missing repo root is
+    a refusal, never a silent fallback. Callers that need a specific config (tests, an
+    operator overriding a single root) pass a ``PathConfig`` explicitly.
+    """
+    return PathConfig.from_env()
+
+
+#: The D-2 auth set (proposal §0/D-2) — the four read-only auth mounts, derived from the
+#: default config's ``auth_home`` (``PathConfig.auth_dirs``): the container auth home is the
+#: host user's home (``HOME`` / ``AUTH_HOME`` in the compose), so the claude symlink chain
 #: (``~/.local/bin/claude`` → ``~/.local/share/claude/versions/<v>``) resolves unchanged.
+#: A snapshot for importers of this module's historical name; the request builders and the
+#: validator use the config's own :meth:`PathConfig.auth_dirs`, so the two can never disagree
+#: about which auth dirs a given config mounts.
 #:
 #: NOTE (P0-3, control-plane stabilization): ``~/.local/share/opencode`` is deliberately NOT
 #: here. The sibling's CLI state is the per-attempt :data:`STATE_TARGET` namespace (rw, mounted
@@ -94,37 +180,27 @@ from agentic_dynamics.experiment.experiment_spec import (  # noqa: E402
 #: (ro) — the host's LIVE opencode state (opencode.db, sessions, compaction) never enters a
 #: cell in any mode, and no two cells ever share a writable CLI-state directory.
 AUTH_DIRS: frozenset[str] = frozenset(
-    {
-        "/home/drseuss/.claude",
-        "/home/drseuss/.local/bin",
-        "/home/drseuss/.local/share/claude",
-        "/home/drseuss/.opencode/bin",
-    }
+    str(d) for d in PathConfig.from_env(require_existing=False).auth_dirs
 )
 
-#: P0-3: the credential FILE mount (ro). Auth is a single file, never the host's whole state
-#: directory: a cell mounts ``<host auth.json>`` at ``/auth/opencode_auth.json`` and the
-#: entrypoint seeds it into the cell's OWN state namespace. Mirrors the compose-level
-#: ``/auth/opencode_auth.json`` contract.
-AUTH_CRED_FILE = "/auth/opencode_auth.json"
-
-#: P0-3: the per-attempt CLI-state target (rw). Every spawned sibling gets a UNIQUE host
-#: namespace under :data:`STATE_ROOT` mounted here, and ``XDG_DATA_HOME``/``XDG_CONFIG_HOME``/
-#: ``XDG_CACHE_HOME`` point into it — opencode's session DB, SQLite/WAL, and compaction state
-#: are private to one run/step/attempt. Two concurrent cells can never see each other's
-#: session IDs (review finding P0: "all scaled OpenCode cells appear to share the same
-#: writable OpenCode state directory").
-STATE_TARGET = "/state"
-STATE_ROOT = os.environ.get("FINOPS_OPENCODE_STATE_ROOT", "/tmp/opencode_state")
+#: P0-3: the credential FILE mount (ro) + the per-attempt CLI-state target (rw). Both are now
+#: defined ONCE in the pure shared contract (``broker_contract.AUTH_CRED_FILE`` /
+#: ``broker_contract.STATE_TARGET`` — imported above and re-exported here for this module's
+#: historical import surface): the broker's profile expansion mounts them, so a credential/state
+#: constant that drifted between the wrapper and the broker would be a mount the wrapper
+#: validated but the broker did not mount. One definition — the contract's.
+STATE_ROOT = str(PathConfig.from_env(require_existing=False).state_root)
 
 #: The XDG redirect vars the state namespace sets, so the CLI's writable state lands in the
 #: per-attempt namespace instead of the image's default ``~/.local/share``.
 STATE_ENV_KEYS: tuple[str, ...] = ("XDG_DATA_HOME", "XDG_CONFIG_HOME", "XDG_CACHE_HOME")
 
-#: The fixed-mount categories (proposal §3). ``mode`` is the CONTRACT's mode; ``results`` is
-#: ``None`` because the scope narrows it (ro vs rw). A mount target not in this map (plus the
-#: D-2 auth set) is outside the contract — rejected at step 3.
-CONTRACT_TARGETS: dict[str, tuple[str, str | None]] = {
+#: The fixed CONTAINER mount targets (proposal §3). ``mode`` is the CONTRACT's mode;
+#: ``results`` is ``None`` because the scope narrows it (ro vs rw). These targets are the same
+#: in every deployment — the isolation constant. A mount target outside this map (plus the
+#: PathConfig-derived repo-alias/.git pair and the D-2 auth set, assembled by
+#: :func:`contract_targets`) is outside the contract — rejected at step 3.
+FIXED_CONTRACT_TARGETS: dict[str, tuple[str, str | None]] = {
     "/tmp": ("worktree", "rw"),
     "/app/experiments/results": ("results", None),
     "/repo": ("repo", "ro"),
@@ -133,20 +209,85 @@ CONTRACT_TARGETS: dict[str, tuple[str, str | None]] = {
     #: /repo/.git — read-only there breaks every phase commit. Mirrors the results-overlay
     #: pattern: the repo working tree stays ro; only .git is overlaid rw.
     "/repo/.git": ("repo-git", "rw"),
-    #: The repo at its HOST path (D-16 fix, 2026-08-31): worktrees in the shared /tmp namespace
-    #: carry a ``gitdir:`` pointer to the repo's HOST path (e.g.
-    #: /home/drseuss/ai-finops-framework/.git/...). Without this mount the pointer does not
-    #: resolve inside a cell, git treats the worktree as foreign, and the runner rewrites the
-    #: pointer to /repo/.git — wedging the worktree for the host. Mounting the repo at the
-    #: SAME path in the container makes one pointer valid in both views.
-    "/home/drseuss/ai-finops-framework": ("repo-alias", "ro"),
-    "/home/drseuss/ai-finops-framework/.git": ("repo-alias-git", "rw"),
     #: P0-3: the per-attempt CLI-state namespace (rw). The ONE writable state a cell gets —
     #: mounted as a unique per-run/step/attempt host dir, never a shared pool directory.
     STATE_TARGET: ("state", "rw"),
 }
-CONTRACT_TARGETS.update({d: ("auth", "ro") for d in AUTH_DIRS})
-CONTRACT_TARGETS[AUTH_CRED_FILE] = ("auth-file", "ro")
+
+#: The repo at its HOST path (D-16 fix, 2026-08-31): worktrees in the shared worktree namespace
+#: carry a ``gitdir:`` pointer to the repo's HOST path (``<repo_root>/.git/...``). Without this
+#: mount the pointer does not resolve inside a cell, git treats the worktree as foreign, and the
+#: runner rewrites the pointer to /repo/.git — wedging the worktree for the host. Mounting the
+#: repo at the SAME path in the container makes one pointer valid in both views. The host path
+#: is the config's ``repo_root`` / ``git_dir`` — derived, never a literal (b1_path_config).
+#:
+#: This shared-worktree surface (the D-16 alias + the ``/repo/.git`` overlay + the shared
+#: ``/tmp`` namespace in :data:`FIXED_CONTRACT_TARGETS`) belongs to the PRE-clone shared-worktree
+#: contract ONLY. fb1_clone_mounted's clone-world contract (:func:`clone_contract_targets`)
+#: excludes every one of them: a cell that mounts its per-run clone needs no worktree gitdir
+#: pointer and no shared ``.git`` — the clone has its own.
+
+
+def contract_targets(path_config: PathConfig) -> dict[str, tuple[str, str | None]]:
+    """The full mount contract for ``path_config`` — fixed targets + derived host-path targets.
+
+    The fixed CONTAINER targets (:data:`FIXED_CONTRACT_TARGETS`) are joined with the
+    config-derived host-path targets: the repo at its host path (``repo-alias`` ro), its git
+    dir (``repo-alias-git`` rw — the D-16 overlay), the D-2 auth dirs (``auth`` ro, from
+    ``path_config.auth_dirs``), and the credential FILE (``auth-file`` ro). Both the request
+    builders and :func:`validate_spawn` assemble the contract from the SAME config, so a
+    request can never name a mount the validator does not also derive.
+    """
+    targets: dict[str, tuple[str, str | None]] = dict(FIXED_CONTRACT_TARGETS)
+    targets[str(path_config.repo_root)] = ("repo-alias", "ro")
+    targets[str(path_config.git_dir)] = ("repo-alias-git", "rw")
+    targets.update({str(d): ("auth", "ro") for d in path_config.auth_dirs})
+    targets[AUTH_CRED_FILE] = ("auth-file", "ro")
+    return targets
+
+
+#: The mount CATEGORY of the clone-sourced repo mount (fb1_clone_mounted). A clone-world
+#: request mounts its per-run clone at ``/repo`` — this category distinguishes that mount from
+#: the shared-worktree shape's ``repo`` (working tree of the SHARED repo) + ``repo-git``
+#: (overlay of the SHARED ``.git``), so validation can require a clone-world cell's repo to be
+#: its own clone and refuse the shared surfaces outright.
+REPO_CLONE_CATEGORY = "repo-clone"
+
+
+def clone_contract_targets(path_config: PathConfig) -> dict[str, tuple[str, str | None]]:
+    """The CLONE-world mount contract for ``path_config`` (fb1_clone_mounted).
+
+    When a spawn request names a run clone (``run_clone`` = ``runs_root/<run-id>/repo``), the
+    cell's world IS that clone — so the shared-host surfaces of the shared-worktree contract
+    are deliberately NOT part of this contract: no worktree namespace (``/tmp``), no shared
+    ``/repo/.git`` overlay, no D-16 host-path repo/``.git`` aliases. Two concurrent cells must
+    never share git metadata through ANY path, and the shared surfaces are the paths that
+    would reintroduce sharing.
+
+    The clone-world contract is the per-cell surface only: ``/repo`` (the run's clone — mode
+    ro|rw per the profile, validated separately), ``results`` (mode = the scope's
+    ``results_mode``), the per-attempt ``state`` namespace (rw), the D-2 ``auth`` dirs (ro) and
+    the credential ``auth-file`` (ro). ``validate_spawn`` derives THIS table (never the
+    shared-worktree :func:`contract_targets`) when the request under validation carries a run
+    clone, so a request that would mount the shared worktree or shared ``.git`` fails step 3.
+    """
+    targets: dict[str, tuple[str, str | None]] = {
+        REPO_TARGET: (REPO_CLONE_CATEGORY, None),
+        RESULTS_TARGET: ("results", None),
+        STATE_TARGET: ("state", "rw"),
+        AUTH_CRED_FILE: ("auth-file", "ro"),
+    }
+    targets.update({str(d): ("auth", "ro") for d in path_config.auth_dirs})
+    return targets
+
+
+#: The default config's full contract — the historical module-level map, kept as a snapshot for
+#: importers that name it directly. Runtime validation uses :func:`contract_targets` on the
+#: caller's own config (default: :func:`default_path_config`), never this import-time snapshot,
+#: so a monkeypatched env is always honored.
+CONTRACT_TARGETS: dict[str, tuple[str, str | None]] = contract_targets(
+    PathConfig.from_env(require_existing=False)
+)
 
 #: The write-flag env keys the scope model governs (G1/G2). ``FINOPS_KB_WRITE`` is allowed only
 #: when the scope's ``write_flag`` is True (the ``implementation`` scope, and only for a P1-P11
@@ -170,9 +311,10 @@ VERIFIER_REQUEST_MARKER = "verifier"
 #: plus the host-path alias (``repo-alias``) — is mounted ``ro``: a verifier needs the
 #: candidate's TREE, never the ability to change it. Categories OUTSIDE this set (``results``,
 #: ``state``, the ``auth``/``auth-file`` credential mounts) are never on a verifier request —
-#: validation refuses them if present.
+#: validation refuses them if present. In the clone world (fb1_clone_mounted) the candidate
+#: surface is the run's own clone (``repo-clone``), which is a member of the same read-only set.
 VERIFIER_READONLY_CATEGORIES: frozenset[str] = frozenset(
-    {"worktree", "repo", "repo-git", "repo-alias", "repo-alias-git"}
+    {"worktree", "repo", "repo-git", "repo-alias", "repo-alias-git", "repo-clone"}
 )
 
 #: Step 6's vocabulary (admission_leases p2), re-exported from the tier-0 admission contract so
@@ -263,7 +405,7 @@ CELL_IMAGE = "fleet/base"
 #: fleet/base``, tagged ``fleet/job-<name>``). This is a CLOSED namespace, not an arbitrary
 #: image override: a submit can never name ``fleet/base``/``fleet/orchestrator``/
 #: ``fleet/supervisor`` directly (those are the ladder's own tiers, not a job's to pick) or an
-#: attacker-supplied third-party image on the one socket-holding service's phase cells. The
+#: attacker-supplied third-party image on the broker's phase-cell launches. The
 #: matched image is threaded through to the orchestrator's sibling-cell spawn as
 #: ``--cell-image`` (``scripts/run_workflow.py``) — it changes what image the PHASE cells run,
 #: never the orchestrator/workflow-runner container itself.
@@ -286,6 +428,59 @@ def _scope_config(scope: str) -> dict[str, Any]:
     return SCOPE_CONFIGS.get(scope, {})
 
 
+def _mounts_shared_surface(mount: Any, path_config: PathConfig) -> bool:
+    """True when a CLONE-world mount would expose the SHARED worktree or the SHARED ``.git``.
+
+    fb1_clone_mounted — a clone-world cell's repo is its per-run clone, so any mount that
+    reaches the shared-host surfaces is a sharing hazard and is refused. Checked by TARGET
+    (the shared ``/tmp`` worktree namespace, the shared ``/repo/.git`` overlay, and the D-16
+    host-path repo + ``.git`` aliases) and by SOURCE (the shared worktrees-root namespace root
+    itself, or the shared git dir — ``git_dir`` itself or anything under it). Sources UNDER the
+    worktrees root (e.g. the per-attempt state namespace, which lives at
+    ``worktrees_root/opencode_state``) are NOT shared surfaces — only the namespace ROOT
+    bind that would hand a cell every worktree is.
+
+    cs1_container_env (fleet_launch_container_smoke, f1 close-out): the D-16 shared-repo
+    ``repo_root`` alias is a shared surface ONLY when it is a HOST path distinct from the fixed
+    clone target ``REPO_TARGET`` (``/repo``). A container-tier config carries the repo view
+    ``FINOPS_REPO_DIR=/repo`` (the compose ``/repo`` mount — cs1), so ``repo_root == /repo ==
+    REPO_TARGET`` there, and the cell's OWN clone mount (``target=/repo``, source under
+    ``runs_root``) would be mis-flagged as "the shared repo at its alias path" and the broker
+    would refuse every containerized clone-world spawn it was built for (the fleet_launch_smoke
+    adversarial F1(b) collision). When ``repo_root`` coincides with the clone target the shared
+    tree is never mountable through it anyway: the step-3 clone-source binding refuses any
+    ``/repo`` mount that does not source the run's own clone, and ``git_dir`` (``/repo/.git``
+    when rooted at ``/repo``) stays a shared surface by the ``/repo/.git`` overlay target below.
+    """
+    target = str((mount or {}).get("target", ""))
+    source = str((mount or {}).get("source", "") or "")
+    if target in (
+        WORKTREE_TARGET,
+        f"{REPO_TARGET}/.git",
+        str(path_config.git_dir),
+    ):
+        return True
+    # The D-16 shared-repo alias target — the shared repo TREE bound at its own host path.
+    # Excluded when the config's repo_root IS the fixed clone target (a container-view config
+    # rooted at /repo): there the /repo mount is the run clone, and the step-3 clone-source
+    # binding is the guard that keeps it honest.
+    if str(path_config.repo_root) != REPO_TARGET and target == str(path_config.repo_root):
+        return True
+    if source:
+        src = Path(source).resolve()
+        worktrees_root = path_config.worktrees_root.resolve()
+        git_dir = path_config.git_dir.resolve()
+        if src in (worktrees_root, git_dir) or git_dir in src.parents:
+            return True
+        # The shared repo TREE itself as a bind source (the D-16 alias shape) — refused for a
+        # clone-world cell whatever its target. A clone-world request never sources repo_root:
+        # its repo source is the run clone under runs_root, its results source is
+        # results_dir (a subdir of repo_root, not the root itself).
+        if src == path_config.repo_root.resolve():
+            return True
+    return False
+
+
 # ── The five-check validation (§5, D-16) ─────────────────────────────────────
 
 
@@ -295,6 +490,7 @@ def validate_spawn(
     phase_scopes: dict[str, str] | None = None,
     now: float | None = None,
     require_lease: bool | None = None,
+    path_config: PathConfig | None = None,
 ) -> list[str]:
     """Validate a spawn request against the scope model + the spend contract. Empty list = valid.
 
@@ -320,8 +516,15 @@ def validate_spawn(
 
     ``now`` is the clock step 6 judges expiry against (injected for deterministic tests; defaults
     to the wall clock).
+
+    ``path_config`` (b1_path_config) is the :class:`PathConfig` step 3 derives the mount
+    contract from — the repo-alias/.git pair and the D-2 auth dirs are config-derived, so a
+    request built against one config validates against the SAME config. ``None`` (the default)
+    derives it from the environment at call time (:func:`default_path_config`).
     """
     errors: list[str] = []
+    path_config = path_config or default_path_config()
+    contract = contract_targets(path_config)
     phase = str(request.get("phase", ""))
     scope = str(request.get("scope", ""))
 
@@ -334,6 +537,10 @@ def validate_spawn(
         return errors
 
     # Step 2 — the phase must be AUTHORIZED for that scope (its declared allowed scope).
+    # A phase that DECLARED its scope in the spec is authorized by that declaration (the
+    # request's ``scope_declared`` — the declared scope wins per the resolution order; the
+    # static table cannot know a custom spec's phases, the F3 cs4 fix). Without a declaration,
+    # the table (or the caller's phase_scopes) is the authorization source.
     if phase_scopes is not None:
         authorized = phase_scopes.get(phase)
     else:
@@ -347,24 +554,62 @@ def validate_spawn(
 
     cfg = _scope_config(scope)
 
-    # Step 3 — every mount's target ∈ the four + D-2, and its mode matches the scope/contract.
+    # Step 3 — every mount's target ∈ the contract, and its mode matches the scope/contract.
+    # The effective contract depends on whether the request names a run clone (fb1_clone_mounted
+    # — the clone is the cell's world):
+    #   * NO run_clone — the shared-worktree contract (:func:`contract_targets`: the four + D-2
+    #     + the D-16 host-path repo/.git alias), unchanged from before fb1.
+    #   * run_clone present — the CLONE-world contract (:func:`clone_contract_targets`): the
+    #     cell's repo IS its per-run clone (runs_root/<run-id>/repo), so the shared worktree
+    #     mount and the shared .git overlays/aliases are OUT of contract, and a request that
+    #     would mount them (by target or by source) is refused HERE, before the socket call.
     # A VERIFIER request (the DockerVerifierExecutor's read-only cell — stamped by
-    # build_verifier_request) is a DIFFERENT contract: it may carry ONLY the read-only
-    # candidate surface (worktree/repo/repo-git/repo-alias/repo-alias-git, all ro), never the
-    # results/state/auth mounts of an agent cell. Read-only-for-candidate is enforced HERE, at
-    # validation time — a verifier request that would mount its candidate rw is refused before
-    # the socket call, never left to the child's --no-commit.
+    # build_verifier_request) is a DIFFERENT contract on top: it may carry ONLY the read-only
+    # candidate surface (worktree/repo/repo-git/repo-alias/repo-alias-git/repo-clone, all ro),
+    # never the results/state/auth mounts of an agent cell. Read-only-for-candidate is enforced
+    # HERE, at validation time — a verifier request that would mount its candidate rw is
+    # refused before the socket call, never left to the child's --no-commit.
     is_verifier = bool(request.get(VERIFIER_REQUEST_MARKER))
-    for m in request.get("mounts", []) or []:
+    clone_ref = request.get("run_clone")
+    clone_world = bool(clone_ref)
+    mounts = request.get("mounts", []) or []
+    if clone_world:
+        if not path_config.is_run_clone_dir(str(clone_ref)):
+            errors.append(
+                f"step 3: run_clone {clone_ref!r} is not a runs_root/<run-id>/repo clone path "
+                f"— a clone-world request must name the run's private clone"
+            )
+        contract = clone_contract_targets(path_config)
+    for m in mounts:
         target = str((m or {}).get("target", ""))
         mode = str((m or {}).get("mode", ""))
-        if target not in CONTRACT_TARGETS:
+        source = str((m or {}).get("source", "") or "")
+        if clone_world and _mounts_shared_surface(m, path_config):
             errors.append(
-                f"step 3: mount target {target!r} is outside the four-mount contract + the "
-                f"D-2 auth set"
+                f"step 3: mount target {target!r} (source {source!r}) is the SHARED "
+                f"worktree/.git surface — a clone-world cell mounts its own run clone "
+                f"(runs_root/<run-id>/repo), never the shared worktree or the shared .git"
             )
             continue
-        category, contract_mode = CONTRACT_TARGETS[target]
+        if target not in contract:
+            if clone_world:
+                errors.append(
+                    f"step 3: mount target {target!r} is outside the clone-world contract "
+                    f"(the shared worktree/.git surface is not mountable by a run-clone cell)"
+                )
+            else:
+                errors.append(
+                    f"step 3: mount target {target!r} is outside the four-mount contract + the "
+                    f"D-2 auth set"
+                )
+            continue
+        category, contract_mode = contract[target]
+        if clone_world and target == REPO_TARGET and source and source != str(clone_ref):
+            errors.append(
+                f"step 3: the /repo mount sources {source!r}, but a clone-world cell's repo "
+                f"must source from ITS run clone {clone_ref!r} (runs_root/<run-id>/repo)"
+            )
+            continue
         if is_verifier:
             # The verifier's mount contract (g1_verifier_mount): candidate surface only, ro.
             if category not in VERIFIER_READONLY_CATEGORIES:
@@ -386,10 +631,27 @@ def validate_spawn(
                     f"step 3: results mount mode {mode!r} != scope {scope} results_mode "
                     f"{expected!r}"
                 )
+        elif category == REPO_CLONE_CATEGORY:
+            # The clone mount is the cell's repo: ro for a read-only cell, rw for a
+            # commit-capable implementation cell (its commits land in ITS clone). Either is
+            # contract-legal; the shared surfaces are already excluded above.
+            if mode not in ("ro", "rw"):
+                errors.append(
+                    f"step 3: /repo clone mount mode {mode!r} not in ro/rw"
+                )
         elif mode != contract_mode:
             errors.append(
                 f"step 3: mount {target!r} mode {mode!r} != contract {contract_mode!r}"
             )
+    if clone_world and not any(
+        str((m or {}).get("target", "")) == REPO_TARGET
+        and str((m or {}).get("source", "") or "") == str(clone_ref)
+        for m in mounts
+    ):
+        errors.append(
+            f"step 3: a clone-world request must mount its repo from the run clone "
+            f"({clone_ref!r}) at {REPO_TARGET} — no /repo clone mount present"
+        )
 
     # Step 4 — the network must be exactly the scope's declared network.
     network = str(request.get("network", ""))
@@ -448,6 +710,7 @@ def validate_fleet_command(
     max_scale: int = MAX_SCALE,
     repo_root: Path | str | None = None,
     phase_scopes: dict[str, str] | None = None,
+    path_config: PathConfig | None = None,
 ) -> list[str]:
     """Validate a fleet:commands command against the compose allowlist + bounded counts.
 
@@ -460,6 +723,8 @@ def validate_fleet_command(
     A ``submit`` command has a different shape entirely (``{"spec", "goal", "model",
     "workdir"}`` — no ``service``/``count``), so it is delegated whole to
     :func:`validate_submit_request` rather than checked against the service allowlist.
+    ``path_config`` (b1_path_config) is forwarded to the submit delegation; scale/drain/restart
+    never touch host paths.
     """
     errors: list[str] = []
     action = str(command.get("action", ""))
@@ -468,7 +733,9 @@ def validate_fleet_command(
         return errors
 
     if action == "submit":
-        return validate_submit_request(command, repo_root=repo_root, phase_scopes=phase_scopes)
+        return validate_submit_request(
+            command, repo_root=repo_root, phase_scopes=phase_scopes, path_config=path_config,
+        )
 
     allowed = allowlist if allowlist is not None else COMPOSE_ALLOWLIST
     service = str(command.get("service", ""))
@@ -526,14 +793,18 @@ def _resolve_spec_path(spec_rel: str, repo_root: Path) -> tuple[Path | None, lis
     return resolved, errors
 
 
-def _is_worktree_scoped_workdir(workdir: str) -> list[str]:
+def _is_worktree_scoped_workdir(
+    workdir: str,
+    path_config: PathConfig | None = None,
+) -> list[str]:
     """Check a submit's ``workdir`` against the worktree-root contract + host-service markers.
 
-    A valid workdir is a path strictly UNDER ``FINOPS_WORKTREE_ROOT`` (the shared ``/tmp``
-    namespace every worker/orchestrator already agrees on — see ``build_phase_request``'s own
-    ``FINOPS_WORKTREE_ROOT`` default). "Strictly under" (not equal to the root) matters because
-    the root itself is a shared directory, not one job's isolated worktree — mounting it would
-    hand a cell every OTHER job's worktree too.
+    A valid workdir is a path strictly UNDER the config's ``worktrees_root`` (the shared worktree
+    namespace every worker/orchestrator already agrees on — ``FINOPS_WORKTREE_ROOT``, default
+    the ``/tmp`` namespace the ladder mounts into every container at the same path).
+    "Strictly under" (not equal to the root) matters because the root itself is a shared
+    directory, not one job's isolated worktree — mounting it would hand a cell every OTHER
+    job's worktree too.
     """
     errors: list[str] = []
     if not workdir:
@@ -548,7 +819,8 @@ def _is_worktree_scoped_workdir(workdir: str) -> list[str]:
         )
         return errors
 
-    worktree_root = Path(os.environ.get("FINOPS_WORKTREE_ROOT", "/tmp")).resolve()
+    path_config = path_config or default_path_config()
+    worktree_root = path_config.worktrees_root.resolve()
     resolved = Path(workdir).resolve()
     if resolved == worktree_root or worktree_root not in resolved.parents:
         errors.append(
@@ -563,6 +835,7 @@ def validate_submit_request(
     *,
     repo_root: Path | str | None = None,
     phase_scopes: dict[str, str] | None = None,
+    path_config: PathConfig | None = None,
 ) -> list[str]:
     """Validate a ``submit`` request. Empty list = valid; the socket is reached only then.
 
@@ -592,8 +865,15 @@ def validate_submit_request(
     the exact fields ``fleet_manager submit`` LPUSHes, plus the three optional fields a caller
     may set to exercise checks 6/7/8 directly (the CLI never sets network/env; they default to
     the permitted value — ``image`` is CLI-settable via ``--image``, still validated here).
+
+    ``path_config`` (b1_path_config) is the :class:`PathConfig` the workdir check and the
+    per-phase mount derivation/validation use, so a submit request and its derived phase
+    requests all speak one config (default: derived from the environment at call time).
+    ``repo_root`` remains the spec-resolution root (the checkout the wrapper sees); it defaults
+    to this module's own repo root and is independent of the host-path ``path_config.repo_root``.
     """
     errors: list[str] = []
+    path_config = path_config or default_path_config()
     repo_root = Path(repo_root) if repo_root is not None else _REPO_ROOT
 
     # Step 1 — spec path resolvable + compile-validates.
@@ -618,7 +898,7 @@ def validate_submit_request(
 
     # Step 3 — workdir is an allowed worktree path.
     workdir = str(request.get("workdir", "") or "")
-    errors.extend(_is_worktree_scoped_workdir(workdir))
+    errors.extend(_is_worktree_scoped_workdir(workdir, path_config=path_config))
 
     # Step 4 — goal present.
     goal = str(request.get("goal", "") or "").strip()
@@ -638,8 +918,11 @@ def validate_submit_request(
                 model=model,
                 spec_name=spec.name,
                 phase_scopes=phase_scopes,
+                path_config=path_config,
             )
-            for e in validate_spawn(phase_request, phase_scopes=phase_scopes):
+            for e in validate_spawn(
+                phase_request, phase_scopes=phase_scopes, path_config=path_config
+            ):
                 errors.append(f"submit: phase {phase.get('name')!r}: {e}")
 
     # Step 6 — network must be exactly fleet-net (only checked when the request declares one —
@@ -679,93 +962,109 @@ def validate_submit_request(
     return errors
 
 
-# ── The spawn mechanism (validate THEN socket) ───────────────────────────────
+# ── The spawn mechanism (validate THEN the broker over the seam) ─────────────
 
 
-def build_spawn_argv(
-    request: dict[str, Any],
-    *,
-    docker: str = "docker",
-    image: str | None = None,
-    command: list[str] | None = None,
-    name: str | None = None,
-) -> list[str]:
-    """Build the ``docker run`` argv for a sibling container (called only AFTER validation).
+def _broker_client() -> BrokerClient:
+    """The seam client for this spawn path, bound to the configured broker socket.
 
-    The container runs as a sibling cell with the request's mounts/network/env. The socket is
-    deliberately NOT mounted on the sibling (it is a phase CELL, not the orchestrator) — the
-    escalation stays with the orchestrator that spawned it (D-3).
+    The socket path is resolved from the environment at call time (``FINOPS_LAUNCH_BROKER_SOCKET``,
+    else the user runtime dir) so a test or an operator can re-point the seam between requests.
+    The broker itself — the host-side systemd unit — is never imported here; this module only
+    ever speaks the seam.
     """
-    argv = [docker, "run", "--rm", "-i"]
-    if name:
-        argv += ["--name", name]
-    for m in request.get("mounts", []) or []:
-        source = str((m or {}).get("source", ""))
-        target = str((m or {}).get("target", ""))
-        mode = str((m or {}).get("mode", "ro"))
-        argv += ["-v", f"{source}:{target}:{mode}"]
-    argv += ["--network", str(request.get("network", "fleet-net"))]
-    for k, v in (request.get("env", {}) or {}).items():
-        argv += ["-e", f"{k}={v}"]
-    argv += [image or CELL_IMAGE]
-    argv += command or request.get("command", [])
-    return argv
+    return BrokerClient()
+
+
+def _broker_outcome_or_raise(outcome: dict[str, Any]) -> dict[str, Any]:
+    """Map a broker outcome's NAMED ``state`` onto this module's refusal contract.
+
+    The host broker replies to every request with a complete outcome carrying a ``state``:
+
+    * ``REFUSED`` — the broker re-validated what it will execute and refused. Mapped to
+      :class:`SpawnValidationError` with the broker's errors, the SAME refusal type the old
+      in-process ``LaunchRequestError`` mapping produced (callers keep one refusal type).
+    * ``DOCKER_UNAVAILABLE`` / ``SERVER_ERROR`` — the broker cannot reach docker, or faulted.
+      Raised as a :class:`SpawnValidationError` carrying the named state — a LOUD failure,
+      never a silent pass (fb2 VERIFY e: docker-unavailable fails loudly, never silently).
+    * ``DRY_RUN`` / ``OK`` / ``RUN_FAILED`` / ``PONG`` — returned as-is; the caller classifies
+      the docker outcome (a nonzero ``returncode`` is a normal cell outcome, not a refusal).
+    """
+    state = str(outcome.get("state", ""))
+    if state == "REFUSED":
+        raise SpawnValidationError(
+            outcome.get("errors") or ["the launch broker refused the request"]
+        )
+    if state == "DOCKER_UNAVAILABLE":
+        raise SpawnValidationError(
+            [outcome.get("stderr") or "the host-side broker cannot reach docker (state "
+             "DOCKER_UNAVAILABLE)"]
+        )
+    if state == "SERVER_ERROR":
+        raise SpawnValidationError(
+            [outcome.get("stderr") or "the launch broker faulted (state SERVER_ERROR)"]
+        )
+    return outcome
 
 
 def spawn_sibling(
     request: dict[str, Any],
     *,
     phase_scopes: dict[str, str] | None = None,
-    docker: str = "docker",
-    image: str | None = None,
-    command: list[str] | None = None,
     dry_run: bool = False,
     now: float | None = None,
     require_lease: bool | None = None,
+    path_config: PathConfig | None = None,
 ) -> dict[str, Any]:
-    """Validate a spawn request, then (if valid) run the sibling container.
+    """Validate a typed launch request, then emit it to the broker over the seam.
 
     The ordering is the load-bearing guarantee: :func:`validate_spawn` runs FIRST, and any error
-    raises :class:`SpawnValidationError` before a single ``docker`` argv is built — a compromised
-    phase can never reach the socket with a request it was not authorized for, and (since
-    admission_leases p2) never with a request it has no lease for. On success returns
-    ``{"ok", "argv", "returncode"?, "stdout"?, "stderr"?}`` (``dry_run`` builds the argv only).
+    raises :class:`SpawnValidationError` before anything is launched — a compromised phase can
+    never reach the broker with a request it was not authorized for, and (since admission_leases
+    p2) never with a request it has no lease for. The typed contract is then checked with the
+    SHARED :func:`broker_contract.validate_launch_request` (the wrapper validates what it intends
+    to submit against the same profiles the broker validates what it will execute against), and
+    the request is emitted to the host-side launch broker over the seam
+    (:func:`_broker_client` → ``BrokerClient.launch``). The wrapper never builds a docker argv
+    and never calls docker (b3_launch_broker), and it never imports the broker module either
+    (fb2_broker_hostside — the docker call executes only in the broker's host process).
+
+    On success returns ``{"ok", "argv", "returncode", "stdout", "stderr", "state"}`` — the argv
+    is the broker's (a ``dry_run`` builds it only). A broker refusal (``state == REFUSED``) and
+    a broker-side failure (``DOCKER_UNAVAILABLE`` / ``SERVER_ERROR``) are mapped onto this
+    module's :class:`SpawnValidationError` so callers keep one loud refusal type
+    (:func:`_broker_outcome_or_raise`). A seam that cannot be reached (the broker unit is down)
+    raises :class:`SpawnValidationError` with the socket path — never a silent pass.
+
+    ``path_config`` (b1_path_config) is the :class:`PathConfig` the LOCAL validation derives its
+    mount contract from (default: derived from the environment at call time). The broker
+    re-validates + executes against ITS OWN host config, derived from the same env in
+    deployment — a client never sends host paths or a config over the seam.
     """
     errors = validate_spawn(
-        request, phase_scopes=phase_scopes, now=now, require_lease=require_lease
+        request, phase_scopes=phase_scopes, now=now, require_lease=require_lease,
+        path_config=path_config,
     )
     if errors:
         raise SpawnValidationError(errors)
 
-    argv = build_spawn_argv(request, docker=docker, image=image, command=command)
-    if dry_run:
-        return {"ok": True, "argv": argv, "returncode": None}
+    typed_errors = validate_launch_request(request, path_config=path_config)
+    if typed_errors:
+        raise SpawnValidationError(typed_errors)
 
-    proc = subprocess.run(argv, capture_output=True, text=True)
-    return {
-        "ok": proc.returncode == 0,
-        "argv": argv,
-        "returncode": proc.returncode,
-        "stdout": proc.stdout,
-        "stderr": proc.stderr,
-    }
+    try:
+        outcome = _broker_client().launch(request, dry_run=dry_run)
+    except BrokerError as exc:
+        # The SEAM itself failed (the host broker unit is down / the socket is absent) — loud.
+        raise SpawnValidationError([str(exc)]) from exc
+    return _broker_outcome_or_raise(outcome)
 
 
-def _sanitize_namespace(namespace: str) -> str:
-    """P0-3: map an arbitrary run/step/attempt identifier onto a safe relative path segment.
-
-    The state namespace becomes a host path under :data:`STATE_ROOT` — it must be a single
-    relative path (no ``..``, no absolute path, no leading slash) or a ``..`` escape would
-    walk the state root. Separators that are legal in identifiers but hostile in paths are
-    collapsed to ``/`` segments, and any remaining ``..``/empty segments are dropped.
-    """
-    parts = [
-        p for p in str(namespace).replace("\\", "/").split("/")
-        if p not in ("", ".", "..")
-    ]
-    if not parts:
-        return "unnamed"
-    return "/".join(parts)
+#: P0-3: state-namespace sanitization is defined ONCE in the pure shared contract
+#: (``broker_contract.sanitize_namespace`` — the broker mints the same namespace it validates).
+#: This alias preserves this module's historical private name for its callers/tests; it never
+#: re-implements the rule, so the wrapper and the broker cannot drift.
+_sanitize_namespace = sanitize_namespace
 
 
 def build_phase_request(
@@ -779,17 +1078,38 @@ def build_phase_request(
     command: list[str] | None = None,
     admission: LeaseContext | None = None,
     state_namespace: str | None = None,
+    run_clone: str | Path | None = None,
+    path_config: PathConfig | None = None,
+    image: str | None = None,
+    timeout_seconds: int | None = None,
 ) -> dict[str, Any]:
     """Build a scope-driven spawn request for one workflow phase (the campaign-wrapper mechanism).
 
     Resolves the phase's authorized scope (declared ``scope:`` → authorization table), then
-    assembles the four-mount contract (with the scope's results mode) + the scope's network + the
-    canonical cell env (the write flag only when the scope authorizes it). The result feeds
-    :func:`spawn_sibling` — which re-validates it before the socket call. ``command`` is the
-    sibling container's entrypoint (defaults to the phase-runner; see ``phase_runner.py``).
+    assembles the mount profile (the fixed :data:`MOUNT_PROFILES` the broker defines — selected
+    by the scope's writability) + the scope's network + the canonical cell env (the write flag
+    only when the scope authorizes it). The result IS the typed launch request the broker
+    accepts (:data:`LaunchRequest`): the six canonical fields ``image_digest`` / ``network`` /
+    ``mount_profile`` / ``state_namespace`` / ``command`` / ``timeout_seconds`` ride on the
+    request alongside the scope-model context (``phase`` / ``scope`` / ``env`` / the lease
+    block / ``run_clone``) that the shared validation consumes. The request's ``mounts`` are the
+    SHARED profile expansion (:func:`broker_contract.mounts_for_profile` — the ONE expansion the
+    wrapper AND the broker derive) — the wrapper validates the same mount set the broker will
+    execute, and neither side can assemble a mount the other does not derive. The result feeds
+    :func:`spawn_sibling`, which re-validates it before emitting it to the broker over the seam.
+    ``command`` is the sibling container's entrypoint (defaults to the phase-runner; see
+    ``phase_runner.py``).
+
+    ``path_config`` (b1_path_config) is the :class:`PathConfig` every host path on the request
+    derives from — the worktree/results/repo mounts' SOURCES, the repo-alias + its ``.git``
+    target pair (the config's ``repo_root`` / ``git_dir``), the D-2 auth dirs (the config's
+    ``auth_home``), the per-attempt state namespace root, and the credential-file source.
+    Defaults to the environment-derived config (:func:`default_path_config`); a request built
+    with an explicit config validates against the SAME config (``validate_spawn``'s
+    ``path_config``), so a request can never name a host path the validator does not derive.
 
     P0-3 (control-plane stabilization): every sibling carries a UNIQUE writable state
-    namespace — ``<STATE_ROOT>/<state_namespace>`` mounted at ``/state`` (rw) with
+    namespace — ``<config.state_root>/<state_namespace>`` mounted at ``/state`` (rw) with
     ``XDG_DATA_HOME``/``XDG_CONFIG_HOME``/``XDG_CACHE_HOME`` pointed into it — plus the
     credential FILE mount (``/auth/opencode_auth.json``, ro). ``state_namespace`` defaults to
     ``<spec_name>/<phase>``; the orchestrator may pass a finer per-attempt value (run/step/
@@ -811,7 +1131,34 @@ def build_phase_request(
     refused at step 6 once it is armed. The wrapper never mints an admission itself — reserving
     against Redis is the controller's job, and a validator that could also grant would be a
     validator that could grant itself a pass.
+
+    ``run_clone`` (fb1_clone_mounted — the clone is the cell's world) is the run's private
+    ephemeral clone path — ``PathConfig.runs_root/<run-id>/repo`` — carried on the request so
+    the cell executes in ITS OWN clone, never a shared worktree with a shared writable ``.git``.
+    It is both a top-level typed REFERENCE (the broker validates it resolves to a genuine
+    runs_root clone) AND the mount source of the cell's repo: :func:`mounts_for_profile`
+    binds the clone at ``/repo`` (rw for a commit-capable implementation cell, ro for a
+    read-only cell) and drops the shared worktree/``.git`` surface from the expansion. The
+    request's ``mounts`` are that clone-world expansion, and :func:`validate_spawn` refuses a
+    clone-world request that would mount the shared worktree or shared ``.git``. Omitted (the
+    default — a caller that has not provisioned a clone), the request keeps the pre-clone
+    shared-worktree shape and carries no ``run_clone`` key.
+
+    ``view`` (ws2_broker_pathview, fleet_launch_smoke): every request this builder returns
+    carries the VIEW of ``path_config`` — the config whose paths the request's mounts were
+    built against. A config rooted at the image's ``/app`` (a container-tier derivation,
+    ``FINOPS_REPO_DIR`` absent) stamps ``container``; a checkout-rooted config stamps ``host``.
+    The broker validates the request against the view it carries (a container-view request
+    against the container-view PathConfig), so the D-16 repo-alias split never becomes a
+    refusal for a request the container tier legitimately built.
+
+    ``image`` (b3_launch_broker) is the sibling's image reference (``fleet/base`` /
+    ``fleet/orchestrator`` / ``fleet/job-<name>``) carried on the request as
+    ``image_digest``. Defaults to :data:`CELL_IMAGE`. ``timeout_seconds`` bounds the broker's
+    docker subprocess when positive; ``0``/``None`` (the default) means the child's own
+    per-phase ``--timeout`` governs (no docker-side kill).
     """
+    path_config = path_config or default_path_config()
     scope = phase_scope(phase_def)
     if scope is None:
         # No declared scope and no authorization-table entry — the spawn will fail at step 2.
@@ -819,43 +1166,39 @@ def build_phase_request(
     cfg = _scope_config(scope) or {}
     results_mode = cfg.get("results_mode", "rw")
 
-    auth_home = os.environ.get("AUTH_HOME", "/home/drseuss")
-    mounts = [
-        {"source": os.environ.get("FINOPS_WORKTREE_ROOT", "/tmp"),
-         "target": "/tmp", "mode": "rw"},
-        {"source": os.environ.get("FINOPS_RESULTS_DIR", str(_REPO_ROOT / "experiments" / "results")),
-         "target": "/app/experiments/results", "mode": results_mode},
-        {"source": os.environ.get("FINOPS_REPO_DIR", str(_REPO_ROOT)),
-         "target": "/repo", "mode": "ro"},
-        {"source": f"{os.environ.get('FINOPS_REPO_DIR', str(_REPO_ROOT))}/.git",
-         "target": "/repo/.git", "mode": "rw"},
-    ]
-    repo_home = os.environ.get("FINOPS_REPO_DIR", str(_REPO_ROOT))
-    mounts += [
-        {"source": repo_home, "target": repo_home, "mode": "ro"},
-        {"source": f"{repo_home}/.git", "target": f"{repo_home}/.git", "mode": "rw"},
-    ]
-    for d in AUTH_DIRS:
-        mounts.append({"source": d, "target": d, "mode": "ro"})
+    # b3_launch_broker: the mount PROFILE is the closed vocabulary; the profile's expansion
+    # (mounts_for_profile) is the mount set BOTH sides derive. The profile is selected by the
+    # scope's writability — results rw ⇒ implementation_rw, results ro ⇒ repo_readonly — and a
+    # verifier request overrides it to verifier_readonly in build_verifier_request. The
+    # membership guard keeps the builder on the SAME closed table the broker validates against
+    # (a profile the broker does not define can never leave this builder).
+    profile = "implementation_rw" if results_mode == "rw" else "repo_readonly"
+    if profile not in MOUNT_PROFILES:
+        raise ValueError(
+            f"scope {scope!r} resolved to profile {profile!r}, which is not in the broker's "
+            f"fixed mount profiles {sorted(MOUNT_PROFILES)}"
+        )
 
     # P0-3: the per-attempt state namespace + the credential FILE mount. The host namespace is
-    # minted here (mkdir -p, best-effort — a mkdir failure surfaces as a spawn error, never a
-    # silent fallback to a shared directory) and is unique to this request: <spec>/<phase>
-    # by default, or a finer run/step/attempt value the orchestrator passes.
+    # minted by the profile expansion (mkdir -p, best-effort) and is unique to this request:
+    # <spec>/<phase> by default, or a finer run/step/attempt value the orchestrator passes.
     namespace = state_namespace or f"{spec_name or 'spec'}/{phase_def.get('name', 'phase')}"
-    state_src = Path(STATE_ROOT) / _sanitize_namespace(namespace)
-    state_src.mkdir(parents=True, exist_ok=True)
-    mounts.append({"source": str(state_src), "target": STATE_TARGET, "mode": "rw"})
-    mounts.append({"source": f"{auth_home}/.local/share/opencode/auth.json",
-                   "target": AUTH_CRED_FILE, "mode": "ro"})
+    ns_safe = sanitize_namespace(namespace)
+    mounts = mounts_for_profile(
+        profile,
+        path_config=path_config,
+        state_namespace=ns_safe,
+        run_clone=run_clone,
+    )
 
+    auth_home = path_config.auth_home
     env: dict[str, str] = {
         "FINOPS_REDIS_HOST": os.environ.get("FINOPS_REDIS_HOST", "finops-queue"),
         "FINOPS_REDIS_PORT": os.environ.get("FINOPS_REDIS_PORT", "6379"),
         "FINOPS_REDIS_DB": "1",
         "FINOPS_KB_DB": "2",
         "FINOPS_WORKTREE_ROOT": "/tmp",
-        "HOME": auth_home,
+        "HOME": str(auth_home),
         "OPENCODE_BIN": f"{auth_home}/.opencode/bin/opencode",
         "CLAUDE_BIN": f"{auth_home}/.local/bin/claude",
         "FINOPS_CELL_ID": f"{spec_name}:{phase_def.get('name', 'phase')}",
@@ -884,7 +1227,7 @@ def build_phase_request(
         "phase": str(phase_def.get("name", "")),
         "scope": scope,
         "mounts": mounts,
-        "network": cfg.get("network", "fleet-net"),
+        "network": cfg.get("network", LAUNCH_NETWORK),
         "env": env,
         "command": command or [
             "python3", "scripts/fleet/phase_runner.py",
@@ -894,7 +1237,28 @@ def build_phase_request(
             "--model", model,
             "--workdir", "/tmp",
         ],
+        # b3_launch_broker — the typed launch fields the broker validates against the fixed
+        # profiles (image in the closed fleet namespace, network fixed, profile known,
+        # namespace safe, command a typed argv, timeout bounded).
+        "image_digest": image or CELL_IMAGE,
+        "mount_profile": profile,
+        "state_namespace": ns_safe,
+        "timeout_seconds": timeout_seconds or 0,
     }
+    # fb1_clone_mounted: the run's private clone path, when the caller carries one. The request
+    # carries the clone — runs_root/<run-id>/repo — as a typed reference (validate_launch_request
+    # step 5b checks it resolves under the runs root) AND its mount set is the clone-world
+    # expansion (mounts_for_profile bound the clone at /repo and dropped the shared
+    # worktree/.git surface), which validate_spawn's step 3 enforces at the mount contract.
+    if run_clone:
+        request["run_clone"] = str(run_clone)
+    # ws2_broker_pathview (fleet_launch_smoke): the request carries the VIEW of the PathConfig
+    # its mounts were built against (config_view — host for a checkout-rooted config, container
+    # for a config rooted at the image's /app). The broker validates the request against that
+    # view, so a container-tier request's /app D-16 alias mounts are never refused for a path
+    # split the caller cannot see. Absent (a hand-built legacy request) the broker defaults to
+    # host; every builder-made request carries its view explicitly.
+    request["view"] = config_view(path_config)
     if admission is not None:
         request.update(admission.to_request_fields())
     return request
@@ -909,6 +1273,10 @@ def build_verifier_request(
     spec_name: str = "",
     command: list[str] | None = None,
     admission: LeaseContext | None = None,
+    run_clone: str | Path | None = None,
+    path_config: PathConfig | None = None,
+    image: str | None = None,
+    timeout_seconds: int | None = None,
 ) -> dict[str, Any]:
     """Build the READ-ONLY verifier spawn request for a ``kind: test`` phase (w1, 2026-09-02).
 
@@ -931,10 +1299,13 @@ def build_verifier_request(
       would otherwise authorize — a verifier never emits.
 
     What REMAINS is the candidate surface the suite runs against — and it is mounted
-    READ-ONLY in its entirety (g1_verifier_mount, engine_gaps_followups F1): the worktree
-    namespace (``/tmp`` — the candidate workdir), the repo (``/repo``), and both git dirs
-    (``/repo/.git`` + the host-path ``.git`` alias). A verifier needs the candidate's TREE
-    to run the suite against, never the ability to change it — so the writable candidate
+    READ-ONLY in its entirety (g1_verifier_mount, engine_gaps_followups F1). In the
+    shared-worktree shape that surface is the worktree namespace (``/tmp`` — the candidate
+    workdir), the repo (``/repo``), and both git dirs (``/repo/.git`` + the host-path ``.git``
+    alias). In the clone world (fb1_clone_mounted) it is the run's own clone, mounted read-only
+    at ``/repo`` — the suite runs against the clone's TREE, and the clone's own ``.git`` rides
+    inside the mount (no shared git dir is mounted at all). A verifier needs the candidate's
+    TREE to run the suite against, never the ability to change it — so the writable candidate
     surfaces an agent phase mounts (``rw`` because it COMMITS its work) are flipped to ``ro``
     HERE, at the mount contract, never left to the child's ``--no-commit``. The request is
     stamped with :data:`VERIFIER_REQUEST_MARKER` so :func:`validate_spawn` enforces
@@ -944,7 +1315,25 @@ def build_verifier_request(
     ``admission`` mirrors ``build_phase_request``'s contract: supplied when a lease context is
     in force; a verifier request deliberately has none when absent, because the verifier spends
     no model dollars (a budget lease reserves model spend — the verifier has none to reserve).
+
+    ``path_config`` (b1_path_config) is forwarded to :func:`build_phase_request`; the
+    forbidden-surface drop removes exactly the auth dirs THAT config mounted, so a verifier
+    request can never retain a credential mount the config did not add.
+
+    ``run_clone`` (fb1_clone_mounted) is forwarded to :func:`build_phase_request` unchanged —
+    a verifier verifies against the run's private clone too (the suite runs in the read-only
+    clone), so when the caller carries the clone path the verifier request's candidate mount IS
+    the clone (read-only), and validation (step 3's verifier branch + the clone-world repo
+    binding) enforces that it stays read-only against the clone.
+
+    ``image`` / ``timeout_seconds`` (b3_launch_broker) are forwarded to
+    :func:`build_phase_request`. The typed request's ``mount_profile`` is overridden to
+    :data:`verifier_readonly <broker_contract.MOUNT_PROFILES>` — the broker's fixed verifier
+    profile — and the request's ``mounts`` become THAT profile's expansion (the reduced,
+    all-``ro`` candidate surface), so the wrapper validates the exact mount set the broker will
+    execute for a verifier.
     """
+    path_config = path_config or default_path_config()
     request = build_phase_request(
         phase_def,
         goal=goal,
@@ -953,78 +1342,53 @@ def build_verifier_request(
         spec_name=spec_name,
         command=command,
         admission=admission,
+        run_clone=run_clone,
+        path_config=path_config,
+        image=image,
+        timeout_seconds=timeout_seconds,
     )
-    forbidden_mount_targets = {STATE_TARGET, AUTH_CRED_FILE, *AUTH_DIRS}
-    request["mounts"] = [
-        m for m in (request.get("mounts") or [])
-        if str((m or {}).get("target", "")) not in forbidden_mount_targets
-    ]
-    # The verifier writes nothing to the results mount — drop it (its mode is scope-derived
-    # and read-only-for-a-verifier would otherwise fail the scope's own mode check).
-    request["mounts"] = [
-        m for m in request["mounts"]
-        if not str((m or {}).get("target", "")).startswith("/app/experiments/results")
-    ]
-    # F1 (g1_verifier_mount): after the forbidden-surface drops the ONLY mounts left ARE the
-    # candidate surface (worktree /tmp, repo /repo + /repo/.git, the host-path repo-alias +
-    # its .git) — flip every one of them to READ-ONLY. The verifier container cannot write its
-    # candidate through any mount; if a writable scratch is ever genuinely needed it is a
-    # SEPARATE, empty, non-candidate volume (never the worktree, never .git), and validation
-    # refuses any non-candidate mount on a verifier request regardless. Marking the request
-    # lets validation REFUSE a request that would mount the candidate rw.
-    for m in request["mounts"]:
-        m["mode"] = "ro"
+    # F1 (g1_verifier_mount) + b3_launch_broker: the verifier's mount set IS the broker's
+    # ``verifier_readonly`` profile expansion — the candidate surface (worktree /tmp, repo
+    # /repo + /repo/.git, the host-path repo-alias + its .git), every mount READ-ONLY, with NO
+    # results/state/auth mounts. Deriving it from the profile (not by dropping mounts from the
+    # agent expansion) makes the wrapper and the broker derive the SAME verifier surface from
+    # the SAME profile. The verifier container cannot write its candidate through any mount; if
+    # a writable scratch is ever genuinely needed it is a SEPARATE, empty, non-candidate volume
+    # (never the worktree, never .git), and validation refuses any non-candidate mount on a
+    # verifier request regardless. Marking the request lets validation REFUSE a request that
+    # would mount the candidate rw.
+    ns_safe = str(request.get("state_namespace", "") or "verifier")
+    request["mount_profile"] = "verifier_readonly"
+    request["mounts"] = mounts_for_profile(
+        "verifier_readonly",
+        path_config=path_config,
+        state_namespace=ns_safe,
+        run_clone=run_clone,
+    )
     request[VERIFIER_REQUEST_MARKER] = True
     env = {k: v for k, v in (request.get("env", {}) or {}).items() if k not in STATE_ENV_KEYS}
     env.pop("FINOPS_OPENCODE_STATE_DIR", None)
     for flag in WRITE_FLAG_ENVS:
         env.pop(flag, None)
+    # ws4_smoke (fleet_launch_smoke, exposed by THE SMOKE): a verifier cell runs a SUITE and
+    # makes NO model call, so it mounts no CLI/auth dirs (the D-18 probe's whole premise — the
+    # model CLIs attach through the D-2 auth mounts). Its container therefore boots with the
+    # entrypoint's binary-resolution probe SKIPPED — the same FLEET_SKIP_PROBE=1 the compose
+    # gives the supervisor services that invoke no CLI (docker-compose.ladder.yml "the
+    # supervisor services invoke no CLI"). Before this fix a real verifier cell always died at
+    # boot: the probe found no opencode/claude (they are not mounted) and FAILED the container
+    # before the suite ever ran. An agent cell (build_phase_request) does NOT set this — it
+    # mounts the CLI dirs and the probe legitimately asserts they resolve.
+    env["FLEET_SKIP_PROBE"] = "1"
     request["env"] = env
     return request
 
 
-def build_submit_argv(
-    command: dict[str, Any],
-    *,
-    compose: str = "docker-compose",
-    compose_file: str | None = None,
-) -> list[str]:
-    """Build the ``docker compose run`` argv for a validated submit (called only AFTER
-    :func:`validate_submit_request` returns no errors).
-
-    This is the reference containerized execution path (see the run-workflow skill):
-    ``docker compose -f infrastructure/docker-compose.ladder.yml run --rm workflow-runner
-    python3 scripts/run_workflow.py --spec ... --goal ... --model ... --workdir ...
-    --orchestrator``. ``--orchestrator`` switches ``run_workflow.py`` into sibling-spawn mode,
-    where EVERY phase re-runs through :func:`validate_spawn` before its own container exists —
-    this dispatch only proves the whole spec is launchable, not that any individual phase gets
-    a free pass later.
-
-    ``command["image"]`` (already checked against :data:`JOB_IMAGE_PATTERN` by
-    :func:`validate_submit_request`'s step 8), when present, becomes ``--cell-image`` — it
-    changes which image the orchestrator spawns for each PHASE cell (``run_workflow.py``'s
-    ``_run_orchestrator`` threads it to :func:`spawn_sibling`), never the ``workflow-runner``
-    container itself, which always runs ``fleet/orchestrator`` (the one socket-holder needs the
-    docker CLI + this wrapper — a job image built off fleet/base does not carry either).
-    """
-    compose_file = compose_file or str(_REPO_ROOT / "infrastructure" / "docker-compose.ladder.yml")
-    job_id = str(command.get("job_id", "") or "")
-    argv = [compose, "-f", compose_file, "run", "--rm"]
-    if job_id:
-        argv += ["-e", f"FINOPS_CELL_ID={job_id}"]
-    argv += [
-        "workflow-runner",
-        "python3", "scripts/run_workflow.py",
-        "--spec", str(command.get("spec", "")),
-        "--goal", str(command.get("goal", "")),
-        "--model", str(command.get("model", "")),
-        "--workdir", str(command.get("workdir", "")),
-        "--orchestrator",
-    ]
-    image = command.get("image")
-    if image:
-        argv += ["--cell-image", str(image)]
-    return argv
+#: NOTE (b3_launch_broker + fb2_broker_hostside): the compose argv builders live in the launch
+#: broker module (its ``build_submit_argv`` / ``build_fleet_action_argv``) — the wrapper
+#: never builds docker/compose argv. The wrapper validates a submit and emits it over the seam;
+#: the HOST broker performs the ``docker compose run`` with its own compose config (a client
+#: never chooses the broker's compose file — that is host-side state).
 
 
 def dispatch_submit(
@@ -1032,35 +1396,36 @@ def dispatch_submit(
     *,
     repo_root: Path | str | None = None,
     phase_scopes: dict[str, str] | None = None,
-    compose: str = "docker-compose",
-    compose_file: str | None = None,
+    path_config: PathConfig | None = None,
     dry_run: bool = False,
 ) -> dict[str, Any]:
-    """Validate a submit command, then (if valid) run ``docker compose run`` for it.
+    """Validate a submit command, then emit it to the host broker over the seam.
 
     Mirrors :func:`spawn_sibling`'s ordering guarantee: :func:`validate_submit_request` runs
-    FIRST, and any error raises :class:`SpawnValidationError` before :func:`build_submit_argv`
-    is even called — an invalid submit (a bad scope, an unlisted model, a host-service workdir,
-    an undeclared write flag) never reaches the socket. ``consume_fleet_commands`` inlines this
-    same ordering (via ``validate_fleet_command`` + ``build_submit_argv``) for the live BRPOP
+    FIRST, and any error raises :class:`SpawnValidationError` before anything is submitted — an
+    invalid submit (a bad scope, an unlisted model, a host-service workdir, an undeclared write
+    flag) never reaches the broker. The compose call itself is performed by the HOST broker over
+    the seam (:func:`_broker_client` → ``BrokerClient.submit``), which re-validates the submit
+    with the same :func:`validate_submit_request` before executing — the ONLY docker caller
+    (b3_launch_broker), reached only over the seam (fb2_broker_hostside).
+    ``consume_fleet_commands`` emits ``fleet-command`` over the SAME seam for the live BRPOP
     loop; this function exists so the ordering itself is unit-testable without Redis.
+
+    ``path_config`` (b1_path_config) is forwarded to :func:`validate_submit_request` for the
+    local validation; the broker validates + executes against its own host config.
     """
-    errors = validate_submit_request(command, repo_root=repo_root, phase_scopes=phase_scopes)
+    errors = validate_submit_request(
+        command, repo_root=repo_root, phase_scopes=phase_scopes, path_config=path_config,
+    )
     if errors:
         raise SpawnValidationError(errors)
 
-    argv = build_submit_argv(command, compose=compose, compose_file=compose_file)
-    if dry_run:
-        return {"ok": True, "argv": argv, "returncode": None}
-
-    proc = subprocess.run(argv, capture_output=True, text=True)
-    return {
-        "ok": proc.returncode == 0,
-        "argv": argv,
-        "returncode": proc.returncode,
-        "stdout": proc.stdout,
-        "stderr": proc.stderr,
-    }
+    try:
+        outcome = _broker_client().submit(command, dry_run=dry_run)
+    except BrokerError as exc:
+        # The SEAM itself failed (the host broker unit is down / the socket is absent) — loud.
+        raise SpawnValidationError([str(exc)]) from exc
+    return _broker_outcome_or_raise(outcome)
 
 
 # ── The fleet:commands BRPOP consumer (D-14) ─────────────────────────────────
@@ -1128,30 +1493,36 @@ def _latest_ledger(spec_name: str) -> str | None:
 def consume_fleet_commands(
     *,
     client: Any | None = None,
-    compose_file: str | None = None,
     dry_run: bool = False,
     once: bool = False,
 ) -> None:
     """BRPOP ``fleet:commands`` and dispatch validated scale/drain/restart/submit commands (D-14).
 
-    Each popped command is validated against :func:`validate_fleet_command` BEFORE any
-    ``docker compose`` call; an invalid command is logged and dropped (never acted on). This is
-    the orchestrator's "hands" — the supervisor LPUSHes, this consumer validates + executes.
+    Each popped command is validated against :func:`validate_fleet_command` BEFORE anything is
+    dispatched; an invalid command is logged and dropped (never acted on). This is the
+    orchestrator's "hands" — the supervisor LPUSHes, this consumer validates + emits.
 
-    ``submit`` is dispatched the same way as scale/drain/restart (validate, then build argv,
-    then run) but through :func:`build_submit_argv` instead of the service-shaped argv the
-    other three actions use — and, per the isolation-over-coordination design, dispatching one
-    submit never blocks or refuses another: there is no lock here, only per-request validation.
+    Every ``docker compose`` call is performed by the HOST launch broker over the seam
+    (:func:`_broker_client` → the broker's ``fleet-command`` verb), which re-validates the
+    command with the same :func:`validate_fleet_command` before executing. ``submit`` is
+    dispatched the same way as scale/drain/restart (validate, then emit) but through the
+    broker's submit path (the ``submit`` verb) instead of the service-shaped actions — and,
+    per the isolation-over-coordination design, dispatching one submit never blocks or refuses
+    another: there is no lock here, only per-request validation. NO in-container code calls
+    docker and NO container mounts the docker socket (fb2_broker_hostside); the broker's own
+    compose file is host-side state the client never chooses.
 
     A submit's ``job_id`` additionally drives the board lifecycle (p2_launch_handler,
-    :func:`fleet_manager.record_job_status`): a refusal here (never reaching the socket) writes
-    "failed" straight away; otherwise "running" is recorded just before the ``docker compose``
-    call, and the observed exit code resolves it to "completed" or "failed" — a nonzero exit (or
-    a pre-socket refusal) is ALSO filed onto the ``fleet_jobs`` dead-letter list
-    (``scripts/fleet/dlq.py``), reusing the existing per-queue DLQ surface rather than adding a
-    new one. ``client`` is an injectable redis connection (tests pass a fake; the real consumer
-    loop leaves it ``None`` and connects via :func:`_connect_redis`) — the same "the caller may
-    own the connection" shape ``fleet_manager.py``'s own functions already use.
+    :func:`fleet_manager.record_job_status`): a refusal here (never reaching the broker) writes
+    "failed" straight away; otherwise "running" is recorded just before the broker's
+    ``docker compose`` call, and the observed exit code resolves it to "completed" or "failed" —
+    a nonzero exit (or a pre-broker refusal) is ALSO filed onto the ``fleet_jobs`` dead-letter
+    list (``scripts/fleet/dlq.py``), reusing the existing per-queue DLQ surface rather than
+    adding a new one. A seam that cannot be reached (the host broker unit is down) marks the
+    job failed with the socket path in the reason — a loud failure, never a silent pass.
+    ``client`` is an injectable redis connection (tests pass a fake; the real consumer loop
+    leaves it ``None`` and connects via :func:`_connect_redis`) — the same "the caller may own
+    the connection" shape ``fleet_manager.py``'s own functions already use.
     """
     # Sibling script modules (scripts/fleet/ is a dir, not a package — no __init__.py, so a
     # bare "import dlq" only resolves once this dir is on sys.path; this module may itself be
@@ -1166,10 +1537,8 @@ def consume_fleet_commands(
     import fleet_manager  # noqa: PLC0415
 
     client = client if client is not None else _connect_redis()
-    compose_file = compose_file or str(_REPO_ROOT / "infrastructure" / "docker-compose.ladder.yml")
-    compose = os.environ.get("DOCKER_COMPOSE", "docker-compose")
 
-    print(f"[spawn-wrapper] consuming {COMMANDS_KEY} (compose {compose_file})", flush=True)
+    print(f"[spawn-wrapper] consuming {COMMANDS_KEY}", flush=True)
     while True:
         try:
             result = client.brpop(COMMANDS_KEY, timeout=10)
@@ -1206,35 +1575,74 @@ def consume_fleet_commands(
             continue
         action = command["action"]
         service = command.get("service")
-        if action == "submit":
-            argv = build_submit_argv(command, compose=compose, compose_file=compose_file)
-        elif action == "scale":
-            argv = [compose, "-f", compose_file, "up", "-d", "--scale",
-                    f"{service}={command['count']}", service]
-        elif action == "drain":
-            argv = [compose, "-f", compose_file, "stop", service]
-        else:  # restart
-            argv = [compose, "-f", compose_file, "restart", service]
-        print(f"[spawn-wrapper] DISPATCH {action} {service or command.get('job_id')}: {argv}",
-              flush=True)
         job_id = command.get("job_id") if action == "submit" else None
         if job_id:
             fleet_manager.record_job_status(client, job_id, "running")
         if not dry_run:
-            proc = subprocess.run(argv, check=False)
+            try:
+                outcome = _broker_client().fleet_command(command, dry_run=False)
+            except BrokerError as exc:
+                # The SEAM itself failed (the host broker unit is down / the socket is absent) —
+                # record the job failed with the socket path; never a silent pass.
+                print(f"[spawn-wrapper] BROKER UNREACHABLE {command}: {exc}", flush=True)
+                if job_id:
+                    reason = f"launch broker unreachable: {exc}"
+                    fleet_manager.record_job_status(client, job_id, "failed", error=reason)
+                    dlq.record_dead(client, "fleet_jobs", command, reason)
+                if once:
+                    return
+                continue
+            state = outcome.get("state")
+            if state == "REFUSED":
+                # The broker re-validated what it will execute and refused (should not fire
+                # after the wrapper's own validation — fail-closed anyway).
+                errors = outcome.get("errors") or ["the launch broker refused the command"]
+                print(f"[spawn-wrapper] BROKER REFUSED {command}: {errors}", flush=True)
+                if job_id:
+                    reason = "; ".join(errors)
+                    fleet_manager.record_job_status(client, job_id, "failed", error=reason)
+                    dlq.record_dead(client, "fleet_jobs", command, reason)
+                if once:
+                    return
+                continue
+            if state in ("DOCKER_UNAVAILABLE", "SERVER_ERROR"):
+                reason = outcome.get("stderr") or f"broker state {state}"
+                print(f"[spawn-wrapper] {state} {command}: {reason}", flush=True)
+                if job_id:
+                    fleet_manager.record_job_status(client, job_id, "failed", error=reason)
+                    dlq.record_dead(client, "fleet_jobs", command, reason)
+                if once:
+                    return
+                continue
+            argv = outcome.get("argv", [])
+            print(f"[spawn-wrapper] DISPATCH {action} {service or job_id}: {argv}", flush=True)
             if job_id:
                 ledger = _latest_ledger(_spec_name_for_ledger(str(command.get("spec", ""))))
-                if proc.returncode == 0:
+                if outcome.get("returncode") == 0:
                     fleet_manager.record_job_status(
-                        client, job_id, "completed", returncode=proc.returncode, ledger=ledger,
+                        client, job_id, "completed",
+                        returncode=outcome.get("returncode"), ledger=ledger,
                     )
                 else:
-                    reason = f"compose run exited {proc.returncode}"
+                    reason = f"compose run exited {outcome.get('returncode')}"
                     fleet_manager.record_job_status(
-                        client, job_id, "failed", returncode=proc.returncode, ledger=ledger,
-                        error=reason,
+                        client, job_id, "failed",
+                        returncode=outcome.get("returncode"), ledger=ledger, error=reason,
                     )
                     dlq.record_dead(client, "fleet_jobs", command, reason)
+        else:
+            try:
+                argv = _broker_client().fleet_command(command, dry_run=True).get("argv", [])
+            except BrokerError as exc:
+                print(
+                    f"[spawn-wrapper] BROKER UNREACHABLE {command}: {exc} (dry-run)",
+                    flush=True,
+                )
+                if once:
+                    return
+                continue
+            print(f"[spawn-wrapper] DISPATCH {action} {service or job_id}: {argv} (dry-run)",
+                  flush=True)
         if once:
             return
 
@@ -1247,7 +1655,6 @@ def main(argv: list[str] | None = None) -> int:
     p_consume = sub.add_parser("consume", help="BRPOP fleet:commands and dispatch")
     p_consume.add_argument("--once", action="store_true")
     p_consume.add_argument("--dry-run", action="store_true")
-    p_consume.add_argument("--compose-file", default=None)
     args = parser.parse_args(argv)
 
     if args.command == "validate":
@@ -1259,7 +1666,7 @@ def main(argv: list[str] | None = None) -> int:
         print("spawn valid")
         return 0
 
-    consume_fleet_commands(compose_file=args.compose_file, dry_run=args.dry_run, once=args.once)
+    consume_fleet_commands(dry_run=args.dry_run, once=args.once)
     return 0
 
 

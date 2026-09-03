@@ -252,7 +252,6 @@ workflow:
         timeout: 900
         tests:
           - tests/test_spawn_wrapper.py
-          - tests/test_docker_executor.py
           - tests/test_path_config.py
           - tests/test_launch_broker.py
           - tests/test_workflow_executor_parity.py

@@ -1,0 +1,109 @@
+# agentic-dynamics-launch-broker.service — the launch broker, running where the socket is (fb2_broker_hostside).
+#
+# *** THIS FILE IS A TEMPLATE — DO NOT INSTALL IT BY `cp`. ***
+#
+# Its three repo-dependent fields (Environment=REPO=, WorkingDirectory=, and the
+# Documentation=file:// URL) carry a repo placeholder token — NOT a host path. The operator's
+# checkout path is the b1 host-literal the fleet banished from committed code
+# (fleet_launch_boundary b1_path_config / fleet_launch_smoke ws3_stragglers): a unit that
+# hard-codes it must be hand-edited whenever the framework lives elsewhere, and no committed
+# unit may carry the operator's host path. Render the installable unit from the tier-0 path
+# object instead (never hand-edit, never cp):
+#
+#   python3 infrastructure/gen_launch_broker_service.py          # writes ~/.config/systemd/user/
+#
+# The generator derives the repo root ONCE from agentic_dynamics.core.paths.PathConfig
+# (FINOPS_REPO_DIR override, else the package root — never a literal) and substitutes it for
+# each token occurrence in the three fields below. The broker itself also self-locates its repo
+# from its module path at serve time, so the rendered WorkingDirectory is belt-and-braces: the
+# process is correct even if a stale unit set a wrong cwd.
+#
+# A systemd USER unit, following the docs-drift-scan.service precedent
+# (~/.config/systemd/user/) rather than the system-wide fleet-bootstrap.service: the broker is
+# the operator's own host-side component that holds the Docker socket. It is the ONLY Docker
+# API caller in the fleet (its two documented exceptions — the game board's read-only `docker
+# ps` in scripts/system_snapshot.py (fb3 f4, a display read) and the archived one-time
+# sonar-scanner docker run in scripts/archive/backfill_sonar.py (ws3_stragglers, frozen, never
+# re-run); both are reads, never a launch) — every cell launch / fleet command the orchestrator
+# needs is emitted over the broker's unix-socket IPC seam (scripts/fleet/broker_client.py), and
+# NO container mounts the docker socket. This unit IS the docker socket's only home.
+#
+# The unit runs `scripts/fleet/launch_broker.py serve` as a long-running daemon: it binds the
+# seam socket (a unix socket under the user runtime dir, %t = $XDG_RUNTIME_DIR), accepts one
+# framed typed request per connection, validates it against the shared contract
+# (broker_contract.py), and performs the docker/compose call itself. Type=simple +
+# Restart=on-failure: the daemon has no natural end, and a crashed broker must come back (a
+# stopped broker is a loud spawn failure — clients raise, never silently pass).
+#
+# The docker socket (/var/run/docker.sock) is read via the operator user's docker-group
+# membership (the same access `docker` from this login has) — the broker process is the host
+# user, never root, and never a container.
+#
+# Install (as the operator, NOT root):
+#   python3 infrastructure/gen_launch_broker_service.py      # render from PathConfig
+#   systemctl --user daemon-reload
+#   systemctl --user enable --now agentic-dynamics-launch-broker.service
+#   loginctl enable-linger "$USER"      # so the daemon survives logout
+#
+# Inspect:
+#   systemctl --user status agentic-dynamics-launch-broker
+#   journalctl --user -u agentic-dynamics-launch-broker -n 50
+#
+# Smoke (a synthetic cell spawn request round-trips through the host broker — the unit suite
+# drives the same round-trip against a stubbed docker binary, tests/test_broker_hostside.py):
+#   python3 -m pytest tests/test_broker_hostside.py -q
+#   # live seam liveness check:
+#   python3 -c "import sys; sys.path.insert(0, 'scripts/fleet'); import broker_client; \
+# print(broker_client.BrokerClient().ping())"
+
+[Unit]
+Description=Agentic-dynamics launch broker — the host-side Docker-socket holder + typed IPC seam
+Documentation=file://@REPO_ROOT@/workflows/repository/fleet_launch_boundary_followups.yaml
+# Wants=, not Requires=: the broker's validation + launch logic needs no other unit; it is the
+# socket's home and nothing upstream of it must gate its start. After=network-online.target
+# because the broker may launch cells that reach model APIs through the egress proxy.
+After=network-online.target
+
+[Service]
+Type=simple
+Restart=on-failure
+RestartSec=5
+
+# The deployed checkout, PathConfig-derived at render time (the repo placeholder in the three
+# fields below is substituted by infrastructure/gen_launch_broker_service.py from
+# agentic_dynamics.core.paths.PathConfig — never a hand-edited host path).
+Environment=REPO=@REPO_ROOT@
+WorkingDirectory=@REPO_ROOT@
+
+# The docker/compose binaries the broker executes (its own PATH is the unit's default).
+Environment=FINOPS_DOCKER_BIN=docker
+Environment=FINOPS_DOCKER_COMPOSE_BIN=docker-compose
+
+# The per-run clone root (F1 closure, fleet_launch_container_smoke cs4): the broker must
+# validate + bind-mount the SAME runs root the container tier mints clones in
+# (docker-compose.ladder.yml x-ladder-env: FINOPS_RUNS_ROOT, shared-/tmp fallback) — a
+# deployed broker defaulting to /var/lib/agentic-dynamics would REFUSE the container's
+# /tmp clone path (reproduced in cs4). Rendered from the same PathConfig/env contract at
+# gen time (the compose default when unset: /tmp/agentic-dynamics-runs).
+Environment=FINOPS_RUNS_ROOT=@RUNS_ROOT@
+
+# The seam socket lives under the user runtime dir (%t = $XDG_RUNTIME_DIR) — the SAME path
+# broker_client.default_socket_path() resolves to for a host-side client in this user session.
+ExecStart=/usr/bin/env python3 scripts/fleet/launch_broker.py serve --socket %t/launch-broker.sock
+
+# A docker run for a cell can legitimately take hours (a 4h adversarial phase); the broker's
+# own per-request subprocess timeout is bounded by the typed request's timeout_seconds. This
+# ceiling only bounds a wedged accept loop, never a legitimate long launch.
+TimeoutStartSec=60
+
+# Least privilege for a unit whose whole job is to run docker as the operator: no new
+# privileges, no control-group/kernel surface, no setuid binaries. The docker socket is
+# reached through the operator's docker-group membership, not through root.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectControlGroups=true
+ProtectKernelTunables=true
+RestrictSUIDSGID=true
+
+[Install]
+WantedBy=default.target

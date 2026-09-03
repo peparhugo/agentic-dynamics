@@ -510,12 +510,17 @@ def test_step_6_runs_after_the_scope_checks(armed):
 
 
 def test_spawn_sibling_never_reaches_docker_without_a_lease(armed, monkeypatch):
-    """The socket is never touched by an unbudgeted spawn — the same guarantee as steps 1-5."""
+    """The broker is never reached by an unbudgeted spawn — the same guarantee as steps 1-5.
+
+    fb2_broker_hostside: the docker call executes in the HOST broker's process, so the "never
+    reaches docker" assertion patches the SEAM (spawn_wrapper's seam client factory) — an
+    unbudgeted spawn must refuse at step 6 before the seam is even opened.
+    """
     from scripts.fleet import spawn_wrapper
 
     monkeypatch.setattr(
-        spawn_wrapper.subprocess, "run",
-        lambda *a, **k: pytest.fail("an unbudgeted spawn must never reach the docker socket"),
+        spawn_wrapper, "_broker_client",
+        lambda: pytest.fail("an unbudgeted spawn must never open the broker seam"),
     )
     with pytest.raises(spawn_wrapper.SpawnValidationError, match="step 6"):
         spawn_wrapper.spawn_sibling(_valid_request())

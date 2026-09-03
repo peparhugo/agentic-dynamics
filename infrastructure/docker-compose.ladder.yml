@@ -9,9 +9,16 @@
 # wiring). `finops-redis` (6379) is deliberately NEVER attached: the cells hold no network
 # path to the story-agent sandbox (the two-channel rule made topological).
 #
-# The socket (D-3/D-14) appears in the ORCHESTRATOR tier only — slice 2. The supervisor tier
-# below holds NO socket: its restart authority is the compose policies it owns + the
-# orchestrator as its hands over Redis `fleet:commands` (db1 / 6380).
+# The socket (D-3/D-14) lives on the HOST ONLY — the launch broker (b3_launch_broker) is the
+# host-side (non-container) component that holds the Docker socket and is the ONLY Docker
+# API caller (its two documented exceptions: the game board's read-only `docker ps`,
+# scripts/system_snapshot.py — fb3 f4 — and the archived one-time sonar-scanner docker run,
+# scripts/archive/backfill_sonar.py — ws3_stragglers, frozen, never re-run; both are reads,
+# never a launch). No service in this
+# file mounts the socket; the supervisor tier's restart
+# authority is the compose policies it owns + the orchestrator as its hands over Redis
+# `fleet:commands` (db1 / 6380), and every docker call the orchestrator needs is delegated to
+# the broker as a typed launch/fleet request.
 #
 # Scale (static pools, D-14):  docker-compose up -d --scale story-worker=4 \
 #                              --scale analysis-worker=4 --scale review-unit=2
@@ -37,11 +44,38 @@ x-ladder-env: &ladder-env
   # field is a host /tmp/... path) resolve unchanged inside the container — the additive
   # cut-over (old host workers + new container workers) shares the same path namespace.
   FINOPS_WORKTREE_ROOT: /tmp
+  # cs1_container_env (fleet_launch_container_smoke, f1 close-out): the container tier carries
+  # the repo view. Every ladder container derives its PathConfig from this env, so the repo the
+  # container sees is EXPLICIT (the /repo mount + its .git — the compose working_dir + the :ro
+  # repo mount + the :rw results overlay at /repo/experiments/results), never an implicit
+  # PROJECT_ROOT fallback that silently changes with the image layout / sys.path. Setting the
+  # vars to the CONTAINER-VISIBLE path (not the host path) makes a container-tier orchestrator
+  # derive the SAME repo view the broker validates (its request's D-16 alias/overlay targets are
+  # the fixed /repo + /repo/.git container targets of the shared mount contract), so no tier
+  # derives its view differently (hard rule 3). These are LITERAL container paths — they are the
+  # env mappings docker compose exports INTO the container, distinct from the host-side
+  # ``${FINOPS_REPO_DIR}`` mount-source interpolations below (which the host's docker-compose
+  # substitutes and never exports).
+  FINOPS_REPO_DIR: /repo
+  FINOPS_GIT_DIR: /repo/.git
+  # cs3_container_smoke (fleet_launch_container_smoke, the real-shape smoke): the container tier
+  # also carries the RUNS root. cs1 gave the container the repo view (FINOPS_REPO_DIR/GIT_DIR) so
+  # a container orchestrator derives the repo the broker validates; the real-shape smoke proved
+  # that a container orchestrator ALSO derives its per-run clone root from this env, and without
+  # it the clone defaults to the container-local /var/lib/agentic-dynamics/runs — unwritable by
+  # the cell uid and, worse, a DIFFERENT namespace than the host runs root the broker binds. The
+  # container-visible runs root is the shared /tmp path (the /tmp:rw bind), so a container
+  # orchestrator's run clone lands at the SAME host path the broker validates and bind-mounts
+  # into the cell (hard rule 3 — no tier derives its clone root differently). Interpolated (not a
+  # literal) so an operator's host-side override flows through unchanged; the /tmp default is the
+  # smoke/ws4-era override that the fleet's runs root actually rides on this host (the host
+  # default /var/lib is not writable and not bind-mounted into the ladder).
+  FINOPS_RUNS_ROOT: ${FINOPS_RUNS_ROOT:-/tmp/agentic-dynamics-runs}
   # The container auth home == the host user's home, so the claude symlink chain
   # (~/.local/bin/claude -> ~/.local/share/claude/versions/<v>) resolves unchanged (D-18).
-  HOME: /home/drseuss
-  OPENCODE_BIN: /home/drseuss/.opencode/bin/opencode
-  CLAUDE_BIN: /home/drseuss/.local/bin/claude
+  HOME: ${AUTH_HOME}
+  OPENCODE_BIN: ${AUTH_HOME}/.opencode/bin/opencode
+  CLAUDE_BIN: ${AUTH_HOME}/.local/bin/claude
   # RAG retrieval store endpoints (slice 3, D-17 by-name reachability): the two-leg fusion's
   # dense (chroma 8000) + lexical (neo4j 7687) stores. Consulted only by rag_augment-enabled
   # workflows (and the kb-* consumers) — inert for the plain worker cells.
@@ -64,40 +98,40 @@ x-ladder-env: &ladder-env
 # subset of these — nothing outside them is ever mounted.
 x-ladder-mounts: &ladder-mounts
   - ${FINOPS_WORKTREE_ROOT:-/tmp}:/tmp:rw
-  - ${FINOPS_REPO_DIR:-/home/drseuss/ai-finops-framework}:/repo:ro
+  - ${FINOPS_REPO_DIR:?FINOPS_REPO_DIR must be set (the repo root, no host-specific default)}:/repo:ro
   # D-16 fix (2026-08-31): the repo at its HOST path — worktree gitdir pointers resolve
   # identically in the host and the containers, and the .git overlay lets phase commits write
-  - ${FINOPS_REPO_DIR:-/home/drseuss/ai-finops-framework}:/home/drseuss/ai-finops-framework:ro
-  - ${FINOPS_REPO_DIR:-/home/drseuss/ai-finops-framework}/.git:/home/drseuss/ai-finops-framework/.git:rw
+  - ${FINOPS_REPO_DIR:?FINOPS_REPO_DIR must be set (the repo root, no host-specific default)}:${FINOPS_REPO_DIR}:ro
+  - ${FINOPS_REPO_DIR:?FINOPS_REPO_DIR must be set (the repo root, no host-specific default)}/.git:${FINOPS_REPO_DIR}/.git:rw
   - ${FINOPS_REPO_DIR:-..}/experiments/results:/repo/experiments/results:rw
   # P0-3 (control-plane stabilization): the CLI-state ROOT mount. Each scaled worker mints a
   # FRESH per-job namespace under it (worker.py: <root>/jobs/<cell_id>/) and points
   # XDG_DATA_HOME/XDG_CONFIG_HOME/XDG_CACHE_HOME at it — the root itself is never shared as a
   # writable state directory, and no two replicas ever read/write the same opencode session DB.
   - ${FINOPS_WORKTREE_ROOT:-/tmp}/opencode_state:/state:rw
-  - ${AUTH_HOME:-/home/drseuss}/.local/share/opencode/auth.json:/auth/opencode_auth.json:ro
-  - ${AUTH_HOME:-/home/drseuss}/.local/share/claude:/home/drseuss/.local/share/claude:ro
+  - ${AUTH_HOME:?AUTH_HOME must be set (the auth home, no host-specific default)}/.local/share/opencode/auth.json:/auth/opencode_auth.json:ro
+  - ${AUTH_HOME:?AUTH_HOME must be set (the auth home, no host-specific default)}/.local/share/claude:${AUTH_HOME}/.local/share/claude:ro
   # (the claude binary's symlink target rides here — an isolated claude STATE dir is the
   # recorded open item: the smoke test proved the binary chain needs this ro mount; the
   # claude CLI's own write-state isolation is a follow-up for the claude-model cells)
-  - ${AUTH_HOME:-/home/drseuss}/.claude:/home/drseuss/.claude:ro
-  - ${AUTH_HOME:-/home/drseuss}/.config:/home/drseuss/.config:ro
-  - ${AUTH_HOME:-/home/drseuss}/.local/bin:/home/drseuss/.local/bin:ro
-  - ${AUTH_HOME:-/home/drseuss}/.opencode:/home/drseuss/.opencode:ro
+  - ${AUTH_HOME:?AUTH_HOME must be set (the auth home, no host-specific default)}/.claude:${AUTH_HOME}/.claude:ro
+  - ${AUTH_HOME:?AUTH_HOME must be set (the auth home, no host-specific default)}/.config:${AUTH_HOME}/.config:ro
+  - ${AUTH_HOME:?AUTH_HOME must be set (the auth home, no host-specific default)}/.local/bin:${AUTH_HOME}/.local/bin:ro
+  - ${AUTH_HOME:?AUTH_HOME must be set (the auth home, no host-specific default)}/.opencode:${AUTH_HOME}/.opencode:ro
 
 # The supervisor tier's mount set (D-13): results rw / repo ro / auth ro + the fleet-logs
 # NAMED volume. NO worktree mount (the supervisor holds no worktree), NO socket.
 x-supervisor-mounts: &supervisor-mounts
-  - ${FINOPS_REPO_DIR:-/home/drseuss/ai-finops-framework}:/repo:ro
+  - ${FINOPS_REPO_DIR:?FINOPS_REPO_DIR must be set (the repo root, no host-specific default)}:/repo:ro
   # D-16 fix (2026-08-31): the repo at its HOST path — worktree gitdir pointers resolve
   # identically in the host and the containers, and the .git overlay lets phase commits write
-  - ${FINOPS_REPO_DIR:-/home/drseuss/ai-finops-framework}:/home/drseuss/ai-finops-framework:ro
-  - ${FINOPS_REPO_DIR:-/home/drseuss/ai-finops-framework}/.git:/home/drseuss/ai-finops-framework/.git:rw
+  - ${FINOPS_REPO_DIR:?FINOPS_REPO_DIR must be set (the repo root, no host-specific default)}:${FINOPS_REPO_DIR}:ro
+  - ${FINOPS_REPO_DIR:?FINOPS_REPO_DIR must be set (the repo root, no host-specific default)}/.git:${FINOPS_REPO_DIR}/.git:rw
   - ${FINOPS_REPO_DIR:-..}/experiments/results:/repo/experiments/results:rw
-  - ${AUTH_HOME:-/home/drseuss}/.claude:/home/drseuss/.claude:ro
-  - ${AUTH_HOME:-/home/drseuss}/.config:/home/drseuss/.config:ro
-  - ${AUTH_HOME:-/home/drseuss}/.local/bin:/home/drseuss/.local/bin:ro
-  - ${AUTH_HOME:-/home/drseuss}/.opencode:/home/drseuss/.opencode:ro
+  - ${AUTH_HOME:?AUTH_HOME must be set (the auth home, no host-specific default)}/.claude:${AUTH_HOME}/.claude:ro
+  - ${AUTH_HOME:?AUTH_HOME must be set (the auth home, no host-specific default)}/.config:${AUTH_HOME}/.config:ro
+  - ${AUTH_HOME:?AUTH_HOME must be set (the auth home, no host-specific default)}/.local/bin:${AUTH_HOME}/.local/bin:ro
+  - ${AUTH_HOME:?AUTH_HOME must be set (the auth home, no host-specific default)}/.opencode:${AUTH_HOME}/.opencode:ro
   - fleet-logs:/var/log/fleet
 
 x-cell-base: &cell-base
@@ -118,30 +152,46 @@ x-supervisor-base: &supervisor-base
     FLEET_SKIP_PROBE: "1"         # the supervisor services invoke no CLI
   volumes: *supervisor-mounts
 
-# The orchestrator tier (slice 2, D-3/D-14/D-16): the cell mount set PLUS the docker socket
-# (ro) — the ONE escalation in the ladder. The socket is gated by the sibling-spawn wrapper
-# (scripts/fleet/spawn_wrapper.py), which validates every spawn against the scope model before
-# the socket call. Env (D-15): the cell env MINUS FINOPS_KB_WRITE — the orchestrator never
-# carries the write flag at the container level; its F-1/F-2/P11 writes authorize in code.
+# The orchestrator tier (slice 2, D-3/D-14/D-16): the cell mount set. The DOCKER socket is NOT
+# here (b3_launch_broker, fleet_launch_boundary Wave 2 hard rule 1: the socket leaves the
+# container) — no ladder service mounts the docker socket. The launch broker
+# (scripts/fleet/launch_broker.py, deployed host-side by the agentic-dynamics-launch-broker
+# systemd user unit) is the component that owns the socket and is the ONLY Docker API caller
+# (its two documented exceptions: the game board's read-only `docker ps`,
+# scripts/system_snapshot.py — fb3 f4 — and the archived one-time sonar-scanner docker run,
+# scripts/archive/backfill_sonar.py — ws3_stragglers, frozen, never re-run):
+# the wrapper validates a typed launch request and emits it over the broker's IPC seam, and the
+# broker executes it. The orchestrator services below therefore reach the broker over the SEAM
+# socket (x-orchestrator-mounts mounts it at /run/launch-broker.sock — the typed seam, NOT the
+# docker socket); a socketless cell tier still never calls docker. Env (D-15): the cell env
+# MINUS FINOPS_KB_WRITE — the orchestrator never carries the write flag at the container level;
+# its F-1/F-2/P11 writes authorize in code.
 x-orchestrator-mounts: &orchestrator-mounts
   - ${FINOPS_WORKTREE_ROOT:-/tmp}:/tmp:rw
-  - ${FINOPS_REPO_DIR:-/home/drseuss/ai-finops-framework}:/repo:ro
+  - ${FINOPS_REPO_DIR:?FINOPS_REPO_DIR must be set (the repo root, no host-specific default)}:/repo:ro
   # D-16 fix (2026-08-31): the repo at its HOST path — worktree gitdir pointers resolve
   # identically in the host and the containers, and the .git overlay lets phase commits write
-  - ${FINOPS_REPO_DIR:-/home/drseuss/ai-finops-framework}:/home/drseuss/ai-finops-framework:ro
-  - ${FINOPS_REPO_DIR:-/home/drseuss/ai-finops-framework}/.git:/home/drseuss/ai-finops-framework/.git:rw
+  - ${FINOPS_REPO_DIR:?FINOPS_REPO_DIR must be set (the repo root, no host-specific default)}:${FINOPS_REPO_DIR}:ro
+  - ${FINOPS_REPO_DIR:?FINOPS_REPO_DIR must be set (the repo root, no host-specific default)}/.git:${FINOPS_REPO_DIR}/.git:rw
   - ${FINOPS_REPO_DIR:-..}/experiments/results:/repo/experiments/results:rw
   # P0-3 (control-plane stabilization): the CLI-state ROOT mount. Siblings get their OWN
   # per-attempt namespace (<root>/<spec>/<phase>/) mounted at /state via spawn_wrapper —
   # never a shared pool directory.
   - ${FINOPS_WORKTREE_ROOT:-/tmp}/opencode_state:/state:rw
-  - ${AUTH_HOME:-/home/drseuss}/.local/share/opencode/auth.json:/auth/opencode_auth.json:ro
-  - ${AUTH_HOME:-/home/drseuss}/.local/share/claude:/home/drseuss/.local/share/claude:ro
-  - ${AUTH_HOME:-/home/drseuss}/.claude:/home/drseuss/.claude:ro
-  - ${AUTH_HOME:-/home/drseuss}/.config:/home/drseuss/.config:ro
-  - ${AUTH_HOME:-/home/drseuss}/.local/bin:/home/drseuss/.local/bin:ro
-  - ${AUTH_HOME:-/home/drseuss}/.opencode:/home/drseuss/.opencode:ro
-  - /var/run/docker.sock:/var/run/docker.sock:ro
+  - ${AUTH_HOME:?AUTH_HOME must be set (the auth home, no host-specific default)}/.local/share/opencode/auth.json:/auth/opencode_auth.json:ro
+  - ${AUTH_HOME:?AUTH_HOME must be set (the auth home, no host-specific default)}/.local/share/claude:${AUTH_HOME}/.local/share/claude:ro
+  - ${AUTH_HOME:?AUTH_HOME must be set (the auth home, no host-specific default)}/.claude:${AUTH_HOME}/.claude:ro
+  - ${AUTH_HOME:?AUTH_HOME must be set (the auth home, no host-specific default)}/.config:${AUTH_HOME}/.config:ro
+  - ${AUTH_HOME:?AUTH_HOME must be set (the auth home, no host-specific default)}/.local/bin:${AUTH_HOME}/.local/bin:ro
+  - ${AUTH_HOME:?AUTH_HOME must be set (the auth home, no host-specific default)}/.opencode:${AUTH_HOME}/.opencode:ro
+  # fb2_broker_hostside: the broker SEAM socket — NOT the docker socket (the docker socket's
+  # only home is the host-side launch-broker unit). The orchestrator tier reaches the host
+  # broker over its unix-socket seam: this bind mounts the host socket file (export
+  # FINOPS_LAUNCH_BROKER_SOCKET where docker compose runs; fail-closed if absent) read-only at
+  # the fixed container target /run/launch-broker.sock, and x-orchestrator-base points the
+  # seam client at that target. Only the ORCHESTRATOR tier mounts any socket — no cell or
+  # supervisor service does; no in-container code calls docker (only the typed seam is spoken).
+  - ${FINOPS_LAUNCH_BROKER_SOCKET:?FINOPS_LAUNCH_BROKER_SOCKET must name the host launch-broker seam socket (e.g. the unit's %t/launch-broker.sock)}:/run/launch-broker.sock:ro
 
 x-orchestrator-base: &orchestrator-base
   image: fleet/orchestrator
@@ -150,6 +200,26 @@ x-orchestrator-base: &orchestrator-base
   networks: [fleet-net]
   environment:
     <<: *ladder-env
+    # fb2_broker_hostside: the seam socket's CONTAINER path (the mount target above). The
+    # orchestrator's spawn path reads this env and talks to the host broker over the seam —
+    # never the docker socket, never an in-container docker call.
+    FINOPS_LAUNCH_BROKER_SOCKET: /run/launch-broker.sock
+    # cs1_container_env (fleet_launch_container_smoke, f1 close-out): the orchestrator tier
+    # carries the repo view EXPLICITLY (they ride in x-ladder-env above — declared again here so
+    # the orchestrator service env self-evidently carries them, whichever tier a reviewer reads):
+    # a container-tier orchestrator derives repo_root=/repo + git_dir=/repo/.git — the SAME repo
+    # view the broker validates its spawn requests against (fixed /repo + /repo/.git targets),
+    # never the image's stale baked /app copy.
+    FINOPS_REPO_DIR: /repo
+    FINOPS_GIT_DIR: /repo/.git
+    # cs3_container_smoke (fleet_launch_container_smoke, real-shape smoke): the runs root rides
+    # in x-ladder-env above — declared again here so the orchestrator service env self-evidently
+    # carries it. A container orchestrator mints its per-run clone at this path (create_run_clone
+    # → runs_root/<run-id>/repo), so it MUST be the shared /tmp path the HOST broker validates
+    # and bind-mounts into the cell — the container-local /var/lib default is a different
+    # namespace and the real-shape smoke proved the container orchestrator cannot spawn without
+    # the override in play.
+    FINOPS_RUNS_ROOT: ${FINOPS_RUNS_ROOT:-/tmp/agentic-dynamics-runs}
   volumes: *orchestrator-mounts
 
 services:
@@ -287,8 +357,11 @@ services:
       EGRESS_ALLOWLIST: "api.deepseek.com,api.anthropic.com,api.openai.com,*.anthropic.com,*.deepseek.com,*.openai.com"
 
   # =========================================================================
-  # fleet/orchestrator — the campaign wrapper + the workflow runner. The ONE
-  # socket-holder tier (D-3): /var/run/docker.sock ro, gated by the spawn-wrapper.
+  # fleet/orchestrator — the campaign wrapper + the workflow runner. NO docker
+  # socket (b3_launch_broker, fb2_broker_hostside): the docker socket lives ONLY where the
+  # broker runs (the host-side launch-broker systemd unit). These services build typed launch
+  # requests and emit them to the host broker over the SEAM socket (x-orchestrator-mounts →
+  # /run/launch-broker.sock); the host broker executes them. NO in-container code calls docker.
   # =========================================================================
   campaign-wrapper:
     <<: *orchestrator-base

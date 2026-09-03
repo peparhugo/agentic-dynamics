@@ -11,10 +11,12 @@ or awaiting result.
 g1 (engine_gaps_followups F2): the parity suite's verifier cases use FakeDockerVerifier
 (a local ``run_suite`` shape) and assert only ``build_request`` on the real executor. The
 round-trip harness in the last section closes that gap WITHOUT docker: it drives the REAL
-``DockerVerifierExecutor.execute()`` with the docker boundary (``spawn_wrapper.spawn_sibling``)
-as the ONLY injected seam, returning canned sibling outcomes and asserting the
-envelope → classify → StepResult mapping. Where docker IS available the operator runs the
-TRUE container round-trip under the ``--run-docker`` opt-in marker:
+``DockerVerifierExecutor.execute()`` with the broker boundary
+(``spawn_wrapper.spawn_sibling`` — which validates and delegates the typed request to the
+host-side launch broker, b3_launch_broker) as the ONLY injected seam, returning canned
+sibling outcomes and asserting the envelope → classify → StepResult mapping. Where docker IS
+available the operator runs the TRUE container round-trip under the ``--run-docker`` opt-in
+marker:
 
     python3 -m pytest tests/test_workflow_executor_parity.py --run-docker \
         -k verifier_docker_roundtrip
@@ -69,6 +71,7 @@ if _FLEET_DIR not in sys.path:
     sys.path.insert(0, _FLEET_DIR)
 
 import spawn_wrapper  # noqa: E402
+from docker_executor import DockerAgentExecutor  # noqa: E402
 from docker_verifier_executor import DockerVerifierExecutor  # noqa: E402
 
 # ── exit_code_for_result: the child's exit code mirrors the run outcome ──────────
@@ -597,27 +600,149 @@ def test_verifier_request_carries_no_credentials_and_no_writable_state(tmp_path)
     assert request.phase_def.get("tests") == ["tests/test_spec_x.py"]
 
 
+def _agent_step_request(phase_name: str = "p1_slice1_base_supervisor") -> StepRequest:
+    return StepRequest(
+        phase_name=phase_name,
+        phase_kind="agent",
+        prompt="",
+        model="deepseek/deepseek-v4-flash",
+        goal="g",
+        spec_name="spec_x",
+        workdir="/tmp/wt_x",
+        language="python",
+        timeout=180,
+        phase_def={"name": phase_name, "scope": "implementation"},
+    )
+
+
+def test_agent_executor_request_references_the_run_clone_path(tmp_path):
+    """(b2 VERIFY d) DockerAgentExecutor's phase request carries the run's private clone path
+    when the executor was given one — the request the broker will mount references
+    runs_root/<run-id>/repo."""
+    clone_path = tmp_path / "runs" / "run-abc" / "repo"
+    executor = DockerAgentExecutor(
+        spec_path="/repo/workflows/repository/x.yaml",
+        spec_name="spec_x",
+        goal="g",
+        model="deepseek/deepseek-v4-flash",
+        workdir="/tmp/wt_x",
+        run_clone=str(clone_path),
+    )
+    req = executor.build_request(_agent_step_request())
+    assert req.get("run_clone") == str(clone_path)
+    # the request is still a valid phase request (the clone is a reference, not a mount)
+    assert req["scope"] == "implementation"
+    assert req["phase"] == "p1_slice1_base_supervisor"
+
+
+def test_verifier_executor_request_references_the_run_clone_path(tmp_path):
+    """(b2 VERIFY d) DockerVerifierExecutor's request references the run clone too — a test
+    phase verifies against the run's read-only clone. The verifier's read-only + no-credential
+    contract is intact alongside the reference."""
+    clone_path = tmp_path / "runs" / "run-abc" / "repo"
+    executor = DockerVerifierExecutor(
+        spec_path="/repo/workflows/repository/x.yaml",
+        spec_name="spec_x",
+        goal="g",
+        model="deepseek/deepseek-v4-flash",
+        workdir="/tmp/wt_x",
+        run_clone=str(clone_path),
+    )
+    request = StepRequest(
+        phase_name="gate_run",
+        phase_kind="test",
+        prompt="",
+        model="deepseek/deepseek-v4-flash",
+        goal="g",
+        spec_name="spec_x",
+        workdir="/tmp/wt_x",
+        language="python",
+        timeout=180,
+        phase_def={"name": "gate_run", "kind": "test", "tests": ["tests/test_spec_x.py"]},
+    )
+    req = executor.build_request(request)
+    assert req.get("run_clone") == str(clone_path)
+    targets = {m.get("target") for m in req.get("mounts", [])}
+    assert not (targets & set(spawn_wrapper.AUTH_DIRS))
+    assert all(m.get("mode") == "ro" for m in req.get("mounts", []))
+    # fb1: with a clone the child runs INSIDE it (its --workdir is the clone mount /repo)
+    assert "--workdir /repo" in " ".join(str(c) for c in req.get("command", []))
+
+
+def test_agent_executor_runs_the_child_inside_the_clone_when_configured(tmp_path):
+    """(fb1) with a run clone the sibling cell's command workdir is the clone's container mount
+    point (/repo) — the cell's git operations + commits happen against ITS clone. Without a
+    clone the shared-worktree workdir is unchanged."""
+    clone_path = tmp_path / "runs" / "run-workdir" / "repo"
+    executor = DockerAgentExecutor(
+        spec_path="/repo/workflows/repository/x.yaml",
+        spec_name="spec_x", goal="g", model="deepseek/deepseek-v4-flash",
+        workdir="/tmp/wt_x", run_clone=str(clone_path),
+    )
+    cmd = " ".join(str(c) for c in executor.build_request(_agent_step_request()).get("command", []))
+    assert "--workdir /repo" in cmd
+    assert "/tmp/wt_x" not in cmd
+
+    legacy = DockerAgentExecutor(
+        spec_path="/repo/workflows/repository/x.yaml",
+        spec_name="spec_x", goal="g", model="deepseek/deepseek-v4-flash",
+        workdir="/tmp/wt_x",
+    )
+    legacy_cmd = " ".join(
+        str(c) for c in legacy.build_request(_agent_step_request()).get("command", [])
+    )
+    assert "--workdir /tmp/wt_x" in legacy_cmd
+
+
+def test_executor_inherits_the_run_clone_from_env(tmp_path, monkeypatch):
+    """(b2) the executors fall back to the FINOPS_RUN_CLONE env var (a host-side launcher
+    exports the provisioned clone to the workflow-runner tier); absent both, no clone key."""
+    clone_path = tmp_path / "runs" / "run-env" / "repo"
+    monkeypatch.setenv("FINOPS_RUN_CLONE", str(clone_path))
+
+    agent = DockerAgentExecutor(
+        spec_path="/repo/workflows/repository/x.yaml", spec_name="spec_x",
+        goal="g", model="deepseek/deepseek-v4-flash", workdir="/tmp/wt_x",
+    )
+    verifier = DockerVerifierExecutor(
+        spec_path="/repo/workflows/repository/x.yaml", spec_name="spec_x",
+        goal="g", model="deepseek/deepseek-v4-flash", workdir="/tmp/wt_x",
+    )
+    assert agent.build_request(_agent_step_request()).get("run_clone") == str(clone_path)
+    verifier_req = verifier.build_request(
+        StepRequest(
+            phase_name="gate_run", phase_kind="test", prompt="",
+            model="deepseek/deepseek-v4-flash", goal="g", spec_name="spec_x",
+            workdir="/tmp/wt_x", language="python", timeout=180,
+            phase_def={"name": "gate_run", "kind": "test",
+                       "tests": ["tests/test_spec_x.py"]},
+        )
+    )
+    assert verifier_req.get("run_clone") == str(clone_path)
+
+
 # ══════════════════════════════════════════════════════════════
 # g1 (engine_gaps_followups F2): the round-trip harness — the REAL executor's
-# execute → envelope → classify contract exercised with the docker boundary as the
+# execute → envelope → classify contract exercised with the broker boundary as the
 # ONLY injected seam (docker optional in CI).
 # ══════════════════════════════════════════════════════════════
 #
 # The parity cases above inject FakeDockerVerifier — a DockerVerifier-SHAPED executor that
 # runs run_suite locally — and assert only ``build_request`` on the real executor. F2 (the
 # Wave-1 adversarial review): the genuine container contract — real DockerVerifierExecutor
-# ``execute()`` → ``spawn_wrapper.spawn_sibling`` → the child's result envelope → ``_classify``
+# ``execute()`` → ``spawn_wrapper.spawn_sibling`` (validate → broker delegation, b3) →
+# the child's result envelope → ``_classify``
 # → ``_phase_from_envelope`` → ``StepResult`` — was never exercised, because ``docker`` is not
 # available in CI.
 #
 # The round-trip harness closes that gap WITHOUT docker: it drives the real executor's
-# ``execute()`` and replaces ONLY the docker boundary — the ``spawn_wrapper.spawn_sibling``
-# module attribute the executor calls (``docker_verifier_executor.py:133``) — with a function
+# ``execute()`` and replaces ONLY the broker boundary — the ``spawn_wrapper.spawn_sibling``
+# module attribute the executor calls (``docker_verifier_executor.py:148``) — with a function
 # that returns a canned sibling outcome in the exact shape ``spawn_sibling`` returns
 # (``{"ok", "argv", "returncode", "stdout", "stderr"}``). Everything the executor owns runs
-# for real: ``build_request`` → the spawned request, ``_classify`` over the child's envelope
+# for real: ``build_request`` → the typed spawn request, ``_classify`` over the child's envelope
 # (the indented ``WorkflowRunResult.to_dict()`` JSON a real child prints), and the StepResult
-# mapping. The docker boundary is the ONLY injected seam.
+# mapping. The broker boundary is the ONLY injected seam.
 #
 # (f) Where docker IS available, the same harness runs the TRUE container round-trip (the
 # real ``docker run`` → child ``run_workflow.py --only-phase`` → real envelope) under the
@@ -749,10 +874,15 @@ def test_roundtrip_failed_suite_envelope_maps_to_failed_stepresult(tmp_path, mon
     sr, captured = _rt_execute(
         executor, request, _rt_outcome(EXIT_OK, envelope=env, stderr="boom"), monkeypatch
     )
-    # the docker boundary received the READ-ONLY verifier request build_request produced
-    assert captured["kwargs"] == {"docker": "docker", "image": None}
+    # the docker boundary received the READ-ONLY verifier request build_request produced.
+    # b3_launch_broker: spawn_sibling takes ONLY the typed request — the docker/image args left
+    # the wrapper, so the request itself carries the image (image_digest) and the broker's
+    # mount profile.
+    assert captured["kwargs"] == {}
     spawn_req = captured["request"]
     assert spawn_req.get(spawn_wrapper.VERIFIER_REQUEST_MARKER) is True
+    assert spawn_req.get("mount_profile") == "verifier_readonly"
+    assert spawn_req.get("image_digest") in ("fleet/base", None)
     repo_mounts = [m for m in spawn_req.get("mounts", []) if m.get("target") == "/repo"]
     assert repo_mounts and all(m.get("mode") == "ro" for m in repo_mounts)
     assert not spawn_req.get("mounts") or all(
@@ -993,11 +1123,13 @@ def test_verifier_docker_roundtrip(tmp_path):
     network + a CURRENT ``fleet/base`` image (its baked ``/app`` copy of ``scripts/`` must
     match the repo) whose entrypoint can start a credential-less verifier cell (the D-18 CLI
     probe is satisfied or the cell boots with it skipped — a verifier mounts no auth dirs by
-    construction). Run it from the MAIN checkout (``/home/drseuss/ai-finops-framework`` — the
-    canonical repo path the mount contract's ``repo-alias`` target is pinned to): the real
-    spawn's validation step 3 refuses a repo-alias mount at any OTHER host path, so a
-    ``/tmp/wt_*`` worktree checkout is refused before the socket call by design, never reaching
-    docker. The test builds a real candidate workdir under /tmp (a spec + a passing suite —
+    construction). Run it from the MAIN checkout — the config's ``repo_root`` (the mount
+    contract's ``repo-alias`` target is that config's host path, b1_path_config; the deployed
+    ladder's own ``FINOPS_REPO_DIR`` is the host repo path): the real spawn's validation step 3
+    accepts a repo-alias mount only at the config's derived repo root, so a ``/tmp/wt_*``
+    worktree checkout (a DIFFERENT ``repo_root`` than the compose mount target) is refused
+    before the socket call by design, never reaching docker. The test builds a real candidate
+    workdir under /tmp (a spec + a passing suite —
     the verifier cell mounts the host /tmp namespace read-only at /tmp, so the workdir is
     visible in the container at the same path), then drives the REAL executor and asserts the
     envelope→StepResult contract end to end — the very contract the injected-seam tests above

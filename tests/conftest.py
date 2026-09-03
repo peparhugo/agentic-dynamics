@@ -137,3 +137,92 @@ def _isolate_control_db(tmp_path_factory, monkeypatch):
     monkeypatch.setenv(
         "FINOPS_CONTROL_DB", str(tmp_path_factory.mktemp("control_db") / "control.db")
     )
+
+
+def _start_broker_seam(tmp_path, monkeypatch, *, docker: str, compose: str,
+                       compose_file: str | None = None):
+    """Start a live launch-broker seam server (launch_broker.serve) on a tmp unix socket.
+
+    Returns a namespace carrying ``socket_path`` (and the stop handle) and points
+    ``FINOPS_LAUNCH_BROKER_SOCKET`` at it, so ``spawn_wrapper``'s seam client (which resolves
+    the socket from the env at call time) round-trips through the server. The server runs in a
+    daemon thread of the test process — the host-side broker stand-in for tests; production
+    runs the same ``serve`` code under the ``agentic-dynamics-launch-broker.service`` systemd
+    user unit. ``docker`` / ``compose`` are the broker's runtime binaries (tests pass stub
+    paths when a REAL subprocess execution must be observed; lifecycle tests leave the names
+    and patch ``subprocess.run`` themselves).
+    """
+    import threading
+    import types
+
+    from scripts.fleet import launch_broker
+
+    socket_path = str(tmp_path / "launch-broker.sock")
+    stop_event = threading.Event()
+    ready = threading.Event()
+    thread = threading.Thread(
+        target=launch_broker.serve,
+        kwargs={
+            "socket_path": socket_path,
+            "docker": docker,
+            "compose": compose,
+            "compose_file": compose_file,
+            "stop_event": stop_event,
+            "ready_event": ready,
+        },
+        daemon=True,
+    )
+    thread.start()
+    assert ready.wait(10), "the launch-broker seam server did not start"
+    monkeypatch.setenv("FINOPS_LAUNCH_BROKER_SOCKET", socket_path)
+    seam = types.SimpleNamespace(socket_path=socket_path, stop_event=stop_event, thread=thread)
+    return seam
+
+
+@pytest.fixture
+def broker_seam(tmp_path, monkeypatch):
+    """A live launch-broker seam (fb2_broker_hostside): ``launch_broker.serve`` on a tmp socket.
+
+    The broker runs with the default docker/compose binary NAMES (no execution — tests that
+    need to observe a real subprocess patch ``subprocess.run`` per test, exactly as the
+    consume-lifecycle tests have always done). The env var is set so ``spawn_wrapper``'s seam
+    client reaches the server.
+    """
+    seam = _start_broker_seam(tmp_path, monkeypatch, docker="docker", compose="docker-compose")
+    yield seam.socket_path
+    seam.stop_event.set()
+    seam.thread.join(timeout=10)
+
+
+@pytest.fixture
+def broker_seam_stub(tmp_path, monkeypatch):
+    """A live launch-broker seam whose docker/compose are REAL STUB binaries (fb2 VERIFY d/e).
+
+    The stub binaries record every argv they receive to ``BROKER_STUB_LOG`` and exit with
+    ``BROKER_STUB_EXIT`` (default 0), so a test can assert the host broker executed the stub
+    (the round-trip) and can force a nonzero docker outcome. Returns a namespace with
+    ``socket_path``, ``docker_bin``, ``compose_bin`` and ``log`` (the argv record path).
+    """
+
+    log = tmp_path / "stub-calls.log"
+    for name in ("docker", "docker-compose"):
+        stub = tmp_path / name
+        stub.write_text(
+            "#!/bin/sh\n"
+            f'echo "$@" >> "{log}"\n'
+            'exit "${BROKER_STUB_EXIT:-0}"\n'
+        )
+        stub.chmod(0o755)
+    monkeypatch.setenv("BROKER_STUB_LOG", str(log))
+    monkeypatch.setenv("BROKER_STUB_EXIT", "0")
+    seam = _start_broker_seam(
+        tmp_path, monkeypatch,
+        docker=str(tmp_path / "docker"),
+        compose=str(tmp_path / "docker-compose"),
+    )
+    seam.docker_bin = str(tmp_path / "docker")
+    seam.compose_bin = str(tmp_path / "docker-compose")
+    seam.log = str(log)
+    yield seam
+    seam.stop_event.set()
+    seam.thread.join(timeout=10)

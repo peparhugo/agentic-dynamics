@@ -17,6 +17,7 @@ pre-contract child that exits 0 with ``ok:false`` is failed, never success.
 from __future__ import annotations
 
 import json
+import os
 import sys
 from pathlib import Path
 from typing import Any
@@ -34,10 +35,19 @@ import spawn_wrapper  # noqa: E402
 class DockerAgentExecutor(StepExecutor):
     """Run each agent phase as a sibling cell container with its scope config.
 
-    ``spec_path`` is the spec path AS THE SIBLING SEES IT (the orchestrator mounts the
-    repo at ``/repo``, so ``/repo/<spec>``); ``spec_name`` is the workflow's name used
-    for the per-attempt state namespace; ``cell_image`` is the sibling's image
-    (``fleet/job-<name>`` or the default cell base).
+    ``spec_path`` is the spec path AS THE SIBLING SEES IT (the launch broker mounts the repo
+    at ``/repo`` per the request's mount profile, so ``/repo/<spec>``); ``spec_name`` is the
+    workflow's name used for the per-attempt state namespace; ``cell_image`` is the sibling's
+    image (``fleet/job-<name>`` or the default cell base), carried on the typed request.
+
+    ``run_clone`` (fb1_clone_mounted — the clone is the cell's world) is the run's private
+    ephemeral clone path (``PathConfig.runs_root/<run-id>/repo``). When set, every phase
+    request this executor builds carries it (``build_phase_request(run_clone=...)``) and mounts
+    the clone as the cell's repo — the launch broker binds ``runs_root/<run-id>/repo`` at
+    ``/repo`` (rw for this commit-capable cell) and the shared worktree/``.git`` surface is
+    absent from the request. It may be passed explicitly or inherited from the
+    ``FINOPS_RUN_CLONE`` env var (a host-side launcher exports it to the workflow-runner tier);
+    absent both, requests carry no clone — the pre-b2 shared-worktree shape unchanged.
     """
 
     def __init__(
@@ -51,6 +61,7 @@ class DockerAgentExecutor(StepExecutor):
         backend: str | None = None,
         timeout: int = 1800,
         cell_image: str | None = None,
+        run_clone: str | None = None,
     ):
         self._spec_path = spec_path
         self._spec_name = spec_name
@@ -60,22 +71,42 @@ class DockerAgentExecutor(StepExecutor):
         self._backend = backend
         self._timeout = timeout
         self._cell_image = cell_image
+        self._run_clone = run_clone or os.environ.get("FINOPS_RUN_CLONE")
 
-    def execute(self, request: StepRequest) -> StepResult:
-        """Spawn one sibling cell for ``request`` and classify its outcome.
+    def build_request(self, request: StepRequest) -> dict[str, Any]:
+        """Build the sibling-cell spawn request for ``request`` (pure, no docker).
 
-        The admission in force (the engine entered ``phase_admission_scope`` before
-        calling us) is stamped onto the spawn request as the lease block — a container
-        inherits an environment, not a ContextVar.
+        The admission in force (the engine entered ``phase_admission_scope`` before calling
+        us) is stamped onto the spawn request as the lease block — a container inherits an
+        environment, not a ContextVar. The run's clone path (fb1_clone_mounted), when one is
+        configured, is carried on the request so the launch broker mounts the clone as the
+        cell's repo — and the child runs INSIDE the clone (its ``--workdir`` is the clone's
+        container mount point ``/repo``), so the cell's git operations and commits happen
+        against ITS clone, never the shared worktree.
         """
         from agentic_dynamics.core.admission_context import current_context
 
+        # fb1_clone_mounted: with a run clone the sibling operates in the clone, mounted at
+        # /repo (spawn_wrapper/launch_broker REPO_TARGET) — the shared /tmp worktree namespace
+        # is no longer mounted, so the cell's workdir IS the clone. Without a clone the cell
+        # keeps operating in the shared-worktree path (pre-b2 shape, unchanged).
+        sibling_workdir = spawn_wrapper.REPO_TARGET if self._run_clone else self._workdir
+        # ws4_smoke (fleet_launch_smoke, exposed by THE SMOKE): the sibling command must name
+        # the interpreter the CONTAINER resolves on PATH ("python3" = the fleet image's
+        # /usr/local/bin/python3 — the interpreter the deps were installed under), never the
+        # executor process's own sys.executable. The executor may run on the HOST (this wave's
+        # in-process smoke drove it there), where sys.executable is the host's /usr/bin/python3
+        # — a DIFFERENT interpreter that the fleet/base image also carries but with NO project
+        # deps, so the child died at import before the suite ran. spawn_wrapper's own default
+        # cell command ("python3 scripts/fleet/phase_runner.py") and the compose workflow-runner
+        # command already use the PATH-resolved python3; the executors' sys.executable was the
+        # one spot that baked a host path into a container argv.
         sibling_cmd = [
-            sys.executable, "scripts/run_workflow.py",
+            "python3", "scripts/run_workflow.py",
             "--spec", self._spec_path,
             "--goal", self._goal,
             "--model", self._model,
-            "--workdir", self._workdir,
+            "--workdir", sibling_workdir,
             "--only-phase", request.phase_name,
             "--timeout", str(request.timeout or self._timeout),
         ]
@@ -83,21 +114,48 @@ class DockerAgentExecutor(StepExecutor):
             sibling_cmd += ["--backend", self._backend or request.backend]
 
         admission = current_context()
-        phase_request = spawn_wrapper.build_phase_request(
+        # F3 (fleet_launch_container_smoke cs4): pass the phase's OWN declared scope as its
+        # authorization. The phase_def carries ``scope: <vocabulary-member>`` (the declared
+        # scope wins per the resolution order), and the executor is the composition-root side
+        # that knows it — a custom spec's phases legitimately declare their scope, and the
+        # static PHASE_SCOPE_AUTHORIZATION table cannot know them. Without this, step 2 falls
+        # back to the table and REFUSES every custom-phase spawn (the F3 agent-cell gap: the
+        # containerized path could only ever run table-known phases).
+        phase_scopes = None
+        declared = request.phase_def.get("scope") if isinstance(request.phase_def, dict) else None
+        if declared in spawn_wrapper.SCOPE_VOCABULARY:
+            phase_scopes = {request.phase_name: declared}
+        return spawn_wrapper.build_phase_request(
             request.phase_def,
             goal=self._goal,
-            workdir=self._workdir,
+            workdir=sibling_workdir,
             model=self._model,
             spec_name=self._spec_name,
             command=sibling_cmd,
             admission=admission,
+            run_clone=self._run_clone,
+            phase_scopes=phase_scopes,
             # P0-3: a per-attempt state namespace — <spec>/<phase>/ — so retries and
             # concurrent phases never share a writable CLI-state directory.
             state_namespace=f"{self._spec_name}/{request.phase_name}",
+            # b3_launch_broker: the cell image + docker-side timeout ride on the TYPED request
+            # (image_digest / timeout_seconds) — the executor no longer passes them to a docker
+            # call of its own; the broker validates + executes them.
+            image=self._cell_image,
+            timeout_seconds=request.timeout or self._timeout or 0,
         )
-        outcome = spawn_wrapper.spawn_sibling(
-            phase_request, docker="docker", image=self._cell_image,
-        )
+
+    def execute(self, request: StepRequest) -> StepResult:
+        """Spawn one sibling cell for ``request`` (via the launch broker) and classify its outcome."""
+        phase_request = self.build_request(request)
+        # F3 (fleet_launch_container_smoke cs4): the spawn-side re-validation needs the phase's
+        # own declared scope as its authorization (spawn_sibling's step-2 check) — a custom
+        # spec's phase legitimately declares its scope; the static table cannot know it.
+        auth_scopes = None
+        declared = request.phase_def.get("scope") if isinstance(request.phase_def, dict) else None
+        if declared in spawn_wrapper.SCOPE_VOCABULARY:
+            auth_scopes = {request.phase_name: declared}
+        outcome = spawn_wrapper.spawn_sibling(phase_request, phase_scopes=auth_scopes)
         decision = _classify(outcome)
         state = decision["state"]
         envelope = decision.get("envelope") or {}

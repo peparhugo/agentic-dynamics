@@ -2541,3 +2541,27 @@ def test_checkpoint_ledger_round_trips_spec_status_style(tmp_path):
                          commit=False, run_agentic_fn=lambda *a, **k: _fake_agent())
     assert plain.checkpoints == []
     assert plain.to_dict()["checkpoints"] == []
+
+
+def test_test_phase_with_phantom_target_is_a_false_green_guard(tmp_path):
+    """The b5 phantom-target lesson (fleet_launch_boundary F5): a kind:test phase whose
+    ``tests:`` target resolves to NO collected tests (a nonexistent file) must FAIL the
+    phase — a zero-test run is never a pass. The old check failed the phase only on
+    suite failed/errors, so total 0 / failed 0 / errors 0 read ok while
+    test_executed_success was False: the phase record contradicted itself."""
+    spec = load_spec(SPEC)
+    for p in spec.workflow.params["phases"]:
+        if p.get("kind") == "test":
+            p["tests"] = ["tests/this_file_does_not_exist.py"]
+            break
+    else:
+        raise AssertionError("SPEC has no test phase")
+
+    result = run_workflow(spec, goal="g", model="m", workdir=tmp_path, commit=False,
+                          run_agentic_fn=lambda *a, **k: _fake_agent())
+    test_phase = [p for p in result.phases if p.kind == "test"][0]
+    assert test_phase.status == "failed"  # zero tests is a failure, never ok
+    assert test_phase.test_executed_success is False
+    assert test_phase.tests_total == 0
+    assert "TEST_GATE" in test_phase.error or "no tests" in test_phase.error
+    assert result.ok is False  # the run must not report success
