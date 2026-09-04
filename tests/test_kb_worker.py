@@ -18,7 +18,10 @@ connection.
 
 from __future__ import annotations
 
+import contextlib
 import json
+import threading
+import time
 from datetime import datetime, timezone
 
 import pytest
@@ -144,7 +147,9 @@ def test_kb_registry_v1_handler_delete_is_tombstoned(tmp_path, monkeypatch):
     monkeypatch.setattr(kb_worker, "REGISTRY_INDEX_PATH", tmp_path / "registry_index.jsonl")
     handler = kb_worker.build_handler("kb-registry-v1", _FakeRedis())
 
-    handler(_record(knowledge_id="kid_contaminated"), operation="delete", reason="contaminated cell")
+    handler(
+        _record(knowledge_id="kid_contaminated"), operation="delete", reason="contaminated cell"
+    )
 
     lines = [json.loads(line) for line in kb_worker.REGISTRY_INDEX_PATH.read_text().splitlines()]
     assert len(lines) == 1  # a self-tombstone — no predecessor side-effect
@@ -154,13 +159,16 @@ def test_kb_registry_v1_handler_delete_is_tombstoned(tmp_path, monkeypatch):
 
 
 def test_kb_registry_v1_handler_supersede_marks_predecessor_superseded_with_effective_valid_to(
-    tmp_path, monkeypatch,
+    tmp_path,
+    monkeypatch,
 ):
     monkeypatch.setattr(kb_worker, "REGISTRY_INDEX_PATH", tmp_path / "registry_index.jsonl")
     handler = kb_worker.build_handler("kb-registry-v1", _FakeRedis())
 
     successor = _record(
-        knowledge_id="kid_v2", entity_id="eid_1", valid_from="2026-08-18T00:00:00+00:00",
+        knowledge_id="kid_v2",
+        entity_id="eid_1",
+        valid_from="2026-08-18T00:00:00+00:00",
     )
     object.__setattr__(successor, "supersedes", "kid_v1")
 
@@ -181,7 +189,9 @@ def test_kb_registry_v1_handler_supersede_marks_predecessor_superseded_with_effe
     assert predecessor_line["valid_to"] == "2026-08-18T00:00:00+00:00"
 
 
-def test_kb_registry_v1_handler_supersede_without_predecessor_writes_one_line(tmp_path, monkeypatch):
+def test_kb_registry_v1_handler_supersede_without_predecessor_writes_one_line(
+    tmp_path, monkeypatch
+):
     # record.supersedes is falsy (e.g. a mislabeled first version) — no predecessor to mark.
     monkeypatch.setattr(kb_worker, "REGISTRY_INDEX_PATH", tmp_path / "registry_index.jsonl")
     handler = kb_worker.build_handler("kb-registry-v1", _FakeRedis())
@@ -343,7 +353,9 @@ def test_kb_neo4j_v1_handler_writes_cleared_by_edge_for_flag_tombstone(monkeypat
     handler = kb_worker.build_handler("kb-neo4j-v1", _FakeRedis())
 
     flag = _record(
-        knowledge_id="kid_flag_v2", source_type="flag", causes="kid_healthy_observation",
+        knowledge_id="kid_flag_v2",
+        source_type="flag",
+        causes="kid_healthy_observation",
     )
     handler(flag, operation="delete", reason="auto-cleared: subsequent observation was healthy")
 
@@ -359,7 +371,9 @@ def test_kb_neo4j_v1_handler_writes_replaced_by_edge_for_non_flag_tombstone(monk
     handler = kb_worker.build_handler("kb-neo4j-v1", _FakeRedis())
 
     story = _record(
-        knowledge_id="kid_contaminated", source_type="story", causes="kid_clean_rerun",
+        knowledge_id="kid_contaminated",
+        source_type="story",
+        causes="kid_clean_rerun",
     )
     handler(story, operation="delete", reason="contaminated: rerun under a new story_id")
 
@@ -439,7 +453,9 @@ def _flag_record(**overrides) -> KnowledgeRecord:
     )
 
 
-def _observation_record(*, cell_id="session_a", status="healthy", model="deepseek/deepseek-v4-flash", **overrides) -> KnowledgeRecord:
+def _observation_record(
+    *, cell_id="session_a", status="healthy", model="deepseek/deepseek-v4-flash", **overrides
+) -> KnowledgeRecord:
     """A ``source_type="observation"`` fixture carrying the structured ``subject_id``/
     ``subject_status`` fields the auto-clear rule reads (replacing the old text split).
     ``text`` is deliberately overridable so a test can prove the rule no longer depends on it."""
@@ -490,7 +506,8 @@ def test_clear_flag_record_preserves_entity_id_and_sets_causes():
 
 
 def test_flag_autoclear_healthy_observation_emits_exactly_one_delete_for_the_flag(
-    tmp_path, monkeypatch,
+    tmp_path,
+    monkeypatch,
 ):
     monkeypatch.setattr(kb_worker, "REGISTRY_INDEX_PATH", tmp_path / "registry_index.jsonl")
     monkeypatch.setattr(kb_worker, "KB_ARTIFACT_DIR", tmp_path / "kb")
@@ -526,7 +543,9 @@ def test_flag_autoclear_non_healthy_observation_does_not_clear(tmp_path, monkeyp
 
     handler(_flag_record(), operation="upsert")
     for status in ("stalled", "off_track", "unknown"):
-        handler(_observation_record(status=status, knowledge_id=f"kid_obs_{status}"), operation="upsert")
+        handler(
+            _observation_record(status=status, knowledge_id=f"kid_obs_{status}"), operation="upsert"
+        )
 
     assert fake_redis.published == []
 
@@ -546,7 +565,9 @@ def test_flag_autoclear_no_actuation_event_is_ever_produced(tmp_path, monkeypatc
     handler(_observation_record(status="healthy"), operation="upsert")
 
     assert len(fake_redis.published) == 1
-    recorded_source_types = set(fake_redis.hashes.get(kb_worker.ks.SOURCE_TYPE_INDEX_KEY, {}).values())
+    recorded_source_types = set(
+        fake_redis.hashes.get(kb_worker.ks.SOURCE_TYPE_INDEX_KEY, {}).values()
+    )
     assert recorded_source_types == {"flag"}
 
 
@@ -643,3 +664,138 @@ def test_kb_chroma_v1_handler_skips_fact_records(monkeypatch):
 
     handler = kb_worker.build_handler("kb-chroma-v1", _FakeRedis())
     handler(_record(source_type="fact"))  # returns silently — never touches ChromaStore
+
+
+# ── the poll-loop termination contract (graph-leg closeout, Thread 1) ──
+#
+# Pre-fix, the worker's main loop broke out with "idle after N polls; exiting" once
+# ``empty_polls`` reached ``IDLE_POLLS_BEFORE_EXIT`` (12 consecutive empty polls) — in BOTH
+# modes. ``--once`` already broke after its single batch, so the idle-exit's only real victim
+# was the DAEMON: a caught-up consumer exited 0 on ~2 minutes of quiet, and a
+# ``restart:on-failure`` supervisor (compose / ``Restart=on-failure`` systemd) never restarts
+# a clean exit — the 2026-09-04 footgun on ``infrastructure_kb-neo4j_1``. The fix extracted
+# the loop into ``kb_worker._poll_loop`` and REMOVED the idle-exit entirely: a daemon has no
+# self-exit path (only an operator signal stops it), and ``--once`` keeps one-batch-then-exit.
+# These tests exercise the REAL loop with an injected ``process_batch`` — never a live Redis.
+
+
+def test_daemon_mode_never_idle_exits_after_empty_polls(monkeypatch):
+    """A daemon (no ``--once``) survives 12+ consecutive empty polls — a bounded run.
+
+    The real ``_poll_loop`` runs in a daemon thread against an always-empty
+    ``process_batch``. We let it pass the OLD idle-exit threshold (12 empty polls) and assert
+    the loop is STILL ALIVE — the pre-fix break would have returned by now. The run is
+    bounded by terminating the thread with a sentinel operator stop (``SystemExit``, which
+    the loop's ``except Exception`` handlers deliberately do not swallow), then joining.
+    Loop survival is the heartbeat's precondition too: the heartbeat is a daemon thread whose
+    lifetime equals the process's, so a loop that keeps polling is a process that stays up
+    and keeps beating.
+    """
+
+    polls = {"count": 0}
+    stop = {"now": False}
+
+    def fake_process_batch(r, group, consumer, handler, *, once):
+        polls["count"] += 1
+        if stop["now"]:
+            raise SystemExit(0)  # the operator stop — the only exit a daemon has
+        time.sleep(0.001)  # keep the bounded run from busy-spinning
+        return kb_worker.BatchOutcome()  # processed=0: an empty poll
+
+    monkeypatch.setattr(kb_worker, "process_batch", fake_process_batch)
+    monkeypatch.setattr(kb_worker, "refresh_watermark", lambda *a, **k: None)
+    monkeypatch.setattr(kb_worker, "log", lambda *a, **k: None)
+
+    processed_total = [0]
+
+    def _run_bounded():
+        # The sentinel operator-stop (SystemExit below) is suppressed HERE, inside the
+        # thread, so the bounded run ends cleanly instead of surfacing as an unhandled
+        # thread exception.
+        with contextlib.suppress(SystemExit):
+            kb_worker._poll_loop(
+                object(),
+                "kb-ledger-v1",
+                "consumer-1",
+                lambda _rec: None,
+                once=False,
+                processed_total=processed_total,
+            )
+
+    thread = threading.Thread(target=_run_bounded, daemon=True)
+    thread.start()
+
+    # Let the daemon pass the OLD idle-exit threshold (12 consecutive empty polls).
+    deadline = time.monotonic() + 10.0
+    while polls["count"] <= 12 and time.monotonic() < deadline:
+        time.sleep(0.005)
+    assert polls["count"] > 12, f"loop stalled after {polls['count']} polls"
+    assert thread.is_alive(), "daemon exited on idle — the pre-fix footgun"
+
+    stop["now"] = True  # bounded run: now let it terminate
+    thread.join(timeout=10.0)
+    assert not thread.is_alive()
+    assert polls["count"] > 12
+    assert processed_total == [0]  # every poll was empty; the box stayed at zero
+
+
+def test_once_mode_processes_one_batch_then_exits(monkeypatch):
+    """``--once`` keeps one-batch-then-exit: exactly one poll, then the loop returns.
+
+    The pre-fix ``--once`` break already fired after its single batch — this pins that the
+    semantics survived the idle-exit removal unchanged (a non-empty batch lands its count in
+    the heartbeat box before the break).
+    """
+
+    calls = []
+
+    def fake_process_batch(r, group, consumer, handler, *, once):
+        calls.append(once)
+        outcome = kb_worker.BatchOutcome()
+        outcome.processed = 3
+        outcome.last_acked_id = "entry-1"
+        return outcome
+
+    monkeypatch.setattr(kb_worker, "process_batch", fake_process_batch)
+    monkeypatch.setattr(kb_worker, "refresh_watermark", lambda *a, **k: None)
+    monkeypatch.setattr(kb_worker, "log", lambda *a, **k: None)
+
+    processed_total = [0]
+    kb_worker._poll_loop(
+        object(),
+        "kb-ledger-v1",
+        "consumer-1",
+        lambda _rec: None,
+        once=True,
+        processed_total=processed_total,
+    )
+
+    assert calls == [True]  # exactly one batch, once=True forwarded
+    assert processed_total == [3]  # the processed count landed before the break
+
+
+def test_once_mode_exits_after_one_batch_even_when_idle(monkeypatch):
+    """``--once`` on a quiet stream still exits after its single (empty) batch."""
+
+    calls = []
+
+    def fake_process_batch(r, group, consumer, handler, *, once):
+        calls.append(once)
+        return kb_worker.BatchOutcome()  # processed=0: an idle single batch
+
+    monkeypatch.setattr(kb_worker, "process_batch", fake_process_batch)
+    monkeypatch.setattr(kb_worker, "refresh_watermark", lambda *a, **k: None)
+    monkeypatch.setattr(kb_worker, "log", lambda *a, **k: None)
+
+    processed_total = [0]
+    kb_worker._poll_loop(
+        object(),
+        "kb-ledger-v1",
+        "consumer-1",
+        lambda _rec: None,
+        once=True,
+        processed_total=processed_total,
+    )
+
+    assert len(calls) == 1  # one batch and done — never reaches an idle-exit check
+    assert processed_total == [0]

@@ -77,7 +77,6 @@ REDIS_PORT = int(os.environ.get("FINOPS_REDIS_PORT", "6380"))
 REDIS_BASE_DELAY = 2.0
 REDIS_MAX_RETRIES = 10
 BLOCK_TIMEOUT_MS = 10_000
-IDLE_POLLS_BEFORE_EXIT = 12
 RECONCILE_EVERY_S = ks.RECONCILE_INTERVAL_S
 
 
@@ -652,9 +651,10 @@ def main() -> None:
     created = ks.create_consumer_group(r, group)
     log(f"consumer group {group} {'created' if created else 'already existed'}")
 
-    # The completed-job counter the heartbeat reports — initialized BEFORE the heartbeat thread
-    # starts (the thread's first beat fires immediately, and the closure reads it by cell).
-    processed_total = 0
+    # The completed-job counter the heartbeat reports — a one-element box, initialized
+    # BEFORE the heartbeat thread starts (its first beat fires immediately) and updated IN
+    # PLACE by the poll loop so the closure reads the LIVE count on every beat.
+    processed_total = [0]
 
     # Worker liveness (slice 3): a daemon heartbeat thread beats every 10s so the fleet
     # manager's read-only watcher surfaces this consumer on the board. The thread owns its own
@@ -662,18 +662,52 @@ def main() -> None:
     heartbeat.HeartbeatThread(
         group,
         f"{socket.gethostname()}:{os.getpid()}",
-        jobs_counter=lambda: processed_total,
+        jobs_counter=lambda: processed_total[0],
     ).start()
     log(f"heartbeat: worker:{group}")
 
     handler = build_handler(group, r)
-    last_reconcile = time.monotonic()
+    _poll_loop(r, group, consumer, handler, once=args.once, processed_total=processed_total)
 
-    empty_polls = 0
+    log(f"Done. processed={processed_total[0]}")
+
+
+def _poll_loop(
+    r,
+    group: str,
+    consumer: str,
+    handler,
+    *,
+    once: bool,
+    processed_total: list[int],
+) -> None:
+    """Poll ``process_batch`` until ``--once``'s single batch or an operator signal.
+
+    Extracted from ``main()`` so the daemon-vs-``--once`` termination contract is testable
+    in-process (the graph-leg closeout's Thread-1 fix). The loop has EXACTLY two exit paths:
+
+    * the ``--once`` break after its single batch (one-batch-then-exit, unchanged); and
+    * an uncaught operator signal (``KeyboardInterrupt``/``SystemExit`` — the ``except
+      Exception`` handlers below deliberately do not swallow them).
+
+    There is deliberately NO idle-exit: a daemon-mode worker (no ``--once``) must STAY UP
+    through any number of consecutive empty polls. A caught-up consumer that exits 0 on idle
+    leaves a ``restart:on-failure`` supervisor (compose) or ``Restart=on-failure`` unit with a
+    dead process — the 2026-09-04 footgun on ``infrastructure_kb-neo4j_1``. ``--once`` already
+    breaks after its one batch, so the old ``empty_polls`` bookkeeping + "idle after N polls"
+    break (:714) was dead weight for ``--once`` and harmful for the daemon — removed entirely.
+    The BRPOP workers (``worker.py``/``analysis_worker.py``) keep their own idle-exit: they are
+    drained batch workers, not daemons, and this file's loop is not theirs.
+
+    ``processed_total`` is a caller-owned one-element list so the heartbeat thread's
+    ``jobs_counter`` closure (bound in ``main()``) sees the live total, updated in place on
+    every batch.
+    """
+    last_reconcile = time.monotonic()
 
     while True:
         try:
-            outcome = process_batch(r, group, consumer, handler, once=args.once)
+            outcome = process_batch(r, group, consumer, handler, once=once)
         except redis.exceptions.ConnectionError as e:
             log(f"Redis connection error: {e}; reconnecting")
             # Record the outage against this projection BEFORE sleeping. Without this the
@@ -696,12 +730,7 @@ def main() -> None:
         # and it is what keeps a healthy quiet projector out of the STALE bucket.
         refresh_watermark(group, r, outcome)
 
-        processed = outcome.processed
-        processed_total += processed
-        if processed == 0:
-            empty_polls += 1
-        else:
-            empty_polls = 0
+        processed_total[0] += outcome.processed
 
         # Hourly manifest reconciliation — re-emit any expected knowledge_id that the
         # stores do not yet contain (repairs missed hooks / Redis loss / consumer crash).
@@ -709,13 +738,8 @@ def main() -> None:
             log("reconciliation pass (no manifest wired in v1 — see knowledge_ingestion)")
             last_reconcile = time.monotonic()
 
-        if args.once:
+        if once:
             break
-        if empty_polls >= IDLE_POLLS_BEFORE_EXIT:
-            log(f"idle after {empty_polls} polls; exiting")
-            break
-
-    log(f"Done. processed={processed_total}")
 
 
 if __name__ == "__main__":
