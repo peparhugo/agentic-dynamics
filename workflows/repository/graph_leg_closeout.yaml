@@ -1,0 +1,413 @@
+name: graph_leg_closeout
+question: >-
+  Close the three open graph/KB threads the 2026-09-04 close record carried
+  (session 2026-09-04-kb-facts-and-graph-repair, merged main 96738e6da): (1)
+  the kb_worker idle-exit footgun — kb_worker.py:714 exits 0 after 12 empty
+  polls even in DAEMON mode, so compose restart:on-failure leaves a healthy
+  caught-up consumer dead (runtime mitigation = restart=always; the code fix
+  is open); (2) the expansion-leg schema noise — graph.py ALLOWED_EXPANSION_RELS
+  names CONTRADICTS/PRECEDES/PRODUCED_BY/AFFECTS that nothing ever creates
+  (neo4j warns per query; prune or create; graph_paths {} is live); (3) the
+  associative layer — Knowledge records (wave findings/sessions/verdicts) are
+  LEAF nodes; only the multi-label code symbols carry edges (CALLS/TESTED_BY/
+  SUPERSEDES 18.3k); finding->code/spec edges are never written, so the graph
+  leg's distinctive value beyond fulltext awaits this design item
+  (docs/designs/proposed/self_knowledge_layer.md's associative/causal row).
+  Worktree/feature-branch work — NOT control actions: each thread lands as
+  small task-card phases (one deliverable each), on one branch, for the
+  controller's permanence decision.
+version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: false
+repeatable: false
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: true
+    context:
+      finding: >-
+        Thread 1 (code fix): scripts/kb_worker.py:80 IDLE_POLLS_BEFORE_EXIT = 12;
+        :672 empty_polls; :702-715 — the "idle after N polls; exiting" break at
+        :714 fires in BOTH modes; --once already breaks at :712 after its single
+        batch, so the idle-exit's only real victim is the DAEMON. A caught-up
+        daemon under compose restart:on-failure exits 0 on idle and stays dead
+        (restart:on-failure only restarts failures). Proven 2026-09-04 on
+        infrastructure_kb-neo4j_1; runtime mitigation (restart=always, systemd
+        Restart=always units for chroma/registry/ledger) is in place — the code
+        still needs the fix + test. Thread 2 (schema prune): knowledge/graph.py:40
+        ALLOWED_EXPANSION_RELS = {DEFINES, IMPORTS, CALLS, TESTED_BY,
+        PRODUCED_BY, PRECEDES, SUPERSEDES, CONTRADICTS, AFFECTS, ...} — the
+        expansion query (graph.py expand_candidates; IMPACT_EXPANSION_RELS :60)
+        emits rel-type patterns the live neo4j warns on per query for the names
+        no writer ever creates. Thread 3 (design): Knowledge records are leaf
+        nodes — the graph census (neo4j, 2026-09-04) shows edges only among
+        multi-label code symbols (ModuleVersion/SymbolVersion also carrying
+        :Knowledge); finding->code/spec edges never written.
+      hard_rules: >-
+        (1) Daemon mode must NEVER self-exit on idle; --once keeps its
+        one-batch-then-exit semantics. (2) A rel name may stay in
+        ALLOWED_EXPANSION_RELS only if a writer exists or the c1 design names
+        it — prune before c2's writer lands, never prune a name c1 claims.
+        (3) The associative layer's first family is producer-side writes with
+        the record's own provenance + authority (scope org:repo), idempotent
+        (rerun-safe), never a retrieval-time fabrication. (4) Test-driven; do
+        not weaken tests. (5) Live neo4j/chroma probes are read-only +
+        evidence-doc'd, never mutating the corpus.
+      run_shape: >-
+        SINGLE-model: run with --model deepseek/deepseek-v4-flash. One
+        worktree, one branch (feature/graph-leg-closeout); each phase commits
+        [workflow] <phase>. g9 runs the adversarial verdict on
+        deepseek/deepseek-v4-pro (run_model). Worktree/feature-branch work —
+        merge to main is the controller's permanence decision, not this run's.
+    phases:
+      - name: p0_pin_threads
+        kind: agent
+        scope: implementation
+        timeout: 3600
+        prompt: |
+          GOAL: {goal}
+          ROLE: verification — the house pin convention. Write
+          docs/reviews/graph_leg_closeout_preregistration.md carrying: (a)
+          this spec's file SHA256 + the worktree git sha; (b) the three edges
+          VERIFIED against the actual repo:
+          (1) IDLE-EXIT: scripts/kb_worker.py:714 — a daemon-mode worker
+          (no --once) exits 0 after IDLE_POLLS_BEFORE_EXIT=12 consecutive
+          empty polls (:80, :702-715); --once breaks at :712 before the idle
+          check ever fires.
+          (2) EXPANSION NOISE: knowledge/graph.py:40-60 — list the full
+          ALLOWED_EXPANSION_RELS set; grep every rel name for a writer (graph
+          write paths + ingestion producers + scripts); name the ones with NO
+          writer (expect CONTRADICTS/PRECEDES/PRODUCED_BY/AFFECTS) and confirm
+          the expansion query emits them (expand_candidates/IMPACT_EXPANSION_RELS).
+          (3) LEAF NODES: run the read-only graph census (the kb-neo4j leg at
+          bolt://neo4j:7687 via the graph client or cypher-shell equivalent in
+          the graph module's vocabulary): count Knowledge-only nodes vs
+          code-symbol nodes carrying edges (CALLS/TESTED_BY/SUPERSEDES);
+          confirm zero finding/session/verdict -> code/spec edges exist.
+          An edge that does not hold is a FAILED finding. If a claim cannot be
+          reproduced after THREE attempts, record the deviation and FAIL —
+          never loop. DB LOCATION: machine-local state at the MAIN checkout
+          (control db + redis 6380); the graph census reads the live neo4j.
+          DELIVER: the preregistration with the verified edges, committed.
+          LOG: PASS/FAIL per claim; commit.
+      # ── thread 1: kb_worker idle-exit (a1) + restart-policy evidence (a2) ──────────
+      - name: a1_fix_idle_exit
+        kind: agent
+        scope: implementation
+        timeout: 3600
+        prompt: |
+          GOAL: {goal}
+          DELIVERABLE: the kb_worker idle-exit code fix — DAEMON mode never
+          self-exits on idle; --once keeps its one-batch-then-exit semantics.
+          The current idle-exit (scripts/kb_worker.py:80 IDLE_POLLS_BEFORE_EXIT,
+          :702-715 empty_polls bookkeeping + the "idle after N polls; exiting"
+          break) exists so a --once-style bounded loop terminates; --once
+          already breaks at :712 after its batch, so the :714 idle-exit's only
+          victim is the daemon under restart:on-failure (a clean exit-0 leaves
+          it dead — the 2026-09-04 footgun on infrastructure_kb-neo4j_1).
+          INPUTS: scripts/kb_worker.py (the main loop :660-720; the --once
+          flag :644); tests/test_kb_worker.py (the existing shape); the
+          restart-policy semantics the fix must make safe (compose
+          restart:on-failure + a caught-up daemon must STAY UP).
+          DONE_WHEN: (a) a daemon-mode worker (no --once) with 12+ consecutive
+          empty polls does NOT exit — the loop keeps polling, the heartbeat
+          thread keeps beating (assert with a bounded run in the test); (b)
+          --once still processes one batch then exits 0; (c) the fix is the
+          smallest change (gate/remove the idle-exit so daemon mode never
+          takes it) with the rationale in the commit; (d) no test weakened.
+          GATES: tests/test_kb_worker.py (the daemon-stays-alive case + the
+          --once one-batch case).
+          SCOPE FENCE: the worker loop ONLY — no changes to knowledge_stream,
+          the compose files, or the systemd units (deployment policy is a
+          separate decision the a2 card evidences).
+          DELIVER: the fix + tests, committed.
+          LOG: PASS/FAIL; commit.
+      # ── thread 3 design FIRST (c1) — b1 prunes against a committed design ─────────
+      - name: c1_assoc_edge_design
+        kind: agent
+        scope: implementation
+        timeout: 7200
+        prompt: |
+          GOAL: {goal}
+          DELIVERABLE: the associative-layer FIRST-FAMILY design decision —
+          a small decision doc (docs/designs/current/graph_leg_associative_edges.md)
+          choosing ONE edge family to land first, so Knowledge leaf nodes gain
+          their first real edges. Context: Knowledge records (wave findings,
+          sessions, verdicts) are leaf nodes; only multi-label code symbols
+          (ModuleVersion/SymbolVersion, which also carry :Knowledge) have edges
+          (CALLS/TESTED_BY/SUPERSEDES 18.3k); finding->code/spec edges are never
+          written (2026-09-04 close record; self_knowledge_layer.md's
+          associative/causal row).
+          INPUTS: the record model (knowledge.py — entity_id/knowledge_id/
+          source_uri/logical_locator/supersedes/causes/authority); the producers
+          (knowledge_ingestion derive_* + record_to_artifact/record_to_event +
+          the write-time registration sites); the graph schema (graph.py —
+          node labels, the two-ID contract, the rel allowlist
+          ALLOWED_EXPANSION_RELS); how code/spec entities are addressed in
+          records (logical_locator/source_uri patterns); the wave-finding and
+          session record shapes (session_ingestion/wave_verdict_ingestion where
+          present).
+          DECIDE: (a) which records emit edges and to WHAT target (code symbol
+          vs spec entity — the citation address must already live in the
+          record or its artifact; never invent locators); (b) the edge rel
+          name — PREFER an existing allowlisted name the record's semantics
+          justify (e.g. PRODUCED_BY for a finding about a code area); a NEW rel
+          name requires the design to name its writer (the b1 prune keeps it);
+          (c) the writer site — producer-side at record emission
+          (best-effort, never blocks the emit), with the record's authority +
+          scope (org:repo default); idempotent/rerun-safe; (d) what the c3
+          probe must show to call the family live.
+          DONE_WHEN: the decision doc names ONE family with its target
+          addressing, rel name(s), writer site, provenance, and the c3 probe
+          criteria — committed. The doc is small (one family, not the whole
+          associative layer).
+          GATES: the doc's rel claims are consistent with graph.py's current
+          allowlist (a diff-aware read); tests/test_graph.py conventions.
+          SCOPE FENCE: the design doc ONLY — no code writes (c2 implements).
+          DELIVER: the decision doc, committed.
+          LOG: PASS/FAIL; commit.
+      # ── thread 2: expansion-leg prune (b1) + warning-free probe (b2) ──────────────
+      - name: b1_prune_expansion_rels
+        kind: agent
+        scope: implementation
+        timeout: 3600
+        prompt: |
+          GOAL: {goal}
+          DELIVERABLE: the expansion-leg schema prune — ALLOWED_EXPANSION_RELS
+          reduced to {writers} ∪ {rel names the committed c1 design claims}.
+          Context: knowledge/graph.py:40-60 names rels nothing ever creates
+          (the p0 pin lists the dead set; neo4j warns per expansion query);
+          graph_paths {} is live but thin. The c1 design (committed before
+          this phase — docs/designs/current/graph_leg_associative_edges.md)
+          may claim an existing allowlisted name for the first associative
+          family; that name STAYS even without a writer yet (the c2 phase
+          lands the writer).
+          INPUTS: knowledge/graph.py (ALLOWED_EXPANSION_RELS :40,
+          IMPACT_EXPANSION_RELS :60, expand_candidates + the query builder);
+          the p0 pin's writer census; the c1 decision doc.
+          DONE_WHEN: (a) every remaining allowlisted rel has a writer in the
+          codebase OR is claimed by the c1 doc; (b) the dead names are removed
+          from ALLOWED_EXPANSION_RELS + IMPACT_EXPANSION_RELS + the expansion
+          query's rel patterns in one place (no stale string literals — grep);
+          (c) tests assert the allowlist == writers ∪ c1-claims (a frozen
+          allowlist test); (d) nothing else changes.
+          GATES: tests/test_graph.py + tests/test_versioned_graph.py (the
+          allowlist/expansion cases).
+          SCOPE FENCE: the allowlist + the expansion query ONLY — no producer
+          changes, no retrieval changes.
+          DELIVER: the prune + tests, committed.
+          LOG: PASS/FAIL; commit.
+      - name: b2_probe_warning_free
+        kind: agent
+        scope: implementation
+        timeout: 3600
+        prompt: |
+          GOAL: {goal}
+          DELIVERABLE: live verification that the expansion query no longer
+          emits unused-rel warnings — run the expansion path against the live
+          kb-neo4j leg (read-only) and capture the evidence: before/after
+          warning output or the graph client's clean response, plus a probe of
+          a real expansion (graph_paths on a known code symbol).
+          INPUTS: the b1 commit; the graph client (graph.py's query surface);
+          the live neo4j (bolt://neo4j:7687 — read-only).
+          DONE_WHEN: the evidence doc (docs/reviews/graph_leg_closeout_expansion_probe.md)
+          shows the pre-prune warning (from the p0 pin's capture or a fresh
+          repro on the pre-b1 tree) and the post-prune clean query on the same
+          input; the probe's graph_paths response is non-empty for a symbol
+          with known edges.
+          GATES: none beyond the probe evidence (read-only).
+          SCOPE FENCE: evidence ONLY — no schema or code changes in this phase.
+          DELIVER: the evidence doc, committed.
+          LOG: PASS/FAIL; commit.
+      # ── thread 1 evidence: daemon survives idle under restart:on-failure ──────────
+      - name: a2_verify_daemon_survives_idle
+        kind: agent
+        scope: implementation
+        timeout: 3600
+        prompt: |
+          GOAL: {goal}
+          DELIVERABLE: restart-policy evidence for the a1 fix — a caught-up
+          DAEMON under compose restart:on-failure semantics survives idle.
+          Method: with the a1 fix committed, run a THROWAWAY consumer under a
+          restart:on-failure-style supervisor (a temporary systemd user unit
+          agentic-dynamics-kb-idletest.service with Restart=on-failure, or the
+          compose shape if available) against a drained/quiet group (kb-ledger
+          or a --consumer on a quiet stream), let it idle past 12+ empty polls
+          (well past the old exit threshold — > 5 minutes of quiet), and
+          confirm: (a) the process does NOT exit; (b) the supervisor records
+          zero restarts; (c) it stays Up until the unit is stopped. Then REMOVE
+          the throwaway unit (leave the live kb-chroma/registry/ledger systemd
+          units exactly as they were — Restart=always on the kb-neo4j container
+          is a live-op mitigation this card only EVIDENCES, never changes).
+          INPUTS: the a1 fix; the live units (agentic-dynamics-kb-*.service);
+          journalctl for the evidence trail.
+          DONE_WHEN: the evidence doc (docs/reviews/graph_leg_closeout_idle_evidence.md)
+          records the idle window, the zero-restart observation, and the
+          clean teardown of the throwaway unit.
+          GATES: none beyond the evidence (read-only w.r.t. live state;
+          throwaway unit removed by the phase's end).
+          SCOPE FENCE: evidence + throwaway unit ONLY — no changes to the live
+          units or compose files.
+          DELIVER: the evidence doc, committed.
+          LOG: PASS/FAIL; commit.
+      # ── thread 3 implement: the c1 family writer (c2) + live probe (c3) ───────────
+      - name: c2_assoc_edge_writer
+        kind: agent
+        scope: implementation
+        timeout: 7200
+        prompt: |
+          GOAL: {goal}
+          DELIVERABLE: the associative first-family WRITER per the c1 decision
+          doc (docs/designs/current/graph_leg_associative_edges.md) — the
+          producer-side emit that writes the chosen edges when the chosen
+          record type is registered, with the record's own provenance +
+          authority + scope, best-effort (a graph write failure never blocks
+          the record emit), idempotent/rerun-safe (the same record derives the
+          same edge — no duplicates on reprocess).
+          INPUTS: the c1 doc; the graph write surface (graph.py's edge-creation
+          path — mirror how code ingestion writes CALLS/TESTED_BY/SUPERSEDES);
+          the record registration sites (the producer that emits the chosen
+          record type — derive_* + record_to_event + publish_event/register_records);
+          the allowlist state AFTER the b1 prune (the chosen rel must be
+          allowlisted — if c1 chose a name b1 pruned, the writer ADDS it back
+          with a test, per the hard rule that allowlist == writers ∪ claims).
+          DONE_WHEN: (a) registering a synthetic record of the chosen type
+          writes the edge(s) the c1 doc specifies (test asserts the graph
+          contains them, keyed by the record's entity/knowledge ids); (b)
+          re-registering the same record writes no duplicates; (c) a graph
+          outage degrades to the record emit succeeding without edges (the
+          best-effort posture), logged not silent; (d) the allowlist test from
+          b1 still passes (writer now exists for the claimed rel).
+          GATES: tests/test_graph.py + the b1 allowlist test + the new
+          writer's test file (the c1 doc names it).
+          SCOPE FENCE: the writer + its tests ONLY — no retrieval/expansion
+          changes (c3 probes; retrieval wiring is a later decision).
+          DELIVER: the writer + tests, committed.
+          LOG: PASS/FAIL; commit.
+      - name: c3_assoc_probe
+        kind: agent
+        scope: implementation
+        timeout: 3600
+        prompt: |
+          GOAL: {goal}
+          DELIVERABLE: live probe evidence that the associative first family
+          is real — run the c1 doc's probe criteria against the live graph
+          (read-only): register/emit one real record of the chosen type (or
+          replay one existing record through the c2 writer), then show (a) the
+          record's node now carries the chosen edge to its cited target; (b) a
+          traversal FROM the record reaches the code/spec entity (the
+          leaf-node property is broken for this family); (c) the census
+          numbers move (Knowledge-only leaf count drops by the family's
+          records).
+          INPUTS: the c2 writer; the live kb-neo4j leg; the c1 doc's probe
+          criteria; one real record of the chosen type from the corpus.
+          DONE_WHEN: the evidence doc (docs/reviews/graph_leg_closeout_assoc_probe.md)
+          records the probe queries + results + the census delta.
+          GATES: none beyond the probe evidence (read-only except the one
+          emit/replay the c1 doc authorizes).
+          SCOPE FENCE: evidence ONLY — no further code changes (a probe finding
+          that the family is broken FAILS the phase and returns to c2).
+          DELIVER: the evidence doc, committed.
+          LOG: PASS/FAIL; commit.
+      # ── the wave's verdict phases ─────────────────────────────────────────────────
+      - name: g9_adversarial
+        kind: agent
+        scope: adversarial_readonly
+        requires_deliverable: true
+        run_model: openai/gpt-5.6-terra
+        timeout: 14400
+        prompt: |
+          GOAL: {goal}
+          ROLE: the INDEPENDENT adversarial reviewer — a DIFFERENT model and
+          session (pro vs the flash author). Falsify the graph-leg close-out,
+          not certify it. Attack in order, re-verified against the actual
+          code + the live graph (never asserted): (1) IDLE-EXIT: does a
+          daemon-mode kb_worker survive 12+ empty polls (run it)? does --once
+          still exit after one batch? is the a2 evidence honest (throwaway
+          unit really removed, live units untouched)? (2) EXPANSION: is the
+          allowlist exactly writers ∪ c1-claims (grep every remaining rel for
+          a writer + read the c1 doc)? does the live expansion query run
+          warning-free (probe)? (3) ASSOCIATIVE: does the c2 writer really
+          write the c1-doc edges on a real record (emit one)? idempotent on
+          replay (emit twice)? does the graph write failure degrade without
+          blocking the record emit (fault-inject the client)? (4) LEAK CHECK:
+          do the new edges respect scope/authority (probe with a workload
+          scope)? is anything opt-in that should be default-on, or vice versa
+          (the k1 lesson)? Every finding: FIX on the branch or RECORD as an
+          accepted limitation with reasoning. At least 3 findings or a clean
+          sweep with re-verification evidence — a bare PASS is a failed
+          review.
+          RELEASE VERDICT: merge-ready to main? Each of the three threads
+          honestly closed (code or evidence), nothing live-op changed without
+          being documented?
+          DELIVER: docs/reviews/graph_leg_closeout_adversarial.md (finding
+          table), committed.
+          LOG: finding table; PASS/FAIL; commit.
+      - name: g10_test_gate
+        kind: test
+        scope: implementation
+        timeout: 900
+        tests:
+          - tests/test_kb_worker.py
+          - tests/test_graph.py
+          - tests/test_versioned_graph.py
+          - tests/test_knowledge_stream.py
+          - tests/test_codebase_graph.py
+          - tests/test_workflow_runner.py
+          - tests/test_script_classification.py
+          - tests/test_doc_lifecycle.py
+          - tests/test_agent_config_render.py
+factors:
+  - {name: model, levels: [deepseek/deepseek-v4-flash]}
+design: factorial
+rules:
+  - name: three_threads_pinned
+    plane: measurement
+    evidence_class: "[M]"
+    requires: []
+    produces: [thread_edges_verified]
+  - name: idle_exit_gated
+    plane: measurement
+    evidence_class: "[C]"
+    requires: [thread_edges_verified]
+    produces: [daemon_survives_idle]
+  - name: expansion_allowlist_clean
+    plane: measurement
+    evidence_class: "[C]"
+    requires: [thread_edges_verified]
+    produces: [no_unused_rel_warnings]
+  - name: assoc_edges_land
+    plane: measurement
+    evidence_class: "[C]"
+    requires: [thread_edges_verified]
+    produces: [knowledge_leaf_edges_written]
+  - name: graph_leg_threads_clean
+    plane: measurement
+    evidence_class: "[M]"
+    requires: [daemon_survives_idle, no_unused_rel_warnings,
+               knowledge_leaf_edges_written]
+    produces: [closeout_wave_clean]
+  - name: test_gate_measured
+    plane: measurement
+    evidence_class: "[M]"
+    requires: [test_executed_success]
+    produces: [independent_gate_recorded]
+metrics:
+  - {name: thread_edges_verified, agg: mean, over: cell}
+  - {name: daemon_survives_idle, agg: mean, over: cell}
+  - {name: no_unused_rel_warnings, agg: mean, over: cell}
+  - {name: knowledge_leaf_edges_written, agg: mean, over: cell}
+  - {name: closeout_wave_clean, agg: mean, over: cell}
+  - {name: independent_gate_recorded, agg: mean, over: cell}
+writeup:
+  format: lab_book
+  sections: [p0_pin_threads, a1_fix_idle_exit, c1_assoc_edge_design,
+             b1_prune_expansion_rels, b2_probe_warning_free,
+             a2_verify_daemon_survives_idle, c2_assoc_edge_writer,
+             c3_assoc_probe, g9_adversarial, g10_test_gate]
+stop: {budget_usd: 8.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}
