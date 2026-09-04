@@ -1,0 +1,230 @@
+name: promote_row_closeout
+question: >-
+  Close the promote-bookkeeping defect that stranded the graph_leg_closeout run
+  rows (2026-09-04, session 2026-09-04-aio-graph-leg-closeout): promote.py
+  squash-merges the candidate to main and pushes, but never transitions its
+  control row — run-f822d6ecd88b + run-426ca19fe025 stayed `promotable` with
+  content already on main as 3e40537e2 (tree-identical), so the control packet
+  advertised "promote me" for merged work, and the next session burned an hour
+  of git archaeology concluding the wrong theories (parallel adversarial
+  chains). The fix has two deliverables: (a1) promote closes its own row
+  (promotable -> merged on successful push, via the legitimate transition API,
+  best-effort — a downed control db warns, never unwinds the landed push); (a2)
+  promote REFUSES a candidate whose tree is already on main (the stale-candidate
+  guard — tree-identical content at the candidate sha vs main head means the
+  run is a post-promote leftover; refuse with the evidence, not a second merge).
+  The close-out sweep (scripts-side) remains the standing backstop for legacy
+  rows this fix cannot reach.
+version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: false
+repeatable: false
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: true
+    context:
+      finding: >-
+        scripts/promote.py:330-345 — after `pushed {base} -> {sha} (squash of
+        {candidate})` the s2b decision emission fires (:338) and the act
+        emission follows, but NO control-db transition closes the promoted
+        run: the row stays `promotable` forever (proven 2026-09-04:
+        run-f822d6ecd88b candidate 4adae17e0, run-426ca19fe025 candidate
+        f0c612516 — both promoted as 3e40537e2, both still promotable until
+        cancelled by hand). The packet's safe_actions then offer promote for
+        already-merged content, and git archaeology cannot resolve the
+        topology (squash commit on main, branch tip untouched, rows open).
+        Additionally promote has no stale-candidate guard: re-promoting the
+        same tree passes verification.
+      hard_rules: >-
+        (1) The row close uses ControlDB.transition_run — never raw SQL; the
+        run_transitions log stays the single history. (2) Best-effort order:
+        push lands FIRST, then the row close; a control-db failure after a
+        landed push is a printed warning + the sweep backstop, never a crash
+        and never an unwound push. (3) The stale-candidate guard compares
+        candidate tree vs base (main) head tree; tree-identical is REFUSED
+        with the reason naming the likely merged sha — never auto-cancelled,
+        always refused-with-evidence. (4) --dry-run reports the would-be row
+        close + the stale check without writing anything. (5) Test-driven; do
+        not weaken tests.
+      run_shape: >-
+        SINGLE-model: run with --model deepseek/deepseek-v4-flash on one
+        worktree, one branch (feature/promote-row-closeout); each phase
+        commits [workflow] <phase>. g9 runs the adversarial verdict on
+        openai/gpt-5.6-terra (run_model). Merge to main is the controller's
+        permanence decision.
+    phases:
+      - name: p0_pin_defect
+        kind: agent
+        scope: implementation
+        timeout: 3600
+        prompt: |
+          GOAL: {goal}
+          ROLE: verification — the house pin convention. Write
+          docs/reviews/promote_row_closeout_preregistration.md carrying: (a)
+          this spec's file SHA256 + the worktree git sha; (b) the defect edges
+          VERIFIED against the actual repo:
+          (1) ROW LEFT OPEN: scripts/promote.py's success path (find the
+          post-push steps ~:330-345) performs NO control-db transition — grep
+          promote.py for transition_run/ControlDB; confirm the only state
+          writes are the ledger/decision/act emissions.
+          (2) EVIDENCE ON MAIN: commit 3e40537e2 (main, message
+          "[workflow] g9_adversarial — close the graph-leg open threads on
+          feat") is tree-identical to f0c612516 (feature/graph-leg-closeout
+          tip) — `git diff --quiet 3e40537e2 f0c612516` exits 0; the control
+          rows for the two graph_leg_closeout runs were cancelled by hand
+          (actor controller-close-out) — check run_transitions for the
+          cancellation rows proving the class existed.
+          (3) NO STALE GUARD: promote --dry-run against a candidate whose
+          tree equals base head does NOT refuse today.
+          An edge that does not hold is a FAILED finding. THREE attempts max
+          per claim, then record the deviation and FAIL.
+          DELIVER: the preregistration, committed.
+          LOG: PASS/FAIL per claim; commit.
+      - name: a1_close_row_on_success
+        kind: agent
+        scope: implementation
+        timeout: 7200
+        prompt: |
+          GOAL: {goal}
+          DELIVERABLE: promote.py closes its own control row — after the push
+          succeeds (step 5, the `pushed {base} -> {sha}` print), transition
+          the promoted run promotable -> merged via the legitimate API
+          (ControlDB.transition_run), binding the run by ledger spec_id/run_id
+          + the pushed sha. Best-effort ordering: the push has LANDED; a
+          control-db failure prints a warning naming the run_id + the
+          close-out sweep as backstop, never raises, never unwinds.
+          INPUTS: the p0 pin (defect edges); scripts/promote.py (the success
+          path ~:330-345, how the ledger is loaded, the injectable
+          `record_decision`/`emit_act` seam pattern — mirror it with an
+          injectable `close_row`); the control-db API
+          (src/agentic_dynamics/control/control_db.py transition_run, open
+          via the runner's resolve_db_path convention); how run_workflow
+          records run_id on the ledger (the ledger's spec_id/run_id fields).
+          DONE_WHEN: (a) a promoted run's control row reads `merged` with a
+          run_transitions row (promotable -> merged, actor promote,
+          reason naming the squash sha); (b) the packet no longer advertises
+          the run (promotable_runs drops it); (c) --dry-run reports the
+          would-be row close + writes nothing; (d) a control-db outage after
+          the push prints the warning and exits 0 (the push stands).
+          GATES: tests/test_promote.py (the row-close cases — inject a fake
+          ControlDB), plus tests/test_control_status.py if the packet shape
+          is touched.
+          SCOPE FENCE: promote.py's success path + its tests ONLY — no
+          changes to run_workflow, the sweep, or the packet derivations.
+          DELIVER: the fix + tests, committed.
+          LOG: PASS/FAIL; commit.
+      - name: a2_stale_candidate_guard
+        kind: agent
+        scope: implementation
+        timeout: 7200
+        prompt: |
+          GOAL: {goal}
+          DELIVERABLE: promote REFUSES a stale candidate — before the push
+          step, compare the candidate's tree against the base (main) head
+          tree; tree-identical content is a REFUSED promotion (the
+          _PromoteRefusedError path, exit 20) with a reason naming the
+          evidence: the likely merged sha (find it via `git log` for a
+          main-side commit with an equal tree — or state the equality plainly
+          if none is found) and the recommendation to cancel the run row, not
+          re-promote.
+          INPUTS: the a1 commit; scripts/promote.py (the verify phase where
+          the refusal would sit — before the push); the tree-equality check
+          pattern (`git diff --quiet <candidate> <base-head>` or the python
+          git plumbing equivalent the runner already uses).
+          DONE_WHEN: (a) promoting a candidate whose tree equals base head
+          exits 20 with the stale reason + a run_transitions-free refusal
+          (nothing written, nothing pushed — verify by dry-run and by a
+          real-shot against a synthetic tree-identical branch); (b) a
+          genuinely-new candidate still promotes (the existing happy-path
+          tests pass unchanged).
+          GATES: tests/test_promote.py (the stale-guard cases).
+          SCOPE FENCE: the verify phase + tests ONLY.
+          DELIVER: the guard + tests, committed.
+          LOG: PASS/FAIL; commit.
+      - name: g9_adversarial
+        kind: agent
+        scope: adversarial_readonly
+        requires_deliverable: true
+        run_model: openai/gpt-5.6-terra
+        timeout: 14400
+        prompt: |
+          GOAL: {goal}
+          ROLE: the INDEPENDENT adversarial reviewer — a DIFFERENT model and
+          session (terra vs the flash author). Falsify the promote-row
+          close-out, not certify it. Attack in order, re-verified against the
+          actual code (never asserted): (1) ROW CLOSE: run a synthetic
+          promotion with an injected fake ControlDB — does the row read
+          `merged` with the transition row after a successful push? does a
+          control-db failure AFTER the push warn + exit 0 (the push stands)?
+          does --dry-run write nothing? (2) STALE GUARD: build a branch whose
+          tree equals main head — is the promote REFUSED (exit 20, no push, no
+          transition row)? does a genuinely-new candidate still promote?
+          (3) LEAK CHECK: can the row-close path be triggered without a
+          landed push (order inversion)? is the close idempotent if promote is
+          re-run (already-merged row — no double transition)? Every finding:
+          FIX on the branch or RECORD as an accepted limitation with
+          reasoning. At least 3 findings or a clean sweep with re-verification
+          evidence — a bare PASS is a failed review.
+          RELEASE VERDICT: merge-ready to main? The stale-promotable class is
+          closed (rows close on promote; stale candidates refuse)?
+          DELIVER: docs/reviews/promote_row_closeout_adversarial.md (finding
+          table), committed.
+          LOG: finding table; PASS/FAIL; commit.
+      - name: g10_test_gate
+        kind: test
+        scope: implementation
+        timeout: 900
+        tests:
+          - tests/test_promote.py
+          - tests/test_control_db.py
+          - tests/test_control_status.py
+          - tests/test_workflow_runner.py
+          - tests/test_doc_lifecycle.py
+          - tests/test_agent_config_render.py
+          - tests/test_script_classification.py
+factors:
+  - {name: model, levels: [deepseek/deepseek-v4-flash]}
+design: factorial
+rules:
+  - name: defect_pinned
+    plane: measurement
+    evidence_class: "[M]"
+    requires: []
+    produces: [row_left_open_verified]
+  - name: row_closes_on_promote
+    plane: measurement
+    evidence_class: "[C]"
+    requires: [row_left_open_verified]
+    produces: [packet_stops_advertising_merged_runs]
+  - name: stale_candidate_refuses
+    plane: measurement
+    evidence_class: "[C]"
+    requires: [row_left_open_verified]
+    produces: [no_double_merge_of_same_tree]
+  - name: promote_closeout_clean
+    plane: measurement
+    evidence_class: "[M]"
+    requires: [packet_stops_advertising_merged_runs, no_double_merge_of_same_tree]
+    produces: [promote_bookkeeping_wave_clean]
+  - name: test_gate_measured
+    plane: measurement
+    evidence_class: "[M]"
+    requires: [test_executed_success]
+    produces: [independent_gate_recorded]
+metrics:
+  - {name: row_left_open_verified, agg: mean, over: cell}
+  - {name: packet_stops_advertising_merged_runs, agg: mean, over: cell}
+  - {name: no_double_merge_of_same_tree, agg: mean, over: cell}
+  - {name: promote_bookkeeping_wave_clean, agg: mean, over: cell}
+  - {name: independent_gate_recorded, agg: mean, over: cell}
+writeup:
+  format: lab_book
+  sections: [p0_pin_defect, a1_close_row_on_success, a2_stale_candidate_guard,
+             g9_adversarial, g10_test_gate]
+stop: {budget_usd: 6.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}

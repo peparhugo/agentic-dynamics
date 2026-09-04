@@ -93,7 +93,7 @@ Efficiency (durable outcome value / total cost).
 | Game reports | 348 |
 | Model variants | 7 (3 providers: DeepSeek, Anthropic, OpenAI) |
 | Experiment configs | 0 |
-| Experiment + workflow specs | 190 (11 experiments + 179 workflows) |
+| Experiment + workflow specs | 191 (11 experiments + 180 workflows) |
 | Perturbation operators | 10 (specification corruption, objective mutation, process perturbation) |
 | Lab books | 21 (8 canonical + 12 quarantined) |
 | Story-corpus measured spend | $309.17 |

@@ -1,7 +1,7 @@
 {
   "schema_version": "spec-status/v2",
-  "generated_at": "2026-09-03T19:44:56.998407+00:00",
-  "n_specs": 189,
+  "generated_at": "2026-09-04T15:00:13.857917+00:00",
+  "n_specs": 191,
   "specs": [
     {
       "name": "auto_posthoc_wiring",
@@ -584,6 +584,26 @@
       "authored_status": null
     },
     {
+      "name": "graph_leg_closeout",
+      "version": "0.1",
+      "status": "runnable",
+      "spec_path": "workflows/repository/graph_leg_closeout.yaml",
+      "artifact_kind": "workflow",
+      "repeatable": false,
+      "supersedes": [],
+      "superseded_by": null,
+      "completed_at": null,
+      "last_run_at": null,
+      "latest_ok": null,
+      "latest_model": null,
+      "latest_cost_usd": null,
+      "latest_git_sha": null,
+      "results_pointer": null,
+      "n_runs": 0,
+      "workflow_revision_id": "6e2707222b858afb8fd3e4a24d372476ea31ad2828312a785e0ea28cff3aefa4",
+      "authored_status": null
+    },
+    {
       "name": "green_main_closure",
       "version": "0.1",
       "status": "runnable",
@@ -721,6 +741,26 @@
       "results_pointer": null,
       "n_runs": 0,
       "workflow_revision_id": "c340c7e80cbefcf5a8ddd188baa5e2442d6dd3481c9f27de182bfed0ffcf4d4c",
+      "authored_status": null
+    },
+    {
+      "name": "promote_row_closeout",
+      "version": "0.1",
+      "status": "runnable",
+      "spec_path": "workflows/repository/promote_row_closeout.yaml",
+      "artifact_kind": "workflow",
+      "repeatable": false,
+      "supersedes": [],
+      "superseded_by": null,
+      "completed_at": null,
+      "last_run_at": null,
+      "latest_ok": null,
+      "latest_model": null,
+      "latest_cost_usd": null,
+      "latest_git_sha": null,
+      "results_pointer": null,
+      "n_runs": 0,
+      "workflow_revision_id": "ff9be7382b589f44364e8aa67717a9211ba9e2eb14f190beafb0fe198a87768a",
       "authored_status": null
     },
     {
@@ -941,26 +981,6 @@
       "results_pointer": null,
       "n_runs": 0,
       "workflow_revision_id": "70fbe88a1937fb58492db660bc39227ae3039c5aba9a1efb3dafb27f7744481b",
-      "authored_status": null
-    },
-    {
-      "name": "self_knowledge_layer",
-      "version": "0.1",
-      "status": "runnable",
-      "spec_path": "workflows/repository/self_knowledge_layer.yaml",
-      "artifact_kind": "workflow",
-      "repeatable": false,
-      "supersedes": [],
-      "superseded_by": null,
-      "completed_at": null,
-      "last_run_at": null,
-      "latest_ok": null,
-      "latest_model": null,
-      "latest_cost_usd": null,
-      "latest_git_sha": null,
-      "results_pointer": null,
-      "n_runs": 0,
-      "workflow_revision_id": "a800c96df4eab5a9180d71d28cb07f4d2d6a10f65ab9971386c3520fd8e08dcb",
       "authored_status": null
     },
     {
@@ -3617,6 +3637,26 @@
       "results_pointer": "experiments/results/workflows/routing_kb_more_itertools/20260817T183852Z.json",
       "n_runs": 1,
       "workflow_revision_id": "df4fde076cd354c4b68de6e417dc893ad543f9a5bea0e4c6ac2d1a2fa35ec58b",
+      "authored_status": null
+    },
+    {
+      "name": "self_knowledge_layer",
+      "version": "0.1",
+      "status": "completed",
+      "spec_path": "workflows/repository/self_knowledge_layer.yaml",
+      "artifact_kind": "workflow",
+      "repeatable": false,
+      "supersedes": [],
+      "superseded_by": null,
+      "completed_at": null,
+      "last_run_at": "2026-09-03T23:49:46.294219+00:00",
+      "latest_ok": true,
+      "latest_model": "deepseek/deepseek-v4-flash",
+      "latest_cost_usd": 1.412104,
+      "latest_git_sha": "c0b5c2542",
+      "results_pointer": "experiments/results/workflows/self_knowledge_layer/20260903T234946Z.json",
+      "n_runs": 1,
+      "workflow_revision_id": "a800c96df4eab5a9180d71d28cb07f4d2d6a10f65ab9971386c3520fd8e08dcb",
       "authored_status": null
     },
     {
