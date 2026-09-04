@@ -98,7 +98,7 @@ artifact; never invent locators.** Verified against the actual corpus:
      therefore resolves
      `MATCH (s:Knowledge {entity_id: 'spec:<name>', source_type: 'spec', lifecycle_state: 'current'})`
      and pins the newest copy deterministically
-     (`ORDER BY coalesce(s.indexed_at, ''), s.knowledge_id DESC LIMIT 1`), so a duplicated
+     (`ORDER BY coalesce(s.indexed_at, '') DESC, s.knowledge_id DESC LIMIT 1`), so a duplicated
      entity still yields exactly ONE target. The spec node is the kb-neo4j consumer's to
      create — the writer never MERGEs a spec node by entity (that would mint more duplicates);
      when NO current spec node is present (spec not yet projected), the writer **skips and

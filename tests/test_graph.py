@@ -1,6 +1,7 @@
 """Tests for Neo4j graph module — Neo4jClient, _BufferedResult."""
 
 import socket
+import uuid
 
 import neo4j.exceptions
 import pytest
@@ -521,3 +522,166 @@ class TestSearchHelpers(_Neo4jTestBase):
         # node is still returned.
         res = self.client.search_fulltext("step_text_ft", "websocket")
         assert any(r["properties"].get("step_id") == "ft_c2" for r in res)
+
+
+# ── the associative first-family writer (graph_leg closeout c2) ───────────────
+#
+# merge_wave_finding_produced_by is the c2 writer for the c1 design
+# (docs/designs/current/graph_leg_associative_edges.md): a wave-conclusion finding record
+# (source_type=finding, logical_locator=wave:<spec>) gains one -[:PRODUCED_BY]-> edge to the
+# spec:<spec> Knowledge entity whose run produced it. All ids here are namespaced by a fresh
+# tag and cleaned up on teardown, so the tests never collide with live corpus nodes.
+
+
+def _assoc_stub(**overrides):
+    """A minimal record stand-in with exactly the fields the writer reads."""
+    base = dict(
+        knowledge_id="",
+        entity_id="",
+        source_type="finding",
+        logical_locator="",
+        source_uri="file://workflow/phase",
+        repository_id="c2-assoc-test",
+        acl_scope="public",
+        authority=type("A", (), {"name": "DERIVED"})(),
+        evidence_class="[C]",
+        commit_sha="deadbeef",
+        language="",
+        text="wave test_spec -> verdict clean",
+        valid_from="",
+        observed_at="",
+        indexed_at="",
+        supersedes=None,
+        causes=None,
+    )
+    base.update(overrides)
+    return type("Rec", (), base)()
+
+
+class TestAssocEdgeWriter:
+    """Live-graph tests for the c2 writer (skip when no Neo4j, like the rest of this file)."""
+
+    @pytest.fixture(autouse=True)
+    def setup(self):
+        self.client = Neo4jClient(
+            uri="bolt://localhost:7687", user="neo4j", password="password123"
+        )
+        self.tag = uuid.uuid4().hex[:10]
+        self.spec = f"c2assoc{self.tag}"
+        self.fid = f"c2t-{self.tag}:finding:1"
+        yield
+        # Clean up every node this test created (namespaced ids only).
+        self.client._run(
+            "MATCH (n:Knowledge) WHERE n.knowledge_id STARTS WITH $p DETACH DELETE n",
+            {"p": f"c2t-{self.tag}"},
+        )
+        self.client._run(
+            "MATCH (n:Knowledge) WHERE n.entity_id STARTS WITH $p DETACH DELETE n",
+            {"p": f"spec:c2assoc{self.tag}"},
+        )
+        self.client.close()
+
+    def _add_current_spec(self, *, knowledge_id=None, indexed_at=""):
+        kid = knowledge_id or f"c2t-{self.tag}:spec:v1"
+        self.client._run(
+            "MERGE (s:Knowledge {knowledge_id: $kid}) "
+            "SET s.entity_id = $eid, s.source_type = 'spec', "
+            "s.lifecycle_state = 'current', s.repository_id = 'agentic-dynamics', "
+            "s.acl_scope = 'public', s.indexed_at = $ia",
+            {"kid": kid, "eid": f"spec:{self.spec}", "ia": indexed_at},
+        )
+        return kid
+
+    def _edge_count(self):
+        return self.client._run_value(
+            "MATCH (f:Knowledge {knowledge_id: $fid})-[:PRODUCED_BY]->"
+            "(s:Knowledge {entity_id: $eid}) RETURN count(*) AS c",
+            {"fid": self.fid, "eid": f"spec:{self.spec}"},
+        )["c"]
+
+    def test_writes_produced_by_edge_keyed_by_ids(self):
+        self._add_current_spec()
+        rec = _assoc_stub(
+            knowledge_id=self.fid,
+            entity_id=f"c2t-{self.tag}:entity:1",
+            logical_locator=f"wave:{self.spec}",
+            text=f"wave {self.spec} -> verdict clean",
+        )
+        status = self.client.merge_wave_finding_produced_by(rec)
+
+        assert status == "edge_merged"
+        assert self._edge_count() == 1
+        # The source node exists with the record's provenance.
+        node = self.client._run_value(
+            "MATCH (f:Knowledge {knowledge_id: $fid}) "
+            "RETURN f.source_type AS st, f.logical_locator AS loc, "
+            "f.entity_id AS eid, f.lifecycle_state AS ls",
+            {"fid": self.fid},
+        )
+        assert node["st"] == "finding"
+        assert node["loc"] == f"wave:{self.spec}"
+        assert node["eid"] == f"c2t-{self.tag}:entity:1"
+        assert node["ls"] == "current"
+
+    def test_reregister_writes_no_duplicate(self):
+        self._add_current_spec()
+        rec = _assoc_stub(
+            knowledge_id=self.fid,
+            entity_id=f"c2t-{self.tag}:entity:1",
+            logical_locator=f"wave:{self.spec}",
+        )
+        assert self.client.merge_wave_finding_produced_by(rec) == "edge_merged"
+        assert self.client.merge_wave_finding_produced_by(rec) == "edge_merged"
+
+        assert self._edge_count() == 1
+
+    def test_target_absent_skips_without_fabricating_source(self):
+        # No spec:<self.spec> node exists — the writer must NOT create one, must NOT create
+        # the source/edge, and must report target_absent (idempotent + healing).
+        rec = _assoc_stub(
+            knowledge_id=self.fid,
+            entity_id=f"c2t-{self.tag}:entity:1",
+            logical_locator=f"wave:{self.spec}",
+        )
+        assert self.client.merge_wave_finding_produced_by(rec) == "target_absent"
+        assert self._edge_count() == 0
+        assert self.client._run_value(
+            "MATCH (f:Knowledge {knowledge_id: $fid}) RETURN count(*) AS c",
+            {"fid": self.fid},
+        )["c"] == 0
+
+    def test_duplicate_current_targets_pin_the_newest_copy(self):
+        self._add_current_spec(knowledge_id=f"c2t-{self.tag}:spec:old", indexed_at="2026-01-01")
+        newest = self._add_current_spec(
+            knowledge_id=f"c2t-{self.tag}:spec:new", indexed_at="2026-06-01"
+        )
+        rec = _assoc_stub(
+            knowledge_id=self.fid,
+            entity_id=f"c2t-{self.tag}:entity:1",
+            logical_locator=f"wave:{self.spec}",
+        )
+        assert self.client.merge_wave_finding_produced_by(rec) == "edge_merged"
+
+        # The edge lands on the newest copy (higher indexed_at), never on both.
+        assert self._edge_count() == 1
+        target = self.client._run_value(
+            "MATCH (f:Knowledge {knowledge_id: $fid})-[:PRODUCED_BY]->(s:Knowledge) "
+            "RETURN s.knowledge_id AS kid",
+            {"fid": self.fid},
+        )
+        assert target["kid"] == newest
+
+    def test_not_family_is_a_no_op(self):
+        self._add_current_spec()
+        rec = _assoc_stub(knowledge_id=self.fid, logical_locator="exp_some_worktree")
+        assert self.client.merge_wave_finding_produced_by(rec) == "not_family"
+        assert self.client._run_value(
+            "MATCH (f:Knowledge {knowledge_id: $fid}) RETURN count(*) AS c",
+            {"fid": self.fid},
+        )["c"] == 0
+
+    def test_claimed_rel_is_still_allowlisted(self):
+        # b1 keeps PRODUCED_BY because c1 claims it; c2 now provides the writer. The frozen
+        # allowlist test above already pins the 7-name set; this asserts the claim's rel is
+        # the one the writer emits (writers u claims now includes it).
+        assert "PRODUCED_BY" in ALLOWED_EXPANSION_RELS
