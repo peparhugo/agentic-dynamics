@@ -96,7 +96,12 @@ _KNOWN_SAFE_SUFFIX = "_known_safe.md"
 _PREREG_SUFFIX = "_preregistration.md"
 
 #: Verdict vocabulary the mandate fixes: ``merge-ready`` / ``not`` / ``clean``.
-VERDICTS = ("merge-ready", "not", "clean")
+VERDICTS = ("merge-ready", "not-merge-ready", "clean")
+#: F1 fix (deep review 2026-09-04): the classifier's bare ``"not"`` rendered as the
+#: ambiguous word "not" in every retrieval surface ("verdict not"). The readable label is
+#: ``not-merge-ready`` — a retrieval surface should answer with the full disposition, never
+#: the truncated classifier token.
+VERDICT_LABELS = {"not": "not-merge-ready", "merge-ready": "merge-ready", "clean": "clean"}
 
 
 # ── Wave discovery (deterministic) ──────────────────────────────
@@ -510,6 +515,9 @@ def derive_wave_record(
     else:
         verdict = classify_verdict("", ledger_state=ledger_state)
 
+    # F1 fix: the retrieval-facing label (never the bare classifier token "not").
+    verdict = VERDICT_LABELS.get(verdict, verdict)
+
     count = finding_count(adv_text) if adv_text else 0
     residuals = residual_list(adv_text) if adv_text else []
 
@@ -541,10 +549,17 @@ def derive_wave_record(
     if ledger and ledger.get("ledgers"):
         goal_prefix = str(ledger["ledgers"][-1].get("goal") or "")[:140]
 
+    # F2 fix (deep review 2026-09-04): the retrieval text must carry the CONCLUSION —
+    # before this, the conclusion lived only in the payload dict (never embedded/indexed),
+    # so retrieval returned shells ("findings 0, residuals 0") with the substance absent.
     text = (
         f"wave {wave} -> verdict {verdict}, spec_sha {sha or 'unpinned'}, "
         f"findings {count}, residuals {len(residuals)}"
     )
+    if conclusion:
+        text += f" :: {conclusion}"
+    if residuals:
+        text += f" :: residuals: {' | '.join(str(r)[:200] for r in residuals[:3])}"
     payload: dict[str, Any] = {
         "wave": wave,
         "spec_sha": sha,

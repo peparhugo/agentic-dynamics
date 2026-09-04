@@ -181,6 +181,32 @@ def session_payload(
 # ── Record construction ─────────────────────────────────────────
 
 
+def _session_prose_summary(session: dict[str, Any], payload: dict[str, Any]) -> str:
+    """A retrieval-facing prose summary of a session close (F3, deep review 2026-09-04).
+
+    The AIO's continuity queries are prose ("what did the last session decide, what merged,
+    what was parked") — a pure JSON blob embeds poorly against them. The summary leads with
+    the human meaning and appends the canonical JSON for structured consumers.
+    """
+    slug = str(session.get("slug") or payload.get("slug") or "")
+    date = str(session.get("session_date") or payload.get("session_date") or "")
+    merged = payload.get("merged") or []
+    parked = payload.get("parked") or []
+    threads = payload.get("open_threads") or []
+    notes = str(payload.get("self_notes") or "")
+    parts = [f"session close {date} ({slug}):"]
+    if merged:
+        parts.append(f"merged {len(merged)}: " + "; ".join(str(m) for m in merged[:5]))
+    if parked:
+        parts.append(f"parked: " + "; ".join(str(p) for p in parked[:5]))
+    if threads:
+        parts.append(f"open threads: " + "; ".join(str(t) for t in threads[:5]))
+    if notes:
+        parts.append(f"self-notes: {notes[:300]}")
+    summary = " ".join(parts)
+    return summary + " || json: " + json.dumps(payload, sort_keys=True)
+
+
 def build_session_record(
     session: dict[str, Any],
     *,
@@ -228,7 +254,11 @@ def build_session_record(
         revision=REVISION_FALLBACK,
         authority=Authority.ADVISORY,
         evidence_class="[H]",
-        text=json.dumps(payload, sort_keys=True),
+        # F3 fix (deep review 2026-09-04): a pure JSON blob embeds poorly against prose
+        # queries ("session continuity AIO" returned zero session records). Prepend a
+        # retrieval-facing prose summary so the record is findable BY MEANING, not only by
+        # id — the AIO's continuity queries are prose, and the spine must answer them.
+        text=_session_prose_summary(session, payload),
         extra_fields={
             # The session record is not tied to a commit of its own — mirror the observation
             # producer, which passes commit_sha="" while folding its revision marker through the
@@ -463,6 +493,11 @@ def _classify_session_artifact(
     text = artifact.get("text")
     if not isinstance(text, str):
         return _ARTIFACT_ANOMALY, None, None
+    # F3 fix (deep review 2026-09-04): the record text is now a prose+JSON hybrid — the
+    # prose leads (retrieval embeds it) and the canonical JSON follows the separator.
+    # Parse the JSON suffix; tolerate a pure-JSON text (pre-fix records) unchanged.
+    if " || json: " in text:
+        text = text.split(" || json: ", 1)[1]
     try:
         payload = json.loads(text)
     except ValueError:

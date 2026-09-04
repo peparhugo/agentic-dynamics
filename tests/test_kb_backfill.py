@@ -168,7 +168,7 @@ def test_derive_wave_record_from_synthetic_corpus(synth_corpus):
     assert rec.commit_sha == "1" * 64
     # Non-empty text carrying the mandated fields.
     assert rec.text.startswith(
-        "wave synth_wave_alpha -> verdict not, spec_sha 1111111111111111111111111111111111111111111111111111111111111111, findings 4"
+        "wave synth_wave_alpha -> verdict not-merge-ready, spec_sha 1111111111111111111111111111111111111111111111111111111111111111, findings 4"
     )
     assert "residuals" in rec.text and "conclusion" in rec.text
 

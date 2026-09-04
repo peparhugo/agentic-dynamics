@@ -51,7 +51,13 @@ def _session(**overrides) -> dict:
 
 
 def _payload(record) -> dict:
-    return json.loads(record.text)
+    # The F3 fix (deep review 2026-09-04) makes text a prose+JSON hybrid — the prose leads
+    # (retrieval embeds it) and the canonical JSON follows after the " || json: " separator.
+    # Parse the JSON suffix; tolerate a pure-JSON text (older records) unchanged.
+    text = record.text or ""
+    if " || json: " in text:
+        text = text.split(" || json: ", 1)[1]
+    return json.loads(text)
 
 
 def _ledger_meta_session_attempt(attempt_id: str = "9696322fa9636310_1"):
@@ -641,7 +647,7 @@ class TestSessionOpen:
         assert opened.entity_id == closed.record.entity_id
         assert opened.candidates == 1
         # The decoded body is byte-identical to the closed record's own canonical payload.
-        assert opened.payload == json.loads(closed.record.text)
+        assert opened.payload == _payload(closed.record)
         for field in si.CONTENT_FIELDS:
             assert opened.payload[field] == session[field]
 
@@ -788,7 +794,7 @@ class TestSessionOpen:
         closed = _close(_session(slug="wt_selfk_s1b_close_writer"), tmp_path, _FakeRedis())
 
         data = json.loads(record_to_artifact(si.derive_session_record(_session(slug="impostor"))))
-        payload = json.loads(data["text"])
+        payload = _payload(si.derive_session_record(_session(slug="impostor")))
         payload["actor"] = "supervisor"  # not the AIO
         data["text"] = json.dumps(payload)
         (tmp_path / "impostor.json").write_bytes(json.dumps(data, sort_keys=True).encode())
