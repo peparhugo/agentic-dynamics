@@ -662,7 +662,42 @@ def emit_record(record: KnowledgeRecord, *, root: Path) -> str:
     reg.parent.mkdir(parents=True, exist_ok=True)
     with reg.open("a", encoding="utf-8") as fh:
         fh.write(json.dumps(line) + "\n")
+
+    # c2 (graph_leg closeout): the associative first-family edge — producer-side, best-effort.
+    # The durable artifact + registry row above are the record; the edge is the graph write, and
+    # a graph outage must never fail the emit (write_wave_finding_edge catches and logs).
+    write_wave_finding_edge(record)
+
     return "new"
+
+
+def write_wave_finding_edge(record: KnowledgeRecord) -> str:
+    """Producer-side associative first-family edge write (graph_leg closeout c2).
+
+    Best-effort: a graph outage must NEVER fail the record emit — any exception is caught,
+    printed as a warning (never silent), and reported as ``"skipped"``. Only the
+    wave-conclusion family (``source_type='finding'`` with ``logical_locator='wave:<spec>'``)
+    is eligible; any other record is a ``"not_family"`` no-op that never touches the graph.
+    The write is ``Neo4jClient.merge_wave_finding_produced_by`` (an idempotent MERGE of the
+    record's ``-[:PRODUCED_BY]->`` edge to its cited spec entity; never fabricates the target).
+    """
+    if record.source_type != "finding" or not (record.logical_locator or "").startswith("wave:"):
+        return "not_family"
+    from agentic_dynamics.knowledge.graph import Neo4jClient
+
+    client = Neo4jClient()
+    try:
+        status = client.merge_wave_finding_produced_by(record)
+        print(
+            f"  [assoc] {record.knowledge_id[:12]} PRODUCED_BY -> "
+            f"{record.logical_locator} {status}"
+        )
+        return status
+    except Exception as exc:  # noqa: BLE001 — a graph outage must not fail the record emit
+        print(f"  [warn] assoc edge skipped for {record.knowledge_id[:12]}: {exc}")
+        return "skipped"
+    finally:
+        client.close()
 
 
 def run_backfill(

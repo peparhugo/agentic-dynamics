@@ -27,6 +27,7 @@ from agentic_dynamics.core.language import (
 )
 
 if TYPE_CHECKING:
+    from agentic_dynamics.knowledge.knowledge import KnowledgeRecord
     from agentic_dynamics.measurement.codebase_graph import CodebaseGraph
 
 
@@ -35,20 +36,27 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent.parent
 # Allowlisted relationship types for bounded graph expansion. Retrieval may only
 # traverse these types; any other relationship (ad-hoc links, ``MENTIONS``, etc.)
 # is invisible to expansion, so retrieved evidence cannot sneak in through an
-# unvetted edge. ``CONTAINS`` + ``AFFECTS`` (design §5.5) are the versioned-graph
-# relations the executor must traverse (module/symbol containment, issue→symbol).
+# unvetted edge. The allowlist obeys the graph_leg closeout (b1) invariant
+# ``writers ∪ c1-claims``: a name may stay only while a writer exists in the
+# codebase OR a committed design claims it. ``DEFINES`` / ``IMPORTS`` / ``CALLS`` /
+# ``TESTED_BY`` / ``SUPERSEDES`` / ``CONTAINS`` are written by the code-graph +
+# versioned-graph + kb-neo4j write paths (``load_codebase_graph``,
+# ``populate_versioned_graph``, ``kb_worker``'s kb-neo4j handler). ``PRODUCED_BY`` is
+# CLAIMED by ``docs/designs/current/graph_leg_associative_edges.md`` (its writer lands
+# in the graph_leg closeout's c2 phase). ``PRECEDES`` / ``CONTRADICTS`` (no writer,
+# unclaimed) and ``AFFECTS`` (a dormant ``populate_versioned_graph`` issues/diagnostics
+# path no call site feeds — zero live edges) were PRUNED here: the expansion query no
+# longer emits their rel-type patterns, removing the live neo4j
+# ``UnknownRelationshipTypeWarning`` per query (measured at the p0 pin).
 ALLOWED_EXPANSION_RELS = frozenset(
     {
         "DEFINES",
         "IMPORTS",
         "CALLS",
         "TESTED_BY",
-        "PRODUCED_BY",
-        "PRECEDES",
+        "PRODUCED_BY",  # c1-claimed (graph_leg_associative_edges.md)
         "SUPERSEDES",
-        "CONTRADICTS",
         "CONTAINS",
-        "AFFECTS",
     }
 )
 
@@ -803,6 +811,80 @@ class Neo4jClient:
 
         return counts
 
+    def merge_wave_finding_produced_by(self, record: KnowledgeRecord) -> str:
+        """Write the associative first-family edge for one wave-conclusion finding record.
+
+        Producer-side writer for the c1 design (graph_leg closeout,
+        ``docs/designs/current/graph_leg_associative_edges.md``): a ``wave:<spec>`` finding
+        record gains a ``-[:PRODUCED_BY]->`` edge to the ``spec:<spec>`` Knowledge entity whose
+        run produced it. The rel (``PRODUCED_BY``) was claimed by c1 and kept by the b1 prune;
+        this method is the writer c2 delivers, so the claim now has its writer.
+
+        Idempotent/rerun-safe: a ``MERGE`` keyed on the deterministic pair of the record's
+        ``knowledge_id`` and the spec entity, so re-registering the same record writes exactly
+        one edge. The source node is MERGEd with the record's own provenance (the same SET
+        clause shape the kb-neo4j consumer uses, so the producer's node and the consumer's
+        projection converge on ONE node). The target is NEVER fabricated: the spec node is the
+        kb-neo4j consumer's to create (``entity_id`` is indexed, not unique — a producer MERGE
+        by entity could mint duplicates), so the writer only MATCHes a ``current`` ``spec:<name>``
+        node and, when duplicate current copies exist, pins the newest deterministically
+        (``indexed_at`` then ``knowledge_id``). When no current spec node exists the write is
+        SKIPPED (``"target_absent"``) — idempotent and healing, since a later replay lands the
+        edge the moment the target projects. Best-effort is the CALLER's responsibility (a graph
+        outage must not fail the record emit); this method only reports its outcome.
+
+        :param record: the wave-conclusion record (``source_type='finding'``,
+            ``logical_locator='wave:<spec>'``).
+        :returns: ``"edge_merged"`` when the edge exists after the write; ``"target_absent"``
+            when the cited spec is not yet a current graph node (skipped); ``"not_family"``
+            when the record is not of the wave-conclusion family.
+        """
+        if record.source_type != "finding" or not (record.logical_locator or "").startswith("wave:"):
+            return "not_family"
+        spec_name = (record.logical_locator or "")[len("wave:"):]
+        if not spec_name:
+            return "not_family"
+        row = self._run_value(
+            "MATCH (s:Knowledge) "
+            "WHERE s.entity_id = $spec_eid AND s.source_type = 'spec' "
+            "AND s.lifecycle_state = 'current' "
+            "WITH s "
+            "ORDER BY coalesce(s.indexed_at, '') DESC, s.knowledge_id DESC "
+            "LIMIT 1 "
+            "MERGE (f:Knowledge {knowledge_id: $fid}) "
+            "SET f.entity_id = $fentity, f.text = $text, f.source_uri = $uri, "
+            "f.authority = $authority, f.commit_sha = $commit, "
+            "f.source_type = $stype, f.logical_locator = $loc, "
+            "f.language = $lang, f.evidence_class = $ev, "
+            "f.repository_id = $repo, f.acl_scope = $acl, "
+            "f.valid_from = $valid_from, f.observed_at = $observed_at, "
+            "f.indexed_at = $indexed_at, f.supersedes = $supersedes, "
+            "f.causes = $causes, f.lifecycle_state = 'current' "
+            "MERGE (f)-[:PRODUCED_BY]->(s) "
+            "RETURN count(s) AS matched",
+            {
+                "spec_eid": f"spec:{spec_name}",
+                "fid": record.knowledge_id,
+                "fentity": record.entity_id,
+                "text": record.text,
+                "uri": record.source_uri,
+                "authority": record.authority.name,
+                "commit": record.commit_sha,
+                "stype": record.source_type,
+                "loc": record.logical_locator,
+                "lang": record.language,
+                "ev": record.evidence_class,
+                "repo": record.repository_id,
+                "acl": record.acl_scope,
+                "valid_from": record.valid_from,
+                "observed_at": record.observed_at,
+                "indexed_at": record.indexed_at,
+                "supersedes": record.supersedes,
+                "causes": record.causes,
+            },
+        )
+        return "edge_merged" if row and row.get("matched") else "target_absent"
+
     def populate_versioned_graph(
         self,
         snapshot: Any,
@@ -977,6 +1059,11 @@ class Neo4jClient:
         # ``acl_scope``) so a scoped expansion can reach them (and their other AFFECTS
         # targets), and their keys are repository/revision-namespaced so the same issue key
         # in different repositories or revisions never collides (cap_2a p1 hardening).
+        # NOTE (graph_leg closeout b1): AFFECTS is deliberately NOT in
+        # ``ALLOWED_EXPANSION_RELS`` — this issues/diagnostics path is dormant (no call
+        # site feeds it; zero live edges), so expansion must not emit an AFFECTS pattern.
+        # The write path stays for the Sonar/LSP wiring that would feed it; re-allowlisting
+        # AFFECTS requires a writer that is actually fed (the b1 frozen-allowlist rule).
         for issue in issues or []:
             vid = self._version_id_for_location(snapshot, issue.file_path, issue.line, repository_id, revision)
             if vid is None:
