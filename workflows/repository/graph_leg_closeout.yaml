@@ -61,7 +61,7 @@ workflow:
         SINGLE-model: run with --model deepseek/deepseek-v4-flash. One
         worktree, one branch (feature/graph-leg-closeout); each phase commits
         [workflow] <phase>. g9 runs the adversarial verdict on
-        deepseek/deepseek-v4-pro (run_model). Worktree/feature-branch work —
+        openai/gpt-5.6-terra (run_model). Worktree/feature-branch work —
         merge to main is the controller's permanence decision, not this run's.
     phases:
       - name: p0_pin_threads
