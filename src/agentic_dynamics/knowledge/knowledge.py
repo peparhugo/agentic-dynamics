@@ -137,6 +137,47 @@ SOURCE_TYPES: dict[str, SourceTypeSpec] = {
     "observation": SourceTypeSpec("observation", Authority.ADVISORY, "[H]"),
     "flag": SourceTypeSpec("observation", Authority.ADVISORY, "[H]"),
     "meta_session": SourceTypeSpec("observation", Authority.ADVISORY, "[H]"),
+    # Self-knowledge layer (loop 2, s2a): the decision-record family. A decision IS an
+    # observation with intent — the AIO's own account of what was decided, why, and the
+    # alternatives weighed — registered as its own observation-family type so the registry
+    # census can distinguish decision rows from supervisor verdicts, the a5 aio-decision
+    # observations, and session closes. Minted BESIDE the a5 observation family (prereg D-1's
+    # second option) because the a5 verdict shape carries none of the s2 fields and is not
+    # retrievable by category; observation-family so a permanence actuation may cite a decision
+    # as its justifying `causes` (the s2b line).
+    "decision": SourceTypeSpec("observation", Authority.ADVISORY, "[H]"),
+    # Self-knowledge layer (loop 2, s3a): the wave-verdict record family. A wave verdict is the
+    # run's own run-completion narrative — "what happened and why" — derived deterministically
+    # from its ledger + control-db row + (when present) the adversarial review doc. It is an
+    # OBSERVATION (it states what a run's completion was, never an instruction to act) with
+    # nominal DERIVED/[C] provenance: the record is a deterministic synthesis over measured
+    # ledger/control state + the advisory review, so it can feed the scoreboard (s5) and the
+    # belief layer (s4) but never masquerade as an independent measurement. Producer: the run,
+    # scoped to workload:<spec>/job:<cell> (its own) — NOT the AIO's org root.
+    "wave_verdict": SourceTypeSpec("observation", Authority.DERIVED, "[C]"),
+    # Self-knowledge layer (loop 2, s4a): the belief-record family. A belief is a hypothesis
+    # the machine holds about itself operating — the Bayesian engine of loop 2, tracked with
+    # n_confirmations/n_disconfirmations and a posterior confidence (the s4b update protocol
+    # revises these in place; s4c seeds the corpus from the measured history). It is an
+    # OBSERVATION (a belief states what the machine holds, never an instruction to act) with
+    # nominal ADVISORY/[H] provenance — self-reported like a session close or a decision, so a
+    # belief can inform the AIO's next operating choice but never override a MEASURED ledger
+    # row or pinned policy. Each record's BODY carries the belief's own declared
+    # evidence_class from the [P]/[M]/[C]/[H] ladder as a REPORTED description of its backing
+    # evidence (the record's KB trust tier stays uniformly ADVISORY — a declared class never
+    # self-elevates the writer). Producer: the AIO, scoped to its org root (org:agentic-dynamics)
+    # — the controller + AIO see these records; cell agents never resolve them.
+    "belief": SourceTypeSpec("observation", Authority.ADVISORY, "[H]"),
+    # Self-knowledge layer (loop 2, s6a): the reflection-record family. A reflection entry is
+    # the AIO's own self-notes appended at session close into a session-keyed reflection
+    # series — "what I got wrong, what surprised me, what I'd change about my own process"
+    # (design §record types 6); multi-session contemplation is their accumulation. It is an
+    # OBSERVATION (it states what a session reflected, never an instruction to act) with
+    # nominal ADVISORY/[H] provenance — self-reported like a session close, a decision, or a
+    # belief, so an entry can inform the next session but never override a MEASURED ledger row
+    # or pinned policy. Producer: the AIO, scoped to its org root (org:agentic-dynamics) —
+    # private to the controller-AIO pair, never resolved by cell agents or the supervisor rail.
+    "reflection": SourceTypeSpec("observation", Authority.ADVISORY, "[H]"),
     # Spec-lifecycle addition: the experiment spec *document* and its derived lifecycle
     # (status / supersedes chain / last run). POLICY authority + "[P]" for the same reason
     # `policy` carries them — a spec is authored, pinned repository policy, read from the

@@ -360,6 +360,10 @@ def test_terminal_write_degrades_when_derivation_itself_raises(
         raise RuntimeError("simulated corrupt registry row")
 
     monkeypatch.setattr(kpf, "derive_run_facts", _raise_derive)
+    # Isolate the fact producer: the wave-verdict producer (s3b, default-on) is a sibling at
+    # this same call site and must not decide this test's outcome — stub it to a no-op, exactly
+    # as the spec-index read is stubbed by the `control_db` fixture.
+    monkeypatch.setattr(rw, "_wave_verdict_payload", lambda *a, **kw: None)
 
     run_id = _open_run(rw, control_db)
     rw._control_terminal_write(

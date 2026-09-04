@@ -25,6 +25,12 @@ promote decision (with the run identity + candidate sha + operator name) before 
 an actuation record whose ``causes`` cites that observation after the push lands. Emission is
 BEST-EFFORT: a downed knowledge stream is a warning, never a blocked promotion.
 
+Verified-command decision record (s2b, the self-knowledge layer): promoting is also recorded
+as an s2 DECISION record (``decision_ingestion.record_decision``, ``actor: verified_command``)
+bound to the run_id + candidate_sha this promotion acted on — the org-root "what was promoted
+and why" the next session retrieves by category instead of re-deriving by grep. Default-on and
+best-effort under the same structural contract: a failed record never blocks a promotion.
+
 Exit codes (the same vocabulary as run_workflow.py):
     0   promoted (or dry-run: would promote)
     10  awaiting_approval — the run stopped at a checkpoint and no valid approval binds
@@ -38,6 +44,7 @@ import argparse
 import json
 import subprocess
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 
 try:
@@ -160,12 +167,72 @@ def _aio_emit_act(decision: dict, *, causes: str) -> dict:
     return {"actuation_id": out["actuation"].knowledge_id, "entry_ids": out["entry_ids"]}
 
 
+# ── s2b verified-command decision-record emission (self-knowledge layer, loop 2) ──
+# Every verified permanence verb records an s2 DECISION record at its own call site — the
+# org-root "what was promoted/published and why" the next session retrieves by category instead
+# of re-deriving by grep. This is the promote emission: ``decision_ingestion.record_decision``
+# with ``actor: verified_command`` and the decision bound to this promotion's run_id +
+# candidate_sha. Default-on (no flag arms it) and best-effort (a failed record never blocks a
+# verified promotion — the same structural contract as the a5 emissions above).
+
+#: The s2 actor this verified command records (the module docstring's ``verified_command``).
+VERIFIED_COMMAND_ACTOR = "verified_command"
+
+#: The retrieval category the promote decisions are filed under — ``scan_decision_records(
+#: category="promote")`` resolves every promotion this command has recorded. Categories are open
+#: by design (documentation, never a validator); the verb IS the natural retrieval axis here.
+DECISION_CATEGORY = "promote"
+
+
+def _default_decision_record(decision: dict) -> dict:
+    """Default record_decision: record ONE s2 decision through the producer seam (best-effort).
+
+    The durable artifact + pointer event are written by ``decision_ingestion.record_decision``
+    itself, whose contract is best-effort (a downed stream degrades to a warning, never a
+    raise). This wrapper exists so the call site can name one injectable seam.
+    """
+    from agentic_dynamics.knowledge import decision_ingestion as di
+
+    result = di.record_decision(decision)
+    return {
+        "status": result.status,
+        "knowledge_id": result.record.knowledge_id,
+        "artifact": str(result.artifact_path),
+        "warnings": list(result.warnings),
+    }
+
+
+def _promote_decision_record(args: argparse.Namespace, ledger: dict, candidate: str) -> dict:
+    """The s2 decision dict this promote records: what/why/category/actor + run/candidate.
+
+    ``what`` names the permanence act in human terms; ``why`` is the decision's rationale (the
+    candidate passed every gate the promotion verified); ``run_id``/``candidate_sha`` bind the
+    record to the exact run + tree the promotion acted on (the DONE_WHEN). ``decided_at`` is the
+    moment of the decision — recorded at invocation, not at some later derivation.
+    """
+    phases = ledger.get("phases") or []
+    cost = float(ledger.get("total_cost_usd", 0) or 0)
+    run_id = str(ledger.get("spec_id") or "") or str(ledger.get("spec_name") or "") or args.spec
+    return {
+        "what": f"promote workflow {args.spec} to {args.base}",
+        "why": f"candidate {candidate[:12]} passed {len(phases)} verified phase gate(s) "
+               f"(${cost:.4f}) — promoted as '{PROMOTION_PREFIX} {args.spec}'",
+        "alternatives": [],
+        "category": DECISION_CATEGORY,
+        "decided_at": datetime.now(timezone.utc).isoformat(),
+        "actor": VERIFIED_COMMAND_ACTOR,
+        "run_id": run_id,
+        "candidate_sha": candidate,
+    }
+
+
 def _run_promotion(
     args: argparse.Namespace,
     *,
     push=None,
     emit_decision=None,
     emit_act=None,
+    record_decision=None,
 ) -> None:
     """Verify and promote a candidate. The three side-effecting/emitting steps are injectable.
 
@@ -178,6 +245,7 @@ def _run_promotion(
     push = push or _push_squashed
     emit_decision = emit_decision or _aio_emit_decision
     emit_act = emit_act or _aio_emit_act
+    record_decision = record_decision or _default_decision_record
 
     workdir = Path(args.workdir).resolve()
     if not workdir.is_dir():
@@ -261,7 +329,16 @@ def _run_promotion(
     pushed = push(workdir, base, subject, candidate)
     print(f"promote: pushed {base} → {pushed[:12]} (squash of {candidate[:12]})")
 
-    # 6 ── the act emits AFTER it lands: an actuation record whose ``causes`` links back to
+    # 6 ── the s2b DECISION record lands after the push succeeds: the verified command records
+    # its own permanence decision (actor: verified_command) bound to this run_id + candidate_sha
+    # — what was promoted and why, retrievable by category. Default-on and best-effort: a failed
+    # record never blocks (the durable act already happened).
+    _emit_best_effort(
+        "promote decision record",
+        lambda: record_decision(_promote_decision_record(args, ledger, candidate)),
+    )
+
+    # 7 ── the act emits AFTER it lands: an actuation record whose ``causes`` links back to
     # the decision observation above (the lineage gate), carrying the pushed sha as the outcome.
     _emit_best_effort(
         "promote act",

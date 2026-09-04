@@ -71,12 +71,14 @@ def _ok_live_checker():
 
 
 def _noop_emitter():
-    """A no-op a5 emission pair: a hermetic real-path run must never publish test candidates.
+    """A no-op emission triple: a hermetic real-path run must never publish test candidates.
 
     ``test_failed_deploy_is_recorded`` and ``test_publish_run_does_not_touch_...`` run the real
     (non-dry-run) publish path against the suite's deadbeef/operator-test fixtures; the
     default emitters would publish those onto the live knowledge stream (DB 2) whenever Redis
     is up, so the real-path tests inject no-op emitters exactly as they inject the deployer.
+    ``record_decision`` (s2b) is the same: a hermetic run must never write test candidates
+    into the real KB artifact dir / live stream.
     """
     def emit_decision(decision):
         return {"observation_id": "test-observation", "entry_ids": []}
@@ -84,7 +86,10 @@ def _noop_emitter():
     def emit_act(decision, *, causes):
         return {"actuation_id": "test-actuation", "entry_ids": []}
 
-    return emit_decision, emit_act
+    def record_decision(decision):
+        return {"status": "no-op", "knowledge_id": "test", "artifact": "", "warnings": []}
+
+    return emit_decision, emit_act, record_decision
 
 
 def _now_iso() -> str:
@@ -225,11 +230,12 @@ def test_failed_deploy_is_recorded(monkeypatch, tmp_path):
     monkeypatch.setattr(pub, "SITE_ROOT", site)
     monkeypatch.setattr(pub, "DATA_JS", site / "data.js")
     calls, deploy = _fail_first_deployer()
-    emit_decision, emit_act = _noop_emitter()
+    emit_decision, emit_act, record_decision = _noop_emitter()
     rc = pr.main(["--candidate-sha", "deadbeef", "--operator", "operator-test",
                   "--db", str(path)],
                  deployer=deploy, builder=_ok_builder(), live_checker=_ok_live_checker(),
-                 emit_decision=emit_decision, emit_act=emit_act)
+                 emit_decision=emit_decision, emit_act=emit_act,
+                 record_decision=record_decision)
     assert rc == pr.EXIT_DEPLOY_FAILED
     assert calls == ["canonical", "mirror"]  # BOTH were attempted
     # ...and the failure is in the database, not lost:
@@ -302,11 +308,12 @@ def test_publish_run_does_not_touch_the_production_receipt_dir(monkeypatch, tmp_
     monkeypatch.setattr(pub, "SITE_ROOT", site)
     monkeypatch.setattr(pub, "DATA_JS", site / "data.js")
     calls, deploy = _fail_first_deployer()
-    emit_decision, emit_act = _noop_emitter()
+    emit_decision, emit_act, record_decision = _noop_emitter()
     rc = pr.main(["--candidate-sha", "deadbeef", "--operator", "operator-test",
                   "--db", str(path)],
                  deployer=deploy, builder=_ok_builder(), live_checker=_ok_live_checker(),
-                 emit_decision=emit_decision, emit_act=emit_act)
+                 emit_decision=emit_decision, emit_act=emit_act,
+                 record_decision=record_decision)
     assert rc == pr.EXIT_DEPLOY_FAILED
     after = sorted(p.name for p in pub.RECEIPT_DIR.glob("*")) if pub.RECEIPT_DIR.exists() else []
     assert after == before  # the production dir did not grow a receipt

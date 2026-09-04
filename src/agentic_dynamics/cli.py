@@ -128,6 +128,33 @@ _COMMANDS: dict[tuple[str, ...], str] = {
     ("control", "status"): "control_status.py",
     ("control", "drain-outbox"): "control_drain_outbox.py",
     ("control", "sweep-zombies"): "control_sweep_zombies.py",
+    # session (the self-knowledge layer — loop 2: the machine learning about itself operating).
+    # `session close` (s1b) writes the AIO's session-spine record via the s1a meta_session type
+    # (what ran, what merged, what parked, open threads, self-notes) — rerun-safe (an identical
+    # re-close is a no-op) and best-effort (a producer failure is a warning, never a crash).
+    # `session open` (s1c) is the read half: it retrieves the LAST session's close record and
+    # renders it as the opening context (decisions, open threads, parked items, self-notes), or
+    # a clear first-session bootstrap when no close exists.
+    ("session", "close"): "session_close.py",
+    ("session", "open"): "session_open.py",
+    # decision (the self-knowledge layer — loop 2). `decision record` (s2a) records a decision
+    # at the moment of decision — what was decided, why, the alternatives weighed — through the
+    # s2a decision record type (a decision IS an observation with intent). Rerun-safe and
+    # best-effort (an identical re-record is a no-op; a producer failure is a warning).
+    ("decision", "record"): "decision_record.py",
+    # scoreboard (the self-knowledge layer — loop 2). `scoreboard` (s5a) aggregates the s3
+    # wave-verdict records into the measured scoreboard rows (waves completed, merge rate,
+    # adversarial-finding rate, cost/wave, time-to-merge, phases/wave, per model) — recomputed
+    # from the records, never hand-written totals. `--recompute` re-aggregates + rewrites the
+    # durable document; without it a stored document is rendered when one exists. Producer aio,
+    # org:repo (controller + AIO + supervisor read; never cell agents).
+    ("scoreboard",): "scoreboard.py",
+    # reflect (the self-knowledge layer — loop 2). `reflect --read` (s6b) reads the accumulated
+    # reflection series — every session's self-notes entry, one per session, in the order the
+    # sessions happened — so a session can contemplate across its predecessors (the read half
+    # of the reflection series the session close's s6a append writes). An empty series renders
+    # a clear empty state. Producer aio, org:repo — private to the controller-AIO pair.
+    ("reflect",): "reflect.py",
     # publication (the ONE publication transaction — control_db_publication p6). Deploying the
     # website is a P0 controller-only action: `publish release` refuses without --operator and
     # records both hosts + the publication/v1 receipt in the control database.
@@ -180,6 +207,10 @@ Subcommands (each forwards to its backing script):
   validate    session|tests|prereq|preexisting
   supervise   [claude-agents|orphans|leases]
   control     status|drain-outbox|sweep-zombies
+  session     open|close
+  decision    record
+  scoreboard
+  reflect
   publish     release
   release     check-protection
   surfaces    sync|snapshot
@@ -214,7 +245,7 @@ def _resolve(argv: list[str]) -> tuple[str | None, list[str]]:
     # True longest-prefix match over the static command table (longest prefixes first).
     for prefix in _SORTED_PREFIXES:
         if tuple(argv[: len(prefix)]) == prefix:
-            return _COMMANDS[prefix], argv[len(prefix):]
+            return _COMMANDS[prefix], argv[len(prefix) :]
     # ``registry query|show|lineage`` -> registry.py <subcommand> ...
     if argv[0] == "registry" and len(argv) >= 2 and argv[1] in _REGISTRY_SUBCOMMANDS:
         return "registry.py", argv[1:]

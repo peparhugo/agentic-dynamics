@@ -297,6 +297,12 @@ def _fake_push(calls: list):
     return push
 
 
+def _noop_record_decision(decision):
+    """A no-op s2b record seam: a hermetic a5 test must never write test candidates into the
+    real KB artifact dir / live knowledge stream (the same reason it injects emit fakes)."""
+    return {"status": "no-op", "knowledge_id": "test", "artifact": "", "warnings": []}
+
+
 class TestPromoteCallSiteEmits:
     def test_promote_decision_and_act_emit_end_to_end(self, tmp_path, monkeypatch):
         """Run the real promote path against a fake knowledge stream + fake push.
@@ -324,7 +330,7 @@ class TestPromoteCallSiteEmits:
         monkeypatch.setattr(ks, "connect", lambda: redis)
         pushes: list = []
         args = _promote_args(tmp_path, wt, ledger)
-        _run_promotion(args, push=_fake_push(pushes))
+        _run_promotion(args, push=_fake_push(pushes), record_decision=_noop_record_decision)
 
         assert len(pushes) == 1  # the act happened
         # the decision dict the call site built (deterministic from args+ledger) is what the
@@ -370,6 +376,7 @@ class TestPromoteCallSiteEmits:
         _run_promotion(
             _promote_args(tmp_path, wt, ledger),
             push=_fake_push([]), emit_decision=emit_decision, emit_act=emit_act,
+            record_decision=_noop_record_decision,
         )
 
         assert len(calls["decision"]) == 1
@@ -397,6 +404,7 @@ class TestPromoteCallSiteEmits:
         _run_promotion(
             _promote_args(tmp_path, wt, ledger),
             push=_fake_push(pushes), emit_decision=boom_decision, emit_act=boom_act,
+            record_decision=_noop_record_decision,
         )
         assert len(pushes) == 1
 
@@ -405,13 +413,16 @@ class TestPromoteCallSiteEmits:
         wt, _base, head = _candidate_worktree(tmp_path)
         ledger = _ledger(head)
         calls: list = []
+        record_calls: list = []
         _run_promotion(
             _promote_args(tmp_path, wt, ledger, dry_run=True),
             push=_fake_push([]),
             emit_decision=lambda d: calls.append(("decision", d)) or {},
             emit_act=lambda d, **kw: calls.append(("act", d)) or {},
+            record_decision=lambda d: record_calls.append(d) or _noop_record_decision(d),
         )
         assert calls == []  # nothing emitted, nothing pushed
+        assert record_calls == []  # ...and no s2b decision record on a dry run
 
 
 # ═════════════════════════════════════════════════════════════════════════════
@@ -474,6 +485,7 @@ class TestPublishCallSiteEmits:
             deployer=deploy, builder=lambda: (True, "built"),
             live_checker=lambda host, receipt: "",
             emit_decision=emit_decision, emit_act=emit_act,
+            record_decision=_noop_record_decision,
         )
         assert rc == pr.EXIT_OK
         assert len(calls["decision"]) == 1
@@ -514,6 +526,7 @@ class TestPublishCallSiteEmits:
             deployer=failing_deploy, builder=lambda: (True, "built"),
             live_checker=lambda host, receipt: "",
             emit_decision=emit_decision, emit_act=emit_act,
+            record_decision=_noop_record_decision,
         )
         assert rc == pr.EXIT_DEPLOY_FAILED
         assert deployed == ["canonical", "mirror"]
@@ -534,6 +547,7 @@ class TestPublishCallSiteEmits:
             live_checker=lambda host, receipt: "",
             emit_decision=lambda d: calls.append(d) or {},
             emit_act=lambda d, **kw: calls.append(d) or {},
+            record_decision=_noop_record_decision,
         )
         assert rc == pr.EXIT_OK
         assert calls == []

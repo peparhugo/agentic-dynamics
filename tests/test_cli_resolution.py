@@ -114,6 +114,21 @@ DOCUMENTED_RESOLUTIONS: list[tuple[tuple[str, ...], str, tuple[str, ...]]] = [
     (("control", "sweep-zombies"), "control_sweep_zombies.py", ()),
     # publish — the ONE publication transaction (control_db_publication p6).
     (("publish", "release"), "publish_release.py", ()),
+    # session — the self-knowledge layer: `close` (s1b) writes the AIO's session-spine record;
+    # `open` (s1c) retrieves the last close as the opening context (or the first-session bootstrap).
+    (("session", "close"), "session_close.py", ()),
+    (("session", "open"), "session_open.py", ()),
+    # decision — the self-knowledge layer: `record` (s2a) records a decision at the moment of
+    # decision (what/why/alternatives/category) via the s2a decision record type.
+    (("decision", "record"), "decision_record.py", ()),
+    # scoreboard — the self-knowledge layer: `scoreboard` (s5a) aggregates the s3 wave-verdict
+    # records into the measured rows (waves/merge rate/adversarial/cost/time-to-merge/phases,
+    # per model) — recomputed, never hand-written; `--recompute` re-aggregates + rewrites.
+    (("scoreboard",), "scoreboard.py", ()),
+    # reflect — the self-knowledge layer: `reflect --read` (s6b) reads the accumulated
+    # reflection series (every session's self-notes entry, in session order) so a session can
+    # contemplate across its predecessors; an empty series renders a clear empty state.
+    (("reflect",), "reflect.py", ()),
     # release
     (("release", "check-protection"), "check_branch_protection.py", ()),
     # surfaces — the self-maintenance command (design: system_knowledge_abstraction)
@@ -154,6 +169,9 @@ def _documented_leaf_commands() -> set[tuple[str, ...]]:
             leaves.add((family,))
             leaves.add((family, "claude-agents"))
             leaves.add((family, "orphans"))
+        elif not rest:
+            # A bare flag-command family (e.g. `scoreboard`) documents no leaf word.
+            leaves.add((family,))
         else:
             for leaf in rest.split("|"):
                 leaves.add((family, leaf))

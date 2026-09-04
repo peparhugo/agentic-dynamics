@@ -51,6 +51,7 @@ import subprocess
 import sys
 from collections.abc import Callable
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -79,12 +80,76 @@ EXIT_POST_DEPLOY_FAILED = 4
 # and an actuation (actuation_ingestion's derive_actuation_record, the first permanence caller)
 # whose ``causes`` cites that observation once both hosts have deployed. Emission is
 # BEST-EFFORT by contract: a downed knowledge stream is a warning, never a blocked publication.
+#
+# Verified-command decision record (s2b, the self-knowledge layer): publishing is also recorded
+# as an s2 DECISION record (``decision_ingestion.record_decision``, ``actor: verified_command``)
+# bound to the run_id + candidate_sha this release acted on — the org-root "what was published
+# and why" the next session retrieves by category instead of re-deriving by grep. Default-on and
+# best-effort under the same structural contract: a failed record never blocks a publication.
 
 
 def _default_emit_decision(decision: dict) -> dict:
     """Default emit_decision: build + publish the publish-decision observation (best-effort)."""
     out = aio_emission.emit_decision(decision)
     return {"observation_id": out["observation"].knowledge_id, "entry_ids": out["entry_ids"]}
+
+
+# ── s2b verified-command decision-record emission (self-knowledge layer, loop 2) ──
+# Every verified permanence verb records an s2 DECISION record at its own call site — the
+# org-root "what was promoted/published and why" the next session retrieves by category instead
+# of re-deriving by grep. This is the publish emission: ``decision_ingestion.record_decision``
+# with ``actor: verified_command`` and the decision bound to this publication's run_id +
+# candidate_sha. Default-on (no flag arms it) and best-effort (a failed record never blocks a
+# verified publication — the same structural contract as the a5 emissions above).
+
+#: The s2 actor this verified command records (the module docstring's ``verified_command``).
+VERIFIED_COMMAND_ACTOR = "verified_command"
+
+#: The retrieval category the publish decisions are filed under — ``scan_decision_records(
+#: category="publish")`` resolves every release this command has recorded.
+DECISION_CATEGORY = "publish"
+
+
+def _default_decision_record(decision: dict) -> dict:
+    """Default record_decision: record ONE s2 decision through the producer seam (best-effort)."""
+    from agentic_dynamics.knowledge import decision_ingestion as di
+
+    result = di.record_decision(decision)
+    return {
+        "status": result.status,
+        "knowledge_id": result.record.knowledge_id,
+        "artifact": str(result.artifact_path),
+        "warnings": list(result.warnings),
+    }
+
+
+def _publish_decision_record(args: argparse.Namespace, receipt: dict[str, Any]) -> dict:
+    """The s2 decision dict this publish records: what/why/category/actor + run/candidate.
+
+    ``what`` names the permanence act in human terms; ``why`` is the decision's rationale (the
+    publication receipt + the projection/consistency gates it passed); ``run_id``/``candidate_sha``
+    bind the record to the exact run + tree the release acted on (the DONE_WHEN). A publish with
+    no ``--run-id`` is cleanly a decision without a run binding — the candidate sha is always
+    present (publication refuses without one).
+    """
+    head = str(receipt.get("repo_sha") or "")
+    candidate = args.candidate_sha or head
+    record = {
+        "what": f"publish website release {candidate[:12]} to both Firebase hosts",
+        "why": f"publication receipt {pub.receipt_sha256(receipt)[:12]} — projections fresh, "
+               "site consistent, data.js built; release deployed",
+        "alternatives": [],
+        "category": DECISION_CATEGORY,
+        "decided_at": datetime.now(timezone.utc).isoformat(),
+        "actor": VERIFIED_COMMAND_ACTOR,
+        "candidate_sha": candidate,
+    }
+    # run_id bound only when the invocation carries one — an unbound publish is cleanly a
+    # decision about a candidate, not a decision-plus-empty-hook (the payload builder omits
+    # an empty run_id from the body).
+    if args.run_id:
+        record["run_id"] = args.run_id
+    return record
 
 
 def _default_emit_act(decision: dict, *, causes: str) -> dict:
@@ -347,6 +412,7 @@ def main(
     live_checker: Callable[[pub.FirebaseHost, dict[str, Any]], str] | None = None,
     emit_decision: Callable[[dict], dict] | None = None,
     emit_act: Callable[..., dict] | None = None,
+    record_decision: Callable[[dict], dict] | None = None,
 ) -> int:
     """Run the publication transaction.
 
@@ -359,6 +425,8 @@ def main(
     ``emit_decision`` / ``emit_act`` (a5) are the AIO-permanence emission steps, injectable for
     the same reason: the tests pass no-op/capturing fakes so a hermetic suite never publishes
     test candidates onto the live knowledge stream. Defaults are the real best-effort emitters.
+    ``record_decision`` (s2b) is the verified-command decision-record seam — default-on, the
+    same best-effort contract, and injectable so the call-site tests stay hermetic.
     """
     args = build_parser().parse_args(argv)
     quiet = args.json
@@ -367,6 +435,7 @@ def main(
     live_check = live_checker or (lambda host, receipt: check_live_site(host, receipt))
     emit_decision = emit_decision or _default_emit_decision
     emit_act = emit_act or _default_emit_act
+    record_decision = record_decision or _default_decision_record
 
     # ── P0 guard ─────────────────────────────────────────────────────────────────────────
     # Named before any work is done, so an operator-less invocation fails in a second rather
@@ -558,6 +627,16 @@ def main(
             _publish_decision(args, receipt, requested_action=requested_action),
             causes=observation_id or "",
         ),
+    )
+
+    # The s2b DECISION record lands after both hosts deployed: the verified command records its
+    # own permanence decision (actor: verified_command) bound to this publication's run_id +
+    # candidate_sha — what was published and why, retrievable by category. Default-on and
+    # best-effort: a failed record never blocks (the release already happened). A dry run or a
+    # partial deploy emits nothing — there is no completed permanence decision to record.
+    _emit_best_effort(
+        "publish decision record",
+        lambda: record_decision(_publish_decision_record(args, receipt)),
     )
 
     # ── Step 8: post-deploy check ────────────────────────────────────────────────────────
