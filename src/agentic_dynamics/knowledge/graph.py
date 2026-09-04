@@ -35,20 +35,27 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent.parent
 # Allowlisted relationship types for bounded graph expansion. Retrieval may only
 # traverse these types; any other relationship (ad-hoc links, ``MENTIONS``, etc.)
 # is invisible to expansion, so retrieved evidence cannot sneak in through an
-# unvetted edge. ``CONTAINS`` + ``AFFECTS`` (design §5.5) are the versioned-graph
-# relations the executor must traverse (module/symbol containment, issue→symbol).
+# unvetted edge. The allowlist obeys the graph_leg closeout (b1) invariant
+# ``writers ∪ c1-claims``: a name may stay only while a writer exists in the
+# codebase OR a committed design claims it. ``DEFINES`` / ``IMPORTS`` / ``CALLS`` /
+# ``TESTED_BY`` / ``SUPERSEDES`` / ``CONTAINS`` are written by the code-graph +
+# versioned-graph + kb-neo4j write paths (``load_codebase_graph``,
+# ``populate_versioned_graph``, ``kb_worker``'s kb-neo4j handler). ``PRODUCED_BY`` is
+# CLAIMED by ``docs/designs/current/graph_leg_associative_edges.md`` (its writer lands
+# in the graph_leg closeout's c2 phase). ``PRECEDES`` / ``CONTRADICTS`` (no writer,
+# unclaimed) and ``AFFECTS`` (a dormant ``populate_versioned_graph`` issues/diagnostics
+# path no call site feeds — zero live edges) were PRUNED here: the expansion query no
+# longer emits their rel-type patterns, removing the live neo4j
+# ``UnknownRelationshipTypeWarning`` per query (measured at the p0 pin).
 ALLOWED_EXPANSION_RELS = frozenset(
     {
         "DEFINES",
         "IMPORTS",
         "CALLS",
         "TESTED_BY",
-        "PRODUCED_BY",
-        "PRECEDES",
+        "PRODUCED_BY",  # c1-claimed (graph_leg_associative_edges.md)
         "SUPERSEDES",
-        "CONTRADICTS",
         "CONTAINS",
-        "AFFECTS",
     }
 )
 
@@ -977,6 +984,11 @@ class Neo4jClient:
         # ``acl_scope``) so a scoped expansion can reach them (and their other AFFECTS
         # targets), and their keys are repository/revision-namespaced so the same issue key
         # in different repositories or revisions never collides (cap_2a p1 hardening).
+        # NOTE (graph_leg closeout b1): AFFECTS is deliberately NOT in
+        # ``ALLOWED_EXPANSION_RELS`` — this issues/diagnostics path is dormant (no call
+        # site feeds it; zero live edges), so expansion must not emit an AFFECTS pattern.
+        # The write path stays for the Sonar/LSP wiring that would feed it; re-allowlisting
+        # AFFECTS requires a writer that is actually fed (the b1 frozen-allowlist rule).
         for issue in issues or []:
             vid = self._version_id_for_location(snapshot, issue.file_path, issue.line, repository_id, revision)
             if vid is None:

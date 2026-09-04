@@ -6,7 +6,12 @@ import neo4j.exceptions
 import pytest
 
 from agentic_dynamics.knowledge.embeddings import step_doc_id
-from agentic_dynamics.knowledge.graph import ALLOWED_EXPANSION_RELS, Neo4jClient, _BufferedResult
+from agentic_dynamics.knowledge.graph import (
+    ALLOWED_EXPANSION_RELS,
+    IMPACT_EXPANSION_RELS,
+    Neo4jClient,
+    _BufferedResult,
+)
 
 try:
     socket.create_connection(("localhost", 7687), timeout=2).close()
@@ -341,11 +346,26 @@ class TestExpandCandidates(_Neo4jTestBase):
         assert "hub" in names
 
     def test_allowlisted_relationships_are_fixed(self):
+        # graph_leg closeout (b1): the expansion allowlist is FROZEN to
+        # {writers in the codebase} ∪ {rel names the committed c1 design claims} — a name
+        # may not re-enter without a writer (or a new committed claim). Live writers:
+        # DEFINES/IMPORTS/CALLS/TESTED_BY/SUPERSEDES/CONTAINS (load_codebase_graph +
+        # populate_versioned_graph + kb_worker's kb-neo4j handler). PRODUCED_BY is CLAIMED
+        # by docs/designs/current/graph_leg_associative_edges.md (c1) — its writer lands
+        # in the graph_leg closeout's c2 phase, so it stays without a writer yet. Pruned:
+        # PRECEDES / CONTRADICTS (no writer, unclaimed) and AFFECTS (a dormant
+        # populate_versioned_graph issues/diagnostics path — no call site feeds it, zero
+        # live edges; the write path remains for the Sonar/LSP wiring that would feed it,
+        # but expansion must not emit it).
         assert {
             "DEFINES", "IMPORTS", "CALLS", "TESTED_BY",
-            "PRODUCED_BY", "PRECEDES", "SUPERSEDES", "CONTRADICTS",
-            "CONTAINS", "AFFECTS",  # design §5.5 — the versioned-graph traversal relations
+            "PRODUCED_BY",  # c1-claimed (graph_leg_associative_edges.md); c2 writes it
+            "SUPERSEDES", "CONTAINS",
         } == ALLOWED_EXPANSION_RELS
+        for pruned in ("PRECEDES", "CONTRADICTS", "AFFECTS"):
+            assert pruned not in ALLOWED_EXPANSION_RELS, f"{pruned} must stay pruned"
+            assert pruned not in IMPACT_EXPANSION_RELS, f"{pruned} must stay out of the impact set"
+        assert ALLOWED_EXPANSION_RELS - {"SUPERSEDES"} == IMPACT_EXPANSION_RELS
 
     def test_expand_returns_rel_type_depth_path_and_origin(self):
         self._build_star()

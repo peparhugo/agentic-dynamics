@@ -248,7 +248,10 @@ def test_impact_expansion_allowlist_excludes_supersedes():
 
     assert ALLOWED_EXPANSION_RELS - {"SUPERSEDES"} == IMPACT_EXPANSION_RELS
     assert "SUPERSEDES" not in IMPACT_EXPANSION_RELS
-    assert "CALLS" in IMPACT_EXPANSION_RELS and "AFFECTS" in IMPACT_EXPANSION_RELS
+    assert "CALLS" in IMPACT_EXPANSION_RELS
+    # graph_leg closeout (b1): AFFECTS was pruned from the expansion/impact allowlists —
+    # its populate_versioned_graph issues/diagnostics writer is dormant (no call site feeds it).
+    assert "AFFECTS" not in IMPACT_EXPANSION_RELS
 
 
 # ── The graph-family Part A seam (p4) — the wall's fix: graph-first + in-process rollback ──
