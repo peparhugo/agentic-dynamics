@@ -3,8 +3,8 @@
 **Generated — do not edit by hand.** Regenerate with `python scripts/spec_status.py`;
 `scripts/run_workflow.py` also refreshes it at the end of every run.
 
-Generated at: `2026-09-03T19:44:56.998407+00:00`  ·  189 spec(s)
-**Work remaining:** 78 open · 111 completed/retired
+Generated at: `2026-09-04T15:00:13.857917+00:00`  ·  191 spec(s)
+**Work remaining:** 79 open · 112 completed/retired
 
 | name | kind | repeatable | status | version | supersedes | last_run | ok | model | cost | n_runs |
 |---|---|---|---|---|---|---|---|---|---|---|
@@ -37,6 +37,7 @@ Generated at: `2026-09-03T19:44:56.998407+00:00`  ·  189 spec(s)
 | `finding_economics_closure` | workflow | yes | runnable | 0.1 | — | 2026-08-22 17:22 | ok | deepseek/deepseek-v4-pro | $1.2820 | 1 |
 | `fleet_job_submission` | workflow | no | runnable | 0.1 | — | — | — | — | — | 3 |
 | `fleet_launch_boundary` | workflow | no | runnable | 0.1 | — | — | — | — | — | 1 |
+| `graph_leg_closeout` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `green_main_closure` | workflow | no | runnable | 0.1 | — | — | — | — | — | 4 |
 | `kb_finding_layer` | workflow | no | runnable | 0.1 | — | — | — | — | — | 1 |
 | `labbook_refresh` | workflow | yes | runnable | 0.1 | — | 2026-08-17 18:14 | ok | deepseek/deepseek-v4-flash | $0.0275 | 1 |
@@ -44,6 +45,7 @@ Generated at: `2026-09-03T19:44:56.998407+00:00`  ·  189 spec(s)
 | `ledger_instrumentation_probe` | workflow | yes | runnable | 0.1 | — | 2026-08-30 19:05 | fail | openai/gpt-5.6-sol | $0.0020 | 1 |
 | `posthoc_pipeline` | workflow | yes | runnable | 0.1 | — | — | — | — | — | 0 |
 | `process_perturbation_resample` | experiment | yes | runnable | 0.1 | — | — | — | — | — | 0 |
+| `promote_row_closeout` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `public_truth_closure` | workflow | yes | runnable | 0.1 | — | 2026-08-21 22:03 | ok | deepseek/deepseek-v4-pro | $2.0485 | 1 |
 | `queue_steer` | workflow | yes | runnable | 0.1 | — | 2026-08-15 19:32 | ok | deepseek/deepseek-v4-flash | $0.0330 | 1 |
 | `rag_bare_vs_augmented` | experiment | yes | runnable | 0.1 | — | — | — | — | — | 0 |
@@ -55,7 +57,6 @@ Generated at: `2026-09-03T19:44:56.998407+00:00`  ·  189 spec(s)
 | `routing_kb_experiment_design` | experiment | yes | runnable | 0.1 | — | 2026-08-17 18:28 | ok | openai/gpt-5.6-sol | $3.0669 | 7 |
 | `routing_kb_experiment_design_research` | experiment | yes | runnable | 0.1 | — | 2026-08-17 18:12 | ok | deepseek/deepseek-v4-pro | $0.2203 | 1 |
 | `routing_regret_under_degradation` | experiment | yes | runnable | 0.2 | — | — | — | — | — | 0 |
-| `self_knowledge_layer` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `self_recommending_experiment` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `test_suite_speed` | workflow | no | runnable | 0.1 | — | — | — | — | — | 1 |
 | `test_suite_tiering` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
@@ -188,6 +189,7 @@ Generated at: `2026-09-03T19:44:56.998407+00:00`  ·  189 spec(s)
 | `retry_observational_analysis` | workflow | no | completed | 0.1 | — | 2026-08-30 21:59 | ok | deepseek/deepseek-v4-pro | $0.3321 | 1 |
 | `routing_follow_up` | workflow | no | completed | 0.1 | — | 2026-08-14 22:26 | ok | deepseek/deepseek-v4-pro | $0.2511 | 1 |
 | `routing_kb_more_itertools` | workflow | no | completed | 0.1 | — | 2026-08-17 18:38 | ok | deepseek/deepseek-v4-pro | $0.0337 | 1 |
+| `self_knowledge_layer` | workflow | no | completed | 0.1 | — | 2026-09-03 23:49 | ok | deepseek/deepseek-v4-flash | $1.4121 | 1 |
 | `site_golden_circle` | workflow | no | completed | 0.1 | — | 2026-08-14 07:36 | ok | openai/gpt-5.6-sol | $0.0000 | 1 |
 | `spec_lifecycle` | workflow | no | completed | 0.1 | — | 2026-08-19 22:53 | ok | deepseek/deepseek-v4-pro | $0.4710 | 2 |
 | `supervisor_control_room` | workflow | no | completed | 0.1 | — | 2026-08-14 16:09 | ok | openai/gpt-5.6-sol | $10.8221 | 2 |
