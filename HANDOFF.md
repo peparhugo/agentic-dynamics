@@ -1,3 +1,6 @@
+---
+status: accepted
+---
 # HANDOFF — session 2026-09-04 (pick-up surface)
 
 **Open with:** `python3 scripts/session_open.py` — the session spine (loop 2) works and
