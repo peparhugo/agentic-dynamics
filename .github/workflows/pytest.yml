@@ -106,6 +106,16 @@ jobs:
           # under its 180s budget (the slow-regression trip wire in tests/test_fast_path_gate.py).
           bash scripts/test_fast.sh
 
+      - name: Restore the corpus fixture (post-migration CI coverage)
+        run: |
+          # Corpus migration (2026-09-08): experiments/results/** is untracked runtime data,
+          # so a fresh clone has NO corpus and the resolution/publication tests would skip.
+          # Restore the committed fixture snapshot so CI keeps running them (a regression in
+          # registry resolution or lab publication fails here instead of only locally).
+          mkdir -p experiments/results
+          cp -r tests/fixtures/corpus/* experiments/results/
+          ls experiments/results/ | head -3
+
       - name: Run deterministic test suite (external-service tests excluded)
         run: |
           # --timeout: a hanging test is a failure, never an infinite block

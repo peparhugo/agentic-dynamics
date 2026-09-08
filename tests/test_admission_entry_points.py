@@ -340,6 +340,10 @@ class _FakeQueueRedis:
         return 1
 
 
+@pytest.mark.skipif(
+    not Path("/state").is_dir() or not os.access("/state", os.W_OK),
+    reason="needs the fleet /state mount (worker-job layout); not present on the host",
+)
 def test_worker_loop_spawns_no_subprocess_when_admission_is_denied(
     armed, controller: AdmissionController, capped: LeaseRegistry, monkeypatch
 ):
@@ -378,6 +382,10 @@ def test_worker_loop_spawns_no_subprocess_when_admission_is_denied(
     assert fake.status["denied_cell"] == "queued"
 
 
+@pytest.mark.skipif(
+    not Path("/state").is_dir() or not os.access("/state", os.W_OK),
+    reason="needs the fleet /state mount (worker-job layout); not present on the host",
+)
 def test_worker_loop_exits_after_persistent_denials(
     armed, controller: AdmissionController, capped: LeaseRegistry, monkeypatch
 ):

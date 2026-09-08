@@ -470,7 +470,16 @@ def test_neo4j_index_populated_and_group_caught_up_live(neo4j_available, redis_f
 
     r = ks.connect()
     try:
-        stream_caught_up = ks.pending_count(r, "kb-neo4j-v1") == 0
+        # Live consumers drain asynchronously — a batch test that published moments ago
+        # legitimately has a non-zero backlog at the first read. Settle to steady state
+        # (two consecutive empty reads) within a bound before judging the equivalence.
+        stream_caught_up = False
+        for _ in range(30):
+            empty = ks.pending_count(r, "kb-neo4j-v1") == 0
+            if empty and stream_caught_up:
+                break
+            stream_caught_up = empty
+            time.sleep(2)
     finally:
         r.close()
 

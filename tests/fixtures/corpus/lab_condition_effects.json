@@ -1,0 +1,69 @@
+{
+  "experiment_id": "lab_condition_effects",
+  "generated_at": "2026-09-09T00:12:52.941544",
+  "summary": {
+    "conditions": 2,
+    "stories": 207,
+    "reviews": 242,
+    "joined_reviews": 155,
+    "reviews_without_current_story": 87
+  },
+  "conditions": [
+    {
+      "condition": "clean",
+      "cells": 135,
+      "success_rate": 0.97,
+      "cascade_rate": 0.015,
+      "avg_cost": 1.54287,
+      "total_cost": 208.287391,
+      "avg_captured_cost": 1.54287,
+      "total_captured_cost": 208.287391,
+      "cost_captured_records": 135,
+      "total_records": 135,
+      "cost_coverage": 1.0,
+      "reviews": 134,
+      "worse_rate": 0.0
+    },
+    {
+      "condition": "early_degrade",
+      "cells": 72,
+      "success_rate": 0.958,
+      "cascade_rate": 0.028,
+      "avg_cost": 1.401126,
+      "total_cost": 100.8811,
+      "avg_captured_cost": 1.401126,
+      "total_captured_cost": 100.8811,
+      "cost_captured_records": 72,
+      "total_records": 72,
+      "cost_coverage": 1.0,
+      "reviews": 21,
+      "worse_rate": 0.0
+    }
+  ],
+  "lab_contract": {
+    "lab": "lab_condition_effects.py",
+    "input_dataset_id": "canonical_registry/story+review",
+    "registry_identity_sha256": "cf8e0b3ec7851f83f9918bda3c8c18a9f3500680959686a9568532de36446c3a",
+    "resolved_input_sha256": "8c90d86e0573b3f1e71982d544672cf90ef94cb1097452b3c857baf343d008a6",
+    "registry_version": "data-manifest/1.0+18392rows",
+    "metric_definition_version": "condition_effects/v2",
+    "metric_source_sha256": "c7023d1bd40fa57e38cc738cca8a9a71780532be3f60898f74954fb6c80f7b32",
+    "n_resolved_records": 449,
+    "n_eligible_records": 362,
+    "n_used_records": 362,
+    "n_excluded_records": 87,
+    "n_unused_eligible_records": 0,
+    "used_record_refs_sha256": "47d98b8cd543f705e025bdfcf24a773b60499081a608bec700ac783a3a7002b3",
+    "excluded_record_refs_sha256": "b9f23e41d491fb219bd9ef35f71b785a6adba1b092bb77d337183067b8b13a86",
+    "used_unique_records": 362,
+    "used_contributions": 362,
+    "review_without_current_story": 87,
+    "story_without_review": 0,
+    "missing_required_field": 0,
+    "outside_analysis_population": 0,
+    "data_integrity_policy": "docs/data_integrity_findings.md",
+    "requires_external_service": null,
+    "contract_version": "lab-contract/v6",
+    "generated_at": "2026-09-08T22:12:52.942298+00:00"
+  }
+}
