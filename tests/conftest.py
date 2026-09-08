@@ -258,3 +258,18 @@ requires_corpus = pytest.mark.skipif(
     not _corpus_present(),
     reason="canonical corpus not present on disk (post-migration: runtime data, not tracked)",
 )
+
+
+def _full_corpus_present() -> bool:
+    """The FULL canonical corpus incl. aggregate payloads the lab-recompute tests need
+    (stories/reviews/analyses resolved from their payload files). The committed CI fixture
+    carries only registry + summary + labs — enough for resolution/contract tests, not for
+    recomputation over every payload."""
+    root = PROJECT_ROOT / "experiments" / "results"
+    return _corpus_present() and (root / "reports").is_dir()
+
+
+requires_full_corpus = pytest.mark.skipif(
+    not _full_corpus_present(),
+    reason="full canonical corpus (payloads for recompute) not present — runs locally where the data root lives",
+)

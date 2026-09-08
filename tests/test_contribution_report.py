@@ -24,7 +24,7 @@ import json
 from pathlib import Path
 
 import pytest
-from conftest import requires_corpus
+from conftest import requires_corpus, requires_full_corpus
 
 from agentic_dynamics.reporting import canonical_corpus as cc
 from agentic_dynamics.reporting.lab_contract import (
@@ -103,6 +103,7 @@ def _canonical_labs() -> list[str]:
 
 
 @pytest.mark.parametrize("script", _canonical_labs())
+@requires_full_corpus
 def test_contract_reconciles_with_recomputed_contribution(script: str):
     """The published contract equals the computation's own ContributionReport (m3).
 

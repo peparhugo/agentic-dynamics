@@ -18,7 +18,7 @@ import sys
 from pathlib import Path
 
 import pytest
-from conftest import requires_corpus
+from conftest import requires_corpus, requires_full_corpus
 
 SCRIPTS_DIR = Path(__file__).resolve().parent.parent / "scripts"
 if str(SCRIPTS_DIR) not in sys.path:
@@ -734,6 +734,7 @@ def test_real_data_js_model_sections_agree_on_avg_cost():
     assert not disagreements, "model sections disagree on avg_cost:\n" + "\n".join(disagreements)
 
 
+@requires_full_corpus
 def test_data_js_publication_contract_present_and_verifies():
     """The generated data.js carries a global publication contract that verifies (P1/P2)."""
     import json
