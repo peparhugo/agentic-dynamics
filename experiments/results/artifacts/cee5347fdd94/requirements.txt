@@ -1,5 +1,0 @@
-celery[redis]
-flask
-Flask-Limiter[redis]
-pytest
-werkzeug

@@ -1,8 +1,0 @@
-flask
-pytest
-pyjwt
-werkzeug
-celery
-redis
-flask-limiter
-fakeredis

@@ -1,6 +1,0 @@
-flask
-werkzeug
-pyjwt
-celery[redis]
-redis
-pytest

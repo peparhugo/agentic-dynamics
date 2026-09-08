@@ -1,2 +1,0 @@
-Flask-Limiter>=4.0
-redis>=5.0

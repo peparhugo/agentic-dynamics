@@ -1,9 +1,0 @@
-<ul class="post-list">
-  {{#each posts}}
-  <li>
-    <a href="{{url}}">{{frontmatter.title}}</a>
-    {{#if frontmatter.date}}<time>{{formatDate frontmatter.date}}</time>{{/if}}
-    {{#if excerpt}}<p>{{excerpt}}</p>{{/if}}
-  </li>
-  {{/each}}
-</ul>

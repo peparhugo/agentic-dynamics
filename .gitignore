@@ -86,3 +86,9 @@ experiments/results/control/
 # produced by the kb producers + write-time registration; lives in the working tree /
 # data root, never swept into machine-state commits again.
 experiments/results/kb/
+
+# ---- corpus migration: the data plane is runtime data, not source ----
+# (2026-09-08 close: 2026-09-08-aio-corpus-migration; stage-2)
+# All experiment results/registry/kb/control data lives in the ignored working tree
+# (future: FINOPS_RESULTS_DIR data root). Keep NO tracked content under here.
+experiments/results/

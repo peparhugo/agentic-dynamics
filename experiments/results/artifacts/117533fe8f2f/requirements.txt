@@ -1,6 +1,0 @@
-flask
-PyJWT
-pytest
-celery
-redis
-Flask-Limiter

@@ -1,7 +1,0 @@
-<h1>{{title}}</h1>
-{{#each posts}}
-<article>
-  <h2><a href="{{../site.baseUrl}}/{{slug}}.html">{{frontmatter.title}}</a></h2>
-  <time datetime="{{frontmatter.date}}">{{dateFormat frontmatter.date}}</time>
-</article>
-{{/each}}
