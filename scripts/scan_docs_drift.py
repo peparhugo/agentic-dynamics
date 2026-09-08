@@ -390,8 +390,7 @@ def _argparse_flags(script: Path) -> set[str]:
         if not (isinstance(func, ast.Attribute) and func.attr == "add_argument"):
             continue
         for arg in node.args:
-            if isinstance(arg, ast.Constant) and isinstance(arg.value, str):
-                if arg.value.startswith("--"):
+            if isinstance(arg, ast.Constant) and isinstance(arg.value, str) and arg.value.startswith("--"):
                     flags.add(arg.value)
     return flags
 
@@ -418,8 +417,7 @@ def _literal_flags(script: Path) -> set[str]:
         return flags
     pattern = re.compile(r"^--[a-z0-9][a-z0-9-]*$")
     for node in ast.walk(tree):
-        if isinstance(node, ast.Constant) and isinstance(node.value, str):
-            if pattern.match(node.value):
+        if isinstance(node, ast.Constant) and isinstance(node.value, str) and pattern.match(node.value):
                 flags.add(node.value)
     return flags
 

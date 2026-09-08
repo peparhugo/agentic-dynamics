@@ -17,7 +17,6 @@ from agentic_dynamics.knowledge import review_ingestion as ri
 from agentic_dynamics.knowledge.knowledge import Authority, compute_entity_id
 from agentic_dynamics.knowledge.knowledge_ingestion import record_to_artifact
 
-
 pytestmark = pytest.mark.fast
 
 def _review(**overrides) -> dict:

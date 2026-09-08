@@ -51,10 +51,9 @@ from pathlib import Path
 # scripts/fleet/ -> add scripts/ to the path, then reuse the shared bootstrap.
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-import redis  # noqa: E402
-
 import dlq  # noqa: E402  (scripts/fleet/ is this module's dir)
 import heartbeat  # noqa: E402
+import redis  # noqa: E402
 
 REDIS_HOST = os.environ.get("FINOPS_REDIS_HOST", "127.0.0.1")
 REDIS_PORT = int(os.environ.get("FINOPS_REDIS_PORT", "6380"))

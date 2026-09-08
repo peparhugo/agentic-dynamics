@@ -1,8 +1,9 @@
 """Tests for the task-optimal routing engine."""
 
+import pytest
+
 from agentic_dynamics.control.routing import compute_routing, normalize_task, recommend_route
 
-import pytest
 pytestmark = pytest.mark.fast
 
 DEEPSEEK = "deepseek/deepseek-v4-pro"

@@ -594,6 +594,7 @@ def test_approve_command_records_and_emits(tmp_path, monkeypatch):
     the control db (operator + candidate bound), writes the resume-path artifact, and
     emits the decision through the AIO emission seam (verb=approve)."""
     import importlib.util
+
     from agentic_dynamics.control.control_db import ControlDB, RunState
 
     db_path = tmp_path / "control.db"
@@ -626,6 +627,7 @@ def test_approve_command_records_and_emits(tmp_path, monkeypatch):
 def test_approve_placeholder_operator_refused(tmp_path, monkeypatch):
     """An approval with no real approver is not an approval (exit 20)."""
     import importlib.util
+
     from agentic_dynamics.control.control_db import ControlDB, RunState
 
     db_path = tmp_path / "control.db"

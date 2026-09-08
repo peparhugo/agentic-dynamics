@@ -68,7 +68,7 @@ def _git_log(subject_grep: str | None = None, merges_only: bool = False) -> list
     if merges_only:
         cmd.append("--merges")
     out = subprocess.run(cmd, capture_output=True, text=True)
-    subjects = [l for l in out.stdout.splitlines() if l.strip()]
+    subjects = [ln for ln in out.stdout.splitlines() if ln.strip()]
     if subject_grep:
         subjects = [s for s in subjects if subject_grep in s]
     return subjects
@@ -92,7 +92,7 @@ def _chain_events(marker: str) -> int:
 def _review_rounds(campaign: str) -> int:
     """Count the review documents for a campaign (known_safe + adversary + any review)."""
     n = 0
-    for review in REVIEWS_DIR.glob(f"*{campaign}*.md"):
+    for _review in REVIEWS_DIR.glob(f"*{campaign}*.md"):
         n += 1
     # also count the *_known_safe / *_adversary naming that uses the marker, not the campaign id
     return n
@@ -162,7 +162,7 @@ def main() -> None:
         components[campaign] = _campaign_components(campaign, breakdowns)
 
     rows = []
-    for campaign, comp in components.items():
+    for _campaign, comp in components.items():
         beta = coordination_overhead(comp.cell_cost, comp.wrapper_cost)
         share = wrapper_share(comp.cell_cost, comp.wrapper_cost)
         rows.append({

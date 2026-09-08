@@ -398,3 +398,27 @@ def test_db2_keys_are_isolated_from_db1(redis2, redis1):
     redis2.set("kb:v1:test_probe", "x")
     assert redis2.exists("kb:v1:test_probe") == 1
     assert redis1.exists("kb:v1:test_probe") == 0  # never visible on the queue DB
+
+
+# ── connect() client contract (the redis-py >= 8 socket-timeout landmine) ─────────────
+
+def test_connect_pins_socket_timeout_none(monkeypatch):
+    # redis-py >= 8 defaults socket_timeout to 5s; this client issues blocking reads
+    # (XREADGROUP BLOCK 10000 in read_events), and a 5s timeout makes every empty poll
+    # on a caught-up group fail with TimeoutError (the 2026-09-04 neo4j-container
+    # footgun). connect() must pin None explicitly so behaviour is version-independent.
+    import redis as redis_mod
+
+    captured = {}
+
+    class _FakeRedis:
+        def __init__(self, **kwargs):
+            captured.update(kwargs)
+
+        def ping(self):
+            return True
+
+    monkeypatch.setattr(redis_mod, "Redis", _FakeRedis)
+    ks.connect(db=TEST_DB)
+    assert captured["socket_timeout"] is None
+    assert captured["socket_connect_timeout"] == 5

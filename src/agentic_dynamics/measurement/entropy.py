@@ -17,9 +17,10 @@ Five dimensions:
 from __future__ import annotations
 
 import math
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 from agentic_dynamics.core.language import (
     LanguageProfile,
@@ -112,9 +113,7 @@ def compute_entropy(
         """The shared walk gate: skip dirs + optional caller filter."""
         if _should_skip(file_path):
             return False
-        if file_filter is not None and not file_filter(file_path):
-            return False
-        return True
+        return file_filter is None or file_filter(file_path)
 
     ep = EntropyProfile()
 

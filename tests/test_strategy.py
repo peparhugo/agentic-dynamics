@@ -5,13 +5,13 @@ lock in that classification is invariant under a uniform price rescale and that
 no model is "expensive" or "efficient" purely by its price tier.
 """
 
+import pytest
+
 from agentic_dynamics.measurement.basin import BasinMetrics
 from agentic_dynamics.measurement.efficiency import EfficiencyMetrics
 from agentic_dynamics.measurement.solution import SolutionMetrics
 from agentic_dynamics.measurement.strategy import StrategyType, classify_strategy
 
-
-import pytest
 pytestmark = pytest.mark.fast
 
 def _classify(correctness, novelty, escape, thinking_ratio, cost) -> StrategyType:

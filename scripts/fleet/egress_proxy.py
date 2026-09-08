@@ -25,6 +25,7 @@ standalone image/service on ``fleet-net``.
 
 from __future__ import annotations
 
+import contextlib
 import os
 import select
 import socket
@@ -54,7 +55,7 @@ class Allowlist:
     suffixes: list[str] = field(default_factory=list)
 
     @classmethod
-    def from_env(cls, raw: str | None = None) -> "Allowlist":
+    def from_env(cls, raw: str | None = None) -> Allowlist:
         """Build from ``EGRESS_ALLOWLIST`` (comma-separated), falling back to the defaults."""
         raw = raw if raw is not None else os.environ.get("EGRESS_ALLOWLIST", "")
         entries = [e.strip().lower() for e in raw.split(",") if e.strip()] or _DEFAULT_ALLOWLIST
@@ -97,10 +98,8 @@ def _relay(src: socket.socket, dst: socket.socket) -> None:
         pass
     finally:
         for s in (src, dst):
-            try:
+            with contextlib.suppress(OSError):
                 s.close()
-            except OSError:
-                pass
 
 
 class ProxyHandler(socketserver.BaseRequestHandler):

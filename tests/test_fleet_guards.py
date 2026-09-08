@@ -355,9 +355,13 @@ class _FakeRedis:
     def __init__(self) -> None:
         self._hashes: dict[str, dict[str, str]] = {}
         self._lists: dict[str, list[str]] = {}
+        self._ttls: dict[str, int] = {}
 
     def hset(self, key: str, mapping: dict) -> None:
         self._hashes[key] = {k: str(v) for k, v in mapping.items()}
+
+    def expire(self, key: str, ttl: int) -> None:
+        self._ttls[key] = ttl
 
     def scan_iter(self, match: str | None = None, count: int | None = None):
         return iter(self._hashes.keys())
@@ -391,6 +395,10 @@ def test_board_surfaces_heartbeats_and_dlq_counts():
     assert "worker:story:a" in heartbeats
     assert "worker:analysis:b" in heartbeats
     assert heartbeats["worker:story:a"]["jobs"] == "3"
+    # A heartbeat key must carry the hygiene TTL (the 2026-09-04 footgun: ~700 one-shot
+    # consumers minted permanent keys with no expiry — the stale list grew without bound).
+    assert r._ttls["worker:story:a"] == int(heartbeat.HEARTBEAT_TTL_S)
+    assert r._ttls["worker:analysis:b"] == int(heartbeat.HEARTBEAT_TTL_S)
 
     counts = dlq.dead_counts(r)
     assert counts == {"story_jobs": 1, "analysis_jobs": 2, "review_jobs": 0, "fleet_jobs": 0}

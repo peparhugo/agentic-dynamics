@@ -1518,7 +1518,7 @@ def _deploy_pattern_match(command: str) -> str | None:
     # is an argument, not the executed command.
     known_launchers = ("npx ", "yarn ", "sudo ", "firebase ", "./firebase", "env ")
     starts_at_command = head.startswith("firebase") or any(
-        head.startswith(l) for l in known_launchers
+        head.startswith(ln) for ln in known_launchers
     ) or bool(re.match(r"^[A-Za-z_][A-Za-z0-9_]*=[^\s]*\s+(?:npx\s+|sudo\s+)?firebase\b", head))
     if not starts_at_command:
         # Also allow a compound whose LAST command is firebase (a &&/;/| chain ending in

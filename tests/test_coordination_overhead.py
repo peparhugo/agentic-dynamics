@@ -4,6 +4,7 @@ Design: ``docs/designs/proposed/beta_snowball_measurement_design.md`` §2.
 """
 
 import pytest
+
 pytestmark = pytest.mark.fast
 
 from agentic_dynamics.measurement.coordination_overhead import (

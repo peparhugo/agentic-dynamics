@@ -2,10 +2,10 @@
 
 from datetime import datetime, timezone
 
+import pytest
+
 from scripts.lab_beta_from_corpus import LADDER_WINDOW, _bin_of, _excluded, _fit_ols
 
-
-import pytest
 pytestmark = pytest.mark.fast
 
 def _row(**kw):

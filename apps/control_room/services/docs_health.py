@@ -37,8 +37,9 @@ Public surface:
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 from scripts import docs_drift_watchdog as watchdog
 from scripts import docs_proposal_gate as gate

@@ -31,7 +31,6 @@ sys.path.insert(0, str(ROOT / "scripts"))
 import docs_drift_watchdog as watchdog  # noqa: E402
 import docs_proposal_gate as gate  # noqa: E402
 
-
 # ─────────────────────────────────────────────────────────────────────────────────────────────
 # Fixtures — synthetic reports in the scanner's real ``docs-drift/v1`` shape
 # ─────────────────────────────────────────────────────────────────────────────────────────────
@@ -289,7 +288,7 @@ def test_goal_bounds_the_inventory_and_counts_the_overflow(results_dir, remediat
     assert "15 further finding(s)" in goal
 
 
-def test_the_dispatched_brief_is_the_APPROVED_inventory(results_dir, remediation, workdir_root):
+def test_the_dispatched_brief_is_the_approved_inventory(results_dir, remediation, workdir_root):
     """The brief renders the findings the controller signed for, not the current report file.
 
     The watchdog rewrites ``latest.json`` every hour. If the goal were rebuilt from that file at

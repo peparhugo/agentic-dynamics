@@ -198,9 +198,9 @@ def _session_prose_summary(session: dict[str, Any], payload: dict[str, Any]) -> 
     if merged:
         parts.append(f"merged {len(merged)}: " + "; ".join(str(m) for m in merged[:5]))
     if parked:
-        parts.append(f"parked: " + "; ".join(str(p) for p in parked[:5]))
+        parts.append("parked: " + "; ".join(str(p) for p in parked[:5]))
     if threads:
-        parts.append(f"open threads: " + "; ".join(str(t) for t in threads[:5]))
+        parts.append("open threads: " + "; ".join(str(t) for t in threads[:5]))
     if notes:
         parts.append(f"self-notes: {notes[:300]}")
     summary = " ".join(parts)

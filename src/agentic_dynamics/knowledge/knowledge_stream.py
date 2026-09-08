@@ -85,6 +85,15 @@ def connect(
 
     Unlike ``live.py``'s best-effort ``_connect`` (which no-ops on failure), ingestion
     **raises** — a downed stream must be visible, not silently dropped.
+
+    ``socket_timeout`` is pinned to ``None`` explicitly because it is NOT the library
+    default anymore: redis-py >= 8 made 5s the default, and this client issues blocking
+    reads (``XREADGROUP ... BLOCK 10000`` in ``read_events``, the kb_worker poll loop).
+    On a caught-up group every poll blocks the full 10s, so a 5s socket timeout made
+    every empty poll fail with ``TimeoutError`` (the 2026-09-04 container-era footgun on
+    ``infrastructure_kb-neo4j_1``, whose image carries redis-py 8.1 while the host env
+    pins 5.0.1 with a ``None`` default). ``None`` restores the pre-8 behaviour every
+    other worker runs under; ``socket_connect_timeout`` still bounds the connect itself.
     """
     import redis
 
@@ -94,6 +103,7 @@ def connect(
         db=db,
         decode_responses=True,
         socket_connect_timeout=5,
+        socket_timeout=None,
         socket_keepalive=False,
     )
     client.ping()  # fail fast; the caller retries with backoff

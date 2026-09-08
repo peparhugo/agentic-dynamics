@@ -16,7 +16,6 @@ from agentic_dynamics.control import observation_ingestion as oi
 from agentic_dynamics.knowledge.knowledge import Authority, compute_entity_id
 from agentic_dynamics.knowledge.knowledge_ingestion import record_to_artifact
 
-
 pytestmark = pytest.mark.fast
 
 def _verdict(**overrides) -> dict:

@@ -23,7 +23,6 @@ from apps.control_room.clients.claude_agents_client import (
 )
 from apps.control_room.clients.opencode_client import OpenCodeError
 
-
 #: The portal binds Tailscale-only, so the tailnet CGNAT range is the trusted surface.
 _TAILNET_CGNAT = ipaddress.ip_network("100.64.0.0/10")
 

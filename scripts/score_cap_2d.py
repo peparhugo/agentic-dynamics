@@ -429,8 +429,8 @@ def abstention_decision_rule(rows: list[dict]) -> dict:
     # The abstention treatment's declines were on the absent cells (leg 2) whose escapes STAND in
     # both arms (the pilot is flag-only, no fix); the unseen-family cells were NOT declined (leg 3
     # never fired — the Option A fingerprint did not materialize). So prevented escapes = 0.
-    escaped_sq = sum(r["escaped_defect_count"] for r in sq)
-    escaped_ab = sum(r["escaped_defect_count"] for r in ab)
+    sum(r["escaped_defect_count"] for r in sq)
+    sum(r["escaped_defect_count"] for r in ab)
     # treatment-attributable prevented escapes: declines that produced an escape in status_quo's
     # matched cell but not in the abstention cell.
     prevented = 0

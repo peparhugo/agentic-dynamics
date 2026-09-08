@@ -1,10 +1,10 @@
 
 
+import pytest
+
 from agentic_dynamics.measurement.basin import BasinMetrics
 from agentic_dynamics.measurement.solution import SolutionMetrics
 
-
-import pytest
 pytestmark = pytest.mark.fast
 
 def _scrub_nan(d: dict) -> dict:

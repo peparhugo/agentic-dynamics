@@ -32,6 +32,17 @@ HEARTBEAT_PREFIX = "worker"
 
 DEFAULT_INTERVAL = 10.0  # seconds between beats
 
+#: How long a heartbeat key survives its last beat. There is deliberately NO self-expiry
+#: contract in the reader: a worker whose ``last_seen`` is stale is a dead worker, and the
+#: staleness window (45s — the control packet's ``WORKER_STALE_AFTER_S``, four missed beats
+#: at the 10s cadence) decides that. The TTL is a hygiene backstop, not the judgment: it
+#: must comfortably exceed the staleness window so a dead worker stays VISIBLE as stale for
+#: a while after death (the fleet manager's autopsy window), then evicts itself instead of
+#: accumulating forever. Every one-shot ``--once`` pass and every ephemeral container mints
+#: a key (the 2026-09-04 board: ~700 stale keys from drain passes + the fleet era, none
+#: expiring) — without a TTL the board's stale list grows without bound.
+HEARTBEAT_TTL_S = 300.0
+
 
 def key(worker_type: str, worker_id: str) -> str:
     """The Redis key for a worker's heartbeat (``worker:<type>:<id>``)."""
@@ -54,6 +65,9 @@ def publish(client: redis.Redis, worker_type: str, worker_id: str, *,
         "started_at": datetime.now(timezone.utc).isoformat(),
     }
     client.hset(key(worker_type, worker_id), mapping=payload)
+    # Hygiene, not judgment: keep the key for the autopsy window past the staleness line,
+    # then let it evict. Without this every ephemeral consumer leaves a permanent corpse.
+    client.expire(key(worker_type, worker_id), int(HEARTBEAT_TTL_S))
 
 
 def read_all(client: redis.Redis) -> dict[str, dict]:

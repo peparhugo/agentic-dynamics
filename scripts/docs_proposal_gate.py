@@ -112,10 +112,11 @@ import json
 import os
 import sys
 import tempfile
+from collections.abc import Callable
 from contextlib import suppress
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -694,10 +695,8 @@ def claim_is_expired(claim: dict, *, ttl_seconds: int = CLAIM_TTL_SECONDS,
         return False
     reference = datetime.now(timezone.utc)
     if at:
-        try:
+        with suppress(ValueError):
             reference = datetime.fromisoformat(at.replace("Z", "+00:00"))
-        except ValueError:
-            pass
     return (reference - started).total_seconds() > ttl_seconds
 
 
@@ -1172,7 +1171,7 @@ def dispatch(
 
     remediation = load_remediation(root)
     goal = build_goal(proposal, remediation)
-    run_id = hashlib.sha256(f"{proposal_id}|{at}".encode("utf-8")).hexdigest()[:12]
+    run_id = hashlib.sha256(f"{proposal_id}|{at}".encode()).hexdigest()[:12]
     command = [
         "python3", "scripts/run_workflow.py",
         "--spec", remediation.spec,

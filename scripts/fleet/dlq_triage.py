@@ -21,7 +21,6 @@ import hashlib
 import json
 import os
 import sys
-import time
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -92,7 +91,7 @@ def triage(*, dry_run: bool, limit: int | None = None) -> dict:
         "dry_run": dry_run,
     }
 
-    for entry_id, fields in entries:
+    for _entry_id, fields in entries:
         ok, why = _artifact_ok(fields)
         if ok:
             disposition["re_driven"] += 1

@@ -1,9 +1,9 @@
 """Tests for backend dispatch."""
 
+import pytest
+
 from agentic_dynamics.adapters.backends import get_backend_for_model, resolve_backend
 
-
-import pytest
 pytestmark = pytest.mark.fast
 
 def test_anthropic_routes_to_claude_cli():

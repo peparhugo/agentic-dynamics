@@ -37,6 +37,8 @@ try:
 except ImportError:
     from scripts import _bootstrap  # noqa: E402,F401
 
+import contextlib
+
 from agentic_dynamics.core.language import (
     _should_skip,
     build_code_snapshot,
@@ -90,7 +92,7 @@ def _git_root_commit(worktree: Path) -> str | None:
         ["git", "-C", str(worktree), "rev-list", "--max-parents=0", "HEAD"],
         capture_output=True, text=True, timeout=15,
     )
-    lines = [l for l in out.stdout.splitlines() if l.strip()]
+    lines = [ln for ln in out.stdout.splitlines() if ln.strip()]
     return lines[0] if lines else None
 
 
@@ -171,7 +173,6 @@ def _measure_cell(
 def _measure_story_cells() -> tuple[list[dict], list[dict]]:
     cells: list[dict] = []
     skipped: list[dict] = []
-    profile_cache: dict[str, object] = {}
     baseline_split_cache: dict[str, object] = {}
     baseline_snapshot_cache: dict[str, object] = {}
 
@@ -236,7 +237,7 @@ def _load_campaign_facts() -> dict[str, dict]:
         base = REPO_ROOT / "experiments/results" / campaign
         # 1. per-cell facts (changed_symbols_with_tests_ratio + worktree)
         cells_dir = base / "cells"
-        for cell_file in sorted((cells_dir.glob("*.json") if cells_dir.is_dir() else [])):
+        for cell_file in sorted(cells_dir.glob("*.json") if cells_dir.is_dir() else []):
             try:
                 rec = json.loads(cell_file.read_text())
             except json.JSONDecodeError:
@@ -247,10 +248,8 @@ def _load_campaign_facts() -> dict[str, dict]:
             f = rec.get("facts") or {}
             entry = facts.setdefault(cid, {})
             if "changed_symbols_with_tests_ratio" in f:
-                try:
+                with contextlib.suppress(TypeError, ValueError):
                     entry["tests_ratio"] = float(f["changed_symbols_with_tests_ratio"])
-                except (TypeError, ValueError):
-                    pass
             entry["worktree"] = rec.get("seeded_app_worktree") or rec.get("worktree")
         # 2. p2_cells_run.json (cap_2b shape) — facts + worktree
         run_file = base / "p2_cells_run.json"
@@ -266,10 +265,8 @@ def _load_campaign_facts() -> dict[str, dict]:
                 f = rec.get("facts") or {}
                 entry = facts.setdefault(cid, {})
                 if "changed_symbols_with_tests_ratio" in f:
-                    try:
+                    with contextlib.suppress(TypeError, ValueError):
                         entry["tests_ratio"] = float(f["changed_symbols_with_tests_ratio"])
-                    except (TypeError, ValueError):
-                        pass
                 entry.setdefault("worktree", rec.get("seeded_app_worktree"))
         # 3. score JSON — test_executed_success
         for score_file in sorted(base.glob("*_score_*.json")):

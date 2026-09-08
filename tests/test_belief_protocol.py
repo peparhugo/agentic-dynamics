@@ -1301,6 +1301,6 @@ def test_the_corpus_is_data_only_reusing_the_s4a_type():
     # derivation (no dedup, no batch pre-filter, no KB write).
     records = bs.derive_seed_records()
     assert len(records) == len(bs.SEEDS)
-    for record, seed in zip(records, bs.SEEDS):
+    for record, seed in zip(records, bs.SEEDS, strict=False):
         assert record.knowledge_id == bi.derive_belief_record(seed).knowledge_id
 

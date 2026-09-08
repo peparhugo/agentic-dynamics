@@ -9,11 +9,11 @@ correctness, zero constraint count) must be ``None`` — never a fabricated ``0.
 ``max(denom, tiny)`` superspike — and ``to_dict`` must round-trip that as JSON ``null``.
 """
 
+import pytest
+
 from agentic_dynamics.measurement import basin, constraint_detection, efficiency, recovery_cost
 from agentic_dynamics.measurement.solution import SolutionMetrics
 
-
-import pytest
 pytestmark = pytest.mark.fast
 
 def _solution(correctness=0.9, composite=0.8, loc=120):

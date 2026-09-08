@@ -50,10 +50,7 @@ def _run_pytest(workdir: Path, timeout: int, *, target: str | list[str] | None =
     so the phase runs ITS tests, never the whole multi-thousand-test tree. ``None`` keeps the
     historical whole-tree scope.
     """
-    if target:
-        targets = [target] if isinstance(target, str) else list(target)
-    else:
-        targets = ["."]
+    targets = ([target] if isinstance(target, str) else list(target)) if target else ["."]
     cmd = [
         sys.executable, "-m", "pytest", "-q", "--tb=short", *targets,
         # Stale generated artifacts under experiments/results must never be collected.

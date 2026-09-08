@@ -21,6 +21,7 @@ from agentic_dynamics.experiment.experiment_spec import (
     Workflow,
     committed_spec_paths,
 )
+
 pytestmark = pytest.mark.fast
 
 from agentic_dynamics.experiment.spec_status import (

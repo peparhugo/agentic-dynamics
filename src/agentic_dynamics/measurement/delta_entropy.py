@@ -86,9 +86,7 @@ def is_test_file(path: Path, profile: LanguageProfile) -> bool:
     pattern = profile.test_file_pattern
     if pattern and fnmatch.fnmatch(name, pattern):
         return True
-    if profile.name == "typescript" and ".test." in name:
-        return True
-    return False
+    return profile.name == "typescript" and ".test." in name
 
 
 def split_files(files: list[Path], profile: LanguageProfile) -> tuple[list[Path], list[Path]]:

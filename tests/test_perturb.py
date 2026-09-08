@@ -4,6 +4,7 @@ import random
 import pytest
 
 from agentic_dynamics.measurement.basin import BasinMetrics
+
 pytestmark = pytest.mark.fast
 
 from agentic_dynamics.measurement.perturb import (

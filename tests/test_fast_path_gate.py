@@ -20,8 +20,6 @@ import sys
 import time
 from pathlib import Path
 
-import pytest
-
 ROOT = Path(__file__).resolve().parent.parent
 
 #: The budget — a slow-regression trip wire (3x the measured ~25s fast path), never a flaky wall.

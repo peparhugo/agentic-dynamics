@@ -13,11 +13,11 @@ path again without failing here.
 
 from __future__ import annotations
 
+import pytest
+
 from agentic_dynamics.core.paths import PROJECT_ROOT
 from apps.control_room import server
 
-
-import pytest
 pytestmark = pytest.mark.fast
 
 def test_root_equals_project_root() -> None:

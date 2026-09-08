@@ -12,6 +12,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from agentic_dynamics.experiment.experiment_spec import LEDGER_FIELDS
 from agentic_dynamics.measurement import signal_registry
 from agentic_dynamics.measurement.signal_registry import (
@@ -25,7 +27,6 @@ from agentic_dynamics.measurement.signal_registry import (
 from agentic_dynamics.runtime import routing as routing_mod
 from agentic_dynamics.runtime.routing import RoutingPreferences, validate_preferences
 
-import pytest
 pytestmark = pytest.mark.fast
 
 ROOT = Path(__file__).resolve().parent.parent
