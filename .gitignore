@@ -81,3 +81,8 @@ audit.md
 # reviewed, and the durable provenance projected from it (run ledgers, the registry index,
 # publication receipts) is already tracked. The `-wal`/`-shm` sidecars go with it.
 experiments/results/control/
+
+# The durable KB artifact store is runtime data (corpus migration — see close record 2026-09-08):
+# produced by the kb producers + write-time registration; lives in the working tree /
+# data root, never swept into machine-state commits again.
+experiments/results/kb/
