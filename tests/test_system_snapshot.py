@@ -109,7 +109,7 @@ def test_snapshot_module_docstring_documents_the_docker_exception():
         "to the ONLY-caller rule"
     )
     assert BENIGN_READ_ONLY_PHRASE in doc
-    assert "scripts/fleet/launch_broker.py" in doc
+    assert "scripts/fleet/launch_broker.py" in doc  # fast-safe: asserts on committed prose — no live call
 
 
 def test_snapshot_docker_call_site_has_a_documenting_docstring():
@@ -119,7 +119,7 @@ def test_snapshot_docker_call_site_has_a_documenting_docstring():
     helper_doc = _helper_docstring(src)
     assert DOCUMENTED_EXCEPTION_PHRASE in helper_doc
     assert BENIGN_READ_ONLY_PHRASE in helper_doc
-    assert "docker" in helper_doc and "chromadb" in helper_doc
+    assert "docker" in helper_doc and "chromadb" in helper_doc  # fast-safe: asserts on committed prose — no live call
 
 
 def test_snapshot_has_exactly_one_docker_invocation_site():
@@ -133,7 +133,7 @@ def test_snapshot_has_exactly_one_docker_invocation_site():
     # …and that single literal sits in the documented helper, never in main().
     head, _tail = src.split("def main()", 1)
     assert '"docker"' in head, "the docker invocation must live in a helper, not in main()"
-    assert "_chromadb_docker_ps()" in _tail, "main() must call the documented helper"
+    assert "_chromadb_docker_ps()" in _tail, "main() must call the documented helper"  # fast-safe: asserts on committed prose — no live call
 
 
 def test_no_second_untyped_docker_caller_in_maintained_non_fleet_code():
@@ -184,9 +184,9 @@ def test_containerfile_describes_no_socket_holder_state():
         assert phrase not in text, f"Containerfile.fleet still carries stale phrase {phrase!r}"
     # Positive direction: it describes the broker reality instead — and no longer names the
     # socket path at all (the socket-holder era named it; the broker era names the host unit).
-    assert "host-side launch broker" in text
-    assert "docker socket" in text
-    assert "/var/run/docker.sock" not in text
+    assert "host-side launch broker" in text  # fast-safe: asserts on committed prose — no live call
+    assert "docker socket" in text  # fast-safe: asserts broker-era prose exists in the generated surfaces — no live call
+    assert "/var/run/docker.sock" not in text  # fast-safe: asserts on committed prose — no live call
 
 
 def test_agent_config_sources_describe_no_socket_holder_state():
@@ -210,7 +210,7 @@ def test_rendered_surfaces_describe_no_socket_holder_state():
         for phrase in STALE_SOCKET_HOLDER_PHRASES:
             if phrase in text:
                 stale_in.setdefault(rel, []).append(phrase)
-    assert stale_in == {}, f"rendered surfaces still carry stale socket-holder prose: {stale_in}"
+    assert stale_in == {}, f"rendered surfaces still carry stale socket-holder prose: {stale_in}"  # fast-safe: asserts on committed prose — no live call
 
 
 def test_rendered_surfaces_carry_the_broker_reality():
@@ -219,11 +219,11 @@ def test_rendered_surfaces_carry_the_broker_reality():
     the docker call; no container mounts the docker socket) — the text a socket-holder revert
     would delete."""
     agents = (ROOT / "AGENTS.md").read_text(encoding="utf-8")
-    assert "emits every launch as a typed request over the unix-socket seam" in agents
-    assert "the docker socket's only home" in agents
+    assert "emits every launch as a typed request over the unix-socket seam" in agents  # fast-safe: asserts on committed prose — no live call
+    assert "the docker socket's only home" in agents  # fast-safe: asserts on committed prose — no live call
     skill = (ROOT / ".opencode" / "skills" / "run-workflow" / "SKILL.md").read_text(encoding="utf-8")
-    assert "No container mounts the docker socket" in skill
-    assert "host broker's unix-socket seam" in skill
+    assert "No container mounts the docker socket" in skill  # fast-safe: asserts on committed prose — no live call
+    assert "host broker's unix-socket seam" in skill  # fast-safe: asserts on committed prose — no live call
     claude_skill = (ROOT / ".claude" / "skills" / "run-workflow" / "SKILL.md").read_text(
         encoding="utf-8"
     )

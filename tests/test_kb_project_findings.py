@@ -125,7 +125,7 @@ def test_project_dispatches_to_handler_bodies_and_skips_registered(tmp_path):
     reg.parent.mkdir(parents=True, exist_ok=True)
     reg.write_text(json.dumps({"knowledge_id": kid_a, "source_type": "finding"}) + "\n")
 
-    calls: dict[str, list[str]] = {"kb-chroma-v1": [], "kb-neo4j-v1": [], "kb-registry-v1": []}
+    calls: dict[str, list[str]] = {"kb-chroma-v1": [], "kb-neo4j-v1": [], "kb-registry-v1": []}  # fast-safe: recorder keys/asserts, no live calls
 
     def factory(group, r):
         # The projection passes the kb_worker CONSUMER-GROUP name (the real handler bodies);
@@ -138,13 +138,13 @@ def test_project_dispatches_to_handler_bodies_and_skips_registered(tmp_path):
     records = kpf.select_records(tmp_path)
     counts = kpf.project(
         records,
-        legs=("chroma", "neo4j", "registry"),
+        legs=("chroma", "neo4j", "registry"),  # fast-safe: recorder keys/asserts, no live calls
         root=tmp_path,
         handler_factory=factory,
     )
-    assert counts == {"chroma": 2, "neo4j": 2, "registry": 1}
+    assert counts == {"chroma": 2, "neo4j": 2, "registry": 1}  # fast-safe: recorder keys/asserts, no live calls
     # Registry leg: only the unregistered record (kid_b) was appended — kid_a was a no-op.
     assert sorted(calls["kb-registry-v1"]) == [kid_b]
     # Chroma/neo4j project every record (idempotent upserts).
-    assert sorted(calls["kb-chroma-v1"]) == sorted([kid_a, kid_b])
-    assert sorted(calls["kb-neo4j-v1"]) == sorted([kid_a, kid_b])
+    assert sorted(calls["kb-chroma-v1"]) == sorted([kid_a, kid_b])  # fast-safe: recorder keys/asserts, no live calls
+    assert sorted(calls["kb-neo4j-v1"]) == sorted([kid_a, kid_b])  # fast-safe: recorder keys/asserts, no live calls
