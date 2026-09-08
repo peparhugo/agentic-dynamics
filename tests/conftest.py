@@ -241,3 +241,20 @@ def _disarm_finding_emit(monkeypatch):
     without touching the live KB.
     """
     monkeypatch.setenv("FINOPS_EMIT_SELF", "0")
+
+
+def _corpus_present() -> bool:
+    """The canonical corpus (registry + aggregates) lives on disk post-migration.
+
+    Corpus-migration (2026-09-08): experiments/results/** is untracked runtime data —
+    a fresh clone has NO corpus, so corpus-reading tests must skip there and run only
+    where the data root exists (CI provisions nothing; local runs carry the tree).
+    """
+    root = PROJECT_ROOT / "experiments" / "results"
+    return (root / "registry_index.jsonl").exists() and (root / "_results_summary.json").exists()
+
+
+requires_corpus = pytest.mark.skipif(
+    not _corpus_present(),
+    reason="canonical corpus not present on disk (post-migration: runtime data, not tracked)",
+)

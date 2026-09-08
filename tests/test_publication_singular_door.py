@@ -29,6 +29,7 @@ from collections import Counter
 from pathlib import Path
 
 import pytest
+from conftest import requires_corpus
 
 from agentic_dynamics.reporting import canonical_corpus as cc
 
@@ -120,6 +121,7 @@ def test_public_data_producer_does_not_glob_raw_result_dirs(script: str):
 # ---------------------------------------------------------------------------
 
 
+@requires_corpus
 def test_canonical_condition_split_has_no_bad_seed_arm():
     """The resolver's canonical split is exactly ``clean 135 / early_degrade 72``."""
     identity = cc.current_manifest_identity()

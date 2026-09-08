@@ -18,6 +18,7 @@ import sys
 from pathlib import Path
 
 import pytest
+from conftest import requires_corpus
 
 SCRIPTS_DIR = Path(__file__).resolve().parent.parent / "scripts"
 if str(SCRIPTS_DIR) not in sys.path:
@@ -76,6 +77,7 @@ def _story_payload(story_id: str, *, condition: str, instrumented: bool) -> dict
 # ── corpus loading ────────────────────────────────────────────────
 
 
+@requires_corpus
 def test_missing_manifest_degrades_with_a_warning(tmp_path, capsys):
     """A missing manifest is not a hard failure — empty corpus + a stderr warning."""
     corpus = build_data.load_canonical_corpus(tmp_path / "does_not_exist.json")

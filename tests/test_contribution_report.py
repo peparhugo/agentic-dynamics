@@ -24,6 +24,7 @@ import json
 from pathlib import Path
 
 import pytest
+from conftest import requires_corpus
 
 from agentic_dynamics.reporting import canonical_corpus as cc
 from agentic_dynamics.reporting.lab_contract import (
@@ -155,6 +156,7 @@ def test_contract_reconciles_with_recomputed_contribution(script: str):
     assert contract["used_contributions"] == contribution.used_contributions, script
 
 
+@requires_corpus
 def test_contribution_report_derives_resolved_from_buckets():
     """``ContributionReport.of`` forces full accounting of every resolved record."""
     c = ContributionReport.of(

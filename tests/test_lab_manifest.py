@@ -30,6 +30,7 @@ import json
 from pathlib import Path
 
 import pytest
+from conftest import requires_corpus
 
 ROOT = Path(__file__).resolve().parent.parent
 SCRIPTS_DIR = ROOT / "scripts"
@@ -75,6 +76,7 @@ def _labs() -> dict[str, dict]:
 # ---------------------------------------------------------------------------
 
 
+@requires_corpus
 def test_manifest_exists_and_is_valid_json():
     assert MANIFEST_PATH.exists(), "scripts/lab_manifest.json is the lab classification manifest"
     assert _manifest().get("schema_version", "").startswith("lab-manifest/")

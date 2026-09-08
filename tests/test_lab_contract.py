@@ -27,6 +27,7 @@ import json
 from pathlib import Path
 
 import pytest
+from conftest import requires_corpus
 
 from agentic_dynamics.reporting import canonical_corpus as cc
 from agentic_dynamics.reporting.lab_contract import (
@@ -116,6 +117,7 @@ def _contract_payload(tables: cc.CanonicalTables, *, entry: LabEntry | None = No
 # ---------------------------------------------------------------------------
 
 
+@requires_corpus
 def test_contract_carries_all_required_fields(tables_factory):
     """Every required field (with the P2 rename/addition and the p3 record-scope fields),
     verbatim, on a fresh contract."""

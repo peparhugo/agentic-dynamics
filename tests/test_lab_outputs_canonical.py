@@ -30,6 +30,7 @@ import re
 from pathlib import Path
 
 import pytest
+from conftest import requires_corpus
 
 from agentic_dynamics.reporting import canonical_corpus as cc
 from agentic_dynamics.reporting.lab_contract import (
@@ -64,6 +65,7 @@ def _data_js_payload() -> dict | None:
 # ---------------------------------------------------------------------------
 
 
+@requires_corpus
 def test_live_results_dir_holds_only_declared_non_quarantined_lab_outputs():
     """Every ``experiments/results/lab_*.json`` is a manifest-DECLARED, non-quarantined output.
 
