@@ -1,8 +1,8 @@
-/* Generated 2026-09-03 16:23:26 UTC by build_data.py */
+/* Generated 2026-09-04 15:48:48 UTC by build_data.py */
 /* DO NOT EDIT — regenerate with: python scripts/build_data.py */
 window.DYNAMICS_DATA = {
   "_meta": {
-    "generated_at": "2026-09-03T16:23:22.539885+00:00",
+    "generated_at": "2026-09-04T15:48:44.833754+00:00",
     "provenance_note": "All values tagged [M]easured, [C]omputed, [H]euristic, or e[X]ternal. See methodology.html."
   },
   "summary": {
@@ -78,7 +78,7 @@ window.DYNAMICS_DATA = {
     "providers": 3,
     "experiment_configs": 0,
     "experiment_specs": 11,
-    "workflow_specs": 178,
+    "workflow_specs": 180,
     "perturbation_operators": 10,
     "lab_books": 21,
     "lab_books_canonical": 8,
@@ -3993,7 +3993,7 @@ window.DYNAMICS_DATA = {
       "successful": 1007,
       "failed": 20
     },
-    "generated_at": "2026-09-03T16:23:22.703284+00:00"
+    "generated_at": "2026-09-04T15:48:44.994362+00:00"
   },
   "reviews": {
     "models": [
@@ -4654,7 +4654,7 @@ window.DYNAMICS_DATA = {
   "labs": {
     "cache_economics": {
       "experiment_id": "lab_cache_economics",
-      "generated_at": "2026-08-31T19:55:51.556650",
+      "generated_at": "2026-09-04T17:48:38.871055",
       "summary": {
         "models": 7,
         "stories": 207
@@ -4923,12 +4923,12 @@ window.DYNAMICS_DATA = {
         "data_integrity_policy": "docs/data_integrity_findings.md",
         "requires_external_service": null,
         "contract_version": "lab-contract/v6",
-        "generated_at": "2026-08-31T19:55:51.557221+00:00"
+        "generated_at": "2026-09-04T15:48:38.871798+00:00"
       }
     },
     "condition_effects": {
       "experiment_id": "lab_condition_effects",
-      "generated_at": "2026-08-31T19:55:52.219038",
+      "generated_at": "2026-09-04T17:48:39.497543",
       "summary": {
         "conditions": 2,
         "stories": 207,
@@ -4992,12 +4992,12 @@ window.DYNAMICS_DATA = {
         "data_integrity_policy": "docs/data_integrity_findings.md",
         "requires_external_service": null,
         "contract_version": "lab-contract/v6",
-        "generated_at": "2026-08-31T19:55:52.219801+00:00"
+        "generated_at": "2026-09-04T15:48:39.498375+00:00"
       }
     },
     "grit": {
       "experiment_id": "lab_grit",
-      "generated_at": "2026-08-31T19:55:52.984566",
+      "generated_at": "2026-09-04T17:48:40.224181",
       "metric_definition": "G(s) = P(test_executed_success | perturbation_strength = s)",
       "summary": {
         "cells": 136,
@@ -5271,12 +5271,281 @@ window.DYNAMICS_DATA = {
         "data_integrity_policy": "docs/data_integrity_findings.md",
         "requires_external_service": null,
         "contract_version": "lab-contract/v6",
-        "generated_at": "2026-08-31T19:55:52.985209+00:00"
+        "generated_at": "2026-09-04T15:48:40.224793+00:00"
+      }
+    },
+    "quality_frontier": {
+      "experiment_id": "lab_quality_frontier",
+      "generated_at": "2026-09-04T17:48:40.885205",
+      "summary": {
+        "models": 7,
+        "stories": 207,
+        "analyses": 207,
+        "lsp_available_cells": 0
+      },
+      "models": [
+        {
+          "model": "deepseek-v4-flash",
+          "cells": 31,
+          "avg_cost": 0.074461,
+          "avg_captured_cost": 0.074461,
+          "total_captured_cost": 2.308294,
+          "cost_captured_records": 31,
+          "total_records": 31,
+          "cost_coverage": 1.0,
+          "lsp_errors_per_cell": null,
+          "lsp_cells": 0,
+          "code_quality_score": 0.038,
+          "code_quality_score_coverage": {
+            "value": 0.038,
+            "n_available": 31,
+            "n_total": 31,
+            "coverage": 1.0
+          },
+          "cyclomatic_complexity": 485.323,
+          "cyclomatic_complexity_coverage": {
+            "value": 485.323,
+            "n_available": 31,
+            "n_total": 31,
+            "coverage": 1.0
+          },
+          "novelty_score": 0.88,
+          "novelty_score_coverage": {
+            "value": 0.88,
+            "n_available": 31,
+            "n_total": 31,
+            "coverage": 1.0
+          }
+        },
+        {
+          "model": "gpt-5.6-luna",
+          "cells": 34,
+          "avg_cost": 0.093548,
+          "avg_captured_cost": 0.093548,
+          "total_captured_cost": 3.180633,
+          "cost_captured_records": 34,
+          "total_records": 34,
+          "cost_coverage": 1.0,
+          "lsp_errors_per_cell": null,
+          "lsp_cells": 0,
+          "code_quality_score": 0.087,
+          "code_quality_score_coverage": {
+            "value": 0.087,
+            "n_available": 34,
+            "n_total": 34,
+            "coverage": 1.0
+          },
+          "cyclomatic_complexity": 261.765,
+          "cyclomatic_complexity_coverage": {
+            "value": 261.765,
+            "n_available": 34,
+            "n_total": 34,
+            "coverage": 1.0
+          },
+          "novelty_score": 0.88,
+          "novelty_score_coverage": {
+            "value": 0.88,
+            "n_available": 34,
+            "n_total": 34,
+            "coverage": 1.0
+          }
+        },
+        {
+          "model": "deepseek-v4-pro",
+          "cells": 39,
+          "avg_cost": 0.161908,
+          "avg_captured_cost": 0.161908,
+          "total_captured_cost": 6.314403,
+          "cost_captured_records": 39,
+          "total_records": 39,
+          "cost_coverage": 1.0,
+          "lsp_errors_per_cell": null,
+          "lsp_cells": 0,
+          "code_quality_score": 0.044,
+          "code_quality_score_coverage": {
+            "value": 0.044,
+            "n_available": 39,
+            "n_total": 39,
+            "coverage": 1.0
+          },
+          "cyclomatic_complexity": 315.359,
+          "cyclomatic_complexity_coverage": {
+            "value": 315.359,
+            "n_available": 39,
+            "n_total": 39,
+            "coverage": 1.0
+          },
+          "novelty_score": 0.845,
+          "novelty_score_coverage": {
+            "value": 0.845,
+            "n_available": 39,
+            "n_total": 39,
+            "coverage": 1.0
+          }
+        },
+        {
+          "model": "gpt-5.6-terra",
+          "cells": 30,
+          "avg_cost": 1.044326,
+          "avg_captured_cost": 1.044326,
+          "total_captured_cost": 31.329782,
+          "cost_captured_records": 30,
+          "total_records": 30,
+          "cost_coverage": 1.0,
+          "lsp_errors_per_cell": null,
+          "lsp_cells": 0,
+          "code_quality_score": 0.086,
+          "code_quality_score_coverage": {
+            "value": 0.086,
+            "n_available": 30,
+            "n_total": 30,
+            "coverage": 1.0
+          },
+          "cyclomatic_complexity": 245.6,
+          "cyclomatic_complexity_coverage": {
+            "value": 245.6,
+            "n_available": 30,
+            "n_total": 30,
+            "coverage": 1.0
+          },
+          "novelty_score": 0.91,
+          "novelty_score_coverage": {
+            "value": 0.91,
+            "n_available": 30,
+            "n_total": 30,
+            "coverage": 1.0
+          }
+        },
+        {
+          "model": "claude-haiku-4-5",
+          "cells": 20,
+          "avg_cost": 1.63084,
+          "avg_captured_cost": 1.63084,
+          "total_captured_cost": 32.616808,
+          "cost_captured_records": 20,
+          "total_records": 20,
+          "cost_coverage": 1.0,
+          "lsp_errors_per_cell": null,
+          "lsp_cells": 0,
+          "code_quality_score": 0.036,
+          "code_quality_score_coverage": {
+            "value": 0.036,
+            "n_available": 20,
+            "n_total": 20,
+            "coverage": 1.0
+          },
+          "cyclomatic_complexity": 354.4,
+          "cyclomatic_complexity_coverage": {
+            "value": 354.4,
+            "n_available": 20,
+            "n_total": 20,
+            "coverage": 1.0
+          },
+          "novelty_score": 0.86,
+          "novelty_score_coverage": {
+            "value": 0.86,
+            "n_available": 20,
+            "n_total": 20,
+            "coverage": 1.0
+          }
+        },
+        {
+          "model": "gpt-5.6-sol",
+          "cells": 30,
+          "avg_cost": 3.817461,
+          "avg_captured_cost": 3.817461,
+          "total_captured_cost": 114.52382,
+          "cost_captured_records": 30,
+          "total_records": 30,
+          "cost_coverage": 1.0,
+          "lsp_errors_per_cell": null,
+          "lsp_cells": 0,
+          "code_quality_score": 0.054,
+          "code_quality_score_coverage": {
+            "value": 0.054,
+            "n_available": 30,
+            "n_total": 30,
+            "coverage": 1.0
+          },
+          "cyclomatic_complexity": 303.333,
+          "cyclomatic_complexity_coverage": {
+            "value": 303.333,
+            "n_available": 30,
+            "n_total": 30,
+            "coverage": 1.0
+          },
+          "novelty_score": 0.916,
+          "novelty_score_coverage": {
+            "value": 0.916,
+            "n_available": 30,
+            "n_total": 30,
+            "coverage": 1.0
+          }
+        },
+        {
+          "model": "claude-sonnet-5",
+          "cells": 23,
+          "avg_cost": 5.169337,
+          "avg_captured_cost": 5.169337,
+          "total_captured_cost": 118.894751,
+          "cost_captured_records": 23,
+          "total_records": 23,
+          "cost_coverage": 1.0,
+          "lsp_errors_per_cell": null,
+          "lsp_cells": 0,
+          "code_quality_score": 0.048,
+          "code_quality_score_coverage": {
+            "value": 0.048,
+            "n_available": 23,
+            "n_total": 23,
+            "coverage": 1.0
+          },
+          "cyclomatic_complexity": 374.478,
+          "cyclomatic_complexity_coverage": {
+            "value": 374.478,
+            "n_available": 23,
+            "n_total": 23,
+            "coverage": 1.0
+          },
+          "novelty_score": 0.81,
+          "novelty_score_coverage": {
+            "value": 0.81,
+            "n_available": 23,
+            "n_total": 23,
+            "coverage": 1.0
+          }
+        }
+      ],
+      "lab_contract": {
+        "lab": "lab_quality_frontier.py",
+        "input_dataset_id": "canonical_registry/story+analysis",
+        "registry_identity_sha256": "dfff942e34e5143e94ef238550994330059bbf4010e1c64555b5f72d59e75406",
+        "resolved_input_sha256": "00753f57e1b20017872d1cf16f347439a54a568b26c3b6d69d0a28cf5901cad6",
+        "registry_version": "data-manifest/1.0+14911rows",
+        "metric_definition_version": "quality_frontier/v2",
+        "metric_source_sha256": "4bf5e2c7953d5ffe68ed0499541f12143991be7b4ebbf25dd8622f1cadcf4d1c",
+        "n_resolved_records": 414,
+        "n_eligible_records": 414,
+        "n_used_records": 414,
+        "n_excluded_records": 0,
+        "n_unused_eligible_records": 0,
+        "used_record_refs_sha256": "e90ae84768acb701e9615a20335480cf5f8a8710392826184a9cf8dc6a221f7b",
+        "excluded_record_refs_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "used_unique_records": 414,
+        "used_contributions": 414,
+        "review_without_current_story": 0,
+        "story_without_review": 0,
+        "missing_required_field": 0,
+        "outside_analysis_population": 0,
+        "data_integrity_policy": "docs/data_integrity_findings.md",
+        "requires_external_service": null,
+        "contract_version": "lab-contract/v6",
+        "generated_at": "2026-09-04T15:48:40.885970+00:00"
       }
     },
     "story_arc": {
       "experiment_id": "lab_story_arc",
-      "generated_at": "2026-08-31T19:55:54.303819",
+      "generated_at": "2026-09-04T17:48:41.543509",
       "summary": {
         "snowball_factor": 2.32,
         "session1_cost": 0.173207,
@@ -5437,12 +5706,12 @@ window.DYNAMICS_DATA = {
         "data_integrity_policy": "docs/data_integrity_findings.md",
         "requires_external_service": null,
         "contract_version": "lab-contract/v6",
-        "generated_at": "2026-08-31T19:55:54.304487+00:00"
+        "generated_at": "2026-09-04T15:48:41.544176+00:00"
       }
     },
     "verification_frontier": {
       "experiment_id": "lab_verification_frontier",
-      "generated_at": "2026-08-31T19:55:55.717947",
+      "generated_at": "2026-09-04T17:48:42.898637",
       "summary": {
         "models": 7,
         "stories": 207,
@@ -5577,12 +5846,12 @@ window.DYNAMICS_DATA = {
         "data_integrity_policy": "docs/data_integrity_findings.md",
         "requires_external_service": null,
         "contract_version": "lab-contract/v6",
-        "generated_at": "2026-08-31T19:55:55.718539+00:00"
+        "generated_at": "2026-09-04T15:48:42.899242+00:00"
       }
     },
     "verification_value": {
       "experiment_id": "lab_verification_value",
-      "generated_at": "2026-08-31T19:55:56.369591",
+      "generated_at": "2026-09-04T17:48:43.507591",
       "summary": {
         "correlation_tests_vs_worse_rate": null,
         "cells": 105,
@@ -6352,7 +6621,7 @@ window.DYNAMICS_DATA = {
         "data_integrity_policy": "docs/data_integrity_findings.md",
         "requires_external_service": null,
         "contract_version": "lab-contract/v6",
-        "generated_at": "2026-08-31T19:55:56.370362+00:00"
+        "generated_at": "2026-09-04T15:48:43.508630+00:00"
       }
     }
   },
