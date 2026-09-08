@@ -30,7 +30,7 @@ import re
 from pathlib import Path
 
 import pytest
-from conftest import requires_corpus
+from conftest import requires_corpus, requires_full_corpus
 
 from agentic_dynamics.reporting import canonical_corpus as cc
 from agentic_dynamics.reporting.lab_contract import (
@@ -135,6 +135,7 @@ def test_quarantined_lab_scripts_point_at_the_legacy_dir():
         )
 
 
+@requires_full_corpus
 def test_legacy_dir_documents_itself():
     """``legacy_labs/`` carries a README explaining why its contents are not canonical."""
     readme = LEGACY_DIR / "README.md"
@@ -182,6 +183,7 @@ def test_no_live_lab_output_carries_retired_summary_lineage():
         )
 
 
+@requires_full_corpus
 def test_published_artifacts_match_the_current_registry():
     """ "Regenerated from current canonical records" is verified, not asserted.
 
@@ -255,6 +257,7 @@ def test_condition_effects_contract_reconciles_with_output():
     assert sum(c["reviews"] for c in payload["conditions"]) == summary["joined_reviews"]
 
 
+@requires_full_corpus
 def test_verification_value_join_publishes_no_placeholder_identity():
     """The story→review join fails explicitly — no ``model: "?"`` row survives (m1).
 

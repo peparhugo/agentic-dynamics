@@ -508,6 +508,7 @@ def test_fail_closed_passes_with_waiver_and_waiver_visible(tmp_path, monkeypatch
     assert waived[0]["reason"] == "known payload-less stub"
 
 
+@requires_full_corpus
 def test_real_corpus_resolution_is_tombstoned():
     """The committed corpus resolves with zero unresolved rows — the ten payload-less
     stories are tombstoned (never waived), so publication needs no waiver at all.

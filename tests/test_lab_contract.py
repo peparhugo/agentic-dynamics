@@ -27,7 +27,7 @@ import json
 from pathlib import Path
 
 import pytest
-from conftest import requires_corpus
+from conftest import requires_corpus, requires_full_corpus
 
 from agentic_dynamics.reporting import canonical_corpus as cc
 from agentic_dynamics.reporting.lab_contract import (
@@ -582,6 +582,7 @@ def test_publication_lab_does_not_glob_raw_result_dirs(entry: LabEntry):
 # ---------------------------------------------------------------------------
 
 
+@requires_full_corpus
 def test_published_lab_artifacts_carry_a_valid_contract():
     """Every lab JSON build_data would publish validates against the current manifest.
 
