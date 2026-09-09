@@ -128,6 +128,7 @@ _COMMANDS: dict[tuple[str, ...], str] = {
     ("control", "status"): "control_status.py",
     ("control", "drain-outbox"): "control_drain_outbox.py",
     ("control", "sweep-zombies"): "control_sweep_zombies.py",
+    ("control", "recording-sweep"): "recording_sweep.py",
     # session (the self-knowledge layer — loop 2: the machine learning about itself operating).
     # `session close` (s1b) writes the AIO's session-spine record via the s1a meta_session type
     # (what ran, what merged, what parked, open threads, self-notes) — rerun-safe (an identical
@@ -206,7 +207,7 @@ Subcommands (each forwards to its backing script):
   spec        status|pipeline
   validate    session|tests|prereq|preexisting
   supervise   [claude-agents|orphans|leases]
-  control     status|drain-outbox|sweep-zombies
+  control     status|drain-outbox|sweep-zombies|recording-sweep
   session     open|close
   decision    record
   scoreboard

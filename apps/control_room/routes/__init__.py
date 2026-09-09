@@ -31,6 +31,7 @@ def register(app: Flask, services: ControlRoomServices) -> None:
         docs_health,
         flags,
         index,
+        recording,
         registry,
         telemetry,
     )
@@ -38,6 +39,7 @@ def register(app: Flask, services: ControlRoomServices) -> None:
     telemetry.register(app, services)
     flags.register(app, services)
     registry.register(app, services)
+    recording.register(app, services)
     design_sessions.register(app, services)
     claude_agents.register(app, services)
     docs_health.register(app, services)

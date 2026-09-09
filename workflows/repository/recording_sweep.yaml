@@ -1,0 +1,93 @@
+name: recording_sweep
+question: >-
+  Deterministic decision-record coverage: a machine-run reconciliation sweep over the
+  record layer (the 2026-09-09 discipline audit's rail). Each night the sweep scans main's
+  commit-days against decision records and session closes; a day with commits but neither
+  is a recording gap; a close citing a decision record with no artifact is a phantom claim
+  (the 80f02d3ce5 class). The sweep records a backfilled decision per gap day with
+  reconstructed rationale (commit messages + transition reasons, actor recording-sweep) —
+  never fabricated intent — and writes the audit report. Zero model calls in the engine;
+  the phases are thin orchestration shells so the RUN itself is recorded by the workflow
+  machinery (control rows, ledger, auto fact-emit), not a bare cron.
+version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: false
+repeatable: true
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: false
+    context:
+      finding: >-
+        scripts/recording_sweep.py implements the deterministic engine (--scan /
+        --backfill / --report). The record layer: decision records (kb/ artifacts with a
+        JSON body carrying category + decided_at), session closes (meta_session artifacts
+        whose prose opens "session close <date>"), main first-parent commits by day, and
+        phantom claims (a close or decision text citing a 64-hex decision record id with
+        no artifact). The sweep is rerun-safe: a day already decided/closed is never
+        re-recorded. This spec wraps the engine so runs carry full workflow recording.
+      hard_rules: >-
+        (1) The engine script is the only writer — phases never derive records inline.
+        (2) Backfill rationale is reconstructed from evidence, actor recording-sweep.
+        (3) The audit report lands at experiments/results/recording/audit.json (runtime
+        data — never committed). (4) A scan finding gaps exits nonzero; the phase fails
+        loudly, it does not silently pass.
+      run_shape: >-
+        SINGLE-model deepseek/deepseek-v4-flash, in-process; three phases each invoke
+        one engine mode. Repeatable (nightly cadence = timer + this spec).
+    phases:
+      - name: p0_scan
+        kind: agent
+        scope: implementation
+        timeout: 600
+        prompt: |
+          GOAL: {goal}
+          DELIVERABLE: run the scan and report the audit to stdout.
+          INPUTS: scripts/recording_sweep.py.
+          DONE_WHEN: `python3 scripts/recording_sweep.py --report` exits 0 and prints the
+          audit JSON (commit_days, decided_days, closed_days, gap_days,
+          phantom_close_claims). Do NOT run --backfill in this phase. Do NOT edit any file.
+          If the engine errors, capture the traceback and FAIL.
+          DELIVER: the audit JSON as the phase log output.
+          LOG: PASS/FAIL.
+      - name: p1_backfill
+        kind: agent
+        scope: implementation
+        timeout: 900
+        prompt: |
+          GOAL: {goal}
+          DELIVERABLE: record the gap days. INPUTS: the p0 audit; scripts/recording_sweep.py.
+          DONE_WHEN: `python3 scripts/recording_sweep.py --backfill` exits 0 and reports the
+          days recorded; each backfilled day now has a decision record (actor
+          recording-sweep, category recording). Rerun-safe: if p0 found no gaps the phase
+          reports zero and passes.
+          GATES: rerun the scan afterwards — gap_days must be empty (or only days whose
+          backfill legitimately predates the spine, documented in the close record).
+          SCOPE FENCE: the engine script ONLY — no hand-written records, no editing the
+          audit JSON.
+          DELIVER: the backfill report.
+          LOG: PASS/FAIL.
+      - name: p2_report
+        kind: agent
+        scope: implementation
+        timeout: 600
+        prompt: |
+          GOAL: {goal}
+          DELIVERABLE: the reconciled audit as of this run. INPUTS: the p1 state.
+          DONE_WHEN: `python3 scripts/recording_sweep.py --report` prints a clean audit
+          (gap_days empty or documented). The report artifact is at
+          experiments/results/recording/audit.json (runtime data — do NOT commit it).
+          DELIVER: a one-line summary of the sweep outcome.
+          LOG: PASS/FAIL.
+factors:
+  - {name: model, levels: [deepseek/deepseek-v4-flash]}
+design: factorial
+writeup:
+  format: lab_book
+  sections: [p0_scan, p1_backfill, p2_report]
+stop: {budget_usd: 0.5, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}
