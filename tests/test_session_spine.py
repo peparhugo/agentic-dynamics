@@ -530,6 +530,10 @@ class TestSessionCloseCommand:
             session["self_notes"],
         ]
         assert sc.main(argv) == 0
+        session = dict(session)
+        session["close_seq"] = si._close_sequence_number(
+            session["session_date"], session["slug"], tmp_path
+        )
         spine = si.derive_session_record(session)
         reflection = ri.derive_reflection_record(session)
         assert {path.name for path in tmp_path.glob("*.json")} == {
@@ -889,6 +893,10 @@ class TestSessionOpenCommand:
         ]
         assert sc.main(argv) == 0
         capsys.readouterr()  # drop the close command's report — the buffer below is open's own
+        session = dict(session)
+        session["close_seq"] = si._close_sequence_number(
+            session["session_date"], session["slug"], tmp_path
+        )
         spine = si.derive_session_record(session)
         reflection = ri.derive_reflection_record(session)
         artifacts = {path.name for path in tmp_path.glob("*.json")}
@@ -923,3 +931,31 @@ class TestSessionOpenCommand:
         assert "self_knowledge_layer/s0_pin_spec, self_knowledge_layer/s1a" in out
         assert "open command (s1c)" in out
         assert "I re-derived the wave verdict by grep instead of reading a record." in out
+
+    def test_two_distinct_sessions_same_day_open_returns_the_newest(self, tmp_path):
+        """The 2026-09-08 open_session regression: two DISTINCT sessions closing the same day
+        cannot be ordered by content (slug lexicographic picked the morning's record). The
+        content-stamped close_seq makes close-order authoritative: open returns the SECOND
+        session's close, never the lexicographically-highest slug."""
+        from agentic_dynamics.core import paths as core_paths
+        from agentic_dynamics.knowledge import knowledge_stream as ks
+
+        redis = _FakeRedis()
+        monkeypatch = None  # noqa: F841 - kept for symmetry; tmp_path is real
+        morning = _session()
+        morning["slug"] = "2026-09-08-kb-facts-and-graph-repair"
+        morning["session_date"] = "2026-09-08"
+        afternoon = _session()
+        afternoon["slug"] = "2026-09-08-aio-corpus-migration"
+        afternoon["session_date"] = "2026-09-08"
+        afternoon["waves_run"] = ["corpus migration"]
+
+        _close(morning, tmp_path, redis)
+        _close(afternoon, tmp_path, redis)
+
+        opened = si.open_session(artifact_dir=tmp_path)
+        assert opened.payload["slug"] == "2026-09-08-aio-corpus-migration"
+        assert opened.payload["close_seq"] == 2
+        # the lexical max would have been kb-facts (k > a) — the seq beats the slug
+        assert opened.payload["slug"] != "2026-09-08-kb-facts-and-graph-repair"
+

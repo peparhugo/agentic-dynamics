@@ -173,6 +173,8 @@ def session_payload(
     for field in sorted(LIST_FIELDS):
         payload[field] = _list_value(session, field)
     payload["self_notes"] = str(session.get("self_notes") or "")
+    if session.get("close_seq") is not None:
+        payload["close_seq"] = int(session["close_seq"])
     payload["actor"] = ACTOR
     payload["scope"] = aio_acl_scope(repository_id)
     return payload
@@ -372,8 +374,12 @@ def close_session(
         record_to_event,
     )
 
-    record = derive_session_record(session, repository_id=repository_id, now=now)
     artifact_dir = artifact_dir or KB_ARTIFACT_DIR
+    session = dict(session)
+    session["close_seq"] = _close_sequence_number(
+        session.get("session_date") or "", session.get("slug") or "", artifact_dir
+    )
+    record = derive_session_record(session, repository_id=repository_id, now=now)
     artifact_path = artifact_dir / f"{record.knowledge_id}.json"
     artifact_bytes = record_to_artifact(record)
     warnings: list[str] = []
@@ -565,6 +571,41 @@ def scan_session_records(
     return triples, warnings
 
 
+def _close_sequence_number(session_date: str, slug: str, artifact_dir: Path) -> int:
+    """Content-stable ordering within one session-date: how many OTHER session slots have
+    closed that day already.
+
+    The spine's content blanks wall clocks, so two DISTINCT sessions closing the same day
+    cannot be ordered by content (the 2026-09-08 open_session regression: the lexicographic
+    slug tiebreak picked the morning session over the afternoon's). ``close_seq`` = 1 + the
+    number of same-date records with a DIFFERENT slug stamps close-order into the content:
+    distinct sessions increase it, while a re-close of the SAME slug keeps its own sequence
+    (preserving the rerun-safe no-op — the body is unchanged, so the id is unchanged).
+    """
+    if not session_date or not slug:
+        return 1
+    from agentic_dynamics.core.paths import KB_ARTIFACT_DIR
+
+    artifact_dir = artifact_dir or KB_ARTIFACT_DIR
+    try:
+        peers = 0
+        for path in session_artifact_files(artifact_dir):
+            try:
+                _kind, _artifact, payload = _classify_session_artifact(
+                    path, repository_id=REPOSITORY_ID
+                )
+            except Exception:
+                continue
+            if (
+                str(payload.get("session_date") or "") == session_date
+                and str(payload.get("slug") or "") != slug
+            ):
+                peers += 1
+        return peers + 1
+    except Exception:
+        return 1
+
+
 def _selection_key(
     triple: tuple[Path, dict[str, Any], dict[str, Any]],
 ) -> tuple[str, str, float, str]:
@@ -587,6 +628,7 @@ def _selection_key(
         mtime = 0.0
     return (
         str(payload.get("session_date") or ""),
+        int(payload.get("close_seq") or 0),
         str(payload.get("slug") or ""),
         mtime,
         _path.name,
