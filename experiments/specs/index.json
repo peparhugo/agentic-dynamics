@@ -1,7 +1,7 @@
 {
   "schema_version": "spec-status/v2",
-  "generated_at": "2026-09-04T15:00:13.857917+00:00",
-  "n_specs": 191,
+  "generated_at": "2026-09-09T23:53:06.364280+00:00",
+  "n_specs": 192,
   "specs": [
     {
       "name": "auto_posthoc_wiring",
@@ -599,7 +599,7 @@
       "latest_cost_usd": null,
       "latest_git_sha": null,
       "results_pointer": null,
-      "n_runs": 0,
+      "n_runs": 4,
       "workflow_revision_id": "6e2707222b858afb8fd3e4a24d372476ea31ad2828312a785e0ea28cff3aefa4",
       "authored_status": null
     },
@@ -744,26 +744,6 @@
       "authored_status": null
     },
     {
-      "name": "promote_row_closeout",
-      "version": "0.1",
-      "status": "runnable",
-      "spec_path": "workflows/repository/promote_row_closeout.yaml",
-      "artifact_kind": "workflow",
-      "repeatable": false,
-      "supersedes": [],
-      "superseded_by": null,
-      "completed_at": null,
-      "last_run_at": null,
-      "latest_ok": null,
-      "latest_model": null,
-      "latest_cost_usd": null,
-      "latest_git_sha": null,
-      "results_pointer": null,
-      "n_runs": 0,
-      "workflow_revision_id": "ff9be7382b589f44364e8aa67717a9211ba9e2eb14f190beafb0fe198a87768a",
-      "authored_status": null
-    },
-    {
       "name": "public_truth_closure",
       "version": "0.1",
       "status": "runnable",
@@ -821,6 +801,26 @@
       "results_pointer": null,
       "n_runs": 0,
       "workflow_revision_id": "dacb1f39ee45fca1e334837c5cb240a3014cbf5399e87fa5f77bdd5dcd3f699c",
+      "authored_status": null
+    },
+    {
+      "name": "recording_sweep",
+      "version": "0.1",
+      "status": "runnable",
+      "spec_path": "workflows/repository/recording_sweep.yaml",
+      "artifact_kind": "workflow",
+      "repeatable": true,
+      "supersedes": [],
+      "superseded_by": null,
+      "completed_at": null,
+      "last_run_at": "2026-09-09T23:53:06.355579+00:00",
+      "latest_ok": true,
+      "latest_model": "deepseek/deepseek-v4-flash",
+      "latest_cost_usd": 0.020363,
+      "latest_git_sha": "f7d9ebe42",
+      "results_pointer": "experiments/results/workflows/recording_sweep/20260909T235306Z.json",
+      "n_runs": 1,
+      "workflow_revision_id": "a17e27bcf0fc9ee8ae17b2bf84a3ad3a1949f8f91c526de7c2d40ba2da37643f",
       "authored_status": null
     },
     {
@@ -1427,6 +1427,26 @@
       "results_pointer": "experiments/results/workflows/evidence_redesign/20260814T191814Z.json",
       "n_runs": 3,
       "workflow_revision_id": "19e300ee8c562498f4bf8b0f28355faca8f97e72c89bd07a0f88806fbf750af5",
+      "authored_status": null
+    },
+    {
+      "name": "promote_row_closeout",
+      "version": "0.1",
+      "status": "failed",
+      "spec_path": "workflows/repository/promote_row_closeout.yaml",
+      "artifact_kind": "workflow",
+      "repeatable": false,
+      "supersedes": [],
+      "superseded_by": null,
+      "completed_at": null,
+      "last_run_at": "2026-09-04T15:01:22.436362+00:00",
+      "latest_ok": true,
+      "latest_model": "deepseek/deepseek-v4-flash",
+      "latest_cost_usd": 0.0,
+      "latest_git_sha": "169bb2fbb",
+      "results_pointer": "experiments/results/workflows/promote_row_closeout/20260904T150122Z.json",
+      "n_runs": 2,
+      "workflow_revision_id": "ff9be7382b589f44364e8aa67717a9211ba9e2eb14f190beafb0fe198a87768a",
       "authored_status": null
     },
     {

@@ -3,8 +3,8 @@
 **Generated — do not edit by hand.** Regenerate with `python scripts/spec_status.py`;
 `scripts/run_workflow.py` also refreshes it at the end of every run.
 
-Generated at: `2026-09-04T15:00:13.857917+00:00`  ·  191 spec(s)
-**Work remaining:** 79 open · 112 completed/retired
+Generated at: `2026-09-09T23:53:06.364280+00:00`  ·  192 spec(s)
+**Work remaining:** 80 open · 112 completed/retired
 
 | name | kind | repeatable | status | version | supersedes | last_run | ok | model | cost | n_runs |
 |---|---|---|---|---|---|---|---|---|---|---|
@@ -37,7 +37,7 @@ Generated at: `2026-09-04T15:00:13.857917+00:00`  ·  191 spec(s)
 | `finding_economics_closure` | workflow | yes | runnable | 0.1 | — | 2026-08-22 17:22 | ok | deepseek/deepseek-v4-pro | $1.2820 | 1 |
 | `fleet_job_submission` | workflow | no | runnable | 0.1 | — | — | — | — | — | 3 |
 | `fleet_launch_boundary` | workflow | no | runnable | 0.1 | — | — | — | — | — | 1 |
-| `graph_leg_closeout` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
+| `graph_leg_closeout` | workflow | no | runnable | 0.1 | — | — | — | — | — | 4 |
 | `green_main_closure` | workflow | no | runnable | 0.1 | — | — | — | — | — | 4 |
 | `kb_finding_layer` | workflow | no | runnable | 0.1 | — | — | — | — | — | 1 |
 | `labbook_refresh` | workflow | yes | runnable | 0.1 | — | 2026-08-17 18:14 | ok | deepseek/deepseek-v4-flash | $0.0275 | 1 |
@@ -45,10 +45,10 @@ Generated at: `2026-09-04T15:00:13.857917+00:00`  ·  191 spec(s)
 | `ledger_instrumentation_probe` | workflow | yes | runnable | 0.1 | — | 2026-08-30 19:05 | fail | openai/gpt-5.6-sol | $0.0020 | 1 |
 | `posthoc_pipeline` | workflow | yes | runnable | 0.1 | — | — | — | — | — | 0 |
 | `process_perturbation_resample` | experiment | yes | runnable | 0.1 | — | — | — | — | — | 0 |
-| `promote_row_closeout` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `public_truth_closure` | workflow | yes | runnable | 0.1 | — | 2026-08-21 22:03 | ok | deepseek/deepseek-v4-pro | $2.0485 | 1 |
 | `queue_steer` | workflow | yes | runnable | 0.1 | — | 2026-08-15 19:32 | ok | deepseek/deepseek-v4-flash | $0.0330 | 1 |
 | `rag_bare_vs_augmented` | experiment | yes | runnable | 0.1 | — | — | — | — | — | 0 |
+| `recording_sweep` | workflow | yes | runnable | 0.1 | — | 2026-09-09 23:53 | ok | deepseek/deepseek-v4-flash | $0.0204 | 1 |
 | `registry_canonicalize` | workflow | yes | runnable | 0.1 | — | 2026-08-19 13:42 | ok | deepseek/deepseek-v4-pro | $0.1872 | 1 |
 | `retrieval_activation` | workflow | no | runnable | 0.1 | — | — | — | — | — | 2 |
 | `retrieval_activation_augment_proof` | workflow | yes | runnable | 0.1 | — | 2026-09-01 04:45 | fail | deepseek/deepseek-v4-flash | $0.0016 | 5 |
@@ -79,6 +79,7 @@ Generated at: `2026-09-04T15:00:13.857917+00:00`  ·  191 spec(s)
 | `design_sessions` | workflow | no | failed | 0.1 | — | 2026-08-14 06:58 | fail | openai/gpt-5.6-sol | $0.0000 | 1 |
 | `engine_gaps_verifier_revision` | workflow | no | failed | 0.1 | — | 2026-09-02 16:50 | ok | deepseek/deepseek-v4-flash | $0.0951 | 2 |
 | `evidence_redesign` | workflow | no | failed | 0.1 | — | 2026-08-14 19:18 | ok | openai/gpt-5.6-sol | $5.9008 | 3 |
+| `promote_row_closeout` | workflow | no | failed | 0.1 | — | 2026-09-04 15:01 | ok | deepseek/deepseek-v4-flash | $0.0000 | 2 |
 | `rag_knowledge_base` | workflow | no | failed | 0.1 | — | 2026-08-14 23:37 | ok | openai/gpt-5.6-sol | $5.4215 | 4 |
 | `semantic_integrity_release` | workflow | no | failed | 0.1 | — | 2026-08-21 05:25 | ok | deepseek/deepseek-v4-pro | $1.6898 | 4 |
 | `admission_leases` | workflow | no | blocked | 0.1 | — | 2026-09-01 00:37 | ok | anthropic/claude-opus-5 | $7.7920 | 5 |
