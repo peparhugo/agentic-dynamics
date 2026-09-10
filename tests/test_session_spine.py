@@ -937,8 +937,6 @@ class TestSessionOpenCommand:
         cannot be ordered by content (slug lexicographic picked the morning's record). The
         content-stamped close_seq makes close-order authoritative: open returns the SECOND
         session's close, never the lexicographically-highest slug."""
-        from agentic_dynamics.core import paths as core_paths
-        from agentic_dynamics.knowledge import knowledge_stream as ks
 
         redis = _FakeRedis()
         monkeypatch = None  # noqa: F841 - kept for symmetry; tmp_path is real
@@ -959,3 +957,82 @@ class TestSessionOpenCommand:
         # the lexical max would have been kb-facts (k > a) — the seq beats the slug
         assert opened.payload["slug"] != "2026-09-08-kb-facts-and-graph-repair"
 
+
+# ── R1 (aio_controller_postmortem): the close-time recording probe ─────────────────────────────
+#
+# The doctrine "recording is part of the act" (agent_config/rules.md) is made self-checking at
+# the session-close seam: the close runs the existing recording_sweep scan and reports the
+# window's uncovered days + phantom close claims. The probe is best-effort and
+# unmeasured-aware, so these tests pin the three contract states (unmeasured / gap / clean)
+# without needing a data root, Redis, or a git worktree.
+
+
+_SCRIPTS_DIR = Path(__file__).resolve().parent.parent / "scripts"
+if str(_SCRIPTS_DIR) not in sys.path:
+    sys.path.insert(0, str(_SCRIPTS_DIR))
+
+
+class TestRecordingProbe:
+    def test_unmeasured_when_no_kb_artifact_dir(self, tmp_path, monkeypatch):
+        """A checkout with no runtime data root reports unmeasured — never a fabricated gap."""
+        import recording_sweep as sweep
+        import session_close as sc
+
+        monkeypatch.setattr(sweep, "ROOT", tmp_path)  # no experiments/results/kb under it
+        probe = sc._recording_check("2026-09-10")
+        assert probe == {"status": "unmeasured", "reason": "no KB artifact dir on disk"}
+
+    def test_unmeasured_when_the_scan_faults(self, tmp_path, monkeypatch):
+        """A scan fault is a warning state, never an exception that costs the close its record."""
+        import recording_sweep as sweep
+        import session_close as sc
+
+        (tmp_path / "experiments" / "results" / "kb").mkdir(parents=True)
+        monkeypatch.setattr(sweep, "ROOT", tmp_path)
+
+        def _boom():
+            raise RuntimeError("git unavailable")
+
+        monkeypatch.setattr(sweep, "scan", _boom)
+        probe = sc._recording_check("2026-09-10")
+        assert probe["status"] == "unmeasured"
+        assert "git unavailable" in probe["reason"]
+
+    def test_measured_reports_gap_and_phantoms(self, tmp_path, monkeypatch):
+        """A measured scan surfaces the session-day gap and phantom claims verbatim."""
+        import recording_sweep as sweep
+        import session_close as sc
+
+        (tmp_path / "experiments" / "results" / "kb").mkdir(parents=True)
+        monkeypatch.setattr(sweep, "ROOT", tmp_path)
+        monkeypatch.setattr(
+            sweep,
+            "scan",
+            lambda: {
+                "gap_days": ["2026-09-10"],
+                "phantom_close_claims": ["aaaa.json: cites bbbb... (no artifact)"],
+            },
+        )
+        probe = sc._recording_check("2026-09-10")
+        assert probe["status"] == "measured"
+        assert probe["session_day_is_gap"] is True
+        lines = sc._recording_lines(probe)
+        assert any("2026-09-10 has no decision/close coverage" in line for line in lines)
+        assert any("1 phantom close claim" in line for line in lines)
+
+    def test_unmeasured_line_names_the_reason(self):
+        import session_close as sc
+
+        lines = sc._recording_lines(
+            {"status": "unmeasured", "reason": "no KB artifact dir on disk"}
+        )
+        assert lines == ["[session-close] recording: unmeasured (no KB artifact dir on disk)"]
+
+    def test_clean_measured_state_is_silent(self):
+        """A covered day with no phantoms emits no warning line (never noise on a good close)."""
+        import session_close as sc
+
+        assert (
+            sc._recording_lines({"status": "measured", "gap_days": [], "phantom_close_claims": []})
+            == []
+        )

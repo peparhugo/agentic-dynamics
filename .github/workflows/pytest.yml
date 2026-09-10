@@ -62,6 +62,17 @@ jobs:
           # `python3 scripts/_gen_instructions.py`, and commit the regenerated surfaces.
           python3 scripts/_gen_instructions.py --check
 
+      - name: Gate — docs drift (spec lifecycle)
+        run: |
+          # aio_controller_postmortem R3: a generated surface and its dependents never drift.
+          # The scanner re-derives the spec-lifecycle counts from
+          # experiments/specs/index.json and fails when a source doc (the README "By the
+          # Numbers" row) disagrees — a red build instead of a silent stale count. The scanner
+          # is stdlib-only, so it stays in this dependency-free job; it reports other axes
+          # (anchor integrity, manifest counts) but only this one is gated, because the
+          # untracked data plane legitimately breaks data-file anchors.
+          python3 scripts/scan_docs_drift.py --check spec_lifecycle --fail-on-drift
+
   test:
     runs-on: ubuntu-latest
     strategy:

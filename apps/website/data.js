@@ -78,7 +78,7 @@ window.DYNAMICS_DATA = {
     "providers": 3,
     "experiment_configs": 0,
     "experiment_specs": 11,
-    "workflow_specs": 180,
+    "workflow_specs": 181,
     "perturbation_operators": 10,
     "lab_books": 21,
     "lab_books_canonical": 8,

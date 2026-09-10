@@ -118,7 +118,71 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def _report(result: si.SessionCloseResult, reflection: ri.ReflectionAppendResult) -> dict:
+def _recording_check(session_date: str) -> dict[str, Any]:
+    """Best-effort coverage probe run at close time (the R1 rail of the postmortem wave).
+
+    The doctrine is "recording is part of the act" (``agent_config/rules.md``): the decision
+    record is written when the decision is made and the session is closed when it ends. This
+    probe makes that self-checking at the close seam instead of only in the nightly sweep: it
+    runs the already-written :mod:`recording_sweep` scan for the window and reports whether
+    the session's own day is covered by a decision/close and whether any close on disk cites a
+    decision artifact that does not exist (the phantom-claim class).
+
+    It is deliberately **unmeasured-aware**: the post-migration data root
+    (``experiments/results/kb``) is untracked runtime state, so a checkout without it cannot
+    answer the question. "Unmeasured" is reported as such — never a fabricated gap — and it is
+    a warning, never a failure: the same best-effort contract as the reflection append, so a
+    probe fault can never cost the session its spine record.
+    """
+    try:
+        import recording_sweep as sweep  # sibling script (scripts/ is sys.path[0] on direct run)
+    except ImportError:  # pragma: no cover - importable in every maintained invocation
+        return {"status": "unmeasured", "reason": "recording_sweep unavailable"}
+    kb_dir = sweep.ROOT / "experiments" / "results" / "kb"
+    if not kb_dir.is_dir():
+        return {"status": "unmeasured", "reason": "no KB artifact dir on disk"}
+    try:
+        report = sweep.scan()
+    except Exception as exc:  # noqa: BLE001 — a probe fault is a warning, never a failed close
+        return {"status": "unmeasured", "reason": f"{type(exc).__name__}: {exc}"}
+    gaps = list(report.get("gap_days") or [])
+    phantoms = list(report.get("phantom_close_claims") or [])
+    return {
+        "status": "measured",
+        "gap_days": gaps,
+        "phantom_close_claims": phantoms,
+        "session_day_is_gap": session_date in gaps,
+    }
+
+
+def _recording_lines(recording: dict[str, Any]) -> list[str]:
+    """Human report lines for the close-time recording probe (warnings only, never fatal)."""
+    status = recording.get("status")
+    if status == "unmeasured":
+        return [f"[session-close] recording: unmeasured ({recording.get('reason')})"]
+    lines: list[str] = []
+    gap_days = list(recording.get("gap_days") or [])
+    if recording.get("session_day_is_gap"):
+        day = gap_days[0] if gap_days else "this day"
+        lines.append(
+            f"[session-close] recording: {day} has no "
+            "decision/close coverage in the window — record at the moment of the act"
+        )
+    phantoms = recording.get("phantom_close_claims") or []
+    if phantoms:
+        lines.append(
+            f"[session-close] recording: {len(phantoms)} phantom close claim(s) cite a "
+            "decision artifact that does not exist"
+        )
+        lines.extend(f"[session-close] recording:   {p}" for p in phantoms)
+    return lines
+
+
+def _report(
+    result: si.SessionCloseResult,
+    reflection: ri.ReflectionAppendResult,
+    recording: dict[str, Any] | None = None,
+) -> dict:
     """The machine report: what the close did, plus the record's durable identity.
 
     ``reflection`` is the s6a reflection-append half of the close. Its block names the
@@ -126,6 +190,9 @@ def _report(result: si.SessionCloseResult, reflection: ri.ReflectionAppendResult
     was written — the reflection record's own durable identity. ``no-notes`` (a session with
     empty self-notes) carries ``null`` identities: nothing was derived, which is the honest
     report, never a fabricated entry id.
+
+    ``recording`` is the close-time coverage probe (``_recording_check``): the sweep's
+    ``status`` plus, when measured, the window's uncovered days and phantom close claims.
     """
     reflection_block: dict[str, Any] = {"status": reflection.status}
     if reflection.record is not None:
@@ -146,6 +213,7 @@ def _report(result: si.SessionCloseResult, reflection: ri.ReflectionAppendResult
         "artifact": str(result.artifact_path),
         "entry_id": result.entry_id,
         "reflection": reflection_block,
+        "recording": recording or {"status": "unmeasured", "reason": "probe not run"},
         "warnings": list(result.warnings) + list(reflection.warnings),
     }
 
@@ -206,8 +274,13 @@ def main(argv: list[str] | None = None) -> int:
         # reflection must never cost the session its spine record.
         reflection = ri.ReflectionAppendResult(record=None, status="degraded", warnings=[str(exc)])
 
+    # R1 — the close-time coverage probe ("recording is part of the act"). Best-effort like the
+    # reflection append: a probe fault must never cost the session its spine record.
+    recording = _recording_check(args.session_date)
+    recording_lines = _recording_lines(recording)
+
     if args.json:
-        print(json.dumps(_report(result, reflection), indent=2))
+        print(json.dumps(_report(result, reflection, recording), indent=2))
     else:
         status = result.status
         slug = result.record.logical_locator
@@ -228,6 +301,8 @@ def main(argv: list[str] | None = None) -> int:
             )
         for line in _reflection_lines(reflection):
             print(line)
+    for line in recording_lines:
+        print(line, file=sys.stderr)
     for warning in list(result.warnings) + list(reflection.warnings):
         print(f"[session-close] warning: {warning}", file=sys.stderr)
     return 0

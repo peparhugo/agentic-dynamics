@@ -767,6 +767,38 @@ def test_data_js_publication_contract_present_and_verifies():
     assert contract["data_integrity_policy_version"] == cc.DATA_INTEGRITY_POLICY_VERSION
 
 
+def test_data_js_resolution_report_is_complete_without_a_data_root():
+    """CI-tier resolution guard (aio_controller_postmortem R5): the committed publication
+    attests a COMPLETE resolution — with no data root required.
+
+    The pre-existing publication-contract test only checked data.js-vs-manifest *identity*, and
+    it is gated on the full corpus (``@requires_full_corpus``), so it never ran in CI. This
+    guard runs on the committed ``apps/website/data.js`` alone: a published artifact that omits
+    the resolution report, or that carries any missing / unreadable / ambiguous / duplicate row,
+    is a red build. ``build_data.py`` already refuses to emit such an artifact
+    (``_assert_resolution_complete``), so this closes the *publication* half of the class — the
+    historical 407-row red could not ship as a clean-looking data.js. The full-corpus
+    re-resolution remains ``@requires_full_corpus`` (payloads are not in the CI fixture).
+    """
+    import json
+
+    data_js = Path(__file__).resolve().parent.parent / "apps" / "website" / "data.js"
+    if not data_js.exists():  # pragma: no cover - generated file, present in CI
+        pytest.skip("apps/website/data.js not generated")
+    text = data_js.read_text(encoding="utf-8")
+    payload = json.loads(text[text.index("{") : text.rindex("}") + 1])
+
+    report = payload.get("resolution_report")
+    assert report is not None, (
+        "data.js carries no resolution_report — resolution is unverified, publication is refused"
+    )
+    assert report.get("resolved") == report.get("expected_current"), (
+        f"data.js resolved {report.get('resolved')} of {report.get('expected_current')} current rows"
+    )
+    for kind in ("missing", "unreadable", "ambiguous", "duplicate"):
+        assert report.get(kind, 0) == 0, f"data.js resolution report has {kind}: {report.get(kind)}"
+
+
 def test_data_js_generator_source_tree_identity_is_current():
     """The publication contract's generator_source_tree_identity matches a fresh recompute.
 
