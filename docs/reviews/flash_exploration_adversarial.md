@@ -5,113 +5,51 @@ status: accepted
 # Flash Exploration Adversarial Review
 
 **Reviewer:** `openai/gpt-5.6-terra` (independent of the flash author)
-**Reviewed branch:** `feature/flash-exploration` at `f481c8d4e`
-**Scope:** review only. This pass changed no implementation or test files.
-**Verdict: FAIL.** The branch is not merge-ready for the data-plane mint or ladder. Fix F1 and
-F2, then repeat the unavailable live-store probes required by F3. F4 and F5 must also be
-corrected before treating `p4_verify` as a passing gate artifact.
+
+**Reviewed branch:** `feature/flash-exploration` at `46e479bef`. The implementation candidate is
+`693ded194f89f980dbae0ba9cb103922075ae63a`; changes after it are the close-out documentation,
+the regenerated probe artifact, and workflow/preregistration material. `retrieval.py` and
+`probe_retrieval_reachability.py` are unchanged from that candidate.
+
+**Scope:** adversarial review only. This pass changes only this review document.
+
+**Verdict: FAIL.** The required non-Python cosmetic-invariance attack remains bypassable, and a
+second JavaScript-template bypass remains. The retrieval path also has a pre-existing ACL leak,
+and the new host probe can falsely report dense availability. Do not release the ladder until
+F1-F4 are repaired and independently re-reviewed.
 
 ## Findings
 
-| ID | Severity | Finding | Direct evidence | Required disposition |
-|---|---|---|---|---|
-| F1 | High | `portfolio_diversity` remains gameable by inline comments in non-Python source. The fallback only discards whole `#`/`//` lines; it retains inline `//` and block comments, which raise `mean_composite` and `max_composite` despite no semantic change. | `pairwise_divergence("function f(){ return 1; }", "function f(){ return 1; } // cosmetic")` returned `composite=0.10909090909090909`; the analogous C block-comment pair returned `0.16153846153846152`. `src/agentic_dynamics/measurement/diversity.py:93-99` implements the incomplete fallback. | Normalize comments for every collected language, or restrict the metric to a parser-backed representation and explicitly report unsupported-language coverage. Add JavaScript/C inline-comment regression tests. |
-| F2 | High | The new portfolio instrument is not connected to a production measurement path. It is defined and unit-tested, but no non-test caller calculates it from result JSON or records a portfolio result. `solution_code` therefore cannot yield the declared `portfolio_diversity_measured` signal. | Repository search found `portfolio_diversity(` only at `src/agentic_dynamics/measurement/diversity.py:199` and `tests/test_diversity.py`; `solution_code` is written only by `scripts/run.py:217,347` and has no scorer consumer. | Add the intended scorer/aggregation seam, persist the result with its coverage, and test it from a result JSON containing `None` and collected source. |
-| F3 | High | The three live retrieval layers were not independently re-verified on this HEAD. The dense probe cannot start because `chromadb` is absent, and the lexical probe cannot connect because `bolt://localhost:7687` refuses connections. Pure filter/unit evidence does not demonstrate either running store accepts exempt authorities or rejects stale SOURCE at the current commit. | `from agentic_dynamics.knowledge.embeddings import ChromaStore; ChromaStore(...)` raised `ModuleNotFoundError: No module named 'chromadb'`. A direct `Neo4jClient(uri="bolt://localhost:7687", ...)` mismatched-commit query raised `neo4j.exceptions.ServiceUnavailable: connection refused`. | Re-run the mismatched-commit probe against live Chroma and Neo4j on the candidate HEAD. Show MEASURED/DERIVED/ADVISORY admitted and mismatched SOURCE excluded in every layer. |
-| F4 | Medium | `solution_code` is deliberately nullable, not always populated. This is the right absence representation, but it does not meet a literal claim that every attempt has recoverable solution code, and there is no downstream scorer enforcing the documented exclusion rule. | `_serialize_solution_code(None)` and `_serialize_solution_code({})` both returned `None`; `scripts/run.py:585-590` documents the same rule. `_collect_code` returns `None` for an unavailable worktree or no supported source at `scripts/run.py:615-631`. | Make the ladder's coverage denominator explicit, exclude null-source attempts in the real scorer, and report the excluded count. Do not describe this field as universally populated. |
-| F5 | Medium | `p4_verify` is not a passing verification artifact under its own `DONE_WHEN`. It labels the dense clause untested, pattern convergence simulated rather than live, and Probe 5's raw output records the superseded `""` behavior. Its consumer command also names nonexistent `scripts/backfill_artifacts.py`; the actual archived consumer is `scripts/archive/backfill_artifacts.py`. | `docs/reviews/flash_exploration_verify.md:15-25,56-60,648-684,719-745`; `workflows/repository/flash_exploration_build.yaml:161-174`; actual consumer at `scripts/archive/backfill_artifacts.py:74-178`. | Replace the stale/raw-incompatible Probe 5 evidence, inspect the actual archived consumer, and do not mark the phase complete until F3's live-store and live-convergence evidence exist. |
+| Finding | Severity | Direct re-verification | Required disposition |
+|---|---|---|---|
+| F1: The non-Python fallback treats ordinary reformatting as diversity. Its canonical form collapses whitespace runs but preserves whitespace adjacent to punctuation, so equivalent JavaScript and C formatting remains textually different. This violates the required interior-whitespace/reformatting invariance and can inflate `portfolio_diversity`. | High | `pairwise_divergence("function f(){return 1;}\n", "function f() { return 1; }\n")["composite"] == 0.1607142857142857`; the C analogue (`int f(void){return 1;}` vs `int f( void ) { return 1; }`) is `0.23823529411764707`. `measurement/diversity.py:168-170` normalizes with `" ".join(stripped.split())`, which cannot make these equivalent. By contrast, comment-only pairs return `0.0`; the gap is specifically formatting around syntax. | Replace the fallback canonicalization with a language-aware/token-level representation that preserves literal contents and semantic token boundaries while discarding formatting. Add JavaScript and C whitespace/reformatting regression cases; every cosmetic case must be exactly `0.0`. |
+| F2: The comment scanner treats a whole JavaScript template literal as opaque. Comments inside a `${...}` interpolation are JavaScript comments, not template content, but they survive canonicalization and inflate the score. | High | Comparing a template with interpolation `1` to the same template with `1 /* cosmetic */` in that interpolation returned composite `0.20322580645161292`. `_strip_comments` enters backtick quote mode at `measurement/diversity.py:113-117` and therefore does not lex interpolation expressions. | Parse or recursively lex `${...}` expressions while preserving literal segments. Add an interpolation-comment regression case with an exact-zero assertion. |
+| F3: Direct lexical retrieval can return knowledge from a foreign ACL scope when its `repository_id` matches. This is pre-existing (`git blame` attributes the direct lexical call and post-filter to `e8eb2e4c6a`/`523c0bac14`), not introduced by the flash commit-gate patch, but it violates the documented hard per-cell scope boundary and is exposed by this reachability path. | High | A fake lexical graph returned a MEASURED record with `repository_id="self-a"` and `acl_scope="private-b"`. `retrieve(... repository_id="self-a", acl_scope="private-a")` produced `candidate_ids ['foreign-acl']` and `selected_ids ['foreign-acl']`. `retrieval.py:1431-1433` does not pass `acl_scope` to the direct lexical query; `:1572-1575` filters only `repository_id`, and `Candidate` does not retain ACL scope for a later filter. | Preserve and enforce ACL scope for the lexical leg, before fusion and selection, and add a direct-lexical foreign-ACL regression test. Treat this as a separate pre-existing security repair, not as a regression attribution against the flash author. |
+| F4: The host probe's `dense_available` field means only that `ChromaStore` constructed, not that the dense store was reachable. It can therefore report `dense_available: true` while its direct dense leg failed. | Medium | `probe_retrieval_reachability.py:84-94,111` sets the field after construction. `embeddings.py:141-148` defers `get_or_create_collection()` until first use; `_leg_counts` then catches a search failure and emits `dense_hits: null` plus `dense_error` (`probe_retrieval_reachability.py:56-62`) without clearing `dense_available`. | Set availability only after a successful direct dense query, or rename it to `dense_constructed` and require the artifact validator to reject `dense_available: true` with `dense_hits: null`/`dense_error`. Regenerate the host artifact after the repair. |
 
-## Re-Verified Passes
+## Passing Re-Verification
 
-The following checks are positive evidence, but they do not outweigh the findings above.
-
-| Probe | Result |
+| Check | PASS evidence |
 |---|---|
-| Focused suites | `143 passed, 1 skipped`: `test_retrieval.py`, `test_context_plane_pattern.py`, `test_kb_produce_facts_integration.py`, `test_diversity.py`, and `test_run_result_shape.py`. |
-| Fusion and dense predicate | At a mismatched commit, `freshness_multiplier` returned `None` for SOURCE and `1.0` for MEASURED/DERIVED; `_dense_filter` contained only empty/exact commit plus MEASURED/DERIVED/ADVISORY authority clauses. This is code-path evidence only, not F3's live-store proof. |
-| Pattern stability | With the same three finding rows in opposite order at revisions `a*40` and `b*40`, the reducer emitted the same `evidence:8bc42bb1c1108965` window and equal fact fingerprints. Adding `k4` changed the window to `evidence:500c7dff003c1c8e` and changed the fingerprint. |
-| Edge/null rules | Empty strings, whitespace-only strings, and two identical samples produced exact zero pairwise diversity. Empty and singleton portfolios produced null aggregate metrics with `coverage` `empty` and `single`. |
-| Artifact names and consumers | Nine `(seed_variant, repetition)` pairs produced nine distinct suffixes and the default suffix remained empty. Direct inspection found no incompatible consumer dependency: `analyze_worktrees` and archived `backfill_artifacts` derive their own names from worktrees; `inventory` does not consume these fields. |
-
-## Probe Record
-
-The review ran the following representative commands at the reviewed HEAD.
-
-```bash
-PYTHONPATH=src python3 -m pytest \
-  tests/test_retrieval.py tests/test_context_plane_pattern.py \
-  tests/test_kb_produce_facts_integration.py tests/test_diversity.py \
-  tests/test_run_result_shape.py -q -p no:cacheprovider
-```
-
-```text
-143 passed, 1 skipped in 1.49s
-```
-
-```bash
-PYTHONPATH=src python3 - <<'PY'
-import importlib.util
-
-from agentic_dynamics.control import fact_ingestion as fi
-from agentic_dynamics.control.reducers.pattern import decode_pattern_payload, pattern_v1
-
-spec = importlib.util.spec_from_file_location("pattern_tests", "tests/test_context_plane_pattern.py")
-mod = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(mod)
-rows = [
-    mod._finding(knowledge_id="k1", test_executed_success=True),
-    mod._finding(knowledge_id="k2", test_executed_success=False),
-    mod._finding(knowledge_id="k3", test_executed_success=True),
-]
-a = pattern_v1(mod._reducer_input(rows, source_revision="a" * 40))[0]
-b = pattern_v1(mod._reducer_input(list(reversed(rows)), source_revision="b" * 40))[0]
-added = pattern_v1(
-    mod._reducer_input(rows + [mod._finding(knowledge_id="k4", test_executed_success=True)])
-)[0]
-window_a = decode_pattern_payload(a.value).validity_window
-window_b = decode_pattern_payload(b.value).validity_window
-window_added = decode_pattern_payload(added.value).validity_window
-print("stable_window", window_a, window_b, window_a == window_b)
-print("stable_fingerprint", fi.fact_fingerprint(fi.build_fact_record(a)) == fi.fact_fingerprint(fi.build_fact_record(b)))
-print("added_window_changed", window_a, window_added, window_a != window_added)
-print("added_fingerprint_changed", fi.fact_fingerprint(fi.build_fact_record(a)) != fi.fact_fingerprint(fi.build_fact_record(added)))
-PY
-```
-
-```text
-stable_window evidence:8bc42bb1c1108965 evidence:8bc42bb1c1108965 True
-stable_fingerprint True
-added_window_changed evidence:8bc42bb1c1108965 evidence:500c7dff003c1c8e True
-added_fingerprint_changed True
-```
-
-```bash
-PYTHONPATH=src python3 - <<'PY'
-from agentic_dynamics.measurement.diversity import pairwise_divergence
-
-pairs = [
-    ("js_inline_comment", "function f(){ return 1; }\n", "function f(){ return 1; } // cosmetic\n"),
-    ("c_block_comment", "int f(void) { return 1; }\n", "int f(void) { /* cosmetic */ return 1; }\n"),
-]
-for name, before, after in pairs:
-    print(name, "composite=" + str(pairwise_divergence(before, after)["composite"]))
-PY
-```
-
-```text
-js_inline_comment composite=0.10909090909090909
-c_block_comment composite=0.16153846153846152
-```
-
-The first two results establish the evidence-window behavior. The final result falsifies the
-remediation claim that non-Python cosmetic changes cannot affect the diversity metric.
+| Hermetic gate | `python3 -m pytest tests/test_retrieval.py tests/test_context_plane_pattern.py tests/test_kb_produce_facts_integration.py tests/test_diversity.py tests/test_run_result_shape.py tests/test_portfolio_scorer.py -q` completed with `151 passed, 1 skipped in 1.52s`. The existing tests do not cover F1/F2's bypasses. |
+| A1 semantic-change protection | The C preprocessor change `#define VALUE 1` to `#define VALUE 2` scored `0.06818181818181819`; a JavaScript template literal `http://one` to `http://two` scored `0.1111111111111111`. Both are greater than zero. |
+| Comments already covered by the fallback | Inline/block comment-only JavaScript and C examples scored `0.0`. This does not offset F1 or F2: the required attack includes whitespace/reformatting and comments inside template expressions. |
+| Pattern validity window | The specified hermetic context-pattern suite passed. The reducer's evidence-digest window and fact fingerprint are therefore pinned against input ordering/revision churn, while changed evidence changes the window, as documented in the repaired verification artifact. |
+| Scorer null/not-collected handling | A four-attempt result set with one `null`, one omitted value, one integer, and one string yielded `n_attempts=4`, `n_scored=1`, `excluded_null_source=1`, `excluded_invalid_source=2`, `coverage="single"`, and every aggregate diversity metric `null`. No uncollected/malformed attempt was scored as empty and no value was fabricated below two samples. |
+| A2 expanded-neighbor commit gate | Re-executing the graph-expansion fixture produced candidates `['k_seed', 'k_measured_neighbor']` and selected the same pair. The expanded mismatched-commit SOURCE neighbor was absent from both candidates and selection; the mismatched MEASURED neighbor stayed eligible. This is enforced by `retrieval.py:1637-1644`. |
+| Live lexical probe | In-cell, against `bolt://neo4j:7687` as required, a mismatched all-zero commit returned MEASURED records for `perturbed class semantic correctness`; the `spec-index-regeneration` query returned DERIVED and ADVISORY records; `docs-drift` returned ADVISORY and DERIVED records. The stale-SOURCE probe `relay_once` returned zero hits. No localhost endpoint was used. |
+| Host dense artifact | `flash_exploration_retrieval_probe.json` has `generated_at`, `code_sha=693ded194...`, and resolved package/retrieval paths. It records direct `dense_hits=10` and `lexical_hits=10`, independently of `fallback_mode`. For both projection settings, `selected=48`, the per-type sum is `48`, `selected_evidence` has `48` entries, and `stale_source_selected` is empty. The runner and retrieval source are unchanged from `693ded194`. The artifact is internally consistent; F4 concerns an outage-path misstatement, not this successful capture. |
+| Environment boundary | Chroma is host-side on `ai-infra`; cells are on `fleet-net` by design. The dense leg was not run in-cell and this is an environment fact, not a finding. The committed runner exercises real `retrieve()`, `ChromaStore`, and `_dense_filter`; the artifact provides direct per-leg counts. |
+| Probe 5 artifact | `flash_exploration_verify.md:602-631` contains a syntactically complete heredoc command including its closing `PY` marker. Its raw output is in the separate `text` fence at `:634-662`. The document head labels Probes 1-4 as historical at `f3957a318` and Probe 5 as regenerated at `693ded194`, consistent with the round-3/round-4 remediation record. |
 
 ## Release Decision
 
-**FAIL: do not mint or launch the ladder from this branch.** The minimum repair sequence is:
+**FAIL: do not mint or launch the ladder from this candidate.**
 
-1. Eliminate F1's non-Python comment inflation and add regression coverage.
-2. Wire F2 into a real, coverage-aware portfolio scorer over persisted result records.
-3. Re-run the current candidate against live Chroma and Neo4j, including a real DERIVED pattern
-   after the controller-approved mint, to close F3.
-4. Refresh `p4_verify` with raw output from the repaired HEAD and correct F4/F5's stale claims.
+1. Repair F1 and F2, including adversarial C/JavaScript formatting and template-interpolation
+   regression coverage.
+2. Repair F3 as a separately attributed pre-existing ACL isolation defect; it must not be hidden
+   by the otherwise-correct SOURCE commit gate.
+3. Repair F4 and regenerate the host-side probe artifact.
+4. Re-run the six-suite hermetic gate, the expanded-neighbor check, the in-cell live lexical
+   probe, and an independent adversarial review on the repaired candidate.
