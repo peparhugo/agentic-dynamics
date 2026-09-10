@@ -75,13 +75,24 @@ def _count_loc(code: str) -> int:
     )
 
 
+#: C/C++ preprocessor directives — a leading ``#`` here is CODE, not a comment. The review-4
+#: A1 regression: stripping ``#define`` lines made two different macros canonicalize equal and
+#: take the hard-zero branch.
+_CPP_DIRECTIVES = frozenset({
+    "define", "undef", "include", "include_next", "if", "ifdef", "ifndef", "else", "elif",
+    "endif", "pragma", "error", "warning", "line",
+})
+
+
 def _strip_comments(code: str) -> str:
-    """Remove ``#``/``//``/``/* */`` comments that sit OUTSIDE string literals.
+    r"""Remove ``#``/``//``/``/* */`` comments that sit OUTSIDE string literals.
 
     The g5 round-2 F1 finding: the line filter dropped whole comment lines only, so inline
     ``//`` and C block comments still raised the metric. A tiny scanner (not a parser) tracks
-    single/double quotes and backslash escapes; everything from a comment marker to its end is
-    removed. Contents of strings are preserved, so ``"http://x"`` survives.
+    single/double/backtick quotes and backslash escapes; everything from a comment marker to
+    its end is removed. Contents of strings are preserved, so ``"http://x"`` and JavaScript
+    template literals (``\`http://x\```) survive. A leading ``#`` that opens a C/C++
+    preprocessor directive is CODE and is preserved (review-4 A1).
     """
     out: list[str] = []
     i = 0
@@ -99,12 +110,19 @@ def _strip_comments(code: str) -> str:
                 quote = None
             i += 1
             continue
-        if ch in ("'", '"'):
+        if ch in ("'", '"', "`"):
             quote = ch
             out.append(ch)
             i += 1
             continue
         if ch == "#":
+            line_start = code.rfind("\n", 0, i) + 1
+            on_own_line = code[line_start:i].strip() == ""
+            directive = code[i + 1 : i + 20].lstrip().split(None, 1)[0].rstrip(":") if on_own_line else ""
+            if on_own_line and directive in _CPP_DIRECTIVES:
+                out.append(ch)
+                i += 1
+                continue
             while i < n and code[i] != "\n":
                 i += 1
             continue

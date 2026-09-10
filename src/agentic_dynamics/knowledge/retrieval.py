@@ -1631,6 +1631,17 @@ def retrieve(
                     resolver=source_type_resolver,
                 )
                 authority = _coerce_authority(props.get("authority"))
+                # Review-4 A2: an EXPANDED neighbor must pass the same freshness/commit
+                # gate as a direct candidate. Without this, a stale SOURCE neighbor could
+                # be appended after fusion and selected, bypassing the SOURCE commit gate.
+                if freshness_multiplier(
+                    authority=authority,
+                    commit_sha=str(props.get("commit_sha", "") or ""),
+                    observed_at=props.get("observed_at"),
+                    current_commit=commit_sha,
+                    now=now,
+                ) is None:
+                    continue
                 if not _candidate_allowed(
                     source_type,
                     pattern_projection=plan.pattern_projection,

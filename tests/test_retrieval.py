@@ -1660,3 +1660,23 @@ def test_freshness_multiplier_advisory_naive_timestamp_is_utc():
         now=datetime(2026, 9, 10, tzinfo=timezone.utc),
     )
     assert stale is None
+
+
+def test_retrieve_expansion_applies_commit_gate_to_source_neighbors():
+    """Review-4 A2: an expanded stale SOURCE neighbor never bypasses the commit gate."""
+    stale = _expanded_node("k_seed", cid="k_stale_source")
+    stale["properties"]["commit_sha"] = "other"
+    expanded_knowledge = _expanded_node("k_seed", cid="k_measured_neighbor")
+    expanded_knowledge["properties"]["authority"] = "measured"
+    expanded_knowledge["properties"]["commit_sha"] = "other"
+
+    attempt = retrieve(
+        "websocket reload",
+        dense_store=_FakeDenseStore([_seed_hit()]),
+        graph_client=_FakeGraph([stale, expanded_knowledge]),
+        commit_sha="current",
+    )
+    candidate_ids = {c.id for c in attempt.candidates}
+    assert "k_stale_source" not in candidate_ids
+    assert "k_measured_neighbor" in candidate_ids
+    assert "k_stale_source" not in {c.id for c in attempt.selected_evidence}

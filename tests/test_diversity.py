@@ -235,3 +235,23 @@ def test_interior_whitespace_and_comment_removal_normalize_to_zero():
     assert pairwise_divergence(base, "int f(){ /* note */ return 1; }")["composite"] == 0.0
     assert pairwise_divergence(base, "int f(){  return 1; }")["composite"] == 0.0
     assert pairwise_divergence(base, "int f(){\n    return 1;\n}")["composite"] == 0.0
+
+
+def test_semantic_c_macro_and_js_template_literals_are_not_cosmetic():
+    """Review-4 A1: real semantic changes must score > 0 — no false zeros.
+
+    ``#define`` is code (never a comment) and backtick template literals are strings; stripping
+    either made two different programs canonicalize identically.
+    """
+    assert pairwise_divergence(
+        "#define VALUE 1\nint f(){ return VALUE; }",
+        "#define VALUE 2\nint f(){ return VALUE; }",
+    )["composite"] > 0.0
+    assert pairwise_divergence(
+        "const url = `http://one`;", "const url = `http://two`;"
+    )["composite"] > 0.0
+    # Cosmetic invariance is retained for real comments around the same code.
+    assert pairwise_divergence(
+        "#define V 1\nint f(){ return V; } // note",
+        "#define V 1\nint f(){ return V; }",
+    )["composite"] == 0.0
