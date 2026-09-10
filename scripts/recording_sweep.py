@@ -88,8 +88,12 @@ def _main_commits_by_day() -> dict[str, list[str]]:
     """First-parent main commits (subject + date) over the lookback window."""
     since = (date.today() - timedelta(days=LOOKBACK_DAYS)).isoformat()
     out = _git(
-        "log", "--first-parent", "--since=" + since,
-        "--format=%ad|%h|%s", "--date=format:%Y-%m-%d", "main",
+        "log",
+        "--first-parent",
+        "--since=" + since,
+        "--format=%ad|%h|%s",
+        "--date=format:%Y-%m-%d",
+        "main",
     )
     by_day: dict[str, list[str]] = {}
     for line in out.splitlines():
@@ -101,7 +105,15 @@ def _main_commits_by_day() -> dict[str, list[str]]:
 
 
 def _phantom_close_claims() -> list[str]:
-    """Close records citing ``decision record <id>`` whose artifact is missing."""
+    """Close records citing ``decision record <id>`` whose artifact is missing.
+
+    The citation is matched as a **prefix** (6–64 hex), not only as a full 64-char id: closes
+    in this corpus cite the short human form (``…, decision record 80f02d3ce5``), and the
+    artifact filename IS the 64-char ``knowledge_id``. A cited id is a phantom when no known
+    artifact stem starts with it. This prefix form was the verified fix of the
+    ``aio_controller_postmortem`` p5 replay (the original 64-hex-only regex never fired on the
+    historical citation that a backfill later had to repair).
+    """
     known = {p.stem for p in (ROOT / "experiments/results/kb").glob("*.json")}
     phantoms: list[str] = []
     for path in (ROOT / "experiments/results/kb").glob("*.json"):
@@ -109,9 +121,10 @@ def _phantom_close_claims() -> list[str]:
             text = path.read_text()
         except Exception:
             continue
-        for m in re.finditer(r"decision record ([0-9a-f]{64})", text):
-            if m.group(1) not in known:
-                phantoms.append(f"{path.stem[:12]}: cites {m.group(1)[:16]}... (no artifact)")
+        for m in re.finditer(r"decision record ([0-9a-f]{6,64})", text):
+            cited = m.group(1)
+            if not any(stem.startswith(cited) for stem in known):
+                phantoms.append(f"{path.stem[:12]}: cites {cited[:16]}... (no artifact)")
     return phantoms
 
 
@@ -121,9 +134,7 @@ def scan() -> dict:
     decided = _decision_days()
     closed = _close_days()
     gaps = {
-        day: commits[day]
-        for day in sorted(commits)
-        if day not in decided and day not in closed
+        day: commits[day] for day in sorted(commits) if day not in decided and day not in closed
     }
     return {
         "generated_at": datetime.now(timezone_utc()).isoformat(),
@@ -147,17 +158,27 @@ def backfill(report: dict) -> list[str]:
     for day in report.get("gap_days", []):
         subjects = report["gaps"][day]
         what = f"recording-sweep coverage backfill for {day} ({len(subjects)} main commits)"
-        why = "day had main commits but no decision record and no session close; " + (
-            "; ".join(subjects)[:400]
+        why = (
+            "day had main commits but no decision record and no session close; "
+            + ("; ".join(subjects)[:400])
         )
         proc = subprocess.run(
             [
-                sys.executable, str(ROOT / "scripts/decision_record.py"),
-                "--what", what, "--why", why,
-                "--category", "recording", "--actor", ACTOR,
-                "--decided-at", day + "T23:59:59+00:00",
+                sys.executable,
+                str(ROOT / "scripts/decision_record.py"),
+                "--what",
+                what,
+                "--why",
+                why,
+                "--category",
+                "recording",
+                "--actor",
+                ACTOR,
+                "--decided-at",
+                day + "T23:59:59+00:00",
             ],
-            capture_output=True, text=True,
+            capture_output=True,
+            text=True,
         )
         if proc.returncode == 0:
             recorded.append(day)
