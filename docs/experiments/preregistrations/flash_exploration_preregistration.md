@@ -259,3 +259,41 @@ the expected outcome) + `g6_test_gate` (six suites). No §4 metric, condition, r
 decision rule changes; `D_c` remains the composite over scored attempts, with unsupported
 coverage reported. On a clean verification the wave proceeds to the one-time pattern mint (AIO
 data-plane act, supplying F2b) and then the ladder.
+
+## 12. Ladder harness addendum — pinned before the first cell (2026-09-10)
+
+**Step-1 data plane (done, recorded):** the one-time pattern mint emitted 6 facts + 6
+projections; the convergence dry-run then derived 0 / would-emit 0; the live F2b probe shows
+`pattern_projection=True` returning **6 `pattern` records** (0 with the flag off),
+`fallback_mode="full"`, and 0 stale SOURCE (`docs/reviews/flash_exploration_retrieval_probe.json`,
+code SHA `da0a0694d`).
+
+**Pinned harness** (SHAs at the commit carrying this addendum):
+
+| Artifact | SHA256 |
+|---|---|
+| `workflows/repository/flash_ladder_bare.yaml` | `9335582f54e7ec0a36fe3148cdcea475bea43544ae1d798c6d22cdf41b1b83ed` |
+| `workflows/repository/flash_ladder_kb.yaml` | `d65abaf588829b4d703410df41b86165881b75701d44603dabb3ef4d794c2b55` |
+| `scripts/run_flash_ladder.py` | `bf48ef9dfaf657894e11b367ac8e0ac881a9ee3806a6b0e6ebc1e0477c7a6459` |
+| `tests/flash_ladder/taskman_contract_test.py` | `57ffac37664d2ae85d370a8363b46362221c18b6bfd0f1f3ed41c5616d9fe022` |
+
+**Ladder base:** the commit carrying this addendum (recorded per cell as `base_sha` in
+`experiments/results/flash_ladder/cells/<cell>.json`; every cell worktree is a detached checkout
+of it).
+
+**Assignment table (registered):** the 4×3 grid in §4, in order C0-r1…C0-r3, C1-r1…C1-r3,
+C2-r1…C2-r3, C3-r1…C3-r3. C0/C1/C2 share `flash_ladder_bare` (C1 carries the divergence framing
+in the goal; C2 carries `--thinking-budget-tokens 32000`); C3 uses `flash_ladder_kb`
+(`rag_augment: true`, shared scope `agentic-dynamics`/`public`, `pattern_projection: true`).
+
+**Safety rails (the "do not break the back" set):** one orchestrator at a time (the executor is
+sequential and each dispatch is a bounded `docker-compose run`); a fresh detached cell worktree
+per cell; cells cannot write the shared KB (`--no-fact-emit`, `FINOPS_EMIT_SELF=0`, and
+`rag.emit_self: false` in both specs); the generated tree + diff are exported durably under
+`experiments/results/flash_ladder/cells/<cell>/`; the campaign is resumable and halts on the
+first infra failure.
+
+**Quality read:** the in-run `g_test` phase records `test_executed_success`; the scorer re-runs
+the PRISTINE contract test (restored from the base) against each exported tree and excludes
+`solution_code is None` attempts with their count reported. Metrics/comparison/decision rule and
+stop remain exactly §4.
