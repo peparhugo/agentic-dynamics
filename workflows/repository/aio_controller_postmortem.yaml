@@ -2,7 +2,7 @@ name: aio_controller_postmortem
 question: >-
   Why have the recent AIO controller sessions degraded, and what rails stop the
   classes? Evidence (2026-09-04 -> 2026-09-10): the hammer session (ses_f92f8804affe,
-  uncommitted 292-file stabilization wave, died Aborted without records); the emitter
+  uncommitted ~237-file stabilization wave, died Aborted without records); the emitter
   hunt (hours of tracing, never identified); the registry dedup (48k -> 20k rows,
   over-deleted tombstone/supersede marker lines, restored from stash); git add -A
   before .gitignore re-tracked 32k files; the launch path improvisation (hand-rolled
@@ -190,7 +190,7 @@ workflow:
           GOAL: {goal}
           ROLE: the INDEPENDENT adversarial reviewer (terra vs the flash author).
           Falsify the postmortem, not certify it. Attack in order, re-verified against
-          the actual evidence: (1) CORPUS: are the worst items (hammer 292-file mess,
+          the actual evidence: (1) CORPUS: are the worst items (hammer ~237-file mess,
           registry dedup over-deletion, add-A re-track, launch improvisation)
           actually present with pointers? is anything severity-5 absent? (2)
           TAXONOMY: do the classes have >= 2 real items each — or did the author

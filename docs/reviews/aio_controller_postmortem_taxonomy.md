@@ -10,9 +10,15 @@ status: accepted
 signature, root-cause hypothesis and the existing defense that failed to catch it, and
 count items per class.
 
-**Result:** **19/19 items classified** into **6 classes with ≥ 2 items each** plus **1
+**Result:** **19/19 items classified** into **6 classes with ≥ 2 rows each** plus **1
 "rare" class** (one environmental singleton). Every class names at least one defense from
 the *current* system that should have caught it and did not.
+
+**Counting basis (A6).** The ≥ 2 threshold counts corpus **rows**, not independent incident
+chains. C1, C2, C3, C4 and C5 each carry ≥ 2 rows from distinct incidents; **C6's rows
+(F-01, F-02) are two symptoms of one incident chain** — the same hammer session and the same
+19-hour abandonment arc — so as independent incidents C6 is a **singleton** and the
+"≥ 5 classes with ≥ 2 items" gate is met by C1–C5 alone.
 
 ---
 
@@ -214,9 +220,15 @@ Counts: C1=3, C2=2, C3=3, C4=5, C5=3, C6=2, R=1 → **19**.
 - **Existing defense that failed.** The rule *"a session that does not write its close
   record has not closed"* is exactly the right doctrine and was violated (F-01 wrote no
   close); the single-writer rule was violated (two sessions fought over the `main` checkout);
-  no supervisor/watchdog surfaced the uncommitted 292-file tree or the stalled session.
+  no supervisor/watchdog surfaced the uncommitted ~237-file tree or the stalled session.
 - **Items / evidence.** F-01 (uncommitted wave + abandonment, sev 4), F-02 (19 h rabbit-hole
   without check-in, sev 3).
+- **Counting basis (A6).** The class threshold counts **corpus rows, not independent
+  incidents**. F-01 and F-02 are two distinguishable symptoms of the SAME incident: one
+  hammer session (`ses_f92f8804affe…`) and the same 19-hour, uncommitted abandonment arc. As
+  rows it is a 2-item class; as independent incidents it is a **singleton**. The class does
+  not demonstrate two independent C6 events — stated explicitly here rather than implying it
+  via row count.
 - **Direction for p2/p3.** A checkpoint cadence / "close or explicitly park" directive wired
   to an existing rail (the supervisor is flag-only and the right place for a
   long-session/no-close flag); reinforce the close doctrine with a rail rather than prose.
@@ -252,8 +264,10 @@ defenses to these six classes + rare and mark catches/partial/none.
 ## 6. Taxonomy completion log
 
 - **DONE_WHEN — every corpus item classified:** PASS (19/19; see §3 mapping).
-- **DONE_WHEN — ≥ 5 classes with ≥ 2 items:** PASS (C1=3, C2=2, C3=3, C4=5, C5=3, C6=2;
-  singleton F-07 → Rare, per the brief).
+- **DONE_WHEN — ≥ 5 classes with ≥ 2 items:** PASS by ROW count (C1=3, C2=2, C3=3, C4=5,
+  C5=3, C6=2 rows; singleton F-07 → Rare). By independent **incident** count the gate is met
+  by C1–C5 alone; C6's two rows are one incident chain (A6) and C6 is a singleton incident.
+  The counting basis is stated in §2's "Counting basis (A6)".
 - **DONE_WHEN — each class names at least one current-system defense that failed:** PASS
   (§2 table + each class's "Existing defense that failed").
 - **LOG:** PASS.

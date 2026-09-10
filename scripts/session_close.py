@@ -145,6 +145,10 @@ def _recording_check(session_date: str) -> dict[str, Any]:
         report = sweep.scan()
     except Exception as exc:  # noqa: BLE001 — a probe fault is a warning, never a failed close
         return {"status": "unmeasured", "reason": f"{type(exc).__name__}: {exc}"}
+    if report.get("status") == "unmeasured":
+        # A7: the sweep itself reports absent runtime data / no git; propagate it rather than
+        # reading a gap set out of a report the sweep declined to measure.
+        return {"status": "unmeasured", "reason": report.get("reason") or "unmeasured"}
     gaps = list(report.get("gap_days") or [])
     phantoms = list(report.get("phantom_close_claims") or [])
     return {

@@ -799,6 +799,76 @@ def test_data_js_resolution_report_is_complete_without_a_data_root():
         assert report.get(kind, 0) == 0, f"data.js resolution report has {kind}: {report.get(kind)}"
 
 
+def test_fixture_tier_resolver_resolves_every_current_row_and_fails_on_one_unresolvable(
+    tmp_path, monkeypatch
+):
+    """R5 (redesigned, aio_controller_postmortem A3) — the FIXTURE-TIER RESOLVER replay.
+
+    The p3 design required the publication guard to resolve every current fixture registry
+    row to a measurement payload (or a sanctioned tombstone/waiver) and to FAIL on one
+    unresolvable row. The first delivery only parsed the committed ``data.js`` counter — a
+    stale or falsified all-zero report passed (A3). This test drives the REAL resolver
+    (``canonical_corpus.load_canonical_tables``) over a hermetic fixture manifest + payloads:
+
+    1. positive — every current ``story``/``review``/``finding`` row resolves; the tombstoned
+       row is excluded by lifecycle, so ``resolved == expected_current`` and ``unresolved == 0``;
+    2. negative — deleting ONE payload makes the resolver report exactly one ``missing`` issue
+       and NAME the unresolvable row (the historical 402-row F-05 signature, at fixture scale).
+    """
+    stories_dir = tmp_path / "stories"
+    reviews_dir = tmp_path / "reviews"
+    payload_file = tmp_path / "experiments" / "results" / "task_manager_x.json"
+    stories_dir.mkdir()
+    reviews_dir.mkdir()
+    payload_file.parent.mkdir(parents=True)
+
+    (stories_dir / "note_service_s1.json").write_text(
+        json.dumps(_story_payload("s1", condition="clean", instrumented=True))
+    )
+    (reviews_dir / "review_s1.json").write_text(json.dumps({"story_id": "s1", "verdict": "ok"}))
+    payload_file.write_text(
+        json.dumps(
+            {
+                "experiment": "task_manager",
+                "runs": [{"type": "perturbed", "workdir": "/tmp/exp_x", "cost_usd": 0.01}],
+            }
+        )
+    )
+
+    manifest_path = tmp_path / "data_manifest.json"
+    _write_manifest(
+        manifest_path,
+        [
+            _row(knowledge_id="k_s", entity_id="e_s", source_type="story",
+                 logical_locator="s1", source_uri="story:s1"),
+            _row(knowledge_id="k_r", entity_id="e_r", source_type="review",
+                 logical_locator="s1", source_uri="review:s1"),
+            _row(knowledge_id="k_f", entity_id="e_f", source_type="finding",
+                 logical_locator="exp_x",
+                 source_uri="file://experiments/results/task_manager_x.json"),
+            _row(knowledge_id="k_t", entity_id="e_t", source_type="story",
+                 logical_locator="gone", source_uri="story:gone",
+                 lifecycle_state="tombstoned", reason="contaminated"),
+        ],
+    )
+    monkeypatch.setattr(cc, "STORIES_DIR", stories_dir)
+    monkeypatch.setattr(cc, "REVIEWS_DIR", reviews_dir)
+    monkeypatch.setattr(cc, "PROJECT_ROOT", tmp_path)
+
+    tables = cc.load_canonical_tables("story", "review", "finding", manifest_path=manifest_path)
+    assert tables.resolution.expected_current == 3  # the tombstoned row is not expected
+    assert tables.resolution.resolved == 3
+    assert tables.resolution.unresolved == 0
+    assert tables.resolution.complete is True
+
+    # Negative replay: remove ONE payload -> exactly one missing row, named by the resolver.
+    (stories_dir / "note_service_s1.json").unlink()
+    tables = cc.load_canonical_tables("story", "review", "finding", manifest_path=manifest_path)
+    assert tables.resolution.missing == 1
+    assert tables.resolution.unresolved == 1
+    assert [(i.table, i.logical_locator) for i in tables.resolution.issues] == [("story", "s1")]
+
+
 def test_data_js_generator_source_tree_identity_is_current():
     """The publication contract's generator_source_tree_identity matches a fresh recompute.
 

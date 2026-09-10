@@ -1,8 +1,20 @@
 #!/usr/bin/env python3
-"""Generate data_manifest.json — schema version, hashes, pipeline audit trail."""
+"""Generate data_manifest.json — schema version, hashes, pipeline audit trail.
+
+**The registry drain guard (aio_controller_postmortem A4).** ``_compact_registry_index`` is
+the active path that consumes the append-only ``registry_index.jsonl``. That store only ever
+grows — every change to a record (a supersede, a tombstone) APPENDS a line, it never removes
+one — so the number of distinct ``knowledge_id`` versions is monotonic. The historical
+"Sep-4 drain" (F-03) resolved a merge of this file to a stale side and dropped 48,321 → 5,011
+rows; nothing refused it. This script now compares the compacted version count against the
+previously written manifest and refuses to overwrite it with a smaller one unless the operator
+passes ``--allow-shrink`` — a shrink is a violation until proven otherwise.
+"""
+import argparse
 import hashlib
 import json
 import subprocess
+import sys
 from collections import defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
@@ -245,7 +257,62 @@ def _compact_registry_index(path):
 
     return sorted(compacted, key=lambda r: r["entity_id"])
 
-def main():
+def _registry_version_count(registry: list[dict]) -> int:
+    """Total version rows in a compacted registry.
+
+    One entry per ``knowledge_id`` ever appended (a compacted row nests its entity's
+    ``versions`` list), so this is the count the append-only index can only increase.
+    """
+    return sum(len(row.get("versions") or [row]) for row in registry)
+
+
+def _read_previous_registry_versions(manifest_path: Path) -> int | None:
+    """The version count recorded by the manifest already on disk, or ``None`` when absent."""
+    if not manifest_path.exists():
+        return None
+    try:
+        previous = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return None
+    registry = previous.get("registry")
+    if not isinstance(registry, list) or not registry:
+        return None
+    return _registry_version_count(registry)
+
+
+def detect_registry_drain(
+    new_registry: list[dict], previous_versions: int | None
+) -> tuple[int, int] | None:
+    """``(new_count, previous_count)`` when an append-only registry lost versions, else None.
+
+    Pure and side-effect free so the direction check is directly testable; ``main`` wires it
+    to the write. A ``None`` baseline (first run, or a manifest without a registry) cannot
+    prove a drain and is therefore not refused — the guard fails closed only on evidence.
+    """
+    if previous_versions is None:
+        return None
+    new_versions = _registry_version_count(new_registry)
+    if new_versions < previous_versions:
+        return (new_versions, previous_versions)
+    return None
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="agentic-dynamics data manifest",
+        description="Generate data_manifest.json (schema, hashes, compacted registry).",
+    )
+    parser.add_argument(
+        "--allow-shrink",
+        action="store_true",
+        help="permit a compaction that drops registry versions below the previous manifest "
+        "(a destructive-store repair — the drain guard refuses by default)",
+    )
+    return parser
+
+
+def main(argv: list[str] | None = None) -> int:
+    args = build_parser().parse_args(argv if argv is not None else [])
     manifest = {
         "schema_version": "1.0",
         "generated_at": datetime.now(timezone.utc).isoformat(),
@@ -294,9 +361,25 @@ def main():
     # only. `manifest["files"]` above is otherwise byte-for-byte unchanged (design §11's
     # backward-compatibility requirement), and this key is new, so no existing consumer
     # of data_manifest.json is affected by its presence.
-    manifest["registry"] = _compact_registry_index(REGISTRY_INDEX_PATH)
-
+    compacted_registry = _compact_registry_index(REGISTRY_INDEX_PATH)
     output_path = PROJECT_ROOT / "experiments" / "data_manifest.json"
+
+    # A4: the append-only registry only grows; refuse to overwrite the manifest with a
+    # compaction that lost versions (the F-03 drain signature) unless the operator allowed it.
+    drain = detect_registry_drain(compacted_registry, _read_previous_registry_versions(output_path))
+    if drain is not None and not args.allow_shrink:
+        new_versions, previous_versions = drain
+        print(
+            "REFUSED: registry_index.jsonl compacted to "
+            f"{new_versions} versions, below the previous manifest's {previous_versions}. "
+            "The append-only registry only grows; a shrink is the drain/over-deletion "
+            "signature (aio_controller_postmortem F-03/F-04). Repair the index, or re-run "
+            "with --allow-shrink if the loss is understood and intended.",
+            file=sys.stderr,
+        )
+        return 2
+
+    manifest["registry"] = compacted_registry
     with open(output_path, "w") as f:
         json.dump(manifest, f, indent=2)
     print(f"Written {output_path}")
@@ -313,6 +396,8 @@ def main():
             else:
                 print(f"    {name}: MISSING")
     print(f"  registry: {len(manifest['registry'])} entities (compacted from {REGISTRY_INDEX_PATH.name})")
+    return 0
+
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main(sys.argv[1:]))

@@ -1020,6 +1020,64 @@ class TestRecordingProbe:
         assert any("2026-09-10 has no decision/close coverage" in line for line in lines)
         assert any("1 phantom close claim" in line for line in lines)
 
+    def test_same_day_close_cannot_cover_its_own_audit(self, tmp_path, monkeypatch, capsys):
+        """F-09 end-to-end replay (A1): the close being written cannot satisfy the coverage
+        check for the day it audits.
+
+        Runs the REAL ``session close`` command (no mocked ``scan``) against a throwaway git
+        repo + KB dir: a commit-day with no decision record is still reported as a gap even
+        though the command has just written its own same-day close. Materializing the day's
+        decision (the F-09 backfill) clears it.
+        """
+        import json
+        import os
+        import subprocess
+
+        import recording_sweep as sweep
+        import session_close as sc
+
+        from agentic_dynamics.core import paths as core_paths
+        from agentic_dynamics.knowledge import knowledge_stream as ks
+
+        repo = tmp_path
+        subprocess.run(["git", "init", "-q", "-b", "main"], cwd=repo, check=True)
+        subprocess.run(["git", "config", "user.email", "r@x"], cwd=repo, check=True)
+        subprocess.run(["git", "config", "user.name", "r"], cwd=repo, check=True)
+        (repo / "f").write_text("1")
+        subprocess.run(["git", "add", "f"], cwd=repo, check=True)
+        stamp = "2026-09-09T12:00:00"
+        subprocess.run(
+            ["git", "commit", "-q", "-m", "unrecorded act"],
+            cwd=repo,
+            check=True,
+            env={**os.environ, "GIT_AUTHOR_DATE": stamp, "GIT_COMMITTER_DATE": stamp},
+        )
+        kb = repo / "experiments" / "results" / "kb"
+        kb.mkdir(parents=True)
+        monkeypatch.setattr(sweep, "ROOT", repo)
+        monkeypatch.setattr(sweep, "LOOKBACK_DAYS", 100000)
+        monkeypatch.setattr(core_paths, "KB_ARTIFACT_DIR", kb)
+        monkeypatch.setattr(ks, "connect", lambda: _FakeRedis())
+
+        rc = sc.main(["--slug", "wt_f09", "--session-date", "2026-09-09", "--json"])
+        assert rc == 0
+        report = json.loads(capsys.readouterr().out)
+        assert report["recording"]["status"] == "measured"
+        # The close just written is for 2026-09-09; it must NOT cover 2026-09-09.
+        assert report["recording"]["session_day_is_gap"] is True
+        assert "2026-09-09" in report["recording"]["gap_days"]
+
+        # The F-09 backfill: materialize the day's decision record -> the gap clears.
+        (kb / ("d" * 64 + ".json")).write_text(
+            json.dumps(
+                {"text": json.dumps({"category": "ops", "decided_at": "2026-09-09T12:00:00+00:00"})}
+            )
+        )
+        rc = sc.main(["--slug", "wt_f09b", "--session-date", "2026-09-09", "--json"])
+        assert rc == 0
+        report = json.loads(capsys.readouterr().out)
+        assert report["recording"]["session_day_is_gap"] is False
+
     def test_unmeasured_line_names_the_reason(self):
         import session_close as sc
 

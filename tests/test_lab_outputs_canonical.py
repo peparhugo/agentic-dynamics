@@ -40,7 +40,13 @@ from agentic_dynamics.reporting.lab_contract import (
 )
 from agentic_dynamics.reporting.lab_manifest import load_lab_manifest, publication_labs
 
-pytestmark = pytest.mark.fast
+# NOT fast-marked: this is a corpus-contract test. Its `@requires_corpus` /
+# `@requires_full_corpus` cases read the runtime canonical corpus and (on a full data root)
+# recompute over every payload — a dependency the `fast` subset's dependency-free contract
+# forbids. On a host with the full corpus those recomputes blew the 180s fast-path budget
+# (aio_controller_postmortem g10); in a corpus-less checkout the unguarded sibling failed the
+# fast path outright. The fast subset must stay a pure-unit smoke; this module runs in the
+# full suite, where the corpus work belongs.
 
 ROOT = Path(__file__).resolve().parent.parent
 RESULTS_DIR = ROOT / "experiments" / "results"
@@ -162,12 +168,18 @@ def _published_artifacts() -> list[tuple[str, Path, dict]]:
     return out
 
 
+@requires_corpus
 def test_no_live_lab_output_carries_retired_summary_lineage():
     """Item 3's headline claim, checked directly.
 
     Structural, not keyword-based: a live artifact must carry a contract whose
     ``input_dataset_id`` names the canonical registry resolver. A lab derived from the
     retired summary cannot produce one — it has no registry identity to embed.
+
+    ``@requires_corpus``: the labs are runtime artifacts (the CI fixture provides them), so
+    a source checkout with no data root SKIPS rather than failing — "no artifacts present" is
+    a state, not a violation. (This test was the g10 fast-path failure in a corpus-less
+    checkout before it was guarded and its module de-``fast``-marked.)
     """
     artifacts = _published_artifacts()
     assert artifacts, "no publication-eligible lab artifacts found — run the core lab set"

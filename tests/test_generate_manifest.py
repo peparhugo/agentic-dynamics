@@ -364,6 +364,55 @@ def test_main_registry_is_empty_list_when_no_index_file_exists(tmp_path, monkeyp
     assert manifest["registry"] == []
 
 
+def test_detect_registry_drain_reports_the_direction():
+    """The pure direction check: an append-only store that lost versions is a drain."""
+    assert gm.detect_registry_drain([{"versions": [{}, {}]}], 3) == (2, 3)
+    assert gm.detect_registry_drain([{"versions": [{}, {}, {}]}], 3) is None
+    assert gm.detect_registry_drain([{"versions": [{}]}], None) is None  # no baseline, no claim
+
+
+def test_registry_drain_guard_refuses_a_smaller_compaction(tmp_path, monkeypatch, capsys):
+    """A4 replay of the F-03 Sep-4 drain: a compaction below the recorded version count is
+    refused (exit 2) and the manifest is left untouched; ``--allow-shrink`` is the explicit
+    operator override for an understood, intended loss.
+    """
+    project_root = tmp_path
+    results_dir = project_root / "experiments" / "results"
+    results_dir.mkdir(parents=True)
+    (project_root / "apps" / "website").mkdir(parents=True)
+    manifest_path = project_root / "experiments" / "data_manifest.json"
+    # The manifest already on disk recorded 5 versions (the pre-drain state).
+    manifest_path.write_text(
+        json.dumps(
+            {
+                "schema_version": "1.0",
+                "registry": [
+                    {
+                        "entity_id": "e_prev",
+                        "knowledge_id": "k_prev",
+                        "versions": [{"knowledge_id": f"k{i}"} for i in range(5)],
+                    }
+                ],
+            }
+        )
+    )
+    # The drained registry now compacts to only 2 versions — the drain signature.
+    index = results_dir / "registry_index.jsonl"
+    _write_jsonl(index, [_row(knowledge_id=f"k{i}", entity_id=f"e{i}") for i in range(2)])
+    monkeypatch.setattr(gm, "PROJECT_ROOT", project_root)
+    monkeypatch.setattr(gm, "RESULTS_DIR", results_dir)
+    monkeypatch.setattr(gm, "REGISTRY_INDEX_PATH", index)
+
+    assert gm.main([]) == 2
+    assert "REFUSED" in capsys.readouterr().err
+    # The previous manifest is untouched — the guard fails closed before the write.
+    assert json.loads(manifest_path.read_text())["registry"][0]["knowledge_id"] == "k_prev"
+
+    # The explicit override performs the understood repair.
+    assert gm.main(["--allow-shrink"]) == 0
+    assert len(json.loads(manifest_path.read_text())["registry"]) == 2
+
+
 def test_compact_registry_index_merges_marker_line_without_losing_observed_at(tmp_path):
     # A supersede event appends (a) the successor's full "current" line, (b) a thin
     # "predecessor superseded" marker line that shares the predecessor's knowledge_id. The

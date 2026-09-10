@@ -93,9 +93,11 @@ committed 6 run ledgers into the tree stage-2 untracked 13 min later (F-06); the
   is "a session that does not write its close record has not closed". A wave of this size
   should have been checkpointed incrementally rather than left only in the working tree.
 - **Damage / cleanup cost.** `origin/main` untouched but the local main checkout left
-  ~292 files dirty for 4 days; the durable registry restore and manifest/labs existed
-  nowhere in git. Recovery required the 09-08 session to walk the hammer's 133-command
-  trail, separate the ~35 source/test files from generated churn, re-verify, and only then
+  **~237 files dirty** for 4 days (the retained opening `git status` pointer: 1 modified +
+  236 untracked — the A5 correction of the earlier unsupported "~292" estimate); the durable
+  registry restore and manifest/labs existed nowhere in git. Recovery required the 09-08
+  session to walk the hammer's 133-command trail, separate the ~35 source/test files from
+  generated churn, re-verify, and only then
   commit `bb47441bc` (51 files, +124/−73). The 4-day window (09-04 17:07 → 09-08 17:03)
   has **zero git activity on any ref or stash**.
 - **Severity:** 4 (near data loss; the restored registry could have been lost with the

@@ -2,41 +2,49 @@
 status: accepted
 ---
 
-# AIO controller postmortem — replay verification (p5)
+# AIO controller postmortem — replay verification (p5, revised under g10)
 
-**Inputs:** the p4 branch (`61c4c97fe`) + the p0 corpus (`d19ef95a9`) and p3 design
-(`f03a8d1fe`).
-**Role:** replay each selected remediation (R1–R5) against its historical class and record the
+**Inputs:** the p4 branch (`61c4c97fe`), the p0 corpus (`d19ef95a9`), and the g9 adversarial
+review (`docs/reviews/aio_controller_postmortem_adversarial.md`, `272ffaa89`).
+**Role:** replay each selected remediation against its historical class and record the
 outcome. A remediation that does not demonstrably catch its class is reverted or re-designed
 here — never shipped unverified.
 
-**Headline result:** **4 of 5 pass as applied; R1 was re-designed in this phase** (the
-verification falsified the original detector — see §3). All five are committed verified.
+**Correction of the original p5 headline.** The first p5 doc claimed "4 of 5 pass as applied;
+R1 was re-designed in this phase … All five are committed verified"
+(`aio_controller_postmortem_verify.md`, original §Headline). The g9 adversarial falsified that
+at the selected-remediation scope. This revision **retracts** the over-broad claims and
+records the repaired, replayed state item by item (§0). No claim below rests on the
+deleted headline.
 
 **Environment note.** `experiments/results/**` is untracked runtime data and is absent from
-this worktree, so replays use hermetic copies / detached worktrees of historical commits where
-a data root would otherwise be required. Every command below was run on this branch.
+this worktree, so replays use hermetic copies / detached worktrees where a data root would
+otherwise be required. Every command below was run on this branch (HEAD after the g10 repair).
 
 ---
 
-## 1. Summary
+## 0. Disposition of the g9 findings (A1–A7) + the g10 gate
 
-| ID | Class (items) | Doctrine clause | Rail replay | Verdict |
-|---|---|---|---|---|
-| R1 | C4 (F-08…F-12) + C6 clause | "Recording is part of the act" | `recording_sweep.scan()` on a hermetic historical KB → flags the gap day + the short-prefix phantom | **PASS (re-designed)** |
-| R2 | C1 (F-03, F-04, F-06) | "Bulk mutation needs the store's convention" | none (rule-only, vector retired) — historical numeric proof + transcript | **PASS** |
-| R3 | C3 (F-15, F-16, F-19) | "New work rides a worktree; … regenerate the dependents" | wired CI gate run in a detached worktree at the pre-fix commit → **exit 1**, names README:96 | **PASS** |
-| R4 | C2 (F-13, F-14) | "When the documented path fails, stop and record the gap" | none (rule-only) — historical transcript | **PASS** |
-| R5 | C5 (F-05; F-17/F-18 context) | n/a (rail-only) | test on the committed data.js → pass; mutated `missing: 402` → **fail** | **PASS (scoped)** |
+| Finding | Severity | Disposition in this phase | Replay evidence |
+|---|---|---|---|
+| **A1** R1 self-masks a same-day close | P0 | **REPAIRED** — coverage invariant re-designed; a close never covers its own day | §1a: e2e `test_same_day_close_cannot_cover_its_own_audit` (real `session close`) |
+| **A2** R1 presented as C4, implements F-09/F-01 | P0 | **REPAIRED (scope reduced + marked)** — R1's scope is F-09/F-01; F-08/F-11/F-12 explicitly uncovered/attributed | §1b |
+| **A3** R5 is an attestation, not a resolver replay | P0 | **REPAIRED** — real fixture-tier resolver replay added | §5: `test_fixture_tier_resolver_resolves_every_current_row_and_fails_on_one_unresolvable` |
+| **A4** C1 severity-5 has no catching rail | P0 | **REPAIRED** — bounded drain guard on the active registry-compaction path | §2: `test_registry_drain_guard_refuses_a_smaller_compaction` + F-03 numeric proof |
+| **A5** 292-file count unsupported | P1 | **CORRECTED** — now ~237 (1 modified + 236 untracked), citing the retained `git status` | §6a |
+| **A6** C6 class size inflated by row-splitting | P1 | **CORRECTED** — counting basis stated; C6 is a singleton incident | §6b |
+| **A7** recording rail inconsistent with its own unmeasured claim | P1 | **REPAIRED** — `scan()` returns `unmeasured`; report/backfill refuse; source-checkout replay | §7 |
+| **g10** fast path fails its gate | gate | **REPAIRED** — corpus-dependent modules de-`fast`-marked + audit hardened; fast path green at ~27s | §8 |
+
+**Overall release verdict after this phase:** **PASS for the scoped remediation set.** The
+original blanket FAIL is discharged for R1–R5 **as scoped**, with three C4 signatures (F-08,
+F-11-partial, F-12) explicitly left uncovered and named in §1b and §9 — not claimed.
 
 ---
 
-## 2. Per-remediation replay
+## 1. R1 — "Recording is part of the act" — scope REDUCED to F-09 / F-01 (A1, A2)
 
-### R1 — "Recording is part of the act" (C4; carries the C6 clause) — PASS (re-designed)
-
-**Doctrine now says what the class violated** (rendered `AGENTS.md:61`, source
-`agent_config/rules.md`):
+**Doctrine** (rendered `AGENTS.md`; source `agent_config/rules.md`):
 
 > "**Recording is part of the act.** A consequential act is not finished until it is recorded.
 > Write the decision at the moment of the decision (`agentic-dynamics decision record`) and
@@ -44,103 +52,154 @@ a data root would otherwise be required. Every command below was run on this bra
 > in the retrospective is a reconstruction, not a record, and a session that does not write its
 > close record has not closed. Cite a decision record only after its artifact exists. …"
 
-**The extended rail flags the signature.** The close-time probe calls the existing
-`recording_sweep.scan()`; the hermetic replay (`/tmp/r1_replay`, a temp git repo with a
-2026-09-04 commit covered by a close and an unrecorded 2026-09-09 commit, plus a close artifact
-citing `decision record 80f02d3ce5` with no artifact):
+### 1a. A1 — the coverage invariant is re-designed so a close cannot cover its own audit
+
+**The old invariant.** `recording_sweep.scan()` covered a commit-day when it had a decision
+**or any close** on that day. `scripts/session_close.py` ran the probe *after* writing the
+close, so the close being checked became the evidence that covered the day it was auditing —
+a self-mask. The p5 replay only exercised an uncovered day with **no** same-day close, and the
+close-probe unit tests mocked `scan()`.
+
+**The new invariant** (`scripts/recording_sweep.py`):
+
+> A commit-day is covered by a decision record dated that day, or by a session close dated
+> **strictly later** than the day. A close is a retrospective attestation of the days it
+> follows; it never covers its own day.
+
+**The rail flags the signature (run).** End-to-end through the REAL `session close` command
+(no mocked `scan`), in a hermetic git repo + KB dir with a commit but no decision record:
 
 ```
-REPLAY A (decision artifact ABSENT) — the historical state:
-  gap_days: ['2026-09-09']
-  phantom_close_claims: ['aaaaaaaaaaaa: cites 80f02d3ce5... (no artifact)']
-REPLAY B (decision artifact materialized) — after the backfill:
-  phantom_close_claims: []
+$ python3 -m pytest tests/test_session_spine.py::TestRecordingProbe -q -p no:cacheprovider
+6 passed
+# test_same_day_close_cannot_cover_its_own_audit:
+#   session close --session-date 2026-09-09 (real command, real scan)
+#   -> recording.session_day_is_gap == True ; "2026-09-09" in gap_days   (the close did NOT cover it)
+#   after materializing the day's decision record (the F-09 backfill)
+#   -> recording.session_day_is_gap == False
+$ python3 -m pytest tests/test_recording_sweep.py -q -p no:cacheprovider
+7 passed
+#   test_same_day_close_does_not_cover_its_own_day        -> 09-04 in gap_days
+#   test_later_close_covers_earlier_days_and_decision...  -> later close covers 09-04; decision covers 09-09
 ```
 
-The close-time probe surfaces exactly this in `--json` (`recording.gap_days` /
-`recording.phantom_close_claims`) and as a stderr warning; it is best-effort and
-`unmeasured`-aware (a checkout without the data root reports `unmeasured`, never a fabricated
-gap) — pinned by 5 tests in `tests/test_session_spine.py`.
+**The historical moment it governs.** The close `session:2026-09-04-kb-facts-and-graph-repair`
+cites `decision record 80f02d3ce5`, which did not exist until the 09-04 backfill
+(`80f02d3ce520aa`); the unrecorded acts are the 09-09 audit
+(`part@2026-09-10 01:00:39` "NOT recorded (no decision records): corpus migration, 402-row
+tombstone disposition, CI fixture strategy…"; backfill `01:01:25`/`01:01:35`; close
+`01:01:45`). Under the old invariant the 09-10 close covered the day it audited; under the new
+invariant the same-day close is silent and the missing decision is the gap. — F-09.
 
-**The historical moment it governs.**
-- The phantom: close `session:2026-09-04-kb-facts-and-graph-repair` (kb artifact
-  `0bd5105085aa7fd0`) cites `decision record 80f02d3ce5`, which did not exist until the 09-04
-  backfill (`80f02d3ce520aa`, category `merge`). — F-09.
-- The unrecorded acts: `opencode.db ses_f95ece514ffe… part@2026-09-10 01:00:39` ("NOT recorded
-  (no decision records): corpus migration, 402-row tombstone disposition, CI fixture
-  strategy…"); backfill at `part@2026-09-10 01:01:25` / `01:01:35`; close at `01:01:45`.
-- The un-closed session: the hammer's last part `ses_f92f8804affe… part@2026-09-05 17:56:04`
-  (no close record) — F-01 — is what the "close or explicitly park" clause governs.
+**Verdict: PASS (re-designed; replayed same-day).**
 
-**Verdict:** PASS after the §3 re-design.
+### 1b. A2 — R1's claim is split by signature; the uncovered C4 signatures are named
 
-### R2 — "Bulk mutation needs the store's convention" (C1) — PASS
+R1's code (`recording_sweep` gap + phantom detector, plus the "close or explicitly park"
+doctrine) covers **F-09** (recording-discipline gap / phantom claim) and **F-01** (session
+never closed — the close/park clause). It does **not** add rails for the other C4 signatures;
+the original p3 "C4 (F-08…F-12)" label was over-broad. Corrected attribution:
 
-**Doctrine** (rendered `AGENTS.md:68`):
+| C4 item | Signature | Covered by | Status |
+|---|---|---|---|
+| **F-09** | acts unrecorded until backfilled; close-record phantom | R1 (this branch) | **covered** (replayed §1a) |
+| **F-01** | session abandoned, never closed | R1's "close or explicitly park" clause | **covered by doctrine** (no catching rail; the e2e probe now flags an unrecorded day) |
+| **F-08** | unattributable double-registered finding rows (no producer path) | — | **UNCOVERED** — no producer-attribution check was added |
+| **F-11** | stale `promotable` rows; promote did not close its own row | pre-existing in-window fix in `promote.py` (close-row-on-success + stale-tree refusal) | **not R1**; cite the in-window fix, do not claim R1 |
+| **F-12** | `running` zombie rows; runner mints the row before validating the workdir | detection/reconciliation only (`control_sweep_zombies.py` sweeps heartbeat-expired `running` rows to `CANCELLED`) | **PARTIAL** — prevention not added |
 
-> "**Bulk mutation needs the store's convention.** Before any bulk mutation of a durable store
-> or of git's index/refs — a merge, a dedup, `git add -A`, `git rm --cached`, a history rewrite —
-> apply the store's documented convention and prove the direction is safe. Append-only stores
-> merge by **union**, never by taking a side; a dedup keeps only **full-row-equal** duplicates;
-> the `.gitignore` lands before the `add`. An operation that shrinks an append-only store is a
-> violation until proven otherwise."
+The F-12 mechanism is still present at HEAD: the runner opens its control row before the engine
+starts and before the clone/executors are built (`scripts/run_workflow.py:641-655`), so an
+exception in that interval can still leave the historical no-heartbeat shape. No R1 claim
+covers it.
 
-**Rail:** none selected, by design — the tracked-store vector was retired by the corpus
-migration (`ab887b5c8`), so an assertion would be new machinery for a gone vector (p3 §5 P2).
-The replay is therefore doctrine + the historical numeric/transcript moment (the prompt's
-"quote the clause + cite the transcript" path):
+**Verdict: PASS (claim reduced and re-scoped; F-08/F-11/F-12 explicitly not claimed).**
 
-**Historical moment.**
-- The Sep-4 drain — an append-only store shrunk in a merge:
-  `git diff --numstat 9bdb74059 9e4773fb1 -- experiments/results/registry_index.jsonl` = `1  43311`
-  (commit `9e4773fb1`). The clause names this exact operation a violation. — F-03.
-- The dedup over-deletion: `ses_f95ece514ffe… part@2026-09-08 17:05:36` (`48324 -> 20132 rows`);
-  self-caught at `part@2026-09-08 17:24:03` ("**my dedup was wrong**"). — F-04.
-- `git add -A` before the ignore: `part@2026-09-08 23:23:36`. — F-06.
+---
 
-**Verdict:** PASS (doctrine + history). Residual: no automated volume/ordering rail
-(parked P2); the rule is directive and names the exact convention violated.
+## 2. R2 — "Bulk mutation needs the store's convention" (C1) — now a bounded catching rail (A4)
 
-### R3 — "New work rides a worktree; regenerate the dependents" (C3) — PASS
+**The p5 gap.** R2 shipped rule text only, and the original replay correctly recorded "none
+(rule-only)". The adversarial held that a severity-5 class with **no** catching rail cannot
+support a "top classes have catching rails" claim.
 
-**Doctrine** (rendered `AGENTS.md:74`):
+**The bounded catching rail (A4).** `scripts/generate_manifest.py` is the active path that
+consumes the append-only `experiments/results/registry_index.jsonl`. That store only grows —
+every supersede/tombstone APPENDS a line — so the number of distinct `knowledge_id` versions
+is monotonic. The script now compares its compacted version count against the manifest already
+on disk and **refuses to overwrite it with a smaller one** (exit 2), unless the operator passes
+`--allow-shrink`:
+
+```
+$ python3 -m pytest tests/test_generate_manifest.py -q -p no:cacheprovider
+20 passed
+# test_detect_registry_drain_reports_the_direction: detect_registry_drain(new=2, prev=3) == (2,3)
+# test_registry_drain_guard_refuses_a_smaller_compaction:
+#   previous manifest = 5 versions; drained index compacts to 2 -> exit 2, manifest untouched
+#   --allow-shrink -> exit 0 (the explicit, understood repair)
+```
+
+**The historical numeric proof.** The clause names exactly the F-03 operation — an append-only
+store shrunk in a merge:
+
+```
+$ git diff --numstat 9bdb74059 9e4773fb1 -- experiments/results/registry_index.jsonl
+1       43311   experiments/results/registry_index.jsonl
+$ git show 9bdb74059:.../registry_index.jsonl | wc -l   # 48321
+$ git show 9e4773fb1:.../registry_index.jsonl | wc -l   # 5011
+```
+
+Under the guard, the post-drain compaction (5,011 rows) can no longer replace the
+pre-drain manifest (48,321 rows) without `--allow-shrink`; the same rule catches F-04's
+over-deletion (a dedup that removes knowledge_ids shrinks the version count).
+
+**Scope / residual (stated honestly).** The guard fires at the compaction seam — the active
+path now that the index is untracked. It does not block a raw file edit that is never followed
+by `manifest` regeneration, and `--allow-shrink` is a deliberate operator override. F-06's
+`git add -A` re-track vector is retired by the corpus migration (`experiments/results/` is
+untracked, `git ls-files experiments/results | wc -l` = 0; `test_publication_singular_door`
+guards the producers). The severity-5 path now has a catching rail at the only place the store
+is consumed; it is bounded, not universal.
+
+**Verdict: PASS (bounded catching rail added and replayed; residual scope named).**
+
+---
+
+## 3. R3 — "New work rides a worktree; regenerate the dependents" (C3) — PASS (unchanged)
+
+**Doctrine** (rendered `AGENTS.md`; source `agent_config/rules.md`):
 
 > "**New work rides a worktree; `main` gets only small derived-surface sweeps.** … when a
 > generated surface changes, regenerate its dependents in the same wave (`python3
 > scripts/_gen_instructions.py`, `python scripts/spec_status.py`, then the README count) — a
 > derived surface and its source never drift on purpose."
 
-**The wired rail flags the historical signature.** The CI `surfaces` job now runs
-`python3 scripts/scan_docs_drift.py --check spec_lifecycle --fail-on-drift`. Run in a detached
-worktree at the pre-fix commit `24837b7d0` (README 191, index 192):
+**The wired rail flags the historical signature.** Running the CI gate in a detached worktree
+at the pre-fix commit `24837b7d0` and at this branch's HEAD:
 
 ```
-$ git worktree add --detach /tmp/replay_f19 24837b7d0
-$ (cd /tmp/replay_f19 && python3 scripts/scan_docs_drift.py --check spec_lifecycle --fail-on-drift)
+$ (cd <worktree 24837b7d0> && python3 scripts/scan_docs_drift.py --check spec_lifecycle --fail-on-drift)
 exit=1
-  spec_lifecycle              1        0       1        0       1
   DRIFT SCORE: 1
-  findings:
-    [spec_lifecycle]
-      STALE    README.md:96
-               claim: README.md:96 claims 191 specs (11 experiments + 180 workflows)
-               code:  index.json holds 192 (11 experiments + 181 workflows)
+    [spec_lifecycle] STALE README.md:96
+      claim: README.md:96 claims 191 specs (11 experiments + 180 workflows)
+      code:  index.json holds 192 (11 experiments + 181 workflows)
+$ (cd <branch HEAD> && python3 scripts/scan_docs_drift.py --check spec_lifecycle --fail-on-drift)
+exit=0   (drift score 0)
 ```
 
-At the branch HEAD the same gate exits `0` (drift score 0). The existing
-`tests/test_doc_lifecycle.py::test_readme_spec_counts_match_index` is the test-level twin.
-
-**Historical moment.** The recording-rail chain (`f7d9ebe42` + `24837b7d0`, 09-10) regenerated
-`experiments/specs/index.json` but did not resync the README — F-19. And the direct-`main`
+**Historical moment.** The recording-rail chain (`f7d9ebe42` + `24837b7d0`) regenerated
+`experiments/specs/index.json` but left `README.md:96` at 191 — F-19. The direct-`main`
 commits the worktree clause addresses: `bb47441bc`, `292c47bad`, `ab887b5c8`, `77eb6c0b3`,
-`9e4773fb1` (all on the `main` checkout) — F-16, which the 09-09 close names as the live
-permanence gap.
+`9e4773fb1` — F-16.
 
-**Verdict:** PASS — the gate fails on the exact historical commit and passes on the fixed one.
+**Verdict: PASS — the gate fails on the exact historical commit and is clean at HEAD.**
 
-### R4 — "When the documented path fails, stop and record the gap" (C2) — PASS
+---
 
-**Doctrine** (rendered `AGENTS.md:81`):
+## 4. R4 — "When the documented path fails, stop and record the gap" (C2) — PASS (unchanged)
+
+**Doctrine** (rendered `AGENTS.md`; source `agent_config/rules.md`):
 
 > "**When the documented path fails, stop and record the gap — do not build around it.** A
 > failing rail is repaired, never replaced by a parallel mechanism. A net-new top-level
@@ -148,97 +207,191 @@ permanence gap.
 > justification naming the gap it closes, and is reviewed like any other proposal. If a
 > mechanism must be invented to finish a task, say so and stop; do not wrap the mistake."
 
-**Rail:** none selected (rule-only, p3 §5 P3) — a generic wrapper-necessity heuristic would be
-new, low-precision machinery; the existing `tests/test_script_classification.py` already fails a
-new unclassified `scripts/*.py`. Replay is doctrine + transcript:
+**Rail:** none selected (rule-only) — a generic wrapper-necessity heuristic would be new,
+low-precision machinery; `tests/test_script_classification.py` already fails a new
+unclassified `scripts/*.py`. Replay is doctrine + transcript:
 
-**Historical moment.**
 - F-13: `ses_f95ece514ffe… part@2026-09-10 02:10:50` (writes `scripts/launch_workflow.py`);
-  controller alarm `part@2026-09-10 02:11:34`; delete + admission `part@2026-09-10 02:11:46`
-  ("I was inventing a third launcher when the machinery already owns this").
+  controller alarm `02:11:34`; delete + admission `02:11:46` ("I was inventing a third
+  launcher when the machinery already owns this").
 - F-14: `part@2026-09-10 01:23:20` (agent-spec wrapper around the zero-model engine);
-  admission `part@2026-09-10 02:13:57` ("when the ask was ambiguous on shape, I built the
-  bigger thing instead of asking").
+  admission `02:13:57` ("when the ask was ambiguous on shape, I built the bigger thing
+  instead of asking").
 
-**Verdict:** PASS (doctrine + history). Residual: no automated wrapper gate (parked P3).
+**Verdict: PASS (doctrine + history). Residual: no automated wrapper gate.**
 
-### R5 — Publication-resolution guard (C5) — PASS (scoped)
+---
 
-**Rail** (`tests/test_build_data.py::test_data_js_resolution_report_is_complete_without_a_data_root`),
-runs in CI with no data root. Positive on the committed artifact; negative on the class
-signature (a data.js carrying unresolved rows), replayed in a detached worktree at HEAD with
-`resolution_report.missing` set to the historical 402:
+## 5. R5 — Publication-resolution guard (C5) — REDESIGNED as a fixture-tier resolver replay (A3)
+
+**The p5 gap (A3).** The first R5 parsed only the committed `apps/website/data.js` and asserted
+its `resolution_report` counters were zero; its "negative" replay mutated the report counter
+itself. It loaded no registry, payload, waiver, or corpus root — a stale or falsified all-zero
+report would pass. That is an artifact attestation, not the resolver replay p3 specified.
+
+**The real rail (added).** `tests/test_build_data.py::test_fixture_tier_resolver_resolves_every_current_row_and_fails_on_one_unresolvable`
+drives the REAL resolver (`canonical_corpus.load_canonical_tables`) over a hermetic fixture
+manifest + payloads:
 
 ```
-$ python3 -m pytest tests/test_build_data.py -k resolution_report_is_complete   # committed
+$ python3 -m pytest tests/test_build_data.py -k fixture_tier_resolver -q -p no:cacheprovider
 1 passed
-$ (mutate /tmp/replay_r5/apps/website/data.js: "missing": 402)
-$ python3 -m pytest tests/test_build_data.py -k resolution_report_is_complete   # mutated
-E   assert 402 == 0
-FAILED tests/test_build_data.py::test_data_js_resolution_report_is_complete_without_a_data_root
+# positive: 3 current rows (story/review/finding) + 1 tombstoned
+#   resolution.expected_current == 3 ; resolved == 3 ; unresolved == 0 ; complete is True
+# negative: delete ONE payload -> missing == 1 ; the resolver NAMES the row
+#   [("story", "s1")]  (the F-05 signature at fixture scale)
 ```
+
+The pre-existing `data.js` attestation guard
+(`test_data_js_resolution_report_is_complete_without_a_data_root`) is retained as a
+**complementary artifact check**, explicitly scoped as such: it closes the publication half
+(a broken corpus cannot ship as a clean-looking `data.js`), while the new test closes the
+resolution half. The full-corpus re-resolution over the real 1.6 GB payload tree remains
+`@requires_full_corpus` (local-only, documented migration tradeoff).
 
 **Historical moment.** `build_data.py` hard-aborted on the unresolvable rows —
-`ses_f92f8804affe… part@2026-09-05 17:55:14` / `17:55:20` ("publication aborted: current
+`ses_f92f8804affe… part@2026-09-05 17:55:14`/`17:55:20` ("publication aborted: current
 registry rows could not be resolved…"); the 402 mis-registered rows were tombstoned at
 `ddbca7545`; the prior CI contract test checked only `data.js`↔manifest identity and was
 `@requires_full_corpus` (skipped in CI) — F-05.
 
-**Scope (recorded honestly).** The guard asserts the **published artifact's** resolution
-attestation is present and failure-free; it does not re-resolve the on-disk registry (the CI
-fixture carries no payloads, so that assertion remains `@requires_full_corpus`, local-only —
-the documented migration tradeoff). Its role is fail-closed prevention: an artifact regenerated
-from a broken registry cannot ship as a clean-looking `data.js`. The C5 sibling signatures
-F-17 (container provenance) and F-18 (heartbeat TTL) are context; the TTL assertion landed
-in-window in `tests/test_fleet_guards.py`.
-
-**Verdict:** PASS (published-signature replay); full registry re-resolution explicitly out of
-scope.
+**Verdict: PASS (fixture-tier resolver replay; the attestation guard is retained but no longer
+the sole claim).**
 
 ---
 
-## 3. Re-designed in this phase (R1)
+## 6. Corpus and taxonomy corrections (A5, A6)
 
-The first R1 attempt **did not demonstrably catch F-09's phantom**, and verification caught it:
+### 6a. A5 — the dirty-file count is corrected to the evidenced value
 
-- The existing `recording_sweep._phantom_close_claims()` matched only a **64-hex** id
-  (`r"decision record ([0-9a-f]{64})"`), but the corpus cites the **short human form** —
-  `…, decision record 80f02d3ce5` (10 hex). Replay with the original regex: **no match, no
-  phantom** (a missed catch).
-- **Re-design applied:** the detector now matches a **prefix** (6–64 hex) and treats the
-  citation as a phantom when no known artifact stem starts with it; documented in the function
-  docstring. Replay after the fix flags the historical citation (§2-R1) and clears when the
-  artifact exists.
-- Guarded by the new `tests/test_recording_sweep.py` (4 tests: short-prefix phantom, clears on
-  artifact, full-hex happy path, gap scan). `ruff` clean; suite green.
+`docs/reviews/aio_controller_postmortem_corpus.md` (F-01) now states **~237 files dirty** and
+cites the retained opening `git status` pointer (1 modified + 236 untracked), replacing the
+unsupported "~292". The qualification is recorded inline in the corpus. The same correction is
+applied to the taxonomy's C6 narrative and the workflow spec's `question`/g9 prompt. The
+corpus completeness claim is unchanged: every item still carries a first-hand pointer; the
+quantity now carries the one the pointer shows.
 
-This is the phase's most important result: the postmortem's own instrument was itself
-under-firing, and the replay found and fixed it.
+### 6b. A6 — the counting basis is stated
 
----
+The taxonomy's ≥2 threshold counts corpus **rows**, not independent incidents. §2 now states
+this and records that **C6's two rows (F-01, F-02) are two symptoms of one incident chain**
+(the same hammer session and the same 19-hour abandonment arc), so as independent incidents
+C6 is a **singleton**. The "≥5 classes with ≥2 items" gate is met by C1–C5 alone (C6 does not
+carry it).
 
-## 4. Residuals (parked, unchanged from p3 §5)
-
-- **P1 — C6 interactive-session / uncommitted-work watchdog:** parked; covered by R1's
-  "close or explicitly park" clause.
-- **P2 — C1 volume/ordering assertion:** parked; tracked-store vector retired by the
-  migration.
-- **P3 — C2 wrapper-necessity test:** parked; R4's justification clause is the cover.
-- **P4 — R (environmental):** no action; fixed by the corpus migration + `snapshot:false`.
-- **R5 full registry re-resolution:** remains `@requires_full_corpus`; documented.
+**Verdict: PASS (both corrected in place).**
 
 ---
 
-## 5. Verification completion log
+## 7. A7 — the recording rail returns unmeasured and refuses mutation
 
-- **DONE_WHEN — every selected remediation shows replay evidence:** PASS (R1 hermetic rail run;
-  R2 numeric + transcript; R3 wired CI gate on the historical commit; R4 transcript; R5
-  positive/negative rail run).
-- **DONE_WHEN — the verify doc records pass/revert per item:** PASS (5/5 PASS; R1 re-designed
-  in-phase and re-verified; no reverts).
-- **DONE_WHEN — no remediation shipped unverified:** PASS (R1 rebased on the falsification;
-  R5's scope limitation stated explicitly).
-- **Gates:** `python3 scripts/_gen_instructions.py --check` → surfaces OK; focused suite →
-  `90 passed, 3 skipped` (recording-sweep/session-spine/build-data/doc-lifecycle); `ruff check`
-  on touched files → clean.
+**The p5 gap.** `python3 -B scripts/recording_sweep.py --scan` reported `GAPS: 12 uncovered
+day(s)` and exit 1 in a source checkout with no runtime KB data: the sweep treated the absent
+`experiments/results/kb` as zero decision/close coverage. A nightly run from a source checkout
+could therefore produce false gaps and backfill reconstructions without evidence.
+
+**The fix.** `scan()` now returns `{"status": "unmeasured", "reason": …}` when the runtime data
+root is absent (or git is unavailable). `main` refuses every mode while unmeasured — `--scan`
+and the default exit 2 with the reason; `--report` writes no audit; `--backfill` refuses to
+mint a reconstruction. `session_close._recording_check` propagates the sweep's `unmeasured`
+state rather than reading gaps out of a report the sweep declined to measure.
+
+**The source-checkout replay (run, no runtime data root):**
+
+```
+$ python3 -B scripts/recording_sweep.py --scan
+recording_sweep: UNMEASURED — no KB artifact dir on disk; refused to report or backfill
+exit=2
+$ python3 -B scripts/recording_sweep.py --backfill
+recording_sweep: UNMEASURED — no KB artifact dir on disk; refused to report or backfill
+exit=2
+$ python3 -B scripts/recording_sweep.py --report    # exit 2; no audit.json written
+exit=2
+$ ls experiments/results/recording/audit.json       # No such file
+```
+
+Guard tests: `tests/test_recording_sweep.py::test_scan_is_unmeasured_when_the_runtime_data_root_is_absent`,
+`::test_backfill_refuses_an_unmeasured_report`; the close-probe path in
+`tests/test_session_spine.py::TestRecordingProbe` (6 passed).
+
+**Verdict: PASS (unmeasured is first-class; report/backfill refuse).**
+
+---
+
+## 8. g10 — the fast path (REPAIRED)
+
+**The reproduced failure.** The fast path (`pytest tests/ -m fast`) is the dependency-free
+smoke the guards and g10 run. Two corpus-dependent modules were `fast`-marked in error
+(`tests/test_lab_outputs_canonical.py`, `test_contribution_report.py`,
+`test_publication_singular_door.py`):
+
+- in a corpus-less checkout (exactly CI's fast-path step, which runs **before** the fixture
+  restore) the unguarded `test_no_live_lab_output_carries_retired_summary_lineage` fails the
+  smoke outright;
+- on a host carrying the full runtime corpus, the `@requires_full_corpus` cases recompute over
+  every payload, which is unbounded against the 180 s gate.
+
+**The fix.** The three corpus-contract modules are no longer `fast`-marked (they run in the
+full suite, where corpus work belongs), and the parallel-safety audit now forbids a
+runtime-corpus dependency (`requires_(full_)?corpus`) in any `fast`-marked module, so the
+dependency-free contract cannot silently regress.
+
+**Replay (no runtime data root, the source-checkout condition):**
+
+```
+$ python3 -m pytest tests/ -m fast -q -p no:cacheprovider
+533 passed, 2 skipped, 3430 deselected in 27.62s          # budget 180s
+$ python3 -m pytest tests/test_fast_path_gate.py -q -p no:cacheprovider
+3 passed in 33.66s                                          # includes the nested fast-path gate
+$ python3 scripts/scan_docs_drift.py --check fast_path
+DRIFT SCORE: 0  (fast_path 3/3 current)
+```
+
+The g10 gate itself (its fixed test list) is green:
+
+```
+$ python3 -m pytest tests/test_agent_config_render.py tests/test_doc_lifecycle.py \
+    tests/test_script_classification.py tests/test_fast_path_gate.py \
+    tests/test_dependency_direction.py tests/test_control_room_paths.py -q -p no:cacheprovider
+54 passed in 34.31s
+```
+
+**Verdict: PASS (fast path green at ~27 s, well under the 180 s budget; audit hardened).**
+
+---
+
+## 9. Residuals (named, not claimed)
+
+- **F-08 (C4, unattributable emitter):** uncovered — no producer-attribution rail added.
+- **F-11 (C4, stale promote rows):** not R1; covered by the in-window `promote.py`
+  row-close fix (pre-existing, outside this remediation set).
+- **F-12 (C4, row-before-workdir):** prevention not added; detection/reconciliation only via
+  `control_sweep_zombies.py`; the runner still mints the row before validating the workdir
+  (`scripts/run_workflow.py:641-655`).
+- **C1 drain guard:** bounded to the `generate_manifest.py` compaction seam; a raw edit never
+  followed by `manifest` is not blocked; `--allow-shrink` is the operator override.
+- **R5 full registry re-resolution:** remains `@requires_full_corpus` (local-only); the
+  fixture-tier replay and the artifact attestation cover the CI-runnable half.
+- **P1/P2/P3 parked** as in p3 §5 (C6 watchdog, C1 volume/ordering beyond the drain guard, C2
+  wrapper test) — unchanged.
+- **A4 verdict note:** because the top severity-5 class (C1) now carries a **bounded** rail
+  rather than none, the g9 "top classes have no catching rails" FAIL is discharged **for the
+  registry path**; the durability of the guard is bounded as stated above.
+
+---
+
+## 10. Verification completion log
+
+- **DONE_WHEN — every selected remediation shows replay evidence:** PASS (R1 e2e same-day; R2
+  drain guard; R3 historical commit gate; R4 transcript; R5 fixture-tier resolver). A1–A7 each
+  carry a replay in §0/§1–§7.
+- **DONE_WHEN — the verify doc records pass/revert per item:** PASS (R1 PASS re-designed;
+  R2 PASS + bounded rail; R3 PASS; R4 PASS; R5 PASS redesigned; A5/A6/A7/g10 PASS; no reverts).
+- **DONE_WHEN — no remediation shipped unverified:** PASS — every claim above is a command
+  that was run on this branch; the original p5 headline is retracted where it overclaimed.
+- **Gates:** `python3 scripts/_gen_instructions.py --check` → surfaces OK (38 files);
+  `python3 -m pytest tests/test_recording_sweep.py tests/test_generate_manifest.py
+  tests/test_build_data.py tests/test_doc_lifecycle.py tests/test_agent_config_render.py
+  tests/test_session_spine.py -q` → **140 passed, 3 skipped**; fast path **533 passed / 27.62s**;
+  g10 list **54 passed**; `ruff` on touched files clean.
 - **LOG:** PASS.

@@ -70,37 +70,80 @@ def test_full_hex_citation_that_matches_is_not_a_phantom(tmp_path, monkeypatch):
     assert rs._phantom_close_claims() == []
 
 
-def test_gap_scan_flags_a_commit_day_without_a_decision_or_close(tmp_path, monkeypatch):
-    """A commit-day with no decision AND no close is a gap; a closed day is not."""
+def _commit(repo: Path, day: str, message: str) -> None:
+    """Commit a file onto ``main`` with a fixed author/committer date."""
+    import os
     import subprocess
 
-    repo = tmp_path
+    marker = repo / "f"
+    marker.write_text((marker.read_text() if marker.exists() else "") + message + "\n")
+    subprocess.run(["git", "add", "f"], cwd=repo, check=True)
+    stamp = f"{day}T12:00:00"
+    subprocess.run(
+        ["git", "commit", "-q", "-m", message],
+        cwd=repo,
+        check=True,
+        env={**os.environ, "GIT_AUTHOR_DATE": stamp, "GIT_COMMITTER_DATE": stamp},
+    )
+
+
+def _repo(tmp_path: Path) -> Path:
+    import subprocess
+
+    subprocess.run(["git", "init", "-q", "-b", "main"], cwd=tmp_path, check=True)
+    subprocess.run(["git", "config", "user.email", "r@x"], cwd=tmp_path, check=True)
+    subprocess.run(["git", "config", "user.name", "r"], cwd=tmp_path, check=True)
+    return tmp_path
+
+
+def test_same_day_close_does_not_cover_its_own_day(tmp_path, monkeypatch):
+    """A1: a close dated on day D does NOT cover D's commits — the act being audited.
+
+    This is the re-designed invariant. The original ``day in closed`` check let the close
+    written at close-time satisfy its own coverage check (the F-09 self-mask).
+    """
+    repo = _repo(tmp_path)
     _kb(tmp_path)
-    subprocess.run(["git", "init", "-q", "-b", "main"], cwd=repo, check=True)
-    subprocess.run(["git", "config", "user.email", "r@x"], cwd=repo, check=True)
-    subprocess.run(["git", "config", "user.name", "r"], cwd=repo, check=True)
-    (repo / "f").write_text("1")
-    subprocess.run(["git", "add", "f"], cwd=repo, check=True)
-    env = {"GIT_AUTHOR_DATE": "2026-09-04T12:00:00", "GIT_COMMITTER_DATE": "2026-09-04T12:00:00"}
-    subprocess.run(
-        ["git", "commit", "-q", "-m", "covered day"],
-        cwd=repo,
-        check=True,
-        env={**__import__("os").environ, **env},
-    )
-    (repo / "f").write_text("2")
-    subprocess.run(["git", "add", "f"], cwd=repo, check=True)
-    env2 = {"GIT_AUTHOR_DATE": "2026-09-09T12:00:00", "GIT_COMMITTER_DATE": "2026-09-09T12:00:00"}
-    subprocess.run(
-        ["git", "commit", "-q", "-m", "unrecorded day"],
-        cwd=repo,
-        check=True,
-        env={**__import__("os").environ, **env2},
-    )
-    # A close for 09-04 only; 09-09 has no decision/close.
-    _close(_kb(tmp_path), "c" * 64, "session close 2026-09-04 (covered)")
+    _commit(repo, "2026-09-04", "own-day commit")
+    # The only close is for 09-04 itself; it must not cover 09-04.
+    _close(_kb(tmp_path), "c" * 64, "session close 2026-09-04 (own-day)")
     monkeypatch.setattr(rs, "ROOT", tmp_path)
-    monkeypatch.setattr(rs, "LOOKBACK_DAYS", 30)
+    monkeypatch.setattr(rs, "LOOKBACK_DAYS", 3000)
     report = rs.scan()
-    assert "2026-09-09" in report["gap_days"]
+    assert report["status"] == "measured"
+    assert "2026-09-04" in report["gap_days"]
+
+
+def test_later_close_covers_earlier_days_and_decision_covers_its_own(tmp_path, monkeypatch):
+    """A close attests the days it FOLLOWS; a decision covers its own day."""
+    repo = _repo(tmp_path)
+    _kb(tmp_path)
+    _commit(repo, "2026-09-04", "earlier day")
+    _commit(repo, "2026-09-09", "later day")
+    # A close for the LATER day covers the earlier day; the later day has its own decision.
+    _close(_kb(tmp_path), "c" * 64, "session close 2026-09-09 (covers 09-04)")
+    decision = {"text": json.dumps({"category": "ops", "decided_at": "2026-09-09T12:00:00+00:00"})}
+    (_kb(tmp_path) / ("d" * 64 + ".json")).write_text(json.dumps(decision))
+    monkeypatch.setattr(rs, "ROOT", tmp_path)
+    monkeypatch.setattr(rs, "LOOKBACK_DAYS", 3000)
+    report = rs.scan()
     assert "2026-09-04" not in report["gap_days"]
+    assert "2026-09-09" not in report["gap_days"]
+
+
+def test_scan_is_unmeasured_when_the_runtime_data_root_is_absent(tmp_path, monkeypatch):
+    """A7: a source checkout (no experiments/results/kb) measures nothing — never a gap."""
+    monkeypatch.setattr(rs, "ROOT", tmp_path)  # no kb dir under it
+    report = rs.scan()
+    assert report["status"] == "unmeasured"
+    assert report["reason"] == "no KB artifact dir on disk"
+    assert report["gap_days"] == []
+
+
+def test_backfill_refuses_an_unmeasured_report(tmp_path, monkeypatch):
+    """A7: backfill must refuse to mint a reconstruction from an unmeasured sweep."""
+    import pytest
+
+    monkeypatch.setattr(rs, "ROOT", tmp_path)
+    with pytest.raises(ValueError, match="unmeasured"):
+        rs.backfill(rs.scan())
