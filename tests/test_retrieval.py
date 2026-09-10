@@ -1680,3 +1680,35 @@ def test_retrieve_expansion_applies_commit_gate_to_source_neighbors():
     assert "k_stale_source" not in candidate_ids
     assert "k_measured_neighbor" in candidate_ids
     assert "k_stale_source" not in {c.id for c in attempt.selected_evidence}
+
+
+def test_direct_lexical_leg_enforces_acl_scope():
+    """Review-5 F3: a foreign-ACL record never surfaces via the direct lexical leg.
+
+    The pre-existing leak: the lexical leg filtered only ``repository_id``, so a record with a
+    matching repository but a different ACL scope was selectable.
+    """
+    def hit():
+        h = _knowledge_lexical_hit(cid="foreign-acl", text="task manager api building finding")
+        h["properties"]["repository_id"] = "self-a"
+        h["properties"]["acl_scope"] = "private-b"
+        return h
+
+    leaked = retrieve(
+        "build a task manager api",
+        dense_store=None,
+        graph_client=_FakeGraph(lexical_hits=[hit()]),
+        repository_id="self-a",
+        acl_scope="private-a",
+    )
+    assert leaked.candidates == []
+    assert leaked.selected_evidence == []
+
+    admitted = retrieve(
+        "build a task manager api",
+        dense_store=None,
+        graph_client=_FakeGraph(lexical_hits=[hit()]),
+        repository_id="self-a",
+        acl_scope="private-b",
+    )
+    assert {c.id for c in admitted.candidates} == {"foreign-acl"}

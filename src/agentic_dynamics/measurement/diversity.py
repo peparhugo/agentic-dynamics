@@ -7,25 +7,29 @@ generalization of the basin primitives.
 
 It deliberately defines **no new divergence math**. Architecture, structure, and novelty are
 imported from ``basin`` so a fix to the basin metric can never leave a second, stale copy
-behind — there is exactly one implementation of each axis. Public aliases are exposed for
-callers that do not want to reach into private names.
+behind — there is exactly one implementation of each axis.
 
-Two entry points:
+**The normalization contract (frozen after four adversarial-review rounds).** Only
+PARSER-BACKED Python is scored. Parseable Python is canonicalized through ``ast`` (comments,
+whitespace, and formatting vanish); the ``run.py`` multi-file ``solution_code`` blob
+(``# === <relpath> ===`` headers) is split and each file parsed. Any source that cannot be
+parsed is **UNSCORED**: :func:`pairwise_divergence` returns null axes with ``scored: False``
+and ``reason: "unsupported_source"`` — never a number that could be wrong in either direction
+(a cosmetically-changed pair reading as divergence, or a semantically-changed pair reading as
+zero). Heuristic normalization of arbitrary languages was tried and abandoned: every layer
+created the next bypass. The ladder's subject is Python, which this contract covers;
+:func:`portfolio_diversity` reports ``unsupported_pairs`` / ``unsupported_fraction`` so an
+unscored sample is visible, never silently averaged.
 
-* :func:`pairwise_divergence` — the three basin axes plus their registered composite
-  (``0.4·arch + 0.3·struct + 0.3·novelty``, the basin escape weights and the preregistration's
-  ``D_c`` definition) for one pair.
-* :func:`portfolio_diversity` — the aggregate over every unordered pair of a sequence:
-  means, max, a threshold-based ``distinct_fraction``, and a ``coverage`` verdict.
-
-Null-not-zero: every mean/max is ``None`` when there is no pair to average over (``n < 2``).
-An unmeasured portfolio statistic is not a measured zero. ``coverage`` says which case applies:
-``empty`` (n=0), ``single`` (n=1), ``full`` (n≥2).
+Null-not-zero: every mean/max is ``None`` when there is no SCORED pair to average over.
+``coverage`` describes the portfolio size (``empty``/``single``/``full``); when every pair is
+unsupported the aggregates are ``None`` and ``unsupported_fraction`` is ``1.0``.
 """
 
 from __future__ import annotations
 
 import ast
+import re
 from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Any
@@ -52,6 +56,9 @@ NOVELTY_WEIGHT = 0.3
 #: preregistration registers this threshold (flash_exploration_preregistration.md §4).
 DEFAULT_DISTINCT_THRESHOLD = 0.5
 
+#: The stable per-file header ``run.py`` writes into the concatenated ``solution_code`` blob.
+_BLOB_HEADER = re.compile(r"^# === .+ ===$", re.MULTILINE)
+
 __all__ = [
     "PortfolioDiversity",
     "architecture_divergence",
@@ -63,149 +70,88 @@ __all__ = [
 
 
 def _count_loc(code: str) -> int:
-    """Count executable lines the way ``solution.evaluate_solution`` does.
-
-    ``basin._structure_divergence`` takes two line counts rather than deriving them, so the
-    caller must supply them. We mirror ``solution.py``'s definition (non-blank, non-comment
-    lines) so a portfolio assembled from persisted ``solution_code`` counts lines identically
-    to the run-time evaluation that produced it.
-    """
+    """Count executable lines the way ``solution.evaluate_solution`` does."""
     return len(
         [line for line in code.split("\n") if line.strip() and not line.strip().startswith("#")]
     )
 
 
-#: C/C++ preprocessor directives — a leading ``#`` here is CODE, not a comment. The review-4
-#: A1 regression: stripping ``#define`` lines made two different macros canonicalize equal and
-#: take the hard-zero branch.
-_CPP_DIRECTIVES = frozenset({
-    "define", "undef", "include", "include_next", "if", "ifdef", "ifndef", "else", "elif",
-    "endif", "pragma", "error", "warning", "line",
-})
+def _split_source_blob(code: str) -> list[str] | None:
+    """Split a ``run.py`` multi-file ``solution_code`` blob into its file bodies.
 
-
-def _strip_comments(code: str) -> str:
-    r"""Remove ``#``/``//``/``/* */`` comments that sit OUTSIDE string literals.
-
-    The g5 round-2 F1 finding: the line filter dropped whole comment lines only, so inline
-    ``//`` and C block comments still raised the metric. A tiny scanner (not a parser) tracks
-    single/double/backtick quotes and backslash escapes; everything from a comment marker to
-    its end is removed. Contents of strings are preserved, so ``"http://x"`` and JavaScript
-    template literals (``\`http://x\```) survive. A leading ``#`` that opens a C/C++
-    preprocessor directive is CODE and is preserved (review-4 A1).
+    Returns ``None`` when the text carries no ``# === <relpath> ===`` headers (not a blob).
     """
-    out: list[str] = []
-    i = 0
-    n = len(code)
-    quote: str | None = None
-    while i < n:
-        ch = code[i]
-        if quote is not None:
-            out.append(ch)
-            if ch == "\\" and i + 1 < n:
-                out.append(code[i + 1])
-                i += 2
-                continue
-            if ch == quote:
-                quote = None
-            i += 1
-            continue
-        if ch in ("'", '"', "`"):
-            quote = ch
-            out.append(ch)
-            i += 1
-            continue
-        if ch == "#":
-            line_start = code.rfind("\n", 0, i) + 1
-            on_own_line = code[line_start:i].strip() == ""
-            directive = code[i + 1 : i + 20].lstrip().split(None, 1)[0].rstrip(":") if on_own_line else ""
-            if on_own_line and directive in _CPP_DIRECTIVES:
-                out.append(ch)
-                i += 1
-                continue
-            while i < n and code[i] != "\n":
-                i += 1
-            continue
-        if ch == "/" and i + 1 < n and code[i + 1] == "/":
-            while i < n and code[i] != "\n":
-                i += 1
-            continue
-        if ch == "/" and i + 1 < n and code[i + 1] == "*":
-            i += 2
-            while i < n and not (code[i] == "*" and i + 1 < n and code[i + 1] == "/"):
-                i += 1
-            i += 2
-            continue
-        out.append(ch)
-        i += 1
-    return "".join(out)
+    headers = list(_BLOB_HEADER.finditer(code))
+    if not headers:
+        return None
+    bodies: list[str] = []
+    for index, header in enumerate(headers):
+        start = header.end()
+        end = headers[index + 1].start() if index + 1 < len(headers) else len(code)
+        bodies.append(code[start:end].strip("\n"))
+    return bodies
 
 
-def _normalized_forms(code: str) -> tuple[str, str]:
-    """Return ``(canonical, line_form)`` for a source sample.
+def _python_canonical(code: str) -> str | None:
+    """The AST-canonical form of parseable Python, or ``None`` when the source is unsupported.
 
-    The adversarial reviews (findings F3, F1, then F1-round-2) measured whitespace-only,
-    comment-only, and non-Python inline/block-comment pairs — including interior whitespace
-    left behind by a removed comment — scoring nonzero composite divergence. Cosmetic churn
-    must read as zero, so:
-
-    * ``canonical`` — the comment-free, whitespace-canonical text every axis except structure
-      compares. Python that parses goes through the AST (full normalization); other or
-      unparseable sources have comments stripped (:func:`_strip_comments`, string-aware) and
-      ALL whitespace runs collapsed to single spaces, so interior whitespace, reformatting,
-      and comment removal are all cosmetic-invariant.
-    * ``line_form`` — comment-free lines with blank lines dropped and edges stripped. Its line
-      COUNT feeds structure divergence: collapsing newlines wholesale would degenerate LOC.
-
-    Concatenated multi-file ``solution_code`` (the ``# === <relpath> ===`` headers make it
-    unparseable as one module) takes the fallback.
+    Every file of a multi-file blob must parse; one unparseable file makes the whole sample
+    unsupported. An empty/whitespace-only string parses (to nothing) and is supported.
     """
     try:
-        canonical = ast.unparse(ast.parse(code))
-        return canonical, canonical
+        return ast.unparse(ast.parse(code))
     except (SyntaxError, ValueError, TypeError):
         pass
-    stripped = _strip_comments(code)
-    lines = [line.strip() for line in stripped.splitlines() if line.strip()]
-    return " ".join(stripped.split()), "\n".join(lines)
+    parts = _split_source_blob(code)
+    if parts is None:
+        return None
+    canonical_parts: list[str] = []
+    for part in parts:
+        try:
+            canonical_parts.append(ast.unparse(ast.parse(part)))
+        except (SyntaxError, ValueError, TypeError):
+            return None
+    return "\n".join(canonical_parts)
 
 
-def _normalize_source(code: str) -> str:
-    """The canonical (comment-free, whitespace-canonical) form of one source sample."""
-    return _normalized_forms(code)[0]
+def _normalize_source(code: str) -> str | None:
+    """The canonical form of one sample, or ``None`` when the source is unsupported."""
+    return _python_canonical(code)
 
 
-def pairwise_divergence(a: str, b: str) -> dict[str, float]:
+def pairwise_divergence(a: str, b: str) -> dict[str, Any]:
     """Divergence between two solutions across the three basin axes plus their composite.
 
-    Args:
-        a: One solution's source (typically the concatenated ``solution_code``).
-        b: The other solution's source.
-
-    Returns:
-        ``{"novelty", "architecture_divergence", "structure_divergence", "composite"}`` with
-        ``composite = 0.4·arch + 0.3·struct + 0.3·novelty``.
-
-    Formatting is normalized away BEFORE any axis is scored (:func:`_normalize_source`): a
-    whitespace-only or comment-only pair is a hard zero, so cosmetic churn cannot inflate the
-    portfolio statistics the ladder's decision rule reads (the g5 F3 finding). Identity is a
-    hard zero; the normalization also keeps the empty/whitespace case honest, because basin's
-    neutral-prior novelty (0.5 when no 5-grams exist) would otherwise score two empty strings
-    as divergent.
+    Two parseable-Python samples are canonicalized (comments/whitespace/formatting removed) and
+    scored; identical canonicals are a hard zero. If either sample is not parseable Python the
+    pair is UNSUPPORTED — every axis is ``None`` and ``scored`` is ``False``; no number is
+    invented (the review-4 A1 / review-5 F1-F2 false-zero and inflation classes are impossible
+    by construction).
     """
-    canonical_a, lines_a = _normalized_forms(a)
-    canonical_b, lines_b = _normalized_forms(b)
+    canonical_a = _python_canonical(a)
+    canonical_b = _python_canonical(b)
+    if canonical_a is None or canonical_b is None:
+        return {
+            "novelty": None,
+            "architecture_divergence": None,
+            "structure_divergence": None,
+            "composite": None,
+            "scored": False,
+            "reason": "unsupported_source",
+        }
     if canonical_a == canonical_b:
         return {
             "novelty": 0.0,
             "architecture_divergence": 0.0,
             "structure_divergence": 0.0,
             "composite": 0.0,
+            "scored": True,
+            "reason": "",
         }
 
     arch = architecture_divergence(canonical_a, canonical_b)
     struct = structure_divergence(
-        _count_loc(lines_a), _count_loc(lines_b), canonical_a, canonical_b
+        _count_loc(canonical_a), _count_loc(canonical_b), canonical_a, canonical_b
     )
     novelty = compute_novelty(canonical_a, canonical_b)
     composite = ARCHITECTURE_WEIGHT * arch + STRUCTURE_WEIGHT * struct + NOVELTY_WEIGHT * novelty
@@ -214,6 +160,8 @@ def pairwise_divergence(a: str, b: str) -> dict[str, float]:
         "architecture_divergence": arch,
         "structure_divergence": struct,
         "composite": composite,
+        "scored": True,
+        "reason": "",
     }
 
 
@@ -221,44 +169,50 @@ def pairwise_divergence(a: str, b: str) -> dict[str, float]:
 class PortfolioDiversity:
     """The aggregate diversity of a portfolio of attempts.
 
-    Frozen so a portfolio statistic is a value, not mutable state passed between analyses.
-
     Attributes:
         n: Number of samples.
         n_pairs: Number of unordered pairs compared (``n·(n−1)/2``).
-        mean_novelty: Mean pairwise novelty, or ``None`` when ``n < 2``.
-        mean_architecture_divergence: Mean pairwise architecture divergence, or ``None``.
-        mean_structure_divergence: Mean pairwise structure divergence, or ``None``.
-        mean_composite: Mean pairwise composite (the preregistration's ``D_c``), or ``None``.
-        max_composite: The single largest pairwise composite, or ``None``.
-        distinct_fraction: Fraction of pairs whose composite reaches ``threshold``, or
-            ``None`` when there are no pairs (``n < 2``).
-        coverage: ``"empty"`` (n=0), ``"single"`` (n=1), or ``"full"`` (n≥2) — which case
-            the portfolio is in, so a ``None`` mean is read as coverage, never as a zero.
+        n_scored_pairs: Pairs scored (both samples parseable Python).
+        unsupported_pairs: Pairs whose samples could not be parsed — reported, never averaged.
+        coverage: ``"empty"`` (n=0), ``"single"`` (n=1), or ``"full"`` (n≥2) — the size case.
+        unsupported_fraction: ``unsupported_pairs / n_pairs``, or ``None`` when there are no
+            pairs.
+        mean_novelty: Mean pairwise novelty over SCORED pairs, or ``None``.
+        mean_architecture_divergence: As above, over scored pairs.
+        mean_structure_divergence: As above, over scored pairs.
+        mean_composite: The preregistration's ``D_c`` — over scored pairs, or ``None``.
+        max_composite: Largest scored-pair composite, or ``None``.
+        distinct_fraction: Fraction of SCORED pairs at/above ``threshold``, or ``None``.
     """
 
     n: int
     n_pairs: int
+    n_scored_pairs: int
+    unsupported_pairs: int
+    coverage: str
+    unsupported_fraction: float | None
     mean_novelty: float | None
     mean_architecture_divergence: float | None
     mean_structure_divergence: float | None
     mean_composite: float | None
     max_composite: float | None
     distinct_fraction: float | None
-    coverage: str
 
     def to_dict(self) -> dict[str, Any]:
         """Serialize with the same 4-decimal rounding basin uses (``None`` passes through)."""
         return {
             "n": self.n,
             "n_pairs": self.n_pairs,
+            "n_scored_pairs": self.n_scored_pairs,
+            "unsupported_pairs": self.unsupported_pairs,
+            "coverage": self.coverage,
+            "unsupported_fraction": _round_or_none(self.unsupported_fraction),
             "mean_novelty": _round_or_none(self.mean_novelty),
             "mean_architecture_divergence": _round_or_none(self.mean_architecture_divergence),
             "mean_structure_divergence": _round_or_none(self.mean_structure_divergence),
             "mean_composite": _round_or_none(self.mean_composite),
             "max_composite": _round_or_none(self.max_composite),
             "distinct_fraction": _round_or_none(self.distinct_fraction),
-            "coverage": self.coverage,
         }
 
 
@@ -280,44 +234,68 @@ def portfolio_diversity(
     """Aggregate pairwise divergence across a portfolio of solution samples.
 
     Args:
-        samples: The solutions (typically concatenated source strings) to compare.
-        threshold: A pair is "distinct" once its composite reaches this value; the fraction of
-            such pairs is reported as ``distinct_fraction``.
+        samples: The solutions (typically concatenated ``solution_code``) to compare.
+        threshold: A SCORED pair is "distinct" once its composite reaches this value; the
+            fraction of such pairs (over scored pairs) is reported as ``distinct_fraction``.
 
     Returns:
-        A frozen :class:`PortfolioDiversity`. Means, ``max_composite``, and
-        ``distinct_fraction`` are ``None`` when ``n < 2`` — there is no pair to aggregate.
+        A frozen :class:`PortfolioDiversity`. Aggregates are ``None`` when there is no scored
+        pair to aggregate over; unsupported pairs are counted, never averaged.
     """
     n = len(samples)
     n_pairs = n * (n - 1) // 2
     coverage = "empty" if n == 0 else "single" if n == 1 else "full"
 
     if n < 2:
-        # No pair exists: every aggregate is unmeasured, not zero (null-not-zero).
         return PortfolioDiversity(
             n=n,
             n_pairs=n_pairs,
+            n_scored_pairs=0,
+            unsupported_pairs=0,
+            coverage=coverage,
+            unsupported_fraction=None,
             mean_novelty=None,
             mean_architecture_divergence=None,
             mean_structure_divergence=None,
             mean_composite=None,
             max_composite=None,
             distinct_fraction=None,
-            coverage=coverage,
         )
 
     pairs = [pairwise_divergence(samples[i], samples[j]) for i in range(n) for j in range(i + 1, n)]
-    composites = [p["composite"] for p in pairs]
-    distinct_pairs = sum(1 for c in composites if c >= threshold)
+    scored = [p for p in pairs if p["scored"]]
+    unsupported = len(pairs) - len(scored)
 
+    if not scored:
+        # Every pair unmeasured — report the coverage, fabricate nothing (null-not-zero).
+        return PortfolioDiversity(
+            n=n,
+            n_pairs=n_pairs,
+            n_scored_pairs=0,
+            unsupported_pairs=unsupported,
+            coverage=coverage,
+            unsupported_fraction=unsupported / n_pairs,
+            mean_novelty=None,
+            mean_architecture_divergence=None,
+            mean_structure_divergence=None,
+            mean_composite=None,
+            max_composite=None,
+            distinct_fraction=None,
+        )
+
+    composites = [p["composite"] for p in scored]
+    distinct_pairs = sum(1 for c in composites if c >= threshold)
     return PortfolioDiversity(
         n=n,
         n_pairs=n_pairs,
-        mean_novelty=_mean([p["novelty"] for p in pairs]),
-        mean_architecture_divergence=_mean([p["architecture_divergence"] for p in pairs]),
-        mean_structure_divergence=_mean([p["structure_divergence"] for p in pairs]),
+        n_scored_pairs=len(scored),
+        unsupported_pairs=unsupported,
+        coverage=coverage,
+        unsupported_fraction=unsupported / n_pairs,
+        mean_novelty=_mean([p["novelty"] for p in scored]),
+        mean_architecture_divergence=_mean([p["architecture_divergence"] for p in scored]),
+        mean_structure_divergence=_mean([p["structure_divergence"] for p in scored]),
         mean_composite=_mean(composites),
         max_composite=max(composites),
-        distinct_fraction=distinct_pairs / n_pairs,
-        coverage=coverage,
+        distinct_fraction=distinct_pairs / len(scored),
     )

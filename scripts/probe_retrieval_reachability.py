@@ -81,7 +81,6 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--acl-scope", default="public")
     args = parser.parse_args(argv)
 
-    dense_available = True
     store = None
     try:
         store = ChromaStore(
@@ -90,8 +89,7 @@ def main(argv: list[str] | None = None) -> int:
             collection_name="knowledge_chunks_v1",
         )
     except Exception as exc:  # noqa: BLE001 — a missing dense store is REPORTED, not a crash
-        dense_available = False
-        print(f"dense store unavailable: {exc!r}", file=sys.stderr)
+        print(f"dense store construction failed: {exc!r}", file=sys.stderr)
 
     graph = Neo4jClient(
         uri=os.environ.get("NEO4J_URI", "bolt://localhost:7687"),
@@ -102,6 +100,11 @@ def main(argv: list[str] | None = None) -> int:
     import agentic_dynamics
     import agentic_dynamics.knowledge.retrieval as retrieval_module
 
+    legs = _leg_counts(store, graph, args)
+    # Availability is a MEASUREMENT, not a construction fact (review-5 F4): the store is
+    # available only when its direct dense query actually returned hits.
+    dense_available = legs.get("dense_hits") is not None
+
     out: dict = {
         "generated_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "code_sha": _git_sha(),
@@ -110,7 +113,7 @@ def main(argv: list[str] | None = None) -> int:
         "commit_sha": args.commit_sha,
         "dense_available": dense_available,
         "query": args.query,
-        "legs": _leg_counts(store, graph, args),
+        "legs": legs,
         "runs": [],
     }
     for projection in (False, True):

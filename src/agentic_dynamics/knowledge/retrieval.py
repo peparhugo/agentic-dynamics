@@ -693,6 +693,17 @@ def scope_excluded(candidate_repository_id: str, requested_scope: str) -> bool:
     )
 
 
+def acl_excluded(candidate_acl: str, requested_acl: str) -> bool:
+    """Return True when a candidate is hard-excluded by the requested ACL scope.
+
+    The lexical leg's mirror of :func:`scope_excluded`: a candidate carrying a different,
+    non-empty ``acl_scope`` never surfaces; an empty candidate scope is unknown/legacy and
+    stays eligible; an empty requested scope disables the filter. Closes the pre-existing
+    direct-lexical ACL leak (review-5 F3).
+    """
+    return bool(requested_acl and candidate_acl and candidate_acl != requested_acl)
+
+
 def graph_boost(seed_score: float, depth: int, relationship: str) -> float:
     """Decayed boost for a graph-expanded node: ``seed_score * weight * 0.7**depth``."""
     weight = RELATIONSHIP_WEIGHTS.get(relationship, 0.0)
@@ -1412,6 +1423,7 @@ def retrieve(
         "commit_sha": commit_sha,
         "acl_scope": acl_scope,
     }
+    requested_acl = str(filters.get("acl_scope", ""))
 
     dense_hits: list[dict[str, Any]] = []
     lexical_hits: list[dict[str, Any]] = []
@@ -1505,6 +1517,8 @@ def retrieve(
     lexical_rank = 0
     for hit in lexical_hits:
         props = hit.get("properties") or {}
+        if acl_excluded(str(props.get("acl_scope", "") or ""), requested_acl):
+            continue  # a foreign-ACL record never surfaces via the direct lexical leg
         cid = _canonical_id(props, hit.get("id", ""))
         text = props.get("text", "")
         source_type = _resolve_source_type(
@@ -1658,6 +1672,8 @@ def retrieve(
                     continue
                 if scope_excluded(props.get("repository_id", ""), requested_scope):
                     continue  # another cell's neighbor never surfaces via expansion
+                if acl_excluded(str(props.get("acl_scope", "") or ""), requested_acl):
+                    continue  # a foreign-ACL neighbor never surfaces via expansion
                 origin = node.get("origin_seed") or ""
                 seed_score = seed_scores.get(origin)
                 if seed_score is None or seed_score <= 0:
