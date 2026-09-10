@@ -18,6 +18,7 @@ from . import (
     lsp_diagnostics,
     mutation,
     perturb,
+    portfolio_score,
     prompt_perturbation,
     recovery_cost,
     semantic_validation,
@@ -26,4 +27,4 @@ from . import (
     strategy,
 )
 
-__all__ = ['basin', 'codebase_graph', 'commit_analysis', 'constraint_detection', 'coordination_overhead', 'delta_entropy', 'diversity', 'efficiency', 'entropy', 'lsp_diagnostics', 'mutation', 'perturb', 'prompt_perturbation', 'recovery_cost', 'semantic_validation', 'solution', 'sonar', 'strategy']
+__all__ = ['basin', 'codebase_graph', 'commit_analysis', 'constraint_detection', 'coordination_overhead', 'delta_entropy', 'diversity', 'efficiency', 'entropy', 'lsp_diagnostics', 'mutation', 'perturb', 'portfolio_score', 'prompt_perturbation', 'recovery_cost', 'semantic_validation', 'solution', 'sonar', 'strategy']

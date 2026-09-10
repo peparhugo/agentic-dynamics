@@ -176,3 +176,29 @@ Two containerized-platform constraints were hit while executing §2 and repaired
 `g6_test_gate`, dispatched against branch HEAD `5035f849c`. The p0–p4 evidence is the harvested
 chain on the branch plus the original run's ledger; the continuation's ledger covers g5/g6. No
 §4 metric, condition, rep, margin, or decision rule changes.
+
+## 8. Second continuation addendum + evidence-class contract (2026-09-10)
+
+The second adversarial review (`docs/reviews/flash_exploration_adversarial.md`, against
+`f481c8d4e`) returned FAIL with findings F1–F5; both remediation rounds are recorded in
+`docs/reviews/flash_exploration_remediation.md` (round 1: F3/F4/F2a/F5-F6; round 2: F1
+comment-stripping, F2/F4 scorer seam, F3 host-side probe runner + artifact, F5 corrections).
+
+**The decidable evidence contract** (the reason the earlier reviews could never pass, now
+written down): cells run on `fleet-net`; `neo4j` (`infrastructure_kb-neo4j_1`) is on that
+network, so the **live lexical probe is reproducible in-cell** at `bolt://neo4j:7687` (never
+`localhost`). `chromadb` runs on `infrastructure_ai-infra` and is **not reachable from cells by
+network design**, so the **dense live evidence is host-side**: the committed runner
+`scripts/probe_retrieval_reachability.py` and its attached output
+`docs/reviews/flash_exploration_retrieval_probe.json`. A review verifies the runner's code path
+and the artifact's internal consistency; it does not demand in-cell reproduction of a network
+boundary. The live DERIVED-pattern query and the second live dry-run (F2b) require the
+controller-approved mint and are the first post-mint acts — out of scope for the build review.
+
+**Continuation spec:** `workflows/repository/flash_exploration_build_resume2.yaml` SHA256
+`cebc81dcc70694d4e1d290abfe56a7c5d7412d3fe01a3320aa3285f8c383761d` — phases `g5_adversarial`
+(corrected review contract, terra) + `g6_test_gate` (six suites, including the new
+`test_run_result_shape.py` and `test_portfolio_scorer.py`), dispatched against the branch HEAD
+that carries both remediation rounds. No §4 metric, condition, rep, margin, or decision rule
+changes; on a clean g5 + g6 the wave proceeds to the one-time pattern mint (AIO data-plane act)
+and then the ladder.

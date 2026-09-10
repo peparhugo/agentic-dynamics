@@ -655,9 +655,16 @@ print('b')
 # === sub/c.py ===
 x = 1
 
-  empty portfolio -> '' / ''
+  empty portfolio -> None / None   # g5 round-2 F4: uncollected source is NULL, never ""
   deterministic order (two runs equal): True
 ```
+
+**Correction (g5 round-2 F4, `f481c8d4e` + this pass).** The raw output above was captured
+before the F4 repair: ``_serialize_solution_code(None)``/``({})`` now return ``None``
+(uncollected source), so an attempt is never indistinguishable from an intentionally empty
+one. The live consumer is `scripts/score_flash_ladder.py` /
+`agentic_dynamics.measurement.portfolio_score`, which excludes ``None`` attempts and reports
+the excluded count (`tests/test_portfolio_scorer.py`, `tests/test_run_result_shape.py`).
 
 ### 5b — the static call-site / consumer check
 
@@ -667,7 +674,7 @@ x = 1
 cd /repo
 grep -n "solution_code\|_serialize_solution_code\|_attempt_suffix" scripts/run.py
 grep -rn "_s{s}\|_s{strength}\|f\"{name}_" \
-  scripts/analyze_worktrees.py scripts/backfill_artifacts.py scripts/inventory.py scripts/build_data.py
+  scripts/analyze_worktrees.py scripts/archive/backfill_artifacts.py scripts/inventory.py scripts/build_data.py
 ```
 
 **Raw output**

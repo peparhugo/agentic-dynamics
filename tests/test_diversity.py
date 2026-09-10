@@ -210,3 +210,20 @@ def test_genuine_change_remains_positive():
     assert pairwise_divergence(
         "def f():\n    return 1\n", "def g():\n    return 2\n"
     )["composite"] > 0.0
+
+
+def test_inline_and_block_comments_in_non_python_normalize_to_zero():
+    """The g5 round-2 F1 finding: inline ``//`` and C block comments must not read as churn."""
+    js = "function f(){ return 1; }"
+    assert pairwise_divergence(js, js + " // cosmetic")["composite"] == 0.0
+    c = "int f() { return 1; }"
+    assert pairwise_divergence(c, "/* cosmetic */\n" + c)["composite"] == 0.0
+    assert pairwise_divergence(c, c + " /* trailing */")["composite"] == 0.0
+    # String contents are preserved, so a URL is not mistaken for a comment (JS sample —
+    # in Python a trailing "//" would be floor-division, not a comment; the AST path owns it).
+    from agentic_dynamics.measurement.diversity import _strip_comments
+
+    assert _strip_comments('var u = "http://x"; // note') == 'var u = "http://x"; '
+    assert pairwise_divergence(
+        'var u = "http://x";', 'var u = "http://x"; // note'
+    )["composite"] == 0.0

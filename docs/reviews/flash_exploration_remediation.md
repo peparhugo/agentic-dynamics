@@ -103,3 +103,39 @@ The reviewer could not see a gate that ran after it — the sequencing is the di
 2. Controller approval of the one-time pattern mint; then the **F2b** probes: a live
    DERIVED-pattern query and a second live dry-run proving 0 fact / 0 projection
    supersessions.
+
+## Remediation round 2 (the second review's findings F1–F5)
+
+The second independent review (terra, against `f481c8d4e`) returned FAIL with five findings.
+Each is closed here, completely:
+
+- **F1 — non-Python inline/block comments.** `_normalize_source`'s fallback now strips comments
+  with a string-aware scanner (`diversity._strip_comments`) covering `#`, `//`, and `/* */`
+  outside quotes; string contents survive (`"http://x"` is not a comment). Tests:
+  `tests/test_diversity.py::test_inline_and_block_comments_in_non_python_normalize_to_zero`
+  (JS inline, C block/leading/trailing, URL preservation).
+- **F2/F4 — no production consumer for the instrument.** Built the scorer seam:
+  `src/agentic_dynamics/measurement/portfolio_score.py` + `scripts/score_flash_ladder.py`
+  (CLI `agentic-dynamics experiment flash-ladder-score`). It loads `run.py` result JSON, groups
+  by condition, **excludes** `solution_code is None` attempts while **reporting**
+  `excluded_null_source`, computes `portfolio_diversity`, and persists the score with input
+  sha256s and the code sha. Tests: `tests/test_portfolio_scorer.py` (null exclusion + coverage,
+  all-null → empty not zero, hashes/code sha).
+- **F3 — live-store evidence not reproducible where the reviewer sits.** The network topology
+  is now the documented contract: `neo4j` (`infrastructure_kb-neo4j_1`) is on `fleet-net`, so
+  the **lexical live probe is reproducible in-cell at `bolt://neo4j:7687`** (never
+  `localhost`); `chromadb` is on `infrastructure_ai-infra` and is **not reachable from cells by
+  design**, so the dense live evidence is host-side, produced by the committed runner
+  `scripts/probe_retrieval_reachability.py` and attached as
+  `docs/reviews/flash_exploration_retrieval_probe.json`. In-cell reproduction of the dense leg
+  is structurally impossible and is reported as an environment boundary, not a failure; the
+  reviewer verifies the runner's code path and the artifact's internal consistency instead.
+  Artifact (this HEAD): `dense_available: true`, `fallback_mode: full` both flag settings,
+  48 knowledge records selected (43 findings, 2 decisions, 2 flags, 1 meta-session),
+  `stale_source_selected: 0`.
+- **F5 — stale Probe 5 output + wrong consumer path.** `docs/reviews/flash_exploration_verify.md`
+  Probe 5 now records the F4 semantics (`None`) with a correction note, and the archived
+  consumer path is corrected to `scripts/archive/backfill_artifacts.py`.
+- **Reproduction caveat (from review 1, still true).** F2b (live DERIVED-pattern query + a
+  second live dry-run proving 0/0) requires the controller-approved mint; it is the first
+  post-mint act and is not part of this review's evidence classes.

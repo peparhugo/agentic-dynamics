@@ -75,27 +75,76 @@ def _count_loc(code: str) -> int:
     )
 
 
+def _strip_comments(code: str) -> str:
+    """Remove ``#``/``//``/``/* */`` comments that sit OUTSIDE string literals.
+
+    The g5 round-2 F1 finding: the line filter dropped whole comment lines only, so inline
+    ``//`` and C block comments still raised the metric. A tiny scanner (not a parser) tracks
+    single/double quotes and backslash escapes; everything from a comment marker to its end is
+    removed. Contents of strings are preserved, so ``"http://x"`` survives.
+    """
+    out: list[str] = []
+    i = 0
+    n = len(code)
+    quote: str | None = None
+    while i < n:
+        ch = code[i]
+        if quote is not None:
+            out.append(ch)
+            if ch == "\\" and i + 1 < n:
+                out.append(code[i + 1])
+                i += 2
+                continue
+            if ch == quote:
+                quote = None
+            i += 1
+            continue
+        if ch in ("'", '"'):
+            quote = ch
+            out.append(ch)
+            i += 1
+            continue
+        if ch == "#":
+            while i < n and code[i] != "\n":
+                i += 1
+            continue
+        if ch == "/" and i + 1 < n and code[i + 1] == "/":
+            while i < n and code[i] != "\n":
+                i += 1
+            continue
+        if ch == "/" and i + 1 < n and code[i + 1] == "*":
+            i += 2
+            while i < n and not (code[i] == "*" and i + 1 < n and code[i + 1] == "/"):
+                i += 1
+            i += 2
+            continue
+        out.append(ch)
+        i += 1
+    return "".join(out)
+
+
 def _normalize_source(code: str) -> str:
     """Strip formatting-only code so a cosmetic edit cannot read as divergence.
 
-    The adversarial review (``g5_adversarial``, F3) measured whitespace-only and
-    comment-only pairs scoring nonzero composite divergence — churn a diversity metric must
-    not reward. Python sources that parse are normalized through the AST (comments, blank
-    lines, indentation style, and trailing whitespace all vanish). Non-Python or
-    unparseable sources fall back to a line filter: blank lines and ``#``/``//`` comment
-    lines dropped, line edges stripped. Concatenated multi-file ``solution_code`` (the
-    ``# === <relpath> ===`` headers make it unparseable as one module) takes the fallback.
+    The adversarial reviews (``g5_adversarial`` findings F3 then F1) measured whitespace-only,
+    comment-only, and non-Python inline/block-comment pairs scoring nonzero composite
+    divergence — churn a diversity metric must not reward. Python sources that parse are
+    normalized through the AST (comments, blank lines, indentation style, and trailing
+    whitespace all vanish). Non-Python or unparseable sources take comments out with
+    :func:`_strip_comments` (string-aware, for ``#``, ``//``, and ``/* */``), then drop blank
+    lines and strip line edges. Concatenated multi-file ``solution_code`` (the
+    ``# === <relpath> ===`` headers make it unparseable as one module) takes this fallback.
     """
     try:
         return ast.unparse(ast.parse(code))
     except (SyntaxError, ValueError, TypeError):
         pass
+    stripped = _strip_comments(code)
     lines: list[str] = []
-    for line in code.splitlines():
-        stripped = line.strip()
-        if not stripped or stripped.startswith("#") or stripped.startswith("//"):
-            continue
-        lines.append(stripped)
+    for line in stripped.splitlines():
+        trimmed = line.strip()
+        if trimmed:
+            lines.append(trimmed)
     return "\n".join(lines)
 
 
