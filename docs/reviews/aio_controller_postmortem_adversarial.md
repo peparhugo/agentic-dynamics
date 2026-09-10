@@ -2,115 +2,72 @@
 status: accepted
 ---
 
-# AIO controller postmortem - adversarial re-review after p5 repair
+# AIO Controller Postmortem: Final Adversarial Re-Review
 
-**Reviewer role:** independent adversarial reviewer. This re-review tests repair commit
-`26e2ed7ed3f1751725127c1f8b8fb3e9dd16baf2` against the original A1-A7 findings and the g10
-fast-path budget. It treats a passing unit test as evidence for its exact invariant, not as
-evidence for a broader class claim.
+**Reviewer:** independent adversarial review (terra)
 
-**Method:** inspected the p0 corpus, taxonomy, p5 verification claims, repair implementation,
-and regression tests; replayed the named test paths and generated-surface guard. Historical
-Git evidence was rechecked directly. Host OpenCode transcript pointers remain the primary
-evidence for local, uncommitted incidents; the committed corpus preserves their identifiers.
+**Scope:** convergence repair `96958a4d5` (A5 and B1-B4). This review tests the
+claims against the primary transcript, committed history, implementation, and executable
+guards. A rail is credited only for the signature its implementation actually refuses.
 
-## Release Verdict
+## Finding Table
 
-**FAIL - not merge-ready.** The repair genuinely fixes A1, A2, A3, A6, A7, and the g10 budget
-gate. It also adds a bounded F-03 drain defense, so A4's former "no rail at all" premise is no
-longer true. But the release claim remains too broad: R2 cannot catch the F-04 marker-line
-dedup signature it says it catches, R4 remains directive-only and cannot stop the create-then-
-delete launcher signature, and the F-06 re-track vector has no index/commit catching rail.
-The corrected dirty-file count is still missing its promised primary `git status` pointer in the
-corpus evidence list. These are shipped assertions and release predicates, not merely future
-enhancements.
-
-## A1-A7 And Budget Table
-
-| ID | Verdict | Re-verification | Residual or correction |
-|---|---|---|---|
-| A1 - R1 self-masking | **REPAIRED** | `recording_sweep.scan()` now requires a decision on day D or a close strictly later than D. The real `session close` replay is exercised by `TestRecordingProbe::test_same_day_close_cannot_cover_its_own_audit`; the focused suite passed. | This is detective and best-effort: `session close` still writes successfully after reporting a gap, and a session that never closes is not caught at close time. That limitation does not re-open the same-day self-mask. |
-| A2 - C4 claim split | **REPAIRED** | `aio_controller_postmortem_verify.md:96-116` separates F-09, F-01, F-08, F-11, and F-12. F-08 is explicitly uncovered; F-11 is explicitly not R1; F-12 is explicitly partial. | F-01 remains doctrine rather than a catching rail. F-11's row-close mechanism is not a substitute for an R1 claim, as the repaired text now admits. |
-| A3 - R5 resolver | **REPAIRED** | `test_fixture_tier_resolver_resolves_every_current_row_and_fails_on_one_unresolvable` drives `canonical_corpus.load_canonical_tables` over manifest rows and real fixture payloads, then removes a payload and names `("story", "s1")`. The replay passed. | This is a synthetic hermetic fixture, not a replay of the committed 402/407-row corpus and not a waiver case. It supports the narrow fixture-resolver claim, not a full-corpus resolution claim. |
-| A4 - C1 catching rail | **REPAIRED, BOUNDED** | `generate_manifest.py` refuses a compacted version-count shrink against a valid previous manifest. `test_registry_drain_guard_refuses_a_smaller_compaction` passed within the focused suite. This catches the F-03 drain at that seam. | The p5 statement that the same rule catches F-04 is false; see B1. Raw index edits, a missing/corrupt baseline, and `--allow-shrink` remain outside the catch. |
-| A5 - dirty-file count | **STILL OPEN** | The text was corrected from unsupported `~292` to `~237` (1 modified + 236 untracked) in `aio_controller_postmortem_corpus.md:95-102`. | The evidence list at `:105-114` does not identify the retained opening `git status` transcript part that establishes 237. The value is plausible and independently recoverable from the host transcript, but it is not yet self-contained primary evidence as the corpus claims. |
-| A6 - class counting | **REPAIRED** | `aio_controller_postmortem_taxonomy.md:17-21,226-231` explicitly says the threshold counts corpus rows and that C6's two rows are one independent incident chain. | C2's F-13/F-14 acts are also causally connected, so the taxonomy should not imply all C1-C5 pairs are independent without separate support. The stated row-count gate itself is now honest. |
-| A7 - absent-data sweep | **REPAIRED** | In this source checkout, `python3 scripts/recording_sweep.py --report` returned `UNMEASURED`; `experiments/results/recording/audit.json` remained absent. The code returns before report/backfill writes, and the focused regression suite passed. | No dedicated CLI test asserts the report file remains absent, although the direct replay and control flow confirm it here. |
-| g10 - fast-path budget | **REPAIRED** | `python3 -m pytest tests/test_fast_path_gate.py -q -p no:cacheprovider` passed: **3 passed in 32.68s**. That test invokes the fast subset and enforces its 180-second budget. | The fast-marker audit is syntax/regex based, so alternate marker or corpus-dependency shapes can evade it. The p5 prose also says "two" corpus modules while naming three (`verify.md:323-326`). |
-
-## Fresh Adversarial Findings
-
-| ID | Severity | Finding | Evidence and falsification | Required disposition |
+| ID | Severity | Finding | Evidence | Release effect |
 |---|---|---|---|---|
-| B1 | P0 | **R2 overclaims F-04 coverage.** | `generate_manifest.py` compacts rows sharing a `knowledge_id` before `detect_registry_drain()` counts versions. F-04 deleted tombstone/supersede marker lines that deliberately share that id with their target (`aio_controller_postmortem_corpus.md:161-188`). The counter can therefore remain unchanged while those lifecycle lines are lost. `verify.md:152-154` says the guard catches F-04; it does not. | Retract the F-04-catching assertion. Either add a full-row/lifecycle-marker conservation assertion at the durable-store mutation seam, or explicitly retain F-04 as uncovered. |
-| B2 | P1 | **R4 is still doctrine, not a catching defense for launch improvisation.** | `verify.md:200-221` correctly says "Rail: none selected." Script classification catches an unclassified file only if it survives; F-13 was written and deleted after the controller objected. The rule is directive and valuable, but it would not have stopped the actual transcript moment. | Keep R4 as an explicit policy residual, not a PASS that contributes to a "top classes have catching rails" release condition. Add a pre-creation/new-mechanism gate only if the existing documented path can host it. |
-| B3 | P1 | **F-06's re-track path is asserted retired without an index/commit catch.** | The corpus migration and `.gitignore` prevent ordinary re-adds, but do not prevent force-staging or an ordering error before ignore state lands. The repository's own `test_relabel_tree_gate.py` uses `git add -Af`, demonstrating the index can still be forced. `verify.md:159-162` therefore overstates C1 protection. | Mark F-06 residual. Extend an existing staged-tree or commit gate only if it can reject tracked `experiments/results/**` without creating parallel machinery. |
-| B4 | P1 | **The C2 two-item claim is a row count, not evidence of two independent incidents.** | F-14's wrapper produced the F-12 failed launches, and F-12 triggered F-13's launcher draft (`aio_controller_postmortem_corpus.md:351-403`). They are two real acts, but one connected improvisation chain. | Preserve C2's row-count classification, but do not use it as independent-incident evidence without an explicit counting-basis statement matching C6. |
+| F1 | P0 | The B1 rail is a raw-row-count drain guard, not full-row or lifecycle-marker conservation. It rejects the supplied marker-loss fixture, but it cannot tell a lost marker from a lost ordinary row, and a marker can be replaced by an unrelated valid row with the count unchanged. | `scripts/generate_manifest.py:279-292` counts `_iter_registry_rows`; `:345-361` compares only integer counts; `:438-463` refuses only a count decrease. `tests/test_generate_manifest.py:406-458` proves the narrow `2 -> 1` count-drop signature. `verify.md:186-228`, `:459-460`, and the release log call this "full-row/lifecycle-marker conservation." | **FAIL.** The shipped assertion is false. Rename and bound the rail as a raw-source-row-count drain guard, or preserve and compare row identities/content if full-row conservation is intended. |
+| F2 | P0 | The release predicate says R1 catches its scoped class, although its own scope table says F-01 is only "covered by doctrine (no catching rail)" and F-08/F-11/F-12 are not R1 catches. The exercised same-day recording test is an F-09 test, not an abandonment/no-close interception. | `verify.md:121-141` states the exclusions; `:131` explicitly says no catching rail for F-01; `:492-493` nevertheless says the scoped rails, including R1, demonstrably catch their class. | **FAIL.** The R1 release claim must be narrowed to F-09's tested same-day-recording signature. F-01 must remain a policy/detection residual unless a rail actually catches no-close abandonment. |
+| F3 | P0 | The same release predicate overstates R3 and R5 from a signature-level replay to class-level coverage. R3 reproduces README/index drift F-19 only; it does not catch F-15 wrong-command selection or F-16 direct-main work. R5 exercises a three-row fixture for F-05 only; it does not catch the C5 mount-provenance or heartbeat-TTL signatures F-17/F-18. | R3 replay is only F-19 at `verify.md:241-260`; C3 still includes F-15/F-16 at `taxonomy.md:56, 73, 82-86`. R5 fixture scope is stated at `verify.md:302-320`; C5 includes F-17/F-18 at `taxonomy.md:58, 84-85`. The class-level claim remains at `verify.md:492-493`. | **FAIL.** The predicate must name individual covered signatures, not the broader C3/C5 classes, or add and replay the missing class rails. |
+| F4 | P1 | The A5 primary pointer resolves and proves an opening snapshot of 237 tab-prefixed status rows. It does not prove that those same files remained dirty for four days, so the corpus duration wording exceeds its cited evidence. | Read-only query of `opencode.db` part `prt_06d0793c6001c5VS663QZ6oYh4`: 1 modified + 236 untracked = 237. The unsupported persistence wording is `corpus.md:95-103`. | Bound the statement to the 2026-09-04 opening snapshot, plus the separately proven no-git-activity interval. Do not infer unchanged dirty paths across that interval. |
+| F5 | P1 | The taxonomy now honestly distinguishes row count from independent incident count. C2 and C6 each have two genuine corpus rows but only one connected incident chain, so they do not satisfy a two-independent-case standard. | `taxonomy.md:17-26`, `:143-149`, and `:238-243`; the same caveat appears at `verify.md:354-368`. | **PASS, corrected.** No independent-case over-claim remains if all threshold language retains the row-count qualifier. |
+| F6 | P1 | R4 and the F-06 re-track vector are honestly retained as residuals rather than counted as catching rails. | `verify.md:214-225`, `:264-291`, and `:461-475`. | **PASS, corrected.** |
 
-## Corpus And Taxonomy Re-verification
+## Corpus Result
 
-The requested worst items are present and point to primary evidence:
+The four requested worst items are present with first-hand pointers:
 
-- **Hammer:** F-01 records the 1 modified + 236 untracked basis and the abandoned session
-  (`aio_controller_postmortem_corpus.md:80-114`). The numerical statement needs the missing
-  exact transcript-part citation noted in A5.
-- **Registry drain:** F-03 is severity 5 and Git-reproducible. The direct replay produced
-  `1 43311` for `git diff --numstat 9bdb74059 9e4773fb1 -- registry_index.jsonl`; the blobs are
-  48,321 and 5,011 lines respectively.
-- **Registry dedup:** F-04 gives the 48,324 to 20,132 transcript result, self-correction, and
-  full-row-equality recovery pointer (`corpus.md:161-188`).
-- **`git add -A` re-track:** F-06 names the ordered command, the immediate admission, and the
-  32,312-path recovery commit (`corpus.md:214-237`).
-- **Launch improvisation:** F-13 names write, controller objection, and deletion timestamps;
-  no committed `scripts/launch_workflow.py` exists (`corpus.md:368-383`).
+- The hammer snapshot is the retained transcript part above; it establishes 237 status rows.
+- The registry dedup transcript records `48324 -> 20132`, admits marker loss, then shows a
+  restoration and full-row-equality rededup: `corpus.md:166-193`.
+- The re-track transcript and the cleanup commit are recorded at `corpus.md:219-242`; commit
+  `ab887b5c8` changes 32,312 files and removes 15,620,993 lines.
+- The launch improvised draft, controller objection, and deletion are separately pointed at
+  `corpus.md:373-388`.
 
-No further severity-5 event was found in the corpus's declared 2026-09-04 through 2026-09-10
-window. F-03 is the sole documented severity-5 item. A pre-window one-line registry collapse
-is relevant historical context but is not an omission under that bounded corpus definition.
+The only severity-5 item is F-03. It is present, and the committed comparison confirms the
+claimed drain: `9bdb74059 -> 9e4773fb1` is `+1/-43311` lines, with 48,321 source lines before
+and 5,011 after. No severity-5 corpus item is absent.
 
-All classes have at least two **rows** except Rare. The taxonomy now explicitly distinguishes
-rows from independent chains for C6, which repairs A6. C2 needs the same caution (B4); it is
-not force-fit, because F-13 and F-14 are distinct real actions, but neither proves two unrelated
-incidents.
+## Executed Verification
 
-## Reproduction Log
+| Check | Result |
+|---|---|
+| `test_registry_source_row_guard_refuses_marker_line_loss` | PASS, 1 passed. The guard rejects the precise marker-line count-drop fixture. |
+| Fixture-tier publication resolver test | PASS, 1 passed. This is a fixture-scale F-05 check. |
+| Recording, manifest, doc-lifecycle, agent-config, and session-spine tests | PASS, 112 passed. |
+| `python3 scripts/scan_docs_drift.py --check spec_lifecycle --fail-on-drift` | PASS, drift score 0. |
+| `python3 scripts/_gen_instructions.py --check` | PASS, 38 generated surfaces match. |
+| `ruff check scripts/generate_manifest.py tests/test_generate_manifest.py` | PASS. |
 
-```text
-$ PYTHONDONTWRITEBYTECODE=1 python3 -m pytest \
-    tests/test_recording_sweep.py tests/test_session_spine.py::TestRecordingProbe \
-    tests/test_generate_manifest.py tests/test_build_data.py \
-    -k 'not test_build_data' -q -p no:cacheprovider
-33 passed, 34 deselected in 1.06s
+These checks show that the repair did not break the exercised existing surfaces. They do not
+convert a count-only guard into full-row conservation or a signature-level replay into
+class-level coverage.
 
-$ PYTHONDONTWRITEBYTECODE=1 python3 -m pytest tests/test_build_data.py \
-    -k fixture_tier_resolver -q -p no:cacheprovider
-1 passed, 33 deselected in 0.19s
+## Final Verdict
 
-$ PYTHONDONTWRITEBYTECODE=1 python3 -m pytest tests/test_fast_path_gate.py \
-    -q -p no:cacheprovider
-3 passed in 32.68s
+**FAIL - not merge-ready.** A5 resolves, B1's named marker-loss fixture is caught, B2/B3 are
+honestly residual, B4 states its row-count basis, and generated surfaces are clean. However,
+`verify.md` still contains false shipped assertions: the B1 count guard is labeled full-row /
+lifecycle-marker conservation, and the release predicate claims R1/R2/R3/R5 catch their
+classes despite explicitly uncovered or doctrine-only signatures. The release predicate must
+be rewritten to enumerate only demonstrated signatures before this postmortem can be released.
 
-$ python3 scripts/recording_sweep.py --report
-recording_sweep: UNMEASURED - no KB artifact dir on disk; refused to report or backfill
-# experiments/results/recording/audit.json: absent after the command
+## Required Correction
 
-$ python3 scripts/_gen_instructions.py --check
-surfaces OK - 38 generated files match agent_config/
+1. Replace every B1 "full-row" or general "lifecycle-marker conservation" claim with
+   "raw valid source-row-count drain guard," including its equal-count replacement limitation.
+2. Replace `verify.md`'s class-level release predicate with signature-level coverage: R1/F-09,
+   R2/F-03 and the count-decrease form of F-04, R3/F-19, and R5/F-05 fixture resolution.
+3. Bound F-01's dirty-tree claim to the measured opening snapshot; retain the no-git-activity
+   interval as separate evidence rather than asserting path persistence.
 
-$ git diff --numstat 9bdb74059 9e4773fb1 -- experiments/results/registry_index.jsonl
-1       43311   experiments/results/registry_index.jsonl
-$ git show 9bdb74059:experiments/results/registry_index.jsonl | wc -l
-48321
-$ git show 9e4773fb1:experiments/results/registry_index.jsonl | wc -l
-5011
-```
-
-## Completion Log
-
-- **A1-A7 and g10 re-verified:** PASS with A5 still open and the stated bounded residuals.
-- **At least three fresh evidence-grounded findings:** PASS (B1-B4).
-- **Blast-radius generated-surface check:** PASS.
-- **Top classes have complete catching rails:** FAIL (B1-B3).
-- **Nothing unverified shipped:** FAIL (the F-04 and F-06 coverage claims overstate the rails).
-- **RELEASE VERDICT:** **FAIL - not merge-ready.**
-- **LOG:** FAIL.
+**LOG:** FAIL.
