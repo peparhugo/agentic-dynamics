@@ -25,8 +25,9 @@ required claims were overstated in the first revision of this document and are N
   and the live second dry-run after the mint is still required.
 
 The author-side repairs and their regression tests live in
-`docs/reviews/flash_exploration_remediation.md`; this document keeps its raw probe outputs
-unchanged and downgrades only the disposition.
+`docs/reviews/flash_exploration_remediation.md`. Probes 1–4 below remain the historical raw
+captures at `f3957a318`; Probe 5 and the retrieval artifact are regenerated at `10c1f3519`
+and labeled in place.
 
 ## Environment / reproduction contract
 
@@ -605,33 +606,8 @@ spec = importlib.util.spec_from_file_location("run_mod", "/repo/scripts/run.py")
 run = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(run)
 
-print("=== _attempt_suffix: names are unique per (variant, repetition) ===")
-seen = {}
-for variant in (0, 1, 2):
-    for rep in (0, 1, 2):
-        r = {"seed_variant": variant, "repetition": rep}
-        slug = f"cfg_model_op_s1{run._attempt_suffix(r)}"
-        seen.setdefault(slug, []).append((variant, rep))
-        print(f"  variant={variant} rep={rep} -> {slug}")
-dupes = {k: v for k, v in seen.items() if len(v) > 1}
-print(f"  distinct slugs: {len(seen)} / 9; collisions: {dupes or 'none'}")
-print(f"  default (0,0) suffix is empty: {run._attempt_suffix({'seed_variant': 0, 'repetition': 0})!r}")
+print("**Regenerated at HEAD 10c1f3519 (2026-09-10):**
 
-print()
-print("=== _serialize_solution_code: solution code is persisted, deterministically ===")
-files = {"b.py": "print('b')\n", "a.py": "print('a')\n", "sub/c.py": "x = 1\n"}
-code = run._serialize_solution_code(files)
-print(code)
-print(f"  empty portfolio -> {run._serialize_solution_code(None)!r} / "
-      f"{run._serialize_solution_code({})!r}")
-print(f"  deterministic order (two runs equal): "
-      f"{run._serialize_solution_code(files) == run._serialize_solution_code(dict(reversed(list(files.items()))))}")
-PY
-```
-
-**Raw output**
-
-```text
 === _attempt_suffix: names are unique per (variant, repetition) ===
   variant=0 rep=0 -> cfg_model_op_s1
   variant=0 rep=1 -> cfg_model_op_s1_r1
@@ -655,16 +631,17 @@ print('b')
 # === sub/c.py ===
 x = 1
 
-  empty portfolio -> None / None   # g5 round-2 F4: uncollected source is NULL, never ""
+  empty portfolio -> None / None
   deterministic order (two runs equal): True
 ```
 
-**Correction (g5 round-2 F4, `f481c8d4e` + this pass).** The raw output above was captured
-before the F4 repair: ``_serialize_solution_code(None)``/``({})`` now return ``None``
-(uncollected source), so an attempt is never indistinguishable from an intentionally empty
-one. The live consumer is `scripts/score_flash_ladder.py` /
+**Current-HEAD transcript.** The output above is regenerated at HEAD `10c1f3519` — not a
+historical capture: ``_serialize_solution_code(None)``/``({})`` return ``None`` (uncollected
+source), so an attempt is never indistinguishable from an intentionally empty one. The live
+consumer is `scripts/score_flash_ladder.py` /
 `agentic_dynamics.measurement.portfolio_score`, which excludes ``None`` attempts and reports
-the excluded count (`tests/test_portfolio_scorer.py`, `tests/test_run_result_shape.py`).
+both the null and the invalid/missing exclusion counts
+(`tests/test_portfolio_scorer.py`, `tests/test_run_result_shape.py`).
 
 ### 5b — the static call-site / consumer check
 

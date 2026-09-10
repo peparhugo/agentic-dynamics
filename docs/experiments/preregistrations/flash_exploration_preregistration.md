@@ -202,3 +202,21 @@ controller-approved mint and are the first post-mint acts — out of scope for t
 that carries both remediation rounds. No §4 metric, condition, rep, margin, or decision rule
 changes; on a clean g5 + g6 the wave proceeds to the one-time pattern mint (AIO data-plane act)
 and then the ladder.
+
+## 9. Third continuation addendum (2026-09-10)
+
+The third adversarial review (against `1b7ca911d`) returned FAIL with findings F1–F4
+(interior-whitespace gaming in non-Python; omitted/malformed `solution_code` silently unscored;
+probe artifact without candidate provenance or per-leg counts; a Probe 5 doc contradiction).
+Remediation round 3 closed all four at commit `10c1f3519` (see
+`docs/reviews/flash_exploration_remediation.md` §Remediation round 3): canonical/line_form
+normalization split, `excluded_invalid_source` accounting, provenance-bound probe artifact with
+direct `dense_hits`/`lexical_hits`, and a regenerated Probe 5 transcript.
+
+**Continuation spec:** `workflows/repository/flash_exploration_build_resume3.yaml` SHA256
+`05154bbd149e42c931ad238dab521dbdc82cd21288077af669c8f51ad6a5d0a5` — phases `g5_adversarial`
+(terra; same decidable evidence classes as §8, plus explicit checks for the round-3 fixes and a
+**no-padding** rule: every genuine finding reported, a verified clean sweep a valid outcome) +
+`g6_test_gate` (six suites). No §4 metric, condition, rep, margin, or decision rule changes.
+On a clean g5 + g6 the wave proceeds to the one-time pattern mint (AIO data-plane act, which
+supplies F2b's live DERIVED evidence) and then the ladder.

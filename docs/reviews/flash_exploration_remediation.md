@@ -139,3 +139,29 @@ Each is closed here, completely:
 - **Reproduction caveat (from review 1, still true).** F2b (live DERIVED-pattern query + a
   second live dry-run proving 0/0) requires the controller-approved mint; it is the first
   post-mint act and is not part of this review's evidence classes.
+
+## Remediation round 3 (the third review's findings F1–F4)
+
+The third independent review (terra, against `1b7ca911d`) returned FAIL with four findings;
+all are closed here, at commit `10c1f3519`:
+
+- **F1 — interior whitespace / non-Python reformatting still inflatable.** `_normalized_forms`
+  now returns TWO forms: a **canonical** form (AST for parseable Python; otherwise
+  comment-stripped with ALL whitespace runs collapsed to single spaces) that every axis except
+  structure compares, and a **line_form** (comment-free, blank lines dropped) whose line count
+  feeds structure divergence so LOC does not degenerate. Interior whitespace left by a removed
+  comment, and whitespace-only reformatting, now read as `0.0`. Tests:
+  `tests/test_diversity.py::test_interior_whitespace_and_comment_removal_normalize_to_zero`.
+- **F2 — omitted/malformed `solution_code` silently unscored.** `ConditionScore` gained
+  `excluded_invalid_source`: a missing key or a non-string, non-null value is counted
+  separately (never scored, never folded into the null count). Tests:
+  `tests/test_portfolio_scorer.py::test_scorer_reports_invalid_source_separately`.
+- **F3 — probe artifact unbound to the candidate and no per-leg counts.** The probe now records
+  `generated_at`, `code_sha` (git HEAD), the resolved `agentic_dynamics` and `retrieval`
+  module paths, and **direct per-leg hit counts** (never inferred from `fallback_mode`).
+  Regenerated artifact at `10c1f3519`: `dense_hits: 10`, `lexical_hits: 10`,
+  `dense_available: true`, `fallback_mode: "full"` both settings, 48 knowledge records, 0
+  stale SOURCE (`docs/reviews/flash_exploration_retrieval_probe.json`).
+- **F4 — contradictory Probe 5 evidence.** `docs/reviews/flash_exploration_verify.md` Probe 5 is
+  a **regenerated current-HEAD transcript** at `10c1f3519` (labeled), and the document head now
+  distinguishes historical captures (Probes 1–4 at `f3957a318`) from the regenerated Probe 5.

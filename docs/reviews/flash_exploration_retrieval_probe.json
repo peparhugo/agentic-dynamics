@@ -1,7 +1,15 @@
 {
+  "generated_at": "2026-09-10T20:52:04Z",
+  "code_sha": "10c1f35195901c058b86a06dd37e13791fc470f9",
+  "package_file": "/tmp/wt_flash_exploration/src/agentic_dynamics/__init__.py",
+  "retrieval_file": "/tmp/wt_flash_exploration/src/agentic_dynamics/knowledge/retrieval.py",
   "commit_sha": "0000000000000000000000000000000000000000",
   "dense_available": true,
   "query": "grit recovery under process perturbation test success",
+  "legs": {
+    "dense_hits": 10,
+    "lexical_hits": 10
+  },
   "runs": [
     {
       "pattern_projection": false,
