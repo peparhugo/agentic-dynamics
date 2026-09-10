@@ -227,3 +227,11 @@ def test_inline_and_block_comments_in_non_python_normalize_to_zero():
     assert pairwise_divergence(
         'var u = "http://x";', 'var u = "http://x"; // note'
     )["composite"] == 0.0
+
+
+def test_interior_whitespace_and_comment_removal_normalize_to_zero():
+    """Round-2 F1: interior whitespace (incl. space left by a removed comment) must not churn."""
+    base = "int f(){ return 1; }"
+    assert pairwise_divergence(base, "int f(){ /* note */ return 1; }")["composite"] == 0.0
+    assert pairwise_divergence(base, "int f(){  return 1; }")["composite"] == 0.0
+    assert pairwise_divergence(base, "int f(){\n    return 1;\n}")["composite"] == 0.0

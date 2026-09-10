@@ -56,6 +56,7 @@ class ConditionScore:
     n_attempts: int
     n_scored: int
     excluded_null_source: int
+    excluded_invalid_source: int
     diversity: PortfolioDiversity
 
 
@@ -83,6 +84,7 @@ class PortfolioScore:
                     "n_attempts": c.n_attempts,
                     "n_scored": c.n_scored,
                     "excluded_null_source": c.excluded_null_source,
+                    "excluded_invalid_source": c.excluded_invalid_source,
                     "diversity": c.diversity.to_dict(),
                 }
                 for c in self.conditions
@@ -154,17 +156,30 @@ def score_result_files(
         for run in load_result_file(path):
             grouped.setdefault(_condition_key(run, group_by), []).append(run)
 
+    missing = object()
     conditions: list[ConditionScore] = []
     for condition in sorted(grouped):
         runs = grouped[condition]
-        samples = [r["solution_code"] for r in runs if isinstance(r.get("solution_code"), str)]
-        excluded = sum(1 for r in runs if r.get("solution_code") is None)
+        samples: list[str] = []
+        excluded_null = 0
+        excluded_invalid = 0
+        for run in runs:
+            value = run.get("solution_code", missing)
+            if isinstance(value, str):
+                samples.append(value)
+            elif value is None:
+                excluded_null += 1
+            else:
+                # Omitted or malformed (non-string, non-null) source is neither scored nor
+                # silently dropped: it is counted separately (the review's F2-round-2 finding).
+                excluded_invalid += 1
         conditions.append(
             ConditionScore(
                 condition=condition,
                 n_attempts=len(runs),
                 n_scored=len(samples),
-                excluded_null_source=excluded,
+                excluded_null_source=excluded_null,
+                excluded_invalid_source=excluded_invalid,
                 diversity=portfolio_diversity(samples, threshold=threshold),
             )
         )

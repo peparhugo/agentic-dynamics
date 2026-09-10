@@ -53,3 +53,21 @@ def test_scorer_persists_input_hashes_and_code_sha(tmp_path):
     assert len(payload["inputs"][0]["sha256"]) == 64
     assert payload["code_sha"]
     assert payload["conditions"][0]["n_attempts"] == 1
+
+
+def test_scorer_reports_invalid_source_separately(tmp_path):
+    """Omitted or malformed source fields are counted, never silently unscored (F2-round-2)."""
+    results = tmp_path / "flash_w.json"
+    _write(results, [
+        {"operator": "op", "strength": 1.0, "solution_code": None},
+        {"operator": "op", "strength": 1.0, "solution_code": A},
+        {"operator": "op", "strength": 1.0},
+        {"operator": "op", "strength": 1.0, "solution_code": 42},
+    ])
+    (cond,) = score_result_files([results]).conditions
+    assert cond.n_attempts == 4
+    assert cond.n_scored == 1
+    assert cond.excluded_null_source == 1
+    assert cond.excluded_invalid_source == 2
+    assert cond.diversity.coverage == "single"
+    assert cond.diversity.mean_composite is None

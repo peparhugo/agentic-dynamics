@@ -67,6 +67,7 @@ def main(argv: list[str] | None = None) -> int:
         print(
             f"{condition['condition']}: n={condition['n_attempts']} "
             f"scored={condition['n_scored']} excluded_null={condition['excluded_null_source']} "
+            f"excluded_invalid={condition['excluded_invalid_source']} "
             f"coverage={diversity['coverage']} mean_composite={diversity['mean_composite']} "
             f"distinct_fraction={diversity['distinct_fraction']}"
         )

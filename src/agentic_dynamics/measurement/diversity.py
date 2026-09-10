@@ -123,29 +123,38 @@ def _strip_comments(code: str) -> str:
     return "".join(out)
 
 
-def _normalize_source(code: str) -> str:
-    """Strip formatting-only code so a cosmetic edit cannot read as divergence.
+def _normalized_forms(code: str) -> tuple[str, str]:
+    """Return ``(canonical, line_form)`` for a source sample.
 
-    The adversarial reviews (``g5_adversarial`` findings F3 then F1) measured whitespace-only,
-    comment-only, and non-Python inline/block-comment pairs scoring nonzero composite
-    divergence — churn a diversity metric must not reward. Python sources that parse are
-    normalized through the AST (comments, blank lines, indentation style, and trailing
-    whitespace all vanish). Non-Python or unparseable sources take comments out with
-    :func:`_strip_comments` (string-aware, for ``#``, ``//``, and ``/* */``), then drop blank
-    lines and strip line edges. Concatenated multi-file ``solution_code`` (the
-    ``# === <relpath> ===`` headers make it unparseable as one module) takes this fallback.
+    The adversarial reviews (findings F3, F1, then F1-round-2) measured whitespace-only,
+    comment-only, and non-Python inline/block-comment pairs — including interior whitespace
+    left behind by a removed comment — scoring nonzero composite divergence. Cosmetic churn
+    must read as zero, so:
+
+    * ``canonical`` — the comment-free, whitespace-canonical text every axis except structure
+      compares. Python that parses goes through the AST (full normalization); other or
+      unparseable sources have comments stripped (:func:`_strip_comments`, string-aware) and
+      ALL whitespace runs collapsed to single spaces, so interior whitespace, reformatting,
+      and comment removal are all cosmetic-invariant.
+    * ``line_form`` — comment-free lines with blank lines dropped and edges stripped. Its line
+      COUNT feeds structure divergence: collapsing newlines wholesale would degenerate LOC.
+
+    Concatenated multi-file ``solution_code`` (the ``# === <relpath> ===`` headers make it
+    unparseable as one module) takes the fallback.
     """
     try:
-        return ast.unparse(ast.parse(code))
+        canonical = ast.unparse(ast.parse(code))
+        return canonical, canonical
     except (SyntaxError, ValueError, TypeError):
         pass
     stripped = _strip_comments(code)
-    lines: list[str] = []
-    for line in stripped.splitlines():
-        trimmed = line.strip()
-        if trimmed:
-            lines.append(trimmed)
-    return "\n".join(lines)
+    lines = [line.strip() for line in stripped.splitlines() if line.strip()]
+    return " ".join(stripped.split()), "\n".join(lines)
+
+
+def _normalize_source(code: str) -> str:
+    """The canonical (comment-free, whitespace-canonical) form of one source sample."""
+    return _normalized_forms(code)[0]
 
 
 def pairwise_divergence(a: str, b: str) -> dict[str, float]:
@@ -166,9 +175,9 @@ def pairwise_divergence(a: str, b: str) -> dict[str, float]:
     neutral-prior novelty (0.5 when no 5-grams exist) would otherwise score two empty strings
     as divergent.
     """
-    normalized_a = _normalize_source(a)
-    normalized_b = _normalize_source(b)
-    if normalized_a == normalized_b:
+    canonical_a, lines_a = _normalized_forms(a)
+    canonical_b, lines_b = _normalized_forms(b)
+    if canonical_a == canonical_b:
         return {
             "novelty": 0.0,
             "architecture_divergence": 0.0,
@@ -176,11 +185,11 @@ def pairwise_divergence(a: str, b: str) -> dict[str, float]:
             "composite": 0.0,
         }
 
-    arch = architecture_divergence(normalized_a, normalized_b)
+    arch = architecture_divergence(canonical_a, canonical_b)
     struct = structure_divergence(
-        _count_loc(normalized_a), _count_loc(normalized_b), normalized_a, normalized_b
+        _count_loc(lines_a), _count_loc(lines_b), canonical_a, canonical_b
     )
-    novelty = compute_novelty(normalized_a, normalized_b)
+    novelty = compute_novelty(canonical_a, canonical_b)
     composite = ARCHITECTURE_WEIGHT * arch + STRUCTURE_WEIGHT * struct + NOVELTY_WEIGHT * novelty
     return {
         "novelty": novelty,

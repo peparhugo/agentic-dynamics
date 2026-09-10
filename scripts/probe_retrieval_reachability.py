@@ -19,7 +19,9 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import subprocess
 import sys
+from datetime import datetime, timezone
 
 try:
     import _bootstrap  # noqa: E402  # direct run: scripts/ is sys.path[0]
@@ -28,7 +30,45 @@ except ImportError:  # imported as scripts.<name> — repo root is on sys.path
 
 from agentic_dynamics.knowledge.embeddings import ChromaStore
 from agentic_dynamics.knowledge.graph import Neo4jClient
-from agentic_dynamics.knowledge.retrieval import retrieve
+from agentic_dynamics.knowledge.retrieval import _dense_filter, build_query_plan, retrieve
+
+
+def _git_sha() -> str:
+    """The probed checkout's HEAD sha (provenance binding for the artifact)."""
+    try:
+        out = subprocess.run(
+            ["git", "rev-parse", "HEAD"], capture_output=True, text=True, timeout=30
+        )
+        return out.stdout.strip()
+    except (OSError, subprocess.SubprocessError):
+        return ""
+
+
+def _leg_counts(store, graph, args) -> dict:
+    """Direct per-leg hit counts — never inferred from ``fallback_mode`` (F3-round-2)."""
+    out: dict = {"dense_hits": None, "lexical_hits": None}
+    plan = build_query_plan(args.query)
+    filters = {
+        "repository_id": args.repository_id,
+        "commit_sha": args.commit_sha,
+        "acl_scope": args.acl_scope,
+    }
+    if store is not None:
+        try:
+            out["dense_hits"] = len(
+                store.search(plan.dense_query, top_k=10, where=_dense_filter(filters))
+            )
+        except Exception as exc:  # noqa: BLE001 — reported, never silent
+            out["dense_error"] = repr(exc)
+    try:
+        out["lexical_hits"] = len(
+            graph.search_knowledge_fulltext(
+                plan.lexical_query, limit=10, commit=args.commit_sha
+            )
+        )
+    except Exception as exc:  # noqa: BLE001 — reported, never silent
+        out["lexical_error"] = repr(exc)
+    return out
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -59,10 +99,18 @@ def main(argv: list[str] | None = None) -> int:
         password=os.environ.get("NEO4J_PASSWORD", "password123"),
     )
 
+    import agentic_dynamics
+    import agentic_dynamics.knowledge.retrieval as retrieval_module
+
     out: dict = {
+        "generated_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "code_sha": _git_sha(),
+        "package_file": agentic_dynamics.__file__,
+        "retrieval_file": retrieval_module.__file__,
         "commit_sha": args.commit_sha,
         "dense_available": dense_available,
         "query": args.query,
+        "legs": _leg_counts(store, graph, args),
         "runs": [],
     }
     for projection in (False, True):
