@@ -211,6 +211,10 @@ def _run_baseline(task, constraints, model_id, timeout, exp_name="exp",
         "duration_s": elapsed,
         "exit_code": r.exit_code,
         "final_response": r.final_response,
+        # Per-attempt solution code (design B3): persist the generated source so a scorer can
+        # recompute portfolio divergence from the result JSON alone, never from a /tmp worktree
+        # the harness may have already removed.
+        "solution_code": _serialize_solution_code(code_files),
         "quality_per_dollar": sol.correctness_score / max(r.estimated_cost_usd, 0.000001),
         "quality_per_joule": sol.composite_score / max(eff.total_energy_j, 0.01),
         "workdir": r.workdir,
@@ -339,6 +343,8 @@ def _run_perturbed(task, constraints, op_name, strength, baseline,
         "strategy_score": strat.strategy_score,
         "verdict": strat.verdict,
         "final_response": r.final_response,
+        # Per-attempt solution code (design B3) — see the baseline record's note.
+        "solution_code": _serialize_solution_code(code_files),
         "quality_per_dollar": sol.correctness_score / max(r.estimated_cost_usd, 0.000001),
         "quality_per_joule": sol.composite_score / max(eff.total_energy_j, 0.01),
         "workdir": r.workdir,
@@ -456,8 +462,11 @@ def _generate_game_reports(runs, name, model_label, constraints, results_dir):
             model=model_label,
         )
 
-        # Artifact bundling
-        artifact_dir_name = f"{name}_{model_slug}_{op}_s{s}"
+        # Artifact bundling. The variant/repetition suffix is empty for the defaults (variant 0,
+        # rep 0) so existing report names do not move; a non-default attempt gets a unique slug
+        # instead of overwriting its siblings (design F5/B3).
+        attempt = _attempt_suffix(r)
+        artifact_dir_name = f"{name}_{model_slug}_{op}_s{s}{attempt}"
         artifact_dir = ""
         has_code = False
         has_session = False
@@ -504,7 +513,7 @@ def _generate_game_reports(runs, name, model_label, constraints, results_dir):
             has_session=has_session,
         )
 
-        md_path = reports_dir / f"{name}_{model_slug}_{op}_s{s}.md"
+        md_path = reports_dir / f"{name}_{model_slug}_{op}_s{s}{attempt}.md"
         md_path.write_text(game.to_markdown())
 
 
@@ -544,6 +553,42 @@ def multi_model_compare(config_path, model_ids, timeout=200):
 _SOURCE_EXTS = {'.py', '.js', '.ts', '.tsx', '.jsx', '.go', '.rs', '.java', '.rb',
                 '.json', '.yaml', '.yml', '.toml', '.proto', '.prisma', '.sql',
                 '.css', '.scss', '.html', '.hbs', '.md', '.mjs', '.cjs'}
+
+
+def _attempt_suffix(run: dict) -> str:
+    """Return the variant/repetition suffix for a run's artifact/report slug.
+
+    The default starting-point variant and first repetition are both ``0`` (config
+    ``seed_variants: [0]``, ``repetitions: 1``). Their names must stay byte-identical to the
+    pre-ladder naming so existing reports and consumers do not move; a non-default attempt
+    appends ``_v<N>`` / ``_r<N>`` so independently measured attempts stop overwriting one
+    another (design F5/B3).
+    """
+    suffix = ""
+    variant = run.get("seed_variant")
+    if variant not in (None, 0):
+        suffix += f"_v{variant}"
+    repetition = run.get("repetition")
+    if repetition not in (None, 0):
+        suffix += f"_r{repetition}"
+    return suffix
+
+
+def _serialize_solution_code(code_files: dict[str, str] | None) -> str:
+    """Flatten collected source files into one persistable ``solution_code`` string.
+
+    The results record must let a scorer recompute portfolio divergence without reaching back
+    into a ``/tmp`` worktree that may already be gone (design F5/B3). Each file is delimited
+    by a stable ``# === <relpath> ===`` header so the concatenation is deterministic and
+    re-parseable; an empty portfolio serializes to the empty string.
+    """
+    if not code_files:
+        return ""
+    parts: list[str] = []
+    for relpath in sorted(code_files):
+        parts.append(f"# === {relpath} ===")
+        parts.append(code_files[relpath])
+    return "\n".join(parts)
 
 
 def _verify_tests(workdir: str) -> bool | None:
