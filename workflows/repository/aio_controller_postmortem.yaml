@@ -1,0 +1,272 @@
+name: aio_controller_postmortem
+question: >-
+  Why have the recent AIO controller sessions degraded, and what rails stop the
+  classes? Evidence (2026-09-04 -> 2026-09-10): the hammer session (ses_f92f8804affe,
+  uncommitted 292-file stabilization wave, died Aborted without records); the emitter
+  hunt (hours of tracing, never identified); the registry dedup (48k -> 20k rows,
+  over-deleted tombstone/supersede marker lines, restored from stash); git add -A
+  before .gitignore re-tracked 32k files; the launch path improvisation (hand-rolled
+  worktree launcher instead of the orchestrator/run_clone machinery — deleted after
+  review); the spec-wrapper over-delivery (recording sweep got an agent-workflow
+  wrapper it did not need); wrong-script runs corrected mid-flight; and a discipline
+  audit showing consequential acts went unrecorded until backfilled. The machine's own
+  record layer (session closes, decision records, control-db transitions, commit
+  shapes, opencode transcripts) carries the full corpus — this wave mines it,
+  classifies the failure classes, audits the current defenses against them, designs the
+  minimal remediation, implements it, and VERIFIES it catches the historical classes.
+version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: false
+repeatable: false
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: true
+    context:
+      finding: >-
+        Failure corpus locations: (a) session closes + self-notes in the KB
+        (meta_session artifacts, 2026-09-04..2026-09-10); (b) decision records
+        (categories recording/architecture/ops — the backfill record whose why lists
+        what was missed); (c) control-db run_transitions + step_attempts (crash
+        residue, zombie rows, promotable-but-merged rows); (d) git shapes on main
+        (machine-state churn sizes, reverted mistakes in reflogs, the 32k-file
+        re-track + corpus migration arc); (e) opencode transcripts in
+        ~/.local/share/opencode/opencode.db (session ses_f92f8804affe = the hammer;
+        the 09-08/09-09 sessions = this author line); (f) the recording-sweep audit
+        (scripts/recording_sweep.py --report). Candidate classes from the 2026-09-10
+        controller review: mechanism improvisation when a documented path fails;
+        over-building (ceremony beyond the ask); destructive store/repo operations
+        without the documented convention; rabbit-hole chasing without check-ins;
+        convention misses (classification manifest, generated surfaces, generated
+        surfaces regenerate); recording discipline gaps. Current defenses to audit:
+        AGENTS.md/rules doctrine, the skills (run-workflow/instrument/queue/...), the
+        verified commands (promote.py etc.), the control packet, the recording rail
+        (engine+timer+portal), the generated-surface CI check, the fast-path and
+        doc-lifecycle guards.
+      hard_rules: >-
+        (1) Every claim about a failure cites its evidence (session id / artifact /
+        transition / commit sha / transcript line) — no vibes, the corpus is rich.
+        (2) Remediation is minimal: prefer rule text + existing rails over new
+        machinery; a NEW mechanism is a named proposal with the class it closes.
+        (3) DONE_WHEN for every change = it catches the historical class it targets
+        (replay the evidence through the new rail in the verify phase).
+        (4) The remediation ships through the generated-surface rail (agent_config/
+        source + regen + CI) when it touches instructions.
+        (5) No changes outside the branch; merge is the controller's call.
+      run_shape: >-
+        SINGLE-model deepseek/deepseek-v4-flash on one branch
+        (feature/aio-controller-postmortem); g9 adversarial on
+        openai/gpt-5.6-terra. Worktree/feature-branch work — merge to main is the
+        controller's permanence decision.
+    phases:
+      - name: p0_corpus_build
+        kind: agent
+        scope: implementation
+        timeout: 14400
+        prompt: |
+          GOAL: {goal}
+          DELIVERABLE: the annotated failure corpus —
+          docs/reviews/aio_controller_postmortem_corpus.md.
+          ROLE: evidence assembler. Mine the record layer for the 2026-09-04 ->
+          2026-09-10 window and list EVERY identifiable AIO failure or near-miss with
+          its evidence pointer: (a) session closes/self-notes from the KB
+          (meta_session artifacts); (b) decision records incl. the recording backfills
+          (what/why fields carry the self-reported misses); (c) control-db
+          run_transitions + step_attempts (zombie rows, crash residue, abort
+          patterns); (d) git: reflogs showing reverts/corrections, the corpus
+          migration arc commits, any commit that fixed a previous commit's mistake;
+          (e) the opencode transcripts (opencode.db) for ses_f92f8804affe (the hammer:
+          reconstruct its arc from its parts — commands, edits, the abort) and the
+          09-08/09-09 sessions' own improvisations; (f) the recording-sweep audit
+          output. For EACH item: date, session/run id, what happened, what should
+          have happened (the documented mechanism), the damage/cleanup cost, severity
+          (1 = cosmetic .. 5 = data loss or permanent confusion). At least 12 items.
+          GATES: every item carries an evidence pointer; items with no pointer are
+          marked unverified and excluded from the taxonomy.
+          DELIVER: the corpus doc, committed.
+          LOG: PASS/FAIL; commit.
+      - name: p1_taxonomy
+        kind: agent
+        scope: implementation
+        timeout: 7200
+        prompt: |
+          GOAL: {goal}
+          DELIVERABLE: the failure-class taxonomy — append the classification to the
+          corpus doc (or a sibling taxonomy doc). INPUTS: the p0 corpus.
+          Classify every corpus item into mechanism classes; name each class with its
+          trigger (the situation that precedes it), its signature (what the bad
+          behavior looks like), its root cause hypothesis (why the AIO does it: doc
+          gap? rule ambiguity? missing gate? incentive?), and the existing defense (if
+          any) that should have caught it. Count items per class. At least 5 classes
+          with >= 2 items each (merge singletons into a "rare" class).
+          DONE_WHEN: every corpus item is classified; each class names at least one
+          candidate defense from the CURRENT system that failed to catch it.
+          DELIVER: taxonomy committed with the corpus doc.
+          LOG: PASS/FAIL; commit.
+      - name: p2_defense_audit
+        kind: agent
+        scope: implementation
+        timeout: 7200
+        prompt: |
+          GOAL: {goal}
+          DELIVERABLE: the defense-gap matrix — docs/reviews/aio_controller_postmortem_defenses.md.
+          INPUTS: the p1 taxonomy. Inventory the CURRENT defenses (rules doctrine in
+          agent_config/rules.md; the skills; verified commands; the control packet;
+          the recording rail; the generated-surface + fast-path + doc-lifecycle
+          guards; the session spine's open/close) and map each taxonomy class to the
+          defense(s) that SHOULD catch it, marking: catches / partially catches /
+          does not exist. For each class with no catching defense, name the minimal
+          remediation candidate (rule text in agent_config/rules.md preferred; an
+          existing rail extended second; a NEW mechanism only with justification).
+          DONE_WHEN: every class has a row with a catching/partial/none verdict and a
+          remediation candidate where none catches.
+          DELIVER: the matrix doc, committed.
+          LOG: PASS/FAIL; commit.
+      - name: p3_remediation_design
+        kind: agent
+        scope: implementation
+        timeout: 7200
+        prompt: |
+          GOAL: {goal}
+          DELIVERABLE: the remediation design — docs/reviews/aio_controller_postmortem_remediation.md.
+          INPUTS: the p2 matrix. Design the minimal change set: for each class with a
+          gap, ONE remediation with exact proposed text (rules.md wording if rule-
+          based), the DONE_WHEN that proves it catches the historical class (the
+          replay target), and the blast radius (which surfaces regenerate). Rank by
+          cost/leverage. Cap the set at the top 5 by leverage; mark the rest parked.
+          DONE_WHEN: each selected remediation has exact text + a replay test defined
+          (the p5 phase executes it); nothing in the set creates new machinery where
+          an existing rail suffices.
+          DELIVER: the design doc, committed.
+          LOG: PASS/FAIL; commit.
+      - name: p4_implement
+        kind: agent
+        scope: implementation
+        timeout: 14400
+        prompt: |
+          GOAL: {goal}
+          DELIVERABLE: the p3 remediation applied on the branch. For rule-based
+          changes: edit agent_config/rules.md (the neutral source — never the
+          generated surfaces), then regenerate via
+          `python3 scripts/_gen_instructions.py` and confirm zero drift
+          (`--check`). For rail-extension changes: the minimal code edit + test.
+          INPUTS: the p3 design.
+          DONE_WHEN: (a) every selected remediation is applied; (b) the generated
+          surfaces match their sources (CI --check passes); (c) new/edited rule text
+          reads as directive, not suggestion (the review's complaint: prose that
+          "tells it to behave better" without rails); (d) no unrelated changes.
+          GATES: python3 scripts/_gen_instructions.py --check.
+          DELIVER: the applied changes, committed.
+          LOG: PASS/FAIL; commit.
+      - name: p5_verify
+        kind: agent
+        scope: implementation
+        timeout: 14400
+        prompt: |
+          GOAL: {goal}
+          DELIVERABLE: replay evidence — docs/reviews/aio_controller_postmortem_verify.md.
+          INPUTS: the p4 branch + the p1 corpus. For EACH selected remediation, replay
+          its historical class against the new rail and record the outcome: the
+          doctrine text now says what the class violated (quote the exact clause);
+          the extended rail now flags the signature (run it); the historical
+          transcript shows the moment the old behavior started (cite it). A
+          remediation that does NOT demonstrably catch its class is reverted or
+          re-designed in this phase (never shipped unverified).
+          DONE_WHEN: every selected remediation shows replay evidence; the verify doc
+          records pass/revert per item.
+          DELIVER: the verify doc, committed.
+          LOG: PASS/FAIL; commit.
+      - name: g9_adversarial
+        kind: agent
+        scope: adversarial_readonly
+        requires_deliverable: true
+        run_model: openai/gpt-5.6-terra
+        timeout: 14400
+        prompt: |
+          GOAL: {goal}
+          ROLE: the INDEPENDENT adversarial reviewer (terra vs the flash author).
+          Falsify the postmortem, not certify it. Attack in order, re-verified against
+          the actual evidence: (1) CORPUS: are the worst items (hammer 292-file mess,
+          registry dedup over-deletion, add-A re-track, launch improvisation)
+          actually present with pointers? is anything severity-5 absent? (2)
+          TAXONOMY: do the classes have >= 2 real items each — or did the author
+          force-fit singletons? (3) DEFENSES: does any class genuinely have a
+          catching defense the author marked 'none' (or vice versa)? (4)
+          REMEDIATION: is the text directive, not suggestion? would the replay have
+          stopped the actual transcript moment — or does it only sound like it would?
+          (5) BLAST RADIUS: do the rule changes break any existing surface (regen
+          --check clean)? At least 3 findings or a clean sweep with re-verification —
+          a bare PASS is a failed review.
+          RELEASE VERDICT: merge-ready? The top classes have catching rails; nothing
+          unverified shipped?
+          DELIVER: docs/reviews/aio_controller_postmortem_adversarial.md (finding
+          table), committed.
+          LOG: finding table; PASS/FAIL; commit.
+      - name: g10_test_gate
+        kind: test
+        scope: implementation
+        timeout: 900
+        tests:
+          - tests/test_agent_config_render.py
+          - tests/test_doc_lifecycle.py
+          - tests/test_script_classification.py
+          - tests/test_fast_path_gate.py
+          - tests/test_dependency_direction.py
+          - tests/test_control_room_paths.py
+factors:
+  - {name: model, levels: [deepseek/deepseek-v4-flash]}
+design: factorial
+rules:
+  - name: corpus_assembled
+    plane: measurement
+    evidence_class: "[M]"
+    requires: []
+    produces: [annotated_failure_corpus]
+  - name: taxonomy_complete
+    plane: measurement
+    evidence_class: "[C]"
+    requires: [annotated_failure_corpus]
+    produces: [failure_classes_named]
+  - name: defense_gaps_mapped
+    plane: measurement
+    evidence_class: "[C]"
+    requires: [failure_classes_named]
+    produces: [defense_gap_matrix]
+  - name: remediation_selected
+    plane: measurement
+    evidence_class: "[C]"
+    requires: [defense_gap_matrix]
+    produces: [top_classes_gain_catching_rails]
+  - name: replay_verified
+    plane: measurement
+    evidence_class: "[M]"
+    requires: [top_classes_gain_catching_rails]
+    produces: [historical_classes_caught]
+  - name: aio_quality_wave_clean
+    plane: measurement
+    evidence_class: "[M]"
+    requires: [historical_classes_caught]
+    produces: [aio_operating_rails_verified]
+  - name: test_gate_measured
+    plane: measurement
+    evidence_class: "[M]"
+    requires: [test_executed_success]
+    produces: [independent_gate_recorded]
+metrics:
+  - {name: annotated_failure_corpus, agg: mean, over: cell}
+  - {name: failure_classes_named, agg: mean, over: cell}
+  - {name: defense_gap_matrix, agg: mean, over: cell}
+  - {name: top_classes_gain_catching_rails, agg: mean, over: cell}
+  - {name: historical_classes_caught, agg: mean, over: cell}
+  - {name: aio_operating_rails_verified, agg: mean, over: cell}
+  - {name: independent_gate_recorded, agg: mean, over: cell}
+writeup:
+  format: lab_book
+  sections: [p0_corpus_build, p1_taxonomy, p2_defense_audit, p3_remediation_design,
+             p4_implement, p5_verify, g9_adversarial, g10_test_gate]
+stop: {budget_usd: 12.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}
