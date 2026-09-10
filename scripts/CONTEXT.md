@@ -92,17 +92,20 @@ maintained: workflow_new.py workflow_lint.py workflow_plan.py
 | `test_workflow_runner.py` | 187.0s | **38.5s** | the 132s change-analysis root-commit test → 0.7s (`change_analysis_legs=False` scopes the sonar/lsp external legs); the watchdog family 24.9s → 17.2s |
 | `test_relabel_tree_gate.py` | 49.1s | **26.4s** | the 298MB attempt-A tree is materialized ONCE (module fixture), the replay tests hardlink-copy it (~3.7s each, was ~12.5s) |
 | `test_checkpoint_mechanism.py` | 15.2s | **1.4s** | the revamp3 replay uses a minimal worktree + the REAL unsigned template content |
-| fast path (`pytest tests/ -m fast`) | — | **~25s** | 509 tests; budget 180s (3x — a trip wire, not a flaky wall) |
+| fast path (`pytest tests/ -m fast`) | — | **~27s** | 533 tests; budget 180s (3x — a trip wire, not a flaky wall) |
 
 **The fast path** — `bash scripts/test_fast.sh` (or `python3 -m pytest tests/ -m fast -q -p no:cacheprovider`):
 the `fast`-marked subset = the sub-minute guard family + the audited pure-unit families (no real
-subprocesses, no Redis/stores/ports, no real git worktrees — the parallel-safety audit in
-`tests/test_fast_path_gate.py` enforces this on every run). Target: sub-3-minutes (measured
-~25s). **The full suite stays the gate** — the fast path is a smoke subset, never a replacement;
-run `python3 -m pytest tests/ -q` on demand and keep it green.
+subprocesses, no Redis/stores/ports, no real git worktrees, no runtime-corpus reads — the
+parallel-safety audit in `tests/test_fast_path_gate.py` enforces this on every run). Target:
+sub-3-minutes (measured ~25s). **The full suite stays the gate** — the fast path is a smoke
+subset, never a replacement; run `python3 -m pytest tests/ -q` on demand and keep it green.
 
 **Budget gate** — `tests/test_fast_path_gate.py`: the fast path must stay under 180s (a slow
 regression trips the wire) and every `fast`-marked module must pass the parallel-safety audit.
+A module that reads the runtime canonical corpus (a `@requires_corpus`/`@requires_full_corpus`
+case) is a corpus-contract test, never `fast`-marked: on a full data root those recomputes are
+unbounded (the g10 budget failure) and in a corpus-less checkout they fail the smoke outright.
 
 **Wired into the guard cadence** (test_suite_speed p3-d): CI runs `bash scripts/test_fast.sh`
 as the fast smoke in the `test` job of `.github/workflows/pytest.yml` (before the deterministic

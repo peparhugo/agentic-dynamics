@@ -35,7 +35,9 @@ from agentic_dynamics.reporting.lab_contract import (
 )
 from agentic_dynamics.reporting.lab_manifest import load_lab_manifest
 
-pytestmark = pytest.mark.fast
+# NOT fast-marked: a corpus-contract module — its `@requires_full_corpus` cases recompute
+# over the runtime canonical corpus, which is not dependency-free (see the sibling note in
+# tests/test_lab_outputs_canonical.py; aio_controller_postmortem g10).
 
 ROOT = Path(__file__).resolve().parent.parent
 RESULTS_DIR = ROOT / "experiments" / "results"

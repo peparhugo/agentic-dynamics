@@ -53,6 +53,31 @@ that does not write its close record has not closed.
 - **One writer per plane.** The orchestrator owns the control database; children never write the
   outbox (the parent emits, exactly once, atomically with the state change it describes). Per-
   projection watermarks are the single documented exception — each projector owns its own row.
+- **Recording is part of the act.** A consequential act is not finished until it is recorded.
+  Write the decision at the moment of the decision (`agentic-dynamics decision record`) and
+  **close or explicitly park the session** (`agentic-dynamics session close`) — a record written
+  in the retrospective is a reconstruction, not a record, and a session that does not write its
+  close record has not closed. Cite a decision record only after its artifact exists. The AIO's
+  own rule (2026-09-09 discipline audit): every consequential act gets its decision record at the
+  moment of the act, not in the retrospective.
+- **Bulk mutation needs the store's convention.** Before any bulk mutation of a durable store or
+  of git's index/refs — a merge, a dedup, `git add -A`, `git rm --cached`, a history rewrite —
+  apply the store's documented convention and prove the direction is safe. Append-only stores
+  merge by **union**, never by taking a side; a dedup keeps only **full-row-equal** duplicates;
+  the `.gitignore` lands before the `add`. An operation that shrinks an append-only store is a
+  violation until proven otherwise.
+- **New work rides a worktree; `main` gets only small derived-surface sweeps.** Permanence work —
+  a feature, a migration, a data-plane change, a merge of an append-only log — rides a
+  `feature/*` branch through the permanence gate. Follow the documented command/runner shape the
+  skills and `scripts/CONTEXT.md` name; when a generated surface changes, regenerate its
+  dependents in the same wave (`python3 scripts/_gen_instructions.py`,
+  `python scripts/spec_status.py`, then the README count) — a derived surface and its source
+  never drift on purpose.
+- **When the documented path fails, stop and record the gap — do not build around it.** A failing
+  rail is repaired, never replaced by a parallel mechanism. A net-new top-level mechanism — a new
+  `scripts/*` entry point or an agent-spec wrapper — requires a one-line justification naming the
+  gap it closes, and is reviewed like any other proposal. If a mechanism must be invented to
+  finish a task, say so and stop; do not wrap the mistake.
 
 **DYNAMIC STATE (never from this file):** these instructions are STABLE content only — architecture,
 authority, the command surface. Anything that changes while you read it — run states, what is

@@ -33,7 +33,9 @@ from conftest import requires_corpus, requires_full_corpus
 
 from agentic_dynamics.reporting import canonical_corpus as cc
 
-pytestmark = pytest.mark.fast
+# NOT fast-marked: a corpus-contract module — its `@requires_corpus`/`@requires_full_corpus`
+# cases read the runtime canonical corpus and `data.js`, which is not dependency-free (aio_
+# controller_postmortem g10). Runs in the full suite.
 
 ROOT = Path(__file__).resolve().parent.parent
 SCRIPTS_DIR = ROOT / "scripts"

@@ -346,6 +346,8 @@ def test_main_adds_registry_without_disturbing_the_files_block(tmp_path, monkeyp
     # registry{} is additive and reflects the compacted index.
     assert len(manifest["registry"]) == 1
     assert manifest["registry"][0]["knowledge_id"] == "kid_only"
+    # B1: the raw source-row count is recorded so the next run has a drain-count baseline.
+    assert manifest["registry_source_rows"] == 1
 
 
 def test_main_registry_is_empty_list_when_no_index_file_exists(tmp_path, monkeypatch):
@@ -362,6 +364,141 @@ def test_main_registry_is_empty_list_when_no_index_file_exists(tmp_path, monkeyp
 
     manifest = json.loads((project_root / "experiments" / "data_manifest.json").read_text())
     assert manifest["registry"] == []
+
+
+def test_detect_registry_drain_reports_the_direction():
+    """The pure direction check: an append-only store that lost versions is a drain."""
+    assert gm.detect_registry_drain([{"versions": [{}, {}]}], 3) == (2, 3)
+    assert gm.detect_registry_drain([{"versions": [{}, {}, {}]}], 3) is None
+    assert gm.detect_registry_drain([{"versions": [{}]}], None) is None  # no baseline, no claim
+
+
+def test_detect_registry_source_drain_reports_the_direction():
+    """The B1 pure direction check: a raw append-only source-row count decrease is refused."""
+    assert gm.detect_registry_source_drain(1, 2) == (1, 2)
+    assert gm.detect_registry_source_drain(2, 2) is None
+    assert gm.detect_registry_source_drain(3, 2) is None
+    assert gm.detect_registry_source_drain(2, None) is None  # no baseline, no claim
+
+
+def test_count_registry_source_rows_counts_marker_lines_sharing_a_knowledge_id(tmp_path):
+    """A supersede marker line shares its target's knowledge_id; the RAW count sees both
+    lines even though the distinct-version count collapses them into one."""
+    path = tmp_path / "registry_index.jsonl"
+    _write_jsonl(path, [
+        _row(knowledge_id="kid_v1", entity_id="eid_1",
+             observed_at="2026-08-14T00:00:00+00:00", indexed_at="2026-08-14T00:00:01+00:00"),
+        _row(knowledge_id="kid_v2", entity_id="eid_1",
+             observed_at="2026-08-15T00:00:00+00:00", indexed_at="2026-08-15T00:00:01+00:00",
+             supersedes="kid_v1"),
+        # the thin "predecessor superseded" marker — SAME knowledge_id as kid_v1.
+        {
+            "knowledge_id": "kid_v1", "entity_id": "eid_1",
+            "lifecycle_state": "superseded", "valid_to": "2026-08-15T00:00:00+00:00",
+            "indexed_at": "2026-08-15T00:00:01+00:00",
+        },
+    ])
+    assert gm._count_registry_source_rows(path) == 3
+    # ... while the version count (distinct knowledge_ids) is only 2.
+    assert gm._registry_version_count(gm._compact_registry_index(path)) == 2
+
+
+def test_registry_source_row_guard_refuses_marker_line_loss(tmp_path, monkeypatch, capsys):
+    """B1 replay of the F-04 dedup COUNT-DECREASE signature. The dedup deleted a
+    tombstone/supersede MARKER line that deliberately shares its target's knowledge_id, so the
+    distinct-knowledge_id version count is UNCHANGED and the A4 version guard cannot see the
+    loss. The raw-source-row-count guard does: the manifest is refused (exit 2) and left
+    untouched; ``--allow-shrink`` is the explicit operator override. This is a count guard,
+    not content conservation — it cannot tell the lost marker from a lost ordinary row, and an
+    equal-count replacement is not covered (proven by the count-decrease fixture)."""
+    project_root = tmp_path
+    results_dir = project_root / "experiments" / "results"
+    results_dir.mkdir(parents=True)
+    (project_root / "apps" / "website").mkdir(parents=True)
+    manifest_path = project_root / "experiments" / "data_manifest.json"
+    # The previous manifest: one entity, one distinct knowledge_id version — but it recorded
+    # TWO source rows (the full registration line + the supersede marker sharing that id).
+    # This is exactly the F-04 blind spot: versions = 1, source rows = 2.
+    manifest_path.write_text(
+        json.dumps(
+            {
+                "schema_version": "1.0",
+                "registry": [
+                    {
+                        "entity_id": "eid_1",
+                        "knowledge_id": "kid_v1",
+                        "versions": [{"knowledge_id": "kid_v1", "lifecycle_state": "superseded"}],
+                    }
+                ],
+                "registry_source_rows": 2,
+            }
+        )
+    )
+    # The deduped index lost the marker line: still ONE distinct knowledge_id, but only ONE
+    # raw row. The version count is unchanged (1 == 1); the source count fell (1 < 2).
+    index = results_dir / "registry_index.jsonl"
+    _write_jsonl(index, [_row(knowledge_id="kid_v1", entity_id="eid_1")])
+    monkeypatch.setattr(gm, "PROJECT_ROOT", project_root)
+    monkeypatch.setattr(gm, "RESULTS_DIR", results_dir)
+    monkeypatch.setattr(gm, "REGISTRY_INDEX_PATH", index)
+
+    # The version guard is blind to this signature — proving the new guard is load-bearing.
+    compacted = gm._compact_registry_index(index)
+    assert gm.detect_registry_drain(compacted, 1) is None
+    assert gm.detect_registry_source_drain(1, 2) == (1, 2)
+
+    assert gm.main([]) == 2
+    err = capsys.readouterr().err
+    assert "REFUSED" in err
+    assert "F-04" in err
+    # The previous manifest is untouched — the guard fails closed before the write.
+    assert json.loads(manifest_path.read_text())["registry_source_rows"] == 2
+
+    # The explicit override performs the understood repair and records the new baseline.
+    assert gm.main(["--allow-shrink"]) == 0
+    assert json.loads(manifest_path.read_text())["registry_source_rows"] == 1
+
+
+def test_registry_drain_guard_refuses_a_smaller_compaction(tmp_path, monkeypatch, capsys):
+    """A4 replay of the F-03 Sep-4 drain: a compaction below the recorded version count is
+    refused (exit 2) and the manifest is left untouched; ``--allow-shrink`` is the explicit
+    operator override for an understood, intended loss.
+    """
+    project_root = tmp_path
+    results_dir = project_root / "experiments" / "results"
+    results_dir.mkdir(parents=True)
+    (project_root / "apps" / "website").mkdir(parents=True)
+    manifest_path = project_root / "experiments" / "data_manifest.json"
+    # The manifest already on disk recorded 5 versions (the pre-drain state).
+    manifest_path.write_text(
+        json.dumps(
+            {
+                "schema_version": "1.0",
+                "registry": [
+                    {
+                        "entity_id": "e_prev",
+                        "knowledge_id": "k_prev",
+                        "versions": [{"knowledge_id": f"k{i}"} for i in range(5)],
+                    }
+                ],
+            }
+        )
+    )
+    # The drained registry now compacts to only 2 versions — the drain signature.
+    index = results_dir / "registry_index.jsonl"
+    _write_jsonl(index, [_row(knowledge_id=f"k{i}", entity_id=f"e{i}") for i in range(2)])
+    monkeypatch.setattr(gm, "PROJECT_ROOT", project_root)
+    monkeypatch.setattr(gm, "RESULTS_DIR", results_dir)
+    monkeypatch.setattr(gm, "REGISTRY_INDEX_PATH", index)
+
+    assert gm.main([]) == 2
+    assert "REFUSED" in capsys.readouterr().err
+    # The previous manifest is untouched — the guard fails closed before the write.
+    assert json.loads(manifest_path.read_text())["registry"][0]["knowledge_id"] == "k_prev"
+
+    # The explicit override performs the understood repair.
+    assert gm.main(["--allow-shrink"]) == 0
+    assert len(json.loads(manifest_path.read_text())["registry"]) == 2
 
 
 def test_compact_registry_index_merges_marker_line_without_losing_observed_at(tmp_path):

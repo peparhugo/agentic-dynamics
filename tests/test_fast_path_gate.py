@@ -40,6 +40,10 @@ FORBIDDEN_IN_FAST = [
     (r"\bworktree\b", "real git worktrees (shared .git state)"),
     (r"time\.sleep", "wall-clock waits"),
     (r"sonar-scanner|run_sonar_analysis", "the external analyzer JVM"),
+    # Runtime-corpus reads are not dependency-free: on a full data root they cost unbounded
+    # time (the aio_controller_postmortem g10 case: `@requires_full_corpus` recomputes inside
+    # a fast-marked module blew the 180s budget), and in a corpus-less checkout they fail.
+    (r"requires_(full_)?corpus", "a runtime-corpus dependency (not a dependency-free unit test)"),
 ]
 
 
