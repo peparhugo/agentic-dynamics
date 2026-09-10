@@ -153,3 +153,26 @@ build adversary's "must fix" verdict. Test failures are data, not errors.
 Any post-commit change to §4 (a condition, a rep, a metric definition, the margin, the task
 contract, a dropped cell) is recorded as a deviation in the verdict document with its reason,
 and the affected comparison is reported as **exploratory**, never as the registered result.
+
+## 7. Build continuation addendum (2026-09-10)
+
+Two containerized-platform constraints were hit while executing §2 and repaired/worked around
+**before any §4 cell runs**; the §4 ladder commitments are unchanged.
+
+1. **Run-clone bookkeeping (fixed).** The orchestrator's post-phase gates/commits read the host
+   worktree while sibling cells commit into the run's private clone, so `p4_verify` failed
+   `NO_CHANGES` with an empty `pre_head` although its 728-line deliverable was committed in the
+   clone. Repaired in `src/agentic_dynamics/runtime/workflow_runner.py` (post-phase git
+   operations and the commit-msg hook now resolve the run clone from `FINOPS_RUN_CLONE` when
+   containerized) with a regression test; commit `5035f849c`.
+2. **Adversarial scope (spec correction).** `adversarial_readonly` binds the run clone
+   READ-ONLY (`scripts/fleet/spawn_wrapper.py:138-139`), so a containerized adversarial phase
+   cannot deliver its finding doc; the original spec's `g5_adversarial` scope is corrected to
+   `implementation` in the continuation spec (prompt unchanged). The pinned original spec is
+   **not** edited.
+
+**Continuation spec:** `workflows/repository/flash_exploration_build_resume.yaml` SHA256
+`d09a175ab37233e1f2286c6670b718f2028d1db07ea031df85b446cdc10df22c` — phases `g5_adversarial`,
+`g6_test_gate`, dispatched against branch HEAD `5035f849c`. The p0–p4 evidence is the harvested
+chain on the branch plus the original run's ledger; the continuation's ledger covers g5/g6. No
+§4 metric, condition, rep, margin, or decision rule changes.
