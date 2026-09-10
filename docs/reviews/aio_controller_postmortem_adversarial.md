@@ -2,100 +2,115 @@
 status: accepted
 ---
 
-# AIO controller postmortem - adversarial review
+# AIO controller postmortem - adversarial re-review after p5 repair
 
-**Reviewer role:** independent adversarial reviewer. This review attacks the corpus, taxonomy,
-defense audit, remediation, replay evidence, and generated-surface blast radius rather than
-accepting their self-reported completion logs.
+**Reviewer role:** independent adversarial reviewer. This re-review tests repair commit
+`26e2ed7ed3f1751725127c1f8b8fb3e9dd16baf2` against the original A1-A7 findings and the g10
+fast-path budget. It treats a passing unit test as evidence for its exact invariant, not as
+evidence for a broader class claim.
 
-**Evidence checked:** the committed p0-p5 documents (`d19ef95a9` through `b7cd6cf71`), Git
-history, the host OpenCode pointers named by p0, installed code/tests, and live deterministic
-commands. This is a review record, not a remediation: no production behavior was changed here.
+**Method:** inspected the p0 corpus, taxonomy, p5 verification claims, repair implementation,
+and regression tests; replayed the named test paths and generated-surface guard. Historical
+Git evidence was rechecked directly. Host OpenCode transcript pointers remain the primary
+evidence for local, uncommitted incidents; the committed corpus preserves their identifiers.
 
 ## Release Verdict
 
-**FAIL - not merge-ready.** The p5 claim that "all five are committed verified"
-(`aio_controller_postmortem_verify.md:13-14`) is false at the selected-remediation scope.
-R1 self-masks a same-day recording gap and does not cover most of the C4 failures attributed to
-it. R5 checks a generated self-attestation rather than independently resolving fixture rows.
-R2, the only selected response to the severity-5 destructive-store class, remains rule text
-without a catching rail. Do not promote this branch until the findings below are either repaired
-and replayed against the named historical signatures, or the documents retract the broader PASS
-claims and explicitly park the uncovered classes.
+**FAIL - not merge-ready.** The repair genuinely fixes A1, A2, A3, A6, A7, and the g10 budget
+gate. It also adds a bounded F-03 drain defense, so A4's former "no rail at all" premise is no
+longer true. But the release claim remains too broad: R2 cannot catch the F-04 marker-line
+dedup signature it says it catches, R4 remains directive-only and cannot stop the create-then-
+delete launcher signature, and the F-06 re-track vector has no index/commit catching rail.
+The corrected dirty-file count is still missing its promised primary `git status` pointer in the
+corpus evidence list. These are shipped assertions and release predicates, not merely future
+enhancements.
 
-## Finding Table
+## A1-A7 And Budget Table
 
-| ID | Severity | Finding | Evidence and adversarial result | Required disposition |
+| ID | Verdict | Re-verification | Residual or correction |
+|---|---|---|---|
+| A1 - R1 self-masking | **REPAIRED** | `recording_sweep.scan()` now requires a decision on day D or a close strictly later than D. The real `session close` replay is exercised by `TestRecordingProbe::test_same_day_close_cannot_cover_its_own_audit`; the focused suite passed. | This is detective and best-effort: `session close` still writes successfully after reporting a gap, and a session that never closes is not caught at close time. That limitation does not re-open the same-day self-mask. |
+| A2 - C4 claim split | **REPAIRED** | `aio_controller_postmortem_verify.md:96-116` separates F-09, F-01, F-08, F-11, and F-12. F-08 is explicitly uncovered; F-11 is explicitly not R1; F-12 is explicitly partial. | F-01 remains doctrine rather than a catching rail. F-11's row-close mechanism is not a substitute for an R1 claim, as the repaired text now admits. |
+| A3 - R5 resolver | **REPAIRED** | `test_fixture_tier_resolver_resolves_every_current_row_and_fails_on_one_unresolvable` drives `canonical_corpus.load_canonical_tables` over manifest rows and real fixture payloads, then removes a payload and names `("story", "s1")`. The replay passed. | This is a synthetic hermetic fixture, not a replay of the committed 402/407-row corpus and not a waiver case. It supports the narrow fixture-resolver claim, not a full-corpus resolution claim. |
+| A4 - C1 catching rail | **REPAIRED, BOUNDED** | `generate_manifest.py` refuses a compacted version-count shrink against a valid previous manifest. `test_registry_drain_guard_refuses_a_smaller_compaction` passed within the focused suite. This catches the F-03 drain at that seam. | The p5 statement that the same rule catches F-04 is false; see B1. Raw index edits, a missing/corrupt baseline, and `--allow-shrink` remain outside the catch. |
+| A5 - dirty-file count | **STILL OPEN** | The text was corrected from unsupported `~292` to `~237` (1 modified + 236 untracked) in `aio_controller_postmortem_corpus.md:95-102`. | The evidence list at `:105-114` does not identify the retained opening `git status` transcript part that establishes 237. The value is plausible and independently recoverable from the host transcript, but it is not yet self-contained primary evidence as the corpus claims. |
+| A6 - class counting | **REPAIRED** | `aio_controller_postmortem_taxonomy.md:17-21,226-231` explicitly says the threshold counts corpus rows and that C6's two rows are one independent incident chain. | C2's F-13/F-14 acts are also causally connected, so the taxonomy should not imply all C1-C5 pairs are independent without separate support. The stated row-count gate itself is now honest. |
+| A7 - absent-data sweep | **REPAIRED** | In this source checkout, `python3 scripts/recording_sweep.py --report` returned `UNMEASURED`; `experiments/results/recording/audit.json` remained absent. The code returns before report/backfill writes, and the focused regression suite passed. | No dedicated CLI test asserts the report file remains absent, although the direct replay and control flow confirm it here. |
+| g10 - fast-path budget | **REPAIRED** | `python3 -m pytest tests/test_fast_path_gate.py -q -p no:cacheprovider` passed: **3 passed in 32.68s**. That test invokes the fast subset and enforces its 180-second budget. | The fast-marker audit is syntax/regex based, so alternate marker or corpus-dependency shapes can evade it. The p5 prose also says "two" corpus modules while naming three (`verify.md:323-326`). |
+
+## Fresh Adversarial Findings
+
+| ID | Severity | Finding | Evidence and falsification | Required disposition |
 |---|---|---|---|---|
-| A1 | P0 | **R1 self-masks the missing-decision condition it claims to catch.** | `session_close.py:259-280` writes the close before calling `_recording_check()`. `recording_sweep.py:131-148` then treats a day as covered when it has **either** a decision **or any close**. An unrecorded act followed by the current close therefore becomes covered by the close being checked. The p5 replay only creates an uncovered day with no same-day close (`tests/test_recording_sweep.py:73-106`); its close-probe tests mock `scan()` (`tests/test_session_spine.py:1001-1021`). | Retract R1 PASS. Re-design the coverage invariant so a close cannot satisfy the evidence check for the act it is auditing, then add an end-to-end same-day close regression and replay F-09. |
-| A2 | P0 | **R1 is presented as C4 (F-08 through F-12) remediation but implements only a narrow F-09/F-01 backstop.** | The selected scope is explicitly "C4 (F-08...F-12) + C6" (`aio_controller_postmortem_remediation.md:25-31`). R1 adds rule text and the close-time sweep; it adds no producer attribution check for F-08, no binding of decisions to acts, no promotion-row check for F-11, and no pre-row workdir validation for F-12. The runner still opens its control row at `run_workflow.py:641-655`, constructs orchestrator executors at `:657-681`, and only seeds the heartbeat at `:704-725`; an exception in that interval leaves the historical no-heartbeat failure shape. | Split the C4 claim by signature. Add and replay a rail for each claimed signature, or reduce R1's scope to F-09/F-01 and mark F-08/F-11/F-12 uncovered. |
-| A3 | P0 | **R5 is a static self-attestation guard, not the independent fixture-tier resolution assertion designed in p3.** | p3 requires that every current fixture registry row resolve to a payload or sanctioned waiver/tombstone and that one unresolvable fixture row fail (`aio_controller_postmortem_remediation.md:182-202`). The delivered test only parses committed `data.js` and asserts counters in its `resolution_report` are zero (`tests/test_build_data.py:770-800`); it loads no registry, payload, waiver, or corpus root. The negative replay mutates the report counter itself (`aio_controller_postmortem_verify.md:167-179`), not a registry row/payload. A stale or falsified all-zero report passes. | Retract R5's independent-resolution PASS. Either implement the fixture-tier resolver replay specified in p3, or rename R5 as an artifact-attestation guard and leave F-05's resolution defense partial. |
-| A4 | P0 | **The severity-5 C1 class has no catching rail, contrary to the release requirement.** | F-03 is independently real: `git diff --numstat 9bdb74059 9e4773fb1 -- experiments/results/registry_index.jsonl` returns `1 43311`; historical blobs are `48321` then `5011` lines. But R2 deliberately supplies rule text only (`aio_controller_postmortem_verify.md:88-102`). A directive may be clear, but it does not catch/block a future destructive merge, dedup, or index operation. | Do not claim the top classes have catching rails. Either implement a bounded existing-gate extension for the active durable-store path or explicitly accept C1 as a residual and keep the release verdict FAIL. |
-| A5 | P1 | **The corpus labels an unsupported quantity as verified evidence.** | F-01 says the main checkout was "~292 files dirty" (`aio_controller_postmortem_corpus.md:95-100`) while the corpus globally states 19 verified items and zero unverified claims (`:14-18`). The retained opening hammer `git status` pointer contains 237 tab-indented paths (1 modified plus 236 untracked); no cited retained surface establishes 292. The abandonment and uncommitted-wave core are supported, but this quantity is not. | Correct the count to the evidenced value, qualify it as an estimate with a source, or move the unsupported detail to an unverified note. Re-run the corpus completeness claim afterward. |
-| A6 | P1 | **The taxonomy's C6 minimum-size claim is inflated by splitting one incident chain.** | C6 has exactly F-01 and F-02 (`aio_controller_postmortem_taxonomy.md:43-49,57-58`), both the same hammer session and same 19-hour, uncommitted abandonment arc (`aio_controller_postmortem_corpus.md:78-133`). They are distinguishable symptoms, but not two independent real incidents. The stated class-size test is therefore satisfied only by row splitting. | State whether the threshold counts corpus rows or independent incident chains. If it requires independent incidents, reclassify C6 as a singleton/rare class or find a second independent C6 event. |
-| A7 | P1 | **The recording rail is operationally inconsistent with its own unmeasured claim.** | On this branch, `python3 -B scripts/recording_sweep.py --scan` reports `GAPS: 12 uncovered day(s)` and exits 1 because the runtime KB data is absent. By contrast, only the `session_close` wrapper recognizes that absence as `unmeasured` (`tests/test_session_spine.py:975-999`). `recording_sweep.py:48-84` itself treats a missing artifact directory as zero decision/close coverage. A nightly run from a source checkout can therefore produce false gaps and backfill reconstructions without evidence. | Make the sweep itself return an explicit unmeasured result on absent runtime data, and ensure report/backfill modes refuse mutation while unmeasured. Replay the source-checkout condition. |
+| B1 | P0 | **R2 overclaims F-04 coverage.** | `generate_manifest.py` compacts rows sharing a `knowledge_id` before `detect_registry_drain()` counts versions. F-04 deleted tombstone/supersede marker lines that deliberately share that id with their target (`aio_controller_postmortem_corpus.md:161-188`). The counter can therefore remain unchanged while those lifecycle lines are lost. `verify.md:152-154` says the guard catches F-04; it does not. | Retract the F-04-catching assertion. Either add a full-row/lifecycle-marker conservation assertion at the durable-store mutation seam, or explicitly retain F-04 as uncovered. |
+| B2 | P1 | **R4 is still doctrine, not a catching defense for launch improvisation.** | `verify.md:200-221` correctly says "Rail: none selected." Script classification catches an unclassified file only if it survives; F-13 was written and deleted after the controller objected. The rule is directive and valuable, but it would not have stopped the actual transcript moment. | Keep R4 as an explicit policy residual, not a PASS that contributes to a "top classes have catching rails" release condition. Add a pre-creation/new-mechanism gate only if the existing documented path can host it. |
+| B3 | P1 | **F-06's re-track path is asserted retired without an index/commit catch.** | The corpus migration and `.gitignore` prevent ordinary re-adds, but do not prevent force-staging or an ordering error before ignore state lands. The repository's own `test_relabel_tree_gate.py` uses `git add -Af`, demonstrating the index can still be forced. `verify.md:159-162` therefore overstates C1 protection. | Mark F-06 residual. Extend an existing staged-tree or commit gate only if it can reject tracked `experiments/results/**` without creating parallel machinery. |
+| B4 | P1 | **The C2 two-item claim is a row count, not evidence of two independent incidents.** | F-14's wrapper produced the F-12 failed launches, and F-12 triggered F-13's launcher draft (`aio_controller_postmortem_corpus.md:351-403`). They are two real acts, but one connected improvisation chain. | Preserve C2's row-count classification, but do not use it as independent-incident evidence without an explicit counting-basis statement matching C6. |
 
 ## Corpus And Taxonomy Re-verification
 
-The four required incidents are present with actionable primary pointers:
+The requested worst items are present and point to primary evidence:
 
-- The Sep-4 registry drain (F-03) is in p0 with Git and transcript pointers; the Git numerical
-  proof above confirms the severity-5 loss.
-- The dedup over-deletion (F-04) is in p0 with the 48,324 to 20,132 transcript output and the
-  self-correction/restore pointers (`aio_controller_postmortem_corpus.md:159-186`).
-- The `git add -A` re-track (F-06) is in p0 with the ordered command and the 32,311-file recovery
-  pointer (`:212-235`).
-- The launch improvisation (F-13) is in p0 with write, controller objection, and deletion
-  timestamps (`:366-381`); no committed `scripts/launch_workflow.py` exists.
+- **Hammer:** F-01 records the 1 modified + 236 untracked basis and the abandoned session
+  (`aio_controller_postmortem_corpus.md:80-114`). The numerical statement needs the missing
+  exact transcript-part citation noted in A5.
+- **Registry drain:** F-03 is severity 5 and Git-reproducible. The direct replay produced
+  `1 43311` for `git diff --numstat 9bdb74059 9e4773fb1 -- registry_index.jsonl`; the blobs are
+  48,321 and 5,011 lines respectively.
+- **Registry dedup:** F-04 gives the 48,324 to 20,132 transcript result, self-correction, and
+  full-row-equality recovery pointer (`corpus.md:161-188`).
+- **`git add -A` re-track:** F-06 names the ordered command, the immediate admission, and the
+  32,312-path recovery commit (`corpus.md:214-237`).
+- **Launch improvisation:** F-13 names write, controller objection, and deletion timestamps;
+  no committed `scripts/launch_workflow.py` exists (`corpus.md:368-383`).
 
-No required severity-5 item was absent: F-03 is present and primary-evidenced. The severity-5
-corpus issue is precision, not omission: F-01's dirty-file count is not established by the cited
-evidence (A5). The taxonomy arithmetic is internally consistent (19 rows; six classes with at
-least two rows plus Rare), but A6 shows that its C6 threshold does not demonstrate two independent
+No further severity-5 event was found in the corpus's declared 2026-09-04 through 2026-09-10
+window. F-03 is the sole documented severity-5 item. A pre-window one-line registry collapse
+is relevant historical context but is not an omission under that bounded corpus definition.
+
+All classes have at least two **rows** except Rare. The taxonomy now explicitly distinguishes
+rows from independent chains for C6, which repairs A6. C2 needs the same caution (B4); it is
+not force-fit, because F-13 and F-14 are distinct real actions, but neither proves two unrelated
 incidents.
-
-## Defense And Replay Re-verification
-
-The review agrees with two narrow clean claims:
-
-- R3 is a genuine replay: the wired `scan_docs_drift.py --check spec_lifecycle --fail-on-drift`
-  fails against historical `24837b7d0`, names `README.md:96`, and is clean at HEAD. It catches the
-  F-19 generated-surface signature, not direct-main F-16.
-- R2 and R4 are imperative doctrine, not suggestions: the rendered rules use "must", "never",
-  "is a violation", "do not", and named commands. That is useful policy, but it is not a catching
-  rail and cannot satisfy a release claim that the top classes are mechanically caught.
-
-The implementation's targeted tests pass but do not falsify A1-A3: `82 passed, 3 skipped` across
-the R1/R5-related test files. `python3 scripts/_gen_instructions.py --check` also passes (38
-generated surfaces match). This validates render blast radius only; it does not validate the
-semantic coverage promised in the p5 verification document.
 
 ## Reproduction Log
 
 ```text
+$ PYTHONDONTWRITEBYTECODE=1 python3 -m pytest \
+    tests/test_recording_sweep.py tests/test_session_spine.py::TestRecordingProbe \
+    tests/test_generate_manifest.py tests/test_build_data.py \
+    -k 'not test_build_data' -q -p no:cacheprovider
+33 passed, 34 deselected in 1.06s
+
+$ PYTHONDONTWRITEBYTECODE=1 python3 -m pytest tests/test_build_data.py \
+    -k fixture_tier_resolver -q -p no:cacheprovider
+1 passed, 33 deselected in 0.19s
+
+$ PYTHONDONTWRITEBYTECODE=1 python3 -m pytest tests/test_fast_path_gate.py \
+    -q -p no:cacheprovider
+3 passed in 32.68s
+
+$ python3 scripts/recording_sweep.py --report
+recording_sweep: UNMEASURED - no KB artifact dir on disk; refused to report or backfill
+# experiments/results/recording/audit.json: absent after the command
+
+$ python3 scripts/_gen_instructions.py --check
+surfaces OK - 38 generated files match agent_config/
+
 $ git diff --numstat 9bdb74059 9e4773fb1 -- experiments/results/registry_index.jsonl
 1       43311   experiments/results/registry_index.jsonl
 $ git show 9bdb74059:experiments/results/registry_index.jsonl | wc -l
 48321
 $ git show 9e4773fb1:experiments/results/registry_index.jsonl | wc -l
 5011
-
-$ python3 -m pytest tests/test_recording_sweep.py tests/test_session_spine.py \
-    tests/test_build_data.py -q -p no:cacheprovider
-82 passed, 3 skipped
-$ python3 scripts/_gen_instructions.py --check
-surfaces OK - 38 generated files match agent_config/
-$ python3 -B scripts/recording_sweep.py --scan
-GAPS: 12 uncovered day(s)
-exit 1
 ```
 
 ## Completion Log
 
-- **Required worst incidents checked:** PASS, with A5's count qualification.
-- **At least three evidence-grounded findings:** PASS (A1-A7).
-- **Blast-radius render check:** PASS (generated surfaces clean).
-- **Top classes have catching rails:** FAIL (A1-A4).
-- **Nothing unverified shipped:** FAIL (A1-A3 and A5).
+- **A1-A7 and g10 re-verified:** PASS with A5 still open and the stated bounded residuals.
+- **At least three fresh evidence-grounded findings:** PASS (B1-B4).
+- **Blast-radius generated-surface check:** PASS.
+- **Top classes have complete catching rails:** FAIL (B1-B3).
+- **Nothing unverified shipped:** FAIL (the F-04 and F-06 coverage claims overstate the rails).
 - **RELEASE VERDICT:** **FAIL - not merge-ready.**
 - **LOG:** FAIL.
