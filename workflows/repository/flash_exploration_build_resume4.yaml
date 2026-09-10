@@ -1,0 +1,131 @@
+name: flash_exploration_build_resume4
+question: >-
+  Fourth continuation of `flash_exploration_build`, after the fourth adversarial review returned
+  FAIL (findings A1-A3: false zeros from C preprocessor directives and JS template literals in
+  non-Python normalization; graph EXPANSION bypassing the SOURCE commit gate; a non-runnable
+  stale Probe 5 transcript). Remediation round 4 closed all three at commit 693ded194. Same
+  decidable evidence classes as resume2/3 (hermetic + live lexical in-cell; dense host-side
+  artifact by network design) and the no-padding rule: every genuine finding reported; a
+  verified clean sweep is a valid outcome. Only g5_adversarial and g6_test_gate run.
+version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: false
+repeatable: false
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: true
+    context:
+      hard_rules: >-
+        (1) The adversarial phase writes ONLY docs/reviews/flash_exploration_adversarial.md; it
+        does not change src/ or tests/. (2) The test phase is the independent gate. (3) No
+        live-KB writes; the pattern mint is the controller-approved post-build act.
+      evidence_classes: >-
+        Hermetic tests + the live lexical probe (bolt://neo4j:7687, the fleet-net alias — never
+        localhost) run in-cell. The dense live probe is host-side by design (chromadb on
+        ai-infra; cells on fleet-net): verify the committed runner and the provenance-bound
+        artifact. In-cell dense replication is an environment boundary, not a finding.
+    phases:
+      - name: g5_adversarial
+        kind: agent
+        scope: implementation
+        requires_deliverable: true
+        run_model: openai/gpt-5.6-terra
+        timeout: 10800
+        prompt: |
+          GOAL: {goal}
+          ROLE: the INDEPENDENT adversarial reviewer (terra vs the flash author). Falsify the
+          build; report EVERY genuine finding with direct evidence. A verified clean sweep is a
+          valid outcome — do NOT pad the count.
+
+          READ FIRST: docs/reviews/flash_exploration_adversarial.md (the four prior reviews),
+          docs/reviews/flash_exploration_remediation.md (rounds 1-3),
+          docs/reviews/flash_exploration_verify.md (the corrected p4 artifact),
+          docs/reviews/flash_exploration_retrieval_probe.json (probe provenance).
+
+          EVIDENCE CLASSES (decidable contract):
+          - HERMETIC (run in-cell): python3 -m pytest tests/test_retrieval.py
+            tests/test_context_plane_pattern.py tests/test_kb_produce_facts_integration.py
+            tests/test_diversity.py tests/test_run_result_shape.py tests/test_portfolio_scorer.py -q
+          - LIVE LEXICAL PROBE (run in-cell): Neo4j at bolt://neo4j:7687 (neo4j /
+            password123) — the fleet-net service alias; localhost is NOT the service. A
+            mismatched-commit query must admit MEASURED/DERIVED/ADVISORY and exclude SOURCE
+            with a different non-empty commit.
+          - HOST-SIDE DENSE EVIDENCE (environment boundary, NOT a finding): chromadb runs on
+            ai-infra; cells run on fleet-net BY DESIGN. Verify
+            scripts/probe_retrieval_reachability.py exercises the real
+            retrieve()/ChromaStore/dense-filter path, and that the artifact is
+            provenance-bound (generated_at, code_sha, module paths) with DIRECT per-leg hit
+            counts (dense_hits/lexical_hits — never infer dense contribution from
+            fallback_mode alone) and internal consistency. Report the boundary as an
+            environment fact. The live 0-pattern state is F2b (post-mint) and out of scope.
+
+          ATTACK (report every genuine finding; a clean sweep is allowed):
+          (1) A1: verify the non-Python fallback cannot false-zero a REAL change — C
+              preprocessor values (``#define VALUE 1`` vs ``#define VALUE 2``) and JS
+              template-literal contents must score > 0, while comments/interior whitespace
+              around identical code still score 0.0.
+          (1b) F1-round-3: try to inflate portfolio_diversity with cosmetic edits in
+              Python/JS/C — inline/block comments, INTERIOR whitespace, reformatting/newline
+              moves — must be 0.0. Check the canonical/line_form split in
+              measurement/diversity.py.
+          (2) F2-round-3: audit the scorer (scripts/score_flash_ladder.py +
+              measurement/portfolio_score.py) for omitted/malformed solution_code: null and
+              invalid counts must be separate; uncollected attempts are never scored as empty;
+              no fabricated zeros below n=2.
+          (2b) A2: audit the graph-EXPANSION path — an expanded SOURCE neighbor with a
+              different non-empty commit must be absent from candidates AND selected evidence;
+              an expanded MEASURED/DERIVED/ADVISORY neighbor stays eligible. Do not test only
+              the direct lexical/dense legs.
+          (3) F3-round-3: run the in-cell lexical probe; verify the host artifact's provenance
+              fields and per-leg counts against the runner code (regenerated at the reviewed
+              candidate).
+          (4) A3: the verify doc's Probe 5 must contain a SYNTACTICALLY RUNNABLE command
+              (closing PY marker) and a separate raw-output fence, regenerated at the reviewed
+              candidate, consistent with the document head and the remediation docs.
+          (5) Regression audit of the source fixes (retrieval reachability, pattern window,
+              diversity, scorer).
+
+          DELIVER: docs/reviews/flash_exploration_adversarial.md — replace it with the CURRENT
+          review: an evidence table (finding, severity, direct re-verification, required
+          disposition) and a release verdict.
+          SCOPE NOTE: this phase writes ONLY that doc; do not touch src/ or tests/.
+          LOG: finding table; PASS/FAIL; commit.
+      - name: g6_test_gate
+        kind: test
+        scope: implementation
+        timeout: 1200
+        tests:
+          - tests/test_retrieval.py
+          - tests/test_context_plane_pattern.py
+          - tests/test_kb_produce_facts_integration.py
+          - tests/test_diversity.py
+          - tests/test_run_result_shape.py
+          - tests/test_portfolio_scorer.py
+factors:
+  - {name: model, levels: [deepseek/deepseek-v4-flash]}
+design: factorial
+rules:
+  - name: build_falsified_or_clean
+    plane: measurement
+    evidence_class: "[H]"
+    requires: []
+    produces: [adversarial_verdict_recorded]
+  - name: test_gate_measured
+    plane: measurement
+    evidence_class: "[M]"
+    requires: [adversarial_verdict_recorded]
+    produces: [independent_gate_recorded]
+metrics:
+  - {name: adversarial_verdict_recorded, agg: mean, over: cell}
+  - {name: independent_gate_recorded, agg: mean, over: cell}
+comparison: null
+writeup:
+  format: lab_book
+  sections: [question, g5_adversarial, g6_test_gate]
+stop: {budget_usd: 4.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}

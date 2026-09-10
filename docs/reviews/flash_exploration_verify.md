@@ -26,7 +26,7 @@ required claims were overstated in the first revision of this document and are N
 
 The author-side repairs and their regression tests live in
 `docs/reviews/flash_exploration_remediation.md`. Probes 1–4 below remain the historical raw
-captures at `f3957a318`; Probe 5 and the retrieval artifact are regenerated at `10c1f3519`
+captures at `f3957a318`; Probe 5 and the retrieval artifact are regenerated at `693ded194`
 and labeled in place.
 
 ## Environment / reproduction contract
@@ -596,18 +596,44 @@ the result JSON. A static check of the code paths is acceptable.
 
 ### 5a — the helper behavior (in-process)
 
-**Command**
+**Command** (runnable from the repo root as written; regenerated at HEAD `693ded194`,
+2026-09-10)
 
 ```bash
-cd /repo && PYTHONPATH=/repo/src:/repo/scripts python3 - <<'PY'
+cd "$(git rev-parse --show-toplevel)" && PYTHONPATH=src:scripts python3 - <<'PY'
 import importlib.util
 
-spec = importlib.util.spec_from_file_location("run_mod", "/repo/scripts/run.py")
+spec = importlib.util.spec_from_file_location("run_mod", "scripts/run.py")
 run = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(run)
 
-print("**Regenerated at HEAD 10c1f3519 (2026-09-10):**
+print("=== _attempt_suffix: names are unique per (variant, repetition) ===")
+seen = {}
+for variant in (0, 1, 2):
+    for rep in (0, 1, 2):
+        r = {"seed_variant": variant, "repetition": rep}
+        slug = f"cfg_model_op_s1{run._attempt_suffix(r)}"
+        seen.setdefault(slug, []).append((variant, rep))
+        print(f"  variant={variant} rep={rep} -> {slug}")
+dupes = {k: v for k, v in seen.items() if len(v) > 1}
+print(f"  distinct slugs: {len(seen)} / 9; collisions: {dupes or 'none'}")
+print(f"  default (0,0) suffix is empty: {run._attempt_suffix({'seed_variant': 0, 'repetition': 0})!r}")
 
+print()
+print("=== _serialize_solution_code: solution code is persisted, deterministically ===")
+files = {"b.py": "print('b')\n", "a.py": "print('a')\n", "sub/c.py": "x = 1\n"}
+code = run._serialize_solution_code(files)
+print(code)
+print(f"  empty portfolio -> {run._serialize_solution_code(None)!r} / "
+      f"{run._serialize_solution_code({})!r}")
+print(f"  deterministic order (two runs equal): "
+      f"{run._serialize_solution_code(files) == run._serialize_solution_code(dict(reversed(list(files.items()))))}")
+PY
+```
+
+**Raw output**
+
+```text
 === _attempt_suffix: names are unique per (variant, repetition) ===
   variant=0 rep=0 -> cfg_model_op_s1
   variant=0 rep=1 -> cfg_model_op_s1_r1
@@ -634,14 +660,6 @@ x = 1
   empty portfolio -> None / None
   deterministic order (two runs equal): True
 ```
-
-**Current-HEAD transcript.** The output above is regenerated at HEAD `10c1f3519` — not a
-historical capture: ``_serialize_solution_code(None)``/``({})`` return ``None`` (uncollected
-source), so an attempt is never indistinguishable from an intentionally empty one. The live
-consumer is `scripts/score_flash_ladder.py` /
-`agentic_dynamics.measurement.portfolio_score`, which excludes ``None`` attempts and reports
-both the null and the invalid/missing exclusion counts
-(`tests/test_portfolio_scorer.py`, `tests/test_run_result_shape.py`).
 
 ### 5b — the static call-site / consumer check
 

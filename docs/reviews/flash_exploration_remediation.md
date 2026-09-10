@@ -165,3 +165,28 @@ all are closed here, at commit `10c1f3519`:
 - **F4 — contradictory Probe 5 evidence.** `docs/reviews/flash_exploration_verify.md` Probe 5 is
   a **regenerated current-HEAD transcript** at `10c1f3519` (labeled), and the document head now
   distinguishes historical captures (Probes 1–4 at `f3957a318`) from the regenerated Probe 5.
+
+## Remediation round 4 (the fourth review's findings A1–A3)
+
+The fourth independent review (terra, against `fd97a2ea9`) returned FAIL with three findings —
+two of them genuine regressions introduced by earlier remediation rounds. All are closed at
+commit `693ded194`:
+
+- **A1 — false zeros in non-Python normalization.** The comment scanner stripped a leading
+  ``#`` that opens a C/C++ preprocessor directive (so ``#define VALUE 1`` and ``#define VALUE 2``
+  canonicalized equal → hard zero) and did not track JavaScript template literals (so
+  ``\`http://one\``` lost everything after ``//``). Fixed: `_CPP_DIRECTIVES` preserves
+  directive lines, backticks are a quote class, and semantic changes now score > 0 while
+  cosmetic changes stay 0.0. Tests:
+  `tests/test_diversity.py::test_semantic_c_macro_and_js_template_literals_are_not_cosmetic`.
+- **A2 — graph expansion bypassed the SOURCE commit gate.** Expanded neighbors were appended
+  after fusion with authority/pattern/scope checks but no freshness check, so a stale SOURCE
+  neighbor was selectable. Fixed: `freshness_multiplier` is applied to every expanded candidate
+  before it is appended (SOURCE mismatched commit → excluded; MEASURED/DERIVED/ADVISORY
+  admitted). Test:
+  `tests/test_retrieval.py::test_retrieve_expansion_applies_commit_gate_to_source_neighbors`.
+- **A3 — Probe 5 was not a runnable/current transcript.** The section is rewritten at
+  `693ded194`: a runnable command (heredoc with a closing `PY` marker) followed by a separate
+  output fence, both regenerated and consistent with the document head.
+- Regenerated evidence at `693ded194`: `docs/reviews/flash_exploration_retrieval_probe.json`
+  (provenance-bound; `dense_hits`/`lexical_hits` direct) and the Probe 5 transcript.

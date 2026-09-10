@@ -220,3 +220,22 @@ direct `dense_hits`/`lexical_hits`, and a regenerated Probe 5 transcript.
 `g6_test_gate` (six suites). No §4 metric, condition, rep, margin, or decision rule changes.
 On a clean g5 + g6 the wave proceeds to the one-time pattern mint (AIO data-plane act, which
 supplies F2b's live DERIVED evidence) and then the ladder.
+
+## 10. Fourth continuation addendum (2026-09-10)
+
+The fourth adversarial review (against `fd97a2ea9`) returned FAIL with findings A1–A3: false
+zeros from C preprocessor directives and JS template literals in the non-Python normalizer
+(a regression from round 3), graph **expansion** bypassing the SOURCE commit gate (a path the
+earlier reachability fix missed), and a non-runnable/stale Probe 5 transcript. Remediation
+round 4 closed all three at commit `693ded194` (see
+`docs/reviews/flash_exploration_remediation.md` §Remediation round 4): preprocessor-aware,
+backtick-aware comment scanning; `freshness_multiplier` applied to every expanded neighbor;
+Probe 5 rebuilt as a runnable command + separate output fence, and the probe artifact
+regenerated at `693ded194`.
+
+**Continuation spec:** `workflows/repository/flash_exploration_build_resume4.yaml` SHA256
+`0949e00da05361901da72abdee4367a683a0b7cbf7d3778427430f4c800031ab` — phases `g5_adversarial`
+(terra; same decidable evidence classes as §8–§9, with explicit A1/A2/A3 checks and the
+no-padding rule) + `g6_test_gate` (six suites). No §4 metric, condition, rep, margin, or
+decision rule changes. On a clean g5 + g6 the wave proceeds to the one-time pattern mint (AIO
+data-plane act, supplying F2b) and then the ladder.
