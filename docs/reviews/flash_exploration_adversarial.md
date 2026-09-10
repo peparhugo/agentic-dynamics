@@ -53,3 +53,29 @@ F1-F4 are repaired and independently re-reviewed.
 3. Repair F4 and regenerate the host-side probe artifact.
 4. Re-run the six-suite hermetic gate, the expanded-neighbor check, the in-cell live lexical
    probe, and an independent adversarial review on the repaired candidate.
+
+## Repair Verification
+
+**Verifier:** `openai/gpt-5.6-terra` (independent verification of the review-5 repairs only).
+This pass intentionally did not open new attack surface. It checked R1-R4, the recorded
+reachability/pattern regressions, and consistency between the host-side probe code and artifact.
+
+| Repair | Direct evidence | Verdict |
+|---|---|---|
+| R1: parser-backed Python diversity contract | Direct execution returned null for every divergence axis, `scored: false`, and `reason: "unsupported_source"` for a JS/C pair. Python comment-only and formatting-only edits returned exactly `0.0`; a `return 1` to `return 2` change returned `0.03333333333333335`; and the headed multi-file `solution_code` blob returned `0.046153846153846156` for a semantic edit. `tests/test_diversity.py` covers these cases. | PASS |
+| R2: portfolio coverage accounting | The direct mixed portfolio result was `n_pairs=3`, `n_scored_pairs=1`, `unsupported_pairs=2`, and `unsupported_fraction=0.6667`; its scored aggregate was unchanged from the Python-only pair. The JS/C portfolio returned `n_scored_pairs=0`, `unsupported_pairs=1`, `unsupported_fraction=1.0`, and null aggregates. | PASS |
+| R3: direct and expanded ACL enforcement | The hermetic direct-lexical fake-graph test passed: foreign `private-b` evidence was absent from both candidates and selection under `private-a`, while matching ACL evidence was admitted. A separate execution using the same fake graph's expansion fixture excluded a foreign-ACL expanded neighbor and admitted a matching-ACL neighbor. The read-only live lexical probe against `bolt://neo4j:7687` returned `fallback_mode="lexical_graph_only"`, 40 candidates, 30 selected findings, and no stale SOURCE evidence. | PASS |
+| R4: measured probe availability and provenance | `probe_retrieval_reachability.py` sets `dense_available` from `dense_hits is not None`, after the direct dense query, and records per-leg errors. The reviewed artifact has `generated_at`, code SHA `16ab8cb6bb7cdd67845ef4ee6559ccb68a44aed7`, resolved module paths, `dense_hits=10`, `lexical_hits=10`, two full-fallback runs, consistent selected-type totals, and no stale SOURCE selection. The relevant source files are unchanged from that SHA. | PASS |
+| Regression check: reachability gate and pattern validity window | The hermetic suite includes the SOURCE-only commit gate, expanded-neighbor commit gate, pattern opt-in/scope gate, and pattern re-derivation stability checks. Same evidence remains byte-stable across order and source revision; changed evidence moves the validity window. | PASS |
+
+**Hermetic gate:** `PYTHONPATH=src python3 -m pytest -q -p no:cacheprovider`
+over `test_diversity.py`, `test_portfolio_scorer.py`, `test_retrieval.py`,
+`test_context_plane_pattern.py`, `test_kb_produce_facts_integration.py`, and
+`test_run_result_shape.py` completed with **152 passed, 1 skipped** in 1.43s. The focused
+commit/pattern/ACL subset also completed with **5 passed**.
+
+## Release Verdict
+
+**PASS: R1-R4 are complete and internally consistent.** No scoped verification finding remains.
+This verification accepts the repaired candidate as satisfying the review-5 repair contract; it
+does not itself authorize the controller-only mint, launch, or release action.
