@@ -239,3 +239,23 @@ regenerated at `693ded194`.
 no-padding rule) + `g6_test_gate` (six suites). No §4 metric, condition, rep, margin, or
 decision rule changes. On a clean g5 + g6 the wave proceeds to the one-time pattern mint (AIO
 data-plane act, supplying F2b) and then the ladder.
+
+## 11. Fifth continuation addendum — the contract change (2026-09-10)
+
+The fifth adversarial review (against `46e479bef`) returned FAIL on F1/F2 (the non-Python
+normalization — the same small component for the third round), F3 (a pre-existing direct-lexical
+ACL leak), and F4 (probe availability a construction fact). Remediation round 5 is a **contract
+change, not another heuristic**: the diversity instrument scores **parser-backed Python only**;
+any other source is UNSCORED (`scored: false`, null axes) with `unsupported_pairs` /
+`unsupported_fraction` coverage on the portfolio — the unbounded-language claim that generated
+the edge-case rounds is deleted. ACL scope is enforced on the lexical leg and the expansion
+path; probe availability is a measured dense-query result. Commit `16ab8cb6b`; 332 tests green.
+
+**Continuation spec:** `workflows/repository/flash_exploration_build_resume5.yaml` SHA256
+`8096b3c35f18629b2cfd6194b0e8fd43ee17f1beaf00aa23ee31e5e2a0b8bb23` — phases `g5_adversarial`
+(terra as a **scoped repair verifier**: verify R1–R4 and regressions only; report only an
+incomplete/incorrect repair, a regression, or contradicted evidence — a clean verification is
+the expected outcome) + `g6_test_gate` (six suites). No §4 metric, condition, rep, margin, or
+decision rule changes; `D_c` remains the composite over scored attempts, with unsupported
+coverage reported. On a clean verification the wave proceeds to the one-time pattern mint (AIO
+data-plane act, supplying F2b) and then the ladder.

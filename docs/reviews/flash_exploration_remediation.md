@@ -190,3 +190,29 @@ commit `693ded194`:
   output fence, both regenerated and consistent with the document head.
 - Regenerated evidence at `693ded194`: `docs/reviews/flash_exploration_retrieval_probe.json`
   (provenance-bound; `dense_hits`/`lexical_hits` direct) and the Probe 5 transcript.
+
+## Remediation round 5 (the fifth review's findings F1–F4) — the contract change
+
+The fifth independent review (terra, against `46e479bef`) returned FAIL with F1/F2 (non-Python
+formatting/template-interpolation invariance still bypassable), F3 (a PRE-EXISTING direct
+lexical ACL leak), and F4 (probe availability a construction fact). F1/F2 were the same small
+component failing for the third time; the fix is a **contract change, not another heuristic**:
+
+- **The unbounded language claim is deleted.** `pairwise_divergence` now scores
+  **parser-backed Python only**: parseable sources are AST-canonicalized, and the `run.py`
+  multi-file `solution_code` blob is split on its `# === <relpath> ===` headers and parsed per
+  file. Anything else is **UNSCORED** — null axes, `scored: false`,
+  `reason: "unsupported_source"` — never a guessed number in either direction. The whole
+  heuristic scanner (`_strip_comments`, C-preprocessor/backtick handling) is gone.
+  `PortfolioDiversity` reports `n_scored_pairs`, `unsupported_pairs`, `unsupported_fraction`;
+  aggregates are over scored pairs and are `None` when none exist — no false zeros, no cosmetic
+  inflation, and no edge-case surface left to fuzz. The ladder's subject is Python.
+- **F3 — lexical ACL enforcement.** `acl_excluded()` mirrors `scope_excluded()`; the direct
+  lexical leg and the graph-expansion path both drop a candidate whose non-empty `acl_scope`
+  differs from the requested one, before fusion/selection. Regression:
+  `tests/test_retrieval.py::test_direct_lexical_leg_enforces_acl_scope` (foreign ACL absent;
+  matching ACL admitted).
+- **F4 — probe availability is measured.** `dense_available` is true only when the direct dense
+  query actually returned hits (`dense_hits is not None`); a failed query yields
+  `dense_available: false` plus `dense_error`. Artifact regenerated at `16ab8cb6b`.
+- Tests: 332 passed / 1 skipped across the ten affected suites.

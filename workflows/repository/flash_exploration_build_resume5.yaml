@@ -1,0 +1,116 @@
+name: flash_exploration_build_resume5
+question: >-
+  Repair-verification continuation of `flash_exploration_build`, after the fifth adversarial
+  review returned FAIL on F1/F2 (non-Python normalization — the unbounded language claim is now
+  DELETED: only parser-backed Python is scored, everything else is unscored with explicit
+  coverage), F3 (a pre-existing direct-lexical ACL leak, now enforced on the lexical and
+  expansion paths), and F4 (probe availability now measured by a real dense query). This spec's
+  g5 is a SCOPED VERIFIER, not a new adversarial dig: it verifies the four repairs and the
+  absence of regressions, and reports only a repair that is incomplete/incorrect, a regression
+  introduced by a repair, or contradicted evidence. Only g5_adversarial and g6_test_gate run.
+version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: false
+repeatable: false
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: true
+    context:
+      hard_rules: >-
+        (1) The verifier writes ONLY docs/reviews/flash_exploration_adversarial.md; it does not
+        change src/ or tests/. (2) The test phase is the independent gate. (3) No live-KB
+        writes; the pattern mint is the controller-approved post-build act.
+      evidence_classes: >-
+        Hermetic tests + the live lexical probe (bolt://neo4j:7687, the fleet-net alias — never
+        localhost) run in-cell. The dense live probe is host-side by design (chromadb on
+        ai-infra; cells on fleet-net): verify the committed runner and the provenance-bound
+        artifact. In-cell dense replication is an environment boundary, not a finding.
+    phases:
+      - name: g5_adversarial
+        kind: agent
+        scope: implementation
+        requires_deliverable: true
+        run_model: openai/gpt-5.6-terra
+        timeout: 10800
+        prompt: |
+          GOAL: {goal}
+          ROLE: the independent VERIFIER of the review-5 repairs (terra). The previous review
+          combined a breadth attack with deep fuzzing; this pass is SCOPED: verify the four
+          repairs and the absence of regressions. Do NOT open new attack surface or hunt for
+          new classes. Report a finding ONLY if (a) a repair is incomplete or incorrect,
+          (b) a repair introduced a regression, or (c) the repaired evidence contradicts
+          itself. A clean verification is the expected outcome.
+
+          READ FIRST: docs/reviews/flash_exploration_adversarial.md (the five prior reviews),
+          docs/reviews/flash_exploration_remediation.md (rounds 1-5; round 5 is the contract
+          change), docs/reviews/flash_exploration_retrieval_probe.json (provenance).
+
+          REPAIRS TO VERIFY (R1-R4):
+          R1 — the diversity contract: `pairwise_divergence` scores parser-backed Python only.
+               Verify: a JS/C pair returns null axes + `scored: false` (NO number, neither a
+               false zero nor inflation); Python comment/whitespace/formatting edits score
+               exactly 0.0; a Python semantic change scores > 0; the run.py multi-file
+               `solution_code` blob (``# === <relpath> ===`` headers) is scored and normalized.
+          R2 — portfolio coverage accounting: `PortfolioDiversity` reports `n_scored_pairs`,
+               `unsupported_pairs`, `unsupported_fraction`; a portfolio containing a
+               non-Python sample counts its pairs unsupported and does NOT change the scored
+               aggregates; all-unsupported → null means, fraction 1.0 (null-not-zero).
+          R3 — ACL enforcement: a direct lexical record with a foreign, non-empty `acl_scope`
+               (matching repository) is absent from candidates AND selected evidence; a
+               matching-ACL record is admitted; the expansion path enforces the same rule.
+               Reproduce with the hermetic fake-graph fixture and, where possible, the live
+               lexical probe (bolt://neo4j:7687).
+          R4 — probe honesty: `dense_available` is true only when the direct dense query
+               returned hits; the artifact at the reviewed candidate is provenance-bound
+               (generated_at, code_sha, module paths) with per-leg `dense_hits`/`lexical_hits`.
+          REGRESSION CHECK: the hermetic suite passes; the source fixes from earlier rounds
+          (reachability gate, expanded-neighbor gate, pattern window) still behave as recorded.
+
+          EVIDENCE CLASSES: hermetic tests in-cell; live lexical probe against
+          bolt://neo4j:7687 (the fleet-net alias — localhost is not the service); the host-side
+          dense artifact verified by code + provenance (in-cell replication is a network
+          boundary, not a finding).
+
+          DELIVER: docs/reviews/flash_exploration_adversarial.md — a REPAIR VERIFICATION table
+          (repair, direct evidence, verdict) plus a release verdict.
+          SCOPE NOTE: this phase writes ONLY that doc; do not touch src/ or tests/.
+          LOG: verification table; PASS/FAIL; commit.
+      - name: g6_test_gate
+        kind: test
+        scope: implementation
+        timeout: 1200
+        tests:
+          - tests/test_retrieval.py
+          - tests/test_context_plane_pattern.py
+          - tests/test_kb_produce_facts_integration.py
+          - tests/test_diversity.py
+          - tests/test_run_result_shape.py
+          - tests/test_portfolio_scorer.py
+factors:
+  - {name: model, levels: [deepseek/deepseek-v4-flash]}
+design: factorial
+rules:
+  - name: build_falsified_or_clean
+    plane: measurement
+    evidence_class: "[H]"
+    requires: []
+    produces: [adversarial_verdict_recorded]
+  - name: test_gate_measured
+    plane: measurement
+    evidence_class: "[M]"
+    requires: [adversarial_verdict_recorded]
+    produces: [independent_gate_recorded]
+metrics:
+  - {name: adversarial_verdict_recorded, agg: mean, over: cell}
+  - {name: independent_gate_recorded, agg: mean, over: cell}
+comparison: null
+writeup:
+  format: lab_book
+  sections: [question, g5_adversarial, g6_test_gate]
+stop: {budget_usd: 4.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}
