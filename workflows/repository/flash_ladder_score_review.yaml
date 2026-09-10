@@ -33,11 +33,15 @@ workflow:
           mis-classified, the pristine restoration is unfaithful, or the arithmetic/decision
           contradicts the pre-registered rule. Do NOT open new attack surface.
 
-          INPUTS: experiments/results/flash_ladder/score_round1.json (the score),
-          experiments/results/flash_ladder/cells/*.json (cell records + exported trees),
-          scripts/score_flash_ladder.py (the scorer), and
-          docs/experiments/preregistrations/flash_exploration_preregistration.md §4 (the
-          registered metrics/rule).
+          INPUTS (RUNTIME EVIDENCE, not tracked files — do NOT look for them via git):
+          the ladder evidence is staged read-only at ``/tmp/flash_ladder_evidence/``, which
+          every cell mounts: ``/tmp/flash_ladder_evidence/score_round1.json`` (the score) and
+          ``/tmp/flash_ladder_evidence/cells/<cell>.json`` plus ``.../cells/<cell>/`` (the cell
+          records and exported package trees). Read them from there with ordinary file tools
+          (ls/cat/python); ``/repo/experiments/results`` may be empty in a cell by design.
+          Also read ``scripts/score_flash_ladder.py`` (the scorer, tracked) and
+          ``docs/experiments/preregistrations/flash_exploration_preregistration.md`` §4 (the
+          registered metrics/rule, tracked).
 
           CHECKS:
           (1) Recompute, from the raw exports only, each cell's package sources (any layout:
