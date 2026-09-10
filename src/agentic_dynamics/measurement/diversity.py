@@ -25,6 +25,7 @@ An unmeasured portfolio statistic is not a measured zero. ``coverage`` says whic
 
 from __future__ import annotations
 
+import ast
 from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Any
@@ -74,6 +75,30 @@ def _count_loc(code: str) -> int:
     )
 
 
+def _normalize_source(code: str) -> str:
+    """Strip formatting-only code so a cosmetic edit cannot read as divergence.
+
+    The adversarial review (``g5_adversarial``, F3) measured whitespace-only and
+    comment-only pairs scoring nonzero composite divergence — churn a diversity metric must
+    not reward. Python sources that parse are normalized through the AST (comments, blank
+    lines, indentation style, and trailing whitespace all vanish). Non-Python or
+    unparseable sources fall back to a line filter: blank lines and ``#``/``//`` comment
+    lines dropped, line edges stripped. Concatenated multi-file ``solution_code`` (the
+    ``# === <relpath> ===`` headers make it unparseable as one module) takes the fallback.
+    """
+    try:
+        return ast.unparse(ast.parse(code))
+    except (SyntaxError, ValueError, TypeError):
+        pass
+    lines: list[str] = []
+    for line in code.splitlines():
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#") or stripped.startswith("//"):
+            continue
+        lines.append(stripped)
+    return "\n".join(lines)
+
+
 def pairwise_divergence(a: str, b: str) -> dict[str, float]:
     """Divergence between two solutions across the three basin axes plus their composite.
 
@@ -85,11 +110,16 @@ def pairwise_divergence(a: str, b: str) -> dict[str, float]:
         ``{"novelty", "architecture_divergence", "structure_divergence", "composite"}`` with
         ``composite = 0.4·arch + 0.3·struct + 0.3·novelty``.
 
-    Identity is a hard zero. Two byte-identical samples have no divergence by definition; the
-    short-circuit also keeps the empty/whitespace case honest, because basin's neutral-prior
-    novelty (0.5 when no 5-grams exist) would otherwise score two empty strings as divergent.
+    Formatting is normalized away BEFORE any axis is scored (:func:`_normalize_source`): a
+    whitespace-only or comment-only pair is a hard zero, so cosmetic churn cannot inflate the
+    portfolio statistics the ladder's decision rule reads (the g5 F3 finding). Identity is a
+    hard zero; the normalization also keeps the empty/whitespace case honest, because basin's
+    neutral-prior novelty (0.5 when no 5-grams exist) would otherwise score two empty strings
+    as divergent.
     """
-    if a == b:
+    normalized_a = _normalize_source(a)
+    normalized_b = _normalize_source(b)
+    if normalized_a == normalized_b:
         return {
             "novelty": 0.0,
             "architecture_divergence": 0.0,
@@ -97,9 +127,11 @@ def pairwise_divergence(a: str, b: str) -> dict[str, float]:
             "composite": 0.0,
         }
 
-    arch = architecture_divergence(a, b)
-    struct = structure_divergence(_count_loc(a), _count_loc(b), a, b)
-    novelty = compute_novelty(a, b)
+    arch = architecture_divergence(normalized_a, normalized_b)
+    struct = structure_divergence(
+        _count_loc(normalized_a), _count_loc(normalized_b), normalized_a, normalized_b
+    )
+    novelty = compute_novelty(normalized_a, normalized_b)
     composite = ARCHITECTURE_WEIGHT * arch + STRUCTURE_WEIGHT * struct + NOVELTY_WEIGHT * novelty
     return {
         "novelty": novelty,

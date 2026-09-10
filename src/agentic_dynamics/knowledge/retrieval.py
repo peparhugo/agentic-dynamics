@@ -581,7 +581,15 @@ def freshness_multiplier(
         observed = _parse_timestamp(observed_at)
         if observed is None:
             return ADVISORY_FRESH_90D
-        age_days = ((now or datetime.now(timezone.utc)) - observed).days
+        # ISO strings without an offset parse NAIVE while the reference clock is aware —
+        # subtracting them raised TypeError on the first live dense probe (2026-09-10).
+        # Treat a naive timestamp as UTC; normalize the injected reference clock the same way.
+        if observed.tzinfo is None:
+            observed = observed.replace(tzinfo=timezone.utc)
+        reference = now or datetime.now(timezone.utc)
+        if reference.tzinfo is None:
+            reference = reference.replace(tzinfo=timezone.utc)
+        age_days = (reference - observed).days
         if age_days <= 30:
             return ADVISORY_FRESH_30D
         if age_days <= 90:

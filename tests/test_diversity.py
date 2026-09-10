@@ -8,7 +8,7 @@ a fabricated zero (null-not-zero). These are pure-unit tests over source strings
 
 import pytest
 
-from agentic_dynamics.measurement import basin
+from agentic_dynamics.measurement import basin, diversity
 from agentic_dynamics.measurement.diversity import (
     PortfolioDiversity,
     pairwise_divergence,
@@ -73,19 +73,32 @@ def test_pairwise_identical_is_zero_and_reuses_basin_axes():
 
 
 def test_pairwise_fields_are_the_basin_primitives():
-    """The pairwise axes must be the basin primitives, not a second copy of the math."""
+    """The pairwise axes must be the basin primitives on the NORMALIZED sources, not a second
+    copy of the math (normalization strips cosmetic-only edits — the g5 F3 finding)."""
+    normalized_a = diversity._normalize_source(SAMPLE_A)
+    normalized_b = diversity._normalize_source(SAMPLE_B)
     result = pairwise_divergence(SAMPLE_A, SAMPLE_B)
     a_loc = len(
-        [line for line in SAMPLE_A.split("\n") if line.strip() and not line.strip().startswith("#")]
+        [
+            line
+            for line in normalized_a.split("\n")
+            if line.strip() and not line.strip().startswith("#")
+        ]
     )
     b_loc = len(
-        [line for line in SAMPLE_B.split("\n") if line.strip() and not line.strip().startswith("#")]
+        [
+            line
+            for line in normalized_b.split("\n")
+            if line.strip() and not line.strip().startswith("#")
+        ]
     )
-    assert result["architecture_divergence"] == basin._architecture_divergence(SAMPLE_A, SAMPLE_B)
+    assert result["architecture_divergence"] == basin._architecture_divergence(
+        normalized_a, normalized_b
+    )
     assert result["structure_divergence"] == basin._structure_divergence(
-        a_loc, b_loc, SAMPLE_A, SAMPLE_B
+        a_loc, b_loc, normalized_a, normalized_b
     )
-    assert result["novelty"] == basin._compute_novelty(SAMPLE_A, SAMPLE_B)
+    assert result["novelty"] == basin._compute_novelty(normalized_a, normalized_b)
     assert result["composite"] == pytest.approx(
         0.4 * result["architecture_divergence"]
         + 0.3 * result["structure_divergence"]
@@ -170,3 +183,30 @@ def test_to_dict_rounds_but_keeps_none():
     empty = portfolio_diversity([]).to_dict()
     assert empty["mean_composite"] is None
     assert empty["coverage"] == "empty"
+
+
+def test_cosmetic_edits_normalize_to_zero():
+    """The g5 F3 finding: whitespace/comment-only pairs must not read as divergence."""
+    base = "def f():\n    return 1\n"
+    assert pairwise_divergence(base, base + "\n\n   \n")["composite"] == 0.0
+    assert pairwise_divergence(base, "def f():\n    return 1\n# a comment\n")["composite"] == 0.0
+    assert pairwise_divergence("def f():\n    return 1  # inline\n", base)["composite"] == 0.0
+    assert pairwise_divergence("", " \n\t\n")["composite"] == 0.0
+
+
+def test_cosmetic_portfolio_has_zero_diversity():
+    variants = [
+        "def f():\n    return 1\n",
+        "def f():\n    return 1\n# c1\n",
+        "def f():\n\n    return 1  # c2\n",
+    ]
+    d = portfolio_diversity(variants)
+    assert d.coverage == "full"
+    assert d.mean_composite == 0.0
+    assert d.distinct_fraction == 0.0
+
+
+def test_genuine_change_remains_positive():
+    assert pairwise_divergence(
+        "def f():\n    return 1\n", "def g():\n    return 2\n"
+    )["composite"] > 0.0

@@ -12,10 +12,21 @@ the tip after `p1_reachability` (`c740ac41a`), `p2_pattern_repair` (`f5cbc43b9`)
 and the live Neo4j graph are read; the only filesystem side effect was a temporary
 `experiments/results` symlink for Probe 4, removed before this document was committed.
 
-**Result: PASS.** All five required probes have an exact command and its raw output below; no
-probe failed. The honest caveats (not failures) are stated with each probe: **`chromadb` is not
-installed in this container** (the dense leg cannot run here), **0 `source_type=pattern` records
-exist live** yet, and the live pattern dry-run still reports the one-time supersede migration.
+**Result: PARTIAL — corrected after the independent adversarial review (`g5_adversarial`, verdict
+FAIL; findings F2/F5/F6).** Every probe below has an exact command and raw output, but three
+required claims were overstated in the first revision of this document and are NOT proven here:
+
+- the **dense (Chroma) leg was never exercised** — `chromadb` is not installed in the container,
+  so Probe 1 ran lexical-only and Probe 2b is a pure-function check (F2);
+- **no live DERIVED `pattern` record exists**, so the live retrieval proof cannot cover patterns
+  until the post-build mint (F2);
+- the **two-revision dry-run does not demonstrate live convergence** — both revisions report the
+  one-time supersede migration; convergence (0/0) is proven only against a temp registry (F5),
+  and the live second dry-run after the mint is still required.
+
+The author-side repairs and their regression tests live in
+`docs/reviews/flash_exploration_remediation.md`; this document keeps its raw probe outputs
+unchanged and downgrades only the disposition.
 
 ## Environment / reproduction contract
 
@@ -42,11 +53,11 @@ exist live** yet, and the live pattern dry-run still reports the one-time supers
 
 | # | Probe | Command shape | Verdict |
 |---|---|---|---|
-| 1 | Reachability: mismatched commit returns ≥1 MEASURED finding; `pattern_projection` toggles patterns | in-process `retrieve()` vs live Neo4j | **PASS** |
-| 2 | SOURCE commit gate still holds at all three layers | `freshness_multiplier` + `_dense_filter` + live Neo4j `search_knowledge_fulltext` | **PASS** |
+| 1 | Reachability: mismatched commit returns ≥1 MEASURED finding; `pattern_projection` toggles patterns | in-process `retrieve()` vs live Neo4j | **PARTIAL** — lexical leg only; live dense + DERIVED pending the mint (F2) |
+| 2 | SOURCE commit gate still holds at all three layers | `freshness_multiplier` + `_dense_filter` + live Neo4j `search_knowledge_fulltext` | **PASS (lexical + pure-function)** — the live dense clause is untested (F2) |
 | 3 | `portfolio_diversity`: divergent > 0, identical 0, single/empty → None means | in-process instrument | **PASS** |
-| 4 | Pattern convergence: dry-run at two revisions; simulated first mint → 0/0 | `kb_produce_facts --dry-run` + temp-registry re-derivation | **PASS** |
-| 5 | `run.py`: unique rep/variant slugs; `solution_code` persisted | in-process helpers + static call-site/consumer check | **PASS** |
+| 4 | Pattern convergence: dry-run at two revisions; simulated first mint → 0/0 | `kb_produce_facts --dry-run` + temp-registry re-derivation | **PARTIAL** — convergence proven only against a temp registry; the live dry-runs both supersede (F5) |
+| 5 | `run.py`: unique rep/variant slugs; `solution_code` persisted | in-process helpers + static call-site/consumer check | **PARTIAL at this commit** — `solution_code` was `""` for uncollected source; corrected to `None` (F4) |
 
 ---
 
@@ -569,7 +580,10 @@ fact fingerprints all identical across revisions: True
 fingerprints at both revisions while `source_revision` still differs — the window moved from
 run-identity to content-identity exactly as designed. A simulated first mint emits **6 facts +
 6 projections**; re-deriving the same evidence at the other revision emits **0 facts and 0
-projections** — G-B2's convergence, proven without touching the live KB.
+projections** — the reducer's decision boundary, proven on a temp registry. **Correction (F5):
+this does NOT prove live convergence** — the live dry-runs at both revisions still report the
+one-time supersede migration (12 derived = 6 facts + 6 projections), because the live registry
+holds the pre-B2 windows. Live convergence requires the post-mint second dry-run.
 
 ---
 
@@ -721,8 +735,13 @@ cd /repo && PYTHONPATH=/repo/src python3 -m pytest \
 
 ## Disposition
 
-- **PASS.** Every probe has its exact command and raw output; no probe failed.
-- The branch is ready for the `g5_adversarial` falsification pass and the `g6_test_gate`, then
-  (controller permitting) the post-build data-plane mint + ladder.
+- **PARTIAL (corrected).** Every probe has its exact command and raw output; the original
+  disposition overstated what they prove, as the independent adversarial review found
+  (F2/F5/F6). Dense-leg, live-DERIVED, and live-convergence evidence remain outstanding.
+- Before the data-plane mint: the remediation repairs (F3 metric normalization, F4
+  `solution_code` null) and a host-side live Chroma mismatched-commit probe; then a fresh
+  adversarial re-review and `g6_test_gate`.
+- After the controller-approved mint: a live DERIVED-pattern query and a second live dry-run
+  (0 fact / 0 projection supersessions) demonstrating F2b and live convergence.
 - Committed as the `p4_verify` deliverable with commit prefix
   `[workflow] p4_verify — Build the flash exploration wave: KB rea…`.

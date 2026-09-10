@@ -574,16 +574,20 @@ def _attempt_suffix(run: dict) -> str:
     return suffix
 
 
-def _serialize_solution_code(code_files: dict[str, str] | None) -> str:
+def _serialize_solution_code(code_files: dict[str, str] | None) -> str | None:
     """Flatten collected source files into one persistable ``solution_code`` string.
 
     The results record must let a scorer recompute portfolio divergence without reaching back
     into a ``/tmp`` worktree that may already be gone (design F5/B3). Each file is delimited
     by a stable ``# === <relpath> ===`` header so the concatenation is deterministic and
-    re-parseable; an empty portfolio serializes to the empty string.
+    re-parseable.
+
+    Coverage is explicit (the g5 F4 finding): an attempt with NO collectable source persists
+    ``None`` — never ``""``, which is indistinguishable from an intentionally empty solution.
+    A ladder scorer must exclude ``None`` attempts, never score them as empty source.
     """
     if not code_files:
-        return ""
+        return None
     parts: list[str] = []
     for relpath in sorted(code_files):
         parts.append(f"# === {relpath} ===")

@@ -1635,3 +1635,28 @@ def test_k4_lexical_leg_types_a_record_the_dense_leg_could_not():
     assert shared.source_type == "finding"  # typed by the lexical leg, never left untyped
     assert shared.id in [c.id for c in attempt.selected_evidence]
 
+def test_freshness_multiplier_advisory_naive_timestamp_is_utc():
+    """A naive ISO timestamp must not crash ADVISORY freshness (live dense probe, 2026-09-10).
+
+    ``datetime.fromisoformat("2026-09-01T00:00:00")`` is naive while the reference clock is
+    aware; subtracting them raised TypeError on the first host-side Chroma probe, which
+    excluded every ADVISORY record (reviews, decisions) from retrieval.
+    """
+    from agentic_dynamics.knowledge.retrieval import freshness_multiplier
+
+    fresh = freshness_multiplier(
+        authority=Authority.ADVISORY,
+        commit_sha="rev-a",
+        observed_at="2026-09-01T00:00:00",
+        current_commit="rev-b",
+        now=datetime(2026, 9, 10, tzinfo=timezone.utc),
+    )
+    assert fresh is not None and fresh > 0
+    stale = freshness_multiplier(
+        authority=Authority.ADVISORY,
+        commit_sha="rev-a",
+        observed_at="2026-01-01T00:00:00",
+        current_commit="rev-b",
+        now=datetime(2026, 9, 10, tzinfo=timezone.utc),
+    )
+    assert stale is None
