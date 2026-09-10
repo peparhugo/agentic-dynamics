@@ -162,8 +162,20 @@ class DockerVerifierExecutor(StepExecutor):
             )
 
         verifier_request = self.build_request(request)
+        # F3 parity (cs4, mirrored from DockerAgentExecutor): the phase's OWN declared scope
+        # authorizes its spawn. A custom spec's test-phase name is not in the static
+        # PHASE_SCOPE_AUTHORIZATION table; without this mapping step 2 refuses the verifier
+        # (the g6_test_gate "authorized: None" refusal, run-5126d586f734) and the independent
+        # gate silently never runs.
+        auth_scopes = None
+        declared = request.phase_def.get("scope") if isinstance(request.phase_def, dict) else None
+        if declared in spawn_wrapper.SCOPE_VOCABULARY:
+            auth_scopes = {request.phase_name: declared}
         try:
-            outcome = spawn_wrapper.spawn_sibling(verifier_request)
+            if auth_scopes:
+                outcome = spawn_wrapper.spawn_sibling(verifier_request, phase_scopes=auth_scopes)
+            else:
+                outcome = spawn_wrapper.spawn_sibling(verifier_request)
         except Exception as exc:  # noqa: BLE001 — a spawn refusal is a failed verdict, never a crash
             return StepResult(
                 ok=False,

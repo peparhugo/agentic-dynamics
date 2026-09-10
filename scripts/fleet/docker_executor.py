@@ -60,6 +60,9 @@ class DockerAgentExecutor(StepExecutor):
         workdir: str,
         backend: str | None = None,
         timeout: int = 1800,
+        thinking_effort: str = "high",
+        thinking_budget_tokens: int = 0,
+        output_token_limit: int = 0,
         cell_image: str | None = None,
         run_clone: str | None = None,
     ):
@@ -70,6 +73,13 @@ class DockerAgentExecutor(StepExecutor):
         self._workdir = workdir
         self._backend = backend
         self._timeout = timeout
+        # The run's generation knobs must reach the CELL: the engine resolves them per
+        # phase and the child re-runs the same spec, so a flag the orchestrator received
+        # but the child does not would silently null the condition (the ladder's C2
+        # thinking-budget arm depends on this).
+        self._thinking_effort = thinking_effort
+        self._thinking_budget_tokens = thinking_budget_tokens
+        self._output_token_limit = output_token_limit
         self._cell_image = cell_image
         self._run_clone = run_clone or os.environ.get("FINOPS_RUN_CLONE")
 
@@ -105,11 +115,16 @@ class DockerAgentExecutor(StepExecutor):
             "python3", "scripts/run_workflow.py",
             "--spec", self._spec_path,
             "--goal", self._goal,
-            "--model", self._model,
+            "--model", request.model or self._model,
             "--workdir", sibling_workdir,
             "--only-phase", request.phase_name,
             "--timeout", str(request.timeout or self._timeout),
+            "--thinking-effort", self._thinking_effort,
         ]
+        if self._thinking_budget_tokens:
+            sibling_cmd += ["--thinking-budget-tokens", str(self._thinking_budget_tokens)]
+        if self._output_token_limit:
+            sibling_cmd += ["--output-token-limit", str(self._output_token_limit)]
         if self._backend or request.backend:
             sibling_cmd += ["--backend", self._backend or request.backend]
 
@@ -129,7 +144,7 @@ class DockerAgentExecutor(StepExecutor):
             request.phase_def,
             goal=self._goal,
             workdir=sibling_workdir,
-            model=self._model,
+            model=request.model or self._model,
             spec_name=self._spec_name,
             command=sibling_cmd,
             admission=admission,
