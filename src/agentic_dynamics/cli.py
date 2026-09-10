@@ -26,6 +26,7 @@ _COMMANDS: dict[tuple[str, ...], str] = {
     ("experiment", "cap-2c-grid"): "run_cap_2c_grid.py",
     ("experiment", "cap-2c-score"): "score_cap_2c.py",
     ("experiment", "flash-ladder-score"): "score_flash_ladder.py",
+    ("experiment", "flash-ladder-run"): "run_flash_ladder.py",
     ("experiment", "cap-2d-grid"): "run_cap_2d_grid.py",
     ("experiment", "cap-2d-score"): "score_cap_2d.py",
     ("experiment", "cap-2e-grid"): "run_cap_2e_grid.py",

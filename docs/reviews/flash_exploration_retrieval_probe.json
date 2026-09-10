@@ -1,6 +1,6 @@
 {
-  "generated_at": "2026-09-10T22:05:52Z",
-  "code_sha": "16ab8cb6bb7cdd67845ef4ee6559ccb68a44aed7",
+  "generated_at": "2026-09-10T22:15:01Z",
+  "code_sha": "da0a0694dfcc56883b641eac863b91f8fdaa7a6f",
   "package_file": "/tmp/wt_flash_exploration/src/agentic_dynamics/__init__.py",
   "retrieval_file": "/tmp/wt_flash_exploration/src/agentic_dynamics/knowledge/retrieval.py",
   "commit_sha": "0000000000000000000000000000000000000000",
@@ -14,10 +14,10 @@
     {
       "pattern_projection": false,
       "fallback_mode": "full",
-      "candidates": 47,
-      "selected": 44,
+      "candidates": 41,
+      "selected": 39,
       "selected_by_source_type": {
-        "finding": 42,
+        "finding": 37,
         "flag": 2
       },
       "stale_source_selected": [],
@@ -245,40 +245,10 @@
           "locator": "exp_sweep_gpt_5_6_fb"
         },
         {
-          "source_type": "finding",
-          "authority": "MEASURED",
-          "commit_sha": "results/v1",
-          "locator": "exp_hcnattl6"
-        },
-        {
-          "source_type": "finding",
-          "authority": "MEASURED",
-          "commit_sha": "results/v1",
-          "locator": "exp_d6lkz5pg"
-        },
-        {
-          "source_type": "finding",
-          "authority": "MEASURED",
-          "commit_sha": "results/v1",
-          "locator": "exp_cqc0vqav"
-        },
-        {
           "source_type": "flag",
           "authority": "ADVISORY",
           "commit_sha": "",
           "locator": "docs-drift"
-        },
-        {
-          "source_type": "finding",
-          "authority": "MEASURED",
-          "commit_sha": "results/v1",
-          "locator": "exp_batch_autocomplete_search_natural"
-        },
-        {
-          "source_type": "finding",
-          "authority": "MEASURED",
-          "commit_sha": "results/v1",
-          "locator": "exp_qu6tc1zc"
         },
         {
           "source_type": "flag",
@@ -291,20 +261,15 @@
     {
       "pattern_projection": true,
       "fallback_mode": "full",
-      "candidates": 47,
+      "candidates": 46,
       "selected": 44,
       "selected_by_source_type": {
-        "finding": 42,
+        "finding": 36,
+        "pattern": 6,
         "flag": 2
       },
       "stale_source_selected": [],
       "selected_evidence": [
-        {
-          "source_type": "finding",
-          "authority": "DERIVED",
-          "commit_sha": "spec-index-regeneration:2026-09-04T14:43:17.160488+00:00",
-          "locator": "spec-index-regeneration:2026-09-04T14:43:17.160488+00:00"
-        },
         {
           "source_type": "finding",
           "authority": "MEASURED",
@@ -315,37 +280,7 @@
           "source_type": "finding",
           "authority": "MEASURED",
           "commit_sha": "results/v1",
-          "locator": "exp_brg802xf"
-        },
-        {
-          "source_type": "finding",
-          "authority": "MEASURED",
-          "commit_sha": "results/v1",
-          "locator": "exp_9i_wq5gc"
-        },
-        {
-          "source_type": "finding",
-          "authority": "MEASURED",
-          "commit_sha": "results/v1",
-          "locator": "exp_bh23zs7r"
-        },
-        {
-          "source_type": "finding",
-          "authority": "MEASURED",
-          "commit_sha": "results/v1",
-          "locator": "exp_brg802xf"
-        },
-        {
-          "source_type": "finding",
-          "authority": "MEASURED",
-          "commit_sha": "results/v1",
-          "locator": "exp_selbvg5r"
-        },
-        {
-          "source_type": "finding",
-          "authority": "MEASURED",
-          "commit_sha": "results/v1",
-          "locator": "exp_9uzjxitk"
+          "locator": "exp_lw9zhue9"
         },
         {
           "source_type": "finding",
@@ -357,7 +292,7 @@
           "source_type": "finding",
           "authority": "MEASURED",
           "commit_sha": "results/v1",
-          "locator": "exp_9uzjxitk"
+          "locator": "exp_2hoxdd8p"
         },
         {
           "source_type": "finding",
@@ -368,14 +303,14 @@
         {
           "source_type": "finding",
           "authority": "DERIVED",
-          "commit_sha": "spec-index-regeneration:2026-09-09T23:53:06.364280+00:00",
-          "locator": "spec-index-regeneration:2026-09-09T23:53:06.364280+00:00"
+          "commit_sha": "spec-index-regeneration:2026-09-04T14:43:17.160488+00:00",
+          "locator": "spec-index-regeneration:2026-09-04T14:43:17.160488+00:00"
         },
         {
           "source_type": "finding",
           "authority": "MEASURED",
           "commit_sha": "results/v1",
-          "locator": "exp_96rfqfgd"
+          "locator": "exp_0mwneie4"
         },
         {
           "source_type": "finding",
@@ -393,7 +328,7 @@
           "source_type": "finding",
           "authority": "MEASURED",
           "commit_sha": "results/v1",
-          "locator": "exp_73hs5n35"
+          "locator": "exp_brg802xf"
         },
         {
           "source_type": "finding",
@@ -405,25 +340,55 @@
           "source_type": "finding",
           "authority": "MEASURED",
           "commit_sha": "results/v1",
-          "locator": "exp_ay66qv12"
-        },
-        {
-          "source_type": "finding",
-          "authority": "MEASURED",
-          "commit_sha": "results/v1",
           "locator": "exp_dfyjk1mo"
         },
         {
           "source_type": "finding",
           "authority": "MEASURED",
           "commit_sha": "results/v1",
-          "locator": "exp_mp0le40h"
+          "locator": "exp_9uzjxitk"
         },
         {
           "source_type": "finding",
           "authority": "MEASURED",
           "commit_sha": "results/v1",
           "locator": "exp_uiem8t3d"
+        },
+        {
+          "source_type": "finding",
+          "authority": "MEASURED",
+          "commit_sha": "results/v1",
+          "locator": "exp_9uzjxitk"
+        },
+        {
+          "source_type": "finding",
+          "authority": "DERIVED",
+          "commit_sha": "spec-index-regeneration:2026-09-09T23:53:06.364280+00:00",
+          "locator": "spec-index-regeneration:2026-09-09T23:53:06.364280+00:00"
+        },
+        {
+          "source_type": "finding",
+          "authority": "MEASURED",
+          "commit_sha": "results/v1",
+          "locator": "exp_96rfqfgd"
+        },
+        {
+          "source_type": "finding",
+          "authority": "MEASURED",
+          "commit_sha": "results/v1",
+          "locator": "exp_73hs5n35"
+        },
+        {
+          "source_type": "finding",
+          "authority": "MEASURED",
+          "commit_sha": "results/v1",
+          "locator": "exp_ay66qv12"
+        },
+        {
+          "source_type": "finding",
+          "authority": "MEASURED",
+          "commit_sha": "results/v1",
+          "locator": "exp_mp0le40h"
         },
         {
           "source_type": "finding",
@@ -522,22 +487,10 @@
           "locator": "exp_sweep_gpt_5_6_fb"
         },
         {
-          "source_type": "finding",
-          "authority": "MEASURED",
-          "commit_sha": "results/v1",
-          "locator": "exp_hcnattl6"
-        },
-        {
-          "source_type": "finding",
-          "authority": "MEASURED",
-          "commit_sha": "results/v1",
-          "locator": "exp_d6lkz5pg"
-        },
-        {
-          "source_type": "finding",
-          "authority": "MEASURED",
-          "commit_sha": "results/v1",
-          "locator": "exp_cqc0vqav"
+          "source_type": "pattern",
+          "authority": "DERIVED",
+          "commit_sha": "da0a0694dfcc56883b641eac863b91f8fdaa7a6f",
+          "locator": "workload:pattern/task_manager/specification_corruption#pattern"
         },
         {
           "source_type": "flag",
@@ -546,22 +499,40 @@
           "locator": "docs-drift"
         },
         {
-          "source_type": "finding",
-          "authority": "MEASURED",
-          "commit_sha": "results/v1",
-          "locator": "exp_batch_autocomplete_search_natural"
+          "source_type": "pattern",
+          "authority": "DERIVED",
+          "commit_sha": "da0a0694dfcc56883b641eac863b91f8fdaa7a6f",
+          "locator": "workload:pattern/task_manager/objective_mutation#pattern"
         },
         {
-          "source_type": "finding",
-          "authority": "MEASURED",
-          "commit_sha": "results/v1",
-          "locator": "exp_qu6tc1zc"
+          "source_type": "pattern",
+          "authority": "DERIVED",
+          "commit_sha": "da0a0694dfcc56883b641eac863b91f8fdaa7a6f",
+          "locator": "workload:pattern/task_manager/process_perturbation#pattern"
+        },
+        {
+          "source_type": "pattern",
+          "authority": "DERIVED",
+          "commit_sha": "da0a0694dfcc56883b641eac863b91f8fdaa7a6f",
+          "locator": "workload:pattern/process_perturbation_resample/process_perturbation#pattern"
         },
         {
           "source_type": "flag",
           "authority": "ADVISORY",
           "commit_sha": "",
           "locator": "docs-drift"
+        },
+        {
+          "source_type": "pattern",
+          "authority": "DERIVED",
+          "commit_sha": "da0a0694dfcc56883b641eac863b91f8fdaa7a6f",
+          "locator": "workload:pattern/task_manager/baseline#pattern"
+        },
+        {
+          "source_type": "pattern",
+          "authority": "DERIVED",
+          "commit_sha": "da0a0694dfcc56883b641eac863b91f8fdaa7a6f",
+          "locator": "workload:pattern/process_perturbation_resample/baseline#pattern"
         }
       ]
     }
