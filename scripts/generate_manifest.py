@@ -10,15 +10,17 @@ rows; nothing refused it. This script now compares the compacted version count a
 previously written manifest and refuses to overwrite it with a smaller one unless the operator
 passes ``--allow-shrink`` — a shrink is a violation until proven otherwise.
 
-**The full-row conservation guard (aio_controller_postmortem B1).** The version count alone
-is blind to the F-04 dedup signature: a tombstone/supersede **marker** line deliberately
+**The raw-source-row-count drain guard (aio_controller_postmortem B1).** The version count
+alone is blind to the F-04 dedup signature: a tombstone/supersede **marker** line deliberately
 shares its target's ``knowledge_id`` (it annotates the record it points at), so deleting the
 marker does NOT reduce the number of distinct ``knowledge_id`` versions — yet real lifecycle
-evidence is gone. The append-only store's raw line count is monotonic for the same reason the
-version count is, but it is strictly more sensitive, so the manifest also records the number
-of structurally valid source rows and refuses a compaction whose source row count fell below
-the previous manifest's. Together the two guards conserve both halves of the file: distinct
-version identities AND the raw rows/lifecycle markers that carry them.
+evidence is gone. The manifest therefore also records the number of structurally valid source
+rows and refuses a compaction whose source-row count fell below the previous manifest's. This
+is strictly more sensitive than the version count and catches the F-04 **count-decrease** form
+(it cannot tell a lost marker from a lost ordinary row). It is a raw-COUNT guard, not identity
+or content conservation: a marker replaced by an unrelated valid row leaves the count unchanged
+and is NOT refused. Together the two guards bound the file by (a) distinct version identities
+and (b) raw valid source-row count — neither compares row content.
 """
 import argparse
 import hashlib
@@ -283,9 +285,11 @@ def _count_registry_source_rows(path: Path) -> int:
     this counts raw source lines. A tombstone/supersede MARKER line deliberately shares its
     target's ``knowledge_id`` (it annotates the record it points at), so it does not add a
     version — but it is still a durable line in the append-only store, and losing it is the
-    F-04 signature. Counting raw rows conserves those lines even when the version count cannot
-    see them. Malformed/blank lines are skipped exactly as :func:`_iter_registry_rows` skips
-    them (they are not valid data, so their absence is not a data loss).
+    F-04 signature. Counting raw rows makes a COUNT DECREASE visible even when the version
+    count cannot see it. It is a count, not content conservation: an equal-count replacement
+    (a lost marker swapped for an unrelated valid row) is not detected. Malformed/blank lines
+    are skipped exactly as :func:`_iter_registry_rows` skips them (they are not valid data, so
+    their absence is not a data loss).
     """
     if not path.exists():
         return 0
@@ -349,8 +353,10 @@ def detect_registry_source_drain(
 
     The version-count guard (:func:`detect_registry_drain`) cannot see a lost
     tombstone/supersede MARKER line, because the marker shares its target's ``knowledge_id``
-    and so does not change the distinct-version count. Raw source rows can. Pure and
-    side-effect free so the direction check is directly testable; ``main`` wires it to the
+    and so does not change the distinct-version count. A raw-source-row COUNT DECREASE can —
+    but only a decrease: the guard cannot distinguish a lost marker from a lost ordinary row,
+    and an equal-count replacement (one valid row substituted for another) is invisible. Pure
+    and side-effect free so the direction check is directly testable; ``main`` wires it to the
     write. A ``None`` baseline (first run, or a manifest without a source-row count) is not
     refused — the guard fails closed only on evidence.
     """
@@ -369,8 +375,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--allow-shrink",
         action="store_true",
-        help="permit a compaction that drops registry versions below the previous manifest "
-        "(a destructive-store repair — the drain guard refuses by default)",
+        help="permit a compaction that drops registry versions or raw valid source rows below "
+        "the previous manifest (a destructive-store repair — the drain guards refuse by default)",
     )
     return parser
 
@@ -433,8 +439,8 @@ def main(argv: list[str] | None = None) -> int:
     # compaction that lost versions (the F-03 drain signature) unless the operator allowed it.
     drain = detect_registry_drain(compacted_registry, _read_previous_registry_versions(output_path))
     # B1: the raw append-only source also only grows. A version-count drain misses the F-04
-    # marker-loss signature (the marker shares its target's knowledge_id), so conserve the
-    # raw source rows too — a loss of either is refused.
+    # marker-loss COUNT DECREASE (the marker shares its target's knowledge_id), so also refuse
+    # a raw source-row count decrease. This is a count guard, not content conservation.
     source_drain = detect_registry_source_drain(
         source_rows, _read_previous_registry_source_rows(output_path)
     )
@@ -454,10 +460,12 @@ def main(argv: list[str] | None = None) -> int:
             print(
                 "REFUSED: registry_index.jsonl now holds "
                 f"{new_rows} valid source rows, below the previous manifest's {previous_rows}. "
-                "The append-only registry only grows; a lost row is the F-04 lifecycle-marker "
-                "over-deletion signature (a tombstone/supersede marker shares its target's "
-                "knowledge_id, so the version count cannot see it). Repair the index, or re-run "
-                "with --allow-shrink if the loss is understood and intended.",
+                "The append-only registry only grows; a valid source-row count decrease is the "
+                "F-04 over-deletion signature (the version count cannot see a lost "
+                "tombstone/supersede marker, which shares its target's knowledge_id). This "
+                "guard compares COUNTS, not row identities — an equal-count replacement is not "
+                "refused. Repair the index, or re-run with --allow-shrink if the loss is "
+                "understood and intended.",
                 file=sys.stderr,
             )
         return 2

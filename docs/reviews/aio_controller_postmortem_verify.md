@@ -2,13 +2,13 @@
 status: accepted
 ---
 
-# AIO controller postmortem — replay verification (p5, revised under g10)
+# AIO controller postmortem — replay verification (p5; revised under g10; claim-narrowed under the third review's F1–F4)
 
 **Inputs:** the p4 branch (`61c4c97fe`), the p0 corpus (`d19ef95a9`), and the g9 adversarial
 review (`docs/reviews/aio_controller_postmortem_adversarial.md`, `272ffaa89`).
-**Role:** replay each selected remediation against its historical class and record the
-outcome. A remediation that does not demonstrably catch its class is reverted or re-designed
-here — never shipped unverified.
+**Role:** replay each selected remediation against the historical signature it targets and
+record the outcome. A remediation that does not demonstrably refuse that signature is reverted
+or re-designed here — never shipped unverified.
 
 **Correction of the original p5 headline.** The first p5 doc claimed "4 of 5 pass as applied;
 R1 was re-designed in this phase … All five are committed verified"
@@ -17,16 +17,27 @@ at the selected-remediation scope. This revision **retracts** the over-broad cla
 records the repaired, replayed state item by item (§0). No claim below rests on the
 deleted headline.
 
-**Second convergence pass.** A second adversarial re-review (the g9 re-review after the first
-repair, `docs/reviews/aio_controller_postmortem_adversarial.md`) raised findings A5 and B1–B4
-against the first repair. This revision disposition each in §0b: **A5** repaired with the
-primary `git status` part; **B1 (P0)** repaired by adding a second, full-row/lifecycle-marker
-conservation guard at the same manifest seam (§2b) — the version-count claim that could not
-catch F-04 is replaced, not repeated; **B2** keeps R4 as an explicit policy residual (removed
-from the catching-rail PASS); **B3** retains F-06's re-track vector as a residual (the
-overstated C1 protection is retracted); **B4** states C2's counting basis exactly as C6's.
-Every remaining over-claim is retracted or bounded; the release predicate below is now exactly
-true.
+**Second convergence pass.** A second adversarial re-review raised findings A5 and B1–B4
+against the first repair. That revision dispositioned each in §0b: **A5** repaired with the
+primary `git status` part; **B1 (P0)** repaired by adding a second guard at the same manifest
+seam (§2b) — the false version-count "catches F-04" sentence was replaced; **B2** keeps R4 as
+an explicit policy residual (removed from the catching-rail PASS); **B3** retains F-06's
+re-track vector as a residual; **B4** states C2's counting basis exactly as C6's.
+
+**Third pass (claim narrowing, F1–F4).** A third adversarial re-review (F1–F4 in the same
+review doc) found the repair's *wording* still over-claimed. This pass renames and bounds the
+B1 guard to what it is — a **raw-source-row-count drain guard** — including its equal-count
+replacement limitation (§2b), and rewrites the release predicate to name only individually
+exercised signatures: R1/F-09, R2/F-03 and the count-decrease form of F-04, R3/F-19, R5/F-05
+(§10). F-01 remains a policy/detection residual, not a catch; F-04's equal-count replacement
+form, F-15, F-16, F-17 and F-18 are explicitly not claimed. The release predicate below is now
+true sentence by sentence.
+
+> **Naming note (F1).** The p5 commit message (`96958a4d5`) calls the added rail a
+> "full-row/lifecycle-marker conservation guard." That log line is historical and immutable;
+> this pass supersedes it in the durable surface: the rail is a **raw-source-row-count drain
+> guard**, bound in §2b, in `scripts/generate_manifest.py`'s docstrings, and in the final
+> commit's release text. No full-row or content conservation is claimed anywhere.
 
 **Environment note.** `experiments/results/**` is untracked runtime data and is absent from
 this worktree, so replays use hermetic copies / detached worktrees where a data root would
@@ -52,18 +63,21 @@ otherwise be required. Every command below was run on this branch (HEAD after th
 | Finding | Sev | Disposition in this pass | Replay evidence |
 |---|---|---|---|
 | **A5** dirty-file count has no primary pointer | P1 | **REPAIRED** — the retained `git status` part is now cited in F-01's evidence list | §6a: `part@2026-09-04 17:26:48` → 237 = 1 modified + 236 untracked |
-| **B1** R2's F-04 coverage over-claimed | P0 | **REPAIRED** — a full-row/lifecycle-marker conservation guard added at the same `generate_manifest` seam (the false "catches F-04" sentence is replaced) | §2b: `test_registry_source_row_guard_refuses_marker_line_loss` (version guard blind; source guard refuses) |
+| **B1** R2's F-04 coverage over-claimed | P0 | **REPAIRED (bounded in the F1 third pass)** — a raw-**source-row-count** drain guard added at the same `generate_manifest` seam (the false "catches F-04" sentence is replaced; it refuses only a count DECREASE, so the equal-count replacement form is not covered) | §2b: `test_registry_source_row_guard_refuses_marker_line_loss` (version guard blind; source-row-count guard refuses the count-drop fixture) |
 | **B2** R4 is doctrine, not a catching rail | P1 | **RESIDUAL (policy)** — R4 removed from the catching-rail PASS and retained as an explicit policy residual | §4 (transcript replay only; no gate) |
 | **B3** F-06 re-track asserted retired | P1 | **RESIDUAL** — overstatement retracted; a force-stage/ordering error can still re-track; no index/commit gate added | §2 (scope/residual) |
 | **B4** C2 two-item claim is a row count | P1 | **CORRECTED** — C2's two rows are one connected improvisation chain; the basis is stated as for C6 | §6b; taxonomy §2/§4 |
 
 **Overall release verdict after this convergence pass:** **PASS for the scoped remediation
-set, with two explicitly-retained residuals (R4/C2 policy-only; F-06 re-track).** The original
-blanket FAIL is discharged for the rails that demonstrably catch their class (R1, R2, R3, R5),
-with the uncovered C4 signatures (F-08, F-11-partial, F-12) named in §1b/§9, **R4 kept as a
-policy residual — not counted as a catching-rail PASS** (§4), and **F-06's re-track vector
-retained as a residual** (§2). Every shipped assertion is bounded to what its rail demonstrably
-does.
+set, at individual-signature scope.** The original blanket FAIL is discharged only for the
+signatures each rail demonstrably refuses: R1 flags the **F-09** same-day-recording signature;
+R2 refuses the **F-03** version-drain signature and the **F-04 count-decrease** form; R3 fails
+on the **F-19** README/index drift signature; R5 names the **F-05** unresolvable-row fixture
+signature. It is **not** a class-level PASS: F-01 remains a policy/detection residual (no
+catching rail), F-04's equal-count replacement form is not caught by the count guard, and
+F-08/F-11/F-12 (C4) and F-15/F-16 (C3) and F-17/F-18 (C5) are named as uncovered or
+doctrine-only in §1b/§3/§5/§9. **R4 (C2)** and **F-06** are explicitly-retained residuals, not
+counted. Every shipped assertion is bounded to the signature its rail demonstrably refuses.
 
 ---
 
@@ -180,29 +194,30 @@ does not catch F-04** — the second adversarial review's B1. F-04's dedup delet
 tombstone/supersede **marker lines that deliberately share their target's `knowledge_id`**
 (`corpus.md:161-188`), so the number of distinct `knowledge_id` versions can be unchanged while
 real lifecycle evidence is lost. B1 is resolved by adding a second, strictly more sensitive
-conservation guard at the same mutation seam (§2b); the false claim that the version guard
-catches F-04 is removed.
+**raw-source-row-count drain guard** at the same mutation seam (§2b); the false claim that the
+version guard catches F-04 is removed.
 
-### 2b. B1 — the full-row/lifecycle-marker conservation guard (replaces the F-04 over-claim)
+### 2b. B1 — the raw-source-row-count drain guard (replaces the F-04 over-claim)
 
 `generate_manifest.py` now also records the count of structurally valid rows in the append-only
 source (`registry_source_rows`) and refuses a compaction whose raw source-row count fell below
 the previous manifest's (`detect_registry_source_drain`), at the same seam as the version guard.
-Raw rows are monotonic for the same reason distinct versions are, but they conserve the marker
-lines the version count collapses into their target's slot:
+Raw rows are monotonic for the same reason distinct versions are; counting them makes the F-04
+**count decrease** visible even though the version count collapses the marker into its target's
+slot. It is a raw-**count** guard, not identity/content conservation:
 
 ```
 $ python3 -m pytest tests/test_generate_manifest.py -q -p no:cacheprovider
 23 passed
 # test_count_registry_source_rows_counts_marker_lines_sharing_a_knowledge_id:
-#   3 raw rows, 2 distinct knowledge_id versions — the shared-id marker is conserved
+#   3 raw rows, 2 distinct knowledge_id versions — the shared-id marker is COUNTED
 # test_detect_registry_source_drain_reports_the_direction: (1,2) / None / None
-# test_registry_source_row_guard_refuses_marker_line_loss (the F-04 replay):
+# test_registry_source_row_guard_refuses_marker_line_loss (the F-04 count-decrease replay):
 #   previous manifest: 1 version, registry_source_rows=2
 #     (a full registration line + a supersede marker sharing kid_v1)
 #   deduped index: 1 raw row (the marker deleted)
 #   detect_registry_drain(compacted, 1) is None     <- the A4 version guard is BLIND to F-04
-#   detect_registry_source_drain(1, 2) == (1, 2)    <- the B1 source guard SEES it
+#   detect_registry_source_drain(1, 2) == (1, 2)    <- the B1 count guard SEES the drop
 #   gm.main([]) == 2 ; stderr names F-04 ; the previous manifest is untouched
 #   --allow-shrink -> exit 0 (the explicit, understood repair)
 ```
@@ -210,6 +225,15 @@ $ python3 -m pytest tests/test_generate_manifest.py -q -p no:cacheprovider
 The guard is conservative in the same way as A4: an absent/corrupt previous manifest records no
 source-row baseline, so the guard fails closed only on evidence (the first post-upgrade run
 records the baseline rather than fabricating a claim).
+
+**The bound (F1 of the third review).** This guard compares integer counts, nothing else. It
+refuses a **count decrease** only; it cannot tell a lost tombstone/supersede marker from a
+lost ordinary row, and it cannot see an **equal-count replacement** — a marker line deleted
+and an unrelated valid row added in the same compaction leaves the raw count unchanged and is
+**not** refused. Full row-identity/content conservation (hashing or set-comparing the source
+rows across the previous and new compaction) would close that gap, but it was **not**
+implemented: F1's first-stated correction — "rename and bound the rail" — is the change this
+pass ships, and this paragraph is that bound.
 
 **Scope / residual (stated honestly).** Both guards fire at the compaction seam — the active
 path now that the index is untracked. They do not block a raw file edit that is never followed
@@ -220,12 +244,13 @@ makes an ordinary re-add unlikely (`experiments/results/` is untracked,
 producers, but neither prevents a force-stage (`git add -Af`) nor an ordering error that lands
 the `add` before the ignore state — the repository's own `test_relabel_tree_gate.py` uses
 `git add -Af`, demonstrating the index can still be forced. No index/commit gate was added. The
-severity-5 drain path (F-03/F-04) now has catching rails at the only place the store is
-consumed; they are bounded, not universal, and F-06 is disclosed as residual rather than
-claimed caught.
+severity-5 drain path now has catching rails at the only place the store is consumed; they are
+bounded, not universal, and F-06 is disclosed as residual rather than claimed caught.
 
-**Verdict: PASS (two bounded catching rails added and replayed — version drain + full-row
-conservation; F-03 and F-04 each demonstrably refused; F-06 disclosed residual).**
+**Verdict: PASS at signature scope (two bounded catching rails added and replayed — the
+version-drain guard for F-03 and the raw-source-row-count drain guard for the F-04
+count-decrease form; F-04's equal-count replacement form is NOT caught; F-06 disclosed
+residual).**
 
 ---
 
@@ -257,7 +282,10 @@ exit=0   (drift score 0)
 commits the worktree clause addresses: `bb47441bc`, `292c47bad`, `ab887b5c8`, `77eb6c0b3`,
 `9e4773fb1` — F-16.
 
-**Verdict: PASS — the gate fails on the exact historical commit and is clean at HEAD.**
+**Verdict: PASS at signature scope — the gate fails on the exact historical commit (`F-19`,
+the README/index drift) and is clean at HEAD.** The clause is *not* a catch for the other C3
+rows: it does not detect F-15 wrong-command selection or F-16 direct-`main` work (those commit
+shapes are cited only as context, not claimed covered).
 
 ---
 
@@ -283,12 +311,12 @@ unclassified `scripts/*.py`. Replay is doctrine + transcript:
   instead of asking").
 
 **Verdict: POLICY RESIDUAL — not a catching-rail PASS.** R4 is directive and valuable, and
-it is replayed against the transcript, but it does **not** catch its class: it would not have
-stopped F-13 (the launcher was written and deleted after the controller objected, before CI
-saw it) or F-14 (the wrapper landed as `f7d9ebe42`). It is therefore **not counted** toward any
-"top classes have catching rails" condition (B2), and the C2 class carries no automated
-new-mechanism gate — only `test_script_classification.py`'s existing (partial) coverage and
-the directive text.
+it is replayed against the transcript, but it does **not** catch the F-13/F-14 signatures: it
+would not have stopped F-13 (the launcher was written and deleted after the controller
+objected, before CI saw it) or F-14 (the wrapper landed as `f7d9ebe42`). It is therefore **not
+counted** toward any "top classes have catching rails" condition (B2), and C2 carries no
+automated new-mechanism gate — only `test_script_classification.py`'s existing (partial)
+coverage and the directive text.
 
 ---
 
@@ -325,8 +353,11 @@ registry rows could not be resolved…"); the 402 mis-registered rows were tombs
 `ddbca7545`; the prior CI contract test checked only `data.js`↔manifest identity and was
 `@requires_full_corpus` (skipped in CI) — F-05.
 
-**Verdict: PASS (fixture-tier resolver replay; the attestation guard is retained but no longer
-the sole claim).**
+**Verdict: PASS at signature scope — the fixture-tier resolver replay refuses the `F-05`
+unresolvable-row signature (one payload removed → the row is named).** It is *not* a catch for
+the other C5 rows: F-17's mount-provenance signature has no R5 rail, and F-18's heartbeat-TTL
+assertion is the already-landed pre-existing half (`tests/test_fleet_guards.py`), not this
+fixture resolution test. The full-registry re-resolution remains `@requires_full_corpus`.
 
 ---
 
@@ -346,10 +377,18 @@ $ python3 -c "import sqlite3,json; ..."   # read-only query over the host transc
 # -> modified: 1 ; untracked: 236 ; total (tab-prefixed status rows): 237
 ```
 
-`docs/reviews/aio_controller_postmortem_corpus.md` (F-01) states **~237 files dirty** citing
-that part (1 modified + 236 untracked), replacing the unsupported "~292". The same correction
-is applied to the taxonomy's C6 narrative and the workflow spec's `question`/g9 prompt. The
-corpus completeness claim is unchanged: every item still carries a first-hand pointer.
+`docs/reviews/aio_controller_postmortem_corpus.md` (F-01) states **~237 files dirty at that
+opening snapshot** citing that part (1 modified + 236 untracked), replacing the unsupported
+"~292". The same correction is applied to the taxonomy's C6 narrative and the workflow spec's
+`question`/g9 prompt. The corpus completeness claim is unchanged: every item still carries a
+first-hand pointer.
+
+**F4 bound (third review).** The 237 is an **opening-snapshot** count at 2026-09-04 17:26:48,
+measured once. The corpus separately proves the interval 09-04 17:07 → 09-08 17:03 had **zero
+git activity on any ref or stash**, but that is a statement about *commits*, not about which
+paths stayed dirty: the retained `git status` does **not** show that the same 237 entries were
+still present on 09-08. This pass removes the "dirty **for 4 days**" wording and asserts only
+(a) the opening snapshot, and (b) the independently proven no-git-activity interval.
 
 ### 6b. A6 + B4 — the counting basis is stated, for C6 AND C2
 
@@ -448,16 +487,28 @@ $ python3 -m pytest tests/test_agent_config_render.py tests/test_doc_lifecycle.p
 
 ## 9. Residuals (named, not claimed)
 
+- **F-01 (C6/C4, session abandoned, never closed):** **policy/detection residual** — R1's
+  "close or explicitly park" clause governs it and the recording probe flags an unrecorded day,
+  but no rail intercepts a no-close abandonment; F-01 is **not** an R1 catch (F2). The corpus
+  duration claim is also bounded to the opening snapshot + the no-git-activity interval (§6a).
 - **F-08 (C4, unattributable emitter):** uncovered — no producer-attribution rail added.
 - **F-11 (C4, stale promote rows):** not R1; covered by the in-window `promote.py`
   row-close fix (pre-existing, outside this remediation set).
 - **F-12 (C4, row-before-workdir):** prevention not added; detection/reconciliation only via
   `control_sweep_zombies.py`; the runner still mints the row before validating the workdir
   (`scripts/run_workflow.py:641-655`).
-- **C1 drain guard (F-03):** bounded to the `generate_manifest.py` compaction seam; a raw edit
-  never followed by `manifest` is not blocked; `--allow-shrink` is the operator override.
-- **C1 full-row conservation (F-04):** the same seam, conserving raw source rows so a lost
-  tombstone/supersede marker (shared `knowledge_id`) is refused; same bounds.
+- **F-15 / F-16 (C3, wrong-command selection / direct-`main` work):** **not caught by R3** —
+  the docs-drift gate reproduces F-19 only; F-15/F-16 are named as context, not covered.
+- **F-17 / F-18 (C5, mount provenance / heartbeat TTL):** **not caught by R5** — R5's
+  fixture resolver reproduces F-05 only; F-18's TTL assertion is the pre-existing half, F-17
+  has no rail in this set.
+- **C1 version-drain guard (F-03):** bounded to the `generate_manifest.py` compaction seam; a
+  raw edit never followed by `manifest` is not blocked; `--allow-shrink` is the operator
+  override.
+- **C1 raw-source-row-count drain guard (F-04):** the same seam, refusing a raw source-row
+  **count decrease** so a lost tombstone/supersede marker (shared `knowledge_id`) is caught;
+  same bounds. **The equal-count replacement form is not caught** — it is a count guard, not
+  row-identity/content conservation (§2b).
 - **C1 re-track vector (F-06):** **retained residual** — the corpus migration + `.gitignore`
   convention remove the ordinary path but a force-stage or an add-before-ignore ordering error
   can still re-track; no index/commit gate was added (B3).
@@ -466,35 +517,44 @@ $ python3 -m pytest tests/test_agent_config_render.py tests/test_doc_lifecycle.p
 - **R5 full registry re-resolution:** remains `@requires_full_corpus` (local-only); the
   fixture-tier replay and the artifact attestation cover the CI-runnable half.
 - **P1/P3 parked** as in p3 §5 (C6 watchdog, C2 wrapper test) — unchanged. **P2 (C1
-  volume/ordering assertion) is partly discharged** by §2b's manifest-seam conservation; only
+  volume/ordering assertion) is partly discharged** by §2b's manifest-seam count guard; only
   a pre-commit/CI staged-tree form remains parked, since the tracked-store vector F-06 names is
   itself a disclosed residual with no index/commit gate (B3).
-- **A4/B1 verdict note:** because the top severity-5 class (C1) now carries **two bounded
-  rails** (the F-03 version drain guard and the F-04 full-row conservation guard) rather than
-  none, the g9 "top classes have no catching rails" FAIL is discharged **for the registry
-  path**; the durability of both guards is bounded as stated above, and F-06 remains a
-  disclosed residual.
+- **A4/B1 verdict note:** the top severity-5 class's **registry path** now carries **two
+  bounded, signature-scoped rails** (the F-03 version drain guard and the F-04 raw-source-row
+  **count-decrease** guard) rather than none; the durability of both guards is bounded as stated
+  above, F-04's equal-count replacement form is disclosed uncovered, and F-06 remains a
+  disclosed residual. This is a signature-scope discharge, not a class-level one.
 
 ---
 
 ## 10. Verification completion log
 
 - **DONE_WHEN — every selected remediation shows replay evidence:** PASS (R1 e2e same-day; R2
-  version drain guard + B1 full-row conservation guard; R3 historical commit gate; R5
+  version drain guard + B1 raw-source-row-count drain guard; R3 historical commit gate; R5
   fixture-tier resolver; R4 transcript only). A1–A7 each carry a replay in §0/§1–§7; the second
   adversarial review's B1–B4 each carry a disposition in §0b, with B1 replayed in §2b.
 - **DONE_WHEN — the verify doc records pass/revert per item:** PASS (R1 PASS re-designed;
-  R2 PASS + two bounded rails; R3 PASS; **R4 policy residual — not a PASS**; R5 PASS redesigned;
-  A5/A6/A7/g10 PASS; B4 corrected; no reverts).
+  R2 PASS + two bounded rails, both at signature scope; R3 PASS at signature scope; **R4 policy
+  residual — not a PASS**; R5 PASS at signature scope; A5/A6/A7/g10 PASS; B4 corrected; F1–F4
+  narrowed; no reverts).
 - **DONE_WHEN — no remediation shipped unverified:** PASS — every claim above is a command
-  that was run on this branch; the original p5 headline is retracted where it overclaimed; R4
-  and F-06 are disclosed residuals, not claims.
-- **Release predicate:** PASS — the scoped rails demonstrably catch their class (R1/R2/R3/R5);
-  the two residuals (R4 policy-only; F-06 re-track) are named and explicitly not counted.
-- **Gates:** `python3 scripts/_gen_instructions.py --check` → surfaces OK (38 files);
-  `python3 -m pytest tests/test_recording_sweep.py tests/test_generate_manifest.py
-  tests/test_build_data.py tests/test_doc_lifecycle.py tests/test_agent_config_render.py
-  tests/test_session_spine.py -q` → **143 passed, 3 skipped**; fast path **533 passed, 2 skipped
-  / 27.22s** (budget 180s); g10 list **54 passed / 34.24s**; `ruff` on
-  `scripts/generate_manifest.py` + `tests/test_generate_manifest.py` clean.
+  that was run on this branch; the original p5 headline is retracted where it overclaimed; R4,
+  F-01 and F-06 are disclosed residuals, not claims.
+- **Release predicate (signature-level — exactly true):** PASS — the following, and only the
+  following, signatures are demonstrably refused by their rails:
+  - **R1 → F-09** (same-day recording gap; §1a). F-01 is a policy/detection residual, not a
+    catch.
+  - **R2 → F-03** (append-only version drain) and the **F-04 count-decrease** form (§2/§2b).
+    F-04's **equal-count replacement** form is *not* caught; F-06 is a disclosed residual.
+  - **R3 → F-19** (README/index drift; §3). F-15/F-16 are *not* caught.
+  - **R5 → F-05** (fixture-tier unresolvable row; §5). F-17/F-18 are *not* caught.
+  Class-level coverage is expressly **not** claimed for C1–C6.
+- **Gates (re-run in this claim-narrowing pass):** `python3 scripts/_gen_instructions.py
+  --check` → surfaces OK (38 files); `python3 -m pytest tests/test_generate_manifest.py
+  tests/test_build_data.py tests/test_recording_sweep.py tests/test_session_spine.py
+  tests/test_doc_lifecycle.py tests/test_agent_config_render.py -q` → **143 passed, 3 skipped**;
+  fast path **533 passed, 2 skipped / 27.56s** (budget 180s); g10 list **54 passed / 33.44s**;
+  `python3 scripts/scan_docs_drift.py --check spec_lifecycle --fail-on-drift` → drift score 0
+  (exit 0); `ruff` on `scripts/generate_manifest.py` + `tests/test_generate_manifest.py` clean.
 - **LOG:** PASS.

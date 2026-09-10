@@ -92,15 +92,17 @@ committed 6 run ledgers into the tree stage-2 untracked 13 min later (F-06); the
   (or park it explicitly), and write the session close (`session_close.py`) — the doctrine
   is "a session that does not write its close record has not closed". A wave of this size
   should have been checkpointed incrementally rather than left only in the working tree.
-- **Damage / cleanup cost.** `origin/main` untouched but the local main checkout left
-  **~237 files dirty** for 4 days (the retained opening `git status` part
-  `ses_f92f8804affe… part@2026-09-04 17:26:48`, counted: 1 modified + 236 untracked — the A5
-  correction of the earlier unsupported "~292" estimate); the durable
-  registry restore and manifest/labs existed nowhere in git. Recovery required the 09-08
-  session to walk the hammer's 133-command trail, separate the ~35 source/test files from
-  generated churn, re-verify, and only then
-  commit `bb47441bc` (51 files, +124/−73). The 4-day window (09-04 17:07 → 09-08 17:03)
-  has **zero git activity on any ref or stash**.
+- **Damage / cleanup cost.** `origin/main` untouched but the local main checkout held
+  **~237 dirty entries at the opening snapshot** — the retained opening `git status` part
+  `ses_f92f8804affe… part@2026-09-04 17:26:48` counts 1 modified + 236 untracked (the A5
+  correction of the earlier unsupported "~292" estimate). The window 09-04 17:07 → 09-08 17:03
+  is **separately proven to have zero git activity on any ref or stash**; that is a
+  commit-activity fact, and the opening snapshot alone does **not** establish that the same 237
+  paths remained dirty across that interval (F4 bound — the count is a snapshot, not a
+  persistence claim). The durable registry restore and manifest/labs existed nowhere in git.
+  Recovery required the 09-08 session to walk the hammer's 133-command trail, separate the ~35
+  source/test files from generated churn, re-verify, and only then commit `bb47441bc`
+  (51 files, +124/−73).
 - **Severity:** 4 (near data loss; the restored registry could have been lost with the
   working tree; large recovery cost).
 - **Evidence pointers.**

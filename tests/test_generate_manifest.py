@@ -346,7 +346,7 @@ def test_main_adds_registry_without_disturbing_the_files_block(tmp_path, monkeyp
     # registry{} is additive and reflects the compacted index.
     assert len(manifest["registry"]) == 1
     assert manifest["registry"][0]["knowledge_id"] == "kid_only"
-    # B1: the raw source-row count is recorded so the next run has a conservation baseline.
+    # B1: the raw source-row count is recorded so the next run has a drain-count baseline.
     assert manifest["registry_source_rows"] == 1
 
 
@@ -374,7 +374,7 @@ def test_detect_registry_drain_reports_the_direction():
 
 
 def test_detect_registry_source_drain_reports_the_direction():
-    """The B1 pure direction check: raw append-only source rows are conserved too."""
+    """The B1 pure direction check: a raw append-only source-row count decrease is refused."""
     assert gm.detect_registry_source_drain(1, 2) == (1, 2)
     assert gm.detect_registry_source_drain(2, 2) is None
     assert gm.detect_registry_source_drain(3, 2) is None
@@ -404,12 +404,13 @@ def test_count_registry_source_rows_counts_marker_lines_sharing_a_knowledge_id(t
 
 
 def test_registry_source_row_guard_refuses_marker_line_loss(tmp_path, monkeypatch, capsys):
-    """B1 replay of the F-04 dedup signature. The dedup deleted a tombstone/supersede MARKER
-    line that deliberately shares its target's knowledge_id, so the distinct-knowledge_id
-    version count is UNCHANGED and the A4 version guard cannot see the loss. The raw
-    source-row conservation guard does: the manifest is refused (exit 2) and left untouched;
-    ``--allow-shrink`` is the explicit operator override.
-    """
+    """B1 replay of the F-04 dedup COUNT-DECREASE signature. The dedup deleted a
+    tombstone/supersede MARKER line that deliberately shares its target's knowledge_id, so the
+    distinct-knowledge_id version count is UNCHANGED and the A4 version guard cannot see the
+    loss. The raw-source-row-count guard does: the manifest is refused (exit 2) and left
+    untouched; ``--allow-shrink`` is the explicit operator override. This is a count guard,
+    not content conservation — it cannot tell the lost marker from a lost ordinary row, and an
+    equal-count replacement is not covered (proven by the count-decrease fixture)."""
     project_root = tmp_path
     results_dir = project_root / "experiments" / "results"
     results_dir.mkdir(parents=True)
