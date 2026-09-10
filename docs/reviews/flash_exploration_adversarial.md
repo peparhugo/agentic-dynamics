@@ -4,6 +4,12 @@ status: accepted
 
 # Flash Exploration Adversarial Review
 
+> **CURRENT VERDICT: PASS** — the Repair Verification and Release Verdict at the END of
+> this document are the current pass (scoped verifier, terra, 2026-09-10): R1–R4 verified,
+> no findings, 152 hermetic tests green. The sections between this note and them are the
+> HISTORICAL review-5 FAIL, retained verbatim; its findings F1–F4 were repaired in
+> remediation round 5 (commits 16ab8cb6b + 91b7efec3).
+
 **Reviewer:** `openai/gpt-5.6-terra` (independent of the flash author)
 
 **Reviewed branch:** `feature/flash-exploration` at `46e479bef`. The implementation candidate is
