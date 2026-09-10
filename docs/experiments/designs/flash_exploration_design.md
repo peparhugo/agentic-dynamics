@@ -1,8 +1,12 @@
 ---
-status: proposed
+status: accepted
 ---
 
 # flash_exploration — design (p0): closing the KB read loop and measuring flash's design diversity
+
+**Status: accepted** by `p0_research_verify` — every §0 pin and every §1 claim re-verified against
+the pinned SHAs; two sub-details corrected in place (F4's error-persistence mechanism, F6's
+incident sub-count). Claim-by-claim evidence: `flash_exploration_design_verify.md`.
 
 **Question.** `deepseek/deepseek-v4-flash` is the machine's workhorse and the cheap subject
 model, but its *creative range* has never been measured, and the knowledge base it produces
@@ -71,7 +75,10 @@ supersedes every pattern fact (dry-run today: 6 supersedes + 6 projections). The
 `run.py`/`run_story.py` have zero references. Of five proof runs, four fell back to `no_rag`:
 empty per-cell scope (fixed by the shared-scope override) and a swallowed constructor
 exception (fixed by `f76b9acfc`), but `AugmentationOutcome.error` is still not persisted in the
-run ledger (`augment.py:205` set; `PhaseResult.to_dict()` does not carry it).
+run ledger: `augment.py:205` sets `outcome.error`, but the RAG seam
+(`workflow_runner.py:3337-3345`) never assigns it to `PhaseResult.error`, so it is dropped.
+(`PhaseResult` *does* define and `to_dict()` *does* serialize an `error` field —
+`workflow_runner.py:232,302` — so the gap is the missing assignment, not a missing field.)
 
 **F5 — no diversity instrument exists; run.py cannot even preserve k attempts.**
 `measure_basin_escape` is baseline-vs-perturbed and pure over code strings
@@ -82,7 +89,7 @@ run ledger (`augment.py:205` set; `PhaseResult.to_dict()` does not carry it).
 each other and the produced code is not recoverable from the result JSON.
 
 **F6 — hygiene risks on the read path (not build blockers, but measurement hazards).**
-36,972 dead letters sit behind `lag=0` watermarks (28,613 from the 2026-09-04 corpus-root
+36,972 dead letters sit behind `lag=0` watermarks (28,291 stamped 2026-09-04 by the corpus-root
 incident); `reconcile_missing` is a no-op in v1; the Chroma handler skips `fact` records and
 ignores deletes. Any "retrieval works" claim must be a direct probe, never a lag reading.
 
