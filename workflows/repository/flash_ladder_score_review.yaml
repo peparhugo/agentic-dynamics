@@ -6,7 +6,7 @@ question: >-
   decision arithmetic. Scoped: report only discrepancies, never a new attack surface.
 version: "0.1"
 artifact_kind: workflow
-intent: read
+intent: mutate
 side_effects:
   repository: true
   external_services: false
