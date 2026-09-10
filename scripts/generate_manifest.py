@@ -9,6 +9,16 @@ one — so the number of distinct ``knowledge_id`` versions is monotonic. The hi
 rows; nothing refused it. This script now compares the compacted version count against the
 previously written manifest and refuses to overwrite it with a smaller one unless the operator
 passes ``--allow-shrink`` — a shrink is a violation until proven otherwise.
+
+**The full-row conservation guard (aio_controller_postmortem B1).** The version count alone
+is blind to the F-04 dedup signature: a tombstone/supersede **marker** line deliberately
+shares its target's ``knowledge_id`` (it annotates the record it points at), so deleting the
+marker does NOT reduce the number of distinct ``knowledge_id`` versions — yet real lifecycle
+evidence is gone. The append-only store's raw line count is monotonic for the same reason the
+version count is, but it is strictly more sensitive, so the manifest also records the number
+of structurally valid source rows and refuses a compaction whose source row count fell below
+the previous manifest's. Together the two guards conserve both halves of the file: distinct
+version identities AND the raw rows/lifecycle markers that carry them.
 """
 import argparse
 import hashlib
@@ -266,6 +276,22 @@ def _registry_version_count(registry: list[dict]) -> int:
     return sum(len(row.get("versions") or [row]) for row in registry)
 
 
+def _count_registry_source_rows(path: Path) -> int:
+    """Count every structurally valid row in the append-only ``registry_index.jsonl``.
+
+    Unlike :func:`_registry_version_count` (which counts distinct ``knowledge_id`` versions),
+    this counts raw source lines. A tombstone/supersede MARKER line deliberately shares its
+    target's ``knowledge_id`` (it annotates the record it points at), so it does not add a
+    version — but it is still a durable line in the append-only store, and losing it is the
+    F-04 signature. Counting raw rows conserves those lines even when the version count cannot
+    see them. Malformed/blank lines are skipped exactly as :func:`_iter_registry_rows` skips
+    them (they are not valid data, so their absence is not a data loss).
+    """
+    if not path.exists():
+        return 0
+    return sum(1 for _ in _iter_registry_rows(path))
+
+
 def _read_previous_registry_versions(manifest_path: Path) -> int | None:
     """The version count recorded by the manifest already on disk, or ``None`` when absent."""
     if not manifest_path.exists():
@@ -294,6 +320,44 @@ def detect_registry_drain(
     new_versions = _registry_version_count(new_registry)
     if new_versions < previous_versions:
         return (new_versions, previous_versions)
+    return None
+
+
+def _read_previous_registry_source_rows(manifest_path: Path) -> int | None:
+    """The source-row count recorded by the manifest already on disk, or ``None`` when absent.
+
+    ``None`` (a manifest written before the B1 guard, or a missing/corrupt file) is not a
+    baseline and therefore cannot prove a marker loss — the guard fails closed only on
+    evidence, mirroring :func:`_read_previous_registry_versions`.
+    """
+    if not manifest_path.exists():
+        return None
+    try:
+        previous = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return None
+    rows = previous.get("registry_source_rows")
+    if not isinstance(rows, int) or isinstance(rows, bool) or rows < 0:
+        return None
+    return rows
+
+
+def detect_registry_source_drain(
+    new_source_rows: int | None, previous_source_rows: int | None
+) -> tuple[int, int] | None:
+    """``(new_rows, previous_rows)`` when the append-only source lost raw lines, else None.
+
+    The version-count guard (:func:`detect_registry_drain`) cannot see a lost
+    tombstone/supersede MARKER line, because the marker shares its target's ``knowledge_id``
+    and so does not change the distinct-version count. Raw source rows can. Pure and
+    side-effect free so the direction check is directly testable; ``main`` wires it to the
+    write. A ``None`` baseline (first run, or a manifest without a source-row count) is not
+    refused — the guard fails closed only on evidence.
+    """
+    if previous_source_rows is None or new_source_rows is None:
+        return None
+    if new_source_rows < previous_source_rows:
+        return (new_source_rows, previous_source_rows)
     return None
 
 
@@ -362,24 +426,44 @@ def main(argv: list[str] | None = None) -> int:
     # backward-compatibility requirement), and this key is new, so no existing consumer
     # of data_manifest.json is affected by its presence.
     compacted_registry = _compact_registry_index(REGISTRY_INDEX_PATH)
+    source_rows = _count_registry_source_rows(REGISTRY_INDEX_PATH)
     output_path = PROJECT_ROOT / "experiments" / "data_manifest.json"
 
     # A4: the append-only registry only grows; refuse to overwrite the manifest with a
     # compaction that lost versions (the F-03 drain signature) unless the operator allowed it.
     drain = detect_registry_drain(compacted_registry, _read_previous_registry_versions(output_path))
-    if drain is not None and not args.allow_shrink:
-        new_versions, previous_versions = drain
-        print(
-            "REFUSED: registry_index.jsonl compacted to "
-            f"{new_versions} versions, below the previous manifest's {previous_versions}. "
-            "The append-only registry only grows; a shrink is the drain/over-deletion "
-            "signature (aio_controller_postmortem F-03/F-04). Repair the index, or re-run "
-            "with --allow-shrink if the loss is understood and intended.",
-            file=sys.stderr,
-        )
+    # B1: the raw append-only source also only grows. A version-count drain misses the F-04
+    # marker-loss signature (the marker shares its target's knowledge_id), so conserve the
+    # raw source rows too — a loss of either is refused.
+    source_drain = detect_registry_source_drain(
+        source_rows, _read_previous_registry_source_rows(output_path)
+    )
+    if (drain is not None or source_drain is not None) and not args.allow_shrink:
+        if drain is not None:
+            new_versions, previous_versions = drain
+            print(
+                "REFUSED: registry_index.jsonl compacted to "
+                f"{new_versions} versions, below the previous manifest's {previous_versions}. "
+                "The append-only registry only grows; a shrink is the drain/over-deletion "
+                "signature (aio_controller_postmortem F-03). Repair the index, or re-run "
+                "with --allow-shrink if the loss is understood and intended.",
+                file=sys.stderr,
+            )
+        if source_drain is not None:
+            new_rows, previous_rows = source_drain
+            print(
+                "REFUSED: registry_index.jsonl now holds "
+                f"{new_rows} valid source rows, below the previous manifest's {previous_rows}. "
+                "The append-only registry only grows; a lost row is the F-04 lifecycle-marker "
+                "over-deletion signature (a tombstone/supersede marker shares its target's "
+                "knowledge_id, so the version count cannot see it). Repair the index, or re-run "
+                "with --allow-shrink if the loss is understood and intended.",
+                file=sys.stderr,
+            )
         return 2
 
     manifest["registry"] = compacted_registry
+    manifest["registry_source_rows"] = source_rows
     with open(output_path, "w") as f:
         json.dump(manifest, f, indent=2)
     print(f"Written {output_path}")

@@ -17,6 +17,17 @@ at the selected-remediation scope. This revision **retracts** the over-broad cla
 records the repaired, replayed state item by item (§0). No claim below rests on the
 deleted headline.
 
+**Second convergence pass.** A second adversarial re-review (the g9 re-review after the first
+repair, `docs/reviews/aio_controller_postmortem_adversarial.md`) raised findings A5 and B1–B4
+against the first repair. This revision disposition each in §0b: **A5** repaired with the
+primary `git status` part; **B1 (P0)** repaired by adding a second, full-row/lifecycle-marker
+conservation guard at the same manifest seam (§2b) — the version-count claim that could not
+catch F-04 is replaced, not repeated; **B2** keeps R4 as an explicit policy residual (removed
+from the catching-rail PASS); **B3** retains F-06's re-track vector as a residual (the
+overstated C1 protection is retracted); **B4** states C2's counting basis exactly as C6's.
+Every remaining over-claim is retracted or bounded; the release predicate below is now exactly
+true.
+
 **Environment note.** `experiments/results/**` is untracked runtime data and is absent from
 this worktree, so replays use hermetic copies / detached worktrees where a data root would
 otherwise be required. Every command below was run on this branch (HEAD after the g10 repair).
@@ -31,14 +42,28 @@ otherwise be required. Every command below was run on this branch (HEAD after th
 | **A2** R1 presented as C4, implements F-09/F-01 | P0 | **REPAIRED (scope reduced + marked)** — R1's scope is F-09/F-01; F-08/F-11/F-12 explicitly uncovered/attributed | §1b |
 | **A3** R5 is an attestation, not a resolver replay | P0 | **REPAIRED** — real fixture-tier resolver replay added | §5: `test_fixture_tier_resolver_resolves_every_current_row_and_fails_on_one_unresolvable` |
 | **A4** C1 severity-5 has no catching rail | P0 | **REPAIRED** — bounded drain guard on the active registry-compaction path | §2: `test_registry_drain_guard_refuses_a_smaller_compaction` + F-03 numeric proof |
-| **A5** 292-file count unsupported | P1 | **CORRECTED** — now ~237 (1 modified + 236 untracked), citing the retained `git status` | §6a |
+| **A5** 292-file count unsupported | P1 | **REPAIRED** — now ~237 (1 modified + 236 untracked) with the exact retained `git status` part | §6a: `part@2026-09-04 17:26:48` |
 | **A6** C6 class size inflated by row-splitting | P1 | **CORRECTED** — counting basis stated; C6 is a singleton incident | §6b |
 | **A7** recording rail inconsistent with its own unmeasured claim | P1 | **REPAIRED** — `scan()` returns `unmeasured`; report/backfill refuse; source-checkout replay | §7 |
 | **g10** fast path fails its gate | gate | **REPAIRED** — corpus-dependent modules de-`fast`-marked + audit hardened; fast path green at ~27s | §8 |
 
-**Overall release verdict after this phase:** **PASS for the scoped remediation set.** The
-original blanket FAIL is discharged for R1–R5 **as scoped**, with three C4 signatures (F-08,
-F-11-partial, F-12) explicitly left uncovered and named in §1b and §9 — not claimed.
+### 0b. Disposition of the second adversarial review (A5, B1–B4)
+
+| Finding | Sev | Disposition in this pass | Replay evidence |
+|---|---|---|---|
+| **A5** dirty-file count has no primary pointer | P1 | **REPAIRED** — the retained `git status` part is now cited in F-01's evidence list | §6a: `part@2026-09-04 17:26:48` → 237 = 1 modified + 236 untracked |
+| **B1** R2's F-04 coverage over-claimed | P0 | **REPAIRED** — a full-row/lifecycle-marker conservation guard added at the same `generate_manifest` seam (the false "catches F-04" sentence is replaced) | §2b: `test_registry_source_row_guard_refuses_marker_line_loss` (version guard blind; source guard refuses) |
+| **B2** R4 is doctrine, not a catching rail | P1 | **RESIDUAL (policy)** — R4 removed from the catching-rail PASS and retained as an explicit policy residual | §4 (transcript replay only; no gate) |
+| **B3** F-06 re-track asserted retired | P1 | **RESIDUAL** — overstatement retracted; a force-stage/ordering error can still re-track; no index/commit gate added | §2 (scope/residual) |
+| **B4** C2 two-item claim is a row count | P1 | **CORRECTED** — C2's two rows are one connected improvisation chain; the basis is stated as for C6 | §6b; taxonomy §2/§4 |
+
+**Overall release verdict after this convergence pass:** **PASS for the scoped remediation
+set, with two explicitly-retained residuals (R4/C2 policy-only; F-06 re-track).** The original
+blanket FAIL is discharged for the rails that demonstrably catch their class (R1, R2, R3, R5),
+with the uncovered C4 signatures (F-08, F-11-partial, F-12) named in §1b/§9, **R4 kept as a
+policy residual — not counted as a catching-rail PASS** (§4), and **F-06's re-track vector
+retained as a residual** (§2). Every shipped assertion is bounded to what its rail demonstrably
+does.
 
 ---
 
@@ -117,7 +142,7 @@ covers it.
 
 ---
 
-## 2. R2 — "Bulk mutation needs the store's convention" (C1) — now a bounded catching rail (A4)
+## 2. R2 — "Bulk mutation needs the store's convention" (C1) — now two bounded catching rails (A4 + B1)
 
 **The p5 gap.** R2 shipped rule text only, and the original replay correctly recorded "none
 (rule-only)". The adversarial held that a severity-5 class with **no** catching rail cannot
@@ -150,18 +175,57 @@ $ git show 9e4773fb1:.../registry_index.jsonl | wc -l   # 5011
 ```
 
 Under the guard, the post-drain compaction (5,011 rows) can no longer replace the
-pre-drain manifest (48,321 rows) without `--allow-shrink`; the same rule catches F-04's
-over-deletion (a dedup that removes knowledge_ids shrinks the version count).
+pre-drain manifest (48,321 rows) without `--allow-shrink`. **This version-count guard alone
+does not catch F-04** — the second adversarial review's B1. F-04's dedup deleted
+tombstone/supersede **marker lines that deliberately share their target's `knowledge_id`**
+(`corpus.md:161-188`), so the number of distinct `knowledge_id` versions can be unchanged while
+real lifecycle evidence is lost. B1 is resolved by adding a second, strictly more sensitive
+conservation guard at the same mutation seam (§2b); the false claim that the version guard
+catches F-04 is removed.
 
-**Scope / residual (stated honestly).** The guard fires at the compaction seam — the active
-path now that the index is untracked. It does not block a raw file edit that is never followed
-by `manifest` regeneration, and `--allow-shrink` is a deliberate operator override. F-06's
-`git add -A` re-track vector is retired by the corpus migration (`experiments/results/` is
-untracked, `git ls-files experiments/results | wc -l` = 0; `test_publication_singular_door`
-guards the producers). The severity-5 path now has a catching rail at the only place the store
-is consumed; it is bounded, not universal.
+### 2b. B1 — the full-row/lifecycle-marker conservation guard (replaces the F-04 over-claim)
 
-**Verdict: PASS (bounded catching rail added and replayed; residual scope named).**
+`generate_manifest.py` now also records the count of structurally valid rows in the append-only
+source (`registry_source_rows`) and refuses a compaction whose raw source-row count fell below
+the previous manifest's (`detect_registry_source_drain`), at the same seam as the version guard.
+Raw rows are monotonic for the same reason distinct versions are, but they conserve the marker
+lines the version count collapses into their target's slot:
+
+```
+$ python3 -m pytest tests/test_generate_manifest.py -q -p no:cacheprovider
+23 passed
+# test_count_registry_source_rows_counts_marker_lines_sharing_a_knowledge_id:
+#   3 raw rows, 2 distinct knowledge_id versions — the shared-id marker is conserved
+# test_detect_registry_source_drain_reports_the_direction: (1,2) / None / None
+# test_registry_source_row_guard_refuses_marker_line_loss (the F-04 replay):
+#   previous manifest: 1 version, registry_source_rows=2
+#     (a full registration line + a supersede marker sharing kid_v1)
+#   deduped index: 1 raw row (the marker deleted)
+#   detect_registry_drain(compacted, 1) is None     <- the A4 version guard is BLIND to F-04
+#   detect_registry_source_drain(1, 2) == (1, 2)    <- the B1 source guard SEES it
+#   gm.main([]) == 2 ; stderr names F-04 ; the previous manifest is untouched
+#   --allow-shrink -> exit 0 (the explicit, understood repair)
+```
+
+The guard is conservative in the same way as A4: an absent/corrupt previous manifest records no
+source-row baseline, so the guard fails closed only on evidence (the first post-upgrade run
+records the baseline rather than fabricating a claim).
+
+**Scope / residual (stated honestly).** Both guards fire at the compaction seam — the active
+path now that the index is untracked. They do not block a raw file edit that is never followed
+by `manifest` regeneration, and `--allow-shrink` is a deliberate operator override. **F-06's
+`git add -A` re-track vector is a retained residual, not retired (B3):** the corpus migration
+makes an ordinary re-add unlikely (`experiments/results/` is untracked,
+`git ls-files experiments/results | wc -l` = 0) and `test_publication_singular_door` guards the
+producers, but neither prevents a force-stage (`git add -Af`) nor an ordering error that lands
+the `add` before the ignore state — the repository's own `test_relabel_tree_gate.py` uses
+`git add -Af`, demonstrating the index can still be forced. No index/commit gate was added. The
+severity-5 drain path (F-03/F-04) now has catching rails at the only place the store is
+consumed; they are bounded, not universal, and F-06 is disclosed as residual rather than
+claimed caught.
+
+**Verdict: PASS (two bounded catching rails added and replayed — version drain + full-row
+conservation; F-03 and F-04 each demonstrably refused; F-06 disclosed residual).**
 
 ---
 
@@ -197,7 +261,7 @@ commits the worktree clause addresses: `bb47441bc`, `292c47bad`, `ab887b5c8`, `7
 
 ---
 
-## 4. R4 — "When the documented path fails, stop and record the gap" (C2) — PASS (unchanged)
+## 4. R4 — "When the documented path fails, stop and record the gap" (C2) — POLICY RESIDUAL
 
 **Doctrine** (rendered `AGENTS.md`; source `agent_config/rules.md`):
 
@@ -218,7 +282,13 @@ unclassified `scripts/*.py`. Replay is doctrine + transcript:
   admission `02:13:57` ("when the ask was ambiguous on shape, I built the bigger thing
   instead of asking").
 
-**Verdict: PASS (doctrine + history). Residual: no automated wrapper gate.**
+**Verdict: POLICY RESIDUAL — not a catching-rail PASS.** R4 is directive and valuable, and
+it is replayed against the transcript, but it does **not** catch its class: it would not have
+stopped F-13 (the launcher was written and deleted after the controller objected, before CI
+saw it) or F-14 (the wrapper landed as `f7d9ebe42`). It is therefore **not counted** toward any
+"top classes have catching rails" condition (B2), and the C2 class carries no automated
+new-mechanism gate — only `test_script_classification.py`'s existing (partial) coverage and
+the directive text.
 
 ---
 
@@ -262,24 +332,40 @@ the sole claim).**
 
 ## 6. Corpus and taxonomy corrections (A5, A6)
 
-### 6a. A5 — the dirty-file count is corrected to the evidenced value
+### 6a. A5 — the dirty-file count now cites its primary `git status` transcript part
 
-`docs/reviews/aio_controller_postmortem_corpus.md` (F-01) now states **~237 files dirty** and
-cites the retained opening `git status` pointer (1 modified + 236 untracked), replacing the
-unsupported "~292". The qualification is recorded inline in the corpus. The same correction is
-applied to the taxonomy's C6 narrative and the workflow spec's `question`/g9 prompt. The
-corpus completeness claim is unchanged: every item still carries a first-hand pointer; the
-quantity now carries the one the pointer shows.
+A5's remaining requirement was not the number (already corrected to ~237) but the **primary
+pointer that establishes it**. F-01's evidence list now cites the retained opening part
+exactly, and the count is reproducible from it:
 
-### 6b. A6 — the counting basis is stated
+```
+$ python3 -c "import sqlite3,json; ..."   # read-only query over the host transcript store
+# part prt_06d0793c6001c5VS663QZ6oYh4, ses_f92f8804affe6ZZ0lH27Benpvc,
+#   part@2026-09-04 17:26:48 (local; 15:26:48Z), command:
+#   git status && git worktree list && git log --oneline -5
+# -> modified: 1 ; untracked: 236 ; total (tab-prefixed status rows): 237
+```
+
+`docs/reviews/aio_controller_postmortem_corpus.md` (F-01) states **~237 files dirty** citing
+that part (1 modified + 236 untracked), replacing the unsupported "~292". The same correction
+is applied to the taxonomy's C6 narrative and the workflow spec's `question`/g9 prompt. The
+corpus completeness claim is unchanged: every item still carries a first-hand pointer.
+
+### 6b. A6 + B4 — the counting basis is stated, for C6 AND C2
 
 The taxonomy's ≥2 threshold counts corpus **rows**, not independent incidents. §2 now states
 this and records that **C6's two rows (F-01, F-02) are two symptoms of one incident chain**
-(the same hammer session and the same 19-hour abandonment arc), so as independent incidents
-C6 is a **singleton**. The "≥5 classes with ≥2 items" gate is met by C1–C5 alone (C6 does not
-carry it).
+(the same hammer session and the same 19-hour abandonment arc), and — per B4 — that **C2's two
+rows (F-13, F-14) are two real acts in one connected improvisation chain** (F-14's wrapper
+produced the F-12 failed launches, and F-12 triggered F-13's launcher draft). As independent
+incidents **C2 and C6 are each a singleton**, so the "≥5 classes with ≥2 items" gate holds only
+at the **row-count** grain (C1–C6 = 6 classes); by independent-incident count it is met by
+**C1, C3, C4, C5 alone (4 classes)**. The taxonomy's §2 counting basis, the C2 and C6 class
+details, and the completion log all carry the corrected statement; C2's row-count
+classification is preserved.
 
-**Verdict: PASS (both corrected in place).**
+**Verdict: PASS (both corrected in place; C2 and C6 each carry an explicit incident-chain
+caveat rather than implying independence from a row count).**
 
 ---
 
@@ -321,7 +407,7 @@ Guard tests: `tests/test_recording_sweep.py::test_scan_is_unmeasured_when_the_ru
 ## 8. g10 — the fast path (REPAIRED)
 
 **The reproduced failure.** The fast path (`pytest tests/ -m fast`) is the dependency-free
-smoke the guards and g10 run. Two corpus-dependent modules were `fast`-marked in error
+smoke the guards and g10 run. Three corpus-dependent modules were `fast`-marked in error
 (`tests/test_lab_outputs_canonical.py`, `test_contribution_report.py`,
 `test_publication_singular_door.py`):
 
@@ -368,30 +454,47 @@ $ python3 -m pytest tests/test_agent_config_render.py tests/test_doc_lifecycle.p
 - **F-12 (C4, row-before-workdir):** prevention not added; detection/reconciliation only via
   `control_sweep_zombies.py`; the runner still mints the row before validating the workdir
   (`scripts/run_workflow.py:641-655`).
-- **C1 drain guard:** bounded to the `generate_manifest.py` compaction seam; a raw edit never
-  followed by `manifest` is not blocked; `--allow-shrink` is the operator override.
+- **C1 drain guard (F-03):** bounded to the `generate_manifest.py` compaction seam; a raw edit
+  never followed by `manifest` is not blocked; `--allow-shrink` is the operator override.
+- **C1 full-row conservation (F-04):** the same seam, conserving raw source rows so a lost
+  tombstone/supersede marker (shared `knowledge_id`) is refused; same bounds.
+- **C1 re-track vector (F-06):** **retained residual** — the corpus migration + `.gitignore`
+  convention remove the ordinary path but a force-stage or an add-before-ignore ordering error
+  can still re-track; no index/commit gate was added (B3).
+- **R4 (C2):** **explicit policy residual** — no automated wrapper/new-mechanism gate; R4 is
+  replayed against the F-13/F-14 transcript but is **not** a catching-rail PASS (B2).
 - **R5 full registry re-resolution:** remains `@requires_full_corpus` (local-only); the
   fixture-tier replay and the artifact attestation cover the CI-runnable half.
-- **P1/P2/P3 parked** as in p3 §5 (C6 watchdog, C1 volume/ordering beyond the drain guard, C2
-  wrapper test) — unchanged.
-- **A4 verdict note:** because the top severity-5 class (C1) now carries a **bounded** rail
-  rather than none, the g9 "top classes have no catching rails" FAIL is discharged **for the
-  registry path**; the durability of the guard is bounded as stated above.
+- **P1/P3 parked** as in p3 §5 (C6 watchdog, C2 wrapper test) — unchanged. **P2 (C1
+  volume/ordering assertion) is partly discharged** by §2b's manifest-seam conservation; only
+  a pre-commit/CI staged-tree form remains parked, since the tracked-store vector F-06 names is
+  itself a disclosed residual with no index/commit gate (B3).
+- **A4/B1 verdict note:** because the top severity-5 class (C1) now carries **two bounded
+  rails** (the F-03 version drain guard and the F-04 full-row conservation guard) rather than
+  none, the g9 "top classes have no catching rails" FAIL is discharged **for the registry
+  path**; the durability of both guards is bounded as stated above, and F-06 remains a
+  disclosed residual.
 
 ---
 
 ## 10. Verification completion log
 
 - **DONE_WHEN — every selected remediation shows replay evidence:** PASS (R1 e2e same-day; R2
-  drain guard; R3 historical commit gate; R4 transcript; R5 fixture-tier resolver). A1–A7 each
-  carry a replay in §0/§1–§7.
+  version drain guard + B1 full-row conservation guard; R3 historical commit gate; R5
+  fixture-tier resolver; R4 transcript only). A1–A7 each carry a replay in §0/§1–§7; the second
+  adversarial review's B1–B4 each carry a disposition in §0b, with B1 replayed in §2b.
 - **DONE_WHEN — the verify doc records pass/revert per item:** PASS (R1 PASS re-designed;
-  R2 PASS + bounded rail; R3 PASS; R4 PASS; R5 PASS redesigned; A5/A6/A7/g10 PASS; no reverts).
+  R2 PASS + two bounded rails; R3 PASS; **R4 policy residual — not a PASS**; R5 PASS redesigned;
+  A5/A6/A7/g10 PASS; B4 corrected; no reverts).
 - **DONE_WHEN — no remediation shipped unverified:** PASS — every claim above is a command
-  that was run on this branch; the original p5 headline is retracted where it overclaimed.
+  that was run on this branch; the original p5 headline is retracted where it overclaimed; R4
+  and F-06 are disclosed residuals, not claims.
+- **Release predicate:** PASS — the scoped rails demonstrably catch their class (R1/R2/R3/R5);
+  the two residuals (R4 policy-only; F-06 re-track) are named and explicitly not counted.
 - **Gates:** `python3 scripts/_gen_instructions.py --check` → surfaces OK (38 files);
   `python3 -m pytest tests/test_recording_sweep.py tests/test_generate_manifest.py
   tests/test_build_data.py tests/test_doc_lifecycle.py tests/test_agent_config_render.py
-  tests/test_session_spine.py -q` → **140 passed, 3 skipped**; fast path **533 passed / 27.62s**;
-  g10 list **54 passed**; `ruff` on touched files clean.
+  tests/test_session_spine.py -q` → **143 passed, 3 skipped**; fast path **533 passed, 2 skipped
+  / 27.22s** (budget 180s); g10 list **54 passed / 34.24s**; `ruff` on
+  `scripts/generate_manifest.py` + `tests/test_generate_manifest.py` clean.
 - **LOG:** PASS.

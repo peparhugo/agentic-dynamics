@@ -93,8 +93,9 @@ committed 6 run ledgers into the tree stage-2 untracked 13 min later (F-06); the
   is "a session that does not write its close record has not closed". A wave of this size
   should have been checkpointed incrementally rather than left only in the working tree.
 - **Damage / cleanup cost.** `origin/main` untouched but the local main checkout left
-  **~237 files dirty** for 4 days (the retained opening `git status` pointer: 1 modified +
-  236 untracked — the A5 correction of the earlier unsupported "~292" estimate); the durable
+  **~237 files dirty** for 4 days (the retained opening `git status` part
+  `ses_f92f8804affe… part@2026-09-04 17:26:48`, counted: 1 modified + 236 untracked — the A5
+  correction of the earlier unsupported "~292" estimate); the durable
   registry restore and manifest/labs existed nowhere in git. Recovery required the 09-08
   session to walk the hammer's 133-command trail, separate the ~35 source/test files from
   generated churn, re-verify, and only then
@@ -103,6 +104,10 @@ committed 6 run ledgers into the tree stage-2 untracked 13 min later (F-06); the
 - **Severity:** 4 (near data loss; the restored registry could have been lost with the
   working tree; large recovery cost).
 - **Evidence pointers.**
+  - `opencode.db ses_f92f8804affe6ZZ0lH27Benpvc part@2026-09-04 17:26:48` — the opening
+    `git status`/`git worktree list`/`git log` part (`prt_06d0793c6001c5VS663QZ6oYh4`),
+    the primary evidence for the dirty-tree size: the status body holds exactly **237
+    tab-prefixed entries = 1 `modified:` + 236 untracked paths** (A5).
   - `opencode.db ses_f92f8804affe6ZZ0lH27Benpvc part@2026-09-04 17:42:08` (edit
     `knowledge_stream.py`); `part@2026-09-04 17:44:09/15` (`heartbeat.py`);
     `part@2026-09-04 23:04:53` (registry restore to 48,324 lines).

@@ -14,11 +14,16 @@ count items per class.
 "rare" class** (one environmental singleton). Every class names at least one defense from
 the *current* system that should have caught it and did not.
 
-**Counting basis (A6).** The ≥ 2 threshold counts corpus **rows**, not independent incident
-chains. C1, C2, C3, C4 and C5 each carry ≥ 2 rows from distinct incidents; **C6's rows
-(F-01, F-02) are two symptoms of one incident chain** — the same hammer session and the same
-19-hour abandonment arc — so as independent incidents C6 is a **singleton** and the
-"≥ 5 classes with ≥ 2 items" gate is met by C1–C5 alone.
+**Counting basis (A6 + B4).** The ≥ 2 threshold counts corpus **rows**, not independent incident
+chains. C1, C3, C4 and C5 each carry ≥ 2 rows from distinct incidents; **C2's rows (F-13, F-14)
+are two real acts but one connected improvisation chain** (F-14's wrapper produced the F-12
+failed launches, and F-12 triggered F-13's launcher draft), and **C6's rows (F-01, F-02) are two
+symptoms of one incident chain** — the same hammer session and the same 19-hour abandonment arc —
+so as independent incidents C2 and C6 are each a **singleton**. The "≥ 5 classes with ≥ 2 items"
+gate therefore holds only at the **row-count** grain (C1–C6 = 6 classes); by
+independent-incident count it is met by **C1, C3, C4, C5 alone (4 classes)**. The row-count
+classification is preserved; the incident-chain caveat is stated for C2 exactly as for C6 rather
+than implied away by the row count.
 
 ---
 
@@ -135,6 +140,13 @@ Counts: C1=3, C2=2, C3=3, C4=5, C5=3, C6=2, R=1 → **19**.
 - **Merged candidate.** This class absorbs the review's "mechanism improvisation" **and**
   "over-building": both signatures are "the actor adds machinery the system did not ask
   for and already had an alternative for."
+- **Counting basis (B4).** The class threshold counts **corpus rows, not independent
+  incidents**. F-13 and F-14 are two distinguishable acts — the launcher draft and the
+  agent-spec wrapper — but ONE connected improvisation chain: F-14's wrapper produced the
+  F-12 failed launches, and those zombie launches were the trigger for F-13's launcher draft.
+  As rows it is a 2-item class; as independent incidents it is a **singleton**. The class does
+  not demonstrate two independent C2 events — stated explicitly here rather than implying it
+  via row count.
 
 ### C3 — Documented-convention miss (a rail exists; it is not followed)
 - **Trigger.** A routine operation with a documented shape — a test selection, a worktree
@@ -266,8 +278,9 @@ defenses to these six classes + rare and mark catches/partial/none.
 - **DONE_WHEN — every corpus item classified:** PASS (19/19; see §3 mapping).
 - **DONE_WHEN — ≥ 5 classes with ≥ 2 items:** PASS by ROW count (C1=3, C2=2, C3=3, C4=5,
   C5=3, C6=2 rows; singleton F-07 → Rare). By independent **incident** count the gate is met
-  by C1–C5 alone; C6's two rows are one incident chain (A6) and C6 is a singleton incident.
-  The counting basis is stated in §2's "Counting basis (A6)".
+  by **C1, C3, C4, C5** (4 classes): C6's two rows are one incident chain (A6) and C2's two
+  rows are one connected improvisation chain (B4). The counting basis is stated in §2's
+  "Counting basis (A6 + B4)".
 - **DONE_WHEN — each class names at least one current-system defense that failed:** PASS
   (§2 table + each class's "Existing defense that failed").
 - **LOG:** PASS.
