@@ -174,8 +174,22 @@ def _parse_run_id(stdout: str) -> str:
 def _export_cell(run_clone: Path, sha: str, base_sha: str, export_dir: Path) -> dict:
     """Export the generated tree + diff so scoring never depends on the ephemeral clone."""
     export_dir.mkdir(parents=True, exist_ok=True)
+    tree = subprocess.run(
+        ["git", "-C", str(run_clone), "ls-tree", "-r", "--name-only", sha],
+        capture_output=True,
+        text=True,
+    )
+    wanted = [
+        name
+        for name in tree.stdout.splitlines()
+        if name == CONTRACT_TEST
+        or name == "taskman.py"
+        or name.startswith("taskman/")
+        or "/taskman/" in name
+        or name.endswith("/taskman.py")
+    ]
     archive = subprocess.run(
-        ["git", "-C", str(run_clone), "archive", sha, "taskman", CONTRACT_TEST],
+        ["git", "-C", str(run_clone), "archive", sha, "--", *wanted],
         capture_output=True,
     )
     if archive.returncode == 0 and archive.stdout:
@@ -249,6 +263,7 @@ def run_cell(plan: CellPlan, *, base_sha: str, deploy_repo: Path, timeout_s: int
             (p.get("test_executed_success") for p in phases if p.get("kind") == "test"), None
         )
         run_id = record.get("run_id") or payload.get("run_id", "")
+        record["run_id"] = run_id
         clone = Path(os.environ.get("FINOPS_RUNS_ROOT", "/tmp/agentic-dynamics-runs")) / run_id / "repo"
         if run_id and clone.is_dir() and record.get("git_sha"):
             record.update(_export_cell(clone, record["git_sha"], base_sha, CELLS_DIR / plan.cell_id))
