@@ -29,6 +29,7 @@ Usage:
   python3 scripts/verify_control_room_rendering.py                 # full gate (needs Chromium)
   python3 scripts/verify_control_room_rendering.py --check-fixtures  # no browser: validate fixtures
   python3 scripts/verify_control_room_rendering.py --a11y             # + accessibility class
+  python3 scripts/verify_control_room_rendering.py --parity           # + feature-parity class
   python3 scripts/verify_control_room_rendering.py --out DIR --json PATH --report PATH
   python3 scripts/verify_control_room_rendering.py --fixtures F-0,F-5 --no-screenshot
 
