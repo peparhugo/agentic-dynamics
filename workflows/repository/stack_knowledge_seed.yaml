@@ -1,0 +1,111 @@
+name: stack_knowledge_seed
+question: >-
+  Seed expert knowledge about THIS repo's technology stacks into the knowledge base. The frozen
+  corpus (experiments/stack_knowledge/sources/, 28 authoritative docs fetched with provenance)
+  is distilled into per-stack skill records by a flash author, checked for entailment and
+  support by an independent terra verifier, and gated by schema/evidence tests; the AIO then
+  emits the accepted skills through the verified pattern projection path. No claim may go
+  beyond the cited sources.
+version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: false
+repeatable: true
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: true
+    context:
+      hard_rules: >-
+        (1) The frozen corpus is the ONLY knowledge source for claims; cite it. (2) One JSON per
+        stack, exact schema; no extra keys required but `notes` is expected. (3) The verifier
+        writes only its review doc; the author does not edit the corpus. (4) No live-KB writes
+        in this workflow — emission is the AIO's data-plane act after review.
+    phases:
+      - name: s0_distill
+        kind: agent
+        scope: implementation
+        requires_deliverable: true
+        timeout: 7200
+        prompt: |
+          GOAL: {goal}
+          Read EVERY source record in experiments/stack_knowledge/sources/*.json (uri, title,
+          sha256, text). These 28 authoritative documents are the ONLY knowledge you may use
+          for claims. Also read the repo stack facts to tailor guidance: pyproject.toml,
+          infrastructure/docker-compose.ladder.yml, src/agentic_dynamics/runtime/story/builtins.py,
+          apps/control_room/static/app.js, apps/website/CONTEXT.md.
+          Write one JSON per stack to experiments/stack_knowledge/skills/ covering AT LEAST:
+          python, flask, celery-redis, sqlite, redis-streams, neo4j-cypher, chroma,
+          docker-compose, playwright, firebase-hosting, web-svg-css, systemd.
+          EXACT schema per file:
+          {
+            "subject": "skill/stack/<name>",
+            "claim": "2-4 sentences of actionable, repo-specific expert guidance (concrete
+                      patterns/idioms/pitfalls, not generic truisms)",
+            "population": "agentic-dynamics stack",
+            "conditions": ["<stack>", "<tags>"],
+            "support": <int: number of DISTINCT fetched sources whose text backs the claim>,
+            "uncertainty": <float 0..1>,
+            "source_experiment": "tech_stack_seed_2026-09-11",
+            "evidence": ["uri:<source uri from the corpus>", ...],
+            "notes": "which sources agree; what they disagree on; why this uncertainty"
+          }
+          Rules: every claim supported by the cited texts; cite 2+ sources where possible; a
+          single-source claim says so in notes and raises uncertainty. Prefer precise guidance
+          (SQLite WAL + busy_timeout for the control DB; Redis streams consumer groups with
+          XACK/XPENDING semantics; Celery retry/idempotency; Chroma where-filters; compose
+          project isolation; Playwright waits + screenshots; WCAG contrast vs SVG fills;
+          Firebase hosting rewrites). Keep each file under 400 words.
+          Verify with: python3 -m pytest tests/test_stack_skills.py -q
+          LOG: list of files + support counts; commit.
+      - name: s1_verify
+        kind: agent
+        scope: implementation
+        requires_deliverable: true
+        run_model: openai/gpt-5.6-terra
+        timeout: 7200
+        prompt: |
+          GOAL: {goal}
+          ROLE: the independent verifier. For EACH file in experiments/stack_knowledge/skills/:
+          (1) read its cited source records in experiments/stack_knowledge/sources/ and check
+              every claim actually follows from them (entailment — flag overreach);
+          (2) check `support` equals the number of distinct cited sources that truly back it;
+          (3) flag uncited claims, missing caveats for single-source claims, and contradictions
+              between sources that the skill hides;
+          (4) check the schema (subject/claim/population/conditions/support/uncertainty/
+              source_experiment/evidence/notes).
+          Write docs/reviews/stack_knowledge_seed_verify.md with a per-skill evidence table
+          (subject, cited sources, verdict, required disposition). Report genuine problems only;
+          a clean verification is a valid outcome. Do NOT modify the skills or the corpus.
+          LOG: verification table; PASS/FAIL; commit.
+      - name: s2_tests
+        kind: test
+        scope: implementation
+        timeout: 600
+        tests:
+          - tests/test_stack_skills.py
+          - tests/test_research_fetch.py
+factors:
+  - {name: model, levels: [deepseek/deepseek-v4-flash]}
+design: factorial
+rules:
+  - name: stack_skills_distilled
+    plane: measurement
+    evidence_class: "[H]"
+    requires: []
+    produces: [stack_skill_records]
+  - name: stack_skills_verified
+    plane: measurement
+    evidence_class: "[H]"
+    requires: [stack_skill_records]
+    produces: [stack_skills_entailment_checked]
+metrics:
+  - {name: stack_skill_records, agg: mean, over: cell}
+  - {name: stack_skills_entailment_checked, agg: mean, over: cell}
+comparison: null
+writeup: {format: lab_book, sections: [question, s0_distill, s1_verify, s2_tests]}
+stop: {budget_usd: 4.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}
