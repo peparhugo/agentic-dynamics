@@ -34,7 +34,7 @@ declaration must not be mistaken for instrumentation.
 ## Counts
 
 - **42 gaps** total; **24** are workflow-management gaps.
-- By class: `not-exposed` 14 · `no-mechanism` 14 · `declared-but-unwritten` 9 · `modeled-only` 4 ·
+- By class: `not-exposed` 14 · `no-mechanism` 13 · `declared-but-unwritten` 9 · `modeled-only` 5 ·
   `coverage` 1.
 - By source plane: ledger 6 · job/attempt table 4 · lease/settlement 3 · queue 3 · control packet
   3 · run ledger 3 · measurement rule 5 · website/lab 5 · **none 9**.
