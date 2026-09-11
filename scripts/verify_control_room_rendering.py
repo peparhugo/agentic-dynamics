@@ -10,16 +10,21 @@ item / marginal counts per viewport.
 
 Classes implemented (p5 IA8: a screenshot must not be asked to prove what only the network can):
   * G geometry     — present/unique, in-viewport, non-zero box, no scroll, contrast, schemas
+  * semantics      — every ON-G1..G7 answer's RENDERED value/state/enum vs FIXTURE truth, plus the
+                     B-class carriers: presence is not proof, so the gate compares content
   * fixtures       — deterministic F-0..F-7 payloads, no live Redis/clock/network (waiver W2)
+  * A a11y         — accessible names/roles, true hidden state, and the keyboard open/close path
+                     with focus containment (``--a11y``)
+  * E state        — epoch consistency and saturated-inbox reservation (folded into semantics)
 
-The blind-comprehension (B), browser/a11y (A) and event/state (E) classes are named in the IA;
-this gate implements the geometry + fixture classes it can automate deterministically. The
-adversaries (``docs/reviews/control_room_facelift_{design,ia}.md``) read the screenshots this
-gate writes.
+The event/state E class is otherwise named in the IA; this gate implements what it can automate
+deterministically. The adversaries (``docs/reviews/control_room_facelift_{design,ia}.md``) read
+the screenshots this gate writes.
 
 Usage:
   python3 scripts/verify_control_room_rendering.py                 # full gate (needs Chromium)
   python3 scripts/verify_control_room_rendering.py --check-fixtures  # no browser: validate fixtures
+  python3 scripts/verify_control_room_rendering.py --a11y             # + accessibility class
   python3 scripts/verify_control_room_rendering.py --out DIR --json PATH --report PATH
   python3 scripts/verify_control_room_rendering.py --fixtures F-0,F-5 --no-screenshot
 
@@ -98,6 +103,17 @@ EXPECTED_BOXES = {
 }
 ROW_COUNT = {"desktop": 8, "narrow": 7, "mobile": 3}
 ATTENTION_COUNT = {"desktop": 5, "narrow": 4, "mobile": 3}
+
+#: Legal value domains (IA §10.2). A rendered value outside its domain is a semantic failure, not
+#: a copy nit: the answer claims a state the system cannot legally be in.
+SYSTEM_STATES = {"up", "degraded", "down", "unknown"}
+PROJECTION_STATES = {"current", "lagging", "stale", "failing", "unknown"}
+DECISION_STATES = {"pending", "none"}
+RISK_STATES = {"active", "all-clear"}
+ELIGIBILITY_STATES = {"observe", "inspect", "approve", "promote", "cancel", "retire", "none"}
+GOVERNED_STATES = {"approve", "promote", "cancel", "retire"}
+#: The severity ranks the R1 work queue orders by (IA §2 R1: severity × actionability).
+SEVERITY_RANKS = {"CRITICAL": 4, "HIGH": 3, "MEDIUM": 2, "LOW": 1}
 
 #: The four catalog-derived charts (facelift a1). Each must render inside its budget at every
 #: breakpoint, with an explicit empty/error state, never a blank panel.
@@ -522,6 +538,150 @@ GEOMETRY_JS = r"""
   };
 }
 """
+
+#: The semantic probe (IA §10 "prove the glance contract"): it reads each `ON-G1..G7` answer's
+#: rendered content — values, states, ages, bucket labels, attention classes, row budget facets —
+#: so the gate can compare RENDERED truth to FIXTURE truth, not merely assert that some text
+#: exists. Paired with `_check_semantics`, it makes every answer literally self-sufficient.
+SEMANTIC_JS = r"""
+() => {
+  const text = (el) => el ? (el.innerText || el.textContent || "").trim() : "";
+  const answerRoot = (a) => document.querySelector('[data-answer="' + a + '"]');
+  const collectFields = (a) => {
+    const out = {};
+    const root = answerRoot(a);
+    if (!root) return out;
+    root.querySelectorAll('[data-field]').forEach((f) => {
+      const v = f.querySelector(':scope > [data-value]');
+      out[f.dataset.field] = text(v);
+    });
+    return out;
+  };
+  const systemDims = [];
+  {
+    const root = answerRoot('ON-G1');
+    if (root) root.querySelectorAll('[data-field]').forEach((f) => {
+      const v = f.querySelector(':scope > [data-value]');
+      systemDims.push({ field: f.dataset.field, value: text(v),
+        state: v ? v.getAttribute('data-state') : null,
+        age: v && v.hasAttribute('data-age-seconds')
+          ? Number(v.getAttribute('data-age-seconds')) : null });
+    });
+  }
+  const rows = [];
+  document.querySelectorAll('[data-region="R2"] [data-run-id]').forEach((r) => {
+    const values = {};
+    r.querySelectorAll('[data-field]').forEach((f) => {
+      const v = f.querySelector(':scope > [data-value]');
+      values[f.dataset.field] = text(v);
+    });
+    const lease = r.querySelector('.row-lease');
+    rows.push({ id: r.getAttribute('data-run-id'), values,
+      budget: lease ? {
+        state: lease.getAttribute('data-budget-state'),
+        reserved: lease.getAttribute('data-budget-reserved'),
+        cap: lease.getAttribute('data-budget-cap'),
+        headroom: lease.getAttribute('data-budget-headroom'),
+        settlement: lease.getAttribute('data-budget-settlement') } : null,
+      hasAuthority: Boolean(r.querySelector('[data-authority="controller"]')),
+      decision: r.getAttribute('data-decision') });
+  });
+  const attention = [];
+  document.querySelectorAll('[data-region="R1"] [data-attention-class]').forEach((it) => {
+    attention.push({ cls: it.getAttribute('data-attention-class'),
+      key: it.getAttribute('data-item-key'),
+      kind: text(it.querySelector('.item-kind')),
+      ariaLabel: it.getAttribute('aria-label') || '' });
+  });
+  const marginals = [];
+  {
+    const root = answerRoot('ON-G7');
+    if (root) root.querySelectorAll('[data-marginal]').forEach((m) => {
+      const buckets = [];
+      m.querySelectorAll('[data-bucket]').forEach((b) => {
+        buckets.push({ bucket: b.getAttribute('data-bucket'),
+          label: text(b.querySelector('.bucket-label')),
+          value: text(b.querySelector('[data-value]')),
+          category: b.getAttribute('data-category') || '' });
+      });
+      marginals.push({ name: m.getAttribute('data-marginal'), buckets });
+    });
+  }
+  const answerBoxes = {};
+  ['ON-G1', 'ON-G2', 'ON-G3', 'ON-G4', 'ON-G5', 'ON-G6', 'ON-G7'].forEach((a) => {
+    const el = answerRoot(a);
+    if (!el) { answerBoxes[a] = null; return; }
+    const box = el.getBoundingClientRect();
+    let visible = true;
+    for (let n = el; n; n = n.parentElement) {
+      const cs = getComputedStyle(n);
+      if (n.hidden || cs.display === 'none' || cs.visibility === 'hidden') { visible = false; }
+    }
+    answerBoxes[a] = { visible, x: box.x, y: box.y, width: box.width, height: box.height,
+      top: box.top, bottom: box.bottom, left: box.left, right: box.right,
+      scrollH: el.scrollHeight, clientH: el.clientHeight,
+      scrollW: el.scrollWidth, clientW: el.clientWidth };
+  });
+  const shell = document.querySelector('[data-glance-shell]');
+  return {
+    innerWidth: window.innerWidth, innerHeight: window.innerHeight,
+    systemDims, runCounts: collectFields('ON-G2'), decision: collectFields('ON-G5'),
+    risk: collectFields('ON-G3'), money: collectFields('ON-G4'),
+    moneyRisk: document.querySelectorAll('[data-answer="ON-G4"] [data-money-risk]').length,
+    moneyProv: text(document.getElementById('cost-prov')),
+    trust: collectFields('ON-G6'), marginals, rows, attention, answerBoxes,
+    shellEpoch: shell ? shell.getAttribute('data-control-epoch') : null,
+    liveRegions: document.querySelectorAll('[aria-live]').length,
+    dockHidden: (() => { const d = document.getElementById('selection-dock');
+      return Boolean(d && d.hidden); })(),
+    lensHidden: (() => { const l = document.getElementById('chart-lens');
+      return Boolean(l && l.hidden); })(),
+    // B-class carriers (IA §10.4): the exact element each blind statement points to.
+    carriers: {
+      b1: Boolean(document.querySelector('[data-answer="ON-G1"] [data-field="system.browser"]')),
+      b2: Boolean(document.querySelector('[data-answer="ON-G2"] [data-field="runs.running"]')),
+      b3: Boolean(document.querySelector('[data-attention-class="risk"] [data-answer="ON-G3"]')),
+      b4: Boolean(document.querySelector('[data-answer="ON-G4"] [data-field="money.spend"]')),
+      b5: Boolean(document.querySelector('[data-attention-class="decision"] [data-answer="ON-G5"]')),
+      b6: Boolean(document.querySelector('[data-answer="ON-G6"] [data-field="trust.epoch"]')),
+      b7: document.querySelectorAll('[data-answer="ON-G7"] [data-marginal]').length === 4,
+      b8: Boolean(document.querySelector('[data-answer="ON-G5"] [data-field="decision.eligibility"]')),
+      b9: Boolean(document.querySelector('[data-region="R2"] .session-band [data-field="session.identity"]')),
+      b10: Boolean(document.querySelector('[data-region="R2"] [data-evidence-class="advisory"]'))
+        && Boolean(document.querySelector('[data-region="R2"] [data-evidence-class="measured"]')),
+      b11: Boolean(document.querySelector('[data-region="R2"] [data-field="decision.eligibility"]'))
+        && Boolean(document.querySelector('[data-region="R2"] [data-field="decision.receipt"]')),
+    },
+  };
+}
+"""
+
+#: The accessibility probe (IA §10.5 A-4/A-5/A-6): roles, accessible names, true hidden state and
+#: the keyboard open/close path. Run against the fixtured page at both required viewports.
+A11Y_JS = r"""
+() => {
+  const rows = Array.from(document.querySelectorAll('[data-region="R2"] [data-run-id]')).map((r) => ({
+    role: r.getAttribute('role'), label: r.getAttribute('aria-label') || '' }));
+  const decisions = Array.from(
+    document.querySelectorAll('[data-region="R1"] [data-attention-class="decision"]')
+  ).map((r) => ({ role: r.getAttribute('role'), label: r.getAttribute('aria-label') || '',
+    tabindex: r.getAttribute('tabindex') }));
+  const risks = Array.from(
+    document.querySelectorAll('[data-region="R1"] [data-attention-class="risk"]')
+  ).map((r) => ({ role: r.getAttribute('role'), label: r.getAttribute('aria-label') || '' }));
+  const dock = document.getElementById('selection-dock');
+  const lens = document.getElementById('chart-lens');
+  return {
+    rows, decisions, risks,
+    dockHidden: Boolean(dock && dock.hidden),
+    dockDisplay: dock ? getComputedStyle(dock).display : null,
+    lensHidden: Boolean(lens && lens.hidden),
+    lensDisplay: lens ? getComputedStyle(lens).display : null,
+    shellPresent: Boolean(document.querySelector('[data-glance-shell]')),
+  };
+}
+"""
+
 
 #: The IA-core probe for the live (unfixtured) portal: the acceptance contract's structural
 #: checks that do not depend on any particular data — every anchor present, in viewport, a
@@ -1112,6 +1272,108 @@ def run_style_gate(out: Path, screenshots: bool) -> tuple[list[dict[str, Any]], 
     return results, errors
 
 
+def _check_a11y(name: str, probe: dict[str, Any], errors: list[str]) -> None:
+    """Assert the IA §10.5 A-class: names/roles (A-4) and true hidden state (A-5)."""
+    for row in probe.get("rows", []):
+        if row.get("role") != "button" or not row.get("label"):
+            _row(errors, name, "a11y", "A-4", f"run row role/label {row}")
+    for item in probe.get("decisions", []):
+        if item.get("role") != "button" or not item.get("label"):
+            _row(errors, name, "a11y", "A-4", f"decision item role/label {item}")
+    for item in probe.get("risks", []):
+        if not item.get("label"):
+            _row(errors, name, "a11y", "A-4", f"risk item lacks accessible name {item}")
+    # A-5: inactive surfaces are truly hidden (the `hidden` attribute), not CSS-only.
+    if not probe.get("dockHidden") or probe.get("dockDisplay") != "none":
+        _row(errors, name, "a11y", "A-5", "selection dock is not truly hidden at rest")
+    if not probe.get("lensHidden") or probe.get("lensDisplay") != "none":
+        _row(errors, name, "a11y", "A-5", "chart lens is not truly hidden at rest")
+
+
+def run_a11y_gate(out: Path, screenshots: bool) -> tuple[list[dict[str, Any]], list[str]]:
+    """Run the IA §10.5 A-class against the fixtured page at desktop and mobile.
+
+    A-4 (accessible names/roles), A-5 (true hidden state), A-6 (keyboard Enter opens / Escape
+    closes), and A-1 (focus is contained in the modal dock and returns to the opening control).
+    Screenshots are optional: the class records its evidence as pass/fail rows, not pixels.
+    """
+    from playwright.sync_api import sync_playwright
+
+    fixture = build_fixture("F-0")
+    frames = _sse_frames([fixture], with_transitions=False)
+    url, httpd = _serve()
+    results: list[dict[str, Any]] = []
+    errors: list[str] = []
+    try:
+        with sync_playwright() as playwright:
+            browser = playwright.chromium.launch(args=["--no-sandbox"])
+            for name, (width, height) in (("desktop", (1440, 900)), ("mobile", (390, 844))):
+                context = browser.new_context(
+                    viewport={"width": width, "height": height}, timezone_id="UTC",
+                    locale="en-US", reduced_motion="reduce", color_scheme="dark",
+                )
+                context.add_init_script(
+                    "try{localStorage.setItem('control-room-theme','dark')}catch(e){}"
+                )
+                page = context.new_page()
+                page.route("**/api/**", lambda route: route.abort())
+                page.route("**/api/glance", _glance_handler(fixture))
+                page.route("**/api/events", _events_handler(frames))
+                page.goto(url, wait_until="domcontentloaded")
+                page.locator('[data-render-state="ready"]').wait_for(timeout=15000)
+                _check_a11y(name, page.evaluate(A11Y_JS), errors)
+
+                # A-6 + A-1: reach a run row by keyboard alone, open with Enter, contain focus,
+                # then Escape and confirm focus returns to the opening row.
+                page.locator("body").click(position={"x": 2, "y": 2})
+                reached = False
+                for _ in range(12):
+                    page.keyboard.press("Tab")
+                    if page.evaluate(
+                        "() => { const el = document.activeElement;"
+                        " return !!(el && el.matches('[data-region=\"R2\"] [data-run-id]')); }"
+                    ):
+                        reached = True
+                        break
+                if not reached:
+                    _row(errors, name, "a11y", "A-6", "could not reach a run row by keyboard")
+                else:
+                    origin = page.evaluate(
+                        "() => document.activeElement.getAttribute('data-run-id')")
+                    page.keyboard.press("Enter")
+                    try:
+                        page.locator("#selection-dock:not([hidden])").wait_for(timeout=3000)
+                    except Exception:  # noqa: BLE001 - a failed open is a finding, not a crash
+                        _row(errors, name, "a11y", "A-6", "Enter did not open the dock")
+                    for _ in range(6):
+                        page.keyboard.press("Tab")
+                    if not page.evaluate(
+                        "() => { const d = document.getElementById('selection-dock');"
+                        " return Boolean(d && d.contains(document.activeElement)); }"
+                    ):
+                        _row(errors, name, "a11y", "A-1", "focus escaped the selection dock")
+                    page.keyboard.press("Escape")
+                    if not page.evaluate(
+                        "() => Boolean(document.getElementById('selection-dock').hidden)"):
+                        _row(errors, name, "a11y", "A-5", "Escape did not close the dock")
+                    returned = page.evaluate(
+                        "() => document.activeElement && document.activeElement.getAttribute"
+                        " ? document.activeElement.getAttribute('data-run-id') : null")
+                    if returned != origin:
+                        _row(errors, name, "a11y", "A-6",
+                             f"focus returned to {returned!r}, not origin {origin!r}")
+                if screenshots:
+                    shot = out / f"a11y_{name}_dark_{width}x{height}.png"
+                    page.screenshot(path=str(shot), full_page=False)
+                    results.append({"case": "a11y", "viewport": name, "screenshot": str(shot)})
+                context.close()
+            browser.close()
+    finally:
+        if httpd is not None:
+            httpd.shutdown()
+    return results, errors
+
+
 def _glance_handler(payload: dict[str, Any]):
     """Return a one-argument Playwright route handler serving the expanded fixture JSON."""
 
@@ -1201,6 +1463,8 @@ def run_browser_gate(
                         _ensure_paint(page)
                         geometry = page.evaluate(GEOMETRY_JS)
                         _check_geometry(fixture_id, name, theme, geometry, errors)
+                        # Semantic layer (IA §10): rendered values vs fixture truth, per answer.
+                        _check_semantics(fixture_id, name, wire, page.evaluate(SEMANTIC_JS), errors)
                         # A console error is a loaded-page defect even when geometry is intact.
                         for message in console_errors:
                             _row(errors, label, fixture_id, "console", message[:200])
@@ -1449,6 +1713,212 @@ def _check_geometry(
             _row(errors, label, fixture_id, "G-11", f"{entry['name']} top bucket incomplete")
 
 
+def _check_semantics(
+    fixture_id: str, name: str, wire: dict[str, Any], probe: dict[str, Any], errors: list[str]
+) -> None:
+    """Assert RENDERED truth against FIXTURE truth for every `ON-G1..G7` answer (IA §10).
+
+    This is the semantic layer the a6 adversary found missing: presence is not proof. For each
+    anchor it checks the value/state/enum the operator actually sees, that the answer's box is
+    visible, non-zero, in-viewport and non-scrolling, and (for the B class) that every blind
+    statement's carrying element exists. A mismatch here is a glance-contract failure even when
+    the geometry is perfect.
+    """
+
+    def fail(check: str, detail: str) -> None:
+        _row(errors, name, fixture_id, check, detail)
+
+    height = probe["innerHeight"]
+    width = probe["innerWidth"]
+
+    # ── per-anchor box: visible, non-zero, in-viewport, no internal scroll ────────────────
+    for answer, box in probe["answerBoxes"].items():
+        if not box:
+            fail("SEM-box", f"{answer} missing")
+            continue
+        if not box["visible"] or box["width"] <= 0 or box["height"] <= 0:
+            fail("SEM-box", f"{answer} box {box['width']}x{box['height']} visible={box['visible']}")
+        elif (box["top"] < -0.5 or box["bottom"] > height + 0.5
+              or box["left"] < -0.5 or box["right"] > width + 0.5):
+            fail("SEM-fold", f"{answer} box "
+                 f"{tuple(round(box[k], 1) for k in ('left', 'top', 'right', 'bottom'))}")
+        if box["scrollH"] > box["clientH"] + 1 or box["scrollW"] > box["clientW"] + 1:
+            fail("SEM-answer-scroll", f"{answer} scrolls")
+
+    # ── ON-G1 system: legal enum, numeric age, exact fixture value ────────────────────────
+    dims = {entry["field"]: entry for entry in probe["systemDims"]}
+    for key in ("browser", "control", "workers", "projections"):
+        field = "system." + key
+        got = dims.get(field)
+        want = wire["system"][key]
+        if not got:
+            fail("SEM-G1", f"{field} missing")
+            continue
+        if got["state"] not in SYSTEM_STATES:
+            fail("SEM-G1", f"{field} illegal state {got['state']!r}")
+        if got["age"] is None or got["age"] < 0:
+            fail("SEM-G1", f"{field} non-numeric age {got['age']!r}")
+        if got["state"] != want["state"] or got["age"] != want["age_seconds"]:
+            fail("SEM-G1", f"{field} rendered {got['state']}/{got['age']} "
+                 f"fixture {want['state']}/{want['age_seconds']}")
+
+    # ── ON-G2 counts: exact fixture equality ──────────────────────────────────────────────
+    for key in ("running", "queued", "failed", "live"):
+        got = probe["runCounts"].get("runs." + key)
+        if got != str(wire["run_counts"][key]):
+            fail("SEM-G2", f"runs.{key} rendered {got!r} fixture {wire['run_counts'][key]!r}")
+
+    # ── ON-G3 risk: legal state, reserved identity, explicit all-clear ────────────────────
+    risk = probe["risk"]
+    want_risk = wire["attention"]["risk"]
+    if risk.get("risk.state") not in RISK_STATES:
+        fail("SEM-G3", f"illegal risk state {risk.get('risk.state')!r}")
+    for field in ("risk.identity", "risk.state", "risk.action"):
+        if not risk.get(field):
+            fail("SEM-G3", f"{field} empty")
+    if want_risk["state"] == "all-clear":
+        if risk.get("risk.identity") != "none" or risk.get("risk.action") != "none":
+            fail("SEM-G3", f"all-clear must render identity/action none: {risk}")
+    elif risk.get("risk.identity") != want_risk["identity"]:
+        fail("SEM-G3", f"risk.identity {risk.get('risk.identity')!r} "
+             f"fixture {want_risk['identity']!r}")
+
+    # ── ON-G4 money: five exact values, marker count, visible provenance ─────────────────
+    want_cost = wire["cost"]
+    for field, key in (("money.spend", "spend"), ("money.burn", "burn"), ("money.quota", "quota"),
+                       ("money.wallet", "wallet"), ("money.leases", "leases")):
+        got = probe["money"].get(field)
+        if got != str(want_cost.get(key, "unknown")):
+            fail("SEM-G4", f"{field} rendered {got!r} fixture {want_cost.get(key)!r}")
+    expected_marker = 1 if want_cost.get("money_risk") else 0
+    if probe["moneyRisk"] != expected_marker:
+        fail("SEM-G4", f"money-risk markers {probe['moneyRisk']} want {expected_marker}")
+    if not probe["moneyProv"]:
+        fail("SEM-G4", "money answer lacks visible source+age provenance")
+
+    # ── ON-G5 decision: legal state/eligibility, none-pending consistency ─────────────────
+    decision = probe["decision"]
+    want_decision = wire["attention"]["decision"]
+    if decision.get("decision.state") not in DECISION_STATES:
+        fail("SEM-G5", f"illegal decision state {decision.get('decision.state')!r}")
+    if decision.get("decision.eligibility") not in ELIGIBILITY_STATES:
+        fail("SEM-G5", f"illegal eligibility {decision.get('decision.eligibility')!r}")
+    if want_decision["state"] == "none":
+        for field in ("decision.target", "decision.kind", "decision.authority",
+                      "decision.eligibility"):
+            if decision.get(field) != "none":
+                fail("SEM-G5", f"none-decision must render {field}=none, got {decision.get(field)!r}")
+    else:
+        if (decision.get("decision.target") != want_decision["target"]
+                or decision.get("decision.kind") != want_decision["kind"]):
+            fail("SEM-G5", f"decision rendered {decision} fixture {want_decision}")
+
+    # ── ON-G6 trust: legal enum, integer counts, epoch + unknown-count truth ──────────────
+    trust = probe["trust"]
+    want_trust = wire["trust"]
+    if trust.get("trust.projection_state") not in PROJECTION_STATES:
+        fail("SEM-G6", f"illegal projection state {trust.get('trust.projection_state')!r}")
+    for key in ("degraded_count", "stale_count", "partial_count", "unknown_count"):
+        raw = trust.get("trust." + key)
+        try:
+            if int(raw) < 0:
+                raise ValueError
+        except (TypeError, ValueError):
+            fail("SEM-G6", f"{key} not a non-negative integer: {raw!r}")
+    if str(trust.get("trust.epoch")) != str(want_trust["epoch"]):
+        fail("SEM-G6", f"trust.epoch {trust.get('trust.epoch')!r} "
+             f"fixture {want_trust['epoch']!r}")
+    if str(trust.get("trust.unknown_count")) != str(want_trust["unknown_count"]):
+        fail("SEM-G6", f"unknown_count {trust.get('trust.unknown_count')!r} "
+             f"fixture {want_trust['unknown_count']!r}")
+
+    # ── ON-G7 composition: four marginals, three explicit legible buckets, fixture truth ──
+    marginals = {entry["name"]: entry for entry in probe["marginals"]}
+    for marginal_name in ("model", "condition", "provider", "lifecycle"):
+        marginal = marginals.get(marginal_name)
+        if not marginal:
+            fail("SEM-G7", f"marginal {marginal_name} missing")
+            continue
+        buckets = {bucket["bucket"]: bucket for bucket in marginal["buckets"]}
+        if set(buckets) != {"top", "other", "unknown"}:
+            fail("SEM-G7", f"{marginal_name} buckets {sorted(buckets)}")
+        for bucket_name, bucket in buckets.items():
+            # The VISIBLE label must be the full bucket word (never 't'/'o'/'u' shorthand).
+            if bucket["label"] != bucket_name:
+                fail("SEM-G7", f"{marginal_name}.{bucket_name} label {bucket['label']!r} not legible")
+            want_value = str(wire["composition"][marginal_name][bucket_name])
+            if bucket["value"] != want_value:
+                fail("SEM-G7", f"{marginal_name}.{bucket_name} rendered {bucket['value']!r} "
+                     f"fixture {want_value!r}")
+        if not buckets.get("top", {}).get("category"):
+            fail("SEM-G7", f"{marginal_name} top bucket lacks data-category")
+
+    # ── R2 rows: spec/cell, paired evidence, receipt, budget facets, authority ────────────
+    expected_rows = wire["run_sample"][:len(probe["rows"])]
+
+    def unmark(value: Any) -> str:
+        """Strip the compact viewport's explicit semantic mark (`spec:` / `cmd:` / `said:`...).
+
+        The density ladder prefixes a mobile value with its field mark so a stranger never infers
+        field meaning from order; the underlying value is unchanged, so the semantic layer
+        compares the unmarked token against fixture truth.
+        """
+        text = str(value if value is not None else "")
+        head, sep, tail = text.partition(":")
+        return tail if sep and head.isalpha() and len(head) <= 5 else text
+
+    for index, row in enumerate(probe["rows"]):
+        expected = expected_rows[index] if index < len(expected_rows) else {}
+        if not row["values"].get("spec.cell"):
+            fail("SEM-R2", f"row {row['id']} missing spec/cell")
+        elif unmark(row["values"].get("spec.cell")) != str(expected.get("spec.cell")):
+            fail("SEM-R2", f"row {row['id']} spec {row['values'].get('spec.cell')!r} "
+                 f"fixture {expected.get('spec.cell')!r}")
+        if row["values"].get("evidence.advisory") == row["values"].get("evidence.measured"):
+            fail("SEM-R2", f"row {row['id']} ADVISORY claim equals MEASURED proof")
+        for field in ("decision.eligibility", "decision.receipt", "cost.provenance"):
+            if not row["values"].get(field):
+                fail("SEM-R2", f"row {row['id']} {field} empty")
+        budget = row["budget"] or {}
+        for facet in ("reserved", "cap", "headroom", "settlement"):
+            if not budget.get(facet):
+                fail("SEM-R2", f"row {row['id']} budget.{facet} missing")
+        if (row["values"].get("decision.eligibility") in GOVERNED_STATES
+                and not row["hasAuthority"]):
+            fail("SEM-R2", f"row {row['id']} governed decision lacks controller authority")
+
+    # ── R1 attention: reserved slots + non-increasing severity ranking ────────────────────
+    attention = probe["attention"]
+    if not attention:
+        fail("SEM-R1", "no attention items rendered")
+    else:
+        if attention[0]["cls"] != "decision":
+            fail("SEM-R1", f"first item is {attention[0]['cls']!r}, want decision")
+        if len(attention) > 1 and attention[1]["cls"] != "risk":
+            fail("SEM-R1", f"second item is {attention[1]['cls']!r}, want risk")
+    previous = 99
+    for item in attention[2:]:
+        if item["cls"] == "empty":
+            continue
+        rank = SEVERITY_RANKS.get(item["kind"], 99)
+        if rank > previous:
+            fail("SEM-R1", f"ranked order breaks: {item['kind']} after rank {previous}")
+        previous = min(previous, rank)
+    if fixture_id == "F-1" and any(item["cls"] == "empty" for item in attention):
+        fail("SEM-R1", "F-1 saturated inbox still shows empty filler")
+
+    # ── E-4: shell, trust share one control epoch ─────────────────────────────────────────
+    if str(probe["shellEpoch"]) != str(wire["control_epoch"]):
+        fail("SEM-E4", f"shell epoch {probe['shellEpoch']!r} fixture {wire['control_epoch']!r}")
+    if str(trust.get("trust.epoch")) != str(probe["shellEpoch"]):
+        fail("SEM-E4", f"trust epoch {trust.get('trust.epoch')!r} != shell {probe['shellEpoch']!r}")
+
+    # ── B-class carriers: every blind statement's element is present ──────────────────────
+    for carrier, present in (probe.get("carriers") or {}).items():
+        if not present:
+            fail("SEM-B", f"blind-comprehension carrier {carrier} missing")
+
+
 # ── Report ───────────────────────────────────────────────────────────────────────────────────
 
 
@@ -1471,8 +1941,8 @@ def write_report(results: list[dict[str, Any]], errors: list[str], report_path: 
         "# Control Room render gate",
         "",
         f"**Status:** {status}",
-        "**Classes:** geometry (IA §10.3 G-1..G-15) · charts (a1) · visuals (a2) · style (a3) · "
-        "live IA-core",
+        "**Classes:** geometry (IA §10.3 G-1..G-15) · semantics (IA §10 G/B: rendered vs fixture) · "
+        "charts (a1) · visuals (a2) · style (a3) · a11y (IA §10.5 A) · live IA-core",
         "**Fixtures:** F-0..F-7 (deterministic; no live Redis/clock/network — waiver W2)",
         f"**Viewports:** {', '.join(f'{k} {w}x{h}' for k, (w, h) in VIEWPORTS.items())}",
         f"**Themes:** {', '.join(THEMES)}",
@@ -1523,6 +1993,9 @@ def main() -> int:
                         help="also run the R4 SVG visual class (a2)")
     parser.add_argument("--style", action="store_true",
                         help="also run the styling/a11y class (a3)")
+    parser.add_argument("--a11y", action="store_true",
+                        help="also run the accessibility class (IA §10.5 A: names/roles/hidden/"
+                             "keyboard)")
     parser.add_argument("--live", action="store_true",
                         help="run the IA-core class against the live /api/* (no fixtures)")
     parser.add_argument("--base", default=None,
@@ -1559,6 +2032,9 @@ def main() -> int:
         if args.style:
             style_results, style_errors = run_style_gate(out, not args.no_screenshot)
             results, errors = results + style_results, errors + style_errors
+        if args.a11y:
+            a11y_results, a11y_errors = run_a11y_gate(out, not args.no_screenshot)
+            results, errors = results + a11y_results, errors + a11y_errors
         if args.live:
             live_results, live_errors = run_live_gate(out, not args.no_screenshot)
             results, errors = results + live_results, errors + live_errors

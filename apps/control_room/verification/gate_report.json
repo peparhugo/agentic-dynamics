@@ -479,6 +479,16 @@
       "screenshot": "/tmp/control_room_research_wt/apps/control_room/verification/style_mobile_dark_390x844.png"
     },
     {
+      "case": "a11y",
+      "viewport": "desktop",
+      "screenshot": "/tmp/control_room_research_wt/apps/control_room/verification/a11y_desktop_dark_1440x900.png"
+    },
+    {
+      "case": "a11y",
+      "viewport": "mobile",
+      "screenshot": "/tmp/control_room_research_wt/apps/control_room/verification/a11y_mobile_dark_390x844.png"
+    },
+    {
       "case": "live",
       "viewport": "desktop",
       "screenshot": "/tmp/control_room_research_wt/apps/control_room/verification/live_desktop_dark_1440x900.png"

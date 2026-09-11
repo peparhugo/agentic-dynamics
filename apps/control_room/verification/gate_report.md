@@ -1,13 +1,13 @@
 # Control Room render gate
 
 **Status:** PASS
-**Classes:** geometry (IA §10.3 G-1..G-15) · charts (a1) · visuals (a2) · style (a3) · live IA-core
+**Classes:** geometry (IA §10.3 G-1..G-15) · semantics (IA §10 G/B: rendered vs fixture) · charts (a1) · visuals (a2) · style (a3) · a11y (IA §10.5 A) · live IA-core
 **Fixtures:** F-0..F-7 (deterministic; no live Redis/clock/network — waiver W2)
 **Viewports:** desktop 1440x900, narrow 1024x768, mobile 390x844
 **Themes:** dark, light, forced-colors
 **Primitives:** present/unique · in-viewport · non-zero box · no page/region scroll · WCAG-AA contrast · first-paint · console-clean
 
-**Screenshots:** 84 (F-0 9, F-1 9, F-2 9, F-3 9, F-4 9, F-5 9, F-6 9, F-7 9, history 3, live 3, style 3, visuals 3)
+**Screenshots:** 86 (F-0 9, F-1 9, F-2 9, F-3 9, F-4 9, F-5 9, F-6 9, F-7 9, a11y 2, history 3, live 3, style 3, visuals 3)
 
 No violations.
 
@@ -94,6 +94,8 @@ No violations.
 - `/tmp/control_room_research_wt/apps/control_room/verification/style_desktop_dark_1440x900.png` — style/desktop
 - `/tmp/control_room_research_wt/apps/control_room/verification/style_narrow_dark_1024x768.png` — style/narrow
 - `/tmp/control_room_research_wt/apps/control_room/verification/style_mobile_dark_390x844.png` — style/mobile
+- `/tmp/control_room_research_wt/apps/control_room/verification/a11y_desktop_dark_1440x900.png` — a11y/desktop
+- `/tmp/control_room_research_wt/apps/control_room/verification/a11y_mobile_dark_390x844.png` — a11y/mobile
 - `/tmp/control_room_research_wt/apps/control_room/verification/live_desktop_dark_1440x900.png` — live/desktop
 - `/tmp/control_room_research_wt/apps/control_room/verification/live_narrow_dark_1024x768.png` — live/narrow
 - `/tmp/control_room_research_wt/apps/control_room/verification/live_mobile_dark_390x844.png` — live/mobile

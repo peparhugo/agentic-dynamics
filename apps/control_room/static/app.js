@@ -420,6 +420,9 @@
     var item = element("li", "attention-item", {
       "data-attention-class": config.kind,
       "data-item-key": config.key,
+      // An answer-bearing item is an interactive work item (A-4: role + accessible name);
+      // ranked/empty rows are ordinary list items.
+      role: config.answer ? "button" : null,
       tabindex: config.answer ? "0" : null,
       "aria-label": config.ariaLabel || null,
     });
@@ -1062,14 +1065,42 @@
     }
     ladder.appendChild(renderAttemptFeed(run));
     dock.hidden = false;
+    // Contain keyboard focus while the modal dock owns the screen (A-1).
+    dock.addEventListener("keydown", trapDockFocus);
     dockOrigin = origin || null;
     var close = document.getElementById("dock-close");
     if (close) close.focus();
   }
 
+  /**
+   * A-1 focus containment (IA §10.5): while the modal dock is open, Tab must cycle within it,
+   * never escape to the resting roster behind. Shift+Tab from the first wraps to the last and
+   * Tab from the last wraps to the first.
+   */
+  function trapDockFocus(event) {
+    if (event.key !== "Tab") return;
+    var dock = document.getElementById("selection-dock");
+    if (!dock || dock.hidden) return;
+    var focusables = dock.querySelectorAll(
+      "button, [href], input, select, textarea, [tabindex]:not([tabindex='-1'])");
+    if (!focusables.length) return;
+    var first = focusables[0];
+    var last = focusables[focusables.length - 1];
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first.focus();
+    }
+  }
+
   function closeDock() {
     var dock = document.getElementById("selection-dock");
-    if (dock) dock.hidden = true;
+    if (dock) {
+      dock.hidden = true;
+      dock.removeEventListener("keydown", trapDockFocus);
+    }
     // Stop feeding a run the operator is no longer inspecting.
     AppState.feedRunId = null;
     AppState.feedBuffer = [];
