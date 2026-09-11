@@ -2,20 +2,28 @@
 status: accepted
 ---
 
-# Control Room — direction: the live run as the unit of work (campaign `control_room_research_repair`, phase `p1_rework_direction`)
+# Control Room — direction and facelift brief: the live run as the unit of work (campaign `control_room_research_repair`, phases `p1_rework_direction` + `p6_refresh_brief`)
 
 **Date:** 2026-09-11
 **Supersedes:** the r5/r7 `control_room_direction.md` facelift brief (retained as the rejected
 baseline; the specific drops are enumerated in §6).
 **Inputs:** the measured baseline `docs/research/control_room_audit.md` (r0), the operator-needs
 contract `docs/research/control_room_questions.md` (r1), the **repaired** taxonomy/catalogs/skills
-`experiments/research/control_room/{taxonomy,catalogs,skills}.json` (p0), and the three adversary
-passes r6a (`..._entailment.md`), r6b (`..._design.md`), r6c (`..._ia.md`).
-**Repair status:** the p0 repair replaced every inflated support count with direct raw-label support;
-`board-per-domain`, `source-provenance`, `degraded-banner`, `uncertainty-encoding`, `audit-trail`,
-`budget-thresholds` and `quota-wallet` were deleted as unsupported, and ten catalog moves are now
-explicit `[P]`. This direction cites only the repaired counts and marks every unsupported move `[P]`
-(`docs/reviews/control_room_taxonomy_repair.md`).
+`experiments/research/control_room/{taxonomy,catalogs,skills}.json` (p0), the one-resting-screen IA
+`docs/research/control_room_ia.md` (p2), and the three repair adversary passes p3 entailment
+(`docs/reviews/control_room_repair_entailment.md`), p4 design
+(`docs/reviews/control_room_repair_design.md`), and p5 IA
+(`docs/reviews/control_room_repair_ia.md`).
+**Brief refresh (p6).** This revision incorporates the repaired supports (with the p3 E1/E4 caveat
+still open), the reworked run-first direction, the p2 glance mapping, and every p3/p4/p5 adversary
+disposition (§16–§18). Acceptance criteria now include the render gate at desktop+mobile, contrast,
+no regressions, and the **one-resting-screen glance check**. The brief is **conditional**: the p3/p4/p5
+blockers are open and must close before the facelift is accepted (see §17).
+**Repair status:** the p0 repair replaced the originally inflated support counts for the deleted nodes
+(`board-per-domain`, `source-provenance`, `degraded-banner`, `uncertainty-encoding`, `audit-trail`,
+`budget-thresholds`, `quota-wallet`) and marked ten catalog moves `[P]`. The p3 re-check found the
+crosswalk still promotes some adjacent labels (E1/E4); those surviving counts are treated as
+provisional `[P]`/`[X]` in this brief until repaired.
 
 **What this document is.** A design direction, not a mockup and not a chart gallery. It says what the
 room is *for* (operating many CLI AI agents by triaging live runs and making governed decisions), what
@@ -93,22 +101,29 @@ moved between lenses (`[M]`; r6c IA10).
 
 ### 2.2 Lifecycle
 
-The run state machine, aligned to the control db's enforced transitions and the packet's derivations
-(`active_runs`, `awaiting_approvals`, `promotable_runs`, `failed_runs`; `[M]`):
+The run state machine is the control db's enforced `RunState` graph, not a re-derived one
+(`src/agentic_dynamics/control/control_db.py:171-208`; the packet derives `active_runs`,
+`awaiting_approvals`, `promotable_runs`, `failed_runs` from it; `[M]`):
 
 ```text
-proposed -> queued -> leased -> running
-    running -> { phase -> attempt }* -> awaiting-evidence
-    awaiting-evidence -> verified | flagged
-    verified -> awaiting-decision   (approve / promote / cancel / retire)
-    awaiting-decision -> settled    (merged / archived / superseded)
-    any -> failed | dead-letter     (terminal, keeps identity)
+queued -> running
+    running          -> awaiting_approval | verifying | promotable
+    awaiting_approval -> running | verifying
+    verifying        -> running | awaiting_approval | promotable
+    promotable -> promoting -> merged -> projecting -> published
+    {any non-terminal} -> failed | quarantined
+    {queued, running, awaiting_approval, verifying, promotable, promoting} -> cancelled
 ```
 
+The UX may render a simplified lifecycle label, but that label must be `[P]` and map exhaustively to
+a `RunState`; only the database graph underwrites `safe_actions`. The earlier
+"proposed/leased/awaiting-evidence/settled/archived/superseded/dead-letter" sketch is withdrawn as a
+`[M]` claim (p3 E2): it named states the database does not enforce.
+
 `phases_completed/phases_total`, `current_phase`, `changed-at`, and `attention state` are the
-lifecycle facts shown per roster row (`[M]`; r6c). The room renders the database's state, never a
-re-derived one: `safe_actions` come from the same transition graph the database enforces (`[M]`;
-r0 M3, r6c IA3).
+lifecycle facts shown per roster row (`[M]`; the packet's `active_runs`/`promotable_runs` entries carry
+phase counts). The room renders the database's state, never a re-derived one: `safe_actions` come from
+the same transition graph the database enforces (`[M]`; r0 M3, r6c IA3).
 
 ### 2.3 Cost
 
@@ -519,7 +534,7 @@ The implementation is graded against these; each maps to a required disposition.
 
 | # | Criterion | Source |
 |---|---|---|
-| 1 | The run is the default addressable object; ON-G1..G6 answerable at rest without board hopping | r6c IA1/IA2, r6b D1/D2 |
+| 1 | The run is the default addressable object; `ON-G1..G7` answerable at rest per the §16 contract (desktop) | r6c IA1/IA2, r6b D1/D2, p5 IA1–IA4 |
 | 2 | The run object renders all four facets (lifecycle, cost, evidence, decision) for the selected run | §2 |
 | 3 | The control packet is the current-state authority with epoch and derived safe actions | r6c IA3 |
 | 4 | Durable attention inbox with the field model and transition-only announcements | r6b D3, r6c IA4 |
@@ -537,16 +552,138 @@ The implementation is graded against these; each maps to a required disposition.
 | 16 | Truthful in-room alert language; no false interrupt promise | r6c IA6 |
 | 17 | All no-regression guardrails hold | r0 §9 |
 | 18 | Inflated support claims are `[P]`/`[X]` after the p0 repair; no consensus claims | r6a E1–E8 |
+| 19 | Render gate: Playwright screenshots + size/overflow/aspect/contrast/first-paint/console checks pass at desktop **and** mobile, zero failures | campaign §a5; §18.1 |
+| 20 | One-resting-screen glance check: every required `ON-G*` answer is visible at rest with no page/region scroll per breakpoint, and blind reviewers identify each answer | p5 IA8; §16, §18.2 |
+| 21 | Every `OPEN` p3/p4/p5 disposition is closed or explicitly downgraded with the open item recorded | p3 E1–E5, p4 D1–D9, p5 IA1–IA11; §17 |
 
 ---
 
-## 15. Open items
+## 15. Open items (direction line)
 
 - **Implementation.** The facelift itself is a later phase; this document is the direction it executes.
 - **Exemplar weakening.** The run-object pattern rests on thin/single-family evidence in places
   (master–detail 4 craft-only; waterfall timeline / session grouping / eval loop / cost attribution
   agentops-only; prompt registry 3). Those moves are labelled `[X]` with the caveat, not consensus.
 - **Deferred external notifications** remain a named decision, not a silent promise (`[IA6]`).
+
+---
+
+## 16. The resting screen — glance mapping (brief)
+
+The IA contract is `docs/research/control_room_ia.md` (p2). This section records the authoritative
+per-breakpoint decision the p6 brief makes to resolve the p5 IA1–IA4 blockers; the IA artifact must be
+regenerated to match.
+
+**Authoritative contract (resolves IA1/IA2/IA3/IA4):**
+
+| Breakpoint | Contract |
+|---|---|
+| Desktop ≥ 1440×900 | `ON-G1..G7` all visible in the initial viewport, with **no page scroll and no R3 scroll**. |
+| Narrow desktop ≥ 1024×768 | `ON-G1..G7` all visible; R3 stays a side rail rendered as a **bounded ticker** that preserves worker/projection state, all five money values, and bounded composition counts. No required answer below the fold. |
+| Mobile 390×844 | Triage/inspection column answers `ON-G1..G6`; `ON-G7` is an explicit, documented secondary view (p2 T4). |
+
+**Glance mapping (region ids per p2 §1):**
+
+| Need | Region | At-rest answer |
+|---|---|---|
+| `ON-G1` up / connected | R0 + R3b | separately named browser-connection, control-plane, worker, and projection states with ages |
+| `ON-G2` running / queued / failed / live | R2 | keyed run roster with phase/lifecycle/live/change state |
+| `ON-G3` failing / stalled / at risk | R1b | durable, ranked attention items with identity and state |
+| `ON-G4` spend / burn / quota / wallet / leases | R3a | the five labelled values + a money-risk exception marker |
+| `ON-G5` decision from me | R1a (+ R2 flag) | decision objects with target, kind, epoch, and action eligibility |
+| `ON-G6` fresh / trustworthy | R0.degraded + per-value chips | global degraded summary + source/age on every consequential value |
+| `ON-G7` fleet shape | R3c | bounded composition counts (model × condition × provider × lifecycle) |
+
+**Binding requirements from the p4/p5 dispositions:**
+
+1. **Agent-native identity (D2).** Each actionable R2 row (or the roster header) must show
+   session/agent id, worktree/terminal target, current command/tool, provider+model, and attempt.
+2. **Global attention ordering (IA6).** R1 is ranked by severity × actionability, not by fixed
+   category; critical capacity is reserved so a new failure cannot be buried by decisions.
+3. **Bounded composition (IA4/IA7).** R3c is a bounded set of marginals (capped groups with explicit
+   `other`/`unknown`), never an unbounded cross-product.
+4. **At-rest action eligibility (IA9/D7).** A row exposes compact eligibility
+   (`observe`/`inspect`/`approve`/`promote`/`cancel`/`retire`/none); the full preview stays in R4.
+5. **Tiered provenance (IA11/D6).** Glance shows state + age + one authority marker; full provenance
+   and event links live in R4. Split summaries (`ON-G1`, `ON-G6`) share one explicit epoch/age.
+6. **Selected-state persistence (IA10).** One arrangement per breakpoint; every region promised to
+   remain visible is tested.
+
+## 17. Adversary dispositions (p3 entailment, p4 design, p5 IA)
+
+Each repair adversary was read-only. "CLOSED (brief)" means this brief now contains the corrective
+contract; "SPECIFIED" means the required disposition and acceptance check are recorded but the
+reviewed artifact/implementation still needs the change; "OPEN" means the brief cannot close it and it
+remains a blocker.
+
+| ID | Severity | Required disposition | Status |
+|---|---|---|---|
+| E1 | BLOCKER | Rebuild the crosswalk from record-level direct evidence; regenerate taxonomy/catalogs/skills/direction/IA; downgrade moves that lose backing to `[P]`. | **OPEN** |
+| E2 | HIGH | Use the real `RunState` graph (or label the UX lifecycle `[P]` with a total mapping). | **CLOSED (brief §2.2)** |
+| E3 | MEDIUM | Fix the narrow-desktop glance contract (minimum ticker schema or explicit narrowing). | **CLOSED (brief §16)** |
+| E4 | MEDIUM | Enforce one-leaf-per-label, or document/test explicit many-to-many evidence roles. | **OPEN** |
+| E5 | MEDIUM | Normalize claim classes: `[M]` repo facts, `[X]` external, `[P]` placement/policy. | **OPEN** (prose pass pending) |
+| D1 | BLOCKER | Replace a primary structural axis with agent/run-native grammar; blind screenshot test vs a generic-dashboard comparator. | **OPEN** |
+| D2 | BLOCKER | Make agent/session/worktree/current-command identity primary on the resting screen; define visible CLI address grammar. | **SPECIFIED** (brief §16.1; implementation pending) |
+| D3 | HIGH | Specify measurable region budgets + breakpoints + ticker schema; test comprehension. | **CLOSED (brief §16/§18)** |
+| D4 | HIGH | Separate "pattern exists" from "composition is distinctive"; keep composition `[P]`; re-ground after E1/E4. | **OPEN** |
+| D5 | HIGH | Define a domain-specific visual grammar for run/evidence/action; tokens are hygiene. | **OPEN** |
+| D6 | MEDIUM-HIGH | Tier provenance; distinct channels for decisions/failures/advisories; scan-time test. | **SPECIFIED** (brief §16.5) |
+| D7 | MEDIUM-HIGH | Surface action eligibility at rest without automatic actuation. | **SPECIFIED** (brief §16.4) |
+| D8 | MEDIUM | Name desktop/narrow/mobile contracts; five-capture blind screenshot set. | **CLOSED (brief §16)** |
+| D9 | MEDIUM | Restraint budget + blind "generic dashboard vs Control Room" comparison. | **OPEN** |
+| IA1 | BLOCKER | One authoritative per-breakpoint contract across r1/p1/p2. | **CLOSED (brief §16)** |
+| IA2 | BLOCKER | No required glance answer may depend on page/R3 scroll; complete ticker schema. | **CLOSED (brief §16)** |
+| IA3 | CRITICAL | Guarantee the five `ON-G4` values at rest, or formally narrow r1. | **CLOSED (brief §16: five values at desktop)** |
+| IA4 | CRITICAL | Bounded `ON-G7` rollup at rest, or formally move it out of the universal glance contract. | **CLOSED (brief §16)** |
+| IA5 | HIGH | One canonical answer per need; shared epoch/age for split summaries; remove duplicate writers. | **SPECIFIED** (brief §16.5) |
+| IA6 | HIGH | Global severity ranking or reserved critical capacity; saturated-inbox fixture. | **SPECIFIED** (brief §16.2) |
+| IA7 | HIGH | Region dimensions, type floor, row caps, truncation, bounded cardinality. | **SPECIFIED** (brief §16.3; budgets in §18) |
+| IA8 | HIGH | Split acceptance into screenshot, blind comprehension, browser/a11y, and event/state tests. | **CLOSED (brief §18)** |
+| IA9 | MEDIUM-HIGH | Compact action eligibility at rest; full preview in R4. | **SPECIFIED** (brief §16.4) |
+| IA10 | MEDIUM | One selected-state arrangement per breakpoint; test region persistence. | **SPECIFIED** (brief §16.6) |
+| IA11 | MEDIUM | Enumerate per-region provenance fields; align the acceptance test. | **SPECIFIED** (brief §16.5) |
+
+## 18. Facelift brief — acceptance criteria, render gate, and glance check
+
+**Scope.** Re-compose and restyle `apps/control_room/static/` only. No framework migration or build
+step; no new mutating route class or automatic actuation; no new persistence plane or decorative
+poller; no invented telemetry (`[M]`; r0 §9, §12.2).
+
+**Acceptance criteria.**
+
+1. **Render gate (desktop + mobile).** A new `verify_control_room_rendering.py` (patterned on the
+   website's `verify_svg_rendering.py`) captures Playwright screenshots and runs gate-style checks
+   (size / overflow / aspect / contrast / first-paint / console) at desktop **and** mobile breakpoints.
+   **Zero failures at both breakpoints**; per-page screenshots retained; no regressions against the
+   current portal.
+2. **One-resting-screen glance check (new).** At the desktop breakpoint every required `ON-G1..G7`
+   region intersects the initial viewport with no page or R3 scroll; at narrow desktop the bounded
+   ticker preserves the `ON-G1/G4/G7` answer tokens; at mobile `ON-G1..G6` are present and `ON-G7` is
+   explicitly deferred. Blind reviewers must identify each answer and the correct next action.
+3. **Contrast.** WCAG 2.2 AA: ≥ 4.5:1 body text, ≥ 3:1 large text, in both themes and forced-colors
+   (`[X]` `[src:wcag-contrast]` `[src:mdn-forced-colors]`).
+4. **Accessibility bar.** §12.1 holds: non-colour status, semantic table controls, one transition-only
+   live region, labelled dialogs with focus containment/return, keyboard operation.
+5. **No regressions.** The eight measured guardrails in §12.2 hold, plus the control-packet authority,
+   the mutation/idempotency boundary, keyed write-on-change rendering, and the no-build constraint.
+6. **Adversary closure.** Every `OPEN` disposition in §17 is closed (or, for E1/E4, explicitly
+   downgraded to `[P]` with the open item recorded) before the facelift is accepted.
+
+**Gate order.** p5 IA8 fixes the test classes: (1) screenshot geometry, (2) blind comprehension,
+(3) browser/accessibility automation, (4) event/network/state. A pass requires all four; DOM presence
+alone is not a pass.
+
+## 19. Open blockers carried into the facelift
+
+- **E1/E4 (taxonomy entailment).** The repaired crosswalk still promotes adjacent labels; surviving
+  `[X]` counts are provisional. Repair the crosswalk (record-level evidence) or downgrade to `[P]`.
+- **D1/D4/D5/D9 (design).** The resting shell is still dashboard-shaped, exemplar grounding does not
+  establish a distinctive composition, the visual grammar is non-differentiating, and the restraint
+  budget is unset. These are `[P]` design work, not corpus claims.
+- **E3/E5/IA contract in artifacts.** The brief fixes the contract text; the p2 IA artifact and the
+  p1 direction prose still need the matching regeneration and claim-class pass.
+- **Implementation.** The facelift itself (a1–a7) has not started.
 
 ---
 
