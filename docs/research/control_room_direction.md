@@ -471,12 +471,14 @@ glance needs the audit found partial or absent (`[M]`; r0 §4, r1 §4.1):
   freshness, not one badge (`[M]`; r0 M2, A1).
 - `ON-G2` running / queued / failed / live — the run roster, live state always visible (`[M]`; r0 M7).
 - `ON-G3` failing / stalled / at risk — durable attention inbox items, not a count (`[M]`; r0 M2, A2).
-- `ON-G4` money — a money-risk exception at rest; full spend/burn/windows/wallet/leases in the run
-  context and the Money lens (`[M]`; r0 M1).
+- `ON-G4` money — **all five** labelled values (spend, burn, provider-window %, wallet headroom,
+  reserved leases) at rest in `R3a`, plus a money-risk exception marker; the full ledger is the Money
+  lens (`[M]`; r0 M1; canonical contract in `control_room_ia.md` §4).
 - `ON-G5` decision needed — actionable decision objects (`[M]`; r0 M3, A3).
 - `ON-G6` fresh / trustworthy — per-object truth + a compact global degraded summary (`[M]`; r0 M2,
   A10).
-- `ON-G7` fleet shape — a secondary composition lens, performance separated (`[M]`; r0 A6).
+- `ON-G7` fleet shape — a **bounded** composition rollup at rest in `R3c` (model × condition ×
+  provider × lifecycle); performance is a separate lens (`[M]`; r0 A6).
 - Drill-down `ON-D1..D7` — one run, step by step, why flagged, safe action, route, cost-by-step, and
   background-session management, all from the run object (`[M]`; r0 §4).
 - Alert `ON-A1..A6` — failure, unhealthy worker/projection, threshold, pending decision, flag,
@@ -563,7 +565,8 @@ Disclosure:  roster (fleet) -> selected run -> evidence detail
 Attention:   observation -> state transition -> attention item -> resolution
 ```
 
-- **Glance:** the resting roster + inbox + truth strip answer ON-G1..G6 without another board.
+- **Glance:** the resting roster + inbox + truth strip answer all of ON-G1..G7 without another board
+  (canonical contract per `control_room_ia.md` §4).
 - **Drill-down:** one selection opens the full run (identity → lifecycle → evidence → cost →
   decision → record) with no board hopping.
 - **Alert:** durable inbox items, transition-only polite announcements; foreground pull-first, with an
@@ -636,7 +639,7 @@ automatic actuation; no new persistence plane or decorative poller; no invented 
 
 | # | Disposition in this direction |
 |---|---|
-| M1 | quota/wallet/leases become a run cost facet + a Money lens; money-risk exception at rest `[P]` grouping |
+| M1 | quota/wallet/leases become a run cost facet + the five-value `R3a` at rest (canonical contract) + the Money lens; grouping is `[P]` |
 | M2 | projection health renders as per-object truth + global degraded summary |
 | M3 | the control packet is the current-state authority (runs, approvals, promotable, failed, workers, lag, epoch, `safe_actions`) |
 | M4 | registry lineage is reachable from the run/decision, not only a destination |
@@ -712,46 +715,52 @@ The implementation is graded against these; each maps to a required disposition.
 
 ---
 
-## 16. The resting screen — glance mapping (brief)
+## 16. The resting screen — the canonical glance contract (brief)
 
-The IA contract is `docs/research/control_room_ia.md` (p2). This section records the authoritative
-per-breakpoint decision the p6 brief makes to resolve the p5 IA1–IA4 blockers; the IA artifact must be
-regenerated to match.
+The IA contract now lives in `docs/research/control_room_ia.md` (q2, `q2_glance_proof`). This section
+is a pointer, not a second contract: **one canonical `ON-G1..G7` list, above the fold at both
+1440×900 and 390×844 with no page or region scroll.** The earlier brief's mobile `ON-G7` omission and
+narrow-desktop ticker fallback are withdrawn (p5 IA1/IA2/IA4); the q2 IA document carries the
+per-need region, visible content, both above-fold assertions, the pixel budget, and the Playwright
+acceptance checks.
 
-**Authoritative contract (resolves IA1/IA2/IA3/IA4):**
+**Authoritative contract:**
 
 | Breakpoint | Contract |
 |---|---|
-| Desktop ≥ 1440×900 | `ON-G1..G7` all visible in the initial viewport, with **no page scroll and no R3 scroll**. |
-| Narrow desktop ≥ 1024×768 | `ON-G1..G7` all visible; R3 stays a side rail rendered as a **bounded ticker** that preserves worker/projection state, all five money values, and bounded composition counts. No required answer below the fold. |
-| Mobile 390×844 | Triage/inspection column answers `ON-G1..G6`; `ON-G7` is an explicit, documented secondary view (p2 T4). |
+| Desktop ≥ 1440×900 | `ON-G1..G7` all visible in the initial viewport, **no page scroll and no region scroll**. |
+| Narrow desktop ≥ 1024×768 | Same seven answers, same regions; only the column widths change. No below-fold placement. |
+| Mobile 390×844 | Same seven answers in one stacked column; the §3.2 mobile pixel budget (676 ≤ 844) proves they fit with no page scroll. |
 
-**Glance mapping (region ids per p2 §1):**
+**Glance mapping (region ids per IA §1; all seven answer at both breakpoints):**
 
-| Need | Region | At-rest answer |
+| Need | Canonical region | At-rest answer |
 |---|---|---|
 | `ON-G1` up / connected | R0 + R3b | separately named browser-connection, control-plane, worker, and projection states with ages |
-| `ON-G2` running / queued / failed / live | R2 | keyed run roster with phase/lifecycle/live/change state |
-| `ON-G3` failing / stalled / at risk | R1b | durable, ranked attention items with identity and state |
-| `ON-G4` spend / burn / quota / wallet / leases | R3a | the five labelled values + a money-risk exception marker |
-| `ON-G5` decision from me | R1a (+ R2 flag) | decision objects with target, kind, epoch, and action eligibility |
-| `ON-G6` fresh / trustworthy | R0.degraded + per-value chips | global degraded summary + source/age on every consequential value |
-| `ON-G7` fleet shape | R3c | bounded composition counts (model × condition × provider × lifecycle) |
+| `ON-G2` running / queued / failed / live | R2 | keyed run roster with counts, phase/lifecycle/live/change state |
+| `ON-G3` failing / stalled / at risk | R1b | durable, globally severity-ranked attention items with identity and state |
+| `ON-G4` spend / burn / quota / wallet / leases | R3a | **all five** labelled values + a money-risk exception marker |
+| `ON-G5` decision from me | R1a (canonical) + R2 mirror | decision objects with target, kind, epoch, and eligibility token |
+| `ON-G6` fresh / trustworthy | R0.degraded + per-value chips | global degraded summary + source/age on every consequential value, one shared epoch |
+| `ON-G7` fleet shape | R3c | bounded composition marginals (model × condition × provider × lifecycle) |
 
-**Binding requirements from the p4/p5 dispositions:**
+**Binding requirements from the p4/p5 dispositions (detail in the IA doc):**
 
 1. **Agent-native identity (D2).** Each actionable R2 row (or the roster header) must show
    session/agent id, worktree/terminal target, current command/tool, provider+model, and attempt.
 2. **Global attention ordering (IA6).** R1 is ranked by severity × actionability, not by fixed
    category; critical capacity is reserved so a new failure cannot be buried by decisions.
 3. **Bounded composition (IA4/IA7).** R3c is a bounded set of marginals (capped groups with explicit
-   `other`/`unknown`), never an unbounded cross-product.
+   `other`/`unknown`), never an unbounded cross-product, and it answers at mobile too.
 4. **At-rest action eligibility (IA9/D7).** A row exposes compact eligibility
    (`observe`/`inspect`/`approve`/`promote`/`cancel`/`retire`/none); the full preview stays in R4.
 5. **Tiered provenance (IA11/D6).** Glance shows state + age + one authority marker; full provenance
    and event links live in R4. Split summaries (`ON-G1`, `ON-G6`) share one explicit epoch/age.
 6. **Selected-state persistence (IA10).** One arrangement per breakpoint; every region promised to
-   remain visible is tested.
+   remain visible is tested (IA §3.3 / §10).
+7. **Mechanical acceptance.** The IA §10 selector contract (`[data-region]`, `[data-answer]`,
+   `[data-field]`) and the five geometry primitives are what the render gate implements; a passing
+   screenshot must show all seven answers, not merely the region anchors.
 
 ## 17. Adversary dispositions (p3 entailment, p4 design, p5 IA)
 
@@ -764,29 +773,29 @@ remains a blocker.
 |---|---|---|---|
 | E1 | BLOCKER | Rebuild the crosswalk from record-level direct evidence; regenerate taxonomy/catalogs/skills/direction/IA; downgrade moves that lose backing to `[P]`. | **CLOSED (q0 semantic crosswalk; §4 re-grounded)** |
 | E2 | HIGH | Use the real `RunState` graph (or label the UX lifecycle `[P]` with a total mapping). | **CLOSED (brief §2.2)** |
-| E3 | MEDIUM | Fix the narrow-desktop glance contract (minimum ticker schema or explicit narrowing). | **CLOSED (brief §16)** |
+| E3 | MEDIUM | Fix the narrow-desktop glance contract (minimum ticker schema or explicit narrowing). | **CLOSED (q2 IA §4: all seven answers at 1024×768; ticker withdrawn)** |
 | E4 | MEDIUM | Enforce one-leaf-per-label, or document/test explicit many-to-many evidence roles. | **CLOSED (q0: one direct leaf per label, verified in build)** |
 | E5 | MEDIUM | Normalize claim classes: `[M]` repo facts, `[X]` external, `[P]` placement/policy. | **CLOSED (brief §4.0; composition claims forced `[P]`)** |
 | D1 | BLOCKER | Replace a primary structural axis with agent/run-native grammar; blind screenshot test vs a generic-dashboard comparator. | **CLOSED (brief §4: session-first moves + §4.3 removed list + blind comparator)** |
 | D2 | BLOCKER | Make agent/session/worktree/current-command identity primary on the resting screen; define visible CLI address grammar. | **SPECIFIED** (brief §4.1 Move 1 + §16.1; implementation pending) |
-| D3 | HIGH | Specify measurable region budgets + breakpoints + ticker schema; test comprehension. | **CLOSED (brief §16/§18)** |
+| D3 | HIGH | Specify measurable region budgets + breakpoints + ticker schema; test comprehension. | **CLOSED (q2 IA §3.2 pixel budget + §10 comprehension tests)** |
 | D4 | HIGH | Separate "pattern exists" from "composition is distinctive"; keep composition `[P]`; re-ground after E1/E4. | **CLOSED (brief §4.0/§4.1; re-grounded to q0 supports)** |
 | D5 | HIGH | Define a domain-specific visual grammar for run/evidence/action; tokens are hygiene. | **CLOSED (brief §4.4)** |
 | D6 | MEDIUM-HIGH | Tier provenance; distinct channels for decisions/failures/advisories; scan-time test. | **SPECIFIED** (brief §4.1 Move 4 + §16.5) |
 | D7 | MEDIUM-HIGH | Surface action eligibility at rest without automatic actuation. | **SPECIFIED** (brief §4.1 Move 3 + §16.4) |
 | D8 | MEDIUM | Name desktop/narrow/mobile contracts; five-capture blind screenshot set. | **CLOSED (brief §16)** |
 | D9 | MEDIUM | Restraint budget + blind "generic dashboard vs Control Room" comparison. | **CLOSED (brief §4.5 + §4.3)** |
-| IA1 | BLOCKER | One authoritative per-breakpoint contract across r1/p1/p2. | **CLOSED (brief §16)** |
-| IA2 | BLOCKER | No required glance answer may depend on page/R3 scroll; complete ticker schema. | **CLOSED (brief §16)** |
-| IA3 | CRITICAL | Guarantee the five `ON-G4` values at rest, or formally narrow r1. | **CLOSED (brief §16: five values at desktop)** |
-| IA4 | CRITICAL | Bounded `ON-G7` rollup at rest, or formally move it out of the universal glance contract. | **CLOSED (brief §16)** |
-| IA5 | HIGH | One canonical answer per need; shared epoch/age for split summaries; remove duplicate writers. | **SPECIFIED** (brief §16.5) |
-| IA6 | HIGH | Global severity ranking or reserved critical capacity; saturated-inbox fixture. | **SPECIFIED** (brief §16.2) |
-| IA7 | HIGH | Region dimensions, type floor, row caps, truncation, bounded cardinality. | **SPECIFIED** (brief §16.3; budgets in §18) |
-| IA8 | HIGH | Split acceptance into screenshot, blind comprehension, browser/a11y, and event/state tests. | **CLOSED (brief §18)** |
-| IA9 | MEDIUM-HIGH | Compact action eligibility at rest; full preview in R4. | **SPECIFIED** (brief §16.4) |
-| IA10 | MEDIUM | One selected-state arrangement per breakpoint; test region persistence. | **SPECIFIED** (brief §16.6) |
-| IA11 | MEDIUM | Enumerate per-region provenance fields; align the acceptance test. | **SPECIFIED** (brief §16.5) |
+| IA1 | BLOCKER | One authoritative per-breakpoint contract across r1/p1/p2. | **CLOSED (q2 IA §4: one canonical `ON-G1..G7` list, both breakpoints)** |
+| IA2 | BLOCKER | No required glance answer may depend on page/R3 scroll; complete ticker schema. | **CLOSED (q2 IA §3.2/§10: budgets + no-scroll primitives; ticker withdrawn)** |
+| IA3 | CRITICAL | Guarantee the five `ON-G4` values at rest, or formally narrow r1. | **CLOSED (q2 IA §4: all five values at 1440×900 and 390×844)** |
+| IA4 | CRITICAL | Bounded `ON-G7` rollup at rest, or formally move it out of the universal glance contract. | **CLOSED (q2 IA §4/T4: bounded `R3c` at both breakpoints; no mobile omission)** |
+| IA5 | HIGH | One canonical answer per need; shared epoch/age for split summaries; remove duplicate writers. | **CLOSED (q2 IA §4/§8: `R1a` canonical, one epoch for `ON-G1`/`ON-G6`)** |
+| IA6 | HIGH | Global severity ranking or reserved critical capacity; saturated-inbox fixture. | **CLOSED (q2 IA §2: severity×actionability ranking + reserved slot; fixture F-1)** |
+| IA7 | HIGH | Region dimensions, type floor, row caps, truncation, bounded cardinality. | **CLOSED (q2 IA §3.2 budget + §10 type floor/row caps + bounded `R3c`)** |
+| IA8 | HIGH | Split acceptance into screenshot, blind comprehension, browser/a11y, and event/state tests. | **CLOSED (q2 IA §10: classes G/B/A/E with five geometry primitives)** |
+| IA9 | MEDIUM-HIGH | Compact action eligibility at rest; full preview in R4. | **CLOSED (q2 IA §2: eligibility token on `R1a`/`R2` mirror)** |
+| IA10 | MEDIUM | One selected-state arrangement per breakpoint; test region persistence. | **CLOSED (q2 IA §3.3: fixed desktop/mobile selected-state; every region tested)** |
+| IA11 | MEDIUM | Enumerate per-region provenance fields; align the acceptance test. | **CLOSED (q2 IA §8: per-region provenance inventory; `AC-7`/G-4 aligned)** |
 
 ## 18. Facelift brief — acceptance criteria, render gate, and glance check
 
@@ -801,10 +810,11 @@ poller; no invented telemetry (`[M]`; r0 §9, §12.2).
    (size / overflow / aspect / contrast / first-paint / console) at desktop **and** mobile breakpoints.
    **Zero failures at both breakpoints**; per-page screenshots retained; no regressions against the
    current portal.
-2. **One-resting-screen glance check (new).** At the desktop breakpoint every required `ON-G1..G7`
-   region intersects the initial viewport with no page or R3 scroll; at narrow desktop the bounded
-   ticker preserves the `ON-G1/G4/G7` answer tokens; at mobile `ON-G1..G6` are present and `ON-G7` is
-   explicitly deferred. Blind reviewers must identify each answer and the correct next action.
+2. **One-resting-screen glance check.** At **both** 1440×900 and 390×844 (and narrow desktop
+   1024×768), all seven `ON-G1..G7` answer anchors are present, non-zero, and fully inside the initial
+   viewport with no page scroll and no region scroll; the five geometry primitives and the §10
+   selector map in `control_room_ia.md` are the implementation contract. Blind reviewers must identify
+   each answer and the correct next action.
 3. **Contrast.** WCAG 2.2 AA: ≥ 4.5:1 body text, ≥ 3:1 large text, in both themes and forced-colors
    (`[X]` `[src:wcag-contrast]` `[src:mdn-forced-colors]`).
 4. **Accessibility bar.** §12.1 holds: non-colour status, semantic table controls, one transition-only
@@ -831,8 +841,9 @@ alone is not a pass. The §4.2 recognizability test is part of blind comprehensi
   the blind comparator and the §4.2 recognizability test are the acceptance gate.
 - **D2/D6/D7 (implementation-carrying).** Specified in §4.1 (Moves 1, 3, 4) and §16; the resting screen
   must render the identity band, the action-eligibility token, and tiered provenance before acceptance.
-- **IA contract in artifacts.** The p2 IA artifact still needs the matching regeneration; this direction
-  records the authoritative contract in §16.
+- **IA contract in artifacts.** **Closed** by q2: `control_room_ia.md` now carries one canonical
+  `ON-G1..G7` contract, the per-need above-fold assertions at 1440×900 and 390×844, the pixel budget,
+  and the Playwright acceptance checks; §16 points to it rather than restating a second contract.
 - **Implementation.** The facelift itself (a1–a7) has not started.
 
 ---
