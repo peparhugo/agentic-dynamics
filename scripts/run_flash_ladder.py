@@ -196,20 +196,19 @@ def _parse_run_id(stdout: str) -> str:
 def _export_cell(run_clone: Path, sha: str, base_sha: str, export_dir: Path) -> dict:
     """Export the generated tree + diff so scoring never depends on the ephemeral clone."""
     export_dir.mkdir(parents=True, exist_ok=True)
-    tree = subprocess.run(
-        ["git", "-C", str(run_clone), "ls-tree", "-r", "--name-only", sha],
+    changed = subprocess.run(
+        ["git", "-C", str(run_clone), "diff", "--name-only", base_sha, sha],
         capture_output=True,
         text=True,
     )
     wanted = [
         name
-        for name in tree.stdout.splitlines()
-        if name == CONTRACT_TEST
-        or name == "taskman.py"
+        for name in changed.stdout.splitlines()
+        if name == "taskman.py"
         or name.startswith("taskman/")
-        or "/taskman/" in name
         or name.endswith("/taskman.py")
-    ]
+        or "/taskman/" in name
+    ] + [CONTRACT_TEST]
     archive = subprocess.run(
         ["git", "-C", str(run_clone), "archive", sha, "--", *wanted],
         capture_output=True,

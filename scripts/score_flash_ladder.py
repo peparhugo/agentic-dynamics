@@ -94,17 +94,46 @@ def _output_path(args: argparse.Namespace, generated_at: str) -> Path:
 # ── ladder cell mode ──────────────────────────────────────────────────────────
 
 
-def collect_package_files(cell_dir: Path) -> list[tuple[Path, str]]:
-    """Every generated ``taskman`` source file, ANY layout: a package dir (``taskman/`` or
+def collect_package_files(cell_dir: Path, changed_files: list[str] | None = None) -> list[tuple[Path, str]]:
+    """Every GENERATED ``taskman`` source file, ANY layout: a package dir (``taskman/`` or
     ``src/taskman/``) or a single-file module (``taskman.py``). Returns ``(abs_path, relpath)``
-    pairs relative to the cell dir. A cell with none is a null-source attempt."""
-    package_dirs = sorted({p.parent for p in cell_dir.rglob("taskman/__init__.py") if p.is_file()})
+    pairs relative to the cell dir. A cell with none is a null-source attempt.
+
+    When the cell record's ``changed_files`` is supplied (the authoritative generated set),
+    selection is limited to those paths — a cell's tree may also contain PRE-EXISTING tracked
+    packages (the committed ladder evidence under ``experiments/``), which must never be scored
+    as the cell's design. The rglob fallback exists only for record-less fixtures and skips
+    ``experiments/``.
+    """
+    if changed_files is not None:
+        selected = [
+            name
+            for name in changed_files
+            if name == "taskman.py"
+            or name.startswith("taskman/")
+            or name.endswith("/taskman.py")
+            or "/taskman/" in name
+        ]
+        matched: list[tuple[Path, str]] = []
+        for name in sorted(selected):
+            path = cell_dir / name
+            if path.is_file() and path.suffix == ".py":
+                matched.append((path, name))
+        return matched
+
+    package_dirs = sorted(
+        {
+            p.parent
+            for p in cell_dir.rglob("taskman/__init__.py")
+            if p.is_file() and "experiments" not in p.parts
+        }
+    )
     single_files = sorted(
         p
         for p in cell_dir.rglob("taskman.py")
-        if p.is_file() and p.parent.name != "taskman"
+        if p.is_file() and p.parent.name != "taskman" and "experiments" not in p.parts
     )
-    matched: list[tuple[Path, str]] = []
+    matched = []
     for package in package_dirs:
         for path in sorted(package.rglob("*.py")):
             if path.is_file():
@@ -114,13 +143,13 @@ def collect_package_files(cell_dir: Path) -> list[tuple[Path, str]]:
     return matched
 
 
-def blob_from_tree(cell_dir: Path) -> str | None:
+def blob_from_tree(cell_dir: Path, changed_files: list[str] | None = None) -> str | None:
     """Concatenate the cell's generated ``taskman`` sources into one deterministic blob.
 
     The ``# === <relpath> ===`` headers are the format the diversity contract splits and parses
     per file. A cell with no generated Python is a null-source attempt (reported, never scored).
     """
-    files = collect_package_files(cell_dir)
+    files = collect_package_files(cell_dir, changed_files)
     if not files:
         return None
     parts: list[str] = []
@@ -131,7 +160,12 @@ def blob_from_tree(cell_dir: Path) -> str | None:
 
 
 def run_pristine_contract(
-    base_sha: str, cell_dir: Path, repo: Path, *, timeout: int = 300
+    base_sha: str,
+    cell_dir: Path,
+    repo: Path,
+    *,
+    changed_files: list[str] | None = None,
+    timeout: int = 300,
 ) -> dict:
     """Re-run the PRISTINE contract test (restored from the ladder base) against the export."""
     pristine = subprocess.run(
@@ -141,7 +175,7 @@ def run_pristine_contract(
     )
     if pristine.returncode != 0:
         return {"pass": None, "error": "pristine contract test unavailable at the base"}
-    package_files = collect_package_files(cell_dir)
+    package_files = collect_package_files(cell_dir, changed_files)
     if not package_files:
         return {"pass": None, "error": "no generated taskman sources exported"}
     with tempfile.TemporaryDirectory() as tmp_dir:
@@ -235,9 +269,10 @@ def score_cells(cells_dir: Path, base_sha: str, repo: Path, *, threshold: float)
     cells: list[dict] = []
     for record in records:
         cell_dir = cells_dir / record["cell_id"]
-        blob = blob_from_tree(cell_dir) if cell_dir.is_dir() else None
+        changed_files = record.get("changed_files")
+        blob = blob_from_tree(cell_dir, changed_files) if cell_dir.is_dir() else None
         pristine = (
-            run_pristine_contract(base_sha, cell_dir, repo)
+            run_pristine_contract(base_sha, cell_dir, repo, changed_files=changed_files)
             if blob is not None
             else {"pass": None, "error": "no generated taskman package exported"}
         )

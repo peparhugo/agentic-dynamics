@@ -77,3 +77,28 @@ def test_decision_flat_within_margin():
     decision = mod.build_decision(conditions)
     assert decision["escalate"] is False
     assert "no policy claim" in decision["adaptive_directive"]
+
+
+def test_changed_files_selection_excludes_preexisting_evidence(tmp_path):
+    """A cell tree may contain the committed evidence packages; only the cell's OWN generated
+    files (record.changed_files) may be scored (the C4 export-collision catch)."""
+    generated = tmp_path / "taskman"
+    generated.mkdir()
+    (generated / "__init__.py").write_text("x = 1\n")
+    evidence = tmp_path / "experiments" / "ladder_evidence" / "round1" / "C0-r1" / "taskman"
+    evidence.mkdir(parents=True)
+    (evidence / "__init__.py").write_text("old = 1\n")
+
+    selected = mod.collect_package_files(tmp_path, ["taskman/__init__.py"])
+    assert [rel for _, rel in selected] == ["taskman/__init__.py"]
+
+    fallback = {rel for _, rel in mod.collect_package_files(tmp_path, None)}
+    assert "taskman/__init__.py" in fallback
+    assert all("experiments" not in rel for rel in fallback)
+
+
+def test_changed_files_selection_empty_means_null_source(tmp_path):
+    package = tmp_path / "taskman"
+    package.mkdir()
+    (package / "__init__.py").write_text("x = 1\n")
+    assert mod.collect_package_files(tmp_path, ["docs/notes.md"]) == []
