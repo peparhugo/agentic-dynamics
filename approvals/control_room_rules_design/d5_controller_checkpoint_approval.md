@@ -26,3 +26,5 @@ wireframe, walkthroughs) and the 11 read-only projections. It does NOT authorize
 
 Each phase carries its own gates (render + parity + job walkthroughs) and its own adversarial
 review. No phase may start before the previous phase's gate passes.
+
+SIGNED-BY-OPERATOR: peparhugo (controller) 2026-09-11
