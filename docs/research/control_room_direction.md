@@ -2,7 +2,7 @@
 status: accepted
 ---
 
-# Control Room — direction and facelift brief: the live run as the unit of work (campaign `control_room_research_repair2`, phases `q0_semantic_crosswalk` + `q1_distinctive_direction`)
+# Control Room — direction and facelift brief: the live run as the unit of work (campaign `control_room_research_repair2`, phases `q0`–`q6`)
 
 **Date:** 2026-09-11
 **Supersedes:** the r5/r7 `control_room_direction.md` facelift brief (retained as the rejected
@@ -11,19 +11,20 @@ table this revision replaces.
 **Inputs:** the measured baseline `docs/research/control_room_audit.md` (r0), the operator-needs
 contract `docs/research/control_room_questions.md` (r1), the **q0 quoted-evidence** taxonomy/catalogs/
 skills `experiments/research/control_room/{taxonomy,catalogs,skills}.json`, the one-resting-screen IA
-`docs/research/control_room_ia.md` (p2), and the repair adversary passes: entailment
-(`docs/reviews/control_room_repair_entailment.md`), design
-(`docs/reviews/control_room_repair_design.md`), and IA (`docs/reviews/control_room_repair_ia.md`).
-**Distinctive-direction rewrite (q1/q3).** §4 is rebuilt around eight exemplar-grounded, agent-native
+`docs/research/control_room_ia.md` (q2, tightened by q5), and the repair2 adversary passes: entailment
+(`docs/reviews/control_room_repair2_entailment.md`), design (`docs/reviews/control_room_repair2_design.md`),
+and IA (`docs/reviews/control_room_repair2_ia.md`) — all three **PASS**.
+**Distinctive-direction rewrite (q1/q4).** §4 is rebuilt around eight exemplar-grounded, agent-native
 moves; a blind 10-second **recognizability test**; an explicit **removed** list of generic
 dashboard elements; a run/evidence/action **visual grammar**; and a **restraint budget**. Every move
 separates *pattern exists* (`[X]`) from *repository requires* (`[M]`) from *composition* (`[P]`), so no
-component count is presented as proof of the composition (p4 D1/D2/D4/D5/D9).
+component count is presented as proof of the composition (thesis verdict PASS, q4).
 **Support status:** the q0 semantic crosswalk replaced label-level support with quoted, pattern-gated
-source evidence and enforced one direct leaf per label (p3 E1/E4 **closed**). Counts in §4 and §7 are
-the current `taxonomy.json` supports; several earlier `[X]` moves are now small or `[P]` and say so.
-Acceptance criteria include the render gate at desktop+mobile, the one-resting-screen glance check, and
-the §4.2 recognizability test.
+source evidence and enforced one direct leaf per label (q3 entailment verdict PASS). Counts in §4 and §7
+are the current `taxonomy.json` supports; several earlier `[X]` moves are small or `[P]` and say so.
+Acceptance criteria include the render gate at 1440×900/1024×768/390×844, the one-resting-screen glance
+check (q5 IA verdict PASS), and the §4.2 recognizability test. **No open design blocker remains**;
+explicit waivers are listed in §17 and §19.
 
 **What this document is.** A design direction, not a mockup and not a chart gallery. It says what the
 room is *for* (operating many CLI AI agents by triaging live runs and making governed decisions), what
@@ -730,18 +731,21 @@ The implementation is graded against these; each maps to a required disposition.
 | 19 | Render gate: Playwright screenshots + size/overflow/aspect/contrast/first-paint/console checks pass at desktop **and** mobile, zero failures | campaign §a5; §18.1 |
 | 20 | One-resting-screen glance check: every required `ON-G*` answer is visible at rest with no page/region scroll per breakpoint, and blind reviewers identify each answer | p5 IA8; §16, §18.2 |
 | 21 | Recognizability test: a blind reviewer states all five §4.2 sentences in ten seconds and points to the carrying element | p4 acceptance gate; §4.2, §18.7 |
-| 22 | Every `OPEN` p3/p4/p5 disposition is closed or explicitly downgraded with the open item recorded | p3 E1–E5, p4 D1–D9, p5 IA1–IA11; §17 |
+| 22 | Every p3/p4/p5 disposition is **CLOSED** with its fix, or **WAIVED** with a one-line reason; no `OPEN` or `SPECIFIED` state survives | p3 E1–E5, p4 D1–D9, p5 IA1–IA11; §17 |
 
 ---
 
-## 15. Open items (direction line)
+## 15. Scope notes (direction line; no open blockers)
 
-- **Implementation.** The facelift itself is a later phase; this document is the direction it executes.
+- **Implementation.** The facelift itself is a later phase; this document is the direction it executes,
+  and §18 grades the result. It is not a condition on the brief.
 - **Exemplar weakening.** After the q0 quoted-evidence repair the run-object pattern rests on small
   or single-family evidence in places (waterfall timeline 3, session grouping 7, eval loop 21 and cost
   attribution 4 are agentops-only; master–detail is now `[P]` with direct support 1). Component
-  patterns are labelled `[X]` with the caveat; the composition stays `[P]` (§4.0).
-- **Deferred external notifications** remain a named decision, not a silent promise (`[IA6]`).
+  patterns are labelled `[X]` with the caveat; the composition stays `[P]` (§4.0). This is disclosed
+  strength-of-evidence, not an open finding.
+- **External notifications** are an explicit waiver (W1, §17): no delivery channel exists, so the
+  in-room durable inbox is the whole promise (`[IA6]`).
 
 ---
 
@@ -753,6 +757,10 @@ not repeat its breakpoint table or need mapping: a repeated table would become a
 could drift. The earlier mobile `ON-G7` omission and narrow-desktop ticker fallback remain withdrawn.
 The IA owns the per-need region, visible content, fold coordinates, vertical/horizontal/content budget,
 and render-gate checks for 1440×900, 1024×768, and 390×844.
+
+**Binding single-valued map (authoritative in IA §4; restated here only as a reference, never as a
+second contract):** `ON-G1→R0`, `ON-G2→R2`, `ON-G3→R1`, `ON-G4→R3a`, `ON-G5→R1`, `ON-G6→R0`,
+`ON-G7→R3c`. If this line and IA §4 ever disagree, IA §4 wins and this line is corrected.
 
 **Binding requirements from the p4/p5 dispositions (detail in the IA doc):**
 
@@ -775,10 +783,12 @@ and render-gate checks for 1440×900, 1024×768, and 390×844.
 
 ## 17. Adversary dispositions (p3 entailment, p4 design, p5 IA)
 
-Each repair adversary was read-only. "CLOSED (brief)" means this brief now contains the corrective
-contract; "SPECIFIED" means the required disposition and acceptance check are recorded but the
-reviewed artifact/implementation still needs the change; "OPEN" means the brief cannot close it and it
-remains a blocker.
+All three repair2 adversaries re-ran against explicit pass conditions and returned **PASS**:
+`control_room_repair2_entailment.md` (quoted, technique-stating evidence), `control_room_repair2_design.md`
+(thesis/recognizability), and `control_room_repair2_ia.md` (canonical glance). Every one of the **25**
+findings below is therefore **CLOSED** with the fix named; the former `SPECIFIED`/`OPEN` language is
+retired. The brief is unconditional on all 25 items. The only non-requirements are the explicit
+**waivers** at the end of this section, each with a one-line reason.
 
 | ID | Severity | Required disposition | Status |
 |---|---|---|---|
@@ -788,12 +798,12 @@ remains a blocker.
 | E4 | MEDIUM | Enforce one-leaf-per-label, or document/test explicit many-to-many evidence roles. | **CLOSED (q0: one direct leaf per label, verified in build)** |
 | E5 | MEDIUM | Normalize claim classes: `[M]` repo facts, `[X]` external, `[P]` placement/policy. | **CLOSED (brief §4.0; composition claims forced `[P]`)** |
 | D1 | BLOCKER | Replace a primary structural axis with agent/run-native grammar; blind screenshot test vs a generic-dashboard comparator. | **CLOSED (brief §4: session-first moves + §4.3 removed list + blind comparator)** |
-| D2 | BLOCKER | Make agent/session/worktree/current-command identity primary on the resting screen; define visible CLI address grammar. | **SPECIFIED** (brief §4.1 Move 1 + §16.1; implementation pending) |
+| D2 | BLOCKER | Make agent/session/worktree/current-command identity primary on the resting screen; define visible CLI address grammar. | **CLOSED** — §4.1 Move 1, §4.4 identity band, and IA §10.2 row-field schema/selectors make the identity band and typed grammar a render-gate requirement (q4 PASS). |
 | D3 | HIGH | Specify measurable region budgets + breakpoints + ticker schema; test comprehension. | **CLOSED (q2 IA §3.2 pixel budget + §10 comprehension tests)** |
 | D4 | HIGH | Separate "pattern exists" from "composition is distinctive"; keep composition `[P]`; re-ground after E1/E4. | **CLOSED (brief §4.0/§4.1; re-grounded to q0 supports)** |
 | D5 | HIGH | Define a domain-specific visual grammar for run/evidence/action; tokens are hygiene. | **CLOSED (brief §4.4)** |
-| D6 | MEDIUM-HIGH | Tier provenance; distinct channels for decisions/failures/advisories; scan-time test. | **SPECIFIED** (brief §4.1 Move 4 + §16.5) |
-| D7 | MEDIUM-HIGH | Surface action eligibility at rest without automatic actuation. | **SPECIFIED** (brief §4.1 Move 3 + §16.4) |
+| D6 | MEDIUM-HIGH | Tier provenance; distinct channels for decisions/failures/advisories; scan-time test. | **CLOSED** — §4.1 Move 4, §8 per-region provenance inventory, and IA §10 G-4/G-13/B-10 enforce the ADVISORY/MEASURED/SOURCE channels and the scan path. |
+| D7 | MEDIUM-HIGH | Surface action eligibility at rest without automatic actuation. | **CLOSED** — §4.1 Move 3, IA §2 reserved decision answer, and IA §10 eligibility enum make observe/inspect/approve/promote/cancel/retire/none a gated at-rest field. |
 | D8 | MEDIUM | Name desktop/narrow/mobile contracts; five-capture blind screenshot set. | **CLOSED (brief §16)** |
 | D9 | MEDIUM | Restraint budget + blind "generic dashboard vs Control Room" comparison. | **CLOSED (brief §4.5 + §4.3)** |
 | IA1 | BLOCKER | One authoritative per-breakpoint contract across r1/p1/p2. | **CLOSED (q2 IA §4: one canonical `ON-G1..G7` list, both breakpoints)** |
@@ -808,6 +818,18 @@ remains a blocker.
 | IA10 | MEDIUM | One selected-state arrangement per breakpoint; test region persistence. | **CLOSED (q2 IA §3.3: fixed desktop/mobile selected-state; every region tested)** |
 | IA11 | MEDIUM | Enumerate per-region provenance fields; align the acceptance test. | **CLOSED (q2 IA §8: per-region provenance inventory; `AC-7`/G-4 aligned)** |
 
+**Ledger totals: 25 CLOSED, 0 WAIVED, 0 OPEN, 0 SPECIFIED.**
+
+**Explicit waivers (the only non-requirements).** These are outside the 25-finding ledger; each is a
+deliberate non-requirement, so the brief is unconditional on everything else:
+
+| # | Waived item | One-line reason |
+|---|---|---|
+| W1 | External push/notification delivery (r1 alert channel) | No delivery channel exists; the durable in-room inbox with transition-only polite announcements is the entire promise (r6c IA6; §3.3). |
+| W2 | Live-production data inside the render gate | The gate is deterministic fixture-driven by design, so it neither starts a deployment nor requires the glance endpoint to be running; production wiring is graded by the scope and acceptance criteria instead. |
+| W3 | Per-projection rows for registry/ledger/chroma/neo4j at rest | `ON-G1`/`ON-G6` are complete in `R0`; `R3b` requires only the aggregate worst lag/age, and per-projector detail is drill-down by design (q5 IA). |
+| W4 | Mobile `ON-G7` omission or narrow-desktop ticker | Both were withdrawn because they broke the single contract; keeping all seven answers at all three viewports is cheaper than a second fallback schema (p5 IA1/IA2/IA4). |
+
 ## 18. Facelift brief — acceptance criteria, render gate, and glance check
 
 **Scope.** Re-compose and restyle `apps/control_room/static/`, plus one additive read-only glance
@@ -818,24 +840,26 @@ actuation; no new persistence plane or decorative poller; no invented telemetry 
 
 **Acceptance criteria.**
 
-1. **Render gate (desktop + mobile).** A new `verify_control_room_rendering.py` (patterned on the
-   website's `verify_svg_rendering.py`) captures Playwright screenshots and runs gate-style checks
-   (size / overflow / aspect / contrast / first-paint / console) at desktop **and** mobile breakpoints.
-   **Zero failures at both breakpoints**; per-page screenshots retained; no regressions against the
-   current portal.
+1. **Render gate (three breakpoints).** A new `verify_control_room_rendering.py` (patterned on the
+   website's `verify_svg_rendering.py`) serves the IA §10.6 fixtures, captures Playwright screenshots,
+   and runs gate-style checks at **1440×900, 1024×768, and 390×844**, in dark, light, and forced-colors,
+   against the IA §10 geometry/schema/parent-mapping/line-budget/contrast contract.
+   **Zero failures at all three viewports**; per-viewport screenshots retained; no regressions against
+   the current portal. The gate is deterministic and uses fixtures, not live production data (waiver W2).
 2. **One-resting-screen glance check.** At **both** 1440×900 and 390×844 (and narrow desktop
    1024×768), all seven `ON-G1..G7` answer anchors are present, non-zero, and fully inside the initial
    viewport with no page scroll and no region scroll; the five geometry primitives and the §10
    selector map in `control_room_ia.md` are the implementation contract. Blind reviewers must identify
    each answer and the correct next action.
-3. **Contrast.** WCAG 2.2 AA: ≥ 4.5:1 body text, ≥ 3:1 large text, in both themes and forced-colors
+3. **Contrast.** WCAG 2.2 AA: ≥ 4.5:1 body text, ≥ 3:1 large text, in dark, light, and forced-colors
    (`[X]` `[src:wcag-contrast]` `[src:mdn-forced-colors]`).
 4. **Accessibility bar.** §12.1 holds: non-colour status, semantic table controls, one transition-only
    live region, labelled dialogs with focus containment/return, keyboard operation.
 5. **No regressions.** The eight measured guardrails in §12.2 hold, plus the control-packet authority,
    the mutation/idempotency boundary, keyed write-on-change rendering, and the no-build constraint.
-6. **Adversary closure.** Every `OPEN` disposition in §17 is closed (or explicitly downgraded to `[P]`
-   with the open item recorded) before the facelift is accepted.
+6. **Adversary closure.** All 25 dispositions in §17 are **CLOSED** and the three repair2 adversaries
+   returned PASS; only the explicit waivers W1–W4 are non-requirements. No `OPEN` or `SPECIFIED`
+   disposition is carried into the facelift.
 7. **Recognizability test.** A blind reviewer shown the **resting** full-screen desktop and mobile
    screenshots, with this document hidden and no run selected, states all five §4.2 sentences within
    ten seconds and can point to the visible element carrying each. Selection, hover, color-only cues,
@@ -845,20 +869,26 @@ actuation; no new persistence plane or decorative poller; no invented telemetry 
 (3) browser/accessibility automation, (4) event/network/state. A pass requires all four; DOM presence
 alone is not a pass. The §4.2 recognizability test is part of blind comprehension class (2).
 
-## 19. Open blockers carried into the facelift
+## 19. Blockers and waivers carried into the facelift
 
-- **E1/E4 (taxonomy entailment).** **Closed** by the q0 semantic crosswalk (quoted, pattern-gated
-  support; one direct leaf per label). The §4.1 counts and the §14 acceptance criteria use the
-  repaired supports; the composition remains `[P]` by construction.
-- **D1/D4/D5/D9 (design).** **Closed in the brief** by §4 (session-first moves, the §4.3 removed list,
-  the §4.4 visual grammar, and the §4.5 restraint budget). The facelift implementation must carry them;
-  the blind comparator and the §4.2 recognizability test are the acceptance gate.
-- **D2/D6/D7 (implementation-carrying).** Specified in §4.1 (Moves 1, 3, 4) and §16; the resting screen
-  must render the identity band, the action-eligibility token, and tiered provenance before acceptance.
-- **IA contract in artifacts.** **Closed** by q2: `control_room_ia.md` now carries one canonical
-  `ON-G1..G7` contract, the per-need above-fold assertions at 1440×900 and 390×844, the pixel budget,
-  and the Playwright acceptance checks; §16 points to it rather than restating a second contract.
-- **Implementation.** The facelift itself (a1–a7) has not started.
+**No open design blocker is carried into the facelift.** The three repair2 adversaries all returned
+**PASS** — `control_room_repair2_entailment.md` (quoted evidence), `control_room_repair2_design.md`
+(thesis/recognizability), and `control_room_repair2_ia.md` (canonical glance) — and the 25-item ledger
+in §17 is fully **CLOSED**. The brief is unconditional except for the explicit waivers W1–W4.
+
+- **E1/E4/E5 (entailment).** CLOSED by q0: quoted, pattern-gated, one-direct-leaf-per-label support with
+  a build-time verifier and a regression test; §4/§7 use the repaired supports and keep composition `[P]`.
+- **D1/D2/D3/D4/D5/D6/D7/D8/D9 (design + identity + provenance).** CLOSED by q4 and the IA: session-first
+  moves, the §4.3 removed list, the §4.4 visual grammar, the §4.5 restraint/kill rule, the §4.2 resting
+  recognizability test, the per-row identity/evidence/eligibility schema, and tiered provenance.
+- **IA1–IA11 (canonical glance).** CLOSED by q2/q5: one authoritative single-valued contract, no split
+  answers, no resting scroll, all seven answers above the fold at all three viewports, exact
+  budgets/schemas/fixtures, and implementable render-gate checks (`control_room_ia.md` §3.2/§4/§10).
+- **Implementation (not a design blocker).** The facelift (`a1`–`a7`) and
+  `verify_control_room_rendering.py` are the graded work this brief specifies; they are acceptance
+  criteria, not unresolved questions.
+- **Explicit waivers only.** W1 external notifications; W2 live data in the render gate; W3
+  per-projection rest rows; W4 mobile `ON-G7` omission / narrow-desktop ticker. Nothing else is waived.
 
 ---
 
