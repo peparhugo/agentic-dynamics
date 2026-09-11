@@ -747,45 +747,26 @@ The implementation is graded against these; each maps to a required disposition.
 
 ## 16. The resting screen — the canonical glance contract (brief)
 
-The IA contract now lives in `docs/research/control_room_ia.md` (q2, `q2_glance_proof`). This section
-is a pointer, not a second contract: **one canonical `ON-G1..G7` list, above the fold at both
-1440×900 and 390×844 with no page or region scroll.** The earlier brief's mobile `ON-G7` omission and
-narrow-desktop ticker fallback are withdrawn (p5 IA1/IA2/IA4); the q2 IA document carries the
-per-need region, visible content, both above-fold assertions, the pixel budget, and the Playwright
-acceptance checks.
-
-**Authoritative contract:**
-
-| Breakpoint | Contract |
-|---|---|
-| Desktop ≥ 1440×900 | `ON-G1..G7` all visible in the initial viewport, **no page scroll and no region scroll**. |
-| Narrow desktop ≥ 1024×768 | Same seven answers, same regions; only the column widths change. No below-fold placement. |
-| Mobile 390×844 | Same seven answers in one stacked column; the §3.2 mobile pixel budget (676 ≤ 844) proves they fit with no page scroll. |
-
-**Glance mapping (region ids per IA §1; all seven answer at both breakpoints):**
-
-| Need | Canonical region | At-rest answer |
-|---|---|---|
-| `ON-G1` up / connected | R0 + R3b | separately named browser-connection, control-plane, worker, and projection states with ages |
-| `ON-G2` running / queued / failed / live | R2 | keyed run roster with counts, phase/lifecycle/live/change state |
-| `ON-G3` failing / stalled / at risk | R1b | durable, globally severity-ranked attention items with identity and state |
-| `ON-G4` spend / burn / quota / wallet / leases | R3a | **all five** labelled values + a money-risk exception marker |
-| `ON-G5` decision from me | R1a (canonical) + R2 mirror | decision objects with target, kind, epoch, and eligibility token |
-| `ON-G6` fresh / trustworthy | R0.degraded + per-value chips | global degraded summary + source/age on every consequential value, one shared epoch |
-| `ON-G7` fleet shape | R3c | bounded composition marginals (model × condition × provider × lifecycle) |
+The IA contract now lives in `docs/research/control_room_ia.md` (q2 contract, tightened by the q5 IA
+adversary). **That file's §4 is the only canonical `ON-G1..G7` list.** This section deliberately does
+not repeat its breakpoint table or need mapping: a repeated table would become a second contract and
+could drift. The earlier mobile `ON-G7` omission and narrow-desktop ticker fallback remain withdrawn.
+The IA owns the per-need region, visible content, fold coordinates, vertical/horizontal/content budget,
+and render-gate checks for 1440×900, 1024×768, and 390×844.
 
 **Binding requirements from the p4/p5 dispositions (detail in the IA doc):**
 
 1. **Agent-native identity (D2).** Each actionable R2 row (or the roster header) must show
    session/agent id, worktree/terminal target, current command/tool, provider+model, and attempt.
-2. **Global attention ordering (IA6).** R1 is ranked by severity × actionability, not by fixed
-   category; critical capacity is reserved so a new failure cannot be buried by decisions.
+2. **Reserved attention answers (IA6).** R1 reserves one risk/all-clear row and one
+   decision/none-pending row, then ranks remaining capacity by severity × actionability. Neither
+   canonical answer can be buried by the other class.
 3. **Bounded composition (IA4/IA7).** R3c is a bounded set of marginals (capped groups with explicit
    `other`/`unknown`), never an unbounded cross-product, and it answers at mobile too.
 4. **At-rest action eligibility (IA9/D7).** A row exposes compact eligibility
    (`observe`/`inspect`/`approve`/`promote`/`cancel`/`retire`/none); the full preview stays in R4.
 5. **Tiered provenance (IA11/D6).** Glance shows state + age + one authority marker; full provenance
-   and event links live in R4. Split summaries (`ON-G1`, `ON-G6`) share one explicit epoch/age.
+   and event links live in R4. `ON-G1` and `ON-G6` are complete in R0; local chips are mirrors only.
 6. **Selected-state persistence (IA10).** One arrangement per breakpoint; every region promised to
    remain visible is tested (IA §3.3 / §10).
 7. **Mechanical acceptance.** The IA §10 selector contract (`[data-region]`, `[data-answer]`,
@@ -819,19 +800,21 @@ remains a blocker.
 | IA2 | BLOCKER | No required glance answer may depend on page/R3 scroll; complete ticker schema. | **CLOSED (q2 IA §3.2/§10: budgets + no-scroll primitives; ticker withdrawn)** |
 | IA3 | CRITICAL | Guarantee the five `ON-G4` values at rest, or formally narrow r1. | **CLOSED (q2 IA §4: all five values at 1440×900 and 390×844)** |
 | IA4 | CRITICAL | Bounded `ON-G7` rollup at rest, or formally move it out of the universal glance contract. | **CLOSED (q2 IA §4/T4: bounded `R3c` at both breakpoints; no mobile omission)** |
-| IA5 | HIGH | One canonical answer per need; shared epoch/age for split summaries; remove duplicate writers. | **CLOSED (q2 IA §4/§8: `R1a` canonical, one epoch for `ON-G1`/`ON-G6`)** |
+| IA5 | HIGH | One canonical answer per need; shared epoch/age for split summaries; remove duplicate writers. | **CLOSED (q5 IA §4/§8: complete single-region answers; mirrors omit `data-answer`)** |
 | IA6 | HIGH | Global severity ranking or reserved critical capacity; saturated-inbox fixture. | **CLOSED (q2 IA §2: severity×actionability ranking + reserved slot; fixture F-1)** |
 | IA7 | HIGH | Region dimensions, type floor, row caps, truncation, bounded cardinality. | **CLOSED (q2 IA §3.2 budget + §10 type floor/row caps + bounded `R3c`)** |
 | IA8 | HIGH | Split acceptance into screenshot, blind comprehension, browser/a11y, and event/state tests. | **CLOSED (q2 IA §10: classes G/B/A/E with five geometry primitives)** |
-| IA9 | MEDIUM-HIGH | Compact action eligibility at rest; full preview in R4. | **CLOSED (q2 IA §2: eligibility token on `R1a`/`R2` mirror)** |
+| IA9 | MEDIUM-HIGH | Compact action eligibility at rest; full preview in R4. | **CLOSED (q5 IA §2: reserved R1 decision answer; R2 mirror is non-authoritative)** |
 | IA10 | MEDIUM | One selected-state arrangement per breakpoint; test region persistence. | **CLOSED (q2 IA §3.3: fixed desktop/mobile selected-state; every region tested)** |
 | IA11 | MEDIUM | Enumerate per-region provenance fields; align the acceptance test. | **CLOSED (q2 IA §8: per-region provenance inventory; `AC-7`/G-4 aligned)** |
 
 ## 18. Facelift brief — acceptance criteria, render gate, and glance check
 
-**Scope.** Re-compose and restyle `apps/control_room/static/` only. No framework migration or build
-step; no new mutating route class or automatic actuation; no new persistence plane or decorative
-poller; no invented telemetry (`[M]`; r0 §9, §12.2).
+**Scope.** Re-compose and restyle `apps/control_room/static/`, plus one additive read-only glance
+projection on the existing Control Room server if the current endpoints cannot supply the IA §10.6
+fixture schema. No framework migration or build step; no new mutating route class or automatic
+actuation; no new persistence plane or decorative poller; no invented telemetry (`[M]`; r0 §9,
+§12.2). Every projected field must derive from the existing control packet/ledger sources.
 
 **Acceptance criteria.**
 

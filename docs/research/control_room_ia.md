@@ -2,7 +2,7 @@
 status: accepted
 ---
 
-# Control Room — the one resting screen: the canonical glance contract (campaign `control_room_research_repair2`, phase `q2_glance_proof`)
+# Control Room — the one resting screen: the canonical glance contract (campaign `control_room_research_repair2`, phases `q2_glance_proof` + `q5_adversary_ia`)
 
 **Date:** 2026-09-11
 **Question answered:** can ONE resting screen answer the operator glance needs `ON-G1..G7`
@@ -30,7 +30,8 @@ superseded by §4.
 **Claim discipline.** `[M]` measured (r0/the repository), `[X]` external exemplar, `[P]` local
 design policy. "At rest" is exact: **visible in the initial viewport with zero interaction** — no
 tab, lens, board, modal, hover, or filter, and no scrolling of the page or of any required region
-(§10). Scrolling is permitted only inside the roster `R2` for rows beyond the bounded visible set.
+(§10). **No resting region scrolls.** Full inbox and fleet lists are drill-down lenses; their bounded
+at-rest summaries never acquire an internal scrollbar.
 
 ---
 
@@ -45,13 +46,13 @@ the fold.
 ```text
 DESKTOP 1440x900                                          MOBILE 390x844
 ┌───────────────────────────────────────────────┐        ┌──────────────────────┐
-│ R0  SCOPE / TRUTH BAR (full width, 56px)       │        │ R0 scope/truth 44px  │
+│ R0  SYSTEM + TRUST (full width, 72px)            │        │ R0 system/trust 72px │
 ├──────────────┬──────────────────┬─────────────┤        ├──────────────────────┤
-│ R1 ATTENTION │ R2 RUN LEDGER    │ R3 CONTEXT  │        │ R1 attention 176px   │
-│  (ranked)    │  (only scroller) │  R3a COST   │        ├──────────────────────┤
-│  R1a decision│  session | phase │  R3b HEALTH │        │ R2 run ledger 196px  │
+│ R1 ATTENTION │ R2 RUN LEDGER    │ R3 CONTEXT  │        │ R1 attention 144px   │
+│  (reserved)  │  (no scroller)   │  R3a COST   │        ├──────────────────────┤
+│  R1a decision│  session | phase │  R3b HEALTH │        │ R2 run ledger 284px  │
 │  R1b failure │  evidence marks │  R3c COMPO  │        ├──────────────────────┤
-│  R1c advisory│  eligibility    │             │        │ R3a COST 92px        │
+│  R1c next    │  eligibility    │             │        │ R3a COST 92px        │
 ├──────────────┴──────────────────┴─────────────┤        │ R3b HEALTH 68px      │
 │ R4 SELECTION DOCK (hidden at rest)             │        │ R3c COMPOSITION 60px │
 └───────────────────────────────────────────────┘        └──────────────────────┘
@@ -64,85 +65,93 @@ DESKTOP 1440x900                                          MOBILE 390x844
 - **Navigation** = switching a route/board/lens, opening the System sheet, or any modal. The
   resting answers in §4 require none of it. Opening `R4` is *drill-down*, not glance.
 
-**Selector contract (`[P]`).** Every region and every answer carries a stable data attribute so the
-render gate can find it without brittle CSS: regions are `[data-region="R0"|"R1"|"R1a"|"R1b"|"R1c"|
-"R2"|"R3a"|"R3b"|"R3c"]`, each need is `[data-answer="ON-G1".."ON-G7"]`, and required values use
-`[data-field="money.spend"|"money.burn"|"money.quota"|"money.wallet"|"money.leases"|
-"health.workers"|"health.projections"|"composition.rollup"]`. The gate contract is §10; the
-implementation is free to choose the DOM tree beneath those anchors.
+**Selector contract (`[P]`).** Every layout region and answer carries a stable data attribute so the
+render gate can find it without brittle CSS. Valid region selectors are the explicit list
+`[data-region="R0"]`, `[data-region="R1"]`, `[data-region="R2"]`, `[data-region="R3a"]`,
+`[data-region="R3b"]`, `[data-region="R3c"]`; `R1a/b/c` are item classes expressed with
+`[data-attention-class]`, not nested layout regions. Exactly one element exists for each explicit
+answer selector `[data-answer="ON-G1"]` through `[data-answer="ON-G7"]`. Required field selectors
+are enumerated in §10.2. The implementation may choose the DOM tree beneath those anchors, but may not
+add a second `[data-answer]` writer for a mirror.
 
 ---
 
 ## 2. Region contents (what each region must render at rest)
 
-### R0 — Scope / truth bar (persistent qualifier)
+### R0 — System and trust bar (two complete answers)
 
-`[data-region="R0"]`, carrying the `ON-G6` answer anchor (`[data-answer="ON-G6"]`). One line, fixed
-height, never scrolls away. Five separately named states (never one health number):
+`[data-region="R0"]` contains the complete, separate `ON-G1` and `ON-G6` answer anchors. It is two
+fixed lines, never scrolls, and never asks the operator to join another region:
 
-| Slot | Content | Failure it prevents |
+| Answer | Required visible fields | Failure it prevents |
 |---|---|---|
-| scope | repository; active worktree/campaign scope | acting on the wrong scope |
-| `conn` | browser/SSE connection state | false "live" while disconnected |
-| `ctrl` | control-plane read state (`control-status/v1` reachable) | acting on a stale/absent control db |
-| `epoch` | control epoch + its age | not knowing the current-state watermark |
-| `degraded` | compact count of degraded dependencies (workers, projections, settlement) | green board over a stale subsystem |
+| `ON-G1` system | browser/SSE, control-plane read, workers, projections; each names state and worst age | requiring a health join with `R3b` |
+| `ON-G6` trust | epoch, worst observation age, projection state, degraded count, stale count, partial count, unknown count | green state over stale or incomplete evidence |
+
+Repository/worktree/campaign scope prefixes both lines but is not a separate answer. `R3b` may mirror
+worker/projection detail, and local values retain provenance chips, but neither is part of the glance
+answer and neither carries `data-answer="ON-G1"` or `data-answer="ON-G6"`.
 
 `[M]` (r0 M2, M3, A1, A10; control packet `control_epoch`/`degraded`).
 
 ### R1 — Attention inbox (the operator's work queue)
 
-A durable, ranked, deduplicated list; not a decorative strip (`[P]`; r6c IA4, IA5). It is one
-**globally ordered** queue, not fixed categories: every item is ranked by *severity × actionability*,
-with capacity reserved for the highest severity class so a saturated inbox cannot bury a new
-critical failure (p5 IA6). The `R1a/b/c` labels are item *classes*, not fixed positions:
+A durable, ranked, deduplicated list; not a decorative strip (`[P]`; r6c IA4, IA5). It has three
+non-scrolling reserved rows. Items are ranked by *severity × actionability* inside those guarantees,
+so a saturated inbox cannot bury either a new critical failure or a pending controller decision:
 
-- **R1a decisions** (`[data-answer="ON-G5"]`) — pending decision objects: target run, decision kind,
+- **R1a decisions** (`[data-attention-class="decision"]`, containing `[data-answer="ON-G5"]`) — one
+  highest-priority pending decision, or an explicit `none pending`: target run, decision kind,
   current epoch, evidence authority, and a compact **eligibility token**
   (`observe|inspect|approve|promote|cancel|retire|none`). This is the canonical at-rest `ON-G5`
-  answer; the `R2` decision token is a navigational mirror, not a second writer (p5 IA5/IA9).
-- **R1b failures/risks** (`[data-answer="ON-G3"]`) — run failures/stalls, worker/projection impact,
-  money-risk exceptions.
-- **R1c advisory/process** — supervisor flags (persistent, `[M]` ON-A5) and docs/recording process
-  gaps.
+  answer; any `R2` decision token is a navigational mirror, never a second answer writer (p5 IA5/IA9).
+- **R1b failures/risks** (`[data-attention-class="risk"]`, containing `[data-answer="ON-G3"]`) — one
+  highest-severity run failure/stall/risk, or an explicit `all clear`; worker/projection impact and
+  money-risk exceptions compete by severity inside this reserved row.
+- **R1c next item** (`[data-attention-class="next"]`) — the highest remaining decision, risk,
+  supervisor flag, or process gap after R1a/R1b reservations.
 
 Each item carries identity, severity, actionability, first/last-seen, scope, state
 (`new|active|snoozed|resolved|stale`), authority, action, and source+age (`[P]`; direction §3.3).
-Visible capacity: **≥ 3 ranked items at mobile, ≥ 5 at desktop**, with the top-severity slot always
-rendered even if lower-ranked items are clipped (`[P]`; p5 IA6).
+Visible capacity is exactly three rows at 390×844, four at 1024×768, and five at 1440×900. Every case
+contains R1a and R1b; remaining rows are globally ranked. Overflow opens the Attention lens; `R1`
+itself never scrolls or clips its two canonical answers (`[P]`; p5 IA6).
 
 ### R2 — Run ledger (default operational body)
 
-`[data-region="R2"]`, carrying the `ON-G2` answer anchor (`[data-answer="ON-G2"]`) and the row
-selector `[data-run-id]`. A keyed, write-on-change list of live agent sessions/runs, ranked for triage
+`[data-region="R2"]`, carrying one `ON-G2` answer anchor (`[data-answer="ON-G2"]`) and bounded row
+selectors `[data-run-id]`. Its fixed counts line contains exactly running, queued, failed, and live;
+those four values are the complete glance answer for any fleet size. Below it, a keyed,
+write-on-change sample of live agent sessions/runs is ranked for triage
 (attention first, then running/queued, then settled) `[M]` keyed-list contract; `[P]` ranking. Every row shows:
 agent/session identity (session id · worktree/host target · current command/tool · provider×model ·
 attempt, per direction §4.1 Move 1) · spec/cell · phase `n/total` · lifecycle state · changed-at/live
 marker · paired **ADVISORY claim / MEASURED proof** marks · source/commit marker · cost provenance
 (on-row) · attention state · **decision-eligibility token** · receipt coverage (`recorded`/`missing`).
 Live/change state is always visible — never behind a filter (`[X]`; r0 M7, r6c IA1). This is where
-`ON-G2` lives and where the row-level `ON-G5` mirror points back to `R1a`. `R2` is the **only** region
-allowed to scroll, and only for rows beyond the bounded visible set (`[P]`; §3.1). A row is a ledger
-line, not a dashboard card; no card border or lifecycle-only row may pass the glance gate.
+`ON-G2` lives and where a row-level decision mirror may point back to `R1a`. `R2` shows at least three
+rows at mobile, seven at 1024×768, and eight at 1440×900. The full fleet opens in a separate lens;
+`R2` never scrolls. A row is a ledger line, not a dashboard card; no card border or lifecycle-only row
+may pass the glance gate.
 
 ### R3 — Constraint ledger (decisions' context, not peer boards)
 
-Three **fixed-height, non-scrolling** annotations stacked. Together they are the `ON-G4` (`R3a`),
-`ON-G1` dependency half (`R3b`), and `ON-G7` (`R3c`) answers; none may require scrolling or move
-below the fold (p5 IA2/IA3/IA4).
+Three **fixed-height, non-scrolling** annotations stacked. `R3a` is the complete `ON-G4` answer and
+`R3c` is the complete `ON-G7` answer. `R3b` is worker/projection detail only; system status is already
+complete in `R0`. None may require scrolling or move below the fold (p5 IA2/IA3/IA4/IA5).
 
 - **R3a COST** (`[data-answer="ON-G4"]`) — exactly five labelled values, each with
   `[data-field]`: retained-window spend, burn rate, worst provider-window %, wallet/token headroom,
   and reserved-(unspent)-leases; a money-risk exception marker when a window/lease nears its cap.
   This is the full `ON-G4` answer, not a risk exception alone (p5 IA3). It is a *constraint annotation*,
   not the removed "Money board" or a field of KPI cards.
-- **R3b HEALTH** (`[data-answer="ON-G1"]`) — named dependency rows: worker health (unhealthy count +
-  affected-run link) and knowledge projections (registry/ledger/chroma/neo4j lag + last-report age),
-  sharing one observation epoch/age with `R0` (p5 IA5). This is the dependency half of `ON-G1` and
-  the source of `ON-G6`'s degraded summary.
+- **R3b HEALTH DETAIL** — two bounded rows: worker health (unhealthy count + affected-run link) and
+  aggregate projection health (worst lag + oldest report age). Registry/ledger/chroma/neo4j detail
+  opens in `R4`. This region mirrors the same epoch as `R0` but is never required to answer `ON-G1`
+  or `ON-G6` (p5 IA5).
 - **R3c COMPOSITION** (`[data-answer="ON-G7"]`) — a **bounded** rollup of model × condition ×
-  provider × lifecycle: four marginals, each capped (e.g. top groups plus explicit `other` and
-  `unknown`), never an unbounded cross-product and never a chart (p5 IA4). Performance/cost/quality
+  provider × lifecycle: exactly four one-line marginals, each with at most three buckets (top,
+  explicit `other`, explicit `unknown`), never an unbounded cross-product and never a chart (p5 IA4). Performance/cost/quality
   is **not** here (separate lens; §5 T3).
 
 ### R4 — Selection dock (drill-down only)
@@ -171,41 +180,68 @@ The hierarchy is **visual weight and reading order within one screen**, not disc
    glance questions as compact annotations attached to the run ledger. They are third by weight, but
    present and **non-scrolling**, never peer KPI cards.
 
-**Anti-crowding rule.** `R1`, `R3a`, `R3b`, `R3c` are fixed-height and summary-first: they show
-exceptions plus headline values, never full detail. `R2` is the **only** region that may scroll, and
-only for rows beyond its bounded visible set. Any content that does not fit a summary region is by
-definition drill-down (`R4`) or lens (§6), not glance. No required answer may live in an internal
-scroll container (p5 IA2/IA7).
+**Anti-crowding rule.** Every resting region is fixed-height and summary-first. `R1` reserves its risk
+and decision rows; `R2` shows a counts line plus a bounded session sample; `R3a/b/c` use the exact line
+budgets below. Any overflow is a drill-down (`R4`) or lens (§6), never an internal scrollbar. No
+required answer, mirror, or sample row may be clipped or below the fold (p5 IA2/IA7).
 
 ### 3.2 Pixel budget (sums fit both viewports)
 
-Max heights in CSS pixels, excluding browser chrome. The mobile column is the sum of every region
-because the regions stack; the desktop column places `R1`/`R2`/`R3` side by side, so its vertical
-sum is `R0 + max(R1, R2, R3)`.
+All dimensions are CSS border-box pixels, including region padding and borders and excluding browser
+chrome. Text may truncate with an accessible full name, but required state/value tokens never wrap past
+their line clamp. The mobile column sums every region; desktop places `R1`/`R2`/the `R3` stack side by
+side, so vertical use is `R0 + gap + max(R1, R2, R3 stack)`.
 
-| Region | Desktop max-height | Mobile max-height | Budgeted content |
-|---|---:|---:|---|
-| `R0` scope / truth | 56 | 44 | 5 named state tokens (`scope`, `conn`, `ctrl`, `epoch`, `degraded`) |
-| `R1` attention inbox | 800 (fills body) | 176 | ≥5 ranked items desktop / ≥3 mobile, top-severity slot reserved |
-| `R2` run roster | 800 (fills body; internal scroll only) | 196 | counts row + ranked identity rows (≥5 desktop / ≥3 mobile visible) |
-| `R3a` money | 220 | 92 | 5 labelled values + exception marker (2-line grid at mobile) |
-| `R3b` health | 180 | 68 | worker state + 4 projection rows (one shared epoch/age) |
-| `R3c` composition | 140 | 60 | 4 capped marginals (`other`/`unknown` explicit) |
-| `R4` selection dock | 0 at rest | 0 at rest | hidden until selection; then bottom dock (§3.3) |
-| Inter-region gaps | 12 (bar → body) | 24 (3 × 8 stack) | plus 2 × 8 internal `R3` gaps at each breakpoint |
-| **Vertical sum** | **56 + 12 + 800 = 868 ≤ 900** | **44+176+196+(92+68+60+16)+24 = 676 ≤ 844** | headroom desktop 32 px, mobile 168 px |
+| Region | 1440×900 max-height | 1024×768 max-height | 390×844 max-height | Internal line/row budget | Canonical need(s) |
+|---|---:|---:|---:|---|---|
+| `R0` system / trust | 72 | 60 | 72 | mobile: 8px vertical padding + 4 × 14px micro-lines + 8px spare =72; desktop/narrow use two 24/22px answer rows | `ON-G1`, `ON-G6` |
+| `R1` attention | 800 | 692 | 144 | max-density rows exactly 5/4/3; row heights 56/52/38; mobile formula 8 padding + 18 heading + 4 gap + 3×38 =144 | `ON-G3`, `ON-G5` |
+| `R2` run ledger | 800 | 692 | 284 | exact rows 8/7/3 at 88/84/80; counts 40/36/32; mobile formula 8 padding +32 counts +4 gap +3×80 =284 | `ON-G2` |
+| `R3a` cost | 220 | 160 | 92 | mobile: 8 padding + one 20px heading/exception line + 2×32px value rows =92; five unique cells in 3+2 grid | `ON-G4` |
+| `R3b` health detail | 180 | 132 | 68 | mobile: 8 padding +18 heading +2×21px detail rows =68; no answer anchor | none (mirror only) |
+| `R3c` composition | 140 | 116 | 60 | mobile: no separate heading; accessible region name + 8 padding +4×13px marginals =60 | `ON-G7` |
+| `R4` selection dock | 0 at rest | 0 at rest | 0 at rest | hidden until selection | none |
+| Outer / internal gaps | 12 + 16 | 8 + 16 | 5 × 8 = 40 | no unbudgeted margins; safe-area padding is inside `R0`/region heights | none |
+| **Vertical sum** | **72 + 12 + 800 = 884 ≤ 900** | **60 + 8 + 692 = 760 ≤ 768** | **72+144+284+92+68+60+40 = 760 ≤ 844** | headroom: 16 / 8 / 84px | all seven |
 
-The chosen budgets leave explicit headroom at both breakpoints; the sums are the *maximum* the regions
-may occupy and are the numbers the render gate asserts (§10). If a future change raises any budget,
-the sum must still satisfy `desktop ≤ 900` and `mobile ≤ 844` or the contract is broken.
+Horizontal fit is equally binding:
+
+| Viewport | Outer padding | Gaps | `R1` | `R2` | `R3` stack | Exact sum |
+|---|---:|---:|---:|---:|---:|---:|
+| 1440 | 2 × 16 | 2 × 12 | 300 | 744 | 340 | **32+24+300+744+340 = 1440** |
+| 1024 | 2 × 12 | 2 × 8 | 224 | 472 | 288 | **24+16+224+472+288 = 1024** |
+| 390 | 2 × 12 | 0 | 366 | 366 | 366 | **24+366 = 390** (stacked, not summed across columns) |
+
+Every region uses `box-sizing:border-box`; horizontal padding is ≤12px per side desktop and ≤8px per
+side mobile. Labels are one line with ellipsis; required values and state words are never ellipsized.
+The render gate asserts all maxima, line clamps, row counts, and exact sums (§10). Raising any budget
+without preserving these inequalities breaks the contract.
+
+**Content grids.** `R3a/b/c` use exactly 8px horizontal padding at every viewport, giving inner widths
+324px desktop, 272px narrow, and 350px mobile. `R3a` uses three columns of 102px with 9px gaps at
+desktop, three 86px columns with 7px gaps at narrow, and three 110px columns with 10px gaps at mobile;
+the second row uses the first two tracks. `R3c` uses label/gap/buckets tracks of 64/4/256px desktop,
+56/4/212px narrow, and 68/4/278px mobile. Each buckets track has exactly three equal slots (`top`,
+`other`, `unknown`). Thus no mobile track is incorrectly reused at a narrower desktop column.
+
+**Mobile forcing grid.** After 8px region padding, each region has 350px inner
+width. `R0` uses a 70px scope column + 4px gap + 276px answer grid: `ON-G1` occupies two 14px rows of
+two 136px cells with a 4px gap; `ON-G6` occupies one row of three 89px cells and one row of four 66px
+cells, with 4px gaps. `R1` rows use two 15px text lines inside each 38px row. `R2` rows use three 18px
+lines inside each 80px row: identity/target/model/attempt, command/phase/lifecycle/live, then
+claim/proof/source/cost/eligibility/receipt. Long identifiers may middle-elide but preserve an
+accessible full value and visible prefix+suffix; state, count, money, trust, and bucket values may not
+ellipsis. `R3a`'s exception shares the 20px heading line. `R3c` has four 13px lines. G-3/G-13/G-14
+reject any overflow, overlap, missing clamp, or value clipping at every viewport.
 
 ### 3.3 Selected state (one arrangement per breakpoint)
 
 Selection is drill-down, not a new resting screen. The fixed arrangement is:
 
 - **Desktop:** `R4` opens as a **bottom dock** (≈ 320 px) while `R0`, `R1`, `R2`, `R3` stay in their
-  resting positions; the body above the dock re-flow-layouts to the reduced height, and no required
-  region scrolls. `R2` keeps its internal row scroll.
+  resting columns; the body above the dock re-flows to reduced-height summaries. The resting-screen
+  no-scroll proof does not apply after selection, but each canonical answer remains represented by
+  its fixed summary rather than an internal scrollbar.
 - **Mobile:** `R4` pushes over `R2` as a full-height inspector with an explicit Back; `R0` and `R1`
   remain at the top and the `R3` answers remain reachable in the same viewport, so the content of the
   resting answer is never destroyed.
@@ -225,18 +261,19 @@ region's own `scrollHeight ≤ clientHeight` (no internal scroll). The mechanica
 
 | Need (authoritative r1 wording) | Canonical region | Visible content (the answer) | Above fold @1440×900 | Above fold @390×844 | Never the answer | Evidence |
 |---|---|---|---|---|---|---|
-| `ON-G1` is the whole system up / room connected? | **`R0` + `R3b`** | four independently named states: browser `conn`, control-plane `ctrl`, worker health, projection lag+age; `R0.degraded` counts the non-green ones; `R0` and `R3b` share one epoch/age | yes — `R0` top + `R3b` in rail, both boxes inside 900; no page scroll | yes — `R0` top + `R3b` stacked, both inside 844; no page scroll | one combined health badge or score | `[M]` r0 M2/M3/A1; `[P]` separation |
-| `ON-G2` what is running / queued / failed right now, and what is live? | **`R2`** | keyed rows with session identity, phase `n/total`, lifecycle, live/changed-at, cost provenance, attention, decision mirror; a counts row for totals | yes — roster fills the body; `R2` is the only scroller (rows only) | yes — roster stacked between `R1` and `R3a`; bounded rows + counts | a hidden or filter-only live view | `[M]` r0 M7 keyed list; `[X]` r6c IA1 |
-| `ON-G3` is anything failing, stalled, or at risk? | **`R1b`** | globally severity-ranked durable items with identity, first/last-seen, scope, state, and a safe action; top-severity slot reserved | yes — `R1` at top of the left column, inside 900 | yes — `R1` directly under `R0`, inside 844 | a count or a one-line strip | `[P]` r6c IA4; `[X]` Linear/Datadog triage |
-| `ON-G4` what is money doing — spend, burn, provider quota, wallet, reserved leases? | **`R3a`** | **all five** labelled values (`money.spend`, `money.burn`, `money.quota`, `money.wallet`, `money.leases`) + a money-risk exception marker near a cap | yes — `R3a` fixed 220 px in the rail, inside 900; no rail scroll | yes — `R3a` fixed 92 px, five values in a 2-line grid, inside 844 | a Money board the operator must open; a risk exception alone | `[M]` r0 M1; `[P]` five-value composition |
-| `ON-G5` does anything need a decision from me? | **`R1a`** (canonical) + `R2` mirror | decision objects: target run, decision kind, epoch, evidence authority, compact eligibility token; the `R2` flag is a mirror only | yes — `R1a` ranked into `R1`, inside 900 | yes — `R1a` ranked into `R1`, inside 844 | a count of pending approvals | `[M]` packet `awaiting_approvals`/`promotable_runs`; `[P]` eligibility tokens (p5 IA9) |
-| `ON-G6` is what I am looking at fresh and trustworthy? | **`R0.degraded`** + per-value chips in `R2/R3a/R3b` | global degraded summary + source+observation-time chips on every consequential value; explicit stale/partial/unknown markers; one shared epoch for split summaries | yes — `R0` top, chips inline, inside 900 | yes — `R0` top, chips inline, inside 844 | a single global age footer | `[M]` r0 M2/A10; `[P]` per-value truth (p5 IA5/IA11) |
-| `ON-G7` what is the shape of the fleet (by model / condition / provider)? | **`R3c`** | **bounded** marginals across model × condition × provider × lifecycle (four capped groups + explicit `other`/`unknown`), text counts only | yes — `R3c` fixed 140 px in the rail, inside 900; no rail scroll | yes — `R3c` fixed 60 px, inside 844 | an unbounded cross-product; a chart; a fleet view the operator must open | `[P]` r6c IA14; `[X]` r1 need (p5 IA4) |
+| `ON-G1` is the whole system up / room connected? | **`R0`** | browser, control plane, workers, and projections each show state + worst age | yes — `R0` is 0–72px; no scroll | yes — `R0` is 0–72px; no scroll | `R3b` detail, one combined health score | `[M]` r0 M2/M3/A1; `[P]` separation |
+| `ON-G2` what is running / queued / failed right now, and what is live? | **`R2`** | exact running/queued/failed/live counts + bounded agent-session sample with lifecycle/live state | yes — `R2` is 84–884px; no scroll | yes — `R2` is 232–516px; no scroll | full-fleet lens, hidden/filter-only live view | `[M]` r0 M7 keyed list; `[X]` r6c IA1 |
+| `ON-G3` is anything failing, stalled, or at risk? | **`R1`** | reserved risk row: highest-severity identity/state/action or explicit `all clear` | yes — `R1` is 84–884px; reserved row visible | yes — `R1` is 80–224px; reserved row visible | overflow queue, a count alone | `[P]` r6c IA4; `[X]` Linear/Datadog triage |
+| `ON-G4` what is money doing — spend, burn, provider quota, wallet, reserved leases? | **`R3a`** | exactly five unique labelled values (`money.spend`, `money.burn`, `money.quota`, `money.wallet`, `money.leases`) + exception marker | yes — `R3a` is 84–304px; no scroll | yes — `R3a` is 524–616px; 3+2 grid, no scroll | Money lens, a risk exception alone | `[M]` r0 M1; `[P]` five-value composition |
+| `ON-G5` does anything need a decision from me? | **`R1`** | reserved decision row: target, kind, epoch, authority, eligibility; or explicit `none pending` | yes — `R1` is 84–884px; reserved row visible | yes — `R1` is 80–224px; reserved row visible | `R2` mirror, pending count alone | `[M]` packet `awaiting_approvals`/`promotable_runs`; `[P]` eligibility tokens |
+| `ON-G6` is what I am looking at fresh and trustworthy? | **`R0`** | epoch, worst age, projection state, degraded count, and explicit stale/partial/unknown counts | yes — `R0` is 0–72px; no scroll | yes — `R0` is 0–72px; no scroll | distributed provenance chips, global age footer | `[M]` r0 M2/A10; `[P]` complete compact verdict |
+| `ON-G7` what is the shape of the fleet (by model / condition / provider)? | **`R3c`** | exactly four marginals: model, condition, provider, lifecycle; each ≤3 buckets including `other` and `unknown` | yes — `R3c` is 500–640px; no scroll | yes — `R3c` is 700–760px; no scroll | unbounded cross-product, chart, secondary lens | `[P]` r6c IA14; `[X]` r1 need |
 
 **Simultaneity assertion (the IA1 test).** A screenshot of the default viewport at **both**
-1440×900 and 390×844 must contain all seven answers' regions at once — none hidden behind a
-peer-board switch, a lens, a modal, an internal scroll, or the fold. This is the mechanical disproof
-of the r5 layout and the p5 IA1/IA2 defects.
+1440×900 and 390×844 must contain exactly one anchor for each answer, inside its one canonical region,
+at once — none hidden behind a peer-board switch, lens, modal, mirror, internal scroll, or the fold.
+The mapping is total and single-valued: `G1→R0`, `G2→R2`, `G3→R1`, `G4→R3a`, `G5→R1`, `G6→R0`,
+`G7→R3c`. This is the mechanical disproof of the r5 layout and p5 IA1/IA2/IA5 defects.
 
 ---
 
@@ -251,10 +288,11 @@ resolution each takes; every resolution preserves the §4 canonical contract.
 layout either crowds the roster or pushes the rail below the fold.
 
 **Resolution `[P]`:** the §3.2 pixel budget with **exception-first, count-first** representations.
-`R1`/`R3` are fixed-height summaries (no embedded tables or charts); `R2` is the sole scrolling
-region. There is **no ticker fallback and no below-fold placement**: the budgets were chosen so the
-regions fit 1440×900 and 390×844 without scrolling. If a future change cannot fit, the offending
-content is drill-down/lens, not a region that moves below the fold.
+Every region is fixed-height and non-scrolling (no embedded tables or charts); full lists open in
+deliberate lenses. There is **no ticker fallback and no below-fold placement**: the vertical,
+horizontal, line, and row budgets were chosen so the regions fit 1440×900 and 390×844 without
+scrolling. If a future change cannot fit, the offending content is drill-down/lens, not a region that
+moves below the fold or acquires overflow.
 
 ### T2 — `ON-G4` "spend, burn, quota, wallet, leases" vs a compact rail
 
@@ -283,18 +321,18 @@ is not part of `ON-G7` and never outranks `R1`/`R2`. This also avoids a thin sma
 deferring `ON-G7` — which broke the single canonical contract (p5 IA1/IA4).
 
 **Resolution `[P]`:** mobile keeps the **same seven answers** in a single stacked column: `R0` bar;
-`R1` ranked inbox; `R2` bounded roster; `R3a` money (five values, two-line grid); `R3b` health;
-`R3c` bounded composition. The §3.2 mobile budget (676 ≤ 844) proves they fit above the fold. There
+`R1` reserved inbox; `R2` bounded ledger; `R3a` cost (five values, two-line grid); `R3b` health detail;
+`R3c` bounded composition. The §3.2 mobile budget (760 ≤ 844) proves they fit above the fold. There
 is **no mobile omission**; the only mobile difference is arrangement and bounded row counts (§10 G-8/G-9).
 
 ### T5 — Very large fleets (hundreds of runs)
 
 **Tension:** the roster cannot render every run at rest.
 
-**Resolution `[P]`:** the `ON-G2` answer at rest is **counts + attention-ranked rows + changed-since
-rows**. The full roster scrolls within `R2`. "What is running/queued/failed" is answered by the counts
-and the visible exceptions for any fleet size; the operator never needs to open a board to know the
-totals or to see what changed.
+**Resolution `[P]`:** the `ON-G2` answer at rest is the exact **running + queued + failed + live
+counts**, followed by attention-ranked and changed-since sample rows. The full roster opens in a Fleet
+lens; it does not scroll inside `R2`. The operator never needs a lens to know the totals or whether
+anything is live, while the resting contract remains independent of fleet cardinality.
 
 ---
 
@@ -348,11 +386,11 @@ foregrounded**, with durable unseen history; no "interrupt" promise (`[P]`; r6c 
 
 ## 8. Truth placement and the per-region provenance inventory (r6c IA7; p5 IA11)
 
-Global: scope, `conn`, `ctrl`, `epoch`, `degraded` (`R0`) and nothing else. Every consequential value
-in `R2/R3/R4` carries its own **source + observation-time/age** chip; truncation/partiality, revision/
-epoch, and measured/estimated/unknown/unmeasured semantics attach where they apply. Green never
-renders for a stale or unmeasured subsystem (`[M]`; r0 M2). This is what lets `ON-G6` be answered at
-rest without one undifferentiated footer.
+`R0` owns both complete global answers: system state (`ON-G1`) and trust verdict (`ON-G6`). Every
+consequential value in `R1/R2/R3/R4` still carries local **source + observation-time/age** provenance;
+truncation/partiality, revision/epoch, and measured/estimated/unknown/unmeasured semantics attach where
+they apply. Those chips explain a value but are not pieces of the glance answer. Green never renders
+for a stale or unmeasured subsystem (`[M]`; r0 M2).
 
 The following inventory is the exact set of provenance-bearing fields the geometry checks (§10 G-4,
 contrast) and the blind check B-6 cover; any value not listed is not "consequential" at rest and may
@@ -360,16 +398,16 @@ omit the chip (p5 IA11):
 
 | Region | Provenance-bearing fields | Required chip attributes |
 |---|---|---|
-| `R0` | `scope`, `conn`, `ctrl`, `epoch`, `degraded` | source + age; `epoch` carries revision; `degraded` carries the non-green count |
+| `R0` | browser, control, workers, projections; epoch, worst age, stale/partial/unknown counts | source + age; `epoch` carries revision; all system/trust fields are complete here |
 | `R1` | every inbox item (decision, failure/risk, advisory) | authority class (`measured`/`computed`/`heuristic`/`policy`/`unknown`) + first/last-seen |
 | `R2` | per-row cost provenance; row `changed-at` | `cost_source` (`metered`/`estimated`/`unknown`/`reconciled`) + age; every visible row |
 | `R3a` | all five `money.*` values | source + age; `unknown` renders as explicit `unknown`, never `0` |
-| `R3b` | worker state; each projection row | source + last-report age; shared observation epoch with `R0` |
+| `R3b` | worker aggregate; projection aggregate | source + last-report age; mirror of `R0`, never required for its answers |
 | `R3c` | composition marginals | source + age; `other`/`unknown` rendered explicitly |
 | `R4` | the full evidence ladder | per-rung evidence class + source + age (drill-down; not tested at rest) |
 
-For any need whose answer is split across regions (`ON-G1`, `ON-G6`), the regions share **one**
-observation epoch/age so a reviewer never has to join two freshnesses (p5 IA5).
+No need is split across regions. Mirrors share the canonical answer's epoch and omit `[data-answer]`,
+so a reviewer never has to join two writers or two freshnesses (p5 IA5).
 
 ---
 
@@ -408,49 +446,63 @@ and **E event/network/state**.
 Every geometry assertion is built from five primitives, each of which must hold for every listed
 selector at every listed viewport:
 
-1. **Present** — `document.querySelector(sel)` is non-null, and the element and all ancestors are
-   not `hidden`, `[hidden]`, `display:none`, `visibility:hidden`, or `aria-hidden="true"`.
+1. **Present and unique** — Playwright `locator(sel)` has the declared cardinality (one for each
+   answer and layout region), and the element and all ancestors are not `hidden`, `[hidden]`,
+   `display:none`, `visibility:hidden`, or `aria-hidden="true"`. Checks over repeated rows/fields use
+   `locator.count()` plus `locator.nth(i)`, never `querySelector`.
 2. **In viewport** — `const r = el.getBoundingClientRect()` satisfies `r.top >= -0.5`,
    `r.bottom <= innerHeight + 0.5`, `r.left >= -0.5`, `r.right <= innerWidth + 0.5`.
 3. **Non-zero box** — `r.width > 0 && r.height > 0` (rejects collapsed or clipped-to-nothing nodes).
 4. **No scroll** — `document.scrollingElement.scrollHeight <= innerHeight + 1` and
-   `scrollWidth <= innerWidth + 1` (no page scroll, no horizontal overflow); for every required
-   non-scrolling region, `el.scrollHeight <= el.clientHeight + 1` (no internal scroll).
+   `scrollWidth <= innerWidth + 1` (no page scroll, no horizontal overflow); for **every resting
+   region and answer anchor**, `el.scrollHeight <= el.clientHeight + 1` and
+   `el.scrollWidth <= el.clientWidth + 1` (no internal scroll or clipping).
 5. **Contrast** — for each text node inside the region, the computed-color luminance ratio is
    ≥ 4.5:1 for normal text and ≥ 3:1 for large text (≥ 24px, or ≥ 18.66px bold), against the
-   element's effective background. (An axe-core `color-contrast` pass is an acceptable substitute.)
+   element's effective composited background. The gate reuses the checked-in
+   `verify_svg_rendering.py` parse/composite/luminance probe for HTML text and requires zero
+   violations; non-empty text is not a contrast substitute.
 
 ### 10.2 Selector map
 
-| Anchor | Selector | Meaning |
+| Anchor | Explicit selector(s) | Required cardinality / meaning |
 |---|---|---|
-| Regions | `[data-region]` with value in `R0, R1, R1a, R1b, R1c, R2, R3a, R3b, R3c` | the §1 regions |
-| Answers | `[data-answer]` with value in `ON-G1 .. ON-G7` | the canonical §4 answer anchors |
-| Money | `[data-field]` with value in `money.spend, money.burn, money.quota, money.wallet, money.leases` | the five `ON-G4` values |
-| Health / truth | `[data-field]` with value in `health.workers, health.projections, truth.conn, truth.ctrl, truth.epoch, truth.degraded` | `ON-G1`/`ON-G6` values |
-| Composition | `[data-field="composition.rollup"]` with child `[data-marginal]` | the bounded `ON-G7` rollup |
-| Row identity | `[data-region="R2"] [data-run-id]` | roster rows (bounded visible set) |
-| Agent identity | `[data-region="R2"] [data-field="session.identity"]`, `[data-field="terminal.target"]`, `[data-field="command.current"]` | the session/terminal identity band |
-| Evidence authority | `[data-region="R2"] [data-field="evidence.advisory"]`, `[data-field="evidence.measured"]`, `[data-field="evidence.source"]` | claim/proof/source marks visible at rest |
-| Action receipt | `[data-region="R2"] [data-field="decision.eligibility"]`, `[data-field="decision.receipt"]` | governed action and recording coverage |
+| Layout containers | `[data-glance-shell]`, `[data-glance-body]`, `[data-r3-stack]` | exactly one each; used for x/y/gap/overlap equations |
+| Layout regions | `[data-region="R0"]`, `[data-region="R1"]`, `[data-region="R2"]`, `[data-region="R3a"]`, `[data-region="R3b"]`, `[data-region="R3c"]` | exactly one each; only these values use `data-region` |
+| Answers | `[data-answer="ON-G1"]` through `[data-answer="ON-G7"]` (seven selectors written separately) | exactly one each; each must be a descendant of the §4 canonical region |
+| Labels / values | every required `[data-field]` contains exactly one `[data-label]` and `[data-value]` | visible label and non-empty visible value checked separately |
+| `ON-G1` system | `[data-field="system.browser"]`, `[data-field="system.control"]`, `[data-field="system.workers"]`, `[data-field="system.projections"]` inside its answer | exact set equality; each contains `[data-state]` in `up,degraded,down,unknown` and numeric `[data-age-seconds]` |
+| `ON-G2` fleet state | `[data-field="runs.running"]`, `[data-field="runs.queued"]`, `[data-field="runs.failed"]`, `[data-field="runs.live"]` inside its answer | exact set equality; four unique fields |
+| `ON-G3` risk | `[data-attention-class="risk"] [data-answer="ON-G3"]` with `[data-field="risk.identity"]`, `[data-field="risk.state"]`, `[data-field="risk.action"]` | exactly one reserved row; state is `active` or `all-clear`; all-clear uses identity/action=`none` |
+| `ON-G4` cost | `[data-field="money.spend"]`, `[data-field="money.burn"]`, `[data-field="money.quota"]`, `[data-field="money.wallet"]`, `[data-field="money.leases"]`; `[data-money-risk]` | exact field set; risk marker count 1 only in F-3, otherwise 0 |
+| `ON-G5` decision | `[data-attention-class="decision"] [data-answer="ON-G5"]` with `[data-field="decision.state"]`, `[data-field="decision.target"]`, `[data-field="decision.kind"]`, `[data-field="decision.epoch"]`, `[data-field="decision.authority"]`, `[data-field="decision.eligibility"]` | state=`pending` or `none`; eligibility in `observe,inspect,approve,promote,cancel,retire,none`; none uses target/kind/authority/eligibility=`none` |
+| `ON-G6` trust | `[data-field="trust.epoch"]`, `[data-field="trust.worst_age"]`, `[data-field="trust.projection_state"]`, `[data-field="trust.degraded_count"]`, `[data-field="trust.stale_count"]`, `[data-field="trust.partial_count"]`, `[data-field="trust.unknown_count"]` | projection state in `current,lagging,stale,failing,unknown`; four counts are non-negative integers; F-0 all zero/current, F-4 unknown>0, F-5 stale/degraded>0 |
+| `ON-G7` composition | four `[data-marginal]` values: `model`, `condition`, `provider`, `lifecycle` | exactly four unique marginals; each has exactly three unique buckets: `top` (with `[data-category]`), `other`, `unknown` |
+| Row identity | `[data-region="R2"] [data-run-id]` | 8 desktop / 7 narrow / 3 mobile visible rows in the max-density fixture |
+| Agent identity | for each R2 row: `session.identity`, `terminal.target`, `command.current`, `model.provider`, `attempt.number` | five non-empty fields scoped to that row |
+| Run state | for each R2 row: `[data-field="phase.progress"]`, `[data-field="lifecycle.state"]`, `[data-field="run.live"]`, `[data-field="source.commit"]`, `[data-field="cost.provenance"]`, `[data-field="attention.state"]` | six non-empty fields scoped to that row |
+| Evidence / action | for each R2 row: `[data-field="evidence.advisory"]`, `[data-field="evidence.measured"]`, `[data-field="evidence.source"]`, `[data-field="decision.eligibility"]`, `[data-field="decision.receipt"]` | five non-empty fields scoped to that row; mirrors never carry `data-answer` |
+| Line clamps | `[data-max-lines]` on every R0 micro-row, R1 item line, R2 row line, R3a cell, R3b line, and R3c marginal | integer contract checked against rendered `height / line-height`; required values also carry `[data-no-ellipsis]` |
 
 ### 10.3 Geometry checks (G)
 
 | # | Viewport | Selectors | Assertion | Threshold |
 |---|---|---|---|---|
-| G-1 | 1440×900, 390×844 | all `[data-region]`, all `[data-answer]` | primitives 1, 2, 3 | 0 violations |
-| G-2 | both | all `[data-answer]` | primitive 4 (page) | `scrollHeight ≤ innerHeight+1`, `scrollWidth ≤ innerWidth+1` |
-| G-3 | both | `R1`, `R3a`, `R3b`, `R3c` | primitive 4 (no internal scroll) | each `scrollHeight ≤ clientHeight+1` |
-| G-4 | both | all text nodes in `[data-answer]` | primitive 5 (contrast) | ≥ 4.5:1 normal / ≥ 3:1 large |
-| G-5 | both | computed `font-size` in `R0..R3c` | type floor | ≥ 12px mobile, ≥ 13px desktop; labels ≥ 11px |
-| G-6 | both | all `[data-answer]` | non-empty answer token | `innerText.trim().length > 0` |
-| G-7 | 1440×900 | `R0`, `R1`, `R2`, `R3a/b/c` | §3.2 desktop budget | `R0≤56`, `R1/R2≤800`, `R3a≤220`, `R3b≤180`, `R3c≤140`; vertical sum ≤ 900 |
-| G-8 | 390×844 | `R0`, `R1`, `R2`, `R3a/b/c` | §3.2 mobile budget | `R0≤44`, `R1≤176`, `R2≤196`, `R3a≤92`, `R3b≤68`, `R3c≤60`; vertical sum ≤ 844 |
-| G-9 | 390×844 | `[data-region]` | single-column arrangement | all regions share the same `left` and `width ≈ innerWidth`; no side-by-side |
-| G-10 | 1440×900 | `[data-answer="ON-G4"] [data-field^="money."]` | exactly five money values, all non-empty | `count === 5` |
-| G-11 | 1440×900 | `[data-answer="ON-G7"] [data-marginal]` | bounded composition | `2 ≤ count ≤ 6`, each marginal has an explicit `other`/`unknown` bucket |
-| G-12 | 1024×768 (narrow desktop) | all `[data-answer]` | same seven answers present and in viewport | same as G-1/G-2 |
-| G-13 | both | first visible `[data-run-id]` row | agent identity, evidence authority, eligibility, and receipt fields are non-empty | 0 missing fields |
+| G-1 | all three | six explicit region selectors + seven explicit answer selectors | unique + primitives 1, 2, 3 | exact global value sets; exactly one each; 0 violations |
+| G-2 | all three | page + all answers | primitive 4 (page) | `scrollHeight ≤ innerHeight+1`, `scrollWidth ≤ innerWidth+1` |
+| G-3 | all three | all six regions + all seven answer anchors | primitive 4 (no internal scroll/clipping) | scroll width/height ≤ client width/height + 1 |
+| G-4 | all themes/viewports | all text nodes in the six resting regions | primitive 5 (contrast) | ≥ 4.5:1 normal / ≥ 3:1 large; dark/light/forced-colors |
+| G-5 | all three | computed `font-size` in `R0..R3c` | type floor | ≥ 12px mobile, ≥ 13px desktop; labels ≥ 11px |
+| G-6 | all three | `[data-value]` inside every required field | non-empty visible value | `innerText.trim().length > 0`; label text alone cannot pass |
+| G-7 | 1440×900 | shell/body/R3 stack + six regions | §3.2 desktop equations | fixed boxes and gaps equal expected coordinates ±1px; no overlap; 72+12+800≤900; 32+24+300+744+340=1440 |
+| G-8 | 390×844 | six regions | §3.2 mobile budget | heights ≤72/144/284/92/68/60; exact vertical sum ≤844; content width=366 |
+| G-9 | 390×844 | six explicit region selectors | single-column arrangement | each left=12±1 and width=366±1; no nested item class included |
+| G-10 | all three | `ON-G4` descendant fields + `[data-money-risk]` | exact money schema | set equals five named fields; no duplicate; marker count matches fixture; every value visible |
+| G-11 | all three | `ON-G7` marginals/buckets | exact bounded composition | exactly four unique legal marginals; each has exactly three unique buckets: `top`,`other`,`unknown` |
+| G-12 | 1024×768 | six regions + seven answers | §3.2 narrow budget | unique/in viewport/no scroll; vertical sum ≤768; exact width sum=1024 |
+| G-13 | all three | every visible `[data-run-id]` row | row-scoped identity/evidence/action field sets | each exact set present and non-empty; no unscoped comma selectors |
+| G-14 | all three | `R1` reserved rows + R2 counts/sample | capacity and line clamps | decision+risk rows always visible; R2 counts exact; row counts 8/7/3; no text exceeds declared lines |
+| G-15 | all three | seven answers | canonical parent mapping | exact map `G1:R0,G2:R2,G3:R1,G4:R3a,G5:R1,G6:R0,G7:R3c`; mirrors have no answer attr |
 
 Mobile has **no** `ON-G7` omission: G-1 and G-11 run at 390×844 too (p5 IA4).
 
@@ -462,12 +514,12 @@ test; p5 IA8).
 
 | # | Reviewer says | Carrying element |
 |---|---|---|
-| B-1 | "The room is connected / the system is up." | `R0` `truth.conn`/`truth.ctrl` + `R3b` |
-| B-2 | "These are the live runs and what is queued/failed." | `R2` counts + rows |
-| B-3 | "That failure needs me." | `R1b` item, top of the ranked inbox |
+| B-1 | "The room is connected / the system is up." | complete `R0` system answer: browser/control/workers/projections |
+| B-2 | "These are the live runs and what is queued/failed." | `R2` exact counts + bounded rows |
+| B-3 | "That failure needs me" or "risks are clear." | `R1` reserved risk answer |
 | B-4 | "Here is spend against the five money buckets." | `R3a` five values |
-| B-5 | "That run is waiting on a decision." | `R1a` decision object / `R2` mirror |
-| B-6 | "Here is whether the data is fresh." | `R0.degraded` + per-value chips |
+| B-5 | "That run is waiting on a decision" or "none need me." | `R1` reserved decision answer |
+| B-6 | "Here is whether the data is fresh." | complete `R0` trust answer: epoch/worst age/stale/partial/unknown |
 | B-7 | "Here is the fleet's shape." | `R3c` bounded rollup |
 | B-8 | The correct next action for the top item. | `R1` eligibility token / `R2` mirror |
 | B-9 | "This is an agent session writing to a terminal, not a service dashboard." | first R2 identity band: session, terminal target, current command, provider×model, attempt |
@@ -494,55 +546,359 @@ Screenshots cannot prove these; the gate runs them in the browser or over the ne
 
 ### 10.6 Fixtures
 
-`F-1` saturated inbox (critical failure injected), `F-2` ≥ 200-run fleet, `F-3` near-cap money,
-`F-4` unknown provider, `F-5` stale projection, `F-6` disconnected browser. Each geometry check
-runs against the default and the relevant fixture.
+The gate intercepts every `/api/*` request and the SSE endpoint before navigation, serves committed
+fixture JSON/event frames, then waits for exactly one `[data-render-state="ready"]`. No live Redis,
+clock, network, or production data participates; fixture time is frozen and every payload carries one
+control epoch.
+
+`ready` has one exact meaning: all initial mocked GET responses have resolved; the initial SSE
+`replay_complete` boundary for the same epoch has rendered; `document.fonts.ready` has resolved; two
+`requestAnimationFrame` turns have completed; and the root's `data-control-epoch` equals the fixture
+epoch. The browser context fixes UTC, `en-US`, reduced motion, `Date.now()`, and animation durations.
+Geometry contexts close the SSE stream at `replay_complete`; event tests use a separate context and may
+emit only the transition named by that test.
+
+| Fixture | Required forcing state |
+|---|---|
+| `F-0` max-density default | 8/7/3 visible rows by viewport; one running, queued, failed and live count; one decision; one risk |
+| `F-1` saturated inbox | >20 low-priority items plus a new critical failure and pending decision; both reserved answers remain visible |
+| `F-2` 200-run fleet | exact aggregate counts plus bounded R2 sample; no R2 scrollbar |
+| `F-3` near-cap cost | all five cost fields plus exception marker |
+| `F-4` unknown provider | provider marginal includes `unknown`; cost source shows unknown, never zero |
+| `F-5` stale projection | R0 trust stale count/worst age and system projection state both fail visibly |
+| `F-6` disconnected browser | R0 browser state fails while other system dimensions remain independently named |
+| `F-7` empty queues | reserved risk says `all clear`; reserved decision says `none pending` |
+
+The fixture route inventory is exactly `GET /api/glance` and `GET /api/events` (SSE); any other
+`/api/*` request fails the case. `F-0` uses this exact seed object; the fixture loader expands
+`run_defaults` into each listed run before returning JSON, so every row has the complete schema:
+
+```json
+{
+  "control_epoch": 42,
+  "source": "fixture:/api/glance",
+  "observed_at": "2026-09-11T11:59:56Z",
+  "system": {
+    "browser": {"state": "up", "age_seconds": 1},
+    "control": {"state": "up", "age_seconds": 2},
+    "workers": {"state": "up", "age_seconds": 4},
+    "projections": {"state": "up", "age_seconds": 4}
+  },
+  "trust": {"epoch": 42, "worst_age": 4, "projection_state": "current",
+    "degraded_count": 0, "stale_count": 0, "partial_count": 0, "unknown_count": 0},
+  "attention": {
+    "decision": {"state": "pending", "target": "run-approve", "kind": "approve",
+      "epoch": 42, "authority": "controller", "eligibility": "approve"},
+    "risk": {"identity": "run-failed", "state": "active", "action": "inspect"},
+    "next": {"identity": "projection-registry", "state": "active", "action": "inspect"},
+    "items": []
+  },
+  "run_counts": {"running": 5, "queued": 1, "failed": 1, "live": 3},
+  "run_defaults": {"terminal.target": "wt/control-room", "command.current": "pytest",
+    "model.provider": "openai/gpt-5.6-sol", "attempt.number": "1", "phase.progress": "2/4",
+    "lifecycle.state": "running", "run.live": "live", "source.commit": "abc1234",
+    "cost.provenance": "metered", "attention.state": "none", "evidence.advisory": "claimed pass",
+    "evidence.measured": "tests pending", "evidence.source": "commit abc1234",
+    "decision.eligibility": "inspect", "decision.receipt": "recorded"},
+  "run_sample": [
+    {"id": "run-approve", "session.identity": "agent-01", "decision.eligibility": "approve"},
+    {"id": "run-failed", "session.identity": "agent-02", "lifecycle.state": "failed"},
+    {"id": "run-live", "session.identity": "agent-03"},
+    {"id": "run-04", "session.identity": "agent-04"},
+    {"id": "run-05", "session.identity": "agent-05"},
+    {"id": "run-06", "session.identity": "agent-06"},
+    {"id": "run-07", "session.identity": "agent-07"},
+    {"id": "run-08", "session.identity": "agent-08"}
+  ],
+  "cost": {"spend": "$12.40", "burn": "$0.82/h", "quota": "61%",
+    "wallet": "$7.60", "leases": "$2.10", "money_risk": false},
+  "health_detail": {"workers": "0 unhealthy", "projections": "current · lag 0 · age 4s"},
+  "composition": {
+    "model": {"top": "sol 5", "other": "2", "unknown": "0"},
+    "condition": {"top": "clean 4", "other": "3", "unknown": "0"},
+    "provider": {"top": "openai 5", "other": "2", "unknown": "0"},
+    "lifecycle": {"top": "running 5", "other": "2", "unknown": "0"}
+  }
+}
+```
+
+Before serving, the fixture loader recursively copies the top-level `source`, `observed_at`, and
+`control_epoch` into every nested object that lacks an override; the returned wire JSON therefore has
+those three keys on each system field, attention item, run, cost field, health field, and composition
+marginal. This expansion is deterministic and is itself snapshot-tested.
+
+Fixture deltas are exact: `F-1` appends advisory items `adv-01` through `adv-20` to
+`attention.items`, each expanded from `{state:active,action:inspect,authority:heuristic,severity:low}`,
+but leaves the decision/risk objects above;
+`F-2` sets counts to `80/60/40/20` and keeps the same eight-row sample; `F-3` sets quota=`96%` and
+`money_risk=true`; `F-4` sets provider unknown=`2`, `trust.unknown_count=2`, and every affected cost
+value to literal `unknown`; `F-5` sets system.projections=`degraded/901s`, projection_state=`stale`,
+worst_age=`901`, degraded_count=`1`, stale_count=`1`; `F-6` sets system.browser=`down/7s`; `F-7`
+sets decision to `{state:none,target:none,kind:none,epoch:42,authority:none,eligibility:none}` and risk
+to `{identity:none,state:all-clear,action:none}`. The exact wire frames follow (blank-line terminators
+included); geometry receives snapshot + replay completion, while the event test appends transition:
+
+```text
+event: snapshot
+data: {"control_epoch":42,"fixture":"F-0"}
+
+event: replay_complete
+data: {"control_epoch":42}
+
+event: transition
+data: {"control_epoch":43,"kind":"run.failed","target":"run-live"}
+
+```
+
+Geometry receives only the first two frames. Event tests append the third frame in their separate
+context and expect exactly one keyed DOM update and one polite announcement.
+
+Every geometry check runs against `F-0`; G-10/G-11/G-14/G-15 additionally run against all forcing
+fixtures that change their fields. The gate fails on an unmocked request. Fixtures expose the exact
+view projection consumed by the static UI: `system`, `trust`, `attention`, `run_counts`, `run_sample`,
+`cost`, `health_detail`, and `composition` objects, all with `control_epoch`, source, and observed-at.
+The production implementation needs an additive read-only projection with the same schema; the render
+gate itself is deterministic and does not depend on that endpoint existing while the fixture runs.
 
 ### 10.7 Reference gate (pseudo-code)
 
 ```python
-# verify_control_room_rendering.py — geometry class, per viewport.
+# verify_control_room_rendering.py — executable shape of the geometry class.
 VIEWPORTS = {"desktop": (1440, 900), "narrow": (1024, 768), "mobile": (390, 844)}
-REQUIRED = ['[data-region="R0"]', '[data-region="R1"]', '[data-region="R2"]',
-            '[data-region="R3a"]', '[data-region="R3b"]', '[data-region="R3c"]'] + \
-           [f'[data-answer="ON-G{i}"]' for i in range(1, 8)]
+THEMES = ("dark", "light", "forced-colors")
+REGIONS = ["R0", "R1", "R2", "R3a", "R3b", "R3c"]
+ANSWER_REGION = {
+    "ON-G1": "R0", "ON-G2": "R2", "ON-G3": "R1", "ON-G4": "R3a",
+    "ON-G5": "R1", "ON-G6": "R0", "ON-G7": "R3c",
+}
+FIELDS = {
+    "ON-G1": {"system.browser", "system.control", "system.workers", "system.projections"},
+    "ON-G2": {"runs.running", "runs.queued", "runs.failed", "runs.live"},
+    "ON-G3": {"risk.identity", "risk.state", "risk.action"},
+    "ON-G4": {"money.spend", "money.burn", "money.quota", "money.wallet", "money.leases"},
+    "ON-G5": {"decision.state", "decision.target", "decision.kind", "decision.epoch",
+              "decision.authority", "decision.eligibility"},
+    "ON-G6": {"trust.epoch", "trust.worst_age", "trust.projection_state",
+              "trust.degraded_count", "trust.stale_count", "trust.partial_count",
+              "trust.unknown_count"},
+}
+ROW_FIELDS = {
+    "session.identity", "terminal.target", "command.current", "model.provider", "attempt.number",
+    "phase.progress", "lifecycle.state", "run.live", "source.commit", "cost.provenance",
+    "attention.state", "evidence.advisory", "evidence.measured", "evidence.source",
+    "decision.eligibility", "decision.receipt",
+}
+EXPECTED_BOXES = {
+    "desktop": {"R0": (16, 0, 1408, 72), "R1": (16, 84, 300, 800),
+                "R2": (328, 84, 744, 800), "R3a": (1084, 84, 340, 220),
+                "R3b": (1084, 312, 340, 180), "R3c": (1084, 500, 340, 140)},
+    "narrow": {"R0": (12, 0, 1000, 60), "R1": (12, 68, 224, 692),
+               "R2": (244, 68, 472, 692), "R3a": (724, 68, 288, 160),
+               "R3b": (724, 236, 288, 132), "R3c": (724, 376, 288, 116)},
+    "mobile": {"R0": (12, 0, 366, 72), "R1": (12, 80, 366, 144),
+               "R2": (12, 232, 366, 284), "R3a": (12, 524, 366, 92),
+               "R3b": (12, 624, 366, 68), "R3c": (12, 700, 366, 60)},
+}
 
-for name, (w, h) in VIEWPORTS.items():
+for fixture, theme, viewport in product(FIXTURES, THEMES, VIEWPORTS.items()):
+    name, (w, h) = viewport
+    page = new_isolated_page(timezone="UTC", locale="en-US", reduced_motion="reduce")
+    freeze_clock_and_animations(page, "2026-09-11T12:00:00Z")
+    install_api_and_sse_routes(page, fixture)  # installed before page.goto
+    if theme == "forced-colors":
+        page.emulate_media(color_scheme="dark", forced_colors="active", reduced_motion="reduce")
+        page.add_init_script("localStorage.removeItem('control-room-theme')")
+    else:
+        page.emulate_media(color_scheme=theme, forced_colors="none", reduced_motion="reduce")
+        page.add_init_script(
+            f"localStorage.setItem('control-room-theme', {json.dumps(theme)})"
+        )
     page.set_viewport_size({"width": w, "height": h})
     page.goto(PORTAL_URL)
-    # G-2 no page scroll
+    page.locator('[data-render-state="ready"]').wait_for()
+
+    # Reject unknown values as well as omissions; all repeated checks use nth().
+    assert set(page.locator("[data-region]").evaluate_all(
+        "els => els.map(e => e.dataset.region)")) == set(REGIONS)
+    assert set(page.locator("[data-answer]").evaluate_all(
+        "els => els.map(e => e.dataset.answer)")) == set(ANSWER_REGION)
+    for region in REGIONS:
+        assert page.locator(f'[data-region="{region}"]').count() == 1
+    for answer, region in ANSWER_REGION.items():
+        anchor = page.locator(f'[data-answer="{answer}"]')
+        assert anchor.count() == 1
+        assert anchor.evaluate("(el, r) => el.closest('[data-region]').dataset.region === r", region)
+        assert anchor.locator("xpath=ancestor::*[@data-region]").count() == 1
+
+    # Assert fixed x/y/width/height, gaps, and non-overlap rather than only maxima.
+    for region, expected in EXPECTED_BOXES[name].items():
+        box = page.locator(f'[data-region="{region}"]').bounding_box()
+        actual = (box["x"], box["y"], box["width"], box["height"])
+        assert all(abs(got - want) <= 1 for got, want in zip(actual, expected))
+
+    # No page, region, answer, or field scroll/clipping.
     assert page.evaluate("document.scrollingElement.scrollHeight <= innerHeight + 1")
     assert page.evaluate("document.scrollingElement.scrollWidth <= innerWidth + 1")
-    for sel in REQUIRED:
-        el = page.query_selector(sel)
-        assert el and el.is_visible(), f"{sel} missing/hidden at {name}"          # primitive 1
+    checked = page.locator('[data-region], [data-answer], [data-answer] [data-field]')
+    for i in range(checked.count()):
+        el = checked.nth(i)
+        assert el.evaluate("""e => {
+          for (let n=e; n; n=n.parentElement) {
+            const s=getComputedStyle(n);
+            if (n.hidden || n.getAttribute('aria-hidden') === 'true' ||
+                s.display === 'none' || s.visibility === 'hidden') return false;
+          }
+          return true;
+        }""")
         box = el.bounding_box()
-        assert box["width"] > 0 and box["height"] > 0, f"{sel} zero box"          # primitive 3
-        assert box["y"] >= -0.5 and box["y"] + box["height"] <= h + 0.5, sel     # primitive 2
-        assert box["x"] >= -0.5 and box["x"] + box["width"] <= w + 0.5, sel
-        assert el.evaluate("e => e.scrollHeight <= e.clientHeight + 1"), sel     # primitive 4
-        assert page.evaluate(  # primitive 5 (per text node), simplified
-            "e => e.innerText.trim().length > 0", el)
-    # G-10 / G-11 exactness on the required viewports
-    assert len(page.query_selector_all('[data-answer="ON-G4"] [data-field^="money."]')) == 5
-    marg = page.query_selector_all('[data-answer="ON-G7"] [data-marginal]')
-    assert 2 <= len(marg) <= 6
+        assert box and box["width"] > 0 and box["height"] > 0
+        assert -0.5 <= box["x"] and box["x"] + box["width"] <= w + 0.5
+        assert -0.5 <= box["y"] and box["y"] + box["height"] <= h + 0.5
+        assert el.evaluate("e => e.scrollHeight <= e.clientHeight + 1")
+        assert el.evaluate("e => e.scrollWidth <= e.clientWidth + 1")
+
+    # Exact schemas reject duplicates as well as omissions.
+    for answer, expected in FIELDS.items():
+        fields = page.locator(f'[data-answer="{answer}"] [data-field]')
+        actual = [fields.nth(i).get_attribute("data-field") for i in range(fields.count())]
+        assert len(actual) == len(set(actual)) and set(actual) == expected
+        for i in range(fields.count()):
+            field = fields.nth(i)
+            assert field.locator(":scope > [data-label]").count() == 1
+            assert field.locator(":scope > [data-value]").count() == 1
+            assert field.locator(":scope > [data-value]").inner_text().strip()
+
+    # Semantic values are part of the schema, not free display prose.
+    system = page.locator('[data-answer="ON-G1"] [data-field]')
+    for i in range(system.count()):
+        assert system.nth(i).locator("[data-state]").get_attribute("data-state") in \
+               {"up", "degraded", "down", "unknown"}
+        assert int(system.nth(i).locator("[data-age-seconds]").get_attribute("data-age-seconds")) >= 0
+    decision = values_for(page, "ON-G5")
+    assert decision["decision.state"] in {"pending", "none"}
+    assert decision["decision.eligibility"] in \
+           {"observe", "inspect", "approve", "promote", "cancel", "retire", "none"}
+    risk = values_for(page, "ON-G3")
+    assert risk["risk.state"] in {"active", "all-clear"}
+    if fixture.id == "F-7":
+        assert risk == {"risk.identity": "none", "risk.state": "all-clear", "risk.action": "none"}
+        assert decision == {"decision.state": "none", "decision.target": "none",
+                            "decision.kind": "none", "decision.epoch": "42",
+                            "decision.authority": "none", "decision.eligibility": "none"}
+    trust = values_for(page, "ON-G6")
+    assert trust["trust.projection_state"] in \
+           {"current", "lagging", "stale", "failing", "unknown"}
+    assert all(int(trust[key]) >= 0 for key in {
+        "trust.degraded_count", "trust.stale_count", "trust.partial_count", "trust.unknown_count"
+    })
+    assert int(trust["trust.epoch"]) >= 0 and int(trust["trust.worst_age"]) >= 0
+    run_counts = values_for(page, "ON-G2")
+    assert all(int(value) >= 0 for value in run_counts.values())
+
+    expected_rows = {"desktop": 8, "narrow": 7, "mobile": 3}[name]
+    rows = page.locator('[data-region="R2"] [data-run-id]')
+    assert rows.count() == expected_rows
+    for i in range(rows.count()):
+        row_fields = rows.nth(i).locator("[data-field]")
+        actual = row_fields.evaluate_all("els => els.map(e => e.dataset.field)")
+        assert len(actual) == len(set(actual)) and set(actual) == ROW_FIELDS
+        assert all(row_fields.nth(j).locator(":scope > [data-value]").inner_text().strip()
+                   for j in range(row_fields.count()))
+        values = values_for(rows.nth(i))
+        assert int(values["attempt.number"]) >= 1
+        assert re.fullmatch(r"\d+/\d+", values["phase.progress"])
+        assert values["lifecycle.state"] in {
+            "queued", "running", "awaiting_approval", "verifying", "promotable", "promoting",
+            "merged", "projecting", "published", "failed", "quarantined", "cancelled"
+        }
+        assert values["run.live"] in {"live", "not-live"}
+        assert re.fullmatch(r"[0-9a-f]{7,40}|uncommitted", values["source.commit"])
+        assert values["cost.provenance"] in {"metered", "estimated", "unknown", "reconciled"}
+        assert values["attention.state"] in {"new", "active", "snoozed", "resolved", "stale", "none"}
+        assert values["decision.eligibility"] in {
+            "observe", "inspect", "approve", "promote", "cancel", "retire", "none"
+        }
+        assert values["decision.receipt"] in {"recorded", "missing"}
+        for field, evidence_class in {
+            "evidence.advisory": "advisory", "evidence.measured": "measured",
+            "evidence.source": "source",
+        }.items():
+            assert rows.nth(i).locator(
+                f'[data-field="{field}"]'
+            ).get_attribute("data-evidence-class") == evidence_class
+    marginals = page.locator('[data-answer="ON-G7"] [data-marginal]')
+    assert marginals.count() == 4
+    assert {marginals.nth(i).get_attribute("data-marginal") for i in range(4)} == \
+           {"model", "condition", "provider", "lifecycle"}
+    for i in range(4):
+        buckets = marginals.nth(i).locator("[data-bucket]")
+        actual = [buckets.nth(j).get_attribute("data-bucket") for j in range(buckets.count())]
+        assert len(actual) == len(set(actual)) == 3
+        assert set(actual) == {"top", "other", "unknown"}
+        top = marginals.nth(i).locator('[data-bucket="top"]')
+        assert top.get_attribute("data-category") and top.locator("[data-value]").inner_text().strip()
+
+    money_risk = page.locator('[data-answer="ON-G4"] [data-money-risk]')
+    assert money_risk.count() == (1 if fixture.id == "F-3" else 0)
+
+    # Count rendered lines using computed line-height; identifiers may carry the
+    # explicit middle-ellipsis contract, but required values may not clip.
+    row_count = {"desktop": 8, "narrow": 7, "mobile": 3}[name]
+    attention_count = {"desktop": 5, "narrow": 4, "mobile": 3}[name]
+    clamp_groups = {
+        '[data-region="R0"] [data-micro-row]': 4,
+        '[data-region="R1"] [data-item-line]': attention_count * 2,
+        '[data-region="R2"] [data-row-line]': row_count * 3,
+        '[data-region="R3a"] [data-field]': 5,
+        '[data-region="R3b"] [data-detail-line]': 2,
+        '[data-region="R3c"] [data-marginal]': 4,
+    }
+    for selector, expected_count in clamp_groups.items():
+        group = page.locator(selector)
+        assert group.count() == expected_count
+        assert group.evaluate_all("els => els.every(e => e.hasAttribute('data-max-lines'))")
+    clamped = page.locator("[data-max-lines]")
+    for i in range(clamped.count()):
+        el = clamped.nth(i)
+        assert rendered_line_count(el) <= int(el.get_attribute("data-max-lines"))
+    required_values = page.locator('[data-region] [data-value]:not([data-identifier])')
+    assert required_values.evaluate_all("els => els.every(e => e.hasAttribute('data-no-ellipsis'))")
+    assert_no_clipped_required_values(required_values)
+
+    # Walk all text under every resting region, including detailed R2 rows.
+    assert_no_effective_contrast_violations(
+        page.locator("[data-region]"), minimum=4.5, large_minimum=3.0
+    )
 ```
+
+### 10.8 HTML contrast probe
+
+`assert_no_effective_contrast_violations` is not the SVG probe applied unchanged. It reuses only its
+tested color parsing, alpha compositing, relative-luminance, and ratio functions, then walks HTML text
+nodes under every resting region with a `TreeWalker`. For each non-whitespace text node it creates a `Range`
+and rejects a zero/off-viewport box; reads the parent's computed `color`; composites computed
+`backgroundColor` from the parent through ancestors until alpha=1; composites a translucent
+foreground over that result; and applies 4.5:1 or 3:1 from computed font size/weight. A non-`none`
+background image behind required text is a gate failure rather than an unmeasured guess. Forced-colors
+uses the browser's post-emulation computed colors. The helper returns every failing selector, text,
+foreground, effective background, and ratio, so zero failures is deterministic and actionable.
 
 ---
 
 ## 11. Open items
 
 - **Implementation.** This document is the IA contract the facelift executes; the code change (and
-  the `[data-*]` selector contract in §10.2) is a later phase. The gate script does not exist yet;
-  `verify_control_room_rendering.py` is named in the direction's acceptance criteria.
+   the `[data-*]` selector contract in §10.2) is a later phase. The gate script does not exist yet;
+   `verify_control_room_rendering.py` is named in the direction's acceptance criteria. Section 10 is
+   implementable without an IA decision: it fixes selectors, cardinalities, parent mapping, fixtures,
+   ready state, viewport dimensions, exact schemas, clipping rules, and contrast mechanism.
 - **Canonical contract reconciled.** The earlier mobile `ON-G7` omission and the narrow-desktop
   ticker fallback are both withdrawn: §4 and T4/T1 now answer all seven needs at 1440×900 and
   390×844 with no below-fold placement, so r1, the direction, and this document agree.
-- **Fixtures.** `F-1`..`F-6` (§10.6) need a test harness that can inject a near-cap window/lease, a
-  stale projection, an unknown provider, and a saturated inbox; the numbers exist but the fixtures
-  are not committed.
-- **Contrast automation.** Primitive 5 may be satisfied by axe-core; if a bespoke checker is used it
-  must resolve effective backgrounds for the status chips, which are layered on tinted rows.
+- **Fixtures.** `F-0`..`F-7` (§10.6) define the deterministic payload contract; the implementation must
+   commit their JSON/SSE frames with the render gate and fail on any unmocked request.
+- **Contrast automation.** Primitive 5 reuses the existing rendering gate's color parser, alpha
+  compositing, and luminance functions for HTML text, including effective ancestor backgrounds and
+  tinted status rows; dark, light, and forced-colors all run.
 - **Provider composition** (`G-11`) depends on the control packet / ledger carrying provider per
   run; if a run lacks it, the count must show `unknown`, never be omitted.
