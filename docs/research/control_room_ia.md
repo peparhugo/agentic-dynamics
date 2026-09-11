@@ -36,20 +36,22 @@ tab, lens, board, modal, hover, or filter, and no scrolling of the page or of an
 
 ## 1. The resting screen, defined
 
-The resting screen is **one layout**, not a set of destinations. Desktop is a persistent qualifier
-bar over a **three-column body**; mobile is the same regions stacked in one column. Nothing is
-hidden behind navigation, and no required answer is below the fold.
+The resting screen is **one run ledger**, not a set of dashboard destinations. Desktop is a persistent
+qualifier bar over a three-column body: `R2` is the visually dominant agent-session ledger, while `R1`
+and `R3` are annotation gutters attached to that ledger, not peer card boards. Mobile stacks the same
+ledger and gutters in one column. Nothing is hidden behind navigation, and no required answer is below
+the fold.
 
 ```text
 DESKTOP 1440x900                                          MOBILE 390x844
 ┌───────────────────────────────────────────────┐        ┌──────────────────────┐
 │ R0  SCOPE / TRUTH BAR (full width, 56px)       │        │ R0 scope/truth 44px  │
 ├──────────────┬──────────────────┬─────────────┤        ├──────────────────────┤
-│ R1 ATTENTION │ R2 RUN ROSTER    │ R3 RAIL     │        │ R1 attention 176px   │
-│  (ranked)    │  (only scroller) │  R3a MONEY  │        ├──────────────────────┤
-│  R1a money   │  run | phase    │  R3b HEALTH │        │ R2 roster 196px      │
-│  R1b failure │  lifecycle      │  R3c COMPO  │        ├──────────────────────┤
-│  R1c advisory│  decision token │             │        │ R3a MONEY 92px       │
+│ R1 ATTENTION │ R2 RUN LEDGER    │ R3 CONTEXT  │        │ R1 attention 176px   │
+│  (ranked)    │  (only scroller) │  R3a COST   │        ├──────────────────────┤
+│  R1a decision│  session | phase │  R3b HEALTH │        │ R2 run ledger 196px  │
+│  R1b failure │  evidence marks │  R3c COMPO  │        ├──────────────────────┤
+│  R1c advisory│  eligibility    │             │        │ R3a COST 92px        │
 ├──────────────┴──────────────────┴─────────────┤        │ R3b HEALTH 68px      │
 │ R4 SELECTION DOCK (hidden at rest)             │        │ R3c COMPOSITION 60px │
 └───────────────────────────────────────────────┘        └──────────────────────┘
@@ -109,29 +111,31 @@ Each item carries identity, severity, actionability, first/last-seen, scope, sta
 Visible capacity: **≥ 3 ranked items at mobile, ≥ 5 at desktop**, with the top-severity slot always
 rendered even if lower-ranked items are clipped (`[P]`; p5 IA6).
 
-### R2 — Run roster (default operational body)
+### R2 — Run ledger (default operational body)
 
 `[data-region="R2"]`, carrying the `ON-G2` answer anchor (`[data-answer="ON-G2"]`) and the row
-selector `[data-run-id]`. A keyed, write-on-change list of live runs/cells, ranked for triage (attention first, then
-running/queued, then settled) `[M]` keyed-list contract; `[P]` ranking. Every row shows:
+selector `[data-run-id]`. A keyed, write-on-change list of live agent sessions/runs, ranked for triage
+(attention first, then running/queued, then settled) `[M]` keyed-list contract; `[P]` ranking. Every row shows:
 agent/session identity (session id · worktree/host target · current command/tool · provider×model ·
 attempt, per direction §4.1 Move 1) · spec/cell · phase `n/total` · lifecycle state · changed-at/live
-marker · cost provenance (on-row) · attention state · **decision-eligibility token**. Live/change
-state is always visible — never behind a filter (`[X]`; r0 M7, r6c IA1). This is where `ON-G2` lives
-and where the row-level `ON-G5` mirror points back to `R1a`. `R2` is the **only** region allowed to
-scroll, and only for rows beyond the bounded visible set (`[P]`; §3.1).
+marker · paired **ADVISORY claim / MEASURED proof** marks · source/commit marker · cost provenance
+(on-row) · attention state · **decision-eligibility token** · receipt coverage (`recorded`/`missing`).
+Live/change state is always visible — never behind a filter (`[X]`; r0 M7, r6c IA1). This is where
+`ON-G2` lives and where the row-level `ON-G5` mirror points back to `R1a`. `R2` is the **only** region
+allowed to scroll, and only for rows beyond the bounded visible set (`[P]`; §3.1). A row is a ledger
+line, not a dashboard card; no card border or lifecycle-only row may pass the glance gate.
 
-### R3 — Constraint rail (decisions' context, not peer boards)
+### R3 — Constraint ledger (decisions' context, not peer boards)
 
-Three **fixed-height, non-scrolling** summaries stacked. Together they are the `ON-G4` (`R3a`),
+Three **fixed-height, non-scrolling** annotations stacked. Together they are the `ON-G4` (`R3a`),
 `ON-G1` dependency half (`R3b`), and `ON-G7` (`R3c`) answers; none may require scrolling or move
 below the fold (p5 IA2/IA3/IA4).
 
-- **R3a MONEY** (`[data-answer="ON-G4"]`) — exactly five labelled values, each with
+- **R3a COST** (`[data-answer="ON-G4"]`) — exactly five labelled values, each with
   `[data-field]`: retained-window spend, burn rate, worst provider-window %, wallet/token headroom,
   and reserved-(unspent)-leases; a money-risk exception marker when a window/lease nears its cap.
-  This is the full `ON-G4` answer, not a risk exception alone (p5 IA3). It is a *context rail*, not
-  the removed "Money board".
+  This is the full `ON-G4` answer, not a risk exception alone (p5 IA3). It is a *constraint annotation*,
+  not the removed "Money board" or a field of KPI cards.
 - **R3b HEALTH** (`[data-answer="ON-G1"]`) — named dependency rows: worker health (unhealthy count +
   affected-run link) and knowledge projections (registry/ledger/chroma/neo4j lag + last-report age),
   sharing one observation epoch/age with `R0` (p5 IA5). This is the dependency half of `ON-G1` and
@@ -156,13 +160,16 @@ cost provenance → decision → registry record) and the safe-action preview. N
 The hierarchy is **visual weight and reading order within one screen**, not disclosure depth
 (everything in §2 is present at rest). It follows r6c's required sequence (`[P]`; r6c "Required IA").
 
-1. **First — the qualifier and the work queue.** `R0` scope/truth + `R1` attention. The operator sees
-   *whether the data is trustworthy* and *what needs them* before anything else. `R1` is globally
-   severity-ranked (§2), not category-pinned.
-2. **Second — the fleet body.** `R2` run roster is the largest region and the default addressable
-   list. It carries `ON-G2` and is never displaced by a selected object.
-3. **Third — the constraint rail.** `R3a` money, `R3b` health, `R3c` composition answer the remaining
-   glance questions as compact context. They are third by weight, but present and **non-scrolling**.
+1. **First — the run identity and work queue.** `R2` begins with the session/terminal identity band;
+   `R0` truth and `R1` attention qualify it. The operator sees *which agent is acting*, *where*, and
+   *what needs them* before reading generic lifecycle counts. `R1` is globally severity-ranked (§2),
+   not category-pinned.
+2. **Second — the evidence-bearing fleet body.** `R2` run ledger is the largest region and the default
+   addressable list. It carries `ON-G2`, the ADVISORY/MEASURED pair, eligibility, and receipt coverage;
+   it is never displaced by a selected object.
+3. **Third — the constraint ledger.** `R3a` cost, `R3b` health, `R3c` composition answer the remaining
+   glance questions as compact annotations attached to the run ledger. They are third by weight, but
+   present and **non-scrolling**, never peer KPI cards.
 
 **Anti-crowding rule.** `R1`, `R3a`, `R3b`, `R3c` are fixed-height and summary-first: they show
 exceptions plus headline values, never full detail. `R2` is the **only** region that may scroll, and
@@ -423,6 +430,9 @@ selector at every listed viewport:
 | Health / truth | `[data-field]` with value in `health.workers, health.projections, truth.conn, truth.ctrl, truth.epoch, truth.degraded` | `ON-G1`/`ON-G6` values |
 | Composition | `[data-field="composition.rollup"]` with child `[data-marginal]` | the bounded `ON-G7` rollup |
 | Row identity | `[data-region="R2"] [data-run-id]` | roster rows (bounded visible set) |
+| Agent identity | `[data-region="R2"] [data-field="session.identity"]`, `[data-field="terminal.target"]`, `[data-field="command.current"]` | the session/terminal identity band |
+| Evidence authority | `[data-region="R2"] [data-field="evidence.advisory"]`, `[data-field="evidence.measured"]`, `[data-field="evidence.source"]` | claim/proof/source marks visible at rest |
+| Action receipt | `[data-region="R2"] [data-field="decision.eligibility"]`, `[data-field="decision.receipt"]` | governed action and recording coverage |
 
 ### 10.3 Geometry checks (G)
 
@@ -440,6 +450,7 @@ selector at every listed viewport:
 | G-10 | 1440×900 | `[data-answer="ON-G4"] [data-field^="money."]` | exactly five money values, all non-empty | `count === 5` |
 | G-11 | 1440×900 | `[data-answer="ON-G7"] [data-marginal]` | bounded composition | `2 ≤ count ≤ 6`, each marginal has an explicit `other`/`unknown` bucket |
 | G-12 | 1024×768 (narrow desktop) | all `[data-answer]` | same seven answers present and in viewport | same as G-1/G-2 |
+| G-13 | both | first visible `[data-run-id]` row | agent identity, evidence authority, eligibility, and receipt fields are non-empty | 0 missing fields |
 
 Mobile has **no** `ON-G7` omission: G-1 and G-11 run at 390×844 too (p5 IA4).
 
@@ -459,6 +470,9 @@ test; p5 IA8).
 | B-6 | "Here is whether the data is fresh." | `R0.degraded` + per-value chips |
 | B-7 | "Here is the fleet's shape." | `R3c` bounded rollup |
 | B-8 | The correct next action for the top item. | `R1` eligibility token / `R2` mirror |
+| B-9 | "This is an agent session writing to a terminal, not a service dashboard." | first R2 identity band: session, terminal target, current command, provider×model, attempt |
+| B-10 | "The agent's claim and the measured proof are different." | paired R2 ADVISORY/MEASURED marks, visible without opening R4 |
+| B-11 | "An action is eligible and its recording status is visible." | adjacent R2 eligibility and receipt tokens |
 
 ### 10.5 Browser / accessibility automation (A) and event/state (E)
 
