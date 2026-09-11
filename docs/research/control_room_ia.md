@@ -480,7 +480,7 @@ selector at every listed viewport:
 | `ON-G7` composition | four `[data-marginal]` values: `model`, `condition`, `provider`, `lifecycle` | exactly four unique marginals; each has exactly three unique buckets: `top` (with `[data-category]`), `other`, `unknown` |
 | Row identity | `[data-region="R2"] [data-run-id]` | 8 desktop / 7 narrow / 3 mobile visible rows in the max-density fixture |
 | Agent identity | for each R2 row: `session.identity`, `terminal.target`, `command.current`, `model.provider`, `attempt.number` | five non-empty fields scoped to that row |
-| Run state | for each R2 row: `[data-field="phase.progress"]`, `[data-field="lifecycle.state"]`, `[data-field="run.live"]`, `[data-field="source.commit"]`, `[data-field="cost.provenance"]`, `[data-field="attention.state"]` | six non-empty fields scoped to that row |
+| Run state | for each R2 row: `[data-field="spec.cell"]`, `[data-field="phase.progress"]`, `[data-field="lifecycle.state"]`, `[data-field="run.live"]`, `[data-field="source.commit"]`, `[data-field="cost.provenance"]`, `[data-field="attention.state"]` | seven non-empty fields scoped to that row |
 | Evidence / action | for each R2 row: `[data-field="evidence.advisory"]`, `[data-field="evidence.measured"]`, `[data-field="evidence.source"]`, `[data-field="decision.eligibility"]`, `[data-field="decision.receipt"]` | five non-empty fields scoped to that row; mirrors never carry `data-answer` |
 | Line clamps | `[data-max-lines]` on every R0 micro-row, R1 item line, R2 row line, R3a cell, R3b line, and R3c marginal | integer contract checked against rendered `height / line-height`; required values also carry `[data-no-ellipsis]` |
 

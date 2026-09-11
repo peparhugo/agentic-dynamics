@@ -114,6 +114,7 @@
   //: entirely (triage). The `data-field` key is unchanged in every case, so the schema holds.
   var SHORT_ROW_LABELS = {
     "session.identity": "ses",
+    "spec.cell": "spec",
     "terminal.target": "tgt",
     "command.current": "cmd",
     "model.provider": "mdl",
@@ -329,6 +330,10 @@
 
     // ── Line 2 · lifecycle state + the lease cost pair (Move 6) ────────────────────────────
     var lineTwo = element("div", "row-line run-state", { "data-row-line": "", "data-max-lines": "1" });
+    // `spec/cell` names the experiment cell this session belongs to (IA §2 R2 / §10.2): without
+    // it the row is a run without its assignment, and the stranger cannot place it in the grid.
+    appendField(lineTwo, "spec.cell", lab("spec.cell", "spec"),
+      mark("spec", run["spec.cell"]), { maxLines: 1 });
     appendField(lineTwo, "phase.progress", lab("phase.progress", "phase"),
       mark("ph", run["phase.progress"]), { maxLines: 1 });
     appendField(lineTwo, "lifecycle.state", lab("lifecycle.state", "lifecycle"),
@@ -447,6 +452,42 @@
     return line;
   }
 
+  //: Severity × actionability ranking for the work queue (IA §2 R1: "ranked by severity ×
+  //: actionability"). Higher wins; ties fall back to the collection order (stable sort).
+  var SEVERITY_RANK = { critical: 4, high: 3, medium: 2, low: 1 };
+  var STATE_RANK = { active: 3, new: 3, stale: 2, snoozed: 1, resolved: 0 };
+
+  /** The numeric rank of one attention entry (severity dominates, then lifecycle state). */
+  function severityRank(entry) {
+    var severity = String((entry && entry.severity) || "medium").toLowerCase();
+    var state = String((entry && entry.state) || "active").toLowerCase();
+    return (SEVERITY_RANK[severity] || 2) * 10 + (STATE_RANK[state] || 0);
+  }
+
+  /**
+   * One ranked (non-reserved) work item: identity, state, authority, the next governed action and
+   * a source/age chip. It carries no `[data-field]` and no `[data-answer]`, so the reserved
+   * decision/risk answers keep their exact schemas while a saturated inbox is still visible.
+   */
+  function renderRankedItem(entry, ageSeconds) {
+    var identity = entry.identity || entry.id || "unknown";
+    var state = entry.state || "active";
+    var action = entry.action || "inspect";
+    var authority = entry.authority || "review";
+    var severity = String(entry.severity || "medium").toUpperCase();
+    var item = attentionItem({
+      key: "rank-" + (entry.id || identity),
+      kind: "next",
+      ariaLabel: "Ranked work item " + identity + " (" + severity + ")",
+    });
+    attentionLine(item.body, severity, [], [["queue-id", identity], ["queue-state", state]]);
+    attentionLine(item.body, "ACTION", [], [
+      ["queue-action", action], ["queue-authority", authority], ["queue-age", "age " + ageSeconds + "s"],
+    ]);
+    item.item.__signature = JSON.stringify(entry);
+    return item.item;
+  }
+
   /** R1 `ON-G5`/`ON-G3`: a ranked, durable work queue of run-linked items, then ONE continuous
    *  clear state. Keyed and write-on-change: reserved rows keep identity across a live update. */
   function renderAttention(glance) {
@@ -501,33 +542,32 @@
     riskItem.item.__signature = JSON.stringify(risk);
     nodes.push(riskItem.item);
 
-    // ── NEXT — the next ranked work item ───────────────────────────────────────────────────
-    var nextItem = attentionItem({
-      key: "next",
-      kind: "next",
-      ariaLabel: "Next highest-ranked item: " + next.identity,
-    });
-    attentionLine(nextItem.body, "NEXT", [
-      ["next.identity", "target", next.identity, true],
-      ["next.state", "state", next.state, false],
-    ]);
-    attentionLine(nextItem.body, "OWNER", [["next.action", "action", next.action, false]]);
-    nextItem.item.__signature = JSON.stringify(next);
-    nodes.push(nextItem.item);
+    // ── R1c · the globally-ranked remainder (Move 8, IA §2 R1c) ───────────────────────────
+    // Decision and risk hold the reserved slots above; the remaining capacity is filled by the
+    // ACTUAL ranked collection (`attention.next` plus `attention.items`), so a saturated inbox
+    // cannot bury a new critical item and never degenerates into repeated empty cards. With few
+    // candidates the surplus collapses into ONE continuous `QUEUE CLEAR` state.
+    var cap = capacities().attention;
+    var fillSlots = Math.max(0, cap - nodes.length);
+    var ageSeconds = (glance.trust && glance.trust.worst_age) || 0;
+    var candidates = [];
+    if (next && next.identity && next.identity !== "none") candidates.push(next);
+    if (Array.isArray(attention.items)) {
+      attention.items.forEach(function (entry) { candidates.push(entry); });
+    }
+    candidates.sort(function (a, b) { return severityRank(b) - severityRank(a); });
+    var ranked = candidates.slice(0, fillSlots);
+    ranked.forEach(function (entry) { nodes.push(renderRankedItem(entry, ageSeconds)); });
 
-    // Fill the remaining reserved capacity so the at-rest count is exact per viewport. The
-    // filler is ONE continuous empty state: only the first carries words, the rest are blank
-    // ruler lines (the DOM count the gate measures is preserved).
-    var filler = capacities().attention - 3;
-    for (var i = 0; i < filler; i += 1) {
+    for (var i = ranked.length; i < fillSlots; i += 1) {
       var empty = attentionItem({
         key: "empty-" + i,
         kind: "empty",
-        ariaLabel: i === 0 ? "Queue clear, no further attention" : null,
+        ariaLabel: i === ranked.length ? "Queue clear, no further attention" : null,
       });
       var lineA = element("div", "item-line", { "data-item-line": "", "data-max-lines": "1" });
       var lineB = element("div", "item-line", { "data-item-line": "", "data-max-lines": "1" });
-      if (i === 0) {
+      if (i === ranked.length) {
         lineA.appendChild(element("span", "item-kind", null, "QUEUE CLEAR"));
         lineA.appendChild(element("span", "queue-empty-note", null, "no further attention"));
         lineB.appendChild(element("span", "queue-empty-note", null,
@@ -558,6 +598,14 @@
       // is inline (one line). The clamp is the desktop shape, so it declares two lines.
       appendField(host, row[0], row[1], row[2] === undefined ? "unknown" : row[2], { maxLines: 2 });
     });
+    // Consequential-value provenance (IA §2 R3a): the money answer names the source and age of
+    // its observation visibly at rest, so spend is never a free-floating KPI.
+    var prov = document.getElementById("cost-prov");
+    if (prov) {
+      var ageValue = glance.trust && glance.trust.worst_age !== undefined
+        ? glance.trust.worst_age + "s" : "unknown";
+      prov.textContent = "source " + (glance.source || "unknown") + " · age " + ageValue;
+    }
     if (cost.money_risk) {
       var marker = element("span", "money-risk", { "data-money-risk": "" });
       marker.appendChild(element("span", null, null, "⚠ near cap"));
@@ -756,6 +804,14 @@
           run["attention.state"] = "active";
         }
       });
+      // E-5 (IA §10.5): a NEW critical failure must stay visible, so it claims the reserved
+      // risk slot in R1 rather than competing for a ranked remainder slot.
+      if (frame.kind === "run.failed") {
+        AppState.glance.attention = AppState.glance.attention || {};
+        AppState.glance.attention.risk = {
+          identity: frame.target, state: "active", action: "inspect",
+        };
+      }
       renderRunList(AppState.glance);
       renderAttention(AppState.glance);
       // Move 7 — a transition for the SELECTED run appends one live feed entry. A paused feed

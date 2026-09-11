@@ -360,6 +360,19 @@ body {
   font-weight: 700;
   letter-spacing: 0.07em;
   color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Per-answer provenance annotation (IA §2 R3a): source + age travel with the consequential
+   money values inline rather than in a separate region. */
+.region-prov {
+  margin-left: 6px;
+  font-size: 10px;
+  font-weight: 400;
+  letter-spacing: 0;
+  color: var(--muted);
 }
 
 /* ── R1 · attention ────────────────────────────────────────────────────────────────────── */
@@ -420,6 +433,11 @@ body {
   white-space: nowrap;
 }
 .queue-action { border-color: var(--accent); color: var(--text); }
+/* Ranked work-queue tokens (identity / state / age). They are plain spans, never `[data-field]`,
+   so a saturated R1 can list real items without touching the reserved answer schemas. */
+.queue-id { color: var(--text); font-family: var(--mono); white-space: nowrap; }
+.queue-state { color: var(--muted); text-transform: uppercase; font-size: 9px; white-space: nowrap; }
+.queue-age { color: var(--muted); white-space: nowrap; }
 
 .item-line {
   display: flex;

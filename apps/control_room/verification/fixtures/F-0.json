@@ -28,6 +28,7 @@
   },
   "run_counts": {"running": 5, "queued": 1, "failed": 1, "live": 3},
   "run_defaults": {
+    "spec.cell": "task_manager/clean",
     "terminal.target": "wt/control-room",
     "command.current": "pytest",
     "model.provider": "openai/gpt-5.6-sol",

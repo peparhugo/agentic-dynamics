@@ -80,10 +80,10 @@ FIELDS = {
     },
 }
 ROW_FIELDS = {
-    "session.identity", "terminal.target", "command.current", "model.provider", "attempt.number",
-    "phase.progress", "lifecycle.state", "run.live", "source.commit", "cost.provenance",
-    "attention.state", "evidence.advisory", "evidence.measured", "evidence.source",
-    "decision.eligibility", "decision.receipt",
+    "session.identity", "spec.cell", "terminal.target", "command.current", "model.provider",
+    "attempt.number", "phase.progress", "lifecycle.state", "run.live", "source.commit",
+    "cost.provenance", "attention.state", "evidence.advisory", "evidence.measured",
+    "evidence.source", "decision.eligibility", "decision.receipt",
 }
 EXPECTED_BOXES = {
     "desktop": {"R0": (16, 0, 1408, 72), "R1": (16, 84, 300, 800),
