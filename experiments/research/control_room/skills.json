@@ -1,6 +1,6 @@
 {
   "schema": "control-room-skills/v1",
-  "phase": "r4_reduce",
+  "phase": "p0_repair_taxonomy",
   "min_support": 3,
   "inputs": [
     {
@@ -25,14 +25,14 @@
     },
     {
       "path": "experiments/research/control_room/taxonomy.json",
-      "sha256": "fd030f65ee2bbb388b5fae84079d6ebdf1bab20ab9e9a075705032bf734bfb9a"
+      "sha256": "316d71062a360028cc1fb51f9411ac29d4e24945891ef600f7e75e6de39fa7d0"
     }
   ],
   "skills": [
     {
       "id": "skill-delivery",
       "decision": "What delivery model should the Control Room use?",
-      "recommendation": "Stay build-less: vanilla JS + CSS custom properties + CSS/SVG micro-visuals. Adopt a chart library only for the time-series/table marks that justify it (uPlot or ECharts for streaming breadth), and prefer D3 only for one or two bespoke marks.",
+      "recommendation": "Stay build-less: vanilla JS + CSS custom properties + CSS/SVG micro-visuals. Adopt a chart library only for the time-series/table marks that justify it (uPlot or ECharts for streaming breadth), and prefer D3 only for one or two bespoke marks. Local [P] policy (not corpus findings): Stay build-less / rule out React \u2014 No-build is a [P] local guardrail (r0 \u00a79.8); the corpus shows viable vanilla/SVG alternatives, not proof React is unnecessary.. Local [P] policy (not corpus findings): Stay build-less / rule out React \u2014 No-build is a [P] local guardrail (r0 \u00a79.8); the corpus shows viable vanilla/SVG alternatives, not proof React is unnecessary.. Local [P] policy (not corpus findings): Stay build-less / rule out React \u2014 No-build is a [P] local guardrail (r0 \u00a79.8); the corpus shows viable vanilla/SVG alternatives, not proof React is unnecessary.. Local [P] policy (not corpus findings): Stay build-less / rule out React \u2014 No-build is a [P] local guardrail (r0 \u00a79.8); the corpus shows viable vanilla/SVG alternatives, not proof React is unnecessary..",
       "avoid": [
         "A React SPA/build pipeline for a single-page local console (no corpus evidence it is needed; conflicts with the no-build guardrail).",
         "Mixing three chart grammars on one page.",
@@ -45,94 +45,82 @@
         "fw-react-kits"
       ],
       "evidence": {
-        "support_max": 39,
+        "support_max": 17,
         "distinct_families": [
           "cli",
           "craft",
-          "dashboards",
           "dataviz"
         ],
         "backing_nodes": [
           {
             "id": "tech-viz-chart-grammar",
-            "support": 52,
+            "support": 15,
             "family_names": [
-              "dataviz",
-              "dashboards",
-              "cli"
-            ]
+              "dataviz"
+            ],
+            "meets_three_source_rule": true
           },
           {
             "id": "tech-viz-time-series-marks",
-            "support": 39,
+            "support": 12,
             "family_names": [
-              "dashboards",
-              "dataviz",
-              "cli"
-            ]
+              "cli",
+              "dataviz"
+            ],
+            "meets_three_source_rule": true
           },
           {
             "id": "tech-svg-theme-aware-svg",
-            "support": 29,
+            "support": 11,
             "family_names": [
-              "craft",
-              "cli",
-              "dataviz"
-            ]
+              "craft"
+            ],
+            "meets_three_source_rule": true
           },
           {
             "id": "stk-svg-css-only",
             "support": 15,
             "family_names": [
               "craft"
-            ]
+            ],
+            "meets_three_source_rule": true
           },
           {
-            "id": "tech-viz-sampling-decimation",
-            "support": 15,
+            "id": "tech-viz-rendering-performance",
+            "support": 17,
             "family_names": [
               "cli",
-              "dataviz",
-              "craft"
-            ]
+              "craft",
+              "dataviz"
+            ],
+            "meets_three_source_rule": true
           },
           {
             "id": "stk-vanilla-js",
-            "support": 14,
+            "support": 4,
             "family_names": [
-              "dataviz",
-              "cli"
-            ]
+              "dataviz"
+            ],
+            "meets_three_source_rule": true
           },
           {
             "id": "stk-react",
             "support": 10,
             "family_names": [
               "dataviz"
-            ]
+            ],
+            "meets_three_source_rule": true
           },
           {
             "id": "stk-d3",
             "support": 5,
             "family_names": [
               "dataviz"
-            ]
-          },
-          {
-            "id": "stk-canvas-webgl",
-            "support": 2,
-            "family_names": [
-              "dataviz"
-            ]
+            ],
+            "meets_three_source_rule": true
           }
         ],
         "refs": [
-          {
-            "family": "dataviz",
-            "uri": "https://github.com/leeoniya/uPlot",
-            "sha256": "c3a34c9200af26ab",
-            "title": "GitHub - leeoniya/uPlot: \ud83d\udcc8 A small, fast chart for time series, lines, areas, ohlc & bars \u00b7 GitHub"
-          },
           {
             "family": "dataviz",
             "uri": "https://d3js.org/",
@@ -140,10 +128,22 @@
             "title": "D3 by Observable | The JavaScript library for bespoke data visualization"
           },
           {
+            "family": "dataviz",
+            "uri": "https://d3js.org/d3-scale-chromatic",
+            "sha256": "2bd7bec1de93305d",
+            "title": "d3-scale-chromatic | D3 by Observable"
+          },
+          {
             "family": "craft",
-            "uri": "https://every-layout.dev/",
-            "sha256": "4b5a5ab9eabd35d8",
-            "title": "Relearn CSS layout: Every Layout"
+            "uri": "https://developer.mozilla.org/en-US/docs/Web/SVG/Tutorial",
+            "sha256": "1c32624cf7da27fe",
+            "title": "Introducing SVG from scratch - SVG | MDN"
+          },
+          {
+            "family": "dataviz",
+            "uri": "https://echarts.apache.org/en/index.html",
+            "sha256": "caa87df6c6cfc387",
+            "title": "Apache ECharts"
           },
           {
             "family": "dataviz",
@@ -153,51 +153,21 @@
           },
           {
             "family": "dataviz",
-            "uri": "https://leeoniya.github.io/uPlot/",
-            "sha256": "0c26530cb0b02576",
-            "title": "uPlot | \ud83d\udcc8 A small, fast chart for time series, lines, areas, ohlc & bars"
+            "uri": "https://nivo.rocks/bar/",
+            "sha256": "142393ea7aca91f1",
+            "title": "Bar chart | nivo"
+          },
+          {
+            "family": "craft",
+            "uri": "https://developer.mozilla.org/en-US/docs/Web/SVG/Tutorial/Texts",
+            "sha256": "88fc7a5094ccc2ab",
+            "title": "Texts - SVG | MDN"
           },
           {
             "family": "dataviz",
-            "uri": "https://www.tremor.so/",
-            "sha256": "ad8fe3598ecb31d8",
-            "title": "Tremor \u2013 Copy-and-Paste Tailwind CSS UI Components for Charts and Dashboards"
-          },
-          {
-            "family": "dataviz",
-            "uri": "https://www.tremor.so/docs/visualizations/area-chart",
-            "sha256": "8f8efdd051827d24",
-            "title": "Area Chart - Tremor"
-          },
-          {
-            "family": "dataviz",
-            "uri": "https://ui.shadcn.com/charts",
-            "sha256": "b34430159fcfd06c",
-            "title": "Area Charts"
-          },
-          {
-            "family": "dataviz",
-            "uri": "https://echarts.apache.org/handbook/en/best-practices/canvas-vs-svg/",
-            "sha256": "f7498c71e2215e1a",
-            "title": "Canvas vs. SVG - Best Practices - Handbook - Apache ECharts"
-          },
-          {
-            "family": "dashboards",
-            "uri": "https://grafana.com/",
-            "sha256": "235bf45a81093a96",
-            "title": "Full-stack observability for the agentic era | Grafana Labs | Grafana Labs"
-          },
-          {
-            "family": "dashboards",
-            "uri": "https://grafana.com/docs/grafana/latest/",
-            "sha256": "7910c639346c2ffa",
-            "title": "Grafana OSS and Enterprise | Grafana documentation"
-          },
-          {
-            "family": "dashboards",
-            "uri": "https://grafana.com/docs/grafana/latest/dashboards/",
-            "sha256": "789c3cf84b24905d",
-            "title": "Dashboards | Grafana documentation"
+            "uri": "https://echarts.apache.org/handbook/en/get-started/",
+            "sha256": "fc1b54a4c3118289",
+            "title": "Get Started - Handbook - Apache ECharts"
           }
         ]
       },
@@ -207,12 +177,19 @@
         "RQ-A1",
         "RQ-A3",
         "RQ-C2"
+      ],
+      "evidence_class": "[X]",
+      "policy": [
+        {
+          "move": "Stay build-less / rule out React",
+          "reason": "No-build is a [P] local guardrail (r0 \u00a79.8); the corpus shows viable vanilla/SVG alternatives, not proof React is unnecessary."
+        }
       ]
     },
     {
       "id": "skill-shell-ia",
       "decision": "How should the room be navigated and laid out?",
-      "recommendation": "Board-per-domain (work / money / health / decisions) filled from a small widget catalog, with a command palette + keyboard shortcuts as an accelerator, a docked master\u2013detail for selection, progressive disclosure for the long tail, and a persisted density ladder. Keep money on the money board and alerts on an attention board rather than in an overflow System area.",
+      "recommendation": "Board-per-domain (work / money / health / decisions) filled from a small widget catalog, with a command palette + keyboard shortcuts as an accelerator, a docked master\u2013detail for selection, progressive disclosure for the long tail, and a persisted density ladder. Keep money on the money board and alerts on an attention board rather than in an overflow System area. Local [P] policy (not corpus findings): Domain-split boards (work / money / health / decisions) \u2014 No source states domain partitioning; support was inflated from generic dashboards labels (r6a E2).; Money board grouping (quota / wallet / leases) \u2014 No source states quota/wallet; support was inflated from payments/alerting labels (r6a E3).; Alerts on a dedicated attention board \u2014 Alerting as a surface is supported; the board placement is [P].. Local [P] policy (not corpus findings): Domain-split boards (work / money / health / decisions) \u2014 No source states domain partitioning; support was inflated from generic dashboards labels (r6a E2).; Money board grouping (quota / wallet / leases) \u2014 No source states quota/wallet; support was inflated from payments/alerting labels (r6a E3).; Alerts on a dedicated attention board \u2014 Alerting as a surface is supported; the board placement is [P].. Local [P] policy (not corpus findings): Domain-split boards (work / money / health / decisions) \u2014 No source states domain partitioning; support was inflated from generic dashboards labels (r6a E2).; Money board grouping (quota / wallet / leases) \u2014 No source states quota/wallet; support was inflated from payments/alerting labels (r6a E3).; Alerts on a dedicated attention board \u2014 Alerting as a surface is supported; the board placement is [P].. Local [P] policy (not corpus findings): Domain-split boards (work / money / health / decisions) \u2014 No source states domain partitioning; support was inflated from generic dashboards labels (r6a E2).; Money board grouping (quota / wallet / leases) \u2014 No source states quota/wallet; support was inflated from payments/alerting labels (r6a E3).; Alerts on a dedicated attention board \u2014 Alerting as a surface is supported; the board placement is [P]..",
       "avoid": [
         "One mega-screen with everything; burying quota/leases or approvals in an overflow drawer.",
         "Command palette as the only navigation.",
@@ -229,7 +206,7 @@
         "ia-money-grouping"
       ],
       "evidence": {
-        "support_max": 63,
+        "support_max": 43,
         "distinct_families": [
           "agentops",
           "cli",
@@ -240,145 +217,90 @@
         "backing_nodes": [
           {
             "id": "tech-ia-widget-catalog",
-            "support": 63,
+            "support": 41,
             "family_names": [
-              "dashboards",
               "cli",
+              "dashboards",
               "dataviz"
-            ]
+            ],
+            "meets_three_source_rule": true
           },
           {
-            "id": "tech-ia-board-per-domain",
-            "support": 55,
+            "id": "tech-ia-dashboard-layout",
+            "support": 43,
             "family_names": [
-              "dashboards",
-              "agentops",
-              "cli"
-            ]
+              "dashboards"
+            ],
+            "meets_three_source_rule": true
           },
           {
             "id": "tech-int-keyboard-first",
-            "support": 30,
+            "support": 22,
             "family_names": [
               "cli",
-              "dashboards",
-              "craft"
-            ]
+              "craft",
+              "dashboards"
+            ],
+            "meets_three_source_rule": true
           },
           {
             "id": "tech-trust-alerting",
-            "support": 28,
-            "family_names": [
-              "dashboards",
-              "agentops"
-            ]
-          },
-          {
-            "id": "tech-money-budget-thresholds",
-            "support": 19,
+            "support": 23,
             "family_names": [
               "dashboards"
-            ]
+            ],
+            "meets_three_source_rule": true
           },
           {
             "id": "tech-money-cost-attribution",
-            "support": 17,
+            "support": 13,
             "family_names": [
-              "agentops",
-              "dashboards"
-            ]
+              "agentops"
+            ],
+            "meets_three_source_rule": true
           },
           {
             "id": "tech-ia-master-detail",
-            "support": 15,
+            "support": 4,
             "family_names": [
-              "cli",
               "craft"
-            ]
+            ],
+            "meets_three_source_rule": true
           },
           {
             "id": "tech-ia-command-palette",
-            "support": 14,
+            "support": 11,
             "family_names": [
-              "dashboards",
-              "cli"
-            ]
+              "cli",
+              "dashboards"
+            ],
+            "meets_three_source_rule": true
           },
           {
             "id": "tech-ia-density-ladder",
-            "support": 14,
+            "support": 8,
             "family_names": [
-              "dashboards",
-              "dataviz",
               "craft",
-              "cli"
-            ]
-          },
-          {
-            "id": "tech-trust-degraded-banner",
-            "support": 11,
-            "family_names": [
-              "dashboards"
-            ]
-          },
-          {
-            "id": "tech-money-quota-wallet",
-            "support": 7,
-            "family_names": [
               "dashboards",
-              "agentops"
-            ]
+              "dataviz"
+            ],
+            "meets_three_source_rule": true
           },
           {
             "id": "tech-ia-progressive-disclosure",
             "support": 4,
             "family_names": [
               "craft"
-            ]
+            ],
+            "meets_three_source_rule": true
           }
         ],
         "refs": [
           {
             "family": "dashboards",
-            "uri": "https://grafana.com/docs/grafana/latest/dashboards/",
-            "sha256": "789c3cf84b24905d",
-            "title": "Dashboards | Grafana documentation"
-          },
-          {
-            "family": "dashboards",
-            "uri": "https://docs.datadoghq.com/dashboards/",
-            "sha256": "10b7d1ed79891712",
-            "title": ""
-          },
-          {
-            "family": "dashboards",
-            "uri": "https://docs.sentry.io/product/dashboards/",
-            "sha256": "78abfbfa297e2a6d",
-            "title": "Dashboards"
-          },
-          {
-            "family": "dashboards",
-            "uri": "https://docs.railway.com/",
-            "sha256": "fb3d9950d9d1705b",
-            "title": "Railway Docs"
-          },
-          {
-            "family": "agentops",
-            "uri": "https://langfuse.com/docs/analytics/overview",
-            "sha256": "245019da24ca609e",
-            "title": "LLM Metrics & Analytics - Langfuse"
-          },
-          {
-            "family": "dashboards",
-            "uri": "https://linear.app/",
-            "sha256": "eb0e0bc396ddd962",
-            "title": "Linear \u2013 The system for product development"
-          },
-          {
-            "family": "dashboards",
-            "uri": "https://linear.app/blog",
-            "sha256": "8567e6066c918c20",
-            "title": "Now \u2013 Updates from the Linear team"
+            "uri": "https://grafana.com/",
+            "sha256": "235bf45a81093a96",
+            "title": "Full-stack observability for the agentic era | Grafana Labs | Grafana Labs"
           },
           {
             "family": "dashboards",
@@ -388,27 +310,39 @@
           },
           {
             "family": "dashboards",
+            "uri": "https://linear.app/",
+            "sha256": "eb0e0bc396ddd962",
+            "title": "Linear \u2013 The system for product development"
+          },
+          {
+            "family": "agentops",
+            "uri": "https://langfuse.com/docs",
+            "sha256": "34d09509900f2a2b",
+            "title": "Open Source AI Engineering Platform - Langfuse"
+          },
+          {
+            "family": "craft",
+            "uri": "https://www.nngroup.com/articles/data-tables/",
+            "sha256": "7bb44646100f45ed",
+            "title": "Data Tables: Four Major User Tasks - NN/G"
+          },
+          {
+            "family": "craft",
+            "uri": "https://web.dev/learn/design/",
+            "sha256": "64d16f4d7158c427",
+            "title": "Learn Responsive Design \u00a0|\u00a0 web.dev"
+          },
+          {
+            "family": "dashboards",
+            "uri": "https://grafana.com/docs/grafana/latest/",
+            "sha256": "7910c639346c2ffa",
+            "title": "Grafana OSS and Enterprise | Grafana documentation"
+          },
+          {
+            "family": "dashboards",
             "uri": "https://vercel.com/blog",
             "sha256": "2570f04ad163d7e4",
             "title": "Blog - Vercel"
-          },
-          {
-            "family": "dashboards",
-            "uri": "https://grafana.com/",
-            "sha256": "235bf45a81093a96",
-            "title": "Full-stack observability for the agentic era | Grafana Labs | Grafana Labs"
-          },
-          {
-            "family": "dashboards",
-            "uri": "https://grafana.com/docs/grafana/latest/panels-visualizations/",
-            "sha256": "3055b3c8b3269ad0",
-            "title": "Panels and visualizations | Grafana documentation"
-          },
-          {
-            "family": "dashboards",
-            "uri": "https://docs.datadoghq.com/dashboards/widgets/",
-            "sha256": "84ad61b44dfaa619",
-            "title": ""
           }
         ]
       },
@@ -418,12 +352,27 @@
         "RQ-B1",
         "RQ-B4",
         "ON-G5"
+      ],
+      "evidence_class": "[X]",
+      "policy": [
+        {
+          "move": "Domain-split boards (work / money / health / decisions)",
+          "reason": "No source states domain partitioning; support was inflated from generic dashboards labels (r6a E2)."
+        },
+        {
+          "move": "Money board grouping (quota / wallet / leases)",
+          "reason": "No source states quota/wallet; support was inflated from payments/alerting labels (r6a E3)."
+        },
+        {
+          "move": "Alerts on a dedicated attention board",
+          "reason": "Alerting as a surface is supported; the board placement is [P]."
+        }
       ]
     },
     {
       "id": "skill-glance",
       "decision": "What must the resting screen answer, in what order?",
-      "recommendation": "Rank the glance screen operator-first: (1) system/connection health, (2) what is running/queued/failed, (3) anything failing or stale, (4) money (spend/burn/quota/leases), (5) decisions pending, (6) fleet shape. Put the single health/staleness summary and the attention surface above the fold.",
+      "recommendation": "Rank the glance screen operator-first: (1) system/connection health, (2) what is running/queued/failed, (3) anything failing or stale, (4) money (spend/burn/quota/leases), (5) decisions pending, (6) fleet shape. Put the single health/staleness summary and the attention surface above the fold. Local [P] policy (not corpus findings): Status grid as the glance default \u2014 Direct heatmap/status-grid support is 4 records; keep as the default only as [P] pending a controlled comparison.; Money (spend/burn/quota/leases) above the fold \u2014 Cost tracking is supported; quota/lease composition is [P] (r6a E3).; Named degraded/staleness summary \u2014 No source states a degraded banner or uncertainty encoding (r6a E4); grounded in the repo's projection/cost contracts.. Local [P] policy (not corpus findings): Status grid as the glance default \u2014 Direct heatmap/status-grid support is 4 records; keep as the default only as [P] pending a controlled comparison.; Money (spend/burn/quota/leases) above the fold \u2014 Cost tracking is supported; quota/lease composition is [P] (r6a E3).; Named degraded/staleness summary \u2014 No source states a degraded banner or uncertainty encoding (r6a E4); grounded in the repo's projection/cost contracts.. Local [P] policy (not corpus findings): Status grid as the glance default \u2014 Direct heatmap/status-grid support is 4 records; keep as the default only as [P] pending a controlled comparison.; Money (spend/burn/quota/leases) above the fold \u2014 Cost tracking is supported; quota/lease composition is [P] (r6a E3).; Named degraded/staleness summary \u2014 No source states a degraded banner or uncertainty encoding (r6a E4); grounded in the repo's projection/cost contracts.. Local [P] policy (not corpus findings): Status grid as the glance default \u2014 Direct heatmap/status-grid support is 4 records; keep as the default only as [P] pending a controlled comparison.; Money (spend/burn/quota/leases) above the fold \u2014 Cost tracking is supported; quota/lease composition is [P] (r6a E3).; Named degraded/staleness summary \u2014 No source states a degraded banner or uncertainty encoding (r6a E4); grounded in the repo's projection/cost contracts..",
       "avoid": [
         "Docs-health or registry chrome pushing fleet state below the fold (r0 M5).",
         "A green badge when a projection is stale (green must never lie)."
@@ -436,120 +385,46 @@
         "ia-money-grouping"
       ],
       "evidence": {
-        "support_max": 30,
+        "support_max": 23,
         "distinct_families": [
           "agentops",
-          "cli",
           "craft",
           "dashboards",
           "dataviz"
         ],
         "backing_nodes": [
           {
-            "id": "tech-viz-heatmap-status-grid",
-            "support": 30,
+            "id": "tech-viz-heatmap",
+            "support": 4,
             "family_names": [
-              "dashboards",
-              "dataviz",
-              "cli",
-              "craft"
-            ]
+              "craft",
+              "dataviz"
+            ],
+            "meets_three_source_rule": true
           },
           {
             "id": "tech-trust-alerting",
-            "support": 28,
-            "family_names": [
-              "dashboards",
-              "agentops"
-            ]
-          },
-          {
-            "id": "tech-money-budget-thresholds",
-            "support": 19,
+            "support": 23,
             "family_names": [
               "dashboards"
-            ]
+            ],
+            "meets_three_source_rule": true
           },
           {
             "id": "tech-money-cost-attribution",
-            "support": 17,
+            "support": 13,
             "family_names": [
-              "agentops",
-              "dashboards"
-            ]
-          },
-          {
-            "id": "tech-trust-degraded-banner",
-            "support": 11,
-            "family_names": [
-              "dashboards"
-            ]
-          },
-          {
-            "id": "tech-money-quota-wallet",
-            "support": 7,
-            "family_names": [
-              "dashboards",
               "agentops"
-            ]
-          },
-          {
-            "id": "tech-trust-freshness-indicator",
-            "support": 4,
-            "family_names": [
-              "cli",
-              "craft"
-            ]
+            ],
+            "meets_three_source_rule": true
           }
         ],
         "refs": [
           {
-            "family": "dashboards",
-            "uri": "https://grafana.com/docs/grafana/latest/alerting/",
-            "sha256": "d28ea3629b46d1b6",
-            "title": "Grafana Alerting | Grafana documentation"
-          },
-          {
-            "family": "dashboards",
-            "uri": "https://docs.datadoghq.com/monitors/",
-            "sha256": "587c48efb20ab9a2",
-            "title": ""
-          },
-          {
-            "family": "dashboards",
-            "uri": "https://docs.sentry.io/product/alerts/",
-            "sha256": "748e01c9871ac335",
-            "title": "Alerts"
-          },
-          {
-            "family": "agentops",
-            "uri": "https://www.langchain.com/langsmith",
-            "sha256": "75ab02f301180387",
-            "title": "LangSmith: Agent & LLM Observability Platform"
-          },
-          {
-            "family": "agentops",
-            "uri": "https://phoenix.arize.com/",
-            "sha256": "4e01378b1cb0df79",
-            "title": "Phoenix - Arize AI"
-          },
-          {
-            "family": "agentops",
-            "uri": "https://www.galileo.ai/",
-            "sha256": "977103c74484cab7",
-            "title": "Galileo AI: The AI Observability and Evaluation Platform"
-          },
-          {
-            "family": "agentops",
-            "uri": "https://www.honeyhive.ai/",
-            "sha256": "6e207fda2bee28b2",
-            "title": "HoneyHive - Agent Observability & Evaluation Platform"
-          },
-          {
-            "family": "agentops",
-            "uri": "https://latitude.so/",
-            "sha256": "110a1cc8d05624f7",
-            "title": "AI Agent Observability & Monitoring - Latitude"
+            "family": "dataviz",
+            "uri": "https://nivo.rocks/bar/",
+            "sha256": "142393ea7aca91f1",
+            "title": "Bar chart | nivo"
           },
           {
             "family": "dashboards",
@@ -558,22 +433,40 @@
             "title": "Full-stack observability for the agentic era | Grafana Labs | Grafana Labs"
           },
           {
+            "family": "agentops",
+            "uri": "https://langfuse.com/docs",
+            "sha256": "34d09509900f2a2b",
+            "title": "Open Source AI Engineering Platform - Langfuse"
+          },
+          {
+            "family": "dataviz",
+            "uri": "https://nivo.rocks/line/",
+            "sha256": "7fbbcfe5789d6603",
+            "title": "Line chart | nivo"
+          },
+          {
             "family": "dashboards",
             "uri": "https://grafana.com/docs/grafana/latest/",
             "sha256": "7910c639346c2ffa",
             "title": "Grafana OSS and Enterprise | Grafana documentation"
           },
           {
-            "family": "dashboards",
-            "uri": "https://docs.railway.com/",
-            "sha256": "fb3d9950d9d1705b",
-            "title": "Railway Docs"
+            "family": "agentops",
+            "uri": "https://langfuse.com/docs/observability/overview",
+            "sha256": "0a1784a27f750267",
+            "title": "LLM Observability & Application Tracing (Open Source) - Langfuse"
           },
           {
-            "family": "craft",
-            "uri": "https://www.nngroup.com/articles/skeleton-screens/",
-            "sha256": "ae670dfbb428a6ce",
-            "title": "Skeleton Screens 101 - NN/G"
+            "family": "dataviz",
+            "uri": "https://nivo.rocks/heatmap/",
+            "sha256": "7342bb6a11b92572",
+            "title": "Heat Map chart | nivo"
+          },
+          {
+            "family": "dashboards",
+            "uri": "https://grafana.com/docs/grafana/latest/dashboards/",
+            "sha256": "789c3cf84b24905d",
+            "title": "Dashboards | Grafana documentation"
           }
         ]
       },
@@ -585,12 +478,27 @@
         "ON-G4",
         "ON-G6",
         "ON-A2"
+      ],
+      "evidence_class": "[X]",
+      "policy": [
+        {
+          "move": "Status grid as the glance default",
+          "reason": "Direct heatmap/status-grid support is 4 records; keep as the default only as [P] pending a controlled comparison."
+        },
+        {
+          "move": "Money (spend/burn/quota/leases) above the fold",
+          "reason": "Cost tracking is supported; quota/lease composition is [P] (r6a E3)."
+        },
+        {
+          "move": "Named degraded/staleness summary",
+          "reason": "No source states a degraded banner or uncertainty encoding (r6a E4); grounded in the repo's projection/cost contracts."
+        }
       ]
     },
     {
       "id": "skill-charts",
       "decision": "Which mark answers which operator question?",
-      "recommendation": "Map questions to marks: cost/burn/latency over time \u2192 line/area + inline sparkline; fleet/node status \u2192 heatmap status grid; bounded quantity (queue/phase) \u2192 gauge; large sets \u2192 virtualized sortable table; live output \u2192 log stream with follow/pause; multi-step run \u2192 timeline/waterfall; cross-group comparison \u2192 small multiples.",
+      "recommendation": "Map questions to marks: cost/burn/latency over time \u2192 line/area + inline sparkline; fleet/node status \u2192 heatmap status grid; bounded quantity (queue/phase) \u2192 gauge; large sets \u2192 virtualized sortable table; live output \u2192 log stream with follow/pause; multi-step run \u2192 timeline/waterfall; cross-group comparison \u2192 small multiples. Local [P] policy (not corpus findings): Gauge for bounded quantities \u2014 Direct gauge support is 1 record.; Small multiples for cross-group comparison \u2014 Direct support is 2 records.; Virtualized table implementation \u2014 Direct virtualized-table support is 3 records; the general table surface is supported.. Local [P] policy (not corpus findings): Gauge for bounded quantities \u2014 Direct gauge support is 1 record.; Small multiples for cross-group comparison \u2014 Direct support is 2 records.; Virtualized table implementation \u2014 Direct virtualized-table support is 3 records; the general table surface is supported.. Local [P] policy (not corpus findings): Gauge for bounded quantities \u2014 Direct gauge support is 1 record.; Small multiples for cross-group comparison \u2014 Direct support is 2 records.; Virtualized table implementation \u2014 Direct virtualized-table support is 3 records; the general table surface is supported.. Local [P] policy (not corpus findings): Gauge for bounded quantities \u2014 Direct gauge support is 1 record.; Small multiples for cross-group comparison \u2014 Direct support is 2 records.; Virtualized table implementation \u2014 Direct virtualized-table support is 3 records; the general table surface is supported..",
       "avoid": [
         "Per-card microcharts that cannot compare (r0 M6).",
         "Color as the only status signal.",
@@ -607,7 +515,7 @@
         "ch-perf"
       ],
       "evidence": {
-        "support_max": 39,
+        "support_max": 32,
         "distinct_families": [
           "agentops",
           "cli",
@@ -618,150 +526,111 @@
         "backing_nodes": [
           {
             "id": "tech-viz-time-series-marks",
-            "support": 39,
+            "support": 12,
             "family_names": [
-              "dashboards",
-              "dataviz",
-              "cli"
-            ]
+              "cli",
+              "dataviz"
+            ],
+            "meets_three_source_rule": true
           },
           {
             "id": "tech-viz-log-stream",
-            "support": 36,
-            "family_names": [
-              "dashboards",
-              "cli",
-              "agentops",
-              "dataviz"
-            ]
-          },
-          {
-            "id": "tech-viz-virtualized-table",
             "support": 32,
             "family_names": [
+              "agentops",
+              "cli",
               "dashboards",
+              "dataviz"
+            ],
+            "meets_three_source_rule": true
+          },
+          {
+            "id": "tech-viz-data-table",
+            "support": 32,
+            "family_names": [
+              "cli",
+              "craft",
+              "dashboards",
+              "dataviz"
+            ],
+            "meets_three_source_rule": true
+          },
+          {
+            "id": "tech-viz-heatmap",
+            "support": 4,
+            "family_names": [
+              "craft",
+              "dataviz"
+            ],
+            "meets_three_source_rule": true
+          },
+          {
+            "id": "tech-viz-rendering-performance",
+            "support": 17,
+            "family_names": [
               "cli",
               "craft",
               "dataviz"
-            ]
+            ],
+            "meets_three_source_rule": true
           },
           {
-            "id": "tech-viz-heatmap-status-grid",
-            "support": 30,
-            "family_names": [
-              "dashboards",
-              "dataviz",
-              "cli",
-              "craft"
-            ]
-          },
-          {
-            "id": "tech-viz-gauge",
-            "support": 25,
-            "family_names": [
-              "dataviz",
-              "dashboards",
-              "cli",
-              "craft"
-            ]
-          },
-          {
-            "id": "tech-viz-sampling-decimation",
-            "support": 15,
-            "family_names": [
-              "cli",
-              "dataviz",
-              "craft"
-            ]
-          },
-          {
-            "id": "tech-viz-timeline-gantt",
+            "id": "tech-viz-waterfall-timeline",
             "support": 14,
             "family_names": [
               "agentops"
-            ]
-          },
-          {
-            "id": "tech-viz-small-multiples",
-            "support": 4,
-            "family_names": [
-              "dataviz",
-              "craft"
-            ]
+            ],
+            "meets_three_source_rule": true
           }
         ],
         "refs": [
           {
             "family": "dataviz",
-            "uri": "https://github.com/leeoniya/uPlot",
-            "sha256": "c3a34c9200af26ab",
-            "title": "GitHub - leeoniya/uPlot: \ud83d\udcc8 A small, fast chart for time series, lines, areas, ohlc & bars \u00b7 GitHub"
+            "uri": "https://d3js.org/d3-scale-chromatic",
+            "sha256": "2bd7bec1de93305d",
+            "title": "d3-scale-chromatic | D3 by Observable"
+          },
+          {
+            "family": "agentops",
+            "uri": "https://docs.helicone.ai/",
+            "sha256": "20ead7ec1d1155ef",
+            "title": "Quickstart - Helicone OSS LLM Observability"
+          },
+          {
+            "family": "dashboards",
+            "uri": "https://vercel.com/",
+            "sha256": "c26a33d2b08d2b60",
+            "title": "Agentic Infrastructure - Vercel"
           },
           {
             "family": "dataviz",
-            "uri": "https://echarts.apache.org/examples/en/index.html",
-            "sha256": "aee393ed66ab001c",
-            "title": "Examples - Apache ECharts"
+            "uri": "https://nivo.rocks/bar/",
+            "sha256": "142393ea7aca91f1",
+            "title": "Bar chart | nivo"
+          },
+          {
+            "family": "dataviz",
+            "uri": "https://echarts.apache.org/en/index.html",
+            "sha256": "caa87df6c6cfc387",
+            "title": "Apache ECharts"
+          },
+          {
+            "family": "agentops",
+            "uri": "https://www.langchain.com/langsmith",
+            "sha256": "75ab02f301180387",
+            "title": "LangSmith: Agent & LLM Observability Platform"
+          },
+          {
+            "family": "agentops",
+            "uri": "https://docs.helicone.ai/features/sessions",
+            "sha256": "7234cf15f2d9295b",
+            "title": "Sessions - Helicone OSS LLM Observability"
           },
           {
             "family": "dashboards",
-            "uri": "https://docs.datadoghq.com/dashboards/",
-            "sha256": "10b7d1ed79891712",
-            "title": ""
-          },
-          {
-            "family": "dashboards",
-            "uri": "https://grafana.com/docs/grafana/latest/dashboards/",
-            "sha256": "789c3cf84b24905d",
-            "title": "Dashboards | Grafana documentation"
-          },
-          {
-            "family": "dashboards",
-            "uri": "https://grafana.com/",
-            "sha256": "235bf45a81093a96",
-            "title": "Full-stack observability for the agentic era | Grafana Labs | Grafana Labs"
-          },
-          {
-            "family": "dashboards",
-            "uri": "https://grafana.com/docs/grafana/latest/",
-            "sha256": "7910c639346c2ffa",
-            "title": "Grafana OSS and Enterprise | Grafana documentation"
-          },
-          {
-            "family": "dashboards",
-            "uri": "https://grafana.com/docs/grafana/latest/panels-visualizations/",
-            "sha256": "3055b3c8b3269ad0",
-            "title": "Panels and visualizations | Grafana documentation"
-          },
-          {
-            "family": "dashboards",
-            "uri": "https://grafana.com/docs/grafana/latest/alerting/",
-            "sha256": "d28ea3629b46d1b6",
-            "title": "Grafana Alerting | Grafana documentation"
-          },
-          {
-            "family": "dashboards",
-            "uri": "https://grafana.com/blog/",
-            "sha256": "c305e2a92f3e3b5f",
-            "title": "Grafana Labs blog | Grafana Labs"
-          },
-          {
-            "family": "craft",
-            "uri": "https://www.nngroup.com/articles/dashboards-preattentive/",
-            "sha256": "b665ad15d558dbd6",
-            "title": "Dashboards: Making Charts and Graphs Easier to Understand - NN/G"
-          },
-          {
-            "family": "dashboards",
-            "uri": "https://sentry.io/",
-            "sha256": "e66bb96ce835f7a4",
-            "title": "Application Performance Monitoring & Error Tracking Software | Sentry"
-          },
-          {
-            "family": "dashboards",
-            "uri": "https://blog.sentry.io/",
-            "sha256": "900dd2c988b418af",
-            "title": "Application Monitoring, Dev Tips & Engineering | Sentry Blog"
+            "uri": "https://vercel.com/blog",
+            "sha256": "2570f04ad163d7e4",
+            "title": "Blog - Vercel"
           }
         ]
       },
@@ -772,6 +641,21 @@
         "ON-G7",
         "ON-D1",
         "RQ-C3"
+      ],
+      "evidence_class": "[X]",
+      "policy": [
+        {
+          "move": "Gauge for bounded quantities",
+          "reason": "Direct gauge support is 1 record."
+        },
+        {
+          "move": "Small multiples for cross-group comparison",
+          "reason": "Direct support is 2 records."
+        },
+        {
+          "move": "Virtualized table implementation",
+          "reason": "Direct virtualized-table support is 3 records; the general table surface is supported."
+        }
       ]
     },
     {
@@ -796,7 +680,7 @@
         "cm-forced-colors"
       ],
       "evidence": {
-        "support_max": 28,
+        "support_max": 29,
         "distinct_families": [
           "cli",
           "craft",
@@ -806,94 +690,102 @@
         "backing_nodes": [
           {
             "id": "tech-vis-design-tokens",
-            "support": 28,
+            "support": 29,
             "family_names": [
+              "cli",
               "craft",
               "dashboards",
-              "dataviz",
-              "cli"
-            ]
+              "dataviz"
+            ],
+            "meets_three_source_rule": true
           },
           {
             "id": "tech-vis-colorblind-safe-status",
-            "support": 16,
+            "support": 12,
             "family_names": [
+              "cli",
               "craft",
-              "dashboards",
-              "dataviz",
-              "cli"
-            ]
+              "dataviz"
+            ],
+            "meets_three_source_rule": true
           },
           {
             "id": "tech-int-reduced-motion",
-            "support": 14,
+            "support": 6,
             "family_names": [
-              "dashboards",
-              "craft",
-              "dataviz"
-            ]
+              "craft"
+            ],
+            "meets_three_source_rule": true
           },
           {
             "id": "tech-vis-motion-easing",
-            "support": 11,
+            "support": 7,
             "family_names": [
-              "craft",
-              "dashboards"
-            ]
+              "craft"
+            ],
+            "meets_three_source_rule": true
           },
           {
             "id": "tech-vis-accent-economy",
-            "support": 10,
+            "support": 5,
             "family_names": [
-              "craft",
-              "dashboards",
-              "cli"
-            ]
+              "craft"
+            ],
+            "meets_three_source_rule": true
           },
           {
             "id": "tech-vis-type-scale",
-            "support": 9,
+            "support": 10,
             "family_names": [
+              "cli",
               "craft",
-              "dashboards",
-              "cli"
-            ]
+              "dashboards"
+            ],
+            "meets_three_source_rule": true
           },
           {
             "id": "tech-vis-forced-colors",
-            "support": 8,
+            "support": 4,
             "family_names": [
-              "cli",
               "craft"
-            ]
+            ],
+            "meets_three_source_rule": true
           },
           {
             "id": "tech-vis-icon-family",
             "support": 4,
             "family_names": [
               "craft"
-            ]
+            ],
+            "meets_three_source_rule": true
           },
           {
             "id": "tech-vis-elevation-model",
             "support": 3,
             "family_names": [
               "craft"
-            ]
+            ],
+            "meets_three_source_rule": true
           }
         ],
         "refs": [
           {
-            "family": "craft",
-            "uri": "https://developer.mozilla.org/en-US/docs/Web/CSS/Using_CSS_custom_properties",
-            "sha256": "a91bb30d7c48d173",
-            "title": "Using CSS custom properties (variables) - CSS | MDN"
+            "family": "dashboards",
+            "uri": "https://linear.app/customers",
+            "sha256": "65f2546f7e24d678",
+            "title": "Linear Customers"
+          },
+          {
+            "family": "dataviz",
+            "uri": "https://d3js.org/d3-scale-chromatic",
+            "sha256": "2bd7bec1de93305d",
+            "title": "d3-scale-chromatic | D3 by Observable"
           },
           {
             "family": "craft",
-            "uri": "https://www.refactoringui.com/",
-            "sha256": "d89a448704f5301e",
-            "title": "Refactoring UI"
+            "uri": "https://developer.mozilla.org/en-US/docs/Web/CSS/@media/prefers-reduced-motion",
+            "sha256": "e3fe57980976a907",
+            "title": "prefers-reduced-motion CSS media feature - CSS | MDN"
           },
           {
             "family": "craft",
@@ -902,58 +794,28 @@
             "title": "color-mix() CSS function - CSS | MDN"
           },
           {
-            "family": "craft",
-            "uri": "https://www.smashingmagazine.com/2024/05/naming-best-practices/",
-            "sha256": "5786269a0bca7790",
-            "title": "Best Practices For Naming Design Tokens, Components And Variables \u2014 Smashing Magazine"
-          },
-          {
-            "family": "dashboards",
-            "uri": "https://linear.app/customers",
-            "sha256": "65f2546f7e24d678",
-            "title": "Linear Customers"
-          },
-          {
-            "family": "dashboards",
-            "uri": "https://vercel.com/",
-            "sha256": "c26a33d2b08d2b60",
-            "title": "Agentic Infrastructure - Vercel"
-          },
-          {
-            "family": "dashboards",
-            "uri": "https://vercel.com/blog",
-            "sha256": "2570f04ad163d7e4",
-            "title": "Blog - Vercel"
-          },
-          {
             "family": "dashboards",
             "uri": "https://vercel.com/docs",
             "sha256": "d78b5b8133aa14cc",
             "title": ""
           },
           {
-            "family": "dashboards",
-            "uri": "https://vercel.com/geist/colors",
-            "sha256": "74aeb67b13ba6192",
-            "title": ""
-          },
-          {
-            "family": "dashboards",
-            "uri": "https://vercel.com/geist/typography",
-            "sha256": "7d664f2129353ada",
-            "title": ""
+            "family": "craft",
+            "uri": "https://developer.mozilla.org/en-US/docs/Web/CSS/@media/forced-colors",
+            "sha256": "ebbddff1da6be245",
+            "title": "forced-colors CSS media feature - CSS | MDN"
           },
           {
             "family": "craft",
-            "uri": "https://web.dev/articles/color-and-contrast-accessibility",
-            "sha256": "aded09c8b9cfa9b7",
-            "title": "Color and contrast accessibility \u00a0|\u00a0 web.dev"
+            "uri": "https://developer.mozilla.org/en-US/docs/Web/SVG/Element/use",
+            "sha256": "4ce5f6172aae264a",
+            "title": "<use> - SVG | MDN"
           },
           {
-            "family": "dataviz",
-            "uri": "https://colorbrewer2.org/",
-            "sha256": "c72ceb0441fc6951",
-            "title": "ColorBrewer: Color Advice for Maps"
+            "family": "craft",
+            "uri": "https://web.dev/learn/css/",
+            "sha256": "40cbdddaac4bd168",
+            "title": "Learn CSS \u00a0|\u00a0 web.dev"
           }
         ]
       },
@@ -965,12 +827,13 @@
         "RQ-D3",
         "RQ-D4",
         "RQ-D5"
-      ]
+      ],
+      "evidence_class": "[X]"
     },
     {
       "id": "skill-svg",
       "decision": "How should diagrams and micro-visuals be built?",
-      "recommendation": "Author diagrams as theme-aware SVG (viewBox + currentColor + custom properties), give informative SVGs a title/desc (aria-hidden when decorative), keep labels as SVG <text> for print, and build sparklines/gauges/status glyphs as small SVG+CSS pieces. Use a path tracer only for genuine flow/route lines.",
+      "recommendation": "Author diagrams as theme-aware SVG (viewBox + currentColor + custom properties), give informative SVGs a title/desc (aria-hidden when decorative), keep labels as SVG <text> for print, and build sparklines/gauges/status glyphs as small SVG+CSS pieces. Use a path tracer only for genuine flow/route lines. Local [P] policy (not corpus findings): Specific flow-diagram topology \u2014 Direct flow-diagram support is 2 records; the path-tracer craft is supported.. Local [P] policy (not corpus findings): Specific flow-diagram topology \u2014 Direct flow-diagram support is 2 records; the path-tracer craft is supported.. Local [P] policy (not corpus findings): Specific flow-diagram topology \u2014 Direct flow-diagram support is 2 records; the path-tracer craft is supported.. Local [P] policy (not corpus findings): Specific flow-diagram topology \u2014 Direct flow-diagram support is 2 records; the path-tracer craft is supported..",
       "avoid": [
         "Hard-coded fills; text outlined to paths.",
         "Pulling a JS chart runtime for a 40px sparkline.",
@@ -985,137 +848,104 @@
         "svg-print"
       ],
       "evidence": {
-        "support_max": 29,
+        "support_max": 17,
         "distinct_families": [
           "cli",
           "craft",
-          "dashboards",
           "dataviz"
         ],
         "backing_nodes": [
           {
             "id": "tech-svg-theme-aware-svg",
-            "support": 29,
+            "support": 11,
             "family_names": [
-              "craft",
-              "cli",
-              "dataviz"
-            ]
+              "craft"
+            ],
+            "meets_three_source_rule": true
           },
           {
             "id": "tech-svg-micro-visual",
-            "support": 22,
+            "support": 17,
             "family_names": [
+              "cli",
               "craft",
-              "dataviz",
-              "cli"
-            ]
+              "dataviz"
+            ],
+            "meets_three_source_rule": true
           },
           {
             "id": "tech-svg-accessible-svg",
-            "support": 10,
+            "support": 5,
             "family_names": [
-              "craft",
-              "dashboards",
-              "dataviz"
-            ]
+              "craft"
+            ],
+            "meets_three_source_rule": true
           },
           {
             "id": "tech-svg-path-tracer",
-            "support": 7,
+            "support": 5,
             "family_names": [
-              "craft",
-              "dataviz"
-            ]
-          },
-          {
-            "id": "tech-svg-flow-diagram",
-            "support": 4,
-            "family_names": [
-              "cli",
               "craft"
-            ]
+            ],
+            "meets_three_source_rule": true
           },
           {
             "id": "tech-svg-print-safe-svg",
             "support": 3,
             "family_names": [
               "craft"
-            ]
+            ],
+            "meets_three_source_rule": true
           }
         ],
         "refs": [
           {
             "family": "craft",
+            "uri": "https://developer.mozilla.org/en-US/docs/Web/SVG/Tutorial",
+            "sha256": "1c32624cf7da27fe",
+            "title": "Introducing SVG from scratch - SVG | MDN"
+          },
+          {
+            "family": "dataviz",
+            "uri": "https://github.com/leeoniya/uPlot",
+            "sha256": "c3a34c9200af26ab",
+            "title": "GitHub - leeoniya/uPlot: \ud83d\udcc8 A small, fast chart for time series, lines, areas, ohlc & bars \u00b7 GitHub"
+          },
+          {
+            "family": "craft",
+            "uri": "https://developer.mozilla.org/en-US/docs/Web/SVG/Tutorial/Texts",
+            "sha256": "88fc7a5094ccc2ab",
+            "title": "Texts - SVG | MDN"
+          },
+          {
+            "family": "dataviz",
+            "uri": "https://leeoniya.github.io/uPlot/",
+            "sha256": "0c26530cb0b02576",
+            "title": "uPlot | \ud83d\udcc8 A small, fast chart for time series, lines, areas, ohlc & bars"
+          },
+          {
+            "family": "craft",
+            "uri": "https://css-tricks.com/mega-list-svg-information/",
+            "sha256": "45906cdcaa5d19ce",
+            "title": "A Compendium of SVG Information | CSS-Tricks"
+          },
+          {
+            "family": "craft",
+            "uri": "https://developer.mozilla.org/en-US/docs/Web/SVG/Tutorial/Paths",
+            "sha256": "1c04ca9858dbfae1",
+            "title": "Paths - SVG | MDN"
+          },
+          {
+            "family": "craft",
+            "uri": "https://css-tricks.com/accessible-svgs/",
+            "sha256": "03dcc0382b1f0621",
+            "title": "Accessible SVGs | CSS-Tricks"
+          },
+          {
+            "family": "craft",
             "uri": "https://developer.mozilla.org/en-US/docs/Web/SVG/Attribute/viewBox",
             "sha256": "c953bc2f52e375d0",
             "title": "viewBox - SVG | MDN"
-          },
-          {
-            "family": "craft",
-            "uri": "https://developer.mozilla.org/en-US/docs/Web/SVG/Element/use",
-            "sha256": "4ce5f6172aae264a",
-            "title": "<use> - SVG | MDN"
-          },
-          {
-            "family": "craft",
-            "uri": "https://www.smashingmagazine.com/2025/11/smashing-animations-part-6-svgs-css-custom-properties/",
-            "sha256": "b8bc0e988e39ee25",
-            "title": "Smashing Animations Part 6: Magnificent SVGs\u00a0With <use>\u00a0And CSS Custom Properties \u2014 Smashing Magazin"
-          },
-          {
-            "family": "craft",
-            "uri": "https://css-tricks.com/svg-properties-and-css/",
-            "sha256": "026f726c04e31390",
-            "title": "SVG Properties in CSS Guide | CSS-Tricks"
-          },
-          {
-            "family": "dataviz",
-            "uri": "https://d3js.org/",
-            "sha256": "a2d77a5b707ffb7d",
-            "title": "D3 by Observable | The JavaScript library for bespoke data visualization"
-          },
-          {
-            "family": "dataviz",
-            "uri": "https://d3js.org/what-is-d3",
-            "sha256": "087f5313e13964ad",
-            "title": "What is D3? | D3 by Observable"
-          },
-          {
-            "family": "dataviz",
-            "uri": "https://echarts.apache.org/en/index.html",
-            "sha256": "caa87df6c6cfc387",
-            "title": "Apache ECharts"
-          },
-          {
-            "family": "dataviz",
-            "uri": "https://echarts.apache.org/handbook/en/get-started/",
-            "sha256": "fc1b54a4c3118289",
-            "title": "Get Started - Handbook - Apache ECharts"
-          },
-          {
-            "family": "dataviz",
-            "uri": "https://nivo.rocks/bar/",
-            "sha256": "142393ea7aca91f1",
-            "title": "Bar chart | nivo"
-          },
-          {
-            "family": "dataviz",
-            "uri": "https://nivo.rocks/line/",
-            "sha256": "7fbbcfe5789d6603",
-            "title": "Line chart | nivo"
-          },
-          {
-            "family": "craft",
-            "uri": "https://css-tricks.com/svg-line-animation-works/",
-            "sha256": "5b1adeb30b08f494",
-            "title": "How SVG Line Animation Works | CSS-Tricks"
-          },
-          {
-            "family": "craft",
-            "uri": "https://svg-tutorial.com/svg/gradient",
-            "sha256": "c4ad218564a5ba70",
-            "title": "How to Use Gradients with SVG - SVG Tutorial"
           }
         ]
       },
@@ -1126,12 +956,19 @@
         "RQ-J2",
         "RQ-J3",
         "RQ-H1"
+      ],
+      "evidence_class": "[X]",
+      "policy": [
+        {
+          "move": "Specific flow-diagram topology",
+          "reason": "Direct flow-diagram support is 2 records; the path-tracer craft is supported."
+        }
       ]
     },
     {
       "id": "skill-trust",
       "decision": "How does the room stay truthful under load?",
-      "recommendation": "Attach provenance (measured/estimated/unknown + model/window) to consequential numbers; show freshness and a retained-window marker instead of implying live; keep a degraded banner that names the failing dependency; and encode uncertainty or 'unmeasured' explicitly so green never lies.",
+      "recommendation": "Attach provenance (measured/estimated/unknown + model/window) to consequential numbers; show freshness and a retained-window marker instead of implying live; keep a degraded banner that names the failing dependency; and encode uncertainty or 'unmeasured' explicitly so green never lies. Local [P] policy (not corpus findings): Provenance badge (measured/estimated/unknown) \u2014 No source states provenance (r6a E4); grounded in the repo's cost_provenance contract.; Named degraded banner \u2014 No source states it (r6a E4).; Explicit uncertainty / unmeasured encoding \u2014 No source states it (r6a E4).; Freshness / retained-window marker \u2014 Direct support is 1 record.. Local [P] policy (not corpus findings): Provenance badge (measured/estimated/unknown) \u2014 No source states provenance (r6a E4); grounded in the repo's cost_provenance contract.; Named degraded banner \u2014 No source states it (r6a E4).; Explicit uncertainty / unmeasured encoding \u2014 No source states it (r6a E4).; Freshness / retained-window marker \u2014 Direct support is 1 record.. Local [P] policy (not corpus findings): Provenance badge (measured/estimated/unknown) \u2014 No source states provenance (r6a E4); grounded in the repo's cost_provenance contract.; Named degraded banner \u2014 No source states it (r6a E4).; Explicit uncertainty / unmeasured encoding \u2014 No source states it (r6a E4).; Freshness / retained-window marker \u2014 Direct support is 1 record.. Local [P] policy (not corpus findings): Provenance badge (measured/estimated/unknown) \u2014 No source states provenance (r6a E4); grounded in the repo's cost_provenance contract.; Named degraded banner \u2014 No source states it (r6a E4).; Explicit uncertainty / unmeasured encoding \u2014 No source states it (r6a E4).; Freshness / retained-window marker \u2014 Direct support is 1 record..",
       "avoid": [
         "A single health number collapsing distinct failure modes.",
         "Fresh-looking charts over stale/partial data.",
@@ -1146,79 +983,45 @@
         "ia-attention-surface"
       ],
       "evidence": {
-        "support_max": 40,
+        "support_max": 23,
         "distinct_families": [
           "agentops",
-          "cli",
-          "craft",
-          "dashboards",
-          "dataviz"
+          "dashboards"
         ],
         "backing_nodes": [
           {
-            "id": "tech-trust-source-provenance",
-            "support": 40,
-            "family_names": [
-              "dashboards",
-              "agentops",
-              "dataviz"
-            ]
-          },
-          {
             "id": "tech-trust-alerting",
-            "support": 28,
+            "support": 23,
             "family_names": [
-              "dashboards",
-              "agentops"
-            ]
+              "dashboards"
+            ],
+            "meets_three_source_rule": true
           },
           {
             "id": "tech-trust-causal-lineage",
-            "support": 23,
+            "support": 18,
             "family_names": [
               "agentops",
-              "dashboards",
-              "cli"
-            ]
+              "dashboards"
+            ],
+            "meets_three_source_rule": true
           },
           {
             "id": "tech-ops-trace-tree",
-            "support": 22,
+            "support": 20,
             "family_names": [
               "agentops",
               "dashboards"
-            ]
-          },
-          {
-            "id": "tech-trust-degraded-banner",
-            "support": 11,
-            "family_names": [
-              "dashboards"
-            ]
-          },
-          {
-            "id": "tech-trust-freshness-indicator",
-            "support": 4,
-            "family_names": [
-              "cli",
-              "craft"
-            ]
-          },
-          {
-            "id": "tech-trust-uncertainty-encoding",
-            "support": 3,
-            "family_names": [
-              "agentops",
-              "dataviz"
-            ]
+            ],
+            "meets_three_source_rule": true
           }
         ],
         "refs": [
           {
-            "family": "agentops",
-            "uri": "https://docs.arize.com/phoenix",
-            "sha256": "03f451e9e86f8ade",
-            "title": "What is Arize Phoenix? - Phoenix"
+            "family": "dashboards",
+            "uri": "https://grafana.com/",
+            "sha256": "235bf45a81093a96",
+            "title": "Full-stack observability for the agentic era | Grafana Labs | Grafana Labs"
           },
           {
             "family": "agentops",
@@ -1228,9 +1031,27 @@
           },
           {
             "family": "agentops",
+            "uri": "https://www.langchain.com/langsmith",
+            "sha256": "75ab02f301180387",
+            "title": "LangSmith: Agent & LLM Observability Platform"
+          },
+          {
+            "family": "dashboards",
+            "uri": "https://grafana.com/docs/grafana/latest/",
+            "sha256": "7910c639346c2ffa",
+            "title": "Grafana OSS and Enterprise | Grafana documentation"
+          },
+          {
+            "family": "agentops",
             "uri": "https://langfuse.com/docs/observability/overview",
             "sha256": "0a1784a27f750267",
             "title": "LLM Observability & Application Tracing (Open Source) - Langfuse"
+          },
+          {
+            "family": "dashboards",
+            "uri": "https://grafana.com/docs/grafana/latest/dashboards/",
+            "sha256": "789c3cf84b24905d",
+            "title": "Dashboards | Grafana documentation"
           },
           {
             "family": "agentops",
@@ -1239,52 +1060,10 @@
             "title": "LangSmith Observability - Docs by LangChain"
           },
           {
-            "family": "agentops",
-            "uri": "https://www.braintrust.dev/docs",
-            "sha256": "1694f5c22f1528ee",
-            "title": "Get started with Braintrust - Braintrust"
-          },
-          {
-            "family": "agentops",
-            "uri": "https://docs.helicone.ai/features/sessions",
-            "sha256": "7234cf15f2d9295b",
-            "title": "Sessions - Helicone OSS LLM Observability"
-          },
-          {
-            "family": "agentops",
-            "uri": "https://docs.agentops.ai/",
-            "sha256": "f8ca1f22853b1f87",
-            "title": "Introduction - AgentOps"
-          },
-          {
-            "family": "agentops",
-            "uri": "https://docs.agentops.ai/v1/quickstart",
-            "sha256": "2220d7215a58ab31",
-            "title": "Quickstart - AgentOps"
-          },
-          {
-            "family": "agentops",
-            "uri": "https://docs.agentops.ai/v1/concepts/sessions",
-            "sha256": "ee26256fee2e96da",
-            "title": "Sessions - AgentOps"
-          },
-          {
-            "family": "agentops",
-            "uri": "https://docs.agentops.ai/v1/concepts/events",
-            "sha256": "4ed18cb4c4c10bf4",
-            "title": "Spans - AgentOps"
-          },
-          {
-            "family": "agentops",
-            "uri": "https://langfuse.com/docs/analytics/overview",
-            "sha256": "245019da24ca609e",
-            "title": "LLM Metrics & Analytics - Langfuse"
-          },
-          {
-            "family": "agentops",
-            "uri": "https://docs.helicone.ai/",
-            "sha256": "20ead7ec1d1155ef",
-            "title": "Quickstart - Helicone OSS LLM Observability"
+            "family": "dashboards",
+            "uri": "https://grafana.com/docs/grafana/latest/panels-visualizations/",
+            "sha256": "3055b3c8b3269ad0",
+            "title": "Panels and visualizations | Grafana documentation"
           }
         ]
       },
@@ -1297,6 +1076,25 @@
         "ON-A6",
         "RQ-F3",
         "RQ-F4"
+      ],
+      "evidence_class": "[X]",
+      "policy": [
+        {
+          "move": "Provenance badge (measured/estimated/unknown)",
+          "reason": "No source states provenance (r6a E4); grounded in the repo's cost_provenance contract."
+        },
+        {
+          "move": "Named degraded banner",
+          "reason": "No source states it (r6a E4)."
+        },
+        {
+          "move": "Explicit uncertainty / unmeasured encoding",
+          "reason": "No source states it (r6a E4)."
+        },
+        {
+          "move": "Freshness / retained-window marker",
+          "reason": "Direct support is 1 record."
+        }
       ]
     },
     {
@@ -1315,83 +1113,57 @@
         "tr-provenance"
       ],
       "evidence": {
-        "support_max": 40,
+        "support_max": 24,
         "distinct_families": [
           "agentops",
-          "cli",
-          "dashboards",
-          "dataviz"
+          "dashboards"
         ],
         "backing_nodes": [
-          {
-            "id": "tech-trust-source-provenance",
-            "support": 40,
-            "family_names": [
-              "dashboards",
-              "agentops",
-              "dataviz"
-            ]
-          },
           {
             "id": "tech-ops-eval-loop",
             "support": 24,
             "family_names": [
               "agentops"
-            ]
+            ],
+            "meets_three_source_rule": true
           },
           {
             "id": "tech-trust-causal-lineage",
-            "support": 23,
+            "support": 18,
             "family_names": [
               "agentops",
-              "dashboards",
-              "cli"
-            ]
+              "dashboards"
+            ],
+            "meets_three_source_rule": true
           },
           {
             "id": "tech-ops-observability",
-            "support": 22,
+            "support": 18,
             "family_names": [
               "agentops",
               "dashboards"
-            ]
+            ],
+            "meets_three_source_rule": true
           },
           {
             "id": "tech-ops-trace-tree",
-            "support": 22,
+            "support": 20,
             "family_names": [
               "agentops",
               "dashboards"
-            ]
+            ],
+            "meets_three_source_rule": true
           },
           {
             "id": "tech-ops-prompt-registry",
-            "support": 4,
+            "support": 3,
             "family_names": [
-              "agentops",
-              "cli"
-            ]
+              "agentops"
+            ],
+            "meets_three_source_rule": true
           }
         ],
         "refs": [
-          {
-            "family": "agentops",
-            "uri": "https://docs.smith.langchain.com/evaluation",
-            "sha256": "60381850f2ec94ec",
-            "title": "Evaluation concepts - Docs by LangChain"
-          },
-          {
-            "family": "agentops",
-            "uri": "https://www.braintrust.dev/docs/guides/evals",
-            "sha256": "943a46764e1dce65",
-            "title": "Evaluate systematically - Braintrust"
-          },
-          {
-            "family": "agentops",
-            "uri": "https://docs.arize.com/phoenix/evaluation/llm-evals",
-            "sha256": "1c5100ce7cf1663b",
-            "title": "Evaluation - Phoenix"
-          },
           {
             "family": "agentops",
             "uri": "https://blog.langchain.dev/",
@@ -1400,9 +1172,21 @@
           },
           {
             "family": "agentops",
+            "uri": "https://langfuse.com/docs",
+            "sha256": "34d09509900f2a2b",
+            "title": "Open Source AI Engineering Platform - Langfuse"
+          },
+          {
+            "family": "agentops",
             "uri": "https://www.langchain.com/langsmith",
             "sha256": "75ab02f301180387",
             "title": "LangSmith: Agent & LLM Observability Platform"
+          },
+          {
+            "family": "agentops",
+            "uri": "https://langfuse.com/docs/observability/overview",
+            "sha256": "0a1784a27f750267",
+            "title": "LLM Observability & Application Tracing (Open Source) - Langfuse"
           },
           {
             "family": "agentops",
@@ -1418,33 +1202,15 @@
           },
           {
             "family": "agentops",
-            "uri": "https://langfuse.com/docs/scores/overview",
-            "sha256": "4667e20442936138",
-            "title": "Evaluation of LLM Applications - Langfuse"
+            "uri": "https://docs.smith.langchain.com/",
+            "sha256": "216cc0ec88b4a616",
+            "title": "LangSmith Observability - Docs by LangChain"
           },
           {
             "family": "agentops",
-            "uri": "https://langfuse.com/docs/prompts/get-started",
-            "sha256": "b6abb3bdd296f457",
-            "title": "Get Started with Prompt Management - Langfuse"
-          },
-          {
-            "family": "cli",
-            "uri": "https://github.com/charmbracelet/gum",
-            "sha256": "0a4ed3be7e9c30d9",
-            "title": "GitHub - charmbracelet/gum: A tool for glamorous shell scripts \ud83c\udf80 \u00b7 GitHub"
-          },
-          {
-            "family": "agentops",
-            "uri": "https://langfuse.com/docs/observability/overview",
-            "sha256": "0a1784a27f750267",
-            "title": "LLM Observability & Application Tracing (Open Source) - Langfuse"
-          },
-          {
-            "family": "agentops",
-            "uri": "https://openllmetry.com/",
-            "sha256": "52d7636af797828b",
-            "title": "Open-source Observability for LLMs with OpenTelemetry"
+            "uri": "https://www.braintrust.dev/blog",
+            "sha256": "74edfbbb273241b6",
+            "title": "Latest Braintrust news - Braintrust"
           }
         ]
       },
@@ -1453,12 +1219,13 @@
       "needs": [
         "RQ-F1",
         "RQ-F2"
-      ]
+      ],
+      "evidence_class": "[X]"
     },
     {
       "id": "skill-synthesis",
       "decision": "One-line synthesis for a sleek dark data-dense agent-ops room.",
-      "recommendation": "Framework: build-less vanilla JS + CSS tokens, with uPlot/ECharts only for streaming charts and D3 for bespoke marks. Layout: board-per-domain from a small widget catalog, command palette + keyboard shortcuts, docked master\u2013detail, persisted density ladder, money and attention as their own boards. Charts: status grid at a glance, line/sparkline over time, gauge for bounded state, virtualized table for sets, waterfall for runs. Visual: one token layer, dark-first + light + forced-colors, colorblind-safe status always with shape/label, tabular numerals, restrained motion with reduced-motion. SVG: theme-aware, accessible, print-safe; micro-visuals as SVG+CSS. Avoid: a React build, per-card microcharts, color-only status, a single collapsing health number, and embiggening chrome over data.",
+      "recommendation": "Framework: build-less vanilla JS + CSS tokens, with uPlot/ECharts only for streaming charts and D3 for bespoke marks. Layout: board-per-domain from a small widget catalog, command palette + keyboard shortcuts, docked master\u2013detail, persisted density ladder, money and attention as their own boards. Charts: status grid at a glance, line/sparkline over time, gauge for bounded state, virtualized table for sets, waterfall for runs. Visual: one token layer, dark-first + light + forced-colors, colorblind-safe status always with shape/label, tabular numerals, restrained motion with reduced-motion. SVG: theme-aware, accessible, print-safe; micro-visuals as SVG+CSS. Avoid: a React build, per-card microcharts, color-only status, a single collapsing health number, and embiggening chrome over data. Local [P] policy (not corpus findings): Domain-split boards \u2014 No source states domain partitioning (r6a E2).; Gauge mark \u2014 Direct gauge support is 1 record (r6a E1).; Status grid default \u2014 Direct support is 4 records (r6a E1).; Money/quota/wallet grouping \u2014 No source states quota/wallet (r6a E3).; Provenance badge / degraded banner / uncertainty \u2014 No source states them (r6a E4).; No-build / rule out React \u2014 [P] local guardrail (r6a E7).. Local [P] policy (not corpus findings): Domain-split boards \u2014 No source states domain partitioning (r6a E2).; Gauge mark \u2014 Direct gauge support is 1 record (r6a E1).; Status grid default \u2014 Direct support is 4 records (r6a E1).; Money/quota/wallet grouping \u2014 No source states quota/wallet (r6a E3).; Provenance badge / degraded banner / uncertainty \u2014 No source states them (r6a E4).; No-build / rule out React \u2014 [P] local guardrail (r6a E7).. Local [P] policy (not corpus findings): Domain-split boards \u2014 No source states domain partitioning (r6a E2).; Gauge mark \u2014 Direct gauge support is 1 record (r6a E1).; Status grid default \u2014 Direct support is 4 records (r6a E1).; Money/quota/wallet grouping \u2014 No source states quota/wallet (r6a E3).; Provenance badge / degraded banner / uncertainty \u2014 No source states them (r6a E4).; No-build / rule out React \u2014 [P] local guardrail (r6a E7).. Local [P] policy (not corpus findings): Domain-split boards \u2014 No source states domain partitioning (r6a E2).; Gauge mark \u2014 Direct gauge support is 1 record (r6a E1).; Status grid default \u2014 Direct support is 4 records (r6a E1).; Money/quota/wallet grouping \u2014 No source states quota/wallet (r6a E3).; Provenance badge / degraded banner / uncertainty \u2014 No source states them (r6a E4).; No-build / rule out React \u2014 [P] local guardrail (r6a E7)..",
       "avoid": [
         "A React SPA build for a local single-page console.",
         "Per-card microcharts and color-only status.",
@@ -1480,7 +1247,7 @@
         "svg-micro"
       ],
       "evidence": {
-        "support_max": 55,
+        "support_max": 43,
         "distinct_families": [
           "agentops",
           "cli",
@@ -1490,140 +1257,170 @@
         ],
         "backing_nodes": [
           {
-            "id": "tech-ia-board-per-domain",
-            "support": 55,
+            "id": "tech-ia-dashboard-layout",
+            "support": 43,
             "family_names": [
-              "dashboards",
-              "agentops",
-              "cli"
-            ]
+              "dashboards"
+            ],
+            "meets_three_source_rule": true
           },
           {
             "id": "tech-viz-time-series-marks",
-            "support": 39,
+            "support": 12,
             "family_names": [
-              "dashboards",
-              "dataviz",
-              "cli"
-            ]
+              "cli",
+              "dataviz"
+            ],
+            "meets_three_source_rule": true
           },
           {
-            "id": "tech-viz-virtualized-table",
+            "id": "tech-viz-data-table",
             "support": 32,
             "family_names": [
-              "dashboards",
               "cli",
               "craft",
+              "dashboards",
               "dataviz"
-            ]
+            ],
+            "meets_three_source_rule": true
           },
           {
             "id": "tech-int-keyboard-first",
-            "support": 30,
+            "support": 22,
             "family_names": [
               "cli",
-              "dashboards",
-              "craft"
-            ]
+              "craft",
+              "dashboards"
+            ],
+            "meets_three_source_rule": true
           },
           {
-            "id": "tech-viz-heatmap-status-grid",
-            "support": 30,
+            "id": "tech-viz-heatmap",
+            "support": 4,
             "family_names": [
-              "dashboards",
-              "dataviz",
-              "cli",
-              "craft"
-            ]
+              "craft",
+              "dataviz"
+            ],
+            "meets_three_source_rule": true
           },
           {
             "id": "tech-svg-theme-aware-svg",
-            "support": 29,
+            "support": 11,
             "family_names": [
-              "craft",
-              "cli",
-              "dataviz"
-            ]
+              "craft"
+            ],
+            "meets_three_source_rule": true
           },
           {
             "id": "tech-vis-design-tokens",
-            "support": 28,
+            "support": 29,
             "family_names": [
+              "cli",
               "craft",
               "dashboards",
-              "dataviz",
-              "cli"
-            ]
-          },
-          {
-            "id": "tech-viz-gauge",
-            "support": 25,
-            "family_names": [
-              "dataviz",
-              "dashboards",
-              "cli",
-              "craft"
-            ]
+              "dataviz"
+            ],
+            "meets_three_source_rule": true
           },
           {
             "id": "tech-svg-micro-visual",
-            "support": 22,
+            "support": 17,
             "family_names": [
+              "cli",
               "craft",
-              "dataviz",
-              "cli"
-            ]
+              "dataviz"
+            ],
+            "meets_three_source_rule": true
           },
           {
             "id": "tech-vis-colorblind-safe-status",
-            "support": 16,
+            "support": 12,
             "family_names": [
+              "cli",
               "craft",
-              "dashboards",
-              "dataviz",
-              "cli"
-            ]
+              "dataviz"
+            ],
+            "meets_three_source_rule": true
           },
           {
             "id": "stk-svg-css-only",
             "support": 15,
             "family_names": [
               "craft"
-            ]
+            ],
+            "meets_three_source_rule": true
           },
           {
             "id": "tech-ia-master-detail",
-            "support": 15,
+            "support": 4,
             "family_names": [
-              "cli",
               "craft"
-            ]
+            ],
+            "meets_three_source_rule": true
           },
           {
             "id": "stk-vanilla-js",
-            "support": 14,
+            "support": 4,
             "family_names": [
-              "dataviz",
-              "cli"
-            ]
+              "dataviz"
+            ],
+            "meets_three_source_rule": true
           },
           {
             "id": "tech-ia-command-palette",
-            "support": 14,
+            "support": 11,
             "family_names": [
-              "dashboards",
-              "cli"
-            ]
+              "cli",
+              "dashboards"
+            ],
+            "meets_three_source_rule": true
           },
           {
-            "id": "tech-viz-timeline-gantt",
+            "id": "tech-viz-waterfall-timeline",
             "support": 14,
             "family_names": [
               "agentops"
-            ]
+            ],
+            "meets_three_source_rule": true
           }
         ],
         "refs": [
+          {
+            "family": "dashboards",
+            "uri": "https://vercel.com/",
+            "sha256": "c26a33d2b08d2b60",
+            "title": "Agentic Infrastructure - Vercel"
+          },
+          {
+            "family": "dataviz",
+            "uri": "https://d3js.org/d3-scale-chromatic",
+            "sha256": "2bd7bec1de93305d",
+            "title": "d3-scale-chromatic | D3 by Observable"
+          },
+          {
+            "family": "dashboards",
+            "uri": "https://linear.app/",
+            "sha256": "eb0e0bc396ddd962",
+            "title": "Linear \u2013 The system for product development"
+          },
+          {
+            "family": "dataviz",
+            "uri": "https://nivo.rocks/bar/",
+            "sha256": "142393ea7aca91f1",
+            "title": "Bar chart | nivo"
+          },
+          {
+            "family": "craft",
+            "uri": "https://developer.mozilla.org/en-US/docs/Web/SVG/Tutorial",
+            "sha256": "1c32624cf7da27fe",
+            "title": "Introducing SVG from scratch - SVG | MDN"
+          },
+          {
+            "family": "dashboards",
+            "uri": "https://linear.app/customers",
+            "sha256": "65f2546f7e24d678",
+            "title": "Linear Customers"
+          },
           {
             "family": "dataviz",
             "uri": "https://github.com/leeoniya/uPlot",
@@ -1631,70 +1428,10 @@
             "title": "GitHub - leeoniya/uPlot: \ud83d\udcc8 A small, fast chart for time series, lines, areas, ohlc & bars \u00b7 GitHub"
           },
           {
-            "family": "dataviz",
-            "uri": "https://d3js.org/",
-            "sha256": "a2d77a5b707ffb7d",
-            "title": "D3 by Observable | The JavaScript library for bespoke data visualization"
-          },
-          {
             "family": "craft",
-            "uri": "https://every-layout.dev/",
-            "sha256": "4b5a5ab9eabd35d8",
-            "title": "Relearn CSS layout: Every Layout"
-          },
-          {
-            "family": "dataviz",
-            "uri": "https://d3js.org/what-is-d3",
-            "sha256": "087f5313e13964ad",
-            "title": "What is D3? | D3 by Observable"
-          },
-          {
-            "family": "dataviz",
-            "uri": "https://leeoniya.github.io/uPlot/",
-            "sha256": "0c26530cb0b02576",
-            "title": "uPlot | \ud83d\udcc8 A small, fast chart for time series, lines, areas, ohlc & bars"
-          },
-          {
-            "family": "dataviz",
-            "uri": "https://www.tremor.so/",
-            "sha256": "ad8fe3598ecb31d8",
-            "title": "Tremor \u2013 Copy-and-Paste Tailwind CSS UI Components for Charts and Dashboards"
-          },
-          {
-            "family": "dataviz",
-            "uri": "https://www.tremor.so/docs/visualizations/area-chart",
-            "sha256": "8f8efdd051827d24",
-            "title": "Area Chart - Tremor"
-          },
-          {
-            "family": "dataviz",
-            "uri": "https://ui.shadcn.com/charts",
-            "sha256": "b34430159fcfd06c",
-            "title": "Area Charts"
-          },
-          {
-            "family": "dashboards",
-            "uri": "https://grafana.com/docs/grafana/latest/dashboards/",
-            "sha256": "789c3cf84b24905d",
-            "title": "Dashboards | Grafana documentation"
-          },
-          {
-            "family": "dashboards",
-            "uri": "https://docs.datadoghq.com/dashboards/",
-            "sha256": "10b7d1ed79891712",
-            "title": ""
-          },
-          {
-            "family": "dashboards",
-            "uri": "https://docs.sentry.io/product/dashboards/",
-            "sha256": "78abfbfa297e2a6d",
-            "title": "Dashboards"
-          },
-          {
-            "family": "dashboards",
-            "uri": "https://docs.railway.com/",
-            "sha256": "fb3d9950d9d1705b",
-            "title": "Railway Docs"
+            "uri": "https://www.nngroup.com/articles/data-tables/",
+            "sha256": "7bb44646100f45ed",
+            "title": "Data Tables: Four Major User Tasks - NN/G"
           }
         ]
       },
@@ -1702,7 +1439,35 @@
       "confidence": "high",
       "needs": [
         "all"
+      ],
+      "evidence_class": "[X]",
+      "policy": [
+        {
+          "move": "Domain-split boards",
+          "reason": "No source states domain partitioning (r6a E2)."
+        },
+        {
+          "move": "Gauge mark",
+          "reason": "Direct gauge support is 1 record (r6a E1)."
+        },
+        {
+          "move": "Status grid default",
+          "reason": "Direct support is 4 records (r6a E1)."
+        },
+        {
+          "move": "Money/quota/wallet grouping",
+          "reason": "No source states quota/wallet (r6a E3)."
+        },
+        {
+          "move": "Provenance badge / degraded banner / uncertainty",
+          "reason": "No source states them (r6a E4)."
+        },
+        {
+          "move": "No-build / rule out React",
+          "reason": "[P] local guardrail (r6a E7)."
+        }
       ]
     }
-  ]
+  ],
+  "method": "Skills re-pointed at the repaired taxonomy. Moves that lost their source support are carried in the skill's `policy` list as [P] local design policy with a one-line reason; nothing unsupported is presented as a finding."
 }
