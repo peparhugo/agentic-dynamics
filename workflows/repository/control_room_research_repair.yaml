@@ -1,0 +1,171 @@
+name: control_room_research_repair
+question: >-
+  Follow-up to control_room_research, driven by the three adversary verdicts:
+  r6a found taxonomy SUPPORT INFLATION (broad labels promoted into narrow techniques no source
+  states) — repair the crosswalk, never promote a claim; r6b found the direction GENERIC
+  (observability-dashboard grammar, "flight deck" styling) — re-center it on the room's unique
+  object: a live run needing triage, evidence, and a governed human decision; r6c found the
+  GLANCE CONTRACT violated (answers split across five places, one board at rest) — one resting
+  screen must answer the operator needs with no interaction. Then re-run all three adversaries
+  on the repaired artifacts and update the brief. No new claims beyond sources; unsupported
+  moves are labelled local design policy [P].
+version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: false
+repeatable: true
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: true
+    rag:
+      emit_self: false
+    context:
+      hard_rules: >-
+        (1) A support count is only the number of SOURCE RECORDS that state the claimed
+        technique; a broad label never backs a narrow technique. (2) Unsupported moves may stay
+        only as explicit [P] local design policy with a reason. (3) The three adversaries are
+        independent (terra/luna/sol) and write only their review docs. (4) Outputs under
+        docs/research/ and experiments/research/control_room/; commit each phase.
+    phases:
+      - name: p0_repair_taxonomy
+        kind: agent
+        scope: implementation
+        requires_deliverable: true
+        timeout: 7200
+        prompt: |
+          GOAL: {goal}
+          Rebuild experiments/research/control_room/taxonomy.json from the corpus records
+          (agentops/dashboards/dataviz/cli/craft .jsonl) with ZERO label promotion: for every
+          node, `support` = the count of distinct source records whose own text states the
+          node's technique; delete/merge nodes whose support would only come from a broader
+          label. Regenerate experiments/research/control_room/skills.json and catalogs.json
+          from the repaired taxonomy; any recommendation that loses its source support becomes
+          a `[P]` local design policy with a one-line reason, never a finding. Write
+          docs/reviews/control_room_taxonomy_repair.md: what was inflated, the before/after
+          support for each affected node, what was downgraded to [P]. Verify no catalog/skill
+          item cites unresolvable sources. Commit.
+      - name: p1_rework_direction
+        kind: agent
+        scope: implementation
+        requires_deliverable: true
+        timeout: 10800
+        prompt: |
+          GOAL: {goal}
+          Rewrite docs/research/control_room_direction.md, re-centered on the room's unique
+          object: A LIVE RUN that may need TRIAGE, EVIDENCE, and a GOVERNED HUMAN DECISION
+          (approve/promote/cancel/retire). Requirements: (a) the direction must be recognizably
+          for operating multiple CLI AI agents — not a generic observability dashboard; name
+          the exemplars that justify each distinctive move (from the repaired catalogs) or mark
+          it [P]; (b) specify the run-object anatomy (lifecycle, cost, evidence chain, decision
+          state) and how it is made immediate on screen; (c) reject the generic grammar
+          explicitly (say which r5 elements are dropped and why); (d) keep accessibility and
+          no-regression constraints. Commit.
+      - name: p2_fix_glance_ia
+        kind: agent
+        scope: implementation
+        requires_deliverable: true
+        timeout: 7200
+        prompt: |
+          GOAL: {goal}
+          Fix the IA to satisfy the no-interaction glance contract: ONE resting screen answers
+          the operator needs (ON-G1..G7 from r1). Write docs/research/control_room_ia.md with a
+          mapping table: every glance need → the exact screen region that answers it at rest,
+          with no navigation; specify the single resting screen's hierarchy (what is first,
+          second, third), the drill-down/alert paths, and the acceptance checks a reviewer can
+          run against screenshots. If a need cannot be answered at rest without crowding,
+          state the tradeoff and the chosen resolution explicitly. Commit.
+      - name: p3_adversary_entailment
+        kind: agent
+        scope: adversarial_readonly
+        requires_deliverable: true
+        run_model: openai/gpt-5.6-terra
+        timeout: 7200
+        prompt: |
+          GOAL: {goal}
+          Adversarial re-check 1/3 — ENTAILMENT/SUPPORT on the REPAIRED taxonomy, skills,
+          catalogs, direction, and IA. Verify every support count equals the distinct sources
+          that actually state the technique (read them); no label promotion; every [P] is
+          labelled and reasoned; no claim cites an unresolvable source. Write
+          docs/reviews/control_room_repair_entailment.md with a findings table. Commit.
+      - name: p4_adversary_design
+        kind: agent
+        scope: adversarial_readonly
+        requires_deliverable: true
+        run_model: openai/gpt-5.6-luna
+        timeout: 7200
+        prompt: |
+          GOAL: {goal}
+          Adversarial re-check 2/3 — DESIGN CRITIQUE on the reworked direction. Is it now
+          recognizably a control surface for multiple CLI AI agents (run/triage/evidence/
+          decision), or still dashboard costume? Attack genericness, datedness, clutter;
+          require exemplar-grounded distinctiveness. Write
+          docs/reviews/control_room_repair_design.md with findings + required dispositions.
+          Commit.
+      - name: p5_adversary_ia
+        kind: agent
+        scope: adversarial_readonly
+        requires_deliverable: true
+        run_model: openai/gpt-5.6-sol
+        timeout: 7200
+        prompt: |
+          GOAL: {goal}
+          Adversarial re-check 3/3 — INFORMATION ARCHITECTURE. Can the ONE resting screen
+          really answer the glance needs with no navigation? Walk each need against the
+          mapping table and the hierarchy; flag crowding, buried alerts, or split answers.
+          Write docs/reviews/control_room_repair_ia.md with findings + dispositions. Commit.
+      - name: p6_refresh_brief
+        kind: agent
+        scope: implementation
+        requires_deliverable: true
+        timeout: 3600
+        prompt: |
+          GOAL: {goal}
+          Update the facelift brief (docs/research/control_room_direction.md §brief or the
+          prior brief doc) to incorporate the repaired supports, the reworked direction, the
+          glance IA mapping, and every adversary disposition; keep the acceptance criteria
+          (render gate at desktop+mobile, contrast, no regressions) and add the one-resting-
+          screen glance check. Write docs/reviews/control_room_repair_verify.md summarizing
+          endpoints + dispositions. Commit.
+      - name: p7_tests
+        kind: test
+        scope: implementation
+        timeout: 600
+        tests:
+          - tests/test_research_fetch.py
+factors:
+  - {name: model, levels: [deepseek/deepseek-v4-flash]}
+design: factorial
+rules:
+  - name: repaired_support
+    plane: measurement
+    evidence_class: "[X]"
+    requires: []
+    produces: [taxonomy_support_repaired]
+  - name: reworked_direction
+    plane: measurement
+    evidence_class: "[H]"
+    requires: [taxonomy_support_repaired]
+    produces: [run_object_direction]
+  - name: glance_contract_placed
+    plane: measurement
+    evidence_class: "[H]"
+    requires: [run_object_direction]
+    produces: [resting_screen_mapping]
+  - name: repair_adversarially_checked
+    plane: measurement
+    evidence_class: "[H]"
+    requires: [resting_screen_mapping]
+    produces: [three_repair_verdicts]
+metrics:
+  - {name: taxonomy_support_repaired, agg: mean, over: cell}
+  - {name: run_object_direction, agg: mean, over: cell}
+  - {name: resting_screen_mapping, agg: mean, over: cell}
+  - {name: three_repair_verdicts, agg: mean, over: cell}
+comparison: null
+writeup: {format: lab_book, sections: [question, p0_repair_taxonomy, p1_rework_direction, p2_fix_glance_ia, p3_adversary_entailment, p4_adversary_design, p5_adversary_ia, p6_refresh_brief]}
+stop: {budget_usd: 18.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}
