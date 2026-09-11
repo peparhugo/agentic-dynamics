@@ -127,7 +127,7 @@ def _existing_hashes(source_dir: Path) -> set[str]:
 def _display_path(path: Path) -> str:
     """Repo-relative when possible (records are readable either way)."""
     try:
-        return _display_path(path)
+        return str(path.relative_to(REPO_ROOT))
     except ValueError:
         return str(path)
 
