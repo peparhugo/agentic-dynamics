@@ -63,6 +63,7 @@ from agentic_dynamics.knowledge.knowledge_ingestion import (  # noqa: E402
     record_to_event,
 )
 from agentic_dynamics.knowledge.record_factory import _now_iso  # noqa: E402
+from agentic_dynamics.runtime.executor import load_prepared_step  # noqa: E402
 from agentic_dynamics.runtime.run_clone import (  # noqa: E402
     RUN_CLONE_ENV,
     create_run_clone,
@@ -504,6 +505,10 @@ def main() -> None:
                          "one-time sonar-scanner docker run, scripts/archive/backfill_sonar.py, "
                          "ws3_stragglers) executes it; a phase "
                          "whose scope fails validation refuses BEFORE the broker is reached.")
+    ap.add_argument("--prepared-step", default=None, metavar="PATH",
+                    help="path to a prepared-step/v1 transport file (step 3): the child "
+                         "executes the parent's exact step — prompt + hash verified — instead "
+                         "of re-deriving the phase from the spec (sibling-cell path)")
     ap.add_argument("--only-phase", default=None, metavar="NAME",
                     help="run a SINGLE phase (name) only — the sibling-cell entrypoint the "
                          "--orchestrator mode spawns for each phase. When set, the spec's phase "
@@ -575,7 +580,21 @@ def _run_workflow_cli(
             )
         only_phase_index = names.index(args.only_phase)
         only_phase_total = len(phases)
-        spec.workflow.params["phases"] = [phases[only_phase_index]]
+        phase = dict(phases[only_phase_index])
+        # Step 3: the PREPARED step is the authority for this phase's prompt — the child
+        # executes what the parent readied (and may have augmented), never a re-derivation.
+        # The transport file is verified (schema + prompt hash) and must name THIS phase; a
+        # missing/tampered/foreign step refuses before anything executes.
+        if args.prepared_step:
+            prepared = load_prepared_step(args.prepared_step)
+            if str(prepared.get("phase_name")) != args.only_phase:
+                raise SystemExit(
+                    f"--prepared-step {args.prepared_step!r} names phase "
+                    f"{prepared.get('phase_name')!r}, not {args.only_phase!r} — refusing to "
+                    f"execute a step prepared for another phase"
+                )
+            phase["prompt"] = prepared["prompt"]
+        spec.workflow.params["phases"] = [phase]
 
     # Signal-store wiring (docs/routing_next_steps.md item 1): when the spec declares routing
     # and no explicit --signals override was supplied, build the store from the measured

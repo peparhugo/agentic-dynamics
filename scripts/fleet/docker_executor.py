@@ -127,6 +127,10 @@ class DockerAgentExecutor(StepExecutor):
             sibling_cmd += ["--output-token-limit", str(self._output_token_limit)]
         if self._backend or request.backend:
             sibling_cmd += ["--backend", self._backend or request.backend]
+        # Step 3 (prepared-step transport): the parent readies the EXACT step (prompt + hash +
+        # settings + attempt) and the child consumes it — never a re-derivation from the spec.
+        prepared_path = self._write_prepared_step(request)
+        sibling_cmd += ["--prepared-step", prepared_path]
 
         admission = current_context()
         # F3 (fleet_launch_container_smoke cs4): pass the phase's OWN declared scope as its
@@ -146,10 +150,11 @@ class DockerAgentExecutor(StepExecutor):
         # path (runs_root/<run-id>/repo); in the legacy no-clone shape the run identity is
         # unknown and the namespace keeps its old form rather than fabricating one.
         run_key = Path(self._run_clone).parent.name if self._run_clone else ""
+        attempt_key = f"a{max(int(request.attempt), 1)}"
         state_namespace = (
-            f"{self._spec_name}/{run_key}/{request.phase_name}"
+            f"{self._spec_name}/{run_key}/{request.phase_name}/{attempt_key}"
             if run_key
-            else f"{self._spec_name}/{request.phase_name}"
+            else f"{self._spec_name}/{request.phase_name}/{attempt_key}"
         )
         return spawn_wrapper.build_phase_request(
             request.phase_def,
@@ -168,6 +173,36 @@ class DockerAgentExecutor(StepExecutor):
             image=self._cell_image,
             timeout_seconds=request.timeout or self._timeout or 0,
         )
+
+    def _write_prepared_step(self, request: StepRequest) -> str:
+        """Write the prepared step where the CHILD reads it; return the child-visible path.
+
+        The file travels inside the run clone (mounted at ``/repo`` in the sibling), so the
+        parent's write path and the child's read path differ only by the mount root. A
+        local-only ``.git/info/exclude`` entry keeps the transport out of the cell's commits
+        (no tracked file changes). Without a clone the legacy shared-worktree shape is used,
+        where the host path IS the child path.
+        """
+        phase_file = f"{request.phase_name}.a{max(int(request.attempt), 1)}.json"
+        if self._run_clone:
+            host_dir = Path(self._run_clone) / ".fleet" / "prepared_steps"
+            child_path = f"{spawn_wrapper.REPO_TARGET}/.fleet/prepared_steps/{phase_file}"
+            exclude = Path(self._run_clone) / ".git" / "info" / "exclude"
+            if exclude.parent.is_dir():
+                line = ".fleet/prepared_steps/"
+                text = exclude.read_text(encoding="utf-8") if exclude.exists() else ""
+                if line not in text.splitlines():
+                    separator = "" if not text or text.endswith("\n") else "\n"
+                    exclude.write_text(f"{text}{separator}{line}\n", encoding="utf-8")
+        else:
+            host_dir = Path(self._workdir) / ".fleet" / "prepared_steps"
+            child_path = str(host_dir / phase_file)
+        host_dir.mkdir(parents=True, exist_ok=True)
+        (host_dir / phase_file).write_text(
+            json.dumps(request.to_prepared_dict(), indent=2, sort_keys=True),
+            encoding="utf-8",
+        )
+        return child_path
 
     def execute(self, request: StepRequest) -> StepResult:
         """Spawn one sibling cell for ``request`` (via the launch broker) and classify its outcome."""

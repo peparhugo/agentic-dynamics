@@ -8,6 +8,7 @@ old form and fabricates no id.
 
 from __future__ import annotations
 
+import json
 import sys
 from pathlib import Path
 
@@ -49,10 +50,40 @@ def _request() -> StepRequest:
 def test_namespace_carries_the_run_id_when_a_clone_is_present():
     executor = _executor(run_clone="/tmp/runs/run-abc/repo")
     built = executor.build_request(_request())
-    assert built["state_namespace"] == "t/run-abc/p1"
+    assert built["state_namespace"] == "t/run-abc/p1/a1"
 
 
 def test_namespace_keeps_the_legacy_shape_without_a_clone():
     executor = _executor()
     built = executor.build_request(_request())
-    assert built["state_namespace"] == "t/p1"
+    assert built["state_namespace"] == "t/p1/a1"
+
+
+# ── step 3b: the prepared-step transport (parent side) ──────────────────────────────────────
+
+def test_prepared_step_is_written_and_passed_to_the_child(tmp_path):
+    """The parent readies the EXACT step: the transport file carries the prompt + its hash,
+    and the child argv names the child-visible path — no re-derivation from the spec."""
+    clone = tmp_path / "runs" / "run-abc" / "repo"
+    (clone / ".git" / "info").mkdir(parents=True)
+    (clone / ".git" / "info" / "exclude").write_text("", encoding="utf-8")
+
+    executor = _executor(run_clone=str(clone))
+    built = executor.build_request(_request())
+
+    command = built["command"]
+    assert "--prepared-step" in command
+    child_path = command[command.index("--prepared-step") + 1]
+    assert child_path == "/repo/.fleet/prepared_steps/p1.a1.json"
+
+    written = json.loads(
+        (clone / ".fleet" / "prepared_steps" / "p1.a1.json").read_text(encoding="utf-8")
+    )
+    assert written["schema"] == "prepared-step/v1"
+    assert written["prompt"] == "do the thing"
+    assert written["prompt_sha256"] == _request().prompt_sha256
+
+    # the transport never lands in the cell's commits (a local-only exclude entry)
+    assert ".fleet/prepared_steps/" in (
+        clone / ".git" / "info" / "exclude"
+    ).read_text(encoding="utf-8")
