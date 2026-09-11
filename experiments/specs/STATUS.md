@@ -3,8 +3,8 @@
 **Generated — do not edit by hand.** Regenerate with `python scripts/spec_status.py`;
 `scripts/run_workflow.py` also refreshes it at the end of every run.
 
-Generated at: `2026-09-11T13:35:43.351947+00:00`  ·  208 spec(s)
-**Work remaining:** 197 open · 11 completed/retired
+Generated at: `2026-09-11T14:42:05.999009+00:00`  ·  210 spec(s)
+**Work remaining:** 199 open · 11 completed/retired
 
 | name | kind | repeatable | status | version | supersedes | last_run | ok | model | cost | n_runs |
 |---|---|---|---|---|---|---|---|---|---|---|
@@ -105,6 +105,7 @@ Generated at: `2026-09-11T13:35:43.351947+00:00`  ·  208 spec(s)
 | `control_room_ui_rebuild` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `control_room_ui_redesign` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `control_room_usage_wiring` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
+| `control_room_ux_repair` | workflow | yes | runnable | 0.1 | — | 2026-09-11 14:42 | fail | deepseek/deepseek-v4-flash | $0.4099 | 1 |
 | `control_room_workflow_phase` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `deep_architecture_review` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `delta_entropy_response_campaign` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
@@ -139,6 +140,7 @@ Generated at: `2026-09-11T13:35:43.351947+00:00`  ·  208 spec(s)
 | `graph_leg_closeout` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `green_main_closure` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `grit_calibration_design` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
+| `herdr_inspired_ux` | workflow | yes | runnable | 0.1 | — | — | — | — | — | 0 |
 | `i10_typed_checkpoint` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `investing_domain_audit` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `kb_event_typing` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |

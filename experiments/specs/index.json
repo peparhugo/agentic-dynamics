@@ -1,7 +1,7 @@
 {
   "schema_version": "spec-status/v2",
-  "generated_at": "2026-09-11T13:35:43.351947+00:00",
-  "n_specs": 208,
+  "generated_at": "2026-09-11T14:42:05.999009+00:00",
+  "n_specs": 210,
   "specs": [
     {
       "name": "admission_leases",
@@ -1958,6 +1958,26 @@
       "authored_status": null
     },
     {
+      "name": "control_room_ux_repair",
+      "version": "0.1",
+      "status": "runnable",
+      "spec_path": "workflows/repository/control_room_ux_repair.yaml",
+      "artifact_kind": "workflow",
+      "repeatable": true,
+      "supersedes": [],
+      "superseded_by": null,
+      "completed_at": null,
+      "last_run_at": "2026-09-11T14:42:05.984473+00:00",
+      "latest_ok": false,
+      "latest_model": "deepseek/deepseek-v4-flash",
+      "latest_cost_usd": 0.409852,
+      "latest_git_sha": "b94e43640",
+      "results_pointer": "experiments/results/workflows/control_room_ux_repair/20260911T144205Z.json",
+      "n_runs": 1,
+      "workflow_revision_id": "ceedbb2e3bf8d88cf251faa15245abdeb889ed9d8873ea993dd1feec1f6a891e",
+      "authored_status": null
+    },
+    {
       "name": "control_room_workflow_phase",
       "version": "0.1",
       "status": "runnable",
@@ -2637,6 +2657,26 @@
       "results_pointer": null,
       "n_runs": 0,
       "workflow_revision_id": "dfdad4a45c4004e99b5a0744d632a7c3f7908fbc4d6154d8143262243e57534c",
+      "authored_status": null
+    },
+    {
+      "name": "herdr_inspired_ux",
+      "version": "0.1",
+      "status": "runnable",
+      "spec_path": "workflows/repository/herdr_inspired_ux.yaml",
+      "artifact_kind": "workflow",
+      "repeatable": true,
+      "supersedes": [],
+      "superseded_by": null,
+      "completed_at": null,
+      "last_run_at": null,
+      "latest_ok": null,
+      "latest_model": null,
+      "latest_cost_usd": null,
+      "latest_git_sha": null,
+      "results_pointer": null,
+      "n_runs": 0,
+      "workflow_revision_id": "6cf009243424939514e951fa18814d2806d3733c8163222a0ef2c4f4201b6472",
       "authored_status": null
     },
     {
