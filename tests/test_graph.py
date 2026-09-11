@@ -472,22 +472,43 @@ class TestSearchHelpers(_Neo4jTestBase):
         # Scoped to the Knowledge label: no Step node leaks into the KB leg.
         assert all("Knowledge" in r["labels"] for r in res)
 
-    def test_search_knowledge_fulltext_commit_filter_excludes_stale_commit(self):
+    def test_search_knowledge_fulltext_commit_filter_excludes_stale_source(self):
         self.client.create_knowledge_schema()
         self.client._run(
             "MERGE (k:Knowledge {knowledge_id: 'kf_full'}) "
             "SET k.entity_id = 'ent_full', k.text = 'task manager api building', "
-            "k.authority = 'MEASURED', k.commit_sha = 'abc'"
+            "k.authority = 'SOURCE', k.commit_sha = 'abc'"
         )
         self.client._run(
-            "MERGE (k:Knowledge {knowledge_id: 'kf_001'}) "
-            "SET k.entity_id = 'ent_1', k.text = 'task manager api building', "
-            "k.authority = 'MEASURED', k.commit_sha = 'xyz'"
+            "MERGE (k:Knowledge {knowledge_id: 'kf_stale'}) "
+            "SET k.entity_id = 'ent_stale', k.text = 'task manager api building', "
+            "k.authority = 'SOURCE', k.commit_sha = 'xyz'"
         )
         res = self.client.search_knowledge_fulltext("task manager api", commit="abc")
         ids = {r["properties"].get("knowledge_id") for r in res}
         assert "kf_full" in ids          # current commit passes
-        assert "kf_001" not in ids       # stale commit is pre-filtered out
+        assert "kf_stale" not in ids     # another branch's SOURCE code is pre-filtered out
+
+    def test_search_knowledge_fulltext_commit_filter_admits_knowledge_authorities(self):
+        # Design B1: only SOURCE stays commit-gated; MEASURED / DERIVED / ADVISORY are
+        # admitted at a mismatched revision so knowledge stays reachable across commits.
+        self.client.create_knowledge_schema()
+        for kid, authority in (
+            ("kf_meas", "MEASURED"),
+            ("kf_deriv", "DERIVED"),
+            ("kf_adv", "ADVISORY"),
+            ("kf_source", "SOURCE"),
+        ):
+            self.client._run(
+                "MERGE (k:Knowledge {knowledge_id: $kid}) "
+                "SET k.entity_id = $eid, k.text = 'task manager api building', "
+                "k.authority = $auth, k.commit_sha = 'xyz'",
+                {"kid": kid, "eid": f"ent_{kid}", "auth": authority},
+            )
+        res = self.client.search_knowledge_fulltext("task manager api", commit="abc")
+        ids = {r["properties"].get("knowledge_id") for r in res}
+        assert {"kf_meas", "kf_deriv", "kf_adv"} <= ids
+        assert "kf_source" not in ids
 
     def test_search_fulltext_commit_filter_excludes_stale_commit(self):
         self.client.create_knowledge_schema()

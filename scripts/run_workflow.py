@@ -392,7 +392,12 @@ def _build_orchestrator_executors(
         cell_image=args.cell_image,
         run_clone=run_clone,
     )
-    step_executor = DockerAgentExecutor(**common)
+    step_executor = DockerAgentExecutor(
+        **common,
+        thinking_effort=args.thinking_effort,
+        thinking_budget_tokens=args.thinking_budget_tokens,
+        output_token_limit=args.output_token_limit,
+    )
     verifier_executor = DockerVerifierExecutor(**common)
 
     # 2. NOW export the clone path to the child environment — after construction, so the

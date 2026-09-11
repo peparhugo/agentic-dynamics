@@ -1,0 +1,15 @@
+{
+  "subject": "skill/stack/redis-streams",
+  "claim": "KB projection groups are created at stream origin (id=\"0\") and read new work with XREADGROUP using >. A projection verifies and extracts an event, performs its idempotent upsert keyed by knowledge_id, and only then XACKs; pending entries can be inspected and reclaimed with XAUTOCLAIM. The current publisher uses XADD without configured stream trimming, while projection-watermark logic monitors delivery and pending state.",
+  "conformance": "repo-conformant",
+  "repo_anchors": ["src/agentic_dynamics/knowledge/knowledge_stream.py:198", "src/agentic_dynamics/knowledge/knowledge_stream.py:299", "src/agentic_dynamics/knowledge/knowledge_stream.py:314", "src/agentic_dynamics/knowledge/knowledge_stream.py:356", "src/agentic_dynamics/knowledge/knowledge_stream.py:465", "src/agentic_dynamics/control/projection_watermarks.py:223"],
+  "population": "agentic-dynamics stack",
+  "conditions": ["redis", "streams", "consumer-groups", "xack", "xpending", "at-least-once"],
+  "support": 1,
+  "uncertainty": 0.45,
+  "source_experiment": "tech_stack_seed_2026-09-11",
+  "evidence": [
+    "uri:https://redis.io/docs/latest/develop/data-types/streams/"
+  ],
+  "notes": "Repo conformance edit: corrected the consumer-group creation cursor from $ to id=\"0\" and removed the claim that the publisher trims the stream. The repository uses unbounded XADD and observes delivery and pending state through projection watermarks."
+}

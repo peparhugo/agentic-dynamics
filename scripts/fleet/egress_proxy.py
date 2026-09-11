@@ -15,9 +15,12 @@ Implementation: a threaded forward proxy that handles the two shapes a modern CL
       the same allowlist check (and refused unless ``EGRESS_ALLOW_HTTP=1`` is set, since
       model traffic should never be cleartext).
 
-Allowlist (``EGRESS_ALLOWLIST``, comma-separated): exact hostname or ``*.suffix`` wildcards,
-defaulting to the opencode/claude/deepseek/anthropic/openai endpoints. A non-matching
-host gets a 403 and a log line — the audit trail for the network-policy guard (slice 4).
+Allowlist (``EGRESS_ALLOWLIST``, comma-separated): exact hostname, ``*.suffix`` wildcards, or
+the literal ``*`` for OPEN egress (all hosts, logged as OPEN at startup) — set by the
+controller's 2026-09-11 decision to let research cells reach the open web; scoping it back
+is an explicit follow-up. Defaulting to the opencode/claude/deepseek/anthropic/openai
+endpoints. A non-matching host gets a 403 and a log line — the audit trail for the
+network-policy guard (slice 4).
 
 This file has no repo imports and no external deps (stdlib only) so it runs as a tiny
 standalone image/service on ``fleet-net``.
@@ -53,6 +56,7 @@ class Allowlist:
 
     exact: set[str] = field(default_factory=set)
     suffixes: list[str] = field(default_factory=list)
+    open: bool = False
 
     @classmethod
     def from_env(cls, raw: str | None = None) -> Allowlist:
@@ -61,7 +65,9 @@ class Allowlist:
         entries = [e.strip().lower() for e in raw.split(",") if e.strip()] or _DEFAULT_ALLOWLIST
         wl = cls()
         for e in entries:
-            if e.startswith("*."):
+            if e == "*":
+                wl.open = True  # OPEN egress (all hosts) — controller decision, logged
+            elif e.startswith("*."):
                 wl.suffixes.append(e[1:])  # store ".suffix" (with the leading dot)
             else:
                 wl.exact.add(e)
@@ -69,6 +75,8 @@ class Allowlist:
 
     def allows(self, host: str) -> bool:
         """True if ``host`` (lowercased, port stripped) is permitted."""
+        if self.open:
+            return True
         h = host.lower().rsplit(":", 1)[0] if ":" in host else host.lower()
         if h in self.exact:
             return True
@@ -170,6 +178,7 @@ class ThreadingProxyServer(socketserver.ThreadingMixIn, socketserver.TCPServer):
 
 def main(argv: list[str] | None = None) -> int:
     _log(f"starting on {LISTEN_HOST}:{LISTEN_PORT} — allowlist "
+         f"mode={'OPEN (all hosts)' if ALLOWLIST.open else 'allowlist'} "
          f"exact={sorted(ALLOWLIST.exact)} suffixes={ALLOWLIST.suffixes}")
     server = ThreadingProxyServer((LISTEN_HOST, LISTEN_PORT), ProxyHandler)
     try:

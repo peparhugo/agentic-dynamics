@@ -3013,6 +3013,15 @@ def run_workflow(
     # dispatch through the injected verifier, or REFUSE loudly when no verifier is
     # injected) from the historical in-process path (run_suite, unchanged).
     containerized_path = step_executor is not None
+    # b2 run-clone bookkeeping: in the containerized path the phases' world is the run's
+    # PRIVATE CLONE (cells run with --workdir=/repo and commit INTO it — run_clone.py), so
+    # the runner's post-phase git operations (pre-head, gates, commits, ledger sha) must
+    # read the clone. The host worktree is the clone's SOURCE, not its tree; in the
+    # orchestrator container its .git pointer is not even mounted, so _git_head(workdir)
+    # reads "" and every requires_deliverable phase fails NO_CHANGES (run-c931259949ee
+    # p4_verify, 2026-09-10). Absent a clone (in-process runs), git_wd IS wd — unchanged.
+    _run_clone = os.environ.get("FINOPS_RUN_CLONE", "") if containerized_path else ""
+    git_wd = Path(_run_clone) if _run_clone and Path(_run_clone).is_dir() else wd
     step_executor = step_executor or LocalAgentExecutor(run_agent)
 
     # RAG augmentation seam. Default OFF — the prompt passed to the executor is then
@@ -3125,7 +3134,7 @@ def run_workflow(
             result.awaiting_phase = phase_name
             result.awaiting_reason = "approval_refused"
             result.ended_at = _now()
-            result.git_sha = _git_head(wd)
+            result.git_sha = _git_head(git_wd)
             if publisher is not None and publisher.enabled:
                 publisher.set_status("awaiting")
             return result
@@ -3177,7 +3186,7 @@ def run_workflow(
         # (kb_finding_layer k6 — the witness gap, see the commit block); this pre-phase
         # baseline is what distinguishes "the phase committed its own conforming work" from
         # "the phase left nothing to commit".
-        phase_head_before = _git_head(wd)
+        phase_head_before = _git_head(git_wd)
 
         try:
             if kind == "test":
@@ -3374,7 +3383,7 @@ def run_workflow(
                     # Commit-prefix enforcement (cap_runner_hardening p3): record the worktree
                     # HEAD before the agent runs, so after the phase the runner can list exactly
                     # the commits the agent made during it (git log pre-head..HEAD).
-                    pre_head = _git_head(wd)
+                    pre_head = _git_head(git_wd)
 
                     # Commit-time prefix prevention (the drawing-board fix, 2026-08-28): a
                     # commit-msg hook installed before the phase rewrites any non-conforming
@@ -3382,7 +3391,7 @@ def run_workflow(
                     # agent cannot produce a violating commit — the post-phase gate becomes a
                     # backstop instead of a failure point. Canonicalize mode only; strict mode
                     # installs no hook (violations must stay visible for the evidence).
-                    _install_commit_msg_hook(wd, name, goal)
+                    _install_commit_msg_hook(git_wd, name, goal)
 
                     # Phase watchdog (cap_runner_hardening p1) — wrap the agent invocation in a
                     # stall monitor. The monitor polls the session transcript's last-step age
@@ -3393,7 +3402,7 @@ def run_workflow(
                     # it). Only agent phases are wrapped; test phases run in-process, never
                     # through this path.
                     watchdog_min = _resolve_watchdog_min(phase_watchdog_min)
-                    watchdog = PhaseWatchdog(wd, watchdog_min) if watchdog_min > 0 else None
+                    watchdog = PhaseWatchdog(git_wd, watchdog_min) if watchdog_min > 0 else None
                     if watchdog is not None:
                         agent_kwargs["watchdog"] = watchdog.seam
                         agent_kwargs["transcript_path"] = str(watchdog.transcript)
@@ -3483,7 +3492,7 @@ def run_workflow(
         # (null-not-zero — no defaulting, no fabrication). A failing gate fails the phase so the
         # commit below is skipped, exactly like the ``kind == "test"`` branch.
         if kind != "test" and phase_def.get("test_gate") and pr.status == "ok":
-            _run_test_gate(pr, wd, language, phase_timeout, target=phase_def.get("tests"))
+            _run_test_gate(pr, git_wd, language, phase_timeout, target=phase_def.get("tests"))
 
         # Deploy gate (cap_runner_hardening p2) — post-phase, agent phases only. Scan the
         # phase's session transcript for firebase production-deploy commands; a hit in a phase
@@ -3492,7 +3501,7 @@ def run_workflow(
         # commit gate so a deploy violation can never be committed. A phase already failed
         # (e.g. STALLED) keeps its reason and gains the DEPLOY_GATE note.
         if kind != "test":
-            _enforce_deploy_gate(pr, wd, phase_def)
+            _enforce_deploy_gate(pr, git_wd, phase_def)
 
         # Commit-prefix enforcement (cap_runner_hardening p3) — post-phase, agent phases only.
         # Every commit made during the phase (git log pre-head..HEAD) must match
@@ -3503,7 +3512,7 @@ def run_workflow(
         # phase's own. The runner's own _git_commit writes the correct message (and runs after)
         # — this catches MANUAL agent commits.
         if kind != "test":
-            _enforce_commit_prefix(pr, wd, name, goal, pre_head)
+            _enforce_commit_prefix(pr, git_wd, name, goal, pre_head)
 
         # Doc-contract enforcement (the 2e merge lesson, 2026-08-28): an agent phase whose
         # range COMMITS or MODIFIES docs/**/*.md must deliver every such doc with a valid
@@ -3515,7 +3524,7 @@ def run_workflow(
         # phase can never deliver an invalid doc. Strict, never canonicalized (the contract
         # layer is state, not render). The runner's own _git_commit never touches docs.
         if kind != "test":
-            _enforce_doc_contract(pr, wd, pre_head)
+            _enforce_doc_contract(pr, git_wd, pre_head)
 
         pr.duration_s = round(time.time() - t0, 2)
         # The wall marker (runner truth): a phase that consumed its full configured timeout
@@ -3524,7 +3533,7 @@ def run_workflow(
         # ok=True), and a clean ok must not mask a wall-burning run.
         pr.timed_out = pr.duration_s >= phase_timeout - 0.5
         if commit and pr.status == "ok":
-            pr.commit_hash = _git_commit(wd, name, goal)
+            pr.commit_hash = _git_commit(git_wd, name, goal)
             # Self-commit adoption (kb_finding_layer k6 — the witness gap). ``_git_commit``
             # stages + commits the phase's *uncommitted* work and returns its short sha, but a
             # phase whose agent ALREADY committed its own conforming work (the orchestration
@@ -3536,14 +3545,14 @@ def run_workflow(
             # commit, and its finding must land like any other's. ``pr.commit_hash`` feeds the
             # enriched finding text, the run ledger, and the emit's idempotence key.
             if not pr.commit_hash:
-                phase_head = _git_head(wd)
+                phase_head = _git_head(git_wd)
                 if phase_head and phase_head != phase_head_before:
                     pr.commit_hash = phase_head
             # Phase-boundary evidence (design §5.7 — e6): when a ChangeAnalyzer is injected,
             # hand the committed change to it (typed snapshots + delta materialized from git)
             # and record its analysis on the phase. Best-effort — never affects the phase.
             if change_analyzer is not None and pr.commit_hash:
-                _run_change_analysis(pr, wd, change_analyzer, legs=change_analysis_legs)
+                _run_change_analysis(pr, git_wd, change_analyzer, legs=change_analysis_legs)
                 # The evidence context rides the existing {prior_phases} channel so the NEXT
                 # phase's prompt receives it (bounded, machine-readable: graph status, full
                 # revision, neighborhood, facts) — only when an analyzer is injected AND this
@@ -3572,7 +3581,7 @@ def run_workflow(
         if kind != "test":
             _enforce_tree_gate(
                 pr,
-                wd,
+                git_wd,
                 spec.name,
                 name,
                 pre_head=pre_head,
@@ -3655,7 +3664,7 @@ def run_workflow(
                 started_at=iso_from_epoch(t0),
                 ended_at=iso_now(),
                 exit_code=phase_exit_code,
-                candidate_sha=pr.commit_hash or _git_head(wd),
+                candidate_sha=pr.commit_hash or _git_head(git_wd),
             )
 
         if (pr.status == "failed" and stop_on_error) or checkpoint_stop:
@@ -3667,7 +3676,7 @@ def run_workflow(
     # that refused past a checkpoint (no new phase ran) — additive, never a re-shape.
     result.attempts = _build_attempt_records(result, cell_id)
     result.ended_at = _now()
-    result.git_sha = _git_head(wd)
+    result.git_sha = _git_head(git_wd)
     if publisher is not None and publisher.enabled:
         if result.awaiting:
             publisher.set_status("awaiting")

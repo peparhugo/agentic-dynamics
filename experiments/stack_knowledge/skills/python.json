@@ -1,0 +1,17 @@
+{
+  "subject": "skill/stack/python",
+  "claim": "This repository requires Python 3.10 or later and configures Ruff with line-length = 100 and target-version = py310. Its retrieval path runs dense and lexical store legs concurrently through a two-worker ThreadPoolExecutor; this is a concrete I/O retrieval implementation, not a repository-wide process-pool policy.",
+  "conformance": "repo-conformant",
+  "repo_anchors": ["pyproject.toml:5", "pyproject.toml:60", "src/agentic_dynamics/knowledge/retrieval.py:1434", "src/agentic_dynamics/knowledge/retrieval.py:1447"],
+  "population": "agentic-dynamics stack",
+  "conditions": ["python", "style", "pep8", "concurrency", "gil"],
+  "support": 2,
+  "uncertainty": 0.3,
+  "source_experiment": "tech_stack_seed_2026-09-11",
+  "evidence": [
+    "uri:https://peps.python.org/pep-0008/",
+    "uri:https://docs.python.org/3/library/concurrency.html",
+    "uri:https://docs.python.org/3/tutorial/"
+  ],
+  "notes": "Repo conformance edit: retained the configured interpreter and Ruff rules and the observed retrieval executor. Removed unverified repository-wide requirements for docstrings and ProcessPoolExecutor selection."
+}

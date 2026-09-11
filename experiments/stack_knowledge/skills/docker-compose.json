@@ -1,0 +1,16 @@
+{
+  "subject": "skill/stack/docker-compose",
+  "claim": "The fleet ladder attaches to the external fleet-net network and reaches data-plane services by name, including finops-queue, chromadb, and neo4j. It deliberately excludes story-agent sandbox Redis (finops-redis on port 6379), and exposes the Control Room only as 127.0.0.1:8001:8001.",
+  "conformance": "repo-conformant",
+  "repo_anchors": ["infrastructure/docker-compose.ladder.yml:3", "infrastructure/docker-compose.ladder.yml:31", "infrastructure/docker-compose.ladder.yml:398", "infrastructure/docker-compose.ladder.yml:447"],
+  "population": "agentic-dynamics stack",
+  "conditions": ["docker", "compose", "networking", "isolation", "dns", "fleet-net"],
+  "support": 2,
+  "uncertainty": 0.3,
+  "source_experiment": "tech_stack_seed_2026-09-11",
+  "evidence": [
+    "uri:https://docs.docker.com/engine/network/",
+    "uri:https://docs.docker.com/compose/compose-file/"
+  ],
+  "notes": "Repo conformance edit: removed broad Docker DNS and default-bridge assertions in favor of the ladder's explicit network, endpoint, sandbox-isolation, and loopback-publication contract."
+}

@@ -1,0 +1,57 @@
+name: flash_ladder_bare
+question: >-
+  The flash-exploration ladder's generation cell for the BARE conditions (C0 neutral, C1
+  divergence-framed, C2 high thinking budget): deepseek/deepseek-v4-flash implements the
+  `taskman` contract in one session. Condition variation is carried by the invocation (goal
+  framing / thinking budget), not by this spec; the spec is shared by C0-C2 and pinned by
+  SHA256 in the pre-registration addendum. No KB emission, no deploy.
+version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: false
+repeatable: true
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: false
+    rag_augment: false
+    rag:
+      emit_self: false
+    phases:
+      - name: generate
+        kind: agent
+        scope: implementation
+        timeout: 3600
+        prompt: |
+          GOAL: {goal}
+          Work only in this worktree. Implement a pure-Python, stdlib-only package `taskman`
+          (exposing `TaskManager`) satisfying the behavioural contract in
+          tests/flash_ladder/taskman_contract_test.py. Read the contract test if useful; do NOT
+          modify any test file. Choose the internal design yourself.
+          Verify with: python3 -m pytest tests/flash_ladder/taskman_contract_test.py -q
+          Iterate until it passes.
+          LOG: a brief note on the design and the test result; commit.
+      - name: g_test
+        kind: test
+        scope: implementation
+        timeout: 900
+        tests:
+          - tests/flash_ladder/taskman_contract_test.py
+factors:
+  - {name: model, levels: [deepseek/deepseek-v4-flash]}
+design: factorial
+rules:
+  - name: ladder_cell_measured
+    plane: measurement
+    evidence_class: "[M]"
+    requires: []
+    produces: [ladder_cell_quality]
+metrics:
+  - {name: ladder_cell_quality, agg: mean, over: cell}
+comparison: null
+writeup: {format: lab_book, sections: [question, generate, g_test]}
+stop: {budget_usd: 2.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}

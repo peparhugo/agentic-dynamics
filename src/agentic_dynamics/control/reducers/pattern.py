@@ -37,6 +37,7 @@ double-counting a duplicated artifact.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import math
 from dataclasses import replace
@@ -195,6 +196,28 @@ def decode_pattern_payload(value: str) -> PatternPayload:
 # ── Fact construction ───────────────────────────────────────────
 
 
+def _evidence_window(refs: list[str]) -> str:
+    """Return the pattern's ``validity_window`` — a deterministic digest of its evidence set.
+
+    Design B2 (``docs/experiments/designs/flash_exploration_design.md`` F3): the window was
+    ``inp.source_revision or REVISION_FALLBACK``, so it moved on every commit even when the
+    evidence behind the pattern had not. ``fact_fingerprint`` (``fact_ingestion.py``) hashes the
+    fact's ``value`` — which includes ``validity_window`` — so a new HEAD changed the fingerprint
+    with zero real change and superseded every pattern fact (the observed churn: 6 supersedes +
+    6 projections on a no-op run).
+
+    Hashing the sorted, deduped evidence refs instead makes the window change **if and only if
+    the evidence set changes**: re-deriving the same evidence at a different revision is
+    byte-identical, while adding/removing an observation moves the window (and therefore the
+    fingerprint) exactly once. ``source_revision`` is still carried on the fact itself as
+    provenance (``CanonicalFact.source_revision``); only the window — the field the fingerprint
+    sees — is derived from evidence. The ``evidence:`` prefix keeps the value self-describing so
+    a reader can tell a B2 window from a legacy revision sha.
+    """
+    digest = hashlib.sha256("\n".join(refs).encode("utf-8")).hexdigest()
+    return f"evidence:{digest[:16]}"
+
+
 def _fact_for_group(
     rows: list[dict[str, Any]],
     task: str,
@@ -226,7 +249,8 @@ def _fact_for_group(
         conditions=_MATCH_CONDITIONS,
         support=support,
         uncertainty=uncertainty,
-        validity_window=inp.source_revision or REVISION_FALLBACK,
+        # B2: the window moves only when the evidence moves — never on a repository revision.
+        validity_window=_evidence_window(refs),
         source_experiment=refs[0],  # deterministic: lexicographically smallest ref
     )
 

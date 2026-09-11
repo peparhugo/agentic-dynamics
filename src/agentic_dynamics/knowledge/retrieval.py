@@ -53,6 +53,18 @@ EXACT_IDENTIFIER_MULTIPLIER = 1.15  # [H] quoted path/symbol/error/test-name mat
 CONFLICT_MULTIPLIER = 0.70  # [H] unresolved contradictory evidence penalty.
 EXACT_COMMIT_MULTIPLIER = 1.10  # [H] freshness bonus for the exact commit.
 
+#: Authorities exempt from the store-level commit pre-filter (design B1). The commit
+#: gate exists to keep another branch's **code** (``SOURCE``) from surfacing; the
+#: knowledge authorities remain reachable across revisions because a measured finding
+#: or a minted pattern is revision-independent. The values are the persisted metadata
+#: strings — ``record.authority.name`` written by ``scripts/kb_worker.py``'s chroma and
+#: kb-neo4j handlers — so the equality clauses match what is actually stored.
+COMMIT_EXEMPT_AUTHORITY_NAMES: tuple[str, ...] = (
+    Authority.MEASURED.name,
+    Authority.DERIVED.name,
+    Authority.ADVISORY.name,
+)
+
 GRAPH_DECAY = 0.7  # [H] 0.7 ** depth — a structural neighbor is categorically weaker.
 
 DEFAULT_TOP_K = 40
@@ -532,22 +544,27 @@ def freshness_multiplier(
 ) -> float | None:
     """Return the freshness multiplier, or ``None`` to *exclude* the candidate.
 
-    POLICY is never retrieved (returns None). When ``current_commit`` is known, a
-    SOURCE/MEASURED/DERIVED candidate carrying a *different, non-empty*
-    ``commit_sha`` is a HARD exclusion — the worktree and commit are hard filters:
-    another branch's code can be semantically similar and operationally wrong. A
-    candidate with an *empty* ``commit_sha`` is treated as current/unknown and stays
-    eligible. The exact-commit boost (``EXACT_COMMIT_MULTIPLIER``) is preserved.
-    Advisory freshness windows (30/90-day) are unchanged.
+    POLICY is never retrieved (returns None). The commit gate exists to keep another
+    branch's **code** from surfacing: only ``SOURCE`` is hard-excluded when
+    ``current_commit`` is known and the candidate carries a *different, non-empty*
+    ``commit_sha``. Knowledge authorities are NOT commit-gated — ``MEASURED`` and
+    ``DERIVED`` fall through to neutral (1.00) regardless of commit, because a
+    measured finding or a minted pattern holds across revisions; ``ADVISORY`` keeps
+    its time-based 30/90-day windows. A candidate with an *empty* ``commit_sha`` is
+    treated as current/unknown and stays eligible. The exact-commit boost
+    (``EXACT_COMMIT_MULTIPLIER``) is preserved.
     """
     if authority is Authority.POLICY:
         return None
-    # Hard commit pre-filter (the safety rationale). Only enforced when the current
-    # commit is known AND the candidate names a *different*, non-empty commit; an
-    # empty commit_sha is unknown/current and therefore eligible.
+    # Hard commit pre-filter (the safety rationale). ONLY SOURCE code is gated — another
+    # branch's code can be semantically similar and operationally wrong. Knowledge
+    # (MEASURED/DERIVED) is revision-independent and stays reachable across commits;
+    # ADVISORY is time-bucketed below. Only enforced when the current commit is known AND
+    # the candidate names a *different*, non-empty commit; an empty commit_sha is
+    # unknown/current and therefore eligible.
     if (
         current_commit
-        and authority in (Authority.SOURCE, Authority.MEASURED, Authority.DERIVED)
+        and authority is Authority.SOURCE
         and commit_sha
         and commit_sha != current_commit
     ):
@@ -564,7 +581,15 @@ def freshness_multiplier(
         observed = _parse_timestamp(observed_at)
         if observed is None:
             return ADVISORY_FRESH_90D
-        age_days = ((now or datetime.now(timezone.utc)) - observed).days
+        # ISO strings without an offset parse NAIVE while the reference clock is aware —
+        # subtracting them raised TypeError on the first live dense probe (2026-09-10).
+        # Treat a naive timestamp as UTC; normalize the injected reference clock the same way.
+        if observed.tzinfo is None:
+            observed = observed.replace(tzinfo=timezone.utc)
+        reference = now or datetime.now(timezone.utc)
+        if reference.tzinfo is None:
+            reference = reference.replace(tzinfo=timezone.utc)
+        age_days = (reference - observed).days
         if age_days <= 30:
             return ADVISORY_FRESH_30D
         if age_days <= 90:
@@ -666,6 +691,17 @@ def scope_excluded(candidate_repository_id: str, requested_scope: str) -> bool:
     return bool(
         requested_scope and candidate_repository_id and candidate_repository_id != requested_scope
     )
+
+
+def acl_excluded(candidate_acl: str, requested_acl: str) -> bool:
+    """Return True when a candidate is hard-excluded by the requested ACL scope.
+
+    The lexical leg's mirror of :func:`scope_excluded`: a candidate carrying a different,
+    non-empty ``acl_scope`` never surfaces; an empty candidate scope is unknown/legacy and
+    stays eligible; an empty requested scope disables the filter. Closes the pre-existing
+    direct-lexical ACL leak (review-5 F3).
+    """
+    return bool(requested_acl and candidate_acl and candidate_acl != requested_acl)
 
 
 def graph_boost(seed_score: float, depth: int, relationship: str) -> float:
@@ -1387,6 +1423,7 @@ def retrieve(
         "commit_sha": commit_sha,
         "acl_scope": acl_scope,
     }
+    requested_acl = str(filters.get("acl_scope", ""))
 
     dense_hits: list[dict[str, Any]] = []
     lexical_hits: list[dict[str, Any]] = []
@@ -1480,6 +1517,8 @@ def retrieve(
     lexical_rank = 0
     for hit in lexical_hits:
         props = hit.get("properties") or {}
+        if acl_excluded(str(props.get("acl_scope", "") or ""), requested_acl):
+            continue  # a foreign-ACL record never surfaces via the direct lexical leg
         cid = _canonical_id(props, hit.get("id", ""))
         text = props.get("text", "")
         source_type = _resolve_source_type(
@@ -1606,6 +1645,17 @@ def retrieve(
                     resolver=source_type_resolver,
                 )
                 authority = _coerce_authority(props.get("authority"))
+                # Review-4 A2: an EXPANDED neighbor must pass the same freshness/commit
+                # gate as a direct candidate. Without this, a stale SOURCE neighbor could
+                # be appended after fusion and selected, bypassing the SOURCE commit gate.
+                if freshness_multiplier(
+                    authority=authority,
+                    commit_sha=str(props.get("commit_sha", "") or ""),
+                    observed_at=props.get("observed_at"),
+                    current_commit=commit_sha,
+                    now=now,
+                ) is None:
+                    continue
                 if not _candidate_allowed(
                     source_type,
                     pattern_projection=plan.pattern_projection,
@@ -1622,6 +1672,8 @@ def retrieve(
                     continue
                 if scope_excluded(props.get("repository_id", ""), requested_scope):
                     continue  # another cell's neighbor never surfaces via expansion
+                if acl_excluded(str(props.get("acl_scope", "") or ""), requested_acl):
+                    continue  # a foreign-ACL neighbor never surfaces via expansion
                 origin = node.get("origin_seed") or ""
                 seed_score = seed_scores.get(origin)
                 if seed_score is None or seed_score <= 0:
@@ -1714,9 +1766,15 @@ def _dense_filter(filters: dict[str, Any]) -> dict[str, Any]:
 
     Chroma requires a ``where`` dict to carry exactly one top-level key, so multiple
     conditions are combined under ``$and`` (a bare multi-key dict is rejected by
-    ``validate_where``). The commit scope is a HARD pre-filter: a stored chunk is
-    eligible only when its ``commit_sha`` is empty (unknown/current) or equals the
-    worktree's commit — stale-commit docs never surface from the dense leg at all.
+    ``validate_where``). The commit scope is a HARD pre-filter for **source code**
+    only: a stored chunk is eligible when its ``commit_sha`` is empty
+    (unknown/current), equals the worktree's commit, OR its ``authority`` is one of
+    the commit-exempt knowledge authorities (:data:`COMMIT_EXEMPT_AUTHORITY_NAMES` —
+    ``MEASURED``/``DERIVED``/``ADVISORY``). The gate keeps another branch's ``SOURCE``
+    code out; it must not hide revision-independent knowledge. Equality clauses (one
+    per authority) are deliberate — the authority values are the exact strings
+    persisted by ``scripts/kb_worker.py`` (``record.authority.name``), and Chroma's
+    ``$or`` matches them directly.
     """
     conditions: list[dict[str, Any]] = []
     if filters.get("repository_id"):
@@ -1730,6 +1788,10 @@ def _dense_filter(filters: dict[str, Any]) -> dict[str, Any]:
                 "$or": [
                     {"commit_sha": ""},
                     {"commit_sha": commit},
+                    *[
+                        {"authority": name}
+                        for name in COMMIT_EXEMPT_AUTHORITY_NAMES
+                    ],
                 ]
             }
         )

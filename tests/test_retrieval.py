@@ -242,17 +242,27 @@ def test_freshness_exact_commit_and_source():
         )
         is None
     )
+    # The exact-commit boost is preserved for the knowledge authorities too.
+    assert freshness_multiplier(
+        authority=Authority.MEASURED, commit_sha="abc", observed_at=None, current_commit="abc"
+    ) == pytest.approx(EXACT_COMMIT_MULTIPLIER)
 
 
-def test_freshness_non_matching_commit_excluded_for_all_non_advisory():
-    # SOURCE / MEASURED / DERIVED are all hard-excluded on a different commit.
-    for authority in (Authority.SOURCE, Authority.MEASURED, Authority.DERIVED):
-        assert (
-            freshness_multiplier(
-                authority=authority, commit_sha="xyz", observed_at=None, current_commit="abc"
-            )
-            is None
+def test_freshness_commit_gate_only_hard_excludes_source():
+    # Design B1: the commit gate keeps another branch's SOURCE *code* out; the
+    # knowledge authorities stay reachable across revisions.
+    # SOURCE + mismatched non-empty commit → hard exclusion.
+    assert (
+        freshness_multiplier(
+            authority=Authority.SOURCE, commit_sha="xyz", observed_at=None, current_commit="abc"
         )
+        is None
+    )
+    # MEASURED / DERIVED + mismatched commit → neutral (admitted at 1.00).
+    for authority in (Authority.MEASURED, Authority.DERIVED):
+        assert freshness_multiplier(
+            authority=authority, commit_sha="xyz", observed_at=None, current_commit="abc"
+        ) == pytest.approx(1.0)
 
 
 def test_freshness_empty_commit_is_eligible():
@@ -284,9 +294,15 @@ def test_freshness_advisory_ignores_commit_scope():
 
 
 def test_dense_filter_commit_scope_prefilter():
-    # Commit scope alone → $or (empty is unknown/current, or exact match).
+    # The commit scope $or admits empty (unknown/current), the exact commit, AND the
+    # commit-exempt knowledge authorities (design B1) — SOURCE stays gated.
+    exempt = [
+        {"authority": "MEASURED"},
+        {"authority": "DERIVED"},
+        {"authority": "ADVISORY"},
+    ]
     assert _dense_filter({"commit_sha": "abc"}) == {
-        "$or": [{"commit_sha": ""}, {"commit_sha": "abc"}]
+        "$or": [{"commit_sha": ""}, {"commit_sha": "abc"}, *exempt]
     }
     # No commit scope → no filter at all.
     assert _dense_filter({"commit_sha": ""}) == {}
@@ -297,9 +313,11 @@ def test_dense_filter_commit_scope_prefilter():
     assert _dense_filter({"repository_id": "repo", "commit_sha": "abc"}) == {
         "$and": [
             {"repository_id": "repo"},
-            {"$or": [{"commit_sha": ""}, {"commit_sha": "abc"}]},
+            {"$or": [{"commit_sha": ""}, {"commit_sha": "abc"}, *exempt]},
         ]
     }
+    # The exemptions are equality clauses, not `$in` (Chroma matches them directly).
+    assert all("$in" not in clause for clause in _dense_filter({"commit_sha": "abc"})["$or"])
 
 
 def test_freshness_advisory_age_buckets():
@@ -1203,6 +1221,52 @@ class TestLuceneEscape:
         assert captured["params"]["query"] == r"retrieve\(\) RRF"
 
 
+class TestKnowledgeFulltextCommitExemption:
+    """Design B1's lexical layer: ``search_knowledge_fulltext`` exempts the knowledge
+    authorities from the commit pre-filter, while ``search_fulltext`` (the Step path and
+    any caller that passes no exemptions) stays back-compatible. Hermetic — a stubbed
+    ``_run`` captures the built Cypher + params without a live Neo4j.
+    """
+
+    def _client(self, monkeypatch, captured):
+        from agentic_dynamics.knowledge import graph as graph_module
+
+        client = graph_module.Neo4jClient.__new__(graph_module.Neo4jClient)
+
+        def _fake_run(query_str, params):
+            captured["query"] = query_str
+            captured["params"] = params
+            return []
+
+        monkeypatch.setattr(client, "_run", _fake_run)
+        return client
+
+    def test_kb_fulltext_passes_the_three_knowledge_authorities(self, monkeypatch):
+        captured: dict = {}
+        client = self._client(monkeypatch, captured)
+        client.search_knowledge_fulltext("task manager api", commit="abc")
+        assert set(captured["params"]["exempt"]) == {"MEASURED", "DERIVED", "ADVISORY"}
+        assert "OR node.authority IN $exempt" in captured["query"]
+
+    def test_step_fulltext_without_exemptions_stays_back_compatible(self, monkeypatch):
+        # The default (no exemptions) must NOT emit the authority clause — Step nodes
+        # carry no authority property and the historical filter shape is unchanged.
+        captured: dict = {}
+        client = self._client(monkeypatch, captured)
+        client.search_fulltext("step_text_ft", "websocket", commit="abc")
+        assert "exempt" not in captured["params"]
+        assert "authority" not in captured["query"]
+
+    def test_no_commit_never_emits_the_exemption_clause(self, monkeypatch):
+        # With no commit filter there is no WHERE at all (back-compatible), even on the
+        # knowledge path.
+        captured: dict = {}
+        client = self._client(monkeypatch, captured)
+        client.search_knowledge_fulltext("task manager api")
+        assert "exempt" not in captured["params"]
+        assert "WHERE" not in captured["query"]
+
+
 # ── Query-shape classification + source-type ordering (k3 — the finding-layer wave) ──
 
 FINDINGS_QUERY = (
@@ -1571,3 +1635,80 @@ def test_k4_lexical_leg_types_a_record_the_dense_leg_could_not():
     assert shared.source_type == "finding"  # typed by the lexical leg, never left untyped
     assert shared.id in [c.id for c in attempt.selected_evidence]
 
+def test_freshness_multiplier_advisory_naive_timestamp_is_utc():
+    """A naive ISO timestamp must not crash ADVISORY freshness (live dense probe, 2026-09-10).
+
+    ``datetime.fromisoformat("2026-09-01T00:00:00")`` is naive while the reference clock is
+    aware; subtracting them raised TypeError on the first host-side Chroma probe, which
+    excluded every ADVISORY record (reviews, decisions) from retrieval.
+    """
+    from agentic_dynamics.knowledge.retrieval import freshness_multiplier
+
+    fresh = freshness_multiplier(
+        authority=Authority.ADVISORY,
+        commit_sha="rev-a",
+        observed_at="2026-09-01T00:00:00",
+        current_commit="rev-b",
+        now=datetime(2026, 9, 10, tzinfo=timezone.utc),
+    )
+    assert fresh is not None and fresh > 0
+    stale = freshness_multiplier(
+        authority=Authority.ADVISORY,
+        commit_sha="rev-a",
+        observed_at="2026-01-01T00:00:00",
+        current_commit="rev-b",
+        now=datetime(2026, 9, 10, tzinfo=timezone.utc),
+    )
+    assert stale is None
+
+
+def test_retrieve_expansion_applies_commit_gate_to_source_neighbors():
+    """Review-4 A2: an expanded stale SOURCE neighbor never bypasses the commit gate."""
+    stale = _expanded_node("k_seed", cid="k_stale_source")
+    stale["properties"]["commit_sha"] = "other"
+    expanded_knowledge = _expanded_node("k_seed", cid="k_measured_neighbor")
+    expanded_knowledge["properties"]["authority"] = "measured"
+    expanded_knowledge["properties"]["commit_sha"] = "other"
+
+    attempt = retrieve(
+        "websocket reload",
+        dense_store=_FakeDenseStore([_seed_hit()]),
+        graph_client=_FakeGraph([stale, expanded_knowledge]),
+        commit_sha="current",
+    )
+    candidate_ids = {c.id for c in attempt.candidates}
+    assert "k_stale_source" not in candidate_ids
+    assert "k_measured_neighbor" in candidate_ids
+    assert "k_stale_source" not in {c.id for c in attempt.selected_evidence}
+
+
+def test_direct_lexical_leg_enforces_acl_scope():
+    """Review-5 F3: a foreign-ACL record never surfaces via the direct lexical leg.
+
+    The pre-existing leak: the lexical leg filtered only ``repository_id``, so a record with a
+    matching repository but a different ACL scope was selectable.
+    """
+    def hit():
+        h = _knowledge_lexical_hit(cid="foreign-acl", text="task manager api building finding")
+        h["properties"]["repository_id"] = "self-a"
+        h["properties"]["acl_scope"] = "private-b"
+        return h
+
+    leaked = retrieve(
+        "build a task manager api",
+        dense_store=None,
+        graph_client=_FakeGraph(lexical_hits=[hit()]),
+        repository_id="self-a",
+        acl_scope="private-a",
+    )
+    assert leaked.candidates == []
+    assert leaked.selected_evidence == []
+
+    admitted = retrieve(
+        "build a task manager api",
+        dense_store=None,
+        graph_client=_FakeGraph(lexical_hits=[hit()]),
+        repository_id="self-a",
+        acl_scope="private-b",
+    )
+    assert {c.id for c in admitted.candidates} == {"foreign-acl"}

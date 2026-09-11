@@ -25,6 +25,8 @@ _COMMANDS: dict[tuple[str, ...], str] = {
     ("experiment", "cap-grit-measure"): "measure_cap_grit_grid.py",
     ("experiment", "cap-2c-grid"): "run_cap_2c_grid.py",
     ("experiment", "cap-2c-score"): "score_cap_2c.py",
+    ("experiment", "flash-ladder-score"): "score_flash_ladder.py",
+    ("experiment", "flash-ladder-run"): "run_flash_ladder.py",
     ("experiment", "cap-2d-grid"): "run_cap_2d_grid.py",
     ("experiment", "cap-2d-score"): "score_cap_2d.py",
     ("experiment", "cap-2e-grid"): "run_cap_2e_grid.py",
@@ -76,6 +78,8 @@ _COMMANDS: dict[tuple[str, ...], str] = {
     ("data", "bundle"): "bundle_artifacts.py",
     # knowledge
     ("knowledge", "ingest"): "kb_produce.py",
+    ("knowledge", "produce-skill"): "kb_produce_skill.py",
+    ("knowledge", "research-fetch"): "research_fetch.py",
     ("knowledge", "sources"): "kb_produce_sources.py",
     ("knowledge", "facts"): "kb_produce_facts.py",
     ("knowledge", "campaign-evidence"): "kb_produce_campaign_evidence.py",

@@ -11,6 +11,7 @@ re-deriving the same evidence set is byte-for-byte stable, regardless of input o
 
 from __future__ import annotations
 
+import json
 from dataclasses import replace
 
 import pytest
@@ -35,6 +36,7 @@ from agentic_dynamics.control.reducers import REDUCERS, get_reducer
 from agentic_dynamics.control.reducers.pattern import (
     MIN_SUPPORT_FOR_UNCERTAINTY,
     PATTERN_V1,
+    _evidence_window,
     decode_pattern_payload,
     pattern_v1,
 )
@@ -94,6 +96,30 @@ def _reducer_input(rows: list[dict], *, source_revision: str = "abc123") -> Redu
         now=NOW,
         source_revision=source_revision,
     )
+
+
+def _registration_line(record) -> dict:
+    """The line ``kb_worker.py``'s ``kb-registry-v1`` handler appends for one fact record.
+
+    Mirrored field-for-field (not imported — the worker needs Redis), exactly as
+    ``tests/test_kb_produce_facts_integration.py``'s helper of the same name does, so a
+    ``derive_fact_records`` call against a temp registry sees the registration a completed
+    producer round would have left: the head's ``reason`` carries the ``fact-content=``
+    fingerprint the convergence guard compares against.
+    """
+    return {
+        "knowledge_id": record.knowledge_id,
+        "entity_id": record.entity_id,
+        "source_type": record.source_type,
+        "logical_locator": record.logical_locator,
+        "source_uri": record.source_uri,
+        "lifecycle_state": "current",
+        "observed_at": record.observed_at,
+        "indexed_at": record.indexed_at,
+        "supersedes": record.supersedes,
+        "causes": record.causes,
+        "reason": fi.fact_reason(record),
+    }
 
 
 # ── (0) `pattern` is a fact KIND, not an EPISTEMIC_MAP row (D7) ─────
@@ -176,7 +202,11 @@ def test_pattern_derived_from_real_records():
     assert payload.population == "finding:task=task_manager,perturbation_class=objective_mutation"
     assert payload.conditions == ("test_executed_success=true",)
     assert payload.support == 3  # a real COUNT — 3 of the 4 rows measured True
-    assert payload.validity_window == "abc123"
+    # B2: the window is a deterministic digest of the sorted, deduped evidence refs — NOT the
+    # injected source_revision. This is what keeps a re-derivation at a new commit byte-stable.
+    assert payload.validity_window == _evidence_window(sorted(fact.evidence_ids))
+    assert payload.validity_window.startswith("evidence:")
+    assert len(payload.validity_window) == len("evidence:") + 16
     assert payload.source_experiment in fact.evidence_ids
     assert payload.source_experiment == min(fact.evidence_ids)  # deterministic pick
 
@@ -350,6 +380,55 @@ def test_re_deriving_the_same_slot_twice_is_idempotent():
     a = pattern_v1(_reducer_input(rows))[0]
     b = pattern_v1(_reducer_input(rows))[0]
     assert a == b
+
+
+def test_cross_revision_same_evidence_is_idempotent(tmp_path):
+    """B2's G-B2: the same evidence at two different ``source_revision`` values yields an
+    identical fact fingerprint, so the convergence guard emits ZERO supersession-worthy
+    records — the churn F3 recorded (a new HEAD superseding every pattern fact) is gone.
+
+    The revision still lands on the fact as provenance; only the ``validity_window`` (and
+    therefore the fingerprint) is evidence-derived.
+    """
+    rows = [
+        _finding(knowledge_id="k1", test_executed_success=True),
+        _finding(knowledge_id="k2", test_executed_success=True),
+        _finding(knowledge_id="k3", test_executed_success=False),
+    ]
+    rev_a, rev_b = "a" * 40, "b" * 40
+    facts_a = pattern_v1(_reducer_input(rows, source_revision=rev_a))
+    facts_b = pattern_v1(_reducer_input(rows, source_revision=rev_b))
+    assert len(facts_a) == len(facts_b) == 1
+    a, b = facts_a[0], facts_b[0]
+
+    # The value (window included), the input digest, and the supersession fingerprint are all
+    # revision-independent — while the fact still records which revision produced it.
+    assert a.value == b.value
+    assert a.inputs_digest == b.inputs_digest
+    assert a.source_revision == rev_a
+    assert b.source_revision == rev_b
+    record_a = fi.build_fact_record(a)
+    record_b = fi.build_fact_record(b)
+    assert fi.fact_fingerprint(record_a) == fi.fact_fingerprint(record_b)
+
+    # Seed a hermetic registry with revision A's registration, then re-derive the SAME evidence
+    # at revision B: the convergence guard emits nothing (no supersede, no fresh version).
+    registry = tmp_path / "registry_index.jsonl"
+    registry.write_text(json.dumps(_registration_line(record_a)) + "\n")
+    emitted = fi.derive_fact_records(
+        pattern_v1(_reducer_input(rows, source_revision=rev_b)),
+        registry_path=registry,
+    )
+    assert emitted == []
+
+    # Changing the evidence set DOES move the window — the digest is not a constant.
+    moved = pattern_v1(
+        _reducer_input(rows + [_finding(knowledge_id="k4", test_executed_success=True)])
+    )
+    assert (
+        decode_pattern_payload(moved[0].value).validity_window
+        != decode_pattern_payload(a.value).validity_window
+    )
 
 
 # ── verify_chain: a tampered pattern fails the mandatory chain check (D3) ─

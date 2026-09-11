@@ -1,0 +1,81 @@
+name: flash_ladder_score_review
+question: >-
+  Independent verification of the flash-exploration ladder score
+  (experiments/results/flash_ladder/score_round1.json): recompute D_c/Q_c from the raw cell
+  exports, audit cell validity and the pristine-test restoration, and check the pre-registered
+  decision arithmetic. Scoped: report only discrepancies, never a new attack surface.
+version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: false
+repeatable: true
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: false
+    rag_augment: false
+    rag:
+      emit_self: false
+    phases:
+      - name: g_score_review
+        kind: agent
+        scope: implementation
+        requires_deliverable: true
+        run_model: openai/gpt-5.6-terra
+        timeout: 7200
+        prompt: |
+          GOAL: {goal}
+          ROLE: the independent verifier of the ladder SCORE. Scoped: verify the recorded
+          score against the raw evidence; report a finding only if a number is wrong, a cell is
+          mis-classified, the pristine restoration is unfaithful, or the arithmetic/decision
+          contradicts the pre-registered rule. Do NOT open new attack surface.
+
+          INPUTS (frozen, TRACKED review evidence — read it from the repo at /repo):
+          ``experiments/ladder_evidence/round1/`` contains ``score_round1.json`` (the score)
+          and, per cell, ``<cell>.json`` (the record) plus the generated ``taskman`` sources
+          (any layout, including ``src/taskman/``). These are committed files, so they are
+          present in every clone; read them with ordinary file tools. Do NOT look for runtime
+          evidence under ``experiments/results`` (gitignored) or host ``/tmp`` (not mounted).
+          Also read ``scripts/score_flash_ladder.py`` (the scorer) and
+          ``docs/experiments/preregistrations/flash_exploration_preregistration.md`` §4.
+
+          CHECKS:
+          (1) Recompute, from the raw exports only, each cell's package sources (any layout:
+              taskman/, src/taskman/, taskman.py), re-run the PRISTINE contract test from the
+              ladder base (base sha in the score), and count Q_c. Compare to the recorded Q.
+          (2) Recompute D_c (mean pairwise composite over valid attempts) with the diversity
+              module and compare to the recorded D; confirm unsupported/excluded accounting.
+          (3) Audit cell validity: tests untouched, export present, run sha/ledger provenance.
+          (4) Check the arithmetic: delta_D/delta_Q vs C0, the escalation thresholds
+              (|delta_D| >= 0.10 or |delta_Q| >= 1), and the FLAT/ESCALATE verdict.
+          (5) Record the C3 condition state (fallback_mode, selected evidence count) as data.
+          A clean verification is the expected outcome; state every check with its raw result.
+          DELIVER: docs/reviews/flash_ladder_score_review.md (verification table + verdict),
+          committed.
+          SCOPE NOTE: write ONLY that doc; do not change code, tests, or the score artifact.
+          LOG: verification table; PASS/FAIL; commit.
+      - name: g_score_tests
+        kind: test
+        scope: implementation
+        timeout: 600
+        tests:
+          - tests/test_flash_ladder_scoring.py
+          - tests/test_portfolio_scorer.py
+factors:
+  - {name: model, levels: [deepseek/deepseek-v4-flash]}
+design: factorial
+rules:
+  - name: score_verified
+    plane: measurement
+    evidence_class: "[H]"
+    requires: []
+    produces: [ladder_score_verified]
+metrics:
+  - {name: ladder_score_verified, agg: mean, over: cell}
+comparison: null
+writeup: {format: lab_book, sections: [question, g_score_review, g_score_tests]}
+stop: {budget_usd: 2.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}

@@ -1,0 +1,16 @@
+{
+  "subject": "skill/stack/neo4j-cypher",
+  "claim": "Agentic Dynamics passes Cypher values separately from query text and validates every interpolated identifier because Neo4j cannot parameterize labels, property names, or index names. Its graph traversals enforce ACL predicates in Cypher rather than post-filtering results, and its full-text retrieval applies the optional commit predicate before returning nodes.",
+  "conformance": "repo-conformant",
+  "repo_anchors": ["src/agentic_dynamics/knowledge/graph.py:135", "src/agentic_dynamics/knowledge/graph.py:167", "src/agentic_dynamics/knowledge/graph.py:1391"],
+  "population": "agentic-dynamics stack",
+  "conditions": ["neo4j", "cypher", "graph", "match", "parameters", "injection"],
+  "support": 2,
+  "uncertainty": 0.3,
+  "source_experiment": "tech_stack_seed_2026-09-11",
+  "evidence": [
+    "uri:https://neo4j.com/docs/cypher-manual/current/clauses/match/",
+    "uri:https://neo4j.com/docs/cypher-manual/current/introduction/"
+  ],
+  "notes": "Repo conformance edit: replaced general MATCH, WITH, relationship-direction, and dynamic-label advice with the repository's parameter, identifier-validation, ACL, and commit-filter contracts."
+}

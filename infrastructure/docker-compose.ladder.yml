@@ -348,13 +348,22 @@ services:
   egress:
     image: fleet/base
     command: ["python3", "scripts/fleet/egress_proxy.py"]
+    working_dir: /repo
+    # Run the repo's OWN proxy code: the image bake had drifted from the branch (the egress
+    # service previously executed a stale baked-in copy). The policy point must be versioned
+    # with the rest of the fleet, exactly like the other services.
+    volumes:
+      - ${FINOPS_REPO_DIR:?FINOPS_REPO_DIR must be set (the repo root, no host-specific default)}:/repo:ro
     restart: on-failure
     networks: [fleet-net]
     environment:
       FLEET_SKIP_PROBE: "1"       # the proxy invokes no CLI
       EGRESS_LISTEN_HOST: 0.0.0.0
       EGRESS_LISTEN_PORT: "8888"
-      EGRESS_ALLOWLIST: "api.deepseek.com,api.anthropic.com,api.openai.com,*.anthropic.com,*.deepseek.com,*.openai.com"
+      # OPEN egress (all hosts) — the controller's 2026-09-11 decision for open-web research
+      # (the fleet carries no secure material yet). Scoping this back is an explicit follow-up.
+      EGRESS_ALLOWLIST: "*"
+      EGRESS_ALLOW_HTTP: "1"
 
   # =========================================================================
   # fleet/orchestrator — the campaign wrapper + the workflow runner. NO docker

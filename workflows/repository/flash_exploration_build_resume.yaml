@@ -1,0 +1,94 @@
+name: flash_exploration_build_resume
+question: >-
+  Continuation of `flash_exploration_build` after two containerized-platform constraints were
+  hit and repaired on the branch: (1) the outer runner's post-phase gates/commits read the host
+  worktree instead of the run's private clone (fixed, regression-tested, commit 5035f849c);
+  (2) `adversarial_readonly` binds the clone READ-ONLY (spawn_wrapper.py:138-139), so a
+  containerized adversarial phase cannot deliver its finding doc — the original spec's
+  `g5_adversarial` scope is corrected here to `implementation` (the only write scope), with the
+  phase prompt unchanged. Runs ONLY the two remaining phases against the harvested branch
+  (p0-p4 landed in flash_exploration_build and its run clone). Pinned in the pre-registration's
+  continuation addendum BEFORE this run.
+version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: false
+repeatable: false
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: true
+    context:
+      hard_rules: >-
+        (1) The adversarial phase reviews and writes ONLY its finding doc; it does not change
+        src/ or tests/. (2) The test phase is the independent gate — its verdict is the
+        container's, never the agent's. (3) No live-KB writes in this run.
+      scale: >-
+        The p0-p4 candidate is the branch HEAD at dispatch (harvested chain + runner fix); the
+        run's clone is born from it.
+    phases:
+      - name: g5_adversarial
+        kind: agent
+        scope: implementation
+        requires_deliverable: true
+        run_model: openai/gpt-5.6-terra
+        timeout: 10800
+        prompt: |
+          GOAL: {goal}
+          ROLE: the INDEPENDENT adversarial reviewer (terra vs the flash author). Falsify the
+          build, not certify it. Attack in order, with direct re-verified evidence:
+          (1) REACHABILITY: do the changes actually admit knowledge at ALL THREE layers, or
+              does one store filter still block (run the probes at a mismatched commit)? And
+              does stale CODE now leak (try a SOURCE record at a mismatched commit)?
+          (2) PATTERN STABILITY: does the new validity_window truly converge across revisions
+              — and does the fingerprint still detect a REAL evidence change (add/remove a
+              finding row in a temp fixture and show the digest changes)?
+          (3) INSTRUMENT: is portfolio_diversity fabricated or degenerate on edge cases
+              (empty strings, whitespace, non-Python code, n=2 identical)? Is it gameable by
+              trivial cosmetic edits? Are the None-coverage rules honored?
+          (4) RUN.PY: do the new names break any consumer (grep/read analyze_worktrees,
+              backfill_artifacts, inventory); is solution_code always populated?
+          (5) SPEC PROSE: any DONE_WHEN claim in p4's verify doc that the raw output does not
+              support. At least 3 findings or a clean sweep with re-verification — a bare
+              PASS is a failed review.
+          SCOPE NOTE (containerized): this phase writes ONLY docs/reviews/
+          flash_exploration_adversarial.md; do not touch src/ or tests/.
+          RELEASE VERDICT: is the branch merge-ready for the data-plane mint + ladder, or what
+          must be fixed first?
+          DELIVER: docs/reviews/flash_exploration_adversarial.md (finding table), committed.
+          LOG: finding table; PASS/FAIL; commit.
+      - name: g6_test_gate
+        kind: test
+        scope: implementation
+        timeout: 1200
+        tests:
+          - tests/test_retrieval.py
+          - tests/test_context_plane_pattern.py
+          - tests/test_kb_produce_facts_integration.py
+          - tests/test_diversity.py
+factors:
+  - {name: model, levels: [deepseek/deepseek-v4-flash]}
+design: factorial
+rules:
+  - name: build_falsified_or_clean
+    plane: measurement
+    evidence_class: "[H]"
+    requires: []
+    produces: [adversarial_verdict_recorded]
+  - name: test_gate_measured
+    plane: measurement
+    evidence_class: "[M]"
+    requires: [adversarial_verdict_recorded]
+    produces: [independent_gate_recorded]
+metrics:
+  - {name: adversarial_verdict_recorded, agg: mean, over: cell}
+  - {name: independent_gate_recorded, agg: mean, over: cell}
+comparison: null
+writeup:
+  format: lab_book
+  sections: [question, g5_adversarial, g6_test_gate]
+stop: {budget_usd: 4.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}

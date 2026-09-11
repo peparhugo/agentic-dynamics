@@ -1,0 +1,267 @@
+name: flash_exploration_build
+question: >-
+  The flash_exploration wave's build half: make the knowledge base readable by an agent in a
+  fresh worktree (today a commit hard-gate excludes every MEASURED/DERIVED record before
+  ranking, so the one augmentation run that "succeeded" injected zero evidence), make pattern
+  minting stable (validity_window = caller HEAD supersedes every pattern fact on every commit),
+  and build the portfolio-diversity instrument the ladder needs (pairwise divergence across k
+  attempts; run.py currently collides variant/rep artifacts and strips the solution). Grounded
+  and pinned in docs/experiments/designs/flash_exploration_design.md (p0, committed before this
+  spec). The wave MUST NOT be run before the pre-registration
+  docs/experiments/preregistrations/flash_exploration_preregistration.md pins this spec by
+  SHA256.
+version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: false
+repeatable: false
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: true
+    context:
+      design: >-
+        docs/experiments/designs/flash_exploration_design.md is the p0 research artifact — read
+        it first. It carries the PINNED SHA256s of every file the wave changes; every finding
+        (F1..F6) cites file:line. p0_research_verify must re-verify each claim against those
+        hashes and flip the doc's frontmatter to accepted ONLY if all hold (or correct it).
+      hard_rules: >-
+        (1) Do not mint pattern facts or write the live KB in this wave — the data-plane mint
+        and the cross-commit probe are the AIO's separate act after the build. Dry-runs only.
+        (2) Never weaken the SOURCE commit gate: the reachability fix exempts knowledge
+        authorities (MEASURED/DERIVED/ADVISORY); stale CODE must stay excluded. (3) No new
+        novelty implementation: reuse basin.py's primitives. (4) Means are None below n=2 —
+        never fabricated zeros. (5) Every change carries a test. (6) No changes outside the
+        branch; merge stays the controller's call.
+      run_shape: >-
+        Model deepseek/deepseek-v4-flash authors the wave on feature/flash-exploration; the
+        adversarial phase runs openai/gpt-5.6-terra. Worktrees under /tmp; results land in
+        experiments/results/workflows/flash_exploration_build/.
+    phases:
+      - name: p0_research_verify
+        kind: agent
+        scope: implementation
+        timeout: 7200
+        prompt: |
+          GOAL: {goal}
+          DELIVERABLE: docs/experiments/designs/flash_exploration_design_verify.md — the
+          claim-by-claim re-verification of the p0 design.
+          INPUTS: docs/experiments/designs/flash_exploration_design.md (its §0 pins table and
+          §1 findings F1..F6).
+          DO: for EVERY pinned file, recompute its sha256 and compare to the table; read the
+          cited lines and confirm or refute each claim (F1: the three commit-gate layers at
+          retrieval.py:548-554, retrieval.py:1726-1735, graph.py:1388-1392 and the empty
+          selected_evidence_ids in the proof ledger; F2: live counts — kb artifacts with
+          source_type=pattern, registry rows with reason starting pattern-content=, and the
+          proof spec's missing pattern_projection; F3: pattern.py:229, fact_payload keys,
+          fact_fingerprint's _PROVENANCE_KEYS; F4: augmentation only in workflow_runner.py;
+          F5: the run.py collision/strip lines and the absence of any portfolio metric; F6:
+          the dead-letter count). Record for each: claim, verdict (CONFIRMED/REFUTED/STALE),
+          evidence command, output. If any claim is REFUTED or STALE, CORRECT the design doc
+          in place (do not silently proceed). Flip the design frontmatter to accepted ONLY
+          when every claim is CONFIRMED; otherwise leave it proposed.
+          GATE: implementation phases depend on this document; a REFUTED claim with no
+          correction fails the phase.
+          DELIVER: the verify doc committed.
+          LOG: PASS/FAIL; commit.
+      - name: p1_reachability
+        kind: agent
+        scope: implementation
+        timeout: 10800
+        prompt: |
+          GOAL: {goal}
+          DELIVERABLE: the reachability fix (design B1) + tests — committed.
+          FILES: src/agentic_dynamics/knowledge/retrieval.py, src/agentic_dynamics/knowledge/graph.py.
+          DO (mirror the same rule at all three layers; ONLY Authority.SOURCE stays hard
+          commit-gated):
+          (a) freshness_multiplier: hard-exclude SOURCE only on a mismatched non-empty
+              commit_sha; MEASURED/DERIVED fall through to neutral 1.00; ADVISORY keeps its
+              30/90-day windows; the exact-commit boost stays.
+          (b) _dense_filter: extend the Chroma `$or` so records whose authority metadata is
+              MEASURED/DERIVED/ADVISORY are admitted regardless of commit; verify the exact
+              stored authority strings in scripts/kb_worker.py's chroma handler first; use
+              equality clauses, not $in.
+          (c) graph.search_fulltext: add an exempt-authorities parameter (default empty) so
+              the Cypher becomes `... OR node.authority IN $exempt` when non-empty;
+              search_knowledge_fulltext passes the three knowledge authorities. Verify the
+              stored Neo4j authority property names before writing the query.
+          (d) Update the tests that pinned the old semantics and ADD both directions:
+              SOURCE+mismatched commit excluded at all three layers; MEASURED/DERIVED
+              admitted at all three; ADVISORY unchanged.
+          GATES: python3 -m pytest tests/test_retrieval.py -q (and the graph/fulltext tests
+          if separate); python3 -m ruff check on changed files.
+          DELIVER: the fix + tests, committed.
+          LOG: PASS/FAIL; commit.
+      - name: p2_pattern_repair
+        kind: agent
+        scope: implementation
+        timeout: 7200
+        prompt: |
+          GOAL: {goal}
+          DELIVERABLE: the pattern-stability fix (design B2) + cross-revision test — committed.
+          FILES: src/agentic_dynamics/control/reducers/pattern.py (+ its tests).
+          DO: replace `validity_window=inp.source_revision or REVISION_FALLBACK`
+          (pattern.py:229) with a deterministic digest of the sorted deduped evidence refs
+          (e.g. `evidence:<16-hex>`), so the window changes ONLY when the evidence set changes.
+          Leave source_revision (line 267) untouched. Grep all consumers/tests of
+          validity_window and update any that pinned the revision. Add a cross-revision
+          idempotency test (same evidence, two different source_revision values → identical
+          fact fingerprints / zero supersession-worthy records). Do NOT mint or write the live
+          KB.
+          GATES: python3 -m pytest tests/test_context_plane_pattern.py
+          tests/test_kb_produce_facts_integration.py -q; ruff.
+          VERIFY (read-only): run `python3 scripts/kb_produce_facts.py --reducer pattern/v1
+          --dry-run` at the current HEAD and at a second revision (--revision <sha>) and show
+          the emitted counts are 0 supersedes / 0 projections in both (the 6 pre-existing
+          facts may supersede once on the FIRST run only if their window value changed —
+          record what you observe honestly; convergence is the DONE_WHEN).
+          DELIVER: the fix + tests, committed.
+          LOG: PASS/FAIL; commit.
+      - name: p3_instrument
+        kind: agent
+        scope: implementation
+        timeout: 10800
+        prompt: |
+          GOAL: {goal}
+          DELIVERABLE: the portfolio-diversity instrument (design B3) + run.py persistence fix
+          + tests — committed.
+          FILES: new src/agentic_dynamics/measurement/diversity.py, measurement/__init__.py,
+          scripts/run.py, new tests/test_diversity.py.
+          DO: (a) diversity.py reuses basin.py's _architecture_divergence /
+              _structure_divergence / _compute_novelty (no third novelty copy; public aliases
+              allowed); pairwise_divergence(a,b) -> {novelty, architecture_divergence,
+              structure_divergence, composite} with composite = 0.4*arch + 0.3*struct +
+              0.3*novelty; portfolio_diversity(samples, *, threshold=0.5) -> frozen dataclass
+              {n, n_pairs, mean_novelty, mean_architecture_divergence,
+              mean_structure_divergence, mean_composite, max_composite, distinct_fraction,
+              coverage}; all means None when n<2; coverage full/single/empty.
+          (b) run.py: include seed_variant/repetition in artifact/report slugs ONLY when
+              non-default (check consumers first: analyze_worktrees/backfill/inventory);
+              persist per-attempt solution code in the results record (solution_code) so a
+              scorer never depends on /tmp worktrees.
+          (c) tests/test_diversity.py: identical → composite 0, distinct_fraction 0; two
+              divergent small Python samples → positive divergence; n=1 → single, means None;
+              n=0 → empty. Follow the repo test conventions (fast marker where siblings do).
+          GATES: python3 -m pytest tests/test_diversity.py -q; ruff on changed files; an
+          import/smoke check of run.py.
+          DELIVER: instrument + fix + tests, committed.
+          LOG: PASS/FAIL; commit.
+      - name: p4_verify
+        kind: agent
+        scope: implementation
+        requires_deliverable: true
+        timeout: 7200
+        prompt: |
+          GOAL: {goal}
+          DELIVERABLE: docs/reviews/flash_exploration_verify.md — the build-side end-to-end
+          probes, every one with its exact command and raw output.
+          DO (read-only against the live stores; NO minting):
+          (1) retrieval reachability: an in-process retrieve() probe with pattern_projection
+              True and a commit_sha DIFFERENT from the records' commit must return at least
+              one MEASURED finding (patterns may not exist yet; report the count honestly).
+              Then pattern_projection False on the same query excludes any pattern.
+          (2) show the SOURCE gate still holds: a mismatched-commit code record is excluded
+              at all three layers.
+          (3) portfolio_diversity on: two hand-written divergent samples (positive), the same
+              sample twice (0), one sample (None means, coverage single), none (empty).
+          (4) pattern convergence: dry-run at two revisions; record counts.
+          (5) run.py: the rep/variant artifact names are unique and solution_code present
+              (a static check of the code paths is acceptable if a live run is too costly).
+          DONE_WHEN: every probe has a command + raw output; any failed probe FAILS the phase
+          (nothing unverified ships).
+          DELIVER: the verify doc, committed.
+          LOG: PASS/FAIL; commit.
+      - name: g5_adversarial
+        kind: agent
+        scope: adversarial_readonly
+        requires_deliverable: true
+        run_model: openai/gpt-5.6-terra
+        timeout: 10800
+        prompt: |
+          GOAL: {goal}
+          ROLE: the INDEPENDENT adversarial reviewer (terra vs the flash author). Falsify the
+          build, not certify it. Attack in order, with direct re-verified evidence:
+          (1) REACHABILITY: do the changes actually admit knowledge at ALL THREE layers, or
+              does one store filter still block (run the probes at a mismatched commit)? And
+              does stale CODE now leak (try a SOURCE record at a mismatched commit)?
+          (2) PATTERN STABILITY: does the new validity_window truly converge across revisions
+              — and does the fingerprint still detect a REAL evidence change (add/remove a
+              finding row in a temp fixture and show the digest changes)?
+          (3) INSTRUMENT: is portfolio_diversity fabricated or degenerate on edge cases
+              (empty strings, whitespace, non-Python code, n=2 identical)? Is it gameable by
+              trivial cosmetic edits? Are the None-coverage rules honored?
+          (4) RUN.PY: do the new names break any consumer (grep/read analyze_worktrees,
+              backfill_artifacts, inventory); is solution_code always populated?
+          (5) SPEC PROSE: any DONE_WHEN claim in p4's verify doc that the raw output does not
+              support. At least 3 findings or a clean sweep with re-verification — a bare
+              PASS is a failed review.
+          RELEASE VERDICT: is the branch merge-ready for the data-plane mint + ladder, or what
+          must be fixed first?
+          DELIVER: docs/reviews/flash_exploration_adversarial.md (finding table), committed.
+          LOG: finding table; PASS/FAIL; commit.
+      - name: g6_test_gate
+        kind: test
+        scope: implementation
+        timeout: 1200
+        tests:
+          - tests/test_retrieval.py
+          - tests/test_context_plane_pattern.py
+          - tests/test_kb_produce_facts_integration.py
+          - tests/test_diversity.py
+factors:
+  - {name: model, levels: [deepseek/deepseek-v4-flash]}
+design: factorial
+rules:
+  - name: design_claims_verified
+    plane: measurement
+    evidence_class: "[M]"
+    requires: []
+    produces: [design_verified]
+  - name: knowledge_reachable_across_commits
+    plane: measurement
+    evidence_class: "[M]"
+    requires: [design_verified]
+    produces: [reachability_gate_fixed]
+  - name: pattern_mint_convergence
+    plane: measurement
+    evidence_class: "[M]"
+    requires: [design_verified]
+    produces: [pattern_window_stable]
+  - name: portfolio_diversity_measured
+    plane: measurement
+    evidence_class: "[C]"
+    requires: [design_verified]
+    produces: [diversity_instrumented]
+  - name: build_probes_recorded
+    plane: measurement
+    evidence_class: "[M]"
+    requires: [reachability_gate_fixed, pattern_window_stable, diversity_instrumented]
+    produces: [build_verified_end_to_end]
+  - name: build_falsified_or_clean
+    plane: measurement
+    evidence_class: "[H]"
+    requires: [build_verified_end_to_end]
+    produces: [adversarial_verdict_recorded]
+  - name: test_gate_measured
+    plane: measurement
+    evidence_class: "[M]"
+    requires: [test_executed_success]
+    produces: [independent_gate_recorded]
+metrics:
+  - {name: design_verified, agg: mean, over: cell}
+  - {name: reachability_gate_fixed, agg: mean, over: cell}
+  - {name: pattern_window_stable, agg: mean, over: cell}
+  - {name: diversity_instrumented, agg: mean, over: cell}
+  - {name: build_verified_end_to_end, agg: mean, over: cell}
+  - {name: adversarial_verdict_recorded, agg: mean, over: cell}
+  - {name: independent_gate_recorded, agg: mean, over: cell}
+comparison: null
+writeup:
+  format: lab_book
+  sections: [question, p0_research_verify, p1_reachability, p2_pattern_repair,
+             p3_instrument, p4_verify, g5_adversarial, g6_test_gate]
+stop: {budget_usd: 12.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}

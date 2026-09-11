@@ -1192,3 +1192,57 @@ def test_verifier_docker_roundtrip(tmp_path):
     assert sr.test_executed_success is True
     assert sr.tests_passed == 1
     assert sr.tests_total == 1
+
+
+def test_agent_executor_forwards_phase_model_and_generation_flags():
+    """The per-phase ``run_model`` and the run's generation knobs reach the child argv.
+
+    Regression (run-5126d586f734): ``g5_adversarial`` declared
+    ``run_model: openai/gpt-5.6-terra`` but the executor passed its own ``self._model``
+    (flash) — the pinned "terra adversary" silently ran on flash. The containerized ladder
+    depends on the same plumbing for its C2 thinking-budget condition.
+    """
+    executor = DockerAgentExecutor(
+        spec_path="/repo/workflows/repository/spec_x.yaml",
+        spec_name="spec_x",
+        goal="g",
+        model="deepseek/deepseek-v4-flash",
+        workdir="/tmp/wt_spec_x",
+        thinking_effort="high",
+        thinking_budget_tokens=32000,
+        output_token_limit=4096,
+    )
+    request = StepRequest(
+        phase_name="g5_adversarial",
+        phase_kind="agent",
+        prompt="p",
+        model="openai/gpt-5.6-terra",
+        goal="g",
+        spec_name="spec_x",
+        workdir="/tmp/wt_spec_x",
+        phase_def={"name": "g5_adversarial", "kind": "agent", "scope": "implementation"},
+    )
+    spawn_request = executor.build_request(request)
+    command = list(spawn_request.get("command") or [])
+    assert command[command.index("--model") + 1] == "openai/gpt-5.6-terra"
+    assert command[command.index("--thinking-effort") + 1] == "high"
+    assert command[command.index("--thinking-budget-tokens") + 1] == "32000"
+    assert command[command.index("--output-token-limit") + 1] == "4096"
+
+
+def test_verifier_executor_passes_declared_scope_for_custom_phase_names(tmp_path, monkeypatch):
+    """A custom-named test phase's DECLARED scope authorizes its verifier spawn.
+
+    Regression (run-5126d586f734): ``g6_test_gate`` declared ``scope: implementation`` but
+    the verifier's spawn re-validation carried no ``phase_scopes`` mapping, so step 2 fell
+    back to the static table (``authorized: None``) and REFUSED the independent test gate.
+    """
+    executor = _rt_executor(tmp_path)
+    request = _rt_request(tmp_path, phase="g6_test_gate")
+    request.phase_def["scope"] = "implementation"
+    outcome = _rt_outcome(
+        EXIT_OK,
+        envelope=_rt_envelope(True, "ok", [_rt_phase("ok", test_executed_success=True)]),
+    )
+    _, captured = _rt_execute(executor, request, outcome, monkeypatch)
+    assert captured["kwargs"].get("phase_scopes") == {"g6_test_gate": "implementation"}

@@ -1,0 +1,362 @@
+{
+  "method": "ladder-cells/v1",
+  "base_sha": "121126df",
+  "threshold": 0.5,
+  "bootstrap": {
+    "resamples": 10000,
+    "seed": 20260910
+  },
+  "conditions": [
+    {
+      "condition": "C0",
+      "n_attempts": 3,
+      "n_valid": 3,
+      "excluded_null_source": 0,
+      "excluded_invalid_source": 0,
+      "Q": 3,
+      "D": 0.3570757005306961,
+      "D_ci95": [
+        0.0,
+        0.35707570053069615
+      ],
+      "distinct_fraction": 0.0,
+      "mean_novelty": 0.6884661391060298,
+      "unsupported_pairs": 0,
+      "median_cost_usd": 0.01036,
+      "total_tokens": 78254,
+      "fallback_modes": [
+        ""
+      ],
+      "diversity": {
+        "n": 3,
+        "n_pairs": 3,
+        "n_scored_pairs": 3,
+        "unsupported_pairs": 0,
+        "coverage": "full",
+        "unsupported_fraction": 0.0,
+        "mean_novelty": 0.6885,
+        "mean_architecture_divergence": 0.2833,
+        "mean_structure_divergence": 0.124,
+        "mean_composite": 0.3571,
+        "max_composite": 0.424,
+        "distinct_fraction": 0.0
+      },
+      "cells": [
+        {
+          "cell_id": "C0-r1",
+          "sha": "42dad4b8d",
+          "pristine_pass": true,
+          "pristine_tests": "13/13",
+          "in_run_test": true,
+          "cost_usd": 0.014039,
+          "tokens": 40605,
+          "fallback_mode": ""
+        },
+        {
+          "cell_id": "C0-r2",
+          "sha": "18d1069e9",
+          "pristine_pass": true,
+          "pristine_tests": "13/13",
+          "in_run_test": true,
+          "cost_usd": 0.01036,
+          "tokens": 23447,
+          "fallback_mode": ""
+        },
+        {
+          "cell_id": "C0-r3",
+          "sha": "2206d18b6",
+          "pristine_pass": true,
+          "pristine_tests": "13/13",
+          "in_run_test": true,
+          "cost_usd": 0.006656,
+          "tokens": 14202,
+          "fallback_mode": ""
+        }
+      ],
+      "delta_D": null,
+      "delta_Q": 0
+    },
+    {
+      "condition": "C1",
+      "n_attempts": 3,
+      "n_valid": 3,
+      "excluded_null_source": 0,
+      "excluded_invalid_source": 0,
+      "Q": 3,
+      "D": 0.36255016332370044,
+      "D_ci95": [
+        0.0,
+        0.36255016332370044
+      ],
+      "distinct_fraction": 0.0,
+      "mean_novelty": 0.7128191594846262,
+      "unsupported_pairs": 0,
+      "median_cost_usd": 0.019841,
+      "total_tokens": 159587,
+      "fallback_modes": [
+        ""
+      ],
+      "diversity": {
+        "n": 3,
+        "n_pairs": 3,
+        "n_scored_pairs": 3,
+        "unsupported_pairs": 0,
+        "coverage": "full",
+        "unsupported_fraction": 0.0,
+        "mean_novelty": 0.7128,
+        "mean_architecture_divergence": 0.2444,
+        "mean_structure_divergence": 0.1698,
+        "mean_composite": 0.3626,
+        "max_composite": 0.3715,
+        "distinct_fraction": 0.0
+      },
+      "cells": [
+        {
+          "cell_id": "C1-r1",
+          "sha": "1d4c2f02e",
+          "pristine_pass": true,
+          "pristine_tests": "13/13",
+          "in_run_test": true,
+          "cost_usd": 0.025736,
+          "tokens": 61283,
+          "fallback_mode": ""
+        },
+        {
+          "cell_id": "C1-r2",
+          "sha": "57687c31e",
+          "pristine_pass": true,
+          "pristine_tests": "13/13",
+          "in_run_test": true,
+          "cost_usd": 0.019605,
+          "tokens": 48913,
+          "fallback_mode": ""
+        },
+        {
+          "cell_id": "C1-r3",
+          "sha": "e8558cd6a",
+          "pristine_pass": true,
+          "pristine_tests": "13/13",
+          "in_run_test": true,
+          "cost_usd": 0.019841,
+          "tokens": 49391,
+          "fallback_mode": ""
+        }
+      ],
+      "delta_D": 0.005474462793004342,
+      "delta_Q": 0
+    },
+    {
+      "condition": "C2",
+      "n_attempts": 3,
+      "n_valid": 3,
+      "excluded_null_source": 0,
+      "excluded_invalid_source": 0,
+      "Q": 3,
+      "D": 0.40715594922110765,
+      "D_ci95": [
+        0.0,
+        0.4071559492211077
+      ],
+      "distinct_fraction": 0.0,
+      "mean_novelty": 0.6789660302991152,
+      "unsupported_pairs": 0,
+      "median_cost_usd": 0.009344,
+      "total_tokens": 100517,
+      "fallback_modes": [
+        ""
+      ],
+      "diversity": {
+        "n": 3,
+        "n_pairs": 3,
+        "n_scored_pairs": 3,
+        "unsupported_pairs": 0,
+        "coverage": "full",
+        "unsupported_fraction": 0.0,
+        "mean_novelty": 0.679,
+        "mean_architecture_divergence": 0.4167,
+        "mean_structure_divergence": 0.1227,
+        "mean_composite": 0.4072,
+        "max_composite": 0.4628,
+        "distinct_fraction": 0.0
+      },
+      "cells": [
+        {
+          "cell_id": "C2-r1",
+          "sha": "da581be23",
+          "pristine_pass": true,
+          "pristine_tests": "13/13",
+          "in_run_test": true,
+          "cost_usd": 0.020831,
+          "tokens": 64805,
+          "fallback_mode": ""
+        },
+        {
+          "cell_id": "C2-r2",
+          "sha": "bd7b2317e",
+          "pristine_pass": true,
+          "pristine_tests": "13/13",
+          "in_run_test": true,
+          "cost_usd": 0.008326,
+          "tokens": 17461,
+          "fallback_mode": ""
+        },
+        {
+          "cell_id": "C2-r3",
+          "sha": "c34aa9208",
+          "pristine_pass": true,
+          "pristine_tests": "13/13",
+          "in_run_test": true,
+          "cost_usd": 0.009344,
+          "tokens": 18251,
+          "fallback_mode": ""
+        }
+      ],
+      "delta_D": 0.050080248690411555,
+      "delta_Q": 0
+    },
+    {
+      "condition": "C3",
+      "n_attempts": 3,
+      "n_valid": 3,
+      "excluded_null_source": 0,
+      "excluded_invalid_source": 0,
+      "Q": 3,
+      "D": 0.4193636366716957,
+      "D_ci95": [
+        0.0,
+        0.4193636366716957
+      ],
+      "distinct_fraction": 0.0,
+      "mean_novelty": 0.6894435589590051,
+      "unsupported_pairs": 0,
+      "median_cost_usd": 0.010049,
+      "total_tokens": 96943,
+      "fallback_modes": [
+        "lexical_graph_only"
+      ],
+      "diversity": {
+        "n": 3,
+        "n_pairs": 3,
+        "n_scored_pairs": 3,
+        "unsupported_pairs": 0,
+        "coverage": "full",
+        "unsupported_fraction": 0.0,
+        "mean_novelty": 0.6894,
+        "mean_architecture_divergence": 0.3667,
+        "mean_structure_divergence": 0.2195,
+        "mean_composite": 0.4194,
+        "max_composite": 0.4695,
+        "distinct_fraction": 0.0
+      },
+      "cells": [
+        {
+          "cell_id": "C3-r1",
+          "sha": "77a4cb984",
+          "pristine_pass": true,
+          "pristine_tests": "13/13",
+          "in_run_test": true,
+          "cost_usd": 0.014616,
+          "tokens": 49409,
+          "fallback_mode": "lexical_graph_only"
+        },
+        {
+          "cell_id": "C3-r2",
+          "sha": "417b674a2",
+          "pristine_pass": true,
+          "pristine_tests": "13/13",
+          "in_run_test": true,
+          "cost_usd": 0.009264,
+          "tokens": 18405,
+          "fallback_mode": "lexical_graph_only"
+        },
+        {
+          "cell_id": "C3-r3",
+          "sha": "27c0f9e22",
+          "pristine_pass": true,
+          "pristine_tests": "13/13",
+          "in_run_test": true,
+          "cost_usd": 0.010049,
+          "tokens": 29129,
+          "fallback_mode": "lexical_graph_only"
+        }
+      ],
+      "delta_D": 0.06228793614099959,
+      "delta_Q": 0
+    },
+    {
+      "condition": "C4",
+      "n_attempts": 3,
+      "n_valid": 3,
+      "excluded_null_source": 0,
+      "excluded_invalid_source": 0,
+      "Q": 3,
+      "D": 0.3607445589162824,
+      "D_ci95": [
+        0.0,
+        0.3607445589162824
+      ],
+      "distinct_fraction": 0.0,
+      "mean_novelty": 0.7525700464757913,
+      "unsupported_pairs": 0,
+      "median_cost_usd": 0.009766,
+      "total_tokens": 86690,
+      "fallback_modes": [
+        "lexical_graph_only"
+      ],
+      "diversity": {
+        "n": 3,
+        "n_pairs": 3,
+        "n_scored_pairs": 3,
+        "unsupported_pairs": 0,
+        "coverage": "full",
+        "unsupported_fraction": 0.0,
+        "mean_novelty": 0.7526,
+        "mean_architecture_divergence": 0.1667,
+        "mean_structure_divergence": 0.2277,
+        "mean_composite": 0.3607,
+        "max_composite": 0.4107,
+        "distinct_fraction": 0.0
+      },
+      "cells": [
+        {
+          "cell_id": "C4-r1",
+          "sha": "c2ca19665",
+          "pristine_pass": true,
+          "pristine_tests": "13/13",
+          "in_run_test": true,
+          "cost_usd": 0.012738,
+          "tokens": 46843,
+          "fallback_mode": "lexical_graph_only"
+        },
+        {
+          "cell_id": "C4-r2",
+          "sha": "682b4605c",
+          "pristine_pass": true,
+          "pristine_tests": "13/13",
+          "in_run_test": true,
+          "cost_usd": 0.00597,
+          "tokens": 19038,
+          "fallback_mode": "lexical_graph_only"
+        },
+        {
+          "cell_id": "C4-r3",
+          "sha": "fd60f7b7a",
+          "pristine_pass": true,
+          "pristine_tests": "13/13",
+          "in_run_test": true,
+          "cost_usd": 0.009766,
+          "tokens": 20809,
+          "fallback_mode": "lexical_graph_only"
+        }
+      ],
+      "delta_D": 0.003668858385586282,
+      "delta_Q": 0
+    }
+  ],
+  "decision": {
+    "escalate": false,
+    "rule": "|delta_D| >= 0.1 or |delta_Q| >= 1",
+    "largest_effect": "C3",
+    "adaptive_directive": "flat within the registered margin; no policy claim"
+  }
+}

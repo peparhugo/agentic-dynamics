@@ -846,6 +846,66 @@ def _agent_writes_marker(counter: list) -> Callable:
     return agent
 
 
+class _CloneCommitExecutor:
+    """A containerized-cell stub: writes + commits in the run clone, never the host worktree."""
+
+    def __init__(self, clone: Path) -> None:
+        self.clone = Path(clone)
+
+    def execute(self, request):  # noqa: ANN001 — the StepRequest surface is not under test
+        (self.clone / "deliverable.txt").write_text("delivered\n")
+        subprocess.run(["git", "add", "-A"], cwd=self.clone, check=True)
+        subprocess.run(
+            ["git", "commit", "-q", "-m", f"[workflow] {request.phase_name} — g"],
+            cwd=self.clone, check=True, capture_output=True,
+        )
+        return _fake_agent()
+
+
+def test_run_clone_bookkeeping_reads_the_run_clone(tmp_path, monkeypatch):
+    """The containerized regression (run-c931259949ee p4_verify): a phase commits INTO the
+    run's private clone while the host worktree is only its source. The post-phase gates
+    (NO_CHANGES), the runner's commit, and the ledger candidate sha must read the CLONE —
+    before the fix, ``_git_head(workdir)`` read "" and every ``requires_deliverable`` phase
+    failed NO_CHANGES even when the cell delivered.
+    """
+    wt = tmp_path / "wt"
+    wt.mkdir()
+    _git_init(wt)
+    (wt / "base.txt").write_text("base\n")
+    subprocess.run(["git", "add", "-A"], cwd=wt, check=True)
+    subprocess.run(["git", "commit", "-q", "-m", "base"], cwd=wt, check=True)
+
+    clone = tmp_path / "runs" / "run-x" / "repo"
+    clone.parent.mkdir(parents=True)
+    subprocess.run(
+        ["git", "clone", "-q", "--no-hardlinks", str(wt), str(clone)], check=True
+    )
+    for key, value in (("user.email", "t@t"), ("user.name", "t")):
+        subprocess.run(["git", "config", key, value], cwd=clone, check=True)
+
+    monkeypatch.setenv("FINOPS_RUN_CLONE", str(clone))
+    monkeypatch.setattr(workflow_runner, "_emit_self_finding", lambda pr, *, goal, scope: None)
+
+    spec = _emit_synth_spec(
+        [{"name": "p1", "kind": "agent", "prompt": "do p1", "requires_deliverable": True}]
+    )
+    result = run_workflow(
+        spec, goal="g", model="m", workdir=wt,
+        step_executor=_CloneCommitExecutor(clone),
+    )
+    ph = result.phases[0]
+    clone_head = subprocess.check_output(
+        ["git", "rev-parse", "--short", "HEAD"], cwd=clone, text=True
+    ).strip()
+    assert ph.status == "ok", ph.error
+    assert ph.commit_gate is None
+    assert ph.commit_hash == clone_head
+    assert result.git_sha == clone_head
+    # The worktree itself was never touched by the phase.
+    assert not (wt / "deliverable.txt").exists()
+
+
 def test_finding_emit_defaults_on_for_committed_phases(tmp_path, monkeypatch):
     """(k1 a) DEFAULT settings emit a finding per committed phase — no opt-in flag.
 

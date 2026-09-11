@@ -3,11 +3,12 @@
 **Generated — do not edit by hand.** Regenerate with `python scripts/spec_status.py`;
 `scripts/run_workflow.py` also refreshes it at the end of every run.
 
-Generated at: `2026-09-09T23:53:06.364280+00:00`  ·  192 spec(s)
-**Work remaining:** 80 open · 112 completed/retired
+Generated at: `2026-09-11T01:38:28.271194+00:00`  ·  206 spec(s)
+**Work remaining:** 89 open · 117 completed/retired
 
 | name | kind | repeatable | status | version | supersedes | last_run | ok | model | cost | n_runs |
 |---|---|---|---|---|---|---|---|---|---|---|
+| `aio_controller_postmortem` | workflow | no | runnable | 0.1 | — | — | — | — | — | 1 |
 | `auto_posthoc_wiring` | workflow | yes | runnable | 0.1 | — | 2026-08-17 16:17 | ok | deepseek/deepseek-v4-pro | $0.1471 | 1 |
 | `automatic_docs_sync` | workflow | no | runnable | 0.1 | — | — | — | — | — | 1 |
 | `cap_2a_calibration_cell` | workflow | yes | runnable | 0.1 | — | — | — | — | — | 0 |
@@ -31,10 +32,14 @@ Generated at: `2026-09-09T23:53:06.364280+00:00`  ·  192 spec(s)
 | `cap_session_routing_evidence` | experiment | yes | runnable | 0.2 | — | — | — | — | — | 0 |
 | `cap_shadow_comparison` | experiment | yes | runnable | 0.1 | — | — | — | — | — | 0 |
 | `control_room_live_board` | workflow | no | runnable | 0.1 | — | — | — | — | — | 1 |
+| `control_room_research` | workflow | yes | runnable | 0.1 | — | 2026-09-11 01:38 | fail | deepseek/deepseek-v4-flash | $4.9758 | 3 |
 | `delta_entropy_response_campaign` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `docs_refresh_remediation` | workflow | no | runnable | 0.1 | — | — | — | — | — | 2 |
 | `explanation_tax` | experiment | yes | runnable | 0.2 | — | — | — | — | — | 0 |
 | `finding_economics_closure` | workflow | yes | runnable | 0.1 | — | 2026-08-22 17:22 | ok | deepseek/deepseek-v4-pro | $1.2820 | 1 |
+| `flash_ladder_bare` | workflow | yes | runnable | 0.1 | — | 2026-09-10 22:34 | ok | deepseek/deepseek-v4-flash | $0.0093 | 9 |
+| `flash_ladder_kb` | workflow | yes | runnable | 0.1 | — | 2026-09-11 00:19 | ok | deepseek/deepseek-v4-flash | $0.0098 | 6 |
+| `flash_ladder_score_review` | workflow | yes | runnable | 0.1 | — | 2026-09-11 00:05 | fail | deepseek/deepseek-v4-flash | $1.1389 | 3 |
 | `fleet_job_submission` | workflow | no | runnable | 0.1 | — | — | — | — | — | 3 |
 | `fleet_launch_boundary` | workflow | no | runnable | 0.1 | — | — | — | — | — | 1 |
 | `graph_leg_closeout` | workflow | no | runnable | 0.1 | — | — | — | — | — | 4 |
@@ -58,6 +63,9 @@ Generated at: `2026-09-09T23:53:06.364280+00:00`  ·  192 spec(s)
 | `routing_kb_experiment_design_research` | experiment | yes | runnable | 0.1 | — | 2026-08-17 18:12 | ok | deepseek/deepseek-v4-pro | $0.2203 | 1 |
 | `routing_regret_under_degradation` | experiment | yes | runnable | 0.2 | — | — | — | — | — | 0 |
 | `self_recommending_experiment` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
+| `stack_knowledge_conformance` | workflow | yes | runnable | 0.1 | — | 2026-09-11 01:35 | ok | deepseek/deepseek-v4-flash | $1.4287 | 1 |
+| `stack_knowledge_seed` | workflow | yes | runnable | 0.1 | — | 2026-09-11 00:55 | fail | deepseek/deepseek-v4-flash | $0.0557 | 1 |
+| `stack_knowledge_verify` | workflow | yes | runnable | 0.1 | — | 2026-09-11 01:22 | ok | deepseek/deepseek-v4-flash | $0.7065 | 1 |
 | `test_suite_speed` | workflow | no | runnable | 0.1 | — | — | — | — | — | 1 |
 | `test_suite_tiering` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `agentic_dynamics_rebrand` | workflow | no | failed | 0.1 | — | 2026-08-14 22:02 | fail | openai/gpt-5.6-sol | $7.7341 | 2 |
@@ -79,6 +87,7 @@ Generated at: `2026-09-09T23:53:06.364280+00:00`  ·  192 spec(s)
 | `design_sessions` | workflow | no | failed | 0.1 | — | 2026-08-14 06:58 | fail | openai/gpt-5.6-sol | $0.0000 | 1 |
 | `engine_gaps_verifier_revision` | workflow | no | failed | 0.1 | — | 2026-09-02 16:50 | ok | deepseek/deepseek-v4-flash | $0.0951 | 2 |
 | `evidence_redesign` | workflow | no | failed | 0.1 | — | 2026-08-14 19:18 | ok | openai/gpt-5.6-sol | $5.9008 | 3 |
+| `flash_exploration_build` | workflow | no | failed | 0.1 | — | 2026-09-10 16:55 | fail | deepseek/deepseek-v4-flash | $0.1542 | 3 |
 | `promote_row_closeout` | workflow | no | failed | 0.1 | — | 2026-09-04 15:01 | ok | deepseek/deepseek-v4-flash | $0.0000 | 2 |
 | `rag_knowledge_base` | workflow | no | failed | 0.1 | — | 2026-08-14 23:37 | ok | openai/gpt-5.6-sol | $5.4215 | 4 |
 | `semantic_integrity_release` | workflow | no | failed | 0.1 | — | 2026-08-21 05:25 | ok | deepseek/deepseek-v4-pro | $1.6898 | 4 |
@@ -155,6 +164,11 @@ Generated at: `2026-09-09T23:53:06.364280+00:00`  ·  192 spec(s)
 | `entropy_beta_instruments` | workflow | no | completed | 0.1 | — | 2026-08-30 19:14 | ok | deepseek/deepseek-v4-pro | $0.2940 | 2 |
 | `evidence_narrative` | workflow | no | completed | 0.1 | — | 2026-08-14 15:04 | ok | openai/gpt-5.6-sol | $0.0000 | 2 |
 | `fix_review_findings` | workflow | no | completed | 0.1 | — | 2026-08-14 13:48 | ok | deepseek/deepseek-v4-pro | $0.1504 | 1 |
+| `flash_exploration_build_resume` | workflow | no | completed | 0.1 | — | 2026-09-10 18:50 | ok | deepseek/deepseek-v4-flash | $1.7176 | 3 |
+| `flash_exploration_build_resume2` | workflow | no | completed | 0.1 | — | 2026-09-10 19:47 | ok | deepseek/deepseek-v4-flash | $2.1719 | 1 |
+| `flash_exploration_build_resume3` | workflow | no | completed | 0.1 | — | 2026-09-10 21:01 | ok | deepseek/deepseek-v4-flash | $1.5664 | 1 |
+| `flash_exploration_build_resume4` | workflow | no | completed | 0.1 | — | 2026-09-10 21:22 | ok | deepseek/deepseek-v4-flash | $1.7091 | 1 |
+| `flash_exploration_build_resume5` | workflow | no | completed | 0.1 | — | 2026-09-10 22:12 | ok | deepseek/deepseek-v4-flash | $1.3976 | 1 |
 | `fleet_ladder_plan` | workflow | no | completed | 0.1 | — | 2026-08-29 15:33 | ok | deepseek/deepseek-v4-flash | $0.0836 | 1 |
 | `fleet_ladder_revision` | workflow | no | completed | 0.1 | — | 2026-08-29 17:02 | ok | deepseek/deepseek-v4-pro | $0.1724 | 2 |
 | `fleet_launch_boundary_followups` | workflow | no | completed | 0.1 | — | 2026-09-03 03:36 | ok | deepseek/deepseek-v4-flash | $0.6404 | 1 |

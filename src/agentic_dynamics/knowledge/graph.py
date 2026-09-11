@@ -25,6 +25,7 @@ from agentic_dynamics.core.language import (
     symbol_version_id,
     tested_symbols,
 )
+from agentic_dynamics.knowledge.knowledge import Authority
 
 if TYPE_CHECKING:
     from agentic_dynamics.knowledge.knowledge import KnowledgeRecord
@@ -1362,7 +1363,13 @@ class Neo4jClient:
         return [self._node_dict(rec) for rec in records]
 
     def search_fulltext(
-        self, index_name: str, query: str, *, limit: int = 10, commit: str | None = None
+        self,
+        index_name: str,
+        query: str,
+        *,
+        limit: int = 10,
+        commit: str | None = None,
+        exempt_authorities: tuple[str, ...] = (),
     ) -> list[dict[str, Any]]:
         """Full-text search against a named native full-text index.
 
@@ -1373,8 +1380,13 @@ class Neo4jClient:
         ``commit`` is an optional HARD commit pre-filter: when supplied, a matched
         node is returned only if its ``commit_sha`` equals ``commit`` or is absent
         (``IS NULL`` — e.g. ``Step`` nodes carry no commit). A node with a
-        non-matching, non-null ``commit_sha`` is excluded. Omitted → no filter
-        (back-compatible).
+        non-matching, non-null ``commit_sha`` is excluded — UNLESS its ``authority``
+        is named in ``exempt_authorities`` (default empty), in which case it is
+        admitted regardless of commit. The exemption exists so the knowledge
+        authorities (``MEASURED``/``DERIVED``/``ADVISORY``) stay reachable across
+        revisions while the gate still keeps another branch's ``SOURCE`` code out.
+        Pass the STORED authority strings (``Authority.<X>.name``, as persisted by
+        ``kb_worker.py``'s kb-neo4j handler). Omitted → no filter (back-compatible).
         """
         _validate_identifier(index_name, "index")
         # ``db.index.fulltext.queryNodes`` parses ``query`` as a Lucene classic query string,
@@ -1387,9 +1399,13 @@ class Neo4jClient:
         query_str = "CALL db.index.fulltext.queryNodes($index, $query) YIELD node, score "
         if commit:
             # Hard commit pre-filter on the lexical leg — mirrors the dense leg's
-            # where filter and the fusion-time exclusion in freshness_multiplier.
+            # where filter and the fusion-time exclusion in freshness_multiplier. Only
+            # SOURCE is gated; an exempt knowledge authority is admitted at any commit.
             query_str += "WHERE node.commit_sha = $commit OR node.commit_sha IS NULL "
             params["commit"] = commit
+            if exempt_authorities:
+                query_str += "OR node.authority IN $exempt "
+                params["exempt"] = list(exempt_authorities)
         query_str += (
             "RETURN elementId(node) AS node_id, labels(node) AS labels, "
             "properties(node) AS properties, score "
@@ -1411,5 +1427,19 @@ class Neo4jClient:
         and its hard commit pre-filter, but scoped to the ``Knowledge`` label so the
         ingested KB (``knowledge_id`` / ``entity_id`` / ``text`` / ``authority`` /
         ``source_type`` / ``commit_sha``) is what the lexical leg actually retrieves.
+
+        The three knowledge authorities are passed as commit exemptions (design B1):
+        a MEASURED finding, a DERIVED pattern, or an ADVISORY review stays reachable
+        across revisions — only ``SOURCE`` code remains commit-gated.
         """
-        return self.search_fulltext("knowledge_text_ft", query, limit=limit, commit=commit)
+        return self.search_fulltext(
+            "knowledge_text_ft",
+            query,
+            limit=limit,
+            commit=commit,
+            exempt_authorities=(
+                Authority.MEASURED.name,
+                Authority.DERIVED.name,
+                Authority.ADVISORY.name,
+            ),
+        )
