@@ -624,26 +624,12 @@
     if (!dock || !ladder) return;
     clear(ladder);
     if (title) title.textContent = "RUN " + (run["session.identity"] || "unknown");
-    var rungs = [
-      ["session", "session.identity"],
-      ["target", "terminal.target"],
-      ["command", "command.current"],
-      ["phase", "phase.progress"],
-      ["lifecycle", "lifecycle.state"],
-      ["claim (advisory)", "evidence.advisory"],
-      ["verification (measured)", "evidence.measured"],
-      ["source", "evidence.source"],
-      ["cost provenance", "cost.provenance"],
-      ["eligibility", "decision.eligibility"],
-      ["receipt", "decision.receipt"],
-    ];
-    rungs.forEach(function (rung) {
-      var row = element("div", "ladder-rung", null);
-      row.appendChild(element("span", "rung-name", null, rung[0]));
-      var value = element("span", "rung-value", null, run[rung[1]] || "unknown");
-      row.appendChild(value);
-      ladder.appendChild(row);
-    });
+    // The inspector is an attempt-scoped CAUSAL LADDER plus a live, scoped dependency flow
+    // (brief §10 / Move 2). visuals.js owns the SVG; the text equivalents it renders alongside
+    // keep the dock accessible, printable and readable with no graphics at all.
+    if (window.ControlRoomVisuals) {
+      window.ControlRoomVisuals.render(ladder, run, AppState.glance);
+    }
     dock.hidden = false;
     dockOrigin = origin || null;
     var close = document.getElementById("dock-close");

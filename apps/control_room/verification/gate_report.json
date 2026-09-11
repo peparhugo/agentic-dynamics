@@ -159,6 +159,21 @@
       "case": "history",
       "viewport": "mobile",
       "screenshot": "apps/control_room/verification/charts_mobile_dark_390x844.png"
+    },
+    {
+      "case": "visuals",
+      "viewport": "desktop",
+      "screenshot": "apps/control_room/verification/visuals_desktop_dark_1440x900.png"
+    },
+    {
+      "case": "visuals",
+      "viewport": "narrow",
+      "screenshot": "apps/control_room/verification/visuals_narrow_dark_1024x768.png"
+    },
+    {
+      "case": "visuals",
+      "viewport": "mobile",
+      "screenshot": "apps/control_room/verification/visuals_mobile_dark_390x844.png"
     }
   ],
   "errors": []

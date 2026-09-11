@@ -578,6 +578,91 @@ body {
 
 .ladder-rung .rung-value { font-family: var(--mono); font-size: 12px; }
 
+/* ── SVG visuals (a2): the attempt-scoped evidence ladder + the live dependency flow ─────
+   svg-theme: viewBox scaling and CSS custom properties/currentColor for every fill, so one
+   drawing serves dark, light and forced-colors. The blocks keep a fixed pixel budget inside
+   the dock so the resting geometry can never be affected (the dock is hidden at rest). */
+
+.visual-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+}
+
+.visual-block {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+/* Fixed pixel budgets: with a viewBox + a definite height the SVG scales to exactly this box
+   (preserveAspectRatio letterboxes it), so a visual can never grow past its budget. */
+.visual-svg { display: block; width: 100%; }
+.visual-ladder { height: 226px; }
+.visual-flow { height: 96px; }
+
+.visual-spine { stroke: var(--line); stroke-width: 1.5; fill: none; }
+.visual-attempt-rule { stroke: var(--muted); stroke-width: 0.5; stroke-dasharray: 2 3; }
+
+.visual-node { fill: var(--muted); stroke: var(--muted); stroke-width: 1; }
+.visual-rung[data-evidence-class="advisory"] .visual-node {
+  fill: none; stroke: var(--advisory); stroke-dasharray: 2 2;
+}
+.visual-rung[data-evidence-class="measured"] .visual-node { fill: var(--measured); stroke: var(--measured); }
+.visual-rung[data-evidence-class="source"] .visual-node { fill: var(--source); stroke: var(--source); }
+.visual-rung[data-evidence-class="policy"] .visual-node { fill: none; stroke: var(--text); }
+.visual-rung[data-evidence-class="lifecycle"] .visual-node { fill: var(--accent); stroke: var(--accent); }
+
+/* Real SVG <text> (svg-print): labels and values are selectable, zoomable and printable. */
+.visual-label { fill: var(--muted); font-family: var(--sans); font-size: 10px; }
+.visual-value { fill: var(--text); font-family: var(--mono); font-size: 10px; }
+
+.visual-flow-line { stroke: var(--line); stroke-width: 1.5; fill: none; stroke-dasharray: 6 4; }
+.visual-flow-node { fill: var(--muted); stroke: var(--muted); stroke-width: 1; }
+.visual-flow-state { fill: var(--muted); font-family: var(--sans); font-size: 8px; }
+.visual-flow-label { fill: var(--text); font-family: var(--sans); font-size: 9px;
+                     text-anchor: middle; }
+.visual-flow-state { text-anchor: middle; }
+/* Node state: shape + word carry the meaning; these rules only add the accent. */
+.visual-flow g[data-node-state="ok"] .visual-flow-node { fill: var(--ok); stroke: var(--ok); }
+.visual-flow g[data-node-state="warn"] .visual-flow-node { fill: var(--warn); stroke: var(--warn); }
+.visual-flow g[data-node-state="bad"] .visual-flow-node { fill: var(--bad); stroke: var(--bad); }
+
+.visual-affected { margin: 0; font-size: 10px; color: var(--muted); }
+.visual-action {
+  align-self: flex-start;
+  font-size: 10px;
+  color: var(--accent);
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 2px 6px;
+  cursor: pointer;
+}
+.visual-action:hover { border-color: var(--accent); }
+.visual-action:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+/* The textual equivalent for screen readers (the SVG's real <text> is the visible carrier and
+   the print/zoom equivalent). Visually hidden so the dock stays a diagram, not a duplicate. */
+.visual-fallback {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Motion budget (brief §11): state-change only, ~220ms, decelerating. The global
+   prefers-reduced-motion rule collapses it; the state words carry meaning regardless. */
+@keyframes visual-draw { from { stroke-dashoffset: 20; } to { stroke-dashoffset: 0; } }
+.visual-draw .visual-flow-line { animation: visual-draw 220ms ease-out; }
+
 .noscript { padding: 16px; color: var(--warn); }
 
 /* ── The trends lens (drill-down charts; hidden at rest) ────────────────────────────────
@@ -872,6 +957,9 @@ body {
     border: none;
   }
   .chart-grid { grid-template-columns: minmax(0, 1fr); }
+
+  /* Mobile inspector: the ladder and the flow stack, each keeping its own budget. */
+  .visual-grid { grid-template-columns: minmax(0, 1fr); }
   .r0-answers { gap: 0; }
   .r0-answer { gap: 4px; }
   .answer-cells { gap: 0 6px; }

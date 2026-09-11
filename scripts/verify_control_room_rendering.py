@@ -683,6 +683,184 @@ def _check_charts(label: str, viewport: str, case: str, probe: dict[str, Any],
              f"page scrollHeight {probe['scrollHeight']} > {probe['innerHeight']}")
 
 
+#: Probe the SVG visuals inside the open R4 dock.
+VISUAL_PROBE_JS = r"""
+() => {
+  const rect = (el) => { const r = el.getBoundingClientRect();
+    return {x: r.x, y: r.y, width: r.width, height: r.height}; };
+  const out = {};
+  ['evidence-ladder', 'dependency-flow'].forEach((id) => {
+    const el = document.querySelector('[data-visual="' + id + '"]');
+    if (!el) { out[id] = {present: false}; return; }
+    out[id] = {
+      present: true,
+      viewBox: el.getAttribute('viewBox'),
+      role: el.getAttribute('role'),
+      aria: el.getAttribute('aria-label') || '',
+      hasTitle: Boolean(el.querySelector('title')),
+      hasDesc: Boolean(el.querySelector('desc')),
+      textNodes: el.querySelectorAll('text').length,
+      marks: el.querySelectorAll('path,rect,circle,line,polyline').length,
+      box: rect(el),
+    };
+  });
+  out.affected = Boolean(document.querySelector('[data-visual-affected]'));
+  out.action = Boolean(document.querySelector('[data-visual-action]'));
+  out.dockOpen = Boolean(document.getElementById('selection-dock')
+    && !document.getElementById('selection-dock').hidden);
+  out.innerHeight = window.innerHeight;
+  out.scrollHeight = document.scrollingElement.scrollHeight;
+  return out;
+}
+"""
+
+#: SVG `<text>` contrast: the same parse/luminance math as the HTML walker, but the foreground
+#: is the computed `fill` (SVG text has no `color`) against the composited ancestor background.
+SVG_TEXT_CONTRAST_JS = r"""
+([selector, minNormal, minLarge]) => {
+  const parseColor = (str) => {
+    if (!str) return null;
+    str = String(str).trim().toLowerCase();
+    if (!str || str === 'none') return null;
+    if (str === 'transparent') return [0,0,0,0];
+    let m;
+    if ((m = str.match(/^rgba?\(\s*([\d.]+)[,\s]+([\d.]+)[,\s]+([\d.]+)(?:[,\s/]+([\d.]+))?\s*\)$/)))
+      return [+m[1], +m[2], +m[3], m[4] === undefined ? 1 : Math.min(1, +m[4])];
+    return null;
+  };
+  const lin = (c) => { c /= 255; return c <= 0.03928 ? c/12.92 : Math.pow((c+0.055)/1.055, 2.4); };
+  const lum = (c) => 0.2126*lin(c[0]) + 0.7152*lin(c[1]) + 0.0722*lin(c[2]);
+  const ratio = (a, b) => { const x = lum(a), y = lum(b); const hi = Math.max(x,y), lo = Math.min(x,y);
+    return (hi + 0.05) / (lo + 0.05); };
+  const bgFor = (el) => {
+    let cur = el.parentElement, acc = null;
+    while (cur && cur.nodeType === 1) {
+      const c = parseColor(getComputedStyle(cur).backgroundColor);
+      if (c && c[3] > 0) {
+        if (!acc) acc = c;
+        else acc = [c[0], c[1], c[2], 1];
+        if (c[3] >= 1) return acc.slice(0,3);
+      }
+      cur = cur.parentElement;
+    }
+    return acc ? acc.slice(0,3) : [13,16,20];
+  };
+  const fails = [];
+  document.querySelectorAll(selector + ' text').forEach((t) => {
+    const label = (t.textContent || '').trim();
+    if (!label) return;
+    const cs = getComputedStyle(t);
+    const fg = parseColor(cs.fill);
+    if (!fg || fg[3] < 0.5) { fails.push({text: label.slice(0,30), fill: cs.fill, ratio: 0}); return; }
+    const bg = bgFor(t);
+    const r = ratio(fg, bg);
+    const size = parseFloat(cs.fontSize) || 9;
+    const need = size >= 24 ? minLarge : minNormal;
+    if (r < need) fails.push({text: label.slice(0,30), fill: cs.fill, ratio: Math.round(r*100)/100});
+  });
+  return fails;
+}
+"""
+
+#: Max rendered SVG box (px) per visual at desktop; the mobile dock stacks and may scroll, so
+#: only the desktop/narrow box budgets are binding.
+VISUAL_BUDGET = {"evidence-ladder": 226, "dependency-flow": 96}
+
+
+def _check_visuals(label: str, viewport: str, probe: dict[str, Any], errors: list[str]) -> None:
+    """Assert the R4 visuals: presence, a11y, real text, marks, and box budget."""
+    if not probe.get("dockOpen"):
+        _row(errors, label, "a2", "visual", "selection dock did not open")
+        return
+    for visual in ("evidence-ladder", "dependency-flow"):
+        info = probe.get(visual) or {}
+        if not info.get("present"):
+            _row(errors, label, "a2", "visual", f"{visual} not rendered")
+            continue
+        if not info.get("viewBox") or info.get("role") != "img" or not info.get("aria"):
+            _row(errors, label, "a2", "visual-a11y",
+                 f"{visual} viewBox/role/aria incomplete")
+        if not info.get("hasTitle") or not info.get("hasDesc"):
+            _row(errors, label, "a2", "visual-a11y", f"{visual} missing title/desc")
+        if info.get("textNodes", 0) <= 0:
+            _row(errors, label, "a2", "visual-text", f"{visual} has no real <text>")
+        if info.get("marks", 0) <= 0:
+            _row(errors, label, "a2", "visual-marks", f"{visual} has no marks")
+        box = info.get("box") or {}
+        if box.get("width", 0) <= 0 or box.get("height", 0) <= 0:
+            _row(errors, label, "a2", "visual-box", f"{visual} zero box {box}")
+        elif viewport != "mobile" and box["height"] > VISUAL_BUDGET[visual] + 4:
+            _row(errors, label, "a2", "visual-budget",
+                 f"{visual} height {box['height']:.0f} > {VISUAL_BUDGET[visual]}")
+    if not probe.get("affected") or not probe.get("action"):
+        _row(errors, label, "a2", "visual-action", "affected record/action missing")
+    if probe["scrollHeight"] > probe["innerHeight"] + 1:
+        _row(errors, label, "a2", "visual-page-scroll",
+             f"page scrollHeight {probe['scrollHeight']} > {probe['innerHeight']}")
+
+
+def run_visual_gate(out: Path, screenshots: bool) -> tuple[list[dict[str, Any]], list[str]]:
+    """Select the first run, open R4, and assert the a2 SVG visuals at every viewport/theme.
+
+    Also asserts the visuals are NOT shown at rest (brief §10: no static diagram in the
+    resting room) and that the SVG `<text>` meets WCAG-AA contrast.
+    """
+    from playwright.sync_api import sync_playwright
+
+    fixture = build_fixture("F-0")
+    frames = _sse_frames([fixture], with_transitions=False)
+    url, httpd = serve_app()
+    results: list[dict[str, Any]] = []
+    errors: list[str] = []
+    try:
+        with sync_playwright() as playwright:
+            browser = playwright.chromium.launch(args=["--no-sandbox"])
+            for theme in ("dark", "light"):
+                for name, (width, height) in VIEWPORTS.items():
+                    label = f"{name}/{theme}"
+                    context = browser.new_context(
+                        viewport={"width": width, "height": height}, timezone_id="UTC",
+                        locale="en-US", reduced_motion="reduce", color_scheme=theme,
+                    )
+                    context.add_init_script(
+                        f"try{{localStorage.setItem('control-room-theme','{theme}')}}catch(e){{}}"
+                    )
+                    page = context.new_page()
+                    page.route("**/api/**", lambda route: route.abort())
+                    page.route("**/api/glance", _glance_handler(fixture))
+                    page.route("**/api/events", _events_handler(frames))
+                    page.goto(url, wait_until="domcontentloaded")
+                    page.locator('[data-render-state="ready"]').wait_for(timeout=15000)
+                    # No topology in the resting room: the dock (and its visuals) stays hidden.
+                    if page.evaluate(
+                        "() => { const d=document.getElementById('selection-dock');"
+                        " return !!(d && !d.hidden); }"
+                    ):
+                        _row(errors, label, "a2", "visual-resting", "dock visible at rest")
+                    page.locator('[data-region="R2"] [data-run-id]').first.click()
+                    page.locator("#selection-dock:not([hidden])").wait_for(timeout=5000)
+                    page.wait_for_function(
+                        "() => document.querySelector('[data-visual=\"evidence-ladder\"]')",
+                        timeout=5000,
+                    )
+                    probe = page.evaluate(VISUAL_PROBE_JS)
+                    _check_visuals(label, name, probe, errors)
+                    for failure in page.evaluate(
+                        SVG_TEXT_CONTRAST_JS, ["[data-visual]", 4.5, 3.0]
+                    ):
+                        _row(errors, label, "a2", "visual-contrast", json.dumps(failure))
+                    if screenshots and theme == "dark":
+                        shot = out / f"visuals_{name}_dark_{width}x{height}.png"
+                        page.screenshot(path=str(shot), full_page=False)
+                        results.append({"case": "visuals", "viewport": name,
+                                        "screenshot": str(shot)})
+                    context.close()
+            browser.close()
+    finally:
+        httpd.shutdown()
+    return results, errors
+
+
 def _glance_handler(payload: dict[str, Any]):
     """Return a one-argument Playwright route handler serving the expanded fixture JSON."""
 
@@ -953,6 +1131,8 @@ def main() -> int:
                         help="validate deterministic fixtures without a browser")
     parser.add_argument("--charts", action="store_true",
                         help="also run the trends-lens chart class (a1)")
+    parser.add_argument("--visuals", action="store_true",
+                        help="also run the R4 SVG visual class (a2)")
     args = parser.parse_args()
 
     fixtures = [item.strip() for item in args.fixtures.split(",") if item.strip()]
@@ -975,6 +1155,9 @@ def main() -> int:
         if args.charts:
             chart_results, chart_errors = run_chart_gate(out, not args.no_screenshot)
             results, errors = results + chart_results, errors + chart_errors
+        if args.visuals:
+            visual_results, visual_errors = run_visual_gate(out, not args.no_screenshot)
+            results, errors = results + visual_results, errors + visual_errors
     except ImportError:
         print("playwright is not installed; run with --check-fixtures for the browser-free check",
               file=sys.stderr)

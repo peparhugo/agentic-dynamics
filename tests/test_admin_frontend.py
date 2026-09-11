@@ -256,6 +256,61 @@ def test_chart_styles_declare_budgets_themes_and_motion() -> None:
     assert ".chart-gauge-fill { background: Highlight; }" in css
 
 
+def test_visual_module_renders_accessible_svg_without_a_runtime() -> None:
+    """visuals.js is the SVG set: viewBox, real <text>, title/desc, currentColor, no runtime."""
+    visuals = _read("visuals.js")
+    for visual in ("evidence-ladder", "dependency-flow"):
+        assert f'data-visual": "{visual}"' in visuals or f'"{visual}"' in visuals, visual
+    assert "createElementNS" in visuals
+    assert "viewBox" in visuals
+    assert "preserveAspectRatio" in visuals
+    assert 'svg("title"' in visuals
+    assert 'svg("desc"' in visuals
+    assert "stroke-dasharray" in visuals
+    # Typed evidence classes are carried by shape AND label word.
+    for cls in ("advisory", "measured", "source", "policy", "lifecycle"):
+        assert f'data-evidence-class' in visuals and cls in visuals, cls
+    # Actionable + live: the affected record and the lens action are rendered.
+    assert "data-visual-affected" in visuals
+    assert "data-visual-action" in visuals
+    # No runtime, no <img>, no canvas.
+    assert "getContext" not in visuals
+    assert "createElement(\"img\")" not in visuals
+    assert "http" not in visuals.replace("http://www.w3.org/2000/svg", "")
+
+
+def test_resting_room_ships_no_static_topology() -> None:
+    """Brief §10: no static diagram in the resting room; topology is scoped to the dock."""
+    html = _read("index.html")
+    assert "architecture.svg" not in html
+    assert 'id="selection-dock"' in html and "hidden" in html
+    # The visual module loads only as a classic script beside charts.
+    assert '<script src="/static/visuals.js"></script>' in html
+
+
+def test_visual_styles_hold_theme_contrast_budget_and_motion() -> None:
+    """Every visual has a budget, theme-aware fills, a reduced-motion path, forced-colors."""
+    css = _read("style.css")
+    for selector in (
+        ".visual-grid",
+        ".visual-block",
+        ".visual-svg",
+        ".visual-ladder",
+        ".visual-flow",
+        ".visual-spine",
+        ".visual-rung",
+        ".visual-flow-line",
+        ".visual-fallback",
+        ".visual-action",
+    ):
+        assert selector in css, selector
+    assert ".visual-ladder { height: 226px; }" in css
+    assert ".visual-flow { height: 96px; }" in css
+    assert "visual-draw" in css  # state-change motion
+    assert "prefers-reduced-motion" in css  # global collapse
+    assert "--advisory" in css and "--measured" in css  # theme tokens, not hard-coded hex
+
+
 def test_all_preexisting_routes_still_resolve() -> None:
     """The facelift is additive: every previously-registered API path is still served."""
     from apps.control_room import server

@@ -173,8 +173,9 @@
     </noscript>
   </div>
   <script src="/static/app.js"></script>
-  <!-- charts.js is a classic script loaded after app.js: app.js calls its `update` seam at
-       render time, which is always after both scripts have parsed. -->
+  <!-- charts.js / visuals.js are classic scripts loaded after app.js: app.js calls their
+       `update` / `render` seams at render/selection time, always after all scripts parsed. -->
   <script src="/static/charts.js"></script>
+  <script src="/static/visuals.js"></script>
 </body>
 </html>
