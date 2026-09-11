@@ -113,11 +113,12 @@ def test_launch_broker_service_unit_carries_no_host_literal():
 
 
 def test_launch_broker_service_template_pins_exactly_the_repo_fields():
-    """The template carries EXACTLY the token count the generator pins (Environment=REPO=,
-    WorkingDirectory=, Documentation=file://) — a fourth repo-dependent field is a shape change
-    the render refuses rather than absorbs silently."""
+    """The template carries EXACTLY the token count the generator pins (three @REPO_ROOT@
+    fields — Environment=REPO=, WorkingDirectory=, Documentation=file:// — plus the one
+    @RUNS_ROOT@ field) — a further repo-dependent field is a shape change the render refuses
+    rather than absorbs silently."""
     text = _UNIT_FILE.read_text()
-    assert text.count(gen.REPO_TOKEN) == gen.EXPECTED_TOKEN_COUNT
+    assert text.count(gen.REPO_TOKEN) + text.count(gen.RUNS_TOKEN) == gen.EXPECTED_TOKEN_COUNT
 
 
 # ── (b) the installed values are PathConfig-derived (the render, both directions) ─

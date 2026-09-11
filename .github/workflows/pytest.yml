@@ -100,7 +100,7 @@ jobs:
       - name: Install core dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install pytest pytest-timeout pyyaml numpy scikit-learn tree-sitter==0.21.3 tree-sitter-languages
+          pip install pytest pytest-timeout pytest-xdist pyyaml numpy scikit-learn tree-sitter==0.21.3 tree-sitter-languages
           # The deterministic suite imports the knowledge clients at collection time
           # (test_graph -> neo4j, embeddings -> chromadb, ollama_analyzer -> ollama,
           # sync_data --check -> duckdb+pyarrow) — the [admin] extra is not enough;
@@ -127,26 +127,46 @@ jobs:
           cp -r tests/fixtures/corpus/* experiments/results/
           ls experiments/results/ | head -3
 
-      - name: Run deterministic test suite (external-service tests excluded)
+      - name: Run deterministic test suite (external-service tests excluded; parallel)
         run: |
           # --timeout: a hanging test is a failure, never an infinite block
           # (cap_stabilization_release p3 post-mortem: the Chroma live tests hung the
           # suite ~60 min; the heartbeat guards + this timeout make hangs impossible to miss)
-          pytest tests/ -m "not external" -v --timeout=600
+          # -n auto --dist loadfile: parallel workers, one test FILE per worker (file-local
+          # fixtures/state never interleave). Measured on the CI fixture corpus: 254s serial
+          # -> 90s with -n auto, all 3871 pass (2026-09-11, local 12-core; CI runner 4 vCPU).
+          pytest tests/ -m "not external" -n auto --dist loadfile -v --timeout=600
 
       - name: Verify build_data imports cleanly (no DB required)
         run: |
           python -c "import sys; sys.path.insert(0, 'scripts'); import build_data; print('build_data imports OK')"
 
-      - name: Verify build_data integrity (dry run)
+      - name: Verify build_data integrity (dry run; empty-corpus smoke)
         run: |
+          # CI has no full corpus post-migration (experiments/results/** is untracked runtime
+          # data; the fixture snapshot carries registry + labs, not the story payloads the
+          # resolution gate reads). Run the build against a self-consistent EMPTY registry so
+          # the code path is still exercised and the fail-closed resolution gate has nothing
+          # to refuse; the FULL-corpus build stays local-only.
+          cp experiments/data_manifest.json /tmp/ci_manifest.committed.json
+          printf '{"schema_version": "1.0", "registry": []}\n' > experiments/data_manifest.json
           python scripts/build_data.py --dry-run
+          cp /tmp/ci_manifest.committed.json experiments/data_manifest.json
         env:
           ALLOW_MISSING_EXPERIMENT_DATA: "1"
 
-      - name: Verify parquet parity (sync_data --check)
+      - name: Verify parquet parity (sync_data --check; full corpus only)
         run: |
-          python scripts/sync_data.py --check
+          # The fixture snapshot carries registry + summary + labs, NOT the payload tree the
+          # parity recompute reads (tests/conftest.py `_full_corpus_present` — the same
+          # predicate the @requires_full_corpus tests use). Without payloads, resolution
+          # yields zero rows and the check would compare nothing against nothing; skip loudly
+          # instead of fabricating a pass or failing on an absent corpus.
+          if [ -f experiments/results/registry_index.jsonl ] && [ -f experiments/results/_results_summary.json ] && [ -d experiments/results/reports ]; then
+            python scripts/sync_data.py --check
+          else
+            echo "SKIP: full corpus payloads absent (fixture-only checkout) — parquet parity runs where the data root lives"
+          fi
 
       - name: Import gate
         run: |
@@ -223,18 +243,22 @@ jobs:
       - name: Gate — clean image build (docker build -t agentic-dynamics .)
         run: docker build -t agentic-dynamics .
 
-      - name: Gate — container CORE run on the committed canonical fixture
+      - name: Gate — container CORE run (self-consistent empty-corpus smoke)
         run: |
-          # Run the image's ACTUAL default command (reproduce.sh core) against the
-          # committed canonical corpus (experiments/data_manifest.json + results),
-          # not merely build + dry-run. Core needs no opencode.db, SonarQube, or
-          # Neo4j (inventory/analyze warn-and-continue; labs read the registry).
-          # Mount a scratch dir as apps/website so the rebuilt data.js persists and
-          # is verifiable (the review item 7 data.js persistence fix). Also mount the
-          # manifest as a single file (it regenerates OUTSIDE the results/ mount) so
-          # its regeneration is verifiable too (the canonical-publication c6 fix).
+          # Run the image's ACTUAL default command (reproduce.sh core), not merely build +
+          # dry-run. Post corpus-migration (2026-09-08) experiments/results/** is untracked
+          # runtime data, so a CI checkout has NO full corpus: the fixture snapshot carries
+          # registry + labs, not the story payloads the publication resolution reads. Rather
+          # than pretend, this smoke mounts a self-consistent EMPTY registry (nothing to
+          # resolve, so the fail-closed resolution gate has nothing to refuse) and asserts
+          # the pipeline runs end-to-end in the image: inventory/analyze warn-and-continue,
+          # the labs render absent data honestly, build_data rebuilds data.js, and
+          # generate_manifest rebuilds the manifest. The FULL-corpus reproduction stays
+          # local-only; a fixture-backed reproduction gate is a named follow-up.
+          # The website scratch mount persists the rebuilt data.js (review item 7). The
+          # manifest mount keeps the regenerated manifest verifiable (canonical-publication c6).
           mkdir -p /tmp/repro-out/website
-          cp experiments/data_manifest.json /tmp/repro-out/data_manifest.json
+          printf '{"schema_version": "1.0", "registry": []}\n' > /tmp/repro-out/data_manifest.json
           docker run --rm \
             -v /tmp/repro-out/website:/app/apps/website \
             -v /tmp/repro-out/data_manifest.json:/app/experiments/data_manifest.json \
@@ -244,9 +268,8 @@ jobs:
           echo "CORE reproduce produced data.js ($(wc -c < /tmp/repro-out/website/data.js) bytes)"
           python - <<'PY'
           import json
-          committed = json.load(open("experiments/data_manifest.json"))
           regenerated = json.load(open("/tmp/repro-out/data_manifest.json"))
-          assert regenerated["generated_at"] != committed["generated_at"], \
+          assert regenerated.get("generated_at"), \
               "data_manifest.json was not regenerated inside the container"
           print(f"CORE reproduce regenerated data_manifest.json (generated_at {regenerated['generated_at']})")
           PY

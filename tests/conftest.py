@@ -139,6 +139,21 @@ def _isolate_control_db(tmp_path_factory, monkeypatch):
     )
 
 
+@pytest.fixture(autouse=True)
+def _hermetic_kb_write_default(monkeypatch):
+    """Every test starts with the knowledge-write opt-in UNSET (hermetic by default).
+
+    ``FINOPS_KB_WRITE`` is process-global: a producer that sets it without restoring leaks the
+    opt-in into every later test, and a test that then calls ``save_story_result`` or
+    ``finalize_reviews._finalize_story`` attempts a real knowledge-stream connection. On a
+    Redis-less CI runner that surfaced as six ``ConnectionError: 127.0.0.1:6380`` failures
+    (``test_finalize_reviews`` x3, ``test_story`` x3) that never reproduced on a workstation
+    with a live Redis. Tests opt in per-test with ``monkeypatch.setenv`` exactly as before;
+    this fixture only guarantees the STARTING state cannot leak in from a previous test.
+    """
+    monkeypatch.delenv("FINOPS_KB_WRITE", raising=False)
+
+
 def _start_broker_seam(tmp_path, monkeypatch, *, docker: str, compose: str,
                        compose_file: str | None = None):
     """Start a live launch-broker seam server (launch_broker.serve) on a tmp unix socket.

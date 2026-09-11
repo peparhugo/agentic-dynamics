@@ -54,7 +54,6 @@ COPY scripts/ scripts/
 COPY conventions/ conventions/
 COPY apps/ apps/
 COPY experiments/definitions/ experiments/definitions/
-COPY experiments/results/ experiments/results/
 COPY experiments/waivers/ experiments/waivers/
 COPY experiments/specs/ experiments/specs/
 COPY experiments/data_manifest.json experiments/data_manifest.json

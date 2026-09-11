@@ -99,7 +99,9 @@ the `fast`-marked subset = the sub-minute guard family + the audited pure-unit f
 subprocesses, no Redis/stores/ports, no real git worktrees, no runtime-corpus reads — the
 parallel-safety audit in `tests/test_fast_path_gate.py` enforces this on every run). Target:
 sub-3-minutes (measured ~25s). **The full suite stays the gate** — the fast path is a smoke
-subset, never a replacement; run `python3 -m pytest tests/ -q` on demand and keep it green.
+subset, never a replacement; run `python3 -m pytest tests/ -q` on demand and keep it green
+(add `-n auto --dist loadfile` with `pytest-xdist` for ~3x wall-clock — measured 254s -> 90s
+on the CI fixture corpus; the CI `test` job runs the suite parallel).
 
 **Budget gate** — `tests/test_fast_path_gate.py`: the fast path must stay under 180s (a slow
 regression trips the wire) and every `fast`-marked module must pass the parallel-safety audit.
@@ -275,16 +277,17 @@ reasoning_divergence, semantic_clusters. Superseded by `semantic_validation.py`.
 
 | File | Purpose |
 |------|---------|
-| `apps/control_room/server.py` | Flask backend — the **Control Room portal**, 32 routes across 6 API categories plus the static shell (below). Serves `apps/control_room/static/`. Port 8000 (`FINOPS_PORT`). |
+| `apps/control_room/server.py` | Flask backend — the **Control Room portal**, 34 routes across 7 API categories plus the static shell (below). Serves `apps/control_room/static/`. Port 8000 (`FINOPS_PORT`). |
 | `apps/control_room/static/` | Vanilla-JS dashboard: Matrix grid, Cell Inspector (live transcript), Routing board, supervisor flags, design sessions, Claude background sessions. |
 
-`apps/control_room/server.py`'s 32 routes, categorized:
+`apps/control_room/server.py`'s 34 routes, categorized:
 - **Legacy telemetry** (8): `/api/matrix`, `/api/status` (SSE), `/api/events/<cell_id>` (SSE), `/api/projections`, `/api/routing`, `/api/subscription-usage`, `POST /api/experiments`, `POST /api/queue/reinterleave`
 - **Supervisor flags** (3): `/api/flags`, `POST /api/flags/<session_id>/steer`, `POST /api/flags/<session_id>/interrupt`
 - **Registry** (2): `/api/registry`, `/api/registry/<entity_id>`
 - **Design sessions** (7): `/api/design-sessions`, `POST /api/design-sessions`, `/api/design-sessions/<portal_id>/spec`, `POST /api/design-sessions/<portal_id>/input`, `POST /api/design-sessions/<portal_id>/interrupt`, `POST /api/design-sessions/<portal_id>/save`, `POST /api/design-sessions/<portal_id>/run`
 - **Claude background sessions** (9): `/api/claude-agents`, `POST /api/claude-agents`, `/api/claude-agents/<session_id>/logs`, `POST /api/claude-agents/<session_id>/stop`, `POST /api/claude-agents/<session_id>/respawn`, `POST /api/claude-agents/<session_id>/rm`, `POST /api/claude-agents/<session_id>/steer`, `/api/claude-agents/daemon`, `POST /api/claude-agents/daemon/stop`
 - **Docs health** (2): `/api/docs-health`, `POST /api/docs-health/approve` — the docs-drift rail's surface (green/yellow/red + the controller's approve affordance; see `scripts/scan_docs_drift.py` → `docs_drift_watchdog.py` → `docs_proposal_gate.py`)
+- **Recording** (2): `/api/recording-audit`, `POST /api/recording-sweep/run` — the recording rail's read + sweep trigger (`scripts/recording_sweep.py`)
 - **Static shell** (1): `GET /`
 
 Full endpoint reference: `docs/architecture/current/supervisor_design.md`, `docs/architecture/current/spec.md`.

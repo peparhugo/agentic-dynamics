@@ -112,6 +112,8 @@ DOCUMENTED_RESOLUTIONS: list[tuple[tuple[str, ...], str, tuple[str, ...]]] = [
     (("control", "status"), "control_status.py", ()),
     (("control", "drain-outbox"), "control_drain_outbox.py", ()),
     (("control", "sweep-zombies"), "control_sweep_zombies.py", ()),
+    # recording-sweep — the recording rail's sweep trigger (scripts/recording_sweep.py).
+    (("control", "recording-sweep"), "recording_sweep.py", ()),
     # publish — the ONE publication transaction (control_db_publication p6).
     (("publish", "release"), "publish_release.py", ()),
     # session — the self-knowledge layer: `close` (s1b) writes the AIO's session-spine record;
