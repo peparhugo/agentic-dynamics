@@ -144,9 +144,18 @@ jobs:
         env:
           ALLOW_MISSING_EXPERIMENT_DATA: "1"
 
-      - name: Verify parquet parity (sync_data --check)
+      - name: Verify parquet parity (sync_data --check; full corpus only)
         run: |
-          python scripts/sync_data.py --check
+          # The fixture snapshot carries registry + summary + labs, NOT the payload tree the
+          # parity recompute reads (tests/conftest.py `_full_corpus_present` — the same
+          # predicate the @requires_full_corpus tests use). Without payloads, resolution
+          # yields zero rows and the check would compare nothing against nothing; skip loudly
+          # instead of fabricating a pass or failing on an absent corpus.
+          if [ -f experiments/results/registry_index.jsonl ] && [ -f experiments/results/_results_summary.json ] && [ -d experiments/results/reports ]; then
+            python scripts/sync_data.py --check
+          else
+            echo "SKIP: full corpus payloads absent (fixture-only checkout) — parquet parity runs where the data root lives"
+          fi
 
       - name: Import gate
         run: |

@@ -25,6 +25,8 @@ if str(SCRIPTS_DIR) not in sys.path:
 
 import sync_data  # noqa: E402
 
+from conftest import requires_full_corpus  # noqa: E402  # tests/ is on sys.path under pytest
+
 
 def test_atomic_write_writes_an_empty_table(tmp_path):
     """An empty canonical source writes an EMPTY parquet — never leaves a stale table."""
@@ -77,8 +79,15 @@ def test_content_hashes_are_deterministic_and_sensitive():
     assert sync_data._schema_sha256() == sync_data._schema_sha256()
 
 
+@requires_full_corpus
 def test_check_returns_zero_when_current():
-    """``check()`` proves the committed parquet matches the current canonical source."""
+    """``check()`` proves the committed parquet matches the current canonical source.
+
+    Full-corpus only: the parity recompute reads every row from the payload tree the CI
+    fixture does not carry (tests/conftest.py ``_full_corpus_present``); on a fixture
+    checkout the test skips rather than comparing an absent corpus against the committed
+    parquet (mirrors the CI step's guard in .github/workflows/pytest.yml).
+    """
     if not (sync_data.DATA_DIR / "sessions.parquet").exists():  # pragma: no cover
         pytest.skip("no parquet files — run scripts/sync_data.py first")
     assert sync_data.check() == 0
