@@ -63,6 +63,7 @@ jobs:
           python3 scripts/_gen_instructions.py --check
 
       - name: Gate — docs drift (spec lifecycle)
+        if: ${{ always() }}  # a surfaces failure must not hide the lifecycle-drift gate
         run: |
           # aio_controller_postmortem R3: a generated surface and its dependents never drift.
           # The scanner re-derives the spec-lifecycle counts from
@@ -75,10 +76,11 @@ jobs:
 
   test:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        python-version: ["3.10"]
-
+    # No strategy matrix. A single-entry matrix renames the check to "test (3.10)", which
+    # can never satisfy the branch-protection required context "test"
+    # (docs/release/branch_protection_settings.md; machine twin
+    # scripts/check_branch_protection.py) — every PR was policy-BLOCKED until the operator
+    # merged with an admin override. The check name must stay exactly "test".
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
         with:
@@ -87,10 +89,10 @@ jobs:
           # replay tests fail in CI while passing locally. Full history + tags fixes it.
           fetch-depth: 0
 
-      - name: Set up Python ${{ matrix.python-version }}
+      - name: Set up Python 3.10
         uses: actions/setup-python@0b93645e9fea7318ecaed2b359559ac225c90a2b  # v5.3.0
         with:
-          python-version: ${{ matrix.python-version }}
+          python-version: "3.10"
 
       - name: Configure git identity (tests commit in temp worktrees)
         run: |
@@ -117,7 +119,13 @@ jobs:
           # under its 180s budget (the slow-regression trip wire in tests/test_fast_path_gate.py).
           bash scripts/test_fast.sh
 
+      # `if: ${{ always() }}` on every verification layer below: a failing step must not
+      # hide the steps after it. On 2026-09-11 the fast path failed on two doc-lifecycle
+      # guards and GitHub skipped the rest of the job — a second layer of 10 pre-existing
+      # failures stayed invisible behind the first red. The JOB still fails if any step
+      # fails; `always()` only means every layer reports.
       - name: Restore the corpus fixture (post-migration CI coverage)
+        if: ${{ always() }}
         run: |
           # Corpus migration (2026-09-08): experiments/results/** is untracked runtime data,
           # so a fresh clone has NO corpus and the resolution/publication tests would skip.
@@ -128,6 +136,7 @@ jobs:
           ls experiments/results/ | head -3
 
       - name: Run deterministic test suite (external-service tests excluded; parallel)
+        if: ${{ always() }}
         run: |
           # --timeout: a hanging test is a failure, never an infinite block
           # (cap_stabilization_release p3 post-mortem: the Chroma live tests hung the
@@ -138,10 +147,12 @@ jobs:
           pytest tests/ -m "not external" -n auto --dist loadfile -v --timeout=600
 
       - name: Verify build_data imports cleanly (no DB required)
+        if: ${{ always() }}
         run: |
           python -c "import sys; sys.path.insert(0, 'scripts'); import build_data; print('build_data imports OK')"
 
       - name: Verify build_data integrity (dry run; empty-corpus smoke)
+        if: ${{ always() }}
         run: |
           # CI has no full corpus post-migration (experiments/results/** is untracked runtime
           # data; the fixture snapshot carries registry + labs, not the story payloads the
@@ -156,6 +167,7 @@ jobs:
           ALLOW_MISSING_EXPERIMENT_DATA: "1"
 
       - name: Verify parquet parity (sync_data --check; full corpus only)
+        if: ${{ always() }}
         run: |
           # The fixture snapshot carries registry + summary + labs, NOT the payload tree the
           # parity recompute reads (tests/conftest.py `_full_corpus_present` — the same
@@ -169,6 +181,7 @@ jobs:
           fi
 
       - name: Import gate
+        if: ${{ always() }}
         run: |
           python -c "import agentic_dynamics; print('agentic_dynamics imports OK')"
 
@@ -230,9 +243,11 @@ jobs:
         run: agentic-dynamics --help
 
       - name: Gate — reproduction entrypoint dry-run (scripts/reproduce.sh --dry-run)
+        if: ${{ always() }}
         run: bash scripts/reproduce.sh --dry-run
 
       - name: Gate — reproduce.sh core/opt-in split (review item 7, dry-run only)
+        if: ${{ always() }}
         run: |
           # Core is deterministic + no external services: --no-tests --no-sonar.
           bash scripts/reproduce.sh --dry-run | grep -q -- "--no-tests --no-sonar"
@@ -241,6 +256,7 @@ jobs:
           bash scripts/reproduce.sh --dry-run --with-sonar | grep -q -- "lab_sonar_quality.py"
 
       - name: Gate — clean image build (docker build -t agentic-dynamics .)
+        if: ${{ always() }}
         run: docker build -t agentic-dynamics .
 
       - name: Gate — container CORE run (self-consistent empty-corpus smoke)
