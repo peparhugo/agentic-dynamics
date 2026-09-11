@@ -1,0 +1,14 @@
+{
+  "subject": "skill/stack/celery-redis",
+  "claim": "Make Celery tasks idempotent: by default a worker acknowledges the message before executing, but with acks_late=True a crashed worker redelivers, so side effects must be safe to repeat. Retry transient work with autoretry_for plus retry_backoff=True (exponential backoff with jitter, capped at 10 minutes by default) instead of hand-rolled try/except; keep max_retries bounded (default 3). Give every task a unique namespaced name and route long-running work to dedicated queues.",
+  "population": "agentic-dynamics stack",
+  "conditions": ["celery", "redis", "broker", "retry", "idempotency", "acks-late"],
+  "support": 2,
+  "uncertainty": 0.2,
+  "source_experiment": "tech_stack_seed_2026-09-11",
+  "evidence": [
+    "uri:https://docs.celeryq.dev/en/stable/userguide/tasks.html",
+    "uri:https://docs.celeryq.dev/en/stable/userguide/calling.html"
+  ],
+  "notes": "Tasks backs message-acknowledgement ordering, idempotency, acks_late, autoretry_for/retry_backoff/retry_jitter/retry_backoff_max defaults, max_retries and task naming. Calling backs apply_async execution options, queue routing/priority and the deliberately short default publish-retry policy (max 3). Both agree; low uncertainty."
+}

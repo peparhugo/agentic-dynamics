@@ -1,0 +1,13 @@
+{
+  "subject": "skill/stack/redis-streams",
+  "claim": "Use Redis Streams consumer groups for the KB projections: XGROUP CREATE key group $ then XREADGROUP GROUP g c ... > delivers only never-delivered entries and advances the group's last-id, while a numeric ID (e.g. 0) replays that consumer's pending history. Confirm each entry with XACK; delivered-but-unacked entries stay in the PEL, where XPENDING exposes idle time and delivery count and XAUTOCLAIM / XCLAIM lets a live consumer take over a dead consumer's messages. Bound the stream with XADD/XTRIM MAXLEN — the group cursor is independent of trimming, so a lagging projection can still lose entries, which is why projection lag must be watched and processing must be idempotent.",
+  "population": "agentic-dynamics stack",
+  "conditions": ["redis", "streams", "consumer-groups", "xack", "xpending", "at-least-once"],
+  "support": 1,
+  "uncertainty": 0.45,
+  "source_experiment": "tech_stack_seed_2026-09-11",
+  "evidence": [
+    "uri:https://redis.io/docs/latest/develop/data-types/streams/"
+  ],
+  "notes": "Single-source: only the Redis Streams page has fetched text. The Redis pub/sub and distributed-locks pages in this corpus fetched EMPTY (0 characters), so no second independent source backs the claim. The Streams page itself backs XGROUP/XREADGROUP with '>' vs numeric IDs, XACK, the PEL/XPENDING idle-time + delivery-count fields, XAUTOCLAIM/XCLAIM reassignment, and MAXLEN/XTRIM trimming. Uncertainty is raised to reflect the missing corroborating pages; delivery is at-least-once, so each projection must upsert by knowledge_id."
+}

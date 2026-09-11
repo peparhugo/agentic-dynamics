@@ -1,0 +1,14 @@
+{
+  "subject": "skill/stack/sqlite",
+  "claim": "Run the control DB with PRAGMA journal_mode=WAL so readers never block the single writer, but WAL is not a busy-free promise: queries can still return SQLITE_BUSY during exclusive locking, connection close, or crash recovery, so applications must be prepared for it (a busy timeout/retry, as the repo does). Bound WAL growth by leaving automatic checkpointing on (1000-page default) and avoiding very large write transactions or checkpoint starvation from permanently open readers. WAL does not work on a network filesystem, so the DB must stay on one host.",
+  "population": "agentic-dynamics stack",
+  "conditions": ["sqlite", "wal", "control-db", "concurrency", "busy-timeout"],
+  "support": 2,
+  "uncertainty": 0.3,
+  "source_experiment": "tech_stack_seed_2026-09-11",
+  "evidence": [
+    "uri:https://sqlite.org/wal.html",
+    "uri:https://sqlite.org/lang.html"
+  ],
+  "notes": "The WAL page backs journal_mode=WAL persistence, reader/writer concurrency and the checkpoint model, the enumerated SQLITE_BUSY cases, large-transaction limits, and the network-filesystem prohibition. The language page fetched as a topic index (PRAGMA, SAVEPOINT, UPSERT, RETURNING, window functions) and is cited as the SQL-surface reference only. The docs say applications should 'be prepared' for SQLITE_BUSY; busy_timeout is the repo's concrete remedy, not a named API in the corpus, so uncertainty is moderate."
+}

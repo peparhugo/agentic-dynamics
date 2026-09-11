@@ -1,0 +1,14 @@
+{
+  "subject": "skill/stack/neo4j-cypher",
+  "claim": "Anchor Cypher MATCH patterns on labels and typed, directed relationships, and attach WHERE to the MATCH it refines — predicates are part of the pattern, not a post-filter. Pass values as parameters ($title) rather than string-concatenating them; the manual notes that dynamic labels/types $() likewise mitigate Cypher injection. Carry variables deliberately across clause boundaries with WITH, because a variable that is neither referenced nor explicitly imported is discarded before the next clause. Prefer static labels/types over dynamic ones, which have documented planner/index caveats.",
+  "population": "agentic-dynamics stack",
+  "conditions": ["neo4j", "cypher", "graph", "match", "parameters", "injection"],
+  "support": 2,
+  "uncertainty": 0.3,
+  "source_experiment": "tech_stack_seed_2026-09-11",
+  "evidence": [
+    "uri:https://neo4j.com/docs/cypher-manual/current/clauses/match/",
+    "uri:https://neo4j.com/docs/cypher-manual/current/introduction/"
+  ],
+  "notes": "The MATCH page backs WHERE-with-MATCH semantics, parameter usage, WITH variable scope/carry-over, dynamic labels and types with the injection-mitigation note, and the per-version planner/index performance caveats. The Introduction backs Cypher as a declarative property-graph language and the Cypher 25 vs frozen Cypher 5 version split (relevant to any newer syntax). Moderate uncertainty because the Introduction fetched mostly as navigational prose."
+}

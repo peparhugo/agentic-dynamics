@@ -1,0 +1,15 @@
+{
+  "subject": "skill/stack/python",
+  "claim": "Write repo Python in PEP 8 style: 4-space indentation, imports grouped stdlib/third-party/local at the top of the file, and docstrings on every public module, class and function. Follow the repo's pinned toolchain (ruff line-length 100, target py3.10) rather than PEP 8's 79-column default. Choose concurrency by workload: threading / concurrent.futures.ThreadPoolExecutor for I/O-bound waits and multiprocessing / ProcessPoolExecutor for CPU-bound work, because the GIL limits true thread parallelism for CPU tasks.",
+  "population": "agentic-dynamics stack",
+  "conditions": ["python", "style", "pep8", "concurrency", "gil"],
+  "support": 2,
+  "uncertainty": 0.3,
+  "source_experiment": "tech_stack_seed_2026-09-11",
+  "evidence": [
+    "uri:https://peps.python.org/pep-0008/",
+    "uri:https://docs.python.org/3/library/concurrency.html",
+    "uri:https://docs.python.org/3/tutorial/"
+  ],
+  "notes": "PEP 8 backs the style rules (4-space indentation, separate/grouped imports, docstrings for public API). The Concurrent Execution overview backs the CPU-bound vs I/O-bound selection ('the appropriate choice of tool will depend on the task'). The Python Tutorial source fetched only its table of contents, so it is cited as background, not as an independent second backing — hence support=2. Disagreement: PEP 8 says 79 columns but the repo's ruff config sets 100, so follow the repo. Uncertainty is modest."
+}

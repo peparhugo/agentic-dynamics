@@ -1,0 +1,14 @@
+{
+  "subject": "skill/stack/firebase-hosting",
+  "claim": "Configure Firebase Hosting in firebase.json: public selects the deploy directory (this repo uses \"public\": \".\" under apps/website), redirects issue an HTTP redirect while rewrites serve the destination file (or a Cloud Function/Run service) without one. Response priority is fixed — reserved /__/* namespaces, then redirects, then exact-match static content, then rewrites, then custom 404 — and within redirects/rewrites the FIRST matching rule wins, so order rules deliberately. Validate on a preview channel (firebase hosting:channel:deploy) before firebase deploy --only hosting, and deploy both mirrored projects.",
+  "population": "agentic-dynamics stack",
+  "conditions": ["firebase", "hosting", "static-site", "rewrites", "deploy"],
+  "support": 2,
+  "uncertainty": 0.2,
+  "source_experiment": "tech_stack_seed_2026-09-11",
+  "evidence": [
+    "uri:https://firebase.google.com/docs/hosting/full-config",
+    "uri:https://firebase.google.com/docs/hosting/deploying"
+  ],
+  "notes": "Full-config backs public/ignore, redirects vs rewrites, the documented priority order and first-match ordering, cleanUrls/trailingSlash, headers and the custom 404.html. Deploying backs preview channels, firebase deploy --only hosting and cloning a tested channel to live. Both agree; low uncertainty. The repo-specific mirror step (also --project agentic-dynamics) comes from apps/website/CONTEXT.md, not the corpus."
+}

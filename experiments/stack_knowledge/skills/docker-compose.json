@@ -1,0 +1,14 @@
+{
+  "subject": "skill/stack/docker-compose",
+  "claim": "On a user-defined (non-default) Compose network, containers resolve each other by service/container name through Docker's embedded DNS (127.0.0.11); on the default bridge they only get IPs and cannot refer to each other by name. Keep the fleet's network external and reference data-plane hosts by name (finops-queue, neo4j, chromadb), publish host ports only for operator surfaces (e.g. 127.0.0.1:8001), and never attach the sandbox Redis (6379). Compose's networks/volumes/profiles/merge/interpolation top-level keys are the supported surface for that wiring.",
+  "population": "agentic-dynamics stack",
+  "conditions": ["docker", "compose", "networking", "isolation", "dns", "fleet-net"],
+  "support": 2,
+  "uncertainty": 0.3,
+  "source_experiment": "tech_stack_seed_2026-09-11",
+  "evidence": [
+    "uri:https://docs.docker.com/engine/network/",
+    "uri:https://docs.docker.com/compose/compose-file/"
+  ],
+  "notes": "The Docker Networking page backs user-defined networks, by-name resolution vs the default bridge's IP-only access, published ports, the embedded DNS 127.0.0.11, multiple-network attachment and gateway priority. The Compose file reference fetched largely as a section index (networks, volumes, profiles, merge, interpolation), so it backs only the existence/role of those top-level keys, not their detailed semantics. Both agree; uncertainty reflects the thin Compose-reference extraction. Anchored to this repo's external fleet-net and by-name ladder env."
+}
