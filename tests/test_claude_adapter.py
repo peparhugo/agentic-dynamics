@@ -61,11 +61,21 @@ def test_resolve_claude_bin_honors_explicit_override():
     assert _resolve_claude_bin(configured="/custom/claude") == "/custom/claude"
 
 
-def test_resolve_claude_bin_home_fallback_when_path_is_missing():
+def test_resolve_claude_bin_home_fallback_when_path_is_missing(monkeypatch, tmp_path):
     """P0-era fix (2026-09-01): a PATH without ~/.local/bin previously resolved to bare
     'claude' — an unspawnable command whose failure (exit_code=-2 at ~5s, $0) was
     indistinguishable from a kill. The framework's canonical install location is the
-    fallback BEFORE the bare command name, mirroring opencode.py's binary resolution."""
+    fallback BEFORE the bare command name, mirroring opencode.py's binary resolution.
+
+    Hermetic: the fallback only fires when the canonical binary EXISTS, so the test builds
+    one under a throwaway HOME (a CI runner's home has no claude symlink and failed this
+    assertion on the real ~/.local/bin path)."""
+    fake_home = tmp_path / "home"
+    home_claude = fake_home / ".local" / "bin" / "claude"
+    home_claude.parent.mkdir(parents=True)
+    home_claude.write_text("#!/bin/sh\n")
+    monkeypatch.setenv("HOME", str(fake_home))
+
     resolved = _resolve_claude_bin(find_executable=lambda name: None)
     assert resolved == str(Path.home() / ".local" / "bin" / "claude")
 
