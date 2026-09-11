@@ -1,3 +1,6 @@
+---
+status: accepted
+---
 # Flash Ladder Round-1 Score Review
 
 **Verdict: PASS (score and decision).** Independent replay from the committed

@@ -1,3 +1,6 @@
+---
+status: accepted
+---
 # Stack Knowledge Conformance
 
 This review classifies the 12 distilled stack skills against their maintained implementation
