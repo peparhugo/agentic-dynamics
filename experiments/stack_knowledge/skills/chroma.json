@@ -1,6 +1,8 @@
 {
   "subject": "skill/stack/chroma",
-  "claim": "In Chroma, use .query for nearest-neighbor similarity search and .get for ID/pagination retrieval without ranking. Results are column-major (one array per field), and .query groups results per input query while .get is a flat list; n_results defaults to 10 and ids are always returned. Filter at query time with where (metadata equality/range) and where_document ($contains / regex), and control the payload with include. If the collection has no embedding function attached, supply query_embeddings whose dimension matches the stored embeddings.",
+  "claim": "Agentic Dynamics' ChromaStore embeds a text query and calls collection.query with query_embeddings, n_results (default top_k=10), and an optional metadata where filter. Runtime retrieval pushes repository, ACL, and commit scope into that where filter before dense and lexical fusion. ChromaStore.inventory uses collection.get(include=[]) only to inventory canonical IDs.",
+  "conformance": "repo-conformant",
+  "repo_anchors": ["src/agentic_dynamics/knowledge/embeddings.py:233", "src/agentic_dynamics/knowledge/embeddings.py:254", "src/agentic_dynamics/knowledge/embeddings.py:275", "src/agentic_dynamics/knowledge/retrieval.py:1434", "src/agentic_dynamics/knowledge/retrieval.py:1764"],
   "population": "agentic-dynamics stack",
   "conditions": ["chroma", "vector-store", "retrieval", "where-filter", "embeddings"],
   "support": 2,
@@ -10,5 +12,5 @@
     "uri:https://docs.trychroma.com/docs/querying-collections/query-and-get",
     "uri:https://docs.trychroma.com/docs/overview/introduction"
   ],
-  "notes": "Query-and-get backs query vs get, the 10-result default, n_results/ids/where/where_document/include, the column-major QueryResult/GetResult shapes, and the embedding-dimension requirement. Introduction backs Chroma's metadata filtering plus dense/sparse/hybrid search and the Apache-2.0 self-host/cloud options. Both agree; low uncertainty. In the repo's RRF fusion Chroma is one candidate leg, so the hard per-cell scope should be pushed into where, never applied as a post-filter."
+  "notes": "Repo conformance edit: replaced broad Chroma API and result-shape guidance with the wrapper calls and hard scope filtering this repository actually performs. The cited Chroma documentation remains background evidence; the repo anchors establish local practice."
 }

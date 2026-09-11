@@ -1,6 +1,8 @@
 {
   "subject": "skill/stack/playwright",
-  "claim": "Write Playwright Python end-to-end tests through the Pytest plugin: install pytest-playwright plus the browsers (playwright install), name files and functions with the test_ prefix, and request the built-in page fixture; tests run headless on Chromium by default. Drive assertions with auto-waiting locators and web-first expects (page.get_by_role(...), expect(page).to_have_title(...)) instead of fixed sleeps. Capture visual evidence with page.screenshot(path=..., full_page=True) or a single element via page.locator(sel).screenshot(...), and use buffer capture when feeding a pixel diff.",
+  "claim": "The website SVG rendering gate uses Playwright's direct async API (async_playwright), launches Chromium itself, waits for document completion, then applies an explicit 700ms settle delay before probing rendered SVG. It captures full-page screenshots with page.screenshot(..., full_page=True). This repository does not currently use the pytest-playwright fixture model.",
+  "conformance": "repo-conformant",
+  "repo_anchors": ["apps/website/verify_svg_rendering.py:431", "apps/website/verify_svg_rendering.py:441", "apps/website/verify_svg_rendering.py:561"],
   "population": "agentic-dynamics stack",
   "conditions": ["playwright", "e2e", "pytest", "screenshots", "auto-waiting"],
   "support": 2,
@@ -10,5 +12,5 @@
     "uri:https://playwright.dev/python/docs/intro",
     "uri:https://playwright.dev/python/docs/screenshots"
   ],
-  "notes": "Installation backs the pytest-playwright plugin, the test_ prefix convention, the page fixture, the headless/Chromium default, and web-first assertions with get_by_role. Screenshots backs path/full_page, element screenshots and buffer capture. Both agree; uncertainty is modest because the corpus has no page on explicit wait strategies — the claim stays inside what was fetched (auto-waiting locators/expect)."
+  "notes": "Repo conformance edit: corrected the pytest-playwright fixture claim. The maintained rendering gate imports and drives async_playwright directly and intentionally uses a bounded settle delay before capture."
 }

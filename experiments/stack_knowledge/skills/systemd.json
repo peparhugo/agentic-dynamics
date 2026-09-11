@@ -1,6 +1,8 @@
 {
   "subject": "skill/stack/systemd",
-  "claim": "Author service units with a [Service] section and choose Type= deliberately: exec (or simple) for long-running daemons and oneshot for run-to-completion jobs (add RemainAfterExit= if the unit should remain 'active'). For long-running services set Restart=on-failure — the manual's recommended choice for reliability — or always; ExecStop= plus TimeoutStopSec= govern graceful shutdown before SIGKILL. Auto-restart is rate-limited by StartLimitIntervalSec=/StartLimitBurst=, so a crash-looping unit eventually stops and stays failed rather than restarting forever.",
+  "claim": "When authoring a future systemd unit, choose Type for its lifecycle, select a deliberate restart policy for daemons, and configure stop and start-rate-limit behavior when the service requires it. The current launch broker is a Type=simple, Restart=on-failure daemon; other repository units demonstrate Type=oneshot and RemainAfterExit=yes.",
+  "conformance": "generic-guidance",
+  "repo_anchors": ["infrastructure/agentic-dynamics-launch-broker.service:67", "infrastructure/docs-drift-scan.service:42", "infrastructure/fleet-bootstrap.service:17"],
   "population": "agentic-dynamics stack",
   "conditions": ["systemd", "service-unit", "restart-policy", "daemon", "launch-broker"],
   "support": 1,
@@ -9,5 +11,5 @@
   "evidence": [
     "uri:https://www.freedesktop.org/software/systemd/man/latest/systemd.service.html"
   ],
-  "notes": "Single-source: only the systemd.service man page has fetched text, and it backs Type= semantics (simple/exec/forking/oneshot), the Restart= cause/effect matrix and the on-failure recommendation, ExecStop=/TimeoutStopSec= shutdown behavior, and start rate limiting. No companion source (e.g. systemd.unit/systemd.kill) is in the corpus, so uncertainty is raised. The repo's host-side agentic-dynamics-launch-broker.service should follow the on-failure recommendation with a bounded start limit."
+  "notes": "Repo conformance edit: the previous claim implied that every current daemon uses stop and start-limit settings. The launch broker does not configure ExecStop, TimeoutStopSec, or StartLimit settings. applies_to: creating or reviewing future systemd units; this is guidance, not a repository-wide implementation contract."
 }

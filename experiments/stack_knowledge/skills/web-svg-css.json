@@ -1,6 +1,8 @@
 {
   "subject": "skill/stack/web-svg-css",
-  "claim": "Build inline SVG through the SVG namespace — document.createElementNS(\"http://www.w3.org/2000/svg\", ...) — and keep geometry on the node (viewBox, rx, points) rather than relying on CSS, because SVG is XML with its own namespace rules; the Control Room's burn trace and sparklines already do this. Style with the CSS cascade/specificity and inheritance, custom properties, and flex/grid layout. Meet WCAG contrast: at least 4.5:1 for normal text, 3:1 for large text (18pt or 14pt bold), 7:1 for enhanced text, and 3:1 for non-text UI/graphical objects; never rely on color alone, and give meaningful graphics a text alternative or ARIA label.",
+  "claim": "The Control Room constructs inline SVG with document.createElementNS and sets geometry such as viewBox, points, and rx on SVG nodes. Meaningful burn-trace SVGs receive an aria-label; decorative sparklines are aria-hidden and have accompanying screen-reader text. Control Room styles use CSS custom properties. The website SVG rendering gate enforces a minimum 4.5:1 text contrast threshold; it does not by itself enforce the broader WCAG thresholds.",
+  "conformance": "repo-conformant",
+  "repo_anchors": ["apps/control_room/static/app.js:265", "apps/control_room/static/app.js:299", "apps/control_room/static/style.css:85", "apps/website/verify_svg_rendering.py:64", "apps/website/verify_svg_rendering.py:360"],
   "population": "agentic-dynamics stack",
   "conditions": ["svg", "css", "accessibility", "wcag", "contrast", "aria"],
   "support": 3,
@@ -11,5 +13,5 @@
     "uri:https://developer.mozilla.org/en-US/docs/Web/CSS",
     "uri:https://developer.mozilla.org/en-US/docs/Web/Accessibility/Understanding_WCAG/Perceivable"
   ],
-  "notes": "SVG backs the XML/namespace nature and the CSS/DOM/JavaScript integration. CSS backs cascade, specificity, inheritance, custom properties, flexbox and grid. WCAG Perceivable backs the exact contrast thresholds (1.4.3, 1.4.6, 1.4.11), the use-of-color rule (1.4.1) and text alternatives (1.1.1). All three agree; uncertainty is modest because the CSS source fetched largely as an index/subsection list. The createElementNS/viewBox/aria pattern is the repo's own (apps/control_room/static/app.js)."
+  "notes": "Repo conformance edit: limited the accessibility claim to the ARIA behavior and 4.5:1 text-contrast check the code enforces. The prior claim overstated the SVG gate as enforcement of 3:1, 7:1, non-text, and color-independence requirements."
 }
