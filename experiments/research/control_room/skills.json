@@ -1,6 +1,6 @@
 {
   "schema": "control-room-skills/v1",
-  "phase": "p0_repair_taxonomy",
+  "phase": "q0_semantic_crosswalk",
   "min_support": 3,
   "inputs": [
     {
@@ -25,14 +25,14 @@
     },
     {
       "path": "experiments/research/control_room/taxonomy.json",
-      "sha256": "316d71062a360028cc1fb51f9411ac29d4e24945891ef600f7e75e6de39fa7d0"
+      "sha256": "fd52b22657fb3d358498cf6d8e799485be27d447148f71b9e8cd1e90d7cf3311"
     }
   ],
   "skills": [
     {
       "id": "skill-delivery",
       "decision": "What delivery model should the Control Room use?",
-      "recommendation": "Stay build-less: vanilla JS + CSS custom properties + CSS/SVG micro-visuals. Adopt a chart library only for the time-series/table marks that justify it (uPlot or ECharts for streaming breadth), and prefer D3 only for one or two bespoke marks. Local [P] policy (not corpus findings): Stay build-less / rule out React \u2014 No-build is a [P] local guardrail (r0 \u00a79.8); the corpus shows viable vanilla/SVG alternatives, not proof React is unnecessary.. Local [P] policy (not corpus findings): Stay build-less / rule out React \u2014 No-build is a [P] local guardrail (r0 \u00a79.8); the corpus shows viable vanilla/SVG alternatives, not proof React is unnecessary.. Local [P] policy (not corpus findings): Stay build-less / rule out React \u2014 No-build is a [P] local guardrail (r0 \u00a79.8); the corpus shows viable vanilla/SVG alternatives, not proof React is unnecessary.. Local [P] policy (not corpus findings): Stay build-less / rule out React \u2014 No-build is a [P] local guardrail (r0 \u00a79.8); the corpus shows viable vanilla/SVG alternatives, not proof React is unnecessary..",
+      "recommendation": "Stay build-less: vanilla JS + CSS custom properties + CSS/SVG micro-visuals. Adopt a chart library only for the time-series/table marks that justify it (uPlot or ECharts for streaming breadth), and prefer D3 only for one or two bespoke marks. Local [P] policy (not corpus findings): Stay build-less / rule out React \u2014 No-build is a [P] local guardrail (r0 \u00a79.8); the corpus shows viable vanilla/SVG alternatives, not proof React is unnecessary.. Local [P] policy (not corpus findings): Stay build-less / rule out React \u2014 No-build is a [P] local guardrail (r0 \u00a79.8); the corpus shows viable vanilla/SVG alternatives, not proof React is unnecessary.. Local [P] policy (not corpus findings): Stay build-less / rule out React \u2014 No-build is a [P] local guardrail (r0 \u00a79.8); the corpus shows viable vanilla/SVG alternatives, not proof React is unnecessary.. Local [P] policy (not corpus findings): Stay build-less / rule out React \u2014 No-build is a [P] local guardrail (r0 \u00a79.8); the corpus shows viable vanilla/SVG alternatives, not proof React is unnecessary.. Local [P] policy (not corpus findings): Stay build-less / rule out React \u2014 No-build is a [P] local guardrail (r0 \u00a79.8); the corpus shows viable vanilla/SVG alternatives, not proof React is unnecessary.. Local [P] policy (not corpus findings): Stay build-less / rule out React \u2014 No-build is a [P] local guardrail (r0 \u00a79.8); the corpus shows viable vanilla/SVG alternatives, not proof React is unnecessary.. Local [P] policy (not corpus findings): Stay build-less / rule out React \u2014 No-build is a [P] local guardrail (r0 \u00a79.8); the corpus shows viable vanilla/SVG alternatives, not proof React is unnecessary.. Local [P] policy (not corpus findings): Stay build-less / rule out React \u2014 No-build is a [P] local guardrail (r0 \u00a79.8); the corpus shows viable vanilla/SVG alternatives, not proof React is unnecessary.. Local [P] policy (not corpus findings): Stay build-less / rule out React \u2014 No-build is a [P] local guardrail (r0 \u00a79.8); the corpus shows viable vanilla/SVG alternatives, not proof React is unnecessary.. Local [P] policy (not corpus findings): Stay build-less / rule out React \u2014 No-build is a [P] local guardrail (r0 \u00a79.8); the corpus shows viable vanilla/SVG alternatives, not proof React is unnecessary.. Local [P] policy (not corpus findings): Stay build-less / rule out React \u2014 No-build is a [P] local guardrail (r0 \u00a79.8); the corpus shows viable vanilla/SVG alternatives, not proof React is unnecessary..",
       "avoid": [
         "A React SPA/build pipeline for a single-page local console (no corpus evidence it is needed; conflicts with the no-build guardrail).",
         "Mixing three chart grammars on one page.",
@@ -45,7 +45,7 @@
         "fw-react-kits"
       ],
       "evidence": {
-        "support_max": 17,
+        "support_max": 16,
         "distinct_families": [
           "cli",
           "craft",
@@ -54,7 +54,7 @@
         "backing_nodes": [
           {
             "id": "tech-viz-chart-grammar",
-            "support": 15,
+            "support": 13,
             "family_names": [
               "dataviz"
             ],
@@ -62,7 +62,7 @@
           },
           {
             "id": "tech-viz-time-series-marks",
-            "support": 12,
+            "support": 8,
             "family_names": [
               "cli",
               "dataviz"
@@ -71,7 +71,7 @@
           },
           {
             "id": "tech-svg-theme-aware-svg",
-            "support": 11,
+            "support": 3,
             "family_names": [
               "craft"
             ],
@@ -87,7 +87,7 @@
           },
           {
             "id": "tech-viz-rendering-performance",
-            "support": 17,
+            "support": 16,
             "family_names": [
               "cli",
               "craft",
@@ -123,15 +123,39 @@
         "refs": [
           {
             "family": "dataviz",
-            "uri": "https://d3js.org/",
-            "sha256": "a2d77a5b707ffb7d",
-            "title": "D3 by Observable | The JavaScript library for bespoke data visualization"
+            "uri": "https://github.com/observablehq/plot",
+            "sha256": "3c3c373dbb4ae6a0",
+            "title": "GitHub - observablehq/plot: A concise API for exploratory data visualization implementing a layered grammar of graphics \u00b7 GitHub"
           },
           {
             "family": "dataviz",
-            "uri": "https://d3js.org/d3-scale-chromatic",
-            "sha256": "2bd7bec1de93305d",
-            "title": "d3-scale-chromatic | D3 by Observable"
+            "uri": "https://d3js.org/d3-shape",
+            "sha256": "5e09a57ff0edcbbf",
+            "title": "d3-shape | D3 by Observable"
+          },
+          {
+            "family": "craft",
+            "uri": "https://www.smashingmagazine.com/2025/11/smashing-animations-part-6-svgs-css-custom-properties/",
+            "sha256": "b8bc0e988e39ee25",
+            "title": "Smashing Animations Part 6: Magnificent SVGs\u00a0With <use>\u00a0And CSS Custom Properties \u2014 Smashing Magazine"
+          },
+          {
+            "family": "craft",
+            "uri": "https://web.dev/articles/content-visibility",
+            "sha256": "7aa4893ce08fa550",
+            "title": "content-visibility: the new CSS property that boosts your rendering performance \u00a0|\u00a0 Articles \u00a0|\u00a0 web.dev"
+          },
+          {
+            "family": "dataviz",
+            "uri": "https://vega.github.io/vega-lite/docs/config.html",
+            "sha256": "a619341697a7a296",
+            "title": "Configuration | Vega-Lite"
+          },
+          {
+            "family": "dataviz",
+            "uri": "https://github.com/leeoniya/uPlot",
+            "sha256": "c3a34c9200af26ab",
+            "title": "GitHub - leeoniya/uPlot: \ud83d\udcc8 A small, fast chart for time series, lines, areas, ohlc & bars \u00b7 GitHub"
           },
           {
             "family": "craft",
@@ -141,33 +165,9 @@
           },
           {
             "family": "dataviz",
-            "uri": "https://echarts.apache.org/en/index.html",
-            "sha256": "caa87df6c6cfc387",
-            "title": "Apache ECharts"
-          },
-          {
-            "family": "dataviz",
-            "uri": "https://d3js.org/what-is-d3",
-            "sha256": "087f5313e13964ad",
-            "title": "What is D3? | D3 by Observable"
-          },
-          {
-            "family": "dataviz",
-            "uri": "https://nivo.rocks/bar/",
-            "sha256": "142393ea7aca91f1",
-            "title": "Bar chart | nivo"
-          },
-          {
-            "family": "craft",
-            "uri": "https://developer.mozilla.org/en-US/docs/Web/SVG/Tutorial/Texts",
-            "sha256": "88fc7a5094ccc2ab",
-            "title": "Texts - SVG | MDN"
-          },
-          {
-            "family": "dataviz",
-            "uri": "https://echarts.apache.org/handbook/en/get-started/",
-            "sha256": "fc1b54a4c3118289",
-            "title": "Get Started - Handbook - Apache ECharts"
+            "uri": "https://leeoniya.github.io/uPlot/",
+            "sha256": "0c26530cb0b02576",
+            "title": "uPlot | \ud83d\udcc8 A small, fast chart for time series, lines, areas, ohlc & bars"
           }
         ]
       },
@@ -189,7 +189,7 @@
     {
       "id": "skill-shell-ia",
       "decision": "How should the room be navigated and laid out?",
-      "recommendation": "Board-per-domain (work / money / health / decisions) filled from a small widget catalog, with a command palette + keyboard shortcuts as an accelerator, a docked master\u2013detail for selection, progressive disclosure for the long tail, and a persisted density ladder. Keep money on the money board and alerts on an attention board rather than in an overflow System area. Local [P] policy (not corpus findings): Domain-split boards (work / money / health / decisions) \u2014 No source states domain partitioning; support was inflated from generic dashboards labels (r6a E2).; Money board grouping (quota / wallet / leases) \u2014 No source states quota/wallet; support was inflated from payments/alerting labels (r6a E3).; Alerts on a dedicated attention board \u2014 Alerting as a surface is supported; the board placement is [P].. Local [P] policy (not corpus findings): Domain-split boards (work / money / health / decisions) \u2014 No source states domain partitioning; support was inflated from generic dashboards labels (r6a E2).; Money board grouping (quota / wallet / leases) \u2014 No source states quota/wallet; support was inflated from payments/alerting labels (r6a E3).; Alerts on a dedicated attention board \u2014 Alerting as a surface is supported; the board placement is [P].. Local [P] policy (not corpus findings): Domain-split boards (work / money / health / decisions) \u2014 No source states domain partitioning; support was inflated from generic dashboards labels (r6a E2).; Money board grouping (quota / wallet / leases) \u2014 No source states quota/wallet; support was inflated from payments/alerting labels (r6a E3).; Alerts on a dedicated attention board \u2014 Alerting as a surface is supported; the board placement is [P].. Local [P] policy (not corpus findings): Domain-split boards (work / money / health / decisions) \u2014 No source states domain partitioning; support was inflated from generic dashboards labels (r6a E2).; Money board grouping (quota / wallet / leases) \u2014 No source states quota/wallet; support was inflated from payments/alerting labels (r6a E3).; Alerts on a dedicated attention board \u2014 Alerting as a surface is supported; the board placement is [P]..",
+      "recommendation": "Board-per-domain (work / money / health / decisions) filled from a small widget catalog, with a command palette + keyboard shortcuts as an accelerator, a docked master\u2013detail for selection, progressive disclosure for the long tail, and a persisted density ladder. Keep money on the money board and alerts on an attention board rather than in an overflow System area. Local [P] policy (not corpus findings): Domain-split boards (work / money / health / decisions) \u2014 No source states domain partitioning; support was inflated from generic dashboards labels (r6a E2).; Money board grouping (quota / wallet / leases) \u2014 No source states quota/wallet; support was inflated from payments/alerting labels (r6a E3).; Alerts on a dedicated attention board \u2014 Alerting as a surface is supported; the board placement is [P].. Local [P] policy (not corpus findings): Domain-split boards (work / money / health / decisions) \u2014 No source states domain partitioning; support was inflated from generic dashboards labels (r6a E2).; Money board grouping (quota / wallet / leases) \u2014 No source states quota/wallet; support was inflated from payments/alerting labels (r6a E3).; Alerts on a dedicated attention board \u2014 Alerting as a surface is supported; the board placement is [P].. Local [P] policy (not corpus findings): Domain-split boards (work / money / health / decisions) \u2014 No source states domain partitioning; support was inflated from generic dashboards labels (r6a E2).; Money board grouping (quota / wallet / leases) \u2014 No source states quota/wallet; support was inflated from payments/alerting labels (r6a E3).; Alerts on a dedicated attention board \u2014 Alerting as a surface is supported; the board placement is [P].. Local [P] policy (not corpus findings): Domain-split boards (work / money / health / decisions) \u2014 No source states domain partitioning; support was inflated from generic dashboards labels (r6a E2).; Money board grouping (quota / wallet / leases) \u2014 No source states quota/wallet; support was inflated from payments/alerting labels (r6a E3).; Alerts on a dedicated attention board \u2014 Alerting as a surface is supported; the board placement is [P].. Local [P] policy (not corpus findings): Domain-split boards (work / money / health / decisions) \u2014 No source states domain partitioning; support was inflated from generic dashboards labels (r6a E2).; Money board grouping (quota / wallet / leases) \u2014 No source states quota/wallet; support was inflated from payments/alerting labels (r6a E3).; Alerts on a dedicated attention board \u2014 Alerting as a surface is supported; the board placement is [P].. Local [P] policy (not corpus findings): Domain-split boards (work / money / health / decisions) \u2014 No source states domain partitioning; support was inflated from generic dashboards labels (r6a E2).; Money board grouping (quota / wallet / leases) \u2014 No source states quota/wallet; support was inflated from payments/alerting labels (r6a E3).; Alerts on a dedicated attention board \u2014 Alerting as a surface is supported; the board placement is [P].. Local [P] policy (not corpus findings): Domain-split boards (work / money / health / decisions) \u2014 No source states domain partitioning; support was inflated from generic dashboards labels (r6a E2).; Money board grouping (quota / wallet / leases) \u2014 No source states quota/wallet; support was inflated from payments/alerting labels (r6a E3).; Alerts on a dedicated attention board \u2014 Alerting as a surface is supported; the board placement is [P].. Local [P] policy (not corpus findings): Domain-split boards (work / money / health / decisions) \u2014 No source states domain partitioning; support was inflated from generic dashboards labels (r6a E2).; Money board grouping (quota / wallet / leases) \u2014 No source states quota/wallet; support was inflated from payments/alerting labels (r6a E3).; Alerts on a dedicated attention board \u2014 Alerting as a surface is supported; the board placement is [P].. Local [P] policy (not corpus findings): Domain-split boards (work / money / health / decisions) \u2014 No source states domain partitioning; support was inflated from generic dashboards labels (r6a E2).; Money board grouping (quota / wallet / leases) \u2014 No source states quota/wallet; support was inflated from payments/alerting labels (r6a E3).; Alerts on a dedicated attention board \u2014 Alerting as a surface is supported; the board placement is [P].. Local [P] policy (not corpus findings): Domain-split boards (work / money / health / decisions) \u2014 No source states domain partitioning; support was inflated from generic dashboards labels (r6a E2).; Money board grouping (quota / wallet / leases) \u2014 No source states quota/wallet; support was inflated from payments/alerting labels (r6a E3).; Alerts on a dedicated attention board \u2014 Alerting as a surface is supported; the board placement is [P].. Local [P] policy (not corpus findings): Domain-split boards (work / money / health / decisions) \u2014 No source states domain partitioning; support was inflated from generic dashboards labels (r6a E2).; Money board grouping (quota / wallet / leases) \u2014 No source states quota/wallet; support was inflated from payments/alerting labels (r6a E3).; Alerts on a dedicated attention board \u2014 Alerting as a surface is supported; the board placement is [P]..",
       "avoid": [
         "One mega-screen with everything; burying quota/leases or approvals in an overflow drawer.",
         "Command palette as the only navigation.",
@@ -206,7 +206,7 @@
         "ia-money-grouping"
       ],
       "evidence": {
-        "support_max": 43,
+        "support_max": 30,
         "distinct_families": [
           "agentops",
           "cli",
@@ -217,7 +217,7 @@
         "backing_nodes": [
           {
             "id": "tech-ia-widget-catalog",
-            "support": 41,
+            "support": 28,
             "family_names": [
               "cli",
               "dashboards",
@@ -227,7 +227,7 @@
           },
           {
             "id": "tech-ia-dashboard-layout",
-            "support": 43,
+            "support": 30,
             "family_names": [
               "dashboards"
             ],
@@ -235,7 +235,7 @@
           },
           {
             "id": "tech-int-keyboard-first",
-            "support": 22,
+            "support": 12,
             "family_names": [
               "cli",
               "craft",
@@ -245,7 +245,7 @@
           },
           {
             "id": "tech-trust-alerting",
-            "support": 23,
+            "support": 13,
             "family_names": [
               "dashboards"
             ],
@@ -253,96 +253,70 @@
           },
           {
             "id": "tech-money-cost-attribution",
-            "support": 13,
+            "support": 6,
             "family_names": [
               "agentops"
             ],
             "meets_three_source_rule": true
           },
           {
-            "id": "tech-ia-master-detail",
-            "support": 4,
-            "family_names": [
-              "craft"
-            ],
-            "meets_three_source_rule": true
-          },
-          {
             "id": "tech-ia-command-palette",
-            "support": 11,
+            "support": 4,
             "family_names": [
               "cli",
               "dashboards"
-            ],
-            "meets_three_source_rule": true
-          },
-          {
-            "id": "tech-ia-density-ladder",
-            "support": 8,
-            "family_names": [
-              "craft",
-              "dashboards",
-              "dataviz"
-            ],
-            "meets_three_source_rule": true
-          },
-          {
-            "id": "tech-ia-progressive-disclosure",
-            "support": 4,
-            "family_names": [
-              "craft"
             ],
             "meets_three_source_rule": true
           }
         ],
         "refs": [
           {
-            "family": "dashboards",
-            "uri": "https://grafana.com/",
-            "sha256": "235bf45a81093a96",
-            "title": "Full-stack observability for the agentic era | Grafana Labs | Grafana Labs"
+            "family": "cli",
+            "uri": "https://github.com/ratatui/ratatui",
+            "sha256": "6039c7625aad32c5",
+            "title": "GitHub - ratatui/ratatui: A Rust crate for cooking up terminal user interfaces (TUIs) \ud83d\udc68\u200d\ud83c\udf73\ud83d\udc00 https://ratatui.rs \u00b7 GitHub"
           },
           {
             "family": "dashboards",
-            "uri": "https://vercel.com/",
-            "sha256": "c26a33d2b08d2b60",
-            "title": "Agentic Infrastructure - Vercel"
+            "uri": "https://posthog.com/docs/product-analytics/dashboards",
+            "sha256": "6c432f3f48666914",
+            "title": "Dashboards - Docs - PostHog"
+          },
+          {
+            "family": "craft",
+            "uri": "https://www.smashingmagazine.com/2025/06/what-i-wish-someone-told-me-aria/",
+            "sha256": "44d54c5850d776a2",
+            "title": "What I Wish Someone Told Me When I Was Getting Into ARIA \u2014 Smashing Magazine"
           },
           {
             "family": "dashboards",
-            "uri": "https://linear.app/",
-            "sha256": "eb0e0bc396ddd962",
-            "title": "Linear \u2013 The system for product development"
+            "uri": "https://grafana.com/docs/grafana/latest/alerting/",
+            "sha256": "d28ea3629b46d1b6",
+            "title": "Grafana Alerting | Grafana documentation"
           },
           {
             "family": "agentops",
-            "uri": "https://langfuse.com/docs",
-            "sha256": "34d09509900f2a2b",
-            "title": "Open Source AI Engineering Platform - Langfuse"
-          },
-          {
-            "family": "craft",
-            "uri": "https://www.nngroup.com/articles/data-tables/",
-            "sha256": "7bb44646100f45ed",
-            "title": "Data Tables: Four Major User Tasks - NN/G"
-          },
-          {
-            "family": "craft",
-            "uri": "https://web.dev/learn/design/",
-            "sha256": "64d16f4d7158c427",
-            "title": "Learn Responsive Design \u00a0|\u00a0 web.dev"
+            "uri": "https://docs.honeyhive.ai/",
+            "sha256": "0ab7e926909c38ee",
+            "title": "Introducing HoneyHive - HoneyHive AI Docs"
           },
           {
             "family": "dashboards",
-            "uri": "https://grafana.com/docs/grafana/latest/",
-            "sha256": "7910c639346c2ffa",
-            "title": "Grafana OSS and Enterprise | Grafana documentation"
+            "uri": "https://docs.railway.com/develop/services",
+            "sha256": "7417e982f156d980",
+            "title": "Services | Railway Docs"
           },
           {
             "family": "dashboards",
-            "uri": "https://vercel.com/blog",
-            "sha256": "2570f04ad163d7e4",
-            "title": "Blog - Vercel"
+            "uri": "https://docs.sentry.io/product/dashboards/",
+            "sha256": "78abfbfa297e2a6d",
+            "title": "Dashboards"
+          },
+          {
+            "family": "craft",
+            "uri": "https://www.w3.org/WAI/ARIA/apg/patterns/",
+            "sha256": "67aa84429d27fba3",
+            "title": "Patterns | APG | WAI | W3CPatterns"
           }
         ]
       },
@@ -372,7 +346,7 @@
     {
       "id": "skill-glance",
       "decision": "What must the resting screen answer, in what order?",
-      "recommendation": "Rank the glance screen operator-first: (1) system/connection health, (2) what is running/queued/failed, (3) anything failing or stale, (4) money (spend/burn/quota/leases), (5) decisions pending, (6) fleet shape. Put the single health/staleness summary and the attention surface above the fold. Local [P] policy (not corpus findings): Status grid as the glance default \u2014 Direct heatmap/status-grid support is 4 records; keep as the default only as [P] pending a controlled comparison.; Money (spend/burn/quota/leases) above the fold \u2014 Cost tracking is supported; quota/lease composition is [P] (r6a E3).; Named degraded/staleness summary \u2014 No source states a degraded banner or uncertainty encoding (r6a E4); grounded in the repo's projection/cost contracts.. Local [P] policy (not corpus findings): Status grid as the glance default \u2014 Direct heatmap/status-grid support is 4 records; keep as the default only as [P] pending a controlled comparison.; Money (spend/burn/quota/leases) above the fold \u2014 Cost tracking is supported; quota/lease composition is [P] (r6a E3).; Named degraded/staleness summary \u2014 No source states a degraded banner or uncertainty encoding (r6a E4); grounded in the repo's projection/cost contracts.. Local [P] policy (not corpus findings): Status grid as the glance default \u2014 Direct heatmap/status-grid support is 4 records; keep as the default only as [P] pending a controlled comparison.; Money (spend/burn/quota/leases) above the fold \u2014 Cost tracking is supported; quota/lease composition is [P] (r6a E3).; Named degraded/staleness summary \u2014 No source states a degraded banner or uncertainty encoding (r6a E4); grounded in the repo's projection/cost contracts.. Local [P] policy (not corpus findings): Status grid as the glance default \u2014 Direct heatmap/status-grid support is 4 records; keep as the default only as [P] pending a controlled comparison.; Money (spend/burn/quota/leases) above the fold \u2014 Cost tracking is supported; quota/lease composition is [P] (r6a E3).; Named degraded/staleness summary \u2014 No source states a degraded banner or uncertainty encoding (r6a E4); grounded in the repo's projection/cost contracts..",
+      "recommendation": "Rank the glance screen operator-first: (1) system/connection health, (2) what is running/queued/failed, (3) anything failing or stale, (4) money (spend/burn/quota/leases), (5) decisions pending, (6) fleet shape. Put the single health/staleness summary and the attention surface above the fold. Local [P] policy (not corpus findings): Status grid as the glance default \u2014 Direct heatmap/status-grid support is 4 records; keep as the default only as [P] pending a controlled comparison.; Money (spend/burn/quota/leases) above the fold \u2014 Cost tracking is supported; quota/lease composition is [P] (r6a E3).; Named degraded/staleness summary \u2014 No source states a degraded banner or uncertainty encoding (r6a E4); grounded in the repo's projection/cost contracts.. Local [P] policy (not corpus findings): Status grid as the glance default \u2014 Direct heatmap/status-grid support is 4 records; keep as the default only as [P] pending a controlled comparison.; Money (spend/burn/quota/leases) above the fold \u2014 Cost tracking is supported; quota/lease composition is [P] (r6a E3).; Named degraded/staleness summary \u2014 No source states a degraded banner or uncertainty encoding (r6a E4); grounded in the repo's projection/cost contracts.. Local [P] policy (not corpus findings): Status grid as the glance default \u2014 Direct heatmap/status-grid support is 4 records; keep as the default only as [P] pending a controlled comparison.; Money (spend/burn/quota/leases) above the fold \u2014 Cost tracking is supported; quota/lease composition is [P] (r6a E3).; Named degraded/staleness summary \u2014 No source states a degraded banner or uncertainty encoding (r6a E4); grounded in the repo's projection/cost contracts.. Local [P] policy (not corpus findings): Status grid as the glance default \u2014 Direct heatmap/status-grid support is 4 records; keep as the default only as [P] pending a controlled comparison.; Money (spend/burn/quota/leases) above the fold \u2014 Cost tracking is supported; quota/lease composition is [P] (r6a E3).; Named degraded/staleness summary \u2014 No source states a degraded banner or uncertainty encoding (r6a E4); grounded in the repo's projection/cost contracts.. Local [P] policy (not corpus findings): Status grid as the glance default \u2014 Direct heatmap/status-grid support is 4 records; keep as the default only as [P] pending a controlled comparison.; Money (spend/burn/quota/leases) above the fold \u2014 Cost tracking is supported; quota/lease composition is [P] (r6a E3).; Named degraded/staleness summary \u2014 No source states a degraded banner or uncertainty encoding (r6a E4); grounded in the repo's projection/cost contracts.. Local [P] policy (not corpus findings): Status grid as the glance default \u2014 Direct heatmap/status-grid support is 4 records; keep as the default only as [P] pending a controlled comparison.; Money (spend/burn/quota/leases) above the fold \u2014 Cost tracking is supported; quota/lease composition is [P] (r6a E3).; Named degraded/staleness summary \u2014 No source states a degraded banner or uncertainty encoding (r6a E4); grounded in the repo's projection/cost contracts.. Local [P] policy (not corpus findings): Status grid as the glance default \u2014 Direct heatmap/status-grid support is 4 records; keep as the default only as [P] pending a controlled comparison.; Money (spend/burn/quota/leases) above the fold \u2014 Cost tracking is supported; quota/lease composition is [P] (r6a E3).; Named degraded/staleness summary \u2014 No source states a degraded banner or uncertainty encoding (r6a E4); grounded in the repo's projection/cost contracts.. Local [P] policy (not corpus findings): Status grid as the glance default \u2014 Direct heatmap/status-grid support is 4 records; keep as the default only as [P] pending a controlled comparison.; Money (spend/burn/quota/leases) above the fold \u2014 Cost tracking is supported; quota/lease composition is [P] (r6a E3).; Named degraded/staleness summary \u2014 No source states a degraded banner or uncertainty encoding (r6a E4); grounded in the repo's projection/cost contracts.. Local [P] policy (not corpus findings): Status grid as the glance default \u2014 Direct heatmap/status-grid support is 4 records; keep as the default only as [P] pending a controlled comparison.; Money (spend/burn/quota/leases) above the fold \u2014 Cost tracking is supported; quota/lease composition is [P] (r6a E3).; Named degraded/staleness summary \u2014 No source states a degraded banner or uncertainty encoding (r6a E4); grounded in the repo's projection/cost contracts.. Local [P] policy (not corpus findings): Status grid as the glance default \u2014 Direct heatmap/status-grid support is 4 records; keep as the default only as [P] pending a controlled comparison.; Money (spend/burn/quota/leases) above the fold \u2014 Cost tracking is supported; quota/lease composition is [P] (r6a E3).; Named degraded/staleness summary \u2014 No source states a degraded banner or uncertainty encoding (r6a E4); grounded in the repo's projection/cost contracts.. Local [P] policy (not corpus findings): Status grid as the glance default \u2014 Direct heatmap/status-grid support is 4 records; keep as the default only as [P] pending a controlled comparison.; Money (spend/burn/quota/leases) above the fold \u2014 Cost tracking is supported; quota/lease composition is [P] (r6a E3).; Named degraded/staleness summary \u2014 No source states a degraded banner or uncertainty encoding (r6a E4); grounded in the repo's projection/cost contracts..",
       "avoid": [
         "Docs-health or registry chrome pushing fleet state below the fold (r0 M5).",
         "A green badge when a projection is stale (green must never lie)."
@@ -385,26 +359,15 @@
         "ia-money-grouping"
       ],
       "evidence": {
-        "support_max": 23,
+        "support_max": 13,
         "distinct_families": [
           "agentops",
-          "craft",
-          "dashboards",
-          "dataviz"
+          "dashboards"
         ],
         "backing_nodes": [
           {
-            "id": "tech-viz-heatmap",
-            "support": 4,
-            "family_names": [
-              "craft",
-              "dataviz"
-            ],
-            "meets_three_source_rule": true
-          },
-          {
             "id": "tech-trust-alerting",
-            "support": 23,
+            "support": 13,
             "family_names": [
               "dashboards"
             ],
@@ -412,7 +375,7 @@
           },
           {
             "id": "tech-money-cost-attribution",
-            "support": 13,
+            "support": 6,
             "family_names": [
               "agentops"
             ],
@@ -421,28 +384,28 @@
         ],
         "refs": [
           {
-            "family": "dataviz",
-            "uri": "https://nivo.rocks/bar/",
-            "sha256": "142393ea7aca91f1",
-            "title": "Bar chart | nivo"
-          },
-          {
             "family": "dashboards",
-            "uri": "https://grafana.com/",
-            "sha256": "235bf45a81093a96",
-            "title": "Full-stack observability for the agentic era | Grafana Labs | Grafana Labs"
+            "uri": "https://grafana.com/docs/grafana/latest/alerting/",
+            "sha256": "d28ea3629b46d1b6",
+            "title": "Grafana Alerting | Grafana documentation"
           },
           {
             "family": "agentops",
-            "uri": "https://langfuse.com/docs",
-            "sha256": "34d09509900f2a2b",
-            "title": "Open Source AI Engineering Platform - Langfuse"
+            "uri": "https://docs.honeyhive.ai/",
+            "sha256": "0ab7e926909c38ee",
+            "title": "Introducing HoneyHive - HoneyHive AI Docs"
           },
           {
-            "family": "dataviz",
-            "uri": "https://nivo.rocks/line/",
-            "sha256": "7fbbcfe5789d6603",
-            "title": "Line chart | nivo"
+            "family": "dashboards",
+            "uri": "https://grafana.com/docs/grafana/latest/panels-visualizations/",
+            "sha256": "3055b3c8b3269ad0",
+            "title": "Panels and visualizations | Grafana documentation"
+          },
+          {
+            "family": "agentops",
+            "uri": "https://docs.latitude.so/",
+            "sha256": "ece55c9402f2f298",
+            "title": "Latitude Overview - Latitude Docs"
           },
           {
             "family": "dashboards",
@@ -452,21 +415,21 @@
           },
           {
             "family": "agentops",
-            "uri": "https://langfuse.com/docs/observability/overview",
-            "sha256": "0a1784a27f750267",
-            "title": "LLM Observability & Application Tracing (Open Source) - Langfuse"
-          },
-          {
-            "family": "dataviz",
-            "uri": "https://nivo.rocks/heatmap/",
-            "sha256": "7342bb6a11b92572",
-            "title": "Heat Map chart | nivo"
+            "uri": "https://langfuse.com/docs",
+            "sha256": "34d09509900f2a2b",
+            "title": "Open Source AI Engineering Platform - Langfuse"
           },
           {
             "family": "dashboards",
             "uri": "https://grafana.com/docs/grafana/latest/dashboards/",
             "sha256": "789c3cf84b24905d",
             "title": "Dashboards | Grafana documentation"
+          },
+          {
+            "family": "agentops",
+            "uri": "https://langfuse.com/docs/analytics/overview",
+            "sha256": "245019da24ca609e",
+            "title": "LLM Metrics & Analytics - Langfuse"
           }
         ]
       },
@@ -498,7 +461,7 @@
     {
       "id": "skill-charts",
       "decision": "Which mark answers which operator question?",
-      "recommendation": "Map questions to marks: cost/burn/latency over time \u2192 line/area + inline sparkline; fleet/node status \u2192 heatmap status grid; bounded quantity (queue/phase) \u2192 gauge; large sets \u2192 virtualized sortable table; live output \u2192 log stream with follow/pause; multi-step run \u2192 timeline/waterfall; cross-group comparison \u2192 small multiples. Local [P] policy (not corpus findings): Gauge for bounded quantities \u2014 Direct gauge support is 1 record.; Small multiples for cross-group comparison \u2014 Direct support is 2 records.; Virtualized table implementation \u2014 Direct virtualized-table support is 3 records; the general table surface is supported.. Local [P] policy (not corpus findings): Gauge for bounded quantities \u2014 Direct gauge support is 1 record.; Small multiples for cross-group comparison \u2014 Direct support is 2 records.; Virtualized table implementation \u2014 Direct virtualized-table support is 3 records; the general table surface is supported.. Local [P] policy (not corpus findings): Gauge for bounded quantities \u2014 Direct gauge support is 1 record.; Small multiples for cross-group comparison \u2014 Direct support is 2 records.; Virtualized table implementation \u2014 Direct virtualized-table support is 3 records; the general table surface is supported.. Local [P] policy (not corpus findings): Gauge for bounded quantities \u2014 Direct gauge support is 1 record.; Small multiples for cross-group comparison \u2014 Direct support is 2 records.; Virtualized table implementation \u2014 Direct virtualized-table support is 3 records; the general table surface is supported..",
+      "recommendation": "Map questions to marks: cost/burn/latency over time \u2192 line/area + inline sparkline; fleet/node status \u2192 heatmap status grid; bounded quantity (queue/phase) \u2192 gauge; large sets \u2192 virtualized sortable table; live output \u2192 log stream with follow/pause; multi-step run \u2192 timeline/waterfall; cross-group comparison \u2192 small multiples. Local [P] policy (not corpus findings): Gauge for bounded quantities \u2014 Direct gauge support is 1 record.; Small multiples for cross-group comparison \u2014 Direct support is 2 records.; Virtualized table implementation \u2014 Direct virtualized-table support is 3 records; the general table surface is supported.. Local [P] policy (not corpus findings): Gauge for bounded quantities \u2014 Direct gauge support is 1 record.; Small multiples for cross-group comparison \u2014 Direct support is 2 records.; Virtualized table implementation \u2014 Direct virtualized-table support is 3 records; the general table surface is supported.. Local [P] policy (not corpus findings): Gauge for bounded quantities \u2014 Direct gauge support is 1 record.; Small multiples for cross-group comparison \u2014 Direct support is 2 records.; Virtualized table implementation \u2014 Direct virtualized-table support is 3 records; the general table surface is supported.. Local [P] policy (not corpus findings): Gauge for bounded quantities \u2014 Direct gauge support is 1 record.; Small multiples for cross-group comparison \u2014 Direct support is 2 records.; Virtualized table implementation \u2014 Direct virtualized-table support is 3 records; the general table surface is supported.. Local [P] policy (not corpus findings): Gauge for bounded quantities \u2014 Direct gauge support is 1 record.; Small multiples for cross-group comparison \u2014 Direct support is 2 records.; Virtualized table implementation \u2014 Direct virtualized-table support is 3 records; the general table surface is supported.. Local [P] policy (not corpus findings): Gauge for bounded quantities \u2014 Direct gauge support is 1 record.; Small multiples for cross-group comparison \u2014 Direct support is 2 records.; Virtualized table implementation \u2014 Direct virtualized-table support is 3 records; the general table surface is supported.. Local [P] policy (not corpus findings): Gauge for bounded quantities \u2014 Direct gauge support is 1 record.; Small multiples for cross-group comparison \u2014 Direct support is 2 records.; Virtualized table implementation \u2014 Direct virtualized-table support is 3 records; the general table surface is supported.. Local [P] policy (not corpus findings): Gauge for bounded quantities \u2014 Direct gauge support is 1 record.; Small multiples for cross-group comparison \u2014 Direct support is 2 records.; Virtualized table implementation \u2014 Direct virtualized-table support is 3 records; the general table surface is supported.. Local [P] policy (not corpus findings): Gauge for bounded quantities \u2014 Direct gauge support is 1 record.; Small multiples for cross-group comparison \u2014 Direct support is 2 records.; Virtualized table implementation \u2014 Direct virtualized-table support is 3 records; the general table surface is supported.. Local [P] policy (not corpus findings): Gauge for bounded quantities \u2014 Direct gauge support is 1 record.; Small multiples for cross-group comparison \u2014 Direct support is 2 records.; Virtualized table implementation \u2014 Direct virtualized-table support is 3 records; the general table surface is supported.. Local [P] policy (not corpus findings): Gauge for bounded quantities \u2014 Direct gauge support is 1 record.; Small multiples for cross-group comparison \u2014 Direct support is 2 records.; Virtualized table implementation \u2014 Direct virtualized-table support is 3 records; the general table surface is supported..",
       "avoid": [
         "Per-card microcharts that cannot compare (r0 M6).",
         "Color as the only status signal.",
@@ -515,7 +478,7 @@
         "ch-perf"
       ],
       "evidence": {
-        "support_max": 32,
+        "support_max": 21,
         "distinct_families": [
           "agentops",
           "cli",
@@ -526,7 +489,7 @@
         "backing_nodes": [
           {
             "id": "tech-viz-time-series-marks",
-            "support": 12,
+            "support": 8,
             "family_names": [
               "cli",
               "dataviz"
@@ -535,10 +498,9 @@
           },
           {
             "id": "tech-viz-log-stream",
-            "support": 32,
+            "support": 18,
             "family_names": [
               "agentops",
-              "cli",
               "dashboards",
               "dataviz"
             ],
@@ -546,7 +508,7 @@
           },
           {
             "id": "tech-viz-data-table",
-            "support": 32,
+            "support": 21,
             "family_names": [
               "cli",
               "craft",
@@ -556,17 +518,8 @@
             "meets_three_source_rule": true
           },
           {
-            "id": "tech-viz-heatmap",
-            "support": 4,
-            "family_names": [
-              "craft",
-              "dataviz"
-            ],
-            "meets_three_source_rule": true
-          },
-          {
             "id": "tech-viz-rendering-performance",
-            "support": 17,
+            "support": 16,
             "family_names": [
               "cli",
               "craft",
@@ -576,7 +529,7 @@
           },
           {
             "id": "tech-viz-waterfall-timeline",
-            "support": 14,
+            "support": 4,
             "family_names": [
               "agentops"
             ],
@@ -586,51 +539,51 @@
         "refs": [
           {
             "family": "dataviz",
-            "uri": "https://d3js.org/d3-scale-chromatic",
-            "sha256": "2bd7bec1de93305d",
-            "title": "d3-scale-chromatic | D3 by Observable"
-          },
-          {
-            "family": "agentops",
-            "uri": "https://docs.helicone.ai/",
-            "sha256": "20ead7ec1d1155ef",
-            "title": "Quickstart - Helicone OSS LLM Observability"
+            "uri": "https://d3js.org/d3-shape",
+            "sha256": "5e09a57ff0edcbbf",
+            "title": "d3-shape | D3 by Observable"
           },
           {
             "family": "dashboards",
-            "uri": "https://vercel.com/",
-            "sha256": "c26a33d2b08d2b60",
-            "title": "Agentic Infrastructure - Vercel"
+            "uri": "https://blog.sentry.io/",
+            "sha256": "900dd2c988b418af",
+            "title": "Application Monitoring, Dev Tips & Engineering | Sentry Blog"
           },
           {
-            "family": "dataviz",
-            "uri": "https://nivo.rocks/bar/",
-            "sha256": "142393ea7aca91f1",
-            "title": "Bar chart | nivo"
+            "family": "craft",
+            "uri": "https://www.nngroup.com/articles/data-tables/",
+            "sha256": "7bb44646100f45ed",
+            "title": "Data Tables: Four Major User Tasks - NN/G"
           },
           {
-            "family": "dataviz",
-            "uri": "https://echarts.apache.org/en/index.html",
-            "sha256": "caa87df6c6cfc387",
-            "title": "Apache ECharts"
-          },
-          {
-            "family": "agentops",
-            "uri": "https://www.langchain.com/langsmith",
-            "sha256": "75ab02f301180387",
-            "title": "LangSmith: Agent & LLM Observability Platform"
+            "family": "craft",
+            "uri": "https://web.dev/articles/content-visibility",
+            "sha256": "7aa4893ce08fa550",
+            "title": "content-visibility: the new CSS property that boosts your rendering performance \u00a0|\u00a0 Articles \u00a0|\u00a0 web.dev"
           },
           {
             "family": "agentops",
-            "uri": "https://docs.helicone.ai/features/sessions",
-            "sha256": "7234cf15f2d9295b",
-            "title": "Sessions - Helicone OSS LLM Observability"
+            "uri": "https://langfuse.com/docs",
+            "sha256": "34d09509900f2a2b",
+            "title": "Open Source AI Engineering Platform - Langfuse"
+          },
+          {
+            "family": "dataviz",
+            "uri": "https://github.com/leeoniya/uPlot",
+            "sha256": "c3a34c9200af26ab",
+            "title": "GitHub - leeoniya/uPlot: \ud83d\udcc8 A small, fast chart for time series, lines, areas, ohlc & bars \u00b7 GitHub"
           },
           {
             "family": "dashboards",
-            "uri": "https://vercel.com/blog",
-            "sha256": "2570f04ad163d7e4",
-            "title": "Blog - Vercel"
+            "uri": "https://fly.io/",
+            "sha256": "c3b38e7d13ce962d",
+            "title": "Fly \u00b7 Computers for agents"
+          },
+          {
+            "family": "craft",
+            "uri": "https://www.w3.org/WAI/tutorials/tables/",
+            "sha256": "627865eeda93dba0",
+            "title": "Tables Tutorial | Web Accessibility Initiative (WAI) | W3C"
           }
         ]
       },
@@ -680,7 +633,7 @@
         "cm-forced-colors"
       ],
       "evidence": {
-        "support_max": 29,
+        "support_max": 20,
         "distinct_families": [
           "cli",
           "craft",
@@ -690,7 +643,7 @@
         "backing_nodes": [
           {
             "id": "tech-vis-design-tokens",
-            "support": 29,
+            "support": 20,
             "family_names": [
               "cli",
               "craft",
@@ -701,9 +654,8 @@
           },
           {
             "id": "tech-vis-colorblind-safe-status",
-            "support": 12,
+            "support": 7,
             "family_names": [
-              "cli",
               "craft",
               "dataviz"
             ],
@@ -711,7 +663,7 @@
           },
           {
             "id": "tech-int-reduced-motion",
-            "support": 6,
+            "support": 3,
             "family_names": [
               "craft"
             ],
@@ -719,14 +671,6 @@
           },
           {
             "id": "tech-vis-motion-easing",
-            "support": 7,
-            "family_names": [
-              "craft"
-            ],
-            "meets_three_source_rule": true
-          },
-          {
-            "id": "tech-vis-accent-economy",
             "support": 5,
             "family_names": [
               "craft"
@@ -734,36 +678,19 @@
             "meets_three_source_rule": true
           },
           {
-            "id": "tech-vis-type-scale",
-            "support": 10,
+            "id": "tech-vis-accent-economy",
+            "support": 4,
             "family_names": [
-              "cli",
+              "craft"
+            ],
+            "meets_three_source_rule": true
+          },
+          {
+            "id": "tech-vis-type-scale",
+            "support": 6,
+            "family_names": [
               "craft",
               "dashboards"
-            ],
-            "meets_three_source_rule": true
-          },
-          {
-            "id": "tech-vis-forced-colors",
-            "support": 4,
-            "family_names": [
-              "craft"
-            ],
-            "meets_three_source_rule": true
-          },
-          {
-            "id": "tech-vis-icon-family",
-            "support": 4,
-            "family_names": [
-              "craft"
-            ],
-            "meets_three_source_rule": true
-          },
-          {
-            "id": "tech-vis-elevation-model",
-            "support": 3,
-            "family_names": [
-              "craft"
             ],
             "meets_three_source_rule": true
           }
@@ -771,15 +698,15 @@
         "refs": [
           {
             "family": "dashboards",
-            "uri": "https://linear.app/customers",
-            "sha256": "65f2546f7e24d678",
-            "title": "Linear Customers"
+            "uri": "https://vercel.com/",
+            "sha256": "c26a33d2b08d2b60",
+            "title": "Agentic Infrastructure - Vercel"
           },
           {
-            "family": "dataviz",
-            "uri": "https://d3js.org/d3-scale-chromatic",
-            "sha256": "2bd7bec1de93305d",
-            "title": "d3-scale-chromatic | D3 by Observable"
+            "family": "craft",
+            "uri": "https://web.dev/learn/accessibility/",
+            "sha256": "abe7da4e372ad808",
+            "title": "Learn Accessibility \u00a0|\u00a0 web.dev"
           },
           {
             "family": "craft",
@@ -789,33 +716,33 @@
           },
           {
             "family": "craft",
-            "uri": "https://developer.mozilla.org/en-US/docs/Web/CSS/color_value/color-mix",
-            "sha256": "3ab0045d33f37663",
-            "title": "color-mix() CSS function - CSS | MDN"
+            "uri": "https://www.nngroup.com/articles/color-enhance-design/",
+            "sha256": "def697856da898b9",
+            "title": "Using Color to Enhance Your Design - NN/G"
+          },
+          {
+            "family": "craft",
+            "uri": "https://www.smashingmagazine.com/2023/10/choose-typefaces-fintech-products-guide-part1/",
+            "sha256": "88846b6feced9773",
+            "title": "How To Choose Typefaces For Fintech Products: Our Best Practices Guide (Part 1) \u2014 Smashing Magazine"
           },
           {
             "family": "dashboards",
-            "uri": "https://vercel.com/docs",
-            "sha256": "d78b5b8133aa14cc",
-            "title": ""
+            "uri": "https://vercel.com/blog",
+            "sha256": "2570f04ad163d7e4",
+            "title": "Blog - Vercel"
           },
           {
             "family": "craft",
-            "uri": "https://developer.mozilla.org/en-US/docs/Web/CSS/@media/forced-colors",
-            "sha256": "ebbddff1da6be245",
-            "title": "forced-colors CSS media feature - CSS | MDN"
+            "uri": "https://web.dev/articles/color-and-contrast-accessibility",
+            "sha256": "aded09c8b9cfa9b7",
+            "title": "Color and contrast accessibility \u00a0|\u00a0 web.dev"
           },
           {
             "family": "craft",
-            "uri": "https://developer.mozilla.org/en-US/docs/Web/SVG/Element/use",
-            "sha256": "4ce5f6172aae264a",
-            "title": "<use> - SVG | MDN"
-          },
-          {
-            "family": "craft",
-            "uri": "https://web.dev/learn/css/",
-            "sha256": "40cbdddaac4bd168",
-            "title": "Learn CSS \u00a0|\u00a0 web.dev"
+            "uri": "https://web.dev/articles/prefers-reduced-motion",
+            "sha256": "00c6f4b49de13c1b",
+            "title": "prefers-reduced-motion: Sometimes less movement is more \u00a0|\u00a0 Articles \u00a0|\u00a0 web.dev"
           }
         ]
       },
@@ -833,7 +760,7 @@
     {
       "id": "skill-svg",
       "decision": "How should diagrams and micro-visuals be built?",
-      "recommendation": "Author diagrams as theme-aware SVG (viewBox + currentColor + custom properties), give informative SVGs a title/desc (aria-hidden when decorative), keep labels as SVG <text> for print, and build sparklines/gauges/status glyphs as small SVG+CSS pieces. Use a path tracer only for genuine flow/route lines. Local [P] policy (not corpus findings): Specific flow-diagram topology \u2014 Direct flow-diagram support is 2 records; the path-tracer craft is supported.. Local [P] policy (not corpus findings): Specific flow-diagram topology \u2014 Direct flow-diagram support is 2 records; the path-tracer craft is supported.. Local [P] policy (not corpus findings): Specific flow-diagram topology \u2014 Direct flow-diagram support is 2 records; the path-tracer craft is supported.. Local [P] policy (not corpus findings): Specific flow-diagram topology \u2014 Direct flow-diagram support is 2 records; the path-tracer craft is supported..",
+      "recommendation": "Author diagrams as theme-aware SVG (viewBox + currentColor + custom properties), give informative SVGs a title/desc (aria-hidden when decorative), keep labels as SVG <text> for print, and build sparklines/gauges/status glyphs as small SVG+CSS pieces. Use a path tracer only for genuine flow/route lines. Local [P] policy (not corpus findings): Specific flow-diagram topology \u2014 Direct flow-diagram support is 2 records; the path-tracer craft is supported.. Local [P] policy (not corpus findings): Specific flow-diagram topology \u2014 Direct flow-diagram support is 2 records; the path-tracer craft is supported.. Local [P] policy (not corpus findings): Specific flow-diagram topology \u2014 Direct flow-diagram support is 2 records; the path-tracer craft is supported.. Local [P] policy (not corpus findings): Specific flow-diagram topology \u2014 Direct flow-diagram support is 2 records; the path-tracer craft is supported.. Local [P] policy (not corpus findings): Specific flow-diagram topology \u2014 Direct flow-diagram support is 2 records; the path-tracer craft is supported.. Local [P] policy (not corpus findings): Specific flow-diagram topology \u2014 Direct flow-diagram support is 2 records; the path-tracer craft is supported.. Local [P] policy (not corpus findings): Specific flow-diagram topology \u2014 Direct flow-diagram support is 2 records; the path-tracer craft is supported.. Local [P] policy (not corpus findings): Specific flow-diagram topology \u2014 Direct flow-diagram support is 2 records; the path-tracer craft is supported.. Local [P] policy (not corpus findings): Specific flow-diagram topology \u2014 Direct flow-diagram support is 2 records; the path-tracer craft is supported.. Local [P] policy (not corpus findings): Specific flow-diagram topology \u2014 Direct flow-diagram support is 2 records; the path-tracer craft is supported.. Local [P] policy (not corpus findings): Specific flow-diagram topology \u2014 Direct flow-diagram support is 2 records; the path-tracer craft is supported..",
       "avoid": [
         "Hard-coded fills; text outlined to paths.",
         "Pulling a JS chart runtime for a 40px sparkline.",
@@ -848,16 +775,15 @@
         "svg-print"
       ],
       "evidence": {
-        "support_max": 17,
+        "support_max": 5,
         "distinct_families": [
           "cli",
-          "craft",
-          "dataviz"
+          "craft"
         ],
         "backing_nodes": [
           {
             "id": "tech-svg-theme-aware-svg",
-            "support": 11,
+            "support": 3,
             "family_names": [
               "craft"
             ],
@@ -865,17 +791,16 @@
           },
           {
             "id": "tech-svg-micro-visual",
-            "support": 17,
+            "support": 3,
             "family_names": [
               "cli",
-              "craft",
-              "dataviz"
+              "craft"
             ],
             "meets_three_source_rule": true
           },
           {
             "id": "tech-svg-accessible-svg",
-            "support": 5,
+            "support": 3,
             "family_names": [
               "craft"
             ],
@@ -888,40 +813,14 @@
               "craft"
             ],
             "meets_three_source_rule": true
-          },
-          {
-            "id": "tech-svg-print-safe-svg",
-            "support": 3,
-            "family_names": [
-              "craft"
-            ],
-            "meets_three_source_rule": true
           }
         ],
         "refs": [
           {
             "family": "craft",
-            "uri": "https://developer.mozilla.org/en-US/docs/Web/SVG/Tutorial",
-            "sha256": "1c32624cf7da27fe",
-            "title": "Introducing SVG from scratch - SVG | MDN"
-          },
-          {
-            "family": "dataviz",
-            "uri": "https://github.com/leeoniya/uPlot",
-            "sha256": "c3a34c9200af26ab",
-            "title": "GitHub - leeoniya/uPlot: \ud83d\udcc8 A small, fast chart for time series, lines, areas, ohlc & bars \u00b7 GitHub"
-          },
-          {
-            "family": "craft",
-            "uri": "https://developer.mozilla.org/en-US/docs/Web/SVG/Tutorial/Texts",
-            "sha256": "88fc7a5094ccc2ab",
-            "title": "Texts - SVG | MDN"
-          },
-          {
-            "family": "dataviz",
-            "uri": "https://leeoniya.github.io/uPlot/",
-            "sha256": "0c26530cb0b02576",
-            "title": "uPlot | \ud83d\udcc8 A small, fast chart for time series, lines, areas, ohlc & bars"
+            "uri": "https://www.smashingmagazine.com/2025/11/smashing-animations-part-6-svgs-css-custom-properties/",
+            "sha256": "b8bc0e988e39ee25",
+            "title": "Smashing Animations Part 6: Magnificent SVGs\u00a0With <use>\u00a0And CSS Custom Properties \u2014 Smashing Magazine"
           },
           {
             "family": "craft",
@@ -931,21 +830,39 @@
           },
           {
             "family": "craft",
-            "uri": "https://developer.mozilla.org/en-US/docs/Web/SVG/Tutorial/Paths",
-            "sha256": "1c04ca9858dbfae1",
-            "title": "Paths - SVG | MDN"
-          },
-          {
-            "family": "craft",
             "uri": "https://css-tricks.com/accessible-svgs/",
             "sha256": "03dcc0382b1f0621",
             "title": "Accessible SVGs | CSS-Tricks"
           },
           {
             "family": "craft",
-            "uri": "https://developer.mozilla.org/en-US/docs/Web/SVG/Attribute/viewBox",
-            "sha256": "c953bc2f52e375d0",
-            "title": "viewBox - SVG | MDN"
+            "uri": "https://css-tricks.com/svg-line-animation-works/",
+            "sha256": "5b1adeb30b08f494",
+            "title": "How SVG Line Animation Works | CSS-Tricks"
+          },
+          {
+            "family": "craft",
+            "uri": "https://developer.mozilla.org/en-US/docs/Web/SVG/Tutorial",
+            "sha256": "1c32624cf7da27fe",
+            "title": "Introducing SVG from scratch - SVG | MDN"
+          },
+          {
+            "family": "cli",
+            "uri": "https://github.com/aristocratos/btop",
+            "sha256": "f6d5e898349bb60c",
+            "title": "GitHub - aristocratos/btop: A monitor of resources \u00b7 GitHub"
+          },
+          {
+            "family": "craft",
+            "uri": "https://svg-tutorial.com/",
+            "sha256": "ea201b4404388cbe",
+            "title": "SVG Tutorial - Learn how to code images in HTML with SVG"
+          },
+          {
+            "family": "cli",
+            "uri": "https://github.com/XuehaiPan/nvitop",
+            "sha256": "f0d68d37b1d8bc32",
+            "title": "GitHub - XuehaiPan/nvitop: An interactive NVIDIA-GPU process viewer and beyond, the one-stop solution for GPU process management. \u00b7 GitHub"
           }
         ]
       },
@@ -968,7 +885,7 @@
     {
       "id": "skill-trust",
       "decision": "How does the room stay truthful under load?",
-      "recommendation": "Attach provenance (measured/estimated/unknown + model/window) to consequential numbers; show freshness and a retained-window marker instead of implying live; keep a degraded banner that names the failing dependency; and encode uncertainty or 'unmeasured' explicitly so green never lies. Local [P] policy (not corpus findings): Provenance badge (measured/estimated/unknown) \u2014 No source states provenance (r6a E4); grounded in the repo's cost_provenance contract.; Named degraded banner \u2014 No source states it (r6a E4).; Explicit uncertainty / unmeasured encoding \u2014 No source states it (r6a E4).; Freshness / retained-window marker \u2014 Direct support is 1 record.. Local [P] policy (not corpus findings): Provenance badge (measured/estimated/unknown) \u2014 No source states provenance (r6a E4); grounded in the repo's cost_provenance contract.; Named degraded banner \u2014 No source states it (r6a E4).; Explicit uncertainty / unmeasured encoding \u2014 No source states it (r6a E4).; Freshness / retained-window marker \u2014 Direct support is 1 record.. Local [P] policy (not corpus findings): Provenance badge (measured/estimated/unknown) \u2014 No source states provenance (r6a E4); grounded in the repo's cost_provenance contract.; Named degraded banner \u2014 No source states it (r6a E4).; Explicit uncertainty / unmeasured encoding \u2014 No source states it (r6a E4).; Freshness / retained-window marker \u2014 Direct support is 1 record.. Local [P] policy (not corpus findings): Provenance badge (measured/estimated/unknown) \u2014 No source states provenance (r6a E4); grounded in the repo's cost_provenance contract.; Named degraded banner \u2014 No source states it (r6a E4).; Explicit uncertainty / unmeasured encoding \u2014 No source states it (r6a E4).; Freshness / retained-window marker \u2014 Direct support is 1 record..",
+      "recommendation": "Attach provenance (measured/estimated/unknown + model/window) to consequential numbers; show freshness and a retained-window marker instead of implying live; keep a degraded banner that names the failing dependency; and encode uncertainty or 'unmeasured' explicitly so green never lies. Local [P] policy (not corpus findings): Provenance badge (measured/estimated/unknown) \u2014 No source states provenance (r6a E4); grounded in the repo's cost_provenance contract.; Named degraded banner \u2014 No source states it (r6a E4).; Explicit uncertainty / unmeasured encoding \u2014 No source states it (r6a E4).; Freshness / retained-window marker \u2014 Direct support is 1 record.. Local [P] policy (not corpus findings): Provenance badge (measured/estimated/unknown) \u2014 No source states provenance (r6a E4); grounded in the repo's cost_provenance contract.; Named degraded banner \u2014 No source states it (r6a E4).; Explicit uncertainty / unmeasured encoding \u2014 No source states it (r6a E4).; Freshness / retained-window marker \u2014 Direct support is 1 record.. Local [P] policy (not corpus findings): Provenance badge (measured/estimated/unknown) \u2014 No source states provenance (r6a E4); grounded in the repo's cost_provenance contract.; Named degraded banner \u2014 No source states it (r6a E4).; Explicit uncertainty / unmeasured encoding \u2014 No source states it (r6a E4).; Freshness / retained-window marker \u2014 Direct support is 1 record.. Local [P] policy (not corpus findings): Provenance badge (measured/estimated/unknown) \u2014 No source states provenance (r6a E4); grounded in the repo's cost_provenance contract.; Named degraded banner \u2014 No source states it (r6a E4).; Explicit uncertainty / unmeasured encoding \u2014 No source states it (r6a E4).; Freshness / retained-window marker \u2014 Direct support is 1 record.. Local [P] policy (not corpus findings): Provenance badge (measured/estimated/unknown) \u2014 No source states provenance (r6a E4); grounded in the repo's cost_provenance contract.; Named degraded banner \u2014 No source states it (r6a E4).; Explicit uncertainty / unmeasured encoding \u2014 No source states it (r6a E4).; Freshness / retained-window marker \u2014 Direct support is 1 record.. Local [P] policy (not corpus findings): Provenance badge (measured/estimated/unknown) \u2014 No source states provenance (r6a E4); grounded in the repo's cost_provenance contract.; Named degraded banner \u2014 No source states it (r6a E4).; Explicit uncertainty / unmeasured encoding \u2014 No source states it (r6a E4).; Freshness / retained-window marker \u2014 Direct support is 1 record.. Local [P] policy (not corpus findings): Provenance badge (measured/estimated/unknown) \u2014 No source states provenance (r6a E4); grounded in the repo's cost_provenance contract.; Named degraded banner \u2014 No source states it (r6a E4).; Explicit uncertainty / unmeasured encoding \u2014 No source states it (r6a E4).; Freshness / retained-window marker \u2014 Direct support is 1 record.. Local [P] policy (not corpus findings): Provenance badge (measured/estimated/unknown) \u2014 No source states provenance (r6a E4); grounded in the repo's cost_provenance contract.; Named degraded banner \u2014 No source states it (r6a E4).; Explicit uncertainty / unmeasured encoding \u2014 No source states it (r6a E4).; Freshness / retained-window marker \u2014 Direct support is 1 record.. Local [P] policy (not corpus findings): Provenance badge (measured/estimated/unknown) \u2014 No source states provenance (r6a E4); grounded in the repo's cost_provenance contract.; Named degraded banner \u2014 No source states it (r6a E4).; Explicit uncertainty / unmeasured encoding \u2014 No source states it (r6a E4).; Freshness / retained-window marker \u2014 Direct support is 1 record.. Local [P] policy (not corpus findings): Provenance badge (measured/estimated/unknown) \u2014 No source states provenance (r6a E4); grounded in the repo's cost_provenance contract.; Named degraded banner \u2014 No source states it (r6a E4).; Explicit uncertainty / unmeasured encoding \u2014 No source states it (r6a E4).; Freshness / retained-window marker \u2014 Direct support is 1 record.. Local [P] policy (not corpus findings): Provenance badge (measured/estimated/unknown) \u2014 No source states provenance (r6a E4); grounded in the repo's cost_provenance contract.; Named degraded banner \u2014 No source states it (r6a E4).; Explicit uncertainty / unmeasured encoding \u2014 No source states it (r6a E4).; Freshness / retained-window marker \u2014 Direct support is 1 record..",
       "avoid": [
         "A single health number collapsing distinct failure modes.",
         "Fresh-looking charts over stale/partial data.",
@@ -983,7 +900,7 @@
         "ia-attention-surface"
       ],
       "evidence": {
-        "support_max": 23,
+        "support_max": 18,
         "distinct_families": [
           "agentops",
           "dashboards"
@@ -991,24 +908,15 @@
         "backing_nodes": [
           {
             "id": "tech-trust-alerting",
-            "support": 23,
+            "support": 13,
             "family_names": [
-              "dashboards"
-            ],
-            "meets_three_source_rule": true
-          },
-          {
-            "id": "tech-trust-causal-lineage",
-            "support": 18,
-            "family_names": [
-              "agentops",
               "dashboards"
             ],
             "meets_three_source_rule": true
           },
           {
             "id": "tech-ops-trace-tree",
-            "support": 20,
+            "support": 18,
             "family_names": [
               "agentops",
               "dashboards"
@@ -1019,21 +927,27 @@
         "refs": [
           {
             "family": "dashboards",
-            "uri": "https://grafana.com/",
-            "sha256": "235bf45a81093a96",
-            "title": "Full-stack observability for the agentic era | Grafana Labs | Grafana Labs"
+            "uri": "https://grafana.com/docs/grafana/latest/alerting/",
+            "sha256": "d28ea3629b46d1b6",
+            "title": "Grafana Alerting | Grafana documentation"
+          },
+          {
+            "family": "dashboards",
+            "uri": "https://docs.sentry.io/product/explore/",
+            "sha256": "cde48f7511724486",
+            "title": "Traces and Spans"
+          },
+          {
+            "family": "dashboards",
+            "uri": "https://grafana.com/docs/grafana/latest/panels-visualizations/",
+            "sha256": "3055b3c8b3269ad0",
+            "title": "Panels and visualizations | Grafana documentation"
           },
           {
             "family": "agentops",
-            "uri": "https://langfuse.com/docs",
-            "sha256": "34d09509900f2a2b",
-            "title": "Open Source AI Engineering Platform - Langfuse"
-          },
-          {
-            "family": "agentops",
-            "uri": "https://www.langchain.com/langsmith",
-            "sha256": "75ab02f301180387",
-            "title": "LangSmith: Agent & LLM Observability Platform"
+            "uri": "https://docs.agentops.ai/v1/concepts/events",
+            "sha256": "4ed18cb4c4c10bf4",
+            "title": "Spans - AgentOps"
           },
           {
             "family": "dashboards",
@@ -1043,9 +957,9 @@
           },
           {
             "family": "agentops",
-            "uri": "https://langfuse.com/docs/observability/overview",
-            "sha256": "0a1784a27f750267",
-            "title": "LLM Observability & Application Tracing (Open Source) - Langfuse"
+            "uri": "https://docs.agentops.ai/",
+            "sha256": "f8ca1f22853b1f87",
+            "title": "Introduction - AgentOps"
           },
           {
             "family": "dashboards",
@@ -1055,15 +969,9 @@
           },
           {
             "family": "agentops",
-            "uri": "https://docs.smith.langchain.com/",
-            "sha256": "216cc0ec88b4a616",
-            "title": "LangSmith Observability - Docs by LangChain"
-          },
-          {
-            "family": "dashboards",
-            "uri": "https://grafana.com/docs/grafana/latest/panels-visualizations/",
-            "sha256": "3055b3c8b3269ad0",
-            "title": "Panels and visualizations | Grafana documentation"
+            "uri": "https://docs.arize.com/phoenix",
+            "sha256": "03f451e9e86f8ade",
+            "title": "What is Arize Phoenix? - Phoenix"
           }
         ]
       },
@@ -1128,7 +1036,7 @@
             "meets_three_source_rule": true
           },
           {
-            "id": "tech-trust-causal-lineage",
+            "id": "tech-ops-trace-tree",
             "support": 18,
             "family_names": [
               "agentops",
@@ -1138,27 +1046,10 @@
           },
           {
             "id": "tech-ops-observability",
-            "support": 18,
+            "support": 13,
             "family_names": [
               "agentops",
               "dashboards"
-            ],
-            "meets_three_source_rule": true
-          },
-          {
-            "id": "tech-ops-trace-tree",
-            "support": 20,
-            "family_names": [
-              "agentops",
-              "dashboards"
-            ],
-            "meets_three_source_rule": true
-          },
-          {
-            "id": "tech-ops-prompt-registry",
-            "support": 3,
-            "family_names": [
-              "agentops"
             ],
             "meets_three_source_rule": true
           }
@@ -1166,51 +1057,51 @@
         "refs": [
           {
             "family": "agentops",
-            "uri": "https://blog.langchain.dev/",
-            "sha256": "978edb60fa825493",
-            "title": "LangChain Blog"
+            "uri": "https://docs.confident-ai.com/",
+            "sha256": "8159075eb65dcf26",
+            "title": "DeepEval - The LLM Evaluation Framework"
+          },
+          {
+            "family": "dashboards",
+            "uri": "https://docs.sentry.io/product/explore/",
+            "sha256": "cde48f7511724486",
+            "title": "Traces and Spans"
           },
           {
             "family": "agentops",
-            "uri": "https://langfuse.com/docs",
-            "sha256": "34d09509900f2a2b",
-            "title": "Open Source AI Engineering Platform - Langfuse"
+            "uri": "https://www.agentops.ai/blog",
+            "sha256": "01acc93b6715a0a3",
+            "title": "AgentOps"
           },
           {
             "family": "agentops",
-            "uri": "https://www.langchain.com/langsmith",
-            "sha256": "75ab02f301180387",
-            "title": "LangSmith: Agent & LLM Observability Platform"
+            "uri": "https://docs.smith.langchain.com/evaluation",
+            "sha256": "60381850f2ec94ec",
+            "title": "Evaluation concepts - Docs by LangChain"
           },
           {
             "family": "agentops",
-            "uri": "https://langfuse.com/docs/observability/overview",
-            "sha256": "0a1784a27f750267",
-            "title": "LLM Observability & Application Tracing (Open Source) - Langfuse"
+            "uri": "https://docs.agentops.ai/v1/concepts/events",
+            "sha256": "4ed18cb4c4c10bf4",
+            "title": "Spans - AgentOps"
           },
           {
             "family": "agentops",
-            "uri": "https://langfuse.com/blog",
-            "sha256": "9222b2041ecf6042",
-            "title": "Blog - Langfuse"
+            "uri": "https://arize.com/blog/",
+            "sha256": "eac1806de3b83585",
+            "title": "AI Engineering Blog: Agents, Evals & Observability | Arize AI"
           },
           {
             "family": "agentops",
-            "uri": "https://docs.smith.langchain.com/prompt_engineering",
-            "sha256": "195faedbb34b0887",
-            "title": "Prompt & Context Hub - Docs by LangChain"
+            "uri": "https://langfuse.com/docs/scores/overview",
+            "sha256": "4667e20442936138",
+            "title": "Evaluation of LLM Applications - Langfuse"
           },
           {
             "family": "agentops",
-            "uri": "https://docs.smith.langchain.com/",
-            "sha256": "216cc0ec88b4a616",
-            "title": "LangSmith Observability - Docs by LangChain"
-          },
-          {
-            "family": "agentops",
-            "uri": "https://www.braintrust.dev/blog",
-            "sha256": "74edfbbb273241b6",
-            "title": "Latest Braintrust news - Braintrust"
+            "uri": "https://docs.agentops.ai/",
+            "sha256": "f8ca1f22853b1f87",
+            "title": "Introduction - AgentOps"
           }
         ]
       },
@@ -1225,7 +1116,7 @@
     {
       "id": "skill-synthesis",
       "decision": "One-line synthesis for a sleek dark data-dense agent-ops room.",
-      "recommendation": "Framework: build-less vanilla JS + CSS tokens, with uPlot/ECharts only for streaming charts and D3 for bespoke marks. Layout: board-per-domain from a small widget catalog, command palette + keyboard shortcuts, docked master\u2013detail, persisted density ladder, money and attention as their own boards. Charts: status grid at a glance, line/sparkline over time, gauge for bounded state, virtualized table for sets, waterfall for runs. Visual: one token layer, dark-first + light + forced-colors, colorblind-safe status always with shape/label, tabular numerals, restrained motion with reduced-motion. SVG: theme-aware, accessible, print-safe; micro-visuals as SVG+CSS. Avoid: a React build, per-card microcharts, color-only status, a single collapsing health number, and embiggening chrome over data. Local [P] policy (not corpus findings): Domain-split boards \u2014 No source states domain partitioning (r6a E2).; Gauge mark \u2014 Direct gauge support is 1 record (r6a E1).; Status grid default \u2014 Direct support is 4 records (r6a E1).; Money/quota/wallet grouping \u2014 No source states quota/wallet (r6a E3).; Provenance badge / degraded banner / uncertainty \u2014 No source states them (r6a E4).; No-build / rule out React \u2014 [P] local guardrail (r6a E7).. Local [P] policy (not corpus findings): Domain-split boards \u2014 No source states domain partitioning (r6a E2).; Gauge mark \u2014 Direct gauge support is 1 record (r6a E1).; Status grid default \u2014 Direct support is 4 records (r6a E1).; Money/quota/wallet grouping \u2014 No source states quota/wallet (r6a E3).; Provenance badge / degraded banner / uncertainty \u2014 No source states them (r6a E4).; No-build / rule out React \u2014 [P] local guardrail (r6a E7).. Local [P] policy (not corpus findings): Domain-split boards \u2014 No source states domain partitioning (r6a E2).; Gauge mark \u2014 Direct gauge support is 1 record (r6a E1).; Status grid default \u2014 Direct support is 4 records (r6a E1).; Money/quota/wallet grouping \u2014 No source states quota/wallet (r6a E3).; Provenance badge / degraded banner / uncertainty \u2014 No source states them (r6a E4).; No-build / rule out React \u2014 [P] local guardrail (r6a E7).. Local [P] policy (not corpus findings): Domain-split boards \u2014 No source states domain partitioning (r6a E2).; Gauge mark \u2014 Direct gauge support is 1 record (r6a E1).; Status grid default \u2014 Direct support is 4 records (r6a E1).; Money/quota/wallet grouping \u2014 No source states quota/wallet (r6a E3).; Provenance badge / degraded banner / uncertainty \u2014 No source states them (r6a E4).; No-build / rule out React \u2014 [P] local guardrail (r6a E7)..",
+      "recommendation": "Framework: build-less vanilla JS + CSS tokens, with uPlot/ECharts only for streaming charts and D3 for bespoke marks. Layout: board-per-domain from a small widget catalog, command palette + keyboard shortcuts, docked master\u2013detail, persisted density ladder, money and attention as their own boards. Charts: status grid at a glance, line/sparkline over time, gauge for bounded state, virtualized table for sets, waterfall for runs. Visual: one token layer, dark-first + light + forced-colors, colorblind-safe status always with shape/label, tabular numerals, restrained motion with reduced-motion. SVG: theme-aware, accessible, print-safe; micro-visuals as SVG+CSS. Avoid: a React build, per-card microcharts, color-only status, a single collapsing health number, and embiggening chrome over data. Local [P] policy (not corpus findings): Domain-split boards \u2014 No source states domain partitioning (r6a E2).; Gauge mark \u2014 Direct gauge support is 1 record (r6a E1).; Status grid default \u2014 Direct support is 4 records (r6a E1).; Money/quota/wallet grouping \u2014 No source states quota/wallet (r6a E3).; Provenance badge / degraded banner / uncertainty \u2014 No source states them (r6a E4).; No-build / rule out React \u2014 [P] local guardrail (r6a E7).. Local [P] policy (not corpus findings): Domain-split boards \u2014 No source states domain partitioning (r6a E2).; Gauge mark \u2014 Direct gauge support is 1 record (r6a E1).; Status grid default \u2014 Direct support is 4 records (r6a E1).; Money/quota/wallet grouping \u2014 No source states quota/wallet (r6a E3).; Provenance badge / degraded banner / uncertainty \u2014 No source states them (r6a E4).; No-build / rule out React \u2014 [P] local guardrail (r6a E7).. Local [P] policy (not corpus findings): Domain-split boards \u2014 No source states domain partitioning (r6a E2).; Gauge mark \u2014 Direct gauge support is 1 record (r6a E1).; Status grid default \u2014 Direct support is 4 records (r6a E1).; Money/quota/wallet grouping \u2014 No source states quota/wallet (r6a E3).; Provenance badge / degraded banner / uncertainty \u2014 No source states them (r6a E4).; No-build / rule out React \u2014 [P] local guardrail (r6a E7).. Local [P] policy (not corpus findings): Domain-split boards \u2014 No source states domain partitioning (r6a E2).; Gauge mark \u2014 Direct gauge support is 1 record (r6a E1).; Status grid default \u2014 Direct support is 4 records (r6a E1).; Money/quota/wallet grouping \u2014 No source states quota/wallet (r6a E3).; Provenance badge / degraded banner / uncertainty \u2014 No source states them (r6a E4).; No-build / rule out React \u2014 [P] local guardrail (r6a E7).. Local [P] policy (not corpus findings): Domain-split boards \u2014 No source states domain partitioning (r6a E2).; Gauge mark \u2014 Direct gauge support is 1 record (r6a E1).; Status grid default \u2014 Direct support is 4 records (r6a E1).; Money/quota/wallet grouping \u2014 No source states quota/wallet (r6a E3).; Provenance badge / degraded banner / uncertainty \u2014 No source states them (r6a E4).; No-build / rule out React \u2014 [P] local guardrail (r6a E7).. Local [P] policy (not corpus findings): Domain-split boards \u2014 No source states domain partitioning (r6a E2).; Gauge mark \u2014 Direct gauge support is 1 record (r6a E1).; Status grid default \u2014 Direct support is 4 records (r6a E1).; Money/quota/wallet grouping \u2014 No source states quota/wallet (r6a E3).; Provenance badge / degraded banner / uncertainty \u2014 No source states them (r6a E4).; No-build / rule out React \u2014 [P] local guardrail (r6a E7).. Local [P] policy (not corpus findings): Domain-split boards \u2014 No source states domain partitioning (r6a E2).; Gauge mark \u2014 Direct gauge support is 1 record (r6a E1).; Status grid default \u2014 Direct support is 4 records (r6a E1).; Money/quota/wallet grouping \u2014 No source states quota/wallet (r6a E3).; Provenance badge / degraded banner / uncertainty \u2014 No source states them (r6a E4).; No-build / rule out React \u2014 [P] local guardrail (r6a E7).. Local [P] policy (not corpus findings): Domain-split boards \u2014 No source states domain partitioning (r6a E2).; Gauge mark \u2014 Direct gauge support is 1 record (r6a E1).; Status grid default \u2014 Direct support is 4 records (r6a E1).; Money/quota/wallet grouping \u2014 No source states quota/wallet (r6a E3).; Provenance badge / degraded banner / uncertainty \u2014 No source states them (r6a E4).; No-build / rule out React \u2014 [P] local guardrail (r6a E7).. Local [P] policy (not corpus findings): Domain-split boards \u2014 No source states domain partitioning (r6a E2).; Gauge mark \u2014 Direct gauge support is 1 record (r6a E1).; Status grid default \u2014 Direct support is 4 records (r6a E1).; Money/quota/wallet grouping \u2014 No source states quota/wallet (r6a E3).; Provenance badge / degraded banner / uncertainty \u2014 No source states them (r6a E4).; No-build / rule out React \u2014 [P] local guardrail (r6a E7).. Local [P] policy (not corpus findings): Domain-split boards \u2014 No source states domain partitioning (r6a E2).; Gauge mark \u2014 Direct gauge support is 1 record (r6a E1).; Status grid default \u2014 Direct support is 4 records (r6a E1).; Money/quota/wallet grouping \u2014 No source states quota/wallet (r6a E3).; Provenance badge / degraded banner / uncertainty \u2014 No source states them (r6a E4).; No-build / rule out React \u2014 [P] local guardrail (r6a E7).. Local [P] policy (not corpus findings): Domain-split boards \u2014 No source states domain partitioning (r6a E2).; Gauge mark \u2014 Direct gauge support is 1 record (r6a E1).; Status grid default \u2014 Direct support is 4 records (r6a E1).; Money/quota/wallet grouping \u2014 No source states quota/wallet (r6a E3).; Provenance badge / degraded banner / uncertainty \u2014 No source states them (r6a E4).; No-build / rule out React \u2014 [P] local guardrail (r6a E7)..",
       "avoid": [
         "A React SPA build for a local single-page console.",
         "Per-card microcharts and color-only status.",
@@ -1247,7 +1138,7 @@
         "svg-micro"
       ],
       "evidence": {
-        "support_max": 43,
+        "support_max": 30,
         "distinct_families": [
           "agentops",
           "cli",
@@ -1258,7 +1149,7 @@
         "backing_nodes": [
           {
             "id": "tech-ia-dashboard-layout",
-            "support": 43,
+            "support": 30,
             "family_names": [
               "dashboards"
             ],
@@ -1266,7 +1157,7 @@
           },
           {
             "id": "tech-viz-time-series-marks",
-            "support": 12,
+            "support": 8,
             "family_names": [
               "cli",
               "dataviz"
@@ -1275,7 +1166,7 @@
           },
           {
             "id": "tech-viz-data-table",
-            "support": 32,
+            "support": 21,
             "family_names": [
               "cli",
               "craft",
@@ -1286,7 +1177,7 @@
           },
           {
             "id": "tech-int-keyboard-first",
-            "support": 22,
+            "support": 12,
             "family_names": [
               "cli",
               "craft",
@@ -1295,17 +1186,8 @@
             "meets_three_source_rule": true
           },
           {
-            "id": "tech-viz-heatmap",
-            "support": 4,
-            "family_names": [
-              "craft",
-              "dataviz"
-            ],
-            "meets_three_source_rule": true
-          },
-          {
             "id": "tech-svg-theme-aware-svg",
-            "support": 11,
+            "support": 3,
             "family_names": [
               "craft"
             ],
@@ -1313,7 +1195,7 @@
           },
           {
             "id": "tech-vis-design-tokens",
-            "support": 29,
+            "support": 20,
             "family_names": [
               "cli",
               "craft",
@@ -1324,19 +1206,17 @@
           },
           {
             "id": "tech-svg-micro-visual",
-            "support": 17,
+            "support": 3,
             "family_names": [
               "cli",
-              "craft",
-              "dataviz"
+              "craft"
             ],
             "meets_three_source_rule": true
           },
           {
             "id": "tech-vis-colorblind-safe-status",
-            "support": 12,
+            "support": 7,
             "family_names": [
-              "cli",
               "craft",
               "dataviz"
             ],
@@ -1345,14 +1225,6 @@
           {
             "id": "stk-svg-css-only",
             "support": 15,
-            "family_names": [
-              "craft"
-            ],
-            "meets_three_source_rule": true
-          },
-          {
-            "id": "tech-ia-master-detail",
-            "support": 4,
             "family_names": [
               "craft"
             ],
@@ -1368,7 +1240,7 @@
           },
           {
             "id": "tech-ia-command-palette",
-            "support": 11,
+            "support": 4,
             "family_names": [
               "cli",
               "dashboards"
@@ -1377,7 +1249,7 @@
           },
           {
             "id": "tech-viz-waterfall-timeline",
-            "support": 14,
+            "support": 4,
             "family_names": [
               "agentops"
             ],
@@ -1387,51 +1259,51 @@
         "refs": [
           {
             "family": "dashboards",
-            "uri": "https://vercel.com/",
-            "sha256": "c26a33d2b08d2b60",
-            "title": "Agentic Infrastructure - Vercel"
+            "uri": "https://posthog.com/docs/product-analytics/dashboards",
+            "sha256": "6c432f3f48666914",
+            "title": "Dashboards - Docs - PostHog"
           },
           {
             "family": "dataviz",
-            "uri": "https://d3js.org/d3-scale-chromatic",
-            "sha256": "2bd7bec1de93305d",
-            "title": "d3-scale-chromatic | D3 by Observable"
-          },
-          {
-            "family": "dashboards",
-            "uri": "https://linear.app/",
-            "sha256": "eb0e0bc396ddd962",
-            "title": "Linear \u2013 The system for product development"
-          },
-          {
-            "family": "dataviz",
-            "uri": "https://nivo.rocks/bar/",
-            "sha256": "142393ea7aca91f1",
-            "title": "Bar chart | nivo"
-          },
-          {
-            "family": "craft",
-            "uri": "https://developer.mozilla.org/en-US/docs/Web/SVG/Tutorial",
-            "sha256": "1c32624cf7da27fe",
-            "title": "Introducing SVG from scratch - SVG | MDN"
-          },
-          {
-            "family": "dashboards",
-            "uri": "https://linear.app/customers",
-            "sha256": "65f2546f7e24d678",
-            "title": "Linear Customers"
-          },
-          {
-            "family": "dataviz",
-            "uri": "https://github.com/leeoniya/uPlot",
-            "sha256": "c3a34c9200af26ab",
-            "title": "GitHub - leeoniya/uPlot: \ud83d\udcc8 A small, fast chart for time series, lines, areas, ohlc & bars \u00b7 GitHub"
+            "uri": "https://d3js.org/d3-shape",
+            "sha256": "5e09a57ff0edcbbf",
+            "title": "d3-shape | D3 by Observable"
           },
           {
             "family": "craft",
             "uri": "https://www.nngroup.com/articles/data-tables/",
             "sha256": "7bb44646100f45ed",
             "title": "Data Tables: Four Major User Tasks - NN/G"
+          },
+          {
+            "family": "craft",
+            "uri": "https://www.smashingmagazine.com/2025/06/what-i-wish-someone-told-me-aria/",
+            "sha256": "44d54c5850d776a2",
+            "title": "What I Wish Someone Told Me When I Was Getting Into ARIA \u2014 Smashing Magazine"
+          },
+          {
+            "family": "craft",
+            "uri": "https://www.smashingmagazine.com/2025/11/smashing-animations-part-6-svgs-css-custom-properties/",
+            "sha256": "b8bc0e988e39ee25",
+            "title": "Smashing Animations Part 6: Magnificent SVGs\u00a0With <use>\u00a0And CSS Custom Properties \u2014 Smashing Magazine"
+          },
+          {
+            "family": "dashboards",
+            "uri": "https://vercel.com/",
+            "sha256": "c26a33d2b08d2b60",
+            "title": "Agentic Infrastructure - Vercel"
+          },
+          {
+            "family": "craft",
+            "uri": "https://css-tricks.com/mega-list-svg-information/",
+            "sha256": "45906cdcaa5d19ce",
+            "title": "A Compendium of SVG Information | CSS-Tricks"
+          },
+          {
+            "family": "craft",
+            "uri": "https://web.dev/learn/accessibility/",
+            "sha256": "abe7da4e372ad808",
+            "title": "Learn Accessibility \u00a0|\u00a0 web.dev"
           }
         ]
       },

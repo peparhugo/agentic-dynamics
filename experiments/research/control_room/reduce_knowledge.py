@@ -36,7 +36,11 @@ RENAME: dict[str, str | None] = {
     "tech-viz-timeline-gantt": "tech-viz-waterfall-timeline",
     "tech-viz-sampling-decimation": "tech-viz-rendering-performance",
     "tech-ia-board-per-domain": "tech-ia-dashboard-layout",
+    # q0 semantic crosswalk: the causal-lineage leaf duplicated trace-tree's labels
+    # (E4), so its catalog/skill references follow into trace-tree.
+    "tech-trust-causal-lineage": "tech-ops-trace-tree",
     # deleted by the repair — see taxonomy.repair.deleted_nodes
+    "tech-ops-prompt-registry": None,
     "tech-trust-source-provenance": None,
     "tech-trust-degraded-banner": None,
     "tech-trust-uncertainty-encoding": None,
@@ -45,10 +49,17 @@ RENAME: dict[str, str | None] = {
     "tech-trust-audit-trail": None,
     "tech-trust-freshness-indicator": None,
     "tech-viz-gauge": "thin-viz-gauge",
-    "tech-viz-small-multiples": "thin-viz-small-multiples",
-    "tech-svg-flow-diagram": "thin-svg-flow-diagram",
-    "tech-int-confirmation-door": "thin-int-confirmation-door",
     "tech-ops-self-host": "thin-ops-self-host",
+    # q0 evidence gate: these thin leaves have no source stating the technique,
+    # so they are dropped (ABSENT) and their items become [P].
+    "tech-viz-small-multiples": None,
+    "tech-svg-flow-diagram": None,
+    "tech-int-confirmation-door": None,
+    "thin-viz-small-multiples": None,
+    "thin-viz-threshold-bands": None,
+    "thin-ia-overflow-drawer": None,
+    "thin-svg-flow-diagram": None,
+    "thin-int-confirmation-door": None,
 }
 
 # Catalog items that split into a still-supported item + an explicit [P] item, or
@@ -442,8 +453,13 @@ def node_evidence(node_id: str, nodes: dict) -> dict | None:
 
 def build_evidence(backing: list[str], tax: dict, nodes: dict, records: list[dict],
                    max_refs: int = 6) -> dict:
-    """Recompute a catalog item's evidence block from repaired taxonomy nodes."""
-    cw = tax["crosswalk"]
+    """Recompute a catalog item's evidence block from repaired taxonomy nodes.
+
+    Refs are drawn from the taxonomy node's own ``evidence_quotes`` — the records the
+    q0 semantic crosswalk actually counted and quoted — never from a fresh label match.
+    That is what makes "every cited support has a stored evidence_quotes entry" true for
+    the emitted catalogs and skills.
+    """
     node_rows = [node_evidence(b, nodes) for b in backing if b in nodes]
     node_rows = [r for r in node_rows if r is not None]
     support = max((r["support"] for r in node_rows), default=0)
@@ -451,25 +467,28 @@ def build_evidence(backing: list[str], tax: dict, nodes: dict, records: list[dic
     for r in node_rows:
         families.update(r["family_names"])
 
-    # Refs: round-robin across backing nodes, dedup by sha, exact corpus titles.
+    # Refs: round-robin across backing nodes' quoted records, dedup by sha.
     seen: set[str] = set()
     refs: list[dict] = []
-    pools = [matched_for(b, cw, records) for b in backing]
+    pools = [
+        [q for q in nodes[b].get("evidence_quotes") or []]
+        for b in backing if b in nodes
+    ]
     pools = [p for p in pools if p]
     idx = 0
     while len(refs) < max_refs and pools:
         progressed = False
         for pool in pools:
             if idx < len(pool) and len(refs) < max_refs:
-                r = pool[idx]
-                if r["sha"] not in seen:
-                    seen.add(r["sha"])
+                q = pool[idx]
+                if q["sha256"] not in seen:
+                    seen.add(q["sha256"])
                     refs.append(
                         {
-                            "family": r["family"],
-                            "uri": r["uri"],
-                            "sha256": r["sha16"],
-                            "title": r["title"],  # exact corpus title (fixes r6a E8)
+                            "family": q["family"],
+                            "uri": q["uri"],
+                            "sha256": q["sha256"],
+                            "title": q["title"],  # exact corpus title
                         }
                     )
                 progressed = True
@@ -520,11 +539,19 @@ def repair_catalogs(tax: dict, nodes: dict, records: list[dict]) -> dict:
                 policy = dict(item)
                 policy["label"] = f"[P] {item['label']}"
                 policy["evidence_class"] = "[P]"
-                policy["policy_reason"] = (
-                    "Backing taxonomy node(s) "
-                    + ", ".join(new_backing or old_nodes)
-                    + " fall below the >=3-source bar after the support repair."
-                )
+                if new_backing:
+                    policy["policy_reason"] = (
+                        "Backing taxonomy node(s) "
+                        + ", ".join(new_backing)
+                        + " fall below the >=3-source bar after the q0 evidence gate."
+                    )
+                else:
+                    policy["policy_reason"] = (
+                        "Backing taxonomy node(s) "
+                        + (", ".join(old_nodes) or "(none recorded)")
+                        + " were deleted by the q0 semantic crosswalk; no stored source "
+                        "states the technique."
+                    )
                 policy["evidence"] = {
                     "support": max(
                         (nodes[b]["support"] for b in new_backing if b in nodes), default=0
@@ -544,7 +571,7 @@ def repair_catalogs(tax: dict, nodes: dict, records: list[dict]) -> dict:
         catalogs.append({**cat, "items": items})
 
     out = dict(old)
-    out["phase"] = "p0_repair_taxonomy"
+    out["phase"] = "q0_semantic_crosswalk"
     out["method"] = (
         "Catalogs re-pointed at the repaired taxonomy. Items whose backing nodes were "
         "deleted or dropped below the >=3-source bar are explicit [P] local design "
@@ -624,7 +651,7 @@ def repair_skills(tax: dict, nodes: dict, records: list[dict]) -> dict:
         skills.append(new_skill)
 
     out = dict(old)
-    out["phase"] = "p0_repair_taxonomy"
+    out["phase"] = "q0_semantic_crosswalk"
     out["method"] = (
         "Skills re-pointed at the repaired taxonomy. Moves that lost their source "
         "support are carried in the skill's `policy` list as [P] local design policy "
@@ -679,6 +706,68 @@ def validate_refs(path: Path, records: list[dict]) -> int:
     return bad
 
 
+def verify_evidence_citations(tax: dict, records: list[dict], catalogs: dict, skills: dict) -> int:
+    """Fail if any artifact cites a support without a backing evidence_quotes entry.
+
+    For every catalog item and skill evidence block this checks (a) each cited
+    *technique* node that asserts support has non-empty ``evidence_quotes`` in the
+    taxonomy, and (b) every emitted ``refs`` sha is a record matched by one of the
+    cited nodes (technique or structural). That is the "no support count without
+    evidence" contract of the q0 semantic crosswalk.
+    """
+    nodes = {n["id"]: n for n in tax["nodes"]}
+    cw = tax["crosswalk"]
+    quoted = {
+        nid: {q["sha256"] for q in n.get("evidence_quotes") or []}
+        for nid, n in nodes.items()
+        if "technique" in n.get("facet", {})
+    }
+
+    def matched_shas(node_id: str) -> set[str]:
+        labels = set(cw.get(node_id, []))
+        if not labels:
+            return set()
+        return {r["sha16"] for r in records if set(r["techniques"]) & labels}
+
+    bad = 0
+
+    def check_block(block: dict, where: str) -> None:
+        nonlocal bad
+        cited = [
+            row["id"] for row in block.get("taxonomy_nodes", [])
+            if isinstance(row, dict) and row.get("support", 0) > 0
+        ]
+        for node_id in cited:
+            # Technique leaves must carry quotes; structural facets (stack/category)
+            # are crosswalk values and need none.
+            if node_id in quoted and not quoted[node_id]:
+                bad += 1
+                print(f"  EVIDENCE {where}: cited {node_id} has no evidence_quotes")
+        allowed = set()
+        for node_id in cited:
+            allowed |= quoted.get(node_id, set()) or matched_shas(node_id)
+        for ref in block.get("refs", []):
+            sha = ref.get("sha256") if isinstance(ref, dict) else None
+            if sha and sha not in allowed:
+                bad += 1
+                print(f"  EVIDENCE {where}: ref {sha} is not in the backing nodes' records")
+
+    for cat in catalogs.get("catalogs", []):
+        for item in cat.get("items", []):
+            check_block(item.get("evidence", {}), f"catalog:{cat.get('id')}/{item.get('id')}")
+    for skill in skills.get("skills", []):
+        ev = skill.get("evidence", {})
+        # Skills store backing nodes under evidence.backing_nodes.
+        check_block(
+            {
+                "taxonomy_nodes": ev.get("backing_nodes", []),
+                "refs": ev.get("refs", []),
+            },
+            f"skill:{skill.get('id')}",
+        )
+    return bad
+
+
 def main() -> None:
     records = load_corpus()
     tax, nodes = load_taxonomy()
@@ -688,12 +777,13 @@ def main() -> None:
     SKILLS_PATH.write_text(json.dumps(skills, indent=2) + "\n", encoding="utf-8")
     print(f"wrote {CATALOGS_PATH.name}, {SKILLS_PATH.name}")
     bad = validate_refs(CATALOGS_PATH, records) + validate_refs(SKILLS_PATH, records)
+    bad += verify_evidence_citations(tax, records, catalogs, skills)
     n_policy = sum(
         1 for c in catalogs["catalogs"] for i in c["items"] if i.get("evidence_class") == "[P]"
     )
     print(f"  [P] catalog items: {n_policy}  skills with policy: "
           f"{sum(1 for s in skills['skills'] if s.get('policy'))}")
-    print(f"  unresolved refs: {bad}")
+    print(f"  unresolved refs / evidence violations: {bad}")
     if bad:
         raise SystemExit(1)
 

@@ -1,6 +1,6 @@
 {
   "schema": "control-room-catalogs/v1",
-  "phase": "p0_repair_taxonomy",
+  "phase": "q0_semantic_crosswalk",
   "min_support": 3,
   "inputs": [
     {
@@ -25,7 +25,7 @@
     },
     {
       "path": "experiments/research/control_room/taxonomy.json",
-      "sha256": "316d71062a360028cc1fb51f9411ac29d4e24945891ef600f7e75e6de39fa7d0"
+      "sha256": "fd52b22657fb3d358498cf6d8e799485be27d447148f71b9e8cd1e90d7cf3311"
     }
   ],
   "catalogs": [
@@ -66,7 +66,7 @@
               },
               {
                 "id": "tech-svg-theme-aware-svg",
-                "support": 11,
+                "support": 3,
                 "family_names": [
                   "craft"
                 ],
@@ -76,33 +76,15 @@
             "refs": [
               {
                 "family": "craft",
-                "uri": "https://developer.mozilla.org/en-US/docs/Web/SVG/Tutorial",
-                "sha256": "1c32624cf7da27fe",
-                "title": "Introducing SVG from scratch - SVG | MDN"
-              },
-              {
-                "family": "craft",
-                "uri": "https://developer.mozilla.org/en-US/docs/Web/SVG/Tutorial/Texts",
-                "sha256": "88fc7a5094ccc2ab",
-                "title": "Texts - SVG | MDN"
-              },
-              {
-                "family": "craft",
-                "uri": "https://developer.mozilla.org/en-US/docs/Web/SVG/Attribute/viewBox",
-                "sha256": "c953bc2f52e375d0",
-                "title": "viewBox - SVG | MDN"
-              },
-              {
-                "family": "craft",
-                "uri": "https://developer.mozilla.org/en-US/docs/Web/SVG/Element/use",
-                "sha256": "4ce5f6172aae264a",
-                "title": "<use> - SVG | MDN"
-              },
-              {
-                "family": "craft",
                 "uri": "https://www.smashingmagazine.com/2025/11/smashing-animations-part-6-svgs-css-custom-properties/",
                 "sha256": "b8bc0e988e39ee25",
                 "title": "Smashing Animations Part 6: Magnificent SVGs\u00a0With <use>\u00a0And CSS Custom Properties \u2014 Smashing Magazine"
+              },
+              {
+                "family": "craft",
+                "uri": "https://developer.mozilla.org/en-US/docs/Web/SVG/Tutorial",
+                "sha256": "1c32624cf7da27fe",
+                "title": "Introducing SVG from scratch - SVG | MDN"
               },
               {
                 "family": "craft",
@@ -129,9 +111,9 @@
           "when": "One or two custom visualizations that no library draws well.",
           "avoid_when": "Standard time-series or dashboards that a smaller library already covers.",
           "evidence": {
-            "support": 15,
+            "support": 13,
             "support_by_family": {
-              "dataviz": 15
+              "dataviz": 13
             },
             "independent_families": 1,
             "taxonomy_nodes": [
@@ -145,7 +127,7 @@
               },
               {
                 "id": "tech-viz-chart-grammar",
-                "support": 15,
+                "support": 13,
                 "family_names": [
                   "dataviz"
                 ],
@@ -155,27 +137,15 @@
             "refs": [
               {
                 "family": "dataviz",
-                "uri": "https://d3js.org/",
-                "sha256": "a2d77a5b707ffb7d",
-                "title": "D3 by Observable | The JavaScript library for bespoke data visualization"
+                "uri": "https://github.com/observablehq/plot",
+                "sha256": "3c3c373dbb4ae6a0",
+                "title": "GitHub - observablehq/plot: A concise API for exploratory data visualization implementing a layered grammar of graphics \u00b7 GitHub"
               },
               {
                 "family": "dataviz",
-                "uri": "https://d3js.org/what-is-d3",
-                "sha256": "087f5313e13964ad",
-                "title": "What is D3? | D3 by Observable"
-              },
-              {
-                "family": "dataviz",
-                "uri": "https://vega.github.io/vega-lite/",
-                "sha256": "2064f3499486a4bb",
-                "title": "A High-Level Grammar of Interactive Graphics | Vega-Lite"
-              },
-              {
-                "family": "dataviz",
-                "uri": "https://vega.github.io/vega-lite/docs/",
-                "sha256": "aba275e3390d0ded",
-                "title": "Overview | Vega-Lite"
+                "uri": "https://vega.github.io/vega-lite/docs/config.html",
+                "sha256": "a619341697a7a296",
+                "title": "Configuration | Vega-Lite"
               },
               {
                 "family": "dataviz",
@@ -188,6 +158,18 @@
                 "uri": "https://vega.github.io/vega-lite/docs/scale.html",
                 "sha256": "36fcf8dd2be3cb7e",
                 "title": "Scale | Vega-Lite"
+              },
+              {
+                "family": "dataviz",
+                "uri": "https://vega.github.io/vega-lite/docs/encoding.html",
+                "sha256": "874608e224e11388",
+                "title": "Encoding | Vega-Lite"
+              },
+              {
+                "family": "dataviz",
+                "uri": "https://vega.github.io/vega-lite/",
+                "sha256": "2064f3499486a4bb",
+                "title": "A High-Level Grammar of Interactive Graphics | Vega-Lite"
               }
             ]
           },
@@ -216,7 +198,7 @@
             "taxonomy_nodes": [
               {
                 "id": "tech-viz-chart-grammar",
-                "support": 15,
+                "support": 13,
                 "family_names": [
                   "dataviz"
                 ],
@@ -234,27 +216,15 @@
             "refs": [
               {
                 "family": "dataviz",
-                "uri": "https://d3js.org/",
-                "sha256": "a2d77a5b707ffb7d",
-                "title": "D3 by Observable | The JavaScript library for bespoke data visualization"
+                "uri": "https://github.com/observablehq/plot",
+                "sha256": "3c3c373dbb4ae6a0",
+                "title": "GitHub - observablehq/plot: A concise API for exploratory data visualization implementing a layered grammar of graphics \u00b7 GitHub"
               },
               {
                 "family": "dataviz",
-                "uri": "https://d3js.org/what-is-d3",
-                "sha256": "087f5313e13964ad",
-                "title": "What is D3? | D3 by Observable"
-              },
-              {
-                "family": "dataviz",
-                "uri": "https://vega.github.io/vega-lite/",
-                "sha256": "2064f3499486a4bb",
-                "title": "A High-Level Grammar of Interactive Graphics | Vega-Lite"
-              },
-              {
-                "family": "dataviz",
-                "uri": "https://vega.github.io/vega-lite/docs/",
-                "sha256": "aba275e3390d0ded",
-                "title": "Overview | Vega-Lite"
+                "uri": "https://vega.github.io/vega-lite/docs/config.html",
+                "sha256": "a619341697a7a296",
+                "title": "Configuration | Vega-Lite"
               },
               {
                 "family": "dataviz",
@@ -267,6 +237,18 @@
                 "uri": "https://vega.github.io/vega-lite/docs/scale.html",
                 "sha256": "36fcf8dd2be3cb7e",
                 "title": "Scale | Vega-Lite"
+              },
+              {
+                "family": "dataviz",
+                "uri": "https://vega.github.io/vega-lite/docs/encoding.html",
+                "sha256": "874608e224e11388",
+                "title": "Encoding | Vega-Lite"
+              },
+              {
+                "family": "dataviz",
+                "uri": "https://vega.github.io/vega-lite/",
+                "sha256": "2064f3499486a4bb",
+                "title": "A High-Level Grammar of Interactive Graphics | Vega-Lite"
               }
             ]
           },
@@ -284,17 +266,17 @@
           "when": "Hundreds of concurrent live series or high-frequency updates.",
           "avoid_when": "A handful of static marks (SVG is simpler and accessible by default).",
           "evidence": {
-            "support": 17,
+            "support": 16,
             "support_by_family": {
               "dataviz": 9,
-              "cli": 6,
+              "cli": 5,
               "craft": 2
             },
             "independent_families": 3,
             "taxonomy_nodes": [
               {
                 "id": "tech-viz-time-series-marks",
-                "support": 12,
+                "support": 8,
                 "family_names": [
                   "cli",
                   "dataviz"
@@ -303,7 +285,7 @@
               },
               {
                 "id": "tech-viz-rendering-performance",
-                "support": 17,
+                "support": 16,
                 "family_names": [
                   "cli",
                   "craft",
@@ -315,15 +297,27 @@
             "refs": [
               {
                 "family": "dataviz",
-                "uri": "https://d3js.org/d3-scale-chromatic",
-                "sha256": "2bd7bec1de93305d",
-                "title": "d3-scale-chromatic | D3 by Observable"
+                "uri": "https://d3js.org/d3-shape",
+                "sha256": "5e09a57ff0edcbbf",
+                "title": "d3-shape | D3 by Observable"
+              },
+              {
+                "family": "craft",
+                "uri": "https://web.dev/articles/content-visibility",
+                "sha256": "7aa4893ce08fa550",
+                "title": "content-visibility: the new CSS property that boosts your rendering performance \u00a0|\u00a0 Articles \u00a0|\u00a0 web.dev"
               },
               {
                 "family": "dataviz",
-                "uri": "https://echarts.apache.org/en/index.html",
-                "sha256": "caa87df6c6cfc387",
-                "title": "Apache ECharts"
+                "uri": "https://github.com/leeoniya/uPlot",
+                "sha256": "c3a34c9200af26ab",
+                "title": "GitHub - leeoniya/uPlot: \ud83d\udcc8 A small, fast chart for time series, lines, areas, ohlc & bars \u00b7 GitHub"
+              },
+              {
+                "family": "dataviz",
+                "uri": "https://leeoniya.github.io/uPlot/",
+                "sha256": "0c26530cb0b02576",
+                "title": "uPlot | \ud83d\udcc8 A small, fast chart for time series, lines, areas, ohlc & bars"
               },
               {
                 "family": "dataviz",
@@ -333,21 +327,9 @@
               },
               {
                 "family": "dataviz",
-                "uri": "https://echarts.apache.org/handbook/en/get-started/",
-                "sha256": "fc1b54a4c3118289",
-                "title": "Get Started - Handbook - Apache ECharts"
-              },
-              {
-                "family": "dataviz",
-                "uri": "https://nivo.rocks/line/",
-                "sha256": "7fbbcfe5789d6603",
-                "title": "Line chart | nivo"
-              },
-              {
-                "family": "dataviz",
-                "uri": "https://echarts.apache.org/handbook/en/concepts/chart-size/",
-                "sha256": "66a59665faa2a804",
-                "title": "Chart Container - Concepts - Handbook - Apache ECharts"
+                "uri": "https://echarts.apache.org/en/index.html",
+                "sha256": "caa87df6c6cfc387",
+                "title": "Apache ECharts"
               }
             ]
           },
@@ -367,15 +349,15 @@
           "avoid_when": "A single mark on a build-less page.",
           "evidence_class": "[X]",
           "evidence": {
-            "support": 15,
+            "support": 13,
             "support_by_family": {
-              "dataviz": 15
+              "dataviz": 13
             },
             "independent_families": 1,
             "taxonomy_nodes": [
               {
                 "id": "tech-viz-chart-grammar",
-                "support": 15,
+                "support": 13,
                 "family_names": [
                   "dataviz"
                 ],
@@ -385,27 +367,15 @@
             "refs": [
               {
                 "family": "dataviz",
-                "uri": "https://d3js.org/",
-                "sha256": "a2d77a5b707ffb7d",
-                "title": "D3 by Observable | The JavaScript library for bespoke data visualization"
+                "uri": "https://github.com/observablehq/plot",
+                "sha256": "3c3c373dbb4ae6a0",
+                "title": "GitHub - observablehq/plot: A concise API for exploratory data visualization implementing a layered grammar of graphics \u00b7 GitHub"
               },
               {
                 "family": "dataviz",
-                "uri": "https://d3js.org/what-is-d3",
-                "sha256": "087f5313e13964ad",
-                "title": "What is D3? | D3 by Observable"
-              },
-              {
-                "family": "dataviz",
-                "uri": "https://vega.github.io/vega-lite/",
-                "sha256": "2064f3499486a4bb",
-                "title": "A High-Level Grammar of Interactive Graphics | Vega-Lite"
-              },
-              {
-                "family": "dataviz",
-                "uri": "https://vega.github.io/vega-lite/docs/",
-                "sha256": "aba275e3390d0ded",
-                "title": "Overview | Vega-Lite"
+                "uri": "https://vega.github.io/vega-lite/docs/config.html",
+                "sha256": "a619341697a7a296",
+                "title": "Configuration | Vega-Lite"
               },
               {
                 "family": "dataviz",
@@ -418,6 +388,18 @@
                 "uri": "https://vega.github.io/vega-lite/docs/scale.html",
                 "sha256": "36fcf8dd2be3cb7e",
                 "title": "Scale | Vega-Lite"
+              },
+              {
+                "family": "dataviz",
+                "uri": "https://vega.github.io/vega-lite/docs/encoding.html",
+                "sha256": "874608e224e11388",
+                "title": "Encoding | Vega-Lite"
+              },
+              {
+                "family": "dataviz",
+                "uri": "https://vega.github.io/vega-lite/",
+                "sha256": "2064f3499486a4bb",
+                "title": "A High-Level Grammar of Interactive Graphics | Vega-Lite"
               }
             ]
           },
@@ -477,15 +459,15 @@
           "avoid_when": "A single-object workflow that needs no aggregation.",
           "evidence_class": "[X]",
           "evidence": {
-            "support": 43,
+            "support": 30,
             "support_by_family": {
-              "dashboards": 43
+              "dashboards": 30
             },
             "independent_families": 3,
             "taxonomy_nodes": [
               {
                 "id": "tech-ia-dashboard-layout",
-                "support": 43,
+                "support": 30,
                 "family_names": [
                   "dashboards"
                 ],
@@ -493,7 +475,7 @@
               },
               {
                 "id": "tech-ia-widget-catalog",
-                "support": 41,
+                "support": 28,
                 "family_names": [
                   "cli",
                   "dashboards",
@@ -505,27 +487,21 @@
             "refs": [
               {
                 "family": "dashboards",
-                "uri": "https://vercel.com/",
-                "sha256": "c26a33d2b08d2b60",
-                "title": "Agentic Infrastructure - Vercel"
+                "uri": "https://posthog.com/docs/product-analytics/dashboards",
+                "sha256": "6c432f3f48666914",
+                "title": "Dashboards - Docs - PostHog"
+              },
+              {
+                "family": "cli",
+                "uri": "https://github.com/ratatui/ratatui",
+                "sha256": "6039c7625aad32c5",
+                "title": "GitHub - ratatui/ratatui: A Rust crate for cooking up terminal user interfaces (TUIs) \ud83d\udc68\u200d\ud83c\udf73\ud83d\udc00 https://ratatui.rs \u00b7 GitHub"
               },
               {
                 "family": "dashboards",
-                "uri": "https://grafana.com/",
-                "sha256": "235bf45a81093a96",
-                "title": "Full-stack observability for the agentic era | Grafana Labs | Grafana Labs"
-              },
-              {
-                "family": "dashboards",
-                "uri": "https://vercel.com/blog",
-                "sha256": "2570f04ad163d7e4",
-                "title": "Blog - Vercel"
-              },
-              {
-                "family": "dashboards",
-                "uri": "https://grafana.com/docs/grafana/latest/",
-                "sha256": "7910c639346c2ffa",
-                "title": "Grafana OSS and Enterprise | Grafana documentation"
+                "uri": "https://docs.sentry.io/product/dashboards/",
+                "sha256": "78abfbfa297e2a6d",
+                "title": "Dashboards"
               },
               {
                 "family": "dashboards",
@@ -535,9 +511,15 @@
               },
               {
                 "family": "dashboards",
-                "uri": "https://grafana.com/docs/grafana/latest/panels-visualizations/",
-                "sha256": "3055b3c8b3269ad0",
-                "title": "Panels and visualizations | Grafana documentation"
+                "uri": "https://docs.railway.com/develop/services",
+                "sha256": "7417e982f156d980",
+                "title": "Services | Railway Docs"
+              },
+              {
+                "family": "cli",
+                "uri": "https://github.com/ClementTsang/bottom",
+                "sha256": "5f823865a8701651",
+                "title": "GitHub - ClementTsang/bottom: Yet another cross-platform graphical process/system monitor. \u00b7 GitHub"
               }
             ]
           },
@@ -556,15 +538,15 @@
           "avoid_when": "A single-object workflow that needs no aggregation.",
           "evidence_class": "[X]",
           "evidence": {
-            "support": 43,
+            "support": 30,
             "support_by_family": {
-              "dashboards": 43
+              "dashboards": 30
             },
             "independent_families": 3,
             "taxonomy_nodes": [
               {
                 "id": "tech-ia-dashboard-layout",
-                "support": 43,
+                "support": 30,
                 "family_names": [
                   "dashboards"
                 ],
@@ -572,7 +554,7 @@
               },
               {
                 "id": "tech-ia-widget-catalog",
-                "support": 41,
+                "support": 28,
                 "family_names": [
                   "cli",
                   "dashboards",
@@ -584,27 +566,21 @@
             "refs": [
               {
                 "family": "dashboards",
-                "uri": "https://vercel.com/",
-                "sha256": "c26a33d2b08d2b60",
-                "title": "Agentic Infrastructure - Vercel"
+                "uri": "https://posthog.com/docs/product-analytics/dashboards",
+                "sha256": "6c432f3f48666914",
+                "title": "Dashboards - Docs - PostHog"
+              },
+              {
+                "family": "cli",
+                "uri": "https://github.com/ratatui/ratatui",
+                "sha256": "6039c7625aad32c5",
+                "title": "GitHub - ratatui/ratatui: A Rust crate for cooking up terminal user interfaces (TUIs) \ud83d\udc68\u200d\ud83c\udf73\ud83d\udc00 https://ratatui.rs \u00b7 GitHub"
               },
               {
                 "family": "dashboards",
-                "uri": "https://grafana.com/",
-                "sha256": "235bf45a81093a96",
-                "title": "Full-stack observability for the agentic era | Grafana Labs | Grafana Labs"
-              },
-              {
-                "family": "dashboards",
-                "uri": "https://vercel.com/blog",
-                "sha256": "2570f04ad163d7e4",
-                "title": "Blog - Vercel"
-              },
-              {
-                "family": "dashboards",
-                "uri": "https://grafana.com/docs/grafana/latest/",
-                "sha256": "7910c639346c2ffa",
-                "title": "Grafana OSS and Enterprise | Grafana documentation"
+                "uri": "https://docs.sentry.io/product/dashboards/",
+                "sha256": "78abfbfa297e2a6d",
+                "title": "Dashboards"
               },
               {
                 "family": "dashboards",
@@ -614,9 +590,15 @@
               },
               {
                 "family": "dashboards",
-                "uri": "https://grafana.com/docs/grafana/latest/panels-visualizations/",
-                "sha256": "3055b3c8b3269ad0",
-                "title": "Panels and visualizations | Grafana documentation"
+                "uri": "https://docs.railway.com/develop/services",
+                "sha256": "7417e982f156d980",
+                "title": "Services | Railway Docs"
+              },
+              {
+                "family": "cli",
+                "uri": "https://github.com/ClementTsang/bottom",
+                "sha256": "5f823865a8701651",
+                "title": "GitHub - ClementTsang/bottom: Yet another cross-platform graphical process/system monitor. \u00b7 GitHub"
               }
             ]
           },
@@ -635,15 +617,15 @@
           "avoid_when": "A single-object workflow that needs no aggregation.",
           "evidence_class": "[X]",
           "evidence": {
-            "support": 43,
+            "support": 30,
             "support_by_family": {
-              "dashboards": 43
+              "dashboards": 30
             },
             "independent_families": 3,
             "taxonomy_nodes": [
               {
                 "id": "tech-ia-dashboard-layout",
-                "support": 43,
+                "support": 30,
                 "family_names": [
                   "dashboards"
                 ],
@@ -651,7 +633,7 @@
               },
               {
                 "id": "tech-ia-widget-catalog",
-                "support": 41,
+                "support": 28,
                 "family_names": [
                   "cli",
                   "dashboards",
@@ -663,27 +645,21 @@
             "refs": [
               {
                 "family": "dashboards",
-                "uri": "https://vercel.com/",
-                "sha256": "c26a33d2b08d2b60",
-                "title": "Agentic Infrastructure - Vercel"
+                "uri": "https://posthog.com/docs/product-analytics/dashboards",
+                "sha256": "6c432f3f48666914",
+                "title": "Dashboards - Docs - PostHog"
+              },
+              {
+                "family": "cli",
+                "uri": "https://github.com/ratatui/ratatui",
+                "sha256": "6039c7625aad32c5",
+                "title": "GitHub - ratatui/ratatui: A Rust crate for cooking up terminal user interfaces (TUIs) \ud83d\udc68\u200d\ud83c\udf73\ud83d\udc00 https://ratatui.rs \u00b7 GitHub"
               },
               {
                 "family": "dashboards",
-                "uri": "https://grafana.com/",
-                "sha256": "235bf45a81093a96",
-                "title": "Full-stack observability for the agentic era | Grafana Labs | Grafana Labs"
-              },
-              {
-                "family": "dashboards",
-                "uri": "https://vercel.com/blog",
-                "sha256": "2570f04ad163d7e4",
-                "title": "Blog - Vercel"
-              },
-              {
-                "family": "dashboards",
-                "uri": "https://grafana.com/docs/grafana/latest/",
-                "sha256": "7910c639346c2ffa",
-                "title": "Grafana OSS and Enterprise | Grafana documentation"
+                "uri": "https://docs.sentry.io/product/dashboards/",
+                "sha256": "78abfbfa297e2a6d",
+                "title": "Dashboards"
               },
               {
                 "family": "dashboards",
@@ -693,9 +669,15 @@
               },
               {
                 "family": "dashboards",
-                "uri": "https://grafana.com/docs/grafana/latest/panels-visualizations/",
-                "sha256": "3055b3c8b3269ad0",
-                "title": "Panels and visualizations | Grafana documentation"
+                "uri": "https://docs.railway.com/develop/services",
+                "sha256": "7417e982f156d980",
+                "title": "Services | Railway Docs"
+              },
+              {
+                "family": "cli",
+                "uri": "https://github.com/ClementTsang/bottom",
+                "sha256": "5f823865a8701651",
+                "title": "GitHub - ClementTsang/bottom: Yet another cross-platform graphical process/system monitor. \u00b7 GitHub"
               }
             ]
           },
@@ -714,15 +696,15 @@
           "avoid_when": "A single-object workflow that needs no aggregation.",
           "evidence_class": "[X]",
           "evidence": {
-            "support": 43,
+            "support": 30,
             "support_by_family": {
-              "dashboards": 43
+              "dashboards": 30
             },
             "independent_families": 3,
             "taxonomy_nodes": [
               {
                 "id": "tech-ia-dashboard-layout",
-                "support": 43,
+                "support": 30,
                 "family_names": [
                   "dashboards"
                 ],
@@ -730,7 +712,7 @@
               },
               {
                 "id": "tech-ia-widget-catalog",
-                "support": 41,
+                "support": 28,
                 "family_names": [
                   "cli",
                   "dashboards",
@@ -742,27 +724,21 @@
             "refs": [
               {
                 "family": "dashboards",
-                "uri": "https://vercel.com/",
-                "sha256": "c26a33d2b08d2b60",
-                "title": "Agentic Infrastructure - Vercel"
+                "uri": "https://posthog.com/docs/product-analytics/dashboards",
+                "sha256": "6c432f3f48666914",
+                "title": "Dashboards - Docs - PostHog"
+              },
+              {
+                "family": "cli",
+                "uri": "https://github.com/ratatui/ratatui",
+                "sha256": "6039c7625aad32c5",
+                "title": "GitHub - ratatui/ratatui: A Rust crate for cooking up terminal user interfaces (TUIs) \ud83d\udc68\u200d\ud83c\udf73\ud83d\udc00 https://ratatui.rs \u00b7 GitHub"
               },
               {
                 "family": "dashboards",
-                "uri": "https://grafana.com/",
-                "sha256": "235bf45a81093a96",
-                "title": "Full-stack observability for the agentic era | Grafana Labs | Grafana Labs"
-              },
-              {
-                "family": "dashboards",
-                "uri": "https://vercel.com/blog",
-                "sha256": "2570f04ad163d7e4",
-                "title": "Blog - Vercel"
-              },
-              {
-                "family": "dashboards",
-                "uri": "https://grafana.com/docs/grafana/latest/",
-                "sha256": "7910c639346c2ffa",
-                "title": "Grafana OSS and Enterprise | Grafana documentation"
+                "uri": "https://docs.sentry.io/product/dashboards/",
+                "sha256": "78abfbfa297e2a6d",
+                "title": "Dashboards"
               },
               {
                 "family": "dashboards",
@@ -772,9 +748,15 @@
               },
               {
                 "family": "dashboards",
-                "uri": "https://grafana.com/docs/grafana/latest/panels-visualizations/",
-                "sha256": "3055b3c8b3269ad0",
-                "title": "Panels and visualizations | Grafana documentation"
+                "uri": "https://docs.railway.com/develop/services",
+                "sha256": "7417e982f156d980",
+                "title": "Services | Railway Docs"
+              },
+              {
+                "family": "cli",
+                "uri": "https://github.com/ClementTsang/bottom",
+                "sha256": "5f823865a8701651",
+                "title": "GitHub - ClementTsang/bottom: Yet another cross-platform graphical process/system monitor. \u00b7 GitHub"
               }
             ]
           },
@@ -793,15 +775,15 @@
           "avoid_when": "A single-object workflow that needs no aggregation.",
           "evidence_class": "[X]",
           "evidence": {
-            "support": 43,
+            "support": 30,
             "support_by_family": {
-              "dashboards": 43
+              "dashboards": 30
             },
             "independent_families": 3,
             "taxonomy_nodes": [
               {
                 "id": "tech-ia-dashboard-layout",
-                "support": 43,
+                "support": 30,
                 "family_names": [
                   "dashboards"
                 ],
@@ -809,7 +791,7 @@
               },
               {
                 "id": "tech-ia-widget-catalog",
-                "support": 41,
+                "support": 28,
                 "family_names": [
                   "cli",
                   "dashboards",
@@ -821,27 +803,21 @@
             "refs": [
               {
                 "family": "dashboards",
-                "uri": "https://vercel.com/",
-                "sha256": "c26a33d2b08d2b60",
-                "title": "Agentic Infrastructure - Vercel"
+                "uri": "https://posthog.com/docs/product-analytics/dashboards",
+                "sha256": "6c432f3f48666914",
+                "title": "Dashboards - Docs - PostHog"
+              },
+              {
+                "family": "cli",
+                "uri": "https://github.com/ratatui/ratatui",
+                "sha256": "6039c7625aad32c5",
+                "title": "GitHub - ratatui/ratatui: A Rust crate for cooking up terminal user interfaces (TUIs) \ud83d\udc68\u200d\ud83c\udf73\ud83d\udc00 https://ratatui.rs \u00b7 GitHub"
               },
               {
                 "family": "dashboards",
-                "uri": "https://grafana.com/",
-                "sha256": "235bf45a81093a96",
-                "title": "Full-stack observability for the agentic era | Grafana Labs | Grafana Labs"
-              },
-              {
-                "family": "dashboards",
-                "uri": "https://vercel.com/blog",
-                "sha256": "2570f04ad163d7e4",
-                "title": "Blog - Vercel"
-              },
-              {
-                "family": "dashboards",
-                "uri": "https://grafana.com/docs/grafana/latest/",
-                "sha256": "7910c639346c2ffa",
-                "title": "Grafana OSS and Enterprise | Grafana documentation"
+                "uri": "https://docs.sentry.io/product/dashboards/",
+                "sha256": "78abfbfa297e2a6d",
+                "title": "Dashboards"
               },
               {
                 "family": "dashboards",
@@ -851,9 +827,568 @@
               },
               {
                 "family": "dashboards",
-                "uri": "https://grafana.com/docs/grafana/latest/panels-visualizations/",
-                "sha256": "3055b3c8b3269ad0",
-                "title": "Panels and visualizations | Grafana documentation"
+                "uri": "https://docs.railway.com/develop/services",
+                "sha256": "7417e982f156d980",
+                "title": "Services | Railway Docs"
+              },
+              {
+                "family": "cli",
+                "uri": "https://github.com/ClementTsang/bottom",
+                "sha256": "5f823865a8701651",
+                "title": "GitHub - ClementTsang/bottom: Yet another cross-platform graphical process/system monitor. \u00b7 GitHub"
+              }
+            ]
+          },
+          "confidence": "high",
+          "caveats": [],
+          "needs": [
+            "RQ-B1",
+            "RQ-B4"
+          ]
+        },
+        {
+          "id": "ia-dashboard-layout",
+          "label": "Dashboard board / grid layout",
+          "recommendation": "Use a dashboard board/grid as the primary layout: the corpus' dashboards are board-and-grid surfaces, and the widget catalog they contain is catalogs.ia-widget-catalog.",
+          "when": "An operator console that aggregates multiple live surfaces.",
+          "avoid_when": "A single-object workflow that needs no aggregation.",
+          "evidence_class": "[X]",
+          "evidence": {
+            "support": 30,
+            "support_by_family": {
+              "dashboards": 30
+            },
+            "independent_families": 3,
+            "taxonomy_nodes": [
+              {
+                "id": "tech-ia-dashboard-layout",
+                "support": 30,
+                "family_names": [
+                  "dashboards"
+                ],
+                "meets_three_source_rule": true
+              },
+              {
+                "id": "tech-ia-widget-catalog",
+                "support": 28,
+                "family_names": [
+                  "cli",
+                  "dashboards",
+                  "dataviz"
+                ],
+                "meets_three_source_rule": true
+              }
+            ],
+            "refs": [
+              {
+                "family": "dashboards",
+                "uri": "https://posthog.com/docs/product-analytics/dashboards",
+                "sha256": "6c432f3f48666914",
+                "title": "Dashboards - Docs - PostHog"
+              },
+              {
+                "family": "cli",
+                "uri": "https://github.com/ratatui/ratatui",
+                "sha256": "6039c7625aad32c5",
+                "title": "GitHub - ratatui/ratatui: A Rust crate for cooking up terminal user interfaces (TUIs) \ud83d\udc68\u200d\ud83c\udf73\ud83d\udc00 https://ratatui.rs \u00b7 GitHub"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://docs.sentry.io/product/dashboards/",
+                "sha256": "78abfbfa297e2a6d",
+                "title": "Dashboards"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://grafana.com/docs/grafana/latest/dashboards/",
+                "sha256": "789c3cf84b24905d",
+                "title": "Dashboards | Grafana documentation"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://docs.railway.com/develop/services",
+                "sha256": "7417e982f156d980",
+                "title": "Services | Railway Docs"
+              },
+              {
+                "family": "cli",
+                "uri": "https://github.com/ClementTsang/bottom",
+                "sha256": "5f823865a8701651",
+                "title": "GitHub - ClementTsang/bottom: Yet another cross-platform graphical process/system monitor. \u00b7 GitHub"
+              }
+            ]
+          },
+          "confidence": "high",
+          "caveats": [],
+          "needs": [
+            "RQ-B1",
+            "RQ-B4"
+          ]
+        },
+        {
+          "id": "ia-dashboard-layout",
+          "label": "Dashboard board / grid layout",
+          "recommendation": "Use a dashboard board/grid as the primary layout: the corpus' dashboards are board-and-grid surfaces, and the widget catalog they contain is catalogs.ia-widget-catalog.",
+          "when": "An operator console that aggregates multiple live surfaces.",
+          "avoid_when": "A single-object workflow that needs no aggregation.",
+          "evidence_class": "[X]",
+          "evidence": {
+            "support": 30,
+            "support_by_family": {
+              "dashboards": 30
+            },
+            "independent_families": 3,
+            "taxonomy_nodes": [
+              {
+                "id": "tech-ia-dashboard-layout",
+                "support": 30,
+                "family_names": [
+                  "dashboards"
+                ],
+                "meets_three_source_rule": true
+              },
+              {
+                "id": "tech-ia-widget-catalog",
+                "support": 28,
+                "family_names": [
+                  "cli",
+                  "dashboards",
+                  "dataviz"
+                ],
+                "meets_three_source_rule": true
+              }
+            ],
+            "refs": [
+              {
+                "family": "dashboards",
+                "uri": "https://posthog.com/docs/product-analytics/dashboards",
+                "sha256": "6c432f3f48666914",
+                "title": "Dashboards - Docs - PostHog"
+              },
+              {
+                "family": "cli",
+                "uri": "https://github.com/ratatui/ratatui",
+                "sha256": "6039c7625aad32c5",
+                "title": "GitHub - ratatui/ratatui: A Rust crate for cooking up terminal user interfaces (TUIs) \ud83d\udc68\u200d\ud83c\udf73\ud83d\udc00 https://ratatui.rs \u00b7 GitHub"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://docs.sentry.io/product/dashboards/",
+                "sha256": "78abfbfa297e2a6d",
+                "title": "Dashboards"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://grafana.com/docs/grafana/latest/dashboards/",
+                "sha256": "789c3cf84b24905d",
+                "title": "Dashboards | Grafana documentation"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://docs.railway.com/develop/services",
+                "sha256": "7417e982f156d980",
+                "title": "Services | Railway Docs"
+              },
+              {
+                "family": "cli",
+                "uri": "https://github.com/ClementTsang/bottom",
+                "sha256": "5f823865a8701651",
+                "title": "GitHub - ClementTsang/bottom: Yet another cross-platform graphical process/system monitor. \u00b7 GitHub"
+              }
+            ]
+          },
+          "confidence": "high",
+          "caveats": [],
+          "needs": [
+            "RQ-B1",
+            "RQ-B4"
+          ]
+        },
+        {
+          "id": "ia-dashboard-layout",
+          "label": "Dashboard board / grid layout",
+          "recommendation": "Use a dashboard board/grid as the primary layout: the corpus' dashboards are board-and-grid surfaces, and the widget catalog they contain is catalogs.ia-widget-catalog.",
+          "when": "An operator console that aggregates multiple live surfaces.",
+          "avoid_when": "A single-object workflow that needs no aggregation.",
+          "evidence_class": "[X]",
+          "evidence": {
+            "support": 30,
+            "support_by_family": {
+              "dashboards": 30
+            },
+            "independent_families": 3,
+            "taxonomy_nodes": [
+              {
+                "id": "tech-ia-dashboard-layout",
+                "support": 30,
+                "family_names": [
+                  "dashboards"
+                ],
+                "meets_three_source_rule": true
+              },
+              {
+                "id": "tech-ia-widget-catalog",
+                "support": 28,
+                "family_names": [
+                  "cli",
+                  "dashboards",
+                  "dataviz"
+                ],
+                "meets_three_source_rule": true
+              }
+            ],
+            "refs": [
+              {
+                "family": "dashboards",
+                "uri": "https://posthog.com/docs/product-analytics/dashboards",
+                "sha256": "6c432f3f48666914",
+                "title": "Dashboards - Docs - PostHog"
+              },
+              {
+                "family": "cli",
+                "uri": "https://github.com/ratatui/ratatui",
+                "sha256": "6039c7625aad32c5",
+                "title": "GitHub - ratatui/ratatui: A Rust crate for cooking up terminal user interfaces (TUIs) \ud83d\udc68\u200d\ud83c\udf73\ud83d\udc00 https://ratatui.rs \u00b7 GitHub"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://docs.sentry.io/product/dashboards/",
+                "sha256": "78abfbfa297e2a6d",
+                "title": "Dashboards"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://grafana.com/docs/grafana/latest/dashboards/",
+                "sha256": "789c3cf84b24905d",
+                "title": "Dashboards | Grafana documentation"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://docs.railway.com/develop/services",
+                "sha256": "7417e982f156d980",
+                "title": "Services | Railway Docs"
+              },
+              {
+                "family": "cli",
+                "uri": "https://github.com/ClementTsang/bottom",
+                "sha256": "5f823865a8701651",
+                "title": "GitHub - ClementTsang/bottom: Yet another cross-platform graphical process/system monitor. \u00b7 GitHub"
+              }
+            ]
+          },
+          "confidence": "high",
+          "caveats": [],
+          "needs": [
+            "RQ-B1",
+            "RQ-B4"
+          ]
+        },
+        {
+          "id": "ia-dashboard-layout",
+          "label": "Dashboard board / grid layout",
+          "recommendation": "Use a dashboard board/grid as the primary layout: the corpus' dashboards are board-and-grid surfaces, and the widget catalog they contain is catalogs.ia-widget-catalog.",
+          "when": "An operator console that aggregates multiple live surfaces.",
+          "avoid_when": "A single-object workflow that needs no aggregation.",
+          "evidence_class": "[X]",
+          "evidence": {
+            "support": 30,
+            "support_by_family": {
+              "dashboards": 30
+            },
+            "independent_families": 3,
+            "taxonomy_nodes": [
+              {
+                "id": "tech-ia-dashboard-layout",
+                "support": 30,
+                "family_names": [
+                  "dashboards"
+                ],
+                "meets_three_source_rule": true
+              },
+              {
+                "id": "tech-ia-widget-catalog",
+                "support": 28,
+                "family_names": [
+                  "cli",
+                  "dashboards",
+                  "dataviz"
+                ],
+                "meets_three_source_rule": true
+              }
+            ],
+            "refs": [
+              {
+                "family": "dashboards",
+                "uri": "https://posthog.com/docs/product-analytics/dashboards",
+                "sha256": "6c432f3f48666914",
+                "title": "Dashboards - Docs - PostHog"
+              },
+              {
+                "family": "cli",
+                "uri": "https://github.com/ratatui/ratatui",
+                "sha256": "6039c7625aad32c5",
+                "title": "GitHub - ratatui/ratatui: A Rust crate for cooking up terminal user interfaces (TUIs) \ud83d\udc68\u200d\ud83c\udf73\ud83d\udc00 https://ratatui.rs \u00b7 GitHub"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://docs.sentry.io/product/dashboards/",
+                "sha256": "78abfbfa297e2a6d",
+                "title": "Dashboards"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://grafana.com/docs/grafana/latest/dashboards/",
+                "sha256": "789c3cf84b24905d",
+                "title": "Dashboards | Grafana documentation"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://docs.railway.com/develop/services",
+                "sha256": "7417e982f156d980",
+                "title": "Services | Railway Docs"
+              },
+              {
+                "family": "cli",
+                "uri": "https://github.com/ClementTsang/bottom",
+                "sha256": "5f823865a8701651",
+                "title": "GitHub - ClementTsang/bottom: Yet another cross-platform graphical process/system monitor. \u00b7 GitHub"
+              }
+            ]
+          },
+          "confidence": "high",
+          "caveats": [],
+          "needs": [
+            "RQ-B1",
+            "RQ-B4"
+          ]
+        },
+        {
+          "id": "ia-dashboard-layout",
+          "label": "Dashboard board / grid layout",
+          "recommendation": "Use a dashboard board/grid as the primary layout: the corpus' dashboards are board-and-grid surfaces, and the widget catalog they contain is catalogs.ia-widget-catalog.",
+          "when": "An operator console that aggregates multiple live surfaces.",
+          "avoid_when": "A single-object workflow that needs no aggregation.",
+          "evidence_class": "[X]",
+          "evidence": {
+            "support": 30,
+            "support_by_family": {
+              "dashboards": 30
+            },
+            "independent_families": 3,
+            "taxonomy_nodes": [
+              {
+                "id": "tech-ia-dashboard-layout",
+                "support": 30,
+                "family_names": [
+                  "dashboards"
+                ],
+                "meets_three_source_rule": true
+              },
+              {
+                "id": "tech-ia-widget-catalog",
+                "support": 28,
+                "family_names": [
+                  "cli",
+                  "dashboards",
+                  "dataviz"
+                ],
+                "meets_three_source_rule": true
+              }
+            ],
+            "refs": [
+              {
+                "family": "dashboards",
+                "uri": "https://posthog.com/docs/product-analytics/dashboards",
+                "sha256": "6c432f3f48666914",
+                "title": "Dashboards - Docs - PostHog"
+              },
+              {
+                "family": "cli",
+                "uri": "https://github.com/ratatui/ratatui",
+                "sha256": "6039c7625aad32c5",
+                "title": "GitHub - ratatui/ratatui: A Rust crate for cooking up terminal user interfaces (TUIs) \ud83d\udc68\u200d\ud83c\udf73\ud83d\udc00 https://ratatui.rs \u00b7 GitHub"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://docs.sentry.io/product/dashboards/",
+                "sha256": "78abfbfa297e2a6d",
+                "title": "Dashboards"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://grafana.com/docs/grafana/latest/dashboards/",
+                "sha256": "789c3cf84b24905d",
+                "title": "Dashboards | Grafana documentation"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://docs.railway.com/develop/services",
+                "sha256": "7417e982f156d980",
+                "title": "Services | Railway Docs"
+              },
+              {
+                "family": "cli",
+                "uri": "https://github.com/ClementTsang/bottom",
+                "sha256": "5f823865a8701651",
+                "title": "GitHub - ClementTsang/bottom: Yet another cross-platform graphical process/system monitor. \u00b7 GitHub"
+              }
+            ]
+          },
+          "confidence": "high",
+          "caveats": [],
+          "needs": [
+            "RQ-B1",
+            "RQ-B4"
+          ]
+        },
+        {
+          "id": "ia-dashboard-layout",
+          "label": "Dashboard board / grid layout",
+          "recommendation": "Use a dashboard board/grid as the primary layout: the corpus' dashboards are board-and-grid surfaces, and the widget catalog they contain is catalogs.ia-widget-catalog.",
+          "when": "An operator console that aggregates multiple live surfaces.",
+          "avoid_when": "A single-object workflow that needs no aggregation.",
+          "evidence_class": "[X]",
+          "evidence": {
+            "support": 30,
+            "support_by_family": {
+              "dashboards": 30
+            },
+            "independent_families": 3,
+            "taxonomy_nodes": [
+              {
+                "id": "tech-ia-dashboard-layout",
+                "support": 30,
+                "family_names": [
+                  "dashboards"
+                ],
+                "meets_three_source_rule": true
+              },
+              {
+                "id": "tech-ia-widget-catalog",
+                "support": 28,
+                "family_names": [
+                  "cli",
+                  "dashboards",
+                  "dataviz"
+                ],
+                "meets_three_source_rule": true
+              }
+            ],
+            "refs": [
+              {
+                "family": "dashboards",
+                "uri": "https://posthog.com/docs/product-analytics/dashboards",
+                "sha256": "6c432f3f48666914",
+                "title": "Dashboards - Docs - PostHog"
+              },
+              {
+                "family": "cli",
+                "uri": "https://github.com/ratatui/ratatui",
+                "sha256": "6039c7625aad32c5",
+                "title": "GitHub - ratatui/ratatui: A Rust crate for cooking up terminal user interfaces (TUIs) \ud83d\udc68\u200d\ud83c\udf73\ud83d\udc00 https://ratatui.rs \u00b7 GitHub"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://docs.sentry.io/product/dashboards/",
+                "sha256": "78abfbfa297e2a6d",
+                "title": "Dashboards"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://grafana.com/docs/grafana/latest/dashboards/",
+                "sha256": "789c3cf84b24905d",
+                "title": "Dashboards | Grafana documentation"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://docs.railway.com/develop/services",
+                "sha256": "7417e982f156d980",
+                "title": "Services | Railway Docs"
+              },
+              {
+                "family": "cli",
+                "uri": "https://github.com/ClementTsang/bottom",
+                "sha256": "5f823865a8701651",
+                "title": "GitHub - ClementTsang/bottom: Yet another cross-platform graphical process/system monitor. \u00b7 GitHub"
+              }
+            ]
+          },
+          "confidence": "high",
+          "caveats": [],
+          "needs": [
+            "RQ-B1",
+            "RQ-B4"
+          ]
+        },
+        {
+          "id": "ia-dashboard-layout",
+          "label": "Dashboard board / grid layout",
+          "recommendation": "Use a dashboard board/grid as the primary layout: the corpus' dashboards are board-and-grid surfaces, and the widget catalog they contain is catalogs.ia-widget-catalog.",
+          "when": "An operator console that aggregates multiple live surfaces.",
+          "avoid_when": "A single-object workflow that needs no aggregation.",
+          "evidence_class": "[X]",
+          "evidence": {
+            "support": 30,
+            "support_by_family": {
+              "dashboards": 30
+            },
+            "independent_families": 3,
+            "taxonomy_nodes": [
+              {
+                "id": "tech-ia-dashboard-layout",
+                "support": 30,
+                "family_names": [
+                  "dashboards"
+                ],
+                "meets_three_source_rule": true
+              },
+              {
+                "id": "tech-ia-widget-catalog",
+                "support": 28,
+                "family_names": [
+                  "cli",
+                  "dashboards",
+                  "dataviz"
+                ],
+                "meets_three_source_rule": true
+              }
+            ],
+            "refs": [
+              {
+                "family": "dashboards",
+                "uri": "https://posthog.com/docs/product-analytics/dashboards",
+                "sha256": "6c432f3f48666914",
+                "title": "Dashboards - Docs - PostHog"
+              },
+              {
+                "family": "cli",
+                "uri": "https://github.com/ratatui/ratatui",
+                "sha256": "6039c7625aad32c5",
+                "title": "GitHub - ratatui/ratatui: A Rust crate for cooking up terminal user interfaces (TUIs) \ud83d\udc68\u200d\ud83c\udf73\ud83d\udc00 https://ratatui.rs \u00b7 GitHub"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://docs.sentry.io/product/dashboards/",
+                "sha256": "78abfbfa297e2a6d",
+                "title": "Dashboards"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://grafana.com/docs/grafana/latest/dashboards/",
+                "sha256": "789c3cf84b24905d",
+                "title": "Dashboards | Grafana documentation"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://docs.railway.com/develop/services",
+                "sha256": "7417e982f156d980",
+                "title": "Services | Railway Docs"
+              },
+              {
+                "family": "cli",
+                "uri": "https://github.com/ClementTsang/bottom",
+                "sha256": "5f823865a8701651",
+                "title": "GitHub - ClementTsang/bottom: Yet another cross-platform graphical process/system monitor. \u00b7 GitHub"
               }
             ]
           },
@@ -893,17 +1428,17 @@
           "when": "The same panel type repeats across boards.",
           "avoid_when": "Every panel is genuinely one-off.",
           "evidence": {
-            "support": 41,
+            "support": 28,
             "support_by_family": {
-              "dashboards": 19,
+              "dashboards": 9,
               "dataviz": 7,
-              "cli": 15
+              "cli": 12
             },
             "independent_families": 3,
             "taxonomy_nodes": [
               {
                 "id": "tech-ia-widget-catalog",
-                "support": 41,
+                "support": 28,
                 "family_names": [
                   "cli",
                   "dashboards",
@@ -914,16 +1449,16 @@
             ],
             "refs": [
               {
-                "family": "dashboards",
-                "uri": "https://grafana.com/",
-                "sha256": "235bf45a81093a96",
-                "title": "Full-stack observability for the agentic era | Grafana Labs | Grafana Labs"
+                "family": "cli",
+                "uri": "https://github.com/ratatui/ratatui",
+                "sha256": "6039c7625aad32c5",
+                "title": "GitHub - ratatui/ratatui: A Rust crate for cooking up terminal user interfaces (TUIs) \ud83d\udc68\u200d\ud83c\udf73\ud83d\udc00 https://ratatui.rs \u00b7 GitHub"
               },
               {
                 "family": "dashboards",
-                "uri": "https://grafana.com/docs/grafana/latest/",
-                "sha256": "7910c639346c2ffa",
-                "title": "Grafana OSS and Enterprise | Grafana documentation"
+                "uri": "https://docs.sentry.io/product/dashboards/",
+                "sha256": "78abfbfa297e2a6d",
+                "title": "Dashboards"
               },
               {
                 "family": "dashboards",
@@ -932,22 +1467,22 @@
                 "title": "Dashboards | Grafana documentation"
               },
               {
-                "family": "dashboards",
-                "uri": "https://grafana.com/docs/grafana/latest/panels-visualizations/",
-                "sha256": "3055b3c8b3269ad0",
-                "title": "Panels and visualizations | Grafana documentation"
+                "family": "cli",
+                "uri": "https://github.com/ClementTsang/bottom",
+                "sha256": "5f823865a8701651",
+                "title": "GitHub - ClementTsang/bottom: Yet another cross-platform graphical process/system monitor. \u00b7 GitHub"
               },
               {
-                "family": "dashboards",
-                "uri": "https://grafana.com/docs/grafana/latest/alerting/",
-                "sha256": "d28ea3629b46d1b6",
-                "title": "Grafana Alerting | Grafana documentation"
+                "family": "cli",
+                "uri": "https://github.com/Textualize/textual",
+                "sha256": "f870e111a641c897",
+                "title": "GitHub - Textualize/textual: The lean application framework for Python.  Build sophisticated user interfaces with a simple Python API. Run your apps in the terminal and a web browser. \u00b7 GitHub"
               },
               {
-                "family": "dashboards",
-                "uri": "https://grafana.com/blog/",
-                "sha256": "c305e2a92f3e3b5f",
-                "title": "Grafana Labs blog | Grafana Labs"
+                "family": "cli",
+                "uri": "https://github.com/jesseduffield/lazygit",
+                "sha256": "bcba07779b22b8e0",
+                "title": "GitHub - jesseduffield/lazygit: simple terminal UI for git commands \u00b7 GitHub"
               }
             ]
           },
@@ -966,17 +1501,17 @@
           "when": "Power operators repeat the same jumps and actions.",
           "avoid_when": "It is the only navigation (discoverability suffers).",
           "evidence": {
-            "support": 22,
+            "support": 12,
             "support_by_family": {
-              "dashboards": 11,
-              "cli": 7,
+              "dashboards": 5,
+              "cli": 3,
               "craft": 4
             },
             "independent_families": 3,
             "taxonomy_nodes": [
               {
                 "id": "tech-ia-command-palette",
-                "support": 11,
+                "support": 4,
                 "family_names": [
                   "cli",
                   "dashboards"
@@ -985,7 +1520,7 @@
               },
               {
                 "id": "tech-int-keyboard-first",
-                "support": 22,
+                "support": 12,
                 "family_names": [
                   "cli",
                   "craft",
@@ -997,15 +1532,27 @@
             "refs": [
               {
                 "family": "dashboards",
-                "uri": "https://linear.app/",
-                "sha256": "eb0e0bc396ddd962",
-                "title": "Linear \u2013 The system for product development"
+                "uri": "https://docs.railway.com/develop/services",
+                "sha256": "7417e982f156d980",
+                "title": "Services | Railway Docs"
               },
               {
-                "family": "dashboards",
-                "uri": "https://linear.app/blog",
-                "sha256": "8567e6066c918c20",
-                "title": "Now \u2013 Updates from the Linear team"
+                "family": "craft",
+                "uri": "https://www.smashingmagazine.com/2025/06/what-i-wish-someone-told-me-aria/",
+                "sha256": "44d54c5850d776a2",
+                "title": "What I Wish Someone Told Me When I Was Getting Into ARIA \u2014 Smashing Magazine"
+              },
+              {
+                "family": "cli",
+                "uri": "https://docs.warp.dev/",
+                "sha256": "195a63f0e2b72c34",
+                "title": "Getting started with Warp | Warp"
+              },
+              {
+                "family": "craft",
+                "uri": "https://www.w3.org/WAI/ARIA/apg/patterns/",
+                "sha256": "67aa84429d27fba3",
+                "title": "Patterns | APG | WAI | W3CPatterns"
               },
               {
                 "family": "dashboards",
@@ -1014,22 +1561,10 @@
                 "title": "Railway Docs"
               },
               {
-                "family": "dashboards",
-                "uri": "https://linear.app/customers",
-                "sha256": "65f2546f7e24d678",
-                "title": "Linear Customers"
-              },
-              {
-                "family": "dashboards",
-                "uri": "https://docs.railway.com/guides/",
-                "sha256": "d79597e894fe6c47",
-                "title": "Guides | Railway"
-              },
-              {
-                "family": "dashboards",
-                "uri": "https://posthog.com/docs/product-analytics",
-                "sha256": "923433f300af8023",
-                "title": "Product analytics - Docs - PostHog"
+                "family": "craft",
+                "uri": "https://web.dev/learn/accessibility/",
+                "sha256": "abe7da4e372ad808",
+                "title": "Learn Accessibility \u00a0|\u00a0 web.dev"
               }
             ]
           },
@@ -1043,52 +1578,25 @@
         },
         {
           "id": "ia-master-detail",
-          "label": "Master / detail (docked detail, side peek)",
+          "label": "[P] [P] [P] [P] [P] Master / detail (docked detail, side peek)",
           "recommendation": "Select a node in a live grid and inspect it in a docked detail region that survives updates; the corpus' table/preview patterns pair a list with an adjacent detail.",
           "when": "Drill-down from a dense list without losing the list.",
           "avoid_when": "Selection is rare (a routed page is simpler).",
           "evidence": {
-            "support": 4,
-            "support_by_family": {
-              "craft": 4
-            },
-            "independent_families": 1,
+            "support": 1,
+            "support_by_family": {},
+            "independent_families": 0,
             "taxonomy_nodes": [
               {
                 "id": "tech-ia-master-detail",
-                "support": 4,
+                "support": 1,
                 "family_names": [
                   "craft"
                 ],
-                "meets_three_source_rule": true
+                "meets_three_source_rule": false
               }
             ],
-            "refs": [
-              {
-                "family": "craft",
-                "uri": "https://www.nngroup.com/articles/data-tables/",
-                "sha256": "7bb44646100f45ed",
-                "title": "Data Tables: Four Major User Tasks - NN/G"
-              },
-              {
-                "family": "craft",
-                "uri": "https://www.w3.org/WAI/tutorials/tables/",
-                "sha256": "627865eeda93dba0",
-                "title": "Tables Tutorial | Web Accessibility Initiative (WAI) | W3C"
-              },
-              {
-                "family": "craft",
-                "uri": "https://inclusive-components.design/",
-                "sha256": "ac8dbab4744ac5bf",
-                "title": "Inclusive Components"
-              },
-              {
-                "family": "craft",
-                "uri": "https://every-layout.dev/",
-                "sha256": "4b5a5ab9eabd35d8",
-                "title": "Relearn CSS layout: Every Layout"
-              }
-            ]
+            "refs": []
           },
           "confidence": "medium",
           "caveats": [],
@@ -1096,7 +1604,8 @@
             "RQ-B3",
             "RQ-E1"
           ],
-          "evidence_class": "[X]"
+          "evidence_class": "[P]",
+          "policy_reason": "Backing taxonomy node(s) tech-ia-master-detail fall below the >=3-source bar after the q0 evidence gate."
         },
         {
           "id": "ia-tab-bar",
@@ -1105,16 +1614,16 @@
           "when": "Operators juggle several surfaces at once.",
           "avoid_when": "A single surface is enough.",
           "evidence": {
-            "support": 8,
+            "support": 3,
             "support_by_family": {
-              "cli": 7,
+              "cli": 2,
               "craft": 1
             },
             "independent_families": 2,
             "taxonomy_nodes": [
               {
                 "id": "tech-ia-tab-bar",
-                "support": 8,
+                "support": 3,
                 "family_names": [
                   "cli",
                   "craft"
@@ -1124,34 +1633,16 @@
             ],
             "refs": [
               {
-                "family": "cli",
-                "uri": "https://www.warp.dev/",
-                "sha256": "b5c3555b32cf6350",
-                "title": "Warp \u2014 The Open Platform for Automating Development"
+                "family": "craft",
+                "uri": "https://www.w3.org/WAI/ARIA/apg/patterns/",
+                "sha256": "67aa84429d27fba3",
+                "title": "Patterns | APG | WAI | W3CPatterns"
               },
               {
                 "family": "cli",
-                "uri": "https://www.warp.dev/blog",
-                "sha256": "9b7288189adb64df",
-                "title": "Warp Blog: AI Agents, Terminal Engineering & Dev Tips | Warp"
-              },
-              {
-                "family": "cli",
-                "uri": "https://www.waveterm.dev/",
-                "sha256": "4460022b6d85a5be",
-                "title": "Wave Terminal \u2014 Upgrade Your Command Line"
-              },
-              {
-                "family": "cli",
-                "uri": "https://ghostty.org/",
-                "sha256": "c2dd13ab48151194",
-                "title": "Ghostty"
-              },
-              {
-                "family": "cli",
-                "uri": "https://ghostty.org/docs",
-                "sha256": "4813bfcf2917963d",
-                "title": "Ghostty Docs"
+                "uri": "https://sw.kovidgoyal.net/kitty/",
+                "sha256": "a3d50cc44562b66c",
+                "title": "kitty"
               },
               {
                 "family": "cli",
@@ -1171,52 +1662,25 @@
         },
         {
           "id": "ia-progressive-disclosure",
-          "label": "Progressive disclosure",
+          "label": "[P] [P] [P] [P] [P] Progressive disclosure",
           "recommendation": "Show the common case and defer the rest to a secondary surface (drawer/peek); NN/g's canonical two-level reveal and Every Layout's composable primitives both support this.",
           "when": "Surfaces have a frequent core and a long tail.",
           "avoid_when": "Hiding a decision-critical signal (r0 M5 risk).",
           "evidence": {
-            "support": 4,
-            "support_by_family": {
-              "craft": 4
-            },
-            "independent_families": 1,
+            "support": 2,
+            "support_by_family": {},
+            "independent_families": 0,
             "taxonomy_nodes": [
               {
                 "id": "tech-ia-progressive-disclosure",
-                "support": 4,
+                "support": 2,
                 "family_names": [
                   "craft"
                 ],
-                "meets_three_source_rule": true
+                "meets_three_source_rule": false
               }
             ],
-            "refs": [
-              {
-                "family": "craft",
-                "uri": "https://web.dev/learn/design/",
-                "sha256": "64d16f4d7158c427",
-                "title": "Learn Responsive Design \u00a0|\u00a0 web.dev"
-              },
-              {
-                "family": "craft",
-                "uri": "https://www.nngroup.com/articles/progressive-disclosure/",
-                "sha256": "704fe924fed0ccae",
-                "title": "Progressive Disclosure - NN/G"
-              },
-              {
-                "family": "craft",
-                "uri": "https://www.nngroup.com/articles/skeleton-screens/",
-                "sha256": "ae670dfbb428a6ce",
-                "title": "Skeleton Screens 101 - NN/G"
-              },
-              {
-                "family": "craft",
-                "uri": "https://every-layout.dev/",
-                "sha256": "4b5a5ab9eabd35d8",
-                "title": "Relearn CSS layout: Every Layout"
-              }
-            ]
+            "refs": []
           },
           "confidence": "low",
           "caveats": [
@@ -1227,72 +1691,30 @@
             "RQ-B3",
             "RQ-B5"
           ],
-          "evidence_class": "[X]"
+          "evidence_class": "[P]",
+          "policy_reason": "Backing taxonomy node(s) tech-ia-progressive-disclosure fall below the >=3-source bar after the q0 evidence gate."
         },
         {
           "id": "ia-density-ladder",
-          "label": "Density ladder / responsive sizing",
+          "label": "[P] [P] [P] [P] [P] Density ladder / responsive sizing",
           "recommendation": "Provide a persisted density mode (comfortable/compact) and intrinsic layout; the responsive-design and data-dense typography sources support both.",
           "when": "Dense telemetry must stay usable across laptop and phone.",
           "avoid_when": "Density switch resets selection/focus.",
           "evidence": {
-            "support": 8,
-            "support_by_family": {
-              "dashboards": 4,
-              "dataviz": 1,
-              "craft": 3
-            },
-            "independent_families": 3,
+            "support": 2,
+            "support_by_family": {},
+            "independent_families": 0,
             "taxonomy_nodes": [
               {
                 "id": "tech-ia-density-ladder",
-                "support": 8,
+                "support": 2,
                 "family_names": [
-                  "craft",
-                  "dashboards",
-                  "dataviz"
+                  "craft"
                 ],
-                "meets_three_source_rule": true
+                "meets_three_source_rule": false
               }
             ],
-            "refs": [
-              {
-                "family": "dashboards",
-                "uri": "https://linear.app/",
-                "sha256": "eb0e0bc396ddd962",
-                "title": "Linear \u2013 The system for product development"
-              },
-              {
-                "family": "dashboards",
-                "uri": "https://linear.app/blog",
-                "sha256": "8567e6066c918c20",
-                "title": "Now \u2013 Updates from the Linear team"
-              },
-              {
-                "family": "dashboards",
-                "uri": "https://fly.io/",
-                "sha256": "c3b38e7d13ce962d",
-                "title": "Fly \u00b7 Computers for agents"
-              },
-              {
-                "family": "dashboards",
-                "uri": "https://fly.io/blog/",
-                "sha256": "bfefc60052d89057",
-                "title": "The Fly Blog"
-              },
-              {
-                "family": "dataviz",
-                "uri": "https://echarts.apache.org/handbook/en/concepts/chart-size/",
-                "sha256": "66a59665faa2a804",
-                "title": "Chart Container - Concepts - Handbook - Apache ECharts"
-              },
-              {
-                "family": "craft",
-                "uri": "https://web.dev/learn/design/",
-                "sha256": "64d16f4d7158c427",
-                "title": "Learn Responsive Design \u00a0|\u00a0 web.dev"
-              }
-            ]
+            "refs": []
           },
           "confidence": "high",
           "caveats": [],
@@ -1300,7 +1722,8 @@
             "RQ-E2",
             "RQ-H3"
           ],
-          "evidence_class": "[X]"
+          "evidence_class": "[P]",
+          "policy_reason": "Backing taxonomy node(s) tech-ia-density-ladder fall below the >=3-source bar after the q0 evidence gate."
         },
         {
           "id": "ia-attention-surface",
@@ -1310,15 +1733,15 @@
           "avoid_when": "A single-threshold system with no routing.",
           "evidence_class": "[X]",
           "evidence": {
-            "support": 23,
+            "support": 13,
             "support_by_family": {
-              "dashboards": 23
+              "dashboards": 13
             },
             "independent_families": 1,
             "taxonomy_nodes": [
               {
                 "id": "tech-trust-alerting",
-                "support": 23,
+                "support": 13,
                 "family_names": [
                   "dashboards"
                 ],
@@ -1328,9 +1751,15 @@
             "refs": [
               {
                 "family": "dashboards",
-                "uri": "https://grafana.com/",
-                "sha256": "235bf45a81093a96",
-                "title": "Full-stack observability for the agentic era | Grafana Labs | Grafana Labs"
+                "uri": "https://grafana.com/docs/grafana/latest/alerting/",
+                "sha256": "d28ea3629b46d1b6",
+                "title": "Grafana Alerting | Grafana documentation"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://grafana.com/docs/grafana/latest/panels-visualizations/",
+                "sha256": "3055b3c8b3269ad0",
+                "title": "Panels and visualizations | Grafana documentation"
               },
               {
                 "family": "dashboards",
@@ -1346,21 +1775,15 @@
               },
               {
                 "family": "dashboards",
-                "uri": "https://grafana.com/docs/grafana/latest/panels-visualizations/",
-                "sha256": "3055b3c8b3269ad0",
-                "title": "Panels and visualizations | Grafana documentation"
+                "uri": "https://docs.sentry.io/product/alerts/",
+                "sha256": "748e01c9871ac335",
+                "title": "Alerts"
               },
               {
                 "family": "dashboards",
-                "uri": "https://grafana.com/docs/grafana/latest/alerting/",
-                "sha256": "d28ea3629b46d1b6",
-                "title": "Grafana Alerting | Grafana documentation"
-              },
-              {
-                "family": "dashboards",
-                "uri": "https://grafana.com/blog/",
-                "sha256": "c305e2a92f3e3b5f",
-                "title": "Grafana Labs blog | Grafana Labs"
+                "uri": "https://docs.sentry.io/product/issues/",
+                "sha256": "acf60cd8ea6418e1",
+                "title": "Issues"
               }
             ]
           },
@@ -1380,15 +1803,15 @@
           "avoid_when": "Cost is someone else's concern.",
           "evidence_class": "[P]",
           "evidence": {
-            "support": 13,
+            "support": 6,
             "support_by_family": {
-              "agentops": 13
+              "agentops": 6
             },
             "independent_families": 1,
             "taxonomy_nodes": [
               {
                 "id": "tech-money-cost-attribution",
-                "support": 13,
+                "support": 6,
                 "family_names": [
                   "agentops"
                 ],
@@ -1398,21 +1821,21 @@
             "refs": [
               {
                 "family": "agentops",
+                "uri": "https://docs.honeyhive.ai/",
+                "sha256": "0ab7e926909c38ee",
+                "title": "Introducing HoneyHive - HoneyHive AI Docs"
+              },
+              {
+                "family": "agentops",
+                "uri": "https://docs.latitude.so/",
+                "sha256": "ece55c9402f2f298",
+                "title": "Latitude Overview - Latitude Docs"
+              },
+              {
+                "family": "agentops",
                 "uri": "https://langfuse.com/docs",
                 "sha256": "34d09509900f2a2b",
                 "title": "Open Source AI Engineering Platform - Langfuse"
-              },
-              {
-                "family": "agentops",
-                "uri": "https://langfuse.com/docs/observability/overview",
-                "sha256": "0a1784a27f750267",
-                "title": "LLM Observability & Application Tracing (Open Source) - Langfuse"
-              },
-              {
-                "family": "agentops",
-                "uri": "https://docs.smith.langchain.com/",
-                "sha256": "216cc0ec88b4a616",
-                "title": "LangSmith Observability - Docs by LangChain"
               },
               {
                 "family": "agentops",
@@ -1422,9 +1845,9 @@
               },
               {
                 "family": "agentops",
-                "uri": "https://www.braintrust.dev/docs",
-                "sha256": "1694f5c22f1528ee",
-                "title": "Get started with Braintrust - Braintrust"
+                "uri": "https://langfuse.com/docs/observability/overview",
+                "sha256": "0a1784a27f750267",
+                "title": "LLM Observability & Application Tracing (Open Source) - Langfuse"
               },
               {
                 "family": "agentops",
@@ -1451,15 +1874,16 @@
           "avoid_when": "Cost is fixed or untracked.",
           "evidence_class": "[X]",
           "evidence": {
-            "support": 13,
+            "support": 7,
             "support_by_family": {
-              "agentops": 13
+              "agentops": 1,
+              "dashboards": 6
             },
             "independent_families": 2,
             "taxonomy_nodes": [
               {
                 "id": "tech-money-cost-attribution",
-                "support": 13,
+                "support": 6,
                 "family_names": [
                   "agentops"
                 ],
@@ -1478,9 +1902,21 @@
             "refs": [
               {
                 "family": "agentops",
-                "uri": "https://langfuse.com/docs",
-                "sha256": "34d09509900f2a2b",
-                "title": "Open Source AI Engineering Platform - Langfuse"
+                "uri": "https://docs.honeyhive.ai/",
+                "sha256": "0ab7e926909c38ee",
+                "title": "Introducing HoneyHive - HoneyHive AI Docs"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://stripe.com/blog",
+                "sha256": "11e34aac5147fea3",
+                "title": "Stripe Blog: Online Payment Solutions Blog"
+              },
+              {
+                "family": "agentops",
+                "uri": "https://docs.latitude.so/",
+                "sha256": "ece55c9402f2f298",
+                "title": "Latitude Overview - Latitude Docs"
               },
               {
                 "family": "agentops",
@@ -1490,27 +1926,15 @@
               },
               {
                 "family": "agentops",
-                "uri": "https://langfuse.com/docs/observability/overview",
-                "sha256": "0a1784a27f750267",
-                "title": "LLM Observability & Application Tracing (Open Source) - Langfuse"
+                "uri": "https://langfuse.com/docs",
+                "sha256": "34d09509900f2a2b",
+                "title": "Open Source AI Engineering Platform - Langfuse"
               },
               {
                 "family": "dashboards",
                 "uri": "https://stripe.com/",
                 "sha256": "3986c0147ca5aaaa",
                 "title": "Stripe | Plateforme et solution de paiement en ligne"
-              },
-              {
-                "family": "agentops",
-                "uri": "https://docs.smith.langchain.com/",
-                "sha256": "216cc0ec88b4a616",
-                "title": "LangSmith Observability - Docs by LangChain"
-              },
-              {
-                "family": "dashboards",
-                "uri": "https://stripe.com/docs",
-                "sha256": "255311919f90098f",
-                "title": "Documentation Stripe"
               }
             ]
           },
@@ -1530,15 +1954,16 @@
           "avoid_when": "Cost is fixed or untracked.",
           "evidence_class": "[X]",
           "evidence": {
-            "support": 13,
+            "support": 7,
             "support_by_family": {
-              "agentops": 13
+              "agentops": 1,
+              "dashboards": 6
             },
             "independent_families": 2,
             "taxonomy_nodes": [
               {
                 "id": "tech-money-cost-attribution",
-                "support": 13,
+                "support": 6,
                 "family_names": [
                   "agentops"
                 ],
@@ -1557,9 +1982,21 @@
             "refs": [
               {
                 "family": "agentops",
-                "uri": "https://langfuse.com/docs",
-                "sha256": "34d09509900f2a2b",
-                "title": "Open Source AI Engineering Platform - Langfuse"
+                "uri": "https://docs.honeyhive.ai/",
+                "sha256": "0ab7e926909c38ee",
+                "title": "Introducing HoneyHive - HoneyHive AI Docs"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://stripe.com/blog",
+                "sha256": "11e34aac5147fea3",
+                "title": "Stripe Blog: Online Payment Solutions Blog"
+              },
+              {
+                "family": "agentops",
+                "uri": "https://docs.latitude.so/",
+                "sha256": "ece55c9402f2f298",
+                "title": "Latitude Overview - Latitude Docs"
               },
               {
                 "family": "agentops",
@@ -1569,27 +2006,15 @@
               },
               {
                 "family": "agentops",
-                "uri": "https://langfuse.com/docs/observability/overview",
-                "sha256": "0a1784a27f750267",
-                "title": "LLM Observability & Application Tracing (Open Source) - Langfuse"
+                "uri": "https://langfuse.com/docs",
+                "sha256": "34d09509900f2a2b",
+                "title": "Open Source AI Engineering Platform - Langfuse"
               },
               {
                 "family": "dashboards",
                 "uri": "https://stripe.com/",
                 "sha256": "3986c0147ca5aaaa",
                 "title": "Stripe | Plateforme et solution de paiement en ligne"
-              },
-              {
-                "family": "agentops",
-                "uri": "https://docs.smith.langchain.com/",
-                "sha256": "216cc0ec88b4a616",
-                "title": "LangSmith Observability - Docs by LangChain"
-              },
-              {
-                "family": "dashboards",
-                "uri": "https://stripe.com/docs",
-                "sha256": "255311919f90098f",
-                "title": "Documentation Stripe"
               }
             ]
           },
@@ -1609,15 +2034,16 @@
           "avoid_when": "Cost is fixed or untracked.",
           "evidence_class": "[X]",
           "evidence": {
-            "support": 13,
+            "support": 7,
             "support_by_family": {
-              "agentops": 13
+              "agentops": 1,
+              "dashboards": 6
             },
             "independent_families": 2,
             "taxonomy_nodes": [
               {
                 "id": "tech-money-cost-attribution",
-                "support": 13,
+                "support": 6,
                 "family_names": [
                   "agentops"
                 ],
@@ -1636,9 +2062,21 @@
             "refs": [
               {
                 "family": "agentops",
-                "uri": "https://langfuse.com/docs",
-                "sha256": "34d09509900f2a2b",
-                "title": "Open Source AI Engineering Platform - Langfuse"
+                "uri": "https://docs.honeyhive.ai/",
+                "sha256": "0ab7e926909c38ee",
+                "title": "Introducing HoneyHive - HoneyHive AI Docs"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://stripe.com/blog",
+                "sha256": "11e34aac5147fea3",
+                "title": "Stripe Blog: Online Payment Solutions Blog"
+              },
+              {
+                "family": "agentops",
+                "uri": "https://docs.latitude.so/",
+                "sha256": "ece55c9402f2f298",
+                "title": "Latitude Overview - Latitude Docs"
               },
               {
                 "family": "agentops",
@@ -1648,27 +2086,15 @@
               },
               {
                 "family": "agentops",
-                "uri": "https://langfuse.com/docs/observability/overview",
-                "sha256": "0a1784a27f750267",
-                "title": "LLM Observability & Application Tracing (Open Source) - Langfuse"
+                "uri": "https://langfuse.com/docs",
+                "sha256": "34d09509900f2a2b",
+                "title": "Open Source AI Engineering Platform - Langfuse"
               },
               {
                 "family": "dashboards",
                 "uri": "https://stripe.com/",
                 "sha256": "3986c0147ca5aaaa",
                 "title": "Stripe | Plateforme et solution de paiement en ligne"
-              },
-              {
-                "family": "agentops",
-                "uri": "https://docs.smith.langchain.com/",
-                "sha256": "216cc0ec88b4a616",
-                "title": "LangSmith Observability - Docs by LangChain"
-              },
-              {
-                "family": "dashboards",
-                "uri": "https://stripe.com/docs",
-                "sha256": "255311919f90098f",
-                "title": "Documentation Stripe"
               }
             ]
           },
@@ -1688,15 +2114,16 @@
           "avoid_when": "Cost is fixed or untracked.",
           "evidence_class": "[X]",
           "evidence": {
-            "support": 13,
+            "support": 7,
             "support_by_family": {
-              "agentops": 13
+              "agentops": 1,
+              "dashboards": 6
             },
             "independent_families": 2,
             "taxonomy_nodes": [
               {
                 "id": "tech-money-cost-attribution",
-                "support": 13,
+                "support": 6,
                 "family_names": [
                   "agentops"
                 ],
@@ -1715,9 +2142,21 @@
             "refs": [
               {
                 "family": "agentops",
-                "uri": "https://langfuse.com/docs",
-                "sha256": "34d09509900f2a2b",
-                "title": "Open Source AI Engineering Platform - Langfuse"
+                "uri": "https://docs.honeyhive.ai/",
+                "sha256": "0ab7e926909c38ee",
+                "title": "Introducing HoneyHive - HoneyHive AI Docs"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://stripe.com/blog",
+                "sha256": "11e34aac5147fea3",
+                "title": "Stripe Blog: Online Payment Solutions Blog"
+              },
+              {
+                "family": "agentops",
+                "uri": "https://docs.latitude.so/",
+                "sha256": "ece55c9402f2f298",
+                "title": "Latitude Overview - Latitude Docs"
               },
               {
                 "family": "agentops",
@@ -1727,27 +2166,15 @@
               },
               {
                 "family": "agentops",
-                "uri": "https://langfuse.com/docs/observability/overview",
-                "sha256": "0a1784a27f750267",
-                "title": "LLM Observability & Application Tracing (Open Source) - Langfuse"
+                "uri": "https://langfuse.com/docs",
+                "sha256": "34d09509900f2a2b",
+                "title": "Open Source AI Engineering Platform - Langfuse"
               },
               {
                 "family": "dashboards",
                 "uri": "https://stripe.com/",
                 "sha256": "3986c0147ca5aaaa",
                 "title": "Stripe | Plateforme et solution de paiement en ligne"
-              },
-              {
-                "family": "agentops",
-                "uri": "https://docs.smith.langchain.com/",
-                "sha256": "216cc0ec88b4a616",
-                "title": "LangSmith Observability - Docs by LangChain"
-              },
-              {
-                "family": "dashboards",
-                "uri": "https://stripe.com/docs",
-                "sha256": "255311919f90098f",
-                "title": "Documentation Stripe"
               }
             ]
           },
@@ -1767,15 +2194,16 @@
           "avoid_when": "Cost is fixed or untracked.",
           "evidence_class": "[X]",
           "evidence": {
-            "support": 13,
+            "support": 7,
             "support_by_family": {
-              "agentops": 13
+              "agentops": 1,
+              "dashboards": 6
             },
             "independent_families": 2,
             "taxonomy_nodes": [
               {
                 "id": "tech-money-cost-attribution",
-                "support": 13,
+                "support": 6,
                 "family_names": [
                   "agentops"
                 ],
@@ -1794,9 +2222,21 @@
             "refs": [
               {
                 "family": "agentops",
-                "uri": "https://langfuse.com/docs",
-                "sha256": "34d09509900f2a2b",
-                "title": "Open Source AI Engineering Platform - Langfuse"
+                "uri": "https://docs.honeyhive.ai/",
+                "sha256": "0ab7e926909c38ee",
+                "title": "Introducing HoneyHive - HoneyHive AI Docs"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://stripe.com/blog",
+                "sha256": "11e34aac5147fea3",
+                "title": "Stripe Blog: Online Payment Solutions Blog"
+              },
+              {
+                "family": "agentops",
+                "uri": "https://docs.latitude.so/",
+                "sha256": "ece55c9402f2f298",
+                "title": "Latitude Overview - Latitude Docs"
               },
               {
                 "family": "agentops",
@@ -1806,27 +2246,575 @@
               },
               {
                 "family": "agentops",
-                "uri": "https://langfuse.com/docs/observability/overview",
-                "sha256": "0a1784a27f750267",
-                "title": "LLM Observability & Application Tracing (Open Source) - Langfuse"
+                "uri": "https://langfuse.com/docs",
+                "sha256": "34d09509900f2a2b",
+                "title": "Open Source AI Engineering Platform - Langfuse"
               },
               {
                 "family": "dashboards",
                 "uri": "https://stripe.com/",
                 "sha256": "3986c0147ca5aaaa",
                 "title": "Stripe | Plateforme et solution de paiement en ligne"
+              }
+            ]
+          },
+          "confidence": "medium",
+          "caveats": [],
+          "needs": [
+            "ON-G4",
+            "RQ-B4",
+            "RQ-I1"
+          ]
+        },
+        {
+          "id": "money-cost-attribution",
+          "label": "Cost attribution to runs/agents",
+          "recommendation": "Attribute cost to the run/agent that incurred it; the agent-ops sources document cost tracking as a first-class run field.",
+          "when": "Multiple agents/models spend against shared budgets.",
+          "avoid_when": "Cost is fixed or untracked.",
+          "evidence_class": "[X]",
+          "evidence": {
+            "support": 7,
+            "support_by_family": {
+              "agentops": 1,
+              "dashboards": 6
+            },
+            "independent_families": 2,
+            "taxonomy_nodes": [
+              {
+                "id": "tech-money-cost-attribution",
+                "support": 6,
+                "family_names": [
+                  "agentops"
+                ],
+                "meets_three_source_rule": true
               },
               {
+                "id": "tech-money-billing",
+                "support": 7,
+                "family_names": [
+                  "agentops",
+                  "dashboards"
+                ],
+                "meets_three_source_rule": true
+              }
+            ],
+            "refs": [
+              {
                 "family": "agentops",
-                "uri": "https://docs.smith.langchain.com/",
-                "sha256": "216cc0ec88b4a616",
-                "title": "LangSmith Observability - Docs by LangChain"
+                "uri": "https://docs.honeyhive.ai/",
+                "sha256": "0ab7e926909c38ee",
+                "title": "Introducing HoneyHive - HoneyHive AI Docs"
               },
               {
                 "family": "dashboards",
-                "uri": "https://stripe.com/docs",
-                "sha256": "255311919f90098f",
-                "title": "Documentation Stripe"
+                "uri": "https://stripe.com/blog",
+                "sha256": "11e34aac5147fea3",
+                "title": "Stripe Blog: Online Payment Solutions Blog"
+              },
+              {
+                "family": "agentops",
+                "uri": "https://docs.latitude.so/",
+                "sha256": "ece55c9402f2f298",
+                "title": "Latitude Overview - Latitude Docs"
+              },
+              {
+                "family": "agentops",
+                "uri": "https://langfuse.com/pricing",
+                "sha256": "843dd0a8b6f100fb",
+                "title": "Pricing - Langfuse"
+              },
+              {
+                "family": "agentops",
+                "uri": "https://langfuse.com/docs",
+                "sha256": "34d09509900f2a2b",
+                "title": "Open Source AI Engineering Platform - Langfuse"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://stripe.com/",
+                "sha256": "3986c0147ca5aaaa",
+                "title": "Stripe | Plateforme et solution de paiement en ligne"
+              }
+            ]
+          },
+          "confidence": "medium",
+          "caveats": [],
+          "needs": [
+            "ON-G4",
+            "RQ-B4",
+            "RQ-I1"
+          ]
+        },
+        {
+          "id": "money-cost-attribution",
+          "label": "Cost attribution to runs/agents",
+          "recommendation": "Attribute cost to the run/agent that incurred it; the agent-ops sources document cost tracking as a first-class run field.",
+          "when": "Multiple agents/models spend against shared budgets.",
+          "avoid_when": "Cost is fixed or untracked.",
+          "evidence_class": "[X]",
+          "evidence": {
+            "support": 7,
+            "support_by_family": {
+              "agentops": 1,
+              "dashboards": 6
+            },
+            "independent_families": 2,
+            "taxonomy_nodes": [
+              {
+                "id": "tech-money-cost-attribution",
+                "support": 6,
+                "family_names": [
+                  "agentops"
+                ],
+                "meets_three_source_rule": true
+              },
+              {
+                "id": "tech-money-billing",
+                "support": 7,
+                "family_names": [
+                  "agentops",
+                  "dashboards"
+                ],
+                "meets_three_source_rule": true
+              }
+            ],
+            "refs": [
+              {
+                "family": "agentops",
+                "uri": "https://docs.honeyhive.ai/",
+                "sha256": "0ab7e926909c38ee",
+                "title": "Introducing HoneyHive - HoneyHive AI Docs"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://stripe.com/blog",
+                "sha256": "11e34aac5147fea3",
+                "title": "Stripe Blog: Online Payment Solutions Blog"
+              },
+              {
+                "family": "agentops",
+                "uri": "https://docs.latitude.so/",
+                "sha256": "ece55c9402f2f298",
+                "title": "Latitude Overview - Latitude Docs"
+              },
+              {
+                "family": "agentops",
+                "uri": "https://langfuse.com/pricing",
+                "sha256": "843dd0a8b6f100fb",
+                "title": "Pricing - Langfuse"
+              },
+              {
+                "family": "agentops",
+                "uri": "https://langfuse.com/docs",
+                "sha256": "34d09509900f2a2b",
+                "title": "Open Source AI Engineering Platform - Langfuse"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://stripe.com/",
+                "sha256": "3986c0147ca5aaaa",
+                "title": "Stripe | Plateforme et solution de paiement en ligne"
+              }
+            ]
+          },
+          "confidence": "medium",
+          "caveats": [],
+          "needs": [
+            "ON-G4",
+            "RQ-B4",
+            "RQ-I1"
+          ]
+        },
+        {
+          "id": "money-cost-attribution",
+          "label": "Cost attribution to runs/agents",
+          "recommendation": "Attribute cost to the run/agent that incurred it; the agent-ops sources document cost tracking as a first-class run field.",
+          "when": "Multiple agents/models spend against shared budgets.",
+          "avoid_when": "Cost is fixed or untracked.",
+          "evidence_class": "[X]",
+          "evidence": {
+            "support": 7,
+            "support_by_family": {
+              "agentops": 1,
+              "dashboards": 6
+            },
+            "independent_families": 2,
+            "taxonomy_nodes": [
+              {
+                "id": "tech-money-cost-attribution",
+                "support": 6,
+                "family_names": [
+                  "agentops"
+                ],
+                "meets_three_source_rule": true
+              },
+              {
+                "id": "tech-money-billing",
+                "support": 7,
+                "family_names": [
+                  "agentops",
+                  "dashboards"
+                ],
+                "meets_three_source_rule": true
+              }
+            ],
+            "refs": [
+              {
+                "family": "agentops",
+                "uri": "https://docs.honeyhive.ai/",
+                "sha256": "0ab7e926909c38ee",
+                "title": "Introducing HoneyHive - HoneyHive AI Docs"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://stripe.com/blog",
+                "sha256": "11e34aac5147fea3",
+                "title": "Stripe Blog: Online Payment Solutions Blog"
+              },
+              {
+                "family": "agentops",
+                "uri": "https://docs.latitude.so/",
+                "sha256": "ece55c9402f2f298",
+                "title": "Latitude Overview - Latitude Docs"
+              },
+              {
+                "family": "agentops",
+                "uri": "https://langfuse.com/pricing",
+                "sha256": "843dd0a8b6f100fb",
+                "title": "Pricing - Langfuse"
+              },
+              {
+                "family": "agentops",
+                "uri": "https://langfuse.com/docs",
+                "sha256": "34d09509900f2a2b",
+                "title": "Open Source AI Engineering Platform - Langfuse"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://stripe.com/",
+                "sha256": "3986c0147ca5aaaa",
+                "title": "Stripe | Plateforme et solution de paiement en ligne"
+              }
+            ]
+          },
+          "confidence": "medium",
+          "caveats": [],
+          "needs": [
+            "ON-G4",
+            "RQ-B4",
+            "RQ-I1"
+          ]
+        },
+        {
+          "id": "money-cost-attribution",
+          "label": "Cost attribution to runs/agents",
+          "recommendation": "Attribute cost to the run/agent that incurred it; the agent-ops sources document cost tracking as a first-class run field.",
+          "when": "Multiple agents/models spend against shared budgets.",
+          "avoid_when": "Cost is fixed or untracked.",
+          "evidence_class": "[X]",
+          "evidence": {
+            "support": 7,
+            "support_by_family": {
+              "agentops": 1,
+              "dashboards": 6
+            },
+            "independent_families": 2,
+            "taxonomy_nodes": [
+              {
+                "id": "tech-money-cost-attribution",
+                "support": 6,
+                "family_names": [
+                  "agentops"
+                ],
+                "meets_three_source_rule": true
+              },
+              {
+                "id": "tech-money-billing",
+                "support": 7,
+                "family_names": [
+                  "agentops",
+                  "dashboards"
+                ],
+                "meets_three_source_rule": true
+              }
+            ],
+            "refs": [
+              {
+                "family": "agentops",
+                "uri": "https://docs.honeyhive.ai/",
+                "sha256": "0ab7e926909c38ee",
+                "title": "Introducing HoneyHive - HoneyHive AI Docs"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://stripe.com/blog",
+                "sha256": "11e34aac5147fea3",
+                "title": "Stripe Blog: Online Payment Solutions Blog"
+              },
+              {
+                "family": "agentops",
+                "uri": "https://docs.latitude.so/",
+                "sha256": "ece55c9402f2f298",
+                "title": "Latitude Overview - Latitude Docs"
+              },
+              {
+                "family": "agentops",
+                "uri": "https://langfuse.com/pricing",
+                "sha256": "843dd0a8b6f100fb",
+                "title": "Pricing - Langfuse"
+              },
+              {
+                "family": "agentops",
+                "uri": "https://langfuse.com/docs",
+                "sha256": "34d09509900f2a2b",
+                "title": "Open Source AI Engineering Platform - Langfuse"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://stripe.com/",
+                "sha256": "3986c0147ca5aaaa",
+                "title": "Stripe | Plateforme et solution de paiement en ligne"
+              }
+            ]
+          },
+          "confidence": "medium",
+          "caveats": [],
+          "needs": [
+            "ON-G4",
+            "RQ-B4",
+            "RQ-I1"
+          ]
+        },
+        {
+          "id": "money-cost-attribution",
+          "label": "Cost attribution to runs/agents",
+          "recommendation": "Attribute cost to the run/agent that incurred it; the agent-ops sources document cost tracking as a first-class run field.",
+          "when": "Multiple agents/models spend against shared budgets.",
+          "avoid_when": "Cost is fixed or untracked.",
+          "evidence_class": "[X]",
+          "evidence": {
+            "support": 7,
+            "support_by_family": {
+              "agentops": 1,
+              "dashboards": 6
+            },
+            "independent_families": 2,
+            "taxonomy_nodes": [
+              {
+                "id": "tech-money-cost-attribution",
+                "support": 6,
+                "family_names": [
+                  "agentops"
+                ],
+                "meets_three_source_rule": true
+              },
+              {
+                "id": "tech-money-billing",
+                "support": 7,
+                "family_names": [
+                  "agentops",
+                  "dashboards"
+                ],
+                "meets_three_source_rule": true
+              }
+            ],
+            "refs": [
+              {
+                "family": "agentops",
+                "uri": "https://docs.honeyhive.ai/",
+                "sha256": "0ab7e926909c38ee",
+                "title": "Introducing HoneyHive - HoneyHive AI Docs"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://stripe.com/blog",
+                "sha256": "11e34aac5147fea3",
+                "title": "Stripe Blog: Online Payment Solutions Blog"
+              },
+              {
+                "family": "agentops",
+                "uri": "https://docs.latitude.so/",
+                "sha256": "ece55c9402f2f298",
+                "title": "Latitude Overview - Latitude Docs"
+              },
+              {
+                "family": "agentops",
+                "uri": "https://langfuse.com/pricing",
+                "sha256": "843dd0a8b6f100fb",
+                "title": "Pricing - Langfuse"
+              },
+              {
+                "family": "agentops",
+                "uri": "https://langfuse.com/docs",
+                "sha256": "34d09509900f2a2b",
+                "title": "Open Source AI Engineering Platform - Langfuse"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://stripe.com/",
+                "sha256": "3986c0147ca5aaaa",
+                "title": "Stripe | Plateforme et solution de paiement en ligne"
+              }
+            ]
+          },
+          "confidence": "medium",
+          "caveats": [],
+          "needs": [
+            "ON-G4",
+            "RQ-B4",
+            "RQ-I1"
+          ]
+        },
+        {
+          "id": "money-cost-attribution",
+          "label": "Cost attribution to runs/agents",
+          "recommendation": "Attribute cost to the run/agent that incurred it; the agent-ops sources document cost tracking as a first-class run field.",
+          "when": "Multiple agents/models spend against shared budgets.",
+          "avoid_when": "Cost is fixed or untracked.",
+          "evidence_class": "[X]",
+          "evidence": {
+            "support": 7,
+            "support_by_family": {
+              "agentops": 1,
+              "dashboards": 6
+            },
+            "independent_families": 2,
+            "taxonomy_nodes": [
+              {
+                "id": "tech-money-cost-attribution",
+                "support": 6,
+                "family_names": [
+                  "agentops"
+                ],
+                "meets_three_source_rule": true
+              },
+              {
+                "id": "tech-money-billing",
+                "support": 7,
+                "family_names": [
+                  "agentops",
+                  "dashboards"
+                ],
+                "meets_three_source_rule": true
+              }
+            ],
+            "refs": [
+              {
+                "family": "agentops",
+                "uri": "https://docs.honeyhive.ai/",
+                "sha256": "0ab7e926909c38ee",
+                "title": "Introducing HoneyHive - HoneyHive AI Docs"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://stripe.com/blog",
+                "sha256": "11e34aac5147fea3",
+                "title": "Stripe Blog: Online Payment Solutions Blog"
+              },
+              {
+                "family": "agentops",
+                "uri": "https://docs.latitude.so/",
+                "sha256": "ece55c9402f2f298",
+                "title": "Latitude Overview - Latitude Docs"
+              },
+              {
+                "family": "agentops",
+                "uri": "https://langfuse.com/pricing",
+                "sha256": "843dd0a8b6f100fb",
+                "title": "Pricing - Langfuse"
+              },
+              {
+                "family": "agentops",
+                "uri": "https://langfuse.com/docs",
+                "sha256": "34d09509900f2a2b",
+                "title": "Open Source AI Engineering Platform - Langfuse"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://stripe.com/",
+                "sha256": "3986c0147ca5aaaa",
+                "title": "Stripe | Plateforme et solution de paiement en ligne"
+              }
+            ]
+          },
+          "confidence": "medium",
+          "caveats": [],
+          "needs": [
+            "ON-G4",
+            "RQ-B4",
+            "RQ-I1"
+          ]
+        },
+        {
+          "id": "money-cost-attribution",
+          "label": "Cost attribution to runs/agents",
+          "recommendation": "Attribute cost to the run/agent that incurred it; the agent-ops sources document cost tracking as a first-class run field.",
+          "when": "Multiple agents/models spend against shared budgets.",
+          "avoid_when": "Cost is fixed or untracked.",
+          "evidence_class": "[X]",
+          "evidence": {
+            "support": 7,
+            "support_by_family": {
+              "agentops": 1,
+              "dashboards": 6
+            },
+            "independent_families": 2,
+            "taxonomy_nodes": [
+              {
+                "id": "tech-money-cost-attribution",
+                "support": 6,
+                "family_names": [
+                  "agentops"
+                ],
+                "meets_three_source_rule": true
+              },
+              {
+                "id": "tech-money-billing",
+                "support": 7,
+                "family_names": [
+                  "agentops",
+                  "dashboards"
+                ],
+                "meets_three_source_rule": true
+              }
+            ],
+            "refs": [
+              {
+                "family": "agentops",
+                "uri": "https://docs.honeyhive.ai/",
+                "sha256": "0ab7e926909c38ee",
+                "title": "Introducing HoneyHive - HoneyHive AI Docs"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://stripe.com/blog",
+                "sha256": "11e34aac5147fea3",
+                "title": "Stripe Blog: Online Payment Solutions Blog"
+              },
+              {
+                "family": "agentops",
+                "uri": "https://docs.latitude.so/",
+                "sha256": "ece55c9402f2f298",
+                "title": "Latitude Overview - Latitude Docs"
+              },
+              {
+                "family": "agentops",
+                "uri": "https://langfuse.com/pricing",
+                "sha256": "843dd0a8b6f100fb",
+                "title": "Pricing - Langfuse"
+              },
+              {
+                "family": "agentops",
+                "uri": "https://langfuse.com/docs",
+                "sha256": "34d09509900f2a2b",
+                "title": "Open Source AI Engineering Platform - Langfuse"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://stripe.com/",
+                "sha256": "3986c0147ca5aaaa",
+                "title": "Stripe | Plateforme et solution de paiement en ligne"
               }
             ]
           },
@@ -1874,16 +2862,16 @@
           "when": "A quantity changes over time (spend, tokens, latency, queue depth).",
           "avoid_when": "Comparing unordered categories.",
           "evidence": {
-            "support": 12,
+            "support": 8,
             "support_by_family": {
-              "dataviz": 10,
-              "cli": 2
+              "dataviz": 7,
+              "cli": 1
             },
             "independent_families": 2,
             "taxonomy_nodes": [
               {
                 "id": "tech-viz-time-series-marks",
-                "support": 12,
+                "support": 8,
                 "family_names": [
                   "cli",
                   "dataviz"
@@ -1894,9 +2882,21 @@
             "refs": [
               {
                 "family": "dataviz",
-                "uri": "https://d3js.org/d3-scale-chromatic",
-                "sha256": "2bd7bec1de93305d",
-                "title": "d3-scale-chromatic | D3 by Observable"
+                "uri": "https://d3js.org/d3-shape",
+                "sha256": "5e09a57ff0edcbbf",
+                "title": "d3-shape | D3 by Observable"
+              },
+              {
+                "family": "dataviz",
+                "uri": "https://github.com/leeoniya/uPlot",
+                "sha256": "c3a34c9200af26ab",
+                "title": "GitHub - leeoniya/uPlot: \ud83d\udcc8 A small, fast chart for time series, lines, areas, ohlc & bars \u00b7 GitHub"
+              },
+              {
+                "family": "dataviz",
+                "uri": "https://leeoniya.github.io/uPlot/",
+                "sha256": "0c26530cb0b02576",
+                "title": "uPlot | \ud83d\udcc8 A small, fast chart for time series, lines, areas, ohlc & bars"
               },
               {
                 "family": "dataviz",
@@ -1911,22 +2911,10 @@
                 "title": "Line chart | nivo"
               },
               {
-                "family": "dataviz",
-                "uri": "https://nivo.rocks/heatmap/",
-                "sha256": "7342bb6a11b92572",
-                "title": "Heat Map chart | nivo"
-              },
-              {
-                "family": "dataviz",
-                "uri": "https://github.com/leeoniya/uPlot",
-                "sha256": "c3a34c9200af26ab",
-                "title": "GitHub - leeoniya/uPlot: \ud83d\udcc8 A small, fast chart for time series, lines, areas, ohlc & bars \u00b7 GitHub"
-              },
-              {
-                "family": "dataviz",
-                "uri": "https://leeoniya.github.io/uPlot/",
-                "sha256": "0c26530cb0b02576",
-                "title": "uPlot | \ud83d\udcc8 A small, fast chart for time series, lines, areas, ohlc & bars"
+                "family": "cli",
+                "uri": "https://github.com/XuehaiPan/nvitop",
+                "sha256": "f0d68d37b1d8bc32",
+                "title": "GitHub - XuehaiPan/nvitop: An interactive NVIDIA-GPU process viewer and beyond, the one-stop solution for GPU process management. \u00b7 GitHub"
               }
             ]
           },
@@ -1941,54 +2929,25 @@
         },
         {
           "id": "ch-status-grid",
-          "label": "Status grid / heatmap for fleet state",
+          "label": "[P] [P] [P] [P] [P] Status grid / heatmap for fleet state",
           "recommendation": "Encode many nodes' state as a status grid so color/position read pre-attentively; NN/g's dashboard guidance and Grafana's panel model both support grid-over-list at fleet scale.",
           "when": "One glance must answer 'is anything wrong across N nodes'.",
           "avoid_when": "Color is the only signal (add shape/label).",
           "evidence": {
-            "support": 4,
-            "support_by_family": {
-              "dataviz": 3,
-              "craft": 1
-            },
-            "independent_families": 2,
+            "support": 1,
+            "support_by_family": {},
+            "independent_families": 0,
             "taxonomy_nodes": [
               {
                 "id": "tech-viz-heatmap",
-                "support": 4,
+                "support": 1,
                 "family_names": [
-                  "craft",
                   "dataviz"
                 ],
-                "meets_three_source_rule": true
+                "meets_three_source_rule": false
               }
             ],
-            "refs": [
-              {
-                "family": "dataviz",
-                "uri": "https://nivo.rocks/bar/",
-                "sha256": "142393ea7aca91f1",
-                "title": "Bar chart | nivo"
-              },
-              {
-                "family": "dataviz",
-                "uri": "https://nivo.rocks/line/",
-                "sha256": "7fbbcfe5789d6603",
-                "title": "Line chart | nivo"
-              },
-              {
-                "family": "dataviz",
-                "uri": "https://nivo.rocks/heatmap/",
-                "sha256": "7342bb6a11b92572",
-                "title": "Heat Map chart | nivo"
-              },
-              {
-                "family": "craft",
-                "uri": "https://www.nngroup.com/articles/dashboards-preattentive/",
-                "sha256": "b665ad15d558dbd6",
-                "title": "Dashboards: Making Charts and Graphs Easier to Understand - NN/G"
-              }
-            ]
+            "refs": []
           },
           "confidence": "high",
           "caveats": [],
@@ -1997,7 +2956,8 @@
             "ON-G7",
             "RQ-C3"
           ],
-          "evidence_class": "[X]"
+          "evidence_class": "[P]",
+          "policy_reason": "Backing taxonomy node(s) tech-viz-heatmap fall below the >=3-source bar after the q0 evidence gate."
         },
         {
           "id": "ch-gauge",
@@ -2029,9 +2989,9 @@
           "avoid_when": "A handful of records better shown as cards.",
           "evidence_class": "[X]",
           "evidence": {
-            "support": 32,
+            "support": 21,
             "support_by_family": {
-              "dashboards": 25,
+              "dashboards": 14,
               "dataviz": 1,
               "cli": 3,
               "craft": 3
@@ -2040,7 +3000,7 @@
             "taxonomy_nodes": [
               {
                 "id": "tech-viz-data-table",
-                "support": 32,
+                "support": 21,
                 "family_names": [
                   "cli",
                   "craft",
@@ -2052,40 +3012,40 @@
             ],
             "refs": [
               {
-                "family": "dashboards",
-                "uri": "https://vercel.com/",
-                "sha256": "c26a33d2b08d2b60",
-                "title": "Agentic Infrastructure - Vercel"
+                "family": "craft",
+                "uri": "https://www.nngroup.com/articles/data-tables/",
+                "sha256": "7bb44646100f45ed",
+                "title": "Data Tables: Four Major User Tasks - NN/G"
+              },
+              {
+                "family": "craft",
+                "uri": "https://www.w3.org/WAI/tutorials/tables/",
+                "sha256": "627865eeda93dba0",
+                "title": "Tables Tutorial | Web Accessibility Initiative (WAI) | W3C"
               },
               {
                 "family": "dashboards",
-                "uri": "https://vercel.com/blog",
-                "sha256": "2570f04ad163d7e4",
-                "title": "Blog - Vercel"
+                "uri": "https://docs.sentry.io/product/dashboards/",
+                "sha256": "78abfbfa297e2a6d",
+                "title": "Dashboards"
               },
               {
                 "family": "dashboards",
-                "uri": "https://grafana.com/docs/grafana/latest/",
-                "sha256": "7910c639346c2ffa",
-                "title": "Grafana OSS and Enterprise | Grafana documentation"
+                "uri": "https://docs.sentry.io/product/explore/",
+                "sha256": "cde48f7511724486",
+                "title": "Traces and Spans"
               },
               {
-                "family": "dashboards",
-                "uri": "https://grafana.com/docs/grafana/latest/dashboards/",
-                "sha256": "789c3cf84b24905d",
-                "title": "Dashboards | Grafana documentation"
+                "family": "cli",
+                "uri": "https://github.com/Textualize/rich",
+                "sha256": "45d0b1b722e4bd6d",
+                "title": "GitHub - Textualize/rich: Rich is a Python library for rich text and beautiful formatting in the terminal. \u00b7 GitHub"
               },
               {
-                "family": "dashboards",
-                "uri": "https://grafana.com/docs/grafana/latest/panels-visualizations/",
-                "sha256": "3055b3c8b3269ad0",
-                "title": "Panels and visualizations | Grafana documentation"
-              },
-              {
-                "family": "dashboards",
-                "uri": "https://grafana.com/docs/grafana/latest/alerting/",
-                "sha256": "d28ea3629b46d1b6",
-                "title": "Grafana Alerting | Grafana documentation"
+                "family": "cli",
+                "uri": "https://github.com/charmbracelet/bubbles",
+                "sha256": "50530f8a2dd9dc7a",
+                "title": "GitHub - charmbracelet/bubbles: TUI components for Bubble Tea \ud83e\udee7 \u00b7 GitHub"
               }
             ]
           },
@@ -2106,21 +3066,19 @@
           "when": "Unbounded, append-only output must be watched live.",
           "avoid_when": "Rebuilding the whole list per event (r0 app.js:1522).",
           "evidence": {
-            "support": 32,
+            "support": 18,
             "support_by_family": {
               "agentops": 2,
-              "dashboards": 21,
-              "dataviz": 2,
-              "cli": 7
+              "dashboards": 14,
+              "dataviz": 2
             },
-            "independent_families": 4,
+            "independent_families": 3,
             "taxonomy_nodes": [
               {
                 "id": "tech-viz-log-stream",
-                "support": 32,
+                "support": 18,
                 "family_names": [
                   "agentops",
-                  "cli",
                   "dashboards",
                   "dataviz"
                 ],
@@ -2129,40 +3087,40 @@
             ],
             "refs": [
               {
-                "family": "agentops",
-                "uri": "https://docs.helicone.ai/",
-                "sha256": "20ead7ec1d1155ef",
-                "title": "Quickstart - Helicone OSS LLM Observability"
-              },
-              {
-                "family": "agentops",
-                "uri": "https://docs.helicone.ai/features/sessions",
-                "sha256": "7234cf15f2d9295b",
-                "title": "Sessions - Helicone OSS LLM Observability"
+                "family": "dashboards",
+                "uri": "https://blog.sentry.io/",
+                "sha256": "900dd2c988b418af",
+                "title": "Application Monitoring, Dev Tips & Engineering | Sentry Blog"
               },
               {
                 "family": "dashboards",
-                "uri": "https://docs.datadoghq.com/",
-                "sha256": "a0a5681d5bc06eff",
-                "title": ""
+                "uri": "https://fly.io/",
+                "sha256": "c3b38e7d13ce962d",
+                "title": "Fly \u00b7 Computers for agents"
               },
               {
                 "family": "dashboards",
-                "uri": "https://docs.datadoghq.com/dashboards/",
-                "sha256": "10b7d1ed79891712",
-                "title": ""
+                "uri": "https://docs.railway.com/develop/services",
+                "sha256": "7417e982f156d980",
+                "title": "Services | Railway Docs"
               },
               {
                 "family": "dashboards",
-                "uri": "https://docs.datadoghq.com/dashboards/widgets/",
-                "sha256": "84ad61b44dfaa619",
-                "title": ""
+                "uri": "https://fly.io/blog/",
+                "sha256": "bfefc60052d89057",
+                "title": "The Fly Blog"
               },
               {
                 "family": "dashboards",
-                "uri": "https://docs.datadoghq.com/monitors/",
-                "sha256": "587c48efb20ab9a2",
-                "title": ""
+                "uri": "https://railway.com/",
+                "sha256": "45e0c5fcb88c45d9",
+                "title": "Railway | The all-in-one intelligent cloud provider"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://blog.railway.com/",
+                "sha256": "0db00f8911e74fd5",
+                "title": "Railway Blog"
               }
             ]
           },
@@ -2182,15 +3140,15 @@
           "avoid_when": "A single instantaneous value.",
           "evidence_class": "[X]",
           "evidence": {
-            "support": 14,
+            "support": 4,
             "support_by_family": {
-              "agentops": 14
+              "agentops": 4
             },
             "independent_families": 1,
             "taxonomy_nodes": [
               {
                 "id": "tech-viz-waterfall-timeline",
-                "support": 14,
+                "support": 4,
                 "family_names": [
                   "agentops"
                 ],
@@ -2200,39 +3158,27 @@
             "refs": [
               {
                 "family": "agentops",
-                "uri": "https://www.langchain.com/langsmith",
-                "sha256": "75ab02f301180387",
-                "title": "LangSmith: Agent & LLM Observability Platform"
-              },
-              {
-                "family": "agentops",
                 "uri": "https://langfuse.com/docs",
                 "sha256": "34d09509900f2a2b",
                 "title": "Open Source AI Engineering Platform - Langfuse"
               },
               {
                 "family": "agentops",
-                "uri": "https://langfuse.com/docs/observability/overview",
-                "sha256": "0a1784a27f750267",
-                "title": "LLM Observability & Application Tracing (Open Source) - Langfuse"
-              },
-              {
-                "family": "agentops",
-                "uri": "https://docs.smith.langchain.com/",
-                "sha256": "216cc0ec88b4a616",
-                "title": "LangSmith Observability - Docs by LangChain"
-              },
-              {
-                "family": "agentops",
-                "uri": "https://www.braintrust.dev/docs",
-                "sha256": "1694f5c22f1528ee",
-                "title": "Get started with Braintrust - Braintrust"
-              },
-              {
-                "family": "agentops",
                 "uri": "https://docs.agentops.ai/",
                 "sha256": "f8ca1f22853b1f87",
                 "title": "Introduction - AgentOps"
+              },
+              {
+                "family": "agentops",
+                "uri": "https://docs.arize.com/phoenix/tracing/llm-traces",
+                "sha256": "f7250de7631c6f73",
+                "title": "Overview: Tracing - Phoenix"
+              },
+              {
+                "family": "agentops",
+                "uri": "https://docs.honeyhive.ai/",
+                "sha256": "0ab7e926909c38ee",
+                "title": "Introducing HoneyHive - HoneyHive AI Docs"
               }
             ]
           },
@@ -2254,37 +3200,11 @@
           "avoid_when": "A single series or a status overview.",
           "evidence_class": "[P]",
           "evidence": {
-            "support": 2,
-            "support_by_family": {
-              "dataviz": 1,
-              "craft": 1
-            },
-            "independent_families": 2,
-            "taxonomy_nodes": [
-              {
-                "id": "thin-viz-small-multiples",
-                "support": 2,
-                "family_names": [
-                  "craft",
-                  "dataviz"
-                ],
-                "meets_three_source_rule": false
-              }
-            ],
-            "refs": [
-              {
-                "family": "dataviz",
-                "uri": "https://echarts.apache.org/handbook/en/best-practices/canvas-vs-svg/",
-                "sha256": "f7498c71e2215e1a",
-                "title": "Canvas vs. SVG - Best Practices - Handbook - Apache ECharts"
-              },
-              {
-                "family": "craft",
-                "uri": "https://www.nngroup.com/articles/dashboards-preattentive/",
-                "sha256": "b665ad15d558dbd6",
-                "title": "Dashboards: Making Charts and Graphs Easier to Understand - NN/G"
-              }
-            ]
+            "support": 0,
+            "support_by_family": {},
+            "independent_families": 0,
+            "taxonomy_nodes": [],
+            "refs": []
           },
           "confidence": "low",
           "caveats": [
@@ -2303,15 +3223,15 @@
           "when": "Deciding how charts are authored at all.",
           "avoid_when": "Mixing three grammars on one page.",
           "evidence": {
-            "support": 15,
+            "support": 13,
             "support_by_family": {
-              "dataviz": 15
+              "dataviz": 13
             },
             "independent_families": 1,
             "taxonomy_nodes": [
               {
                 "id": "tech-viz-chart-grammar",
-                "support": 15,
+                "support": 13,
                 "family_names": [
                   "dataviz"
                 ],
@@ -2321,27 +3241,15 @@
             "refs": [
               {
                 "family": "dataviz",
-                "uri": "https://d3js.org/",
-                "sha256": "a2d77a5b707ffb7d",
-                "title": "D3 by Observable | The JavaScript library for bespoke data visualization"
+                "uri": "https://github.com/observablehq/plot",
+                "sha256": "3c3c373dbb4ae6a0",
+                "title": "GitHub - observablehq/plot: A concise API for exploratory data visualization implementing a layered grammar of graphics \u00b7 GitHub"
               },
               {
                 "family": "dataviz",
-                "uri": "https://d3js.org/what-is-d3",
-                "sha256": "087f5313e13964ad",
-                "title": "What is D3? | D3 by Observable"
-              },
-              {
-                "family": "dataviz",
-                "uri": "https://vega.github.io/vega-lite/",
-                "sha256": "2064f3499486a4bb",
-                "title": "A High-Level Grammar of Interactive Graphics | Vega-Lite"
-              },
-              {
-                "family": "dataviz",
-                "uri": "https://vega.github.io/vega-lite/docs/",
-                "sha256": "aba275e3390d0ded",
-                "title": "Overview | Vega-Lite"
+                "uri": "https://vega.github.io/vega-lite/docs/config.html",
+                "sha256": "a619341697a7a296",
+                "title": "Configuration | Vega-Lite"
               },
               {
                 "family": "dataviz",
@@ -2354,6 +3262,18 @@
                 "uri": "https://vega.github.io/vega-lite/docs/scale.html",
                 "sha256": "36fcf8dd2be3cb7e",
                 "title": "Scale | Vega-Lite"
+              },
+              {
+                "family": "dataviz",
+                "uri": "https://vega.github.io/vega-lite/docs/encoding.html",
+                "sha256": "874608e224e11388",
+                "title": "Encoding | Vega-Lite"
+              },
+              {
+                "family": "dataviz",
+                "uri": "https://vega.github.io/vega-lite/",
+                "sha256": "2064f3499486a4bb",
+                "title": "A High-Level Grammar of Interactive Graphics | Vega-Lite"
               }
             ]
           },
@@ -2371,17 +3291,17 @@
           "when": "Hundreds of marks or long lists update on a short cadence.",
           "avoid_when": "It hides data the operator must see (sampling must be honest).",
           "evidence": {
-            "support": 17,
+            "support": 16,
             "support_by_family": {
               "dataviz": 9,
-              "cli": 6,
+              "cli": 5,
               "craft": 2
             },
             "independent_families": 3,
             "taxonomy_nodes": [
               {
                 "id": "tech-viz-rendering-performance",
-                "support": 17,
+                "support": 16,
                 "family_names": [
                   "cli",
                   "craft",
@@ -2392,22 +3312,28 @@
             ],
             "refs": [
               {
+                "family": "craft",
+                "uri": "https://web.dev/articles/content-visibility",
+                "sha256": "7aa4893ce08fa550",
+                "title": "content-visibility: the new CSS property that boosts your rendering performance \u00a0|\u00a0 Articles \u00a0|\u00a0 web.dev"
+              },
+              {
+                "family": "dataviz",
+                "uri": "https://leeoniya.github.io/uPlot/",
+                "sha256": "0c26530cb0b02576",
+                "title": "uPlot | \ud83d\udcc8 A small, fast chart for time series, lines, areas, ohlc & bars"
+              },
+              {
+                "family": "dataviz",
+                "uri": "https://github.com/leeoniya/uPlot",
+                "sha256": "c3a34c9200af26ab",
+                "title": "GitHub - leeoniya/uPlot: \ud83d\udcc8 A small, fast chart for time series, lines, areas, ohlc & bars \u00b7 GitHub"
+              },
+              {
                 "family": "dataviz",
                 "uri": "https://echarts.apache.org/en/index.html",
                 "sha256": "caa87df6c6cfc387",
                 "title": "Apache ECharts"
-              },
-              {
-                "family": "dataviz",
-                "uri": "https://echarts.apache.org/handbook/en/get-started/",
-                "sha256": "fc1b54a4c3118289",
-                "title": "Get Started - Handbook - Apache ECharts"
-              },
-              {
-                "family": "dataviz",
-                "uri": "https://echarts.apache.org/handbook/en/concepts/chart-size/",
-                "sha256": "66a59665faa2a804",
-                "title": "Chart Container - Concepts - Handbook - Apache ECharts"
               },
               {
                 "family": "dataviz",
@@ -2416,16 +3342,10 @@
                 "title": "Canvas vs. SVG - Best Practices - Handbook - Apache ECharts"
               },
               {
-                "family": "dataviz",
-                "uri": "https://nivo.rocks/bar/",
-                "sha256": "142393ea7aca91f1",
-                "title": "Bar chart | nivo"
-              },
-              {
-                "family": "dataviz",
-                "uri": "https://nivo.rocks/line/",
-                "sha256": "7fbbcfe5789d6603",
-                "title": "Line chart | nivo"
+                "family": "cli",
+                "uri": "https://github.com/alacritty/alacritty",
+                "sha256": "73fcb15b96df52aa",
+                "title": "GitHub - alacritty/alacritty: A cross-platform, OpenGL terminal emulator. \u00b7 GitHub"
               }
             ]
           },
@@ -2451,18 +3371,18 @@
           "when": "A single-page console needs visual consistency.",
           "avoid_when": "Tokens proliferate without a naming convention.",
           "evidence": {
-            "support": 29,
+            "support": 20,
             "support_by_family": {
-              "dashboards": 8,
-              "dataviz": 8,
-              "cli": 3,
-              "craft": 10
+              "dashboards": 5,
+              "dataviz": 7,
+              "cli": 2,
+              "craft": 6
             },
             "independent_families": 4,
             "taxonomy_nodes": [
               {
                 "id": "tech-vis-design-tokens",
-                "support": 29,
+                "support": 20,
                 "family_names": [
                   "cli",
                   "craft",
@@ -2473,12 +3393,6 @@
               }
             ],
             "refs": [
-              {
-                "family": "dashboards",
-                "uri": "https://linear.app/customers",
-                "sha256": "65f2546f7e24d678",
-                "title": "Linear Customers"
-              },
               {
                 "family": "dashboards",
                 "uri": "https://vercel.com/",
@@ -2493,21 +3407,27 @@
               },
               {
                 "family": "dashboards",
-                "uri": "https://vercel.com/docs",
-                "sha256": "d78b5b8133aa14cc",
-                "title": ""
+                "uri": "https://vercel.com/changelog",
+                "sha256": "c889660f133515b2",
+                "title": "Changelog - Vercel"
               },
               {
-                "family": "dashboards",
-                "uri": "https://vercel.com/geist/colors",
-                "sha256": "74aeb67b13ba6192",
-                "title": ""
+                "family": "dataviz",
+                "uri": "https://ui.shadcn.com/docs/components/chart",
+                "sha256": "17c5c86f3c683e8c",
+                "title": "Chart - shadcn/ui"
               },
               {
-                "family": "dashboards",
-                "uri": "https://vercel.com/geist/typography",
-                "sha256": "7d664f2129353ada",
-                "title": ""
+                "family": "cli",
+                "uri": "https://github.com/aristocratos/btop",
+                "sha256": "f6d5e898349bb60c",
+                "title": "GitHub - aristocratos/btop: A monitor of resources \u00b7 GitHub"
+              },
+              {
+                "family": "cli",
+                "uri": "https://sw.kovidgoyal.net/kitty/",
+                "sha256": "a3d50cc44562b66c",
+                "title": "kitty"
               }
             ]
           },
@@ -2526,19 +3446,17 @@
           "when": "Lifecycle/severity/attention states are encoded.",
           "avoid_when": "Hue count grows until it is noise.",
           "evidence": {
-            "support": 12,
+            "support": 7,
             "support_by_family": {
-              "dataviz": 5,
-              "cli": 1,
+              "dataviz": 1,
               "craft": 6
             },
-            "independent_families": 3,
+            "independent_families": 2,
             "taxonomy_nodes": [
               {
                 "id": "tech-vis-colorblind-safe-status",
-                "support": 12,
+                "support": 7,
                 "family_names": [
-                  "cli",
                   "craft",
                   "dataviz"
                 ],
@@ -2547,40 +3465,40 @@
             ],
             "refs": [
               {
-                "family": "dataviz",
-                "uri": "https://d3js.org/d3-scale-chromatic",
-                "sha256": "2bd7bec1de93305d",
-                "title": "d3-scale-chromatic | D3 by Observable"
+                "family": "craft",
+                "uri": "https://web.dev/learn/accessibility/",
+                "sha256": "abe7da4e372ad808",
+                "title": "Learn Accessibility \u00a0|\u00a0 web.dev"
               },
               {
-                "family": "dataviz",
-                "uri": "https://vega.github.io/vega-lite/docs/scale.html",
-                "sha256": "36fcf8dd2be3cb7e",
-                "title": "Scale | Vega-Lite"
+                "family": "craft",
+                "uri": "https://web.dev/articles/color-and-contrast-accessibility",
+                "sha256": "aded09c8b9cfa9b7",
+                "title": "Color and contrast accessibility \u00a0|\u00a0 web.dev"
               },
               {
-                "family": "dataviz",
-                "uri": "https://colorbrewer2.org/",
-                "sha256": "c72ceb0441fc6951",
-                "title": "ColorBrewer: Color Advice for Maps"
+                "family": "craft",
+                "uri": "https://www.w3.org/WAI/WCAG22/Understanding/contrast-minimum.html",
+                "sha256": "3352aaf477e97391",
+                "title": "Understanding Success Criterion 1.4.3: Contrast (Minimum) | WAI | W3C"
               },
               {
-                "family": "dataviz",
-                "uri": "https://www.datawrapper.de/blog/",
-                "sha256": "72007fc9dc4fcb05",
-                "title": "Datawrapper Blog"
+                "family": "craft",
+                "uri": "https://www.nngroup.com/articles/color-enhance-design/",
+                "sha256": "def697856da898b9",
+                "title": "Using Color to Enhance Your Design - NN/G"
               },
               {
-                "family": "dataviz",
-                "uri": "https://www.vis4.net/blog/",
-                "sha256": "0ae7581a43afbde2",
-                "title": "vis4.net"
+                "family": "craft",
+                "uri": "https://developer.mozilla.org/en-US/docs/Web/CSS/@media/forced-colors",
+                "sha256": "ebbddff1da6be245",
+                "title": "forced-colors CSS media feature - CSS | MDN"
               },
               {
-                "family": "cli",
-                "uri": "https://github.com/htop-dev/htop",
-                "sha256": "c30804b3cfb04765",
-                "title": "GitHub - htop-dev/htop: htop - an interactive process viewer \u00b7 GitHub"
+                "family": "craft",
+                "uri": "https://www.w3.org/WAI/WCAG22/quickref/",
+                "sha256": "ed61b139cdf28bff",
+                "title": "How to Meet WCAG (Quickref Reference)"
               }
             ]
           },
@@ -2599,18 +3517,18 @@
           "when": "The room is dark by default.",
           "avoid_when": "Dark is just inverted light (elevation/contrast break).",
           "evidence": {
-            "support": 29,
+            "support": 20,
             "support_by_family": {
-              "dashboards": 8,
-              "dataviz": 8,
-              "cli": 3,
-              "craft": 10
+              "dashboards": 5,
+              "dataviz": 7,
+              "cli": 2,
+              "craft": 6
             },
             "independent_families": 4,
             "taxonomy_nodes": [
               {
                 "id": "tech-vis-design-tokens",
-                "support": 29,
+                "support": 20,
                 "family_names": [
                   "cli",
                   "craft",
@@ -2618,40 +3536,14 @@
                   "dataviz"
                 ],
                 "meets_three_source_rule": true
-              },
-              {
-                "id": "tech-vis-forced-colors",
-                "support": 4,
-                "family_names": [
-                  "craft"
-                ],
-                "meets_three_source_rule": true
               }
             ],
             "refs": [
               {
                 "family": "dashboards",
-                "uri": "https://linear.app/customers",
-                "sha256": "65f2546f7e24d678",
-                "title": "Linear Customers"
-              },
-              {
-                "family": "craft",
-                "uri": "https://developer.mozilla.org/en-US/docs/Web/CSS/@media/forced-colors",
-                "sha256": "ebbddff1da6be245",
-                "title": "forced-colors CSS media feature - CSS | MDN"
-              },
-              {
-                "family": "dashboards",
                 "uri": "https://vercel.com/",
                 "sha256": "c26a33d2b08d2b60",
                 "title": "Agentic Infrastructure - Vercel"
-              },
-              {
-                "family": "craft",
-                "uri": "https://web.dev/articles/color-and-contrast-accessibility",
-                "sha256": "aded09c8b9cfa9b7",
-                "title": "Color and contrast accessibility \u00a0|\u00a0 web.dev"
               },
               {
                 "family": "dashboards",
@@ -2660,10 +3552,28 @@
                 "title": "Blog - Vercel"
               },
               {
-                "family": "craft",
-                "uri": "https://www.smashingmagazine.com/2025/11/smashing-animations-part-6-svgs-css-custom-properties/",
-                "sha256": "b8bc0e988e39ee25",
-                "title": "Smashing Animations Part 6: Magnificent SVGs\u00a0With <use>\u00a0And CSS Custom Properties \u2014 Smashing Magazine"
+                "family": "dashboards",
+                "uri": "https://vercel.com/changelog",
+                "sha256": "c889660f133515b2",
+                "title": "Changelog - Vercel"
+              },
+              {
+                "family": "dataviz",
+                "uri": "https://ui.shadcn.com/docs/components/chart",
+                "sha256": "17c5c86f3c683e8c",
+                "title": "Chart - shadcn/ui"
+              },
+              {
+                "family": "cli",
+                "uri": "https://github.com/aristocratos/btop",
+                "sha256": "f6d5e898349bb60c",
+                "title": "GitHub - aristocratos/btop: A monitor of resources \u00b7 GitHub"
+              },
+              {
+                "family": "cli",
+                "uri": "https://sw.kovidgoyal.net/kitty/",
+                "sha256": "a3d50cc44562b66c",
+                "title": "kitty"
               }
             ]
           },
@@ -2682,15 +3592,15 @@
           "when": "Data is dense and chrome competes with it.",
           "avoid_when": "Every panel is highlighted (nothing stands out).",
           "evidence": {
-            "support": 5,
+            "support": 4,
             "support_by_family": {
-              "craft": 5
+              "craft": 4
             },
             "independent_families": 1,
             "taxonomy_nodes": [
               {
                 "id": "tech-vis-accent-economy",
-                "support": 5,
+                "support": 4,
                 "family_names": [
                   "craft"
                 ],
@@ -2698,18 +3608,6 @@
               }
             ],
             "refs": [
-              {
-                "family": "craft",
-                "uri": "https://developer.mozilla.org/en-US/docs/Web/CSS/color_value/color-mix",
-                "sha256": "3ab0045d33f37663",
-                "title": "color-mix() CSS function - CSS | MDN"
-              },
-              {
-                "family": "craft",
-                "uri": "https://developer.mozilla.org/en-US/docs/Web/CSS/Using_CSS_custom_properties",
-                "sha256": "a91bb30d7c48d173",
-                "title": "Using CSS custom properties (variables) - CSS | MDN"
-              },
               {
                 "family": "craft",
                 "uri": "https://www.nngroup.com/articles/color-enhance-design/",
@@ -2724,9 +3622,15 @@
               },
               {
                 "family": "craft",
-                "uri": "https://www.smashingmagazine.com/2024/05/naming-best-practices/",
-                "sha256": "5786269a0bca7790",
-                "title": "Best Practices For Naming Design Tokens, Components And Variables \u2014 Smashing Magazine"
+                "uri": "https://developer.mozilla.org/en-US/docs/Web/CSS/color_value/color-mix",
+                "sha256": "3ab0045d33f37663",
+                "title": "color-mix() CSS function - CSS | MDN"
+              },
+              {
+                "family": "craft",
+                "uri": "https://developer.mozilla.org/en-US/docs/Web/CSS/Using_CSS_custom_properties",
+                "sha256": "a91bb30d7c48d173",
+                "title": "Using CSS custom properties (variables) - CSS | MDN"
               }
             ]
           },
@@ -2744,19 +3648,17 @@
           "when": "Many small numbers must align and scan.",
           "avoid_when": "More than a few sizes / weights are in play.",
           "evidence": {
-            "support": 10,
+            "support": 6,
             "support_by_family": {
-              "dashboards": 3,
-              "cli": 2,
+              "dashboards": 1,
               "craft": 5
             },
-            "independent_families": 3,
+            "independent_families": 2,
             "taxonomy_nodes": [
               {
                 "id": "tech-vis-type-scale",
-                "support": 10,
+                "support": 6,
                 "family_names": [
-                  "cli",
                   "craft",
                   "dashboards"
                 ],
@@ -2765,16 +3667,16 @@
             ],
             "refs": [
               {
-                "family": "dashboards",
-                "uri": "https://vercel.com/docs",
-                "sha256": "d78b5b8133aa14cc",
-                "title": ""
+                "family": "craft",
+                "uri": "https://www.smashingmagazine.com/2023/10/choose-typefaces-fintech-products-guide-part1/",
+                "sha256": "88846b6feced9773",
+                "title": "How To Choose Typefaces For Fintech Products: Our Best Practices Guide (Part 1) \u2014 Smashing Magazine"
               },
               {
-                "family": "dashboards",
-                "uri": "https://vercel.com/geist/colors",
-                "sha256": "74aeb67b13ba6192",
-                "title": ""
+                "family": "craft",
+                "uri": "https://www.refactoringui.com/",
+                "sha256": "d89a448704f5301e",
+                "title": "Refactoring UI"
               },
               {
                 "family": "dashboards",
@@ -2783,22 +3685,22 @@
                 "title": ""
               },
               {
-                "family": "cli",
-                "uri": "https://ghostty.org/",
-                "sha256": "c2dd13ab48151194",
-                "title": "Ghostty"
-              },
-              {
-                "family": "cli",
-                "uri": "https://ghostty.org/docs",
-                "sha256": "4813bfcf2917963d",
-                "title": "Ghostty Docs"
+                "family": "craft",
+                "uri": "https://practicaltypography.com/summary-of-key-rules.html",
+                "sha256": "ef40706eeb33417f",
+                "title": "Summary of key rules | Butterick\u2019s Practical Typography"
               },
               {
                 "family": "craft",
                 "uri": "https://web.dev/learn/css/",
                 "sha256": "40cbdddaac4bd168",
                 "title": "Learn CSS \u00a0|\u00a0 web.dev"
+              },
+              {
+                "family": "craft",
+                "uri": "https://www.nngroup.com/articles/icon-usability/",
+                "sha256": "1d9e07b7547bfde0",
+                "title": "Icon Usability - NN/G"
               }
             ]
           },
@@ -2811,52 +3713,25 @@
         },
         {
           "id": "cm-icon",
-          "label": "One icon family, labelled where ambiguous",
+          "label": "[P] [P] [P] [P] [P] One icon family, labelled where ambiguous",
           "recommendation": "Use one consistent SVG icon family (symbol/<use>) and label icons whose meaning is not universal; NN/g's icon-usability findings and the SVG symbol technique support this.",
           "when": "Dense toolbars/status glyphs are needed.",
           "avoid_when": "Icon-only controls for novel actions.",
           "evidence": {
-            "support": 4,
-            "support_by_family": {
-              "craft": 4
-            },
-            "independent_families": 1,
+            "support": 2,
+            "support_by_family": {},
+            "independent_families": 0,
             "taxonomy_nodes": [
               {
                 "id": "tech-vis-icon-family",
-                "support": 4,
+                "support": 2,
                 "family_names": [
                   "craft"
                 ],
-                "meets_three_source_rule": true
+                "meets_three_source_rule": false
               }
             ],
-            "refs": [
-              {
-                "family": "craft",
-                "uri": "https://developer.mozilla.org/en-US/docs/Web/SVG/Element/use",
-                "sha256": "4ce5f6172aae264a",
-                "title": "<use> - SVG | MDN"
-              },
-              {
-                "family": "craft",
-                "uri": "https://www.nngroup.com/articles/icon-usability/",
-                "sha256": "1d9e07b7547bfde0",
-                "title": "Icon Usability - NN/G"
-              },
-              {
-                "family": "craft",
-                "uri": "https://www.smashingmagazine.com/2023/10/choose-typefaces-fintech-products-guide-part1/",
-                "sha256": "88846b6feced9773",
-                "title": "How To Choose Typefaces For Fintech Products: Our Best Practices Guide (Part 1) \u2014 Smashing Magazine"
-              },
-              {
-                "family": "craft",
-                "uri": "https://css-tricks.com/mega-list-svg-information/",
-                "sha256": "45906cdcaa5d19ce",
-                "title": "A Compendium of SVG Information | CSS-Tricks"
-              }
-            ]
+            "refs": []
           },
           "confidence": "low",
           "caveats": [
@@ -2866,50 +3741,30 @@
           "needs": [
             "RQ-D4"
           ],
-          "evidence_class": "[X]"
+          "evidence_class": "[P]",
+          "policy_reason": "Backing taxonomy node(s) tech-vis-icon-family fall below the >=3-source bar after the q0 evidence gate."
         },
         {
           "id": "cm-elevation",
-          "label": "Elevation model (surfaces, not shadows-as-decoration)",
+          "label": "[P] [P] [P] [P] [P] Elevation model (surfaces, not shadows-as-decoration)",
           "recommendation": "Separate surfaces with a small elevation ladder (background/surface/raised/overlay); dark-mode and Refactoring UI sources tie depth to structure, not ornament.",
           "when": "Layered panels/overlays must be distinguishable in dark.",
           "avoid_when": "Every card is elevated (depth loses meaning).",
           "evidence": {
-            "support": 3,
-            "support_by_family": {
-              "craft": 3
-            },
-            "independent_families": 1,
+            "support": 2,
+            "support_by_family": {},
+            "independent_families": 0,
             "taxonomy_nodes": [
               {
                 "id": "tech-vis-elevation-model",
-                "support": 3,
+                "support": 2,
                 "family_names": [
                   "craft"
                 ],
-                "meets_three_source_rule": true
+                "meets_three_source_rule": false
               }
             ],
-            "refs": [
-              {
-                "family": "craft",
-                "uri": "https://web.dev/learn/css/",
-                "sha256": "40cbdddaac4bd168",
-                "title": "Learn CSS \u00a0|\u00a0 web.dev"
-              },
-              {
-                "family": "craft",
-                "uri": "https://www.nngroup.com/articles/dark-mode/",
-                "sha256": "effad3bad3f8f8d5",
-                "title": "Dark Mode vs. Light Mode: Which Is Better? - NN/G"
-              },
-              {
-                "family": "craft",
-                "uri": "https://www.refactoringui.com/",
-                "sha256": "d89a448704f5301e",
-                "title": "Refactoring UI"
-              }
-            ]
+            "refs": []
           },
           "confidence": "low",
           "caveats": [
@@ -2919,7 +3774,8 @@
           "needs": [
             "RQ-D1"
           ],
-          "evidence_class": "[X]"
+          "evidence_class": "[P]",
+          "policy_reason": "Backing taxonomy node(s) tech-vis-elevation-model fall below the >=3-source bar after the q0 evidence gate."
         },
         {
           "id": "cm-motion",
@@ -2928,15 +3784,15 @@
           "when": "A change needs confirming (arrive/leave/attention).",
           "avoid_when": "Motion competes with a 1s live tick.",
           "evidence": {
-            "support": 7,
+            "support": 5,
             "support_by_family": {
-              "craft": 7
+              "craft": 5
             },
             "independent_families": 1,
             "taxonomy_nodes": [
               {
                 "id": "tech-vis-motion-easing",
-                "support": 7,
+                "support": 5,
                 "family_names": [
                   "craft"
                 ],
@@ -2952,21 +3808,15 @@
               },
               {
                 "family": "craft",
-                "uri": "https://web.dev/learn/css/",
-                "sha256": "40cbdddaac4bd168",
-                "title": "Learn CSS \u00a0|\u00a0 web.dev"
-              },
-              {
-                "family": "craft",
                 "uri": "https://web.dev/articles/prefers-reduced-motion",
                 "sha256": "00c6f4b49de13c1b",
                 "title": "prefers-reduced-motion: Sometimes less movement is more \u00a0|\u00a0 Articles \u00a0|\u00a0 web.dev"
               },
               {
                 "family": "craft",
-                "uri": "https://www.nngroup.com/articles/response-times-3-important-limits/",
-                "sha256": "ffa84c46b1dc9665",
-                "title": "Response Time Limits: Article by Jakob Nielsen - NN/G"
+                "uri": "https://www.joshwcomeau.com/animation/a-friendly-introduction-to-spring-physics/",
+                "sha256": "71b1e7fa215f3d5a",
+                "title": "A Friendly Introduction to Spring Physics Animation in JavaScript \u2022 Josh W. Comeau"
               },
               {
                 "family": "craft",
@@ -2976,9 +3826,9 @@
               },
               {
                 "family": "craft",
-                "uri": "https://css-tricks.com/svg-line-animation-works/",
-                "sha256": "5b1adeb30b08f494",
-                "title": "How SVG Line Animation Works | CSS-Tricks"
+                "uri": "https://www.nngroup.com/articles/response-times-3-important-limits/",
+                "sha256": "ffa84c46b1dc9665",
+                "title": "Response Time Limits: Article by Jakob Nielsen - NN/G"
               }
             ]
           },
@@ -2996,15 +3846,15 @@
           "when": "Any motion exists at all.",
           "avoid_when": "Reduced motion removes information that only motion carried.",
           "evidence": {
-            "support": 6,
+            "support": 3,
             "support_by_family": {
-              "craft": 6
+              "craft": 3
             },
             "independent_families": 1,
             "taxonomy_nodes": [
               {
                 "id": "tech-int-reduced-motion",
-                "support": 6,
+                "support": 3,
                 "family_names": [
                   "craft"
                 ],
@@ -3020,33 +3870,15 @@
               },
               {
                 "family": "craft",
-                "uri": "https://web.dev/learn/accessibility/",
-                "sha256": "abe7da4e372ad808",
-                "title": "Learn Accessibility \u00a0|\u00a0 web.dev"
-              },
-              {
-                "family": "craft",
                 "uri": "https://web.dev/articles/prefers-reduced-motion",
                 "sha256": "00c6f4b49de13c1b",
                 "title": "prefers-reduced-motion: Sometimes less movement is more \u00a0|\u00a0 Articles \u00a0|\u00a0 web.dev"
               },
               {
                 "family": "craft",
-                "uri": "https://www.nngroup.com/articles/microinteractions/",
-                "sha256": "e70316fbafc50556",
-                "title": "Microinteractions in User Experience - NN/G"
-              },
-              {
-                "family": "craft",
                 "uri": "https://www.w3.org/WAI/WCAG22/quickref/",
                 "sha256": "ed61b139cdf28bff",
                 "title": "How to Meet WCAG (Quickref Reference)"
-              },
-              {
-                "family": "craft",
-                "uri": "https://www.joshwcomeau.com/animation/a-friendly-introduction-to-spring-physics/",
-                "sha256": "71b1e7fa215f3d5a",
-                "title": "A Friendly Introduction to Spring Physics Animation in JavaScript \u2022 Josh W. Comeau"
               }
             ]
           },
@@ -3060,52 +3892,25 @@
         },
         {
           "id": "cm-forced-colors",
-          "label": "Forced-colors / high-contrast support",
+          "label": "[P] [P] [P] [P] [P] Forced-colors / high-contrast support",
           "recommendation": "Use system color keywords and currentColor so the room survives Windows High Contrast; MDN's forced-colors guide is the normative reference.",
           "when": "High-contrast/forced-colors users are supported.",
           "avoid_when": "Hard-coded hex colors block the override.",
           "evidence": {
-            "support": 4,
-            "support_by_family": {
-              "craft": 4
-            },
-            "independent_families": 1,
+            "support": 1,
+            "support_by_family": {},
+            "independent_families": 0,
             "taxonomy_nodes": [
               {
                 "id": "tech-vis-forced-colors",
-                "support": 4,
+                "support": 1,
                 "family_names": [
                   "craft"
                 ],
-                "meets_three_source_rule": true
+                "meets_three_source_rule": false
               }
             ],
-            "refs": [
-              {
-                "family": "craft",
-                "uri": "https://developer.mozilla.org/en-US/docs/Web/CSS/@media/forced-colors",
-                "sha256": "ebbddff1da6be245",
-                "title": "forced-colors CSS media feature - CSS | MDN"
-              },
-              {
-                "family": "craft",
-                "uri": "https://web.dev/articles/color-and-contrast-accessibility",
-                "sha256": "aded09c8b9cfa9b7",
-                "title": "Color and contrast accessibility \u00a0|\u00a0 web.dev"
-              },
-              {
-                "family": "craft",
-                "uri": "https://www.smashingmagazine.com/2025/11/smashing-animations-part-6-svgs-css-custom-properties/",
-                "sha256": "b8bc0e988e39ee25",
-                "title": "Smashing Animations Part 6: Magnificent SVGs\u00a0With <use>\u00a0And CSS Custom Properties \u2014 Smashing Magazine"
-              },
-              {
-                "family": "craft",
-                "uri": "https://css-tricks.com/svg-properties-and-css/",
-                "sha256": "026f726c04e31390",
-                "title": "SVG Properties in CSS Guide | CSS-Tricks"
-              }
-            ]
+            "refs": []
           },
           "confidence": "medium",
           "caveats": [],
@@ -3113,7 +3918,8 @@
             "RQ-H1",
             "RQ-D5"
           ],
-          "evidence_class": "[X]"
+          "evidence_class": "[P]",
+          "policy_reason": "Backing taxonomy node(s) tech-vis-forced-colors fall below the >=3-source bar after the q0 evidence gate."
         }
       ]
     },
@@ -3129,15 +3935,15 @@
           "when": "Any architecture/flow/topology diagram.",
           "avoid_when": "Hard-coded fills (breaks theming/high contrast).",
           "evidence": {
-            "support": 11,
+            "support": 3,
             "support_by_family": {
-              "craft": 11
+              "craft": 3
             },
             "independent_families": 1,
             "taxonomy_nodes": [
               {
                 "id": "tech-svg-theme-aware-svg",
-                "support": 11,
+                "support": 3,
                 "family_names": [
                   "craft"
                 ],
@@ -3147,33 +3953,15 @@
             "refs": [
               {
                 "family": "craft",
-                "uri": "https://developer.mozilla.org/en-US/docs/Web/SVG/Tutorial",
-                "sha256": "1c32624cf7da27fe",
-                "title": "Introducing SVG from scratch - SVG | MDN"
-              },
-              {
-                "family": "craft",
-                "uri": "https://developer.mozilla.org/en-US/docs/Web/SVG/Tutorial/Texts",
-                "sha256": "88fc7a5094ccc2ab",
-                "title": "Texts - SVG | MDN"
-              },
-              {
-                "family": "craft",
-                "uri": "https://developer.mozilla.org/en-US/docs/Web/SVG/Attribute/viewBox",
-                "sha256": "c953bc2f52e375d0",
-                "title": "viewBox - SVG | MDN"
-              },
-              {
-                "family": "craft",
-                "uri": "https://developer.mozilla.org/en-US/docs/Web/SVG/Element/use",
-                "sha256": "4ce5f6172aae264a",
-                "title": "<use> - SVG | MDN"
-              },
-              {
-                "family": "craft",
                 "uri": "https://www.smashingmagazine.com/2025/11/smashing-animations-part-6-svgs-css-custom-properties/",
                 "sha256": "b8bc0e988e39ee25",
                 "title": "Smashing Animations Part 6: Magnificent SVGs\u00a0With <use>\u00a0And CSS Custom Properties \u2014 Smashing Magazine"
+              },
+              {
+                "family": "craft",
+                "uri": "https://developer.mozilla.org/en-US/docs/Web/SVG/Tutorial",
+                "sha256": "1c32624cf7da27fe",
+                "title": "Introducing SVG from scratch - SVG | MDN"
               },
               {
                 "family": "craft",
@@ -3198,49 +3986,29 @@
           "when": "A mark is tiny and repeated many times.",
           "avoid_when": "The mark needs real interaction/data-heavy redraw.",
           "evidence": {
-            "support": 17,
+            "support": 3,
             "support_by_family": {
-              "dataviz": 2,
-              "cli": 3,
-              "craft": 12
+              "cli": 2,
+              "craft": 1
             },
-            "independent_families": 3,
+            "independent_families": 2,
             "taxonomy_nodes": [
               {
                 "id": "tech-svg-micro-visual",
-                "support": 17,
+                "support": 3,
                 "family_names": [
                   "cli",
-                  "craft",
-                  "dataviz"
+                  "craft"
                 ],
                 "meets_three_source_rule": true
               }
             ],
             "refs": [
               {
-                "family": "dataviz",
-                "uri": "https://github.com/leeoniya/uPlot",
-                "sha256": "c3a34c9200af26ab",
-                "title": "GitHub - leeoniya/uPlot: \ud83d\udcc8 A small, fast chart for time series, lines, areas, ohlc & bars \u00b7 GitHub"
-              },
-              {
-                "family": "dataviz",
-                "uri": "https://leeoniya.github.io/uPlot/",
-                "sha256": "0c26530cb0b02576",
-                "title": "uPlot | \ud83d\udcc8 A small, fast chart for time series, lines, areas, ohlc & bars"
-              },
-              {
-                "family": "cli",
-                "uri": "https://github.com/XuehaiPan/nvitop",
-                "sha256": "f0d68d37b1d8bc32",
-                "title": "GitHub - XuehaiPan/nvitop: An interactive NVIDIA-GPU process viewer and beyond, the one-stop solution for GPU process management. \u00b7 GitHub"
-              },
-              {
-                "family": "cli",
-                "uri": "https://nvitop.readthedocs.io/",
-                "sha256": "1062824463740c2a",
-                "title": "Welcome to nvitop\u2019s documentation! \u2014 nvitop: the one-stop solution for GPU process management.  documentation"
+                "family": "craft",
+                "uri": "https://css-tricks.com/mega-list-svg-information/",
+                "sha256": "45906cdcaa5d19ce",
+                "title": "A Compendium of SVG Information | CSS-Tricks"
               },
               {
                 "family": "cli",
@@ -3249,10 +4017,10 @@
                 "title": "GitHub - aristocratos/btop: A monitor of resources \u00b7 GitHub"
               },
               {
-                "family": "craft",
-                "uri": "https://developer.mozilla.org/en-US/docs/Web/SVG/Tutorial",
-                "sha256": "1c32624cf7da27fe",
-                "title": "Introducing SVG from scratch - SVG | MDN"
+                "family": "cli",
+                "uri": "https://github.com/XuehaiPan/nvitop",
+                "sha256": "f0d68d37b1d8bc32",
+                "title": "GitHub - XuehaiPan/nvitop: An interactive NVIDIA-GPU process viewer and beyond, the one-stop solution for GPU process management. \u00b7 GitHub"
               }
             ]
           },
@@ -3270,15 +4038,15 @@
           "when": "Any SVG conveys information.",
           "avoid_when": "A complex diagram has no textual equivalent.",
           "evidence": {
-            "support": 5,
+            "support": 3,
             "support_by_family": {
-              "craft": 5
+              "craft": 3
             },
             "independent_families": 1,
             "taxonomy_nodes": [
               {
                 "id": "tech-svg-accessible-svg",
-                "support": 5,
+                "support": 3,
                 "family_names": [
                   "craft"
                 ],
@@ -3288,9 +4056,9 @@
             "refs": [
               {
                 "family": "craft",
-                "uri": "https://developer.mozilla.org/en-US/docs/Web/SVG/Tutorial/Texts",
-                "sha256": "88fc7a5094ccc2ab",
-                "title": "Texts - SVG | MDN"
+                "uri": "https://css-tricks.com/accessible-svgs/",
+                "sha256": "03dcc0382b1f0621",
+                "title": "Accessible SVGs | CSS-Tricks"
               },
               {
                 "family": "craft",
@@ -3300,21 +4068,9 @@
               },
               {
                 "family": "craft",
-                "uri": "https://css-tricks.com/accessible-svgs/",
-                "sha256": "03dcc0382b1f0621",
-                "title": "Accessible SVGs | CSS-Tricks"
-              },
-              {
-                "family": "craft",
-                "uri": "https://svg-tutorial.com/svg/text",
-                "sha256": "9fe0b8ca73e12d27",
-                "title": "How to Add Text to SVG Images - SVG Tutorial"
-              },
-              {
-                "family": "craft",
-                "uri": "https://inclusive-components.design/",
-                "sha256": "ac8dbab4744ac5bf",
-                "title": "Inclusive Components"
+                "uri": "https://developer.mozilla.org/en-US/docs/Web/SVG/Tutorial/Texts",
+                "sha256": "88fc7a5094ccc2ab",
+                "title": "Texts - SVG | MDN"
               }
             ]
           },
@@ -3351,24 +4107,6 @@
             "refs": [
               {
                 "family": "craft",
-                "uri": "https://developer.mozilla.org/en-US/docs/Web/SVG/Tutorial",
-                "sha256": "1c32624cf7da27fe",
-                "title": "Introducing SVG from scratch - SVG | MDN"
-              },
-              {
-                "family": "craft",
-                "uri": "https://developer.mozilla.org/en-US/docs/Web/SVG/Tutorial/Paths",
-                "sha256": "1c04ca9858dbfae1",
-                "title": "Paths - SVG | MDN"
-              },
-              {
-                "family": "craft",
-                "uri": "https://www.smashingmagazine.com/2025/06/decoding-svg-path-element-line-commands/",
-                "sha256": "88d16fce9095dee4",
-                "title": "Decoding The SVG path Element: Line Commands \u2014 Smashing Magazine"
-              },
-              {
-                "family": "craft",
                 "uri": "https://css-tricks.com/svg-line-animation-works/",
                 "sha256": "5b1adeb30b08f494",
                 "title": "How SVG Line Animation Works | CSS-Tricks"
@@ -3378,6 +4116,24 @@
                 "uri": "https://svg-tutorial.com/",
                 "sha256": "ea201b4404388cbe",
                 "title": "SVG Tutorial - Learn how to code images in HTML with SVG"
+              },
+              {
+                "family": "craft",
+                "uri": "https://www.smashingmagazine.com/2025/06/decoding-svg-path-element-line-commands/",
+                "sha256": "88d16fce9095dee4",
+                "title": "Decoding The SVG path Element: Line Commands \u2014 Smashing Magazine"
+              },
+              {
+                "family": "craft",
+                "uri": "https://developer.mozilla.org/en-US/docs/Web/SVG/Tutorial/Paths",
+                "sha256": "1c04ca9858dbfae1",
+                "title": "Paths - SVG | MDN"
+              },
+              {
+                "family": "craft",
+                "uri": "https://developer.mozilla.org/en-US/docs/Web/SVG/Tutorial",
+                "sha256": "1c32624cf7da27fe",
+                "title": "Introducing SVG from scratch - SVG | MDN"
               }
             ]
           },
@@ -3397,35 +4153,11 @@
           "avoid_when": "A static structural diagram suffices.",
           "evidence_class": "[P]",
           "evidence": {
-            "support": 2,
-            "support_by_family": {
-              "craft": 2
-            },
-            "independent_families": 1,
-            "taxonomy_nodes": [
-              {
-                "id": "thin-svg-flow-diagram",
-                "support": 2,
-                "family_names": [
-                  "craft"
-                ],
-                "meets_three_source_rule": false
-              }
-            ],
-            "refs": [
-              {
-                "family": "craft",
-                "uri": "https://developer.mozilla.org/en-US/docs/Web/SVG/Tutorial/Paths",
-                "sha256": "1c04ca9858dbfae1",
-                "title": "Paths - SVG | MDN"
-              },
-              {
-                "family": "craft",
-                "uri": "https://www.smashingmagazine.com/2025/06/decoding-svg-path-element-line-commands/",
-                "sha256": "88d16fce9095dee4",
-                "title": "Decoding The SVG path Element: Line Commands \u2014 Smashing Magazine"
-              }
-            ]
+            "support": 0,
+            "support_by_family": {},
+            "independent_families": 0,
+            "taxonomy_nodes": [],
+            "refs": []
           },
           "confidence": "low",
           "caveats": [
@@ -3438,46 +4170,25 @@
         },
         {
           "id": "svg-print",
-          "label": "Print-safe SVG (text as text, no raster)",
+          "label": "[P] [P] [P] [P] [P] Print-safe SVG (text as text, no raster)",
           "recommendation": "Keep labels as SVG <text> so diagrams survive print/zoom and scale cleanly.",
           "when": "Diagrams may be exported or printed.",
           "avoid_when": "Text is outlined into paths (loses accessibility/search).",
           "evidence": {
-            "support": 3,
-            "support_by_family": {
-              "craft": 3
-            },
-            "independent_families": 1,
+            "support": 1,
+            "support_by_family": {},
+            "independent_families": 0,
             "taxonomy_nodes": [
               {
                 "id": "tech-svg-print-safe-svg",
-                "support": 3,
+                "support": 1,
                 "family_names": [
                   "craft"
                 ],
-                "meets_three_source_rule": true
+                "meets_three_source_rule": false
               }
             ],
-            "refs": [
-              {
-                "family": "craft",
-                "uri": "https://developer.mozilla.org/en-US/docs/Web/SVG/Tutorial/Texts",
-                "sha256": "88fc7a5094ccc2ab",
-                "title": "Texts - SVG | MDN"
-              },
-              {
-                "family": "craft",
-                "uri": "https://css-tricks.com/accessible-svgs/",
-                "sha256": "03dcc0382b1f0621",
-                "title": "Accessible SVGs | CSS-Tricks"
-              },
-              {
-                "family": "craft",
-                "uri": "https://svg-tutorial.com/svg/text",
-                "sha256": "9fe0b8ca73e12d27",
-                "title": "How to Add Text to SVG Images - SVG Tutorial"
-              }
-            ]
+            "refs": []
           },
           "confidence": "low",
           "caveats": [
@@ -3487,7 +4198,8 @@
           "needs": [
             "RQ-J3"
           ],
-          "evidence_class": "[X]"
+          "evidence_class": "[P]",
+          "policy_reason": "Backing taxonomy node(s) tech-svg-print-safe-svg fall below the >=3-source bar after the q0 evidence gate."
         }
       ]
     },
@@ -3504,25 +4216,16 @@
           "avoid_when": "Flat fire-and-forget tasks.",
           "evidence_class": "[X]",
           "evidence": {
-            "support": 20,
+            "support": 18,
             "support_by_family": {
-              "agentops": 15,
+              "agentops": 13,
               "dashboards": 5
             },
             "independent_families": 2,
             "taxonomy_nodes": [
               {
-                "id": "tech-trust-causal-lineage",
-                "support": 18,
-                "family_names": [
-                  "agentops",
-                  "dashboards"
-                ],
-                "meets_three_source_rule": true
-              },
-              {
                 "id": "tech-ops-trace-tree",
-                "support": 20,
+                "support": 18,
                 "family_names": [
                   "agentops",
                   "dashboards"
@@ -3532,40 +4235,40 @@
             ],
             "refs": [
               {
-                "family": "agentops",
-                "uri": "https://langfuse.com/docs",
-                "sha256": "34d09509900f2a2b",
-                "title": "Open Source AI Engineering Platform - Langfuse"
+                "family": "dashboards",
+                "uri": "https://docs.sentry.io/product/explore/",
+                "sha256": "cde48f7511724486",
+                "title": "Traces and Spans"
               },
               {
                 "family": "agentops",
-                "uri": "https://www.langchain.com/langsmith",
-                "sha256": "75ab02f301180387",
-                "title": "LangSmith: Agent & LLM Observability Platform"
-              },
-              {
-                "family": "agentops",
-                "uri": "https://langfuse.com/docs/observability/overview",
-                "sha256": "0a1784a27f750267",
-                "title": "LLM Observability & Application Tracing (Open Source) - Langfuse"
-              },
-              {
-                "family": "agentops",
-                "uri": "https://docs.smith.langchain.com/",
-                "sha256": "216cc0ec88b4a616",
-                "title": "LangSmith Observability - Docs by LangChain"
-              },
-              {
-                "family": "agentops",
-                "uri": "https://www.braintrust.dev/docs",
-                "sha256": "1694f5c22f1528ee",
-                "title": "Get started with Braintrust - Braintrust"
+                "uri": "https://docs.agentops.ai/v1/concepts/events",
+                "sha256": "4ed18cb4c4c10bf4",
+                "title": "Spans - AgentOps"
               },
               {
                 "family": "agentops",
                 "uri": "https://docs.agentops.ai/",
                 "sha256": "f8ca1f22853b1f87",
                 "title": "Introduction - AgentOps"
+              },
+              {
+                "family": "agentops",
+                "uri": "https://docs.arize.com/phoenix",
+                "sha256": "03f451e9e86f8ade",
+                "title": "What is Arize Phoenix? - Phoenix"
+              },
+              {
+                "family": "agentops",
+                "uri": "https://docs.latitude.so/",
+                "sha256": "ece55c9402f2f298",
+                "title": "Latitude Overview - Latitude Docs"
+              },
+              {
+                "family": "agentops",
+                "uri": "https://www.honeyhive.ai/",
+                "sha256": "6e207fda2bee28b2",
+                "title": "HoneyHive - Agent Observability & Evaluation Platform"
               }
             ]
           },
@@ -3707,21 +4410,9 @@
             "refs": [
               {
                 "family": "agentops",
-                "uri": "https://blog.langchain.dev/",
-                "sha256": "978edb60fa825493",
-                "title": "LangChain Blog"
-              },
-              {
-                "family": "agentops",
-                "uri": "https://www.langchain.com/langsmith",
-                "sha256": "75ab02f301180387",
-                "title": "LangSmith: Agent & LLM Observability Platform"
-              },
-              {
-                "family": "agentops",
-                "uri": "https://langfuse.com/blog",
-                "sha256": "9222b2041ecf6042",
-                "title": "Blog - Langfuse"
+                "uri": "https://docs.confident-ai.com/",
+                "sha256": "8159075eb65dcf26",
+                "title": "DeepEval - The LLM Evaluation Framework"
               },
               {
                 "family": "agentops",
@@ -3731,15 +4422,27 @@
               },
               {
                 "family": "agentops",
-                "uri": "https://docs.smith.langchain.com/prompt_engineering",
-                "sha256": "195faedbb34b0887",
-                "title": "Prompt & Context Hub - Docs by LangChain"
-              },
-              {
-                "family": "agentops",
                 "uri": "https://langfuse.com/docs/scores/overview",
                 "sha256": "4667e20442936138",
                 "title": "Evaluation of LLM Applications - Langfuse"
+              },
+              {
+                "family": "agentops",
+                "uri": "https://langfuse.com/blog",
+                "sha256": "9222b2041ecf6042",
+                "title": "Blog - Langfuse"
+              },
+              {
+                "family": "agentops",
+                "uri": "https://www.agentops.ai/blog",
+                "sha256": "01acc93b6715a0a3",
+                "title": "AgentOps"
+              },
+              {
+                "family": "agentops",
+                "uri": "https://www.braintrust.dev/docs/guides/datasets",
+                "sha256": "1ffbd86f49991e72",
+                "title": "Datasets - Braintrust"
               }
             ]
           },
@@ -3754,46 +4457,16 @@
         },
         {
           "id": "ao-prompt",
-          "label": "Prompt registry / versioning",
+          "label": "[P] [P] [P] [P] [P] [P] [P] Prompt registry / versioning",
           "recommendation": "Version prompts and tie each run to the prompt version that produced it, so a regression is attributable.",
           "when": "Prompts change and outcomes must be compared.",
           "avoid_when": "Prompt versions aren't linked to runs.",
           "evidence": {
-            "support": 3,
-            "support_by_family": {
-              "agentops": 3
-            },
-            "independent_families": 1,
-            "taxonomy_nodes": [
-              {
-                "id": "tech-ops-prompt-registry",
-                "support": 3,
-                "family_names": [
-                  "agentops"
-                ],
-                "meets_three_source_rule": true
-              }
-            ],
-            "refs": [
-              {
-                "family": "agentops",
-                "uri": "https://www.langchain.com/langsmith",
-                "sha256": "75ab02f301180387",
-                "title": "LangSmith: Agent & LLM Observability Platform"
-              },
-              {
-                "family": "agentops",
-                "uri": "https://docs.smith.langchain.com/prompt_engineering",
-                "sha256": "195faedbb34b0887",
-                "title": "Prompt & Context Hub - Docs by LangChain"
-              },
-              {
-                "family": "agentops",
-                "uri": "https://langfuse.com/docs/prompts/get-started",
-                "sha256": "b6abb3bdd296f457",
-                "title": "Get Started with Prompt Management - Langfuse"
-              }
-            ]
+            "support": 0,
+            "support_by_family": {},
+            "independent_families": 0,
+            "taxonomy_nodes": [],
+            "refs": []
           },
           "confidence": "low",
           "caveats": [
@@ -3803,7 +4476,8 @@
             "RQ-F2",
             "ON-D4"
           ],
-          "evidence_class": "[X]"
+          "evidence_class": "[P]",
+          "policy_reason": "Backing taxonomy node(s) (none recorded) were deleted by the q0 semantic crosswalk; no stored source states the technique."
         },
         {
           "id": "ao-observability",
@@ -3812,16 +4486,16 @@
           "when": "Multiple agents/providers must feed one room.",
           "avoid_when": "Proprietary traces are the only option.",
           "evidence": {
-            "support": 18,
+            "support": 13,
             "support_by_family": {
-              "agentops": 15,
-              "dashboards": 3
+              "agentops": 12,
+              "dashboards": 1
             },
             "independent_families": 2,
             "taxonomy_nodes": [
               {
                 "id": "tech-ops-observability",
-                "support": 18,
+                "support": 13,
                 "family_names": [
                   "agentops",
                   "dashboards"
@@ -3830,6 +4504,30 @@
               }
             ],
             "refs": [
+              {
+                "family": "agentops",
+                "uri": "https://www.agentops.ai/blog",
+                "sha256": "01acc93b6715a0a3",
+                "title": "AgentOps"
+              },
+              {
+                "family": "agentops",
+                "uri": "https://arize.com/blog/",
+                "sha256": "eac1806de3b83585",
+                "title": "AI Engineering Blog: Agents, Evals & Observability | Arize AI"
+              },
+              {
+                "family": "agentops",
+                "uri": "https://www.braintrust.dev/blog",
+                "sha256": "74edfbbb273241b6",
+                "title": "Latest Braintrust news - Braintrust"
+              },
+              {
+                "family": "agentops",
+                "uri": "https://www.helicone.ai/blog",
+                "sha256": "a3f580845242c85e",
+                "title": "Helicone Blog | AI Development Insights & Best Practices"
+              },
               {
                 "family": "agentops",
                 "uri": "https://blog.langchain.dev/",
@@ -3841,30 +4539,6 @@
                 "uri": "https://langfuse.com/blog",
                 "sha256": "9222b2041ecf6042",
                 "title": "Blog - Langfuse"
-              },
-              {
-                "family": "agentops",
-                "uri": "https://www.braintrust.dev/blog",
-                "sha256": "74edfbbb273241b6",
-                "title": "Latest Braintrust news - Braintrust"
-              },
-              {
-                "family": "agentops",
-                "uri": "https://docs.helicone.ai/",
-                "sha256": "20ead7ec1d1155ef",
-                "title": "Quickstart - Helicone OSS LLM Observability"
-              },
-              {
-                "family": "agentops",
-                "uri": "https://www.helicone.ai/blog",
-                "sha256": "a3f580845242c85e",
-                "title": "Helicone Blog | AI Development Insights & Best Practices"
-              },
-              {
-                "family": "agentops",
-                "uri": "https://docs.agentops.ai/v1/quickstart",
-                "sha256": "2220d7215a58ab31",
-                "title": "Quickstart - AgentOps"
               }
             ]
           },
@@ -3888,38 +4562,14 @@
     },
     {
       "catalog": "(taxonomy)",
-      "item": "thin-ia-overflow-drawer",
-      "support": 1,
-      "reason": "thin cluster below the >=3-source bar; not promoted"
-    },
-    {
-      "catalog": "(taxonomy)",
       "item": "thin-viz-gauge",
       "support": 1,
       "reason": "thin cluster below the >=3-source bar; not promoted"
     },
     {
       "catalog": "(taxonomy)",
-      "item": "thin-viz-small-multiples",
-      "support": 2,
-      "reason": "thin cluster below the >=3-source bar; not promoted"
-    },
-    {
-      "catalog": "(taxonomy)",
-      "item": "thin-viz-threshold-bands",
-      "support": 2,
-      "reason": "thin cluster below the >=3-source bar; not promoted"
-    },
-    {
-      "catalog": "(taxonomy)",
-      "item": "thin-int-confirmation-door",
+      "item": "tech-int-skeleton-loading",
       "support": 1,
-      "reason": "thin cluster below the >=3-source bar; not promoted"
-    },
-    {
-      "catalog": "(taxonomy)",
-      "item": "thin-svg-flow-diagram",
-      "support": 2,
       "reason": "thin cluster below the >=3-source bar; not promoted"
     },
     {
@@ -3927,6 +4577,51 @@
       "item": "thin-ops-self-host",
       "support": 2,
       "reason": "thin cluster below the >=3-source bar; not promoted"
+    },
+    {
+      "catalog": "ia-layout",
+      "item": "ia-master-detail",
+      "reason": "Backing taxonomy node(s) tech-ia-master-detail fall below the >=3-source bar after the q0 evidence gate."
+    },
+    {
+      "catalog": "ia-layout",
+      "item": "ia-progressive-disclosure",
+      "reason": "Backing taxonomy node(s) tech-ia-progressive-disclosure fall below the >=3-source bar after the q0 evidence gate."
+    },
+    {
+      "catalog": "ia-layout",
+      "item": "ia-density-ladder",
+      "reason": "Backing taxonomy node(s) tech-ia-density-ladder fall below the >=3-source bar after the q0 evidence gate."
+    },
+    {
+      "catalog": "chart-selection",
+      "item": "ch-status-grid",
+      "reason": "Backing taxonomy node(s) tech-viz-heatmap fall below the >=3-source bar after the q0 evidence gate."
+    },
+    {
+      "catalog": "color-motion",
+      "item": "cm-icon",
+      "reason": "Backing taxonomy node(s) tech-vis-icon-family fall below the >=3-source bar after the q0 evidence gate."
+    },
+    {
+      "catalog": "color-motion",
+      "item": "cm-elevation",
+      "reason": "Backing taxonomy node(s) tech-vis-elevation-model fall below the >=3-source bar after the q0 evidence gate."
+    },
+    {
+      "catalog": "color-motion",
+      "item": "cm-forced-colors",
+      "reason": "Backing taxonomy node(s) tech-vis-forced-colors fall below the >=3-source bar after the q0 evidence gate."
+    },
+    {
+      "catalog": "svg-technique",
+      "item": "svg-print",
+      "reason": "Backing taxonomy node(s) tech-svg-print-safe-svg fall below the >=3-source bar after the q0 evidence gate."
+    },
+    {
+      "catalog": "agent-ops",
+      "item": "ao-prompt",
+      "reason": "Backing taxonomy node(s) (none recorded) were deleted by the q0 semantic crosswalk; no stored source states the technique."
     }
   ],
   "method": "Catalogs re-pointed at the repaired taxonomy. Items whose backing nodes were deleted or dropped below the >=3-source bar are explicit [P] local design policies with a reason; every ref is re-derived from corpus with exact titles."
