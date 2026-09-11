@@ -440,15 +440,27 @@ def matched_for(node_id: str, crosswalk: dict, records: list[dict]) -> list[dict
 
 
 def node_evidence(node_id: str, nodes: dict) -> dict | None:
+    """Return a node's support proof without turning structural totals into evidence.
+
+    Technique leaves expose ``support`` and one verbatim quote per counted record.
+    Structural taxonomy nodes expose ``record_count`` instead: their corpus annotation
+    totals are useful context but are not source sentences that establish a technique.
+    """
     node = nodes.get(node_id)
     if node is None:
         return None
-    return {
+    evidence = {
         "id": node_id,
-        "support": node["support"],
         "family_names": sorted(node["support_by_family"].keys()),
         "meets_three_source_rule": node["meets_three_source_rule"],
     }
+    if "support" in node:
+        evidence["support"] = node["support"]
+        # Copy the full record-level proof so this artifact stands on its own.
+        evidence["evidence_quotes"] = node.get("evidence_quotes") or []
+    else:
+        evidence["record_count"] = node.get("record_count", 0)
+    return evidence
 
 
 def build_evidence(backing: list[str], tax: dict, nodes: dict, records: list[dict],
@@ -462,9 +474,10 @@ def build_evidence(backing: list[str], tax: dict, nodes: dict, records: list[dic
     """
     node_rows = [node_evidence(b, nodes) for b in backing if b in nodes]
     node_rows = [r for r in node_rows if r is not None]
-    support = max((r["support"] for r in node_rows), default=0)
+    quoted_rows = [r for r in node_rows if r.get("evidence_quotes")]
+    support = max((r["support"] for r in quoted_rows), default=0)
     families: set[str] = set()
-    for r in node_rows:
+    for r in quoted_rows:
         families.update(r["family_names"])
 
     # Refs: round-robin across backing nodes' quoted records, dedup by sha.
@@ -496,8 +509,10 @@ def build_evidence(backing: list[str], tax: dict, nodes: dict, records: list[dic
             break
         idx += 1
 
-    # Report the family split of the strongest backing node (transparent, not summed).
-    top_id = max(node_rows, key=lambda r: r["support"])["id"] if node_rows else None
+    # Report the family split and full support proof of the strongest quoted node.
+    # The support field is a maximum, not a sum, so its quote array is exactly the
+    # record-level witness for that reported count.
+    top_id = max(quoted_rows, key=lambda r: r["support"])["id"] if quoted_rows else None
     support_by_family = nodes[top_id]["support_by_family"] if top_id else {}
     return {
         "support": support,
@@ -505,6 +520,7 @@ def build_evidence(backing: list[str], tax: dict, nodes: dict, records: list[dic
         "independent_families": len(families),
         "taxonomy_nodes": node_rows,
         "refs": refs,
+        "evidence_quotes": nodes[top_id].get("evidence_quotes") or [] if top_id else [],
     }
 
 
@@ -528,7 +544,10 @@ def repair_catalogs(tax: dict, nodes: dict, records: list[dict]) -> dict:
                 mapped = RENAME.get(nid, nid)
                 if mapped is not None and mapped not in new_backing:
                     new_backing.append(mapped)
-            promoted = [b for b in new_backing if nodes.get(b, {}).get("meets_three_source_rule")]
+            promoted = [
+                b for b in new_backing
+                if nodes.get(b, {}).get("support", 0) >= MIN_SUPPORT
+            ]
             if promoted:
                 new_item = dict(item)
                 new_item["evidence"] = build_evidence(promoted, tax, nodes, records)
@@ -537,7 +556,12 @@ def repair_catalogs(tax: dict, nodes: dict, records: list[dict]) -> dict:
             else:
                 # Lost its source support -> explicit [P] local policy, never a finding.
                 policy = dict(item)
-                policy["label"] = f"[P] {item['label']}"
+                base_label = item["label"]
+                # Existing generated output is the next run's input. Strip old policy
+                # markers so repeated deterministic reductions cannot compound them.
+                while base_label.startswith("[P] "):
+                    base_label = base_label[4:]
+                policy["label"] = f"[P] {base_label}"
                 policy["evidence_class"] = "[P]"
                 if new_backing:
                     policy["policy_reason"] = (
@@ -552,17 +576,7 @@ def repair_catalogs(tax: dict, nodes: dict, records: list[dict]) -> dict:
                         + " were deleted by the q0 semantic crosswalk; no stored source "
                         "states the technique."
                     )
-                policy["evidence"] = {
-                    "support": max(
-                        (nodes[b]["support"] for b in new_backing if b in nodes), default=0
-                    ),
-                    "support_by_family": {},
-                    "independent_families": 0,
-                    "taxonomy_nodes": [
-                        node_evidence(b, nodes) for b in new_backing if b in nodes
-                    ],
-                    "refs": [],
-                }
+                policy["evidence"] = build_evidence(new_backing, tax, nodes, records)
                 items.append(policy)
                 dropped.append(
                     {"catalog": cat["id"], "item": item["id"],
@@ -595,6 +609,9 @@ def repair_catalogs(tax: dict, nodes: dict, records: list[dict]) -> dict:
             "catalog": "(taxonomy)",
             "item": n["id"],
             "support": n["support"],
+            # The below-bar ledger still reports a support count, so retain the
+            # same full proof rather than creating an ungrounded exception.
+            "evidence_quotes": n.get("evidence_quotes") or [],
             "reason": "thin cluster below the >=3-source bar; not promoted",
         }
         for n in tax["nodes"]
@@ -640,21 +657,30 @@ def repair_skills(tax: dict, nodes: dict, records: list[dict]) -> dict:
             mapped = RENAME.get(nid, nid)
             if mapped is not None and mapped not in new_backing:
                 new_backing.append(mapped)
-        promoted = [b for b in new_backing if nodes.get(b, {}).get("meets_three_source_rule")]
+        promoted = [
+            b for b in new_backing
+            if nodes.get(b, {}).get("support", 0) >= MIN_SUPPORT
+        ]
         evidence = build_evidence(promoted, tax, nodes, records, max_refs=8)
         new_skill["evidence"] = {
             "support_max": evidence["support"],
             "distinct_families": sorted({f for b in promoted for f in nodes[b]["support_by_family"]}),
             "backing_nodes": [node_evidence(b, nodes) for b in promoted],
             "refs": evidence["refs"],
+            "evidence_quotes": evidence["evidence_quotes"],
         }
         policies = SKILL_POLICY.get(skill["id"], [])
         new_skill["evidence_class"] = "[P]" if policies and not promoted else "[X]"
         if policies:
             new_skill["policy"] = policies
             # Make the reclassification explicit in the prose: unsupported moves are
-            # local [P] policy, never presented as corpus findings.
-            new_skill["recommendation"] = skill["recommendation"] + " Local [P] policy " \
+            # local [P] policy, never presented as corpus findings. Rebuild from the
+            # pre-generated prose so rerunning this deterministic reducer cannot append
+            # the same policy explanation repeatedly.
+            base_recommendation = skill["recommendation"].split(
+                " Local [P] policy (not corpus findings):", 1
+            )[0]
+            new_skill["recommendation"] = base_recommendation + " Local [P] policy " \
                 "(not corpus findings): " + "; ".join(
                     f"{p['move']} — {p['reason']}" for p in policies
                 ) + "."
@@ -717,13 +743,11 @@ def validate_refs(path: Path, records: list[dict]) -> int:
 
 
 def verify_evidence_citations(tax: dict, records: list[dict], catalogs: dict, skills: dict) -> int:
-    """Fail if any artifact cites a support without a backing evidence_quotes entry.
+    """Fail if any catalog or skill support lacks its own quote-backed proof.
 
-    For every catalog item and skill evidence block this checks (a) each cited
-    *technique* node that asserts support has non-empty ``evidence_quotes`` in the
-    taxonomy, and (b) every emitted ``refs`` sha is a record matched by one of the
-    cited nodes (technique or structural). That is the "no support count without
-    evidence" contract of the q0 semantic crosswalk.
+    Evidence blocks report the maximum support of one backing technique node. Their
+    full ``evidence_quotes`` list must therefore have the same cardinality, be copied
+    from a taxonomy leaf, and contain every ref they expose.
     """
     nodes = {n["id"]: n for n in tax["nodes"]}
     cw = tax["crosswalk"]
@@ -743,6 +767,12 @@ def verify_evidence_citations(tax: dict, records: list[dict], catalogs: dict, sk
 
     def check_block(block: dict, where: str) -> None:
         nonlocal bad
+        support = block.get("support", block.get("support_max", 0))
+        block_quotes = block.get("evidence_quotes") or []
+        quoted_block_shas = {q.get("sha256") for q in block_quotes if q.get("sha256")}
+        if support and len(quoted_block_shas) != support:
+            bad += 1
+            print(f"  EVIDENCE {where}: support={support} but {len(quoted_block_shas)} quote records")
         cited = [
             row["id"] for row in block.get("taxonomy_nodes", [])
             if isinstance(row, dict) and row.get("support", 0) > 0
@@ -753,6 +783,12 @@ def verify_evidence_citations(tax: dict, records: list[dict], catalogs: dict, sk
             if node_id in quoted and not quoted[node_id]:
                 bad += 1
                 print(f"  EVIDENCE {where}: cited {node_id} has no evidence_quotes")
+        for row in block.get("taxonomy_nodes", []):
+            if isinstance(row, dict) and row.get("support", 0):
+                node_quotes = {q.get("sha256") for q in row.get("evidence_quotes") or []}
+                if len(node_quotes) != row["support"]:
+                    bad += 1
+                    print(f"  EVIDENCE {where}: {row['id']} support has no complete quote proof")
         allowed = set()
         for node_id in cited:
             allowed |= quoted.get(node_id, set()) or matched_shas(node_id)
@@ -770,8 +806,10 @@ def verify_evidence_citations(tax: dict, records: list[dict], catalogs: dict, sk
         # Skills store backing nodes under evidence.backing_nodes.
         check_block(
             {
+                "support_max": ev.get("support_max", 0),
                 "taxonomy_nodes": ev.get("backing_nodes", []),
                 "refs": ev.get("refs", []),
+                "evidence_quotes": ev.get("evidence_quotes", []),
             },
             f"skill:{skill.get('id')}",
         )

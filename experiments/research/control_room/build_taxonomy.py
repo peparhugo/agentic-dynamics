@@ -526,22 +526,26 @@ TECHNIQUE: dict[str, str] = {
 # and drops out of the catalogs/skills as [P].
 EVIDENCE_PATTERNS: dict[str, str] = {
     "tech-ia-dashboard-layout": r"dashboard",
-    "tech-ia-widget-catalog": r"widget|component librar|component kit|panel librar|"
-                              r"\bblocks?\b|toolkit|\bpanels?\b",
+    "tech-ia-widget-catalog": r"widget|component (?:librar|kit)|panel (?:librar|catalog)|"
+                               r"\bcomponent toolkit\b|\bwidget catalog\b",
     "tech-ia-command-palette": r"command palette|cmd\s*\+?\s*k|⌘\s*k|command bar",
     "tech-ia-tab-bar": r"tab bar|new tab|\btabs?\b",
-    "tech-ia-progressive-disclosure": r"progressive disclosure|disclosure|"
-                                      r"reveal.{0,20}(detail|demand)|on demand|expander|accordion",
+    "tech-ia-progressive-disclosure": r"progressive disclosure|"
+                                       r"(?:accordion|expander).{0,60}(?:reveal|detail|content)|"
+                                       r"reveal.{0,40}(?:detail|content|on demand)",
     "tech-ia-master-detail": r"master.detail|detail (pane|view)|list.detail|sidebar|"
                              r"split view|two.pane|panel detail",
-    "tech-ia-density-ladder": r"density|compact|comfortable",
+    "tech-ia-density-ladder": r"density (?:ladder|setting|level|control)|"
+                              r"(?:compact|comfortable) (?:mode|density|layout)",
     "tech-viz-chart-types": r"chart type|chart types|charts\b|\d+ chart",
     "tech-viz-chart-grammar": r"grammar of graphics|encoding channels?\b|\bscales\b|"
                               r"\bmarks\b|axis",
-    "tech-viz-time-series-marks": r"line chart|area chart|bar chart|time series|sparkline",
+    "tech-viz-time-series-marks": r"line chart|area chart|time series|sparkline",
     "tech-viz-heatmap": r"heat ?map|status grid",
-    "tech-viz-data-table": r"table|tabular|virtualiz",
-    "tech-viz-log-stream": r"log stream|log viewer|\blogs?\b|request log|streaming",
+    "tech-viz-data-table": r"\btables?\b|\btabular\b|\bvirtualiz",
+    "tech-viz-log-stream": r"log stream|log viewer|"
+                           r"\blogs?\b.{0,50}(?:display|stream|view|follow|event|record)|"
+                           r"streaming.{0,50}\blogs?\b",
     "tech-viz-waterfall-timeline": r"waterfall|timeline",
     "tech-viz-rendering-performance": r"render|performance|gpu|canvas|\bsvg\b",
     "tech-int-keyboard-first": r"keyboard|shortcut|vi mode",
@@ -566,7 +570,8 @@ EVIDENCE_PATTERNS: dict[str, str] = {
     "tech-svg-accessible-svg": r"accessible svg|accessible.{0,20}svg|\baria\b|\brole\b|<title>",
     "tech-svg-micro-visual": r"micro|sparkline|braille|color.bars",
     "tech-svg-path-tracer": r"path.{0,20}animat|draw.{0,20}path|path tracer|stroke.dash",
-    "tech-svg-print-safe-svg": r"print",
+    "tech-svg-print-safe-svg": r"(?:print|printing).{0,80}(?:svg|vector)|"
+                                r"(?:svg|vector).{0,80}(?:print|printing)",
     "tech-money-cost-attribution": r"\bcost\b|spend|price",
     "tech-money-billing": r"payment|billing|pricing|usage.based",
     "tech-ops-trace-tree": r"trace|span",
@@ -903,13 +908,20 @@ def _tokens(value: str) -> list[str]:
 
 
 def _sentences(text: str) -> list[str]:
-    """Split prose into clean candidate sentences (no nav chrome, no code)."""
+    """Return verbatim candidate sentences without navigation chrome or code.
+
+    Quote storage must preserve an exact source substring. Normalizing whitespace
+    creates a display-friendly excerpt that cannot be checked against the source.
+    """
     parts = re.split(r"(?<=[.!?])\s+|\n+", text)
     out: list[str] = []
     for part in parts:
-        sentence = re.sub(r"\s+", " ", part).strip()
+        sentence = part.strip()
         if (
             30 <= len(sentence) <= 300
+            # Headings and navigation labels are not source sentences, even when they
+            # repeat a technique word such as "Log" or "Accordion".
+            and re.search(r"[.!?][\"')\]]*$", sentence)
             and not _NAV_RE.match(sentence)
             and not _CODE_RE.search(sentence)
         ):
@@ -917,15 +929,14 @@ def _sentences(text: str) -> list[str]:
     return out
 
 
-def _matches_pattern(node_id: str, record: "Record") -> bool:
-    """True when the stored source states the leaf's technique (pattern gate)."""
-    pattern = EVIDENCE_PATTERNS.get(node_id)
-    if not pattern:
-        return True
-    body, title = _load_source(record.sha)
-    if not (body.strip() or title.strip()):
-        return False
-    return bool(re.search(pattern, body + " \n " + title, re.I))
+def _has_matching_quote(node_id: str, technique: str, labels: list[str], record: "Record") -> bool:
+    """True only when this record yields the sentence the node will store.
+
+    This keeps the count gate coupled to quote selection: a whole-page match can no
+    longer admit a record whose selected sentence says something unrelated.
+    """
+    quote, source_kind, _score = extract_quote(node_id, technique, labels, record)
+    return bool(quote) and source_kind == "sentence"
 
 
 def extract_quote(node_id: str, technique: str, labels: list[str],
@@ -949,7 +960,9 @@ def extract_quote(node_id: str, technique: str, labels: list[str],
         pattern_hit = bool(pattern_re and pattern_re.search(sentence))
         present = set(_tokens(sentence))
         hits = len(present & strong)
-        if not pattern_hit and hits == 0 and not (present & label_tokens):
+        if pattern_re and not pattern_hit:
+            continue
+        if not pattern_re and hits == 0 and not (present & label_tokens):
             continue
         score = (8.0 if pattern_hit else 0.0) + hits * 4.0 + len(present & label_tokens) * 1.0
         if re.search(
@@ -965,9 +978,9 @@ def extract_quote(node_id: str, technique: str, labels: list[str],
             best = sentence
     if best:
         return best, "sentence", best_score
-    if source_title.strip() and not _NAV_RE.match(source_title):
+    if not pattern_re and source_title.strip() and not _NAV_RE.match(source_title):
         return source_title, "title", 0.5
-    if text.strip():
+    if not pattern_re and text.strip():
         return re.sub(r"\s+", " ", text.strip())[:240], "excerpt", 0.0
     return "", "none", 0.0
 
@@ -1070,6 +1083,14 @@ def make_node(node_id: str, parent: str, kind: str, facet: dict, matched: list[R
     }
 
 
+def make_structural_node(node_id: str, parent: str | None, kind: str, facet: dict,
+                         matched: list[Record], note: str) -> dict:
+    """Build a corpus-annotation total without representing it as source support."""
+    node = make_node(node_id, parent, kind, facet, matched, note)
+    node["record_count"] = node.pop("support")
+    return node
+
+
 def build_evidence_quotes(node_id: str, technique: str, labels: list[str],
                           matched: list[Record]) -> list[dict]:
     """One verbatim source quote per counted record (the support proof).
@@ -1103,22 +1124,22 @@ def build_evidence_quotes(node_id: str, technique: str, labels: list[str],
 def make_technique_node(node_id: str, parent: str, labels: list[str],
                         matched: list[Record], note: str, technique: str,
                         thin: bool = False) -> dict:
+    is_thin = thin or len(matched) < MIN_SUPPORT
     node = make_node(
         node_id,
         parent,
-        "thin" if thin else "cluster",
+        "thin" if is_thin else "cluster",
         {"technique": node_id},
         matched,
-        note if thin else f"{note} Direct labels: {', '.join(sorted(labels))}.",
+        note if is_thin else f"{note} Direct labels: {', '.join(sorted(labels))}.",
     )
     node["technique"] = technique
     node["evidence_quotes"] = build_evidence_quotes(node_id, technique, labels, matched)
-    # A quoted, technique-stating source is PASS. A leaf that loses its support to the
-    # evidence pattern (the sources only state a broader idea) is a PROMOTION and drops
-    # below the >=3-source bar, so catalogs/skills demote it to [P]. Thin leaves are
-    # PASS-but-thin: their few sources do state the technique.
-    node["semantic_verdict"] = "PASS" if (thin or node["meets_three_source_rule"]) else "PROMOTION"
-    if thin:
+    # All surviving leaves are quote-backed PASSes. Below-bar evidence is transparent
+    # but thin, rather than a verdict state that downstream consumers could mistake for
+    # a supported recommendation.
+    node["semantic_verdict"] = "PASS"
+    if is_thin:
         node["note"] = f"Below the >={MIN_SUPPORT}-source bar; not promoted. {note}"
     return node
 
@@ -1138,7 +1159,7 @@ def build() -> dict:
     crosswalk: dict[str, list[str]] = {}
 
     # -- root + dimensions --------------------------------------------------- #
-    root = make_node(
+    root = make_structural_node(
         "root", None, "root", {"schema": "control-room-taxonomy/v1", "families": FAMILIES},
         records, "The whole 5-family corpus. Nodes overlap; supports do not sum.",
     )
@@ -1158,7 +1179,7 @@ def build() -> dict:
                 "parent": "root",
                 "kind": "dimension",
                 "facet": {"dimension": label},
-                "support": len(records),
+                "record_count": len(records),
                 "support_by_family": {},
                 "independent_families": len(FAMILIES),
                 "meets_three_source_rule": True,
@@ -1172,7 +1193,7 @@ def build() -> dict:
     # -- category cluster branch -------------------------------------------- #
     for node_id, values in CATEGORY_CROSSWALK.items():
         matched = [r for r in records if r.category in values]
-        node = make_node(node_id, "dim-category", "cluster", {"category": node_id},
+        node = make_structural_node(node_id, "dim-category", "cluster", {"category": node_id},
                          matched, f"Raw category values folded in: {', '.join(sorted(values))}.")
         node["evidence_basis"] = "structural-category-value"
         nodes.append(node)
@@ -1181,7 +1202,7 @@ def build() -> dict:
     aesthetic_values = sorted({r.aesthetic for r in records if r.aesthetic})
     for value in aesthetic_values:
         matched = [r for r in records if r.aesthetic == value]
-        node = make_node(f"aes-{value}", "dim-aesthetic", "cluster", {"aesthetic": value},
+        node = make_structural_node(f"aes-{value}", "dim-aesthetic", "cluster", {"aesthetic": value},
                          matched, "Raw aesthetic value.")
         node["evidence_basis"] = "structural-aesthetic-value"
         nodes.append(node)
@@ -1189,7 +1210,7 @@ def build() -> dict:
     # -- stack cluster branch ----------------------------------------------- #
     for node_id, values in STACK_CROSSWALK.items():
         matched = [r for r in records if r.stack & set(values)]
-        node = make_node(node_id, "dim-stack", "cluster", {"stack": node_id},
+        node = make_structural_node(node_id, "dim-stack", "cluster", {"stack": node_id},
                          matched, f"Raw stack values folded in: {', '.join(sorted(values))}.")
         node["evidence_basis"] = "structural-stack-value"
         nodes.append(node)
@@ -1197,7 +1218,7 @@ def build() -> dict:
     # -- quality signal branch ---------------------------------------------- #
     for signal in QUALITY_SIGNALS:
         matched = [r for r in records if signal in r.quality]
-        node = make_node(f"ev-{signal}", "dim-evidence", "signal", {"signal": signal},
+        node = make_structural_node(f"ev-{signal}", "dim-evidence", "signal", {"signal": signal},
                          matched, "Records carrying this quality signal.")
         node["evidence_basis"] = "structural-quality-signal"
         nodes.append(node)
@@ -1205,6 +1226,7 @@ def build() -> dict:
     # -- technique branch ---------------------------------------------------- #
     # Track per-node matched sets so groups can union their children exactly.
     matched_by_node: dict[str, list[Record]] = {}
+    excluded_candidates: list[dict] = []
     for group_id, group_label, children in TECH_GROUPS:
         for node_id, labels, _note in children:
             # Only records whose stored source both is quotable AND states the
@@ -1213,43 +1235,61 @@ def build() -> dict:
             matched = [
                 r for r in records
                 if r.techniques & set(labels) and _has_evidence(r.sha)
-                and _matches_pattern(node_id, r)
+                and _has_matching_quote(
+                    node_id,
+                    TECHNIQUE.get(node_id, node_id.replace("tech-", "").replace("-", " ")),
+                    labels,
+                    r,
+                )
             ]
-            matched_by_node[node_id] = matched
-            crosswalk[node_id] = list(labels)
+            if matched:
+                matched_by_node[node_id] = matched
+                crosswalk[node_id] = list(labels)
+            else:
+                excluded_candidates.append(
+                    {"node": node_id, "labels": labels,
+                     "reason": "No stored source sentence states the declared technique; excluded."}
+                )
         # Group support is the union of its children's matched records.
-        group_records = {r.sha: r for node_id, _, _ in children for r in matched_by_node[node_id]}
+        group_records = {
+            r.sha: r for node_id, _, _ in children
+            for r in matched_by_node.get(node_id, [])
+        }
         matched_by_node[group_id] = list(group_records.values())
         crosswalk[group_id] = sorted({lab for _, labs, _ in children for lab in labs})
-        group = make_node(group_id, "dim-technique", "group", {"group": group_label},
+        group = make_structural_node(group_id, "dim-technique", "group", {"group": group_label},
                           matched_by_node[group_id],
-                          f"Union of its promoted child clusters. {group_label}.")
+                           f"Union of its quote-backed child leaves. {group_label}.")
         group["evidence_basis"] = "union-of-children"
-        group["evidence_quotes"] = []
         nodes.append(group)
         # Child nodes are appended after their group so parent-before-child holds.
         for node_id, labels, note in children:
-            nodes.append(
-                make_technique_node(
-                    node_id, group_id, labels, matched_by_node[node_id], note,
-                    TECHNIQUE.get(node_id, node_id.replace("tech-", "").replace("-", " ")),
+            if node_id in matched_by_node:
+                nodes.append(
+                    make_technique_node(
+                        node_id, group_id, labels, matched_by_node[node_id], note,
+                        TECHNIQUE.get(node_id, node_id.replace("tech-", "").replace("-", " ")),
+                    )
                 )
-            )
 
     # -- thin nodes ---------------------------------------------------------- #
-    # A thin leaf whose sources also fail its evidence pattern has NO quote stating
-    # the technique, so it is ABSENT and dropped (rather than kept at support 0).
-    dropped_thin: list[dict] = []
+    # A thin leaf with no matching sentence is excluded rather than emitted at zero
+    # support, so every current leaf has an actual source proof.
     for node_id, labels, parent, note in THIN_NODES:
         matched = [
             r for r in records
             if r.techniques & set(labels) and _has_evidence(r.sha)
-            and _matches_pattern(node_id, r)
+            and _has_matching_quote(
+                node_id,
+                TECHNIQUE.get(node_id, node_id.replace("thin-", "").replace("tech-", "").replace("-", " ")),
+                labels,
+                r,
+            )
         ]
         if not matched:
-            dropped_thin.append(
+            excluded_candidates.append(
                 {"node": node_id, "labels": labels,
-                 "reason": "No stored source states the technique; dropped as ABSENT."}
+                 "reason": "No stored source sentence states the technique; excluded."}
             )
             crosswalk.pop(node_id, None)
             continue
@@ -1278,7 +1318,7 @@ def build() -> dict:
     total_technique_records = len({r.sha for r in records if r.techniques & mapped_labels})
     nodes_by_id = {n["id"]: n for n in nodes}
     if "dim-technique" in nodes_by_id:
-        nodes_by_id["dim-technique"]["support"] = total_technique_records
+        nodes_by_id["dim-technique"]["record_count"] = total_technique_records
         nodes_by_id["dim-technique"]["support_by_family"] = _family_counts(
             [r for r in records if r.techniques & mapped_labels]
         )
@@ -1288,17 +1328,6 @@ def build() -> dict:
         n for n in nodes if "technique" in n.get("facet", {}) and n["kind"] in ("cluster", "thin")
     ]
     verdict_totals = collections.Counter(n["semantic_verdict"] for n in technique_leaves)
-    downgraded_nodes = [
-        {
-            "node": n["id"],
-            "label_support": None,
-            "quoted_support": n["support"],
-            "reason": "Sources under this label state a broader/adjacent idea, not the "
-            "narrow technique; below the >=3-source bar, demoted to [P].",
-        }
-        for n in technique_leaves
-        if n["kind"] == "cluster" and n["semantic_verdict"] == "PROMOTION"
-    ]
     by_family = collections.Counter(r.family for r in records)
     taxonomy = {
         "schema": "control-room-taxonomy/v1",
@@ -1311,7 +1340,7 @@ def build() -> dict:
             "by_family": {f: by_family[f] for f in FAMILIES},
             "unique_technique_labels": len(label_counts),
             "canonical_leaves": len(crosswalk),
-            "promoted_leaves": len([
+            "quoted_leaves_at_or_above_bar": len([
                 n for n in nodes
                 if n["kind"] == "cluster" and n["id"].startswith("tech-")
                 and n["meets_three_source_rule"]
@@ -1326,13 +1355,13 @@ def build() -> dict:
             "Quoted-evidence direct support. Each raw technique label maps to exactly one "
             "technique leaf; a leaf counts a record only when the record carries one of the "
             "leaf's direct labels AND a verbatim source sentence stating the leaf's technique "
-            "is stored in the leaf's evidence_quotes. Broad or adjacent labels are promotions: "
+            "is stored in the leaf's evidence_quotes. Broad or adjacent labels are excluded: "
             "removed from the leaf, re-homed only to the single leaf they literally name, or "
-            "left unmapped. Nodes with no direct support are deleted (see repair.deleted_nodes)."
+            "left unmapped. Techniques with no matching sentence are excluded from nodes."
         ),
         "crosswalk": crosswalk,
         "repair": {
-            "deleted_nodes": DELETED_NODES,
+            "excluded_nodes": DELETED_NODES,
             "renamed_nodes": [
                 {"from": "tech-viz-virtualized-table", "to": "tech-viz-data-table",
                  "reason": "The label set is tables; only 3 records state virtualization."},
@@ -1354,12 +1383,9 @@ def build() -> dict:
             "method": (
                 "Every technique leaf declares the source-text pattern that states its "
                 "technique (EVIDENCE_PATTERNS in build_taxonomy.py). A corpus record counts "
-                "only when its stored page matches that pattern AND a verbatim sentence is "
-                "stored in evidence_quotes. Verdicts: PASS (quote states the narrow technique), "
-                "PROMOTION (the leaf's sources state only a broader/adjacent idea, so quoted "
-                "support falls below the bar and the leaf is demoted to [P]; or a broader raw "
-                "label was removed from a narrow leaf), ABSENT (no source states it — node "
-                "deleted)."
+                "only when a verbatim stored sentence matches that pattern. Every surviving "
+                "leaf is PASS; below-bar evidence is retained as a thin PASS leaf, while "
+                "techniques with no matching sentence are excluded from nodes."
             ),
             "rule": (
                 "One direct leaf per raw label; a support count requires a stored "
@@ -1368,16 +1394,12 @@ def build() -> dict:
             ),
             "verdict_totals": {
                 "PASS": verdict_totals.get("PASS", 0),
-                "PROMOTION": verdict_totals.get("PROMOTION", 0),
-                "ABSENT": len(DELETED_NODES) + len(dropped_thin),
-                "promoted_labels": len(SEMANTIC_PROMOTIONS),
+                "excluded_labels": len(SEMANTIC_PROMOTIONS),
             },
-            "downgraded_nodes": downgraded_nodes,
-            "dropped_thin_nodes": dropped_thin,
-            "promotions": SEMANTIC_PROMOTIONS,
-            "absences": [
+            "excluded_labels": SEMANTIC_PROMOTIONS,
+            "excluded_nodes": [
                 {"node": str(n["id"]), "reason": str(n["reason"])} for n in DELETED_NODES
-            ] + [{"node": d["node"], "reason": d["reason"]} for d in dropped_thin],
+            ] + excluded_candidates,
             "overlap_resolution": {
                 entry["label"]: entry["to"]
                 for entry in SEMANTIC_PROMOTIONS
@@ -1466,11 +1488,7 @@ def technique_leaves(taxonomy: dict) -> list[dict]:
 
 
 def verify_evidence(taxonomy: dict) -> list[str]:
-    """Return a list of violations: a support count without stored evidence quotes.
-
-    A clean taxonomy has one verbatim quote per counted record for every technique
-    leaf, and every quote is a non-empty string with a resolvable sha/uri.
-    """
+    """Return violations of the quote-backed technique-support contract."""
     problems: list[str] = []
     for node in technique_leaves(taxonomy):
         quotes = node.get("evidence_quotes") or []
@@ -1487,6 +1505,15 @@ def verify_evidence(taxonomy: dict) -> list[str]:
                 problems.append(f"{node['id']}: empty quote for {quote.get('sha256')}")
             if not quote.get("uri"):
                 problems.append(f"{node['id']}: quote without uri for {quote.get('sha256')}")
+            body, title = _load_source(quote.get("sha256", ""))
+            text = quote.get("quote", "")
+            if text and text not in body and text != title:
+                problems.append(f"{node['id']}: quote is not verbatim for {quote.get('sha256')}")
+            pattern = EVIDENCE_PATTERNS.get(node["id"])
+            if pattern and text and not re.search(pattern, text, re.I):
+                problems.append(f"{node['id']}: quote does not state its technique for {quote.get('sha256')}")
+        if node.get("semantic_verdict") != "PASS":
+            problems.append(f"{node['id']}: non-PASS semantic verdict")
     return problems
 
 
@@ -1503,7 +1530,7 @@ def write_crosswalk_markdown(taxonomy: dict, path: Path) -> None:
     lines.append("**Generated by:** `experiments/research/control_room/build_taxonomy.py`")
     lines.append("**Review basis:** `docs/reviews/control_room_repair_entailment.md` (E1, E4).")
     lines.append("")
-    lines.append("This file is the record-level verdict for every taxonomy node with a support")
+    lines.append("This file is the record-level verdict for every taxonomy technique leaf with a support")
     lines.append("count. Each counted corpus record stores a verbatim sentence from its stored")
     lines.append("source page (`experiments/research/control_room/sources/<sha256[:16]>.json`);")
     lines.append("a support count without such a quote is a build error.")
@@ -1514,17 +1541,13 @@ def write_crosswalk_markdown(taxonomy: dict, path: Path) -> None:
     lines.append("")
     lines.append(review["rule"])
     lines.append("")
-    lines.append("Verdict semantics:")
-    lines.append("")
-    lines.append("- **PASS** — the quoted source sentence states the node's narrow technique.")
-    lines.append("- **PROMOTION** — the quote states only a broader/adjacent label; the label was")
-    lines.append("  removed from the leaf (and re-homed only where it literally names another leaf).")
-    lines.append("- **ABSENT** — no source states the technique; the node was deleted.")
+    lines.append("Verdict semantics: **PASS** means the quoted source sentence states the node's")
+    lines.append("narrow technique. Below-bar evidence is retained as a thin PASS leaf; an unsupported")
+    lines.append("technique is excluded from the current node set rather than retained as a verdict state.")
     lines.append("")
     totals = review["verdict_totals"]
     lines.append(
-        f"Totals: **{totals['PASS']} PASS leaves**, **{totals['PROMOTION']} PROMOTION leaves**, "
-        f"**{totals['ABSENT']} ABSENT nodes**, **{totals['promoted_labels']} promoted labels**."
+        f"Totals: **{totals['PASS']} PASS leaves**, **{totals['excluded_labels']} excluded labels**."
     )
     lines.append("")
 
@@ -1548,11 +1571,11 @@ def write_crosswalk_markdown(taxonomy: dict, path: Path) -> None:
     lines.append("")
 
     # -- Promotions ---------------------------------------------------------- #
-    lines.append("## 3. Removed label promotions (E1 + E4)")
+    lines.append("## 3. Excluded broad or adjacent labels (E1 + E4)")
     lines.append("")
     lines.append("| Label | Formerly counted by | Disposition | Reason |")
     lines.append("|---|---|---|---|")
-    for entry in review["promotions"]:
+    for entry in review["excluded_labels"]:
         dest = f"re-homed to `{entry['to']}`" if entry["to"] else "unmapped"
         lines.append(
             f"| `{entry['label']}` | `{entry['from']}` | {dest} | {entry['reason']} |"
@@ -1571,36 +1594,26 @@ def write_crosswalk_markdown(taxonomy: dict, path: Path) -> None:
     lines.append("`taxonomy.crosswalk` (enforced by construction; see `build()`).")
     lines.append("")
 
-    # -- Node-level downgrades ---------------------------------------------- #
-    lines.append("## 5. Leaves demoted by the evidence gate (PROMOTION)")
-    lines.append("")
-    lines.append("These leaves keep their direct-label records, but the stored sources state")
-    lines.append("only a broader/adjacent idea, so their quoted support is below the >=3-source")
-    lines.append("bar and catalogs/skills demote them to `[P]`.")
-    lines.append("")
-    lines.append("| Node | Quoted support | Reason |")
-    lines.append("|---|---:|---|")
-    for entry in review.get("downgraded_nodes", []):
-        lines.append(f"| `{entry['node']}` | {entry['quoted_support']} | {entry['reason']} |")
-    lines.append("")
-
-    # -- Deletions ----------------------------------------------------------- #
-    lines.append("## 6. Deleted nodes (ABSENT)")
+    # -- Excluded nodes ------------------------------------------------------ #
+    lines.append("## 5. Excluded techniques")
     lines.append("")
     lines.append("| Node | Prior support | Promoted from | Reason |")
     lines.append("|---|---:|---|---|")
-    for node in taxonomy["repair"]["deleted_nodes"]:
+    for node in taxonomy["repair"]["excluded_nodes"]:
         promoted = ", ".join(f"`{x}`" for x in node["promoted_from"])
         lines.append(
             f"| `{node['id']}` | {node['prior_support']} | {promoted} | {node['reason']} |"
         )
-    for entry in review.get("dropped_thin_nodes", []):
-        labels = ", ".join(f"`{x}`" for x in entry["labels"])
-        lines.append(f"| `{entry['node']}` | <3 | {labels} | {entry['reason']} |")
+    for entry in review.get("excluded_nodes", []):
+        # The historical exclusions carry ``node``/``reason``; only dynamically
+        # excluded thin candidates additionally carry their source labels.
+        if "labels" in entry:
+            labels = ", ".join(f"`{x}`" for x in entry["labels"])
+            lines.append(f"| `{entry['node']}` | <3 | {labels} | {entry['reason']} |")
     lines.append("")
 
     # -- Full evidence appendix --------------------------------------------- #
-    lines.append("## 7. Full quoted evidence (per node, per record)")
+    lines.append("## 6. Full quoted evidence (per node, per record)")
     lines.append("")
     for node in technique_leaves(taxonomy):
         lines.append(f"### `{node['id']}` — {node['technique']} (support {node['support']})")
@@ -1626,14 +1639,14 @@ def main() -> None:
     totals = taxonomy["corpus_totals"]
     print(f"wrote {TAXONOMY_PATH.relative_to(ROOT)}")
     print(f"wrote {CROSSWALK_PATH.relative_to(ROOT)}")
-    print(f"  nodes: {len(taxonomy['nodes'])}  promoted: {totals['promoted_leaves']}"
+    print(f"  nodes: {len(taxonomy['nodes'])}  at-or-above-bar: {totals['quoted_leaves_at_or_above_bar']}"
           f"  thin: {totals['thin_leaves']}")
     print(f"  mapped labels: {totals['mapped_labels']}/{totals['unique_technique_labels']}"
           f"  unmapped mentions: {totals['unmapped_mentions']}")
     review = taxonomy["semantic_review"]
     print(f"  semantic verdicts: {review['verdict_totals']}")
-    for deleted in taxonomy["repair"]["deleted_nodes"]:
-        print(f"  DELETED {deleted['id']} (was {deleted['prior_support']})")
+    for excluded in taxonomy["repair"]["excluded_nodes"]:
+        print(f"  EXCLUDED {excluded['id']} (was {excluded['prior_support']})")
     if problems:
         for problem in problems:
             print(f"  EVIDENCE VIOLATION: {problem}")
