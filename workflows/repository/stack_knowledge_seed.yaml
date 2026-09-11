@@ -18,6 +18,8 @@ workflow:
   params:
     language: python
     fork: true
+    rag:
+      emit_self: false
     context:
       hard_rules: >-
         (1) The frozen corpus is the ONLY knowledge source for claims; cite it. (2) One JSON per
