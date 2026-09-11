@@ -98,44 +98,93 @@ def _run_approval(args: argparse.Namespace) -> None:
                 f"no approval is needed"
             )
 
+    # 1b ── persist the command's INTENT before the act (step 2e: recording is part of the
+    # act). If this process dies between here and the commit, the row survives with
+    # state=intent — an uncertain outcome made visible, never a vanished act.
+    command = None
+    if not args.dry_run:
+        with ControlDB.open() as db:
+            command = db.record_command_intent(
+                "approve",
+                actor="aio",
+                rationale=args.reason,
+                run_id=args.run_id,
+                candidate_sha=args.candidate_sha,
+                target_kind="gate",
+                target_id=args.gate_id or f"{args.spec}/{args.phase}",
+                idempotency_key=f"approve:{args.run_id}:{args.candidate_sha}",
+                detail={
+                    "gate_id": args.gate_id,
+                    "spec": args.spec,
+                    "phase": args.phase,
+                    "operator": args.operator,
+                },
+            )
+
     # 2 ── write AND COMMIT the operator-signed artifact in the run's worktree. The resume
     # path requires the approval committed at HEAD (absent at the checkpoint commit); an
     # uncommitted artifact can never authorize, and the commit must land on the exact
     # candidate the approval names — a rewritten worktree refuses.
-    artifact = _write_artifact(args)
-    artifact_commit = ""
-    if not args.dry_run:
-        artifact_commit = _commit_artifact(args, artifact)
+    try:
+        artifact = _write_artifact(args)
+        artifact_commit = ""
+        if not args.dry_run:
+            artifact_commit = _commit_artifact(args, artifact)
 
-    # 3 ── record the approval in the control db (operator + candidate bound).
-    if not args.dry_run:
-        decision_record = {
-            "schema": "approval-decision/v1",
-            "purpose": "checkpoint",
-            "run_id": args.run_id,
-            "gate_id": args.gate_id,
-            "candidate_sha": args.candidate_sha,
-            "operator": args.operator,
-            "date": _today(),
-            "artifact": str(artifact),
-            "artifact_commit": artifact_commit,
-            "status": "approved",
-        }
+        # 3 ── record the approval in the control db (operator + candidate bound).
+        if not args.dry_run:
+            decision_record = {
+                "schema": "approval-decision/v1",
+                "purpose": "checkpoint",
+                "run_id": args.run_id,
+                "gate_id": args.gate_id,
+                "candidate_sha": args.candidate_sha,
+                "operator": args.operator,
+                "date": _today(),
+                "artifact": str(artifact),
+                "artifact_commit": artifact_commit,
+                "status": "approved",
+            }
+            with ControlDB.open() as db:
+                approval = db.record_approval(
+                    args.run_id,
+                    gate_id=args.gate_id,
+                    candidate_sha=args.candidate_sha,
+                    operator=args.operator,
+                    artifact_path=str(artifact),
+                    purpose="checkpoint",
+                    decision_json=json.dumps(decision_record, sort_keys=True),
+                )
+        else:
+            approval = None
+
+        # 4 ── emit the decision (verb=approve) so the AIO's approval is observable.
+        emission = _emit_approval_decision(args) if not args.dry_run else {}
+    except Exception as exc:
+        if command is not None:
+            try:
+                with ControlDB.open() as db:
+                    db.complete_command(
+                        command.command_id,
+                        state="refused" if isinstance(exc, _ApproveRefusedError) else "failed",
+                        receipt={"error": str(exc)[:400]},
+                    )
+            except Exception:  # the receipt write must never mask the refusal
+                pass
+        raise
+
+    # 5 ── the durable receipt: the observed outcome, recorded at the moment of the act.
+    if command is not None:
         with ControlDB.open() as db:
-            approval = db.record_approval(
-                args.run_id,
-                gate_id=args.gate_id,
-                candidate_sha=args.candidate_sha,
-                operator=args.operator,
-                artifact_path=str(artifact),
-                purpose="checkpoint",
-                decision_json=json.dumps(decision_record, sort_keys=True),
+            db.complete_command(
+                command.command_id,
+                state="completed",
+                receipt={
+                    "approval_id": approval.approval_id if approval else "",
+                    "artifact": str(artifact),
+                    "artifact_commit": artifact_commit,
+                },
             )
-    else:
-        approval = None
-
-    # 4 ── emit the decision (verb=approve) so the AIO's approval is observable.
-    emission = _emit_approval_decision(args) if not args.dry_run else {}
 
     print(
         f"approve: run {args.run_id} approved by {args.operator} "

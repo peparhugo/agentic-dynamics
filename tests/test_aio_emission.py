@@ -643,6 +643,11 @@ def test_approve_command_records_and_emits(tmp_path, monkeypatch):
     assert (workdir / "approvals" / "t" / "p2_approval.md").exists()
     # step 2: the artifact is COMMITTED on the candidate — the resume contract's requirement.
     assert _git("log", "-1", "--format=%s").startswith("[approval] t/p2")
+    # step 2e: the command journal carries the intent + the durable receipt.
+    with ControlDB.open_read_only(db_path) as db:
+        journal = db.commands(run_id=run.run_id)
+    assert [(c.verb, c.state) for c in journal] == [("approve", "completed")]
+    assert '"artifact_commit"' in journal[0].receipt_json
     committed = _git("show", "HEAD:approvals/t/p2_approval.md")
     assert "operator: Dr. Seuss" in committed
     assert "purpose: checkpoint" in committed
