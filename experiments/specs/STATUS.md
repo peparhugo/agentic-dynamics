@@ -3,7 +3,7 @@
 **Generated — do not edit by hand.** Regenerate with `python scripts/spec_status.py`;
 `scripts/run_workflow.py` also refreshes it at the end of every run.
 
-Generated at: `2026-09-11T01:38:28.271194+00:00`  ·  206 spec(s)
+Generated at: `2026-09-11T02:37:57.377298+00:00`  ·  206 spec(s)
 **Work remaining:** 89 open · 117 completed/retired
 
 | name | kind | repeatable | status | version | supersedes | last_run | ok | model | cost | n_runs |
@@ -32,7 +32,7 @@ Generated at: `2026-09-11T01:38:28.271194+00:00`  ·  206 spec(s)
 | `cap_session_routing_evidence` | experiment | yes | runnable | 0.2 | — | — | — | — | — | 0 |
 | `cap_shadow_comparison` | experiment | yes | runnable | 0.1 | — | — | — | — | — | 0 |
 | `control_room_live_board` | workflow | no | runnable | 0.1 | — | — | — | — | — | 1 |
-| `control_room_research` | workflow | yes | runnable | 0.1 | — | 2026-09-11 01:38 | fail | deepseek/deepseek-v4-flash | $4.9758 | 3 |
+| `control_room_research` | workflow | yes | runnable | 0.1 | — | 2026-09-11 02:12 | ok | deepseek/deepseek-v4-flash | $7.3577 | 4 |
 | `delta_entropy_response_campaign` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `docs_refresh_remediation` | workflow | no | runnable | 0.1 | — | — | — | — | — | 2 |
 | `explanation_tax` | experiment | yes | runnable | 0.2 | — | — | — | — | — | 0 |
