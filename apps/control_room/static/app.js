@@ -50,6 +50,66 @@
     while (node.firstChild) node.removeChild(node.firstChild);
   }
 
+  /**
+   * Reconcile a keyed list against `host` — write-on-change, not clear-and-rebuild.
+   *
+   * The no-regression contract (direction §12.2 #3) is that a keyed list performs no write on
+   * a no-op poll and preserves the identity (and focus) of an unchanged row across a live
+   * update. Each desired node carries a stable key attribute and a `__signature` string of its
+   * data; an existing host child with the same key AND signature is reused in place, one with a
+   * changed signature is replaced, and a key that disappeared is removed. New nodes are built
+   * detached, so reusing an existing child never touches the live DOM.
+   */
+  function reconcileList(host, nodes, keyAttr) {
+    var existing = {};
+    Array.prototype.slice.call(host.children).forEach(function (child) {
+      var key = child.getAttribute(keyAttr);
+      if (key !== null) existing[key] = child;
+    });
+    var seen = {};
+    nodes.forEach(function (node, index) {
+      var key = node.getAttribute(keyAttr);
+      seen[key] = true;
+      var current = existing[key];
+      if (current && current.__signature === node.__signature) {
+        // Unchanged: keep the live node, only fix its position.
+        if (host.children[index] !== current) {
+          host.insertBefore(current, host.children[index] || null);
+        }
+        return;
+      }
+      if (current) host.replaceChild(node, current);
+      else host.insertBefore(node, host.children[index] || null);
+    });
+    // Drop anything the new view no longer contains.
+    Array.prototype.slice.call(host.children).forEach(function (child) {
+      var key = child.getAttribute(keyAttr);
+      if (key !== null && !seen[key]) host.removeChild(child);
+    });
+  }
+
+  //: Short field labels for the dense (narrow) row: 16 labelled fields cannot share a 472px
+  //: row, so narrow abbreviates the label while desktop keeps the full word. Mobile hides labels
+  //: entirely (triage). The `data-field` key is unchanged in every case, so the schema holds.
+  var SHORT_ROW_LABELS = {
+    "session.identity": "ses",
+    "terminal.target": "tgt",
+    "command.current": "cmd",
+    "model.provider": "mdl",
+    "attempt.number": "att",
+    "phase.progress": "ph",
+    "lifecycle.state": "life",
+    "run.live": "live",
+    "source.commit": "cmt",
+    "cost.provenance": "cost",
+    "attention.state": "attn",
+    "evidence.advisory": "said",
+    "evidence.measured": "meas",
+    "evidence.source": "src",
+    "decision.eligibility": "elig",
+    "decision.receipt": "rcpt",
+  };
+
   /** The per-viewport at-rest capacities fixed by docs/research/control_room_ia.md §3.2. */
   function capacities() {
     var width = window.innerWidth;
@@ -160,12 +220,19 @@
    */
   function renderRunRow(run) {
     // Mobile is triage: the value band must stay legible without labels, so the evidence values
-    // collapse to their single-word tokens. The full prose is the desktop/narrow rendering.
+    // collapse to their single-word tokens. Narrow is DENSE (short labels, identifiers elide);
+    // desktop keeps the full word. This is the density ladder, not a second information model.
     var compact = window.innerWidth < 760;
-    var advisory = compact ? "claimed" : run["evidence.advisory"];
-    var measured = compact ? "pending" : run["evidence.measured"];
-    var sourceValue = compact ? String(run["source.commit"]).replace(/^commit\s+/, "")
-      : run["evidence.source"];
+    var dense = window.innerWidth < 1200;
+    var lab = function (key, full) { return dense ? (SHORT_ROW_LABELS[key] || full) : full; };
+    // The evidence material is typed by its label + colour/weight; the dense (narrow/mobile)
+    // value collapses to its token so the line never clips a required value.
+    var advisory = dense ? "claimed" : run["evidence.advisory"];
+    var measured = dense ? "pending" : run["evidence.measured"];
+    // The "source" label already names the material, so the value is the bare commit sha — this
+    // also leaves the row's third line room for the authority chip on a governed decision.
+    var sourceValue = String(run["source.commit"] || run["evidence.source"] || "unknown")
+      .replace(/^commit\s+/, "");
     var row = element("li", "run-row", {
       "data-run-id": run["session.identity"] || "unknown",
       "data-attention": run["attention.state"] || "none",
@@ -176,44 +243,51 @@
     });
 
     var lineOne = element("div", "row-line", { "data-row-line": "", "data-max-lines": "1" });
-    appendField(lineOne, "session.identity", "session", run["session.identity"], {
+    appendField(lineOne, "session.identity", lab("session.identity", "session"), run["session.identity"], {
       identifier: true, maxLines: 1,
     });
-    appendField(lineOne, "terminal.target", "target", run["terminal.target"], {
+    appendField(lineOne, "terminal.target", lab("terminal.target", "target"), run["terminal.target"], {
       identifier: true, maxLines: 1,
     });
-    appendField(lineOne, "command.current", "command", run["command.current"], { maxLines: 1 });
+    appendField(lineOne, "command.current", lab("command.current", "command"), run["command.current"], { maxLines: 1 });
     // The provider×model token can middle-elide on a narrow row (it is an identifier, so the
     // gate permits it); the full value stays in the accessible title.
-    appendField(lineOne, "model.provider", "model", run["model.provider"], {
+    appendField(lineOne, "model.provider", lab("model.provider", "model"), run["model.provider"], {
       identifier: true, maxLines: 1,
     });
-    appendField(lineOne, "attempt.number", "attempt", run["attempt.number"], { maxLines: 1 });
+    appendField(lineOne, "attempt.number", lab("attempt.number", "attempt"), run["attempt.number"], { maxLines: 1 });
 
     var lineTwo = element("div", "row-line", { "data-row-line": "", "data-max-lines": "1" });
-    appendField(lineTwo, "phase.progress", "phase", run["phase.progress"], { maxLines: 1 });
-    appendField(lineTwo, "lifecycle.state", "lifecycle", run["lifecycle.state"], { maxLines: 1 });
-    appendField(lineTwo, "run.live", "live", run["run.live"], { maxLines: 1 });
-    appendField(lineTwo, "source.commit", "commit", run["source.commit"], {
+    appendField(lineTwo, "phase.progress", lab("phase.progress", "phase"), run["phase.progress"], { maxLines: 1 });
+    appendField(lineTwo, "lifecycle.state", lab("lifecycle.state", "lifecycle"), run["lifecycle.state"], { maxLines: 1 });
+    appendField(lineTwo, "run.live", lab("run.live", "live"), run["run.live"], { maxLines: 1 });
+    appendField(lineTwo, "source.commit", lab("source.commit", "commit"), run["source.commit"], {
       identifier: true, maxLines: 1,
     });
-    appendField(lineTwo, "cost.provenance", "cost", run["cost.provenance"], { maxLines: 1 });
-    appendField(lineTwo, "attention.state", "attention", run["attention.state"], { maxLines: 1 });
+    appendField(lineTwo, "cost.provenance", lab("cost.provenance", "cost"), run["cost.provenance"], { maxLines: 1 });
+    appendField(lineTwo, "attention.state", lab("attention.state", "attention"), run["attention.state"], { maxLines: 1 });
 
     var lineThree = element("div", "row-line", { "data-row-line": "", "data-max-lines": "1" });
-    appendField(lineThree, "evidence.advisory", "said", advisory, {
+    appendField(lineThree, "evidence.advisory", lab("evidence.advisory", "said"), advisory, {
       evidenceClass: "advisory", maxLines: 1,
     });
-    appendField(lineThree, "evidence.measured", "measured", measured, {
+    appendField(lineThree, "evidence.measured", lab("evidence.measured", "measured"), measured, {
       evidenceClass: "measured", maxLines: 1,
     });
-    appendField(lineThree, "evidence.source", "source", sourceValue, {
+    appendField(lineThree, "evidence.source", lab("evidence.source", "source"), sourceValue, {
       evidenceClass: "source", maxLines: 1,
     });
-    appendField(lineThree, "decision.eligibility", "eligible", run["decision.eligibility"], {
-      maxLines: 1,
-    });
-    appendField(lineThree, "decision.receipt", "receipt", run["decision.receipt"], { maxLines: 1 });
+    var eligibility = run["decision.eligibility"];
+    appendField(lineThree, "decision.eligibility", lab("decision.eligibility", "eligible"), eligibility, { maxLines: 1 });
+    // Recognizability §4.2 #2: a governed decision names its authority beside the eligibility
+    // token. It is a non-field chip, so the gate's 16-field row schema is untouched. Mobile is
+    // triage and drops the chip; the R1 decision item is the mobile authority mirror.
+    var governed = { approve: true, promote: true, cancel: true, retire: true };
+    if (!compact && governed[eligibility]) {
+      lineThree.appendChild(element("span", "row-authority",
+        { "data-authority": "controller", title: "authority: controller" }, "controller"));
+    }
+    appendField(lineThree, "decision.receipt", lab("decision.receipt", "receipt"), run["decision.receipt"], { maxLines: 1 });
 
     row.appendChild(lineOne);
     row.appendChild(lineTwo);
@@ -221,20 +295,26 @@
     return row;
   }
 
-  /** R2 body: the bounded, attention-ranked sample (exactly the viewport's capacity). */
+  /** R2 body: the bounded, attention-ranked sample (exactly the viewport's capacity).
+   *  Keyed by run id and write-on-change, so an unchanged row keeps its identity and focus. */
   function renderRunList(glance) {
     var host = document.getElementById("run-list");
-    clear(host);
-    var sample = Array.isArray(glance.run_sample) ? glance.run_sample : [];
-    sample.slice(0, capacities().rows).forEach(function (run) {
-      host.appendChild(renderRunRow(run));
+    var sample = (Array.isArray(glance.run_sample) ? glance.run_sample : [])
+      .slice(0, capacities().rows);
+    var nodes = sample.map(function (run) {
+      var row = renderRunRow(run);
+      row.__signature = JSON.stringify(run);
+      return row;
     });
+    reconcileList(host, nodes, "data-run-id");
   }
 
-  /** One attention item with exactly two declared lines (the reserved/ranked work queue). */
+  /** One attention item with exactly two declared lines (the reserved/ranked work queue).
+   *  `config.key` is the stable reconciliation key the write-on-change list uses. */
   function renderAttentionItem(config) {
     var item = element("li", "attention-item", {
       "data-attention-class": config.kind,
+      "data-item-key": config.key || config.kind,
       tabindex: config.answer ? "0" : null,
       "aria-label": config.ariaLabel || null,
     });
@@ -261,16 +341,18 @@
     return item;
   }
 
-  /** R1 `ON-G5`/`ON-G3`: reserved decision + risk rows, then the ranked next items to capacity. */
+  /** R1 `ON-G5`/`ON-G3`: reserved decision + risk rows, then the ranked next items to capacity.
+   *  Keyed and write-on-change: the reserved rows keep their identity across a live update. */
   function renderAttention(glance) {
     var host = document.getElementById("attention-list");
-    clear(host);
     var attention = glance.attention || {};
     var decision = attention.decision || { state: "none", target: "none", kind: "none",
       epoch: 0, authority: "none", eligibility: "none" };
     var risk = attention.risk || { identity: "none", state: "all-clear", action: "none" };
+    var nodes = [];
 
-    host.appendChild(renderAttentionItem({
+    var decisionItem = renderAttentionItem({
+      key: "decision",
       kind: "decision",
       answer: "ON-G5",
       title: "DECISION",
@@ -287,9 +369,12 @@
           ["decision.eligibility", "eligible", decision.eligibility, false],
         ],
       ],
-    }));
+    });
+    decisionItem.__signature = JSON.stringify(decision);
+    nodes.push(decisionItem);
 
-    host.appendChild(renderAttentionItem({
+    var riskItem = renderAttentionItem({
+      key: "risk",
       kind: "risk",
       answer: "ON-G3",
       title: "RISK",
@@ -301,26 +386,31 @@
         ],
         [["risk.action", "action", risk.action, false]],
       ],
-    }));
+    });
+    riskItem.__signature = JSON.stringify(risk);
+    nodes.push(riskItem);
 
-    host.appendChild(renderAttentionItem({
+    var next = attention.next || { identity: "none", state: "clear", action: "none" };
+    var nextItem = renderAttentionItem({
+      key: "next",
       kind: "next",
       title: "NEXT",
       ariaLabel: "Next highest-ranked item",
       lines: [
-        [
-          ["next.identity", "target", (attention.next && attention.next.identity) || "none", true],
-          ["next.state", "state", (attention.next && attention.next.state) || "clear", false],
-        ],
-        [["next.action", "action", (attention.next && attention.next.action) || "none", false]],
+        [["next.identity", "target", next.identity, true],
+          ["next.state", "state", next.state, false]],
+        [["next.action", "action", next.action, false]],
       ],
-    }));
+    });
+    nextItem.__signature = JSON.stringify(next);
+    nodes.push(nextItem);
 
     // Fill the remaining reserved capacity so the at-rest row count is exact per viewport.
     var filler = capacities().attention - 3;
     for (var i = 0; i < filler; i += 1) {
       var item = element("li", "attention-item", {
         "data-attention-class": "empty",
+        "data-item-key": "empty-" + i,
         "aria-label": "No further attention",
       });
       var lineA = element("div", "item-line", { "data-item-line": "", "data-max-lines": "1" });
@@ -330,8 +420,10 @@
       lineB.appendChild(element("span", "item-kind", null, "queue clear"));
       item.appendChild(lineA);
       item.appendChild(lineB);
-      host.appendChild(item);
+      item.__signature = "empty";
+      nodes.push(item);
     }
+    reconcileList(host, nodes, "data-item-key");
   }
 
   /** R3a `ON-G4`: exactly five labelled money values + an optional risk marker. */
@@ -420,7 +512,31 @@
     lastHistoryEpoch: null,
     //: True when the projection could not be read, so the charts render an error, not a stale.
     glanceError: false,
+    //: The last rendered payload's signature. A no-op poll (same signature) performs ZERO
+    //: writes, which is the direction §12.2 #3 contract for keyed write-on-change lists.
+    lastSignature: null,
   };
+
+  /**
+   * The DOM-relevant signature of a glance payload.
+   *
+   * Covers every block that feeds the rendered regions. Two payloads with the same signature
+   * would produce byte-identical DOM, so the second render is skipped entirely rather than
+   * rebuilding identical nodes (which would also fire state-change motion on a quiet poll).
+   */
+  function glanceSignature(glance) {
+    return JSON.stringify([
+      glance.control_epoch,
+      glance.system,
+      glance.trust,
+      glance.attention,
+      glance.run_counts,
+      glance.run_sample,
+      glance.cost,
+      glance.health_detail,
+      glance.composition,
+    ]);
+  }
 
   /**
    * Append one bounded history sample for the trends lens.
@@ -448,6 +564,15 @@
   function renderGlance(glance) {
     if (!glance || typeof glance !== "object") return;
     AppState.glance = glance;
+    // Zero-write no-op: an identical payload leaves the live DOM untouched. This is the
+    // strongest form of the write-on-change contract and it makes a quiet poll silent.
+    var signature = glanceSignature(glance);
+    if (signature === AppState.lastSignature) {
+      AppState.rendered = true;
+      maybeReady();
+      return;
+    }
+    AppState.lastSignature = signature;
     var root = document.querySelector("[data-glance-shell]");
     if (root) root.setAttribute("data-control-epoch", String(glance.control_epoch || 0));
 

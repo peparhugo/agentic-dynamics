@@ -39,6 +39,31 @@
   --source: #7f9cf5;
   --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
   --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+
+  /* Type scale (cm-type): one small scale for dense data; every data value uses tabular
+     numerals so columns of numbers align and scan. Sizes are tokens so a future change is one
+     edit, and the gate's type floor (G-5) is stated once here. */
+  --fs-micro: 9px;      /* SVG micro-labels, composition bucket letters */
+  --fs-label: 11px;     /* field labels, region titles */
+  --fs-value-sm: 12px;  /* data values on mobile (the G-5 floor) */
+  --fs-value: 13px;     /* data values on desktop/narrow */
+  --fs-title: 12px;     /* panel/dock titles */
+  --lh-tight: 1.15;
+
+  /* Elevation ladder (cm-elevation): depth is structure, not ornament. */
+  --surface-0: var(--bg);
+  --surface-1: var(--panel);
+  --surface-2: var(--panel-2);
+  --overlay-shadow: 0 16px 48px rgba(0, 0, 0, 0.45);
+
+  /* Motion (cm-motion): state changes only, short and decelerating. */
+  --motion-state: 160ms;
+  --motion-draw: 220ms;
+  --motion-ease: cubic-bezier(0.2, 0.7, 0.3, 1);
+
+  /* Focus ring (a11y): one visible ring everywhere, never removed without a replacement. */
+  --focus-ring: 2px solid var(--accent);
+
   /* Geometry tokens — overridden per breakpoint below. */
   --pad: 16px;
   --gap: 12px;
@@ -69,6 +94,8 @@
   --advisory: #7d5a00;
   --measured: #0f6b5c;
   --source: #3b4cca;
+  /* A lighter shadow on light surfaces keeps elevation structural, not muddy. */
+  --overlay-shadow: 0 16px 40px rgba(20, 30, 50, 0.18);
 }
 
 /* Forced-colours: drop custom colours onto system colours so Windows high-contrast is honoured. */
@@ -101,6 +128,23 @@
 }
 
 * { box-sizing: border-box; }
+
+/* One visible focus ring everywhere (a11y bar). A component may strengthen it but never
+   remove it without a replacement, so keyboard operation is always legible. */
+:focus-visible { outline: var(--focus-ring); outline-offset: 1px; }
+
+/* Tabular numerals (cm-type): every data value and table column aligns on the digit grid, so
+   dense numbers scan as columns rather than proportional-text raggedness. */
+.field [data-value],
+.detail-line [data-value],
+.marginal-bucket,
+.chart-table,
+.chart-gauge-value,
+.visual-value,
+.visual-flow-state,
+.scope-sub {
+  font-variant-numeric: tabular-nums;
+}
 
 html, body {
   margin: 0;
@@ -415,6 +459,21 @@ body {
 .row-line .field [data-value] { font-size: 13px; }
 
 /* Evidence classes are visibly different materials (direction §4.4, Move 4). */
+/* The governed-decision authority marker (recognizability §4.2 #2): a compact chip beside the
+   eligibility token, naming who disposes. Non-field, so the 16-field row schema is untouched. */
+.row-authority {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 4px;
+  /* Accent on the border, body text on the label: the accent alone is below 4.5:1 on the light
+     surface, and the authority word is consequential text, not decoration. */
+  border: 1px solid var(--accent);
+  border-radius: 3px;
+  color: var(--text);
+  font-size: 10px;
+  white-space: nowrap;
+}
+
 .field[data-evidence-class="advisory"] [data-value] { color: var(--advisory); font-style: italic; }
 .field[data-evidence-class="measured"] [data-value] { color: var(--measured); font-weight: 600; }
 .field[data-evidence-class="source"] [data-value] { color: var(--source); }
@@ -533,7 +592,7 @@ body {
   border: 1px solid var(--line);
   border-bottom: none;
   border-radius: 8px 8px 0 0;
-  box-shadow: 0 -12px 40px rgba(0, 0, 0, 0.4);
+  box-shadow: var(--overlay-shadow);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -661,7 +720,7 @@ body {
 /* Motion budget (brief §11): state-change only, ~220ms, decelerating. The global
    prefers-reduced-motion rule collapses it; the state words carry meaning regardless. */
 @keyframes visual-draw { from { stroke-dashoffset: 20; } to { stroke-dashoffset: 0; } }
-.visual-draw .visual-flow-line { animation: visual-draw 220ms ease-out; }
+.visual-draw .visual-flow-line { animation: visual-draw var(--motion-draw) var(--motion-ease); }
 
 .noscript { padding: 16px; color: var(--warn); }
 
@@ -683,7 +742,7 @@ body {
   background: var(--panel);
   border: 1px solid var(--line);
   border-radius: 8px;
-  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.45);
+  box-shadow: var(--overlay-shadow);
   overflow: hidden;
 }
 
@@ -971,7 +1030,10 @@ body {
 /* ── Motion: state transitions only, and collapse under reduced-motion ─────────────────── */
 
 @media (prefers-reduced-motion: no-preference) {
-  .run-row, .attention-item { transition: border-color 140ms ease, background-color 140ms ease; }
+  .run-row, .attention-item {
+    transition: border-color var(--motion-state) var(--motion-ease),
+                background-color var(--motion-state) var(--motion-ease);
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

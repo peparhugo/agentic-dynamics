@@ -4,6 +4,6 @@
 **Fixtures:** F-0..F-7 (deterministic; no live Redis/clock/network — waiver W2)
 **Viewports:** desktop 1440x900, narrow 1024x768, mobile 390x844
 
-**Screenshots:** 30
+**Screenshots:** 33
 
 No geometry violations.

@@ -861,6 +861,155 @@ def run_visual_gate(out: Path, screenshots: bool) -> tuple[list[dict[str, Any]],
     return results, errors
 
 
+#: Probe the styling/a11y contract: tabular numerals, motion, landmarks, recognizability
+#: carriers (the §4.2 sentences' screenshot elements).
+STYLE_PROBE_JS = r"""
+() => {
+  const cs = (sel, prop) => { const el = document.querySelector(sel);
+    return el ? getComputedStyle(el)[prop] : null; };
+  const value = document.querySelector('[data-region="R2"] [data-value]');
+  const regions = Array.from(document.querySelectorAll('[data-region]')).map((el) => ({
+    role: el.getAttribute('role'), label: el.getAttribute('aria-label') || '' }));
+  return {
+    numeric: value ? getComputedStyle(value).fontVariantNumeric : '',
+    rowTransition: cs('.run-row', 'transitionDuration'),
+    regions: regions,
+    liveRegion: Boolean(document.querySelector('[aria-live="polite"]')),
+    carriers: {
+      session: Boolean(document.querySelector('[data-field="session.identity"]')),
+      eligibility: Boolean(document.querySelector('[data-field="decision.eligibility"]')),
+      receipt: Boolean(document.querySelector('[data-field="decision.receipt"]')),
+      advisory: Boolean(document.querySelector('[data-evidence-class="advisory"]')),
+      measured: Boolean(document.querySelector('[data-evidence-class="measured"]')),
+      cost: Boolean(document.querySelector('[data-field="cost.provenance"]')),
+      authority: Boolean(document.querySelector('[data-authority="controller"]'))
+        || Boolean(document.querySelector('[data-answer="ON-G5"] [data-field="decision.authority"]')),
+    },
+  };
+}
+"""
+
+#: Read the focus ring of whatever Tab landed on.
+FOCUS_PROBE_JS = r"""
+() => {
+  const el = document.activeElement;
+  if (!el || el === document.body) return {focusable: false};
+  const cs = getComputedStyle(el);
+  return {
+    focusable: true,
+    id: el.id || '',
+    cls: el.className || '',
+    outlineStyle: cs.outlineStyle,
+    outlineWidth: parseFloat(cs.outlineWidth) || 0,
+  };
+}
+"""
+
+
+def _check_style(label: str, viewport: str, probe: dict[str, Any], errors: list[str]) -> None:
+    """Assert the shape of the styling/a11y contract for one rendered page."""
+    if "tabular-nums" not in str(probe.get("numeric", "")):
+        _row(errors, label, "a3", "tabular-numerals", f"numeric={probe.get('numeric')!r}")
+    for region in probe.get("regions", []):
+        if region.get("role") != "region" or not region.get("label"):
+            _row(errors, label, "a3", "landmark", f"region {region}")
+    if not probe.get("liveRegion"):
+        _row(errors, label, "a3", "live-region", "no polite live region")
+    for carrier, present in (probe.get("carriers") or {}).items():
+        if not present:
+            _row(errors, label, "a3", "recognizability", f"missing carrier: {carrier}")
+    # The motion token must be inside the brief's 100-240ms budget.
+    for prop in ("rowTransition",):
+        value = str(probe.get(prop, "") or "")
+        for part in value.split(","):
+            seconds = part.strip().rstrip("s")
+            try:
+                ms = float(seconds) * 1000
+            except ValueError:
+                continue
+            if ms > 240.5:
+                _row(errors, label, "a3", "motion-budget", f"{prop} {value}")
+
+
+def run_style_gate(out: Path, screenshots: bool) -> tuple[list[dict[str, Any]], list[str]]:
+    """Run the a3 styling/a11y class: tokens, focus rings, reduced motion, recognizability.
+
+    Two contexts per viewport: a normal one (motion budget + focus rings via real Tab presses)
+    and a reduced-motion one (every transition/animation must collapse).
+    """
+    from playwright.sync_api import sync_playwright
+
+    fixture = build_fixture("F-0")
+    frames = _sse_frames([fixture], with_transitions=False)
+    url, httpd = serve_app()
+    results: list[dict[str, Any]] = []
+    errors: list[str] = []
+    try:
+        with sync_playwright() as playwright:
+            browser = playwright.chromium.launch(args=["--no-sandbox"])
+            for name, (width, height) in VIEWPORTS.items():
+                context = browser.new_context(
+                    viewport={"width": width, "height": height}, timezone_id="UTC",
+                    locale="en-US", color_scheme="dark",
+                )
+                context.add_init_script(
+                    "try{localStorage.setItem('control-room-theme','dark')}catch(e){}"
+                )
+                page = context.new_page()
+                page.route("**/api/**", lambda route: route.abort())
+                page.route("**/api/glance", _glance_handler(fixture))
+                page.route("**/api/events", _events_handler(frames))
+                page.goto(url, wait_until="domcontentloaded")
+                page.locator('[data-render-state="ready"]').wait_for(timeout=15000)
+                _check_style(name, name, page.evaluate(STYLE_PROBE_JS), errors)
+
+                # Focus rings: real keyboard Tab presses so :focus-visible actually applies.
+                page.locator("body").click(position={"x": 2, "y": 2})
+                for _ in range(5):
+                    page.keyboard.press("Tab")
+                    focus = page.evaluate(FOCUS_PROBE_JS)
+                    if focus.get("focusable") and (
+                        focus.get("outlineStyle") == "none" or focus.get("outlineWidth", 0) <= 0
+                    ):
+                        _row(errors, name, "a3", "focus-ring", json.dumps(focus))
+                if screenshots:
+                    shot = out / f"style_{name}_dark_{width}x{height}.png"
+                    page.screenshot(path=str(shot), full_page=False)
+                    results.append({"case": "style", "viewport": name, "screenshot": str(shot)})
+                context.close()
+
+                reduced = browser.new_context(
+                    viewport={"width": width, "height": height}, timezone_id="UTC",
+                    locale="en-US", color_scheme="dark", reduced_motion="reduce",
+                )
+                rpage = reduced.new_page()
+                rpage.route("**/api/**", lambda route: route.abort())
+                rpage.route("**/api/glance", _glance_handler(fixture))
+                rpage.route("**/api/events", _events_handler(frames))
+                rpage.goto(url, wait_until="domcontentloaded")
+                rpage.locator('[data-render-state="ready"]').wait_for(timeout=15000)
+                motion = rpage.evaluate(
+                    "() => { const el=document.querySelector('.run-row');"
+                    " const cs=el?getComputedStyle(el):null;"
+                    " return {transition: cs?cs.transitionDuration:'',"
+                    " animation: cs?cs.animationDuration:''}; }"
+                )
+                for key, value in motion.items():
+                    if not value:
+                        continue
+                    # Every part must collapse to (near) zero: 0s, or the global rule's
+                    # 0.001ms !important. A positive duration is a reduced-motion failure.
+                    for part in str(value).split(","):
+                        seconds = float(part.strip().rstrip("s") or "0")
+                        if seconds > 0.01:
+                            _row(errors, name, "a3", "reduced-motion", f"{key}={value}")
+                reduced.close()
+            browser.close()
+    finally:
+        httpd.shutdown()
+    return results, errors
+
+
 def _glance_handler(payload: dict[str, Any]):
     """Return a one-argument Playwright route handler serving the expanded fixture JSON."""
 
@@ -1133,6 +1282,8 @@ def main() -> int:
                         help="also run the trends-lens chart class (a1)")
     parser.add_argument("--visuals", action="store_true",
                         help="also run the R4 SVG visual class (a2)")
+    parser.add_argument("--style", action="store_true",
+                        help="also run the styling/a11y class (a3)")
     args = parser.parse_args()
 
     fixtures = [item.strip() for item in args.fixtures.split(",") if item.strip()]
@@ -1158,6 +1309,9 @@ def main() -> int:
         if args.visuals:
             visual_results, visual_errors = run_visual_gate(out, not args.no_screenshot)
             results, errors = results + visual_results, errors + visual_errors
+        if args.style:
+            style_results, style_errors = run_style_gate(out, not args.no_screenshot)
+            results, errors = results + style_results, errors + style_errors
     except ImportError:
         print("playwright is not installed; run with --check-fixtures for the browser-free check",
               file=sys.stderr)

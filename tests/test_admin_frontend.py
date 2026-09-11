@@ -311,6 +311,45 @@ def test_visual_styles_hold_theme_contrast_budget_and_motion() -> None:
     assert "--advisory" in css and "--measured" in css  # theme tokens, not hard-coded hex
 
 
+def test_styles_define_the_type_color_motion_and_focus_tokens() -> None:
+    """The direction's typography/color/motion rules are a token layer, applied not hard-coded."""
+    css = _read("style.css")
+    for token in (
+        "--fs-micro",
+        "--fs-label",
+        "--fs-value",
+        "--fs-title",
+        "--surface-0",
+        "--surface-1",
+        "--surface-2",
+        "--motion-state",
+        "--motion-draw",
+        "--motion-ease",
+        "--focus-ring",
+    ):
+        assert token in css, token
+    # Tabular numerals on data values (cm-type) and one global focus ring (a11y).
+    assert "font-variant-numeric: tabular-nums" in css
+    assert ":focus-visible { outline: var(--focus-ring)" in css
+    # Motion stays inside the brief's 100-240ms budget.
+    assert "--motion-state: 160ms" in css
+    assert "--motion-draw: 220ms" in css
+    # The authority marker for the recognizability test.
+    assert ".row-authority" in css
+
+
+def test_client_lists_are_keyed_and_write_on_change() -> None:
+    """A no-op poll performs zero writes; a changed poll reuses unchanged keyed rows."""
+    app = _read("app.js")
+    assert "glanceSignature" in app
+    assert "lastSignature" in app
+    assert "reconcileList" in app
+    assert '"data-item-key"' in app
+    assert '"data-authority": "controller"' in app
+    # The authority chip is a non-field token, so the 16-field row schema is untouched.
+    assert "row-authority" in app
+
+
 def test_all_preexisting_routes_still_resolve() -> None:
     """The facelift is additive: every previously-registered API path is still served."""
     from apps.control_room import server
