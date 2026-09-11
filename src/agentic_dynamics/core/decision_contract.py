@@ -244,7 +244,10 @@ def validate_decision(
     the returned names verbatim in their refusal evidence.
     """
     failed: list[str] = []
-    if purpose is not None and decision.purpose != purpose:
+    # A DECLARED purpose must match; an artifact written before the purpose vocabulary existed
+    # carries none (the per-purpose artifact PATHS keep the bindings distinct, and the
+    # approval command writes the purpose from step 2 onward).
+    if purpose is not None and "purpose" in decision.raw and decision.purpose != purpose:
         failed.append("purpose")
     if spec is not None and decision.spec != spec:
         failed.append("spec")

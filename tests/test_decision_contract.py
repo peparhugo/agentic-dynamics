@@ -132,6 +132,17 @@ def test_validate_decision_binds_every_dimension():
     assert "tree" in dc.validate_decision(dec, tree="cafebabe")
 
 
+def test_undeclared_purpose_passes_but_a_declared_mismatch_fails():
+    """A legacy artifact (written before the purpose vocabulary) is judged by its path binding;
+    a DECLARED purpose must match the act it authorizes."""
+    legacy = dc.parse_approval_decision("operator: peparhugo\ndate: 2026-09-11\n")
+    assert "purpose" not in dc.validate_decision(legacy, purpose=dc.PURPOSE_TREE_REUSE)
+    declared = dc.parse_approval_decision(
+        "operator: peparhugo\ndate: 2026-09-11\npurpose: checkpoint\n"
+    )
+    assert "purpose" in dc.validate_decision(declared, purpose=dc.PURPOSE_TREE_REUSE)
+
+
 def test_candidate_sha_accepts_either_abbreviation():
     dec = dc.parse_approval_decision(
         "operator: peparhugo\ndate: 2026-09-11\ncandidate: abc123de\n"

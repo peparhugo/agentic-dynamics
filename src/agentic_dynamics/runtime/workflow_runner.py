@@ -130,6 +130,7 @@ from pathlib import Path
 from typing import Any
 
 from agentic_dynamics.adapters.backends import run_agentic
+from agentic_dynamics.core import decision_contract as dc
 from agentic_dynamics.core.admission_context import AdmissionRefused
 from agentic_dynamics.core.cost_provenance import CostSource
 from agentic_dynamics.core.language import build_code_snapshot, compute_code_delta, detect_language
@@ -2283,34 +2284,25 @@ def _approval_path(wd: Path, spec_name: str, phase_name: str) -> Path:
 
 
 def _parse_approval(text: str) -> dict[str, str]:
-    """Extract ``tree`` / ``phase`` / ``operator`` / ``date`` from the approval markdown.
+    """Extract ``tree`` / ``phase`` / ``operator`` / ``date`` via the ONE contract.
 
-    The artifact is a simple ``- key: value`` list (the operator fills it by hand); the parser
-    accepts any ``key: value`` line whose key is one of the four contract fields, so an
-    approval written with natural prose around it still parses. Missing/empty fields simply
-    fail their check downstream (no defaulting).
+    The parsing dialect lives in ``core.decision_contract`` (migration step 2): tolerant about
+    how an operator writes (canonical ``- key: value`` lines, ``SIGNED-BY-OPERATOR:``, bold
+    decorations, an inline date on the signature line), strict about the fields. Missing or
+    placeholder fields simply fail their check downstream (no defaulting).
     """
-    out: dict[str, str] = {}
-    for line in text.splitlines():
-        stripped = line.strip().lstrip("-* ").strip()
-        if ":" not in stripped:
-            continue
-        key, _, value = stripped.partition(":")
-        key = key.strip().lower()
-        if key in ("tree", "phase", "operator", "date"):
-            out[key] = value.strip()
-    return out
+    decision = dc.parse_approval_decision(text)
+    return {
+        "tree": decision.tree,
+        "phase": decision.phase,
+        "operator": decision.operator,
+        "date": decision.date,
+    }
 
 
 def _date_is_valid(value: str) -> bool:
-    """A real date (ISO-8601 or ``YYYY-MM-DD``); empty/unparseable is not a signature date."""
-    if not value:
-        return False
-    try:
-        datetime.fromisoformat(value.replace("Z", "+00:00"))
-        return True
-    except ValueError:
-        return False
+    """A real date (ISO-8601 or ``YYYY-MM-DD``) — the one contract's check (step 2)."""
+    return dc.date_is_valid(value)
 
 
 def _operator_is_placeholder(operator: str) -> bool:
@@ -2322,13 +2314,7 @@ def _operator_is_placeholder(operator: str) -> bool:
     An angle-bracketed template value (``<name>``, ``<required: ...>``, ``<your signature>``) is
     a placeholder even when the generic-word list does not name it.
     """
-    stripped = operator.strip()
-    norm = " ".join(stripped.lower().split())
-    return (
-        norm in PLACEHOLDER_OPERATORS
-        or len(stripped) < 2
-        or (stripped.startswith("<") and stripped.endswith(">"))
-    )
+    return dc.operator_is_placeholder(operator)
 
 
 def approval_authorizes_tree(
@@ -2355,8 +2341,8 @@ def approval_authorizes_tree(
         "present_at_pre_head": False,
     }
     path = _approval_path(wd, spec_name, phase_name)
+    rel = path.relative_to(wd).as_posix()
     if pre_head:
-        rel = path.relative_to(wd).as_posix()
         try:
             present = subprocess.run(
                 ["git", "cat-file", "-e", f"{pre_head}:{rel}"],
@@ -2369,22 +2355,25 @@ def approval_authorizes_tree(
         evidence["failed_checks"] = ["committed_before_phase"]
         return False, evidence
 
-    parsed = _parse_approval(path.read_text(encoding="utf-8"))
-    evidence["parsed"] = parsed
-    failed: list[str] = []
-    if parsed.get("tree") != tree_hash:
-        failed.append("tree")
-    if parsed.get("phase") != phase_name:
-        failed.append("phase")
-    if _operator_is_placeholder(parsed.get("operator", "")):
-        failed.append("operator")
-    if not _date_is_valid(parsed.get("date", "")):
-        failed.append("date")
+    # Step 2: the decision is a fact about the COMMIT it authorized from, never about the
+    # checkout — an uncommitted edit to the same path reads nothing here.
+    text = dc.read_committed(wd, pre_head, rel)
+    if text is None:
+        evidence["failed_checks"] = ["committed_before_phase"]
+        return False, evidence
+    decision = dc.parse_approval_decision(text)
+    evidence["parsed"] = decision.as_dict()
+    failed = dc.validate_decision(
+        decision,
+        purpose=dc.PURPOSE_TREE_REUSE,
+        phase=phase_name,
+        tree=tree_hash,
+    )
     evidence["failed_checks"] = failed
     if not failed:
         evidence["authorized"] = True
-        evidence["operator"] = parsed["operator"]
-        evidence["date"] = parsed["date"]
+        evidence["operator"] = decision.operator
+        evidence["date"] = decision.date
     return evidence["authorized"], evidence
 
 
@@ -2667,16 +2656,18 @@ def _checkpoint_approval_valid(
     if not ancestor:
         failed.append("checkpoint_lineage_intact")
     if not failed:
-        parsed = _parse_checkpoint_approval(path.read_text(encoding="utf-8"))
-        evidence["parsed"] = parsed
-        if _operator_is_placeholder(parsed.get("operator", "")):
-            failed.append("operator")
-        if not _date_is_valid(parsed.get("date", "")):
-            failed.append("date")
+        # Step 2: validate the COMMITTED bytes at HEAD — never the checkout's working copy.
+        text = dc.read_committed(wd, "HEAD", rel)
+        if text is None:
+            failed.append("committed_at_head")
+        else:
+            decision = dc.parse_approval_decision(text)
+            evidence["parsed"] = decision.as_dict()
+            failed.extend(dc.validate_decision(decision, purpose=dc.PURPOSE_CHECKPOINT))
         if not failed:
             evidence["valid"] = True
-            evidence["operator"] = parsed["operator"]
-            evidence["date"] = parsed["date"]
+            evidence["operator"] = decision.operator
+            evidence["date"] = decision.date
     evidence["failed_checks"] = failed
     return evidence["valid"], evidence
 

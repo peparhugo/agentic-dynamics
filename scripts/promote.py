@@ -64,6 +64,8 @@ try:
 except ImportError:  # imported as scripts.promote — repo root is on sys.path
     from scripts import _bootstrap  # noqa: F401
 
+from agentic_dynamics.core import decision_contract as dc  # noqa: E402  # needs _bootstrap
+
 ROOT = Path(__file__).resolve().parent.parent
 
 #: The promotion candidate's commit-subject pattern (the same canonical pattern the
@@ -145,11 +147,17 @@ def _promote_decision(
 ) -> dict:
     """The promote decision/act dict the emission seam consumes (verb/run/candidate/operator).
 
-    ``run_id`` is the ledger's run identity — the ``spec_id`` when the ledger carries one
-    (``<name>@<version>``), else the spec name: the identifier the ledger that produced this
-    candidate was filed under. The candidate sha is the verified worktree HEAD.
+    ``run_id`` is the ledger's CONTROL run id when it carries one (the ``runs.run_id`` the
+    ledger was filed under — the same identity the control-row close uses), falling back to
+    ``spec_id``/spec name only for a legacy pre-db ledger; a spec id is not a run id.
+    The candidate sha is the verified worktree HEAD.
     """
-    run_id = str(ledger.get("spec_id") or "") or str(ledger.get("spec_name") or "") or args.spec
+    run_id = (
+        _ledger_run_id(ledger)
+        or str(ledger.get("spec_id") or "")
+        or str(ledger.get("spec_name") or "")
+        or args.spec
+    )
     decision = {
         "verb": "promote",
         "run_id": run_id,
@@ -247,7 +255,12 @@ def _promote_decision_record(args: argparse.Namespace, ledger: dict, candidate: 
     """
     phases = ledger.get("phases") or []
     cost = float(ledger.get("total_cost_usd", 0) or 0)
-    run_id = str(ledger.get("spec_id") or "") or str(ledger.get("spec_name") or "") or args.spec
+    run_id = (
+        _ledger_run_id(ledger)
+        or str(ledger.get("spec_id") or "")
+        or str(ledger.get("spec_name") or "")
+        or args.spec
+    )
     return {
         "what": f"promote workflow {args.spec} to {args.base}",
         "why": f"candidate {candidate[:12]} passed {len(phases)} verified phase gate(s) "
@@ -498,7 +511,7 @@ def _run_promotion(
     # 2 ── the run was not left awaiting unless a valid approval binds THIS candidate.
     awaiting = bool(ledger.get("awaiting", False))
     if awaiting:
-        approval = _load_approval(args)
+        approval = _load_approval(args, ledger)
         _verify_approval(approval, ledger, candidate)
 
     # 3 ── the base is present and the promotion is fast-forwardable onto it.
@@ -628,44 +641,64 @@ def _load_ledger(args: argparse.Namespace) -> dict:
     return json.loads(latest[-1].read_text(encoding="utf-8"))
 
 
-def _load_approval(args: argparse.Namespace) -> dict:
-    """Load the approval artifact (markdown frontmatter + signature lines)."""
+def _load_approval(args: argparse.Namespace, ledger: dict) -> dict:
+    """Load the approval artifact (the awaiting checkpoint's per-phase path by default).
+
+    The runner's checkpoint contract lives at ``approvals/<spec>/<phase>_approval.md`` INSIDE
+    the candidate worktree; the old default (``approvals/<spec>/<spec>_approval.md`` under the
+    repo root) could never satisfy it. ``--approval`` still overrides explicitly. Step 2: the
+    bytes are read from the commit at the worktree's HEAD when the path is inside the
+    worktree — a working-copy edit is not a decision.
+    """
     if args.approval:
         path = Path(args.approval)
     else:
-        path = ROOT / "approvals" / args.spec / f"{args.spec}_approval.md"
+        phase = str(ledger.get("awaiting_phase") or "").strip()
+        if not phase:
+            raise _PromoteAwaitingError(
+                "run is awaiting operator approval and the ledger names no awaiting_phase — "
+                "pass --approval <path> explicitly"
+            )
+        path = Path(args.workdir) / "approvals" / args.spec / f"{phase}_approval.md"
     if not path.is_file():
         raise _PromoteAwaitingError(
             f"run is awaiting operator approval and no approval artifact binds it "
             f"({path} not found)"
         )
-    text = path.read_text(encoding="utf-8")
+    workdir = Path(args.workdir)
+    try:
+        rel = path.resolve().relative_to(workdir.resolve()).as_posix()
+    except ValueError:
+        rel = ""
+    committed = dc.read_committed(workdir, "HEAD", rel) if rel else None
+    text = committed if committed is not None else path.read_text(encoding="utf-8")
     lines = [ln.strip() for ln in text.splitlines() if ln.strip()]
     return {"path": path, "text": text, "lines": lines}
 
 
 def _verify_approval(approval: dict, ledger: dict, candidate: str) -> None:
-    """The approval must bind THIS candidate (a stale or foreign approval refuses)."""
-    text = approval["text"]
-    ok_parts = [p for p in ("candidate", "sha", "workflow") if p.lower() in text.lower()]
-    if not ok_parts:
+    """The approval must bind THIS candidate through the ONE contract (migration step 2).
+
+    The old substring checks accepted ``date: nonsense`` and an approval carrying no operator
+    at all; the contract parses the artifact and validates the exact binding — candidate,
+    purpose (when declared), a real operator, and a real date — returning named failed checks.
+    """
+    decision = dc.parse_approval_decision(approval["text"])
+    failed = dc.validate_decision(
+        decision,
+        purpose=dc.PURPOSE_CHECKPOINT,
+        candidate_sha=candidate,
+    )
+    if failed:
+        if "candidate_sha" in failed:
+            raise _PromoteRefusedError(
+                f"approval {approval['path']} binds a DIFFERENT candidate (or names none) — "
+                f"the ledger git_sha {candidate[:12]} must be named; failed checks {failed}"
+            )
         raise _PromoteRefusedError(
-            f"approval {approval['path']} names no candidate — an unsigned or templated "
-            f"approval can never authorize a promotion"
+            f"approval {approval['path']} fails its checks {failed} — an approval must name "
+            f"this candidate ({candidate[:12]}), a real operator, and a real date"
         )
-    if candidate[:12] not in text and candidate not in text:
-        raise _PromoteRefusedError(
-            f"approval {approval['path']} binds a DIFFERENT candidate (ledger git_sha "
-            f"{candidate[:12]} absent) — approval and candidate must match"
-        )
-    # A real signature: a non-placeholder operator + a date, in the approval text.
-    low = text.lower()
-    if "operator" in low and ("operator: " not in low or "placeholder" in low):
-        raise _PromoteRefusedError(
-            f"approval {approval['path']} carries no real operator signature"
-        )
-    if "date" not in low:
-        raise _PromoteRefusedError(f"approval {approval['path']} carries no date")
 
 
 # ── git helpers ───────────────────────────────────────────────────────────────

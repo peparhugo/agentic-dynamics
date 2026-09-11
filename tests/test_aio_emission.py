@@ -589,18 +589,37 @@ def test_approval_is_a_supported_permanence_verb():
 # ── A2 closure: the approve verb has a real call site ─────────────────────────
 
 def test_approve_command_records_and_emits(tmp_path, monkeypatch):
-    """A2 (authoring_product_aio adversarial, 2026-09-03): the approve permanence verb
-    was declared but unwired. The workflow approve command now records the approval in
-    the control db (operator + candidate bound), writes the resume-path artifact, and
-    emits the decision through the AIO emission seam (verb=approve)."""
+    """A2 (authoring_product_aio adversarial, 2026-09-03) + step 2 (2026-09-11): the approve
+    permanence verb records the approval in the control db (operator + candidate bound),
+    writes AND COMMITS the resume-path artifact on the candidate worktree (the runner's
+    checkpoint contract requires the committed approval), and emits the decision through
+    the AIO emission seam (verb=approve)."""
     import importlib.util
+    import subprocess as sp
 
     from agentic_dynamics.control.control_db import ControlDB, RunState
+
+    # a real candidate worktree: the approval must land ON the exact candidate sha.
+    workdir = tmp_path / "wt"
+    workdir.mkdir()
+
+    def _git(*argv: str) -> str:
+        proc = sp.run(["git", *argv], cwd=workdir, capture_output=True, text=True)
+        assert proc.returncode == 0, proc.stderr
+        return proc.stdout.strip()
+
+    _git("init", "-q", "-b", "main")
+    _git("config", "user.email", "t@example.com")
+    _git("config", "user.name", "t")
+    (workdir / "base.txt").write_text("base", encoding="utf-8")
+    _git("add", ".")
+    _git("commit", "-q", "-m", "base")
+    candidate = _git("rev-parse", "HEAD")
 
     db_path = tmp_path / "control.db"
     with ControlDB.open(db_path) as db:
         run = db.create_run(spec_name="t", model="m", state=RunState.RUNNING,
-                            reason="start", candidate_sha="abcd1234567890")
+                            reason="start", candidate_sha=candidate)
         db.transition_run(run.run_id, RunState.AWAITING_APPROVAL, reason="checkpoint")
 
     monkeypatch.setenv("FINOPS_CONTROL_DB", str(db_path))
@@ -611,8 +630,8 @@ def test_approve_command_records_and_emits(tmp_path, monkeypatch):
     monkeypatch.setattr(
         sys, "argv",
         ["approve", "--run-id", run.run_id, "--gate-id", "approval",
-         "--candidate-sha", "abcd1234567890", "--spec", "t", "--phase", "p2",
-         "--operator", "Dr. Seuss", "--workdir", str(tmp_path)],
+         "--candidate-sha", candidate, "--spec", "t", "--phase", "p2",
+         "--operator", "Dr. Seuss", "--workdir", str(workdir)],
     )
     m.main()
 
@@ -620,8 +639,13 @@ def test_approve_command_records_and_emits(tmp_path, monkeypatch):
         approvals = db.approvals(run_id=run.run_id)
         assert len(approvals) == 1
         assert approvals[0].operator == "Dr. Seuss"
-        assert approvals[0].candidate_sha == "abcd1234567890"
-    assert (tmp_path / "approvals" / "t" / "p2_approval.md").exists()
+        assert approvals[0].candidate_sha == candidate
+    assert (workdir / "approvals" / "t" / "p2_approval.md").exists()
+    # step 2: the artifact is COMMITTED on the candidate — the resume contract's requirement.
+    assert _git("log", "-1", "--format=%s").startswith("[approval] t/p2")
+    committed = _git("show", "HEAD:approvals/t/p2_approval.md")
+    assert "operator: Dr. Seuss" in committed
+    assert "purpose: checkpoint" in committed
 
 
 def test_approve_placeholder_operator_refused(tmp_path, monkeypatch):

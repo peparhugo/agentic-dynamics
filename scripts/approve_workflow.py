@@ -20,6 +20,7 @@ Exit codes: 0 approved / 10 not awaiting (no approval needed) / 20 refused
 from __future__ import annotations
 
 import argparse
+import subprocess
 import sys
 from pathlib import Path
 
@@ -96,8 +97,14 @@ def _run_approval(args: argparse.Namespace) -> None:
                 f"no approval is needed"
             )
 
-    # 2 ── write the operator-signed artifact the resume path requires.
+    # 2 ── write AND COMMIT the operator-signed artifact in the run's worktree. The resume
+    # path requires the approval committed at HEAD (absent at the checkpoint commit); an
+    # uncommitted artifact can never authorize, and the commit must land on the exact
+    # candidate the approval names — a rewritten worktree refuses.
     artifact = _write_artifact(args)
+    artifact_commit = ""
+    if not args.dry_run:
+        artifact_commit = _commit_artifact(args, artifact)
 
     # 3 ── record the approval in the control db (operator + candidate bound).
     if not args.dry_run:
@@ -119,6 +126,7 @@ def _run_approval(args: argparse.Namespace) -> None:
         f"approve: run {args.run_id} approved by {args.operator} "
         f"(candidate {args.candidate_sha[:12]})"
         + (f" — approval {approval.approval_id}" if approval else " — dry-run, nothing written")
+        + (f" — committed {artifact_commit[:12]}" if artifact_commit else "")
     )
     if emission:
         print(f"approve: decision emitted ({emission.get('observation_id', '')[:16]}…)")
@@ -139,13 +147,57 @@ def _write_artifact(args: argparse.Namespace) -> Path:
         artifact.write_text(
             f"---\nstatus: accepted\n---\n\n# Approval\n\n"
             f"run: {args.run_id}\n"
-             f"gate: {args.gate_id or '(the run approval gate)'}\n"
+            f"purpose: checkpoint\n"
+            f"gate: {args.gate_id or '(the run approval gate)'}\n"
             f"candidate: {args.candidate_sha}\n"
             f"operator: {args.operator}\n"
             f"date: {_today()}\n"
             f"reason: {args.reason or 'operator approval'}\n"
         )
     return artifact
+
+
+def _commit_artifact(args: argparse.Namespace, artifact: Path) -> str:
+    """Commit the approval in the run's worktree; refuse unless HEAD is the bound candidate.
+
+    The commit carries the operator's name (the signer is the act's author) and the resume
+    path's contract checks it lands after the checkpoint commit and is absent at it. A HEAD
+    that no longer matches the candidate the approval names refuses — approving a rewritten
+    worktree would bind a signature to work nobody verified.
+    """
+    workdir = Path(args.workdir)
+
+    def _git(*argv: str) -> str:
+        run = subprocess.run(
+            ["git", *argv], cwd=workdir, capture_output=True, text=True, timeout=60
+        )
+        if run.returncode != 0:
+            raise _ApproveRefusedError(
+                f"git {' '.join(argv)} failed in {workdir}: "
+                f"{(run.stderr or '').strip()[:300]}"
+            )
+        return run.stdout.strip()
+
+    head = _git("rev-parse", "HEAD")
+    if not (head.startswith(args.candidate_sha) or args.candidate_sha.startswith(head)):
+        raise _ApproveRefusedError(
+            f"worktree HEAD {head[:12]} is not the candidate this approval binds "
+            f"({args.candidate_sha[:12]}) — rebuild or rebind the run before approving"
+        )
+    try:
+        rel = artifact.resolve().relative_to(workdir.resolve()).as_posix()
+    except ValueError:
+        raise _ApproveRefusedError(
+            f"artifact {artifact} is outside the run worktree {workdir} — the resume "
+            f"contract reads approvals from the worktree"
+        ) from None
+    _git("add", rel)
+    _git(
+        "-c", f"user.name={args.operator}",
+        "-c", "user.email=operator@operators.local",
+        "commit", "-m", f"[approval] {args.spec}/{args.phase} — approved by {args.operator}",
+    )
+    return _git("rev-parse", "HEAD")
 
 
 def _emit_approval_decision(args: argparse.Namespace) -> dict:
@@ -159,7 +211,7 @@ def _emit_approval_decision(args: argparse.Namespace) -> dict:
         "gate_id": args.gate_id,
         "candidate_sha": args.candidate_sha,
         "operator": args.operator,
-        "reason": args.reason,
+        "why": args.reason or "operator approval",
         "status": "approved",
     }
     try:
