@@ -1,0 +1,11 @@
+{
+  "uri": "https://colorbrewer2.org/",
+  "final_url": "https://colorbrewer2.org/",
+  "status": 200,
+  "content_type": "text/html",
+  "sha256": "c72ceb0441fc6951665eb8b7861ebe09ee6dc57e918b01fa87991a59128dab62",
+  "title": "ColorBrewer: Color Advice for Maps",
+  "text": "Number of data classes:\n3 4 5 6 7 8 9 10 11 12\nNature of your data:\nsequential diverging qualitative\nPick a color scheme:\nOnly show:\ncolorblind safe\nprint friendly\nphotocopy safe\nContext:\nroads\ncities\nborders\nBackground:\nsolid color\nterrain\ncolor transparency\nBuGn\nHEX RGB CMYK\nhow to use | updates | downloads | credits\nCOLOR BREWER 2.0\ncolor advice for cartography\nEXPORT\nExport your selected color scheme:\nPermalink\nShare a direct link to this color scheme.\nAdobe\nDownload an Adobe Swatch Exchange (ASE) file of this scheme.\nGIMP and Inkscape\nGIMP color palette for this scheme.\nJavaScript\nColors for this scheme as a JS array\nCSS\nCSS classes for this scheme\n\u00a9 Cynthia Brewer, Mark Harrower and The Pennsylvania State University\nSource code and feedback\nBack to Flash version\nBack to ColorBrewer 1.0\nX\nMUGGIN'",
+  "bytes": 8000,
+  "fetched_at": "2026-09-11T01:05:53.878828+00:00"
+}

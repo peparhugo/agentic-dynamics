@@ -1,0 +1,11 @@
+{
+  "uri": "https://nivo.rocks/heatmap/",
+  "final_url": "https://nivo.rocks/heatmap/",
+  "status": 200,
+  "content_type": "text/html; charset=utf-8",
+  "sha256": "7342bb6a11b9257201aa1865f5ea6aaec9bb33c25bb73c6cbb8a7e9e54da0ee4",
+  "title": "Heat Map chart | nivo",
+  "text": "Why nivo? About References Components Guides Scales Axes Colors Legends Gradients Patterns Theming storybook Donate\nlight dark\nHeatMap\n@nivo/heatmap\nsvg canvas http api\nAn heat map matrix, you can chose between various colors scales,\nyou also have the ability to change the cell shape\nfor rectangle or circle and even use a custom component.\nYou can also see more example usages in the storybook .\nchart code data\nroll the dice\nActions Logs\nStart interacting with the chart to log actions\nBase\nDimensions\nStyle\nLabels\nGrid & Axes\nLegends\nCustomization\nInteractivity\nAnnotations\nAccessibility\nMotion\nRecipes\nVariable Cell Size Custom Cell Component Custom Tooltip",
+  "bytes": 104611,
+  "fetched_at": "2026-09-11T01:05:45.165672+00:00"
+}

@@ -1,0 +1,11 @@
+{
+  "uri": "https://vega.github.io/vega-themes/",
+  "final_url": "https://vega.github.io/vega-themes/",
+  "status": 200,
+  "content_type": "text/html; charset=utf-8",
+  "sha256": "ac15dd7105b6481106b05a3420b6e6a70621c2a9b032900faa0ddc28000d6d95",
+  "title": "Vega Theme Test",
+  "text": "Theme: default excel ggplot2 quartz vox dark fivethirtyeight latimes urbaninstitute googlecharts powerbi carbonwhite carbong10 carbong90 carbong100 Renderer: svg canvas\nAdditional imports\nCarbon themes require the Plex font to be imported, as well as an additional CSS file (to style overflow menu &\ntooltips). More instructions here",
+  "bytes": 9186,
+  "fetched_at": "2026-09-11T01:05:34.454490+00:00"
+}

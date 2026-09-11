@@ -1,0 +1,11 @@
+{
+  "uri": "https://vega.github.io/vega/",
+  "final_url": "https://vega.github.io/vega/",
+  "status": 200,
+  "content_type": "text/html; charset=utf-8",
+  "sha256": "03e32b4cfd27b44fd3d905387422956497f68e1d8de35cb69b3c8882fa40635e",
+  "title": "A Visualization Grammar | Vega",
+  "text": "Vega\nVega-Lite Altair Vega-Lite API\nExamples Tutorials Documentation Usage About\nGitHub Try Online\nVega \u2013 A Visualization Grammar\nVega is a visualization grammar , a declarative language for creating, saving, and sharing interactive visualization designs. With Vega, you can describe the visual appearance and interactive behavior of a visualization in a JSON format, and generate web-based views using Canvas or SVG.\nVersion 6.4.0\nVega provides basic building blocks for a wide variety of visualization designs: data loading and transformation , scales , map projections , axes , legends , and graphical marks such as rectangles, lines, plotting symbols, etc . Interaction techniques can be specified using reactive signals that dynamically modify a visualization in response to input event streams .\nA Vega specification defines an interactive visualization in a JSON format. Specifications are parsed by Vega\u2019s JavaScript runtime to generate both static images or interactive web-based views. Vega provides a convenient representation for computational generation of visualizations, and can serve as a foundation for new APIs and visual analysis tools.\nTo get started with Vega, take a look at the tutorials , example gallery , and usage guide , or read about the project\u2019s goals .\nTo rapidly create common statistical graphics, check out Vega-Lite , a higher-level language built on top of Vega. Not that into JavaScript? Take a look at the Altair Python API for Vega-Lite.\nNeed help or want to share examples? Join the Vega discussion forum or the Vega Slack organization !\nEdit this Page",
+  "bytes": 7463,
+  "fetched_at": "2026-09-11T01:05:34.574908+00:00"
+}

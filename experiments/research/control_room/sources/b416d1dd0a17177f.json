@@ -1,0 +1,11 @@
+{
+  "uri": "https://www.tremor.so/docs/getting-started/installation",
+  "final_url": "https://www.tremor.so/docs/getting-started/installation",
+  "status": 200,
+  "content_type": "text/html; charset=utf-8",
+  "sha256": "b416d1dd0a17177fb14f5762241c47c68fd59436fbb6a915e6af9755f44a16c2",
+  "title": "Installation - Tremor",
+  "text": "Tremor is joining Vercel . Read more about our journey\nComponents Charts Blocks & Templates Docs\nOpen main menu\nGetting Started\nInstallation Updated\nYour First Dashboard\nVisualizations\nArea Chart\nBar Chart\nCombo Chart\nBar List\nCategory Bar\nDonut Chart\nLine Chart\nProgress Bar\nProgress Circle\nSpark Chart\nTracker\nInputs\nCalendar\nCheckbox\nDate Picker\nDate Range Picker\nDropdown Menu\nInput\nLabel\nRadio Card Group\nRadio Group\nSelect\nSelect Native\nSlider\nSwitch\nTextarea\nToggle\nUI\nAccordion\nBadge\nButton\nCallout\nCard\nDialog\nDivider\nDrawer\nPopover\nTable\nTabs\nTabNavigation\nToast\nTooltip\nUtilities\nchartUtils\ncx\nfocusInput\nhasErrorInput\nfocusRing\nGetting Started\nInstallation\nEverything you need to set up Tremor Raw.\nFramework Guides\nTremor Raw is designed for React v18.2.0+ and requires Tailwind CSS v4.0+ .\nNext.js\nFull-featured React framework with great developer experience.\nVite\nUpdating Soon\nFast and modern development server and build tool.\nFurther Reading and Resources\nTremor Blocks\nCopy and paste production-ready blocks. Check out Tremor Blocks .\nFigma UI Kit\nHere you'll find all components and styles for building Tremor dashboards in\nFigma. Check out Tremor's Figma UI Kit\nIcons\nWe love the bold style of Remix Icon . It's a large icon set, licensed under Apache License 2.0 .\nFooter\nFound a bug? Let us know here .\n\u00a9 2025 Tremor Labs, Inc. All rights reserved.",
+  "bytes": 68695,
+  "fetched_at": "2026-09-11T01:05:47.287495+00:00"
+}

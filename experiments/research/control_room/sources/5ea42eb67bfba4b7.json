@@ -1,0 +1,11 @@
+{
+  "uri": "https://www.data-to-viz.com/",
+  "final_url": "https://www.data-to-viz.com/",
+  "status": 200,
+  "content_type": "text/html; charset=utf-8",
+  "sha256": "5ea42eb67bfba4b7b0dd7c8adc549ad24b15fbeee405f9899f5d3287839681a6",
+  "title": "From data to Viz | Find the graphic you need",
+  "text": "Menu\nExplore\nStory\nAll\nCaveats\nPoster\nAbout\nContact\nFrom Data to Viz leads you to the most appropriate graph for your data. It links to the code to build it and lists common caveats you should avoid.\nExplore See poster\nWhat kind of data do you have? Pick the main type using the buttons below. Then let the decision tree guide you toward your graphic possibilities. Alternatively, check the complete decision tree .\nNumeric Categoric Num & Cat Maps Network Time series",
+  "bytes": 280691,
+  "fetched_at": "2026-09-11T01:05:53.669907+00:00"
+}
