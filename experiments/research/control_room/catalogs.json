@@ -1,0 +1,4611 @@
+{
+  "schema": "control-room-catalogs/v1",
+  "phase": "r4_reduce",
+  "min_support": 3,
+  "inputs": [
+    {
+      "path": "experiments/research/control_room/corpus/agentops.jsonl",
+      "sha256": "49559c496290d08455bfbd6ef58b85f79e6348d35ed5f8f99a19c61644c6ecd0"
+    },
+    {
+      "path": "experiments/research/control_room/corpus/dashboards.jsonl",
+      "sha256": "cfd93ef011bca1ea6fe921c015144f170314ca6044574a4bbdeea00566651777"
+    },
+    {
+      "path": "experiments/research/control_room/corpus/dataviz.jsonl",
+      "sha256": "abb65f4066536bc5f2a100c002362aed68753ba281a2e9a28f533b9a68632784"
+    },
+    {
+      "path": "experiments/research/control_room/corpus/cli.jsonl",
+      "sha256": "a35062fb602f510f3104e2fe2f5b86d7a8b59a6cbea1bb6616ef113c24899caa"
+    },
+    {
+      "path": "experiments/research/control_room/corpus/craft.jsonl",
+      "sha256": "b6e9cbbb9a9ea12af76dc6c459c63077919eabda84e5e75fcca69541c7700a2d"
+    },
+    {
+      "path": "experiments/research/control_room/taxonomy.json",
+      "sha256": "fd030f65ee2bbb388b5fae84079d6ebdf1bab20ab9e9a075705032bf734bfb9a"
+    }
+  ],
+  "catalogs": [
+    {
+      "id": "frameworks",
+      "label": "Framework / delivery-model catalog",
+      "contract": "RQ-A1\u2013A3, RQ-C2 \u2014 how the console itself is built, and which chart runtime to adopt.",
+      "items": [
+        {
+          "id": "fw-no-build",
+          "label": "Build-less vanilla JS + CSS custom properties",
+          "recommendation": "Keep the console build-less: vanilla JS state/render + CSS custom properties for tokens, and hand-authored SVG/CSS micro-visuals. The corpus' no-framework chart (uPlot) and SVG/CSS craft sources demonstrate the approach at this scale.",
+          "when": "A single-page local operator console with no npm pipeline and few contributors.",
+          "avoid_when": "Many contributors needing a typed component model or a large third-party widget set.",
+          "evidence": {
+            "support": 14,
+            "support_by_family": {
+              "dataviz": 11,
+              "cli": 3
+            },
+            "independent_families": 2,
+            "taxonomy_nodes": [
+              {
+                "id": "stk-vanilla-js",
+                "support": 14,
+                "family_names": [
+                  "dataviz",
+                  "cli"
+                ]
+              },
+              {
+                "id": "stk-svg-css-only",
+                "support": 15,
+                "family_names": [
+                  "craft"
+                ]
+              },
+              {
+                "id": "tech-svg-theme-aware-svg",
+                "support": 29,
+                "family_names": [
+                  "craft",
+                  "cli",
+                  "dataviz"
+                ]
+              }
+            ],
+            "refs": [
+              {
+                "family": "dataviz",
+                "uri": "https://github.com/leeoniya/uPlot",
+                "sha256": "c3a34c9200af26ab",
+                "title": "GitHub - leeoniya/uPlot: \ud83d\udcc8 A small, fast chart for time series, lines, areas, ohlc & bars \u00b7 GitHub"
+              },
+              {
+                "family": "dataviz",
+                "uri": "https://d3js.org/",
+                "sha256": "a2d77a5b707ffb7d",
+                "title": "D3 by Observable | The JavaScript library for bespoke data visualization"
+              },
+              {
+                "family": "craft",
+                "uri": "https://every-layout.dev/",
+                "sha256": "4b5a5ab9eabd35d8",
+                "title": "Relearn CSS layout: Every Layout"
+              },
+              {
+                "family": "dataviz",
+                "uri": "https://d3js.org/",
+                "sha256": "a2d77a5b707ffb7d",
+                "title": "D3 by Observable | The JavaScript library for bespoke data visualization"
+              },
+              {
+                "family": "dataviz",
+                "uri": "https://d3js.org/what-is-d3",
+                "sha256": "087f5313e13964ad",
+                "title": "What is D3? | D3 by Observable"
+              },
+              {
+                "family": "dataviz",
+                "uri": "https://github.com/leeoniya/uPlot",
+                "sha256": "c3a34c9200af26ab",
+                "title": "GitHub - leeoniya/uPlot: \ud83d\udcc8 A small, fast chart for time series, lines, areas, ohlc & bars "
+              },
+              {
+                "family": "dataviz",
+                "uri": "https://leeoniya.github.io/uPlot/",
+                "sha256": "0c26530cb0b02576",
+                "title": "uPlot | \ud83d\udcc8 A small, fast chart for time series, lines, areas, ohlc & bars"
+              },
+              {
+                "family": "dataviz",
+                "uri": "https://www.tremor.so/",
+                "sha256": "ad8fe3598ecb31d8",
+                "title": "Tremor \u2013 Copy-and-Paste Tailwind CSS UI Components for Charts and Dashboards"
+              },
+              {
+                "family": "dataviz",
+                "uri": "https://www.tremor.so/docs/visualizations/area-chart",
+                "sha256": "8f8efdd051827d24",
+                "title": "Area Chart - Tremor"
+              },
+              {
+                "family": "dataviz",
+                "uri": "https://ui.shadcn.com/charts",
+                "sha256": "b34430159fcfd06c",
+                "title": "Area Charts"
+              }
+            ]
+          },
+          "confidence": "medium",
+          "caveats": [],
+          "needs": [
+            "RQ-A1",
+            "RQ-A3"
+          ]
+        },
+        {
+          "id": "fw-d3",
+          "label": "D3 primitives for bespoke marks",
+          "recommendation": "Reach for D3 when a mark is genuinely bespoke (custom flow/cost geometry). It binds data to DOM/SVG directly, so it composes with a no-build console but costs imperative code.",
+          "when": "One or two custom visualizations that no library draws well.",
+          "avoid_when": "Standard time-series or dashboards that a smaller library already covers.",
+          "evidence": {
+            "support": 5,
+            "support_by_family": {
+              "dataviz": 5
+            },
+            "independent_families": 1,
+            "taxonomy_nodes": [
+              {
+                "id": "stk-d3",
+                "support": 5,
+                "family_names": [
+                  "dataviz"
+                ]
+              },
+              {
+                "id": "tech-viz-chart-grammar",
+                "support": 52,
+                "family_names": [
+                  "dataviz",
+                  "dashboards",
+                  "cli"
+                ]
+              }
+            ],
+            "refs": [
+              {
+                "family": "dataviz",
+                "uri": "https://d3js.org/",
+                "sha256": "a2d77a5b707ffb7d",
+                "title": "D3 by Observable | The JavaScript library for bespoke data visualization"
+              },
+              {
+                "family": "dataviz",
+                "uri": "https://github.com/observablehq/plot",
+                "sha256": "3c3c373dbb4ae6a0",
+                "title": "GitHub - observablehq/plot: A concise API for exploratory data visualization implementing a layered "
+              },
+              {
+                "family": "dataviz",
+                "uri": "https://d3js.org/",
+                "sha256": "a2d77a5b707ffb7d",
+                "title": "D3 by Observable | The JavaScript library for bespoke data visualization"
+              },
+              {
+                "family": "dataviz",
+                "uri": "https://d3js.org/what-is-d3",
+                "sha256": "087f5313e13964ad",
+                "title": "What is D3? | D3 by Observable"
+              },
+              {
+                "family": "dataviz",
+                "uri": "https://d3js.org/d3-scale-chromatic",
+                "sha256": "2bd7bec1de93305d",
+                "title": "d3-scale-chromatic | D3 by Observable"
+              },
+              {
+                "family": "dataviz",
+                "uri": "https://d3js.org/getting-started",
+                "sha256": "3aa562758d4b26a3",
+                "title": "Getting started | D3 by Observable"
+              },
+              {
+                "family": "dataviz",
+                "uri": "https://d3js.org/d3-shape",
+                "sha256": "5e09a57ff0edcbbf",
+                "title": "d3-shape | D3 by Observable"
+              }
+            ]
+          },
+          "confidence": "low",
+          "caveats": [
+            "single-family evidence (dataviz only) \u2014 single-source caveat applies"
+          ],
+          "needs": [
+            "RQ-C2",
+            "RQ-J2"
+          ]
+        },
+        {
+          "id": "fw-declarative",
+          "label": "Declarative grammars (Vega-Lite, Observable Plot)",
+          "recommendation": "Use a declarative grammar when chart variety matters more than bespoke geometry; a spec beats imperative code for a catalog of standard marks.",
+          "when": "Many standard chart forms and rapid iteration on encodings.",
+          "avoid_when": "A tiny payload target or one-off marks.",
+          "evidence": {
+            "support": 52,
+            "support_by_family": {
+              "dataviz": 32,
+              "dashboards": 19,
+              "cli": 1
+            },
+            "independent_families": 3,
+            "taxonomy_nodes": [
+              {
+                "id": "tech-viz-chart-grammar",
+                "support": 52,
+                "family_names": [
+                  "dataviz",
+                  "dashboards",
+                  "cli"
+                ]
+              },
+              {
+                "id": "stk-chart-lib",
+                "support": 22,
+                "family_names": [
+                  "dataviz"
+                ]
+              }
+            ],
+            "refs": [
+              {
+                "family": "dataviz",
+                "uri": "https://vega.github.io/vega-lite/",
+                "sha256": "2064f3499486a4bb",
+                "title": "A High-Level Grammar of Interactive Graphics | Vega-Lite"
+              },
+              {
+                "family": "dataviz",
+                "uri": "https://github.com/observablehq/plot",
+                "sha256": "3c3c373dbb4ae6a0",
+                "title": "GitHub - observablehq/plot: A concise API for exploratory data visualization implementing a layered "
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://grafana.com/",
+                "sha256": "235bf45a81093a96",
+                "title": "Full-stack observability for the agentic era | Grafana Labs | Grafana Labs"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://grafana.com/docs/grafana/latest/",
+                "sha256": "7910c639346c2ffa",
+                "title": "Grafana OSS and Enterprise | Grafana documentation"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://grafana.com/docs/grafana/latest/dashboards/",
+                "sha256": "789c3cf84b24905d",
+                "title": "Dashboards | Grafana documentation"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://grafana.com/docs/grafana/latest/panels-visualizations/",
+                "sha256": "3055b3c8b3269ad0",
+                "title": "Panels and visualizations | Grafana documentation"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://grafana.com/docs/grafana/latest/alerting/",
+                "sha256": "d28ea3629b46d1b6",
+                "title": "Grafana Alerting | Grafana documentation"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://grafana.com/blog/",
+                "sha256": "c305e2a92f3e3b5f",
+                "title": "Grafana Labs blog | Grafana Labs"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://docs.datadoghq.com/",
+                "sha256": "a0a5681d5bc06eff",
+                "title": ""
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://docs.datadoghq.com/dashboards/",
+                "sha256": "10b7d1ed79891712",
+                "title": ""
+              }
+            ]
+          },
+          "confidence": "high",
+          "caveats": [],
+          "needs": [
+            "RQ-C2"
+          ]
+        },
+        {
+          "id": "fw-canvas-stream",
+          "label": "Canvas time-series engine (uPlot / ECharts)",
+          "recommendation": "For many live points (cost/burn/latency at fleet scale), prefer a canvas renderer built for streaming \u2014 uPlot is the small/fast end, ECharts the batteries-included end; both document the canvas-vs-SVG tradeoff.",
+          "when": "Hundreds of concurrent live series or high-frequency updates.",
+          "avoid_when": "A handful of static marks (SVG is simpler and accessible by default).",
+          "evidence": {
+            "support": 39,
+            "support_by_family": {
+              "dashboards": 20,
+              "dataviz": 17,
+              "cli": 2
+            },
+            "independent_families": 3,
+            "taxonomy_nodes": [
+              {
+                "id": "tech-viz-time-series-marks",
+                "support": 39,
+                "family_names": [
+                  "dashboards",
+                  "dataviz",
+                  "cli"
+                ]
+              },
+              {
+                "id": "tech-viz-sampling-decimation",
+                "support": 15,
+                "family_names": [
+                  "cli",
+                  "dataviz",
+                  "craft"
+                ]
+              },
+              {
+                "id": "stk-canvas-webgl",
+                "support": 2,
+                "family_names": [
+                  "dataviz"
+                ]
+              }
+            ],
+            "refs": [
+              {
+                "family": "dataviz",
+                "uri": "https://github.com/leeoniya/uPlot",
+                "sha256": "c3a34c9200af26ab",
+                "title": "GitHub - leeoniya/uPlot: \ud83d\udcc8 A small, fast chart for time series, lines, areas, ohlc & bars \u00b7 GitHub"
+              },
+              {
+                "family": "dataviz",
+                "uri": "https://echarts.apache.org/handbook/en/best-practices/canvas-vs-svg/",
+                "sha256": "f7498c71e2215e1a",
+                "title": "Canvas vs. SVG - Best Practices - Handbook - Apache ECharts"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://grafana.com/",
+                "sha256": "235bf45a81093a96",
+                "title": "Full-stack observability for the agentic era | Grafana Labs | Grafana Labs"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://grafana.com/docs/grafana/latest/",
+                "sha256": "7910c639346c2ffa",
+                "title": "Grafana OSS and Enterprise | Grafana documentation"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://grafana.com/docs/grafana/latest/dashboards/",
+                "sha256": "789c3cf84b24905d",
+                "title": "Dashboards | Grafana documentation"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://grafana.com/docs/grafana/latest/panels-visualizations/",
+                "sha256": "3055b3c8b3269ad0",
+                "title": "Panels and visualizations | Grafana documentation"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://grafana.com/docs/grafana/latest/alerting/",
+                "sha256": "d28ea3629b46d1b6",
+                "title": "Grafana Alerting | Grafana documentation"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://grafana.com/blog/",
+                "sha256": "c305e2a92f3e3b5f",
+                "title": "Grafana Labs blog | Grafana Labs"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://docs.datadoghq.com/",
+                "sha256": "a0a5681d5bc06eff",
+                "title": ""
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://docs.datadoghq.com/dashboards/",
+                "sha256": "10b7d1ed79891712",
+                "title": ""
+              }
+            ]
+          },
+          "confidence": "high",
+          "caveats": [],
+          "needs": [
+            "RQ-C5",
+            "RQ-C1"
+          ]
+        },
+        {
+          "id": "fw-echarts",
+          "label": "ECharts for batteries-included charts + ARIA",
+          "recommendation": "ECharts couples a broad chart catalog with responsive containers and documented ARIA support \u2014 the strongest single-library a11y evidence in the corpus.",
+          "when": "Breadth of chart types plus built-in accessibility and resize behavior.",
+          "avoid_when": "A strict small-payload / no-dependency budget.",
+          "evidence": {
+            "support": 52,
+            "support_by_family": {
+              "dataviz": 32,
+              "dashboards": 19,
+              "cli": 1
+            },
+            "independent_families": 3,
+            "taxonomy_nodes": [
+              {
+                "id": "tech-viz-chart-grammar",
+                "support": 52,
+                "family_names": [
+                  "dataviz",
+                  "dashboards",
+                  "cli"
+                ]
+              }
+            ],
+            "refs": [
+              {
+                "family": "dataviz",
+                "uri": "https://echarts.apache.org/en/index.html",
+                "sha256": "caa87df6c6cfc387",
+                "title": "Apache ECharts"
+              },
+              {
+                "family": "dataviz",
+                "uri": "https://echarts.apache.org/handbook/en/best-practices/aria/",
+                "sha256": "dfb00439e589043e",
+                "title": "Aria - Best Practices - Handbook - Apache ECharts"
+              },
+              {
+                "family": "dataviz",
+                "uri": "https://echarts.apache.org/handbook/en/concepts/chart-size/",
+                "sha256": "66a59665faa2a804",
+                "title": "Chart Container - Concepts - Handbook - Apache ECharts"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://grafana.com/",
+                "sha256": "235bf45a81093a96",
+                "title": "Full-stack observability for the agentic era | Grafana Labs | Grafana Labs"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://grafana.com/docs/grafana/latest/",
+                "sha256": "7910c639346c2ffa",
+                "title": "Grafana OSS and Enterprise | Grafana documentation"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://grafana.com/docs/grafana/latest/dashboards/",
+                "sha256": "789c3cf84b24905d",
+                "title": "Dashboards | Grafana documentation"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://grafana.com/docs/grafana/latest/panels-visualizations/",
+                "sha256": "3055b3c8b3269ad0",
+                "title": "Panels and visualizations | Grafana documentation"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://grafana.com/docs/grafana/latest/alerting/",
+                "sha256": "d28ea3629b46d1b6",
+                "title": "Grafana Alerting | Grafana documentation"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://grafana.com/blog/",
+                "sha256": "c305e2a92f3e3b5f",
+                "title": "Grafana Labs blog | Grafana Labs"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://docs.datadoghq.com/",
+                "sha256": "a0a5681d5bc06eff",
+                "title": ""
+              }
+            ]
+          },
+          "confidence": "high",
+          "caveats": [],
+          "needs": [
+            "RQ-C2",
+            "RQ-H1"
+          ]
+        },
+        {
+          "id": "fw-react-kits",
+          "label": "React copy-paste kits (Tremor, shadcn/ui charts, Nivo)",
+          "recommendation": "These are the fastest path to polished chart/UI primitives, but they assume React + a build step (Tailwind/Recharts). Recommended only if the no-build guardrail is lifted.",
+          "when": "A React build is adopted and copy-paste velocity is the priority.",
+          "avoid_when": "The room stays a no-build Flask companion (r0 \u00a79.8).",
+          "evidence": {
+            "support": 10,
+            "support_by_family": {
+              "dataviz": 10
+            },
+            "independent_families": 1,
+            "taxonomy_nodes": [
+              {
+                "id": "stk-react",
+                "support": 10,
+                "family_names": [
+                  "dataviz"
+                ]
+              }
+            ],
+            "refs": [
+              {
+                "family": "dataviz",
+                "uri": "https://www.tremor.so/",
+                "sha256": "ad8fe3598ecb31d8",
+                "title": "Tremor \u2013 Copy-and-Paste Tailwind CSS UI Components for Charts and Dashboards"
+              },
+              {
+                "family": "dataviz",
+                "uri": "https://ui.shadcn.com/charts",
+                "sha256": "b34430159fcfd06c",
+                "title": "Area Charts"
+              },
+              {
+                "family": "dataviz",
+                "uri": "https://nivo.rocks/bar/",
+                "sha256": "142393ea7aca91f1",
+                "title": "Bar chart | nivo"
+              },
+              {
+                "family": "dataviz",
+                "uri": "https://nivo.rocks/bar/",
+                "sha256": "142393ea7aca91f1",
+                "title": "Bar chart | nivo"
+              },
+              {
+                "family": "dataviz",
+                "uri": "https://nivo.rocks/line/",
+                "sha256": "7fbbcfe5789d6603",
+                "title": "Line chart | nivo"
+              },
+              {
+                "family": "dataviz",
+                "uri": "https://nivo.rocks/heatmap/",
+                "sha256": "7342bb6a11b92572",
+                "title": "Heat Map chart | nivo"
+              },
+              {
+                "family": "dataviz",
+                "uri": "https://www.tremor.so/",
+                "sha256": "ad8fe3598ecb31d8",
+                "title": "Tremor \u2013 Copy-and-Paste Tailwind CSS UI Components for Charts and Dashboards"
+              },
+              {
+                "family": "dataviz",
+                "uri": "https://www.tremor.so/docs/visualizations/area-chart",
+                "sha256": "8f8efdd051827d24",
+                "title": "Area Chart - Tremor"
+              },
+              {
+                "family": "dataviz",
+                "uri": "https://ui.shadcn.com/charts",
+                "sha256": "b34430159fcfd06c",
+                "title": "Area Charts"
+              },
+              {
+                "family": "dataviz",
+                "uri": "https://ui.shadcn.com/docs/components/chart",
+                "sha256": "17c5c86f3c683e8c",
+                "title": "Chart - shadcn/ui"
+              }
+            ]
+          },
+          "confidence": "low",
+          "caveats": [
+            "single-family evidence (dataviz only) \u2014 single-source caveat applies"
+          ],
+          "needs": [
+            "RQ-A1",
+            "RQ-C2"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ia-layout",
+      "label": "IA / layout catalog",
+      "contract": "RQ-B1\u2013B5, RQ-E1\u2013E2 \u2014 navigation, board structure, detail pattern, density, attention and money grouping.",
+      "items": [
+        {
+          "id": "ia-board-per-domain",
+          "label": "Board per domain",
+          "recommendation": "Give each operator domain its own board (fleet/work, money, health, decisions) rather than one mega-screen; this is the dominant ops IA in the corpus.",
+          "when": "Several distinct operator questions (work vs money vs health).",
+          "avoid_when": "Only one domain exists.",
+          "evidence": {
+            "support": 55,
+            "support_by_family": {
+              "dashboards": 53,
+              "agentops": 1,
+              "cli": 1
+            },
+            "independent_families": 3,
+            "taxonomy_nodes": [
+              {
+                "id": "tech-ia-board-per-domain",
+                "support": 55,
+                "family_names": [
+                  "dashboards",
+                  "agentops",
+                  "cli"
+                ]
+              }
+            ],
+            "refs": [
+              {
+                "family": "dashboards",
+                "uri": "https://grafana.com/docs/grafana/latest/dashboards/",
+                "sha256": "789c3cf84b24905d",
+                "title": "Dashboards | Grafana documentation"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://docs.datadoghq.com/dashboards/",
+                "sha256": "10b7d1ed79891712",
+                "title": ""
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://docs.sentry.io/product/dashboards/",
+                "sha256": "78abfbfa297e2a6d",
+                "title": "Dashboards"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://docs.railway.com/",
+                "sha256": "fb3d9950d9d1705b",
+                "title": "Railway Docs"
+              },
+              {
+                "family": "agentops",
+                "uri": "https://langfuse.com/docs/analytics/overview",
+                "sha256": "245019da24ca609e",
+                "title": "LLM Metrics & Analytics - Langfuse"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://linear.app/",
+                "sha256": "eb0e0bc396ddd962",
+                "title": "Linear \u2013 The system for product development"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://linear.app/blog",
+                "sha256": "8567e6066c918c20",
+                "title": "Now \u2013 Updates from the Linear team"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://vercel.com/",
+                "sha256": "c26a33d2b08d2b60",
+                "title": "Agentic Infrastructure - Vercel"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://vercel.com/blog",
+                "sha256": "2570f04ad163d7e4",
+                "title": "Blog - Vercel"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://grafana.com/",
+                "sha256": "235bf45a81093a96",
+                "title": "Full-stack observability for the agentic era | Grafana Labs | Grafana Labs"
+              }
+            ]
+          },
+          "confidence": "high",
+          "caveats": [],
+          "needs": [
+            "RQ-B1",
+            "RQ-B4"
+          ]
+        },
+        {
+          "id": "ia-widget-catalog",
+          "label": "Widget / panel catalog",
+          "recommendation": "Offer a small, named set of reusable panels (status tile, sparkline, table, log pane) instead of bespoke per-card markup; the widget-catalog pattern recurs across F2/F3/F4.",
+          "when": "The same panel type repeats across boards.",
+          "avoid_when": "Every panel is genuinely one-off.",
+          "evidence": {
+            "support": 63,
+            "support_by_family": {
+              "dashboards": 41,
+              "cli": 15,
+              "dataviz": 7
+            },
+            "independent_families": 3,
+            "taxonomy_nodes": [
+              {
+                "id": "tech-ia-widget-catalog",
+                "support": 63,
+                "family_names": [
+                  "dashboards",
+                  "cli",
+                  "dataviz"
+                ]
+              }
+            ],
+            "refs": [
+              {
+                "family": "dashboards",
+                "uri": "https://grafana.com/docs/grafana/latest/panels-visualizations/",
+                "sha256": "3055b3c8b3269ad0",
+                "title": "Panels and visualizations | Grafana documentation"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://docs.datadoghq.com/dashboards/widgets/",
+                "sha256": "84ad61b44dfaa619",
+                "title": ""
+              },
+              {
+                "family": "cli",
+                "uri": "https://textual.textualize.io/widgets/",
+                "sha256": "4f3eb637c2b0846a",
+                "title": "Widgets - Textual"
+              },
+              {
+                "family": "cli",
+                "uri": "https://charm.sh/",
+                "sha256": "ffe73f92662e0eaf",
+                "title": "Charm"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://vercel.com/",
+                "sha256": "c26a33d2b08d2b60",
+                "title": "Agentic Infrastructure - Vercel"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://vercel.com/blog",
+                "sha256": "2570f04ad163d7e4",
+                "title": "Blog - Vercel"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://grafana.com/",
+                "sha256": "235bf45a81093a96",
+                "title": "Full-stack observability for the agentic era | Grafana Labs | Grafana Labs"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://grafana.com/docs/grafana/latest/",
+                "sha256": "7910c639346c2ffa",
+                "title": "Grafana OSS and Enterprise | Grafana documentation"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://grafana.com/docs/grafana/latest/dashboards/",
+                "sha256": "789c3cf84b24905d",
+                "title": "Dashboards | Grafana documentation"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://grafana.com/docs/grafana/latest/panels-visualizations/",
+                "sha256": "3055b3c8b3269ad0",
+                "title": "Panels and visualizations | Grafana documentation"
+              }
+            ]
+          },
+          "confidence": "high",
+          "caveats": [],
+          "needs": [
+            "RQ-E3",
+            "RQ-B1"
+          ]
+        },
+        {
+          "id": "ia-command-palette",
+          "label": "Command palette + keyboard-first navigation",
+          "recommendation": "Ship a command palette and global shortcuts as an accelerator over the visual IA \u2014 the ops/terminal sources pair palettes with keyboard access, not instead of boards.",
+          "when": "Power operators repeat the same jumps and actions.",
+          "avoid_when": "It is the only navigation (discoverability suffers).",
+          "evidence": {
+            "support": 14,
+            "support_by_family": {
+              "dashboards": 11,
+              "cli": 3
+            },
+            "independent_families": 2,
+            "taxonomy_nodes": [
+              {
+                "id": "tech-ia-command-palette",
+                "support": 14,
+                "family_names": [
+                  "dashboards",
+                  "cli"
+                ]
+              },
+              {
+                "id": "tech-int-keyboard-first",
+                "support": 30,
+                "family_names": [
+                  "cli",
+                  "dashboards",
+                  "craft"
+                ]
+              }
+            ],
+            "refs": [
+              {
+                "family": "dashboards",
+                "uri": "https://linear.app/",
+                "sha256": "eb0e0bc396ddd962",
+                "title": "Linear \u2013 The system for product development"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://docs.railway.com/",
+                "sha256": "fb3d9950d9d1705b",
+                "title": "Railway Docs"
+              },
+              {
+                "family": "cli",
+                "uri": "https://www.warp.dev/",
+                "sha256": "b5c3555b32cf6350",
+                "title": "Warp \u2014 The Open Platform for Automating Development"
+              },
+              {
+                "family": "cli",
+                "uri": "https://github.com/junegunn/fzf",
+                "sha256": "69fcc77a700dd447",
+                "title": "GitHub - junegunn/fzf: :cherry_blossom: A command-line fuzzy finder \u00b7 GitHub"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://linear.app/",
+                "sha256": "eb0e0bc396ddd962",
+                "title": "Linear \u2013 The system for product development"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://linear.app/blog",
+                "sha256": "8567e6066c918c20",
+                "title": "Now \u2013 Updates from the Linear team"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://linear.app/customers",
+                "sha256": "65f2546f7e24d678",
+                "title": "Linear Customers"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://posthog.com/docs/product-analytics",
+                "sha256": "923433f300af8023",
+                "title": "Product analytics - Docs - PostHog"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://posthog.com/docs/product-analytics/dashboards",
+                "sha256": "6c432f3f48666914",
+                "title": "Dashboards - Docs - PostHog"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://posthog.com/docs/data",
+                "sha256": "618dbd008afea192",
+                "title": "Data management - Docs - PostHog"
+              }
+            ]
+          },
+          "confidence": "medium",
+          "caveats": [],
+          "needs": [
+            "RQ-B2",
+            "RQ-E4"
+          ]
+        },
+        {
+          "id": "ia-master-detail",
+          "label": "Master / detail (docked detail, side peek)",
+          "recommendation": "Select a node in a live grid and inspect it in a docked detail region that survives updates; the corpus' table/preview patterns pair a list with an adjacent detail.",
+          "when": "Drill-down from a dense list without losing the list.",
+          "avoid_when": "Selection is rare (a routed page is simpler).",
+          "evidence": {
+            "support": 15,
+            "support_by_family": {
+              "cli": 11,
+              "craft": 4
+            },
+            "independent_families": 2,
+            "taxonomy_nodes": [
+              {
+                "id": "tech-ia-master-detail",
+                "support": 15,
+                "family_names": [
+                  "cli",
+                  "craft"
+                ]
+              }
+            ],
+            "refs": [
+              {
+                "family": "craft",
+                "uri": "https://inclusive-components.design/",
+                "sha256": "ac8dbab4744ac5bf",
+                "title": "Inclusive Components"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://docs.railway.com/",
+                "sha256": "fb3d9950d9d1705b",
+                "title": "Railway Docs"
+              },
+              {
+                "family": "cli",
+                "uri": "https://github.com/jesseduffield/lazygit",
+                "sha256": "bcba07779b22b8e0",
+                "title": "GitHub - jesseduffield/lazygit: simple terminal UI for git commands \u00b7 GitHub"
+              },
+              {
+                "family": "cli",
+                "uri": "https://www.waveterm.dev/",
+                "sha256": "4460022b6d85a5be",
+                "title": "Wave Terminal \u2014 Upgrade Your Command Line"
+              },
+              {
+                "family": "cli",
+                "uri": "https://github.com/charmbracelet/lipgloss",
+                "sha256": "717a58f6677cd496",
+                "title": "GitHub - charmbracelet/lipgloss: Style definitions for nice terminal layouts \ud83d\udc44 \u00b7 GitHub"
+              },
+              {
+                "family": "cli",
+                "uri": "https://textual.textualize.io/",
+                "sha256": "5fe641dcb2a0ba93",
+                "title": "Textual"
+              },
+              {
+                "family": "cli",
+                "uri": "https://textual.textualize.io/guide/",
+                "sha256": "62c6d49cf53efcd2",
+                "title": "Guide - Textual"
+              },
+              {
+                "family": "cli",
+                "uri": "https://textual.textualize.io/widgets/",
+                "sha256": "4f3eb637c2b0846a",
+                "title": "Widgets - Textual"
+              },
+              {
+                "family": "cli",
+                "uri": "https://ratatui.rs/",
+                "sha256": "b8015256616357f9",
+                "title": "Ratatui | Ratatui"
+              },
+              {
+                "family": "cli",
+                "uri": "https://github.com/ratatui/ratatui",
+                "sha256": "6039c7625aad32c5",
+                "title": "GitHub - ratatui/ratatui: A Rust crate for cooking up terminal user interfaces (TUIs) \ud83d\udc68\u200d\ud83c\udf73\ud83d\udc00"
+              }
+            ]
+          },
+          "confidence": "medium",
+          "caveats": [],
+          "needs": [
+            "RQ-B3",
+            "RQ-E1"
+          ]
+        },
+        {
+          "id": "ia-tab-bar",
+          "label": "Tabs / panes / split views",
+          "recommendation": "Use tabs or split panes to keep several live surfaces co-resident; terminal multiplexers and the ARIA tabs pattern show the interaction contract (roving focus, labelled panels).",
+          "when": "Operators juggle several surfaces at once.",
+          "avoid_when": "A single surface is enough.",
+          "evidence": {
+            "support": 15,
+            "support_by_family": {
+              "cli": 14,
+              "craft": 1
+            },
+            "independent_families": 2,
+            "taxonomy_nodes": [
+              {
+                "id": "tech-ia-tab-bar",
+                "support": 15,
+                "family_names": [
+                  "cli",
+                  "craft"
+                ]
+              }
+            ],
+            "refs": [
+              {
+                "family": "cli",
+                "uri": "https://sw.kovidgoyal.net/kitty/",
+                "sha256": "a3d50cc44562b66c",
+                "title": "kitty"
+              },
+              {
+                "family": "cli",
+                "uri": "https://ghostty.org/",
+                "sha256": "c2dd13ab48151194",
+                "title": "Ghostty"
+              },
+              {
+                "family": "cli",
+                "uri": "https://wezterm.org/",
+                "sha256": "631fc0d9b6a1eb6b",
+                "title": "WezTerm - Wez's Terminal Emulator"
+              },
+              {
+                "family": "craft",
+                "uri": "https://www.w3.org/WAI/ARIA/apg/patterns/",
+                "sha256": "67aa84429d27fba3",
+                "title": "Patterns | APG | WAI | W3CPatterns"
+              },
+              {
+                "family": "cli",
+                "uri": "https://www.warp.dev/",
+                "sha256": "b5c3555b32cf6350",
+                "title": "Warp \u2014 The Open Platform for Automating Development"
+              },
+              {
+                "family": "cli",
+                "uri": "https://www.warp.dev/blog",
+                "sha256": "9b7288189adb64df",
+                "title": "Warp Blog: AI Agents, Terminal Engineering & Dev Tips | Warp"
+              },
+              {
+                "family": "cli",
+                "uri": "https://www.waveterm.dev/",
+                "sha256": "4460022b6d85a5be",
+                "title": "Wave Terminal \u2014 Upgrade Your Command Line"
+              },
+              {
+                "family": "cli",
+                "uri": "https://ghostty.org/",
+                "sha256": "c2dd13ab48151194",
+                "title": "Ghostty"
+              },
+              {
+                "family": "cli",
+                "uri": "https://ghostty.org/docs",
+                "sha256": "4813bfcf2917963d",
+                "title": "Ghostty Docs"
+              },
+              {
+                "family": "cli",
+                "uri": "https://github.com/charmbracelet/lipgloss",
+                "sha256": "717a58f6677cd496",
+                "title": "GitHub - charmbracelet/lipgloss: Style definitions for nice terminal layouts \ud83d\udc44 \u00b7 GitHub"
+              }
+            ]
+          },
+          "confidence": "medium",
+          "caveats": [],
+          "needs": [
+            "RQ-B2",
+            "RQ-H1"
+          ]
+        },
+        {
+          "id": "ia-progressive-disclosure",
+          "label": "Progressive disclosure",
+          "recommendation": "Show the common case and defer the rest to a secondary surface (drawer/peek); NN/g's canonical two-level reveal and Every Layout's composable primitives both support this.",
+          "when": "Surfaces have a frequent core and a long tail.",
+          "avoid_when": "Hiding a decision-critical signal (r0 M5 risk).",
+          "evidence": {
+            "support": 4,
+            "support_by_family": {
+              "craft": 4
+            },
+            "independent_families": 1,
+            "taxonomy_nodes": [
+              {
+                "id": "tech-ia-progressive-disclosure",
+                "support": 4,
+                "family_names": [
+                  "craft"
+                ]
+              }
+            ],
+            "refs": [
+              {
+                "family": "craft",
+                "uri": "https://www.nngroup.com/articles/progressive-disclosure/",
+                "sha256": "704fe924fed0ccae",
+                "title": "Progressive Disclosure - NN/G"
+              },
+              {
+                "family": "craft",
+                "uri": "https://every-layout.dev/",
+                "sha256": "4b5a5ab9eabd35d8",
+                "title": "Relearn CSS layout: Every Layout"
+              },
+              {
+                "family": "craft",
+                "uri": "https://web.dev/learn/design/",
+                "sha256": "64d16f4d7158c427",
+                "title": "Learn Responsive Design \u00a0|\u00a0 web.dev"
+              },
+              {
+                "family": "craft",
+                "uri": "https://www.nngroup.com/articles/progressive-disclosure/",
+                "sha256": "704fe924fed0ccae",
+                "title": "Progressive Disclosure - NN/G"
+              },
+              {
+                "family": "craft",
+                "uri": "https://www.nngroup.com/articles/skeleton-screens/",
+                "sha256": "ae670dfbb428a6ce",
+                "title": "Skeleton Screens 101 - NN/G"
+              },
+              {
+                "family": "craft",
+                "uri": "https://every-layout.dev/",
+                "sha256": "4b5a5ab9eabd35d8",
+                "title": "Relearn CSS layout: Every Layout"
+              }
+            ]
+          },
+          "confidence": "low",
+          "caveats": [
+            "single-family evidence (craft only) \u2014 single-source caveat applies",
+            "thin support (4 sources)"
+          ],
+          "needs": [
+            "RQ-B3",
+            "RQ-B5"
+          ]
+        },
+        {
+          "id": "ia-density-ladder",
+          "label": "Density ladder / responsive sizing",
+          "recommendation": "Provide a persisted density mode (comfortable/compact) and intrinsic layout; the responsive-design and data-dense typography sources support both.",
+          "when": "Dense telemetry must stay usable across laptop and phone.",
+          "avoid_when": "Density switch resets selection/focus.",
+          "evidence": {
+            "support": 14,
+            "support_by_family": {
+              "dashboards": 7,
+              "dataviz": 3,
+              "craft": 3,
+              "cli": 1
+            },
+            "independent_families": 4,
+            "taxonomy_nodes": [
+              {
+                "id": "tech-ia-density-ladder",
+                "support": 14,
+                "family_names": [
+                  "dashboards",
+                  "dataviz",
+                  "craft",
+                  "cli"
+                ]
+              }
+            ],
+            "refs": [
+              {
+                "family": "craft",
+                "uri": "https://web.dev/learn/design/",
+                "sha256": "64d16f4d7158c427",
+                "title": "Learn Responsive Design \u00a0|\u00a0 web.dev"
+              },
+              {
+                "family": "craft",
+                "uri": "https://every-layout.dev/",
+                "sha256": "4b5a5ab9eabd35d8",
+                "title": "Relearn CSS layout: Every Layout"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://fly.io/docs/",
+                "sha256": "302af27b202b0d9a",
+                "title": "Fly.io developer documentation \u00b7 Fly Docs"
+              },
+              {
+                "family": "craft",
+                "uri": "https://www.smashingmagazine.com/2023/10/choose-typefaces-fintech-products-guide-part1/",
+                "sha256": "88846b6feced9773",
+                "title": "How To Choose Typefaces For Fintech Products: Our Best Practices Guide (Part 1) \u2014 Smashing Magazine"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://linear.app/",
+                "sha256": "eb0e0bc396ddd962",
+                "title": "Linear \u2013 The system for product development"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://linear.app/blog",
+                "sha256": "8567e6066c918c20",
+                "title": "Now \u2013 Updates from the Linear team"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://vercel.com/docs",
+                "sha256": "d78b5b8133aa14cc",
+                "title": ""
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://vercel.com/geist/colors",
+                "sha256": "74aeb67b13ba6192",
+                "title": ""
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://vercel.com/geist/typography",
+                "sha256": "7d664f2129353ada",
+                "title": ""
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://fly.io/",
+                "sha256": "c3b38e7d13ce962d",
+                "title": "Fly \u00b7 Computers for agents"
+              }
+            ]
+          },
+          "confidence": "high",
+          "caveats": [],
+          "needs": [
+            "RQ-E2",
+            "RQ-H3"
+          ]
+        },
+        {
+          "id": "ia-attention-surface",
+          "label": "Attention / alert surface",
+          "recommendation": "Give alerts and health a first-class board (severity, owner, ack), not just a count; Grafana/Datadog/Sentry all separate the attention surface from the dashboard.",
+          "when": "Operators must not miss failures or staleness.",
+          "avoid_when": "Alerting becomes a firehose (r0 ON-A2).",
+          "evidence": {
+            "support": 28,
+            "support_by_family": {
+              "dashboards": 23,
+              "agentops": 5
+            },
+            "independent_families": 2,
+            "taxonomy_nodes": [
+              {
+                "id": "tech-trust-alerting",
+                "support": 28,
+                "family_names": [
+                  "dashboards",
+                  "agentops"
+                ]
+              },
+              {
+                "id": "tech-trust-degraded-banner",
+                "support": 11,
+                "family_names": [
+                  "dashboards"
+                ]
+              }
+            ],
+            "refs": [
+              {
+                "family": "dashboards",
+                "uri": "https://grafana.com/docs/grafana/latest/alerting/",
+                "sha256": "d28ea3629b46d1b6",
+                "title": "Grafana Alerting | Grafana documentation"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://docs.datadoghq.com/monitors/",
+                "sha256": "587c48efb20ab9a2",
+                "title": ""
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://docs.sentry.io/product/alerts/",
+                "sha256": "748e01c9871ac335",
+                "title": "Alerts"
+              },
+              {
+                "family": "agentops",
+                "uri": "https://www.langchain.com/langsmith",
+                "sha256": "75ab02f301180387",
+                "title": "LangSmith: Agent & LLM Observability Platform"
+              },
+              {
+                "family": "agentops",
+                "uri": "https://phoenix.arize.com/",
+                "sha256": "4e01378b1cb0df79",
+                "title": "Phoenix - Arize AI"
+              },
+              {
+                "family": "agentops",
+                "uri": "https://www.galileo.ai/",
+                "sha256": "977103c74484cab7",
+                "title": "Galileo AI: The AI Observability and Evaluation Platform"
+              },
+              {
+                "family": "agentops",
+                "uri": "https://www.honeyhive.ai/",
+                "sha256": "6e207fda2bee28b2",
+                "title": "HoneyHive - Agent Observability & Evaluation Platform"
+              },
+              {
+                "family": "agentops",
+                "uri": "https://latitude.so/",
+                "sha256": "110a1cc8d05624f7",
+                "title": "AI Agent Observability & Monitoring - Latitude"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://grafana.com/",
+                "sha256": "235bf45a81093a96",
+                "title": "Full-stack observability for the agentic era | Grafana Labs | Grafana Labs"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://grafana.com/docs/grafana/latest/",
+                "sha256": "7910c639346c2ffa",
+                "title": "Grafana OSS and Enterprise | Grafana documentation"
+              }
+            ]
+          },
+          "confidence": "medium",
+          "caveats": [],
+          "needs": [
+            "ON-G3",
+            "ON-A1",
+            "ON-A2"
+          ]
+        },
+        {
+          "id": "ia-money-grouping",
+          "label": "Group money surfaces together",
+          "recommendation": "Keep spend, burn, quota/wallet and budget thresholds on the money board; the agent-ops cost/analytics sources and Stripe's payments IA both treat money as its own domain (r0 M1: quota buried in System).",
+          "when": "Spend/quota decisions are part of the operator loop.",
+          "avoid_when": "Money data is untrusted/unmeasured.",
+          "evidence": {
+            "support": 17,
+            "support_by_family": {
+              "agentops": 13,
+              "dashboards": 4
+            },
+            "independent_families": 2,
+            "taxonomy_nodes": [
+              {
+                "id": "tech-money-cost-attribution",
+                "support": 17,
+                "family_names": [
+                  "agentops",
+                  "dashboards"
+                ]
+              },
+              {
+                "id": "tech-money-quota-wallet",
+                "support": 7,
+                "family_names": [
+                  "dashboards",
+                  "agentops"
+                ]
+              },
+              {
+                "id": "tech-money-budget-thresholds",
+                "support": 19,
+                "family_names": [
+                  "dashboards"
+                ]
+              }
+            ],
+            "refs": [
+              {
+                "family": "dashboards",
+                "uri": "https://stripe.com/docs",
+                "sha256": "255311919f90098f",
+                "title": "Documentation Stripe"
+              },
+              {
+                "family": "agentops",
+                "uri": "https://langfuse.com/docs/analytics/overview",
+                "sha256": "245019da24ca609e",
+                "title": "LLM Metrics & Analytics - Langfuse"
+              },
+              {
+                "family": "agentops",
+                "uri": "https://docs.helicone.ai/",
+                "sha256": "20ead7ec1d1155ef",
+                "title": "Quickstart - Helicone OSS LLM Observability"
+              },
+              {
+                "family": "agentops",
+                "uri": "https://langfuse.com/docs",
+                "sha256": "34d09509900f2a2b",
+                "title": "Open Source AI Engineering Platform - Langfuse"
+              },
+              {
+                "family": "agentops",
+                "uri": "https://langfuse.com/docs/observability/overview",
+                "sha256": "0a1784a27f750267",
+                "title": "LLM Observability & Application Tracing (Open Source) - Langfuse"
+              },
+              {
+                "family": "agentops",
+                "uri": "https://docs.smith.langchain.com/",
+                "sha256": "216cc0ec88b4a616",
+                "title": "LangSmith Observability - Docs by LangChain"
+              },
+              {
+                "family": "agentops",
+                "uri": "https://langfuse.com/docs/analytics/overview",
+                "sha256": "245019da24ca609e",
+                "title": "LLM Metrics & Analytics - Langfuse"
+              },
+              {
+                "family": "agentops",
+                "uri": "https://www.braintrust.dev/docs",
+                "sha256": "1694f5c22f1528ee",
+                "title": "Get started with Braintrust - Braintrust"
+              },
+              {
+                "family": "agentops",
+                "uri": "https://docs.helicone.ai/",
+                "sha256": "20ead7ec1d1155ef",
+                "title": "Quickstart - Helicone OSS LLM Observability"
+              },
+              {
+                "family": "agentops",
+                "uri": "https://docs.agentops.ai/",
+                "sha256": "f8ca1f22853b1f87",
+                "title": "Introduction - AgentOps"
+              }
+            ]
+          },
+          "confidence": "medium",
+          "caveats": [],
+          "needs": [
+            "ON-G4",
+            "RQ-B4",
+            "RQ-I1"
+          ]
+        },
+        {
+          "id": "ia-audit-trail",
+          "label": "Audit trail / changelog affordance",
+          "recommendation": "Expose a durable, filterable history (what changed, when, by whom) as an evidence surface, not a marketing changelog.",
+          "when": "A canonical record or decision needs explaining.",
+          "avoid_when": "It becomes a passive feed nothing reads.",
+          "evidence": {
+            "support": 14,
+            "support_by_family": {
+              "dashboards": 7,
+              "cli": 6,
+              "agentops": 1
+            },
+            "independent_families": 3,
+            "taxonomy_nodes": [
+              {
+                "id": "tech-trust-audit-trail",
+                "support": 14,
+                "family_names": [
+                  "dashboards",
+                  "cli",
+                  "agentops"
+                ]
+              }
+            ],
+            "refs": [
+              {
+                "family": "dashboards",
+                "uri": "https://linear.app/changelog",
+                "sha256": "65746e441e648c57",
+                "title": "Changelog \u2013 Linear"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://vercel.com/changelog",
+                "sha256": "c889660f133515b2",
+                "title": "Changelog - Vercel"
+              },
+              {
+                "family": "agentops",
+                "uri": "https://docs.confident-ai.com/",
+                "sha256": "8159075eb65dcf26",
+                "title": "DeepEval - The LLM Evaluation Framework"
+              },
+              {
+                "family": "agentops",
+                "uri": "https://docs.smith.langchain.com/administration",
+                "sha256": "d22d5b8b1b9160a0",
+                "title": "Overview - Docs by LangChain"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://linear.app/",
+                "sha256": "eb0e0bc396ddd962",
+                "title": "Linear \u2013 The system for product development"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://linear.app/blog",
+                "sha256": "8567e6066c918c20",
+                "title": "Now \u2013 Updates from the Linear team"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://linear.app/customers",
+                "sha256": "65f2546f7e24d678",
+                "title": "Linear Customers"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://vercel.com/",
+                "sha256": "c26a33d2b08d2b60",
+                "title": "Agentic Infrastructure - Vercel"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://vercel.com/blog",
+                "sha256": "2570f04ad163d7e4",
+                "title": "Blog - Vercel"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://linear.app/changelog",
+                "sha256": "65746e441e648c57",
+                "title": "Changelog \u2013 Linear"
+              }
+            ]
+          },
+          "confidence": "high",
+          "caveats": [],
+          "needs": [
+            "ON-D4",
+            "RQ-F2"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "chart-selection",
+      "label": "Chart-selection catalog",
+      "contract": "RQ-C1\u2013C5 \u2014 which mark for which operator question, and the performance budget.",
+      "items": [
+        {
+          "id": "ch-time-series",
+          "label": "Line / area / sparkline for cost, burn, latency over time",
+          "recommendation": "Use line/area marks for trends over time and sparklines inline in rows; this is the single most-evidenced mark family in the corpus.",
+          "when": "A quantity changes over time (spend, tokens, latency, queue depth).",
+          "avoid_when": "Comparing unordered categories.",
+          "evidence": {
+            "support": 39,
+            "support_by_family": {
+              "dashboards": 20,
+              "dataviz": 17,
+              "cli": 2
+            },
+            "independent_families": 3,
+            "taxonomy_nodes": [
+              {
+                "id": "tech-viz-time-series-marks",
+                "support": 39,
+                "family_names": [
+                  "dashboards",
+                  "dataviz",
+                  "cli"
+                ]
+              }
+            ],
+            "refs": [
+              {
+                "family": "dataviz",
+                "uri": "https://github.com/leeoniya/uPlot",
+                "sha256": "c3a34c9200af26ab",
+                "title": "GitHub - leeoniya/uPlot: \ud83d\udcc8 A small, fast chart for time series, lines, areas, ohlc & bars \u00b7 GitHub"
+              },
+              {
+                "family": "dataviz",
+                "uri": "https://echarts.apache.org/examples/en/index.html",
+                "sha256": "aee393ed66ab001c",
+                "title": "Examples - Apache ECharts"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://docs.datadoghq.com/dashboards/",
+                "sha256": "10b7d1ed79891712",
+                "title": ""
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://grafana.com/docs/grafana/latest/dashboards/",
+                "sha256": "789c3cf84b24905d",
+                "title": "Dashboards | Grafana documentation"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://grafana.com/",
+                "sha256": "235bf45a81093a96",
+                "title": "Full-stack observability for the agentic era | Grafana Labs | Grafana Labs"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://grafana.com/docs/grafana/latest/",
+                "sha256": "7910c639346c2ffa",
+                "title": "Grafana OSS and Enterprise | Grafana documentation"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://grafana.com/docs/grafana/latest/dashboards/",
+                "sha256": "789c3cf84b24905d",
+                "title": "Dashboards | Grafana documentation"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://grafana.com/docs/grafana/latest/panels-visualizations/",
+                "sha256": "3055b3c8b3269ad0",
+                "title": "Panels and visualizations | Grafana documentation"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://grafana.com/docs/grafana/latest/alerting/",
+                "sha256": "d28ea3629b46d1b6",
+                "title": "Grafana Alerting | Grafana documentation"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://grafana.com/blog/",
+                "sha256": "c305e2a92f3e3b5f",
+                "title": "Grafana Labs blog | Grafana Labs"
+              }
+            ]
+          },
+          "confidence": "high",
+          "caveats": [],
+          "needs": [
+            "ON-G4",
+            "ON-D6",
+            "RQ-C1"
+          ]
+        },
+        {
+          "id": "ch-status-grid",
+          "label": "Status grid / heatmap for fleet state",
+          "recommendation": "Encode many nodes' state as a status grid so color/position read pre-attentively; NN/g's dashboard guidance and Grafana's panel model both support grid-over-list at fleet scale.",
+          "when": "One glance must answer 'is anything wrong across N nodes'.",
+          "avoid_when": "Color is the only signal (add shape/label).",
+          "evidence": {
+            "support": 30,
+            "support_by_family": {
+              "dashboards": 17,
+              "dataviz": 10,
+              "cli": 2,
+              "craft": 1
+            },
+            "independent_families": 4,
+            "taxonomy_nodes": [
+              {
+                "id": "tech-viz-heatmap-status-grid",
+                "support": 30,
+                "family_names": [
+                  "dashboards",
+                  "dataviz",
+                  "cli",
+                  "craft"
+                ]
+              }
+            ],
+            "refs": [
+              {
+                "family": "craft",
+                "uri": "https://www.nngroup.com/articles/dashboards-preattentive/",
+                "sha256": "b665ad15d558dbd6",
+                "title": "Dashboards: Making Charts and Graphs Easier to Understand - NN/G"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://grafana.com/docs/grafana/latest/panels-visualizations/",
+                "sha256": "3055b3c8b3269ad0",
+                "title": "Panels and visualizations | Grafana documentation"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://docs.datadoghq.com/dashboards/",
+                "sha256": "10b7d1ed79891712",
+                "title": ""
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://grafana.com/docs/grafana/latest/",
+                "sha256": "7910c639346c2ffa",
+                "title": "Grafana OSS and Enterprise | Grafana documentation"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://grafana.com/docs/grafana/latest/dashboards/",
+                "sha256": "789c3cf84b24905d",
+                "title": "Dashboards | Grafana documentation"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://grafana.com/docs/grafana/latest/panels-visualizations/",
+                "sha256": "3055b3c8b3269ad0",
+                "title": "Panels and visualizations | Grafana documentation"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://grafana.com/docs/grafana/latest/alerting/",
+                "sha256": "d28ea3629b46d1b6",
+                "title": "Grafana Alerting | Grafana documentation"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://sentry.io/",
+                "sha256": "e66bb96ce835f7a4",
+                "title": "Application Performance Monitoring & Error Tracking Software | Sentry"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://blog.sentry.io/",
+                "sha256": "900dd2c988b418af",
+                "title": "Application Monitoring, Dev Tips & Engineering | Sentry Blog"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://posthog.com/docs/product-analytics",
+                "sha256": "923433f300af8023",
+                "title": "Product analytics - Docs - PostHog"
+              }
+            ]
+          },
+          "confidence": "high",
+          "caveats": [],
+          "needs": [
+            "ON-G3",
+            "ON-G7",
+            "RQ-C3"
+          ]
+        },
+        {
+          "id": "ch-gauge",
+          "label": "Gauge / progress meter for bounded quantities",
+          "recommendation": "Use a gauge/progress mark for a bounded quantity (queue depth vs cap, phase progress); process monitors (nvitop, btop) demonstrate the compact bounded-state mark.",
+          "when": "A value has a known maximum or a completion ratio.",
+          "avoid_when": "The value is unbounded (a number or sparkline is better).",
+          "evidence": {
+            "support": 25,
+            "support_by_family": {
+              "dataviz": 10,
+              "dashboards": 8,
+              "cli": 6,
+              "craft": 1
+            },
+            "independent_families": 4,
+            "taxonomy_nodes": [
+              {
+                "id": "tech-viz-gauge",
+                "support": 25,
+                "family_names": [
+                  "dataviz",
+                  "dashboards",
+                  "cli",
+                  "craft"
+                ]
+              }
+            ],
+            "refs": [
+              {
+                "family": "cli",
+                "uri": "https://github.com/XuehaiPan/nvitop",
+                "sha256": "f0d68d37b1d8bc32",
+                "title": "GitHub - XuehaiPan/nvitop: An interactive NVIDIA-GPU process viewer and beyond, the one-stop solutio"
+              },
+              {
+                "family": "cli",
+                "uri": "https://github.com/aristocratos/btop",
+                "sha256": "f6d5e898349bb60c",
+                "title": "GitHub - aristocratos/btop: A monitor of resources \u00b7 GitHub"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://docs.datadoghq.com/dashboards/",
+                "sha256": "10b7d1ed79891712",
+                "title": ""
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://grafana.com/docs/grafana/latest/",
+                "sha256": "7910c639346c2ffa",
+                "title": "Grafana OSS and Enterprise | Grafana documentation"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://grafana.com/docs/grafana/latest/dashboards/",
+                "sha256": "789c3cf84b24905d",
+                "title": "Dashboards | Grafana documentation"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://grafana.com/docs/grafana/latest/panels-visualizations/",
+                "sha256": "3055b3c8b3269ad0",
+                "title": "Panels and visualizations | Grafana documentation"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://grafana.com/docs/grafana/latest/alerting/",
+                "sha256": "d28ea3629b46d1b6",
+                "title": "Grafana Alerting | Grafana documentation"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://posthog.com/docs/product-analytics",
+                "sha256": "923433f300af8023",
+                "title": "Product analytics - Docs - PostHog"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://posthog.com/docs/product-analytics/dashboards",
+                "sha256": "6c432f3f48666914",
+                "title": "Dashboards - Docs - PostHog"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://posthog.com/docs/data",
+                "sha256": "618dbd008afea192",
+                "title": "Data management - Docs - PostHog"
+              }
+            ]
+          },
+          "confidence": "high",
+          "caveats": [],
+          "needs": [
+            "ON-G2",
+            "RQ-C3"
+          ]
+        },
+        {
+          "id": "ch-table",
+          "label": "Virtualized / sortable table for large sets",
+          "recommendation": "Use a large sortable table for registry/cells/events; virtualize rows (content-visibility or a virtual list) and keep header/selection stable under live updates.",
+          "when": "Many rows with find/sort/compare/act tasks.",
+          "avoid_when": "A handful of rows (a list or cards is clearer).",
+          "evidence": {
+            "support": 32,
+            "support_by_family": {
+              "dashboards": 25,
+              "cli": 3,
+              "craft": 3,
+              "dataviz": 1
+            },
+            "independent_families": 4,
+            "taxonomy_nodes": [
+              {
+                "id": "tech-viz-virtualized-table",
+                "support": 32,
+                "family_names": [
+                  "dashboards",
+                  "cli",
+                  "craft",
+                  "dataviz"
+                ]
+              }
+            ],
+            "refs": [
+              {
+                "family": "craft",
+                "uri": "https://www.nngroup.com/articles/data-tables/",
+                "sha256": "7bb44646100f45ed",
+                "title": "Data Tables: Four Major User Tasks - NN/G"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://grafana.com/docs/grafana/latest/panels-visualizations/",
+                "sha256": "3055b3c8b3269ad0",
+                "title": "Panels and visualizations | Grafana documentation"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://fly.io/docs/reference/",
+                "sha256": "5def970095c4ac9c",
+                "title": "Fly.io reference \u00b7 Fly Docs"
+              },
+              {
+                "family": "craft",
+                "uri": "https://www.w3.org/WAI/tutorials/tables/",
+                "sha256": "627865eeda93dba0",
+                "title": "Tables Tutorial | Web Accessibility Initiative (WAI) | W3C"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://vercel.com/",
+                "sha256": "c26a33d2b08d2b60",
+                "title": "Agentic Infrastructure - Vercel"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://vercel.com/blog",
+                "sha256": "2570f04ad163d7e4",
+                "title": "Blog - Vercel"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://grafana.com/docs/grafana/latest/",
+                "sha256": "7910c639346c2ffa",
+                "title": "Grafana OSS and Enterprise | Grafana documentation"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://grafana.com/docs/grafana/latest/dashboards/",
+                "sha256": "789c3cf84b24905d",
+                "title": "Dashboards | Grafana documentation"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://grafana.com/docs/grafana/latest/panels-visualizations/",
+                "sha256": "3055b3c8b3269ad0",
+                "title": "Panels and visualizations | Grafana documentation"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://grafana.com/docs/grafana/latest/alerting/",
+                "sha256": "d28ea3629b46d1b6",
+                "title": "Grafana Alerting | Grafana documentation"
+              }
+            ]
+          },
+          "confidence": "high",
+          "caveats": [],
+          "needs": [
+            "ON-D4",
+            "RQ-E1"
+          ]
+        },
+        {
+          "id": "ch-log-stream",
+          "label": "Live log / event stream with follow + filter",
+          "recommendation": "Render the transcript/log as a bounded live stream with follow, pause and filter; the ops docs treat logs as their own surface, distinct from dashboards.",
+          "when": "Unbounded, append-only output must be watched live.",
+          "avoid_when": "Rebuilding the whole list per event (r0 app.js:1522).",
+          "evidence": {
+            "support": 36,
+            "support_by_family": {
+              "dashboards": 25,
+              "cli": 7,
+              "agentops": 2,
+              "dataviz": 2
+            },
+            "independent_families": 4,
+            "taxonomy_nodes": [
+              {
+                "id": "tech-viz-log-stream",
+                "support": 36,
+                "family_names": [
+                  "dashboards",
+                  "cli",
+                  "agentops",
+                  "dataviz"
+                ]
+              }
+            ],
+            "refs": [
+              {
+                "family": "dashboards",
+                "uri": "https://docs.railway.com/",
+                "sha256": "fb3d9950d9d1705b",
+                "title": "Railway Docs"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://docs.datadoghq.com/",
+                "sha256": "a0a5681d5bc06eff",
+                "title": ""
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://supabase.com/docs/guides/observability",
+                "sha256": "baac7b6fa15f204b",
+                "title": "Observability | Supabase Docs"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://modal.com/docs/guide",
+                "sha256": "c2916a5f238c4eb6",
+                "title": "Introduction | Modal Docs"
+              },
+              {
+                "family": "agentops",
+                "uri": "https://docs.helicone.ai/",
+                "sha256": "20ead7ec1d1155ef",
+                "title": "Quickstart - Helicone OSS LLM Observability"
+              },
+              {
+                "family": "agentops",
+                "uri": "https://docs.helicone.ai/features/sessions",
+                "sha256": "7234cf15f2d9295b",
+                "title": "Sessions - Helicone OSS LLM Observability"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://docs.datadoghq.com/",
+                "sha256": "a0a5681d5bc06eff",
+                "title": ""
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://docs.datadoghq.com/dashboards/",
+                "sha256": "10b7d1ed79891712",
+                "title": ""
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://docs.datadoghq.com/dashboards/widgets/",
+                "sha256": "84ad61b44dfaa619",
+                "title": ""
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://docs.datadoghq.com/monitors/",
+                "sha256": "587c48efb20ab9a2",
+                "title": ""
+              }
+            ]
+          },
+          "confidence": "high",
+          "caveats": [],
+          "needs": [
+            "ON-D1",
+            "RQ-G2"
+          ]
+        },
+        {
+          "id": "ch-timeline",
+          "label": "Timeline / waterfall for runs and phases",
+          "recommendation": "Use a timeline/waterfall to show a run's phases and spans over time; every major agent-ops source ships a trace waterfall for exactly this question.",
+          "when": "A multi-step run's latency and order must be inspected.",
+          "avoid_when": "Only totals matter (a number suffices).",
+          "evidence": {
+            "support": 14,
+            "support_by_family": {
+              "agentops": 14
+            },
+            "independent_families": 1,
+            "taxonomy_nodes": [
+              {
+                "id": "tech-viz-timeline-gantt",
+                "support": 14,
+                "family_names": [
+                  "agentops"
+                ]
+              }
+            ],
+            "refs": [
+              {
+                "family": "agentops",
+                "uri": "https://docs.arize.com/phoenix",
+                "sha256": "03f451e9e86f8ade",
+                "title": "What is Arize Phoenix? - Phoenix"
+              },
+              {
+                "family": "agentops",
+                "uri": "https://www.langchain.com/langsmith",
+                "sha256": "75ab02f301180387",
+                "title": "LangSmith: Agent & LLM Observability Platform"
+              },
+              {
+                "family": "agentops",
+                "uri": "https://langfuse.com/docs",
+                "sha256": "34d09509900f2a2b",
+                "title": "Open Source AI Engineering Platform - Langfuse"
+              },
+              {
+                "family": "agentops",
+                "uri": "https://langfuse.com/docs/observability/overview",
+                "sha256": "0a1784a27f750267",
+                "title": "LLM Observability & Application Tracing (Open Source) - Langfuse"
+              },
+              {
+                "family": "agentops",
+                "uri": "https://docs.smith.langchain.com/",
+                "sha256": "216cc0ec88b4a616",
+                "title": "LangSmith Observability - Docs by LangChain"
+              },
+              {
+                "family": "agentops",
+                "uri": "https://www.braintrust.dev/docs",
+                "sha256": "1694f5c22f1528ee",
+                "title": "Get started with Braintrust - Braintrust"
+              },
+              {
+                "family": "agentops",
+                "uri": "https://docs.agentops.ai/",
+                "sha256": "f8ca1f22853b1f87",
+                "title": "Introduction - AgentOps"
+              },
+              {
+                "family": "agentops",
+                "uri": "https://docs.agentops.ai/v1/concepts/events",
+                "sha256": "4ed18cb4c4c10bf4",
+                "title": "Spans - AgentOps"
+              },
+              {
+                "family": "agentops",
+                "uri": "https://docs.arize.com/phoenix",
+                "sha256": "03f451e9e86f8ade",
+                "title": "What is Arize Phoenix? - Phoenix"
+              },
+              {
+                "family": "agentops",
+                "uri": "https://docs.arize.com/phoenix/tracing/llm-traces",
+                "sha256": "f7250de7631c6f73",
+                "title": "Overview: Tracing - Phoenix"
+              }
+            ]
+          },
+          "confidence": "low",
+          "caveats": [
+            "single-family evidence (agentops only) \u2014 single-source caveat applies"
+          ],
+          "needs": [
+            "ON-D1",
+            "ON-D6",
+            "RQ-C1"
+          ]
+        },
+        {
+          "id": "ch-small-multiples",
+          "label": "Small multiples for comparison",
+          "recommendation": "Tile the same mark across dimensions (model/condition) for comparison; supported but thinner in the corpus \u2014 prefer it over overlaying many series on one axis.",
+          "when": "The same measure must be compared across groups.",
+          "avoid_when": "It becomes a wall of unreadable mini-charts (r0 M6).",
+          "evidence": {
+            "support": 4,
+            "support_by_family": {
+              "dataviz": 3,
+              "craft": 1
+            },
+            "independent_families": 2,
+            "taxonomy_nodes": [
+              {
+                "id": "tech-viz-small-multiples",
+                "support": 4,
+                "family_names": [
+                  "dataviz",
+                  "craft"
+                ]
+              }
+            ],
+            "refs": [
+              {
+                "family": "dataviz",
+                "uri": "https://echarts.apache.org/handbook/en/best-practices/canvas-vs-svg/",
+                "sha256": "f7498c71e2215e1a",
+                "title": "Canvas vs. SVG - Best Practices - Handbook - Apache ECharts"
+              },
+              {
+                "family": "craft",
+                "uri": "https://www.nngroup.com/articles/dashboards-preattentive/",
+                "sha256": "b665ad15d558dbd6",
+                "title": "Dashboards: Making Charts and Graphs Easier to Understand - NN/G"
+              },
+              {
+                "family": "dataviz",
+                "uri": "https://echarts.apache.org/handbook/en/best-practices/canvas-vs-svg/",
+                "sha256": "f7498c71e2215e1a",
+                "title": "Canvas vs. SVG - Best Practices - Handbook - Apache ECharts"
+              },
+              {
+                "family": "dataviz",
+                "uri": "https://github.com/leeoniya/uPlot",
+                "sha256": "c3a34c9200af26ab",
+                "title": "GitHub - leeoniya/uPlot: \ud83d\udcc8 A small, fast chart for time series, lines, areas, ohlc & bars "
+              },
+              {
+                "family": "dataviz",
+                "uri": "https://leeoniya.github.io/uPlot/",
+                "sha256": "0c26530cb0b02576",
+                "title": "uPlot | \ud83d\udcc8 A small, fast chart for time series, lines, areas, ohlc & bars"
+              },
+              {
+                "family": "craft",
+                "uri": "https://www.nngroup.com/articles/dashboards-preattentive/",
+                "sha256": "b665ad15d558dbd6",
+                "title": "Dashboards: Making Charts and Graphs Easier to Understand - NN/G"
+              }
+            ]
+          },
+          "confidence": "low",
+          "caveats": [
+            "thin support (4 sources)"
+          ],
+          "needs": [
+            "ON-G7",
+            "RQ-C3"
+          ]
+        },
+        {
+          "id": "ch-grammar",
+          "label": "Chart grammar / library selection",
+          "recommendation": "Pick one grammar/library per surface and stay consistent; the corpus spans imperative (D3), declarative (Vega-Lite, Plot), canvas (uPlot/ECharts) and React kits \u2014 the choice is the framework catalog's, this item only bounds the mark set.",
+          "when": "Deciding how charts are authored at all.",
+          "avoid_when": "Mixing three grammars on one page.",
+          "evidence": {
+            "support": 52,
+            "support_by_family": {
+              "dataviz": 32,
+              "dashboards": 19,
+              "cli": 1
+            },
+            "independent_families": 3,
+            "taxonomy_nodes": [
+              {
+                "id": "tech-viz-chart-grammar",
+                "support": 52,
+                "family_names": [
+                  "dataviz",
+                  "dashboards",
+                  "cli"
+                ]
+              }
+            ],
+            "refs": [
+              {
+                "family": "dataviz",
+                "uri": "https://vega.github.io/vega-lite/",
+                "sha256": "2064f3499486a4bb",
+                "title": "A High-Level Grammar of Interactive Graphics | Vega-Lite"
+              },
+              {
+                "family": "dataviz",
+                "uri": "https://d3js.org/",
+                "sha256": "a2d77a5b707ffb7d",
+                "title": "D3 by Observable | The JavaScript library for bespoke data visualization"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://grafana.com/",
+                "sha256": "235bf45a81093a96",
+                "title": "Full-stack observability for the agentic era | Grafana Labs | Grafana Labs"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://grafana.com/docs/grafana/latest/",
+                "sha256": "7910c639346c2ffa",
+                "title": "Grafana OSS and Enterprise | Grafana documentation"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://grafana.com/docs/grafana/latest/dashboards/",
+                "sha256": "789c3cf84b24905d",
+                "title": "Dashboards | Grafana documentation"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://grafana.com/docs/grafana/latest/panels-visualizations/",
+                "sha256": "3055b3c8b3269ad0",
+                "title": "Panels and visualizations | Grafana documentation"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://grafana.com/docs/grafana/latest/alerting/",
+                "sha256": "d28ea3629b46d1b6",
+                "title": "Grafana Alerting | Grafana documentation"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://grafana.com/blog/",
+                "sha256": "c305e2a92f3e3b5f",
+                "title": "Grafana Labs blog | Grafana Labs"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://docs.datadoghq.com/",
+                "sha256": "a0a5681d5bc06eff",
+                "title": ""
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://docs.datadoghq.com/dashboards/",
+                "sha256": "10b7d1ed79891712",
+                "title": ""
+              }
+            ]
+          },
+          "confidence": "high",
+          "caveats": [],
+          "needs": [
+            "RQ-C2"
+          ]
+        },
+        {
+          "id": "ch-perf",
+          "label": "Performance budget: canvas, decimation, lazy render",
+          "recommendation": "Bound live marks: canvas over SVG for high-frequency series, sampling/decimation, and content-visibility for off-screen panels; the corpus' only measured performance evidence (web.dev) supports lazy rendering.",
+          "when": "Hundreds of marks or long lists update on a short cadence.",
+          "avoid_when": "It hides data the operator must see (sampling must be honest).",
+          "evidence": {
+            "support": 15,
+            "support_by_family": {
+              "cli": 8,
+              "dataviz": 5,
+              "craft": 2
+            },
+            "independent_families": 3,
+            "taxonomy_nodes": [
+              {
+                "id": "tech-viz-sampling-decimation",
+                "support": 15,
+                "family_names": [
+                  "cli",
+                  "dataviz",
+                  "craft"
+                ]
+              }
+            ],
+            "refs": [
+              {
+                "family": "craft",
+                "uri": "https://web.dev/articles/content-visibility",
+                "sha256": "7aa4893ce08fa550",
+                "title": "content-visibility: the new CSS property that boosts your rendering performance \u00a0|\u00a0 Articles \u00a0|\u00a0 web"
+              },
+              {
+                "family": "dataviz",
+                "uri": "https://echarts.apache.org/handbook/en/best-practices/canvas-vs-svg/",
+                "sha256": "f7498c71e2215e1a",
+                "title": "Canvas vs. SVG - Best Practices - Handbook - Apache ECharts"
+              },
+              {
+                "family": "dataviz",
+                "uri": "https://github.com/leeoniya/uPlot",
+                "sha256": "c3a34c9200af26ab",
+                "title": "GitHub - leeoniya/uPlot: \ud83d\udcc8 A small, fast chart for time series, lines, areas, ohlc & bars \u00b7 GitHub"
+              },
+              {
+                "family": "dataviz",
+                "uri": "https://echarts.apache.org/en/index.html",
+                "sha256": "caa87df6c6cfc387",
+                "title": "Apache ECharts"
+              },
+              {
+                "family": "dataviz",
+                "uri": "https://echarts.apache.org/handbook/en/get-started/",
+                "sha256": "fc1b54a4c3118289",
+                "title": "Get Started - Handbook - Apache ECharts"
+              },
+              {
+                "family": "dataviz",
+                "uri": "https://echarts.apache.org/handbook/en/best-practices/canvas-vs-svg/",
+                "sha256": "f7498c71e2215e1a",
+                "title": "Canvas vs. SVG - Best Practices - Handbook - Apache ECharts"
+              },
+              {
+                "family": "dataviz",
+                "uri": "https://github.com/leeoniya/uPlot",
+                "sha256": "c3a34c9200af26ab",
+                "title": "GitHub - leeoniya/uPlot: \ud83d\udcc8 A small, fast chart for time series, lines, areas, ohlc & bars "
+              },
+              {
+                "family": "dataviz",
+                "uri": "https://leeoniya.github.io/uPlot/",
+                "sha256": "0c26530cb0b02576",
+                "title": "uPlot | \ud83d\udcc8 A small, fast chart for time series, lines, areas, ohlc & bars"
+              },
+              {
+                "family": "cli",
+                "uri": "https://ghostty.org/",
+                "sha256": "c2dd13ab48151194",
+                "title": "Ghostty"
+              },
+              {
+                "family": "cli",
+                "uri": "https://ghostty.org/docs",
+                "sha256": "4813bfcf2917963d",
+                "title": "Ghostty Docs"
+              }
+            ]
+          },
+          "confidence": "high",
+          "caveats": [],
+          "needs": [
+            "RQ-C5",
+            "ON-G6"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "color-motion",
+      "label": "Color / motion / type catalog",
+      "contract": "RQ-D1\u2013D5, RQ-H1 \u2014 tokens, dark-first theming, status color, accent economy, type, motion budget, forced colors.",
+      "items": [
+        {
+          "id": "cm-tokens",
+          "label": "Smallest viable token layer (CSS custom properties)",
+          "recommendation": "Define one token set (surface/elevation/accent/status/type) with CSS custom properties and derive variants with color-mix(); this is the smallest design-system layer that yields consistency without a framework runtime.",
+          "when": "A single-page console needs visual consistency.",
+          "avoid_when": "Tokens proliferate without a naming convention.",
+          "evidence": {
+            "support": 28,
+            "support_by_family": {
+              "craft": 10,
+              "dashboards": 8,
+              "dataviz": 8,
+              "cli": 2
+            },
+            "independent_families": 4,
+            "taxonomy_nodes": [
+              {
+                "id": "tech-vis-design-tokens",
+                "support": 28,
+                "family_names": [
+                  "craft",
+                  "dashboards",
+                  "dataviz",
+                  "cli"
+                ]
+              }
+            ],
+            "refs": [
+              {
+                "family": "craft",
+                "uri": "https://developer.mozilla.org/en-US/docs/Web/CSS/Using_CSS_custom_properties",
+                "sha256": "a91bb30d7c48d173",
+                "title": "Using CSS custom properties (variables) - CSS | MDN"
+              },
+              {
+                "family": "craft",
+                "uri": "https://www.refactoringui.com/",
+                "sha256": "d89a448704f5301e",
+                "title": "Refactoring UI"
+              },
+              {
+                "family": "craft",
+                "uri": "https://developer.mozilla.org/en-US/docs/Web/CSS/color_value/color-mix",
+                "sha256": "3ab0045d33f37663",
+                "title": "color-mix() CSS function - CSS | MDN"
+              },
+              {
+                "family": "craft",
+                "uri": "https://www.smashingmagazine.com/2024/05/naming-best-practices/",
+                "sha256": "5786269a0bca7790",
+                "title": "Best Practices For Naming Design Tokens, Components And Variables \u2014 Smashing Magazine"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://linear.app/customers",
+                "sha256": "65f2546f7e24d678",
+                "title": "Linear Customers"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://vercel.com/",
+                "sha256": "c26a33d2b08d2b60",
+                "title": "Agentic Infrastructure - Vercel"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://vercel.com/blog",
+                "sha256": "2570f04ad163d7e4",
+                "title": "Blog - Vercel"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://vercel.com/docs",
+                "sha256": "d78b5b8133aa14cc",
+                "title": ""
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://vercel.com/geist/colors",
+                "sha256": "74aeb67b13ba6192",
+                "title": ""
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://vercel.com/geist/typography",
+                "sha256": "7d664f2129353ada",
+                "title": ""
+              }
+            ]
+          },
+          "confidence": "high",
+          "caveats": [],
+          "needs": [
+            "RQ-A3",
+            "RQ-D1"
+          ]
+        },
+        {
+          "id": "cm-status-color",
+          "label": "Colorblind-safe, never-color-alone status",
+          "recommendation": "Keep status hues few and colorblind-safe, and always pair color with shape/label; contrast + palette sources (web.dev, ColorBrewer, NN/g, WCAG 1.4.3) define the bar.",
+          "when": "Lifecycle/severity/attention states are encoded.",
+          "avoid_when": "Hue count grows until it is noise.",
+          "evidence": {
+            "support": 16,
+            "support_by_family": {
+              "craft": 6,
+              "dashboards": 5,
+              "dataviz": 4,
+              "cli": 1
+            },
+            "independent_families": 4,
+            "taxonomy_nodes": [
+              {
+                "id": "tech-vis-colorblind-safe-status",
+                "support": 16,
+                "family_names": [
+                  "craft",
+                  "dashboards",
+                  "dataviz",
+                  "cli"
+                ]
+              }
+            ],
+            "refs": [
+              {
+                "family": "craft",
+                "uri": "https://web.dev/articles/color-and-contrast-accessibility",
+                "sha256": "aded09c8b9cfa9b7",
+                "title": "Color and contrast accessibility \u00a0|\u00a0 web.dev"
+              },
+              {
+                "family": "dataviz",
+                "uri": "https://colorbrewer2.org/",
+                "sha256": "c72ceb0441fc6951",
+                "title": "ColorBrewer: Color Advice for Maps"
+              },
+              {
+                "family": "craft",
+                "uri": "https://www.nngroup.com/articles/color-enhance-design/",
+                "sha256": "def697856da898b9",
+                "title": "Using Color to Enhance Your Design - NN/G"
+              },
+              {
+                "family": "craft",
+                "uri": "https://www.w3.org/WAI/WCAG22/Understanding/contrast-minimum.html",
+                "sha256": "3352aaf477e97391",
+                "title": "Understanding Success Criterion 1.4.3: Contrast (Minimum) | WAI | W3C"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://linear.app/customers",
+                "sha256": "65f2546f7e24d678",
+                "title": "Linear Customers"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://vercel.com/docs",
+                "sha256": "d78b5b8133aa14cc",
+                "title": ""
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://vercel.com/geist/colors",
+                "sha256": "74aeb67b13ba6192",
+                "title": ""
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://vercel.com/geist/typography",
+                "sha256": "7d664f2129353ada",
+                "title": ""
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://linear.app/changelog",
+                "sha256": "65746e441e648c57",
+                "title": "Changelog \u2013 Linear"
+              },
+              {
+                "family": "dataviz",
+                "uri": "https://d3js.org/d3-scale-chromatic",
+                "sha256": "2bd7bec1de93305d",
+                "title": "d3-scale-chromatic | D3 by Observable"
+              }
+            ]
+          },
+          "confidence": "high",
+          "caveats": [],
+          "needs": [
+            "RQ-D3",
+            "RQ-H1"
+          ]
+        },
+        {
+          "id": "cm-dark-first",
+          "label": "Dark-first with a real light + forced-colors path",
+          "recommendation": "Theme dark-first but keep a real light theme from the same tokens, and honor prefers-color-scheme/forced-colors; NN/g's dark-mode guidance and MDN's forced-colors feature define the fallback.",
+          "when": "The room is dark by default.",
+          "avoid_when": "Dark is just inverted light (elevation/contrast break).",
+          "evidence": {
+            "support": 28,
+            "support_by_family": {
+              "craft": 10,
+              "dashboards": 8,
+              "dataviz": 8,
+              "cli": 2
+            },
+            "independent_families": 4,
+            "taxonomy_nodes": [
+              {
+                "id": "tech-vis-design-tokens",
+                "support": 28,
+                "family_names": [
+                  "craft",
+                  "dashboards",
+                  "dataviz",
+                  "cli"
+                ]
+              },
+              {
+                "id": "tech-vis-forced-colors",
+                "support": 8,
+                "family_names": [
+                  "cli",
+                  "craft"
+                ]
+              }
+            ],
+            "refs": [
+              {
+                "family": "craft",
+                "uri": "https://www.nngroup.com/articles/dark-mode/",
+                "sha256": "effad3bad3f8f8d5",
+                "title": "Dark Mode vs. Light Mode: Which Is Better? - NN/G"
+              },
+              {
+                "family": "craft",
+                "uri": "https://developer.mozilla.org/en-US/docs/Web/CSS/@media/forced-colors",
+                "sha256": "ebbddff1da6be245",
+                "title": "forced-colors CSS media feature - CSS | MDN"
+              },
+              {
+                "family": "craft",
+                "uri": "https://web.dev/articles/color-and-contrast-accessibility",
+                "sha256": "aded09c8b9cfa9b7",
+                "title": "Color and contrast accessibility \u00a0|\u00a0 web.dev"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://linear.app/customers",
+                "sha256": "65f2546f7e24d678",
+                "title": "Linear Customers"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://vercel.com/",
+                "sha256": "c26a33d2b08d2b60",
+                "title": "Agentic Infrastructure - Vercel"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://vercel.com/blog",
+                "sha256": "2570f04ad163d7e4",
+                "title": "Blog - Vercel"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://vercel.com/docs",
+                "sha256": "d78b5b8133aa14cc",
+                "title": ""
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://vercel.com/geist/colors",
+                "sha256": "74aeb67b13ba6192",
+                "title": ""
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://vercel.com/geist/typography",
+                "sha256": "7d664f2129353ada",
+                "title": ""
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://linear.app/changelog",
+                "sha256": "65746e441e648c57",
+                "title": "Changelog \u2013 Linear"
+              }
+            ]
+          },
+          "confidence": "high",
+          "caveats": [],
+          "needs": [
+            "RQ-D5",
+            "RQ-H1"
+          ]
+        },
+        {
+          "id": "cm-accent",
+          "label": "Accent economy / minimal chrome",
+          "recommendation": "Spend the accent color on one thing at a time and strip decorative chrome; Refactoring UI and NN/g both argue restrained accents carry more meaning.",
+          "when": "Data is dense and chrome competes with it.",
+          "avoid_when": "Every panel is highlighted (nothing stands out).",
+          "evidence": {
+            "support": 10,
+            "support_by_family": {
+              "craft": 5,
+              "dashboards": 4,
+              "cli": 1
+            },
+            "independent_families": 3,
+            "taxonomy_nodes": [
+              {
+                "id": "tech-vis-accent-economy",
+                "support": 10,
+                "family_names": [
+                  "craft",
+                  "dashboards",
+                  "cli"
+                ]
+              }
+            ],
+            "refs": [
+              {
+                "family": "craft",
+                "uri": "https://www.refactoringui.com/",
+                "sha256": "d89a448704f5301e",
+                "title": "Refactoring UI"
+              },
+              {
+                "family": "craft",
+                "uri": "https://www.nngroup.com/articles/color-enhance-design/",
+                "sha256": "def697856da898b9",
+                "title": "Using Color to Enhance Your Design - NN/G"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://vercel.com/",
+                "sha256": "c26a33d2b08d2b60",
+                "title": "Agentic Infrastructure - Vercel"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://linear.app/",
+                "sha256": "eb0e0bc396ddd962",
+                "title": "Linear \u2013 The system for product development"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://vercel.com/",
+                "sha256": "c26a33d2b08d2b60",
+                "title": "Agentic Infrastructure - Vercel"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://vercel.com/blog",
+                "sha256": "2570f04ad163d7e4",
+                "title": "Blog - Vercel"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://modal.com/docs/guide",
+                "sha256": "c2916a5f238c4eb6",
+                "title": "Introduction | Modal Docs"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://vercel.com/changelog",
+                "sha256": "c889660f133515b2",
+                "title": "Changelog - Vercel"
+              },
+              {
+                "family": "cli",
+                "uri": "https://github.com/alacritty/alacritty",
+                "sha256": "73fcb15b96df52aa",
+                "title": "GitHub - alacritty/alacritty: A cross-platform, OpenGL terminal emulator. \u00b7 GitHub"
+              },
+              {
+                "family": "craft",
+                "uri": "https://developer.mozilla.org/en-US/docs/Web/CSS/color_value/color-mix",
+                "sha256": "3ab0045d33f37663",
+                "title": "color-mix() CSS function - CSS | MDN"
+              }
+            ]
+          },
+          "confidence": "high",
+          "caveats": [],
+          "needs": [
+            "RQ-D1"
+          ]
+        },
+        {
+          "id": "cm-type",
+          "label": "Type scale for dense data (tabular numerals)",
+          "recommendation": "Fix a small type scale and use tabular numerals for data-dense panels; the typography and fintech-typeface sources specifically address numerals under dense data.",
+          "when": "Many small numbers must align and scan.",
+          "avoid_when": "More than a few sizes / weights are in play.",
+          "evidence": {
+            "support": 9,
+            "support_by_family": {
+              "craft": 5,
+              "dashboards": 3,
+              "cli": 1
+            },
+            "independent_families": 3,
+            "taxonomy_nodes": [
+              {
+                "id": "tech-vis-type-scale",
+                "support": 9,
+                "family_names": [
+                  "craft",
+                  "dashboards",
+                  "cli"
+                ]
+              }
+            ],
+            "refs": [
+              {
+                "family": "craft",
+                "uri": "https://practicaltypography.com/summary-of-key-rules.html",
+                "sha256": "ef40706eeb33417f",
+                "title": "Summary of key rules | Butterick\u2019s Practical Typography"
+              },
+              {
+                "family": "craft",
+                "uri": "https://www.smashingmagazine.com/2023/10/choose-typefaces-fintech-products-guide-part1/",
+                "sha256": "88846b6feced9773",
+                "title": "How To Choose Typefaces For Fintech Products: Our Best Practices Guide (Part 1) \u2014 Smashing Magazine"
+              },
+              {
+                "family": "craft",
+                "uri": "https://developer.mozilla.org/en-US/docs/Web/SVG/Tutorial/Texts",
+                "sha256": "88fc7a5094ccc2ab",
+                "title": "Texts - SVG | MDN"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://vercel.com/docs",
+                "sha256": "d78b5b8133aa14cc",
+                "title": ""
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://vercel.com/geist/colors",
+                "sha256": "74aeb67b13ba6192",
+                "title": ""
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://vercel.com/geist/typography",
+                "sha256": "7d664f2129353ada",
+                "title": ""
+              },
+              {
+                "family": "cli",
+                "uri": "https://github.com/Textualize/rich",
+                "sha256": "45d0b1b722e4bd6d",
+                "title": "GitHub - Textualize/rich: Rich is a Python library for rich text and beautiful formatting "
+              },
+              {
+                "family": "craft",
+                "uri": "https://web.dev/learn/css/",
+                "sha256": "40cbdddaac4bd168",
+                "title": "Learn CSS \u00a0|\u00a0 web.dev"
+              },
+              {
+                "family": "craft",
+                "uri": "https://www.nngroup.com/articles/icon-usability/",
+                "sha256": "1d9e07b7547bfde0",
+                "title": "Icon Usability - NN/G"
+              },
+              {
+                "family": "craft",
+                "uri": "https://www.refactoringui.com/",
+                "sha256": "d89a448704f5301e",
+                "title": "Refactoring UI"
+              }
+            ]
+          },
+          "confidence": "medium",
+          "caveats": [],
+          "needs": [
+            "RQ-D4"
+          ]
+        },
+        {
+          "id": "cm-icon",
+          "label": "One icon family, labelled where ambiguous",
+          "recommendation": "Use one consistent SVG icon family (symbol/<use>) and label icons whose meaning is not universal; NN/g's icon-usability findings and the SVG symbol technique support this.",
+          "when": "Dense toolbars/status glyphs are needed.",
+          "avoid_when": "Icon-only controls for novel actions.",
+          "evidence": {
+            "support": 4,
+            "support_by_family": {
+              "craft": 4
+            },
+            "independent_families": 1,
+            "taxonomy_nodes": [
+              {
+                "id": "tech-vis-icon-family",
+                "support": 4,
+                "family_names": [
+                  "craft"
+                ]
+              }
+            ],
+            "refs": [
+              {
+                "family": "craft",
+                "uri": "https://www.nngroup.com/articles/icon-usability/",
+                "sha256": "1d9e07b7547bfde0",
+                "title": "Icon Usability - NN/G"
+              },
+              {
+                "family": "craft",
+                "uri": "https://developer.mozilla.org/en-US/docs/Web/SVG/Element/use",
+                "sha256": "4ce5f6172aae264a",
+                "title": "<use> - SVG | MDN"
+              },
+              {
+                "family": "craft",
+                "uri": "https://css-tricks.com/mega-list-svg-information/",
+                "sha256": "45906cdcaa5d19ce",
+                "title": "A Compendium of SVG Information | CSS-Tricks"
+              },
+              {
+                "family": "craft",
+                "uri": "https://developer.mozilla.org/en-US/docs/Web/SVG/Element/use",
+                "sha256": "4ce5f6172aae264a",
+                "title": "<use> - SVG | MDN"
+              },
+              {
+                "family": "craft",
+                "uri": "https://www.nngroup.com/articles/icon-usability/",
+                "sha256": "1d9e07b7547bfde0",
+                "title": "Icon Usability - NN/G"
+              },
+              {
+                "family": "craft",
+                "uri": "https://www.smashingmagazine.com/2023/10/choose-typefaces-fintech-products-guide-part1/",
+                "sha256": "88846b6feced9773",
+                "title": "How To Choose Typefaces For Fintech Products: Our Best Practices Guide (Part 1) \u2014 Smashing"
+              },
+              {
+                "family": "craft",
+                "uri": "https://css-tricks.com/mega-list-svg-information/",
+                "sha256": "45906cdcaa5d19ce",
+                "title": "A Compendium of SVG Information | CSS-Tricks"
+              }
+            ]
+          },
+          "confidence": "low",
+          "caveats": [
+            "single-family evidence (craft only) \u2014 single-source caveat applies",
+            "thin support (4 sources)"
+          ],
+          "needs": [
+            "RQ-D4"
+          ]
+        },
+        {
+          "id": "cm-elevation",
+          "label": "Elevation model (surfaces, not shadows-as-decoration)",
+          "recommendation": "Separate surfaces with a small elevation ladder (background/surface/raised/overlay); dark-mode and Refactoring UI sources tie depth to structure, not ornament.",
+          "when": "Layered panels/overlays must be distinguishable in dark.",
+          "avoid_when": "Every card is elevated (depth loses meaning).",
+          "evidence": {
+            "support": 3,
+            "support_by_family": {
+              "craft": 3
+            },
+            "independent_families": 1,
+            "taxonomy_nodes": [
+              {
+                "id": "tech-vis-elevation-model",
+                "support": 3,
+                "family_names": [
+                  "craft"
+                ]
+              }
+            ],
+            "refs": [
+              {
+                "family": "craft",
+                "uri": "https://www.nngroup.com/articles/dark-mode/",
+                "sha256": "effad3bad3f8f8d5",
+                "title": "Dark Mode vs. Light Mode: Which Is Better? - NN/G"
+              },
+              {
+                "family": "craft",
+                "uri": "https://www.refactoringui.com/",
+                "sha256": "d89a448704f5301e",
+                "title": "Refactoring UI"
+              },
+              {
+                "family": "craft",
+                "uri": "https://web.dev/learn/css/",
+                "sha256": "40cbdddaac4bd168",
+                "title": "Learn CSS \u00a0|\u00a0 web.dev"
+              },
+              {
+                "family": "craft",
+                "uri": "https://web.dev/learn/css/",
+                "sha256": "40cbdddaac4bd168",
+                "title": "Learn CSS \u00a0|\u00a0 web.dev"
+              },
+              {
+                "family": "craft",
+                "uri": "https://www.nngroup.com/articles/dark-mode/",
+                "sha256": "effad3bad3f8f8d5",
+                "title": "Dark Mode vs. Light Mode: Which Is Better? - NN/G"
+              },
+              {
+                "family": "craft",
+                "uri": "https://www.refactoringui.com/",
+                "sha256": "d89a448704f5301e",
+                "title": "Refactoring UI"
+              }
+            ]
+          },
+          "confidence": "low",
+          "caveats": [
+            "single-family evidence (craft only) \u2014 single-source caveat applies",
+            "thin support (3 sources)"
+          ],
+          "needs": [
+            "RQ-D1"
+          ]
+        },
+        {
+          "id": "cm-motion",
+          "label": "Motion easing / springs with a budget",
+          "recommendation": "Animate state changes only, with short durations and spring/ease curves; the spring-physics and microinteraction sources frame motion as feedback, not decoration.",
+          "when": "A change needs confirming (arrive/leave/attention).",
+          "avoid_when": "Motion competes with a 1s live tick.",
+          "evidence": {
+            "support": 11,
+            "support_by_family": {
+              "craft": 7,
+              "dashboards": 4
+            },
+            "independent_families": 2,
+            "taxonomy_nodes": [
+              {
+                "id": "tech-vis-motion-easing",
+                "support": 11,
+                "family_names": [
+                  "craft",
+                  "dashboards"
+                ]
+              }
+            ],
+            "refs": [
+              {
+                "family": "craft",
+                "uri": "https://www.joshwcomeau.com/animation/a-friendly-introduction-to-spring-physics/",
+                "sha256": "71b1e7fa215f3d5a",
+                "title": "A Friendly Introduction to Spring Physics Animation in JavaScript \u2022 Josh W. Comeau"
+              },
+              {
+                "family": "craft",
+                "uri": "https://www.nngroup.com/articles/microinteractions/",
+                "sha256": "e70316fbafc50556",
+                "title": "Microinteractions in User Experience - NN/G"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://linear.app/",
+                "sha256": "eb0e0bc396ddd962",
+                "title": "Linear \u2013 The system for product development"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://linear.app/blog",
+                "sha256": "8567e6066c918c20",
+                "title": "Now \u2013 Updates from the Linear team"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://linear.app/customers",
+                "sha256": "65f2546f7e24d678",
+                "title": "Linear Customers"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://linear.app/changelog",
+                "sha256": "65746e441e648c57",
+                "title": "Changelog \u2013 Linear"
+              },
+              {
+                "family": "craft",
+                "uri": "https://developer.mozilla.org/en-US/docs/Web/CSS/@media/prefers-reduced-motion",
+                "sha256": "e3fe57980976a907",
+                "title": "prefers-reduced-motion CSS media feature - CSS | MDN"
+              },
+              {
+                "family": "craft",
+                "uri": "https://web.dev/learn/css/",
+                "sha256": "40cbdddaac4bd168",
+                "title": "Learn CSS \u00a0|\u00a0 web.dev"
+              },
+              {
+                "family": "craft",
+                "uri": "https://web.dev/articles/prefers-reduced-motion",
+                "sha256": "00c6f4b49de13c1b",
+                "title": "prefers-reduced-motion: Sometimes less movement is more \u00a0|\u00a0 Articles \u00a0|\u00a0 web.dev"
+              },
+              {
+                "family": "craft",
+                "uri": "https://www.nngroup.com/articles/response-times-3-important-limits/",
+                "sha256": "ffa84c46b1dc9665",
+                "title": "Response Time Limits: Article by Jakob Nielsen - NN/G"
+              }
+            ]
+          },
+          "confidence": "medium",
+          "caveats": [],
+          "needs": [
+            "RQ-D2"
+          ]
+        },
+        {
+          "id": "cm-reduced-motion",
+          "label": "Reduced-motion path",
+          "recommendation": "Honor prefers-reduced-motion: drop large/parallax motion and non-essential animation while preserving state feedback; MDN and web.dev define the safe degradation.",
+          "when": "Any motion exists at all.",
+          "avoid_when": "Reduced motion removes information that only motion carried.",
+          "evidence": {
+            "support": 14,
+            "support_by_family": {
+              "dashboards": 7,
+              "craft": 6,
+              "dataviz": 1
+            },
+            "independent_families": 3,
+            "taxonomy_nodes": [
+              {
+                "id": "tech-int-reduced-motion",
+                "support": 14,
+                "family_names": [
+                  "dashboards",
+                  "craft",
+                  "dataviz"
+                ]
+              }
+            ],
+            "refs": [
+              {
+                "family": "craft",
+                "uri": "https://developer.mozilla.org/en-US/docs/Web/CSS/@media/prefers-reduced-motion",
+                "sha256": "e3fe57980976a907",
+                "title": "prefers-reduced-motion CSS media feature - CSS | MDN"
+              },
+              {
+                "family": "craft",
+                "uri": "https://web.dev/articles/prefers-reduced-motion",
+                "sha256": "00c6f4b49de13c1b",
+                "title": "prefers-reduced-motion: Sometimes less movement is more \u00a0|\u00a0 Articles \u00a0|\u00a0 web.dev"
+              },
+              {
+                "family": "craft",
+                "uri": "https://www.nngroup.com/articles/microinteractions/",
+                "sha256": "e70316fbafc50556",
+                "title": "Microinteractions in User Experience - NN/G"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://linear.app/",
+                "sha256": "eb0e0bc396ddd962",
+                "title": "Linear \u2013 The system for product development"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://linear.app/blog",
+                "sha256": "8567e6066c918c20",
+                "title": "Now \u2013 Updates from the Linear team"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://linear.app/customers",
+                "sha256": "65f2546f7e24d678",
+                "title": "Linear Customers"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://vercel.com/docs",
+                "sha256": "d78b5b8133aa14cc",
+                "title": ""
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://vercel.com/geist/colors",
+                "sha256": "74aeb67b13ba6192",
+                "title": ""
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://vercel.com/geist/typography",
+                "sha256": "7d664f2129353ada",
+                "title": ""
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://linear.app/changelog",
+                "sha256": "65746e441e648c57",
+                "title": "Changelog \u2013 Linear"
+              }
+            ]
+          },
+          "confidence": "high",
+          "caveats": [],
+          "needs": [
+            "RQ-D2",
+            "RQ-H1"
+          ]
+        },
+        {
+          "id": "cm-forced-colors",
+          "label": "Forced-colors / high-contrast support",
+          "recommendation": "Use system color keywords and currentColor so the room survives Windows High Contrast; MDN's forced-colors guide is the normative reference.",
+          "when": "High-contrast/forced-colors users are supported.",
+          "avoid_when": "Hard-coded hex colors block the override.",
+          "evidence": {
+            "support": 8,
+            "support_by_family": {
+              "cli": 4,
+              "craft": 4
+            },
+            "independent_families": 2,
+            "taxonomy_nodes": [
+              {
+                "id": "tech-vis-forced-colors",
+                "support": 8,
+                "family_names": [
+                  "cli",
+                  "craft"
+                ]
+              }
+            ],
+            "refs": [
+              {
+                "family": "craft",
+                "uri": "https://developer.mozilla.org/en-US/docs/Web/CSS/@media/forced-colors",
+                "sha256": "ebbddff1da6be245",
+                "title": "forced-colors CSS media feature - CSS | MDN"
+              },
+              {
+                "family": "craft",
+                "uri": "https://web.dev/articles/color-and-contrast-accessibility",
+                "sha256": "aded09c8b9cfa9b7",
+                "title": "Color and contrast accessibility \u00a0|\u00a0 web.dev"
+              },
+              {
+                "family": "cli",
+                "uri": "https://ghostty.org/",
+                "sha256": "c2dd13ab48151194",
+                "title": "Ghostty"
+              },
+              {
+                "family": "cli",
+                "uri": "https://ghostty.org/docs",
+                "sha256": "4813bfcf2917963d",
+                "title": "Ghostty Docs"
+              },
+              {
+                "family": "cli",
+                "uri": "https://github.com/charmbracelet/lipgloss",
+                "sha256": "717a58f6677cd496",
+                "title": "GitHub - charmbracelet/lipgloss: Style definitions for nice terminal layouts \ud83d\udc44 \u00b7 GitHub"
+              },
+              {
+                "family": "cli",
+                "uri": "https://wezterm.org/",
+                "sha256": "631fc0d9b6a1eb6b",
+                "title": "WezTerm - Wez's Terminal Emulator"
+              },
+              {
+                "family": "craft",
+                "uri": "https://developer.mozilla.org/en-US/docs/Web/CSS/@media/forced-colors",
+                "sha256": "ebbddff1da6be245",
+                "title": "forced-colors CSS media feature - CSS | MDN"
+              },
+              {
+                "family": "craft",
+                "uri": "https://web.dev/articles/color-and-contrast-accessibility",
+                "sha256": "aded09c8b9cfa9b7",
+                "title": "Color and contrast accessibility \u00a0|\u00a0 web.dev"
+              },
+              {
+                "family": "craft",
+                "uri": "https://www.smashingmagazine.com/2025/11/smashing-animations-part-6-svgs-css-custom-properties/",
+                "sha256": "b8bc0e988e39ee25",
+                "title": "Smashing Animations Part 6: Magnificent SVGs\u00a0With <use>\u00a0And CSS Custom Properties \u2014 Smashi"
+              },
+              {
+                "family": "craft",
+                "uri": "https://css-tricks.com/svg-properties-and-css/",
+                "sha256": "026f726c04e31390",
+                "title": "SVG Properties in CSS Guide | CSS-Tricks"
+              }
+            ]
+          },
+          "confidence": "medium",
+          "caveats": [],
+          "needs": [
+            "RQ-H1",
+            "RQ-D5"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "svg-technique",
+      "label": "SVG-technique catalog",
+      "contract": "RQ-J1\u2013J3 \u2014 theme-aware, accessible, print-safe diagrams and micro-visuals.",
+      "items": [
+        {
+          "id": "svg-theme",
+          "label": "Theme-aware SVG (viewBox + currentColor + custom properties)",
+          "recommendation": "Author diagrams with viewBox for scale and drive colors from currentColor/custom properties so one SVG renders in both themes and forced-colors.",
+          "when": "Any architecture/flow/topology diagram.",
+          "avoid_when": "Hard-coded fills (breaks theming/high contrast).",
+          "evidence": {
+            "support": 29,
+            "support_by_family": {
+              "craft": 12,
+              "cli": 9,
+              "dataviz": 8
+            },
+            "independent_families": 3,
+            "taxonomy_nodes": [
+              {
+                "id": "tech-svg-theme-aware-svg",
+                "support": 29,
+                "family_names": [
+                  "craft",
+                  "cli",
+                  "dataviz"
+                ]
+              }
+            ],
+            "refs": [
+              {
+                "family": "craft",
+                "uri": "https://developer.mozilla.org/en-US/docs/Web/SVG/Attribute/viewBox",
+                "sha256": "c953bc2f52e375d0",
+                "title": "viewBox - SVG | MDN"
+              },
+              {
+                "family": "craft",
+                "uri": "https://developer.mozilla.org/en-US/docs/Web/SVG/Element/use",
+                "sha256": "4ce5f6172aae264a",
+                "title": "<use> - SVG | MDN"
+              },
+              {
+                "family": "craft",
+                "uri": "https://www.smashingmagazine.com/2025/11/smashing-animations-part-6-svgs-css-custom-properties/",
+                "sha256": "b8bc0e988e39ee25",
+                "title": "Smashing Animations Part 6: Magnificent SVGs\u00a0With <use>\u00a0And CSS Custom Properties \u2014 Smashing Magazin"
+              },
+              {
+                "family": "craft",
+                "uri": "https://css-tricks.com/svg-properties-and-css/",
+                "sha256": "026f726c04e31390",
+                "title": "SVG Properties in CSS Guide | CSS-Tricks"
+              },
+              {
+                "family": "dataviz",
+                "uri": "https://d3js.org/",
+                "sha256": "a2d77a5b707ffb7d",
+                "title": "D3 by Observable | The JavaScript library for bespoke data visualization"
+              },
+              {
+                "family": "dataviz",
+                "uri": "https://d3js.org/what-is-d3",
+                "sha256": "087f5313e13964ad",
+                "title": "What is D3? | D3 by Observable"
+              },
+              {
+                "family": "dataviz",
+                "uri": "https://echarts.apache.org/en/index.html",
+                "sha256": "caa87df6c6cfc387",
+                "title": "Apache ECharts"
+              },
+              {
+                "family": "dataviz",
+                "uri": "https://echarts.apache.org/handbook/en/get-started/",
+                "sha256": "fc1b54a4c3118289",
+                "title": "Get Started - Handbook - Apache ECharts"
+              },
+              {
+                "family": "dataviz",
+                "uri": "https://nivo.rocks/bar/",
+                "sha256": "142393ea7aca91f1",
+                "title": "Bar chart | nivo"
+              },
+              {
+                "family": "dataviz",
+                "uri": "https://nivo.rocks/line/",
+                "sha256": "7fbbcfe5789d6603",
+                "title": "Line chart | nivo"
+              }
+            ]
+          },
+          "confidence": "high",
+          "caveats": [],
+          "needs": [
+            "RQ-J1",
+            "RQ-J3"
+          ]
+        },
+        {
+          "id": "svg-micro",
+          "label": "Micro-visuals as SVG + CSS (no chart runtime)",
+          "recommendation": "Build sparklines, gauges and status glyphs as small SVG+CSS pieces (path + stroke/dasharray/gradient) rather than pulling a JS chart runtime.",
+          "when": "A mark is tiny and repeated many times.",
+          "avoid_when": "The mark needs real interaction/data-heavy redraw.",
+          "evidence": {
+            "support": 22,
+            "support_by_family": {
+              "craft": 12,
+              "dataviz": 7,
+              "cli": 3
+            },
+            "independent_families": 3,
+            "taxonomy_nodes": [
+              {
+                "id": "tech-svg-micro-visual",
+                "support": 22,
+                "family_names": [
+                  "craft",
+                  "dataviz",
+                  "cli"
+                ]
+              }
+            ],
+            "refs": [
+              {
+                "family": "craft",
+                "uri": "https://css-tricks.com/svg-line-animation-works/",
+                "sha256": "5b1adeb30b08f494",
+                "title": "How SVG Line Animation Works | CSS-Tricks"
+              },
+              {
+                "family": "craft",
+                "uri": "https://svg-tutorial.com/svg/gradient",
+                "sha256": "c4ad218564a5ba70",
+                "title": "How to Use Gradients with SVG - SVG Tutorial"
+              },
+              {
+                "family": "craft",
+                "uri": "https://www.nngroup.com/articles/dashboards-preattentive/",
+                "sha256": "b665ad15d558dbd6",
+                "title": "Dashboards: Making Charts and Graphs Easier to Understand - NN/G"
+              },
+              {
+                "family": "dataviz",
+                "uri": "https://d3js.org/",
+                "sha256": "a2d77a5b707ffb7d",
+                "title": "D3 by Observable | The JavaScript library for bespoke data visualization"
+              },
+              {
+                "family": "dataviz",
+                "uri": "https://d3js.org/what-is-d3",
+                "sha256": "087f5313e13964ad",
+                "title": "What is D3? | D3 by Observable"
+              },
+              {
+                "family": "dataviz",
+                "uri": "https://echarts.apache.org/en/index.html",
+                "sha256": "caa87df6c6cfc387",
+                "title": "Apache ECharts"
+              },
+              {
+                "family": "dataviz",
+                "uri": "https://echarts.apache.org/handbook/en/get-started/",
+                "sha256": "fc1b54a4c3118289",
+                "title": "Get Started - Handbook - Apache ECharts"
+              },
+              {
+                "family": "dataviz",
+                "uri": "https://github.com/leeoniya/uPlot",
+                "sha256": "c3a34c9200af26ab",
+                "title": "GitHub - leeoniya/uPlot: \ud83d\udcc8 A small, fast chart for time series, lines, areas, ohlc & bars "
+              },
+              {
+                "family": "dataviz",
+                "uri": "https://leeoniya.github.io/uPlot/",
+                "sha256": "0c26530cb0b02576",
+                "title": "uPlot | \ud83d\udcc8 A small, fast chart for time series, lines, areas, ohlc & bars"
+              },
+              {
+                "family": "dataviz",
+                "uri": "https://d3js.org/getting-started",
+                "sha256": "3aa562758d4b26a3",
+                "title": "Getting started | D3 by Observable"
+              }
+            ]
+          },
+          "confidence": "high",
+          "caveats": [],
+          "needs": [
+            "RQ-J2"
+          ]
+        },
+        {
+          "id": "svg-accessible",
+          "label": "Accessible SVG (title/desc, role, text alternative)",
+          "recommendation": "Give meaningful SVGs a title/desc or role=img with a label, and mark decorative ones aria-hidden; the a11y sources define the text-alternative contract.",
+          "when": "Any SVG conveys information.",
+          "avoid_when": "A complex diagram has no textual equivalent.",
+          "evidence": {
+            "support": 10,
+            "support_by_family": {
+              "craft": 5,
+              "dashboards": 3,
+              "dataviz": 2
+            },
+            "independent_families": 3,
+            "taxonomy_nodes": [
+              {
+                "id": "tech-svg-accessible-svg",
+                "support": 10,
+                "family_names": [
+                  "craft",
+                  "dashboards",
+                  "dataviz"
+                ]
+              }
+            ],
+            "refs": [
+              {
+                "family": "craft",
+                "uri": "https://css-tricks.com/accessible-svgs/",
+                "sha256": "03dcc0382b1f0621",
+                "title": "Accessible SVGs | CSS-Tricks"
+              },
+              {
+                "family": "craft",
+                "uri": "https://developer.mozilla.org/en-US/docs/Web/SVG/Tutorial/Texts",
+                "sha256": "88fc7a5094ccc2ab",
+                "title": "Texts - SVG | MDN"
+              },
+              {
+                "family": "craft",
+                "uri": "https://www.w3.org/WAI/ARIA/apg/patterns/",
+                "sha256": "67aa84429d27fba3",
+                "title": "Patterns | APG | WAI | W3CPatterns"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://vercel.com/docs",
+                "sha256": "d78b5b8133aa14cc",
+                "title": ""
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://vercel.com/geist/colors",
+                "sha256": "74aeb67b13ba6192",
+                "title": ""
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://vercel.com/geist/typography",
+                "sha256": "7d664f2129353ada",
+                "title": ""
+              },
+              {
+                "family": "dataviz",
+                "uri": "https://echarts.apache.org/handbook/en/best-practices/aria/",
+                "sha256": "dfb00439e589043e",
+                "title": "Aria - Best Practices - Handbook - Apache ECharts"
+              },
+              {
+                "family": "dataviz",
+                "uri": "https://www.datawrapper.de/blog/",
+                "sha256": "72007fc9dc4fcb05",
+                "title": "Datawrapper Blog"
+              },
+              {
+                "family": "craft",
+                "uri": "https://developer.mozilla.org/en-US/docs/Web/SVG/Tutorial/Texts",
+                "sha256": "88fc7a5094ccc2ab",
+                "title": "Texts - SVG | MDN"
+              },
+              {
+                "family": "craft",
+                "uri": "https://css-tricks.com/mega-list-svg-information/",
+                "sha256": "45906cdcaa5d19ce",
+                "title": "A Compendium of SVG Information | CSS-Tricks"
+              }
+            ]
+          },
+          "confidence": "high",
+          "caveats": [],
+          "needs": [
+            "RQ-J3",
+            "RQ-H1"
+          ]
+        },
+        {
+          "id": "svg-path",
+          "label": "Path tracer for flow / route lines",
+          "recommendation": "Use path + stroke-dasharray/dashoffset to draw flow or route lines; the path-grammar sources make the geometry maintainable rather than copy-pasted.",
+          "when": "Showing a route/flow/edge between nodes.",
+          "avoid_when": "A plain connector is clearer (don't over-animate).",
+          "evidence": {
+            "support": 7,
+            "support_by_family": {
+              "craft": 5,
+              "dataviz": 2
+            },
+            "independent_families": 2,
+            "taxonomy_nodes": [
+              {
+                "id": "tech-svg-path-tracer",
+                "support": 7,
+                "family_names": [
+                  "craft",
+                  "dataviz"
+                ]
+              }
+            ],
+            "refs": [
+              {
+                "family": "craft",
+                "uri": "https://developer.mozilla.org/en-US/docs/Web/SVG/Tutorial/Paths",
+                "sha256": "1c04ca9858dbfae1",
+                "title": "Paths - SVG | MDN"
+              },
+              {
+                "family": "craft",
+                "uri": "https://css-tricks.com/svg-line-animation-works/",
+                "sha256": "5b1adeb30b08f494",
+                "title": "How SVG Line Animation Works | CSS-Tricks"
+              },
+              {
+                "family": "craft",
+                "uri": "https://www.smashingmagazine.com/2025/06/decoding-svg-path-element-line-commands/",
+                "sha256": "88d16fce9095dee4",
+                "title": "Decoding The SVG path Element: Line Commands \u2014 Smashing Magazine"
+              },
+              {
+                "family": "dataviz",
+                "uri": "https://d3js.org/d3-scale-chromatic",
+                "sha256": "2bd7bec1de93305d",
+                "title": "d3-scale-chromatic | D3 by Observable"
+              },
+              {
+                "family": "dataviz",
+                "uri": "https://d3js.org/d3-shape",
+                "sha256": "5e09a57ff0edcbbf",
+                "title": "d3-shape | D3 by Observable"
+              },
+              {
+                "family": "craft",
+                "uri": "https://developer.mozilla.org/en-US/docs/Web/SVG/Tutorial",
+                "sha256": "1c32624cf7da27fe",
+                "title": "Introducing SVG from scratch - SVG | MDN"
+              },
+              {
+                "family": "craft",
+                "uri": "https://developer.mozilla.org/en-US/docs/Web/SVG/Tutorial/Paths",
+                "sha256": "1c04ca9858dbfae1",
+                "title": "Paths - SVG | MDN"
+              },
+              {
+                "family": "craft",
+                "uri": "https://www.smashingmagazine.com/2025/06/decoding-svg-path-element-line-commands/",
+                "sha256": "88d16fce9095dee4",
+                "title": "Decoding The SVG path Element: Line Commands \u2014 Smashing Magazine"
+              },
+              {
+                "family": "craft",
+                "uri": "https://css-tricks.com/svg-line-animation-works/",
+                "sha256": "5b1adeb30b08f494",
+                "title": "How SVG Line Animation Works | CSS-Tricks"
+              },
+              {
+                "family": "craft",
+                "uri": "https://svg-tutorial.com/",
+                "sha256": "ea201b4404388cbe",
+                "title": "SVG Tutorial - Learn how to code images in HTML with SVG"
+              }
+            ]
+          },
+          "confidence": "medium",
+          "caveats": [],
+          "needs": [
+            "RQ-J2",
+            "RQ-J1"
+          ]
+        },
+        {
+          "id": "svg-flow",
+          "label": "Flow / architecture diagram",
+          "recommendation": "For the queue\u2192worker\u2192cell\u2192session topology, compose labeled shapes with explicit groups and a legend; supported but thin in the corpus (2 families).",
+          "when": "Operators need the system's shape, not a table of its parts.",
+          "avoid_when": "The diagram duplicates live state that belongs on a board.",
+          "evidence": {
+            "support": 4,
+            "support_by_family": {
+              "cli": 2,
+              "craft": 2
+            },
+            "independent_families": 2,
+            "taxonomy_nodes": [
+              {
+                "id": "tech-svg-flow-diagram",
+                "support": 4,
+                "family_names": [
+                  "cli",
+                  "craft"
+                ]
+              }
+            ],
+            "refs": [
+              {
+                "family": "craft",
+                "uri": "https://developer.mozilla.org/en-US/docs/Web/SVG/Tutorial/Paths",
+                "sha256": "1c04ca9858dbfae1",
+                "title": "Paths - SVG | MDN"
+              },
+              {
+                "family": "craft",
+                "uri": "https://www.smashingmagazine.com/2025/06/decoding-svg-path-element-line-commands/",
+                "sha256": "88d16fce9095dee4",
+                "title": "Decoding The SVG path Element: Line Commands \u2014 Smashing Magazine"
+              },
+              {
+                "family": "cli",
+                "uri": "https://github.com/charmbracelet/bubbletea",
+                "sha256": "6fbd5cc537e728c9",
+                "title": "GitHub - charmbracelet/bubbletea: A powerful little TUI framework \ud83c\udfd7 \u00b7 GitHub"
+              },
+              {
+                "family": "cli",
+                "uri": "https://github.com/htop-dev/htop",
+                "sha256": "c30804b3cfb04765",
+                "title": "GitHub - htop-dev/htop: htop - an interactive process viewer \u00b7 GitHub"
+              },
+              {
+                "family": "craft",
+                "uri": "https://developer.mozilla.org/en-US/docs/Web/SVG/Tutorial/Paths",
+                "sha256": "1c04ca9858dbfae1",
+                "title": "Paths - SVG | MDN"
+              },
+              {
+                "family": "craft",
+                "uri": "https://www.smashingmagazine.com/2025/06/decoding-svg-path-element-line-commands/",
+                "sha256": "88d16fce9095dee4",
+                "title": "Decoding The SVG path Element: Line Commands \u2014 Smashing Magazine"
+              }
+            ]
+          },
+          "confidence": "low",
+          "caveats": [
+            "thin support (4 sources)"
+          ],
+          "needs": [
+            "RQ-J1"
+          ]
+        },
+        {
+          "id": "svg-print",
+          "label": "Print-safe SVG (text as text, no raster)",
+          "recommendation": "Keep labels as SVG <text> so diagrams survive print/zoom and scale cleanly.",
+          "when": "Diagrams may be exported or printed.",
+          "avoid_when": "Text is outlined into paths (loses accessibility/search).",
+          "evidence": {
+            "support": 3,
+            "support_by_family": {
+              "craft": 3
+            },
+            "independent_families": 1,
+            "taxonomy_nodes": [
+              {
+                "id": "tech-svg-print-safe-svg",
+                "support": 3,
+                "family_names": [
+                  "craft"
+                ]
+              }
+            ],
+            "refs": [
+              {
+                "family": "craft",
+                "uri": "https://developer.mozilla.org/en-US/docs/Web/SVG/Tutorial/Texts",
+                "sha256": "88fc7a5094ccc2ab",
+                "title": "Texts - SVG | MDN"
+              },
+              {
+                "family": "craft",
+                "uri": "https://css-tricks.com/accessible-svgs/",
+                "sha256": "03dcc0382b1f0621",
+                "title": "Accessible SVGs | CSS-Tricks"
+              },
+              {
+                "family": "craft",
+                "uri": "https://developer.mozilla.org/en-US/docs/Web/SVG/Tutorial/Texts",
+                "sha256": "88fc7a5094ccc2ab",
+                "title": "Texts - SVG | MDN"
+              },
+              {
+                "family": "craft",
+                "uri": "https://css-tricks.com/accessible-svgs/",
+                "sha256": "03dcc0382b1f0621",
+                "title": "Accessible SVGs | CSS-Tricks"
+              },
+              {
+                "family": "craft",
+                "uri": "https://svg-tutorial.com/svg/text",
+                "sha256": "9fe0b8ca73e12d27",
+                "title": "How to Add Text to SVG Images - SVG Tutorial"
+              }
+            ]
+          },
+          "confidence": "low",
+          "caveats": [
+            "single-family evidence (craft only) \u2014 single-source caveat applies",
+            "thin support (3 sources)"
+          ],
+          "needs": [
+            "RQ-J3"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "trust-attention",
+      "label": "Trust / attention catalog (supplementary)",
+      "contract": "RQ-F1\u2013F4, ON-G6/A2 \u2014 lineage, provenance, freshness, degraded state, uncertainty.",
+      "items": [
+        {
+          "id": "tr-lineage",
+          "label": "Causal lineage / span tree",
+          "recommendation": "Represent a run as a session\u2192trace\u2192span tree with parent links so a failure's cause is walkable; every major agent-ops source ships this structure.",
+          "when": "Explaining why a run/step did what it did.",
+          "avoid_when": "The tree is flattened to a log.",
+          "evidence": {
+            "support": 23,
+            "support_by_family": {
+              "agentops": 16,
+              "dashboards": 5,
+              "cli": 2
+            },
+            "independent_families": 3,
+            "taxonomy_nodes": [
+              {
+                "id": "tech-trust-causal-lineage",
+                "support": 23,
+                "family_names": [
+                  "agentops",
+                  "dashboards",
+                  "cli"
+                ]
+              },
+              {
+                "id": "tech-ops-trace-tree",
+                "support": 22,
+                "family_names": [
+                  "agentops",
+                  "dashboards"
+                ]
+              }
+            ],
+            "refs": [
+              {
+                "family": "agentops",
+                "uri": "https://docs.arize.com/phoenix",
+                "sha256": "03f451e9e86f8ade",
+                "title": "What is Arize Phoenix? - Phoenix"
+              },
+              {
+                "family": "agentops",
+                "uri": "https://langfuse.com/docs",
+                "sha256": "34d09509900f2a2b",
+                "title": "Open Source AI Engineering Platform - Langfuse"
+              },
+              {
+                "family": "agentops",
+                "uri": "https://langfuse.com/docs/observability/overview",
+                "sha256": "0a1784a27f750267",
+                "title": "LLM Observability & Application Tracing (Open Source) - Langfuse"
+              },
+              {
+                "family": "agentops",
+                "uri": "https://docs.smith.langchain.com/",
+                "sha256": "216cc0ec88b4a616",
+                "title": "LangSmith Observability - Docs by LangChain"
+              },
+              {
+                "family": "agentops",
+                "uri": "https://www.braintrust.dev/docs",
+                "sha256": "1694f5c22f1528ee",
+                "title": "Get started with Braintrust - Braintrust"
+              },
+              {
+                "family": "agentops",
+                "uri": "https://docs.helicone.ai/features/sessions",
+                "sha256": "7234cf15f2d9295b",
+                "title": "Sessions - Helicone OSS LLM Observability"
+              },
+              {
+                "family": "agentops",
+                "uri": "https://docs.agentops.ai/",
+                "sha256": "f8ca1f22853b1f87",
+                "title": "Introduction - AgentOps"
+              },
+              {
+                "family": "agentops",
+                "uri": "https://docs.agentops.ai/v1/quickstart",
+                "sha256": "2220d7215a58ab31",
+                "title": "Quickstart - AgentOps"
+              },
+              {
+                "family": "agentops",
+                "uri": "https://docs.agentops.ai/v1/concepts/sessions",
+                "sha256": "ee26256fee2e96da",
+                "title": "Sessions - AgentOps"
+              },
+              {
+                "family": "agentops",
+                "uri": "https://docs.agentops.ai/v1/concepts/events",
+                "sha256": "4ed18cb4c4c10bf4",
+                "title": "Spans - AgentOps"
+              }
+            ]
+          },
+          "confidence": "high",
+          "caveats": [],
+          "needs": [
+            "ON-D4",
+            "RQ-F1"
+          ]
+        },
+        {
+          "id": "tr-provenance",
+          "label": "Source provenance / attribution",
+          "recommendation": "Attach provenance (which model/provider/window, measured vs estimated) to every consequential number, especially cost and scores.",
+          "when": "A number drives a decision.",
+          "avoid_when": "Provenance becomes noise on decorative stats.",
+          "evidence": {
+            "support": 40,
+            "support_by_family": {
+              "dashboards": 26,
+              "agentops": 13,
+              "dataviz": 1
+            },
+            "independent_families": 3,
+            "taxonomy_nodes": [
+              {
+                "id": "tech-trust-source-provenance",
+                "support": 40,
+                "family_names": [
+                  "dashboards",
+                  "agentops",
+                  "dataviz"
+                ]
+              }
+            ],
+            "refs": [
+              {
+                "family": "agentops",
+                "uri": "https://langfuse.com/docs/analytics/overview",
+                "sha256": "245019da24ca609e",
+                "title": "LLM Metrics & Analytics - Langfuse"
+              },
+              {
+                "family": "agentops",
+                "uri": "https://docs.helicone.ai/",
+                "sha256": "20ead7ec1d1155ef",
+                "title": "Quickstart - Helicone OSS LLM Observability"
+              },
+              {
+                "family": "agentops",
+                "uri": "https://www.braintrust.dev/docs",
+                "sha256": "1694f5c22f1528ee",
+                "title": "Get started with Braintrust - Braintrust"
+              },
+              {
+                "family": "agentops",
+                "uri": "https://langfuse.com/docs/scores/overview",
+                "sha256": "4667e20442936138",
+                "title": "Evaluation of LLM Applications - Langfuse"
+              },
+              {
+                "family": "agentops",
+                "uri": "https://langfuse.com/docs",
+                "sha256": "34d09509900f2a2b",
+                "title": "Open Source AI Engineering Platform - Langfuse"
+              },
+              {
+                "family": "agentops",
+                "uri": "https://langfuse.com/docs/observability/overview",
+                "sha256": "0a1784a27f750267",
+                "title": "LLM Observability & Application Tracing (Open Source) - Langfuse"
+              },
+              {
+                "family": "agentops",
+                "uri": "https://docs.smith.langchain.com/",
+                "sha256": "216cc0ec88b4a616",
+                "title": "LangSmith Observability - Docs by LangChain"
+              },
+              {
+                "family": "agentops",
+                "uri": "https://langfuse.com/docs/analytics/overview",
+                "sha256": "245019da24ca609e",
+                "title": "LLM Metrics & Analytics - Langfuse"
+              },
+              {
+                "family": "agentops",
+                "uri": "https://www.braintrust.dev/docs",
+                "sha256": "1694f5c22f1528ee",
+                "title": "Get started with Braintrust - Braintrust"
+              },
+              {
+                "family": "agentops",
+                "uri": "https://docs.helicone.ai/",
+                "sha256": "20ead7ec1d1155ef",
+                "title": "Quickstart - Helicone OSS LLM Observability"
+              }
+            ]
+          },
+          "confidence": "high",
+          "caveats": [],
+          "needs": [
+            "ON-G6",
+            "ON-D6",
+            "RQ-F3"
+          ]
+        },
+        {
+          "id": "tr-freshness",
+          "label": "Freshness / staleness indicator",
+          "recommendation": "Show how fresh the data is (last updated / retained window) rather than implying live; the live-monitor sources tie every display to a refresh.",
+          "when": "Data can lag, be retained, or be partial.",
+          "avoid_when": "Green is shown when data is stale (green lies).",
+          "evidence": {
+            "support": 4,
+            "support_by_family": {
+              "cli": 3,
+              "craft": 1
+            },
+            "independent_families": 2,
+            "taxonomy_nodes": [
+              {
+                "id": "tech-trust-freshness-indicator",
+                "support": 4,
+                "family_names": [
+                  "cli",
+                  "craft"
+                ]
+              }
+            ],
+            "refs": [
+              {
+                "family": "dashboards",
+                "uri": "https://docs.railway.com/",
+                "sha256": "fb3d9950d9d1705b",
+                "title": "Railway Docs"
+              },
+              {
+                "family": "craft",
+                "uri": "https://www.nngroup.com/articles/skeleton-screens/",
+                "sha256": "ae670dfbb428a6ce",
+                "title": "Skeleton Screens 101 - NN/G"
+              },
+              {
+                "family": "cli",
+                "uri": "https://github.com/XuehaiPan/nvitop",
+                "sha256": "f0d68d37b1d8bc32",
+                "title": "GitHub - XuehaiPan/nvitop: An interactive NVIDIA-GPU process viewer and beyond, the one-stop solutio"
+              },
+              {
+                "family": "cli",
+                "uri": "https://github.com/XuehaiPan/nvitop",
+                "sha256": "f0d68d37b1d8bc32",
+                "title": "GitHub - XuehaiPan/nvitop: An interactive NVIDIA-GPU process viewer and beyond, the one-st"
+              },
+              {
+                "family": "cli",
+                "uri": "https://nvitop.readthedocs.io/",
+                "sha256": "1062824463740c2a",
+                "title": "Welcome to nvitop\u2019s documentation! \u2014 nvitop: the one-stop solution for GPU process managem"
+              },
+              {
+                "family": "cli",
+                "uri": "https://github.com/derailed/k9s",
+                "sha256": "1a478e7877c824fe",
+                "title": "GitHub - derailed/k9s: \ud83d\udc36 Kubernetes CLI To Manage Your Clusters In Style! \u00b7 GitHub"
+              },
+              {
+                "family": "craft",
+                "uri": "https://www.nngroup.com/articles/response-times-3-important-limits/",
+                "sha256": "ffa84c46b1dc9665",
+                "title": "Response Time Limits: Article by Jakob Nielsen - NN/G"
+              }
+            ]
+          },
+          "confidence": "low",
+          "caveats": [
+            "thin support (4 sources)"
+          ],
+          "needs": [
+            "ON-G6",
+            "ON-A6",
+            "RQ-F3"
+          ]
+        },
+        {
+          "id": "tr-degraded",
+          "label": "Degraded / health banner",
+          "recommendation": "Surface a top-level degraded/health state that names the failing dependency, without collapsing distinct failures into one number.",
+          "when": "A dependency (db/projector/provider) is down.",
+          "avoid_when": "The whole page collapses instead of the affected region.",
+          "evidence": {
+            "support": 11,
+            "support_by_family": {
+              "dashboards": 11
+            },
+            "independent_families": 1,
+            "taxonomy_nodes": [
+              {
+                "id": "tech-trust-degraded-banner",
+                "support": 11,
+                "family_names": [
+                  "dashboards"
+                ]
+              }
+            ],
+            "refs": [
+              {
+                "family": "dashboards",
+                "uri": "https://docs.sentry.io/product/alerts/",
+                "sha256": "748e01c9871ac335",
+                "title": "Alerts"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://docs.railway.com/",
+                "sha256": "fb3d9950d9d1705b",
+                "title": "Railway Docs"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://supabase.com/docs",
+                "sha256": "a62f83704d3f940d",
+                "title": "Supabase Docs"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://www.datadoghq.com/",
+                "sha256": "a9d42f1a8ce613d8",
+                "title": "Cloud Monitoring as a Service | Datadog"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://www.datadoghq.com/blog/",
+                "sha256": "21a1123a7f7711a6",
+                "title": "The Monitor | Datadog Official Blog"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://sentry.io/",
+                "sha256": "e66bb96ce835f7a4",
+                "title": "Application Performance Monitoring & Error Tracking Software | Sentry"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://blog.sentry.io/",
+                "sha256": "900dd2c988b418af",
+                "title": "Application Monitoring, Dev Tips & Engineering | Sentry Blog"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://railway.com/",
+                "sha256": "45e0c5fcb88c45d9",
+                "title": "Railway | The all-in-one intelligent cloud provider"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://blog.railway.com/",
+                "sha256": "0db00f8911e74fd5",
+                "title": "Railway Blog"
+              },
+              {
+                "family": "dashboards",
+                "uri": "https://supabase.com/",
+                "sha256": "1429f63056d2cb7f",
+                "title": "Supabase | The Postgres Development Platform"
+              }
+            ]
+          },
+          "confidence": "low",
+          "caveats": [
+            "single-family evidence (dashboards only) \u2014 single-source caveat applies"
+          ],
+          "needs": [
+            "ON-G1",
+            "ON-A2",
+            "RQ-F4"
+          ]
+        },
+        {
+          "id": "tr-uncertainty",
+          "label": "Uncertainty / eval encoding",
+          "recommendation": "Encode confidence/score/partiality explicitly (bands, intervals, 'unmeasured') so a viewer is never misled; the eval platforms carry the score/measure vocabulary.",
+          "when": "A value is estimated, sampled, or unmeasured.",
+          "avoid_when": "A point estimate is shown as certain.",
+          "evidence": {
+            "support": 3,
+            "support_by_family": {
+              "agentops": 2,
+              "dataviz": 1
+            },
+            "independent_families": 2,
+            "taxonomy_nodes": [
+              {
+                "id": "tech-trust-uncertainty-encoding",
+                "support": 3,
+                "family_names": [
+                  "agentops",
+                  "dataviz"
+                ]
+              }
+            ],
+            "refs": [
+              {
+                "family": "agentops",
+                "uri": "https://www.braintrust.dev/docs/guides/evals",
+                "sha256": "943a46764e1dce65",
+                "title": "Evaluate systematically - Braintrust"
+              },
+              {
+                "family": "agentops",
+                "uri": "https://langfuse.com/docs/scores/overview",
+                "sha256": "4667e20442936138",
+                "title": "Evaluation of LLM Applications - Langfuse"
+              },
+              {
+                "family": "agentops",
+                "uri": "https://docs.arize.com/phoenix/evaluation/llm-evals",
+                "sha256": "1c5100ce7cf1663b",
+                "title": "Evaluation - Phoenix"
+              },
+              {
+                "family": "agentops",
+                "uri": "https://www.patronus.ai/",
+                "sha256": "639142cd8703ceaa",
+                "title": "Patronus AI | Simulating the World's Intelligence"
+              },
+              {
+                "family": "agentops",
+                "uri": "https://www.galileo.ai/",
+                "sha256": "977103c74484cab7",
+                "title": "Galileo AI: The AI Observability and Evaluation Platform"
+              },
+              {
+                "family": "dataviz",
+                "uri": "https://www.data-to-viz.com/",
+                "sha256": "5ea42eb67bfba4b7",
+                "title": "From data to Viz | Find the graphic you need"
+              }
+            ]
+          },
+          "confidence": "low",
+          "caveats": [
+            "thin support (3 sources)"
+          ],
+          "needs": [
+            "ON-G6",
+            "RQ-C4",
+            "RQ-F3"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "agent-ops",
+      "label": "Agent-ops surface catalog (supplementary)",
+      "contract": "F1-specific \u2014 eval loop, prompt registry, OTel observability.",
+      "items": [
+        {
+          "id": "ao-eval",
+          "label": "Eval / dataset / experiment loop",
+          "recommendation": "Treat evals as a first-class surface (datasets \u2192 runs \u2192 scores \u2192 compare) alongside live traces; F1 is unanimous on the eval loop.",
+          "when": "Quality must be tracked, not just observed.",
+          "avoid_when": "Eval becomes a separate disconnected tool.",
+          "evidence": {
+            "support": 24,
+            "support_by_family": {
+              "agentops": 24
+            },
+            "independent_families": 1,
+            "taxonomy_nodes": [
+              {
+                "id": "tech-ops-eval-loop",
+                "support": 24,
+                "family_names": [
+                  "agentops"
+                ]
+              }
+            ],
+            "refs": [
+              {
+                "family": "agentops",
+                "uri": "https://docs.smith.langchain.com/evaluation",
+                "sha256": "60381850f2ec94ec",
+                "title": "Evaluation concepts - Docs by LangChain"
+              },
+              {
+                "family": "agentops",
+                "uri": "https://www.braintrust.dev/docs/guides/evals",
+                "sha256": "943a46764e1dce65",
+                "title": "Evaluate systematically - Braintrust"
+              },
+              {
+                "family": "agentops",
+                "uri": "https://docs.arize.com/phoenix/evaluation/llm-evals",
+                "sha256": "1c5100ce7cf1663b",
+                "title": "Evaluation - Phoenix"
+              },
+              {
+                "family": "agentops",
+                "uri": "https://blog.langchain.dev/",
+                "sha256": "978edb60fa825493",
+                "title": "LangChain Blog"
+              },
+              {
+                "family": "agentops",
+                "uri": "https://www.langchain.com/langsmith",
+                "sha256": "75ab02f301180387",
+                "title": "LangSmith: Agent & LLM Observability Platform"
+              },
+              {
+                "family": "agentops",
+                "uri": "https://langfuse.com/blog",
+                "sha256": "9222b2041ecf6042",
+                "title": "Blog - Langfuse"
+              },
+              {
+                "family": "agentops",
+                "uri": "https://docs.smith.langchain.com/evaluation",
+                "sha256": "60381850f2ec94ec",
+                "title": "Evaluation concepts - Docs by LangChain"
+              },
+              {
+                "family": "agentops",
+                "uri": "https://docs.smith.langchain.com/prompt_engineering",
+                "sha256": "195faedbb34b0887",
+                "title": "Prompt & Context Hub - Docs by LangChain"
+              },
+              {
+                "family": "agentops",
+                "uri": "https://langfuse.com/docs/scores/overview",
+                "sha256": "4667e20442936138",
+                "title": "Evaluation of LLM Applications - Langfuse"
+              },
+              {
+                "family": "agentops",
+                "uri": "https://langfuse.com/docs/prompts/get-started",
+                "sha256": "b6abb3bdd296f457",
+                "title": "Get Started with Prompt Management - Langfuse"
+              }
+            ]
+          },
+          "confidence": "low",
+          "caveats": [
+            "single-family evidence (agentops only) \u2014 single-source caveat applies"
+          ],
+          "needs": [
+            "RQ-F1",
+            "ON-D5"
+          ]
+        },
+        {
+          "id": "ao-prompt",
+          "label": "Prompt registry / versioning",
+          "recommendation": "Version prompts and tie each run to the prompt version that produced it, so a regression is attributable.",
+          "when": "Prompts change and outcomes must be compared.",
+          "avoid_when": "Prompt versions aren't linked to runs.",
+          "evidence": {
+            "support": 4,
+            "support_by_family": {
+              "agentops": 3,
+              "cli": 1
+            },
+            "independent_families": 2,
+            "taxonomy_nodes": [
+              {
+                "id": "tech-ops-prompt-registry",
+                "support": 4,
+                "family_names": [
+                  "agentops",
+                  "cli"
+                ]
+              }
+            ],
+            "refs": [
+              {
+                "family": "agentops",
+                "uri": "https://docs.smith.langchain.com/prompt_engineering",
+                "sha256": "195faedbb34b0887",
+                "title": "Prompt & Context Hub - Docs by LangChain"
+              },
+              {
+                "family": "agentops",
+                "uri": "https://langfuse.com/docs/prompts/get-started",
+                "sha256": "b6abb3bdd296f457",
+                "title": "Get Started with Prompt Management - Langfuse"
+              },
+              {
+                "family": "agentops",
+                "uri": "https://www.langchain.com/langsmith",
+                "sha256": "75ab02f301180387",
+                "title": "LangSmith: Agent & LLM Observability Platform"
+              },
+              {
+                "family": "agentops",
+                "uri": "https://docs.smith.langchain.com/prompt_engineering",
+                "sha256": "195faedbb34b0887",
+                "title": "Prompt & Context Hub - Docs by LangChain"
+              },
+              {
+                "family": "agentops",
+                "uri": "https://langfuse.com/docs/prompts/get-started",
+                "sha256": "b6abb3bdd296f457",
+                "title": "Get Started with Prompt Management - Langfuse"
+              },
+              {
+                "family": "cli",
+                "uri": "https://github.com/charmbracelet/gum",
+                "sha256": "0a4ed3be7e9c30d9",
+                "title": "GitHub - charmbracelet/gum: A tool for glamorous shell scripts \ud83c\udf80 \u00b7 GitHub"
+              }
+            ]
+          },
+          "confidence": "low",
+          "caveats": [
+            "thin support (4 sources)"
+          ],
+          "needs": [
+            "RQ-F2",
+            "ON-D4"
+          ]
+        },
+        {
+          "id": "ao-observability",
+          "label": "Agent observability / OTel instrumentation",
+          "recommendation": "Instrument with an open standard (OTel/OpenLLMetry) so the console can ingest without vendor lock-in; the open-source agent-ops sources converge on this.",
+          "when": "Multiple agents/providers must feed one room.",
+          "avoid_when": "Proprietary traces are the only option.",
+          "evidence": {
+            "support": 22,
+            "support_by_family": {
+              "agentops": 19,
+              "dashboards": 3
+            },
+            "independent_families": 2,
+            "taxonomy_nodes": [
+              {
+                "id": "tech-ops-observability",
+                "support": 22,
+                "family_names": [
+                  "agentops",
+                  "dashboards"
+                ]
+              }
+            ],
+            "refs": [
+              {
+                "family": "agentops",
+                "uri": "https://langfuse.com/docs/observability/overview",
+                "sha256": "0a1784a27f750267",
+                "title": "LLM Observability & Application Tracing (Open Source) - Langfuse"
+              },
+              {
+                "family": "agentops",
+                "uri": "https://openllmetry.com/",
+                "sha256": "52d7636af797828b",
+                "title": "Open-source Observability for LLMs with OpenTelemetry"
+              },
+              {
+                "family": "agentops",
+                "uri": "https://docs.arize.com/phoenix",
+                "sha256": "03f451e9e86f8ade",
+                "title": "What is Arize Phoenix? - Phoenix"
+              },
+              {
+                "family": "agentops",
+                "uri": "https://blog.langchain.dev/",
+                "sha256": "978edb60fa825493",
+                "title": "LangChain Blog"
+              },
+              {
+                "family": "agentops",
+                "uri": "https://www.langchain.com/langsmith",
+                "sha256": "75ab02f301180387",
+                "title": "LangSmith: Agent & LLM Observability Platform"
+              },
+              {
+                "family": "agentops",
+                "uri": "https://langfuse.com/blog",
+                "sha256": "9222b2041ecf6042",
+                "title": "Blog - Langfuse"
+              },
+              {
+                "family": "agentops",
+                "uri": "https://www.braintrust.dev/blog",
+                "sha256": "74edfbbb273241b6",
+                "title": "Latest Braintrust news - Braintrust"
+              },
+              {
+                "family": "agentops",
+                "uri": "https://docs.helicone.ai/",
+                "sha256": "20ead7ec1d1155ef",
+                "title": "Quickstart - Helicone OSS LLM Observability"
+              },
+              {
+                "family": "agentops",
+                "uri": "https://www.helicone.ai/blog",
+                "sha256": "a3f580845242c85e",
+                "title": "Helicone Blog | AI Development Insights & Best Practices"
+              },
+              {
+                "family": "agentops",
+                "uri": "https://docs.agentops.ai/v1/quickstart",
+                "sha256": "2220d7215a58ab31",
+                "title": "Quickstart - AgentOps"
+              }
+            ]
+          },
+          "confidence": "medium",
+          "caveats": [],
+          "needs": [
+            "RQ-A2",
+            "RQ-F1"
+          ]
+        }
+      ]
+    }
+  ],
+  "dropped": [
+    {
+      "catalog": "(taxonomy)",
+      "item": "thin-ia-modal-sheet",
+      "support": 1,
+      "reason": "thin cluster below the >=3-source bar; merged in r3 and not elevated here"
+    },
+    {
+      "catalog": "(taxonomy)",
+      "item": "thin-ia-overflow-drawer",
+      "support": 1,
+      "reason": "thin cluster below the >=3-source bar; merged in r3 and not elevated here"
+    },
+    {
+      "catalog": "(taxonomy)",
+      "item": "thin-viz-threshold-bands",
+      "support": 1,
+      "reason": "thin cluster below the >=3-source bar; merged in r3 and not elevated here"
+    },
+    {
+      "catalog": "(taxonomy)",
+      "item": "thin-ops-self-host",
+      "support": 2,
+      "reason": "thin cluster below the >=3-source bar; merged in r3 and not elevated here"
+    }
+  ]
+}
