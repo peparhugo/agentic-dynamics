@@ -1,0 +1,244 @@
+name: control_room_research
+question: >-
+  Research the open web at breadth (200 high-quality sources) and derive, categorize, split and
+  reduce its own UI/UX knowledge to answer: what would a sleek, sexy control room look like for
+  operating multiple CLI AI-coding-agent sessions — what does the operator need to know, what is
+  present but in the wrong place, what is missing? Output: a faceted taxonomy, decision-oriented
+  skills and catalogs (frameworks, IA/layout, charts, color/motion, SVG technique), a cited
+  design DIRECTION, and a brief with acceptance criteria for the Control Room facelift. Design:
+  docs/designs/proposed/control_room_research_campaign.md.
+version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: false
+repeatable: true
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: true
+    rag:
+      emit_self: false
+    context:
+      hard_rules: >-
+        (1) Every source enters through scripts/research_fetch.py (never ad-hoc fetching);
+        provenance is mandatory. (2) Claims cite their sources; single-source claims carry a
+        caveat in the artifact and raised uncertainty. (3) The adversary phases write only
+        their review docs. (4) No live-KB writes in this workflow; emission and the facelift
+        are separate acts. (5) Deliverables are committed under
+        experiments/research/control_room/ and docs/research/.
+    phases:
+      - name: r0_audit
+        kind: agent
+        scope: implementation
+        requires_deliverable: true
+        timeout: 3600
+        prompt: |
+          GOAL: {goal}
+          Audit the CURRENT Control Room from its code: read apps/control_room/server.py,
+          routes/, clients/, services/, static/index.html, static/app.js, static/style.css,
+          static/architecture.svg. Produce docs/research/control_room_audit.md: every panel and
+          data feed the operator sees; refresh cadence; which operator questions it answers;
+          what is present but mis-placed (ranked by likely operator cost); what is absent.
+          Measured from code — cite file paths and line ranges. Commit.
+      - name: r1_questions
+        kind: agent
+        scope: implementation
+        requires_deliverable: true
+        timeout: 3600
+        prompt: |
+          GOAL: {goal}
+          From r0's audit + the mandate, write docs/research/control_room_questions.md: the
+          research questions; the FACET MATRIX (category × aesthetic × stack × techniques ×
+          quality signals) with the five corpus families; and the operator-needs list (what an
+          operator running many CLI agent sessions must know at a glance, on drill-down, and on
+          alert). Commit.
+      - name: r2a_acquire_agentops
+        kind: agent
+        scope: implementation
+        requires_deliverable: true
+        timeout: 10800
+        prompt: |
+          GOAL: {goal}
+          Acquire ~40 high-quality sources on LLM/agent-operations rooms (LangSmith, Langfuse,
+          Braintrust, Helicone, AgentOps, W&B Weave, Arize Phoenix, and follow their linked
+          docs/case studies). Use python3 scripts/research_fetch.py (batch URLs per invocation;
+          it dedups by content hash). For each stored source write a facet record (category,
+          aesthetic, stack, techniques, quality signals, uri, sha) appending to
+          experiments/research/control_room/corpus/agentops.jsonl. Stop when the family budget
+          is met (±20%) or sources run dry; record the stop reason. Commit.
+      - name: r2b_acquire_dashboards
+        kind: agent
+        scope: implementation
+        requires_deliverable: true
+        timeout: 10800
+        prompt: |
+          GOAL: {goal}
+          Same protocol as r2a for ~50 operational dashboards/design systems: Linear, Vercel,
+          Grafana, Datadog, Sentry, PostHog, Railway, Fly.io, Modal, Supabase, Stripe and their
+          design/engineering posts. research_fetch.py only; facet records to
+          experiments/research/control_room/corpus/dashboards.jsonl; stop reason. Commit.
+      - name: r2c_acquire_dataviz
+        kind: agent
+        scope: implementation
+        requires_deliverable: true
+        timeout: 10800
+        prompt: |
+          GOAL: {goal}
+          Same protocol for ~40 charts/data-viz sources: Observable/D3 galleries, ECharts
+          examples, Vega-Lite, visx, Nivo, uPlot, Tremor, shadcn charts. Facet records to
+          experiments/research/control_room/corpus/dataviz.jsonl; stop reason. Commit.
+      - name: r2d_acquire_cli
+        kind: agent
+        scope: implementation
+        requires_deliverable: true
+        timeout: 10800
+        prompt: |
+          GOAL: {goal}
+          Same protocol for ~30 terminal/CLI sources: Warp, Wave, Ghostty, Charm
+          (bubbletea/gum), Textual, nvitop, asciinema and friends. Facet records to
+          experiments/research/control_room/corpus/cli.jsonl; stop reason. Commit.
+      - name: r2e_acquire_craft
+        kind: agent
+        scope: implementation
+        requires_deliverable: true
+        timeout: 10800
+        prompt: |
+          GOAL: {goal}
+          Same protocol for ~40 craft/reference sources: MDN (SVG/CSS/a11y), web.dev,
+          NN/g, Refactoring UI, Material/Apple HIG (density), Smashing, css-tricks SVG
+          archive, SVG-Tutorial. Facet records to
+          experiments/research/control_room/corpus/craft.jsonl; stop reason. Commit.
+      - name: r3_taxonomy
+        kind: agent
+        scope: implementation
+        requires_deliverable: true
+        timeout: 7200
+        prompt: |
+          GOAL: {goal}
+          Read all five corpus files. Cluster examples by facet; SPLIT heterogeneous clusters
+          and MERGE thin ones; write experiments/research/control_room/taxonomy.json (nodes:
+          id, parent, facet values, example refs, support) and a readable
+          docs/research/control_room_taxonomy.md. No claims beyond the records. Commit.
+      - name: r4_reduce
+        kind: agent
+        scope: implementation
+        requires_deliverable: true
+        timeout: 10800
+        prompt: |
+          GOAL: {goal}
+          Reduce the taxonomy into (a) decision-oriented SKILL records ("for a sleek dark
+          data-dense agent-ops room: framework X, layout Y, chart lib Z, avoid W") and
+          (b) CATALOGS with sources: frameworks, IA/layout patterns, chart selection,
+          color/motion, SVG technique. Every item cites its example refs and support; drop
+          unsupported leaves. Write experiments/research/control_room/skills.json and
+          experiments/research/control_room/catalogs.json plus a readable
+          docs/research/control_room_knowledge.md. Commit.
+      - name: r5_synthesize
+        kind: agent
+        scope: implementation
+        requires_deliverable: true
+        timeout: 10800
+        prompt: |
+          GOAL: {goal}
+          Synthesize ONE design DIRECTION for the Control Room: what sleek/sexy means here
+          (with exemplar citations), the operator-needs answer (glance / drill-down / alert),
+          the "present but wrong place" and "missing" dispositions from r0, rejected
+          alternatives with reasons, and a concrete layout+chart+SVG proposition. Write
+          docs/research/control_room_direction.md, fully cited. Commit.
+      - name: r6a_adversary_entailment
+        kind: agent
+        scope: adversarial_readonly
+        requires_deliverable: true
+        run_model: openai/gpt-5.6-terra
+        timeout: 7200
+        prompt: |
+          GOAL: {goal}
+          Adversarial pass 1 of 3 — ENTAILMENT/QUALITY. For every claim in the direction,
+          skills, and catalogs: check it follows from the cited source records (read them);
+          flag overreach, missing caveats for single-source claims, fake support counts, and
+          hidden contradictions. Write docs/reviews/control_room_research_entailment.md with a
+          findings table and required dispositions. Do not open new attack surface. A clean
+          pass is valid. Commit.
+      - name: r6b_adversary_design
+        kind: agent
+        scope: adversarial_readonly
+        requires_deliverable: true
+        run_model: anthropic/claude-sonnet-5
+        timeout: 7200
+        prompt: |
+          GOAL: {goal}
+          Adversarial pass 2 of 3 — DESIGN CRITIQUE. Acting as a demanding senior product
+          designer: where is the direction generic, dated, cluttered, or cargo-culted? Does it
+          actually read as sleek/sexy for a multi-agent CLI control room, or as a template?
+          Check against the cited exemplars and the operator needs. Write
+          docs/reviews/control_room_research_design.md with findings + required dispositions.
+          Commit.
+      - name: r6c_adversary_ia
+        kind: agent
+        scope: adversarial_readonly
+        requires_deliverable: true
+        run_model: openai/gpt-5.6-sol
+        timeout: 7200
+        prompt: |
+          GOAL: {goal}
+          Adversarial pass 3 of 3 — INFORMATION ARCHITECTURE. Does the direction answer what
+          the operator must know FIRST when running many sessions? What is mis-ranked, buried,
+          or absent versus r0/r1? Attack the glance/drill-down/alert story. Write
+          docs/reviews/control_room_research_ia.md with findings + required dispositions.
+          Commit.
+      - name: r7_verify
+        kind: agent
+        scope: implementation
+        requires_deliverable: true
+        timeout: 3600
+        prompt: |
+          GOAL: {goal}
+          Final check: corpus totals per family vs the 200-source budget (with stop reasons);
+          taxonomy support; every skill/catalog item cited; the three adversary verdicts and
+          the dispositions; the brief's acceptance criteria. Write
+          docs/reviews/control_room_research_verify.md and TIGHTEN
+          docs/research/control_room_direction.md into the facelift brief (scope, layout,
+          chart set, SVG set, motion budget, accessibility bar, no-regression requirements).
+          Commit.
+      - name: r8_tests
+        kind: test
+        scope: implementation
+        timeout: 600
+        tests:
+          - tests/test_research_fetch.py
+factors:
+  - {name: model, levels: [deepseek/deepseek-v4-flash]}
+design: factorial
+rules:
+  - name: control_room_corpus_acquired
+    plane: measurement
+    evidence_class: "[X]"
+    requires: []
+    produces: [research_corpus]
+  - name: control_room_knowledge_reduced
+    plane: measurement
+    evidence_class: "[H]"
+    requires: [research_corpus]
+    produces: [research_taxonomy_skills_catalogs]
+  - name: control_room_direction_cited
+    plane: measurement
+    evidence_class: "[H]"
+    requires: [research_taxonomy_skills_catalogs]
+    produces: [design_direction]
+  - name: control_room_adversarially_checked
+    plane: measurement
+    evidence_class: "[H]"
+    requires: [design_direction]
+    produces: [three_adversary_verdicts]
+metrics:
+  - {name: research_corpus, agg: mean, over: cell}
+  - {name: research_taxonomy_skills_catalogs, agg: mean, over: cell}
+  - {name: design_direction, agg: mean, over: cell}
+  - {name: three_adversary_verdicts, agg: mean, over: cell}
+comparison: null
+writeup: {format: lab_book, sections: [question, r0_audit, r1_questions, r2_acquire, r3_taxonomy, r4_reduce, r5_synthesize, r6_adversary, r7_verify]}
+stop: {budget_usd: 25.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}
