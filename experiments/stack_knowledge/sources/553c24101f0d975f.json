@@ -1,0 +1,11 @@
+{
+  "uri": "https://sqlite.org/lang.html",
+  "final_url": "https://sqlite.org/lang.html",
+  "status": 200,
+  "content_type": "text/html; charset=utf-8",
+  "sha256": "553c24101f0d975f1af72161806475ed71b1401363794f0a67dfdd500a1c2737",
+  "title": "Query Language Understood by SQLite",
+  "text": "Small. Fast. Reliable.\nChoose any three.\nHome\nMenu\nAbout\nDocumentation\nDownload\nLicense\nSupport\nPurchase\nSearch\nAbout\nDocumentation\nDownload\nSupport\nPurchase\nSearch Documentation Search Changelog\nSQL As Understood By SQLite\nSQLite understands most of the standard SQL\nlanguage. But it does omit some features while at the same time\nadding a few features of its own. This document attempts to\ndescribe precisely what parts of the SQL language SQLite does\nand does not support. A list of SQL keywords is\nalso provided. The SQL language syntax is described by syntax diagrams .\nThe following syntax documentation topics are available:\naggregate functions\nALTER TABLE\nANALYZE\nATTACH DATABASE\nBEGIN TRANSACTION\ncomment\nCOMMIT TRANSACTION\ncore functions\nCREATE INDEX\nCREATE TABLE\nCREATE TRIGGER\nCREATE VIEW\nCREATE VIRTUAL TABLE\ndate and time functions\nDELETE\nDETACH DATABASE\nDROP INDEX\nDROP TABLE\nDROP TRIGGER\nDROP VIEW\nEND TRANSACTION\nEXPLAIN\nexpression\nINDEXED BY\nINSERT\nJSON functions\nkeywords\nmath functions\nON CONFLICT clause\nPRAGMA\nREINDEX\nRELEASE SAVEPOINT\nREPLACE\nRETURNING clause\nROLLBACK TRANSACTION\nSAVEPOINT\nSELECT\nUPDATE\nUPSERT\nVACUUM\nwindow functions\nWITH clause\nThe routines sqlite3_prepare_v2() , sqlite3_prepare() , sqlite3_prepare16() , sqlite3_prepare16_v2() , sqlite3_exec() , and sqlite3_get_table() accept\nan SQL statement list (sql-stmt-list) which is a semicolon-separated\nlist of statements.\nsql-stmt-list:\nEach SQL statement in the statement list is an instance of the\nfollowing:\nsql-stmt:\nThis page was last updated on 2024-04-01 12:41:31Z",
+  "bytes": 34250,
+  "fetched_at": "2026-09-11T00:48:44.603579+00:00"
+}
