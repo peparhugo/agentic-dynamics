@@ -204,7 +204,7 @@ def _stub_result():
 
 def _run_main(module, tmp_path, monkeypatch, *, fake_run):
     monkeypatch.setattr(module, "ROOT", tmp_path)
-    monkeypatch.setattr(module, "load_spec", lambda p: _stub_spec())
+    monkeypatch.setattr(module, "load_spec_any", lambda p: _stub_spec())
     monkeypatch.setattr(module, "run_workflow", fake_run)
     # Keep the post-run best-effort hooks quiet in the hermetic environment.
     monkeypatch.setenv("FINOPS_FACT_AUTO_EMIT", "0")
@@ -250,7 +250,7 @@ def test_main_no_analyzer_no_client_without_flag(tmp_path, monkeypatch):
     module = _load_module()
     monkeypatch.setenv("FINOPS_NEO4J_URI", "bolt://env:7687")
     monkeypatch.setattr(module, "ROOT", tmp_path)
-    monkeypatch.setattr(module, "load_spec", lambda p: _stub_spec())
+    monkeypatch.setattr(module, "load_spec_any", lambda p: _stub_spec())
     seen = {}
 
     def fake_run(spec, **kwargs):
@@ -305,7 +305,7 @@ def test_child_mode_records_no_run_and_injects_no_recorder(tmp_path, monkeypatch
         )
 
     monkeypatch.setattr(module, "ROOT", tmp_path)
-    monkeypatch.setattr(module, "load_spec", spec_stub)
+    monkeypatch.setattr(module, "load_spec_any", spec_stub)
     monkeypatch.setattr(module, "run_workflow", fake_run)
     monkeypatch.setenv("FINOPS_FACT_AUTO_EMIT", "0")
     monkeypatch.setattr(sys, "argv", [
@@ -379,7 +379,7 @@ def test_child_mode_starts_no_run_heartbeat(tmp_path, monkeypatch):
             workflow=SimpleNamespace(params={"phases": [{"name": "scope"}]}),
         )
 
-    monkeypatch.setattr(module, "load_spec", spec_stub)
+    monkeypatch.setattr(module, "load_spec_any", spec_stub)
     monkeypatch.setattr(module, "run_workflow", lambda spec, **kw: _stub_result())
     monkeypatch.setenv("FINOPS_FACT_AUTO_EMIT", "0")
     monkeypatch.setattr(sys, "argv", [

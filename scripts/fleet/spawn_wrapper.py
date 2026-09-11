@@ -128,9 +128,9 @@ from agentic_dynamics.experiment.experiment_spec import (  # noqa: E402
     PHASE_SCOPE_AUTHORIZATION,
     SCOPE_CONFIGS,
     SCOPE_VOCABULARY,
-    load_spec,
     phase_scope,
 )
+from workflows.compile_workflow import load_spec_any  # noqa: E402
 
 # ── The mount contract (the isolation constant, proposal §3) ─────────────────
 #
@@ -883,7 +883,7 @@ def validate_submit_request(
     spec = None
     if spec_path is not None:
         try:
-            spec = load_spec(spec_path)
+            spec = load_spec_any(spec_path)
             compile_spec(spec)
         except (SpecError, OSError, ValueError) as exc:
             errors.append(f"submit: spec {spec_rel!r} does not compile-validate: {exc}")
@@ -1466,7 +1466,7 @@ def _spec_name_for_ledger(spec_rel: str) -> str:
     try:
         path, errors = _resolve_spec_path(spec_rel, _REPO_ROOT)
         if path is not None and not errors:
-            return load_spec(path).name
+            return load_spec_any(path).name
     except (SpecError, OSError, ValueError):
         pass
     return Path(spec_rel).stem
