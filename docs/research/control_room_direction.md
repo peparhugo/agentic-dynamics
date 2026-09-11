@@ -2,307 +2,459 @@
 status: accepted
 ---
 
-# Control Room — design direction & facelift brief seed (campaign r5)
+# Control Room - facelift brief (campaign r5 direction, tightened by r7)
 
 **Date:** 2026-09-11
-**Campaign:** `workflows/repository/control_room_research.yaml`, phase `r5_synthesize`.
+**Campaign:** `workflows/repository/control_room_research.yaml`, phases `r5_synthesize` + `r7_verify`.
 **Inputs:** the measured baseline `docs/research/control_room_audit.md` (r0), the operator-needs/facet
-contract `docs/research/control_room_questions.md` (r1), `experiments/research/control_room/taxonomy.json`
-(r3), and `catalogs.json` + `skills.json` (r4).
-**Output:** ONE cited design direction. This is a synthesis of the records; r6 attacks it, r7 tightens it
-into the facelift brief.
+contract `docs/research/control_room_questions.md` (r1), `taxonomy.json` (r3), `catalogs.json` +
+`skills.json` (r4), and the three adversary reviews
+`control_room_research_entailment.md` (r6a),
+`control_room_research_design.md` (r6b), and
+`control_room_research_ia.md` (r6c).
+**Verification:** `docs/reviews/control_room_research_verify.md` (r7).
 
-**Citation legend.**
-`[r0 M#/A#/§]` = measured finding in the audit · `[ON-G#/D#/A#]` = operator need (r1 §4) ·
-`[S1]–[S6]` = sleek criteria (r1 §5) · `[RQ-*]` = research question (r1 §2) ·
-`[skill:…]` / `[cat:…/…]` = reduction artifacts · `[tax:…]` = taxonomy node ·
-`[src:…]` = corpus source (appendix maps tag → family/uri/sha256).
+**What this document is.** r5 produced a design direction; r6a/r6b/r6c returned blocking verdicts;
+r7 tightens the direction into this **facelift brief**: the scope, layout, chart set, SVG set,
+motion budget, accessibility bar, truth/control contracts, and no-regression requirements the
+implementation must satisfy. The r5 body was superseded; its measured r0 dispositions and its
+source appendix are retained below.
 
----
+**Claim discipline (r6a disposition 3).** Every statement is labelled:
 
-## 1. What "sleek and sexy" means here
+- `[M]` **measured** in the repository (r0 code facts, runtime contracts, or the verified corpus
+  counts in the r7 record).
+- `[X]` **external observation** from a named source checked during acquisition, or a fresh direct
+  check recorded by an adversary pass.
+- `[P]` **policy** - a local design decision, not an external consensus.
 
-The mandate forbids hand-describing the adjective, so "sleek" is defined operationally by the six
-criteria r1 derived from the measured problems `[S1]–[S6]`, and each is now backed by exemplars:
+Where r6a found an external support count inflated (E1-E4), the affected recommendation is stated
+as `[P]` and the count is not cited. The corpus counts in the r7 verification record are `[M]`.
 
-1. **Operator-first ranking.** The resting screen answers the operator's questions in cost order; no
-   decoration precedes a decision signal `[S1]`. Exemplars: Grafana/Datadog boards rank state before
-   chrome `[src:grafana]` `[src:datadog]`; NN/g's pre-attentive dashboard guidance puts status
-   encoding first `[src:nng-dash]`.
-2. **Calm under load.** Under the existing 1 s tick / 5 s poll with dozens of nodes, no flicker, no
-   focus loss, no announcement flood `[r0 §9.1–9.3]` `[S2]`. Exemplars: keyed write-on-change lists
-   are already the room's contract `[r0 §9.3]`; progressive disclosure keeps the standing screen
-   quiet `[src:nng-progressive]`.
-3. **Truthful state.** Partial, stale, degraded and unmeasured are distinct and green never lies
-   `[S3]` `[ON-G6]`. Exemplars: projection watermarks already measured but unrendered `[r0 M2]`;
-   freshness/skeleton affordances `[src:nng-skeleton]`; explicit source provenance on agent-ops
-   numbers `[src:langfuse-cost]` `[src:helicone]`.
-4. **Evidence at hand.** Every consequential surface is one step from the decision it supports `[S4]`.
-   Exemplars: registry lineage `[r0 M4]`; agent-ops trace trees `[src:langfuse-obs]` `[src:arize]`.
-5. **Restrained craft.** One token-based system — elevation, accent economy, type scale, motion
-   budget — instead of accumulating chrome `[S5]`. Exemplars: Refactoring UI's constrained tactics
-   `[src:refactoringui]`, token naming `[src:smashing-tokens]`, accent economy `[src:nng-color]`.
-6. **Accessible by default.** Keyboard, screen reader, colorblind, reduced-motion, forced-colors
-   `[S6]` `[ON-A6]`. Exemplars: WCAG 2.2 Quickref `[src:wcag-quickref]`, contrast minimum
-   `[src:wcag-contrast]`, APG patterns `[src:w3c-apg]`, forced-colors
-   `[src:mdn-forced-colors]`, reduced-motion `[src:mdn-reduced-motion]`.
-
-**What sleek is *not* here:** animated flourish over live data `[src:nng-micro]`; a per-card chart
-gallery `[r0 M6]`; a single big "health" number `[r0 A1]`; a modal-everything shell `[r0 M14]`; a
-React component showroom `[cat:frameworks/fw-react-kits]`.
+**Citation legend.** `[src:...]` = corpus source (appendix maps tag to family/URI/sha256);
+`[M#/A#]` = r0 misplaced/absent finding; `[ON-*]` = r1 operator need; `[D#]` = r6b design finding;
+`[IA#]` = r6c IA finding; `[E#]` = r6a entailment finding; `[cat:.../...]` / `[skill:...]` = r4
+reduction artifacts.
 
 ---
 
-## 2. The one direction — "Instrument Panel"
+## 1. The direction
 
-> **A calm, truthful operator instrument: a build-less shell whose first screen is one attention strip
-> over a domain board, whose money and health are first-class boards rather than overflow, whose detail
-> is docked beside the live grid, and whose charts and diagrams answer one question each in a single
-> dark-first token system.**
+> **An evidence-first run triage console.** A calm, terminal-native surface where unresolved work is
+> triaged first, the fleet stays visible while one object is investigated, every run opens into a
+> causal evidence ladder, and every control previews its target, scope, revision, reversibility, and
+> recording before it acts.
 
-The direction is the composition of the r4 `skill-synthesis` `[skill:skill-synthesis]` with the r0
-dispositions in §4. It answers the mandate's three questions directly:
+This replaces r5's "calm instrument panel" container metaphor `[D1]`. The visual system is a
+supporting layer, not the identity: dark/light token parity, restrained motion, and accessible
+status are quality bars `[P]`, not the product's differentiators. The differentiators are triage,
+causal evidence, terminal context, and safe control `[P]`.
 
-- **What the operator needs to know:** the r1 needs `[ON-G1..G7]` `[ON-D1..D7]` `[ON-A1..A6]`,
-  answered in §3.
-- **What is present but in the wrong place:** every r0 M-finding gets a disposition in §4.
-- **What is missing:** every r0 A-finding gets a disposition in §4 (built, folded in, or rejected
-  with reason).
-
----
-
-## 3. The operator-needs answer (glance / drill-down / alert)
-
-### 3.1 Glance — the resting screen (no interaction)
-
-| Need | Direction | Evidence |
-|---|---|---|
-| `[ON-G1]` is the system up / connected? | One **status/health summary** in the rail + a connection state; health is a board, not a badge alone. | `[r0 A1]` `[skill:skill-glance]` `[cat:trust-attention/tr-degraded]` |
-| `[ON-G2]` running / queued / failed now? | **Work board**: keyed fleet grid with counts; live rows are a filter, not a second list. | `[r0 M7]` `[cat:ia-layout/ia-board-per-domain]` `[cat:chart-selection/ch-table]` |
-| `[ON-G3]` anything failing / stalled / at risk? | **Attention strip** above the board: failed runs · projection lag · unhealthy workers · approvals. | `[r0 A2]` `[cat:ia-layout/ia-attention-surface]` |
-| `[ON-G4]` money — spend, burn, quota, wallet, leases? | **Money board** owns spend/burn trend + provider windows + wallet + lease reservations + budget thresholds. | `[r0 M1]` `[cat:ia-layout/ia-money-grouping]` `[src:langfuse-cost]` `[src:stripe]` |
-| `[ON-G5]` anything needs a decision from me? | **Decisions board**: `awaiting_approvals`, `promotable_runs` (+candidate sha), docs proposal, recording coverage. | `[r0 M3]` `[r0 A3]` `[r0 M12]` `[skill:skill-shell-ia]` |
-| `[ON-G6]` is what I see fresh and trustworthy? | **Truth bar** footer: data age, retained-window marker, projection health, provenance on consequential numbers. | `[r0 M2]` `[r0 A10]` `[skill:skill-trust]` `[src:webdev-contentvis]` |
-| `[ON-G7]` shape of the fleet by model/condition? | **Fleet rollup** on the Work board: status grid + small multiples by model/condition. | `[r0 A6]` `[cat:chart-selection/ch-status-grid]` `[cat:chart-selection/ch-small-multiples]` |
-
-### 3.2 Drill-down — one selection away
-
-| Need | Direction | Evidence |
-|---|---|---|
-| `[ON-D1]` what is a cell doing, step by step? | **Docked detail** transcript with follow/pause/filter (bounded stream, never a 500-row rebuild). | `[r0 §9.1]` `[cat:chart-selection/ch-log-stream]` `[src:railway]` |
-| `[ON-D2]` why flagged / safe action? | Detail shows source provenance + typed **confirmation doors** (no native `confirm()`). | `[r0 M14]` `[r0 §9.6]` `[cat:trust-attention/tr-provenance]` |
-| `[ON-D3]` design draft/validation? | Detail design panel unchanged; **status is never color-only**. | `[r0 §9.5]` `[cat:color-motion/cm-status-color]` |
-| `[ON-D4]` which canonical record explains this? | **Registry is a destination** under Decisions, with lineage (span/session tree). | `[r0 M4]` `[cat:trust-attention/tr-lineage]` `[src:langfuse-obs]` `[src:arize]` |
-| `[ON-D5]` route model at what cost/quality? | Routing folded into Work/detail; eval loop lives beside live traces. | `[r0 A6]` `[cat:agent-ops/ao-eval]` `[src:braintrust]` `[src:langsmith-eval]` |
-| `[ON-D6]` what did this cost, by step? | Per-step cost **with provenance** (metered/estimated/unknown) in detail; money board owns the rollup. | `[r0 A5]` `[cat:chart-selection/ch-time-series]` `[src:helicone]` |
-| `[ON-D7]` manage a background `claude` session? | Detail panel unchanged; actions stay typed. | `[r0 §9.6]` |
-
-### 3.3 Alert — must interrupt or be impossible to miss
-
-| Need | Direction | Evidence |
-|---|---|---|
-| `[ON-A1]` a run failed/timed out | Failure is an **event on the attention strip**, not only a count/tile. | `[r0 §4]` `[cat:ia-layout/ia-attention-surface]` |
-| `[ON-A2]` worker/projection unhealthy or stale | Same strip; `projection_lag`/`unhealthy_workers` from the control packet. | `[r0 M2/A2/A4]` `[cat:trust-attention/tr-freshness]` |
-| `[ON-A3]` spend/quota threshold crossed | Money board threshold bands + attention event. Threshold bands are thin in the corpus (1 source) — keep as a text+band cue, not a chart. | `[tax:thin-viz-threshold-bands]` `[cat:ia-layout/ia-money-grouping]` |
-| `[ON-A4]` controller decision pending | Decisions board tile + attention event. | `[r0 M3/A3]` `[skill:skill-shell-ia]` |
-| `[ON-A5]` supervisor flag raised/changed | In-room announcements via a **live region** (polite, deduped), not an announcement flood. | `[r0 §9.7]` `[src:mdn-live-regions]` `[skill:skill-shell-ia]` |
-| `[ON-A6]` the room's own data went stale | Truth bar + degraded banner naming the dependency. | `[r0 A10]` `[cat:trust-attention/tr-degraded]` |
-
-**Alert model.** The room stays **in-room, pull-first** (r0 measured no push channel beyond connection
-state `[r0 §4]`). We add a persistent attention strip + an in-room alert log + `aria-live` status,
-and **reject** external channels (A9) for this scope — see §5.
+**What sleek means here** (r1 section 5, carried forward): operator-first ranking, calm under load,
+truthful state, evidence at hand, restrained craft, accessible by default. The operationally
+testable form of "operator-first ranking" is now the r6c hierarchy below: the resting screen
+answers ON-G1..G6 together without board hopping `[IA1]`.
 
 ---
 
-## 4. Dispositions — every r0 finding
+## 2. Scope
 
-### 4.1 "Present but in the wrong place" (M1–M14)
+### 2.1 In scope
 
-| # | Finding | Disposition | Reason / citation |
-|---|---|---|---|
-| M1 | quota/wallet/leases buried in System | **Move** to the Money board | Money is a first-class operator domain `[skill:skill-shell-ia]` `[cat:ia-layout/ia-money-grouping]` `[r0 M1]` |
-| M2 | projection health measured, unrendered | **Render** on Health + truth bar | The measured-but-unrendered rail was built to stop false confidence `[r0 M2]` `[skill:skill-trust]` |
-| M3 | `control status` packet absent | **Render** the packet on Health/Decisions | ONE dynamic-state contract exists; show it `[r0 M3]` `[r0 A3]` `[cat:trust-attention/tr-degraded]` |
-| M4 | registry is an overflow drawer | **Promote** to destination under Decisions | Evidence must be one step from the decision `[r0 M4]` `[S4]` `[cat:trust-attention/tr-lineage]` |
-| M5 | docs health inline below fold | **Collapse** to one-line health tile + drill | It is an alertable standing state, not a form `[r0 M5]` `[cat:ia-layout/ia-progressive-disclosure]` `[src:nng-progressive]` |
-| M6 | per-card sparkline can't compare | **Remove**; status grid + row sparkline only where comparison is real | The mark has no shared scale/baseline `[r0 M6]` `[src:nng-dash]` `[cat:chart-selection/ch-status-grid]` |
-| M7 | Live now duplicates grid | **Merge** as a filter/pin on the fleet grid | Same selectable nodes rendered twice `[r0 M7]` `[cat:ia-layout/ia-board-per-domain]` |
-| M8 | hidden System still polls 60 s | **Poll only the active board**; pause hidden surfaces | Unconditional polls waste and surprise `[r0 M8]` `[r0 §3.1]` |
-| M9 | rail mirrors `aria-hidden` | **Expose** as a labelled live region with text values | A from-any-board mirror must be hearable `[r0 M9]` `[src:mdn-live-regions]` |
-| M10 | registry rows pseudo-buttons | **Fix semantics**: real focusable controls inside cells; keep table roles | `<tr role=button>` announces inconsistently `[r0 M10]` `[src:w3c-tables]` `[src:w3c-apg]` |
-| M11 | reinterleave has no affordance | **Add** a queue control with a typed door | Route exists, unreachable `[r0 M11]` `[r0 §9.6]` |
-| M12 | recording audit/sweep outside the room | **Surface** on Decisions or System | Recording is part of the act `[r0 M12]` |
-| M13 | pipeline strip re-parented | **Own a strip per board** | Context should not jump between boards `[r0 M13]` |
-| M14 | native `confirm()` seams | **Replace** with the typed-door primitive | Visual/behaviour seam `[r0 M14]` `[r0 §9.6]` |
+- Re-compose and restyle `apps/control_room/static/` (HTML, CSS, classic JS) against this brief.
+- Change information hierarchy, layout, component treatment, motion, and visual tokens.
+- Promote already-measured data into new placements (projections, control packet, registry,
+  subscription/lease state, recording coverage) `[M]`.
+- Add the accepted chart set and SVG set below.
 
-### 4.2 "Missing" (A1–A12)
+### 2.2 Out of scope (guardrails)
 
-| # | Missing | Disposition | Reason / citation |
-|---|---|---|---|
-| A1 | single health/alert aggregate | **Build** the attention strip + health board (not one number) | Summarize without collapsing failure modes `[r0 A1]` `[skill:skill-trust]` |
-| A2 | projection/latency health | **Build** (same as M2) | `[r0 A2]` |
-| A3 | approvals/permanence queue | **Build** Decisions board | `[r0 A3]` `[cat:ia-layout/ia-attention-surface]` |
-| A4 | worker/fleet execution health | **Build** on Health (unhealthy workers, throughput) | `[r0 A4]` `[cat:trust-attention/tr-degraded]` |
-| A5 | historical trends | **Build** time-series marks on Money/Health | The corpus' strongest mark family `[r0 A5]` `[cat:chart-selection/ch-time-series]` `[src:uplot]` |
-| A6 | fleet cost/quality rollup | **Build** fleet rollup + small multiples | `[r0 A6]` `[cat:chart-selection/ch-small-multiples]` `[cat:agent-ops/ao-eval]` |
-| A7 | operator architecture diagram | **Build** a theme-aware topology SVG and adopt the orphaned asset | `[r0 A7/§8.3]` `[cat:svg-technique/svg-theme]` `[src:mdn-viewbox]` |
-| A8 | cross-session/log search | **Build** bounded search over the retained window on the log-stream surface | `[r0 A8]` `[cat:chart-selection/ch-log-stream]` |
-| A9 | notifications (browser/sound/email) | **Reject for this scope**; in-room attention only | The room is the operator's surface; external channels are a separate trust/infra decision `[r0 A9]` |
-| A10 | timezone + data-age everywhere | **Build** the truth bar (age/retained-window per panel); keep UTC + local toggle | `[r0 A10]` `[skill:skill-trust]` |
-| A11 | auth / multi-operator | **Reject** (unchanged): loopback/tailnet trust boundary | By design `[r0 A11]`; out of campaign scope |
-| A12 | mobile treatment for wide tables | **Build** responsive: docked detail collapses to a sheet; tables virtualize and reflow | `[r0 A12]` `[cat:ia-layout/ia-density-ladder]` `[src:webdev-design]` |
+- No framework migration and no build step: the six classic scripts, load order, and
+  `window.ControlRoom*` boundaries remain `[M]`.
+- No new mutating route class and no automatic actuation: every mutation still funnels through the
+  existing trust boundary and typed doors `[M]`.
+- No new persistence plane, no new poller for decoration, no change to the two-layer poll/SSE
+  reconciliation model `[M]`.
+- No invented telemetry: no per-cell model/condition/confidence/heartbeat/quality encoding unless
+  the API later provides the field `[M]` `[r0 section 6, r6b D6]`.
+- No external notification channels in this scope; the promise is foreground in-room attention
+  `[IA6]`.
 
 ---
 
-## 5. Rejected alternatives (with reasons)
+## 3. Layout and information architecture
 
-1. **React SPA / build-pipeline rebuild.** Rejected: the room's no-build guardrail is a measured
-   contract `[r0 §9.8]`; the component kits assume React+Tailwind+Recharts `[cat:frameworks/fw-react-kits]`
-   `[src:tremor]` `[src:shadcn]`. Revisit only if contributor count changes.
-2. **Command-palette-only navigation.** Rejected: palettes are used *alongside* a visual board
-   `[src:linear]` `[src:railway]` `[src:warp]`, never as the only IA `[skill:skill-shell-ia]`.
-3. **One mega-dashboard.** Rejected: board-per-domain dominates ops IA and keeps money/health from
-   drowning in work state `[cat:ia-layout/ia-board-per-domain]` `[src:grafana]` `[src:datadog]`.
-4. **Keep per-card sparklines.** Rejected: no shared scale/baseline, so they cannot compare `[r0 M6]`;
-   prefer a status grid + one row-level sparkline `[src:nng-dash]` `[cat:chart-selection/ch-status-grid]`.
-5. **Canvas/SVG monotheism.** Rejected: ECharts documents the tradeoff — SVG for a few
-   marks/accessibility, canvas for many/high-frequency `[src:echarts-canvas]`; keep both
-   `[skill:skill-charts]`.
-6. **Dark-only theme.** Rejected: dark needs desaturated surfaces and a real light path
-   `[src:nng-dark]`; plus a forced-colors path `[src:mdn-forced-colors]` `[cat:color-motion/cm-dark-first]`.
-7. **A single collapsing health score.** Rejected: it hides distinct failure modes `[r0 A1]`
-   `[skill:skill-trust]`; show named failures on the strip.
-8. **Keep registry/health/quota in System overflow.** Rejected: evidence-at-hand is criterion S4 and
-   the r0 cost ranking puts these at HIGH `[r0 M1/M2/M4]`.
-9. **D3 for every chart.** Rejected: imperative cost is justified only for bespoke marks
-   `[cat:frameworks/fw-d3]`; standard marks use a small library `[cat:frameworks/fw-declarative]`.
-10. **External alert channels (browser/sound/email).** Rejected for this scope (A9); adds a new trust
-    boundary, and the measured gap is in-room attention, not delivery `[r0 A9/§4]`.
+**Acceptance criterion:** at rest, the operator can answer ON-G1..G6 together without opening
+another board `[IA1]`. r5's one-active-board design fails this and is superseded `[IA1]` `[IA2]`.
 
----
+### 3.1 The required structure
 
-## 6. Concrete layout proposition
+```text
+PERSISTENT SCOPE / TRUTH
+  repository | worktree/campaign scope | browser connection | control epoch | degraded summary
 
-```
-┌──────────────────────────────────────────────────────────────────────────────┐
-│  RAIL  ⌂ Work ▤ Money ✚ Health ⚖ Decisions      ⌘K commands   ● status  $$$  │
-├──────────────────────────────────────────────────────────────────────────────┤
-│  ATTENTION STRIP   ▲ 2 failed runs · ▣ 1 approval · ⧗ chroma lag 3 · ⚠ docs  │  ← live region
-├───────────────────────────────────────────────┬──────────────────────────────┤
-│  BOARD (active domain)                        │  DOCKED DETAIL               │
-│                                               │  ─ selected node ─           │
-│  Work:      keyed fleet grid + queue          │  status · provenance         │
-│  Money:     spend/burn line · windows/wallet  │  transcript (follow/pause)   │
-│             lease reservations · budgets      │  lineage tree · per-step cost│
-│  Health:    degraded · workers · projections  │  typed safe-actions          │
-│  Decisions: approvals · promotable · registry │                              │
-│                                               │  (narrow: modal sheet)       │
-├───────────────────────────────────────────────┴──────────────────────────────┤
-│  TRUTH BAR   age 4s · retained window · provenance [M/E/U] · tz UTC|local    │
-└──────────────────────────────────────────────────────────────────────────────┘
-   System overflow (gear): config · recording · advanced — secondary only
+ATTENTION INBOX  (durable, ranked, deduplicated)
+  pending decisions | run failures/stalls | money risk | worker/projection impact
+  advisory flags | process gaps
+
+FLEET TRIAGE  (default resting body)
+  keyed runs/cells | current phase | changed-at | attention state
+  constraint exception | affected dependency | pending decision
+
+SELECTED RUN / SESSION  (docked inspector)
+  identity + current truth
+  phase -> attempt -> events/tools -> change/commit -> independent verification
+  cost/lease provenance -> decision -> registry record
+
+SAFE ACTION
+  target + epoch/revision + scope + budget effect + reversibility
+  preview -> typed confirmation when required -> execute -> receipt
+
+SECONDARY LENSES
+  Money | Health | Decisions | Registry | composition/performance | history
 ```
 
-- **Navigation:** a persistent rail of domains + `⌘K` palette as accelerator `[cat:ia-layout/ia-command-palette]`;
-  tabs/panes for co-resident surfaces `[cat:ia-layout/ia-tab-bar]`.
-- **Detail:** docked right column that survives live updates, collapsing to a modal sheet on narrow
-  viewports `[cat:ia-layout/ia-master-detail]` `[r0 A12]`.
-- **Density:** comfortable/compact ladder, persisted; selection/focus preserved across switches
-  `[cat:ia-layout/ia-density-ladder]` `[src:webdev-design]` `[src:every-layout]`.
-- **Disclosure:** long-tail surfaces behind progressive disclosure, never decision-critical ones
-  `[cat:ia-layout/ia-progressive-disclosure]` `[src:nng-progressive]`.
+### 3.2 Layout requirements
+
+1. **Default surface is Fleet Triage.** Work/runs are the primary addressable list and remain
+   visible while a detail inspector is open `[IA1]` `[IA2]`.
+2. **Persistent summaries, not peer-board hops.** Compact connection, attention, money-risk,
+   pending-decision, and freshness summaries are visible on every lens. Money, Health, Decisions,
+   and Registry become contextual lenses and evidence destinations, not mandatory context switches
+   `[D2]` `[IA2]`.
+3. **One joined run context.** Selecting a run/attention item establishes identity joining
+   `run -> phase -> attempt -> session -> worker -> lease -> approval/candidate SHA -> independent
+   verification -> decision -> registry record`. Decision-changing money, health, and approval
+   facts appear inside that inspector `[D2]` `[IA2]` `[IA9]`.
+4. **Control packet is the current-state authority.** `control-status/v1` (or its imported
+   derivation) is the source of active/failed/promotable runs, awaiting approvals, unhealthy
+   workers, projection lag, degraded state, control epoch, and database-derived `safe_actions`
+   `[M]` `[IA3]`. Analytical views may enrich but must not redefine current state or synthesize
+   actions independently.
+5. **Detail navigation contract.** Each selectable object has a type and stable key; selection
+   survives live reconciliation and compatible lens changes; scope, filters, sort, time range,
+   scroll, transcript query, and follow/pause state persist; incompatible scope changes clear or
+   confirm; disappeared/stale/denied states retain object identity; closing restores focus to the
+   origin; exactly one selected event stream remains `[M]` `[IA10]`.
+6. **Entry paths restored.** Design sessions, background `claude` sessions, supervisor Flags,
+   Routing, Registry, recording, and queue controls all have explicit destinations and are
+   addressable by global search. An unchanged detail panel with no roster is not an acceptable
+   migration `[D8]` `[IA12]`.
+7. **Density ladder** persisted, without resetting selection or focus `[P]`. Pipeline context is
+   owned by the lens that shows it; one canonical summary projection, no re-parenting `[M13]`.
+
+### 3.3 Mobile
+
+Mobile is a **triage and inspection mode**, not a reflow of the desktop wall `[D11]` `[IA16]`.
+Its first view is unresolved attention and recently changed runs; it preserves one selected object,
+its truth/evidence, and the safe-action preview; fleet comparison and historical charts are explicit
+secondary views. The sheet carries the same focus containment, focus return, and preserved
+query/time scope as the dock `[P]`.
 
 ---
 
-## 7. Concrete chart proposition
+## 4. Glance / drill-down / alert contract
 
-| Operator question | Mark | Library | Citation |
+r5 treated alerting as a third disclosure depth; it is orthogonal `[IA5]`. The brief uses two axes:
+
+```text
+Disclosure:  overview -> selected object -> evidence detail
+Attention:   observation -> state transition -> attention item -> notification -> resolution
+```
+
+### 4.1 Glance (resting screen, no interaction)
+
+| Need | Required answer | Evidence |
+|---|---|---|
+| `ON-G1` up / connected | separate browser connection, control-plane health, dependency health, and freshness states (not one badge or one number) | `[M]` `[D4]` `[IA7]` |
+| `ON-G2` running / queued / failed / live | default Fleet Triage list with live/change state always visible, not behind a filter | `[M7]` `[IA1]` |
+| `ON-G3` failing / stalled / risk | durable Attention Inbox items with identity, rank, and lifecycle | `[D3]` `[IA4]` |
+| `ON-G4` money | money-risk exception visible at rest; full spend/burn/windows/wallet/leases in the Money lens and in run context | `[M1]` `[P]` `[IA1]` |
+| `ON-G5` decision needed | actionable decision objects in the Attention Inbox and run context | `[M3]` `[IA9]` |
+| `ON-G6` fresh / trustworthy | compact global degraded summary plus per-object truth (section 6) | `[M2]` `[D4]` `[IA7]` |
+| `ON-G7` fleet shape | secondary composition lens with model, condition, provider, and lifecycle; performance separated | `[r1 section 4.1]` `[IA14]` |
+
+### 4.2 Attention Inbox
+
+The r5 "attention strip" becomes a durable inbox `[D3]` `[IA4]`. The strip may survive only as a
+compact index into it. Each item carries:
+
+| Field | Requirement |
+|---|---|
+| identity | stable item key and typed source object |
+| priority | severity plus whether a human decision is possible now |
+| timing | first seen, last changed, source age, threshold/reset window |
+| scope | affected run, worker, projection, provider, campaign, or room |
+| state | `new`, `active`, `snoozed`, `resolved`, `stale` |
+| authority | measured, computed, heuristic, policy, or unknown |
+| action | evidence link and database-derived safe next action if one exists |
+
+Announcement policy: one polite live region announced on **transitions** only, deduplicated. Ordinary
+changing metrics (rail spend/burn/running/redis) are labelled and readable but **not** live `[M9]`
+`[D3]` `[IA4]`.
+
+### 4.3 Drill-down and evidence
+
+Detail is not a transcript with sidebars; it is a causal evidence ladder `[D9]` `[IA11]`:
+
+```text
+run -> phase -> attempt -> reasoning/tool event -> change/commit
+    -> independent test/evaluator -> cost/lease provenance
+    -> controller decision -> canonical record/supersession
+```
+
+Agent narration, measured runtime facts, independent verification, heuristic flags, cost
+provenance, and controller decisions remain visually and semantically distinct. Registry lineage
+(supersession/causality) is separate from the runtime trace while reachable from the affected run
+`[D9]` `[IA11]`.
+
+### 4.4 Alert honesty
+
+In-room pull-first means **impossible to miss while the Control Room is foregrounded**, with a
+durable inbox retaining what happened while it was not. The word "interrupt" is not used unless a
+delivery channel exists `[IA6]`. External channels remain a deferred decision `[A9]`.
+
+---
+
+## 5. Chart set
+
+**Acceptance criterion:** no unconditional chart defaults `[D6]` `[IA14]`. Every accepted chart
+states, in the brief's implementation notes:
+
+- the operator question and the decision it changes;
+- the comparison baseline and time scope;
+- the data completeness and sampling/decimation rule;
+- the textual/table equivalent;
+- the fallback when too few or too many observations exist;
+- a performance and focus-preservation budget.
+
+**Initial implementation set** (order reflects r6c's ranking - counts and tables before marks):
+
+| Priority | Surface | Form | Notes |
 |---|---|---|---|
-| Money/quality over time (`ON-G4`,`ON-D6`) | line/area + inline sparkline | uPlot (small/streaming) or ECharts | `[cat:chart-selection/ch-time-series]` `[src:uplot]` `[src:echarts]` |
-| Fleet/node state (`ON-G3`,`ON-G7`) | status grid / heatmap | hand SVG or ECharts | `[cat:chart-selection/ch-status-grid]` `[src:nng-dash]` |
-| Bounded quantity: queue/phase (`ON-G2`) | gauge/progress | hand SVG | `[cat:chart-selection/ch-gauge]` `[src:nvitop]` `[src:btop]` |
-| Large sets: registry/cells/events (`ON-D4`) | virtualized sortable table | hand/vanilla + `content-visibility` | `[cat:chart-selection/ch-table]` `[src:nng-tables]` `[src:webdev-contentvis]` |
-| Live output (`ON-D1`) | bounded log stream, follow/pause/filter | hand | `[cat:chart-selection/ch-log-stream]` `[src:railway]` |
-| Multi-step run (`ON-D1`,`ON-D6`) | timeline/waterfall | hand or ECharts | `[cat:chart-selection/ch-timeline]` `[src:langfuse-obs]` |
-| Cross-group compare (`ON-G7`) | small multiples *(thin evidence)* | any | `[cat:chart-selection/ch-small-multiples]` |
-| Many live marks (`RQ-C5`) | canvas + decimation, lazy panels | uPlot/ECharts | `[cat:chart-selection/ch-perf]` `[src:echarts-canvas]` |
+| 1 | Fleet Triage rows / composition | counts, rates, sortable table | status grid only where colour is not the sole signal `[M]` |
+| 2 | Selected run | causal timeline / waterfall | bounded, one question per step `[D9]` |
+| 3 | Money/quality over time | line/area or sparkline | one shared scale/baseline; never per-card comparison `[M6]` |
+| 4 | Bounded quantity (queue/phase) | text + progress/gauge | gauge only where a maximum exists `[P]` |
+| 5 | Live output | bounded log stream with follow/pause/filter | never a full-list rebuild `[M]` |
 
-Chart types with a **default**: status grid at a glance, line/sparkline over time, gauge for
-bounded state, table for sets, waterfall for runs. **Dropped:** threshold-band and small-multiple
-clusters are below/at the evidence bar `[tax:thin-viz-threshold-bands]` — use them only as
-text+band cues where the question forces it.
+**Deferred / gated:** small multiples and threshold bands are thin evidence and are not defaults;
+use only where an operator question demands comparison and the baseline/denominator are explicit
+`[E1]` `[E6]`. Canvas/decimation only when a measured mark count requires it `[X]` `[E5]`.
 
 ---
 
-## 8. Concrete SVG proposition
+## 6. Truth and provenance contract
 
-- **Topology diagram (adopted, `A7`).** Rewrite the orphaned `static/architecture.svg` `[r0 §8.3]` as a
-  **theme-aware flow**: `queues → launch broker → workers → cells → sessions → knowledge projections`.
-  Author with `viewBox` for scale `[src:mdn-viewbox]`, colors from `currentColor`/custom properties
-  `[src:mdn-custom-props]` `[src:smashing-svg]`, grouped + labelled with real `<text>`
-  `[src:svg-tutorial]`, a `<title>`/`<desc>` and `role="img"` (or `aria-hidden` if decorative)
-  `[src:cstricks-accessible]`. Link it from the Health board (topology explains lag).
-- **Micro-visuals.** Sparkline, gauge, status glyph and flow line as small **SVG+CSS** pieces
-  (path + `stroke-dasharray`/gradient), not a JS chart runtime `[cat:svg-technique/svg-micro]`
-  `[src:cstricks-line]` `[src:svg-tutorial]`.
-- **Accessibility.** Every informative SVG carries a text alternative; charts get a textual
-  equivalent `[src:wcag-quickref]` `[src:cstricks-accessible]`; forced-colors safe
-  `[src:mdn-forced-colors]`.
+A single footer cannot qualify local data `[D4]` `[IA7]`. Keep only scope, browser connection,
+control epoch, and a compact degraded summary global. Attach to **every consequential value**:
 
----
+- source and projection (ledger, Redis, registry, browser state);
+- observation time and age;
+- scope, retained window, and truncation/partiality;
+- revision or control epoch where applicable;
+- measured / estimated / unknown / unmeasured semantics;
+- a link to the event or record from which the value was derived.
 
-## 9. Visual system (tokens, color, type, motion)
+Green never lies: a stale or unmeasured subsystem must not render as healthy `[M2]` `[P]`. The
+`partial: True` contract on reported cost and the `history_capped` marker are preserved `[M]`.
 
-- **Tokens.** One CSS-custom-property layer (surface/elevation/accent/status/type); derive variants
-  with `color-mix()` `[src:mdn-custom-props]` `[src:mdn-color-mix]`; name by convention
-  `[src:smashing-tokens]`.
-- **Color.** Few, colorblind-safe status hues; **never color alone** (shape/label always)
-  `[r0 §9.5]` `[cat:color-motion/cm-status-color]` `[src:webdev-contrast]` `[src:nng-color]`;
-  contrast ≥ 4.5:1 body / 3:1 large `[src:wcag-contrast]`.
-- **Theming.** Dark-first + a real light theme from the same tokens + forced-colors
-  `[cat:color-motion/cm-dark-first]` `[src:nng-dark]` `[src:mdn-forced-colors]`.
-- **Type.** Small scale, tabular numerals for dense data `[cat:color-motion/cm-type]` `[src:butterick]`
-  `[src:smashing-type]`; one icon family, labelled where ambiguous `[cat:color-motion/cm-icon]`
-  `[src:nng-icon]` `[src:mdn-use]`.
-- **Elevation.** Structural surface ladder, not decoration `[cat:color-motion/cm-elevation]`
-  `[src:refactoringui]`.
-- **Motion.** Short state-change motion only, spring/ease `[cat:color-motion/cm-motion]`
-  `[src:josh-spring]` `[src:nng-micro]`; honor `prefers-reduced-motion`
-  `[cat:color-motion/cm-reduced-motion]` `[src:mdn-reduced-motion]` `[src:webdev-reduced]`.
-- **Accent economy.** One accent at a time `[cat:color-motion/cm-accent]` `[src:vercel-geist]`.
-- **A11y live.** Attention changes announce via polite live regions, deduped
-  `[src:mdn-live-regions]` `[src:webdev-a11y]`.
+**Refresh by role** (reconciles r5's pause-hidden rule with global attention) `[IA8]`:
+
+| Feed role | Policy |
+|---|---|
+| current control and attention | lightweight, always on while the room is active |
+| selected object | one live stream plus bounded reconciliation `[M]` |
+| active analytical lens | poll while visible; abort/pause when hidden |
+| historical/expensive | fetch on demand; mark its age |
+
+Pause hidden heavy views, never the current-state facts required for truthful global attention `[M8]`.
 
 ---
 
-## 10. No-regression contract + drift reconciliation
+## 7. Control and safe-action contract
 
-The direction must preserve every measured guardrail `[r0 §9]`: two-layer reconciliation `[§9.1]`, one
-selected event stream `[§9.2]`, keyed write-on-change lists `[§9.3]`, no HTML-string rendering
-`[§9.4]`, two-axis status language `[§9.5]`, mutation trust boundary + typed doors `[§9.6]`,
-accessible chrome (hidden-not-CSS, focus traps, reduced motion) `[§9.7]`, and **no build step**
-`[§9.8]`.
+Every mutation shows, before execution `[D12]` `[IA9]`:
 
-It must also reconcile the measured drift `[r0 §8]`: the route count is **34 across 7 categories**
-(not 28/31/32) `[r0 §8.1]`; the design authority actually lives at
-`docs/website/control_room_ui/design.md` `[r0 §8.2]`; `architecture.svg` is orphaned and is **adopted**
-by §8 `[r0 §8.3]`; the route-list docstring must gain the recording category `[r0 §8.4]`.
+- exact target object and current selection;
+- repository / worktree / model / provider context;
+- requested scope and expected blast radius;
+- current run state, control epoch/revision, and concurrency conflict behavior;
+- gate ID and candidate SHA where applicable;
+- proposer, rationale, and evidence authority;
+- lease or budget consequence;
+- reversibility and typed-confirmation requirement;
+- the database-derived safe action;
+- the resulting decision/recording receipt.
 
----
-
-## 11. Carry-forward to r6/r7
-
-- **r6a (entailment):** re-check every `[src:*]` and `[skill/cat]` citation above against the stored
-  records; flag any claim resting on a single family (the agent-ops and a few craft/trust items).
-- **r6b (design):** attack §6/§9 for genericness — is the Instrument Panel actually distinctive, or a
-  Grafana-shaped template?
-- **r6c (IA):** attack §3 for ranking — does the glance screen truly answer `ON-G1..G7` in cost order?
-- **r7 (brief):** tighten §6/§7/§8/§9 into acceptance criteria (scope, layout, chart set, SVG set,
-  motion budget, accessibility bar, no-regression), using the language of `[r0 §9]` and `[r0 §11]`.
+Typed confirmation remains mandatory for irreversible actions but does not replace current-state
+validation. No visual redesign may turn a flag into an automatic steer, interrupt, route, retry, or
+budget action `[P]` `[M]`.
 
 ---
 
-## Appendix — sources cited
+## 8. SVG set
+
+- **Topology.** Ship only if live, scoped, and actionable: highlight the selected run's
+  dependencies, current lag, and affected records `[D7]`. Otherwise link the architecture
+  documentation from System/help; do not place a static diagram in the resting room `[D7]` `[IA12]`.
+- **Micro-visuals.** Sparkline, gauge, status glyph, and flow line as small SVG+CSS pieces
+  (path + stroke-dasharray/gradient), not a JS chart runtime `[X]` `[P]`.
+- **Authoring.** `viewBox` for scale, `currentColor`/custom properties for theming, real `<text>`
+  labels for print/zoom, `<title>`/`<desc>` and role for informative SVGs, `aria-hidden` for
+  decorative `[X]`. Informative charts carry a text equivalent; forced-colors safe `[P]`.
+
+---
+
+## 9. Motion budget
+
+- Animate **state changes only**, with short durations (roughly 100-240 ms) and decelerating easing
+  `[P]`.
+- No entrance animation on poll, no layout-shifting motion, no decorative pulse; liveness is a
+  labelled state and a settled timestamp `[D5]` `[P]`.
+- Honor `prefers-reduced-motion`: all durations collapse to instant, repeating animation is
+  disabled, and state remains conveyed by copy/icon/timestamp `[P]`.
+- Motion must never compete with the 1 s tick / 5 s poll cadence `[M]`.
+
+---
+
+## 10. Accessibility bar
+
+- WCAG 2.2 AA contrast: >= 4.5:1 body, >= 3:1 large text `[X]` `[P]`.
+- Status is never colour-only: every lifecycle/attention state pairs colour with shape and a
+  plain-language word `[M]` `[P]`.
+- Registry and other tables use real focusable controls inside semantic cells; no
+  `<tr role="button">` pseudo-buttons `[M10]` `[X]`.
+- One transition-only polite live region; ordinary metrics are labelled but not announced `[M9]`
+  `[IA4]`.
+- Modal/sheet surfaces: labelled dialog, focus trap, Escape, scrim dismissal, return focus `[M]`.
+- Forced-colors/high-contrast support via system colors and `currentColor` `[X]`.
+- Keyboard: addressable objects, typed search, visible focus, preserved selection, escape paths
+  `[D8]`.
+
+---
+
+## 11. No-regression requirements
+
+Every measured r0 section 9 guardrail holds `[M]`:
+
+1. Two-layer reconciliation: matrix snapshot owns retained telemetry; SSE overlays live samples;
+   bounded replay with a `replay_complete` boundary and de-dup windows.
+2. One selected event stream at a time.
+3. Keyed, write-on-change lists; a no-op poll performs zero writes.
+4. No HTML-string rendering; all content built with `element()`/`textContent`.
+5. Two-axis status language (lifecycle vs supervisor attention), colour never alone.
+6. Mutation trust boundary plus idempotency on every non-GET, with typed doors preserved.
+7. Accessible chrome: `hidden` (not CSS-only) deactivation, focus traps, reduced motion.
+8. No build step: six classic scripts in dependency order.
+
+Additionally: the route set is 34 endpoints across 7 categories, not 28/31/32 `[M]`; the design
+authority path and the `architecture.svg` references are reconciled as part of the facelift `[M]`.
+
+---
+
+## 12. Acceptance checklist (adversary dispositions)
+
+The implementation is graded against these; each maps to a required disposition.
+
+| # | Criterion | Source |
+|---|---|---|
+| 1 | ON-G1..G6 answerable together at rest; Fleet Triage is the default | r6c IA1/IA2 |
+| 2 | Control packet is the current-state authority with epoch and derived safe actions | r6c IA3 |
+| 3 | Durable Attention Inbox with the field model and transition-only announcements | r6b D3, r6c IA4 |
+| 4 | Disclosure and alert lifecycle are separate axes | r6c IA5 |
+| 5 | One joined run context; no decision needs five board hops | r6b D2, r6c IA2/IA9 |
+| 6 | Truth travels with each consequential value; one compact global summary | r6b D4, r6c IA7 |
+| 7 | Refresh split by role; hidden heavy views pause, current state does not | r6c IA8 |
+| 8 | Detail navigation contract (identity, persistence, focus return) | r6c IA10 |
+| 9 | Evidence ladder separates narration, measurement, verification, lineage | r6b D9, r6c IA11 |
+| 10 | All existing entry paths migrated (design, Claude, Flags, Routing, Registry, recording, queue) | r6c IA12 |
+| 11 | Object search and bounded event search specified | r6c IA13 |
+| 12 | Composition and performance separated; provider included | r6c IA14 |
+| 13 | Docs/recording each have one owner and one escalation path | r6c IA15 |
+| 14 | Mobile is triage/inspection mode | r6b D11, r6c IA16 |
+| 15 | No unconditional chart defaults; every chart justified | r6b D6, r6c IA14 |
+| 16 | Topology live+scoped or moved out | r6b D7 |
+| 17 | Terminal grammar: object addressing, context, readonly, preview/apply, escape | r6b D8 |
+| 18 | Safe-action preview on every mutation | r6b D12, r6c IA9 |
+| 19 | Truthful in-room alert language; no false interrupt promise | r6c IA6 |
+| 20 | All no-regression guardrails hold | r0 section 9 |
+| 21 | Inflated r6a support claims downgraded to `[P]`/`[X]`; no consensus claims | r6a E1-E8 |
+
+---
+
+## 13. r0 dispositions (retained, updated by the adversaries)
+
+### 13.1 Present but misplaced (M1-M14)
+
+| # | r5/r7 disposition | Update |
+|---|---|---|
+| M1 | quota/wallet/leases to Money + run context | money-risk exception visible at rest `[IA2]` |
+| M2 | render projection health | roles split: global summary, dependency detail, affected run `[IA7]` |
+| M3 | render control packet | made the current-state authority with epoch + safe actions `[IA3]` |
+| M4 | promote registry | linked directly from run/decision, not only a destination `[IA2]` |
+| M5 | collapse docs health | one process-health owner; warranted proposals become decisions `[IA15]` |
+| M6 | remove incomparable sparklines | no replacement chart inherits the noise `[D6]` |
+| M7 | merge Live now | live/change state always visible, not filter-only `[IA1]` |
+| M8 | pause hidden polls | pause heavy lenses, not current control/attention `[IA8]` |
+| M9 | expose rail mirrors | labelled/readable, not live-announced `[IA4]` |
+| M10 | fix row semantics | real controls inside cells `[M]` |
+| M11 | add reinterleave affordance | add order/target preview, idempotency, receipt `[D12]` |
+| M12 | surface recording | process-health owner; missing record becomes attention `[IA15]` |
+| M13 | per-board strip | one canonical summary projection; no re-parenting `[M]` |
+| M14 | typed doors | doors plus safe-action validation and preview `[D12]` |
+
+### 13.2 Missing (A1-A12)
+
+| # | r5/r7 disposition | Update |
+|---|---|---|
+| A1 | attention strip + health | stateful Attention Inbox `[IA4]` |
+| A2 | projection/latency health | impact + local provenance `[IA7]` |
+| A3 | approvals queue | complete decision objects + safe actions `[IA9]` |
+| A4 | worker health | linked to affected runs/sessions `[IA2]` |
+| A5 | historical trends | secondary analysis tied to a decision and time scope `[IA14]` |
+| A6 | cost/quality rollup | composition and performance separated `[IA14]` |
+| A7 | operator topology | live+scoped or out of the rest view `[D7]` |
+| A8 | cross-session search | object search + bounded event search `[IA13]` |
+| A9 | notifications | deferred; honest foreground-only promise `[IA6]` |
+| A10 | timezone + data age | per-object truth + global degraded summary `[IA7]` |
+| A11 | auth / multi-operator | unchanged scope; actor identity + recording on actions `[P]` |
+| A12 | mobile data surfaces | triage/inspection mode `[IA16]` |
+
+---
+
+## 14. Rejected alternatives
+
+1. **React SPA / build pipeline.** Rejected: no-build is a measured local guardrail `[M]`; the
+   corpus does not prove React unnecessary `[E7]`.
+2. **One mega-dashboard.** Rejected: it buries money/health/decision exceptions in work state `[P]`.
+3. **Command-palette-only navigation.** Rejected: palettes accelerate a visual board, never replace
+   it `[X]`.
+4. **Per-card microcharts.** Rejected: no shared scale/baseline `[M6]`.
+5. **Global truth footer as the trust model.** Rejected: cannot qualify local values `[D4]` `[IA7]`.
+6. **Four peer boards as the primary IA.** Rejected: fragments one decision `[D2]` `[IA2]`.
+7. **Alerting as a third disclosure depth.** Rejected: it is an orthogonal lifecycle `[IA5]`.
+8. **Static topology in the resting room.** Rejected: documentation theater `[D7]`.
+9. **External notification channels (this scope).** Deferred, not silently promised `[IA6]`.
+10. **"Premium flight deck" mood language.** Rejected: identity must come from behavior `[D5]`.
+
+---
+
+## 15. Open items
+
+- **r6a taxonomy crosswalk repair (E1-E4).** The r3 support counts remain inflated; regenerating
+  raw-label support and its descendants is a named open item for a future repair pass. Until then,
+  affected recommendations are `[P]`/`[X]`, and no support count from the disputed nodes is cited.
+- **r6a E8 catalog title drift.** Metadata only; references resolve.
+- **Implementation.** The facelift itself (a1-a7 in the campaign design) is not part of this phase.
+
+---
+
+## Appendix - sources cited
+
+The appendix is the r5 corpus provenance; full 64-character hashes and extracted text live in
+`experiments/research/control_room/sources/` and `sources.jsonl`; facet records carry the same hash
+in `corpus/*.jsonl`.
 
 | Tag | Family | sha256 (16) | URI |
 |---|---|---|---|
@@ -382,6 +534,3 @@ by §8 `[r0 §8.3]`; the route-list docstring must gain the recording category `
 | `[src:every-layout]` | craft | `4b5a5ab9eabd35d8` | https://every-layout.dev/ |
 | `[src:josh-spring]` | craft | `71b1e7fa215f3d5a` | https://www.joshwcomeau.com/animation/a-friendly-introduction-to-spring-physics/ |
 | `[src:butterick]` | craft | `ef40706eeb33417f` | https://practicaltypography.com/summary-of-key-rules.html |
-
-*Full 64-char hashes and extracted text live in `experiments/research/control_room/sources/` and
-`sources.jsonl`; facet records carry the same hash in `corpus/*.jsonl`.*
