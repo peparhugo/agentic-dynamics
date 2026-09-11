@@ -24,7 +24,6 @@ if str(SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPTS_DIR))
 
 import sync_data  # noqa: E402
-
 from conftest import requires_full_corpus  # noqa: E402  # tests/ is on sys.path under pytest
 
 
