@@ -140,6 +140,17 @@ class DockerAgentExecutor(StepExecutor):
         declared = request.phase_def.get("scope") if isinstance(request.phase_def, dict) else None
         if declared in spawn_wrapper.SCOPE_VOCABULARY:
             phase_scopes = {request.phase_name: declared}
+        # Step 3: the state namespace carries the RUN identity — <spec>/<run-id>/<phase> — so
+        # two runs of the same spec never share one writable CLI-state directory (the
+        # pre-step-3 <spec>/<phase> form did exactly that). The run id comes from the clone
+        # path (runs_root/<run-id>/repo); in the legacy no-clone shape the run identity is
+        # unknown and the namespace keeps its old form rather than fabricating one.
+        run_key = Path(self._run_clone).parent.name if self._run_clone else ""
+        state_namespace = (
+            f"{self._spec_name}/{run_key}/{request.phase_name}"
+            if run_key
+            else f"{self._spec_name}/{request.phase_name}"
+        )
         return spawn_wrapper.build_phase_request(
             request.phase_def,
             goal=self._goal,
@@ -150,9 +161,7 @@ class DockerAgentExecutor(StepExecutor):
             admission=admission,
             run_clone=self._run_clone,
             phase_scopes=phase_scopes,
-            # P0-3: a per-attempt state namespace — <spec>/<phase>/ — so retries and
-            # concurrent phases never share a writable CLI-state directory.
-            state_namespace=f"{self._spec_name}/{request.phase_name}",
+            state_namespace=state_namespace,
             # b3_launch_broker: the cell image + docker-side timeout ride on the TYPED request
             # (image_digest / timeout_seconds) — the executor no longer passes them to a docker
             # call of its own; the broker validates + executes them.
