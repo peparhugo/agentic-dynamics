@@ -78,6 +78,7 @@ _COMMANDS: dict[tuple[str, ...], str] = {
     ("data", "bundle"): "bundle_artifacts.py",
     # knowledge
     ("knowledge", "ingest"): "kb_produce.py",
+    ("knowledge", "produce-skill"): "kb_produce_skill.py",
     ("knowledge", "sources"): "kb_produce_sources.py",
     ("knowledge", "facts"): "kb_produce_facts.py",
     ("knowledge", "campaign-evidence"): "kb_produce_campaign_evidence.py",

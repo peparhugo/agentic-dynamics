@@ -257,7 +257,7 @@ def score_cells(cells_dir: Path, base_sha: str, repo: Path, *, threshold: float)
         )
 
     conditions: list[dict] = []
-    for condition in ("C0", "C1", "C2", "C3"):
+    for condition in sorted({c["condition"] for c in cells}):
         rows = [c for c in cells if c["condition"] == condition]
         valid = [c for c in rows if c["valid"]]
         blobs = [c["blob"] for c in valid]

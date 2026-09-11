@@ -57,6 +57,10 @@ FRAMING = (
     "most different from the most obvious approach."
 )
 
+#: C4 is the scope-1 extension arm (pre-registration addendum §13): same KB spec as C3,
+#: after the self-derived skill entered the shared corpus. It is a SEPARATE plan so the
+#: registered 12-cell assignment table never changes.
+EXTENSION_CONDITION = "C4"
 CONDITIONS: dict[str, dict] = {
     "C0": {"spec": "workflows/repository/flash_ladder_bare.yaml", "goal_suffix": "", "budget": 0},
     "C1": {
@@ -74,6 +78,11 @@ CONDITIONS: dict[str, dict] = {
         "goal_suffix": "",
         "budget": 0,
     },
+    "C4": {
+        "spec": "workflows/repository/flash_ladder_kb.yaml",
+        "goal_suffix": "",
+        "budget": 0,
+    },
 }
 
 #: The pre-registered assignment table, in order: 4 conditions x 3 independent repetitions.
@@ -81,6 +90,10 @@ ASSIGNMENT: tuple[tuple[str, str, int], ...] = tuple(
     (f"{condition}-r{rep}", condition, rep)
     for condition in ("C0", "C1", "C2", "C3")
     for rep in (1, 2, 3)
+)
+
+EXTENSION_ASSIGNMENT: tuple[tuple[str, str, int], ...] = tuple(
+    (f"{EXTENSION_CONDITION}-r{rep}", EXTENSION_CONDITION, rep) for rep in (1, 2, 3)
 )
 
 
@@ -96,8 +109,17 @@ class CellPlan:
 
 def build_cell_plan() -> list[CellPlan]:
     """The 12 cells in the pre-registered order (assignment table, no reseeding)."""
+    return _plans_for(ASSIGNMENT)
+
+
+def build_extension_plan() -> list[CellPlan]:
+    """The C4 skill-augmented arm (addendum §13): same spec, run after the skill is live."""
+    return _plans_for(EXTENSION_ASSIGNMENT)
+
+
+def _plans_for(assignment: tuple[tuple[str, str, int], ...]) -> list[CellPlan]:
     plans: list[CellPlan] = []
-    for cell_id, condition, rep in ASSIGNMENT:
+    for cell_id, condition, rep in assignment:
         config = CONDITIONS[condition]
         plans.append(
             CellPlan(
@@ -312,7 +334,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--timeout-s", type=int, default=9000, help="per-cell wall clock")
     args = parser.parse_args(argv)
 
-    plan = build_cell_plan()
+    plan = build_cell_plan() + build_extension_plan()
     if args.cells:
         wanted = {c.strip() for c in args.cells.split(",") if c.strip()}
         plan = [p for p in plan if p.cell_id in wanted]

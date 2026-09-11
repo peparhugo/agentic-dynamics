@@ -297,3 +297,34 @@ first infra failure.
 the PRISTINE contract test (restored from the base) against each exported tree and excludes
 `solution_code is None` attempts with their count reported. Metrics/comparison/decision rule and
 stop remain exactly §4.
+
+## 13. Scope-1 skill + C4 arm addendum (2026-09-11) — pinned BEFORE the first C4 cell
+
+**The self-derived skill.** Contemplation over the round-1 frozen evidence (12 passing designs)
+yielded one consensus procedural claim: a single `TaskManager` class exposing the contract
+methods, tasks in an id-keyed mapping (dicts or a small record class), dependencies as explicit
+id lists, validation in private `_require`/`_validate_dependencies` helpers, and cycle detection
+before mutation (12/12 cells; 13/13 tests each). Support 12, uncertainty 0.35 (quality
+saturated; low design spread), evidence refs = the 12 cell records, `validity_window` = the
+evidence digest. Minted via `scripts/kb_produce_skill.py` through the VERIFIED pattern/v1
+projection path; disclosed: the fact is authored by this producer, not by the pattern reducer
+(the reducer-minted six patterns are unchanged).
+
+**Skill identity (live):**
+`knowledge_id=3c4d382ea67744ba4413237f2ca76f019437fece50655e62d3678d14497579e0`
+(`workload:skill/flash-ladder/taskman#pattern`). Retrieval verified on 2026-09-11: with
+`pattern_projection=True` the skill is selected FIRST among 7 patterns; with the flag off it is
+absent.
+
+**The C4 arm (this addendum):** 3 reps, `flash_ladder_kb` (same pinned spec, SHA256
+`d65abaf588829b4d703410df41b86165881b75701d44603dabb3ef4d794c2b55`), sequential dispatch with
+the §12 rails, base = the commit carrying this addendum (recorded per cell; the contract test's
+SHA256 is unchanged from round 1: `57ffac37664d2ae85d370a8363b46362221c18b6bfd0f1f3ed41c5616d9fe022`).
+No §4 metric, rule, or margin changes.
+
+**Registered endpoints:**
+1. **Primary (loop closure):** the skill record is selected in at least one C4 cell's
+   augmentation — its `knowledge_id` appears in that cell ledger's `selected_evidence_ids`.
+2. **Secondary (descriptive):** `Q_C4` and `D_C4` against C0/C3 under the §4 rule, reported
+   with the same n=3 caveats. Given round-1 saturation, the loop-closure claim rests on (1),
+   not on movement; a flat C4 with the skill selected is the expected, honest outcome.
