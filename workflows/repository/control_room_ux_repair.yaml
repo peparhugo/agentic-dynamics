@@ -1,0 +1,178 @@
+name: control_room_ux_repair
+question: >-
+  The facelift failed at the UX layer: it produced a thin run roster and DROPPED the room's
+  operational surfaces (per-worker event stream/actions, workforce step timings, agent/queue/
+  supervisor controls, boards, burn trace). This wave supplies the missing foundation first —
+  operator definition, jobs-to-be-done, pain points, and DESIGN PRINCIPLES derived from the
+  research corpus — then an interaction model (run lifecycle, decision points, per-worker
+  actions + timing), a PARITY INVENTORY of every existing panel/control and its endpoint, and
+  a reconciled IA. Implementation must preserve parity and satisfy the principles, proven by a
+  semantic + feature-parity render gate, then re-checked by screenshot adversaries.
+version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: false
+repeatable: true
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: true
+    rag:
+      emit_self: false
+    context:
+      hard_rules: >-
+        (1) Every design principle cites the research corpus (catalogs/skills/exemplars) and
+        states what it forbids. (2) Parity: NO existing panel, control, or data feed may be
+        dropped; each is preserve / re-house / explicit-replace-with-reason. (3) The old room
+        (main checkout apps/control_room) is the parity reference; diff its index.html ids and
+        its routes. (4) Gates run before adversaries; adversaries judge screenshots + gates.
+        (5) Nothing is declared done without data on screen.
+    phases:
+      - name: u0_ux_foundation
+        kind: agent
+        scope: implementation
+        requires_deliverable: true
+        timeout: 10800
+        prompt: |
+          GOAL: {goal}
+          Write docs/research/control_room_ux_foundation.md: (1) OPERATOR definition — who runs
+          this room (controller + AIO), their context, what they must never miss; (2) JOBS-TO-
+          BE-DONE — concrete jobs (glance, triage a stalled/failed run, decide approve/cancel,
+          inspect evidence/step timings, watch spend, intervene per worker, audit what
+          happened); each job with frequency and cost of failure; (3) PAIN POINTS in the
+          CURRENT room measured against the old UI (cite ids/routes); (4) DESIGN PRINCIPLES —
+          6-10 principles each with: statement, research evidence (cite repaired catalog/skill
+          refs), what it forbids, and the UI element that enacts it. Derive principles from the
+          corpus, not taste. Commit.
+      - name: u1_interaction_model
+        kind: agent
+        scope: implementation
+        requires_deliverable: true
+        timeout: 10800
+        prompt: |
+          GOAL: {goal}
+          Write docs/research/control_room_interaction_model.md: the RUN LIFECYCLE states; the
+          DECISION POINTS and what evidence each needs; the ACTIONS available PER WORKER/SESSION
+          (start/stop/detach/status/log/advisor; queue/supervisor/design controls) with the
+          step-timing and event information each must show; the alert model; and the drill-down
+          paths. This is the contract for the event stream/actions-per-worker surface the
+          facelift dropped. Commit.
+      - name: u2_parity_inventory
+        kind: agent
+        scope: implementation
+        requires_deliverable: true
+        timeout: 7200
+        prompt: |
+          GOAL: {goal}
+          Build experiments/research/control_room/parity_inventory.json from the OLD room
+          (main checkout: apps/control_room/static/index.html + server.py routes): every panel
+          id, control id, and data feed/endpoint, with its purpose and its disposition
+          (preserve | re-house | replace-with-reason). Compare against the facelift branch and
+          mark what IT dropped. Include the event stream/actions per worker, workforce step
+          timings, boards, burn trace, claude-agent, queue/supervisor/design controls, and cell
+          panel. No silent drops permitted. Commit.
+      - name: u3_reconcile_ia
+        kind: agent
+        scope: implementation
+        requires_deliverable: true
+        timeout: 10800
+        prompt: |
+          GOAL: {goal}
+          Reconcile docs/research/control_room_ia.md with u0-u2: every JOB maps to a surface;
+          every principle maps to elements; every parity_inventory item is placed. Keep the
+          canonical ON-G1..G7 glance contract and the pixel budgets; add the per-worker
+          event/action region and the step-timing region explicitly. Update
+          docs/research/control_room_direction.md only where the reconciliation changes it.
+          Commit.
+      - name: u4_implement
+        kind: agent
+        scope: implementation
+        requires_deliverable: true
+        timeout: 14400
+        prompt: |
+          GOAL: {goal}
+          Implement in apps/control_room/static/* (+ server.py as needed): the reconciled IA,
+          the principles, the interaction model, and FULL parity — re-house every inventory
+          item, including the per-worker event stream + actions and the workforce step-timing
+          view, with live data from the same endpoints the old room used. Keep charts/SVG/
+          styling from the facelift where they satisfy the principles. Commit.
+      - name: u5_gate_semantic_parity
+        kind: agent
+        scope: implementation
+        requires_deliverable: true
+        timeout: 10800
+        prompt: |
+          GOAL: {goal}
+          Extend scripts/verify_control_room_rendering.py: (a) SEMANTIC glance checks (per
+          ON-G anchor, inline value/state, in-viewport, contrast) at 1440x900 and 390x844;
+          (b) FEATURE-PARITY checks: every parity_inventory id/region present, wired to its
+          endpoint, and NON-EMPTY with live data (allow an explicit empty-state only where the
+          inventory says so); (c) per-worker event/action and step-timing checks. Run until
+          PASS; refresh screenshots + report in apps/control_room/verification/. Commit.
+      - name: u6_adversary_design
+        kind: agent
+        scope: adversarial_readonly
+        requires_deliverable: true
+        run_model: openai/gpt-5.6-luna
+        timeout: 7200
+        prompt: |
+          GOAL: {goal}
+          Judge the screenshots + gate report: is this recognizably the control surface for
+          many CLI agents, does it enact the u0 principles, and is any old-room capability
+          visually absent or degraded? PASS only if principles hold and parity is visible.
+          Write docs/reviews/control_room_ux_design.md with findings + dispositions. Commit.
+      - name: u7_adversary_ux_ia
+        kind: agent
+        scope: adversarial_readonly
+        requires_deliverable: true
+        run_model: openai/gpt-5.6-sol
+        timeout: 7200
+        prompt: |
+          GOAL: {goal}
+          Judge against u0 jobs-to-be-done and u1 interaction model on the screenshots: can
+          the operator complete each job without navigating away? Is the per-worker event
+          stream + actions usable, and step timings visible? Can a stalled run be triaged to a
+          decision? FAIL on any job that cannot be completed from the resting screen +
+          documented drill-downs. Write docs/reviews/control_room_ux_ia.md. Commit.
+      - name: u8_tests
+        kind: test
+        scope: implementation
+        timeout: 600
+        tests:
+          - tests/test_research_fetch.py
+factors:
+  - {name: model, levels: [deepseek/deepseek-v4-flash]}
+design: factorial
+rules:
+  - name: ux_foundation
+    plane: measurement
+    evidence_class: "[H]"
+    requires: []
+    produces: [operator_jobs_principles]
+  - name: parity_inventory
+    plane: measurement
+    evidence_class: "[M]"
+    requires: [operator_jobs_principles]
+    produces: [no_dropped_capability]
+  - name: ux_implemented_and_gated
+    plane: measurement
+    evidence_class: "[M]"
+    requires: [no_dropped_capability]
+    produces: [semantic_parity_pass]
+  - name: ux_adversarially_checked
+    plane: measurement
+    evidence_class: "[H]"
+    requires: [semantic_parity_pass]
+    produces: [principle_parity_verdicts]
+metrics:
+  - {name: operator_jobs_principles, agg: mean, over: cell}
+  - {name: no_dropped_capability, agg: mean, over: cell}
+  - {name: semantic_parity_pass, agg: mean, over: cell}
+  - {name: principle_parity_verdicts, agg: mean, over: cell}
+comparison: null
+writeup: {format: lab_book, sections: [question, u0_ux_foundation, u1_interaction_model, u2_parity_inventory, u3_reconcile_ia, u4_implement, u5_gate_semantic_parity, u6_adversary_design, u7_adversary_ux_ia]}
+stop: {budget_usd: 30.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}
