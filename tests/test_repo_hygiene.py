@@ -1,6 +1,6 @@
 """Repository-hygiene guards (the missing CI gates, as guard tests).
 
-Three deterministic guards, all local (git + filesystem, no external services):
+Four deterministic guards, all local (git + filesystem, no external services):
 
 1. No merge-conflict markers may remain in tracked files. The detector uses
    the precise marker shape (``<<<<<<< <ref>``, ``=======``, ``>>>>>>> <ref>``
@@ -16,10 +16,15 @@ Three deterministic guards, all local (git + filesystem, no external services):
    ``apps/website/data.js`` ``public_statistics`` block — numbers are derived
    from ``data.js``, never hardcoded, so the guard stays alive as the corpus
    grows. Both the table cells and the explanatory note must agree with it.
+4. Every build-context ``COPY``/``ADD`` source in the ``Dockerfile`` is
+   git-tracked — the repro image builds from a fresh checkout, where a copy of a
+   gitignored runtime directory (``experiments/results/``) fails even though the
+   directory exists on a working machine.
 """
 
 import json
 import re
+import shlex
 import subprocess
 from pathlib import Path
 
@@ -186,4 +191,71 @@ def test_readme_note_does_not_contradict_table():
     assert f"{stats['db_sessions_total']:,}" in readme, (
         f"README no longer mentions the DB session total {stats['db_sessions_total']:,} "
         "reported by public_statistics"
+    )
+
+
+# ── Dockerfile build-context guard ─────────────────────────────────────────────
+# The repro CI job builds the image from a FRESH CHECKOUT. Dockerfile:57 used to
+# `COPY experiments/results/` — a gitignored runtime directory that exists on a
+# working machine but not in a fresh checkout, so the build failed there
+# ("/experiments/results": not found) while silently working locally. This guard
+# makes that class of failure local: every build-context COPY source must resolve
+# to at least one git-tracked path.
+
+#: Dockerfile COPY sources exempt from the tracked-source guard (none today; add
+#: only with a documenting reason for why a fresh checkout can still build).
+DOCKERFILE_COPY_ALLOW_UNTRACKED: frozenset[str] = frozenset()
+
+
+def _dockerfile_copy_sources() -> list[tuple[int, str]]:
+    """(line_no, source) for every build-context COPY/ADD source in the Dockerfile.
+
+    ``--from=<stage>`` copies read an earlier build stage rather than the build
+    context and are skipped; other flags (``--chown=``, ``--link``) are dropped.
+    Both the shell form (``COPY src dst``) and the JSON form
+    (``COPY ["src", "dst"]``) are parsed.
+    """
+    sources: list[tuple[int, str]] = []
+    text = (ROOT / "Dockerfile").read_text(encoding="utf-8")
+    for line_no, raw in enumerate(text.splitlines(), 1):
+        line = raw.strip()
+        if not line or line.startswith("#"):
+            continue
+        head = line.split(None, 1)
+        if head[0].upper() not in {"COPY", "ADD"}:
+            continue
+        rest = head[1] if len(head) > 1 else ""
+        if rest.lstrip().startswith("["):
+            try:
+                tokens = [str(token) for token in json.loads(rest)]
+            except (ValueError, TypeError):
+                continue
+        else:
+            tokens = shlex.split(rest)
+        if any(token.startswith("--from=") for token in tokens):
+            continue
+        paths = [token for token in tokens if not token.startswith("--")]
+        if len(paths) < 2:  # one source + one destination at minimum
+            continue
+        sources.extend((line_no, source) for source in paths[:-1])
+    return sources
+
+
+def test_dockerfile_copy_sources_are_git_tracked():
+    """Every Dockerfile COPY source from the build context is git-tracked."""
+    sources = _dockerfile_copy_sources()
+    assert sources, "no build-context COPY sources parsed from the Dockerfile — guard vacuous"
+    offenders = []
+    for line_no, source in sources:
+        path = source.rstrip("/")
+        if path in {"", "."} or path in DOCKERFILE_COPY_ALLOW_UNTRACKED:
+            continue
+        tracked = _git(["ls-files", "--", path], check=False)
+        if tracked.returncode != 0 or not tracked.stdout.strip():
+            offenders.append(
+                f"Dockerfile:{line_no}: COPY {source} — no git-tracked files under {path!r}"
+            )
+    assert not offenders, (
+        "Dockerfile copies untracked build-context paths (a fresh checkout fails the repro "
+        "build):\n" + "\n".join(offenders)
     )
