@@ -77,3 +77,26 @@ def test_fetch_source_reads_through_a_fake_response(monkeypatch):
     assert record["title"] == "Sleek Dashboards"
     assert record["bytes"] == len(HTML)
     assert len(record["sha256"]) == 64
+
+
+def test_thin_extraction_is_flagged(monkeypatch):
+    class _Response:
+        status = 200
+        headers = {"Content-Type": "text/html"}
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc):
+            return False
+
+        def read(self):
+            return b"<html><body><script>app()</script></body></html>"
+
+        def geturl(self):
+            return "https://example.com/app"
+
+    monkeypatch.setattr(mod.urllib.request, "urlopen", lambda request, timeout: _Response())
+    record = mod.fetch_source("https://example.com/app")
+    assert record["extraction_quality"] == "thin"
+    assert record["text_chars"] < 200

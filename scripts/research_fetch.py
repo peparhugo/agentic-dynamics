@@ -102,8 +102,12 @@ def fetch_source(url: str, *, timeout: int = 45) -> dict:
         final_url = response.geturl()
         status = getattr(response, "status", 200) or 200
     title, text = _extract_text(body, content_type)
+    # Thin extraction is FLAGGED, never silent: JS-rendered or redirect-only pages fetch a
+    # real body but yield almost no text, and a skill must not cite an empty source.
+    quality = "ok" if len(text.strip()) >= 200 else "thin"
     return {
         "uri": url,
+        "extraction_quality": quality,
         "final_url": final_url,
         "status": status,
         "content_type": content_type,
@@ -111,6 +115,7 @@ def fetch_source(url: str, *, timeout: int = 45) -> dict:
         "title": title,
         "text": text,
         "bytes": len(body),
+        "text_chars": len(text.strip()),
     }
 
 
