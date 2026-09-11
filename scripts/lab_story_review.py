@@ -234,12 +234,14 @@ def main():
     total_sessions = sum(c["sessions"] for c in cells)
     avg_cost_cell = overall_stats["avg_captured_cost"]
     avg_cost_cell_disp = "—" if avg_cost_cell is None else f"${avg_cost_cell:.4f}"
+    avg_cost_session = None if total_sessions == 0 else total_cost / total_sessions
+    avg_cost_session_disp = "—" if avg_cost_session is None else f"${avg_cost_session:.4f}"
     print(f"  Cells: {len(cells)}")
     print(f"  Sessions: {total_sessions}")
     print(rf"  Total captured cost: \${total_cost:.4f}")
     print(f"  Total tokens: {total_tokens:,}")
     print(rf"  Avg cost/cell (captured only): {avg_cost_cell_disp}")
-    print(rf"  Avg cost/session: \${total_cost / total_sessions:.4f}")
+    print(rf"  Avg cost/session: {avg_cost_session_disp}")
 
     # ── JSON Output ──
     output = {
