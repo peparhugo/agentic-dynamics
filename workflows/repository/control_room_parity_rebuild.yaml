@@ -33,6 +33,10 @@ workflow:
         loaded is a FAIL. (3) Slices never delete previously passing ids. (4) The gate evaluates
         the served page AFTER JavaScript runs (post-JS DOM), never the raw template alone.
         (5) Each phase ends with its named acceptance command run and its output committed.
+        (6) CAPABILITY parity, not markup parity: every manifest capability gets a DESIGNED
+        placement (region, hierarchy, interaction, principle) in c0b before any
+        implementation; a designed equivalent must be recorded in the reconciliation table,
+        which is the only legal form of a waiver. Nothing is bolted on.
     phases:
       - name: c0_manifest
         kind: agent
@@ -55,6 +59,35 @@ workflow:
           4) Write docs/reviews/control_room_parity_manifest.md summarizing counts per slice.
           ACCEPTANCE: a script scripts/check_parity_manifest.py validates the JSON schema and
           prints per-slice counts; run it and commit its output. Commit everything.
+      - name: c0b_design_reconciliation
+        kind: agent
+        scope: implementation
+        requires_deliverable: true
+        timeout: 10800
+        prompt: |
+          GOAL: {goal}
+          Put every capability into the DESIGN before any implementation. Steps:
+          1) Read c0's parity_manifest.json, the direction (docs/research/control_room_direction.md),
+             the IA (docs/research/control_room_ia.md), the UX foundation principles
+             (docs/research/control_room_ux_foundation.md), and the interaction model
+             (docs/research/control_room_interaction_model.md).
+          2) Produce experiments/control_room_parity/capability_placement.json: one record per
+             manifest capability (or deliberate merge of several) with {capability, source_ids,
+             designed_home (region + element), hierarchy (glance|drill|action), interaction
+             (what the operator does), principle (which design principle justifies it or is
+             added), disposition (keep|merge|transform|replace), rationale}. Merges and
+             transforms are DESIGN decisions with reasons; drops are forbidden.
+          3) UPDATE the design docs in place: add any new design principles the operational
+             layer requires (e.g., blocked-first triage, per-worker event/action visibility,
+             step-time accountability), extend the IA regions and the canonical glance contract
+             to include the operational surfaces, and revise the direction's layout to show
+             where boards, per-worker streams/actions/timings, and controls live in the new
+             grammar.
+          4) Write docs/reviews/control_room_capability_placement.md: the placement table +
+             what changed in the design docs.
+          ACCEPTANCE: every manifest id appears exactly once across the placement records;
+          scripts/check_capability_placement.py (new) validates coverage; output committed.
+          Commit.
       - name: c1_shell_markup
         kind: agent
         scope: implementation
@@ -87,7 +120,7 @@ workflow:
           3) Run the parity gate (may be a stub in this phase) and report its boards-slice
              section; every boards id must be non-empty with live data or a documented
              empty-state.
-          ACCEPTANCE: gate boards-section 0 misses; doc committed. Commit.
+          ACCEPTANCE: gate boards-section 0 misses OR a designed equivalent recorded in capability_placement.json; doc committed. Commit.
       - name: c3_workers_stream
         kind: agent
         scope: implementation
@@ -103,8 +136,7 @@ workflow:
              from the ledger and document the source.
           3) Field-level parity table in docs/reviews/control_room_parity_workers.md; include
              the per-worker action list and the step-timing fields.
-          ACCEPTANCE: gate workers-section 0 misses; every worker id non-empty with live data.
-          Commit.
+          ACCEPTANCE: gate workers-section 0 misses OR a recorded designed equivalent; every worker id non-empty with live data. Commit.
       - name: c4_controls
         kind: agent
         scope: implementation
@@ -120,7 +152,7 @@ workflow:
              onclick bound in the post-JS DOM).
           3) Table in docs/reviews/control_room_parity_controls.md: id, endpoint, handler,
              confirmation method.
-          ACCEPTANCE: gate controls-section 0 misses. Commit.
+          ACCEPTANCE: gate controls-section 0 misses OR a recorded designed equivalent. Commit.
       - name: c5_parity_gate
         kind: agent
         scope: implementation
@@ -202,6 +234,6 @@ metrics:
   - {name: zero_manifest_misses, agg: mean, over: cell}
   - {name: parity_verdicts, agg: mean, over: cell}
 comparison: null
-writeup: {format: lab_book, sections: [question, c0_manifest, c1_shell_markup, c2_boards_burn, c3_workers_stream, c4_controls, c5_parity_gate, c6_adversary_design, c7_adversary_ux]}
+writeup: {format: lab_book, sections: [question, c0_manifest, c0b_design_reconciliation, c1_shell_markup, c2_boards_burn, c3_workers_stream, c4_controls, c5_parity_gate, c6_adversary_design, c7_adversary_ux]}
 stop: {budget_usd: 30.0, max_attempts: 1}
 adapt: {strategy: manual, selection: highest_regret}
