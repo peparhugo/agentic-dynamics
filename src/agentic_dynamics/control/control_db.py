@@ -131,7 +131,7 @@ CONTROL_DB_ENV = "FINOPS_CONTROL_DB"
 #:   ROOT's ``family_id`` so spec_status can derive completion from the family UNION. Column
 #:   ADDITION to an existing table — handled by the guarded ``_ensure_family_link_columns``
 #:   migration below (``CREATE TABLE IF NOT EXISTS`` cannot add columns to a v3 table).
-SCHEMA_VERSION = 4
+SCHEMA_VERSION = 5
 
 
 # ── The state vocabularies ───────────────────────────────────────────────────────────────────
@@ -582,6 +582,11 @@ class ApprovalRecord:
     decided_at: str
     #: Where the signed artifact lives (a decision doc, a checkpoint contract file).
     artifact_path: str
+    #: Step 2: the act this approval authorizes (``checkpoint`` / ``tree_reuse``; ``''`` for a
+    #: pre-purpose legacy row) — an approval for one act never clears a gate for another.
+    purpose: str = ""
+    #: Step 2: the parsed decision record (contract fields + artifact/commit identity) as JSON.
+    decision_json: str = ""
 
 
 @dataclass(frozen=True)
@@ -940,7 +945,12 @@ CREATE TABLE IF NOT EXISTS approvals (
     candidate_sha TEXT NOT NULL CHECK (candidate_sha <> ''),
     operator      TEXT NOT NULL CHECK (operator <> ''),
     decided_at    TEXT NOT NULL,
-    artifact_path TEXT NOT NULL DEFAULT ''
+    artifact_path TEXT NOT NULL DEFAULT '',
+    -- step 2 (2026-09-11): the typed decision. ``purpose`` is the act the approval authorizes
+    -- (checkpoint / tree_reuse; '' = a pre-purpose legacy row); ``decision_json`` is the parsed
+    -- decision record the contract produced (the durable receipt half).
+    purpose       TEXT NOT NULL DEFAULT '',
+    decision_json TEXT NOT NULL DEFAULT ''
 );
 CREATE INDEX IF NOT EXISTS idx_approvals_run ON approvals(run_id);
 
@@ -1303,6 +1313,8 @@ class ControlDB:
         # they are absent, then let the generic version bump below record v4. Column additions
         # are additive — existing rows get the '' default (a pre-g1 run is its own family).
         self._migrate_runs_family_columns()
+        # v4 → v5 (step 2, 2026-09-11): approvals GAIN the typed-decision columns.
+        self._migrate_approvals_columns()
         with self.transaction():
             self._conn.execute(
                 "INSERT OR IGNORE INTO control_meta(key, value) VALUES ('schema_version', ?)",
@@ -1362,6 +1374,30 @@ class ControlDB:
             self._conn.execute(
                 "CREATE INDEX IF NOT EXISTS idx_runs_parent_run_id ON runs(parent_run_id)"
             )
+        finally:
+            self._conn.execute("COMMIT")
+
+    def _migrate_approvals_columns(self) -> None:
+        """Idempotently add the typed-decision columns to ``approvals`` (v4 → v5).
+
+        ``CREATE TABLE IF NOT EXISTS`` only adds tables, never columns, so a v4 database needs
+        ``ALTER TABLE`` (step 2: an approval is a typed decision — the act it authorizes plus
+        the parsed decision record). Guarded by column presence, so re-opening a v5 database is
+        a no-op and every pre-2d approval reads as a legacy row (purpose '', decision_json '').
+        """
+        existing = {
+            row["name"] for row in self._conn.execute("PRAGMA table_info(approvals)").fetchall()
+        }
+        self._conn.execute("BEGIN IMMEDIATE")
+        try:
+            if "purpose" not in existing:
+                self._conn.execute(
+                    "ALTER TABLE approvals ADD COLUMN purpose TEXT NOT NULL DEFAULT ''"
+                )
+            if "decision_json" not in existing:
+                self._conn.execute(
+                    "ALTER TABLE approvals ADD COLUMN decision_json TEXT NOT NULL DEFAULT ''"
+                )
         finally:
             self._conn.execute("COMMIT")
 
@@ -2016,6 +2052,8 @@ class ControlDB:
         artifact_path: str = "",
         decided_at: str | None = None,
         approval_id: str | None = None,
+        purpose: str = "",
+        decision_json: str = "",
     ) -> ApprovalRecord:
         """Append a human approval, bound to a gate and a candidate sha.
 
@@ -2033,10 +2071,11 @@ class ControlDB:
             conn.execute(
                 """
                 INSERT INTO approvals (approval_id, run_id, gate_id, candidate_sha, operator,
-                                       decided_at, artifact_path)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
+                                       decided_at, artifact_path, purpose, decision_json)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
-                (aid, run_id, gate_id, sha, who, decided_at or _now(), artifact_path),
+                (aid, run_id, gate_id, sha, who, decided_at or _now(), artifact_path,
+                 purpose, decision_json),
             )
         rows = [a for a in self.approvals(run_id) if a.approval_id == aid]
         return rows[0]
@@ -2058,6 +2097,8 @@ class ControlDB:
                 operator=row["operator"],
                 decided_at=row["decided_at"],
                 artifact_path=row["artifact_path"],
+                purpose=row["purpose"],
+                decision_json=row["decision_json"],
             )
             for row in self._conn.execute(sql, params).fetchall()
         ]

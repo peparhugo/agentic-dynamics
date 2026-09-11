@@ -405,6 +405,10 @@ class WorkflowRunResult:
     run_id: str = ""
     parent_run_id: str = ""
     family_id: str = ""
+    #: Step 2 (2026-09-11): a RESUME whose completion set already covered every declared phase
+    #: (the final-checkpoint approval is the canonical case) executes nothing — that is LOGICAL
+    #: COMPLETION, never a cancelled run. Additive key; pre-2d ledgers lack it and parse False.
+    already_complete: bool = False
 
     @property
     def total_cost_usd(self) -> float:
@@ -418,7 +422,9 @@ class WorkflowRunResult:
         a designed stop, not an error — prefer :attr:`state` for the lossless terminal label
         (``awaiting_approval``), which the spec index now derives instead of ``failed``.
         """
-        return bool(self.phases) and all(p.status == "ok" for p in self.phases)
+        return (bool(self.phases) and all(p.status == "ok" for p in self.phases)) or (
+            self.already_complete
+        )
 
     @property
     def state(self) -> str:
@@ -430,9 +436,11 @@ class WorkflowRunResult:
            refused past an unsatisfied checkpoint);
         2. all phases ``ok``    → ``succeeded`` (identical condition to :attr:`ok`);
         3. any phase not ok     → ``failed`` (only when not awaiting);
-        4. nothing ran          → ``cancelled`` (a resume whose every phase was already
-           completed, or an aborted launch — no work was performed by this run, so it is
-           neither a success nor a failure).
+        4. nothing ran          → ``cancelled`` (an aborted launch — no work was performed by
+           this run and nothing was already complete). A resume whose completion set covered
+           every declared phase is ``already_complete`` and reports ``succeeded`` above: the
+           work WAS performed (by the parent), and manufacturing a failure out of it was the
+           final-checkpoint defect step 2 closes.
 
         ``ok == (state == RunState.SUCCEEDED.value)`` — the terminal-success bool stays
         the same for every run the ledger already records.
@@ -462,6 +470,7 @@ class WorkflowRunResult:
             "awaiting": self.awaiting,
             "awaiting_phase": self.awaiting_phase,
             "awaiting_reason": self.awaiting_reason,
+            "already_complete": self.already_complete,
             # ADDED key (I10 — never renames an existing key): the typed checkpoint ledger,
             # one record per checkpoint event (mechanical stop + resume-decided contract
             # reads). Old ledgers lack the key; consumers read it via ``.get("checkpoints",
@@ -3082,6 +3091,17 @@ def run_workflow(
                 start_idx = i + 1
             else:
                 break
+
+    # Step 2: a resume that skipped EVERY phase because its completion set already covered
+    # them executed no work — that is logical completion (the final-checkpoint approval is the
+    # canonical case), never a cancelled run. The flag travels on the ledger so the
+    # spec-status family union reads succeeded instead of manufacturing a failure.
+    result.already_complete = bool(
+        resume
+        and phases
+        and start_idx >= len(phases)
+        and {str(p.get("name", "?")) for p in phases} <= completed
+    )
 
     # Mechanical human checkpoint (cap_runner_hardening2 §Gap 3) — resume gating. BEFORE any
     # further phase runs, every completed checkpoint phase's approval contract must be valid;

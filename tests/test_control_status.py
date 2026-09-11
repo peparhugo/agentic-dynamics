@@ -278,6 +278,7 @@ def test_awaiting_run_yields_an_approve_action_bound_to_its_gate(db) -> None:
             "gate_id": "gate-checkpoint",
             "candidate_sha": run.candidate_sha,
             "spec_name": run.spec_name,
+            "purpose": "checkpoint",
         }
     ]
     approve = [a for a in packet["safe_actions"] if a["action"] == SafeAction.APPROVE.value]
@@ -305,6 +306,7 @@ def test_awaiting_run_without_a_gate_row_still_yields_an_approve(db) -> None:
             "gate_id": "",
             "candidate_sha": run.candidate_sha,
             "spec_name": run.spec_name,
+            "purpose": "checkpoint",
         }
     ]
     assert [a["action"] for a in packet["safe_actions"] if a["action"] == "approve"] == ["approve"]

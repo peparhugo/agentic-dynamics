@@ -78,6 +78,7 @@ from agentic_dynamics.control.control_db import (
     RunRecord,
     RunState,
 )
+from agentic_dynamics.core.decision_contract import PURPOSE_CHECKPOINT
 from agentic_dynamics.core.paths import PROJECT_ROOT
 
 # ── Schema identity ──────────────────────────────────────────────────────────────────────────
@@ -262,6 +263,8 @@ CONTROL_STATUS_SCHEMA: dict[str, Any] = {
                     "gate_id": {"type": "string"},
                     "candidate_sha": {"type": "string"},
                     "spec_name": {"type": "string"},
+                    # the act the operator owes (step 2) — checkpoint for the runner's stops.
+                    "purpose": {"type": "string"},
                 },
             },
         },
@@ -420,8 +423,15 @@ def awaiting_approval_entries(db: ControlDB, runs: Sequence[RunRecord]) -> list[
     for run in runs:
         if run.state is not RunState.AWAITING_APPROVAL:
             continue
-        # (gate_id, candidate_sha) pairs already carrying an operator's signature.
-        approved = {(a.gate_id, a.candidate_sha) for a in db.approvals(run.run_id)}
+        # (gate_id, candidate_sha) pairs already carrying an operator's signature for THIS act.
+        # Step 2: an approval is typed — one recorded for a different purpose (or an unknown
+        # future one) never clears a checkpoint gate; a legacy '' row predates the vocabulary
+        # and is the best information that exists for it.
+        approved = {
+            (a.gate_id, a.candidate_sha)
+            for a in db.approvals(run.run_id)
+            if a.purpose in ("", PURPOSE_CHECKPOINT)
+        }
         gates = db.gate_results(run.run_id, candidate_sha=run.candidate_sha)
         pending = sorted(
             {g.gate_id for g in gates if (g.gate_id, g.candidate_sha) not in approved}
@@ -438,6 +448,8 @@ def awaiting_approval_entries(db: ControlDB, runs: Sequence[RunRecord]) -> list[
                     "gate_id": gate_id,
                     "candidate_sha": run.candidate_sha,
                     "spec_name": run.spec_name,
+                    # the act the operator owes (step 2): the runner awaits a checkpoint.
+                    "purpose": PURPOSE_CHECKPOINT,
                 }
             )
     entries.sort(key=lambda e: (e["run_id"], e["gate_id"]))
@@ -880,7 +892,7 @@ def validate_packet(packet: Any) -> list[str]:
                     entry,
                     where=f"awaiting_approvals[{i}]",
                     required=["run_id", "gate_id", "candidate_sha"],
-                    allowed={"run_id", "gate_id", "candidate_sha", "spec_name"},
+                    allowed={"run_id", "gate_id", "candidate_sha", "spec_name", "purpose"},
                 )
             )
 

@@ -20,6 +20,7 @@ Exit codes: 0 approved / 10 not awaiting (no approval needed) / 20 refused
 from __future__ import annotations
 
 import argparse
+import json
 import subprocess
 import sys
 from pathlib import Path
@@ -108,6 +109,18 @@ def _run_approval(args: argparse.Namespace) -> None:
 
     # 3 ── record the approval in the control db (operator + candidate bound).
     if not args.dry_run:
+        decision_record = {
+            "schema": "approval-decision/v1",
+            "purpose": "checkpoint",
+            "run_id": args.run_id,
+            "gate_id": args.gate_id,
+            "candidate_sha": args.candidate_sha,
+            "operator": args.operator,
+            "date": _today(),
+            "artifact": str(artifact),
+            "artifact_commit": artifact_commit,
+            "status": "approved",
+        }
         with ControlDB.open() as db:
             approval = db.record_approval(
                 args.run_id,
@@ -115,6 +128,8 @@ def _run_approval(args: argparse.Namespace) -> None:
                 candidate_sha=args.candidate_sha,
                 operator=args.operator,
                 artifact_path=str(artifact),
+                purpose="checkpoint",
+                decision_json=json.dumps(decision_record, sort_keys=True),
             )
     else:
         approval = None
