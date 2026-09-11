@@ -30,6 +30,7 @@ def register(app: Flask, services: ControlRoomServices) -> None:
         design_sessions,
         docs_health,
         flags,
+        glance,
         index,
         recording,
         registry,
@@ -43,4 +44,7 @@ def register(app: Flask, services: ControlRoomServices) -> None:
     design_sessions.register(app, services)
     claude_agents.register(app, services)
     docs_health.register(app, services)
+    # The facelift's additive read-only projection + SSE stream (a0). Registered last so it
+    # adds paths rather than replacing any existing surface.
+    glance.register(app, services)
     index.register(app, services)

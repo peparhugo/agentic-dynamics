@@ -11,9 +11,9 @@ It still re-exports the names the tests monkeypatch (``_redis``, ``_design_sessi
 ``DATA_MANIFEST_PATH``, …): the injected services delegate back to those names at call time, so
 the existing test suite is behaviour-identical.
 
-Endpoints (32 routes across 6 API categories, plus the static shell):
+Endpoints (36 routes across 9 API categories, plus the static shell):
 
-    Legacy telemetry (7):
+    Legacy telemetry (8):
         GET  /api/matrix · GET /api/status · GET /api/events/<cell_id>
         GET  /api/projections   (knowledge projection watermarks — control_db_publication p3)
         GET  /api/routing · GET /api/subscription-usage
@@ -22,6 +22,8 @@ Endpoints (32 routes across 6 API categories, plus the static shell):
         GET  /api/flags · POST /api/flags/<session_id>/steer · /interrupt
     Registry (2):
         GET  /api/registry · GET /api/registry/<entity_id>
+    Recording (2):
+        GET  /api/recording-audit · POST /api/recording-sweep/run
     Design sessions (7):
         GET/POST /api/design-sessions · /<portal_id>/spec · /input · /interrupt · /save · /run
     Claude background sessions (9):
@@ -29,8 +31,10 @@ Endpoints (32 routes across 6 API categories, plus the static shell):
         /daemon · /daemon/stop
     Docs health (2):
         GET  /api/docs-health · POST /api/docs-health/approve
+    Glance / events (2) — the facelift's one resting-screen projection:
+        GET  /api/glance · GET /api/events
     Static shell (1):
-        GET  / — static dashboard (apps/control_room/static)
+        GET / — the one resting screen (apps/control_room/static)
 
 Run:
     python3 apps/control_room/server.py      # default port 8000 (FINOPS_PORT override)

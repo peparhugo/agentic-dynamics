@@ -1,0 +1,150 @@
+{
+  "status": "PASS",
+  "screenshots": [
+    {
+      "fixture": "F-0",
+      "viewport": "desktop",
+      "theme": "dark",
+      "screenshot": "apps/control_room/verification/F-0_desktop_dark_1440x900.png"
+    },
+    {
+      "fixture": "F-0",
+      "viewport": "narrow",
+      "theme": "dark",
+      "screenshot": "apps/control_room/verification/F-0_narrow_dark_1024x768.png"
+    },
+    {
+      "fixture": "F-0",
+      "viewport": "mobile",
+      "theme": "dark",
+      "screenshot": "apps/control_room/verification/F-0_mobile_dark_390x844.png"
+    },
+    {
+      "fixture": "F-1",
+      "viewport": "desktop",
+      "theme": "dark",
+      "screenshot": "apps/control_room/verification/F-1_desktop_dark_1440x900.png"
+    },
+    {
+      "fixture": "F-1",
+      "viewport": "narrow",
+      "theme": "dark",
+      "screenshot": "apps/control_room/verification/F-1_narrow_dark_1024x768.png"
+    },
+    {
+      "fixture": "F-1",
+      "viewport": "mobile",
+      "theme": "dark",
+      "screenshot": "apps/control_room/verification/F-1_mobile_dark_390x844.png"
+    },
+    {
+      "fixture": "F-2",
+      "viewport": "desktop",
+      "theme": "dark",
+      "screenshot": "apps/control_room/verification/F-2_desktop_dark_1440x900.png"
+    },
+    {
+      "fixture": "F-2",
+      "viewport": "narrow",
+      "theme": "dark",
+      "screenshot": "apps/control_room/verification/F-2_narrow_dark_1024x768.png"
+    },
+    {
+      "fixture": "F-2",
+      "viewport": "mobile",
+      "theme": "dark",
+      "screenshot": "apps/control_room/verification/F-2_mobile_dark_390x844.png"
+    },
+    {
+      "fixture": "F-3",
+      "viewport": "desktop",
+      "theme": "dark",
+      "screenshot": "apps/control_room/verification/F-3_desktop_dark_1440x900.png"
+    },
+    {
+      "fixture": "F-3",
+      "viewport": "narrow",
+      "theme": "dark",
+      "screenshot": "apps/control_room/verification/F-3_narrow_dark_1024x768.png"
+    },
+    {
+      "fixture": "F-3",
+      "viewport": "mobile",
+      "theme": "dark",
+      "screenshot": "apps/control_room/verification/F-3_mobile_dark_390x844.png"
+    },
+    {
+      "fixture": "F-4",
+      "viewport": "desktop",
+      "theme": "dark",
+      "screenshot": "apps/control_room/verification/F-4_desktop_dark_1440x900.png"
+    },
+    {
+      "fixture": "F-4",
+      "viewport": "narrow",
+      "theme": "dark",
+      "screenshot": "apps/control_room/verification/F-4_narrow_dark_1024x768.png"
+    },
+    {
+      "fixture": "F-4",
+      "viewport": "mobile",
+      "theme": "dark",
+      "screenshot": "apps/control_room/verification/F-4_mobile_dark_390x844.png"
+    },
+    {
+      "fixture": "F-5",
+      "viewport": "desktop",
+      "theme": "dark",
+      "screenshot": "apps/control_room/verification/F-5_desktop_dark_1440x900.png"
+    },
+    {
+      "fixture": "F-5",
+      "viewport": "narrow",
+      "theme": "dark",
+      "screenshot": "apps/control_room/verification/F-5_narrow_dark_1024x768.png"
+    },
+    {
+      "fixture": "F-5",
+      "viewport": "mobile",
+      "theme": "dark",
+      "screenshot": "apps/control_room/verification/F-5_mobile_dark_390x844.png"
+    },
+    {
+      "fixture": "F-6",
+      "viewport": "desktop",
+      "theme": "dark",
+      "screenshot": "apps/control_room/verification/F-6_desktop_dark_1440x900.png"
+    },
+    {
+      "fixture": "F-6",
+      "viewport": "narrow",
+      "theme": "dark",
+      "screenshot": "apps/control_room/verification/F-6_narrow_dark_1024x768.png"
+    },
+    {
+      "fixture": "F-6",
+      "viewport": "mobile",
+      "theme": "dark",
+      "screenshot": "apps/control_room/verification/F-6_mobile_dark_390x844.png"
+    },
+    {
+      "fixture": "F-7",
+      "viewport": "desktop",
+      "theme": "dark",
+      "screenshot": "apps/control_room/verification/F-7_desktop_dark_1440x900.png"
+    },
+    {
+      "fixture": "F-7",
+      "viewport": "narrow",
+      "theme": "dark",
+      "screenshot": "apps/control_room/verification/F-7_narrow_dark_1024x768.png"
+    },
+    {
+      "fixture": "F-7",
+      "viewport": "mobile",
+      "theme": "dark",
+      "screenshot": "apps/control_room/verification/F-7_mobile_dark_390x844.png"
+    }
+  ],
+  "errors": []
+}
