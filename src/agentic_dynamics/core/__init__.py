@@ -21,6 +21,7 @@ from . import (
     admission_context,
     constants,
     cost_provenance,
+    decision_contract,
     language,
     paths,
     session_types,
@@ -28,6 +29,6 @@ from . import (
 )
 
 __all__ = [
-    'admission_context', 'constants', 'cost_provenance', 'language', 'paths',
+    'admission_context', 'constants', 'cost_provenance', 'decision_contract', 'language', 'paths',
     'session_types', 'streaming',
 ]

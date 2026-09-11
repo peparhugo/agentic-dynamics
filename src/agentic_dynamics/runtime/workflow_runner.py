@@ -130,6 +130,7 @@ from pathlib import Path
 from typing import Any
 
 from agentic_dynamics.adapters.backends import run_agentic
+from agentic_dynamics.core import decision_contract as dc
 from agentic_dynamics.core.admission_context import AdmissionRefused
 from agentic_dynamics.core.cost_provenance import CostSource
 from agentic_dynamics.core.language import build_code_snapshot, compute_code_delta, detect_language
@@ -404,6 +405,10 @@ class WorkflowRunResult:
     run_id: str = ""
     parent_run_id: str = ""
     family_id: str = ""
+    #: Step 2 (2026-09-11): a RESUME whose completion set already covered every declared phase
+    #: (the final-checkpoint approval is the canonical case) executes nothing — that is LOGICAL
+    #: COMPLETION, never a cancelled run. Additive key; pre-2d ledgers lack it and parse False.
+    already_complete: bool = False
 
     @property
     def total_cost_usd(self) -> float:
@@ -417,7 +422,9 @@ class WorkflowRunResult:
         a designed stop, not an error — prefer :attr:`state` for the lossless terminal label
         (``awaiting_approval``), which the spec index now derives instead of ``failed``.
         """
-        return bool(self.phases) and all(p.status == "ok" for p in self.phases)
+        return (bool(self.phases) and all(p.status == "ok" for p in self.phases)) or (
+            self.already_complete
+        )
 
     @property
     def state(self) -> str:
@@ -429,9 +436,11 @@ class WorkflowRunResult:
            refused past an unsatisfied checkpoint);
         2. all phases ``ok``    → ``succeeded`` (identical condition to :attr:`ok`);
         3. any phase not ok     → ``failed`` (only when not awaiting);
-        4. nothing ran          → ``cancelled`` (a resume whose every phase was already
-           completed, or an aborted launch — no work was performed by this run, so it is
-           neither a success nor a failure).
+        4. nothing ran          → ``cancelled`` (an aborted launch — no work was performed by
+           this run and nothing was already complete). A resume whose completion set covered
+           every declared phase is ``already_complete`` and reports ``succeeded`` above: the
+           work WAS performed (by the parent), and manufacturing a failure out of it was the
+           final-checkpoint defect step 2 closes.
 
         ``ok == (state == RunState.SUCCEEDED.value)`` — the terminal-success bool stays
         the same for every run the ledger already records.
@@ -461,6 +470,7 @@ class WorkflowRunResult:
             "awaiting": self.awaiting,
             "awaiting_phase": self.awaiting_phase,
             "awaiting_reason": self.awaiting_reason,
+            "already_complete": self.already_complete,
             # ADDED key (I10 — never renames an existing key): the typed checkpoint ledger,
             # one record per checkpoint event (mechanical stop + resume-decided contract
             # reads). Old ledgers lack the key; consumers read it via ``.get("checkpoints",
@@ -2283,34 +2293,25 @@ def _approval_path(wd: Path, spec_name: str, phase_name: str) -> Path:
 
 
 def _parse_approval(text: str) -> dict[str, str]:
-    """Extract ``tree`` / ``phase`` / ``operator`` / ``date`` from the approval markdown.
+    """Extract ``tree`` / ``phase`` / ``operator`` / ``date`` via the ONE contract.
 
-    The artifact is a simple ``- key: value`` list (the operator fills it by hand); the parser
-    accepts any ``key: value`` line whose key is one of the four contract fields, so an
-    approval written with natural prose around it still parses. Missing/empty fields simply
-    fail their check downstream (no defaulting).
+    The parsing dialect lives in ``core.decision_contract`` (migration step 2): tolerant about
+    how an operator writes (canonical ``- key: value`` lines, ``SIGNED-BY-OPERATOR:``, bold
+    decorations, an inline date on the signature line), strict about the fields. Missing or
+    placeholder fields simply fail their check downstream (no defaulting).
     """
-    out: dict[str, str] = {}
-    for line in text.splitlines():
-        stripped = line.strip().lstrip("-* ").strip()
-        if ":" not in stripped:
-            continue
-        key, _, value = stripped.partition(":")
-        key = key.strip().lower()
-        if key in ("tree", "phase", "operator", "date"):
-            out[key] = value.strip()
-    return out
+    decision = dc.parse_approval_decision(text)
+    return {
+        "tree": decision.tree,
+        "phase": decision.phase,
+        "operator": decision.operator,
+        "date": decision.date,
+    }
 
 
 def _date_is_valid(value: str) -> bool:
-    """A real date (ISO-8601 or ``YYYY-MM-DD``); empty/unparseable is not a signature date."""
-    if not value:
-        return False
-    try:
-        datetime.fromisoformat(value.replace("Z", "+00:00"))
-        return True
-    except ValueError:
-        return False
+    """A real date (ISO-8601 or ``YYYY-MM-DD``) — the one contract's check (step 2)."""
+    return dc.date_is_valid(value)
 
 
 def _operator_is_placeholder(operator: str) -> bool:
@@ -2322,13 +2323,7 @@ def _operator_is_placeholder(operator: str) -> bool:
     An angle-bracketed template value (``<name>``, ``<required: ...>``, ``<your signature>``) is
     a placeholder even when the generic-word list does not name it.
     """
-    stripped = operator.strip()
-    norm = " ".join(stripped.lower().split())
-    return (
-        norm in PLACEHOLDER_OPERATORS
-        or len(stripped) < 2
-        or (stripped.startswith("<") and stripped.endswith(">"))
-    )
+    return dc.operator_is_placeholder(operator)
 
 
 def approval_authorizes_tree(
@@ -2355,8 +2350,8 @@ def approval_authorizes_tree(
         "present_at_pre_head": False,
     }
     path = _approval_path(wd, spec_name, phase_name)
+    rel = path.relative_to(wd).as_posix()
     if pre_head:
-        rel = path.relative_to(wd).as_posix()
         try:
             present = subprocess.run(
                 ["git", "cat-file", "-e", f"{pre_head}:{rel}"],
@@ -2369,22 +2364,25 @@ def approval_authorizes_tree(
         evidence["failed_checks"] = ["committed_before_phase"]
         return False, evidence
 
-    parsed = _parse_approval(path.read_text(encoding="utf-8"))
-    evidence["parsed"] = parsed
-    failed: list[str] = []
-    if parsed.get("tree") != tree_hash:
-        failed.append("tree")
-    if parsed.get("phase") != phase_name:
-        failed.append("phase")
-    if _operator_is_placeholder(parsed.get("operator", "")):
-        failed.append("operator")
-    if not _date_is_valid(parsed.get("date", "")):
-        failed.append("date")
+    # Step 2: the decision is a fact about the COMMIT it authorized from, never about the
+    # checkout — an uncommitted edit to the same path reads nothing here.
+    text = dc.read_committed(wd, pre_head, rel)
+    if text is None:
+        evidence["failed_checks"] = ["committed_before_phase"]
+        return False, evidence
+    decision = dc.parse_approval_decision(text)
+    evidence["parsed"] = decision.as_dict()
+    failed = dc.validate_decision(
+        decision,
+        purpose=dc.PURPOSE_TREE_REUSE,
+        phase=phase_name,
+        tree=tree_hash,
+    )
     evidence["failed_checks"] = failed
     if not failed:
         evidence["authorized"] = True
-        evidence["operator"] = parsed["operator"]
-        evidence["date"] = parsed["date"]
+        evidence["operator"] = decision.operator
+        evidence["date"] = decision.date
     return evidence["authorized"], evidence
 
 
@@ -2667,16 +2665,18 @@ def _checkpoint_approval_valid(
     if not ancestor:
         failed.append("checkpoint_lineage_intact")
     if not failed:
-        parsed = _parse_checkpoint_approval(path.read_text(encoding="utf-8"))
-        evidence["parsed"] = parsed
-        if _operator_is_placeholder(parsed.get("operator", "")):
-            failed.append("operator")
-        if not _date_is_valid(parsed.get("date", "")):
-            failed.append("date")
+        # Step 2: validate the COMMITTED bytes at HEAD — never the checkout's working copy.
+        text = dc.read_committed(wd, "HEAD", rel)
+        if text is None:
+            failed.append("committed_at_head")
+        else:
+            decision = dc.parse_approval_decision(text)
+            evidence["parsed"] = decision.as_dict()
+            failed.extend(dc.validate_decision(decision, purpose=dc.PURPOSE_CHECKPOINT))
         if not failed:
             evidence["valid"] = True
-            evidence["operator"] = parsed["operator"]
-            evidence["date"] = parsed["date"]
+            evidence["operator"] = decision.operator
+            evidence["date"] = decision.date
     evidence["failed_checks"] = failed
     return evidence["valid"], evidence
 
@@ -3091,6 +3091,17 @@ def run_workflow(
                 start_idx = i + 1
             else:
                 break
+
+    # Step 2: a resume that skipped EVERY phase because its completion set already covered
+    # them executed no work — that is logical completion (the final-checkpoint approval is the
+    # canonical case), never a cancelled run. The flag travels on the ledger so the
+    # spec-status family union reads succeeded instead of manufacturing a failure.
+    result.already_complete = bool(
+        resume
+        and phases
+        and start_idx >= len(phases)
+        and {str(p.get("name", "?")) for p in phases} <= completed
+    )
 
     # Mechanical human checkpoint (cap_runner_hardening2 §Gap 3) — resume gating. BEFORE any
     # further phase runs, every completed checkpoint phase's approval contract must be valid;
