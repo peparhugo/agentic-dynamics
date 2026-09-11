@@ -13,6 +13,15 @@ the operator-needs contract `control_room_questions.md` (r1), the direction
 `control_room_direction.md` (p1/q1), the **q0 quoted-evidence** taxonomy/catalogs/skills, and the
 two IA adversary passes — p5 (`docs/reviews/control_room_repair_ia.md`, findings IA1–IA11) and r6c
 (`docs/reviews/control_room_research_ia.md`, IA1–IA16).
+**u3 reconciliation (this revision).** This file is reconciled with the UX-repair wave:
+`docs/research/control_room_ux_foundation.md` (u0: operator, jobs `J1–J11`, principles `DP1–DP10`),
+`docs/research/control_room_interaction_model.md` (u1: lifecycle, decision points, per-worker
+actions, alerts, drill-down), and `experiments/research/control_room/parity_inventory.json`
+(u2: every old panel/control/feed with its disposition). The glance contract (§4) and the pixel
+budgets (§3.2) are **unchanged**; the reconciliation (a) names the two regions the facelift dropped
+— the **per-worker event/action region** `R4b` and the **step-timing region** `R4d` — plus the
+**Workforce step-timing lens** that carries the fleet aggregate, and (b) places every parity item on
+a closed surface palette (`§12`–`§15`).
 **This revision's job (q2).** The p5 adversary found that r1, p1, and p2 promised *different*
 glance contracts (IA1), that required answers could scroll or move below the fold (IA2), that
 `ON-G4`/`ON-G7` were not guaranteed at rest (IA3/IA4), and that the acceptance suite tested DOM
@@ -73,6 +82,14 @@ render gate can find it without brittle CSS. Valid region selectors are the expl
 answer selector `[data-answer="ON-G1"]` through `[data-answer="ON-G7"]`. Required field selectors
 are enumerated in §10.2. The implementation may choose the DOM tree beneath those anchors, but may not
 add a second `[data-answer]` writer for a mirror.
+
+**Drill-down region selectors (`[P]`).** `R4` (the selection dock) is not a `data-region` layout
+region and exists only after selection; its four sub-regions use a separate attribute so the resting
+contract in §1/§10 is untouched: `[data-dock-region="address"]` (`R4a`),
+`[data-dock-region="worker"]` (`R4b`), `[data-dock-region="evidence"]` (`R4c`), and
+`[data-dock-region="timing"]` (`R4d`). The workforce aggregate lives in a deliberate lens,
+`[data-lens="workforce"]`. These selectors are added to the acceptance contract in §15; they never
+appear at rest and never carry `data-region` or `data-answer`.
 
 ---
 
@@ -156,9 +173,45 @@ complete in `R0`. None may require scrolling or move below the fold (p5 IA2/IA3/
 
 ### R4 — Selection dock (drill-down only)
 
-Opens on a run/attention-item selection; renders the p1 evidence ladder
-(identity → lifecycle → narration → measured facts → independent verification → change/commit →
-cost provenance → decision → registry record) and the safe-action preview. Not required at rest.
+Opens on a run/attention-item selection; not required at rest, never a `data-region` layout region.
+It is composed of four named sub-regions plus one deliberate lens, reconciled with
+`control_room_interaction_model.md` (§3.1–§3.3) so the two surfaces the facelift dropped are explicit:
+
+- **`R4a` ADDRESS & IDENTITY** (`[data-dock-region="address"]`) — the typed address band
+  (`[data-dock-address]`), run identity (session · worktree/host · current command/tool ·
+  provider×model · attempt), lifecycle state, scope, and control epoch/revision. It carries the
+  routing inputs and the Claude/design session identity from the old detail header, cell panel and
+  routing board (`ON-D5`, u1 §3.1.A/B).
+- **`R4b` PER-WORKER EVENT + ACTION** (`[data-dock-region="worker"]`) — the restored surface. It
+  carries (i) the **one** selected worker's event stream — replayed history bounded by a
+  `replay_complete` boundary then live frames, `[data-attempt-feed]` with `[data-feed-entry]`,
+  `[data-event-kind]` (`step_start|step_finish|reasoning|operator|text|tool_use`), a producer-supplied
+  `[data-event-time]`, and `[data-feed-follow]`/`[data-feed-pause]` controls; and (ii) the **action
+  band** — every action applicable to the selected target, rendered as `[data-action="<verb>"]` with
+  `[data-action-target]`, `[data-action-authority]` (`controller`/`aios`), `[data-action-reversible]`,
+  `[data-action-confirmation]` (the typed-door phrase or `none`), and a `[data-action-receipt]`
+  result. Verbs and endpoints are exactly u1 §3.1: `attach`/`detach`/`copy-session`,
+  `steer`/`interrupt` (`POST /api/flags/<session_id>/…`), the owned Claude
+  `stop`/`respawn`/`rm`/`steer` and `logs` (`POST /api/claude-agents/…`), the design
+  `input`/`interrupt`/`save`/`run` (`POST /api/design-sessions/…`), and the docs
+  `approve` (`POST /api/docs-health/approve`). A flag never becomes an automatic action (I7).
+- **`R4c` EVIDENCE LADDER** (`[data-dock-region="evidence"]`) — the p1 typed chain (identity →
+  lifecycle → narration → measured facts → independent verification → change/commit → cost provenance
+  → decision → registry record) with `[data-evidence-ladder]` and one `[data-attempt-boundary]` per
+  attempt. Satisfies `ON-D1`, `ON-D2`, `ON-D4`.
+- **`R4d` STEP TIMINGS** (`[data-dock-region="timing"]`) — the **per-attempt timing region**: for the
+  selected run's attempt chain, `[data-timing="queue_wait|service_time|first_token|duration|retries|tokens.answer|tokens.explanation|cost|exit_code|verification"]`,
+  each with `[data-state="measured|unknown"]` and a `[data-value]`. Values come from
+  `StepAttemptRecord` (`started_at`/`ended_at`, `attempt_no`, `tokens`, `cost_usd`, `exit_code`,
+  `error`) and the ledger `AttemptRecord` (`queue_wait_ms`, `service_time_ms`, `first_token_at`,
+  `tokens_*`). An unobserved timing is `unknown`, never `0`. Satisfies u1 §3.3 and `ON-D6`.
+
+**Workforce step-timing lens (`[data-lens="workforce"]`, `L-WORKFORCE`).** The per-attempt region
+`R4d` is a single-run view; the **fleet aggregate** — p50/p95 queue wait, p50/p95 service time,
+first-token latency, retry rate, and tokens per attempt by model — is a deliberate lens (like Money
+and Fleet), not a resting region. This keeps the §3.2 resting budget intact while giving the
+"where is the workforce spending time and money?" job (`J4`) a home (u0 §3 P3; r0 A4). A lens is a
+deliberate drill-down; the resting contract never depends on it.
 
 ---
 
@@ -248,6 +301,25 @@ Selection is drill-down, not a new resting screen. The fixed arrangement is:
 
 Either way, every region promised to remain visible is tested in §10 (p5 IA10), and the at-rest
 `ON-G4`/`ON-G7` answers do not disappear while an object is selected.
+
+### 3.4 R4 drill-down budgets (never charged to the resting sum)
+
+The §3.2 budget is the **at-rest** contract and is unchanged: `R4` is `0 at rest`. Once selected,
+`R4` is a bottom dock on desktop (≈320px, §3.3) and a full-height inspector on mobile, and its four
+sub-regions are budgeted **inside** that dock. These budgets are internal to `R4` and must never be
+added to the §3.2 vertical sum.
+
+| Dock sub-region | Desktop (dock ≈320px) | Mobile (full height) | Internal budget | Need(s) |
+|---|---:|---:|---|---|
+| `R4a` address/identity | 48 | 64 | one identity band + one address line; no scroll | `ON-D5` |
+| `R4b` worker event + action | 160 | 360 | event feed: bounded rows with follow/pause; action band: one group of `[data-action]` chips, wraps, no scroll | `ON-D1`, `ON-D2` |
+| `R4c` evidence ladder | 160 | 280 | one `[data-attempt-boundary]` per attempt, bounded; overflow is the Attempt lens | `ON-D1`, `ON-D4` |
+| `R4d` step timings | 96 | 140 | one `[data-timing]` row per timing field; a missing value is an explicit `unknown` row, not a gap | `ON-D6` |
+
+Within a sub-region, excess rows are a deliberate **lens** (Attempt, Money, Workforce), never an
+internal scrollbar: `R4b` bounds the event feed the same way the old transcript bounded 500 rows, and
+`R4d` summarizes the latest `N` attempts with the full chain in the Attempt lens. The `[data-lens]`
+container is `hidden` at rest and is not a `data-region`.
 
 ---
 
@@ -346,13 +418,19 @@ states keep identity; closing restores focus to the origin; exactly one event st
 
 | Need | Path |
 |---|---|
-| `ON-D1` one run, step by step live | select R2 row → R4 evidence ladder → attempt → transcript/tool events (one live stream, follow/pause) |
-| `ON-D2` why flagged / safe action | select R1b item or R2 row → R4 decision/flag object → safe-action preview (target, epoch, scope, budget, reversibility, receipt) |
-| `ON-D3` design draft/validation | Sessions object type (roster/search) → R4 design-session inspector |
-| `ON-D4` canonical explanation | R4 → registry record link → canonical-lineage view (distinct from the runtime trace) |
-| `ON-D5` route + cost/quality | R4 → routing recommendation inputs + evidence, beside the run context |
-| `ON-D6` cost by step/model/cell | R4 cost/lease provenance rung; aggregate in the Money lens |
-| `ON-D7` background Claude session | Sessions object type (roster/search) → R4 Claude-session inspector with owned actions |
+| `ON-D1` one run, step by step live | select R2 row → R4a address → R4c evidence ladder → attempt → **R4b event stream** (one live stream, follow/pause) |
+| `ON-D2` why flagged / safe action | select R1b item or R2 row → R4c decision/flag object → **R4b action band** with safe-action preview (target, epoch, scope, budget, reversibility, receipt) |
+| `ON-D3` design draft/validation | Sessions object type (roster/search) → R4 design-session inspector (R4a + R4b actions) |
+| `ON-D4` canonical explanation | R4c → registry record link → canonical-lineage view (`L-REGISTRY`, distinct from the runtime trace) |
+| `ON-D5` route + cost/quality | R4a routing inputs + evidence (`L-COMPOSITION` for the fleet view), beside the run context |
+| `ON-D6` cost by step/model/cell | R4c cost/lease provenance rung + **R4d step timings**; aggregate in the Money lens and the **Workforce step-timing lens** (`L-WORKFORCE`) |
+| `ON-D7` background Claude session | Sessions object type (roster/search) → R4 Claude-session inspector (R4a + R4b owned actions) |
+
+**Restored worker surfaces (u3).** `ON-D1`/`ON-D2`/`ON-D7` terminate in `R4b` (the per-worker event
+stream plus the governed action band), and `ON-D6` gains `R4d` (per-attempt timing); the fleet
+aggregate is `L-WORKFORCE`. These are the surfaces the facelift dropped; they are placed by
+`parity_inventory.json` (`experiments/research/control_room/`) and asserted by §15. Exactly one
+`R4b` event stream is open at a time (`E-1`/`I2`).
 
 Design sessions, background Claude sessions, supervisor flags, routing, registry, recording and queue
 controls all keep explicit entry paths and global-search classes (`[P]`; r6c IA12).
@@ -404,7 +482,10 @@ omit the chip (p5 IA11):
 | `R3a` | all five `money.*` values | source + age; `unknown` renders as explicit `unknown`, never `0` |
 | `R3b` | worker aggregate; projection aggregate | source + last-report age; mirror of `R0`, never required for its answers |
 | `R3c` | composition marginals | source + age; `other`/`unknown` rendered explicitly |
-| `R4` | the full evidence ladder | per-rung evidence class + source + age (drill-down; not tested at rest) |
+| `R4a` | identity, lifecycle, scope, epoch, routing inputs | source + age; `epoch` carries revision |
+| `R4b` | each `[data-feed-entry]` and each `[data-action]` chip | event: `data-event-kind` + producer `data-event-time`/age; action: authority + target + reversibility + receipt |
+| `R4c` | the full evidence ladder | per-rung evidence class + source + age (drill-down; not tested at rest) |
+| `R4d` | each `[data-timing]` value | `data-state="measured"\|"unknown"` + source + age; an unknown timing is explicit, never `0` |
 
 No need is split across regions. Mirrors share the canonical answer's epoch and omit `[data-answer]`,
 so a reviewer never has to join two writers or two freshnesses (p5 IA5).
@@ -430,6 +511,17 @@ Every existing surface receives an explicit home; none is deleted silently (`[P]
 | recording audit/sweep | R1c process health | missing record becomes an item (M12) |
 | queue reinterleave (route, no UI) | R2 action + R4 preview | target/order preview + receipt (M11) |
 | `architecture.svg` (orphaned) | out of resting screen | live+scoped inspector or System/help link (A7, r6b D7) |
+| cell/session control panel (`cell-control-panel`) | R4a (facts) + R4b (attach/detach/copy) | the per-worker surface the facelift dropped |
+| transcript event stream (`transcript-panel`, `/api/events/<cell_id>`) | R4b | restored with follow/pause; one stream at a time |
+| background `claude` sessions + daemon (`claude-agents`) | L-SESSIONS + R4b owned actions | start/stop/respawn/rm/steer/logs re-housed |
+| design sessions (`design-control-panel`) | L-SESSIONS + R4b | composer/save/run/interrupt re-housed |
+| workforce step timings (absent in the old room) | R4d (per attempt) + L-WORKFORCE (fleet) | net-new surface assembled from the ledger, not a re-skin |
+| recording audit/sweep | AUDIT + R1c process health | decision-record coverage |
+
+**u3 placement.** Every old panel/control/feed is enumerated with its disposition and its target
+**surface** in `experiments/research/control_room/parity_inventory.json` (v1); §14 defines the closed
+surface palette and §15 makes placement an acceptance check. The rows above are the r0-level view of
+the same placement.
 
 ---
 
@@ -902,3 +994,177 @@ foreground, effective background, and ratio, so zero failures is deterministic a
   tinted status rows; dark, light, and forced-colors all run.
 - **Provider composition** (`G-11`) depends on the control packet / ledger carrying provider per
   run; if a run lacks it, the count must show `unknown`, never be omitted.
+
+---
+
+## 12. Reconcile u0 — every JOB maps to a surface (`J1–J11`)
+
+The operator's jobs are `control_room_ux_foundation.md` §2. Each job resolves to a resting region,
+a drill-down region, a lens, or a control surface; **no job requires a surface not named here**, and
+every surface here is defined in §2/§6.
+
+| Job | Surface(s) | Element / selector | Alert item | Contract ref |
+|---|---|---|---|---|
+| `J1` glance (system, runs, risk, money, decision, trust, shape) | `R0`, `R1`, `R2`, `R3a`, `R3b`, `R3c` | the §4 canonical contract | `ON-A1..A6` | u0 DP1; §4 |
+| `J2` triage a stalled/failed run | `R1` risk row → `R4a`, `R4c`, `R4b` | `[data-attention-class="risk"] [data-answer="ON-G3"]` → `[data-dock-region]` | `ON-A1` | u0 J2; u1 §2.2 |
+| `J3` decide approve/cancel (and promote/retire) | `R1a` → `R4a` + `R4b` action band | `[data-field="decision.eligibility"]`, `[data-action="approve\|promote\|cancel\|retire"]` | `ON-A4` | u0 J3/DP4; u1 §2.2 |
+| `J4` inspect evidence **and step timings** | `R4c` ladder + `R4d` timing + `L-WORKFORCE` | `[data-dock-region="evidence"]`, `[data-dock-region="timing"]`, `[data-lens="workforce"]` | — | u0 J4/DP3/DP7; u1 §3.3 |
+| `J5` watch spend | `R3a` + `L-MONEY` (+ `R4c` cost rung) | `[data-field="money.*"]`, `[data-money-risk]` | `ON-A3` | u0 J5/DP5 |
+| `J6` intervene per worker/session | `R4b` action band | `[data-action]` (`attach`/`detach`/`steer`/`interrupt`/`stop`/`respawn`/`rm`) | `ON-A5` | u0 J6; u1 §3.1 |
+| `J7` audit what happened | `L-REGISTRY` + `AUDIT` + `R1c` | `[data-lens="registry"]` (canonical lineage), recording audit | `ON-A4`/process | u0 J7/DP6; u1 §5.1 ON-D4 |
+| `J8` start / enqueue work | `QUEUE` | `[data-action="enqueue\|clear\|reinterleave"]` | — | u0 J8; u1 §3.1.D |
+| `J9` route / choose the model | `R4a` routing inputs + `L-COMPOSITION` | routing fields beside the run (no peer board) | — | u0 J9; u1 §5.1 ON-D5 |
+| `J10` manage background `claude` sessions | `L-SESSIONS` + `R4b` owned actions | `[data-action="start\|stop\|respawn\|rm\|steer\|logs"]` | — | u0 J10; u1 §3.1.B |
+| `J11` record / close the session | `R1c` process health + `AUDIT` + `L-REGISTRY` | recording-coverage token; decision record | process | u0 §1.3 N6 |
+
+**Completeness rule.** The union of the “Surface(s)” column equals the §14 palette minus
+`SEARCH`/`SYSTEM`/`A11Y` (the cross-cutting accelerator, help link, and announcement channel). Every
+job has an at-rest or one-selection answer; no job requires a board switch.
+
+---
+
+## 13. Reconcile u0 — every PRINCIPLE maps to elements (`DP1–DP10`)
+
+The principles are `control_room_ux_foundation.md` §4. Each is enacted by named elements; the render
+gate (§10 geometry, §15 parity) is how “enacted” is checked rather than asserted.
+
+| Principle | Elements that enact it | Enforced by |
+|---|---|---|
+| `DP1` operator-first ranking | `[data-region="R0"/"R1"/"R2"/"R3a"/"R3b"/"R3c"]` + exactly-one `[data-answer="ON-G1..G7"]` | §4; G-1..G-15 |
+| `DP2` agent-native addressable run | `R2 [data-run-id]` identity band; `R4a` `[data-dock-address]` | §10.2 row fields; G-13 |
+| `DP3` typed evidence classes | `R2` `[data-evidence-class="advisory\|measured\|source"]`; `R4c` `[data-evidence-ladder]` | G-13; B-10 |
+| `DP4` governed decisions + receipt | `R1a` decision; `[data-field="decision.eligibility"]`; `R4b` `[data-action-*]` + `[data-action-receipt]` | §15 P-2/E-6 |
+| `DP5` money as bounded constraint | `R3a` five `money.*` + `[data-money-risk]`; `L-MONEY`; `R4c` cost rung | G-10 |
+| `DP6` green never lies | `R0` `trust.*`; `R3b`; `[data-state]`/`[data-age-seconds]`; per-rung provenance | G-4; B-6; §8 |
+| `DP7` marks with a budget | `R2` status rail; `R3c` `[data-marginal]`; `R4b` bounded feed; `L-WORKFORCE` (no per-card sparkline) | G-11; §4.5 restraint (direction) |
+| `DP8` one token layer, accessible | CSS custom properties; `#theme-toggle`; color+glyph status; contrast | G-4/G-5; A-class |
+| `DP9` build-less + accessible SVG | classic scripts; `[data-lens]`; theme-aware/`currentColor` SVG; `SYSTEM` link for `architecture.svg` | §12.2 no-build guardrail (direction) |
+| `DP10` master–detail that persists | `R4` dock; `L-*` lenses; `SEARCH` accelerator; density ladder | A-2/A-3; E-1 |
+
+---
+
+## 14. Reconcile u2 — parity placement (the closed surface palette)
+
+`experiments/research/control_room/parity_inventory.json` (`control-room-parity-inventory/v1`)
+enumerates **every** old panel id (235), route (34), and client feed from `main`, and now carries a
+`surface` on every item, endpoint, and capability. The builder refuses any value outside this closed
+palette, and §15 makes the palette an acceptance check. The palette is:
+
+| Surface | Meaning |
+|---|---|
+| `R0` | system/trust bar (`ON-G1`, `ON-G6`) |
+| `R1` | attention inbox: `R1a` decision, `R1b` risk, `R1c` next (`ON-G3`, `ON-G5`) |
+| `R2` | run ledger (`ON-G2`) |
+| `R3a`/`R3b`/`R3c` | cost / health detail / bounded composition (`ON-G4`, `ON-G7`) |
+| `R4a` | dock address/identity band (`ON-D5`) |
+| `R4b` | dock per-worker event stream + action band (`ON-D1`, `ON-D2`, `ON-D7`) |
+| `R4c` | dock evidence ladder (`ON-D1`, `ON-D4`) |
+| `R4d` | dock step-timing region (`ON-D6`) |
+| `L-MONEY`/`L-COMPOSITION` | money history/leases lens; performance lens |
+| `L-FLEET` | full roster lens (filters, search, density) |
+| `L-ATTENTION` | full inbox (all advisories) |
+| `L-HEALTH` | per-projector health lens |
+| `L-WORKFORCE` | workforce step-timing lens (aggregate by model) |
+| `L-REGISTRY` | canonical-lineage destination (`ON-D4`) |
+| `L-SESSIONS` | sessions object type (design + Claude + search) |
+| `QUEUE` | enqueue/clear/reinterleave surface |
+| `DOCS` | docs-health decision surface |
+| `AUDIT` | recording/decision audit surface |
+| `SEARCH` | global typed search / command accelerator |
+| `SYSTEM` | system/help link (topology, architecture) |
+| `A11Y` | single polite live region (announcement policy) |
+
+**Panel → surface** (the default for each old panel; per-id overrides live in the inventory and are
+exhaustive):
+
+| Panel | Surface | Panel | Surface |
+|---|---|---|---|
+| `rail` | `R0` | `routing` | `R4a` |
+| `detail` | `R4a` | `system` | `SEARCH` |
+| `transcript` | `R4b` | `registry` | `L-REGISTRY` |
+| `cell` | `R4b` | `queue` | `QUEUE` |
+| `supervisor` | `R1` | `usage` | `R3a` |
+| `design` / `claude` / `sessions` | `L-SESSIONS` | `announcer` | `A11Y` |
+| `fleet` / `live-now` | `R2` | `flags` | `R1` |
+| `docs-health` | `DOCS` | `status` | `R3a` |
+
+**Capability → surface** (the ten named capabilities the repair requires):
+
+| Capability | Surface |
+|---|---|
+| per-worker event stream | `R4b` |
+| per-worker actions | `R4b` |
+| workforce step timings | `R4d` + `L-WORKFORCE` (capability row records `R4d`) |
+| boards (fleet/status/flags/sessions/routing) | `R0`/`R1`/`R2`/`R3*`/`L-*` |
+| burn trace | `L-MONEY` |
+| claude-agent controls | `L-SESSIONS` + `R4b` |
+| queue controls | `QUEUE` |
+| supervisor controls | `R1` + `R4b` |
+| design controls | `L-SESSIONS` + `R4b` |
+| cell panel | `R4b` (+ `R4a` facts) |
+
+**Endpoint placement.** All 34 old routes survive server-side (`facelift_route: present`); the
+facelift client wires only `GET /api/glance` and `GET /api/events`, so every other route records
+`facelift_consumer: absent` and a target surface in the inventory. `GET /api/routing`,
+`GET /api/registry`, `GET /api/registry/<entity_id>` are the three `replace-with-reason` dispositions
+(§9); the other 30 are `re-house`.
+
+---
+
+## 15. Reconciled acceptance — restored regions and feature parity
+
+The §10 classes (G/B/A/E) remain; the u3 reconciliation adds a fifth class **P (parity)** and extends
+the R4 checks. All checks reuse the §10.1 primitives (present/unique, in-viewport, non-zero, no
+scroll, contrast) and the §10.6 fixture discipline.
+
+### 15.1 R4 drill-down checks (class G/D)
+
+| # | Selectors | Assertion |
+|---|---|---|
+| `G-16` | dock open on a run | `[data-dock-region="address"]`, `"worker"`, `"evidence"`, `"timing"` each present exactly once; all inside the dock; the rest of the screen unchanged (§3.3) |
+| `G-17` | `[data-attempt-feed]` | a `replay_complete` boundary then live entries; `[data-feed-entry]` count bounded; `[data-feed-follow]`/`[data-feed-pause]` present; exactly one feed open |
+| `G-18` | `[data-dock-region="timing"] [data-timing]` | exact timing field set; each `[data-state]` in `measured,unknown`; an `unknown` row carries no fabricated `0`; a `measured` row carries source+age |
+| `G-19` | `[data-action]` in `R4b` | each action chip carries target, authority, reversibility, confirmation (`none` or the phrase), and receipt; a disabled/ineligible action is not rendered as a live control |
+
+### 15.2 Event/state checks (class E)
+
+| # | Check | Pass condition |
+|---|---|---|
+| `E-6` | an action fires its endpoint | the request matches the u1 §3.1 endpoint; the response renders `[data-action-receipt]`; a no-op is idempotent |
+| `E-7` | exactly one selected worker stream | selecting another worker closes the prior `[data-attempt-feed]` before opening the next |
+
+### 15.3 Feature-parity checks (class P)
+
+`u5_gate_semantic_parity` extends `verify_control_room_rendering.py` to consume
+`parity_inventory.json` and assert, for **every** record (items, endpoints, capabilities):
+
+1. **Placed** — the record carries a `surface` in the §14 palette (guaranteed at build time, re-checked).
+2. **Present** — the surface/region exists in the running room (resting surfaces at rest; `R4*` and
+   `L-*` after their documented selection/open path).
+3. **Wired** — any record with an `old_endpoint` resolves to a live endpoint call (for actions) or a
+   rendered query result (for reads); no inventory endpoint may remain consumer-absent after the repair.
+4. **Non-empty** — a mapped surface renders data from the gate fixtures, or an **explicit
+   documented empty-state** (`all clear`, `none pending`, `unknown`) where the inventory says so; a
+   blank region is a failure.
+5. **No silent drop** — every `facelift: dropped` id has a target surface and a passing
+   present/wired/non-empty assertion; the gate reports any id with no element and no documented
+   empty-state.
+
+### 15.4 Blind comprehension additions (class B)
+
+| # | Reviewer says | Carrying element |
+|---|---|---|
+| `B-12` | “I can watch this one agent and act on it from here.” | `R4b` event feed + action band with eligibility and receipt |
+| `B-13` | “I can see where this run's time and money went, step by step.” | `R4d` timing rows (queue wait / service time / first token / tokens) |
+
+### 15.5 Fixtures
+
+`F-0`..`F-7` are unchanged. Add two forcing fixtures for the restored regions: `F-8` (a selected run
+with a populated `R4b` feed and two eligible actions, one reversible and one typed-door) and `F-9`
+(a selected run whose timing fields are partly `unknown`, proving the no-fabricated-zero rule). Both
+extend the §10.6 `GET /api/glance` + SSE contract; no new route is required.
+
+**Reconciliation exit.** With `§4` and `§3.2` unchanged, the glance contract stands; `R4b`/`R4d` and
+`L-WORKFORCE` are explicit; every `u2` item is placed on the §14 palette; and class P makes “no
+silent drops” a gate result rather than a claim. This is the contract `u4_implement` realizes and
+`u5_gate_semantic_parity` proves.

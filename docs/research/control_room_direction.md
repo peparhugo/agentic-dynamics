@@ -155,6 +155,7 @@ identity
      -> attempt (lifecycle, model, provider version, timestamps)
         -> agent narration / tool events (ADVISORY: what the model claims)
         -> measured runtime facts (MEASURED: ledger events, tokens, timestamps)
+        -> attempt timing (MEASURED: queue wait, service time, first token, duration, retries)
         -> change / commit (SOURCE: the diff, the committed tree)
         -> independent verification (MEASURED: test_runner result, evaluator_independent)
         -> static analysis / diagnostics (DERIVED)
@@ -279,6 +280,27 @@ attention and recently changed runs; one selected object and its evidence ladder
 context and safe actions precede secondary charts; fleet comparison is an explicit filtered view
 rather than a compressed desktop mosaic; and the same truth, focus-containment, focus-return, and
 query/time-preservation rules hold as on desktop.
+
+### 3.6 The restored worker regions (u3 reconciliation)
+
+The facelift dropped the per-worker operations the old room carried. The interaction model
+(`control_room_interaction_model.md` §3.1–§3.3) restores them as explicit drill-down regions, and
+the IA (`control_room_ia.md` §2/§3.4/§15) places them:
+
+- **`R4b` — per-worker event + action region.** The one selected worker's live event feed (replay
+  bounded by `replay_complete`, then live; follow/pause) plus the **action band** — attach/detach,
+  steer, interrupt, the owned `claude` stop/respawn/rm/steer, the design input/interrupt/save/run,
+  docs approve — each governed (target, authority, reversibility, typed door where irreversible,
+  receipt). This is Move 3/Move 7 made operational: eligibility at rest, the full door one selection
+  away. One stream at a time (`[M]`; r0 §9.1/9.2).
+- **`R4d` — step-timing region.** Per attempt: queue wait, service time, first-token latency,
+  duration, retries, tokens by answer/explanation, cost provenance, exit code, verification, each
+  rendered `measured` or an explicit `unknown` — never a fabricated `0` (`[M]`; ledger
+  `AttemptRecord`/`StepAttemptRecord`). The fleet aggregate is the **`L-WORKFORCE`** lens, not a
+  resting region, so the §16 pixel budget is untouched.
+- **Parity is part of the direction, not a nicety.** No old panel, control, or feed may be silently
+  dropped; `experiments/research/control_room/parity_inventory.json` enumerates every one with a
+  disposition and a target surface, and the u3 IA §15 class-P gate proves present/wired/non-empty.
 
 ---
 
@@ -732,6 +754,8 @@ The implementation is graded against these; each maps to a required disposition.
 | 20 | One-resting-screen glance check: every required `ON-G*` answer is visible at rest with no page/region scroll per breakpoint, and blind reviewers identify each answer | p5 IA8; §16, §18.2 |
 | 21 | Recognizability test: a blind reviewer states all five §4.2 sentences in ten seconds and points to the carrying element | p4 acceptance gate; §4.2, §18.7 |
 | 22 | Every p3/p4/p5 disposition is **CLOSED** with its fix, or **WAIVED** with a one-line reason; no `OPEN` or `SPECIFIED` state survives | p3 E1–E5, p4 D1–D9, p5 IA1–IA11; §17 |
+| 23 | The per-worker event/action region (`R4b`) and the step-timing region (`R4d`), plus the `L-WORKFORCE` lens, are present and wired; one worker stream at a time | u3 reconciliation; IA §2/§15; u1 §3.1–§3.3 |
+| 24 | Feature parity: every `parity_inventory.json` record is placed, present, wired, and non-empty (or a documented empty-state); no silent drop | u2 inventory; IA §14/§15 class P |
 
 ---
 
@@ -780,6 +804,9 @@ second contract):** `ON-G1→R0`, `ON-G2→R2`, `ON-G3→R1`, `ON-G4→R3a`, `ON
 7. **Mechanical acceptance.** The IA §10 selector contract (`[data-region]`, `[data-answer]`,
    `[data-field]`) and the five geometry primitives are what the render gate implements; a passing
    screenshot must show all seven answers, not merely the region anchors.
+8. **Restored worker regions (u3).** `R4b` (per-worker event stream + governed action band) and
+   `R4d` (step timings) are drill-down regions, and the fleet aggregate is the `L-WORKFORCE` lens;
+   they carry the dropped per-worker actions and the ledger timing fields (u1 §3.1–§3.3; IA §2/§14).
 
 ## 17. Adversary dispositions (p3 entailment, p4 design, p5 IA)
 
@@ -864,6 +891,11 @@ actuation; no new persistence plane or decorative poller; no invented telemetry 
    screenshots, with this document hidden and no run selected, states all five §4.2 sentences within
    ten seconds and can point to the visible element carrying each. Selection, hover, color-only cues,
    and explanatory prose are disallowed. A miss is a design failure, not a copy fix.
+8. **Semantic + feature-parity gate.** The render gate consumes
+   `experiments/research/control_room/parity_inventory.json` and passes the u3 IA §15 class-P checks:
+   every placed surface present, wired, and non-empty (or a documented empty-state), and the restored
+   `R4b`/`R4d` regions exercised by fixtures `F-8`/`F-9`. DOM presence of the resting anchors alone is
+   not a parity pass.
 
 **Gate order.** p5 IA8 fixes the test classes: (1) screenshot geometry, (2) blind comprehension,
 (3) browser/accessibility automation, (4) event/network/state. A pass requires all four; DOM presence

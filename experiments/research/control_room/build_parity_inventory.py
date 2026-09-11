@@ -70,6 +70,138 @@ CUR_ROUTE_DIR = ROOT / "apps" / "control_room" / "routes"
 DISPOSITIONS = ("preserve", "re-house", "replace-with-reason")
 
 # --------------------------------------------------------------------------- #
+# The surface palette (u3 reconciliation).
+#
+# ``docs/research/control_room_ia.md`` §12–§15 places every old surface. The
+# palette below is that placement as machine-readable ids: every item, endpoint,
+# and capability record carries a ``surface`` drawn from this closed set, and the
+# builder refuses any value outside it. This is what makes "every parity item is
+# placed" a build-time fact rather than a prose claim; ``u5_gate_semantic_parity``
+# then asserts each surface exists (and is non-empty) in the running room.
+# --------------------------------------------------------------------------- #
+SURFACES: dict[str, str] = {
+    "R0": "System/trust bar (ON-G1, ON-G6)",
+    "R1": "Attention inbox: R1a decision, R1b risk, R1c next (ON-G3, ON-G5)",
+    "R2": "Run ledger (ON-G2)",
+    "R3a": "Cost constraint annotation (ON-G4)",
+    "R3b": "Health detail (worker/projection mirror)",
+    "R3c": "Bounded composition (ON-G7)",
+    "R4a": "Dock address/identity band",
+    "R4b": "Dock per-worker event stream + action region",
+    "R4c": "Dock evidence ladder",
+    "R4d": "Dock step-timing region",
+    "L-MONEY": "Money lens (spend/burn/history/leases)",
+    "L-FLEET": "Fleet lens (full roster, filters, search, density)",
+    "L-ATTENTION": "Attention lens (full inbox, all advisories)",
+    "L-HEALTH": "Health/projection lens (per-projector detail)",
+    "L-COMPOSITION": "Composition/performance lens",
+    "L-WORKFORCE": "Workforce step-timing lens (aggregate by model)",
+    "L-REGISTRY": "Canonical-lineage/registry destination (ON-D4)",
+    "L-SESSIONS": "Sessions object type (design + Claude inspectors + search)",
+    "QUEUE": "Queue control surface (enqueue/clear/reinterleave)",
+    "DOCS": "Docs-health decision surface",
+    "AUDIT": "Recording/decision audit surface (J7)",
+    "SEARCH": "Global typed search / command accelerator",
+    "SYSTEM": "System/help link (topology, architecture)",
+    "A11Y": "Single polite live region (announcement policy)",
+}
+
+#: panel -> its canonical resting or drill-down surface.
+PANEL_SURFACE: dict[str, str] = {
+    "rail": "R0",
+    "detail": "R4a",
+    "transcript": "R4b",
+    "cell": "R4b",
+    "supervisor": "R1",
+    "design": "L-SESSIONS",
+    "claude": "L-SESSIONS",
+    "fleet": "R2",
+    "docs-health": "DOCS",
+    "live-now": "R2",
+    "status": "R3a",
+    "flags": "R1",
+    "sessions": "L-SESSIONS",
+    "routing": "R4a",
+    "system": "SEARCH",
+    "registry": "L-REGISTRY",
+    "queue": "QUEUE",
+    "usage": "R3a",
+    "announcer": "A11Y",
+}
+
+#: Per-id surface overrides where one element's home differs from its panel's.
+ID_SURFACE: dict[str, str] = {
+    "system-toggle": "SEARCH",
+    "system-nav": "SEARCH",
+    "destinations": "SEARCH",
+    "burn-label": "L-MONEY",
+    "burn-rate": "L-MONEY",
+    "burn-trace": "L-MONEY",
+    "registry-lineage": "L-REGISTRY",
+    "registry-lineage-content": "L-REGISTRY",
+    "supervisor-flag-list": "L-ATTENTION",
+    "supervisor-steer": "R4b",
+    "supervisor-interrupt": "R4b",
+    "confirm-supervisor-interrupt": "R4b",
+    "watch-button": "R4b",
+    "copy-session": "R4a",
+    "control-session": "R4a",
+}
+
+#: endpoint -> its target surface.
+ENDPOINT_SURFACE: dict[str, str] = {
+    "GET /": "SEARCH",
+    "GET /api/matrix": "R2",
+    "GET /api/status": "R2",
+    "GET /api/projections": "R3b",
+    "GET /api/events/<cell_id>": "R4b",
+    "GET /api/routing": "R4a",
+    "GET /api/subscription-usage": "R3a",
+    "POST /api/experiments": "QUEUE",
+    "POST /api/queue/reinterleave": "QUEUE",
+    "GET /api/flags": "R1",
+    "POST /api/flags/<session_id>/steer": "R4b",
+    "POST /api/flags/<session_id>/interrupt": "R4b",
+    "GET /api/registry": "L-REGISTRY",
+    "GET /api/registry/<entity_id>": "L-REGISTRY",
+    "GET /api/recording-audit": "AUDIT",
+    "POST /api/recording-sweep/run": "AUDIT",
+    "GET /api/docs-health": "DOCS",
+    "POST /api/docs-health/approve": "DOCS",
+    "GET /api/design-sessions": "L-SESSIONS",
+    "POST /api/design-sessions": "L-SESSIONS",
+    "GET /api/design-sessions/<portal_id>/spec": "L-SESSIONS",
+    "POST /api/design-sessions/<portal_id>/input": "R4b",
+    "POST /api/design-sessions/<portal_id>/interrupt": "R4b",
+    "POST /api/design-sessions/<portal_id>/save": "L-SESSIONS",
+    "POST /api/design-sessions/<portal_id>/run": "L-SESSIONS",
+    "GET /api/claude-agents": "L-SESSIONS",
+    "GET /api/claude-agents/<session_id>/logs": "R4b",
+    "GET /api/claude-agents/daemon": "L-SESSIONS",
+    "POST /api/claude-agents": "L-SESSIONS",
+    "POST /api/claude-agents/<session_id>/stop": "R4b",
+    "POST /api/claude-agents/<session_id>/respawn": "R4b",
+    "POST /api/claude-agents/<session_id>/rm": "R4b",
+    "POST /api/claude-agents/<session_id>/steer": "R4b",
+    "POST /api/claude-agents/daemon/stop": "L-SESSIONS",
+}
+
+#: capability id -> its surface.
+CAPABILITY_SURFACE: dict[str, str] = {
+    "per-worker-event-stream": "R4b",
+    "per-worker-actions": "R4b",
+    "workforce-step-timings": "R4d",
+    "boards": "R0",
+    "burn-trace": "L-MONEY",
+    "claude-agent-controls": "L-SESSIONS",
+    "queue-controls": "QUEUE",
+    "supervisor-controls": "R1",
+    "design-controls": "L-SESSIONS",
+    "cell-panel": "R4b",
+}
+
+
+# --------------------------------------------------------------------------- #
 # The curated map: which panel owns each old id, its role, purpose, disposition,
 # and target surface. Ids are grouped by the panel they lived in so the table is
 # auditable in the same shape as the old DOM.
@@ -901,6 +1033,7 @@ def build_items(old_ids: dict[str, str], cur_ids: set[str]) -> list[dict[str, ob
             "old_tag": tag,
             "old_ref": f"{OLD_INDEX} (main) #{i}",
             "purpose": CONTROL_PURPOSES.get(i) or f"{meta['purpose']} — {kind_for(tag)}",
+            "surface": ID_SURFACE.get(i, PANEL_SURFACE[panel]),
             "facelift": "present" if i in cur_ids else "dropped",
             "disposition": override.get("disposition", meta["disposition"]),
             "target": override.get("target", meta["target"]),
@@ -935,6 +1068,7 @@ def build_endpoints(
             "id": route,
             "kind": "endpoint",
             "purpose": meta["purpose"],
+            "surface": ENDPOINT_SURFACE[route],
             "old_ref": "apps/control_room/routes/*.py (main)",
             "old_consumers": sorted(
                 {_normalise_route(f) for f in old_feeds if _normalise_route(f) == route_norm}
@@ -959,6 +1093,7 @@ def build_capabilities(cur_ids: set[str], cur_routes: set[str]) -> list[dict[str
         dropped = [m for m in members if m not in cur_ids]
         endpoints = list(cap.get("member_endpoints", []))  # type: ignore[arg-type]
         record = dict(cap)
+        record["surface"] = CAPABILITY_SURFACE[str(cap["id"])]
         record["facelift_members_present"] = present
         record["facelift_members_dropped"] = dropped
         record["facelift_endpoints_present"] = [e for e in endpoints if e in cur_routes]
@@ -1006,6 +1141,26 @@ def build(old_ref: str) -> dict[str, object]:
     for rec in endpoints:
         endpoint_disp[str(rec["disposition"])] = endpoint_disp.get(str(rec["disposition"]), 0) + 1
 
+    # Palette contract: every item/endpoint/capability is placed on a known surface.
+    used_surfaces = (
+        {str(r["surface"]) for r in items}
+        | {str(r["surface"]) for r in endpoints}
+        | {str(r["surface"]) for r in capabilities}
+    )
+    unknown_surfaces = sorted(used_surfaces - set(SURFACES))
+    if unknown_surfaces:
+        raise SystemExit(
+            "PARITY BUILD FAILED — surfaces outside the palette:\n  "
+            + "\n  ".join(unknown_surfaces)
+        )
+    surface_counts: dict[str, int] = {s: 0 for s in SURFACES}
+    for rec in items + endpoints:
+        surface_counts[str(rec["surface"])] += 1
+    # Informational only: a target surface may be net-new (R4d, L-WORKFORCE) or a
+    # re-composition with no single old id (R3c, L-FLEET). The binding rule is
+    # items -> palette, never palette -> items.
+    unused_surfaces = sorted(s for s, n in surface_counts.items() if n == 0)
+
     inputs = [
         {"role": "old_index", "ref": old_ref, "path": OLD_INDEX, "sha256": sha256_text(old_html)},
         {"role": "old_client_js", "ref": old_ref, "path": f"{OLD_JS_DIR}/*.js",
@@ -1046,7 +1201,10 @@ def build(old_ref: str) -> dict[str, object]:
             "dispositions": disp_counts,
             "endpoint_dispositions": endpoint_disp,
             "capabilities": len(capabilities),
+            "surface_counts": surface_counts,
+            "surfaces_without_old_item": unused_surfaces,
         },
+        "surface_palette": SURFACES,
         # Explicit, machine-consumable statement of what the facelift actually did —
         # the "no silent drops" audit reads this rather than recomputing the diff.
         "facelift": {
