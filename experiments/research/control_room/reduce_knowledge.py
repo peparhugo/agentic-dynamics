@@ -568,7 +568,17 @@ def repair_catalogs(tax: dict, nodes: dict, records: list[dict]) -> dict:
                     {"catalog": cat["id"], "item": item["id"],
                      "reason": policy["policy_reason"]}
                 )
-        catalogs.append({**cat, "items": items})
+        # Idempotency guard: catalog overrides and previously-expanded items can both
+        # appear when this script is re-run over its own output, which used to compound
+        # duplicate ids on every run. Keep the first occurrence of each item id.
+        seen_ids: set[str] = set()
+        deduped: list[dict] = []
+        for item in items:
+            if item["id"] in seen_ids:
+                continue
+            seen_ids.add(item["id"])
+            deduped.append(item)
+        catalogs.append({**cat, "items": deduped})
 
     out = dict(old)
     out["phase"] = "q0_semantic_crosswalk"

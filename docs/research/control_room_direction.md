@@ -2,28 +2,28 @@
 status: accepted
 ---
 
-# Control Room — direction and facelift brief: the live run as the unit of work (campaign `control_room_research_repair`, phases `p1_rework_direction` + `p6_refresh_brief`)
+# Control Room — direction and facelift brief: the live run as the unit of work (campaign `control_room_research_repair2`, phases `q0_semantic_crosswalk` + `q1_distinctive_direction`)
 
 **Date:** 2026-09-11
 **Supersedes:** the r5/r7 `control_room_direction.md` facelift brief (retained as the rejected
-baseline; the specific drops are enumerated in §6).
+baseline; the specific drops are enumerated in §6) and the p1/p6 repair brief, whose §4 distinctive
+table this revision replaces.
 **Inputs:** the measured baseline `docs/research/control_room_audit.md` (r0), the operator-needs
-contract `docs/research/control_room_questions.md` (r1), the **repaired** taxonomy/catalogs/skills
-`experiments/research/control_room/{taxonomy,catalogs,skills}.json` (p0), the one-resting-screen IA
-`docs/research/control_room_ia.md` (p2), and the three repair adversary passes p3 entailment
-(`docs/reviews/control_room_repair_entailment.md`), p4 design
-(`docs/reviews/control_room_repair_design.md`), and p5 IA
-(`docs/reviews/control_room_repair_ia.md`).
-**Brief refresh (p6).** This revision incorporates the repaired supports (with the p3 E1/E4 caveat
-still open), the reworked run-first direction, the p2 glance mapping, and every p3/p4/p5 adversary
-disposition (§16–§18). Acceptance criteria now include the render gate at desktop+mobile, contrast,
-no regressions, and the **one-resting-screen glance check**. The brief is **conditional**: the p3/p4/p5
-blockers are open and must close before the facelift is accepted (see §17).
-**Repair status:** the p0 repair replaced the originally inflated support counts for the deleted nodes
-(`board-per-domain`, `source-provenance`, `degraded-banner`, `uncertainty-encoding`, `audit-trail`,
-`budget-thresholds`, `quota-wallet`) and marked ten catalog moves `[P]`. The p3 re-check found the
-crosswalk still promotes some adjacent labels (E1/E4); those surviving counts are treated as
-provisional `[P]`/`[X]` in this brief until repaired.
+contract `docs/research/control_room_questions.md` (r1), the **q0 quoted-evidence** taxonomy/catalogs/
+skills `experiments/research/control_room/{taxonomy,catalogs,skills}.json`, the one-resting-screen IA
+`docs/research/control_room_ia.md` (p2), and the repair adversary passes: entailment
+(`docs/reviews/control_room_repair_entailment.md`), design
+(`docs/reviews/control_room_repair_design.md`), and IA (`docs/reviews/control_room_repair_ia.md`).
+**Distinctive-direction rewrite (q1).** §4 is rebuilt around eight exemplar-grounded, agent-native
+moves; a blind 10-second **recognizability test**; an explicit **removed** list of generic
+dashboard elements; a run/evidence/action **visual grammar**; and a **restraint budget**. Every move
+separates *pattern exists* (`[X]`) from *repository requires* (`[M]`) from *composition* (`[P]`), so no
+component count is presented as proof of the composition (p4 D1/D2/D4/D5/D9).
+**Support status:** the q0 semantic crosswalk replaced label-level support with quoted, pattern-gated
+source evidence and enforced one direct leaf per label (p3 E1/E4 **closed**). Counts in §4 and §7 are
+the current `taxonomy.json` supports; several earlier `[X]` moves are now small or `[P]` and say so.
+Acceptance criteria include the render gate at desktop+mobile, the one-resting-screen glance check, and
+the §4.2 recognizability test.
 
 **What this document is.** A design direction, not a mockup and not a chart gallery. It says what the
 room is *for* (operating many CLI AI agents by triaging live runs and making governed decisions), what
@@ -163,10 +163,9 @@ identity
 ```
 
 The corpus supports the *causal shape* and the trace/span tree: `[cat:trust-attention/tr-lineage]` backs a
-session→trace→span lineage from `tech-trust-causal-lineage` (18; agentops + dashboards) and
-`tech-ops-trace-tree` (20); `[cat:agent-ops/ao-observability]` backs structured traces from
-`tech-ops-observability` (18); `[cat:chart-selection/ch-timeline]` backs a run timeline from
-`tech-viz-waterfall-timeline` (14, **agentops only** — single-family caveat). The corpus does **not**
+session→trace→span lineage from `tech-ops-trace-tree` (18, agentops + dashboards); `[cat:agent-ops/ao-observability]` backs structured traces from
+`tech-ops-observability` (13); `[cat:chart-selection/ch-timeline]` backs a run timeline from
+`tech-viz-waterfall-timeline` (4, **agentops only** — single-family caveat). The corpus does **not**
 state that every agent-ops source ships an identical waterfall (`[E5]`), so the claim is scoped to the
 cited sources. The narration-vs-verification split is repository-specific `[M]` (`test_runner` is the
 sole source of truth for `test_executed_success`), not a corpus finding; it is stated as `[M]`.
@@ -259,7 +258,7 @@ labelled and readable but not announced (`[M]`; r0 M9; `[X]` `[src:mdn-live-regi
 
 The stateful-inbox pattern is `[X]` from the r6b direct check of Linear Triage (inside the dashboards
 family as a product, outside the sampled technique labels); the internal alerting surface is backed by
-`[cat:ia-layout/ia-attention-surface]` from `tech-trust-alerting` (23, **dashboards only**). The
+`[cat:ia-layout/ia-attention-surface]` from `tech-trust-alerting` (13, **dashboards only**). The
 specific state machine and snooze/resolution semantics are `[P]`.
 
 ### 3.4 Safe action
@@ -280,43 +279,186 @@ query/time-preservation rules hold as on desktop.
 
 ---
 
-## 4. Distinctive moves and their provenance
+## 4. Distinctive moves — exemplar-grounded and agent-native
 
-This table is the (a) requirement: each move is either grounded in the repaired catalogs (with the
-support count and family breadth) or marked `[P]`. Nothing here is presented as external consensus
-unless the repaired evidence warrants it; single-family evidence carries its caveat.
+This is the identity-bearing section. Every move names the exemplar that inspired it, what the
+exemplar actually does, and what OURS does *differently* for operating a fleet of CLI AI agents. It
+answers the p4 design critique directly: the composition must not be a generic observability shell
+with runs substituted for services (p4 D1/D2/D4/D5/D9).
 
-| Distinctive move | Grounding | Class |
+### 4.0 Three claims, kept separate
+
+A design critique (p4 D4) requires the direction to stop blurring three different things. Every move
+below separates them explicitly:
+
+1. **Pattern exists `[X]`** — a named exemplar (or repaired catalog item) demonstrates a component or
+   interaction pattern. This is bounded external observation, scoped to the cited source, never a
+   claim of consensus.
+2. **Repository requires `[M]`** — a local contract (the control packet, `RunState`, admission/lease,
+   `test_runner`) forces a behavior regardless of what any corpus shows.
+3. **Composition is `[P]`** — how those patterns are arranged into *this* screen is a local product
+   decision. No support count makes the composition externally grounded.
+
+The q0 semantic crosswalk replaced label-level support with quoted, pattern-gated source evidence, so
+several earlier counts moved or dropped below the ≥3-source bar. The counts below are the current
+direct supports from `taxonomy.json`. Component patterns may be `[X]`; **every constellation is
+`[P]`**.
+
+### 4.1 The moves
+
+**Move 1 — Session/agent identity is the row's primary key, never a service name.**
+- **Exemplar (`[X]`):** `nvitop` (`[src:nvitop]`) and `btop` (`[src:btop]`) process tables, `k9s`
+  (`[src:k9s]`) resource view, Textual (`[src:textual]`); catalog `[cat:agent-ops/ao-observability]`
+  (`tech-ops-observability` 13).
+- **What the exemplar does:** renders a live table whose first column is the object itself — process
+  id, command, host, resource reading — so an operator identifies and acts without a drill-down.
+- **What OURS does differently:** the addressable object is an **agent session**, and each actionable
+  row leads with `session/agent → worktree/host target → current command/tool → provider×model →
+  attempt`. Hostnames, service names, or metric names are never the key. This is the single largest
+  departure from "observability dashboard with runs substituted for services" (p4 D2).
+- **Class:** pattern `[X]`; composition `[P]`.
+
+**Move 2 — The inspector is an attempt-scoped causal ladder, not a transcript.**
+- **Exemplar (`[X]`):** trace/span trees `[cat:trust-attention/tr-lineage]` (`tech-ops-trace-tree`
+  18) and the trace waterfall `[cat:chart-selection/ch-timeline]` (`tech-viz-waterfall-timeline` 4,
+  **agentops only**).
+- **What the exemplar does:** renders a parent/child span tree with a timing waterfall so a
+  distributed failure is walkable cause-to-effect.
+- **What OURS does differently:** the tree is re-keyed to agent semantics — `session → phase →
+  attempt → {narration, measured facts, commit, independent verification, cost, decision, record}` —
+  and every rung is a **typed evidence class**, not a latency span. A single run's reasoning history
+  becomes the explanation, and the ladder is where the narration/verification boundary lives (Move 4).
+- **Class:** pattern `[X]`; composition `[P]`.
+
+**Move 3 — Every consequential act is a decision object; rows show eligibility, never a button.**
+- **Exemplar (`[X]`/`[M]`):** `k9s` and Railway plan/apply destruction confirms (direct check); the
+  repository's own promotion gate (`safe_actions` derived from the control db transition graph `[M]`).
+- **What the exemplar does:** explains the target and consequences of a destructive ops action before
+  a typed confirm, and blocks the action until the state is re-validated.
+- **What OURS does differently:** the *unit* is a governed decision over an agent run: target, control
+  epoch, scope/blast radius, budget effect, reversibility, proposer + evidence authority, and the
+  receipt that closes it. At rest a row shows a compact **eligibility token**
+  (`observe|inspect|approve|promote|cancel|retire|none`); the full preview stays in the inspector; the
+  machine proposes and the controller disposes, and no flag ever becomes an automatic steer (p4 D7).
+- **Class:** repo contract `[M]`; composition `[P]`.
+
+**Move 4 — Narration and verification are visibly different materials.**
+- **Exemplar (`[X]`):** agent-eval/trace platforms keep a score/annotation channel distinct from raw
+  spans `[cat:agent-ops/ao-eval]` (`tech-ops-eval-loop` 24, **agentops only**).
+- **What the exemplar does:** shows scores or annotations beside, not merged into, the trace.
+- **What OURS does differently:** three visually distinct classes — **ADVISORY** (what the model
+  claims), **MEASURED** (ledger events, tokens, timestamps, `test_runner`), **SOURCE** (the diff and
+  committed tree) — where independent verification is the *only* place a "passed" mark is allowed, and
+  a run cannot render "done" without the measured class. This is the product's reason to exist; a
+  generic dashboard has no such channel (`[M]`: `test_runner` is the sole source of
+  `test_executed_success`).
+- **Class:** repo contract `[M]`; composition `[P]`.
+
+**Move 5 — Objects are addressed by a typed grammar on a persistent roster.**
+- **Exemplar (`[X]`):** `fzf` (`[src:fzf]`), `k9s`, `Lazygit` (`[src:lazygit]`) keyboard addressing;
+  catalog `[cat:ia-layout/ia-command-palette]` (`tech-ia-command-palette` 4 + `tech-int-keyboard-first`
+  12).
+- **What the exemplar does:** lets an operator type to find/address an object and jump directly, with
+  keyboard-first operation and no pointer required.
+- **What OURS does differently:** every object carries a stable typed address — `run`, `phase`,
+  `attempt`, `session`, `worktree`, `lease`, `flag`, `approval`, `record` — and the roster persists
+  while an object is selected. The palette *accelerates* the roster; it is not the information
+  architecture, because palette-over-boards is the generic dashboard idiom (p4 D8).
+- **Class:** pattern `[X]`; composition `[P]`.
+
+**Move 6 — Cost is a per-run lease with provenance, not a money board.**
+- **Exemplar (`[X]`/`[M]`):** per-trace cost attribution `[cat:ia-layout/money-cost-attribution]`
+  (`tech-money-cost-attribution` 6, **agentops only**); the repository admission/lease gate `[M]`.
+- **What the exemplar does:** attributes spend to the session that incurred it.
+- **What OURS does differently:** cost is a run facet — reserved vs settled, the `cost_source`
+  class, and the headroom the next decision consumes — with the rule that **an unknown cost is never
+  drawn as zero**. Fleet money is a deliberate lens, and the only money at rest is a money-risk
+  **attention item**, not a KPI row (`[P]` grouping; `[cat:ia-layout/ia-money-grouping]`).
+- **Class:** repo contract `[M]`; pattern `[X]`; composition `[P]`.
+
+**Move 7 — Exactly one bounded live stream, with follow/pause — never a chart wall.**
+- **Exemplar (`[X]`):** terminal log pagers (Textual, `nvitop`); catalog
+  `[cat:chart-selection/ch-log-stream]` (`tech-viz-log-stream` 18; `tech-int-live-follow` 13).
+- **What the exemplar does:** tails one live output stream with paging, follow and filter.
+- **What OURS does differently:** one stream is open at a time, scoped to the selected run/attempt,
+  bounded, and visibly aged; narration and measured events interleave on one timeline but keep their
+  evidence classes. There are no per-card sparklines and no atmosphere charts (p4 D9).
+- **Class:** pattern `[X]`; composition `[P]`.
+
+**Move 8 — Attention is a durable state machine over runs and control-plane health.**
+- **Exemplar (`[X]`/`[P]`):** Linear Triage's new/active/snoozed/resolved state (direct check, p4);
+  catalog `[cat:ia-layout/ia-attention-surface]` (`tech-trust-alerting` 13, **dashboards only**).
+- **What the exemplar does:** gives an item a stable identity and a lifecycle rather than an ephemeral
+  toast.
+- **What OURS does differently:** attention is ranked by severity × actionability across *agent runs*
+  and worker/projection health, with critical capacity reserved so a new run failure cannot be buried
+  by a governance decision; announcements are transition-only, polite, and foreground-pull (no invented
+  push channel). The specific state machine and snooze semantics are `[P]`.
+- **Class:** pattern `[X]`; composition `[P]`.
+
+### 4.2 Recognizability test (blind, 10 seconds)
+
+A stranger shown a full-screen screenshot, with this document hidden, must be able to say each of the
+following within ten seconds. Each is tied to a visible element, so the render gate and a blind
+reviewer can both check it.
+
+| # | The stranger says | Visible element that carries it |
 |---|---|---|
-| Run roster as the default body, keyed and triage-ranked | resource-list/master-detail terminal exemplars: `[cat:ia-layout/ia-master-detail]` (`tech-ia-master-detail` 4, craft only); keyboard-first operation `[cat:ia-layout/ia-command-palette]` (`tech-int-keyboard-first` 22, 3 families) | `[X]` / `[P]` layout |
-| Master–detail inspector while the roster stays visible | `tech-ia-master-detail` 4 (craft only) + `tech-ia-dashboard-layout` 43 (dashboards) | `[X]` (thin, single-family) |
-| Causal evidence ladder (session→trace→span → attempt → commit → test) | `[cat:trust-attention/tr-lineage]` `tech-trust-causal-lineage` 18 + `tech-ops-trace-tree` 20; `[cat:agent-ops/ao-observability]` `tech-ops-observability` 18; `[cat:chart-selection/ch-timeline]` `tech-viz-waterfall-timeline` 14 (agentops only) | `[X]` (timeline single-family) |
-| Narration ≠ independent verification | repository contract: `test_runner` is the sole source of `test_executed_success` | `[M]` |
-| Eval loop (datasets→runs→scores→compare) attached to the run | `[cat:agent-ops/ao-eval]` `tech-ops-eval-loop` 24 (agentops only) | `[X]` |
-| Session/run grouping across many sessions | `tech-ops-session-grouping` 14 (agentops only) | `[X]` |
-| Prompt registry linked to runs | `[cat:agent-ops/ao-prompt]` `tech-ops-prompt-registry` 3 (agentops only, thin) | `[X]` (thin) |
-| Bounded live log stream with follow/pause | `[cat:chart-selection/ch-log-stream]` `tech-viz-log-stream` 32 (4 families); `tech-int-live-follow` 22 (3 families) | `[X]` |
-| Metrics/latency over time with one scale | `tech-ops-metrics` 34 (3 families); `[cat:chart-selection/ch-time-series]` `tech-viz-time-series-marks` 12 (2 families) | `[X]` |
-| Cost attribution to the run | `[cat:ia-layout/money-cost-attribution]` `tech-money-cost-attribution` 13 (agentops only) | `[X]` (single-family) |
-| Safe-action preview + typed confirmation | repository trust boundary `[M]`; k9s/Railway plan/apply `[X]` (r6b direct check) | `[M]` / `[X]` |
-| Terminal grammar: keyboard addressing, visible context, readonly mode, escape | `tech-int-keyboard-first` 22; `[cat:ia-layout/ia-command-palette]` 11; CLI family (34) | `[X]` |
-| Persisted density ladder without losing selection | `[cat:ia-layout/ia-density-ladder]` `tech-ia-density-ladder` 8 (3 families) | `[X]` |
-| Token system + dark/light parity + forced-colors | `[cat:color-motion/cm-tokens]` `tech-vis-design-tokens` 29 (4 families); `cm-forced-colors` `tech-vis-forced-colors` 4 (craft only) | `[X]` |
-| Status never colour-only | `[cat:color-motion/cm-status-color]` `tech-vis-colorblind-safe-status` 12 (3 families); `tech-int-aria-live` 4 | `[X]` |
-| SVG micro-visuals (sparkline/status glyph) as SVG+CSS | `[cat:svg-technique/svg-micro]` `tech-svg-micro-visual` 17 (3 families) | `[X]` |
-| Attention inbox with a state machine | `[cat:ia-layout/ia-attention-surface]` `tech-trust-alerting` 23 (dashboards only) + Linear Triage `[X]` | `[X]` + `[P]` |
-| Domain-split boards (work/money/health/decisions) as primary IA | **no source states domain partitioning** (r3 support was inflated from generic dashboards) | `[P]` — demoted `[cat:ia-layout/ia-board-per-domain]` |
-| Money grouping (spend/burn/quota/wallet/leases) on one board | **no source states quota/wallet/budget**; cost tracking is supported, the composition is not | `[P]` — `[cat:ia-layout/ia-money-grouping]` |
-| Provenance badge (measured/estimated/unknown) | **no source states provenance**; grounded in the repo `cost_provenance` contract | `[P]` — `[cat:trust-attention/tr-provenance]` |
-| Degraded banner naming the dependency | **no source states it**; grounded in the projection-watermark contract | `[P]` — `[cat:trust-attention/tr-degraded]` |
-| Uncertainty / "unmeasured" encoding | **no source states it**; grounded in the `unknown` cost class | `[P]` — `[cat:trust-attention/tr-uncertainty]` |
-| Freshness / retained-window marker | direct support 1 record | `[P]` — `[cat:trust-attention/tr-freshness]` |
-| Actor audit trail | **no source states it** | `[P]` — `[cat:ia-layout/ia-audit-trail]` |
-| Gauge mark for a bounded quantity | direct support 1 record | `[P]` — `[cat:chart-selection/ch-gauge]` |
-| Small multiples | direct support 2 records | `[P]` — `[cat:chart-selection/ch-small-multiples]` |
-| Virtualized-table rendering | direct support 3 records; the general table surface is supported (`tech-viz-data-table` 32) | `[P]` |
-| Flow-diagram topology | direct support 2 records; the path tracer craft is supported | `[P]` — `[cat:svg-technique/svg-flow]` |
-| No-build / "React is unnecessary" | r0 §9.8 local guardrail; the corpus shows viable alternatives, not necessity | `[P]` `[E7]` |
+| 1 | "These are AI agent sessions, not services." | The identity band on every actionable roster row: session/agent token + worktree/host target + current command/tool + provider×model + attempt (Move 1). |
+| 2 | "That run is waiting on a person." | The decision-eligibility token on the row plus the decision object (target, kind, epoch) in the inspector header (Move 3). |
+| 3 | "This is spend against a hard budget." | The cost facet on the selected run — reserved vs settled, `cost_source`, headroom — plus the money-risk attention item (Move 6). |
+| 4 | "The agent claimed it passed, but that is not the verified result." | The narration (ADVISORY) rung and the independent `test_runner` (MEASURED) rung, carrying distinct marks in the ladder (Move 4). |
+| 5 | "I can act from here, and it will be recorded." | The typed action door with preview and receipt on the decision object (Move 3). |
+
+A screenshot that satisfies fewer than five is not the Control Room (p4 acceptance gate).
+
+### 4.3 Removed — elements that could belong to a generic Grafana-style dashboard
+
+The q0 support repair and the p4 design critique forced a second pass over the composition. These
+elements are **removed** from the resting screen; each would let a reviewer mistake the product for a
+generic observability tooling shell.
+
+| Removed element | Reason |
+|---|---|
+| Fixed left navigation **rail** of peer destinations | The canonical ops-dashboard shell; replaced by a persistent roster plus deliberate lenses (p4 D1). |
+| **Peer board / card grid** (Work · Money · Health · Decisions) | Fragments one run decision across places; no source states domain partitioning (`[E2]`, p4 D1). |
+| **Top-row KPI stat tiles** | A dashboard glance idiom that displaces the roster; the roster *is* the glance. |
+| **Per-card sparklines / microcharts** | No shared scale, so they cannot compare; removed for one-scale time-series (`[M6]`). |
+| **Global truth footer** as the trust model | A footer cannot qualify a local value's source/scope/revision; provenance travels per value (p4 D4). |
+| **Unconditional gauge / status-grid defaults** | Mark support is thin (gauge 1, heatmap 1); both are now `[P]` (`[E1]`, p4 D6). |
+| **Colour-only status dots and repeated neon marks** | Fails non-colour status and reads as retro-ops costume (p4 D5/D9; §12.1). |
+| **Decorative glow / pulse and uppercase telemetry texture** | Atmosphere, not information; the restraint budget (§4.5, p4 D9). |
+| **Static topology / architecture SVG in the resting room** | Documentation theatre; live+scoped or a System/help link only (p4 D7). |
+| **Command palette as primary navigation** | A palette accelerates a board; it cannot replace typed addressability (p4 D8, Move 5). |
+| **Generic transcript + metadata sidebar** | A log viewer is not a causal explanation; replaced by the typed ladder (p4 D9, Move 2). |
+| **Time-range picker as the primary control** | A charting idiom; run triage is ordered by attention, not by a date range. |
+| **"Mission control" / flight-deck mood language** | A mood is not an identity and is the category default (p4 D5). |
+
+### 4.4 Visual grammar for run / evidence / action (p4 D5)
+
+Identity is carried by composition and mark semantics, not by tokens. The following treatments are
+`[P]` (tokens, contrast, reduced motion and SVG technique remain hygiene, per §11–§12):
+
+- **Run identity:** a left-anchored monospace identity band (session token, worktree path, current
+  command) with no card border; density comes from alignment, not chrome.
+- **Attempt boundary:** a hairline rule with attempt number, model, and timestamps; attempts stack in
+  the ladder instead of becoming cards.
+- **Agent-reported (ADVISORY):** a muted, quoted "said" treatment — never a pass mark.
+- **Independently verified (MEASURED):** the test-runner glyph plus timestamp — the only permitted
+  "passed" mark, always accompanied by its source and age.
+- **Proposed vs authorized action:** a hollow/dashed "proposed by <authority>" affordance versus a
+  solid affordance that names the acting controller, the epoch, and the receipt.
+- **Lease / cost constraint:** a headroom bar attached to the run, not a free-floating chart.
+- **Terminal target:** a monospace worktree/host token with a copy affordance, so the operator knows
+  where the agent is actually writing.
+
+### 4.5 Restraint budget (p4 D9)
+
+To keep the identity from collapsing back into dashboard costume, the resting screen holds a budget:
+no decorative glow or pulse; no uppercase telemetry texture used as decoration; no repeated bright
+status marks; no default card field; no chart whose only purpose is atmosphere; no animation except
+state transitions. Validation is a **blind A/B**: a reviewer compares the screen to a generic
+observability dashboard and must locate the run/evidence/action distinction without prose.
 
 ---
 
@@ -381,14 +523,14 @@ Initial implementation set (counts and tables before marks):
 
 | Priority | Run question | Form | Grounding |
 |---|---|---|---|
-| 1 | What needs me now? | ranked run roster: counts, rates, sortable table | `[X]` `tech-viz-data-table` 32; `[P]` virtualization |
-| 2 | What happened in this run? | bounded causal timeline/waterfall, one question per step | `[X]` `tech-viz-waterfall-timeline` 14 (agentops only) |
-| 3 | Cost/quality over time | line/area or sparkline on **one shared scale** | `[X]` `tech-viz-time-series-marks` 12; `tech-ops-metrics` 34 |
-| 4 | Bounded quantity | text + progress; gauge only where a maximum exists | `[P]` `ch-gauge` (direct support 1) |
-| 5 | Live output | bounded log stream with follow/pause/filter | `[X]` `tech-viz-log-stream` 32 |
+| 1 | What needs me now? | ranked run roster: counts, rates, sortable table | `[X]` `tech-viz-data-table` 21; `[P]` virtualization |
+| 2 | What happened in this run? | bounded causal timeline/waterfall, one question per step | `[X]` `tech-viz-waterfall-timeline` 4 (agentops only) |
+| 3 | Cost/quality over time | line/area or sparkline on **one shared scale** | `[X]` `tech-viz-time-series-marks` 8; `tech-ops-metrics` 23 |
+| 4 | Bounded quantity | text + progress; gauge only where a maximum exists | `[P]` `ch-gauge` (no direct support) |
+| 5 | Live output | bounded log stream with follow/pause/filter | `[X]` `tech-viz-log-stream` 18 |
 
-Deferred: small multiples `[P]` (2 records) and threshold bands (thin) are not defaults; canvas
-decimation only when a measured mark count requires it (`[X]` ECharts canvas-vs-SVG; `tech-viz-rendering-performance` 17).
+Deferred: small multiples `[P]` (no direct support) and threshold bands (no source) are not defaults; canvas
+decimation only when a measured mark count requires it (`[X]` ECharts canvas-vs-SVG; `tech-viz-rendering-performance` 16).
 
 ---
 
@@ -551,19 +693,21 @@ The implementation is graded against these; each maps to a required disposition.
 | 15 | Terminal grammar: object addressing, context, readonly, preview/apply, escape | r6b D8 |
 | 16 | Truthful in-room alert language; no false interrupt promise | r6c IA6 |
 | 17 | All no-regression guardrails hold | r0 §9 |
-| 18 | Inflated support claims are `[P]`/`[X]` after the p0 repair; no consensus claims | r6a E1–E8 |
+| 18 | Supports use q0 quoted, pattern-gated evidence; composition claims are `[P]`, never consensus | q0 crosswalk; p3 E1/E4 |
 | 19 | Render gate: Playwright screenshots + size/overflow/aspect/contrast/first-paint/console checks pass at desktop **and** mobile, zero failures | campaign §a5; §18.1 |
 | 20 | One-resting-screen glance check: every required `ON-G*` answer is visible at rest with no page/region scroll per breakpoint, and blind reviewers identify each answer | p5 IA8; §16, §18.2 |
-| 21 | Every `OPEN` p3/p4/p5 disposition is closed or explicitly downgraded with the open item recorded | p3 E1–E5, p4 D1–D9, p5 IA1–IA11; §17 |
+| 21 | Recognizability test: a blind reviewer states all five §4.2 sentences in ten seconds and points to the carrying element | p4 acceptance gate; §4.2, §18.7 |
+| 22 | Every `OPEN` p3/p4/p5 disposition is closed or explicitly downgraded with the open item recorded | p3 E1–E5, p4 D1–D9, p5 IA1–IA11; §17 |
 
 ---
 
 ## 15. Open items (direction line)
 
 - **Implementation.** The facelift itself is a later phase; this document is the direction it executes.
-- **Exemplar weakening.** The run-object pattern rests on thin/single-family evidence in places
-  (master–detail 4 craft-only; waterfall timeline / session grouping / eval loop / cost attribution
-  agentops-only; prompt registry 3). Those moves are labelled `[X]` with the caveat, not consensus.
+- **Exemplar weakening.** After the q0 quoted-evidence repair the run-object pattern rests on small
+  or single-family evidence in places (waterfall timeline 4, session grouping 9, eval loop 24 and cost
+  attribution 6 are agentops-only; master–detail is now `[P]` with direct support 1). Component
+  patterns are labelled `[X]` with the caveat; the composition stays `[P]` (§4.0).
 - **Deferred external notifications** remain a named decision, not a silent promise (`[IA6]`).
 
 ---
@@ -618,20 +762,20 @@ remains a blocker.
 
 | ID | Severity | Required disposition | Status |
 |---|---|---|---|
-| E1 | BLOCKER | Rebuild the crosswalk from record-level direct evidence; regenerate taxonomy/catalogs/skills/direction/IA; downgrade moves that lose backing to `[P]`. | **OPEN** |
+| E1 | BLOCKER | Rebuild the crosswalk from record-level direct evidence; regenerate taxonomy/catalogs/skills/direction/IA; downgrade moves that lose backing to `[P]`. | **CLOSED (q0 semantic crosswalk; §4 re-grounded)** |
 | E2 | HIGH | Use the real `RunState` graph (or label the UX lifecycle `[P]` with a total mapping). | **CLOSED (brief §2.2)** |
 | E3 | MEDIUM | Fix the narrow-desktop glance contract (minimum ticker schema or explicit narrowing). | **CLOSED (brief §16)** |
-| E4 | MEDIUM | Enforce one-leaf-per-label, or document/test explicit many-to-many evidence roles. | **OPEN** |
-| E5 | MEDIUM | Normalize claim classes: `[M]` repo facts, `[X]` external, `[P]` placement/policy. | **OPEN** (prose pass pending) |
-| D1 | BLOCKER | Replace a primary structural axis with agent/run-native grammar; blind screenshot test vs a generic-dashboard comparator. | **OPEN** |
-| D2 | BLOCKER | Make agent/session/worktree/current-command identity primary on the resting screen; define visible CLI address grammar. | **SPECIFIED** (brief §16.1; implementation pending) |
+| E4 | MEDIUM | Enforce one-leaf-per-label, or document/test explicit many-to-many evidence roles. | **CLOSED (q0: one direct leaf per label, verified in build)** |
+| E5 | MEDIUM | Normalize claim classes: `[M]` repo facts, `[X]` external, `[P]` placement/policy. | **CLOSED (brief §4.0; composition claims forced `[P]`)** |
+| D1 | BLOCKER | Replace a primary structural axis with agent/run-native grammar; blind screenshot test vs a generic-dashboard comparator. | **CLOSED (brief §4: session-first moves + §4.3 removed list + blind comparator)** |
+| D2 | BLOCKER | Make agent/session/worktree/current-command identity primary on the resting screen; define visible CLI address grammar. | **SPECIFIED** (brief §4.1 Move 1 + §16.1; implementation pending) |
 | D3 | HIGH | Specify measurable region budgets + breakpoints + ticker schema; test comprehension. | **CLOSED (brief §16/§18)** |
-| D4 | HIGH | Separate "pattern exists" from "composition is distinctive"; keep composition `[P]`; re-ground after E1/E4. | **OPEN** |
-| D5 | HIGH | Define a domain-specific visual grammar for run/evidence/action; tokens are hygiene. | **OPEN** |
-| D6 | MEDIUM-HIGH | Tier provenance; distinct channels for decisions/failures/advisories; scan-time test. | **SPECIFIED** (brief §16.5) |
-| D7 | MEDIUM-HIGH | Surface action eligibility at rest without automatic actuation. | **SPECIFIED** (brief §16.4) |
+| D4 | HIGH | Separate "pattern exists" from "composition is distinctive"; keep composition `[P]`; re-ground after E1/E4. | **CLOSED (brief §4.0/§4.1; re-grounded to q0 supports)** |
+| D5 | HIGH | Define a domain-specific visual grammar for run/evidence/action; tokens are hygiene. | **CLOSED (brief §4.4)** |
+| D6 | MEDIUM-HIGH | Tier provenance; distinct channels for decisions/failures/advisories; scan-time test. | **SPECIFIED** (brief §4.1 Move 4 + §16.5) |
+| D7 | MEDIUM-HIGH | Surface action eligibility at rest without automatic actuation. | **SPECIFIED** (brief §4.1 Move 3 + §16.4) |
 | D8 | MEDIUM | Name desktop/narrow/mobile contracts; five-capture blind screenshot set. | **CLOSED (brief §16)** |
-| D9 | MEDIUM | Restraint budget + blind "generic dashboard vs Control Room" comparison. | **OPEN** |
+| D9 | MEDIUM | Restraint budget + blind "generic dashboard vs Control Room" comparison. | **CLOSED (brief §4.5 + §4.3)** |
 | IA1 | BLOCKER | One authoritative per-breakpoint contract across r1/p1/p2. | **CLOSED (brief §16)** |
 | IA2 | BLOCKER | No required glance answer may depend on page/R3 scroll; complete ticker schema. | **CLOSED (brief §16)** |
 | IA3 | CRITICAL | Guarantee the five `ON-G4` values at rest, or formally narrow r1. | **CLOSED (brief §16: five values at desktop)** |
@@ -667,22 +811,28 @@ poller; no invented telemetry (`[M]`; r0 §9, §12.2).
    live region, labelled dialogs with focus containment/return, keyboard operation.
 5. **No regressions.** The eight measured guardrails in §12.2 hold, plus the control-packet authority,
    the mutation/idempotency boundary, keyed write-on-change rendering, and the no-build constraint.
-6. **Adversary closure.** Every `OPEN` disposition in §17 is closed (or, for E1/E4, explicitly
-   downgraded to `[P]` with the open item recorded) before the facelift is accepted.
+6. **Adversary closure.** Every `OPEN` disposition in §17 is closed (or explicitly downgraded to `[P]`
+   with the open item recorded) before the facelift is accepted.
+7. **Recognizability test.** A blind reviewer shown the full-screen desktop screenshot, with this
+   document hidden, states all five §4.2 sentences within ten seconds and can point to the visible
+   element carrying each. A miss is a design failure, not a copy fix.
 
 **Gate order.** p5 IA8 fixes the test classes: (1) screenshot geometry, (2) blind comprehension,
 (3) browser/accessibility automation, (4) event/network/state. A pass requires all four; DOM presence
-alone is not a pass.
+alone is not a pass. The §4.2 recognizability test is part of blind comprehension class (2).
 
 ## 19. Open blockers carried into the facelift
 
-- **E1/E4 (taxonomy entailment).** The repaired crosswalk still promotes adjacent labels; surviving
-  `[X]` counts are provisional. Repair the crosswalk (record-level evidence) or downgrade to `[P]`.
-- **D1/D4/D5/D9 (design).** The resting shell is still dashboard-shaped, exemplar grounding does not
-  establish a distinctive composition, the visual grammar is non-differentiating, and the restraint
-  budget is unset. These are `[P]` design work, not corpus claims.
-- **E3/E5/IA contract in artifacts.** The brief fixes the contract text; the p2 IA artifact and the
-  p1 direction prose still need the matching regeneration and claim-class pass.
+- **E1/E4 (taxonomy entailment).** **Closed** by the q0 semantic crosswalk (quoted, pattern-gated
+  support; one direct leaf per label). The §4.1 counts and the §14 acceptance criteria use the
+  repaired supports; the composition remains `[P]` by construction.
+- **D1/D4/D5/D9 (design).** **Closed in the brief** by §4 (session-first moves, the §4.3 removed list,
+  the §4.4 visual grammar, and the §4.5 restraint budget). The facelift implementation must carry them;
+  the blind comparator and the §4.2 recognizability test are the acceptance gate.
+- **D2/D6/D7 (implementation-carrying).** Specified in §4.1 (Moves 1, 3, 4) and §16; the resting screen
+  must render the identity band, the action-eligibility token, and tiered provenance before acceptance.
+- **IA contract in artifacts.** The p2 IA artifact still needs the matching regeneration; this direction
+  records the authoritative contract in §16.
 - **Implementation.** The facelift itself (a1–a7) has not started.
 
 ---
