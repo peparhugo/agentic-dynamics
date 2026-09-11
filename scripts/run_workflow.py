@@ -53,7 +53,7 @@ from agentic_dynamics.control.reducers._common import cell_id as _reducer_cell_i
 from agentic_dynamics.control.run_lifecycle import RunHeartbeatThread  # noqa: E402
 from agentic_dynamics.control.signal_store import build_signal_store, load_results  # noqa: E402
 from agentic_dynamics.control.step_routing import ModelSignals, route_step  # noqa: E402
-from agentic_dynamics.experiment.experiment_spec import ExperimentSpec, load_spec  # noqa: E402
+from agentic_dynamics.experiment.experiment_spec import ExperimentSpec  # noqa: E402
 from agentic_dynamics.experiment.spec_status import refresh_spec_status  # noqa: E402
 from agentic_dynamics.knowledge import belief_update as bu  # noqa: E402
 from agentic_dynamics.knowledge import spec_ingestion as si  # noqa: E402
@@ -68,6 +68,7 @@ from agentic_dynamics.runtime.run_clone import (  # noqa: E402
     create_run_clone,
 )
 from agentic_dynamics.runtime.workflow_runner import cell_scope, run_workflow  # noqa: E402
+from workflows.compile_workflow import load_spec_any  # noqa: E402
 
 #: CAP fact auto-emit (docs/architecture/current/cap_fact_auto_emit_design.md §4): the disable-flag
 #: env var. Deliberately the ONE default-ON flag in the FINOPS_* family (every other gate —
@@ -519,7 +520,10 @@ def main() -> None:
                          "image override never reaches the broker unless it is in the namespace).")
     args = ap.parse_args()
 
-    spec = load_spec(Path(args.spec))
+    # Either document kind compiles to the engine's spec (step 1, authoring -> execution):
+    # a workflow-v1 definition goes through workflows.compile_workflow — a refusal surfaces
+    # HERE, before any run state exists — and an ExperimentSpec loads exactly as before.
+    spec = load_spec_any(Path(args.spec))
 
     # --orchestrator: the sibling-container execution path (slice 2). P0-2 (control-plane
     # stabilization): this is NO LONGER a second phase loop. It injects a DockerAgentExecutor
