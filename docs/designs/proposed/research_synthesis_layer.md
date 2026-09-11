@@ -93,3 +93,45 @@ Scope 1 (derive a skill from the ladder's own winning cells) and this layer shar
 representation and its retrieval gate**, built once. Scope 1 is the self-derived turn; this
 layer is the externally-sourced turn; both end in the same place — an augmented generation arm
 measured by the same instrument.
+
+## Breadth, facets, and reduction (scope-2 refinement, 2026-09-11)
+
+The controller's requirement: **not one or two examples.** The layer must study *many* front-end
+examples, derive its own knowledge, and **categorize / split / reduce** it — so that a request
+like "make it sleek and sexy" resolves to concrete framework, layout, visual, and chart
+choices. The unit of derivation is therefore a **faceted catalog**, not a single synthesis:
+
+1. **Breadth-first acquisition.** Many sources per pilot (target: tens to low hundreds,
+   self-determined sufficiency but with an explicit *breadth* obligation: coverage across
+   facets, not just a source count). Each `source_document` is joined by an **example record**
+   with structured facets: `category` (dashboard / marketing / docs / data-viz / portfolio),
+   `aesthetic` (sleek | minimal | dense | brutalist | editorial …), `stack` (framework, chart
+   library, animation), `techniques` (gradients, dark mode, motion, SVG craft, typography),
+   `quality_signals` (recency, provenance), and citations.
+2. **Facet derivation and splitting.** Clustering groups examples by facet; when a cluster is
+   heterogeneous it **splits** (sub-categories), when it is thin it merges. The output is a
+   taxonomy with support per node — the "categorize and split" step.
+3. **Reduction.** Each facet distils to **decision-oriented skills** ("for a sleek admin
+   dashboard: framework X, layout Y, chart lib Z; avoid W") plus **catalogs** (e.g., "30 strong
+   SVG technique examples with sources and what makes each work"). Reduction keeps the support
+   and the evidence links; unsupported leaves are dropped, not published.
+4. **Intent-mapped retrieval.** Skills and catalogs are tagged with the **aesthetic/goal
+   facets** ("sleek and sexy", "data-dense", "print-inviting"), so a goal phrased in design
+   language retrieves the relevant catalog without translating it into implementation terms.
+5. **Visual and graph craft as first-class skills.** Chart selection, color scales,
+   data-ink, motion, accessibility, and SVG technique (gradients, masks, path animation,
+   responsive viewBox) are derived and retrievable as their own facet family.
+
+## Pilots (revised order — dogfood on the Control Room)
+
+1. **Control Room facelift (first).** Hand-rolled SVG + no framework today
+   (`apps/control_room/static/app.js`, 3.4k lines); the facelift derives the sleek/dense
+   dashboard skill set and applies it, adding chart/graph craft and SVG polish. Evaluation:
+   new component/render tests (screenshots at breakpoints) **plus** rubric + controller review.
+2. **External-site architecture page (second).** A new page built from `ARCHITECTURE.md` /
+   `agent_config/mental-model.md`, styled by the derived aesthetic skills — the first
+   content+design application outside the room.
+3. **Site-wide visual refresh + SVG expansion (third).** More and more impressive SVG
+   illustrations using the derived SVG technique catalog; evaluated through the existing
+   website verification harness (`apps/website/verify_svg_rendering.py`, breakpoint
+   screenshots, `verification/` gate reports).
