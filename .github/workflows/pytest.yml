@@ -100,7 +100,7 @@ jobs:
       - name: Install core dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install pytest pytest-timeout pyyaml numpy scikit-learn tree-sitter==0.21.3 tree-sitter-languages
+          pip install pytest pytest-timeout pytest-xdist pyyaml numpy scikit-learn tree-sitter==0.21.3 tree-sitter-languages
           # The deterministic suite imports the knowledge clients at collection time
           # (test_graph -> neo4j, embeddings -> chromadb, ollama_analyzer -> ollama,
           # sync_data --check -> duckdb+pyarrow) — the [admin] extra is not enough;
@@ -127,12 +127,15 @@ jobs:
           cp -r tests/fixtures/corpus/* experiments/results/
           ls experiments/results/ | head -3
 
-      - name: Run deterministic test suite (external-service tests excluded)
+      - name: Run deterministic test suite (external-service tests excluded; parallel)
         run: |
           # --timeout: a hanging test is a failure, never an infinite block
           # (cap_stabilization_release p3 post-mortem: the Chroma live tests hung the
           # suite ~60 min; the heartbeat guards + this timeout make hangs impossible to miss)
-          pytest tests/ -m "not external" -v --timeout=600
+          # -n auto --dist loadfile: parallel workers, one test FILE per worker (file-local
+          # fixtures/state never interleave). Measured on the CI fixture corpus: 254s serial
+          # -> 90s with -n auto, all 3871 pass (2026-09-11, local 12-core; CI runner 4 vCPU).
+          pytest tests/ -m "not external" -n auto --dist loadfile -v --timeout=600
 
       - name: Verify build_data imports cleanly (no DB required)
         run: |

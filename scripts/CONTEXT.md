@@ -99,7 +99,9 @@ the `fast`-marked subset = the sub-minute guard family + the audited pure-unit f
 subprocesses, no Redis/stores/ports, no real git worktrees, no runtime-corpus reads — the
 parallel-safety audit in `tests/test_fast_path_gate.py` enforces this on every run). Target:
 sub-3-minutes (measured ~25s). **The full suite stays the gate** — the fast path is a smoke
-subset, never a replacement; run `python3 -m pytest tests/ -q` on demand and keep it green.
+subset, never a replacement; run `python3 -m pytest tests/ -q` on demand and keep it green
+(add `-n auto --dist loadfile` with `pytest-xdist` for ~3x wall-clock — measured 254s -> 90s
+on the CI fixture corpus; the CI `test` job runs the suite parallel).
 
 **Budget gate** — `tests/test_fast_path_gate.py`: the fast path must stay under 180s (a slow
 regression trips the wire) and every `fast`-marked module must pass the parallel-safety audit.
