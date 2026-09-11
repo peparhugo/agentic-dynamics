@@ -277,7 +277,7 @@ reasoning_divergence, semantic_clusters. Superseded by `semantic_validation.py`.
 | File | Purpose |
 |------|---------|
 | `apps/control_room/server.py` | Flask backend — the **Control Room portal**, 36 routes across 9 API categories plus the static shell (below). Serves `apps/control_room/static/`. Port 8000 (`FINOPS_PORT`). |
-| `apps/control_room/static/` | The one resting screen (facelift a0): one run ledger answering `ON-G1..G7` at rest, no navigation. `index.html` + `style.css` + `app.js` hydrate from `GET /api/glance` and follow `GET /api/events`. |
+| `apps/control_room/static/` | The one resting screen (facelift a0, parity-restored u4): one run ledger answering `ON-G1..G7` at rest, no navigation. `index.html` + `style.css` + `app.js` hydrate from `GET /api/glance` and follow `GET /api/events`; `parity.js` re-houses the dropped operational surfaces — the R4b per-worker event stream + governed action band, R4d step timings, and the workbench lenses (fleet, attention, money, registry, sessions, queue, routing, docs, audit, health, workforce step timings) — each lazy-loading the same endpoint the old room used. |
 
 `apps/control_room/server.py`'s 36 routes, categorized:
 - **Legacy telemetry** (8): `/api/matrix`, `/api/status` (SSE), `/api/events/<cell_id>` (SSE), `/api/projections`, `/api/routing`, `/api/subscription-usage`, `POST /api/experiments`, `POST /api/queue/reinterleave`

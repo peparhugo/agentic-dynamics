@@ -23,10 +23,10 @@
         .run-row[data-run-id] .row-status                      — the left status rail of the object
 
     (b) "that run needs a decision"
-        [data-region="R1"] [data-attention-class="decision"] .queue-kind   — DECISION work item
-        [data-answer="ON-G5"] [data-field="decision.state"]                — pending / none pending
-        [data-answer="ON-G5"] [data-field="decision.eligibility"]          — approve eligibility token
-        [data-answer="ON-G5"] [data-authority="controller"]                — authority: controller
+        [data-region=R1] [data-attention-class=decision] .queue-kind   — DECISION work item
+        [data-answer=ON-G5] [data-field="decision.state"]                — pending / none pending
+        [data-answer=ON-G5] [data-field="decision.eligibility"]          — approve eligibility token
+        [data-answer=ON-G5] [data-authority="controller"]                — authority: controller
         .run-row[data-run-id][data-decision="approve"] .row-decision       — the same door on the row
 
     (c) "spend is against a hard budget"
@@ -36,7 +36,7 @@
         .run-row[data-run-id] [data-budget-cap]                — the hard cap
         .run-row[data-run-id] [data-budget-headroom]           — headroom percent
         .run-row[data-run-id] [data-budget-settlement]         — matched|underspent|overspent|unsettled
-        [data-region="R3a"] [data-money-risk]                  — the bounded cap exception (not a KPI)
+        [data-region=R3a] [data-money-risk]                  — the bounded cap exception (not a KPI)
 
     (d) "evidence is inspectable"
         .run-row[data-run-id] .row-evidence [data-evidence-class="advisory"]  — said/claimed mark
@@ -58,9 +58,13 @@
   6. The eight distinctive moves (direction §4.1) are preserved and carried by the elements named
      in each section comment below; the recognizability block above is their screenshot contract.
 
-  No build step: a single classic script (`app.js`) hydrates the regions from `GET /api/glance`
-  and follows `GET /api/events`. The pre-existing destination-board portal is superseded; its
-  server routes are untouched and remain registered and served.
+  No build step: classic scripts in dependency order. `app.js` hydrates the resting regions from
+  `GET /api/glance` and follows `GET /api/events`; `charts.js`/`visuals.js` draw the trends lens
+  and the R4 causal ladder; `parity.js` re-houses the old room's operational surfaces (the R4b
+  worker event stream + action band, R4d step timings, and the workbench lenses: fleet, attention,
+  money, registry, sessions, queue, routing, docs, audit, health, workforce). The pre-existing
+  destination-board portal is superseded; its server routes are untouched and remain registered
+  and served, and the parity layer lazy-loads them only when the operator opens a lens.
 -->
 <html lang="en">
 <head>
@@ -112,6 +116,19 @@
       <!-- Grouped so mobile can lift the controls out of the answers' flex width (the 72px bar
            has no room to spare for two 28px buttons beside a wrapping trust row). -->
       <div class="r0-actions">
+        <!-- The workbench is where the re-housed operational surfaces live: fleet, attention,
+             money, registry, sessions, queue, routing, docs, audit, health and workforce step
+             timings. It is a deliberate drill-down (like the trends lens), never navigation at
+             rest; each panel lazy-loads the same endpoint the old room used. -->
+        <button class="icon-button" id="workbench-open" type="button" aria-expanded="false"
+                aria-controls="workbench" title="Open the workbench lenses">
+          <svg class="icon-svg" aria-hidden="true" viewBox="0 0 24 24">
+            <path d="M4 6h16M4 12h16M4 18h16"/>
+            <path d="M8 4v4M14 10v4M10 16v4"/>
+          </svg>
+          <span class="sr-only">Open the workbench (fleet, attention, money, registry, sessions,
+            queue, routing, docs, audit, health, workforce)</span>
+        </button>
         <!-- The trends lens is deliberate drill-down, not navigation: the resting regions stay
              in place and the lens opens over the room only when asked (brief §3, §7). -->
         <button class="icon-button" id="lens-open" type="button" aria-expanded="false"
@@ -179,10 +196,12 @@
 
     <!-- ── R4 · SELECTION DOCK (drill-down only; Move 2, Move 5, Move 7) ───────────────
          Hidden at rest. Opening it is drill-down, never navigation; the resting regions stay
-         in place and the roster is never hidden behind a modal. It carries: the typed address
-         band (Move 5), the attempt-scoped causal ladder with nested session/phase/attempt
-         boundaries (Move 2), one bounded attempt feed with follow/pause (Move 7), and the live
-         scoped dependency-health flow (separated from the evidence ladder). -->
+         in place and the roster is never hidden behind a modal. Per the reconciled IA
+         (docs/research/control_room_ia.md §2 R4), it has four named sub-regions:
+           R4a address/identity · R4b per-worker event stream + action band ·
+           R4c evidence ladder · R4d step timings.
+         `data-dock-region` (not `data-region`) keeps the resting `[data-region]` contract
+         untouched; the dock never carries a `data-answer`. -->
     <aside class="selection-dock" id="selection-dock" hidden
            role="dialog" aria-modal="true" aria-label="Selected run evidence">
       <header class="dock-head">
@@ -193,7 +212,33 @@
           <span aria-hidden="true">&#x2715;</span><span class="sr-only">Close run detail</span>
         </button>
       </header>
-      <div class="evidence-ladder" id="evidence-ladder"></div>
+      <!-- R4a — identity/scope facts for the selected run (re-housed cell panel). -->
+      <div class="dock-region dock-address-region" data-dock-region="address"
+           id="dock-address-region" aria-label="Selected run identity"></div>
+      <!-- R4b — the restored per-worker surface: one live event stream plus the governed
+           action band. The stream is the same endpoint the old room used
+           (`GET /api/events/<cell_id>`); the action band fires the same mutation routes. -->
+      <div class="dock-region dock-worker" data-dock-region="worker" id="dock-worker">
+        <div class="dock-region-head">
+          <h3 class="dock-region-title">WORKER</h3>
+          <span class="dock-worker-target" id="dock-worker-target">—</span>
+          <button class="feed-toggle" id="dock-stream-toggle" type="button"
+                  data-feed-follow="follow" aria-pressed="false">Pause</button>
+        </div>
+        <ol class="feed-list" id="dock-event-feed" data-event-feed aria-live="off"></ol>
+        <div class="dock-actions" id="dock-actions" data-action-band></div>
+      </div>
+      <!-- R4c — the attempt-scoped causal ladder (visuals.js) + the bounded attempt feed. -->
+      <div class="dock-region dock-evidence" data-dock-region="evidence" id="dock-evidence">
+        <div class="evidence-ladder" id="evidence-ladder"></div>
+      </div>
+      <!-- R4d — per-attempt step timings (queue wait, service time, first token, duration,
+           retries, tokens by answer/explanation, cost, exit, verification). A value the
+           portal cannot observe renders as an explicit `unknown`, never a fabricated 0. -->
+      <div class="dock-region dock-timing" data-dock-region="timing" id="dock-timing">
+        <h3 class="dock-region-title">STEP TIMINGS</h3>
+        <div class="timing-grid" id="timing-grid" data-timing-grid></div>
+      </div>
     </aside>
 
     <!-- ── TRENDS LENS (drill-down; hidden at rest) ────────────────────────────────────
@@ -213,6 +258,37 @@
       <div class="chart-grid" id="chart-grid"></div>
     </section>
 
+    <!-- ── WORKBENCH (drill-down only; the re-housed destination boards) ───────────────
+         The facelift dropped the old room's five destination boards and System overflow. Per
+         the reconciled IA (docs/research/control_room_ia.md §6/§14), each is re-housed as a
+         deliberate lens: fleet, attention, money, registry, sessions, queue, routing, docs,
+         audit, health, and the workforce step-timing aggregate. Hidden at rest; every panel
+         lazy-loads the SAME endpoint the old room used, so no capability is a stub. The panel
+         nav is an accelerator, not navigation-from-rest (§4.3). -->
+    <section class="workbench" id="workbench" data-workbench hidden
+             role="dialog" aria-modal="true" aria-labelledby="workbench-title">
+      <header class="wb-head">
+        <h2 id="workbench-title">WORKBENCH</h2>
+        <nav class="wb-nav" id="workbench-nav" aria-label="Workbench lenses"></nav>
+        <button class="icon-button" id="workbench-close" type="button">
+          <span aria-hidden="true">&#x2715;</span><span class="sr-only">Close the workbench</span>
+        </button>
+      </header>
+      <div class="wb-body" id="workbench-body">
+        <section class="wb-panel" data-lens="fleet" id="wb-fleet" hidden aria-label="Fleet"></section>
+        <section class="wb-panel" data-lens="attention" id="wb-attention" hidden aria-label="Attention"></section>
+        <section class="wb-panel" data-lens="money" id="wb-money" hidden aria-label="Money"></section>
+        <section class="wb-panel" data-lens="registry" id="wb-registry" hidden aria-label="Registry"></section>
+        <section class="wb-panel" data-lens="sessions" id="wb-sessions" hidden aria-label="Sessions"></section>
+        <section class="wb-panel" data-lens="queue" id="wb-queue" hidden aria-label="Queue"></section>
+        <section class="wb-panel" data-lens="routing" id="wb-routing" hidden aria-label="Routing"></section>
+        <section class="wb-panel" data-lens="docs" id="wb-docs" hidden aria-label="Docs health"></section>
+        <section class="wb-panel" data-lens="audit" id="wb-audit" hidden aria-label="Recording audit"></section>
+        <section class="wb-panel" data-lens="health" id="wb-health" hidden aria-label="Projection health"></section>
+        <section class="wb-panel" data-lens="workforce" id="wb-workforce" hidden aria-label="Workforce step timings"></section>
+      </div>
+    </section>
+
     <!-- One polite live region announces transitions only; ordinary changing metrics are
          labelled and readable but never announced. -->
     <div class="sr-only" id="announcer" aria-live="polite" role="status"></div>
@@ -224,8 +300,11 @@
   </div>
   <script src="/static/app.js"></script>
   <!-- charts.js / visuals.js are classic scripts loaded after app.js: app.js calls their
-       `update` / `render` seams at render/selection time, always after all scripts parsed. -->
+       `update` / `render` seams at render/selection time, always after all scripts parsed.
+       parity.js re-houses the old room's operational surfaces (R4b/R4d + the workbench
+       lenses) and is loaded last so it can extend window.ControlRoom* seams. -->
   <script src="/static/charts.js"></script>
   <script src="/static/visuals.js"></script>
+  <script src="/static/parity.js"></script>
 </body>
 </html>

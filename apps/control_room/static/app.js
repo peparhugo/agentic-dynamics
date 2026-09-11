@@ -1065,6 +1065,12 @@
     }
     ladder.appendChild(renderAttemptFeed(run));
     dock.hidden = false;
+    // The parity layer re-houses the surfaces the facelift dropped into the reconciled R4
+    // sub-regions (R4a address, R4b event stream + actions, R4d step timings) and the workbench
+    // lenses. It is optional: if parity.js failed to load, the resting dock still works.
+    if (window.ControlRoomParity && window.ControlRoomParity.renderDock) {
+      window.ControlRoomParity.renderDock(run, AppState.glance);
+    }
     // Contain keyboard focus while the modal dock owns the screen (A-1).
     dock.addEventListener("keydown", trapDockFocus);
     dockOrigin = origin || null;
@@ -1100,6 +1106,10 @@
     if (dock) {
       dock.hidden = true;
       dock.removeEventListener("keydown", trapDockFocus);
+    }
+    // Close the parity-owned per-worker stream (the "exactly one selected stream" invariant).
+    if (window.ControlRoomParity && window.ControlRoomParity.closeDock) {
+      window.ControlRoomParity.closeDock();
     }
     // Stop feeding a run the operator is no longer inspecting.
     AppState.feedRunId = null;
