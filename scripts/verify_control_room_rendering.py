@@ -99,6 +99,12 @@ EXPECTED_BOXES = {
 ROW_COUNT = {"desktop": 8, "narrow": 7, "mobile": 3}
 ATTENTION_COUNT = {"desktop": 5, "narrow": 4, "mobile": 3}
 
+#: The four catalog-derived charts (facelift a1). Each must render inside its budget at every
+#: breakpoint, with an explicit empty/error state, never a blank panel.
+CHART_IDS = ("spend", "throughput", "failure", "dependency")
+#: Max chart-body height (px) per viewport, matching the CSS `--chart-body-h` budget + tolerance.
+CHART_BODY_MAX = {"desktop": 98, "narrow": 90, "mobile": 74}
+
 #: The committed fixture deltas (§10.6). Applied to a deep copy of F-0 by the loader so the
 #: forcing states stay exact and reviewable rather than duplicated.
 FIXTURE_DELTAS: dict[str, dict[str, Any]] = {
@@ -271,7 +277,7 @@ def serve_app() -> tuple[str, Any]:
 #: nodes under every resting region with a TreeWalker, compositing the effective ancestor
 #: background. A non-`none` background-image behind required text is a failure (never a guess).
 CONTRAST_JS = r"""
-(minNormal, minLarge) => {
+([selector, minNormal, minLarge]) => {
   const parseColor = (str) => {
     if (!str) return null;
     str = String(str).trim().toLowerCase();
@@ -308,7 +314,7 @@ CONTRAST_JS = r"""
     return acc ? acc.slice(0,3) : parseColor('#0d1014').slice(0,3);
   };
   const fails = [];
-  document.querySelectorAll('[data-region]').forEach((region) => {
+  document.querySelectorAll(selector).forEach((region) => {
     const walker = document.createTreeWalker(region, NodeFilter.SHOW_TEXT);
     let node;
     while ((node = walker.nextNode())) {
@@ -457,6 +463,226 @@ GEOMETRY_JS = r"""
 """
 
 
+#: Probe the open trends lens: per-chart body box, mark count, and empty/error state.
+CHART_PROBE_JS = r"""
+() => {
+  const rect = (el) => { const r = el.getBoundingClientRect();
+    return {x: r.x, y: r.y, width: r.width, height: r.height}; };
+  const lens = document.querySelector('[data-chart-lens]');
+  const charts = [];
+  document.querySelectorAll('[data-chart]').forEach((card) => {
+    const body = card.querySelector('[data-chart-body]');
+    const svg = body ? body.querySelector('svg') : null;
+    charts.push({
+      id: card.getAttribute('data-chart'),
+      body: body ? rect(body) : null,
+      hasSvg: Boolean(svg),
+      viewBox: svg ? svg.getAttribute('viewBox') : null,
+      aria: svg ? (svg.getAttribute('aria-label') || '') : '',
+      marks: body ? body.querySelectorAll('polyline,path,circle,rect,line').length : 0,
+      gauges: body ? body.querySelectorAll('.chart-gauge').length : 0,
+      statusCells: body ? body.querySelectorAll('.chart-status-cell').length : 0,
+      empty: body ? Boolean(body.querySelector('[data-chart-empty]')) : false,
+      error: body ? Boolean(body.querySelector('[data-chart-error]')) : false,
+      table: Boolean(card.querySelector('[data-chart-table]')),
+    });
+  });
+  const page = document.scrollingElement;
+  return {
+    open: Boolean(lens && !lens.hidden),
+    lens: lens ? rect(lens) : null,
+    charts: charts,
+    innerHeight: window.innerHeight,
+    scrollHeight: page.scrollHeight,
+  };
+}
+"""
+
+
+def _chart_history(base: dict[str, Any]) -> list[dict[str, Any]]:
+    """Six deterministic samples for the non-empty chart case (varying counts and cost)."""
+    counts = [
+        {"running": 2, "queued": 4, "failed": 0, "live": 1},
+        {"running": 3, "queued": 3, "failed": 1, "live": 2},
+        {"running": 5, "queued": 1, "failed": 1, "live": 3},
+        {"running": 4, "queued": 2, "failed": 2, "live": 3},
+        {"running": 6, "queued": 0, "failed": 1, "live": 4},
+        {"running": 5, "queued": 1, "failed": 1, "live": 3},
+    ]
+    costs = [
+        {"spend": "$8.00", "burn": "$0.40/h", "quota": "44%", "wallet": "$11.00",
+         "leases": "$1.00", "money_risk": False},
+        {"spend": "$9.10", "burn": "$0.55/h", "quota": "50%", "wallet": "$10.10",
+         "leases": "$1.20", "money_risk": False},
+        {"spend": "$10.20", "burn": "$0.70/h", "quota": "55%", "wallet": "$9.00",
+         "leases": "$1.50", "money_risk": False},
+        {"spend": "$11.10", "burn": "$0.78/h", "quota": "58%", "wallet": "$8.20",
+         "leases": "$1.80", "money_risk": False},
+        {"spend": "$12.00", "burn": "$0.80/h", "quota": "60%", "wallet": "$7.80",
+         "leases": "$2.00", "money_risk": False},
+        {"spend": "$12.40", "burn": "$0.82/h", "quota": "61%", "wallet": "$7.60",
+         "leases": "$2.10", "money_risk": False},
+    ]
+    samples = []
+    for index in range(6):
+        payload = copy.deepcopy(base)
+        payload["control_epoch"] = 40 + index
+        payload["run_counts"] = counts[index]
+        payload["cost"] = costs[index]
+        samples.append(payload)
+    return samples
+
+
+def _sse_frames(payloads: list[dict[str, Any]], *, with_transitions: bool) -> str:
+    """Build snapshot → replay_complete (→ epoch transitions) SSE frames from payloads."""
+    first = payloads[0]
+    frames = (
+        "event: snapshot\n"
+        + "data: " + json.dumps({"control_epoch": first["control_epoch"]}, separators=(",", ":"))
+        + "\n\n"
+        + "event: replay_complete\n"
+        + "data: " + json.dumps({"control_epoch": first["control_epoch"]}, separators=(",", ":"))
+        + "\n\n"
+    )
+    if with_transitions:
+        for payload in payloads[1:]:
+            frames += (
+                "event: transition\n"
+                + "data: " + json.dumps({"control_epoch": payload["control_epoch"],
+                                         "glance": payload}, separators=(",", ":")) + "\n\n"
+            )
+    return frames
+
+
+def run_chart_gate(out: Path, screenshots: bool) -> tuple[list[dict[str, Any]], list[str]]:
+    """Open the trends lens and assert the four charts at every viewport in three states.
+
+    Cases: ``history`` (six samples → marks), ``empty`` (one sample → explicit empty state),
+    ``error`` (failed projection → explicit error state). Each chart body must be non-zero and
+    inside its per-viewport budget, and the page must not scroll while the lens is open.
+    """
+    from playwright.sync_api import sync_playwright
+
+    fixture = build_fixture("F-0")
+    history = _chart_history(fixture)
+    url, httpd = serve_app()
+    results: list[dict[str, Any]] = []
+    errors: list[str] = []
+    cases = (
+        ("history", history, True, history[0]),
+        ("empty", [fixture], False, fixture),
+    )
+    try:
+        with sync_playwright() as playwright:
+            browser = playwright.chromium.launch(args=["--no-sandbox"])
+            for case, payloads, with_transitions, glance_payload in cases:
+                frames = _sse_frames(payloads, with_transitions=with_transitions)
+                for name, (width, height) in VIEWPORTS.items():
+                    label = f"{name}/{case}"
+                    context = browser.new_context(
+                        viewport={"width": width, "height": height}, timezone_id="UTC",
+                        locale="en-US", reduced_motion="reduce", color_scheme="dark",
+                    )
+                    context.add_init_script(
+                        "try{localStorage.setItem('control-room-theme','dark')}catch(e){}"
+                    )
+                    page = context.new_page()
+                    page.route("**/api/**", lambda route: route.abort())
+                    page.route("**/api/glance", _glance_handler(glance_payload))
+                    page.route("**/api/events", _events_handler(frames))
+                    page.goto(url, wait_until="domcontentloaded")
+                    page.locator('[data-render-state="ready"]').wait_for(timeout=15000)
+                    if case == "history":
+                        # The transitions are a separate SSE batch; wait for the ring to fill so
+                        # the probe sees measured marks rather than a mid-stream empty state.
+                        page.wait_for_function(
+                            "() => window.ControlRoomCharts"
+                            " && window.ControlRoomCharts.getState().history >= 2",
+                            timeout=5000,
+                        )
+                    page.click("#lens-open")
+                    page.locator('[data-chart-lens]:not([hidden])').wait_for(timeout=5000)
+                    probe = page.evaluate(CHART_PROBE_JS)
+                    _check_charts(label, name, case, probe, errors)
+                    contrast_failures = page.evaluate(
+                        CONTRAST_JS, ["[data-chart-lens]", 4.5, 3.0]
+                    )
+                    for failure in contrast_failures:
+                        _row(errors, label, case, "chart-contrast", json.dumps(failure))
+                    if screenshots and case == "history":
+                        shot = out / f"charts_{name}_dark_{width}x{height}.png"
+                        page.screenshot(path=str(shot), full_page=False)
+                        results.append({"case": case, "viewport": name, "screenshot": str(shot)})
+                    context.close()
+
+            # Error case: the glance fetch is refused and the stream never carries a payload.
+            frames = _sse_frames([fixture], with_transitions=False)
+            for name, (width, height) in VIEWPORTS.items():
+                context = browser.new_context(
+                    viewport={"width": width, "height": height}, timezone_id="UTC",
+                    locale="en-US", reduced_motion="reduce", color_scheme="dark",
+                )
+                page = context.new_page()
+                page.route("**/api/glance", lambda route: route.abort())
+                page.route("**/api/events", _events_handler(frames))
+                page.goto(url, wait_until="domcontentloaded")
+                page.wait_for_timeout(2500)  # the 2s ready fallback when no replay boundary
+                page.click("#lens-open")
+                page.locator('[data-chart-lens]:not([hidden])').wait_for(timeout=5000)
+                probe = page.evaluate(CHART_PROBE_JS)
+                _check_charts(f"{name}/error", name, "error", probe, errors)
+                context.close()
+            browser.close()
+    finally:
+        httpd.shutdown()
+    return results, errors
+
+
+def _check_charts(label: str, viewport: str, case: str, probe: dict[str, Any],
+                  errors: list[str]) -> None:
+    """Assert one lens probe: presence, budget, marks/empty/error, a11y name, no page scroll."""
+    if not probe.get("open"):
+        _row(errors, label, case, "chart", "lens did not open")
+        return
+    ids = [chart["id"] for chart in probe["charts"]]
+    if sorted(ids) != sorted(CHART_IDS):
+        _row(errors, label, case, "chart", f"charts {ids} want {list(CHART_IDS)}")
+    max_height = CHART_BODY_MAX[viewport]
+    for chart in probe["charts"]:
+        body = chart.get("body") or {}
+        if not body or body.get("width", 0) <= 0 or body.get("height", 0) <= 0:
+            _row(errors, label, case, "chart", f"{chart['id']} body {body}")
+            continue
+        if body["height"] > max_height + 2:
+            _row(errors, label, case, "chart-budget",
+                 f"{chart['id']} body height {body['height']:.0f} > {max_height}")
+        if not chart.get("table"):
+            _row(errors, label, case, "chart-table", f"{chart['id']} missing textual equivalent")
+        if case == "history":
+            if chart["id"] == "dependency":
+                # Dependency health is gauges + a status grid, not a time-series SVG.
+                if chart.get("gauges", 0) < 2 or chart.get("statusCells", 0) < 4:
+                    _row(errors, label, case, "chart-blank",
+                         f"dependency gauges={chart.get('gauges')} "
+                         f"status={chart.get('statusCells')}")
+            elif not chart.get("hasSvg") or not chart.get("viewBox") or not chart.get("aria"):
+                _row(errors, label, case, "chart-svg",
+                     f"{chart['id']} svg/viewBox/aria incomplete")
+            elif chart.get("marks", 0) <= 0:
+                _row(errors, label, case, "chart-blank", f"{chart['id']} has no marks")
+            if chart.get("empty") or chart.get("error"):
+                _row(errors, label, case, "chart-state", f"{chart['id']} wrong state")
+        elif case == "empty":
+            if not chart.get("empty"):
+                _row(errors, label, case, "chart-empty", f"{chart['id']} lacks empty state")
+        elif case == "error":
+            if not chart.get("error"):
+                _row(errors, label, case, "chart-error", f"{chart['id']} lacks error state")
+    if probe["scrollHeight"] > probe["innerHeight"] + 1:
+        _row(errors, label, case, "chart-page-scroll",
+             f"page scrollHeight {probe['scrollHeight']} > {probe['innerHeight']}")
+
+
 def _glance_handler(payload: dict[str, Any]):
     """Return a one-argument Playwright route handler serving the expanded fixture JSON."""
 
@@ -548,7 +774,7 @@ def run_browser_gate(
                         # A console error is a loaded-page defect even when geometry is intact.
                         for message in console_errors:
                             _row(errors, label, fixture_id, "console", message[:200])
-                        contrast_failures = page.evaluate(CONTRAST_JS, [4.5, 3.0])
+                        contrast_failures = page.evaluate(CONTRAST_JS, ["[data-region]", 4.5, 3.0])
                         for failure in contrast_failures:
                             _row(errors, label, fixture_id, "contrast", json.dumps(failure))
 
@@ -725,6 +951,8 @@ def main() -> int:
                         help="comma-separated themes to screenshot (contrast runs all themes)")
     parser.add_argument("--check-fixtures", action="store_true",
                         help="validate deterministic fixtures without a browser")
+    parser.add_argument("--charts", action="store_true",
+                        help="also run the trends-lens chart class (a1)")
     args = parser.parse_args()
 
     fixtures = [item.strip() for item in args.fixtures.split(",") if item.strip()]
@@ -744,6 +972,9 @@ def main() -> int:
         results, errors = run_browser_gate(
             fixtures, out, not args.no_screenshot, screenshot_themes=screenshot_themes
         )
+        if args.charts:
+            chart_results, chart_errors = run_chart_gate(out, not args.no_screenshot)
+            results, errors = results + chart_results, errors + chart_errors
     except ImportError:
         print("playwright is not installed; run with --check-fixtures for the browser-free check",
               file=sys.stderr)

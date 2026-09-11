@@ -192,6 +192,70 @@ def test_styles_hold_the_ia_pixel_budget_and_accessibility_bar() -> None:
     assert "overflow: hidden" in css
 
 
+def test_shell_mounts_the_trends_lens_and_the_chart_module() -> None:
+    """The chart set is a deliberate drill-down lens, not a resting region."""
+    html = _read("index.html")
+    for required in (
+        'id="chart-lens"',
+        'data-chart-lens',
+        'id="chart-grid"',
+        'id="lens-open"',
+        'id="lens-close"',
+        'aria-expanded="false"',
+    ):
+        assert required in html, required
+    # The lens is hidden at rest and is NOT a layout region.
+    assert 'data-region="R4"' not in html
+    assert '<script src="/static/charts.js"></script>' in html
+    # Charts never displace a resting answer.
+    assert html.count('data-answer="ON-G1"') == 1
+    assert html.count('data-answer="ON-G7"') == 1
+
+
+def test_chart_module_covers_the_four_catalog_forms_without_a_runtime() -> None:
+    """charts.js builds SVG+CSS micro-charts; no chart library, canvas, or build step."""
+    charts = _read("charts.js")
+    for chart_id in ("spend", "throughput", "failure", "dependency"):
+        assert f'id: "{chart_id}"' in charts, chart_id
+    # SVG authoring: viewBox + currentColor/custom properties + a namespaced element factory.
+    assert "createElementNS" in charts
+    assert "viewBox" in charts
+    assert ('role="img"' in charts or "role: \"img\"" in charts
+            or 'setAttribute("role", "img")' in charts)
+    assert "aria-label" in charts
+    # Empty and error states are first-class (never a blank panel).
+    assert "data-chart-empty" in charts
+    assert "data-chart-error" in charts
+    assert "chart-table" in charts
+    # No runtime dependency: no canvas, no library fetch, bounded history.
+    assert "getContext" not in charts
+    assert "new Chart(" not in charts
+    assert "HISTORY_MAX" in charts
+
+
+def test_chart_styles_declare_budgets_themes_and_motion() -> None:
+    """Every chart has a body budget; series are theme-aware and forced-colors safe."""
+    css = _read("style.css")
+    for selector in (
+        ".chart-lens",
+        ".chart-grid",
+        ".chart-card",
+        ".chart-body",
+        ".chart-svg",
+        ".chart-line",
+        ".chart-table",
+        ".chart-empty",
+        ".chart-error",
+        ".chart-gauge",
+        ".chart-status-grid",
+    ):
+        assert selector in css, selector
+    assert "--chart-body-h" in css
+    # Forced-colors keeps the series distinguishable by system color.
+    assert ".chart-series-0 { color: LinkText; }" in css
+    assert ".chart-gauge-fill { background: Highlight; }" in css
+
+
 def test_all_preexisting_routes_still_resolve() -> None:
     """The facelift is additive: every previously-registered API path is still served."""
     from apps.control_room import server

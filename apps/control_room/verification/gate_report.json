@@ -144,6 +144,21 @@
       "viewport": "mobile",
       "theme": "dark",
       "screenshot": "apps/control_room/verification/F-7_mobile_dark_390x844.png"
+    },
+    {
+      "case": "history",
+      "viewport": "desktop",
+      "screenshot": "apps/control_room/verification/charts_desktop_dark_1440x900.png"
+    },
+    {
+      "case": "history",
+      "viewport": "narrow",
+      "screenshot": "apps/control_room/verification/charts_narrow_dark_1024x768.png"
+    },
+    {
+      "case": "history",
+      "viewport": "mobile",
+      "screenshot": "apps/control_room/verification/charts_mobile_dark_390x844.png"
     }
   ],
   "errors": []

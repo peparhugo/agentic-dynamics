@@ -90,6 +90,14 @@
     --measured: CanvasText;
     --source: CanvasText;
   }
+  /* Charts must survive Windows High Contrast: keep the three series distinguishable by
+     system color and let the status glyphs/labels carry the meaning, never hue alone. */
+  .chart-series-0 { color: LinkText; }
+  .chart-series-1 { color: Highlight; }
+  .chart-series-2 { color: GrayText; }
+  .chart-gauge-fill { background: Highlight; }
+  .chart-card { border-color: CanvasText; }
+  .chart-card[data-focus="1"] { border-color: Highlight; }
 }
 
 * { box-sizing: border-box; }
@@ -168,9 +176,11 @@ body {
 .scope-sub {
   font-family: var(--mono);
   font-size: 11px;
-  color: var(--dim);
+  color: var(--muted);
   white-space: nowrap;
 }
+
+.r0-actions { flex: 0 0 auto; display: flex; align-items: center; gap: 4px; }
 
 .r0-answers {
   flex: 1 1 auto;
@@ -506,7 +516,7 @@ body {
   white-space: nowrap;
 }
 
-.marginal-bucket .bucket-label { font-size: 10px; color: var(--dim); }
+.marginal-bucket .bucket-label { font-size: 10px; color: var(--muted); }
 .marginal-bucket .bucket-value { white-space: nowrap; }
 .marginal-bucket[data-bucket="unknown"] .bucket-value { color: var(--unknown); }
 .marginal-bucket[data-bucket="other"] .bucket-value { color: var(--muted); }
@@ -570,6 +580,144 @@ body {
 
 .noscript { padding: 16px; color: var(--warn); }
 
+/* ── The trends lens (drill-down charts; hidden at rest) ────────────────────────────────
+   A fixed overlay so it never re-flows the resting regions, and its own scroll region on
+   mobile so the page itself never scrolls. Budgets (chart-body height) are per breakpoint. */
+
+.chart-lens {
+  --chart-body-h: 96px;
+  position: fixed;
+  left: 50%;
+  top: 84px;
+  transform: translateX(-50%);
+  width: min(1408px, 96vw);
+  height: 540px;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.45);
+  overflow: hidden;
+}
+
+.chart-lens[hidden] { display: none; }
+
+.lens-head {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--line);
+}
+
+.lens-head h2 {
+  margin: 0;
+  font-size: 12px;
+  letter-spacing: 0.07em;
+}
+
+.lens-scope {
+  flex: 1 1 auto;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.chart-grid {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  padding: 8px 12px 12px;
+}
+
+.chart-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  padding: 6px 8px;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+}
+
+.chart-card[data-focus="1"] { border-color: var(--accent); }
+
+.chart-head { display: flex; align-items: baseline; gap: 8px; }
+.chart-title { margin: 0; font-size: 11px; letter-spacing: 0.06em; color: var(--muted); }
+.chart-question { margin: 0; font-size: 11px; color: var(--text); }
+
+.chart-body {
+  height: var(--chart-body-h);
+  flex: 0 0 auto;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--accent); /* currentColor fallback for the marks in forced-colors */
+}
+
+.chart-svg { display: block; width: 100%; height: 100%; overflow: visible; }
+
+.chart-gridline { stroke: var(--line); stroke-width: 0.5; }
+
+.chart-line { fill: none; stroke: currentColor; stroke-width: 1.4; vector-effect: non-scaling-stroke; }
+.chart-dot { fill: currentColor; }
+.chart-series-0 { color: var(--accent); }
+.chart-series-1 { color: var(--ok); }
+.chart-series-2 { color: var(--warn); }
+
+.chart-dependency { display: flex; flex-direction: column; gap: 4px; height: 100%; }
+.chart-gauge { display: flex; flex-direction: column; gap: 1px; }
+.chart-gauge-head { display: flex; justify-content: space-between; gap: 6px; }
+.chart-gauge-label { font-size: 10px; color: var(--muted); }
+.chart-gauge-value { font-family: var(--mono); font-size: 11px; color: var(--text); }
+.chart-gauge-track { height: 4px; background: var(--line); border-radius: 2px; overflow: hidden; }
+.chart-gauge-fill { height: 100%; background: var(--accent); }
+.chart-gauge-value[data-unknown] { color: var(--unknown); }
+
+.chart-status-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; }
+.chart-status-cell { display: flex; align-items: baseline; gap: 3px; min-width: 0; }
+.chart-status-glyph { font-size: 10px; }
+.chart-status-word { font-size: 10px; color: var(--text); white-space: nowrap; overflow: hidden;
+                     text-overflow: ellipsis; }
+.chart-status-cell[data-status="up"] .chart-status-glyph { color: var(--ok); }
+.chart-status-cell[data-status="degraded"] .chart-status-glyph { color: var(--warn); }
+.chart-status-cell[data-status="down"] .chart-status-glyph { color: var(--bad); }
+.chart-status-cell[data-status="unknown"] .chart-status-glyph { color: var(--unknown); }
+
+.chart-empty, .chart-error {
+  margin: 0;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  font-size: 11px;
+  color: var(--muted);
+}
+.chart-error { color: var(--warn); }
+
+.chart-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--text);
+}
+.chart-table th, .chart-table td {
+  text-align: left;
+  padding: 1px 4px 1px 0;
+  border-bottom: 1px solid var(--line);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.chart-table th { color: var(--muted); font-weight: 600; }
+
+.chart-meta { margin: 0; font-size: 10px; color: var(--muted); line-height: 1.25; }
+
 /* ── Icon button ───────────────────────────────────────────────────────────────────────── */
 
 .icon-button {
@@ -613,6 +761,8 @@ body {
   .attention-item { height: 52px; }
   .run-row { height: 84px; }
   .region-title { padding-top: 6px; }
+  /* Narrow trends lens: one step tighter than desktop, still 2 columns. */
+  .chart-lens { --chart-body-h: 88px; height: 520px; width: min(660px, 94vw); }
 }
 
 /* ── Mobile: 390x844 — the same seven answers, stacked ─────────────────────────────────── */
@@ -700,8 +850,28 @@ body {
      ON-G1 fields wrap two-per-row and the seven ON-G6 fields four-then-three, so the whole
      bar is four 14px micro-rows inside 72px. Compact visible labels keep it honest. */
   .r0 { gap: 4px; }
-  .r0-scope { min-width: 66px; max-width: 70px; }
+  /* Mobile R0: lift the action buttons out of the flex row and park them under the scope text,
+     so the wrapping ON-G1/ON-G6 cells keep the full remaining width (the 72px budget). */
+  .r0 { position: relative; }
+  .r0-actions { position: absolute; left: 12px; bottom: 3px; z-index: 2; }
+  .r0-actions .icon-button { width: 22px; height: 22px; }
+  .r0-scope { min-width: 66px; max-width: 70px; align-self: stretch; padding-top: 3px; }
   .answer-kicker { width: auto; min-width: 30px; font-size: 9px; margin-right: 6px; }
+
+  /* Mobile trends lens: a full-height inspector with a single-column chart list; it scrolls
+     itself, so the resting page still never scrolls. */
+  .chart-lens {
+    --chart-body-h: 72px;
+    left: 0;
+    right: 0;
+    top: 0;
+    transform: none;
+    width: 100vw;
+    height: 100vh;
+    border-radius: 0;
+    border: none;
+  }
+  .chart-grid { grid-template-columns: minmax(0, 1fr); }
   .r0-answers { gap: 0; }
   .r0-answer { gap: 4px; }
   .answer-cells { gap: 0 6px; }

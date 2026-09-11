@@ -70,13 +70,26 @@
           <span class="answer-cells" id="trust-cells" aria-label="Trust verdict"></span>
         </div>
       </div>
-      <button class="icon-button" id="theme-toggle" type="button" aria-pressed="false"
-              title="Toggle light theme">
-        <svg class="icon-svg" aria-hidden="true" viewBox="0 0 24 24">
-          <path d="M20.5 14.3A8.5 8.5 0 0 1 9.7 3.5a8.5 8.5 0 1 0 10.8 10.8Z"/>
-        </svg>
-        <span class="sr-only">Toggle light or dark theme</span>
-      </button>
+      <!-- Grouped so mobile can lift the controls out of the answers' flex width (the 72px bar
+           has no room to spare for two 28px buttons beside a wrapping trust row). -->
+      <div class="r0-actions">
+        <!-- The trends lens is deliberate drill-down, not navigation: the resting regions stay
+             in place and the lens opens over the room only when asked (brief §3, §7). -->
+        <button class="icon-button" id="lens-open" type="button" aria-expanded="false"
+                aria-controls="chart-lens" title="Open the trends lens">
+          <svg class="icon-svg" aria-hidden="true" viewBox="0 0 24 24">
+            <path d="M4 19V5m0 14h16M8 15l3-4 3 2 4-6"/>
+          </svg>
+          <span class="sr-only">Open the trends lens (spend, throughput, failure, dependency health)</span>
+        </button>
+        <button class="icon-button" id="theme-toggle" type="button" aria-pressed="false"
+                title="Toggle light theme">
+          <svg class="icon-svg" aria-hidden="true" viewBox="0 0 24 24">
+            <path d="M20.5 14.3A8.5 8.5 0 0 1 9.7 3.5a8.5 8.5 0 1 0 10.8 10.8Z"/>
+          </svg>
+          <span class="sr-only">Toggle light or dark theme</span>
+        </button>
+      </div>
     </header>
 
     <div class="glance-body" data-glance-body>
@@ -133,6 +146,23 @@
       <div class="evidence-ladder" id="evidence-ladder"></div>
     </aside>
 
+    <!-- ── TRENDS LENS (drill-down; hidden at rest) ────────────────────────────────────
+         The four catalog-derived charts (spend · throughput · failure · dependency health).
+         Every card states its question, decision, baseline, scope and fallback; a missing
+         value is a gap, fewer than two samples is an explicit empty state, and a failed
+         projection is an explicit error state — never a blank panel. -->
+    <section class="chart-lens" id="chart-lens" data-chart-lens hidden
+             role="dialog" aria-modal="false" aria-labelledby="lens-title">
+      <header class="lens-head">
+        <h2 id="lens-title">TRENDS</h2>
+        <span class="lens-scope" id="lens-scope">retained window: this browser session</span>
+        <button class="icon-button" id="lens-close" type="button">
+          <span aria-hidden="true">&#x2715;</span><span class="sr-only">Close the trends lens</span>
+        </button>
+      </header>
+      <div class="chart-grid" id="chart-grid"></div>
+    </section>
+
     <!-- One polite live region announces transitions only; ordinary changing metrics are
          labelled and readable but never announced. -->
     <div class="sr-only" id="announcer" aria-live="polite" role="status"></div>
@@ -143,5 +173,8 @@
     </noscript>
   </div>
   <script src="/static/app.js"></script>
+  <!-- charts.js is a classic script loaded after app.js: app.js calls its `update` seam at
+       render time, which is always after both scripts have parsed. -->
+  <script src="/static/charts.js"></script>
 </body>
 </html>

@@ -406,12 +406,43 @@
 
   // ── Top-level render ───────────────────────────────────────────────────────────────────
 
+  //: The browser-session retained window for the trends lens. A bounded ring, so a long-lived
+  //: tab cannot grow without limit; the lens labels it rather than implying a server history.
+  var HISTORY_MAX = 60;
+
   var AppState = {
     glance: null,
     replayComplete: false,
     rendered: false,
     announcedEpoch: null,
+    //: Bounded samples of the glance slices the charts consume (one per control epoch).
+    history: [],
+    lastHistoryEpoch: null,
+    //: True when the projection could not be read, so the charts render an error, not a stale.
+    glanceError: false,
   };
+
+  /**
+   * Append one bounded history sample for the trends lens.
+   *
+   * Only a NEW control epoch pushes: a repeated render of the same epoch (a poll, a re-render)
+   * would otherwise duplicate the point and make the x-axis lie about time. A missing cost or
+   * count stays as it was on the wire (a string "unknown") so the chart can render a gap.
+   */
+  function pushHistory(glance) {
+    var epoch = Number(glance.control_epoch || 0);
+    if (AppState.lastHistoryEpoch === epoch && AppState.history.length) return;
+    AppState.lastHistoryEpoch = epoch;
+    AppState.history.push({
+      epoch: epoch,
+      observed_at: glance.observed_at || "",
+      cost: glance.cost || null,
+      run_counts: glance.run_counts || null,
+      system: glance.system || null,
+      trust: glance.trust || null,
+    });
+    while (AppState.history.length > HISTORY_MAX) AppState.history.shift();
+  }
 
   /** Render every region from one glance payload. */
   function renderGlance(glance) {
@@ -428,6 +459,12 @@
     renderCost(glance);
     renderHealth(glance);
     renderComposition(glance);
+    pushHistory(glance);
+    // The trends lens is a drill-down; it re-renders only while open, but always receives the
+    // fresh history so opening it later shows the retained window rather than a stale chart.
+    if (window.ControlRoomCharts) {
+      window.ControlRoomCharts.update(AppState.glance, AppState.history, AppState.glanceError);
+    }
     AppState.rendered = true;
     maybeReady();
   }
@@ -446,6 +483,7 @@
     if (!frame || !AppState.glance) return;
     var epoch = Number(frame.control_epoch || 0);
     if (frame.glance && typeof frame.glance === "object") {
+      AppState.glanceError = false;
       renderGlance(frame.glance);
     } else if (frame.kind && frame.target) {
       var sample = AppState.glance.run_sample || [];
@@ -499,8 +537,14 @@
         if (!response.ok) throw new Error("glance " + response.status);
         return response.json();
       })
-      .then(renderGlance)
+      .then(function (glance) {
+        AppState.glanceError = false;
+        renderGlance(glance);
+      })
       .catch(function () {
+        // A failed projection is a first-class state: the resting screen degrades honestly and
+        // the charts render their explicit error state (never a blank or stale panel).
+        AppState.glanceError = true;
         renderGlance({
           control_epoch: 0,
           system: {
@@ -545,7 +589,10 @@
     source.addEventListener("snapshot", function (event) {
       try {
         var frame = JSON.parse(event.data);
-        if (frame && frame.glance) renderGlance(frame.glance);
+        if (frame && frame.glance) {
+          AppState.glanceError = false;
+          renderGlance(frame.glance);
+        }
       } catch (_error) { /* a malformed frame is ignored; the polled snapshot stands */ }
     });
     source.addEventListener("replay_complete", function () {
