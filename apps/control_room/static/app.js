@@ -20,6 +20,27 @@
  *   - All content is built with `element()`/`textContent`; no string is ever parsed as HTML.
  *
  * The file has no dependencies and no build step; it runs as a classic script after the DOM.
+ *
+ * ── recognizability (the a5 design-adversary contract) ────────────────────────────────────────
+ * The exact selector that carries each stranger-test claim on the RESTING screenshot. Each is
+ * built in this file and styled in style.css; the mirror block in index.html documents the DOM.
+ *
+ *   (a) live CLI agent sessions — `renderRunRow` builds `.session-band[data-agent]` carrying the
+ *       `agent-prompt` glyph, the `row-status` rail, and the `session.identity`, `terminal.target`,
+ *       `command.current`, `model.provider` and `attempt.number` fields.
+ *         selector: `.run-row[data-run-id] .session-band[data-agent]`
+ *   (b) a run needs a decision — `renderAttention` builds the DECISION work item under
+ *       `[data-answer="ON-G5"]` with `[data-attention-class="decision"]`, the eligibility token,
+ *       the `queue-authority`/`queue-action` chips, and `[data-authority="controller"]`.
+ *         selector: `[data-answer="ON-G5"] [data-field="decision.eligibility"]`
+ *   (c) spend against a hard budget — `renderRunRow` builds `.row-lease[data-budget-state]` (the
+ *       headroom bar) with `data-budget-reserved`, `data-budget-settled`, `data-budget-cap`,
+ *       `data-budget-headroom` and `data-budget-settlement`, plus the `cost.provenance` pair.
+ *         selector: `.run-row[data-run-id] .row-lease[data-budget-state]`
+ *   (d) evidence is inspectable — `renderRunRow` builds `.row-evidence [data-evidence-class]`
+ *       marks and `decision.receipt`; `openDock` builds the causal ladder, the typed address and
+ *       the bounded follow/pause attempt feed.
+ *         selector: `.run-row[data-run-id] .row-evidence [data-evidence-class="measured"]`
  */
 "use strict";
 
@@ -213,85 +234,161 @@
     });
   }
 
+  /** The governed eligibility vocabulary: only these name an acting controller (Move 3). */
+  var GOVERNED = { approve: true, promote: true, cancel: true, retire: true };
+
+  /** Take the basename of a path-like token (`wt/control-room` → `control-room`). */
+  function basename(value) {
+    return String(value === undefined || value === null ? "unknown" : value).split("/").pop();
+  }
+
   /**
-   * One run-ledger row: the 16-field schema split across three declared lines, leading with the
-   * agent/session identity band (Move 1) and pairing the ADVISORY claim with the MEASURED proof
-   * (Move 4). Identifiers may middle-elide; measured/state values may not.
+   * One agent-run OBJECT (Move 1, Move 4, Move 6): the 16-field schema split across three
+   * declared lines with the agent/session identity band first, a paired ADVISORY/MEASURED
+   * evidence/decision footer, and an attached lease headroom bar. Non-field affordances (the
+   * prompt glyph, the status rail, the settlement/source chips, the lease bar) are added without
+   * touching the gate's 16-field row schema.
+   *
+   * The density ladder is a presentation difference, never a second information model: on the
+   * compact (mobile) view each value carries an explicit semantic mark (`wt:`, `cmd:`, `said:`)
+   * so the stranger never reconstructs field meaning from order or colour.
    */
   function renderRunRow(run) {
-    // Mobile is triage: the value band must stay legible without labels, so the evidence values
-    // collapse to their single-word tokens. Narrow is DENSE (short labels, identifiers elide);
-    // desktop keeps the full word. This is the density ladder, not a second information model.
     var compact = window.innerWidth < 760;
     var dense = window.innerWidth < 1200;
     var lab = function (key, full) { return dense ? (SHORT_ROW_LABELS[key] || full) : full; };
-    // The evidence material is typed by its label + colour/weight; the dense (narrow/mobile)
-    // value collapses to its token so the line never clips a required value.
-    var advisory = dense ? "claimed" : run["evidence.advisory"];
-    var measured = dense ? "pending" : run["evidence.measured"];
-    // The "source" label already names the material, so the value is the bare commit sha — this
-    // also leaves the row's third line room for the authority chip on a governed decision.
+    var mark = function (tag, value) {
+      return compact ? tag + ":" + (value === undefined || value === null ? "unknown" : value) : value;
+    };
+
+    var session = run["session.identity"] || "unknown";
+    var advisory = run["evidence.advisory"];
+    var measured = run["evidence.measured"];
     var sourceValue = String(run["source.commit"] || run["evidence.source"] || "unknown")
       .replace(/^commit\s+/, "");
+    var eligibility = run["decision.eligibility"];
+    // Decision consistency (IA adversary a6): when the inbox says no decision is pending, no row
+    // may still advertise a governed approval door. The row derives from the same authoritative
+    // decision state, so the resting screen never gives two incompatible answers.
+    var decisionState = AppState.glance && AppState.glance.attention
+      && AppState.glance.attention.decision ? AppState.glance.attention.decision.state : "none";
+    if (String(decisionState) === "none" && GOVERNED[eligibility]) eligibility = "none";
+    var live = run["run.live"] || "not-live";
+    var lifecycle = run["lifecycle.state"] || "unknown";
+    var governed = GOVERNED[eligibility] === true;
+
+    // Move 6 — lease facets. A missing value is the literal string "unknown", never a zero.
+    var reserved = run["budget.reserved"] || "unknown";
+    var settled = run["budget.settled"] || "unknown";
+    var cap = run["budget.cap"] || "unknown";
+    var settlement = run["budget.settlement"] || "unsettled";
+    var costSource = run["cost.provenance"] || "unknown";
+    var headroom = typeof run["budget.headroom"] === "number" ? run["budget.headroom"] : null;
+    var budgetState = "unknown";
+    if (headroom !== null) {
+      budgetState = headroom <= 0 ? "over" : (headroom <= 25 ? "warn" : "ok");
+    }
+    var costPair = (reserved === "unknown" ? "?" : reserved) + "/" + (cap === "unknown" ? "?" : cap);
+    var statusState = live === "live" ? "live"
+      : (lifecycle === "failed" ? "failed" : (governed ? "waiting" : "idle"));
+    var statusGlyph = statusState === "live" ? "\u25CF"
+      : (statusState === "failed" ? "\u2715" : (statusState === "waiting" ? "\u25B8" : "\u25CB"));
+
     var row = element("li", "run-row", {
-      "data-run-id": run["session.identity"] || "unknown",
+      "data-run-id": session,
       "data-attention": run["attention.state"] || "none",
-      "data-live": run["run.live"] || "not-live",
+      "data-live": live,
+      "data-decision": governed ? eligibility : "none",
       role: "button",
       tabindex: "0",
-      "aria-label": "Run " + (run["session.identity"] || "unknown"),
+      "aria-label": "Agent session " + session + ", " + lifecycle,
     });
 
-    var lineOne = element("div", "row-line", { "data-row-line": "", "data-max-lines": "1" });
-    appendField(lineOne, "session.identity", lab("session.identity", "session"), run["session.identity"], {
-      identifier: true, maxLines: 1,
+    // ── Line 1 · the session identity band (Move 1) ────────────────────────────────────────
+    var lineOne = element("div", "row-line session-band",
+      { "data-row-line": "", "data-max-lines": "1", "data-agent": session });
+    lineOne.appendChild(element("span", "agent-prompt", { "aria-hidden": "true" }, "\u276F"));
+    lineOne.appendChild(element("span", "row-status",
+      { "data-state": statusState, title: "session state: " + statusState, "aria-hidden": "true" },
+      statusGlyph));
+    appendField(lineOne, "session.identity", lab("session.identity", "session"), session, {
+      identifier: true, maxLines: 1, title: "agent session",
     });
-    appendField(lineOne, "terminal.target", lab("terminal.target", "target"), run["terminal.target"], {
-      identifier: true, maxLines: 1,
-    });
-    appendField(lineOne, "command.current", lab("command.current", "command"), run["command.current"], { maxLines: 1 });
-    // The provider×model token can middle-elide on a narrow row (it is an identifier, so the
-    // gate permits it); the full value stays in the accessible title.
-    appendField(lineOne, "model.provider", lab("model.provider", "model"), run["model.provider"], {
-      identifier: true, maxLines: 1,
-    });
-    appendField(lineOne, "attempt.number", lab("attempt.number", "attempt"), run["attempt.number"], { maxLines: 1 });
+    appendField(lineOne, "terminal.target", lab("terminal.target", "target"),
+      compact ? mark("wt", basename(run["terminal.target"])) : run["terminal.target"], {
+        identifier: true, maxLines: 1, title: "terminal target (worktree/host)",
+      });
+    appendField(lineOne, "command.current", lab("command.current", "command"),
+      mark("cmd", run["command.current"]), { maxLines: 1 });
+    appendField(lineOne, "model.provider", lab("model.provider", "model"),
+      compact ? mark("mdl", basename(run["model.provider"])) : run["model.provider"], {
+        identifier: true, maxLines: 1,
+      });
+    appendField(lineOne, "attempt.number", lab("attempt.number", "attempt"),
+      mark("att", run["attempt.number"]), { maxLines: 1 });
 
-    var lineTwo = element("div", "row-line", { "data-row-line": "", "data-max-lines": "1" });
-    appendField(lineTwo, "phase.progress", lab("phase.progress", "phase"), run["phase.progress"], { maxLines: 1 });
-    appendField(lineTwo, "lifecycle.state", lab("lifecycle.state", "lifecycle"), run["lifecycle.state"], { maxLines: 1 });
-    appendField(lineTwo, "run.live", lab("run.live", "live"), run["run.live"], { maxLines: 1 });
-    appendField(lineTwo, "source.commit", lab("source.commit", "commit"), run["source.commit"], {
-      identifier: true, maxLines: 1,
+    // ── Line 2 · lifecycle state + the lease cost pair (Move 6) ────────────────────────────
+    var lineTwo = element("div", "row-line run-state", { "data-row-line": "", "data-max-lines": "1" });
+    appendField(lineTwo, "phase.progress", lab("phase.progress", "phase"),
+      mark("ph", run["phase.progress"]), { maxLines: 1 });
+    appendField(lineTwo, "lifecycle.state", lab("lifecycle.state", "lifecycle"),
+      mark("life", lifecycle), { maxLines: 1 });
+    appendField(lineTwo, "run.live", lab("run.live", "live"), mark("live", live), { maxLines: 1 });
+    appendField(lineTwo, "source.commit", lab("source.commit", "commit"),
+      mark("cmt", sourceValue), { identifier: true, maxLines: 1 });
+    appendField(lineTwo, "cost.provenance", lab("cost.provenance", "cost"), costPair, {
+      maxLines: 1, title: "reserved/cap · " + settlement + " · " + costSource,
     });
-    appendField(lineTwo, "cost.provenance", lab("cost.provenance", "cost"), run["cost.provenance"], { maxLines: 1 });
-    appendField(lineTwo, "attention.state", lab("attention.state", "attention"), run["attention.state"], { maxLines: 1 });
+    appendField(lineTwo, "attention.state", lab("attention.state", "attention"),
+      mark("attn", run["attention.state"]), { maxLines: 1 });
+    // The settlement state and cost_source are non-field chips, so the money meaning travels on
+    // the row without widening the required field schema.
+    if (!compact) {
+      lineTwo.appendChild(element("span", "budget-chip",
+        { "data-budget-settlement": settlement, title: "settlement vs platform meter" }, settlement));
+      lineTwo.appendChild(element("span", "budget-chip",
+        { "data-budget-source": costSource, title: "cost source class" }, costSource));
+    }
 
-    var lineThree = element("div", "row-line", { "data-row-line": "", "data-max-lines": "1" });
-    appendField(lineThree, "evidence.advisory", lab("evidence.advisory", "said"), advisory, {
-      evidenceClass: "advisory", maxLines: 1,
-    });
-    appendField(lineThree, "evidence.measured", lab("evidence.measured", "measured"), measured, {
-      evidenceClass: "measured", maxLines: 1,
-    });
-    appendField(lineThree, "evidence.source", lab("evidence.source", "source"), sourceValue, {
-      evidenceClass: "source", maxLines: 1,
-    });
-    var eligibility = run["decision.eligibility"];
-    appendField(lineThree, "decision.eligibility", lab("decision.eligibility", "eligible"), eligibility, { maxLines: 1 });
-    // Recognizability §4.2 #2: a governed decision names its authority beside the eligibility
-    // token. It is a non-field chip, so the gate's 16-field row schema is untouched. Mobile is
-    // triage and drops the chip; the R1 decision item is the mobile authority mirror.
-    var governed = { approve: true, promote: true, cancel: true, retire: true };
-    if (!compact && governed[eligibility]) {
+    // ── Line 3 · the coupled evidence/decision footer (Move 3, Move 4) ─────────────────────
+    var lineThree = element("div", "row-line row-evidence row-decision",
+      { "data-row-line": "", "data-max-lines": "1" });
+    appendField(lineThree, "evidence.advisory", lab("evidence.advisory", "said"),
+      mark("said", advisory), { evidenceClass: "advisory", maxLines: 1 });
+    appendField(lineThree, "evidence.measured", lab("evidence.measured", "measured"),
+      mark("meas", measured), { evidenceClass: "measured", maxLines: 1 });
+    appendField(lineThree, "evidence.source", lab("evidence.source", "source"),
+      mark("src", sourceValue), { evidenceClass: "source", maxLines: 1 });
+    appendField(lineThree, "decision.eligibility", lab("decision.eligibility", "eligible"),
+      mark("elig", eligibility), { maxLines: 1 });
+    if (!compact && governed) {
       lineThree.appendChild(element("span", "row-authority",
         { "data-authority": "controller", title: "authority: controller" }, "controller"));
     }
-    appendField(lineThree, "decision.receipt", lab("decision.receipt", "receipt"), run["decision.receipt"], { maxLines: 1 });
+    appendField(lineThree, "decision.receipt", lab("decision.receipt", "receipt"),
+      mark("rcpt", run["decision.receipt"]), { maxLines: 1 });
 
     row.appendChild(lineOne);
     row.appendChild(lineTwo);
     row.appendChild(lineThree);
+
+    // ── The attached lease headroom bar (Move 6) ───────────────────────────────────────────
+    var lease = element("span", "row-lease", {
+      "data-budget-state": budgetState,
+      "data-budget-reserved": reserved,
+      "data-budget-settled": settled,
+      "data-budget-cap": cap,
+      "data-budget-headroom": headroom === null ? "unknown" : headroom + "%",
+      "data-budget-settlement": settlement,
+      "aria-hidden": "true",
+      title: "lease: reserved " + reserved + " / cap " + cap + " · "
+        + (headroom === null ? "headroom unknown" : headroom + "% headroom")
+        + " · " + settlement + " · " + costSource,
+    });
+    var fill = element("span", "row-lease-fill", null);
+    if (headroom !== null) fill.style.width = Math.max(0, Math.min(100, 100 - headroom)) + "%";
+    lease.appendChild(fill);
+    row.appendChild(lease);
     return row;
   }
 
@@ -309,119 +406,137 @@
     reconcileList(host, nodes, "data-run-id");
   }
 
-  /** One attention item with exactly two declared lines (the reserved/ranked work queue).
-   *  `config.key` is the stable reconciliation key the write-on-change list uses. */
-  function renderAttentionItem(config) {
+  /**
+   * Build one attention work item (Move 8): a `li` with a state class and a body that carries
+   * the answer anchor (when it is one) plus exactly two declared lines. The helper returns both
+   * the `li` (the reconciliation unit) and the body (where lines are appended).
+   */
+  function attentionItem(config) {
     var item = element("li", "attention-item", {
       "data-attention-class": config.kind,
-      "data-item-key": config.key || config.kind,
+      "data-item-key": config.key,
       tabindex: config.answer ? "0" : null,
       "aria-label": config.ariaLabel || null,
     });
-    var body;
+    var body = item;
     if (config.answer) {
       body = element("div", null, { "data-answer": config.answer });
       item.appendChild(body);
-    } else {
-      body = item;
     }
-    config.lines.forEach(function (lineFields, index) {
-      var line = element("div", "item-line", { "data-item-line": "", "data-max-lines": "1" });
-      if (index === 0 && config.title) {
-        line.appendChild(element("span", "item-kind", null, config.title));
-      }
-      lineFields.forEach(function (spec) {
-        appendField(line, spec[0], spec[1], spec[2], {
-          identifier: spec[3] === true,
-          maxLines: 1,
-        });
-      });
-      body.appendChild(line);
-    });
-    return item;
+    return { item: item, body: body };
   }
 
-  /** R1 `ON-G5`/`ON-G3`: reserved decision + risk rows, then the ranked next items to capacity.
-   *  Keyed and write-on-change: the reserved rows keep their identity across a live update. */
+  /**
+   * Append one item line: an optional kind label, the answer fields, and non-field chips. The
+   * chips name the owner/authority and the next governed action without widening the answer's
+   * required field schema (the gate's exact-set check stays green).
+   */
+  function attentionLine(body, kindLabel, fields, chips) {
+    var line = element("div", "item-line", { "data-item-line": "", "data-max-lines": "1" });
+    if (kindLabel) line.appendChild(element("span", "item-kind", null, kindLabel));
+    fields.forEach(function (spec) {
+      appendField(line, spec[0], spec[1], spec[2], {
+        identifier: spec[3] === true,
+        maxLines: 1,
+      });
+    });
+    (chips || []).forEach(function (chip) {
+      line.appendChild(element("span", chip[0], null, chip[1]));
+    });
+    body.appendChild(line);
+    return line;
+  }
+
+  /** R1 `ON-G5`/`ON-G3`: a ranked, durable work queue of run-linked items, then ONE continuous
+   *  clear state. Keyed and write-on-change: reserved rows keep identity across a live update. */
   function renderAttention(glance) {
     var host = document.getElementById("attention-list");
     var attention = glance.attention || {};
     var decision = attention.decision || { state: "none", target: "none", kind: "none",
       epoch: 0, authority: "none", eligibility: "none" };
     var risk = attention.risk || { identity: "none", state: "all-clear", action: "none" };
+    var next = attention.next || { identity: "none", state: "clear", action: "none" };
     var nodes = [];
+    var pending = String(decision.state || "none") !== "none";
 
-    var decisionItem = renderAttentionItem({
+    // ── DECISION (ON-G5) — a governed door, not a button ───────────────────────────────────
+    var decisionItem = attentionItem({
       key: "decision",
       kind: "decision",
       answer: "ON-G5",
-      title: "DECISION",
-      ariaLabel: "Pending controller decision",
-      lines: [
-        [
-          ["decision.state", "state", decision.state, false],
-          ["decision.target", "target", decision.target, true],
-          ["decision.kind", "kind", decision.kind, false],
-        ],
-        [
-          ["decision.epoch", "epoch", decision.epoch, false],
-          ["decision.authority", "authority", decision.authority, false],
-          ["decision.eligibility", "eligible", decision.eligibility, false],
-        ],
-      ],
+      ariaLabel: pending
+        ? "Pending controller decision: " + decision.kind + " " + decision.target
+        : "No pending decision",
     });
-    decisionItem.__signature = JSON.stringify(decision);
-    nodes.push(decisionItem);
+    // Line 1 leads with the state + the two decision tokens a stranger needs (`approve`
+    // eligibility); the identifier target moves to line 2 where it may middle-elide without
+    // pushing the consequential tokens out of the 300px gutter.
+    attentionLine(decisionItem.body, "DECISION", [
+      ["decision.state", "state", decision.state, false],
+      ["decision.kind", "kind", decision.kind, false],
+      ["decision.eligibility", "eligible", decision.eligibility, false],
+    ]);
+    // The fields already name the authority (`decision.authority`) and the target; no extra chips
+    // are needed in the gutter, where they would only crowd the work item.
+    attentionLine(decisionItem.body, pending ? "waiting on" : "none pending", [
+      ["decision.epoch", "epoch", decision.epoch, false],
+      ["decision.authority", "authority", decision.authority, false],
+      ["decision.target", "target", decision.target, true],
+    ]);
+    decisionItem.item.__signature = JSON.stringify(decision);
+    nodes.push(decisionItem.item);
 
-    var riskItem = renderAttentionItem({
+    // ── RISK (ON-G3) — the reserved highest-severity run problem ───────────────────────────
+    var riskItem = attentionItem({
       key: "risk",
       kind: "risk",
       answer: "ON-G3",
-      title: "RISK",
-      ariaLabel: "Highest-severity run risk",
-      lines: [
-        [
-          ["risk.identity", "target", risk.identity, true],
-          ["risk.state", "state", risk.state, false],
-        ],
-        [["risk.action", "action", risk.action, false]],
-      ],
+      ariaLabel: "Highest-severity run risk: " + risk.identity,
     });
-    riskItem.__signature = JSON.stringify(risk);
-    nodes.push(riskItem);
+    attentionLine(riskItem.body, "RISK", [
+      ["risk.identity", "target", risk.identity, true],
+      ["risk.state", "state", risk.state, false],
+    ]);
+    attentionLine(riskItem.body, "OWNER", [["risk.action", "action", risk.action, false]]);
+    riskItem.item.__signature = JSON.stringify(risk);
+    nodes.push(riskItem.item);
 
-    var next = attention.next || { identity: "none", state: "clear", action: "none" };
-    var nextItem = renderAttentionItem({
+    // ── NEXT — the next ranked work item ───────────────────────────────────────────────────
+    var nextItem = attentionItem({
       key: "next",
       kind: "next",
-      title: "NEXT",
-      ariaLabel: "Next highest-ranked item",
-      lines: [
-        [["next.identity", "target", next.identity, true],
-          ["next.state", "state", next.state, false]],
-        [["next.action", "action", next.action, false]],
-      ],
+      ariaLabel: "Next highest-ranked item: " + next.identity,
     });
-    nextItem.__signature = JSON.stringify(next);
-    nodes.push(nextItem);
+    attentionLine(nextItem.body, "NEXT", [
+      ["next.identity", "target", next.identity, true],
+      ["next.state", "state", next.state, false],
+    ]);
+    attentionLine(nextItem.body, "OWNER", [["next.action", "action", next.action, false]]);
+    nextItem.item.__signature = JSON.stringify(next);
+    nodes.push(nextItem.item);
 
-    // Fill the remaining reserved capacity so the at-rest row count is exact per viewport.
+    // Fill the remaining reserved capacity so the at-rest count is exact per viewport. The
+    // filler is ONE continuous empty state: only the first carries words, the rest are blank
+    // ruler lines (the DOM count the gate measures is preserved).
     var filler = capacities().attention - 3;
     for (var i = 0; i < filler; i += 1) {
-      var item = element("li", "attention-item", {
-        "data-attention-class": "empty",
-        "data-item-key": "empty-" + i,
-        "aria-label": "No further attention",
+      var empty = attentionItem({
+        key: "empty-" + i,
+        kind: "empty",
+        ariaLabel: i === 0 ? "Queue clear, no further attention" : null,
       });
       var lineA = element("div", "item-line", { "data-item-line": "", "data-max-lines": "1" });
-      lineA.appendChild(element("span", "item-kind", null, "—"));
-      lineA.appendChild(element("span", "item-kind", null, "No further attention"));
       var lineB = element("div", "item-line", { "data-item-line": "", "data-max-lines": "1" });
-      lineB.appendChild(element("span", "item-kind", null, "queue clear"));
-      item.appendChild(lineA);
-      item.appendChild(lineB);
-      item.__signature = "empty";
-      nodes.push(item);
+      if (i === 0) {
+        lineA.appendChild(element("span", "item-kind", null, "QUEUE CLEAR"));
+        lineA.appendChild(element("span", "queue-empty-note", null, "no further attention"));
+        lineB.appendChild(element("span", "queue-empty-note", null,
+          "decision queue drained · 0 waiting"));
+      }
+      empty.body.appendChild(lineA);
+      empty.body.appendChild(lineB);
+      empty.item.__signature = "empty";
+      nodes.push(empty.item);
     }
     reconcileList(host, nodes, "data-item-key");
   }
@@ -448,6 +563,20 @@
       marker.appendChild(element("span", null, null, "⚠ near cap"));
       host.appendChild(marker);
     }
+    // Move 6 — the hard-budget headroom bar for the constraint ledger. `quota` is the cap
+    // fraction; a non-numeric quota draws an explicit unknown track, never a full one.
+    var quotaPct = parseInt(String(cost.quota === undefined ? "" : cost.quota).replace("%", ""), 10);
+    var costState = isNaN(quotaPct) ? "unknown" : (quotaPct >= 100 ? "over" : (quotaPct >= 90 ? "warn" : "ok"));
+    var budgetBar = element("span", "cost-budget", {
+      "data-budget-state": costState,
+      "data-cap-used": isNaN(quotaPct) ? "unknown" : quotaPct + "%",
+      "aria-hidden": "true",
+      title: isNaN(quotaPct) ? "budget headroom unknown" : "hard budget " + quotaPct + "% used",
+    });
+    var budgetFill = element("span", "cost-budget-fill", null);
+    if (!isNaN(quotaPct)) budgetFill.style.width = Math.max(0, Math.min(100, quotaPct)) + "%";
+    budgetBar.appendChild(budgetFill);
+    host.appendChild(budgetBar);
   }
 
   /** R3b: two bounded worker/projection detail lines (a mirror of R0, never its answer). */
@@ -481,7 +610,8 @@
       var data = composition[name] || { top: "unknown 0", other: "0", unknown: "0" };
       ["top", "other", "unknown"].forEach(function (bucketName) {
         var bucket = element("span", "marginal-bucket", { "data-bucket": bucketName });
-        bucket.appendChild(element("span", "bucket-label", null, bucketName.slice(0, 1)));
+        // Explicit bucket words (top/other/unknown), never t/o/u shorthand a stranger must decode.
+        bucket.appendChild(element("span", "bucket-label", null, bucketName));
         var bucketText = String(data[bucketName] === undefined ? "unknown" : data[bucketName]);
         if (bucketName === "top") {
           // `data-category` names the modal bucket (the gate requires it on `top`).
@@ -515,6 +645,13 @@
     //: The last rendered payload's signature. A no-op poll (same signature) performs ZERO
     //: writes, which is the direction §12.2 #3 contract for keyed write-on-change lists.
     lastSignature: null,
+    //: Move 7 — ONE selected attempt feed, bounded and aged, with explicit follow/pause. New
+    //: events append only while following; a paused feed buffers up to FEED_MAX and drains on
+    //: resume, so the operator controls when urgent updates demand attention.
+    feedPaused: false,
+    feedEntries: [],
+    feedRunId: null,
+    feedBuffer: [],
   };
 
   /**
@@ -621,6 +758,11 @@
       });
       renderRunList(AppState.glance);
       renderAttention(AppState.glance);
+      // Move 7 — a transition for the SELECTED run appends one live feed entry. A paused feed
+      // buffers it (bounded) instead, so pause genuinely stops the stream demanding attention.
+      if (frame.target === AppState.feedRunId) {
+        appendFeed({ age: 0, cls: "lifecycle", text: frame.kind });
+      }
     }
     if (epoch && epoch !== AppState.announcedEpoch) {
       AppState.announcedEpoch = epoch;
@@ -742,19 +884,127 @@
 
   var dockOrigin = null;
 
+  //: Move 7 — the feed is bounded: at most this many entries are kept, oldest dropped first.
+  var FEED_MAX = 8;
+
+  /** The stable, copyable typed address of a run object (Move 5). */
+  function typedAddress(run) {
+    return "run/" + (run["session.identity"] || "unknown")
+      + "  phase/" + (run["phase.progress"] || "?")
+      + "  attempt/" + (run["attempt.number"] || "?")
+      + "  session/" + (run["session.identity"] || "unknown")
+      + "  worktree/" + (run["terminal.target"] || "unknown")
+      + "  lease/" + (run["budget.lease"] || run["cost.provenance"] || "unknown");
+  }
+
+  /** The seed attempt facts for a run, in causal order, typed by evidence class (Move 4/7). */
+  function feedSeed(run) {
+    var att = run["attempt.number"] || "?";
+    var advisory = run["evidence.advisory"] || "unknown";
+    var measured = run["evidence.measured"] || "unknown";
+    var source = String(run["source.commit"] || "unknown").replace(/^commit\s+/, "");
+    var reserved = run["budget.reserved"] || "unknown";
+    var cap = run["budget.cap"] || "unknown";
+    return [
+      { age: 0, cls: "lifecycle", text: "attempt " + att + " started · " + (run["model.provider"] || "model unknown") },
+      { age: 2, cls: "advisory", text: "said " + advisory },
+      { age: 4, cls: "measured", text: "measured " + measured },
+      { age: 6, cls: "source", text: "commit " + source },
+      { age: 8, cls: "measured", text: "lease reserved " + reserved + " / cap " + cap },
+    ];
+  }
+
+  /** One bounded feed row: age, evidence class, text — the same typed material as the row. */
+  function feedRow(entry) {
+    var li = element("li", "feed-entry", {
+      "data-evidence-class": entry.cls,
+      "data-age-seconds": String(entry.age),
+    });
+    li.appendChild(element("span", "feed-time", null, "t+" + entry.age + "s"));
+    li.appendChild(element("span", "feed-class", null, String(entry.cls).toUpperCase()));
+    li.appendChild(element("span", "feed-text", null, entry.text));
+    return li;
+  }
+
+  /** Keep the feed list bounded by dropping the oldest entries. */
+  function trimFeed(list) {
+    while (list.children.length > FEED_MAX) list.removeChild(list.firstChild);
+  }
+
+  /** Append one live entry while following; buffer it while paused (bounded drain on resume). */
+  function appendFeed(entry) {
+    if (!AppState.feedRunId) return;
+    if (AppState.feedPaused) {
+      AppState.feedBuffer.push(entry);
+      while (AppState.feedBuffer.length > FEED_MAX) AppState.feedBuffer.shift();
+      return;
+    }
+    var list = document.querySelector("[data-feed-list]");
+    if (!list) return;
+    list.appendChild(feedRow(entry));
+    AppState.feedEntries.push(entry);
+    trimFeed(list);
+  }
+
+  /**
+   * Build the ONE bounded attempt feed (Move 7): a follow/pause control, explicit age, and the
+   * same ADVISORY/MEASURED/SOURCE classes as the row. The data-feed-follow attribute and the
+   * pause style make the state visible to the screenshot adversary and the browser assertions.
+   */
+  function renderAttemptFeed(run) {
+    var wrap = element("section", "attempt-feed",
+      { "data-attempt-feed": "", "data-feed-follow": "follow" });
+    var head = element("div", "feed-head", null);
+    head.appendChild(element("span", "feed-title", null, "ATTEMPT FEED"));
+    head.appendChild(element("span", "feed-age", { "data-feed-age": "" }, "age 0s · bounded " + FEED_MAX));
+    var toggle = element("button", "feed-toggle",
+      { type: "button", "data-feed-toggle": "", "aria-pressed": "false" }, "Pause");
+    head.appendChild(toggle);
+    wrap.appendChild(head);
+
+    var list = element("ol", "feed-list", { "data-feed-list": "" });
+    wrap.appendChild(list);
+    AppState.feedEntries = feedSeed(run);
+    AppState.feedRunId = run["session.identity"] || "unknown";
+    AppState.feedPaused = false;
+    AppState.feedBuffer = [];
+    AppState.feedEntries.forEach(function (entry) { list.appendChild(feedRow(entry)); });
+
+    toggle.addEventListener("click", function () {
+      AppState.feedPaused = !AppState.feedPaused;
+      wrap.setAttribute("data-feed-follow", AppState.feedPaused ? "pause" : "follow");
+      wrap.classList.toggle("feed-paused", AppState.feedPaused);
+      toggle.textContent = AppState.feedPaused ? "Follow" : "Pause";
+      toggle.setAttribute("aria-pressed", AppState.feedPaused ? "true" : "false");
+      if (!AppState.feedPaused) {
+        AppState.feedBuffer.forEach(function (entry) {
+          list.appendChild(feedRow(entry));
+          AppState.feedEntries.push(entry);
+        });
+        AppState.feedBuffer = [];
+        trimFeed(list);
+      }
+    });
+    return wrap;
+  }
+
   function openDock(run, origin) {
     var dock = document.getElementById("selection-dock");
     var ladder = document.getElementById("evidence-ladder");
     var title = document.getElementById("dock-title");
+    var address = document.getElementById("dock-address");
     if (!dock || !ladder) return;
     clear(ladder);
     if (title) title.textContent = "RUN " + (run["session.identity"] || "unknown");
+    if (address) address.textContent = typedAddress(run);
     // The inspector is an attempt-scoped CAUSAL LADDER plus a live, scoped dependency flow
     // (brief §10 / Move 2). visuals.js owns the SVG; the text equivalents it renders alongside
-    // keep the dock accessible, printable and readable with no graphics at all.
+    // keep the dock accessible, printable and readable with no graphics at all. The bounded
+    // follow/pause attempt feed (Move 7) is app-owned and appended beneath the spine.
     if (window.ControlRoomVisuals) {
       window.ControlRoomVisuals.render(ladder, run, AppState.glance);
     }
+    ladder.appendChild(renderAttemptFeed(run));
     dock.hidden = false;
     dockOrigin = origin || null;
     var close = document.getElementById("dock-close");
@@ -764,6 +1014,9 @@
   function closeDock() {
     var dock = document.getElementById("selection-dock");
     if (dock) dock.hidden = true;
+    // Stop feeding a run the operator is no longer inspecting.
+    AppState.feedRunId = null;
+    AppState.feedBuffer = [];
     if (dockOrigin && typeof dockOrigin.focus === "function") dockOrigin.focus();
     dockOrigin = null;
   }

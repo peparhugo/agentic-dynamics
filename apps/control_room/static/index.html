@@ -1,16 +1,51 @@
 <!DOCTYPE html>
 <!--
-  Control Room — the one resting screen (facelift a0).
+  Control Room — the one resting screen (facelift a0; repaired to close the a5 design adversary).
 
-  Structure follows docs/research/control_room_ia.md §1–§3: a persistent qualifier bar (`R0`)
-  over a three-column body whose dominant region is the run ledger (`R2`), with the attention
-  inbox (`R1`) and the constraint ledger (`R3a/b/c`) as annotation gutters. There is NO
-  navigation: every `ON-G1..G7` answer is visible at rest, above the fold, with no page scroll,
-  no region scroll, and no interaction.
+  Structure follows docs/research/control_room_ia.md §1–§3: a persistent machine rail (`R0`)
+  over a three-column body whose dominant region is the agent-run roster (`R2`), with the
+  attention work queue (`R1`) and the constraint ledger (`R3a/b/c`) as annotation gutters. There
+  is NO navigation: every `ON-G1..G7` answer is visible at rest, above the fold, with no page
+  scroll, no region scroll, and no interaction.
 
-  Selector contract (fixed by docs/research/control_room_ia.md §10.2 and consumed by
-  scripts/verify_control_room_rendering.py). The rules the markup obeys:
+  ── recognizability (the a5 design-adversary contract) ──────────────────────────────────────
+  The a5 adversary judges the RESTING screenshot only: no selection, no hover, no prose. Every
+  stranger-test claim below must read as true from the named element alone — because the element
+  is unmistakable, not because a label annotates it. These are the exact selectors (verified by
+  scripts/verify_control_room_rendering.py's STYLE carrier probe and the a5 pass):
 
+    (a) "these are live CLI agent sessions, not services"
+        .run-row[data-run-id] .session-band[data-agent]        — prompt glyph + agent token (Move 1)
+        .run-row[data-run-id] [data-field="terminal.target"]   — worktree/host the agent writes to
+        .run-row[data-run-id] [data-field="command.current"]   — the command/tool now running
+        .run-row[data-run-id] [data-field="model.provider"]    — provider×model driving the session
+        .run-row[data-run-id] [data-field="run.live"][data-state] — live/not-live state mark
+        .run-row[data-run-id] .row-status                      — the left status rail of the object
+
+    (b) "that run needs a decision"
+        [data-region="R1"] [data-attention-class="decision"] .queue-kind   — DECISION work item
+        [data-answer="ON-G5"] [data-field="decision.state"]                — pending / none pending
+        [data-answer="ON-G5"] [data-field="decision.eligibility"]          — approve eligibility token
+        [data-answer="ON-G5"] [data-authority="controller"]                — authority: controller
+        .run-row[data-run-id][data-decision="approve"] .row-decision       — the same door on the row
+
+    (c) "spend is against a hard budget"
+        .run-row[data-run-id] .row-lease[data-budget-state]    — the attached headroom bar (Move 6)
+        .run-row[data-run-id] [data-budget-reserved]           — reserved spend on this attempt
+        .run-row[data-run-id] [data-budget-settled]            — settled/reconciled spend
+        .run-row[data-run-id] [data-budget-cap]                — the hard cap
+        .run-row[data-run-id] [data-budget-headroom]           — headroom percent
+        .run-row[data-run-id] [data-budget-settlement]         — matched|underspent|overspent|unsettled
+        [data-region="R3a"] [data-money-risk]                  — the bounded cap exception (not a KPI)
+
+    (d) "evidence is inspectable"
+        .run-row[data-run-id] .row-evidence [data-evidence-class="advisory"]  — said/claimed mark
+        .run-row[data-run-id] .row-evidence [data-evidence-class="measured"]  — measured proof mark
+        .run-row[data-run-id] [data-field="decision.receipt"]                 — recorded receipt
+        #selection-dock [data-evidence-ladder][data-attempt-boundary]         — the causal ladder
+        #selection-dock [data-attempt-feed] [data-feed-follow]                — bounded follow/pause feed
+
+  ── selector contract (fixed by docs/research/control_room_ia.md §10.2, consumed by the gate) ─
   1. Exactly one element per layout region (values R0/R1/R2/R3a/R3b/R3c on `data-region`)
      and exactly one per answer anchor (`ON-G1`..`ON-G7` on `data-answer`).
   2. The container hooks `[data-glance-shell]`, `[data-glance-body]`, `[data-r3-stack]` are
@@ -20,6 +55,8 @@
      `G1→R0, G2→R2, G3→R1, G4→R3a, G5→R1, G6→R0, G7→R3c`.
   5. All content is built with `element()`/`textContent` (never an HTML string), so the shell
      can carry a safe no-JS fallback and the client never parses model output as markup.
+  6. The eight distinctive moves (direction §4.1) are preserved and carried by the elements named
+     in each section comment below; the recognizability block above is their screenshot contract.
 
   No build step: a single classic script (`app.js`) hydrates the regions from `GET /api/glance`
   and follows `GET /api/events`. The pre-existing destination-board portal is superseded; its
@@ -32,7 +69,7 @@
   <!-- Both themes are real; the inline resolver below picks the stored/system theme before
        first paint so a reload never flashes the wrong surface colour. -->
   <meta name="color-scheme" content="dark light">
-  <title>Control Room · run triage</title>
+  <title>Control Room · agent runs</title>
   <link rel="stylesheet" href="/static/style.css">
   <script>
     // Pre-paint theme resolution, kept inline and tiny on purpose.
@@ -51,12 +88,14 @@
        after the initial /api/glance payload has rendered, the SSE replay boundary has landed,
        fonts have settled, and two animation frames have completed. -->
   <div class="glance-shell" data-glance-shell data-render-state="loading" data-control-epoch="">
-    <!-- ── R0 · SYSTEM + TRUST (full width, 72px) ───────────────────────────────────────
-         Two complete, separate answers: `ON-G1` (browser/control/workers/projections, each
-         with state + worst age) and `ON-G6` (epoch, worst age, projection state, and explicit
-         degraded/stale/partial/unknown counts). Both are rendered here and nowhere else. -->
-    <header class="r0" data-region="R0" role="region" aria-label="System and trust">
+    <!-- ── R0 · MACHINE RAIL (full width, 72px) ─────────────────────────────────────────
+         Recomposed from a "trust bar" into a terminal machine rail: a prompt glyph and the
+         control plane's name at the left, the two complete answers (`ON-G1` system dimensions,
+         `ON-G6` trust verdict) read inline on the rail, and the deliberate lenses at the right.
+         Both answers are rendered here and nowhere else. -->
+    <header class="r0" data-region="R0" role="region" aria-label="Machine and trust">
       <div class="r0-scope">
+        <span class="machine-prompt" aria-hidden="true">&#x276F;</span>
         <span class="scope-name" id="scope-name">control-room</span>
         <span class="scope-sub" id="scope-epoch">epoch —</span>
       </div>
@@ -93,31 +132,37 @@
     </header>
 
     <div class="glance-body" data-glance-body>
-      <!-- ── R1 · ATTENTION (the operator's work queue) ────────────────────────────────
-           A durable, ranked, deduplicated inbox with reserved decision (`ON-G5`) and risk
-           (`ON-G3`) rows; remaining capacity is filled by the globally-ranked next items. -->
-      <section class="r1" data-region="R1" role="region" aria-label="Attention inbox">
+      <!-- ── R1 · ATTENTION WORK QUEUE (Move 8) ────────────────────────────────────────
+           A durable, ranked, deduplicated work queue of run-linked items, not repeated alert
+           cards: the reserved decision (`ON-G5`) and risk (`ON-G3`) items carry lifecycle,
+           owner/authority and the next governed action; remaining capacity collapses into ONE
+           continuous "queue clear" state (the DOM keeps the exact item count the gate measures,
+           the CSS merges the filler into a single empty state so it never reads as a card stack). -->
+      <section class="r1" data-region="R1" role="region" aria-label="Attention work queue">
         <h2 class="region-title">ATTENTION</h2>
         <ol class="attention-list" id="attention-list"></ol>
       </section>
 
-      <!-- ── R2 · RUN LEDGER (the default operational body) ────────────────────────────
-           The exact running/queued/failed/live counts (`ON-G2`) plus a bounded, attention-
-           ranked sample of live agent sessions. Each row leads with the agent/session identity
-           and pairs the ADVISORY claim with the MEASURED proof. -->
-      <section class="r2" data-region="R2" role="region" aria-label="Run ledger">
+      <!-- ── R2 · AGENT RUN ROSTER (Move 1, Move 4, Move 6) ────────────────────────────
+           The dominant surface: a bounded, attention-ranked sample of live CLI agent sessions.
+           Each row is a run OBJECT, not a service row — a left status rail, a monospace session
+           identity band (agent → worktree → command → model → attempt), the exact running/queued/
+           failed/live counts (`ON-G2`), a paired ADVISORY/MEASURED evidence/decision footer, and
+           an attached lease headroom bar (reserved vs settled vs hard cap) along its bottom edge. -->
+      <section class="r2" data-region="R2" role="region" aria-label="Agent run roster">
         <div class="r2-head">
-          <h2 class="region-title">RUN LEDGER</h2>
+          <h2 class="region-title">AGENT RUNS</h2>
           <div class="r2-counts" data-answer="ON-G2" id="run-counts"></div>
         </div>
         <ul class="run-list" id="run-list"></ul>
       </section>
 
-      <!-- ── R3 · CONSTRAINT LEDGER (annotations attached to the run ledger) ────────────
-           Three fixed-height, non-scrolling annotations: R3a cost (`ON-G4`), R3b health
-           detail (a mirror only), R3c bounded composition (`ON-G7`). -->
+      <!-- ── R3 · CONSTRAINT LEDGER (Move 6) ───────────────────────────────────────────
+           Three fixed-height, non-scrolling annotations attached to the roster — an unboxed
+           ledger, not a KPI rail: R3a money vs the hard cap (`ON-G4`), R3b health detail (a
+           mirror only), R3c bounded composition (`ON-G7`). -->
       <div class="r3" data-r3-stack>
-        <section class="r3a" data-region="R3a" role="region" aria-label="Cost">
+        <section class="r3a" data-region="R3a" role="region" aria-label="Cost against budget">
           <h2 class="region-title">COST</h2>
           <div class="cost-grid" data-answer="ON-G4" id="cost-grid"></div>
         </section>
@@ -132,13 +177,18 @@
       </div>
     </div>
 
-    <!-- ── R4 · SELECTION DOCK (drill-down only) ──────────────────────────────────────
+    <!-- ── R4 · SELECTION DOCK (drill-down only; Move 2, Move 5, Move 7) ───────────────
          Hidden at rest. Opening it is drill-down, never navigation; the resting regions stay
-         in place and the roster is never hidden behind a modal. -->
+         in place and the roster is never hidden behind a modal. It carries: the typed address
+         band (Move 5), the attempt-scoped causal ladder with nested session/phase/attempt
+         boundaries (Move 2), one bounded attempt feed with follow/pause (Move 7), and the live
+         scoped dependency-health flow (separated from the evidence ladder). -->
     <aside class="selection-dock" id="selection-dock" hidden
            role="dialog" aria-modal="true" aria-label="Selected run evidence">
       <header class="dock-head">
         <h2 id="dock-title">RUN DETAIL</h2>
+        <!-- Move 5: a stable, copyable typed address for the object under inspection. -->
+        <code class="dock-address" id="dock-address" data-dock-address></code>
         <button class="icon-button" id="dock-close" type="button">
           <span aria-hidden="true">&#x2715;</span><span class="sr-only">Close run detail</span>
         </button>

@@ -243,6 +243,16 @@ def check_fixtures() -> int:
             missing = ROW_FIELDS - set(row)
             if missing:
                 problems.append(f"{fixture_id}: row {row.get('id')} missing {sorted(missing)}")
+            # Facelift repair A5-D2: every actionable row must carry the lease/cost facets, so a
+            # stranger can identify spend against a hard budget from the row alone (the F-0 seed
+            # supplies a known $5.00 cap and an over-cap row).
+            for facet in ("budget.reserved", "budget.settled", "budget.cap",
+                          "budget.headroom", "budget.settlement"):
+                if row.get(facet) in (None, ""):
+                    problems.append(f"{fixture_id}: row {row.get('id')} missing {facet}")
+        if fixture_id == "F-0" and not any(row.get("budget.headroom") == 0
+                                           for row in wire["run_sample"]):
+            problems.append("F-0: needs an over-cap row (budget.headroom == 0)")
         for name in ("model", "condition", "provider", "lifecycle"):
             marginal = wire["composition"][name]
             if not {"top", "other", "unknown"} <= set(marginal):

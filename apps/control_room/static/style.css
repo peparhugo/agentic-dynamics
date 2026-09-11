@@ -88,9 +88,11 @@
   --dim: #7a8492;
   --accent: #1f6feb;
   --ok: #1a7f37;
-  --warn: #9a6700;
+  /* Darkened for the unboxed constraint ledger: the ruled R3 regions now sit on the page
+     background, so warn/unknown must clear 4.5:1 against --bg, not only against a white panel. */
+  --warn: #7a5200;
   --bad: #cf222e;
-  --unknown: #6e7781;
+  --unknown: #58606c;
   --advisory: #7d5a00;
   --measured: #0f6b5c;
   --source: #3b4cca;
@@ -202,9 +204,22 @@ body {
   flex: 0 0 auto;
   min-width: 96px;
   max-width: 148px;
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-template-rows: auto auto;
+  column-gap: 5px;
+  align-items: baseline;
+}
+
+/* The terminal prompt glyph is the machine-rail tell: this surface drives CLI agents, not a
+   service fleet. It is decorative (aria-hidden) — the session bands carry the real identity. */
+.machine-prompt {
+  grid-row: 1 / span 2;
+  align-self: center;
+  font-family: var(--mono);
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--ok);
 }
 
 .scope-name {
@@ -320,12 +335,15 @@ body {
 .r3 { width: var(--r3w); height: auto; display: flex; flex-direction: column; gap: 8px;
       background: none; border: none; border-radius: 0; overflow: visible; }
 
+/* The constraint ledger is RULED, not boxed: three annotations attached to the roster under a
+   single hairline, so it cannot read as a free-floating KPI rail (direction §4.1 Move 6). */
 .r3a, .r3b, .r3c {
   flex: 0 0 auto;
   overflow: hidden;
-  background: var(--panel);
-  border: 1px solid var(--line);
-  border-radius: 6px;
+  background: none;
+  border: none;
+  border-top: 1px solid var(--line);
+  border-radius: 0;
 }
 /* R3a anchors the money-risk exception to its heading line so the marker never adds a grid
    row (the §3.2 budget gives the exception the 20px heading, not a third value row). */
@@ -357,21 +375,51 @@ body {
   overflow: hidden;
 }
 
+/* A work-queue entry, not an alert card: a state rail, a kind chip, and the governed next
+   action. Decision/risk/next differ by STRUCTURE (kind word + authority + action) and authority,
+   not by border colour alone (direction §4.1 Move 8). */
 .attention-item {
   flex: 0 0 auto;
   height: 56px;
   padding: 5px 6px;
-  border: 1px solid var(--line);
+  /* Work-queue rows share the roster's ruled grammar (left rail + hairline), not a card box. */
+  border: none;
   border-left: 3px solid var(--unknown);
-  border-radius: 4px;
-  background: var(--panel-2);
+  border-bottom: 1px solid var(--line);
+  border-radius: 0;
+  background: transparent;
   overflow: hidden;
 }
 
 .attention-item[data-attention-class="decision"] { border-left-color: var(--accent); }
 .attention-item[data-attention-class="risk"] { border-left-color: var(--bad); }
 .attention-item[data-attention-class="next"] { border-left-color: var(--warn); }
-.attention-item[data-attention-class="empty"] { border-left-color: var(--line); opacity: 0.75; }
+/* The filler is ONE continuous empty state, not a stack of empty cards: borders and surfaces are
+   removed and only the first filler keeps the "queue clear" words. The gate's exact item count is
+   preserved in the DOM; the pixels read as a single ruler-lined block. */
+.attention-item[data-attention-class="empty"] {
+  height: 22px;
+  padding: 0 6px;
+  border: none;
+  border-left: 3px solid var(--line);
+  border-radius: 0;
+  background: none;
+  opacity: 0.6;
+}
+
+/* Work-queue chips (non-field, so the answer field schema is untouched). */
+.queue-authority,
+.queue-action {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 4px;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  font-size: 10px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.queue-action { border-color: var(--accent); color: var(--text); }
 
 .item-line {
   display: flex;
@@ -392,7 +440,11 @@ body {
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--muted);
+  /* The work-queue label must never wrap into a second rendered line: the two-line item clamp
+     is load-bearing, and a wrapped label measures as a second line. */
+  white-space: nowrap;
 }
+.queue-empty-note { white-space: nowrap; color: var(--muted); }
 
 /* ── R2 · run ledger ───────────────────────────────────────────────────────────────────── */
 
@@ -424,14 +476,23 @@ body {
   overflow: hidden;
 }
 
+/* The run OBJECT. Not a service row: a left status rail, a monospace session identity band, a
+   coupled evidence/decision footer, and a lease headroom bar attached along the bottom edge
+   (Move 1, Move 4, Move 6). The bottom padding reserves the strip so the 3 declared row-lines
+   still fit the fixed 88px box the gate measures. */
 .run-row {
+  position: relative;
   flex: 0 0 auto;
   height: 88px;
-  padding: 6px 8px;
-  border: 1px solid var(--line);
+  padding: 6px 8px 10px;
+  /* A roster entry, not a card: a left status rail and a hairline separator only. The density
+     comes from alignment, so removing the box keeps the surface from reading as a card stack
+     (direction §4.4; design adversary A5-D1). */
+  border: none;
   border-left: 3px solid var(--line);
-  border-radius: 4px;
-  background: var(--panel-2);
+  border-bottom: 1px solid var(--line);
+  border-radius: 0;
+  background: transparent;
   overflow: hidden;
   cursor: pointer;
 }
@@ -458,6 +519,51 @@ body {
 .row-line .field [data-label] { font-size: 11px; }
 .row-line .field [data-value] { font-size: 13px; }
 
+/* Move 1 — the session identity band leads the row: prompt glyph, agent token, worktree target,
+   current command, provider×model, attempt. Monospace and heavier than the state lines, so a
+   stranger reads "CLI agent session" before reading any label. */
+.session-band { gap: 12px; }
+.session-band .field [data-value] { font-weight: 600; }
+.agent-prompt {
+  flex: 0 0 auto;
+  font-family: var(--mono);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ok);
+}
+
+/* The left status rail's glyph (shape + word, never colour alone). */
+.row-status {
+  flex: 0 0 auto;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--muted);
+}
+.row-status[data-state="live"] { color: var(--ok); }
+.row-status[data-state="failed"] { color: var(--bad); }
+.row-status[data-state="waiting"] { color: var(--accent); }
+
+/* Move 6 — the lease headroom bar attached to the row. Reserved vs hard cap fills the track;
+   state (ok/warn/over) is carried by data-budget-state and the cost field's reserved/cap pair,
+   never by hue alone. An unknown cost is drawn as an explicit dashed "unknown" track, never 0. */
+.row-lease {
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  bottom: 4px;
+  height: 5px;
+  border-radius: 3px;
+  background: var(--line);
+  overflow: hidden;
+}
+.row-lease-fill { display: block; height: 100%; width: 0; background: var(--muted); }
+.row-lease[data-budget-state="ok"] .row-lease-fill { background: var(--ok); }
+.row-lease[data-budget-state="warn"] .row-lease-fill { background: var(--warn); }
+.row-lease[data-budget-state="over"] .row-lease-fill { background: var(--bad); }
+.row-lease[data-budget-state="unknown"] { background: repeating-linear-gradient(
+  90deg, var(--line) 0 6px, transparent 6px 12px); }
+.row-lease[data-budget-state="unknown"] .row-lease-fill { display: none; }
+
 /* Evidence classes are visibly different materials (direction §4.4, Move 4). */
 /* The governed-decision authority marker (recognizability §4.2 #2): a compact chip beside the
    eligibility token, naming who disposes. Non-field, so the 16-field row schema is untouched. */
@@ -470,6 +576,19 @@ body {
   border: 1px solid var(--accent);
   border-radius: 3px;
   color: var(--text);
+  font-size: 10px;
+  white-space: nowrap;
+}
+
+/* Settlement state + cost_source chips (Move 6): non-field, so the cost semantics travel on
+   the row without changing the 16-field schema. */
+.budget-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 4px;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  color: var(--muted);
   font-size: 10px;
   white-space: nowrap;
 }
@@ -495,6 +614,21 @@ body {
 }
 
 .cost-grid .field [data-value] { font-size: 13px; font-weight: 700; }
+
+/* Move 6 — the bounded cap exception's headroom bar. Absolutely anchored so it adds no grid row
+   (the §3.2 budget gives R3a two value rows, not three). */
+.cost-budget {
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  bottom: 6px;
+  height: 5px;
+  border-radius: 3px;
+  background: var(--line);
+  overflow: hidden;
+}
+.cost-budget-fill { display: block; height: 100%; width: 0; background: var(--warn); }
+.cost-budget[data-budget-state="over"] .cost-budget-fill { background: var(--bad); }
 
 .money-risk {
   position: absolute;
@@ -601,6 +735,12 @@ body {
 
 .selection-dock[hidden] { display: none; }
 
+/* The dock is tall enough to show BOTH the causal ladder and the bounded attempt feed without an
+   inner scroll on desktop/narrow (Move 2 + Move 7 visible in one selected capture). */
+@media (min-width: 760px) {
+  .selection-dock { height: 430px; }
+}
+
 .dock-head {
   flex: 0 0 auto;
   display: flex;
@@ -611,6 +751,83 @@ body {
 }
 
 .dock-head h2 { margin: 0; font-size: 12px; letter-spacing: 0.06em; }
+
+/* Move 5 — a stable, copyable typed address for the inspected object. */
+.dock-address {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 0 8px;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Move 7 — one bounded attempt feed with follow/pause. The head names the stream, its age and
+   its class mix; the list is capped and scrolls itself inside the dock. */
+.attempt-feed {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  border-top: 1px solid var(--line);
+  padding-top: 6px;
+}
+.feed-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.feed-title {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+}
+.feed-age { font-size: 10px; color: var(--dim); }
+.feed-toggle {
+  margin-left: auto;
+  font-size: 10px;
+  color: var(--accent);
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 1px 6px;
+  cursor: pointer;
+}
+.feed-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.feed-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 88px;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.feed-entry {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.feed-entry .feed-time { color: var(--dim); }
+.feed-entry .feed-class {
+  flex: 0 0 auto;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+.feed-entry[data-evidence-class="advisory"] .feed-class { color: var(--advisory); }
+.feed-entry[data-evidence-class="measured"] .feed-class { color: var(--measured); }
+.feed-entry[data-evidence-class="source"] .feed-class { color: var(--source); }
+.feed-entry .feed-text { overflow: hidden; text-overflow: ellipsis; }
+.feed-paused .feed-list { opacity: 0.55; }
 
 .evidence-ladder {
   flex: 1 1 auto;
@@ -664,6 +881,16 @@ body {
 
 .visual-spine { stroke: var(--line); stroke-width: 1.5; fill: none; }
 .visual-attempt-rule { stroke: var(--muted); stroke-width: 0.5; stroke-dasharray: 2 3; }
+.visual-phase-rule { stroke: var(--line); stroke-width: 0.5; }
+.visual-scope-label { fill: var(--accent); font-family: var(--sans); font-size: 9px;
+                      text-anchor: end; }
+.visual-time { fill: var(--muted); font-family: var(--mono); font-size: 9px; text-anchor: end; }
+.visual-block-title {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
 
 .visual-node { fill: var(--muted); stroke: var(--muted); stroke-width: 1; }
 .visual-rung[data-evidence-class="advisory"] .visual-node {
@@ -903,7 +1130,9 @@ body {
     --r3ch: 116px;
   }
   .attention-item { height: 52px; }
-  .run-row { height: 84px; }
+  .run-row { height: 84px; padding: 5px 8px 9px; }
+  .run-row .row-line { height: 23px; }
+  .run-row .row-lease { bottom: 3px; height: 4px; }
   .region-title { padding-top: 6px; }
   /* Narrow trends lens: one step tighter than desktop, still 2 columns. */
   .chart-lens { --chart-body-h: 88px; height: 520px; width: min(660px, 94vw); }
@@ -946,9 +1175,10 @@ body {
   .r2 .region-title { display: none; }
   .r2-head { height: 32px; padding: 4px 8px 0; }
   .run-list { gap: 0; padding: 4px 8px 4px; }
-  .run-row { height: 80px; padding: 4px 6px; }
-  .row-line { height: 24px; gap: 8px; }
+  .run-row { height: 80px; padding: 3px 6px 8px; }
+  .row-line { height: 23px; gap: 8px; }
   .row-line .field [data-value] { font-size: 13px; }
+  .run-lease { left: 6px; right: 6px; bottom: 3px; height: 4px; }
   /* Mobile is triage: the row shows VALUES (a terminal-style band) and keeps the field labels
      in the accessibility tree, because six labelled fields cannot share one 350px line. */
   .row-line .field [data-label] {
