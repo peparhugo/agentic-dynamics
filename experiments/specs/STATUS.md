@@ -3,8 +3,8 @@
 **Generated — do not edit by hand.** Regenerate with `python scripts/spec_status.py`;
 `scripts/run_workflow.py` also refreshes it at the end of every run.
 
-Generated at: `2026-09-11T03:03:11.586510+00:00`  ·  205 spec(s)
-**Work remaining:** 194 open · 11 completed/retired
+Generated at: `2026-09-11T07:12:11.647108+00:00`  ·  206 spec(s)
+**Work remaining:** 195 open · 11 completed/retired
 
 | name | kind | repeatable | status | version | supersedes | last_run | ok | model | cost | n_runs |
 |---|---|---|---|---|---|---|---|---|---|---|
@@ -98,6 +98,7 @@ Generated at: `2026-09-11T03:03:11.586510+00:00`  ·  205 spec(s)
 | `control_room_refresh` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `control_room_research` | workflow | yes | runnable | 0.1 | — | — | — | — | — | 0 |
 | `control_room_research_repair` | workflow | yes | runnable | 0.1 | — | 2026-09-11 03:03 | ok | deepseek/deepseek-v4-flash | $13.0278 | 1 |
+| `control_room_research_repair2` | workflow | yes | runnable | 0.1 | — | 2026-09-11 07:12 | ok | deepseek/deepseek-v4-flash | $35.1383 | 1 |
 | `control_room_ui_implement` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `control_room_ui_rebuild` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `control_room_ui_redesign` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |

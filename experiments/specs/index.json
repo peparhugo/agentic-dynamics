@@ -1,7 +1,7 @@
 {
   "schema_version": "spec-status/v2",
-  "generated_at": "2026-09-11T03:03:11.586510+00:00",
-  "n_specs": 205,
+  "generated_at": "2026-09-11T07:12:11.647108+00:00",
+  "n_specs": 206,
   "specs": [
     {
       "name": "admission_leases",
@@ -1815,6 +1815,26 @@
       "results_pointer": "experiments/results/workflows/control_room_research_repair/20260911T030311Z.json",
       "n_runs": 1,
       "workflow_revision_id": "19241645aa50876f42d8d125770170f9027da441e18cb54731e9a1759c762b92",
+      "authored_status": null
+    },
+    {
+      "name": "control_room_research_repair2",
+      "version": "0.1",
+      "status": "runnable",
+      "spec_path": "workflows/repository/control_room_research_repair2.yaml",
+      "artifact_kind": "workflow",
+      "repeatable": true,
+      "supersedes": [],
+      "superseded_by": null,
+      "completed_at": null,
+      "last_run_at": "2026-09-11T07:12:11.639241+00:00",
+      "latest_ok": true,
+      "latest_model": "deepseek/deepseek-v4-flash",
+      "latest_cost_usd": 35.138339,
+      "latest_git_sha": "299ea20bd",
+      "results_pointer": "experiments/results/workflows/control_room_research_repair2/20260911T071211Z.json",
+      "n_runs": 1,
+      "workflow_revision_id": "881c8ec06def50e182a04af70334050661ff2a2346b78dea336c9f163133f693",
       "authored_status": null
     },
     {

@@ -1,0 +1,148 @@
+name: control_room_facelift
+question: >-
+  Apply the adversarially-passed direction + brief to the Control Room: implement the
+  run/triage/evidence/decision-centered layout per the canonical glance contract
+  (docs/research/control_room_ia.md §4), the eight distinctive moves, the chart set and SVG set
+  from the repaired catalogs, and the styling/motion bar — then prove it with a Playwright
+  render gate at 1440x900 and 390x844 (screenshots + size/overflow/contrast/first-paint/console
+  + glance acceptance checks) and re-run the design and IA adversaries against the SCREENSHOTS.
+version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: false
+repeatable: true
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: true
+    rag:
+      emit_self: false
+    context:
+      hard_rules: >-
+        (1) The brief + glance contract are the acceptance target; no unmotivated scope. (2) The
+        render gate runs before any adversary and its screenshots are the review inputs. (3) No
+        regressions to existing routes/APIs; the portal must still start and serve. (4)
+        Adversaries judge screenshots, not prose, and write only their docs.
+    phases:
+      - name: a0_ia_layout
+        kind: agent
+        scope: implementation
+        requires_deliverable: true
+        timeout: 10800
+        prompt: |
+          GOAL: {goal}
+          Read docs/research/control_room_ia.md §4 (canonical glance contract, pixel budgets,
+          regions/anchors) and docs/research/control_room_direction.md (eight distinctive
+          moves + recognizability test). Implement the layout in
+          apps/control_room/static/{index.html,style.css,app.js} and server.py as needed:
+          ONE resting screen answering ON-G1..G7 with no navigation, the run roster, the
+          attention model, the run-detail/evidence chain, and the decision surface. Keep every
+          existing route/API working. Commit.
+      - name: a1_charts
+        kind: agent
+        scope: implementation
+        requires_deliverable: true
+        timeout: 10800
+        prompt: |
+          GOAL: {goal}
+          Implement the derived chart set from experiments/research/control_room/catalogs.json
+          (chart selection + color/motion): replace/augment the hand-rolled sparklines with the
+          chart forms the brief names for spend, throughput, failure, and dependency health.
+          Every chart must render inside its pixel budget at both breakpoints; add empty/error
+          states (never a blank panel). Commit.
+      - name: a2_svg
+        kind: agent
+        scope: implementation
+        requires_deliverable: true
+        timeout: 10800
+        prompt: |
+          GOAL: {goal}
+          Implement the SVG/visual set from the catalogs (SVG technique family) per the eight
+          distinctive moves: the run/evidence visual(s) and any topology/flow graphic the brief
+          requires. Responsive viewBox, theme-aware fills, motion within the brief's budget,
+          contrast >= 4.5:1. Commit.
+      - name: a3_styling
+        kind: agent
+        scope: implementation
+        requires_deliverable: true
+        timeout: 10800
+        prompt: |
+          GOAL: {goal}
+          Apply the direction's typography, color, density, and motion rules in style.css +
+          app.js; ensure the recognizability test holds at a glance and accessibility bar is
+          met (focus states, reduced-motion, WCAG contrast). No layout regressions to a0-a2.
+          Commit.
+      - name: a4_render_gate
+        kind: agent
+        scope: implementation
+        requires_deliverable: true
+        timeout: 10800
+        prompt: |
+          GOAL: {goal}
+          Build scripts/verify_control_room_rendering.py (pattern: apps/website/
+          verify_svg_rendering.py): start apps/control_room/server.py on a port, render at
+          1440x900 and 390x844, and check the IA contract's acceptance checks (each anchor
+          present, in viewport, non-zero box, contrast, no scroll needed), plus size/overflow/
+          first-paint/console. Write per-page screenshots + a markdown report to
+          apps/control_room/verification/. Run it; fix failures until PASS. Commit.
+      - name: a5_adversary_design
+        kind: agent
+        scope: adversarial_readonly
+        requires_deliverable: true
+        run_model: openai/gpt-5.6-luna
+        timeout: 7200
+        prompt: |
+          GOAL: {goal}
+          Judge the SCREENSHOTS (apps/control_room/verification/) against the eight
+          distinctive moves, the recognizability test, and the brief. Does it read as the
+          control surface for multiple CLI coding agents, or as dashboard costume? Write
+          docs/reviews/control_room_facelift_design.md with findings + required dispositions;
+          PASS only if the recognizability test would hold for a stranger. Commit.
+      - name: a6_adversary_ia
+        kind: agent
+        scope: adversarial_readonly
+        requires_deliverable: true
+        run_model: openai/gpt-5.6-sol
+        timeout: 7200
+        prompt: |
+          GOAL: {goal}
+          Judge the SCREENSHOTS against the canonical glance contract: every ON-G1..G7 answer
+          visible at rest, no scroll, alerts not buried, decision state unmistakable. Walk the
+          gate's per-anchor checks and fail on any miss. Write
+          docs/reviews/control_room_facelift_ia.md. Commit.
+      - name: a7_tests
+        kind: test
+        scope: implementation
+        timeout: 600
+        tests:
+          - tests/test_research_fetch.py
+factors:
+  - {name: model, levels: [deepseek/deepseek-v4-flash]}
+design: factorial
+rules:
+  - name: facelift_implemented
+    plane: measurement
+    evidence_class: "[H]"
+    requires: []
+    produces: [facelift_screens]
+  - name: facelift_render_gated
+    plane: measurement
+    evidence_class: "[M]"
+    requires: [facelift_screens]
+    produces: [render_gate_pass]
+  - name: facelift_adversarially_checked
+    plane: measurement
+    evidence_class: "[H]"
+    requires: [render_gate_pass]
+    produces: [screenshot_design_ia_verdicts]
+metrics:
+  - {name: facelift_screens, agg: mean, over: cell}
+  - {name: render_gate_pass, agg: mean, over: cell}
+  - {name: screenshot_design_ia_verdicts, agg: mean, over: cell}
+comparison: null
+writeup: {format: lab_book, sections: [question, a0_ia_layout, a1_charts, a2_svg, a3_styling, a4_render_gate, a5_adversary_design, a6_adversary_ia]}
+stop: {budget_usd: 25.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}
