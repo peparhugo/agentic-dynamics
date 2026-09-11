@@ -3,8 +3,8 @@
 **Generated — do not edit by hand.** Regenerate with `python scripts/spec_status.py`;
 `scripts/run_workflow.py` also refreshes it at the end of every run.
 
-Generated at: `2026-09-11T07:12:11.647108+00:00`  ·  206 spec(s)
-**Work remaining:** 195 open · 11 completed/retired
+Generated at: `2026-09-11T13:02:56.948815+00:00`  ·  207 spec(s)
+**Work remaining:** 196 open · 11 completed/retired
 
 | name | kind | repeatable | status | version | supersedes | last_run | ok | model | cost | n_runs |
 |---|---|---|---|---|---|---|---|---|---|---|
@@ -91,6 +91,7 @@ Generated at: `2026-09-11T07:12:11.647108+00:00`  ·  206 spec(s)
 | `control_db_evidence` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `control_db_followups` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `control_db_publication` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
+| `control_room_facelift` | workflow | yes | runnable | 0.1 | — | 2026-09-11 13:02 | ok | deepseek/deepseek-v4-flash | $5.2080 | 1 |
 | `control_room_hardening` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `control_room_live_board` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `control_room_portal` | workflow | no | runnable | 0.2 | — | — | — | — | — | 0 |

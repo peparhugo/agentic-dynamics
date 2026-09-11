@@ -1,7 +1,7 @@
 {
   "schema_version": "spec-status/v2",
-  "generated_at": "2026-09-11T07:12:11.647108+00:00",
-  "n_specs": 206,
+  "generated_at": "2026-09-11T13:02:56.948815+00:00",
+  "n_specs": 207,
   "specs": [
     {
       "name": "admission_leases",
@@ -1675,6 +1675,26 @@
       "results_pointer": null,
       "n_runs": 0,
       "workflow_revision_id": "77e96581cf9e72ff01b41b964110f62b139c97240c6e0fc4bb8328dacff44858",
+      "authored_status": null
+    },
+    {
+      "name": "control_room_facelift",
+      "version": "0.1",
+      "status": "runnable",
+      "spec_path": "workflows/repository/control_room_facelift.yaml",
+      "artifact_kind": "workflow",
+      "repeatable": true,
+      "supersedes": [],
+      "superseded_by": null,
+      "completed_at": null,
+      "last_run_at": "2026-09-11T13:02:56.933031+00:00",
+      "latest_ok": true,
+      "latest_model": "deepseek/deepseek-v4-flash",
+      "latest_cost_usd": 5.20797,
+      "latest_git_sha": "4335f42b7",
+      "results_pointer": "experiments/results/workflows/control_room_facelift/20260911T130256Z.json",
+      "n_runs": 1,
+      "workflow_revision_id": "8424636fedca91454b0886ddaf8dd9f48ab2d6398bc79bf7915b2a4c11e7cfb2",
       "authored_status": null
     },
     {
