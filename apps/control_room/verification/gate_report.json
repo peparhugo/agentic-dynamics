@@ -189,6 +189,21 @@
       "case": "style",
       "viewport": "mobile",
       "screenshot": "apps/control_room/verification/style_mobile_dark_390x844.png"
+    },
+    {
+      "case": "live",
+      "viewport": "desktop",
+      "screenshot": "apps/control_room/verification/live_desktop_dark_1440x900.png"
+    },
+    {
+      "case": "live",
+      "viewport": "narrow",
+      "screenshot": "apps/control_room/verification/live_narrow_dark_1024x768.png"
+    },
+    {
+      "case": "live",
+      "viewport": "mobile",
+      "screenshot": "apps/control_room/verification/live_mobile_dark_390x844.png"
     }
   ],
   "errors": []

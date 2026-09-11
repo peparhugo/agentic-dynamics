@@ -350,6 +350,30 @@ def test_client_lists_are_keyed_and_write_on_change() -> None:
     assert "row-authority" in app
 
 
+def test_render_gate_implements_the_acceptance_classes() -> None:
+    """The gate (a4) carries the IA acceptance classes, the live mode, and the report writer."""
+    gate = (
+        Path(__file__).resolve().parents[1] / "scripts" / "verify_control_room_rendering.py"
+    ).read_text(encoding="utf-8")
+    for token in (
+        "CONTRAST_JS",            # WCAG-AA contrast walker
+        "SVG_TEXT_CONTRAST_JS",   # SVG text contrast
+        "IA_CORE_JS",             # the live structural contract
+        "first-contentful-paint",  # first-paint primitive
+        "_ensure_paint",          # paint-settle helper
+        "run_live_gate",          # live (no-fixture) IA-core class
+        "run_chart_gate",         # a1 class
+        "run_visual_gate",        # a2 class
+        "run_style_gate",         # a3 class
+        "write_report",           # markdown + JSON report
+        '"--live"',
+        '"--base"',
+        "--check-fixtures",
+    ):
+        assert token in gate, token
+    assert "REPORT_DIR_DEFAULT" in gate and '"verification"' in gate
+
+
 def test_all_preexisting_routes_still_resolve() -> None:
     """The facelift is additive: every previously-registered API path is still served."""
     from apps.control_room import server

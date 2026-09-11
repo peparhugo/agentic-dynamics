@@ -259,13 +259,61 @@ def check_fixtures() -> int:
 # ── The Flask shell (the production app; /api/* is intercepted by Playwright) ────────────────
 
 
+#: When set (by ``--base URL``), every gate renders against this already-running portal instead
+#: of starting its own. A caller that supplies its own server is responsible for its lifecycle,
+#: so the gates never shut it down.
+_BASE_OVERRIDE: str | None = None
+
+
+def _serve() -> tuple[str, Any | None]:
+    """Return ``(base_url, httpd_or_None)`` — the injected base, or a freshly served app."""
+    if _BASE_OVERRIDE:
+        return _BASE_OVERRIDE, None
+    return serve_app()
+
+
+def _ensure_paint(page: Any) -> None:
+    """Wait (briefly) for the browser to record a first paint before probing paint timing.
+
+    Headless Chromium occasionally reports no paint entry at the instant a probe runs even
+    though the page is ready. Waiting for the entry — and forcing two animation frames if it is
+    slow — makes the first-paint check deterministic instead of flaky. A genuine no-paint page
+    still times out here and is then reported by the caller's paint assertion.
+    """
+    try:
+        page.wait_for_function(
+            "() => performance.getEntriesByType('paint').length > 0", timeout=3000
+        )
+    except Exception:  # noqa: BLE001 — a missing paint is a finding, not a crash
+        page.evaluate(
+            "() => new Promise((resolve) => requestAnimationFrame(()"
+            " => requestAnimationFrame(resolve)))"
+        )
+
+
+def _attach_console(page: Any) -> list[str]:
+    """Listen for console errors and uncaught page errors; return the growing message list.
+
+    A loaded page must be console-clean (the website gate's CONSOLE class). The list is mutated
+    by the listeners, so the caller reads it after the page has settled.
+    """
+    errors: list[str] = []
+    page.on("console", lambda message: errors.append(message.text)
+            if message.type == "error" else None)
+    page.on("pageerror", lambda error: errors.append(str(error)))
+    return errors
+
+
 def serve_app() -> tuple[str, Any]:
     """Run the real Control Room Flask app on an ephemeral port; return (base_url, server)."""
     from werkzeug.serving import make_server
 
     from apps.control_room import server as portal
 
-    httpd = make_server("127.0.0.1", 0, portal.app)
+    # Threaded on purpose: the live class holds a long-lived SSE stream open, and a
+    # single-threaded server would block the very static requests the page needs to load. This
+    # mirrors the documented production launch (`app.run(threaded=True)`).
+    httpd = make_server("127.0.0.1", 0, portal.app, threaded=True)
     thread = threading.Thread(target=httpd.serve_forever, daemon=True)
     thread.start()
     return f"http://127.0.0.1:{httpd.server_port}", httpd
@@ -458,6 +506,47 @@ GEOMETRY_JS = r"""
     attentionLines: count('[data-region="R1"] [data-item-line]'),
     rowLines: count('[data-region="R2"] [data-row-line]'),
     detailLines: count('[data-region="R3b"] [data-detail-line]'),
+    // First-paint evidence: the browser's own paint timing, plus the document lifecycle stage.
+    paints: performance.getEntriesByType('paint').map((entry) => entry.name),
+    readyState: document.readyState,
+  };
+}
+"""
+
+#: The IA-core probe for the live (unfixtured) portal: the acceptance contract's structural
+#: checks that do not depend on any particular data — every anchor present, in viewport, a
+#: non-zero box, no page/region scroll, and a recorded first paint.
+IA_CORE_JS = r"""
+() => {
+  const rect = (el) => { const r = el.getBoundingClientRect();
+    return {x: r.x, y: r.y, width: r.width, height: r.height,
+            top: r.top, bottom: r.bottom, left: r.left, right: r.right}; };
+  const visible = (el) => {
+    for (let n = el; n; n = n.parentElement) {
+      const cs = getComputedStyle(n);
+      if (n.hidden || n.getAttribute('aria-hidden') === 'true' || cs.display === 'none' ||
+          cs.visibility === 'hidden') return false;
+    }
+    return true;
+  };
+  const regions = {}, answers = {};
+  document.querySelectorAll('[data-region]').forEach((el) => {
+    regions[el.dataset.region] = {rect: rect(el), visible: visible(el),
+      scrollH: el.scrollHeight, clientH: el.clientHeight,
+      scrollW: el.scrollWidth, clientW: el.clientWidth};
+  });
+  document.querySelectorAll('[data-answer]').forEach((el) => {
+    const parent = el.closest('[data-region]');
+    answers[el.dataset.answer] = {region: parent ? parent.dataset.region : null,
+      rect: rect(el), visible: visible(el)};
+  });
+  const page = document.scrollingElement;
+  return {
+    innerWidth: window.innerWidth, innerHeight: window.innerHeight,
+    scrollWidth: page.scrollWidth, scrollHeight: page.scrollHeight,
+    regions, answers,
+    paints: performance.getEntriesByType('paint').map((entry) => entry.name),
+    readyState: document.readyState,
   };
 }
 """
@@ -565,7 +654,7 @@ def run_chart_gate(out: Path, screenshots: bool) -> tuple[list[dict[str, Any]], 
 
     fixture = build_fixture("F-0")
     history = _chart_history(fixture)
-    url, httpd = serve_app()
+    url, httpd = _serve()
     results: list[dict[str, Any]] = []
     errors: list[str] = []
     cases = (
@@ -634,7 +723,8 @@ def run_chart_gate(out: Path, screenshots: bool) -> tuple[list[dict[str, Any]], 
                 context.close()
             browser.close()
     finally:
-        httpd.shutdown()
+        if httpd is not None:
+            httpd.shutdown()
     return results, errors
 
 
@@ -809,7 +899,7 @@ def run_visual_gate(out: Path, screenshots: bool) -> tuple[list[dict[str, Any]],
 
     fixture = build_fixture("F-0")
     frames = _sse_frames([fixture], with_transitions=False)
-    url, httpd = serve_app()
+    url, httpd = _serve()
     results: list[dict[str, Any]] = []
     errors: list[str] = []
     try:
@@ -857,7 +947,8 @@ def run_visual_gate(out: Path, screenshots: bool) -> tuple[list[dict[str, Any]],
                     context.close()
             browser.close()
     finally:
-        httpd.shutdown()
+        if httpd is not None:
+            httpd.shutdown()
     return results, errors
 
 
@@ -941,7 +1032,7 @@ def run_style_gate(out: Path, screenshots: bool) -> tuple[list[dict[str, Any]], 
 
     fixture = build_fixture("F-0")
     frames = _sse_frames([fixture], with_transitions=False)
-    url, httpd = serve_app()
+    url, httpd = _serve()
     results: list[dict[str, Any]] = []
     errors: list[str] = []
     try:
@@ -1006,7 +1097,8 @@ def run_style_gate(out: Path, screenshots: bool) -> tuple[list[dict[str, Any]], 
                 reduced.close()
             browser.close()
     finally:
-        httpd.shutdown()
+        if httpd is not None:
+            httpd.shutdown()
     return results, errors
 
 
@@ -1045,7 +1137,7 @@ def run_browser_gate(
     """
     from playwright.sync_api import sync_playwright
 
-    base, httpd = serve_app()
+    base, httpd = _serve()
     results: list[dict[str, Any]] = []
     errors: list[str] = []
     try:
@@ -1096,6 +1188,7 @@ def run_browser_gate(
                         page.goto(base, wait_until="domcontentloaded")
                         page.locator('[data-render-state="ready"]').wait_for(timeout=15000)
 
+                        _ensure_paint(page)
                         geometry = page.evaluate(GEOMETRY_JS)
                         _check_geometry(fixture_id, name, theme, geometry, errors)
                         # A console error is a loaded-page defect even when geometry is intact.
@@ -1113,7 +1206,114 @@ def run_browser_gate(
                         context.close()
             browser.close()
     finally:
-        httpd.shutdown()
+        if httpd is not None:
+            httpd.shutdown()
+    return results, errors
+
+
+def _check_ia_core(label: str, viewport: str, probe: dict[str, Any], errors: list[str]) -> None:
+    """The live IA-core contract: anchors present/unique, in viewport, non-zero, no scroll, paint.
+
+    Deliberately data-independent: it asserts the acceptance structure the a4 brief names (each
+    anchor present, in viewport, a non-zero box, no page/region scroll) and the browser/console
+    primitives, but not the fixture-specific row/marginal counts — those belong to the fixture
+    class, because a live portal's run count is whatever the machinery actually has.
+    """
+    width, height = probe["innerWidth"], probe["innerHeight"]
+    if set(probe["regions"]) != set(REGIONS):
+        _row(errors, label, "live", "ia-regions", f"regions={sorted(probe['regions'])}")
+    if set(probe["answers"]) != set(ANSWER_REGION):
+        _row(errors, label, "live", "ia-answers", f"answers={sorted(probe['answers'])}")
+    if probe["scrollHeight"] > height + 1:
+        _row(errors, label, "live", "ia-page-scroll",
+             f"scrollHeight {probe['scrollHeight']} > {height}")
+    if probe["scrollWidth"] > width + 1:
+        _row(errors, label, "live", "ia-page-scroll",
+             f"scrollWidth {probe['scrollWidth']} > {width}")
+    for region in REGIONS:
+        info = probe["regions"].get(region)
+        if not info:
+            continue
+        box = info["rect"]
+        if not info["visible"] or box["width"] <= 0 or box["height"] <= 0:
+            _row(errors, label, "live", "ia-region-box", f"{region} box={box} visible={info['visible']}")
+        elif (box["top"] < -0.5 or box["bottom"] > height + 0.5
+              or box["left"] < -0.5 or box["right"] > width + 0.5):
+            _row(errors, label, "live", "ia-region-fold", f"{region} box={box}")
+        if info["scrollH"] > info["clientH"] + 1 or info["scrollW"] > info["clientW"] + 1:
+            _row(errors, label, "live", "ia-region-scroll", f"{region} scroll")
+    for answer, region in ANSWER_REGION.items():
+        info = probe["answers"].get(answer)
+        if not info:
+            continue
+        if info["region"] != region:
+            _row(errors, label, "live", "ia-answer-region", f"{answer} in {info['region']}")
+        box = info["rect"]
+        if not info["visible"] or box["width"] <= 0 or box["height"] <= 0:
+            _row(errors, label, "live", "ia-answer-box", f"{answer} box={box}")
+        elif box["top"] < -0.5 or box["bottom"] > height + 0.5:
+            _row(errors, label, "live", "ia-answer-fold", f"{answer} box={box}")
+    paints = probe.get("paints") or []
+    if not any(name_ in paints for name_ in ("first-paint", "first-contentful-paint")):
+        _row(errors, label, "live", "first-paint", f"paints={paints}")
+
+
+def run_live_gate(
+    out: Path, screenshots: bool, themes: tuple[str, ...] = THEMES
+) -> tuple[list[dict[str, Any]], list[str]]:
+    """Run the IA-core + contrast + console + first-paint class against the live portal.
+
+    No request interception: the page talks to the real ``/api/glance`` and ``/api/events``. This
+    is the a4 acceptance run — it proves the served screen holds the contract with whatever the
+    control plane actually returns, and it is what a `--base URL` invocation checks.
+    """
+    from playwright.sync_api import sync_playwright
+
+    url, httpd = _serve()
+    results: list[dict[str, Any]] = []
+    errors: list[str] = []
+    try:
+        with sync_playwright() as playwright:
+            browser = playwright.chromium.launch(args=["--no-sandbox"])
+            for theme in themes:
+                for name, (width, height) in VIEWPORTS.items():
+                    label = f"{name}/{theme}"
+                    if theme == "forced-colors":
+                        context = browser.new_context(
+                            viewport={"width": width, "height": height}, timezone_id="UTC",
+                            locale="en-US", reduced_motion="reduce", color_scheme="dark",
+                            forced_colors="active",
+                        )
+                    else:
+                        context = browser.new_context(
+                            viewport={"width": width, "height": height}, timezone_id="UTC",
+                            locale="en-US", reduced_motion="reduce", color_scheme=theme,
+                            forced_colors="none",
+                        )
+                        context.add_init_script(
+                            f"try{{localStorage.setItem('control-room-theme','{theme}')}}catch(e){{}}"
+                        )
+                    page = context.new_page()
+                    console_errors = _attach_console(page)
+                    page.goto(url, wait_until="domcontentloaded")
+                    page.locator('[data-render-state="ready"]').wait_for(timeout=20000)
+                    _ensure_paint(page)
+                    probe = page.evaluate(IA_CORE_JS)
+                    _check_ia_core(label, name, probe, errors)
+                    for message in console_errors:
+                        _row(errors, label, "live", "console", message[:200])
+                    for failure in page.evaluate(CONTRAST_JS, ["[data-region]", 4.5, 3.0]):
+                        _row(errors, label, "live", "contrast", json.dumps(failure))
+                    if screenshots and theme == "dark":
+                        shot = out / f"live_{name}_dark_{width}x{height}.png"
+                        page.screenshot(path=str(shot), full_page=False)
+                        results.append({"case": "live", "viewport": name,
+                                        "screenshot": str(shot)})
+                    context.close()
+            browser.close()
+    finally:
+        if httpd is not None:
+            httpd.shutdown()
     return results, errors
 
 
@@ -1158,6 +1358,12 @@ def _check_geometry(
             _row(errors, label, fixture_id, "G-3", f"{region} scrollH {info['scrollH']}")
         if info["scrollW"] > info["clientW"] + 1:
             _row(errors, label, fixture_id, "G-3", f"{region} scrollW {info['scrollW']}")
+
+    # First paint: the browser recorded a paint timing entry. `readyState` is reported for the
+    # report but is not asserted (a `domcontentloaded` gate could legitimately still be loading).
+    paints = geometry.get("paints") or []
+    if not any(name_ in paints for name_ in ("first-paint", "first-contentful-paint")):
+        _row(errors, label, fixture_id, "first-paint", f"paints={paints}")
 
     # G-7/G-8/G-12 fixed boxes.
     expected = EXPECTED_BOXES[name]
@@ -1238,16 +1444,32 @@ def _check_geometry(
 
 def write_report(results: list[dict[str, Any]], errors: list[str], report_path: Path,
                  json_path: Path, check_fixtures_exit: int) -> int:
-    """Write the markdown + JSON reports; return the exit code."""
+    """Write the markdown + JSON reports; return the exit code.
+
+    The report is the gate's artifact (the website gate's pattern): status, the classes that
+    ran, a per-class screenshot rollup, and the full failure list with the offending selector or
+    value, so a failure is actionable without re-running the browser.
+    """
     status = "PASS" if not errors and check_fixtures_exit == 0 else "FAIL"
+    # Roll the screenshots up by class so the report says what each capture proves.
+    by_class: dict[str, int] = {}
+    for result in results:
+        key = result.get("case") or result.get("fixture") or "resting"
+        by_class[key] = by_class.get(key, 0) + 1
+    rollup = ", ".join(f"{key} {count}" for key, count in sorted(by_class.items())) or "none"
     lines = [
         "# Control Room render gate",
         "",
         f"**Status:** {status}",
+        "**Classes:** geometry (IA §10.3 G-1..G-15) · charts (a1) · visuals (a2) · style (a3) · "
+        "live IA-core",
         "**Fixtures:** F-0..F-7 (deterministic; no live Redis/clock/network — waiver W2)",
         f"**Viewports:** {', '.join(f'{k} {w}x{h}' for k, (w, h) in VIEWPORTS.items())}",
+        f"**Themes:** {', '.join(THEMES)}",
+        "**Primitives:** present/unique · in-viewport · non-zero box · no page/region scroll · "
+        "WCAG-AA contrast · first-paint · console-clean",
         "",
-        f"**Screenshots:** {len(results)}",
+        f"**Screenshots:** {len(results)} ({rollup})",
         "",
     ]
     if errors:
@@ -1255,7 +1477,14 @@ def write_report(results: list[dict[str, Any]], errors: list[str], report_path: 
         lines.append("")
         lines.extend(f"- {error}" for error in errors)
     else:
-        lines.append("No geometry violations.")
+        lines.append("No violations.")
+    lines.append("")
+    lines.append("## Captures")
+    lines.append("")
+    for result in results:
+        rel = result.get("screenshot", "")
+        key = result.get("case") or result.get("fixture") or "resting"
+        lines.append(f"- `{rel}` — {key}/{result.get('viewport', '?')}")
     lines.append("")
     report_path.parent.mkdir(parents=True, exist_ok=True)
     report_path.write_text("\n".join(lines), encoding="utf-8")
@@ -1284,7 +1513,15 @@ def main() -> int:
                         help="also run the R4 SVG visual class (a2)")
     parser.add_argument("--style", action="store_true",
                         help="also run the styling/a11y class (a3)")
+    parser.add_argument("--live", action="store_true",
+                        help="run the IA-core class against the live /api/* (no fixtures)")
+    parser.add_argument("--base", default=None,
+                        help="render an already-running portal at this URL instead of starting one")
     args = parser.parse_args()
+
+    global _BASE_OVERRIDE
+    if args.base:
+        _BASE_OVERRIDE = args.base.rstrip("/")
 
     fixtures = [item.strip() for item in args.fixtures.split(",") if item.strip()]
     fixture_rc = check_fixtures()
@@ -1312,6 +1549,9 @@ def main() -> int:
         if args.style:
             style_results, style_errors = run_style_gate(out, not args.no_screenshot)
             results, errors = results + style_results, errors + style_errors
+        if args.live:
+            live_results, live_errors = run_live_gate(out, not args.no_screenshot)
+            results, errors = results + live_results, errors + live_errors
     except ImportError:
         print("playwright is not installed; run with --check-fixtures for the browser-free check",
               file=sys.stderr)
