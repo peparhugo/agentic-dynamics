@@ -1,6 +1,6 @@
 {
   "schema_version": "spec-status/v2",
-  "generated_at": "2026-09-11T14:42:05.999009+00:00",
+  "generated_at": "2026-09-11T15:08:34.555745+00:00",
   "n_specs": 210,
   "specs": [
     {
@@ -1967,13 +1967,13 @@
       "supersedes": [],
       "superseded_by": null,
       "completed_at": null,
-      "last_run_at": "2026-09-11T14:42:05.984473+00:00",
-      "latest_ok": false,
+      "last_run_at": "2026-09-11T15:08:34.541125+00:00",
+      "latest_ok": true,
       "latest_model": "deepseek/deepseek-v4-flash",
-      "latest_cost_usd": 0.409852,
-      "latest_git_sha": "b94e43640",
-      "results_pointer": "experiments/results/workflows/control_room_ux_repair/20260911T144205Z.json",
-      "n_runs": 1,
+      "latest_cost_usd": 6.147073,
+      "latest_git_sha": "2f06418cd",
+      "results_pointer": "experiments/results/workflows/control_room_ux_repair/20260911T150834Z.json",
+      "n_runs": 2,
       "workflow_revision_id": "ceedbb2e3bf8d88cf251faa15245abdeb889ed9d8873ea993dd1feec1f6a891e",
       "authored_status": null
     },
