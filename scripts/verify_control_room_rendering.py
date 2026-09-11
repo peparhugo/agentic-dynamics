@@ -16,6 +16,10 @@ Classes implemented (p5 IA8: a screenshot must not be asked to prove what only t
   * A a11y         — accessible names/roles, true hidden state, and the keyboard open/close path
                      with focus containment (``--a11y``)
   * E state        — epoch consistency and saturated-inbox reservation (folded into semantics)
+  * P feature-parity (u5) — every ``parity_inventory.json`` surface placed on the closed palette;
+                     each workbench lens requests its endpoint (wired) and renders non-empty data;
+                     the R4b per-worker event stream + action band and the R4d step timings are
+                     present, non-empty and structurally legal (``--parity``)
 
 The event/state E class is otherwise named in the IA; this gate implements what it can automate
 deterministically. The adversaries (``docs/reviews/control_room_facelift_{design,ia}.md``) read
@@ -34,12 +38,14 @@ Exit code 0 = PASS, 1 = FAIL, 2 = browser unavailable.
 from __future__ import annotations
 
 import argparse
+import contextlib
 import copy
 import json
 import sys
 import threading
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlparse
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
@@ -120,6 +126,42 @@ SEVERITY_RANKS = {"CRITICAL": 4, "HIGH": 3, "MEDIUM": 2, "LOW": 1}
 CHART_IDS = ("spend", "throughput", "failure", "dependency")
 #: Max chart-body height (px) per viewport, matching the CSS `--chart-body-h` budget + tolerance.
 CHART_BODY_MAX = {"desktop": 98, "narrow": 90, "mobile": 74}
+
+# ── Feature-parity (u5) ──────────────────────────────────────────────────────────────────────
+#
+# The facelift dropped the old room's operational surfaces; u4 re-housed them behind the workbench
+# lenses and the R4 dock. This class proves that re-housing is real: every surface placed by the
+# u2 parity inventory is present, every endpoint it names is actually requested when its lens
+# opens (wired), and the lens is NON-EMPTY with data (never a stub). The parity inventory is the
+# enumeration; this class is the executable form of `docs/research/control_room_ia.md` §15.3.
+
+#: The u2 parity inventory (the authoritative placement of every old panel/control/feed).
+PARITY_INVENTORY = ROOT / "experiments" / "research" / "control_room" / "parity_inventory.json"
+#: Deterministic payloads for the old-room endpoints (the non-empty-data contract).
+PARITY_FIXTURE = FIXTURE_DIR / "parity_endpoints.json"
+
+#: panel id -> the endpoint paths its loader MUST request when the lens opens (wired).
+PARITY_PANEL_ENDPOINTS: dict[str, list[str]] = {
+    "fleet": ["/api/matrix"],
+    "attention": ["/api/flags"],
+    "money": ["/api/subscription-usage"],
+    "registry": ["/api/registry"],
+    "sessions": ["/api/design-sessions", "/api/claude-agents", "/api/claude-agents/daemon"],
+    "queue": ["/api/matrix"],
+    "routing": ["/api/routing"],
+    "docs": ["/api/docs-health"],
+    "audit": ["/api/recording-audit"],
+    "health": ["/api/projections"],
+    "workforce": ["/api/matrix"],
+}
+
+#: The resting regions every inventory item is placed on (present at rest, one each).
+PARITY_RESTING_REGIONS = ["R0", "R1", "R2", "R3a", "R3b", "R3c"]
+#: The reconciled R4 dock sub-regions (per-worker event/action + step timings live here).
+PARITY_DOCK_REGIONS = ["address", "worker", "evidence", "timing"]
+#: The legal `data-state` on a step-timing row (interaction model §3.3: unknown is explicit).
+PARITY_TIMING_STATES = {"measured", "unknown"}
+
 
 #: The committed fixture deltas (§10.6). Applied to a deep copy of F-0 by the loader so the
 #: forcing states stay exact and reviewable rather than duplicated.
@@ -1591,6 +1633,259 @@ def run_live_gate(
     return results, errors
 
 
+def load_parity_inventory() -> dict[str, Any]:
+    """Load the u2 parity inventory (the enumeration this class checks)."""
+    return json.loads(PARITY_INVENTORY.read_text(encoding="utf-8"))
+
+
+def load_parity_fixtures() -> dict[str, Any]:
+    """Load the deterministic old-room endpoint payloads (parseable data, not a stub)."""
+    raw = json.loads(PARITY_FIXTURE.read_text(encoding="utf-8"))
+    return {key: value for key, value in raw.items() if not key.startswith("_")}
+
+
+def _check_parity_inventory(inventory: dict[str, Any], errors: list[str]) -> None:
+    """Static placement: every inventory record names a surface in the closed palette.
+
+    This is the build-time contract the inventory generator already enforces; the gate re-checks
+    it so a hand-edited inventory cannot smuggle a surface the IA never defined. It also asserts
+    every named capability carries a surface and at least one member, so the "no silent drops"
+    claim is auditable from the gate's own artifact.
+    """
+    palette = set(inventory.get("surface_palette") or {})
+    if not palette:
+        _row(errors, "static", "parity", "palette", "parity_inventory has no surface_palette")
+        return
+    for group in ("items", "endpoints", "capabilities"):
+        for record in inventory.get(group, []):
+            surface = record.get("surface")
+            if surface not in palette:
+                _row(errors, "static", "parity", "placement",
+                     f"{group}:{record.get('id')} surface {surface!r} not in palette")
+    for capability in inventory.get("capabilities", []):
+        if not capability.get("surface"):
+            _row(errors, "static", "parity", "capability-surface",
+                 f"capability {capability.get('id')} has no surface")
+        if not capability.get("member_ids"):
+            _row(errors, "static", "parity", "capability-members",
+                 f"capability {capability.get('id')} has no member ids")
+
+
+def _parity_router(
+    records: list[dict[str, str]],
+    wire: dict[str, Any],
+    glance_frames: str,
+    event_frames: str,
+    fixtures: dict[str, Any],
+):
+    """One Playwright route handler for the whole parity class.
+
+    A single catch-all (rather than many patterns) avoids handler-ordering surprises: it records
+    every request (the "wired" evidence), serves the glance/per-cell SSE and each mapped endpoint
+    from fixtures, fulfills mutations with a stub success so action chips render their receipts,
+    and aborts anything unmapped so a missing endpoint is a visible request, never a silent pass.
+    """
+
+    def handler(route: Any) -> None:
+        request = route.request
+        path = urlparse(request.url).path
+        records.append({"method": request.method, "path": path})
+        if request.method == "POST":
+            route.fulfill(
+                status=200,
+                content_type="application/json",
+                body=json.dumps({"ok": True, "action": path.rstrip("/").rsplit("/", 1)[-1],
+                                 "note": "recorded by the parity gate"}),
+            )
+            return
+        if path == "/api/glance":
+            route.fulfill(status=200, content_type="application/json", body=json.dumps(wire))
+        elif path == "/api/events":
+            route.fulfill(status=200, content_type="text/event-stream", body=glance_frames)
+        elif path.startswith("/api/events/"):
+            route.fulfill(status=200, content_type="text/event-stream", body=event_frames)
+        elif path in fixtures:
+            route.fulfill(status=200, content_type="application/json",
+                          body=json.dumps(fixtures[path]))
+        else:
+            route.abort()
+
+    return handler
+
+
+def run_parity_gate(
+    out: Path, screenshots: bool
+) -> tuple[list[dict[str, Any]], list[str]]:
+    """Run the FEATURE-PARITY + per-worker surface class (u5).
+
+    Deterministic and fixture-driven like the rest of the gate (waiver W2):
+      1. static — every parity_inventory record is placed on a palette surface;
+      2. resting — every region an item is placed on is present;
+      3. workbench — each lens requests its endpoint (wired) and renders non-empty data;
+      4. dock — the R4b per-worker stream + action band and R4d step timings are present,
+         non-empty, and structurally legal; a representative action click POSTs.
+    """
+    from playwright.sync_api import sync_playwright
+
+    inventory = load_parity_inventory()
+    fixtures = load_parity_fixtures()
+    results: list[dict[str, Any]] = []
+    errors: list[str] = []
+    _check_parity_inventory(inventory, errors)
+
+    url, httpd = _serve()
+    try:
+        with sync_playwright() as playwright:
+            browser = playwright.chromium.launch(args=["--no-sandbox"])
+            for name, (width, height) in (("desktop", (1440, 900)), ("mobile", (390, 844))):
+                wire = build_fixture("F-0")
+                epoch = wire["control_epoch"]
+                glance_frames = (
+                    "event: snapshot\n"
+                    + "data: " + json.dumps({"control_epoch": epoch}, separators=(",", ":")) + "\n\n"
+                    + "event: replay_complete\n"
+                    + "data: " + json.dumps({"control_epoch": epoch}, separators=(",", ":")) + "\n\n"
+                )
+                # A few real per-cell frames so the R4b feed has live-shaped content, ending with
+                # the replay boundary the client keys its stream state off.
+                event_frames = (
+                    "data: " + json.dumps({"type": "step_start",
+                                           "part": {"name": "build"}}) + "\n\n"
+                    + "data: " + json.dumps({"type": "tool_use",
+                                             "part": {"name": "bash", "state": {"status": "completed"}}}) + "\n\n"
+                    + "data: " + json.dumps({"type": "step_finish",
+                                             "part": {"cost": 0.01,
+                                                      "tokens": {"input": 120, "output": 40}}}) + "\n\n"
+                    + "event: replay_complete\ndata: {}\n\n"
+                )
+                context = browser.new_context(
+                    viewport={"width": width, "height": height}, timezone_id="UTC",
+                    locale="en-US", reduced_motion="reduce", color_scheme="dark",
+                )
+                page = context.new_page()
+                records: list[dict[str, str]] = []
+                console_errors = _attach_console(page)
+                page.route("**/api/**",
+                           _parity_router(records, wire, glance_frames, event_frames, fixtures))
+                page.goto(url, wait_until="domcontentloaded")
+                page.locator('[data-render-state="ready"]').wait_for(timeout=20000)
+
+                # 2. every resting region is present exactly once.
+                for region in PARITY_RESTING_REGIONS:
+                    count = page.locator(f'[data-region="{region}"]').count()
+                    if count != 1:
+                        _row(errors, name, "parity", "resting-region",
+                             f"{region} count={count}")
+
+                # 3. the workbench lenses: wired + non-empty.
+                page.click("#workbench-open")
+                page.locator("#workbench:not([hidden])").wait_for(timeout=5000)
+                for panel, expected in PARITY_PANEL_ENDPOINTS.items():
+                    records.clear()
+                    page.click(f'#workbench-nav [data-lens-target="{panel}"]')
+                    page.locator(f"#wb-{panel}:not([hidden])").wait_for(timeout=5000)
+                    # Wait for the lens loader to leave its loading state; a stuck loader is
+                    # caught by the non-empty check below rather than by a timeout here.
+                    with contextlib.suppress(Exception):
+                        page.wait_for_function(
+                            """(sel) => {
+                              const el = document.querySelector(sel);
+                              return el && !el.querySelector('[data-panel-state="loading"]');
+                            }""",
+                            arg=f"#wb-{panel}", timeout=5000,
+                        )
+                    got = {record["path"] for record in records}
+                    for path in expected:
+                        if path not in got:
+                            _row(errors, name, "parity-wire", panel, f"{path} not requested")
+                    probe = page.evaluate(
+                        """(sel) => {
+                          const el = document.querySelector(sel);
+                          if (!el) return null;
+                          const content = el.querySelectorAll(
+                            '.panel-table tbody tr, .panel-item, .kv-row, .wb-action, .section-title'
+                          ).length;
+                          const state = el.querySelector('[data-panel-state]');
+                          return {
+                            content,
+                            state: state ? state.getAttribute('data-panel-state') : null,
+                          };
+                        }""",
+                        f"#wb-{panel}",
+                    )
+                    if not probe or probe["content"] == 0:
+                        _row(errors, name, "parity-nonempty", panel, f"panel empty: {probe}")
+                    elif probe["state"] == "error":
+                        _row(errors, name, "parity-nonempty", panel,
+                             "panel rendered an explicit error state")
+                    # One representative mutation-wiring probe: the attention lens' steer chip
+                    # must POST to the flags route (the handler fulfills it).
+                    if panel == "attention":
+                        records.clear()
+                        steer = page.locator("#wb-attention [data-action='steer']")
+                        if steer.count() == 0:
+                            _row(errors, name, "parity-action", "steer",
+                                 "attention flag rendered no steer action")
+                        else:
+                            steer.first.click()
+                            page.wait_for_timeout(250)
+                            if not any(r["method"] == "POST" and r["path"].endswith("/steer")
+                                       for r in records):
+                                _row(errors, name, "parity-action", "steer",
+                                     "steer click did not POST to the flags route")
+                if screenshots:
+                    shot = out / f"parity_workbench_{name}.png"
+                    page.screenshot(path=str(shot), full_page=False)
+                    results.append({"case": "parity-workbench", "viewport": name,
+                                    "screenshot": str(shot)})
+                page.click("#workbench-close")
+
+                # 4. the R4 dock: per-worker event/action + step timings.
+                records.clear()
+                page.locator('[data-region="R2"] [data-run-id]').first.click()
+                page.locator("#selection-dock:not([hidden])").wait_for(timeout=5000)
+                page.wait_for_timeout(400)
+                for sub in PARITY_DOCK_REGIONS:
+                    if page.locator(f'#selection-dock [data-dock-region="{sub}"]').count() != 1:
+                        _row(errors, name, "parity-dock", sub, "sub-region missing/duplicate")
+                got = {record["path"] for record in records}
+                if not any(path.startswith("/api/events/") for path in got):
+                    _row(errors, name, "parity-dock", "worker-stream",
+                         "no per-worker /api/events/<cell> request")
+                entries = page.locator(
+                    "#selection-dock [data-dock-region='worker'] [data-feed-entry]").count()
+                if entries < 1:
+                    _row(errors, name, "parity-dock", "worker-feed", f"{entries} event entries")
+                actions = page.locator(
+                    "#selection-dock [data-dock-region='worker'] [data-action]").count()
+                if actions < 1:
+                    _row(errors, name, "parity-dock", "worker-actions", "no [data-action] chips")
+                timings = page.locator(
+                    "#selection-dock [data-dock-region='timing'] [data-timing]").count()
+                if timings < 1:
+                    _row(errors, name, "parity-dock", "step-timings", "no [data-timing] rows")
+                states = page.eval_on_selector_all(
+                    "#selection-dock [data-dock-region='timing'] [data-timing]",
+                    "els => els.map(e => e.getAttribute('data-state'))",
+                )
+                illegal = [state for state in states if state not in PARITY_TIMING_STATES]
+                if illegal:
+                    _row(errors, name, "parity-dock", "step-timing-state", f"illegal {illegal}")
+                if screenshots:
+                    shot = out / f"parity_dock_{name}.png"
+                    page.screenshot(path=str(shot), full_page=False)
+                    results.append({"case": "parity-dock", "viewport": name,
+                                    "screenshot": str(shot)})
+                for message in console_errors:
+                    _row(errors, name, "parity", "console", message[:200])
+                context.close()
+            browser.close()
+    finally:
+        if httpd is not None:
+            httpd.shutdown()
+    return results, errors
+
+
 def _check_geometry(
     fixture_id: str, name: str, theme: str, geometry: dict[str, Any], errors: list[str]
 ) -> None:
@@ -1942,7 +2237,8 @@ def write_report(results: list[dict[str, Any]], errors: list[str], report_path: 
         "",
         f"**Status:** {status}",
         "**Classes:** geometry (IA §10.3 G-1..G-15) · semantics (IA §10 G/B: rendered vs fixture) · "
-        "charts (a1) · visuals (a2) · style (a3) · a11y (IA §10.5 A) · live IA-core",
+        "charts (a1) · visuals (a2) · style (a3) · a11y (IA §10.5 A) · live IA-core · "
+        "feature-parity (u5)",
         "**Fixtures:** F-0..F-7 (deterministic; no live Redis/clock/network — waiver W2)",
         f"**Viewports:** {', '.join(f'{k} {w}x{h}' for k, (w, h) in VIEWPORTS.items())}",
         f"**Themes:** {', '.join(THEMES)}",
@@ -1996,6 +2292,10 @@ def main() -> int:
     parser.add_argument("--a11y", action="store_true",
                         help="also run the accessibility class (IA §10.5 A: names/roles/hidden/"
                              "keyboard)")
+    parser.add_argument("--parity", action="store_true",
+                        help="also run the FEATURE-PARITY class (u5): every parity_inventory "
+                             "surface present, endpoints wired, workbench lenses non-empty, and "
+                             "the R4b per-worker event/action + R4d step-timing checks")
     parser.add_argument("--live", action="store_true",
                         help="run the IA-core class against the live /api/* (no fixtures)")
     parser.add_argument("--base", default=None,
@@ -2035,6 +2335,9 @@ def main() -> int:
         if args.a11y:
             a11y_results, a11y_errors = run_a11y_gate(out, not args.no_screenshot)
             results, errors = results + a11y_results, errors + a11y_errors
+        if args.parity:
+            parity_results, parity_errors = run_parity_gate(out, not args.no_screenshot)
+            results, errors = results + parity_results, errors + parity_errors
         if args.live:
             live_results, live_errors = run_live_gate(out, not args.no_screenshot)
             results, errors = results + live_results, errors + live_errors
