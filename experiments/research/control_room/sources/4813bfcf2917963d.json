@@ -1,0 +1,11 @@
+{
+  "uri": "https://ghostty.org/docs",
+  "final_url": "https://ghostty.org/docs",
+  "status": 200,
+  "content_type": "text/html; charset=utf-8",
+  "sha256": "4813bfcf2917963dc93292ed05d09d3a760237426d8c61cb4de4a273f28a7840",
+  "title": "Ghostty Docs",
+  "text": "Docs\nDiscord\nGitHub\nDownload\nDownload\nDiscord\nGitHub\nGhostty Docs\nAbout Ghostty\nInstall\nConfiguration\nLinux\nFeatures\nTerminal API (VT)\nHelp\nFinancial Support\nGhostty Docs\nAbout Ghostty\nInstall\nConfiguration\nLinux\nFeatures\nTerminal API (VT)\nHelp\nFinancial Support\nGhostty Docs\nGhostty Docs\nGhostty is a fast, feature-rich, and cross-platform terminal emulator\nthat uses platform-native UI and GPU acceleration.\nGet Started\nInstall Ghostty and run! Zero configuration required to get up and running.\nInstallation Instructions\nReady-to-run binaries for macOS. Packages or build from source for Linux.\nDownload\nBuild from Source\nFeatured Documentation\nKeybindings\nGhostty supports flexible, custom keybindings through the keybind configuration option.\nColor Theme\nGhostty ships with hundreds of built-in themes, supports different themes for light and dark mode, and more.\nConfiguration\nGhostty supports hundreds of configuration options to make it look and behave exactly how you want.\nTerminal API (VT)\nFor terminal application developers, a reference on terminal concepts and supported control sequences.\nEdit on GitHub\nDocs\nDiscord\nGitHub\nDownload\n\u00a9 2026 Ghostty",
+  "bytes": 66543,
+  "fetched_at": "2026-09-11T01:07:44.984603+00:00"
+}

@@ -1,0 +1,11 @@
+{
+  "uri": "https://asciinema.org/",
+  "final_url": "https://asciinema.org/",
+  "status": 200,
+  "content_type": "text/html; charset=utf-8",
+  "sha256": "98f6c32519cf6e4cb242f25b53e67f753a3fdbee9dde509656bb9f5188892ade",
+  "title": "Record and share your terminal sessions, the simple way - asciinema.org",
+  "text": "Get started\nExplore\nDocs\nBlog\nSponsor\nConsulting\nLog in\n/ Sign up\nRecord and share your terminal sessions, the simple way.\nForget screen recording apps and blurry video.\nExperience a lightweight, text-based approach to terminal recording.\nasciinema [as-kee-nuh-muh] is a free and open source solution for recording terminal sessions and sharing them on the web.\nEasy recording\nRecord right where you work - in a terminal.\nTo start, run asciinema rec demo.cast , to end press ctrl+d or type exit .\nGet started \u00bb\nCopy & paste\nWhen viewing a recording just pause the player and copy-paste the content you want. It's just text after all!\nEmbedding\nEasily embed asciinema player in your blog post, project documentation or in conference talk slides.\nSee docs on embedding \u00bb\nLive streams\nBrowse all\nStation-4451 LIVE\nby station\nBEEGND-4 LIVE\nby akira25\nFeatured recordings\nBrowse all\nAngry Flipper 0:45\nby Abraxas86 featured\nTrino: Translate Cli Tool 0:47\nby eneserdogan featured\nPopular recordings\nBrowse all\nAnalyzing the Vulnerabilities for a Network 2:23\nby Shodan\nIntro to asciinema 3:51\nby asciinema\nAbout asciinema.org\nTerms of Service\nPrivacy Policy\nHosted by\nMastodon\nForum\nMatrix\nIRC",
+  "bytes": 38462,
+  "fetched_at": "2026-09-11T01:07:59.507701+00:00"
+}
