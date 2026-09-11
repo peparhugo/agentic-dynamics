@@ -1,0 +1,69 @@
+name: stack_knowledge_conformance
+question: >-
+  Repo-conformance pass for the 12 distilled stack skills: classify each as repo-conformant
+  (with file:line anchors in THIS codebase) or generic-guidance (explicitly labelled), and
+  repair any claim the code contradicts (e.g., Playwright plugin advice vs the repo's
+  async_playwright harness). The schema/test gate refuses un-anchored "repo" claims; emission
+  waits for this pass.
+version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: false
+repeatable: true
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: true
+    rag:
+      emit_self: false
+    phases:
+      - name: c0_conformance
+        kind: agent
+        scope: implementation
+        requires_deliverable: true
+        run_model: openai/gpt-5.6-terra
+        timeout: 7200
+        prompt: |
+          GOAL: {goal}
+          For EACH file in experiments/stack_knowledge/skills/: compare its claims against the
+          ACTUAL repo code (read the relevant files: control_db.py, scripts/kb_worker.py,
+          knowledge_stream.py, runtime/story/*.py, apps/control_room/static/app.js,
+          apps/website/verify_svg_rendering.py, infrastructure/docker-compose.ladder.yml, the
+          systemd units, pyproject.toml, scripts/*). Then UPDATE the skill JSON to add:
+            "conformance": "repo-conformant" | "generic-guidance",
+            "repo_anchors": ["<path>:<line>", ...]   (required when repo-conformant; may be
+                                                        empty for generic-guidance)
+          Rules:
+          - If the code contradicts a claim, REWRITE the claim to match the code and say so in
+            `notes` (e.g., the repo uses async_playwright directly, NOT pytest-playwright).
+          - If the claim is true of the docs but not a practice of this repo, mark it
+            generic-guidance (add "applies_to" to notes: when a reader should use it).
+          - Anchors must be real file:line references; do not invent.
+          Write docs/reviews/stack_knowledge_conformance.md: per-skill verdict table
+          (subject, conformance, anchors, claim edits). Keep claims within the cited sources.
+          Verify with: python3 -m pytest tests/test_stack_skills.py -q
+          LOG: table; commit.
+      - name: c1_tests
+        kind: test
+        scope: implementation
+        timeout: 600
+        tests:
+          - tests/test_stack_skills.py
+factors:
+  - {name: model, levels: [deepseek/deepseek-v4-flash]}
+design: factorial
+rules:
+  - name: stack_skills_conformant
+    plane: measurement
+    evidence_class: "[H]"
+    requires: []
+    produces: [repo_conformance_classified]
+metrics:
+  - {name: repo_conformance_classified, agg: mean, over: cell}
+comparison: null
+writeup: {format: lab_book, sections: [question, c0_conformance, c1_tests]}
+stop: {budget_usd: 3.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}
