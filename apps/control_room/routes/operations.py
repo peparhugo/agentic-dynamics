@@ -10,9 +10,12 @@ unknown run is a 404 — absence is never dressed as a skeleton.
 """
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from flask import Response, jsonify
 
-from apps.control_room.services.context import ControlRoomServices
+if TYPE_CHECKING:  # pragma: no cover - import only for static typing
+    from apps.control_room.services.context import ControlRoomServices
 
 #: The injected application context, bound by ``register()`` before any request is served.
 _services: ControlRoomServices | None = None

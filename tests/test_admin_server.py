@@ -1182,24 +1182,28 @@ def test_design_session_input_forwards_allowlisted_delivery(monkeypatch):
 
 
 def test_route_inventory_covers_all_registered_routes():
-    """F2: the inventory's 36 routes match the actual url_map exactly.
+    """F2: the inventory's 40 routes match the actual url_map exactly.
 
     The count tracks the documented inventory in ``apps/control_room/server.py``'s module
     docstring and ``scripts/CONTEXT.md``. It went 28 -> 29 when ``GET /api/subscription-usage``
     landed, 29 -> 31 when the docs-health pair (``GET /api/docs-health`` +
     ``POST /api/docs-health/approve``) landed with the docs-drift rail's p4, 31 -> 32 when
     ``GET /api/projections`` landed with ``control_db_publication`` p3, and 32 -> 34 when the
-    recording rail (``GET /api/recording-audit`` + ``POST /api/recording-sweep/run``) landed;
-    this guard is what catches a route shipped without its inventory entry, so a bump here must
-    always be paired with the doc update (never the other way round).
+    recording rail (``GET /api/recording-audit`` + ``POST /api/recording-sweep/run``) landed,
+    34 -> 36 when the step-5 operational slice landed (``GET /api/operations`` +
+    ``GET /api/runs/<run_id>``), and 36 -> 40 when the step-6 analytics projections landed
+    (``GET /api/quality`` · ``GET /api/stories/<name>/arc`` · ``GET /api/value`` ·
+    ``GET /api/arms/compare``); this guard is what catches a route shipped without its
+    inventory entry, so a bump here must always be paired with the doc update (never the
+    other way round).
     """
     rules = [
         rule for rule in server.app.url_map.iter_rules() if not rule.rule.startswith("/static")
     ]
 
     # GET and POST on the same path register two Rule objects; count them
-    # (36), then dedupe for path-membership assertions below.
-    assert len(rules) == 36
+    # (40), then dedupe for path-membership assertions below.
+    assert len(rules) == 40
     routes = {rule.rule for rule in rules}
 
     # The surfaces the stale inventory omitted are all registered.
@@ -1223,6 +1227,10 @@ def test_route_inventory_covers_all_registered_routes():
         "/api/recording-sweep/run",
         "/api/operations",
         "/api/runs/<run_id>",
+        "/api/quality",
+        "/api/stories/<name>/arc",
+        "/api/value",
+        "/api/arms/compare",
     ):
         assert required in routes, f"missing route in inventory: {required}"
 

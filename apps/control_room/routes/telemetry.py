@@ -16,6 +16,7 @@ import json
 import subprocess
 import sys
 import time
+from typing import TYPE_CHECKING
 
 from flask import Response, jsonify, request
 
@@ -43,7 +44,7 @@ from agentic_dynamics.control.queue_reinterleave import (
     write_queue,
 )
 from agentic_dynamics.control.routing import compute_routing
-from apps.control_room.services.context import ControlRoomServices
+from agentic_dynamics.reporting.canonical_corpus import load_canonical_tables
 from apps.control_room.services.design_sessions import DESIGN_SESSIONS_KEY
 from apps.control_room.services.mutations import _design_mutation_body, _idempotent_design_response
 from apps.control_room.services.subscription_usage import (
@@ -53,6 +54,9 @@ from apps.control_room.services.subscription_usage import (
     history_summary,
     load_or_refresh,
 )
+
+if TYPE_CHECKING:  # pragma: no cover - import only for static typing
+    from apps.control_room.services.context import ControlRoomServices
 from apps.control_room.services.telemetry import (
     _parse_phases,
     _retained_telemetry,
@@ -253,20 +257,50 @@ def api_events(cell_id) -> Response:
 
 
 def api_routing() -> Response:
-    summary_path = _services.root / "experiments" / "results" / "_results_summary.json"
+    """The routing board, sourced from the CANONICAL corpus.
+
+    Retired path (step 6, one-fact-one-writer): this route used to read
+    ``experiments/results/_results_summary.json`` — the corpus the repo retired
+    (``data_integrity_findings`` rule 4; every lab still reading it is quarantined). The
+    entries are now mapped from the canonical finding rows (the one input door) onto
+    ``compute_routing``'s entry shape; an unreadable corpus is a NAMED state, never numbers
+    from the retired summary.
+    """
     try:
-        data = json.loads(summary_path.read_text())
-        entries = data.get("entries", [])
-    except (OSError, json.JSONDecodeError):
+        tables = load_canonical_tables("finding")
+    except Exception as exc:  # noqa: BLE001 — named unavailability, never stale numbers
         return jsonify(
             {
-                "_meta": {"tasks_analyzed": 0},
+                "_meta": {
+                    "tasks_analyzed": 0,
+                    "total_valid_entries": 0,
+                    "state": "unavailable",
+                    "reason": f"{type(exc).__name__}: {exc}",
+                },
                 "per_task": [],
                 "strategies": {},
-                "note": "no results summary yet",
+                "routing_distribution": {},
             }
         )
-    return jsonify(compute_routing(entries))
+    entries = [
+        {
+            "model": row.get("model"),
+            # compute_routing groups by ``experiment`` (normalized); the canonical finding
+            # row's task family is its ``_experiment`` provenance.
+            "experiment": row.get("_experiment") or "",
+            "correctness": row.get("correctness"),
+            "cost": row.get("cost_usd"),
+        }
+        for row in tables.findings
+    ]
+    payload = compute_routing(entries)
+    payload["_meta"] = {
+        **payload.get("_meta", {}),
+        "source": "canonical_corpus",
+        "input_dataset_id": tables.input_dataset_id,
+        "registry_version": tables.identity.registry_version,
+    }
+    return jsonify(payload)
 
 #: The lease counters the admission board reports beside the provider usage snapshot. Fixed
 #: rather than discovered, because a dashboard needs a stable set of rows: these are the scopes

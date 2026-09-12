@@ -213,9 +213,14 @@ def test_operator_loop_blocked_to_durable_receipt(tmp_path):
     assert '"approval_id"' in detail_after["commands"][0]["receipt_json"]
 
 
-def test_operations_handlers_serve_the_services_payload():
+def test_operations_handlers_serve_the_services_payload(monkeypatch):
     """The route layer is thin: it renders whatever the injected services return, with the
-    services' status codes — 200 for the packet, 404 for an unknown run."""
+    services' status codes — 200 for the packet, 404 for an unknown run.
+
+    ``monkeypatch.setattr`` snapshots the real module global first, so this test cannot leak
+    its fake context into the shared ``server.app`` (a flaky pollution when it ran before the
+    admin tests).
+    """
     from flask import Flask
 
     from apps.control_room.routes import operations as route_ops
@@ -229,8 +234,9 @@ def test_operations_handlers_serve_the_services_payload():
                 return {"schema": "control-room-run-detail/v1", "run": {"run_id": run_id}}, 200
             return {"error": "run not found", "run_id": run_id}, 404
 
+    monkeypatch.setattr(route_ops, "_services", _FakeServices())
     app = Flask(__name__)
-    route_ops.register(app, _FakeServices())
+    route_ops.register(app, route_ops._services)
     client = app.test_client()
 
     assert client.get("/api/operations").status_code == 200
