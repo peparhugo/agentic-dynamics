@@ -1,6 +1,6 @@
 # `scripts/` — Scripts Reference (classification manifest)
 
-84 command scripts plus three helper modules (`_bootstrap.py`, `_gen_instructions.py`,
+85 command scripts plus three helper modules (`_bootstrap.py`, `_gen_instructions.py`,
 `_command_journal.py`), each
 command in exactly one bucket (critique rec 5). The classification below is machine-parsed by
 `tests/test_script_classification.py` — keep the marker lines intact. The `one-time` bucket
@@ -25,6 +25,7 @@ maintained: decision_record.py
 maintained: scoreboard.py
 maintained: reflect.py
 maintained: workflow_new.py workflow_lint.py workflow_plan.py
+maintained: verify_control_room_rendering.py
 <!-- scripts-classification: end -->
 
 - **maintained command** — reached via `agentic-dynamics <subcommand>` (the Stage 3 CLI).
@@ -280,17 +281,18 @@ reasoning_divergence, semantic_clusters. Superseded by `semantic_validation.py`.
 
 | File | Purpose |
 |------|---------|
-| `apps/control_room/server.py` | Flask backend — the **Control Room portal**, 44 routes across 9 API categories plus the static shell (below). Serves `apps/control_room/static/`. Port 8000 (`FINOPS_PORT`). |
-| `apps/control_room/static/` | Vanilla-JS dashboard: Matrix grid, Cell Inspector (live transcript), Routing board, Operations board (packet + run detail), Surfaces board (step-5/6/7 read models), supervisor flags, design sessions, Claude background sessions. |
+| `apps/control_room/server.py` | Flask backend — the **Control Room portal**, 46 routes across 10 API categories plus the static shell (below). Serves `apps/control_room/static/`. Port 8000 (`FINOPS_PORT`). |
+| `apps/control_room/static/` | The one resting screen (facelift a0, parity-restored u4): one run ledger answering `ON-G1..G7` at rest, no navigation. `index.html` + `style.css` + `app.js` hydrate from `GET /api/glance` and follow `GET /api/events`; `parity.js` re-houses the dropped operational surfaces — the R4b per-worker event stream + governed action band, R4d step timings, and the workbench lenses (fleet, attention, money, registry, sessions, queue, routing, docs, audit, health, workforce step timings, plus the step-11 Operations/Surfaces boards and the step-12 batch lane) — each lazy-loading the same endpoint the old room used. |
 
-`apps/control_room/server.py`'s 44 routes, categorized:
+`apps/control_room/server.py`'s 46 routes, categorized:
 - **Legacy telemetry** (8): `/api/matrix`, `/api/status` (SSE), `/api/events/<cell_id>` (SSE), `/api/projections`, `/api/routing`, `/api/subscription-usage`, `POST /api/experiments`, `POST /api/queue/reinterleave`
 - **Supervisor flags** (3): `/api/flags`, `POST /api/flags/<session_id>/steer`, `POST /api/flags/<session_id>/interrupt`
 - **Registry** (2): `/api/registry`, `/api/registry/<entity_id>`
+- **Recording** (2): `/api/recording-audit`, `POST /api/recording-sweep/run` — recording coverage audit + sweep
+- **Glance / events** (2): `/api/glance` (the one resting-screen read-only projection), `/api/events` (bounded SSE: snapshot → replay_complete → epoch transitions) — the facelift's additive surfaces
 - **Design sessions** (7): `/api/design-sessions`, `POST /api/design-sessions`, `/api/design-sessions/<portal_id>/spec`, `POST /api/design-sessions/<portal_id>/input`, `POST /api/design-sessions/<portal_id>/interrupt`, `POST /api/design-sessions/<portal_id>/save`, `POST /api/design-sessions/<portal_id>/run`
 - **Claude background sessions** (9): `/api/claude-agents`, `POST /api/claude-agents`, `/api/claude-agents/<session_id>/logs`, `POST /api/claude-agents/<session_id>/stop`, `POST /api/claude-agents/<session_id>/respawn`, `POST /api/claude-agents/<session_id>/rm`, `POST /api/claude-agents/<session_id>/steer`, `/api/claude-agents/daemon`, `POST /api/claude-agents/daemon/stop`
 - **Docs health** (2): `/api/docs-health`, `POST /api/docs-health/approve` — the docs-drift rail's surface (green/yellow/red + the controller's approve affordance; see `scripts/scan_docs_drift.py` → `docs_drift_watchdog.py` → `docs_proposal_gate.py`)
-- **Recording** (2): `/api/recording-audit`, `POST /api/recording-sweep/run` — the recording rail's read + sweep trigger (`scripts/recording_sweep.py`)
 - **Operations** (2): `/api/operations`, `/api/runs/<run_id>` — the operational read models (step 5): the packet + attention/triage, and P1/P2 per-run detail over the control records
 - **Analytics** (8): `/api/quality`, `/api/stories/<name>/arc`, `/api/value`, `/api/arms/compare` — the step-6 projections (P3 model quality, P4 story arc, P5 observed-only value, P6 arm comparison); `/api/queue/sla`, `/api/escalations`, `/api/batch`, `/api/energy` — the step-7 rule-4/6/8/9 surfaces (measured where owned, labeled scenarios/unknowns where not)
 - **Static shell** (1): `GET /`

@@ -1,2905 +1,1492 @@
-/* ============================================================================================
-   Control Room — design system + application styles.
-
-   Authored mobile-first, per docs/control_room_ui/design.md §8 and research §1.4:
-   the base rules describe the phone (single column, sticky bottom tab bar, modal bottom
-   sheet); `min-width` queries add the desktop rail/columns. Only two `max-width` blocks
-   exist, and both are for things that must NOT survive to desktop (the mobile sheet metrics
-   and the 420px hard-compaction pass).
-
-   Section map
-     1  Tokens — dark + light, spacing, type, radii, motion, z-index      [design §8.2–§8.5]
-     2  Reset + base elements
-     3  Typography + utility primitives
-     4  Shell layout (command rail, boards region, safe areas)            [design §1.4]
-     5  Destinations nav (bottom tab bar -> left rail)                    [design §1.4]
-     6  Boards (generic chrome)                                          [design §1.2]
-     7  Fleet board (stages, filters, grid, cards, density)              [design §2]
-     8  Status board                                                     [design §5]
-     9  Flags board                                                      [design §4]
-    10  Sessions board                                                   [design §6]
-    11  Routing board + System sheet                                     [design §7]
-    12  Detail surface (transcript + control panels)                     [design §3]
-    13  Components (buttons, forms, badges, doors, tables)               [design §3.4]
-    14  Sheets, scrim, drag handle                                       [design §1.5, R §2.7]
-    15  Responsive escalation (>=760px, >=1200px) + mobile-only passes
-    16  Motion, focus, reduced motion                                    [design §8.5]
-
-   Color discipline (the rule that keeps the two axes readable, design §2.2):
-     - `--accent` (indigo) means INTERACTIVITY ONLY: focus ring, active destination, primary CTA.
-     - `--status-*` means LIFECYCLE, and always ships with a glyph + an uppercase word.
-     - `--attention-*` means a SUPERVISOR HEURISTIC and appears only on the Flags board and the
-       supervisor control panel — never on a fleet card.
-   ============================================================================================ */
-
-/* ── 1. Tokens ───────────────────────────────────────────────────────────────────────────── */
+/*
+ * Control Room — the one resting screen (facelift a0).
+ *
+ * This stylesheet implements the geometry contract of docs/research/control_room_ia.md §3.2:
+ * every region has a fixed max-height, the region gaps are exact, and the sums fit the three
+ * claimed viewports (1440x900, 1024x768, 390x844) with headroom. The rendering gate asserts the
+ * fixed x/y/width/height boxes and the no-scroll primitives, so the numbers here are load-
+ * bearing, not decorative.
+ *
+ * Layout model
+ * ------------
+ *   [data-glance-shell]  column, viewport-height, horizontal padding only (R0 starts at y=0)
+ *     [data-region="R0"]  fixed height, full width
+ *     [data-glance-body]  row on desktop/narrow (R1 | R2 | R3 stack), column on mobile
+ *       [data-region="R1"]          fixed width + height
+ *       [data-region="R2"]          fixed width + height
+ *       [data-r3-stack]             fixed width, column, 8px gaps
+ *         [data-region="R3a/b/c"]   fixed heights
+ *
+ * Type floors (gate G-5): values >= 13px desktop / >= 12px mobile, labels >= 11px. Required
+ * values never wrap or ellipsize; only identifiers (marked [data-identifier]) may middle-elide.
+ */
 
 :root {
-  /* Obsidian Signal: dark-first named primitives from c2. Aliases below retain every existing
-     component selector while migrating the visual system without a behavioral rewrite. */
-  --cr-canvas: #05070b;
-  --cr-canvas-raised: #090d14;
-  --cr-surface-1: #0d121b;
-  --cr-surface-2: #131b27;
-  --cr-surface-3: #1a2533;
-  --cr-surface-inset: #070b11;
-  --cr-line-subtle: #1c2837;
-  --cr-line-strong: #2a3a4e;
-  --cr-text-primary: #f3f7fc;
-  --cr-text-secondary: #a9b7c8;
-  --cr-text-tertiary: #718198;
-  --cr-text-disabled: #4d5d72;
-  --cr-accent: #8b7cff;
-  --cr-accent-hover: #a89dff;
-  --cr-accent-ink: #090711;
-  --cr-accent-wash: rgba(139, 124, 255, 0.14);
-  --cr-focus-ring: #c2b9ff;
-  --cr-status-queued: #aab7c6;
-  --cr-status-running: #55b8ff;
-  --cr-status-done: #6ee7b7;
-  --cr-status-failed: #ff7a91;
-  --cr-status-timeout: #ffc15c;
-  --cr-status-retry: #78d6d0;
-  --cr-status-ended: #6b7a8e;
-  --cr-status-unknown: #8596aa;
-  --cr-attention-off-track: #ff8aa1;
-  --cr-attention-stalled: #ffd27d;
-  --cr-attention-neutral: #d1d9e6;
-  --cr-data-model-a: #9a8cff;
-  --cr-data-model-b: #5cc8ff;
-  --cr-data-model-c: #7de0b8;
-  --cr-data-model-d: #ffc875;
-  --cr-overlay: rgba(2, 5, 10, 0.72);
-  --cr-font-sans: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  --cr-font-mono: ui-monospace, "SFMono-Regular", "Cascadia Code", "Roboto Mono", Consolas, monospace;
-  --cr-text-2xs: 0.6875rem;
-  --cr-text-xs: 0.75rem;
-  --cr-text-sm: 0.875rem;
-  --cr-text-base: 1rem;
-  --cr-text-lg: 1.125rem;
-  --cr-text-xl: 1.5rem;
-  --cr-text-2xl: 2rem;
-  --cr-text-3xl: 2.75rem;
-  --cr-weight-regular: 400;
-  --cr-weight-medium: 500;
-  --cr-weight-semibold: 600;
-  --cr-space-1: 0.25rem;
-  --cr-space-2: 0.5rem;
-  --cr-space-3: 0.75rem;
-  --cr-space-4: 1rem;
-  --cr-space-5: 1.25rem;
-  --cr-space-6: 1.5rem;
-  --cr-space-8: 2rem;
-  --cr-space-10: 2.5rem;
-  --cr-radius-sm: 0.5rem;
-  --cr-radius-md: 0.75rem;
-  --cr-radius-lg: 1rem;
-  --cr-radius-xl: 1.5rem;
-  --cr-shadow-1: 0 1px 0 rgba(255, 255, 255, 0.03) inset;
-  --cr-shadow-2: 0 12px 32px rgba(0, 0, 0, 0.22), 0 1px 0 rgba(255, 255, 255, 0.03) inset;
-  --cr-shadow-3: 0 24px 64px rgba(0, 0, 0, 0.46), 0 1px 0 rgba(255, 255, 255, 0.05) inset;
-  --cr-motion-fast: 150ms;
-  --cr-motion-base: 200ms;
-  --cr-motion-slow: 240ms;
-  --cr-ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --bg: #0d1014;
+  --panel: #14181f;
+  --panel-2: #181d26;
+  --line: #262c38;
+  --text: #e7eaf0;
+  --muted: #98a2b3;
+  --dim: #6b7480;
+  --accent: #6ea8fe;
+  --ok: #3fb950;
+  --warn: #d29922;
+  --bad: #f85149;
+  --unknown: #8b949e;
+  --advisory: #c8a24a;
+  --measured: #5fb3a1;
+  --source: #7f9cf5;
+  --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 
-  --bg-0: var(--cr-canvas);
-  --bg-1: var(--cr-surface-1);
-  --bg-2: var(--cr-surface-2);
-  --bg-3: var(--cr-surface-3);
-  --border: var(--cr-line-subtle);
-  --border-strong: var(--cr-line-strong);
-  --text: var(--cr-text-primary);
-  --text-muted: var(--cr-text-secondary);
-  --text-faint: var(--cr-text-tertiary);
-  --accent: var(--cr-accent);
-  --accent-hover: var(--cr-accent-hover);
-  --accent-strong: var(--cr-accent);
-  --accent-ink: var(--cr-accent-ink);
-  --status-queued: var(--cr-status-queued);
-  --status-running: var(--cr-status-running);
-  --status-done: var(--cr-status-done);
-  --status-failed: var(--cr-status-failed);
-  --status-timeout: var(--cr-status-timeout);
-  --status-retry: var(--cr-status-retry);
-  --status-ended: var(--cr-status-ended);
-  --status-unknown: var(--cr-status-unknown);
-  --attention-off-track: var(--cr-attention-off-track);
-  --attention-stalled: var(--cr-attention-stalled);
-  --attention-unknown: var(--cr-attention-neutral);
+  /* Type scale (cm-type): one small scale for dense data; every data value uses tabular
+     numerals so columns of numbers align and scan. Sizes are tokens so a future change is one
+     edit, and the gate's type floor (G-5) is stated once here. */
+  --fs-micro: 9px;      /* SVG micro-labels, composition bucket letters */
+  --fs-label: 11px;     /* field labels, region titles */
+  --fs-value-sm: 12px;  /* data values on mobile (the G-5 floor) */
+  --fs-value: 13px;     /* data values on desktop/narrow */
+  --fs-title: 12px;     /* panel/dock titles */
+  --lh-tight: 1.15;
 
-  /* spacing — 4px base scale, design §8.3 */
-  --sp-1: 4px;
-  --sp-2: 8px;
-  --sp-3: 12px;
-  --sp-4: 16px;
-  --sp-5: 24px;
-  --sp-6: 32px;
+  /* Elevation ladder (cm-elevation): depth is structure, not ornament. */
+  --surface-0: var(--bg);
+  --surface-1: var(--panel);
+  --surface-2: var(--panel-2);
+  --overlay-shadow: 0 16px 48px rgba(0, 0, 0, 0.45);
 
-  /* typography — design §8.4 */
-  --font-ui: var(--cr-font-sans);
-  --font-mono: var(--cr-font-mono);
-  --fs-eyebrow: 11px;
-  --fs-small: 12px;
-  --fs-title: 13px;
-  --fs-base: 14px;
-  --fs-metric: 16px;
-  --fs-hero: 24px;
+  /* Motion (cm-motion): state changes only, short and decelerating. */
+  --motion-state: 160ms;
+  --motion-draw: 220ms;
+  --motion-ease: cubic-bezier(0.2, 0.7, 0.3, 1);
 
-  /* shape */
-  --radius-sm: var(--cr-radius-sm);
-  --radius-md: var(--cr-radius-md);
-  --radius-lg: var(--cr-radius-lg);
+  /* Focus ring (a11y): one visible ring everywhere, never removed without a replacement. */
+  --focus-ring: 2px solid var(--accent);
 
-  /* motion — reserved for transitions, not churn (design §8.5) */
-  --motion-fast: var(--cr-motion-fast);
-  --motion-sheet: var(--cr-motion-base);
-  --ease: var(--cr-ease-standard);
-
-  /* layout constants */
-  --rail-height: 64px;          /* c2 instrument strip */
-  --tabbar-height: 56px;        /* Material 3 NavigationBar height [R §1.4.1] */
-  --nav-rail-width: 84px;       /* desktop icon-first rail */
-  --detail-width: 448px;        /* desktop detail column */
-  --touch-target: 44px;         /* iOS HIG minimum [R §1.4.2] */
-
-  /* stacking: one variable per layer so nothing is ordered by accident */
-  --z-rail: 20;
-  --z-nav: 30;
-  --z-scrim: 40;
-  --z-sheet: 50;
+  /* Geometry tokens — overridden per breakpoint below. */
+  --pad: 16px;
+  --gap: 12px;
+  --r0h: 72px;
+  --r1h: 800px;
+  --r2h: 800px;
+  --r1w: 300px;
+  --r2w: 744px;
+  --r3w: 340px;
+  --r3ah: 220px;
+  --r3bh: 180px;
+  --r3ch: 140px;
 }
 
 [data-theme="light"] {
-  /* Keep the retained light preference real even though refreshed components consume c2 tokens
-     directly rather than only through the legacy aliases below. */
-  --cr-canvas: #f2f5fa;
-  --cr-canvas-raised: #e8edf5;
-  --cr-surface-1: #ffffff;
-  --cr-surface-2: #f8faff;
-  --cr-surface-3: #eef2f8;
-  --cr-surface-inset: #f1f5fa;
-  --cr-line-subtle: #dce4ef;
-  --cr-line-strong: #bdc9da;
-  --cr-text-primary: #101827;
-  --cr-text-secondary: #4b5d73;
-  --cr-text-tertiary: #6f8197;
-  --cr-text-disabled: #9aa8b8;
-  --cr-accent: #6255e8;
-  --cr-accent-hover: #5147c9;
-  --cr-accent-ink: #ffffff;
-  --cr-accent-wash: rgba(98, 85, 232, 0.12);
-  --cr-focus-ring: #5147c9;
-  --cr-status-queued: #61738a;
-  --cr-status-running: #087bbb;
-  --cr-status-done: #087b5a;
-  --cr-status-failed: #d74262;
-  --cr-status-timeout: #ae6800;
-  --cr-status-retry: #087f82;
-  --cr-status-unknown: #718198;
-  --cr-attention-off-track: #d74262;
-  --cr-attention-stalled: #a76000;
-  --cr-attention-neutral: #3c4d61;
-  --cr-overlay: rgba(15, 23, 42, 0.52);
-  --bg-0: #f1f5f9;
-  --bg-1: #ffffff;
-  --bg-2: #f8fafc;
-  --bg-3: #eef2f7;
-  --border: #e2e8f0;
-  --border-strong: #cbd5e1;
-  --text: #0f172a;
-  --text-muted: #475569;
-  --text-faint: #94a3b8;
-  --accent: #4f46e5;
-  --accent-hover: #6366f1;
-  --accent-strong: #4338ca;
-  --accent-ink: #ffffff;
-  /* Keep 11px lifecycle words at the stronger c2 contrast values above. */
-  --status-queued: var(--cr-status-queued);
-  --status-running: var(--cr-status-running);
-  --status-done: var(--cr-status-done);
-  --status-failed: var(--cr-status-failed);
-  --status-timeout: var(--cr-status-timeout);
-  --status-retry: var(--cr-status-retry);
-  --status-ended: var(--cr-status-ended);
-  --status-unknown: var(--cr-status-unknown);
-  --attention-off-track: var(--cr-attention-off-track);
-  --attention-stalled: var(--cr-attention-stalled);
-  --attention-unknown: var(--cr-attention-neutral);
+  --bg: #f4f6f9;
+  --panel: #ffffff;
+  --panel-2: #eef1f5;
+  --line: #d5dae2;
+  --text: #12161c;
+  --muted: #5a6472;
+  --dim: #7a8492;
+  --accent: #1f6feb;
+  --ok: #1a7f37;
+  /* Darkened for the unboxed constraint ledger: the ruled R3 regions now sit on the page
+     background, so warn/unknown must clear 4.5:1 against --bg, not only against a white panel. */
+  --warn: #7a5200;
+  --bad: #cf222e;
+  --unknown: #58606c;
+  --advisory: #7d5a00;
+  --measured: #0f6b5c;
+  --source: #3b4cca;
+  /* A lighter shadow on light surfaces keeps elevation structural, not muddy. */
+  --overlay-shadow: 0 16px 40px rgba(20, 30, 50, 0.18);
 }
 
-/* Tell the UA which form controls/scrollbars to render for the resolved theme. */
-:root { color-scheme: dark; }
-[data-theme="light"] { color-scheme: light; }
+/* Forced-colours: drop custom colours onto system colours so Windows high-contrast is honoured. */
+@media (forced-colors: active) {
+  :root {
+    --bg: Canvas;
+    --panel: Canvas;
+    --panel-2: Canvas;
+    --line: CanvasText;
+    --text: CanvasText;
+    --muted: GrayText;
+    --dim: GrayText;
+    --accent: LinkText;
+    --ok: CanvasText;
+    --warn: CanvasText;
+    --bad: CanvasText;
+    --unknown: GrayText;
+    --advisory: CanvasText;
+    --measured: CanvasText;
+    --source: CanvasText;
+  }
+  /* Charts must survive Windows High Contrast: keep the three series distinguishable by
+     system color and let the status glyphs/labels carry the meaning, never hue alone. */
+  .chart-series-0 { color: LinkText; }
+  .chart-series-1 { color: Highlight; }
+  .chart-series-2 { color: GrayText; }
+  .chart-gauge-fill { background: Highlight; }
+  .chart-card { border-color: CanvasText; }
+  .chart-card[data-focus="1"] { border-color: Highlight; }
+}
 
-/* ── 2. Reset + base ─────────────────────────────────────────────────────────────────────── */
+* { box-sizing: border-box; }
 
-*,
-*::before,
-*::after { box-sizing: border-box; }
+/* One visible focus ring everywhere (a11y bar). A component may strengthen it but never
+   remove it without a replacement, so keyboard operation is always legible. */
+:focus-visible { outline: var(--focus-ring); outline-offset: 1px; }
 
+/* Tabular numerals (cm-type): every data value and table column aligns on the digit grid, so
+   dense numbers scan as columns rather than proportional-text raggedness. */
+.field [data-value],
+.detail-line [data-value],
+.marginal-bucket,
+.chart-table,
+.chart-gauge-value,
+.visual-value,
+.visual-flow-state,
+.scope-sub {
+  font-variant-numeric: tabular-nums;
+}
 
-html,
-body {
+html, body {
   margin: 0;
-  padding: 0;
   height: 100%;
 }
 
 body {
-  background: var(--bg-0);
+  background: var(--bg);
   color: var(--text);
-  font-family: var(--font-ui);
-  font-size: var(--fs-base);
-  line-height: 1.45;
-  /* Tabular numerals everywhere: a 5s poll must never change a counter's width (design §8.4). */
-  font-variant-numeric: tabular-nums;
+  font-family: var(--sans);
+  font-size: 13px;
+  line-height: 1.2;
+  /* The resting screen never scrolls: the page is exactly the viewport. */
+  overflow: hidden;
   -webkit-font-smoothing: antialiased;
-  overscroll-behavior-y: none;
 }
 
-h1, h2, h3, h4 {
-  margin: 0;
-  font-weight: 600;
-  letter-spacing: 0.02em;
-}
-
-h1 { font-size: var(--fs-title); text-transform: uppercase; }
-h2 { font-size: var(--fs-title); text-transform: uppercase; }
-h3 { font-size: var(--fs-small); text-transform: uppercase; color: var(--text-muted); }
-h4 { font-size: var(--fs-small); text-transform: uppercase; color: var(--text-muted); }
-
-p { margin: 0 0 var(--sp-2); }
-
-a { color: var(--accent-hover); }
-
-code, pre, output, time { font-family: var(--font-mono); }
-
-pre {
-  margin: 0;
-  white-space: pre-wrap;
-  word-break: break-word;
-}
-
-/* ── 3. Typography + utility primitives ──────────────────────────────────────────────────── */
-
-.eyebrow {
-  display: block;
-  font-size: var(--fs-eyebrow);
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--text-faint);
-}
-
-.metric-label {
-  font-size: var(--fs-eyebrow);
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--text-muted);
-}
-
-.metric-value {
-  display: block;
-  font-family: var(--font-mono);
-  font-size: var(--fs-metric);
-  color: var(--text);
-}
-
-.cost-value { font-variant-numeric: tabular-nums; }
-
-.provenance,
-.last-update,
-.pane-note,
-.boundary-copy,
-.control-guidance {
-  font-size: var(--fs-small);
-  color: var(--text-muted);
-}
-
-.boundary-copy { color: var(--text-faint); }
-
-.empty-state,
-.terminal-empty {
-  font-size: var(--fs-small);
-  color: var(--text-faint);
-  padding: var(--sp-3);
-}
-
-.error-state {
-  font-size: var(--fs-small);
-  color: var(--status-failed);
-  padding: var(--sp-3);
-}
-
-/* Visible to assistive technology only — used for live regions and icon-button labels. */
 .sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ── The shell and its vertical rhythm ─────────────────────────────────────────────────── */
+
+.glance-shell {
+  width: 100vw;
+  height: 100vh;
+  padding: 0 var(--pad);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* ── R0 · system + trust ───────────────────────────────────────────────────────────────── */
+
+.r0 {
+  flex: 0 0 auto;
+  height: var(--r0h);
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border-bottom: 1px solid var(--line);
+  overflow: hidden;
+}
+
+.r0-scope {
+  flex: 0 0 auto;
+  min-width: 96px;
+  max-width: 148px;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-template-rows: auto auto;
+  column-gap: 5px;
+  align-items: baseline;
+}
+
+/* The terminal prompt glyph is the machine-rail tell: this surface drives CLI agents, not a
+   service fleet. It is decorative (aria-hidden) — the session bands carry the real identity. */
+.machine-prompt {
+  grid-row: 1 / span 2;
+  align-self: center;
+  font-family: var(--mono);
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--ok);
+}
+
+.scope-name {
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.scope-sub {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.r0-actions { flex: 0 0 auto; display: flex; align-items: center; gap: 4px; }
+
+.r0-answers {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+}
+
+.r0-answer {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+
+.answer-kicker {
+  flex: 0 0 auto;
+  width: 54px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
+
+.answer-cells {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  min-width: 0;
+}
+
+/* ── Fields: label + value, exactly one of each (gate §10.2) ───────────────────────────── */
+
+.field {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.field [data-label] {
+  font-size: 11px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.field [data-value] {
+  font-family: var(--mono);
+  font-size: 13px;
+  color: var(--text);
+  white-space: nowrap;
+}
+
+/* Identifiers may middle-elide; required values may not (gate clipping rule). */
+.field [data-value][data-identifier] {
+  display: inline-block;
+  max-width: 22ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.value-state-up { color: var(--ok); }
+.value-state-degraded { color: var(--warn); }
+.value-state-down { color: var(--bad); }
+.value-state-unknown { color: var(--unknown); }
+
+/* ── The body: row (desktop/narrow) or column (mobile) ─────────────────────────────────── */
+
+.glance-body {
+  flex: 1 1 auto;
+  display: flex;
+  gap: var(--gap);
+  margin-top: var(--gap);
+  align-items: flex-start;
+  min-height: 0;
+}
+
+.r1, .r2, .r3 {
+  align-self: flex-start;
+  flex: 0 0 auto;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+}
+
+.r1 { width: var(--r1w); height: var(--r1h); display: flex; flex-direction: column; }
+.r2 { width: var(--r2w); height: var(--r2h); display: flex; flex-direction: column; }
+.r3 { width: var(--r3w); height: auto; display: flex; flex-direction: column; gap: 8px;
+      background: none; border: none; border-radius: 0; overflow: visible; }
+
+/* The constraint ledger is RULED, not boxed: three annotations attached to the roster under a
+   single hairline, so it cannot read as a free-floating KPI rail (direction §4.1 Move 6). */
+.r3a, .r3b, .r3c {
+  flex: 0 0 auto;
+  overflow: hidden;
+  background: none;
+  border: none;
+  border-top: 1px solid var(--line);
+  border-radius: 0;
+}
+/* R3a anchors the money-risk exception to its heading line so the marker never adds a grid
+   row (the §3.2 budget gives the exception the 20px heading, not a third value row). */
+.r3a { position: relative; }
+[data-region="R3a"] { height: var(--r3ah); }
+[data-region="R3b"] { height: var(--r3bh); }
+[data-region="R3c"] { height: var(--r3ch); }
+
+.region-title {
+  flex: 0 0 auto;
+  margin: 0;
+  padding: 8px 8px 2px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Per-answer provenance annotation (IA §2 R3a): source + age travel with the consequential
+   money values inline rather than in a separate region. */
+.region-prov {
+  margin-left: 6px;
+  font-size: 10px;
+  font-weight: 400;
+  letter-spacing: 0;
+  color: var(--muted);
+}
+
+/* ── R1 · attention ────────────────────────────────────────────────────────────────────── */
+
+.attention-list {
+  list-style: none;
+  margin: 0;
+  padding: 2px 8px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* A work-queue entry, not an alert card: a state rail, a kind chip, and the governed next
+   action. Decision/risk/next differ by STRUCTURE (kind word + authority + action) and authority,
+   not by border colour alone (direction §4.1 Move 8). */
+.attention-item {
+  flex: 0 0 auto;
+  height: 56px;
+  padding: 5px 6px;
+  /* Work-queue rows share the roster's ruled grammar (left rail + hairline), not a card box. */
+  border: none;
+  border-left: 3px solid var(--unknown);
+  border-bottom: 1px solid var(--line);
+  border-radius: 0;
+  background: transparent;
+  overflow: hidden;
+}
+
+.attention-item[data-attention-class="decision"] { border-left-color: var(--accent); }
+.attention-item[data-attention-class="risk"] { border-left-color: var(--bad); }
+.attention-item[data-attention-class="next"] { border-left-color: var(--warn); }
+/* The filler is ONE continuous empty state, not a stack of empty cards: borders and surfaces are
+   removed and only the first filler keeps the "queue clear" words. The gate's exact item count is
+   preserved in the DOM; the pixels read as a single ruler-lined block. */
+.attention-item[data-attention-class="empty"] {
+  height: 22px;
+  padding: 0 6px;
+  border: none;
+  border-left: 3px solid var(--line);
+  border-radius: 0;
+  background: none;
+  opacity: 0.6;
+}
+
+/* Work-queue chips (non-field, so the answer field schema is untouched). */
+.queue-authority,
+.queue-action {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 4px;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  font-size: 10px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.queue-action { border-color: var(--accent); color: var(--text); }
+/* Ranked work-queue tokens (identity / state / age). They are plain spans, never `[data-field]`,
+   so a saturated R1 can list real items without touching the reserved answer schemas. */
+.queue-id { color: var(--text); font-family: var(--mono); white-space: nowrap; }
+.queue-state { color: var(--muted); text-transform: uppercase; font-size: 9px; white-space: nowrap; }
+.queue-age { color: var(--muted); white-space: nowrap; }
+
+.item-line {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+  height: 21px;
+  overflow: hidden;
+}
+
+.item-line .field { gap: 3px; }
+.item-line .field [data-label] { font-size: 11px; }
+.item-line .field [data-value] { font-size: 13px; }
+
+.item-kind {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+  /* The work-queue label must never wrap into a second rendered line: the two-line item clamp
+     is load-bearing, and a wrapped label measures as a second line. */
+  white-space: nowrap;
+}
+.queue-empty-note { white-space: nowrap; color: var(--muted); }
+
+/* ── R2 · run ledger ───────────────────────────────────────────────────────────────────── */
+
+.r2-head {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding-right: 8px;
+}
+
+.r2-counts {
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+}
+
+.r2-counts .field [data-value] { font-size: 13px; font-weight: 700; }
+
+.run-list {
+  list-style: none;
+  margin: 0;
+  padding: 0 8px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* The run OBJECT. Not a service row: a left status rail, a monospace session identity band, a
+   coupled evidence/decision footer, and a lease headroom bar attached along the bottom edge
+   (Move 1, Move 4, Move 6). The bottom padding reserves the strip so the 3 declared row-lines
+   still fit the fixed 88px box the gate measures. */
+.run-row {
+  position: relative;
+  flex: 0 0 auto;
+  height: 88px;
+  padding: 6px 8px 10px;
+  /* A roster entry, not a card: a left status rail and a hairline separator only. The density
+     comes from alignment, so removing the box keeps the surface from reading as a card stack
+     (direction §4.4; design adversary A5-D1). */
+  border: none;
+  border-left: 3px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  border-radius: 0;
+  background: transparent;
+  overflow: hidden;
+  cursor: pointer;
+}
+
+.run-row:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.run-row[data-attention="active"] { border-left-color: var(--bad); }
+.run-row[data-live="live"] { border-left-color: var(--ok); }
+
+.row-line {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: baseline;
+  gap: 10px;
+  min-width: 0;
+  height: 24px;
+  overflow: hidden;
+}
+
+.row-line .field { gap: 3px; min-width: 0; overflow: hidden; }
+.row-line .field [data-label] { font-size: 11px; }
+.row-line .field [data-value] { font-size: 13px; }
+
+/* Move 1 — the session identity band leads the row: prompt glyph, agent token, worktree target,
+   current command, provider×model, attempt. Monospace and heavier than the state lines, so a
+   stranger reads "CLI agent session" before reading any label. */
+.session-band { gap: 12px; }
+.session-band .field [data-value] { font-weight: 600; }
+.agent-prompt {
+  flex: 0 0 auto;
+  font-family: var(--mono);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ok);
+}
+
+/* The left status rail's glyph (shape + word, never colour alone). */
+.row-status {
+  flex: 0 0 auto;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--muted);
+}
+.row-status[data-state="live"] { color: var(--ok); }
+.row-status[data-state="failed"] { color: var(--bad); }
+.row-status[data-state="waiting"] { color: var(--accent); }
+
+/* Move 6 — the lease headroom bar attached to the row. Reserved vs hard cap fills the track;
+   state (ok/warn/over) is carried by data-budget-state and the cost field's reserved/cap pair,
+   never by hue alone. An unknown cost is drawn as an explicit dashed "unknown" track, never 0. */
+.row-lease {
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  bottom: 4px;
+  height: 5px;
+  border-radius: 3px;
+  background: var(--line);
+  overflow: hidden;
+}
+.row-lease-fill { display: block; height: 100%; width: 0; background: var(--muted); }
+.row-lease[data-budget-state="ok"] .row-lease-fill { background: var(--ok); }
+.row-lease[data-budget-state="warn"] .row-lease-fill { background: var(--warn); }
+.row-lease[data-budget-state="over"] .row-lease-fill { background: var(--bad); }
+.row-lease[data-budget-state="unknown"] { background: repeating-linear-gradient(
+  90deg, var(--line) 0 6px, transparent 6px 12px); }
+.row-lease[data-budget-state="unknown"] .row-lease-fill { display: none; }
+
+/* Evidence classes are visibly different materials (direction §4.4, Move 4). */
+/* The governed-decision authority marker (recognizability §4.2 #2): a compact chip beside the
+   eligibility token, naming who disposes. Non-field, so the 16-field row schema is untouched. */
+.row-authority {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 4px;
+  /* Accent on the border, body text on the label: the accent alone is below 4.5:1 on the light
+     surface, and the authority word is consequential text, not decoration. */
+  border: 1px solid var(--accent);
+  border-radius: 3px;
+  color: var(--text);
+  font-size: 10px;
+  white-space: nowrap;
+}
+
+/* Settlement state + cost_source chips (Move 6): non-field, so the cost semantics travel on
+   the row without changing the 16-field schema. */
+.budget-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 4px;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  color: var(--muted);
+  font-size: 10px;
+  white-space: nowrap;
+}
+
+.field[data-evidence-class="advisory"] [data-value] { color: var(--advisory); font-style: italic; }
+.field[data-evidence-class="measured"] [data-value] { color: var(--measured); font-weight: 600; }
+.field[data-evidence-class="source"] [data-value] { color: var(--source); }
+
+/* ── R3a · cost ───────────────────────────────────────────────────────────────────────── */
+
+.cost-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  grid-auto-rows: 32px;
+  gap: 4px 9px;
+  padding: 4px 8px 8px;
+}
+
+.cost-grid .field {
+  flex-direction: column;
+  gap: 0;
+  min-width: 0;
+}
+
+.cost-grid .field [data-value] { font-size: 13px; font-weight: 700; }
+
+/* Move 6 — the bounded cap exception's headroom bar. Absolutely anchored so it adds no grid row
+   (the §3.2 budget gives R3a two value rows, not three). */
+.cost-budget {
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  bottom: 6px;
+  height: 5px;
+  border-radius: 3px;
+  background: var(--line);
+  overflow: hidden;
+}
+.cost-budget-fill { display: block; height: 100%; width: 0; background: var(--warn); }
+.cost-budget[data-budget-state="over"] .cost-budget-fill { background: var(--bad); }
+
+.money-risk {
+  position: absolute;
+  top: 7px;
+  right: 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--warn);
+}
+
+/* ── R3b · health detail ───────────────────────────────────────────────────────────────── */
+
+.health-lines {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 2px 8px 8px;
+}
+
+.detail-line {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  height: 21px;
+  overflow: hidden;
+}
+
+.detail-line [data-label] { font-size: 11px; color: var(--muted); white-space: nowrap; }
+.detail-line [data-value] { font-size: 13px; font-family: var(--mono); overflow: hidden;
+                            text-overflow: ellipsis; white-space: nowrap; }
+
+/* ── R3c · composition ─────────────────────────────────────────────────────────────────── */
+
+.composition {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 4px 8px 8px;
+}
+
+.marginal {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  height: 14px;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.marginal-name {
+  flex: 0 0 64px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.marginal-buckets {
+  display: flex;
+  gap: 4px;
+  min-width: 0;
+}
+
+.marginal-bucket {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 2px;
+  min-width: 0;
+  flex: 0 0 auto;
+  font-size: 13px;
+  font-family: var(--mono);
+  white-space: nowrap;
+}
+
+.marginal-bucket .bucket-label { font-size: 10px; color: var(--muted); }
+.marginal-bucket .bucket-value { white-space: nowrap; }
+.marginal-bucket[data-bucket="unknown"] .bucket-value { color: var(--unknown); }
+.marginal-bucket[data-bucket="other"] .bucket-value { color: var(--muted); }
+
+/* ── R4 · selection dock (drill-down) ──────────────────────────────────────────────────── */
+
+.selection-dock {
+  position: fixed;
+  left: var(--pad);
+  right: var(--pad);
+  bottom: 0;
+  height: 320px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-bottom: none;
+  border-radius: 8px 8px 0 0;
+  box-shadow: var(--overlay-shadow);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  z-index: 20;
+}
+
+.selection-dock[hidden] { display: none; }
+
+/* The dock is tall enough to show BOTH the causal ladder and the bounded attempt feed without an
+   inner scroll on desktop/narrow (Move 2 + Move 7 visible in one selected capture). */
+@media (min-width: 760px) {
+  .selection-dock { height: 430px; }
+}
+
+.dock-head {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--line);
+}
+
+.dock-head h2 { margin: 0; font-size: 12px; letter-spacing: 0.06em; }
+
+/* Move 5 — a stable, copyable typed address for the inspected object. */
+.dock-address {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 0 8px;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Move 7 — one bounded attempt feed with follow/pause. The head names the stream, its age and
+   its class mix; the list is capped and scrolls itself inside the dock. */
+.attempt-feed {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  border-top: 1px solid var(--line);
+  padding-top: 6px;
+}
+.feed-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.feed-title {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+}
+.feed-age { font-size: 10px; color: var(--dim); }
+.feed-toggle {
+  margin-left: auto;
+  font-size: 10px;
+  color: var(--accent);
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 1px 6px;
+  cursor: pointer;
+}
+.feed-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.feed-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 88px;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.feed-entry {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.feed-entry .feed-time { color: var(--dim); }
+.feed-entry .feed-class {
+  flex: 0 0 auto;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+.feed-entry[data-evidence-class="advisory"] .feed-class { color: var(--advisory); }
+.feed-entry[data-evidence-class="measured"] .feed-class { color: var(--measured); }
+.feed-entry[data-evidence-class="source"] .feed-class { color: var(--source); }
+.feed-entry .feed-text { overflow: hidden; text-overflow: ellipsis; }
+.feed-paused .feed-list { opacity: 0.55; }
+
+.evidence-ladder {
+  flex: 1 1 auto;
+  overflow: auto;
+  padding: 8px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.ladder-rung {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.ladder-rung .rung-name {
+  flex: 0 0 120px;
+  font-size: 11px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.ladder-rung .rung-value { font-family: var(--mono); font-size: 12px; }
+
+/* ── SVG visuals (a2): the attempt-scoped evidence ladder + the live dependency flow ─────
+   svg-theme: viewBox scaling and CSS custom properties/currentColor for every fill, so one
+   drawing serves dark, light and forced-colors. The blocks keep a fixed pixel budget inside
+   the dock so the resting geometry can never be affected (the dock is hidden at rest). */
+
+.visual-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+}
+
+.visual-block {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+/* Fixed pixel budgets: with a viewBox + a definite height the SVG scales to exactly this box
+   (preserveAspectRatio letterboxes it), so a visual can never grow past its budget. */
+.visual-svg { display: block; width: 100%; }
+.visual-ladder { height: 226px; }
+.visual-flow { height: 96px; }
+
+.visual-spine { stroke: var(--line); stroke-width: 1.5; fill: none; }
+.visual-attempt-rule { stroke: var(--muted); stroke-width: 0.5; stroke-dasharray: 2 3; }
+.visual-phase-rule { stroke: var(--line); stroke-width: 0.5; }
+.visual-scope-label { fill: var(--accent); font-family: var(--sans); font-size: 9px;
+                      text-anchor: end; }
+.visual-time { fill: var(--muted); font-family: var(--mono); font-size: 9px; text-anchor: end; }
+.visual-block-title {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
+
+.visual-node { fill: var(--muted); stroke: var(--muted); stroke-width: 1; }
+.visual-rung[data-evidence-class="advisory"] .visual-node {
+  fill: none; stroke: var(--advisory); stroke-dasharray: 2 2;
+}
+.visual-rung[data-evidence-class="measured"] .visual-node { fill: var(--measured); stroke: var(--measured); }
+.visual-rung[data-evidence-class="source"] .visual-node { fill: var(--source); stroke: var(--source); }
+.visual-rung[data-evidence-class="policy"] .visual-node { fill: none; stroke: var(--text); }
+.visual-rung[data-evidence-class="lifecycle"] .visual-node { fill: var(--accent); stroke: var(--accent); }
+
+/* Real SVG <text> (svg-print): labels and values are selectable, zoomable and printable. */
+.visual-label { fill: var(--muted); font-family: var(--sans); font-size: 10px; }
+.visual-value { fill: var(--text); font-family: var(--mono); font-size: 10px; }
+
+.visual-flow-line { stroke: var(--line); stroke-width: 1.5; fill: none; stroke-dasharray: 6 4; }
+.visual-flow-node { fill: var(--muted); stroke: var(--muted); stroke-width: 1; }
+.visual-flow-state { fill: var(--muted); font-family: var(--sans); font-size: 8px; }
+.visual-flow-label { fill: var(--text); font-family: var(--sans); font-size: 9px;
+                     text-anchor: middle; }
+.visual-flow-state { text-anchor: middle; }
+/* Node state: shape + word carry the meaning; these rules only add the accent. */
+.visual-flow g[data-node-state="ok"] .visual-flow-node { fill: var(--ok); stroke: var(--ok); }
+.visual-flow g[data-node-state="warn"] .visual-flow-node { fill: var(--warn); stroke: var(--warn); }
+.visual-flow g[data-node-state="bad"] .visual-flow-node { fill: var(--bad); stroke: var(--bad); }
+
+.visual-affected { margin: 0; font-size: 10px; color: var(--muted); }
+.visual-action {
+  align-self: flex-start;
+  font-size: 10px;
+  color: var(--accent);
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 2px 6px;
+  cursor: pointer;
+}
+.visual-action:hover { border-color: var(--accent); }
+.visual-action:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+/* The textual equivalent for screen readers (the SVG's real <text> is the visible carrier and
+   the print/zoom equivalent). Visually hidden so the dock stays a diagram, not a duplicate. */
+.visual-fallback {
   position: absolute;
   width: 1px;
   height: 1px;
   margin: -1px;
   padding: 0;
   overflow: hidden;
-  clip: rect(0 0 0 0);
-  clip-path: inset(50%);
+  clip: rect(0, 0, 0, 0);
   white-space: nowrap;
   border: 0;
 }
 
-/* Status vocabulary. Color is never the only signal: each word gets its glyph via ::before
-   and the word itself is always rendered by the data layer (design §2.2). */
-.status-word {
-  font-family: var(--font-mono);
-  font-size: var(--fs-eyebrow);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--status-unknown);
-}
+/* Motion budget (brief §11): state-change only, ~220ms, decelerating. The global
+   prefers-reduced-motion rule collapses it; the state words carry meaning regardless. */
+@keyframes visual-draw { from { stroke-dashoffset: 20; } to { stroke-dashoffset: 0; } }
+.visual-draw .visual-flow-line { animation: visual-draw var(--motion-draw) var(--motion-ease); }
 
-/* The glyph is a real, aria-hidden element emitted by the renderer from the vocabulary in
-   board-fleet.js — not a `::before`. One source for "what a status looks like" means the glyph
-   cannot drift from the word beside it, and a `content:` string that a screen reader may or
-   may not announce never enters the accessibility tree. */
-.status-glyph {
-  display: inline-block;
-  min-width: 1em;
-  margin-right: var(--sp-1);
-  text-align: center;
-}
+.noscript { padding: 16px; color: var(--warn); }
 
-.status-queued { color: var(--status-queued); }      /* glyph: circle,  waiting */
-.status-running { color: var(--status-running); }    /* glyph: quarter, active */
-.status-done { color: var(--status-done); }          /* glyph: check,   succeeded */
-.status-failed { color: var(--status-failed); }      /* glyph: cross,   hard failure */
-.status-timeout { color: var(--status-timeout); }    /* glyph: clock,   ran out of time */
-.status-retry { color: var(--status-retry); }        /* glyph: cycle,   re-enqueued */
-.status-unknown { color: var(--status-unknown); }    /* glyph: query,   unrecognized */
+/* ── The trends lens (drill-down charts; hidden at rest) ────────────────────────────────
+   A fixed overlay so it never re-flows the resting regions, and its own scroll region on
+   mobile so the page itself never scrolls. Budgets (chart-body height) are per breakpoint. */
 
-/* ── 4. Shell layout ─────────────────────────────────────────────────────────────────────── */
-
-/* 100dvh flex shell: rails stay put, only the board region scrolls ([R §2.6], §1.4.4). */
-.app-shell {
-  display: flex;
-  flex-direction: column;
-  min-height: 100dvh;
-  height: 100dvh;
-}
-
-.command-rail {
-  position: sticky;
-  top: 0;
-  z-index: var(--z-rail);
-  display: flex;
-  align-items: center;
-  gap: var(--sp-3);
-  min-height: var(--rail-height);
-  padding: var(--sp-2) var(--sp-3);
-  padding-top: max(var(--sp-2), env(safe-area-inset-top));
-  background: var(--bg-1);
-  border-bottom: 1px solid var(--border);
-}
-
-.rail-identity { min-width: 0; }
-.rail-identity h1 { white-space: nowrap; }
-
-.rail-status-line {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-2);
-  font-size: var(--fs-eyebrow);
-  color: var(--text-muted);
-}
-
-/* Mirrors of the canonical Status-board outputs. They are aria-hidden because the canonical
-   nodes already expose the same values to assistive technology (design §1.3). */
-.rail-mirrors {
-  display: none;
-  gap: var(--sp-4);
-  margin-left: auto;
-}
-
-.rail-mirror {
-  display: flex;
-  flex-direction: column;
-  line-height: 1.2;
-}
-
-.mirror-value {
-  font-family: var(--font-mono);
-  font-size: var(--fs-small);
-  color: var(--text);
-}
-
-.rail-actions {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-1);
-  margin-left: auto;
-}
-
-.rail-mirrors + .rail-actions { margin-left: var(--sp-3); }
-
-/* The scrolling region. `min-height: 0` is required or the flex child refuses to shrink and
-   the sticky rails scroll away with it. */
-.boards {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  background: var(--bg-0);
-  /* Clear the sticky tab bar (and the home indicator) so the last card is reachable. */
-  padding-bottom: calc(var(--tabbar-height) + env(safe-area-inset-bottom) + var(--sp-3));
-}
-
-/* ── 5. Destinations nav ─────────────────────────────────────────────────────────────────── */
-
-/* Mobile: sticky bottom tab bar — five destinations, one-handed, no hamburger (design §1.4). */
-.destinations {
+.chart-lens {
+  --chart-body-h: 96px;
   position: fixed;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  z-index: var(--z-nav);
-  display: flex;
-  justify-content: space-around;
-  align-items: stretch;
-  background: var(--bg-1);
-  border-top: 1px solid var(--border);
-  padding-bottom: env(safe-area-inset-bottom);
-}
-
-.destination {
-  position: relative;
-  flex: 1;
+  left: 50%;
+  top: 84px;
+  transform: translateX(-50%);
+  width: min(1408px, 96vw);
+  height: 540px;
+  z-index: 30;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 2px;
-  min-height: var(--tabbar-height);
-  min-width: var(--touch-target);
-  padding: var(--sp-1);
-  border: 0;
-  background: transparent;
-  color: var(--text-muted);
-  font-family: inherit;
-  font-size: var(--fs-eyebrow);
-  letter-spacing: 0.04em;
-  cursor: pointer;
-}
-
-.destination-glyph { font-size: var(--fs-metric); line-height: 1; }
-
-.destination[aria-current="page"] {
-  color: var(--accent-hover);
-}
-
-/* The active indicator is a shape change, not only a hue change. */
-.destination[aria-current="page"]::after {
-  content: "";
-  position: absolute;
-  top: 0;
-  width: 28px;
-  height: 3px;
-  border-radius: 0 0 var(--radius-sm) var(--radius-sm);
-  background: var(--accent);
-}
-
-/* Attention badge on the Flags destination — suggests, never navigates for you (design §4.2). */
-.destination-badge {
-  position: absolute;
-  top: 6px;
-  right: 50%;
-  transform: translateX(22px);
-  min-width: 18px;
-  padding: 0 5px;
-  border-radius: 9px;
-  background: var(--attention-stalled);
-  color: #1a1205;
-  font-family: var(--font-mono);
-  font-size: 10px;
-  line-height: 18px;
-  text-align: center;
-}
-
-/* System is the overflow: on mobile it is reached from the shell gear, not the tab bar. */
-.destination-system { display: none; }
-
-/* ── 6. Boards ───────────────────────────────────────────────────────────────────────────── */
-
-.board {
-  display: flex;
-  flex-direction: column;
-  gap: var(--sp-3);
-  padding: var(--sp-3);
-}
-
-.board[hidden] { display: none; }
-
-.board-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--sp-2);
-}
-
-.board-header-actions {
-  display: flex;
-  gap: var(--sp-2);
-  flex-wrap: wrap;
-}
-
-.pane-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--sp-2);
-}
-
-/* Mount points for regions shell.js re-parents between boards (see adoptRegions). Empty by
-   design; they collapse when they hold nothing. */
-.region-mount:empty { display: none; }
-
-/* ── 7. Fleet board ──────────────────────────────────────────────────────────────────────── */
-
-/* Stage strip: health-by-stage sits directly above health-by-cell (design §2.1, [R §2.1]). */
-.pipeline-stages {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: var(--sp-2);
-}
-
-.pipeline-stage {
-  display: flex;
-  flex-direction: column;
-  gap: var(--sp-1);
-  padding: var(--sp-2);
-  border: 1px solid var(--border);
-  border-left: 3px solid var(--status-unknown);
-  border-radius: var(--radius-md);
-  background: var(--bg-1);
-}
-
-.pipeline-stage.stage-idle { border-left-color: var(--status-queued); color: var(--status-queued); }
-.pipeline-stage.stage-running { border-left-color: var(--status-running); color: var(--status-running); }
-.pipeline-stage.stage-done { border-left-color: var(--status-done); color: var(--status-done); }
-.pipeline-stage.stage-failed { border-left-color: var(--status-failed); color: var(--status-failed); }
-
-.stage-name {
-  font-size: var(--fs-eyebrow);
-  letter-spacing: 0.12em;
-  color: var(--text-muted);
-}
-
-.stage-counts {
-  font-family: var(--font-mono);
-  font-size: var(--fs-small);
-  color: var(--text);
-}
-
-.stage-total {
-  font-family: var(--font-mono);
-  font-size: var(--fs-eyebrow);
-  color: var(--text-faint);
-}
-
-/* ── 7b. Docs health panel ───────────────────────────────────────────────────────────────────
-
-   The docs-drift rail's surface, sitting beside the pipeline strip. It is a THIRD status axis
-   and is kept structurally distinct from the two board-fleet.js defines: its own `docs-health-`
-   class prefix, and its state carried on a `data-condition` attribute rather than a `status-`
-   class, so there is no way for a docs condition to be looked up in the lifecycle vocabulary.
-
-   HUE CHOICE, deliberately following the attention-axis precedent. The alarm colours come from
-   the ATTENTION family (`--attention-off-track` rose, `--attention-stalled` amber), not the
-   lifecycle family, for the same reason `off_track` is rose and not lifecycle red: a verdict
-   about the documentation must not be misreadable as an execution failure. Green is the one
-   token shared with the lifecycle axis (`--status-done`), because "current" has no confusable
-   second reading — nothing about a green docs panel can be mistaken for a cell having finished.
-
-   Colour is never the only signal: the glyph and the WORD are painted in the markup regardless,
-   and `warranted` and `unmeasured` are told apart by their word, not their (identical) hue. */
-
-.docs-health {
-  display: flex;
-  flex-direction: column;
-  gap: var(--sp-2);
-  padding: var(--sp-2);
-  border: 1px solid var(--border);
-  border-left: 3px solid var(--status-unknown);
-  border-radius: var(--radius-md);
-  background: var(--bg-1);
-}
-
-/* One rule per condition. `unknown` (the pre-fetch initial state) stays neutral: the panel must
-   not paint a verdict before it has one. */
-.docs-health[data-condition="clean"] { border-left-color: var(--status-done); }
-.docs-health[data-condition="findings"] { border-left-color: var(--attention-stalled); }
-.docs-health[data-condition="warranted"] { border-left-color: var(--attention-off-track); }
-.docs-health[data-condition="unmeasured"] { border-left-color: var(--attention-unknown); }
-
-.docs-health[data-condition="clean"] #docs-health-word { color: var(--status-done); }
-.docs-health[data-condition="findings"] #docs-health-word { color: var(--attention-stalled); }
-.docs-health[data-condition="warranted"] #docs-health-word { color: var(--attention-off-track); }
-.docs-health[data-condition="unmeasured"] #docs-health-word { color: var(--attention-unknown); }
-
-.docs-health-header {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: var(--sp-2);
-  flex-wrap: wrap;
-}
-
-.docs-health-header h3 {
-  margin: 0;
-  font-size: var(--fs-small);
-  letter-spacing: 0.08em;
-}
-
-.docs-health-glyph {
-  display: inline-block;
-  min-width: 1em;
-  margin-right: var(--sp-1);
-  text-align: center;
-}
-
-.docs-health-headline {
-  margin: 0;
-  font-family: var(--font-mono);
-  font-size: var(--fs-small);
-  color: var(--text);
-}
-
-/* Per-axis counts as a compact `name  N` grid. Collapses to nothing on a clean scan, where
-   there is no axis with anything to say. */
-.docs-health-axes {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--sp-1) var(--sp-2);
-  margin: 0;
-  font-family: var(--font-mono);
-  font-size: var(--fs-eyebrow);
-}
-
-.docs-health-axes:empty { display: none; }
-.docs-health-axis-name { color: var(--text-muted); }
-.docs-health-axis-count { margin: 0 var(--sp-2) 0 var(--sp-1); color: var(--text); }
-
-.docs-health-inventory {
-  display: flex;
-  flex-direction: column;
-  gap: var(--sp-1);
-}
-
-.docs-health-inventory:empty { display: none; }
-
-/* Findings are collapsed by default: the inventory is evidence to open when a decision is being
-   made, not a wall to scroll past on every glance at the board. */
-.docs-health-finding {
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  padding: var(--sp-1) var(--sp-2);
-  background: var(--bg-0);
-}
-
-.docs-health-finding-summary {
-  cursor: pointer;
-  font-family: var(--font-mono);
-  font-size: var(--fs-eyebrow);
-}
-
-.docs-health-finding-status { margin-right: var(--sp-1); color: var(--attention-stalled); }
-.docs-health-finding-source { color: var(--text-muted); }
-
-.docs-health-finding p {
-  margin: var(--sp-1) 0 0;
-  font-family: var(--font-mono);
-  font-size: var(--fs-eyebrow);
-  color: var(--text-muted);
-  overflow-wrap: anywhere;
-}
-
-.docs-health-finding-basis { color: var(--text-faint); }
-
-.docs-health-proposal {
-  display: flex;
-  flex-direction: column;
-  gap: var(--sp-1);
-  padding-top: var(--sp-2);
-  border-top: 1px solid var(--border);
-}
-
-.docs-health-proposal-detail {
-  margin: 0;
-  font-family: var(--font-mono);
-  font-size: var(--fs-eyebrow);
-  color: var(--text);
-}
-
-.docs-health-approve {
-  display: flex;
-  flex-direction: column;
-  gap: var(--sp-1);
-}
-
-.docs-health-approve label {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  font-size: var(--fs-eyebrow);
-  color: var(--text-muted);
-}
-
-.docs-health-approve-result {
-  margin: 0;
-  font-family: var(--font-mono);
-  font-size: var(--fs-eyebrow);
-  color: var(--text-muted);
-  overflow-wrap: anywhere;
-}
-
-/* Expanded variant: the same strip, adopted by the Status board (design §5.2). */
-.board-status .pipeline-stages { grid-template-columns: minmax(0, 1fr); }
-.board-status .pipeline-stage { padding: var(--sp-3); }
-
-.fleet-controls {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-2);
-  flex-wrap: wrap;
-}
-
-.filter-group {
-  display: flex;
-  gap: var(--sp-1);
-}
-
-.filter-chip {
-  min-height: var(--touch-target);
-  padding: 0 var(--sp-3);
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  background: var(--bg-1);
-  color: var(--text-muted);
-  font-family: inherit;
-  font-size: var(--fs-small);
-  cursor: pointer;
-}
-
-.filter-chip.active {
-  border-color: var(--accent);
-  background: color-mix(in srgb, var(--accent) 18%, var(--bg-1));
-  color: var(--accent-ink);
-}
-
-/* LIVE NOW — the phases board's live dimension (the live board). Rows read like fleet cards
-   (cell id, phase badge, age); the section is a highlight ABOVE the full grid, never a second
-   grid — every row drills into the same detail surface a fleet card does. */
-.live-now {
-  display: flex;
-  flex-direction: column;
-  gap: var(--sp-2);
-  padding: var(--sp-3);
-  border: 1px solid var(--border-strong);
-  border-left: 3px solid var(--status-running);
-  border-radius: var(--radius-md);
-  background: var(--bg-1);
-}
-
-.live-now-header {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: var(--sp-2);
-  flex-wrap: wrap;
-}
-
-.live-now-header h3 {
-  margin: 0;
-  font-size: var(--fs-small);
-  letter-spacing: 0.08em;
-}
-
-.live-now-count { font-variant-numeric: tabular-nums; }
-
-.live-now-list {
-  display: flex;
-  flex-direction: column;
-  gap: var(--sp-1);
-}
-
-.live-now-row {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-2);
-  min-height: var(--touch-target);
-  padding: var(--sp-2);
-  border: 1px solid var(--border);
-  border-left: 3px solid var(--status-running);
-  border-radius: var(--radius-md);
-  background: var(--bg-1);
-  color: var(--text);
-  font-family: var(--font-mono);
-  font-size: var(--fs-small);
-  cursor: pointer;
-  text-align: left;
-}
-
-.live-now-row.selected { border-color: var(--accent); }
-
-.live-now-row .live-age {
-  margin-left: auto;
-  color: var(--text-muted);
-  white-space: nowrap;
-}
-
-.search-label { flex: 1 1 160px; min-width: 0; }
-
-#cell-search {
-  width: 100%;
-  min-height: var(--touch-target);
-  padding: 0 var(--sp-3);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  background: var(--bg-1);
-  color: var(--text);
-  font-family: var(--font-mono);
-  font-size: var(--fs-small);
-}
-
-.density-toggle {
-  min-width: var(--touch-target);
-  min-height: var(--touch-target);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  background: var(--bg-1);
-  color: var(--text-muted);
-  cursor: pointer;
-}
-
-.density-toggle[aria-pressed="true"] {
-  border-color: var(--accent);
-  color: var(--accent-hover);
-}
-
-/* card -> list -> table compaction ([R §1.4.3]): one card per row on a phone, an auto-fill
-   grid as soon as there is width for it. */
-.fleet-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: var(--sp-2);
-}
-
-.cell-card {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  border: 1px solid var(--border);
-  border-left: 3px solid var(--status-unknown);
-  border-radius: var(--radius-md);
-  background: var(--bg-1);
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: var(--overlay-shadow);
   overflow: hidden;
 }
 
-.cell-card.status-queued { border-left-color: var(--status-queued); }
-.cell-card.status-running { border-left-color: var(--status-running); }
-.cell-card.status-done { border-left-color: var(--status-done); }
-.cell-card.status-failed { border-left-color: var(--status-failed); }
-.cell-card.status-timeout { border-left-color: var(--status-timeout); }
-.cell-card.status-retry { border-left-color: var(--status-retry); }
+.chart-lens[hidden] { display: none; }
 
-.cell-card.selected {
-  border-color: var(--accent);
-  box-shadow: inset 0 0 0 1px var(--accent);
-}
-
-/* The whole card is the drill-down target — one tap, no interstitial (design §2.4). */
-.cell-select {
+.lens-head {
+  flex: 0 0 auto;
   display: flex;
-  flex-direction: column;
-  gap: var(--sp-1);
-  width: 100%;
-  min-height: 84px;
-  padding: var(--sp-3);
-  border: 0;
-  background: transparent;
-  color: inherit;
-  font-family: inherit;
-  text-align: left;
-  cursor: pointer;
+  align-items: baseline;
+  gap: 10px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--line);
 }
 
-.cell-select:hover { background: var(--bg-2); }
-
-.cell-heading {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--sp-2);
+.lens-head h2 {
+  margin: 0;
+  font-size: 12px;
+  letter-spacing: 0.07em;
 }
 
-.cell-id {
-  font-family: var(--font-mono);
-  font-size: var(--fs-small);
-  color: var(--text);
-  word-break: break-all;
+.lens-scope {
+  flex: 1 1 auto;
+  font-size: 11px;
+  color: var(--muted);
 }
 
-/* Live workflow phase, e.g. "4/7 rerun_contaminated" (display-only). */
-.phase-badge {
-  align-self: flex-start;
-  padding: 2px var(--sp-2);
-  border: 1px solid var(--border-strong);
-  border-radius: 999px;
-  font-family: var(--font-mono);
-  font-size: 10px;
-  letter-spacing: 0.04em;
-  color: var(--text-muted);
-}
-
-.latest-cost,
-.cost-line {
-  font-family: var(--font-mono);
-  font-size: var(--fs-eyebrow);
-  color: var(--text-muted);
-}
-
-/* SVG presentation properties, not CSS box properties, paint generated telemetry geometry. */
-.cost-line {
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 2;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-
-.sparkline-wrap { line-height: 0; }
-
-.sparkline {
-  width: 100%;
-  height: 22px;
-  color: var(--status-running);
-}
-
-.sparkline-empty {
-  font-size: 10px;
-  color: var(--text-faint);
-}
-
-.token-bar {
-  fill: color-mix(in srgb, var(--status-running) 38%, var(--bg-3));
-}
-
-/* Compact density: the same DOM, less of it visible (design §2.3). */
-.fleet-grid.density-compact .cell-select { min-height: 56px; padding: var(--sp-2); }
-.fleet-grid.density-compact .phase-badge,
-.fleet-grid.density-compact .sparkline-wrap { display: none; }
-
-.skeleton-card {
-  height: 96px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  background: linear-gradient(90deg, var(--bg-1), var(--bg-2), var(--bg-1));
-}
-
-.fleet-counts {
-  font-family: var(--font-mono);
-  font-size: var(--fs-small);
-  color: var(--text-muted);
-  padding-top: var(--sp-1);
-  border-top: 1px solid var(--border);
-}
-
-/* Anchor fallbacks that app.js injects for narrow screens; the Detail sheet supersedes them
-   at >=760px, where they are hidden (design §3.1 removed the anchor-jump chain). */
-.mobile-anchor {
-  display: inline-block;
-  padding: var(--sp-2) var(--sp-3);
-  font-size: var(--fs-small);
-  color: var(--accent-hover);
-}
-
-.card-jump { padding-left: var(--sp-3); }
-
-/* ── 8. Status board ─────────────────────────────────────────────────────────────────────── */
-
-.metric-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: var(--sp-2);
-}
-
-.metric-card {
-  display: flex;
-  flex-direction: column;
-  gap: var(--sp-1);
-  padding: var(--sp-3);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  background: var(--bg-1);
-}
-
-.metric-hero .metric-value { font-size: var(--fs-hero); }
-
-.burn-trace {
-  width: 100%;
-  height: 48px;
-  color: var(--status-running);
-}
-
-.metric-pairs {
+.chart-grid {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--sp-2);
-  margin: 0;
+  gap: 8px;
+  padding: 8px 12px 12px;
 }
 
-.metric-pairs dt {
-  font-size: var(--fs-eyebrow);
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--text-faint);
-}
-
-.metric-pairs dd {
-  margin: 0;
-  font-family: var(--font-mono);
-  font-size: var(--fs-metric);
-}
-
-.bottom-provenance {
-  font-size: var(--fs-eyebrow);
-  letter-spacing: 0.08em;
-  color: var(--text-faint);
-}
-
-.state-badge {
-  padding: 2px var(--sp-2);
-  border-radius: 999px;
-  font-family: var(--font-mono);
-  font-size: 10px;
-  letter-spacing: 0.1em;
-  border: 1px solid var(--border-strong);
-}
-
-.state-live { color: var(--status-done); border-color: var(--status-done); }
-.state-connecting { color: var(--status-queued); }
-.state-reconnecting { color: var(--status-timeout); border-color: var(--status-timeout); }
-.state-offline { color: var(--status-failed); border-color: var(--status-failed); }
-
-/* ── 9. Flags board ──────────────────────────────────────────────────────────────────────── */
-
-/* Named areas keep the delayed-source notice, the attention list, and the flag-only boundary
-   in a fixed reading order regardless of which of them is present (design §4.2). */
-.supervisor-rail {
-  display: grid;
-  grid-template-rows: auto minmax(0, 1fr) auto;
-  grid-template-areas:
-    "delay"
-    "attention"
-    "boundary";
-  gap: var(--sp-2);
-  min-height: 0;
-}
-
-.supervisor-delay {
-  grid-area: delay;
-  padding: var(--sp-2) var(--sp-3);
-  border: 1px solid var(--attention-stalled);
-  border-radius: var(--radius-md);
-  color: var(--attention-stalled);
-  font-size: var(--fs-small);
-}
-
-.supervisor-flag-list {
-  grid-area: attention;
+.chart-card {
   display: flex;
   flex-direction: column;
-  gap: var(--sp-2);
-  min-height: 0;
-  overflow-y: auto;
+  gap: 4px;
+  min-width: 0;
+  padding: 6px 8px;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 6px;
 }
 
-.supervisor-boundary {
-  grid-area: boundary;
-  margin: 0;
-  padding-top: var(--sp-2);
-  border-top: 1px solid var(--border);
-  font-size: var(--fs-small);
-  color: var(--text-muted);
-}
+.chart-card[data-focus="1"] { border-color: var(--accent); }
 
-/* Flags owns the whole board region rather than growing to fit: the list scrolls inside a
-   fixed frame so the count, the provenance line, and the "You decide." boundary stay visible
-   no matter how many flags are open (design §4.1). */
-.board-flags { min-height: 100%; }
-.board-flags .supervisor-rail { flex: 1; min-height: 0; }
+.chart-head { display: flex; align-items: baseline; gap: 8px; }
+.chart-title { margin: 0; font-size: 11px; letter-spacing: 0.06em; color: var(--muted); }
+.chart-question { margin: 0; font-size: 11px; color: var(--text); }
 
-.board-header-meta {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-2);
-}
-
-.attention-count {
-  min-width: 26px;
-  padding: 2px var(--sp-2);
-  border-radius: 999px;
-  background: var(--bg-3);
-  color: var(--attention-stalled);
-  font-family: var(--font-mono);
-  font-size: var(--fs-small);
-  text-align: center;
-}
-
-/* Rows are buttons: selecting one opens the Detail surface in supervisor mode. The board
-   itself never sends a request (design §4.3). */
-.supervisor-flag {
-  display: flex;
-  flex-direction: column;
-  gap: var(--sp-1);
-  width: 100%;
-  padding: var(--sp-3);
-  border: 1px solid var(--border);
-  border-left: 3px solid var(--attention-unknown);
-  border-radius: var(--radius-md);
-  background: var(--bg-1);
-  color: inherit;
-  font-family: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-
-.supervisor-flag.flag-off-track { border-left-color: var(--attention-off-track); }
-.supervisor-flag.flag-stalled { border-left-color: var(--attention-stalled); }
-.supervisor-flag.selected { border-color: var(--accent); }
-
-.supervisor-flag-heading {
-  display: flex;
-  align-items: baseline;
-  gap: var(--sp-2);
-}
-
-.supervisor-flag-title {
-  font-size: var(--fs-base);
-  overflow-wrap: anywhere;
-}
-
-/* Two-line clamp: enough to judge, not enough to push the next flag off screen (design §4.2). */
-.supervisor-flag-reason {
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
+.chart-body {
+  height: var(--chart-body-h);
+  flex: 0 0 auto;
+  min-width: 0;
   overflow: hidden;
-  font-size: var(--fs-small);
-  color: var(--text-muted);
+  color: var(--accent); /* currentColor fallback for the marks in forced-colors */
 }
 
-.supervisor-flag-meta,
-.review-unavailable {
-  font-family: var(--font-mono);
-  font-size: var(--fs-eyebrow);
-  color: var(--text-faint);
-}
+.chart-svg { display: block; width: 100%; height: 100%; overflow: visible; }
 
-.flag-status {
-  font-family: var(--font-mono);
-  font-size: var(--fs-eyebrow);
-  letter-spacing: 0.08em;
-}
+.chart-gridline { stroke: var(--line); stroke-width: 0.5; }
 
-/* Attention axis: same glyph-from-the-renderer rule as the lifecycle axis above. */
-.flag-status-off-track { color: var(--attention-off-track); }   /* glyph: triangle, needs a human */
-.flag-status-stalled { color: var(--attention-stalled); }       /* glyph: square,   idle */
-.flag-status-attention { color: var(--attention-unknown); }     /* glyph: diamond,  unclassified */
+.chart-line { fill: none; stroke: currentColor; stroke-width: 1.4; vector-effect: non-scaling-stroke; }
+.chart-dot { fill: currentColor; }
+.chart-series-0 { color: var(--accent); }
+.chart-series-1 { color: var(--ok); }
+.chart-series-2 { color: var(--warn); }
 
-/* ── 10. Sessions board ──────────────────────────────────────────────────────────────────── */
+.chart-dependency { display: flex; flex-direction: column; gap: 4px; height: 100%; }
+.chart-gauge { display: flex; flex-direction: column; gap: 1px; }
+.chart-gauge-head { display: flex; justify-content: space-between; gap: 6px; }
+.chart-gauge-label { font-size: 10px; color: var(--muted); }
+.chart-gauge-value { font-family: var(--mono); font-size: 11px; color: var(--text); }
+.chart-gauge-track { height: 4px; background: var(--line); border-radius: 2px; overflow: hidden; }
+.chart-gauge-fill { height: 100%; background: var(--accent); }
+.chart-gauge-value[data-unknown] { color: var(--unknown); }
 
-.design-launchers,
-.recent-designs,
-.claude-agents-pane {
+.chart-status-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; }
+.chart-status-cell { display: flex; align-items: baseline; gap: 3px; min-width: 0; }
+.chart-status-glyph { font-size: 10px; }
+.chart-status-word { font-size: 10px; color: var(--text); white-space: nowrap; overflow: hidden;
+                     text-overflow: ellipsis; }
+.chart-status-cell[data-status="up"] .chart-status-glyph { color: var(--ok); }
+.chart-status-cell[data-status="degraded"] .chart-status-glyph { color: var(--warn); }
+.chart-status-cell[data-status="down"] .chart-status-glyph { color: var(--bad); }
+.chart-status-cell[data-status="unknown"] .chart-status-glyph { color: var(--unknown); }
+
+.chart-empty, .chart-error {
+  margin: 0;
+  height: 100%;
   display: flex;
-  flex-direction: column;
-  gap: var(--sp-2);
-  padding: var(--sp-3);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  background: var(--bg-1);
-}
-
-.design-launcher-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-  gap: var(--sp-2);
-}
-
-.recent-design {
-  display: flex;
-  flex-direction: column;
-  gap: var(--sp-1);
-  width: 100%;
-  padding: var(--sp-2) var(--sp-3);
-  margin-bottom: var(--sp-1);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  background: var(--bg-2);
-  color: inherit;
-  font-family: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-
-.recent-design.selected { border-color: var(--accent); }
-.recent-design-title { font-size: var(--fs-small); }
-.recent-design-meta {
-  font-family: var(--font-mono);
-  font-size: var(--fs-eyebrow);
-  color: var(--text-faint);
-}
-
-.claude-agents-header { align-items: center; }
-
-.daemon-panel {
-  display: flex;
-  flex-direction: column;
-  gap: var(--sp-2);
-  padding: var(--sp-3);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  background: var(--bg-2);
-}
-
-.daemon-stop-controls {
-  display: flex;
-  flex-wrap: wrap;
   align-items: center;
-  gap: var(--sp-2);
+  font-size: 11px;
+  color: var(--muted);
 }
+.chart-error { color: var(--warn); }
 
-.claude-agent-grid { margin-top: var(--sp-1); }
-
-.claude-agent-task {
-  font-size: var(--fs-small);
-  color: var(--text);
-  overflow-wrap: anywhere;
-}
-
-.claude-agent-meta {
-  font-family: var(--font-mono);
-  font-size: var(--fs-eyebrow);
-  color: var(--text-faint);
-}
-
-/* Ownership is a read/act distinction, mirroring the server-side gate (design §6.2). */
-.ownership-chip {
-  align-self: flex-start;
-  padding: 1px var(--sp-2);
-  border-radius: 999px;
-  border: 1px solid var(--border-strong);
-  font-family: var(--font-mono);
-  font-size: 10px;
-  letter-spacing: 0.06em;
-}
-
-.ownership-chip.owned { color: var(--accent-hover); border-color: var(--accent); }
-.ownership-chip.external { color: var(--text-faint); }
-
-.claude-agent-external-log {
-  max-height: 200px;
-  overflow: auto;
-  padding: var(--sp-2);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  background: var(--bg-0);
-  font-size: var(--fs-eyebrow);
-}
-
-/* ── 11. Routing board + System sheet ────────────────────────────────────────────────────── */
-
-.routing-drawer {
-  display: flex;
-  flex-direction: column;
-  gap: var(--sp-2);
-  min-height: 0;
-}
-
-.routing-content {
-  min-height: 0;
-  overflow: auto;
-}
-
-.drawer-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--sp-2);
-}
-
-.drawer-toggle {
-  min-height: var(--touch-target);
-  padding: 0 var(--sp-3);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  background: var(--bg-1);
-  color: var(--text-muted);
-  font-family: inherit;
-  font-size: var(--fs-small);
-  cursor: pointer;
-}
-
-/* Dense tables use the same compaction ladder as the fleet: they scroll horizontally on a
-   phone rather than reflowing into unreadable columns ([R §1.4.3]). */
-.table-scroll {
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
-}
-
-.routing-table {
+.chart-table {
   width: 100%;
   border-collapse: collapse;
-  font-family: var(--font-mono);
-  font-size: var(--fs-small);
-}
-
-.routing-table th,
-.routing-table td {
-  padding: var(--sp-2);
-  border-bottom: 1px solid var(--border);
-  text-align: left;
-  white-space: nowrap;
-}
-
-.routing-table th {
-  position: sticky;
-  top: 0;
-  background: var(--bg-1);
-  color: var(--text-muted);
-  font-weight: 500;
-}
-
-.registry-filters {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: var(--sp-2);
-  font-size: var(--fs-small);
-}
-
-.registry-lineage {
-  padding: var(--sp-3);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  background: var(--bg-2);
-}
-
-.system-section {
-  display: flex;
-  flex-direction: column;
-  gap: var(--sp-2);
-  padding: var(--sp-3);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  background: var(--bg-1);
-}
-
-.queue-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--sp-2);
-}
-
-/* ── 12. Detail surface ──────────────────────────────────────────────────────────────────── */
-
-/* Mobile default: a modal bottom sheet over the board, dismissed by the handle, the close
-   button, Escape, or the scrim (design §1.5, [R §2.7]). It is `display: none` when closed so
-   its controls never enter the tab order behind the board. */
-.detail-surface {
-  position: fixed;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  z-index: var(--z-sheet);
-  display: none;
-  flex-direction: column;
-  max-height: 92dvh;
-  padding-bottom: env(safe-area-inset-bottom);
-  border-top: 1px solid var(--border-strong);
-  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
-  background: var(--bg-1);
-  box-shadow: 0 -12px 40px rgba(0, 0, 0, 0.45);
-}
-
-.detail-surface[data-open="true"] {
-  display: flex;
-  animation: sheet-rise var(--motion-sheet) var(--ease);
-  /* The drag gesture writes `transform` directly for 1:1 thumb tracking, so there is no
-     transition on it — an eased transform would lag the finger. */
-  will-change: transform;
-}
-
-.detail-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--sp-2);
-  padding: var(--sp-2) var(--sp-3);
-  border-bottom: 1px solid var(--border);
-}
-
-.transcript-identity { min-width: 0; }
-
-/* Glanceable first: identity, then state, then everything else (design §3.2). */
-#transcript-title {
-  font-family: var(--font-mono);
-  font-size: var(--fs-base);
-  text-transform: none;
-  overflow-wrap: anywhere;
-}
-
-/* Glance line: total reported cost and tokens for the selected cell, directly under the
-   status/phase line so the first screenful answers "what has this cost me?" (design §3.2). */
-.detail-glance {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--sp-3);
-  margin-top: var(--sp-1);
-}
-
-.glance-metric {
-  font-family: var(--font-mono);
-  font-size: var(--fs-small);
-  color: var(--text-muted);
-}
-
-/* Long prose is clamped to three lines and expands on activation. `cursor: pointer` plus the
-   role/tabindex in the markup make it discoverable as a control rather than dead text. */
-.prose-clamp {
-  display: -webkit-box;
-  -webkit-line-clamp: 3;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-  cursor: pointer;
-}
-
-.prose-clamp.expanded {
-  display: block;
-  overflow: visible;
-}
-
-.inline-state {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--sp-2);
-  font-size: var(--fs-eyebrow);
-  color: var(--text-muted);
-}
-
-.detail-body {
-  display: flex;
-  flex-direction: column;
-  gap: var(--sp-3);
-  min-height: 0;
-  overflow-y: auto;
-  padding: var(--sp-3);
-}
-
-.transcript-pane {
-  display: flex;
-  flex-direction: column;
-  gap: var(--sp-2);
-  min-height: 0;
-}
-
-.transcript-controls {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--sp-2);
-}
-
-.transcript-feed {
-  min-height: 240px;
-  max-height: 60dvh;
-  overflow-y: auto;
-  padding: var(--sp-2);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  background: var(--bg-0);
-  font-family: var(--font-mono);
-  font-size: var(--fs-small);
-  line-height: 1.5;
-}
-
-.transcript-row {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  gap: var(--sp-2);
-  padding: var(--sp-1) 0;
-  border-bottom: 1px solid color-mix(in srgb, var(--border) 60%, transparent);
-}
-
-.row-time { color: var(--text-faint); font-size: var(--fs-eyebrow); }
-.row-label {
-  grid-column: 1;
-  color: var(--text-muted);
-  font-size: var(--fs-eyebrow);
-  letter-spacing: 0.06em;
-}
-.row-text { grid-column: 2; overflow-wrap: anywhere; white-space: pre-wrap; }
-.row-meta { grid-column: 2; color: var(--text-faint); font-size: var(--fs-eyebrow); }
-.row-details { grid-column: 2; }
-.row-payload {
-  max-height: 220px;
-  overflow: auto;
-  padding: var(--sp-2);
-  border-radius: var(--radius-sm);
-  background: var(--bg-2);
-  font-size: var(--fs-eyebrow);
-}
-
-/* Transcript row kinds — a left accent only; the label text is always present. */
-.row-think { color: var(--text-muted); }
-.row-agent { color: var(--text); }
-.row-tool .row-label { color: var(--status-retry); }
-.row-operator .row-label { color: var(--accent-hover); }
-.row-step .row-label,
-.row-step-start .row-label { color: var(--status-running); }
-.row-event .row-label { color: var(--text-faint); }
-.row-raw .row-label { color: var(--status-failed); }
-.row-spec .row-label { color: var(--status-done); }
-
-/* Design-session artifacts rendered into the transcript stream. */
-.row-yaml {
-  grid-column: 2;
-  max-height: 260px;
-  overflow: auto;
-  padding: var(--sp-2);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  background: var(--bg-0);
-  font-size: var(--fs-eyebrow);
-  white-space: pre;
-}
-
-.row-validate-pass { color: var(--status-done); }
-.row-validate-error { color: var(--status-failed); }
-
-/* The single most-thumbed control sits in the thumb zone, bottom-right (design §3.3). */
-.jump-live {
-  position: sticky;
-  bottom: var(--sp-2);
-  align-self: flex-end;
-  min-height: var(--touch-target);
-  padding: 0 var(--sp-4);
-  border: 1px solid var(--accent);
-  border-radius: 999px;
-  background: var(--accent);
-  color: var(--accent-ink);
-  font-family: inherit;
-  cursor: pointer;
-}
-
-.detail-controls {
-  display: flex;
-  flex-direction: column;
-  gap: var(--sp-3);
-  padding-top: var(--sp-3);
-  border-top: 1px solid var(--border);
-}
-
-.control-facts {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: var(--sp-2);
-  margin: 0;
-}
-
-.control-facts > div {
-  display: grid;
-  grid-template-columns: 96px minmax(0, 1fr);
-  gap: var(--sp-2);
-  align-items: baseline;
-}
-
-.control-facts dt {
-  font-size: var(--fs-eyebrow);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--text-faint);
-}
-
-.control-facts dd {
-  margin: 0;
-  font-family: var(--font-mono);
-  font-size: var(--fs-small);
-  overflow-wrap: anywhere;
-}
-
-.supervisor-control-panel,
-.design-control-panel,
-.claude-agent-control-panel {
-  display: flex;
-  flex-direction: column;
-  gap: var(--sp-3);
-}
-
-/* The anchor inside a control panel is a mobile-only fallback; the sheet already scrolls to
-   the transcript, so it is hidden once the Detail column exists (>=760px, section 15). */
-.design-control-panel > .mobile-anchor,
-.supervisor-control-panel > .mobile-anchor,
-.claude-agent-control-panel > .mobile-anchor {
-  align-self: flex-start;
-}
-
-.supervisor-stream-actions,
-.design-stream-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--sp-2);
-}
-
-/* ── 13. Components ──────────────────────────────────────────────────────────────────────── */
-
-button {
-  min-height: var(--touch-target);
-  padding: 0 var(--sp-3);
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius-md);
-  background: var(--bg-2);
+  font-family: var(--mono);
+  font-size: 10px;
   color: var(--text);
-  font-family: inherit;
-  font-size: var(--fs-small);
-  cursor: pointer;
 }
-
-button:hover:not(:disabled) { background: var(--bg-3); }
-
-button:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
+.chart-table th, .chart-table td {
+  text-align: left;
+  padding: 1px 4px 1px 0;
+  border-bottom: 1px solid var(--line);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
+.chart-table th { color: var(--muted); font-weight: 600; }
 
-/* Reversible actuation: one explicit press, indigo (design §3.4). */
-.primary-action {
-  border-color: var(--accent);
-  background: var(--accent);
-  color: var(--accent-ink);
-}
+.chart-meta { margin: 0; font-size: 10px; color: var(--muted); line-height: 1.25; }
 
-.primary-action:hover:not(:disabled) { background: var(--accent-hover); }
-
-.secondary-action { background: transparent; }
-
-/* Irreversible actuation: rose, and always paired with a confirmation step — never color
-   alone (design §3.4, [R §2.8]). */
-.danger-action {
-  border-color: var(--attention-off-track);
-  background: transparent;
-  color: var(--attention-off-track);
-}
-
-.danger-action:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--attention-off-track) 16%, transparent);
-}
-
-/* On a phone the sheet is a pushed depth, so the control reads "Back"; on desktop it is a
-   docked column, so it reads as a close glyph. Same button, same handler (design §3.3). */
-.detail-close { display: flex; align-items: center; gap: var(--sp-1); }
-.detail-close .detail-close-glyph { display: none; }
-.detail-close .detail-back-label { font-size: var(--fs-small); }
+/* ── Icon button ───────────────────────────────────────────────────────────────────────── */
 
 .icon-button {
-  min-width: var(--touch-target);
-  padding: 0 var(--sp-2);
-  border-color: transparent;
+  flex: 0 0 auto;
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   background: transparent;
-  color: var(--text-muted);
-  font-size: var(--fs-metric);
+  color: var(--muted);
+  border: 1px solid transparent;
+  border-radius: 4px;
+  cursor: pointer;
 }
 
-.control-form {
-  display: flex;
-  flex-direction: column;
-  gap: var(--sp-2);
-  padding: var(--sp-3);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  background: var(--bg-2);
+.icon-button:hover { color: var(--text); border-color: var(--line); }
+.icon-button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.icon-svg { width: 16px; height: 16px; fill: currentColor; }
+
+/* ── Column gaps and widths are exact; never let flex shrink a fixed column ────────────── */
+
+.r1, .r2, .r3 { flex-shrink: 0; }
+
+/* ── Narrow desktop: 1024x768 ──────────────────────────────────────────────────────────── */
+
+@media (max-width: 1199px) and (min-width: 760px) {
+  :root {
+    --pad: 12px;
+    --gap: 8px;
+    --r0h: 60px;
+    --r1h: 692px;
+    --r2h: 692px;
+    --r1w: 224px;
+    --r2w: 472px;
+    --r3w: 288px;
+    --r3ah: 160px;
+    --r3bh: 132px;
+    --r3ch: 116px;
+  }
+  .attention-item { height: 52px; }
+  .run-row { height: 84px; padding: 5px 8px 9px; }
+  .run-row .row-line { height: 23px; }
+  .run-row .row-lease { bottom: 3px; height: 4px; }
+  .region-title { padding-top: 6px; }
+  /* Narrow trends lens: one step tighter than desktop, still 2 columns. */
+  .chart-lens { --chart-body-h: 88px; height: 520px; width: min(660px, 94vw); }
 }
 
-.compact-form { padding: var(--sp-2); }
+/* ── Mobile: 390x844 — the same seven answers, stacked ─────────────────────────────────── */
 
-.control-form label,
-.registry-filters label {
-  display: flex;
-  flex-direction: column;
-  gap: var(--sp-1);
-  font-size: var(--fs-small);
-  color: var(--text-muted);
-}
-
-.check-label {
-  flex-direction: row;
-  align-items: center;
-  gap: var(--sp-2);
-}
-
-input[type="text"],
-input[type="search"],
-input[type="date"],
-input[type="number"],
-select,
-textarea {
-  width: 100%;
-  min-height: var(--touch-target);
-  padding: var(--sp-2);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  background: var(--bg-1);
-  color: var(--text);
-  font-family: var(--font-mono);
-  font-size: var(--fs-small);
-}
-
-textarea { resize: vertical; }
-
-input[type="checkbox"] {
-  width: auto;
-  min-height: auto;
-  accent-color: var(--accent);
-}
-
-.form-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--sp-2);
-}
-
-.inline-result {
-  display: block;
-  font-family: var(--font-mono);
-  font-size: var(--fs-eyebrow);
-  color: var(--text-muted);
-  overflow-wrap: anywhere;
-}
-
-.supervisor-result { color: var(--attention-off-track); }
-
-/* Mode line: the attachment's read/act state, in a word plus a chip (design §3.4). */
-.readonly-badge,
-.interactive-badge {
-  align-self: flex-start;
-  padding: 2px var(--sp-2);
-  border-radius: 999px;
-  font-family: var(--font-mono);
-  font-size: 10px;
-  letter-spacing: 0.08em;
-  white-space: nowrap;
-}
-
-.readonly-badge {
-  border: 1px solid var(--border-strong);
-  color: var(--text-muted);
-}
-
-.interactive-badge {
-  border: 1px solid var(--accent);
-  background: color-mix(in srgb, var(--accent) 20%, transparent);
-  color: var(--accent-ink);
-}
-
-/* The one-way door: typed confirmation, visually separated from the dismiss path. */
-.interrupt-door {
-  display: flex;
-  flex-direction: column;
-  gap: var(--sp-2);
-  padding: var(--sp-3);
-  border: 1px solid var(--attention-off-track);
-  border-radius: var(--radius-md);
-  background: color-mix(in srgb, var(--attention-off-track) 8%, var(--bg-2));
-  font-size: var(--fs-small);
-}
-
-.validation-panel {
-  display: flex;
-  flex-direction: column;
-  gap: var(--sp-2);
-  padding: var(--sp-3);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  background: var(--bg-2);
-  font-size: var(--fs-small);
-}
-
-.validation-heading {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--sp-2);
-}
-
-.validation-badge {
-  padding: 2px var(--sp-2);
-  border: 1px solid var(--border-strong);
-  border-radius: 999px;
-  font-family: var(--font-mono);
-  font-size: 10px;
-}
-
-.validation-valid { color: var(--status-done); border-color: var(--status-done); }
-.validation-invalid { color: var(--status-failed); border-color: var(--status-failed); }
-
-#validation-errors {
-  margin: 0;
-  padding-left: var(--sp-4);
-  color: var(--status-failed);
-}
-
-#matrix-preview summary { cursor: pointer; }
-#matrix-cells {
-  max-height: 200px;
-  overflow: auto;
-  font-size: var(--fs-eyebrow);
-}
-
-.selected-label {
-  font-family: var(--font-mono);
-  font-size: var(--fs-eyebrow);
-  color: var(--accent-hover);
-}
-
-.count {
-  font-family: var(--font-mono);
-  color: var(--text-muted);
-}
-
-/* ── 14. Sheets, scrim, drag handle ──────────────────────────────────────────────────────── */
-
-.scrim {
-  position: fixed;
-  inset: 0;
-  z-index: var(--z-scrim);
-  background: rgba(2, 4, 8, 0.6);
-}
-
-.scrim[hidden] { display: none; }
-
-/* The drag handle is a real button (keyboard-reachable), drawn as the familiar grabber pill.
-   Its hit area is a full touch target even though the pill itself is 4px tall. */
-.sheet-handle {
-  position: relative;
-  display: block;
-  width: 100%;
-  min-height: var(--touch-target);
-  padding: 0;
-  border: 0;
-  background: transparent;
-  cursor: grab;
-  touch-action: none;
-}
-
-.sheet-handle::after {
-  content: "";
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  width: 36px;
-  height: 4px;
-  transform: translate(-50%, -50%);
-  border-radius: 2px;
-  background: var(--border-strong);
-}
-
-.sheet-handle:active { cursor: grabbing; }
-
-.system-sheet {
-  position: fixed;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  z-index: var(--z-sheet);
-  display: flex;
-  flex-direction: column;
-  max-height: 88dvh;
-  padding-bottom: env(safe-area-inset-bottom);
-  border-top: 1px solid var(--border-strong);
-  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
-  background: var(--bg-1);
-  animation: sheet-rise var(--motion-sheet) var(--ease);
-}
-
-.system-sheet[hidden] { display: none; }
-
-.sheet-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--sp-2);
-  padding: var(--sp-2) var(--sp-3);
-  border-bottom: 1px solid var(--border);
-}
-
-.sheet-body {
-  display: flex;
-  flex-direction: column;
-  gap: var(--sp-3);
-  min-height: 0;
-  overflow-y: auto;
-  padding: var(--sp-3);
-}
-
-@keyframes sheet-rise {
-  from { transform: translateY(12%); opacity: 0; }
-  to { transform: translateY(0); opacity: 1; }
-}
-
-/* ── 15. Responsive escalation ───────────────────────────────────────────────────────────── */
-
-/* Mobile-only rules: everything here must NOT survive to the desktop layout. The transcript
-   is the sheet's body on a phone, so it gets a real minimum height there and only there. */
 @media (max-width: 759px) {
-  .transcript-feed {
-    min-height: 55vh;
+  :root {
+    --pad: 12px;
+    --gap: 8px;
+    --r0h: 72px;
+    --r1h: 144px;
+    --r2h: 284px;
+    --r1w: 100%;
+    --r2w: 100%;
+    --r3w: 100%;
+    --r3ah: 92px;
+    --r3bh: 68px;
+    --r3ch: 60px;
   }
 
-  /* Thumb zone (design §3.3, [R §1.4.2]): on a phone the transcript controls move BELOW the
-     stream and stick to the bottom of the sheet, because `follow` is the single most-thumbed
-     control and the top of a sheet is the hardest place to reach one-handed. The DOM order
-     stays reading-order correct (controls describe the stream that follows them); only the
-     visual order changes, via flex `order`. */
-  .transcript-pane > .transcript-feed { order: 1; }
-  .transcript-pane > .jump-live { order: 2; }
-  .transcript-pane > .transcript-controls {
-    order: 3;
-    position: sticky;
-    bottom: 0;
-    padding: var(--sp-2) 0;
-    background: var(--bg-1);
-    border-top: 1px solid var(--border);
-  }
-  .transcript-pane > .pane-note { order: 4; }
-
-  /* On a phone the sheet owns the screen; the board behind it must not scroll under a drag. */
-  body.sheet-open { overflow: hidden; }
-}
-
-/* Desktop: left nav rail + board column + detail column (design §1.4 diagram). */
-@media (min-width: 760px) {
-  .app-shell {
-    display: grid;
-    grid-template-columns: var(--nav-rail-width) minmax(0, 1fr);
-    grid-template-rows: auto minmax(0, 1fr);
-    grid-template-areas:
-      "rail rail"
-      "nav  boards";
-  }
-
-  .command-rail { grid-area: rail; }
-  .destinations { grid-area: nav; }
-  .boards { grid-area: boards; }
-
-  .rail-mirrors { display: flex; }
-
-  /* The nav becomes a sticky left rail; the same buttons, stacked. */
-  .destinations {
-    /* Drop the phone's bottom-docked offsets before switching to a sticky column: a sticky
-       box honors every offset it is given, and a leftover `bottom: 0` fights the top offset. */
-    position: sticky;
-    top: var(--rail-height);
-    left: auto;
-    right: auto;
-    bottom: auto;
-    align-self: start;
-    height: calc(100dvh - var(--rail-height));
+  .glance-body {
     flex-direction: column;
-    justify-content: flex-start;
-    gap: var(--sp-1);
-    padding: var(--sp-2) var(--sp-1);
-    border-top: 0;
-    border-right: 1px solid var(--border);
+    flex: 1 1 auto;
   }
 
-  .destination {
-    flex: 0 0 auto;
-    min-height: 56px;
-    border-radius: var(--radius-md);
-  }
+  .r1, .r2, .r3 { width: 100%; }
 
-  .destination[aria-current="page"] {
-    background: color-mix(in srgb, var(--accent) 16%, transparent);
-  }
+  /* R1 mobile budget: 8 pad + 18 title + 4 gap + 3x38 rows = 144. */
+  .r1 { height: 144px; }
+  .r1 .region-title { padding: 4px 8px 0; height: 18px; }
+  .attention-list { padding: 0 8px 4px; gap: 2px; }
+  .attention-item { height: 38px; padding: 2px 5px; }
+  .item-line { height: 15px; }
+  .item-line .field [data-value] { font-size: 12px; }
 
-  .destination[aria-current="page"]::after {
-    top: 50%;
+  /* R2 mobile budget: 4 pad + 32 counts + 4 gap + 3x80 rows = 284 (title hidden). */
+  .r2 { height: 284px; }
+  .r2 .region-title { display: none; }
+  .r2-head { height: 32px; padding: 4px 8px 0; }
+  .run-list { gap: 0; padding: 4px 8px 4px; }
+  .run-row { height: 80px; padding: 3px 6px 8px; }
+  .row-line { height: 23px; gap: 8px; }
+  .row-line .field [data-value] { font-size: 13px; }
+  .run-lease { left: 6px; right: 6px; bottom: 3px; height: 4px; }
+  /* Mobile is triage: the row shows VALUES (a terminal-style band) and keeps the field labels
+     in the accessibility tree, because six labelled fields cannot share one 350px line. */
+  .row-line .field [data-label] {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+  }
+  .answer-kicker { padding-right: 0; }
+
+  /* R3a mobile budget: 8 pad + 20 heading/exception + 2x32 value rows = 92. */
+  .r3a .region-title { height: 20px; padding: 4px 8px 0; }
+  .cost-grid { grid-template-columns: repeat(3, 1fr); grid-auto-rows: 32px; gap: 0 10px;
+               padding: 0 8px 4px; }
+  .cost-grid .field { flex-direction: row; align-items: baseline; gap: 4px; }
+
+  /* R3b mobile budget: 8 pad + 18 heading + 2x21 rows = 68. */
+  .r3b .region-title { height: 18px; padding: 4px 8px 0; }
+  .health-lines { padding: 0 8px 4px; }
+  .detail-line [data-value] { font-size: 12px; }
+
+  /* R3c mobile budget: 8 pad + 4x13 marginals = 60 (no separate heading).
+     The 1px top+bottom border eats 2px inside border-box, so the inner padding is 3px. */
+  .r3c .region-title { display: none; }
+  .composition { padding: 3px 8px; gap: 0; }
+  .marginal { height: 13px; }
+  .marginal-bucket { font-size: 12px; }
+
+  .selection-dock {
     left: 0;
-    width: 3px;
-    height: 24px;
-    transform: translateY(-50%);
-    border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
-  }
-
-  .destination-badge { transform: translateX(20px); }
-
-  /* System sits at the bottom of the rail on desktop (design §1.4); the shell gear is the
-     mobile-only equivalent. */
-  .destination-system { display: flex; margin-top: auto; }
-  .system-gear { display: none; }
-
-  .boards { padding-bottom: var(--sp-4); }
-  .board { padding: var(--sp-4); }
-
-  .fleet-grid { grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); }
-  .fleet-grid.density-compact { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
-  .cell-select { min-height: 132px; }
-  .fleet-grid.density-compact .cell-select { min-height: 84px; }
-
-  .metric-grid { grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
-  .metric-hero { grid-column: span 2; }
-  .registry-filters { grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); align-items: end; }
-  .board-status .pipeline-stages { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-
-  /* Detail becomes a docked right column instead of a modal sheet (design §1.5). */
-  .detail-surface {
-    position: static;
-    grid-area: detail;
-    max-height: none;
-    min-height: 0;
-    border-top: 0;
-    border-left: 1px solid var(--border);
+    right: 0;
+    top: 0;
+    height: 100vh;
     border-radius: 0;
-    box-shadow: none;
-    animation: none;
+    border: none;
   }
 
-  .detail-surface[data-open="true"] { animation: none; }
+  /* R0 mobile forcing grid: 70px scope column + 4px gap + 276px answer grid. The four
+     ON-G1 fields wrap two-per-row and the seven ON-G6 fields four-then-three, so the whole
+     bar is four 14px micro-rows inside 72px. Compact visible labels keep it honest. */
+  .r0 { gap: 4px; }
+  /* Mobile R0: lift the action buttons out of the flex row and park them under the scope text,
+     so the wrapping ON-G1/ON-G6 cells keep the full remaining width (the 72px budget). */
+  .r0 { position: relative; }
+  .r0-actions { position: absolute; left: 12px; bottom: 3px; z-index: 2; }
+  .r0-actions .icon-button { width: 22px; height: 22px; }
+  .r0-scope { min-width: 66px; max-width: 70px; align-self: stretch; padding-top: 3px; }
+  .answer-kicker { width: auto; min-width: 30px; font-size: 9px; margin-right: 6px; }
 
-  /* When a node is selected, the shell grows a third column for it. */
-  .app-shell:has(.detail-surface[data-open="true"]) {
-    grid-template-columns: var(--nav-rail-width) minmax(0, 1fr) var(--detail-width);
-    grid-template-areas:
-      "rail rail   rail"
-      "nav  boards detail";
+  /* Mobile trends lens: a full-height inspector with a single-column chart list; it scrolls
+     itself, so the resting page still never scrolls. */
+  .chart-lens {
+    --chart-body-h: 72px;
+    left: 0;
+    right: 0;
+    top: 0;
+    transform: none;
+    width: 100vw;
+    height: 100vh;
+    border-radius: 0;
+    border: none;
   }
+  .chart-grid { grid-template-columns: minmax(0, 1fr); }
 
-  .sheet-handle { display: none; }
-  .detail-close .detail-close-glyph { display: inline; }
-  .detail-close .detail-back-label { display: none; }
-  .mobile-anchor { display: none; }
-  .transcript-feed { max-height: none; flex: 1; }
+  /* Mobile inspector: the ladder and the flow stack, each keeping its own budget. */
+  .visual-grid { grid-template-columns: minmax(0, 1fr); }
+  .r0-answers { gap: 0; }
+  .r0-answer { gap: 4px; }
+  .answer-cells { gap: 0 6px; }
+  .answer-cells .field { gap: 3px; }
+  /* 12px values on mobile keep the four micro-rows inside the 72px bar (G-5 floor is 12px). */
+  .answer-cells .field [data-value] { font-size: 12px; }
+}
 
-  /* System stays a sheet in structure but reads as a centered panel on a large screen. */
-  .system-sheet {
-    left: 50%;
-    top: 50%;
-    right: auto;
-    bottom: auto;
-    width: min(720px, 92vw);
-    max-height: 80dvh;
-    transform: translate(-50%, -50%);
-    border: 1px solid var(--border-strong);
-    border-radius: var(--radius-lg);
+/* ── Motion: state transitions only, and collapse under reduced-motion ─────────────────── */
+
+@media (prefers-reduced-motion: no-preference) {
+  .run-row, .attention-item {
+    transition: border-color var(--motion-state) var(--motion-ease),
+                background-color var(--motion-state) var(--motion-ease);
   }
 }
-
-/* Wide desktop: more fleet columns, wider detail column. */
-@media (min-width: 1200px) {
-  :root { --detail-width: 460px; }
-  .fleet-grid { grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); }
-}
-
-/* Hard compaction for the smallest phones: single-column everything, actions stack full
-   width so nothing overflows the viewport. */
-@media (max-width: 420px) {
-  .board { padding: var(--sp-2); }
-
-  .rail-identity h1 { font-size: var(--fs-small); }
-
-  .design-launcher-grid,
-  .metric-pairs,
-  .pipeline-stages {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .design-stream-actions,
-  .supervisor-stream-actions,
-  .queue-actions,
-  .form-actions {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr);
-    gap: var(--sp-2);
-  }
-
-  .control-facts > div { grid-template-columns: minmax(0, 1fr); }
-
-  .row-yaml,
-  .row-payload { max-height: 180px; }
-}
-
-/* ── 16. Motion, focus, reduced motion ───────────────────────────────────────────────────── */
-
-/* One accent, one focus treatment, everywhere — interactivity is never confused with a
-   status hue (design §8.2). */
-:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
-  border-radius: var(--radius-sm);
-}
-
-/* Motion marks a state transition, not continuous churn: only a running cell pulses, and it
-   pulses on its border, so text never moves (design §8.5, [R §2.9]). */
-@keyframes running-pulse {
-  0%, 100% { border-left-color: var(--status-running); }
-  50% { border-left-color: color-mix(in srgb, var(--status-running) 45%, transparent); }
-}
-
-.cell-card.status-running { animation: running-pulse 2s ease-in-out infinite; }
 
 @media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
+  *, *::before, *::after {
     animation-duration: 0.001ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.001ms !important;
-    scroll-behavior: auto !important;
   }
 }
 
-/* ── 17. Hidden-state guarantee ──────────────────────────────────────────────────────────── */
+/* ═══════════════════════════════════════════════════════════════════════════════════════════
+   PARITY LAYER (UX-repair wave, u4): the restored R4 sub-regions and the workbench lenses.
 
-/* The UA's `[hidden] { display: none }` lives in the user-agent origin, so ANY author rule that
-   gives an element a `display` value silently defeats it — and most components the data layer
-   hides by toggling `.hidden` (the control panels, the drawers, the on-demand forms, the
-   per-card badges) are flex or grid containers here. Restoring the attribute once, globally,
-   beats remembering `:not([hidden])` at a dozen call sites.
+   The resting screen is unchanged: the workbench is `hidden` until opened and R4 only renders
+   on selection. Everything below governs the SELECTED state or a deliberate lens, so none of it
+   can move a resting region or alter the §3.2 budget the render gate asserts.
+   ═══════════════════════════════════════════════════════════════════════════════════════════ */
 
-   Deliberately the LAST rule in the file: it then wins on source order as well as on
-   importance, so it holds even in a CSS engine with an incomplete `!important` cascade. */
-[hidden] { display: none !important; }
+/* The dock grows to give the four sub-regions room; it stays `position:fixed`, so it can never
+   change the page's scroll height. */
+.selection-dock { height: min(74vh, 620px); }
+@media (min-width: 760px) { .selection-dock { height: min(70vh, 580px); } }
 
-/* ── 18. Obsidian Signal refresh ───────────────────────────────────────────────────────────
-   These overrides intentionally preserve the established DOM and state classes. The application
-   can therefore gain the c2 hierarchy without replacing keyed rows, EventSources, or form IDs. */
-
-body {
-  background:
-    radial-gradient(circle at 78% -12%, rgba(139, 124, 255, 0.12), transparent 34rem),
-    var(--cr-canvas);
-  font-size: var(--fs-base);
+.dock-region { min-height: 0; border-top: 1px solid var(--line); }
+.dock-region-head { display: flex; align-items: center; gap: 8px; padding: 4px 12px 0; }
+.dock-region-title {
+  margin: 0; font-size: 10px; font-weight: 700; letter-spacing: 0.06em; color: var(--muted);
 }
-
-h1, h2, h3, h4 {
-  font-weight: 600;
-  letter-spacing: -0.02em;
+.dock-worker-target {
+  flex: 1 1 auto; min-width: 0; font-family: var(--mono); font-size: 10px; color: var(--dim);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
+.dock-worker-target[data-stream-state="live"] { color: var(--ok); }
+.dock-worker-target[data-stream-state="unavailable"] { color: var(--warn); }
 
-h1, h2 {
-  text-transform: none;
+/* R4a — identity/scope facts, a compact wrapped band. */
+[data-dock-region="address"] {
+  flex: 0 0 auto; display: flex; flex-wrap: wrap; gap: 2px 12px;
+  padding: 6px 12px; max-height: 72px; overflow: auto;
 }
+.dock-fact { display: inline-flex; gap: 4px; font-size: 10px; }
+.dock-fact-key { color: var(--dim); text-transform: uppercase; letter-spacing: 0.03em; }
+.dock-fact-value { font-family: var(--mono); color: var(--text); }
 
-h3, h4 {
-  letter-spacing: 0.06em;
+/* R4b — the one live worker stream + the governed action band. */
+[data-dock-region="worker"] { flex: 0 0 auto; display: flex; flex-direction: column; max-height: 200px; }
+[data-dock-region="worker"] .feed-list { max-height: 104px; padding: 0 12px; }
+.dock-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; padding: 4px 12px 6px; }
+
+/* R4c — the causal ladder keeps its own scroll; the wrapper scrolls with it. */
+[data-dock-region="evidence"] { flex: 1 1 auto; min-height: 0; overflow: auto; }
+[data-dock-region="evidence"] .evidence-ladder { overflow: visible; }
+
+/* R4d — per-attempt step timings. */
+[data-dock-region="timing"] { flex: 0 0 auto; padding: 4px 12px 8px; max-height: 150px; overflow: auto; }
+.timing-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 1px 14px; }
+.timing-row { display: flex; justify-content: space-between; gap: 8px; font-family: var(--mono); font-size: 10px; }
+.timing-label { color: var(--dim); }
+.timing-value { color: var(--text); }
+.timing-row[data-state="unknown"] .timing-value { color: var(--unknown); }
+
+/* Governed action chips + their receipts (R4b and every workbench action). */
+.wb-action,
+.danger-action,
+.secondary-action {
+  font: inherit;
+  font-size: 10px;
+  color: var(--accent);
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 2px 7px;
+  cursor: pointer;
 }
-
-.eyebrow,
-.metric-label {
-  letter-spacing: 0.1em;
+.wb-action:hover { border-color: var(--accent); }
+.wb-action:focus-visible,
+.danger-action:focus-visible,
+.secondary-action:focus-visible { outline: var(--focus-ring); outline-offset: 1px; }
+.wb-action[disabled] { opacity: 0.5; cursor: default; }
+.wb-action[data-action-reversible="false"] { border-color: var(--warn); color: var(--warn); }
+.action-eligibility {
+  font-size: 10px; color: var(--muted); border: 1px dashed var(--line);
+  border-radius: 4px; padding: 2px 7px; text-transform: none;
 }
+.action-flag-reason { font-size: 10px; color: var(--advisory); align-self: center; }
+.action-receipt { font-size: 9px; color: var(--muted); align-self: center; }
+.action-receipt[data-action-receipt="failed"] { color: var(--bad); }
 
-.icon-svg {
-  display: block;
-  width: 1.15em;
-  height: 1.15em;
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 1.8;
-  stroke-linecap: round;
-  stroke-linejoin: round;
+/* ── The workbench (full-screen deliberate drill-down; hidden at rest) ─────────────────────── */
+.workbench {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
 }
-
-.command-rail {
-  gap: var(--cr-space-4);
-  min-height: var(--rail-height);
-  padding: var(--cr-space-3) var(--cr-space-5);
-  /* The shorthand above would otherwise erase the base safe-area inset on notched devices. */
-  padding-top: max(var(--cr-space-3), env(safe-area-inset-top));
-  background: color-mix(in srgb, var(--cr-surface-1) 88%, transparent);
-  border-bottom-color: color-mix(in srgb, var(--cr-line-strong) 66%, transparent);
-  box-shadow: var(--cr-shadow-1);
-  backdrop-filter: blur(18px);
-}
-
-.rail-identity h1 {
-  font-size: var(--cr-text-lg);
-  letter-spacing: -0.03em;
-}
-
-.rail-status-line {
-  gap: var(--cr-space-3);
-}
-
-.state-badge {
-  display: inline-flex;
+.workbench[hidden] { display: none; }
+.wb-head {
+  flex: 0 0 auto;
+  display: flex;
   align-items: center;
-  gap: var(--cr-space-2);
-  min-height: 1.75rem;
-  padding: 0 var(--cr-space-2);
-  border-radius: 999px;
-  background: var(--cr-surface-inset);
-  font-weight: 600;
-}
-
-/* The dot reports existing browser connection state; it never pretends to observe SSE comments. */
-.state-badge::before {
-  content: "";
-  width: 0.4rem;
-  height: 0.4rem;
-  border-radius: 50%;
-  background: currentColor;
-}
-
-.state-live {
-  color: var(--status-running);
-  border-color: color-mix(in srgb, var(--status-running) 50%, transparent);
-}
-
-.state-live::before {
-  animation: cr-live-breathe 1.8s ease-in-out infinite;
-}
-
-.state-connecting {
-  color: var(--accent-hover);
-  border-color: color-mix(in srgb, var(--accent) 50%, transparent);
-}
-
-.state-reconnecting {
-  color: var(--status-timeout);
-  border-color: color-mix(in srgb, var(--status-timeout) 58%, transparent);
-}
-
-.state-offline {
-  color: var(--status-failed);
-  border-color: color-mix(in srgb, var(--status-failed) 62%, transparent);
-}
-
-.rail-mirrors {
-  gap: var(--cr-space-6);
-}
-
-.rail-mirror {
-  position: relative;
-  padding-left: var(--cr-space-3);
-}
-
-.rail-mirror::before {
-  position: absolute;
-  top: 0.2rem;
-  bottom: 0.2rem;
-  left: 0;
-  width: 1px;
-  background: var(--cr-line-subtle);
-  content: "";
-}
-
-.mirror-value {
-  color: var(--cr-text-primary);
-}
-
-.icon-button {
-  border-radius: var(--cr-radius-sm);
-  transition: color var(--cr-motion-fast) var(--cr-ease-standard),
-    background var(--cr-motion-fast) var(--cr-ease-standard);
-}
-
-.icon-button:hover:not(:disabled) {
-  background: var(--cr-surface-3);
-  color: var(--cr-accent-hover);
-}
-
-.boards {
-  background: transparent;
-}
-
-.board {
-  width: min(100%, 100rem);
-  margin: 0 auto;
-  gap: var(--cr-space-6);
-  padding: var(--cr-space-6);
-}
-
-.board-header {
-  padding-bottom: var(--cr-space-3);
-  border-bottom: 1px solid var(--cr-line-subtle);
-}
-
-.board-header h2 {
-  margin-top: var(--cr-space-1);
-  font-size: var(--cr-text-xl);
-}
-
-.last-update,
-.bottom-provenance {
-  padding: var(--cr-space-1) var(--cr-space-2);
-  border: 1px solid var(--cr-line-subtle);
-  border-radius: 999px;
-  background: var(--cr-surface-inset);
-}
-
-.destinations {
-  background: color-mix(in srgb, var(--cr-surface-1) 92%, transparent);
-  border-color: var(--cr-line-strong);
-  backdrop-filter: blur(18px);
-}
-
-.destination {
-  gap: var(--cr-space-1);
-  color: var(--cr-text-tertiary);
-  transition: color var(--cr-motion-fast) var(--cr-ease-standard),
-    background var(--cr-motion-fast) var(--cr-ease-standard);
-}
-
-.destination-glyph {
-  display: grid;
-  width: 1.25rem;
-  height: 1.25rem;
-  place-items: center;
-}
-
-.destination[aria-current="page"] {
-  color: var(--cr-accent-hover);
-}
-
-.destination[aria-current="page"]::after {
-  background: var(--cr-accent);
-  box-shadow: 0 0 14px rgba(139, 124, 255, 0.55);
-}
-
-.destination-badge {
-  border: 1px solid color-mix(in srgb, var(--attention-stalled) 66%, transparent);
-  background: var(--cr-surface-2);
-  color: var(--attention-stalled);
-  box-shadow: var(--cr-shadow-1);
-}
-
-.pipeline-stages {
-  gap: var(--cr-space-3);
-}
-
-.pipeline-stage {
-  position: relative;
-  min-height: 5.25rem;
-  padding: var(--cr-space-4);
-  border-color: var(--cr-line-subtle);
-  border-left-width: 2px;
-  background: linear-gradient(145deg, var(--cr-surface-2), var(--cr-surface-1));
-  box-shadow: var(--cr-shadow-1);
-}
-
-.pipeline-stage::after {
-  position: absolute;
-  top: var(--cr-space-3);
-  right: var(--cr-space-3);
-  width: 0.4rem;
-  height: 0.4rem;
-  border-radius: 50%;
-  background: currentColor;
-  content: "";
-  opacity: 0.75;
-}
-
-.pipeline-stage.stage-running::after {
-  animation: cr-live-breathe 1.8s ease-in-out infinite;
-}
-
-.stage-total {
-  color: var(--cr-text-secondary);
-}
-
-.fleet-controls {
-  gap: var(--cr-space-3);
-  padding: var(--cr-space-3);
-  border: 1px solid var(--cr-line-subtle);
-  border-radius: var(--cr-radius-lg);
-  background: color-mix(in srgb, var(--cr-surface-1) 76%, var(--cr-surface-inset));
-}
-
-.filter-chip,
-.density-toggle,
-.drawer-toggle {
-  border-color: transparent;
-  background: transparent;
-  color: var(--cr-text-secondary);
-  transition: color var(--cr-motion-fast) var(--cr-ease-standard),
-    background var(--cr-motion-fast) var(--cr-ease-standard),
-    border-color var(--cr-motion-fast) var(--cr-ease-standard);
-}
-
-.filter-chip:hover:not(:disabled),
-.density-toggle:hover:not(:disabled),
-.drawer-toggle:hover:not(:disabled) {
-  border-color: var(--cr-line-strong);
-  background: var(--cr-surface-3);
-  color: var(--cr-text-primary);
-}
-
-.filter-chip.active,
-.density-toggle[aria-pressed="true"] {
-  border-color: color-mix(in srgb, var(--cr-accent) 64%, transparent);
-  background: var(--cr-accent-wash);
-  color: var(--cr-accent-hover);
-}
-
-/* LIVE NOW — refresh-layer surfaces: the section reads as a running-accented panel above the
-   grid, and its rows inherit the fleet card's hover/selection language. */
-.live-now {
-  border-color: var(--cr-line-subtle);
-  border-left-color: color-mix(in srgb, var(--cr-accent) 70%, transparent);
-  background: color-mix(in srgb, var(--cr-surface-1) 76%, var(--cr-surface-inset));
-}
-
-.live-now-row {
-  border-color: var(--cr-line-subtle);
-  background: var(--cr-surface-2);
-  transition: border-color var(--cr-motion-fast) var(--cr-ease-standard),
-    background var(--cr-motion-fast) var(--cr-ease-standard),
-    transform var(--cr-motion-fast) var(--cr-ease-standard);
-}
-
-.live-now-row:hover {
-  border-color: var(--cr-line-strong);
-  background: var(--cr-surface-3);
-  transform: translateY(-1px);
-}
-
-.live-now-row.selected {
-  border-color: var(--cr-accent);
-  box-shadow: var(--cr-shadow-1), inset 0 0 0 1px var(--cr-accent);
-}
-
-.live-now-row .live-age { color: var(--cr-text-secondary); }
-
-#cell-search {
-  border-color: transparent;
-  background: var(--cr-surface-inset);
-  transition: border-color var(--cr-motion-fast) var(--cr-ease-standard),
-    box-shadow var(--cr-motion-fast) var(--cr-ease-standard);
-}
-
-#cell-search:focus {
-  border-color: var(--cr-accent);
-  box-shadow: 0 0 0 3px var(--cr-accent-wash);
-  outline: 0;
-}
-
-.fleet-grid {
-  gap: var(--cr-space-3);
-}
-
-.cell-card {
-  border-color: var(--cr-line-subtle);
-  border-left-width: 3px;
-  border-radius: var(--cr-radius-lg);
-  background: linear-gradient(145deg, var(--cr-surface-2), var(--cr-surface-1));
-  box-shadow: var(--cr-shadow-1);
-  transition: transform var(--cr-motion-fast) var(--cr-ease-standard),
-    border-color var(--cr-motion-fast) var(--cr-ease-standard),
-    box-shadow var(--cr-motion-fast) var(--cr-ease-standard),
-    background var(--cr-motion-fast) var(--cr-ease-standard);
-}
-
-.cell-card:hover {
-  border-color: var(--cr-line-strong);
-  background: var(--cr-surface-3);
-  transform: translateY(-2px);
-}
-
-.cell-card.selected {
-  border-color: var(--cr-accent);
-  box-shadow: var(--cr-shadow-2), inset 0 0 0 1px var(--cr-accent);
-}
-
-/* Running remains visibly active through its labelled status and orbital stage/header dots.
-   Suppressing the legacy card-border pulse prevents a busy fleet from becoming visual noise. */
-.cell-card.status-running {
-  animation: none;
-}
-
-.cell-select {
-  min-height: 8.25rem;
-  padding: var(--cr-space-4);
-}
-
-.cell-id {
-  color: var(--cr-text-primary);
-}
-
-.phase-badge,
-.ownership-chip,
-.readonly-badge,
-.interactive-badge,
-.validation-badge {
-  border-color: var(--cr-line-strong);
-  background: var(--cr-surface-inset);
-}
-
-/* Interactive is a readable text state on a subtle iris wash, never accent-ink on a dark well. */
-.interactive-badge {
-  border-color: var(--cr-accent);
-  background: var(--cr-accent-wash);
-  color: var(--cr-accent-hover);
-  font-weight: var(--cr-weight-semibold);
-}
-
-.phase-badge {
-  color: var(--cr-text-secondary);
-}
-
-.sparkline {
-  height: 28px;
-  opacity: 0.9;
-}
-
-.sparkline-wrap {
-  margin-top: auto;
-  padding-top: var(--cr-space-2);
-  border-top: 1px solid color-mix(in srgb, var(--cr-line-subtle) 72%, transparent);
-}
-
-.skeleton-card {
-  height: 8.25rem;
-  border-color: var(--cr-line-subtle);
-  border-radius: var(--cr-radius-lg);
-  background: linear-gradient(110deg, var(--cr-surface-1), var(--cr-surface-2), var(--cr-surface-1));
-  background-size: 200% 100%;
-  animation: cr-skeleton 1.6s ease-in-out infinite;
-}
-
-.metric-grid {
-  gap: var(--cr-space-4);
-}
-
-.metric-card {
-  min-height: 9.5rem;
-  padding: var(--cr-space-5);
-  border-color: var(--cr-line-subtle);
-  border-radius: var(--cr-radius-lg);
-  background: linear-gradient(145deg, var(--cr-surface-2), var(--cr-surface-1));
-  box-shadow: var(--cr-shadow-1);
-}
-
-.metric-hero {
-  background:
-    radial-gradient(circle at 92% 12%, rgba(139, 124, 255, 0.16), transparent 15rem),
-    linear-gradient(145deg, var(--cr-surface-2), var(--cr-surface-1));
-}
-
-.metric-hero .metric-value {
-  margin-top: auto;
-  color: var(--cr-text-primary);
-  font-size: clamp(2rem, 3vw, 2.75rem);
-  font-weight: 600;
-  letter-spacing: -0.045em;
-}
-
-.burn-trace {
-  margin-top: auto;
-  border-radius: var(--cr-radius-sm);
-  background: var(--cr-surface-inset);
-}
-
-.supervisor-delay {
-  border-color: color-mix(in srgb, var(--attention-stalled) 64%, transparent);
-  background: color-mix(in srgb, var(--attention-stalled) 9%, var(--cr-surface-1));
-}
-
-.supervisor-flag {
-  gap: var(--cr-space-2);
-  padding: var(--cr-space-4);
-  border-color: var(--cr-line-subtle);
-  border-left-width: 3px;
-  border-radius: var(--cr-radius-lg);
-  background: linear-gradient(145deg, var(--cr-surface-2), var(--cr-surface-1));
-  box-shadow: var(--cr-shadow-1);
-  transition: transform var(--cr-motion-fast) var(--cr-ease-standard),
-    border-color var(--cr-motion-fast) var(--cr-ease-standard),
-    background var(--cr-motion-fast) var(--cr-ease-standard);
-}
-
-.supervisor-flag:hover {
-  background: var(--cr-surface-3);
-  transform: translateY(-1px);
-}
-
-.supervisor-flag.selected {
-  border-color: var(--cr-accent);
-  box-shadow: var(--cr-shadow-2), inset 0 0 0 1px var(--cr-accent);
-}
-
-.supervisor-flag-reason {
-  color: var(--cr-text-secondary);
-}
-
-.design-launchers,
-.recent-designs,
-.claude-agents-pane,
-.system-section {
-  border-color: var(--cr-line-subtle);
-  border-radius: var(--cr-radius-lg);
-  background: linear-gradient(145deg, var(--cr-surface-2), var(--cr-surface-1));
-  box-shadow: var(--cr-shadow-1);
-}
-
-.daemon-panel {
-  border-color: var(--cr-line-subtle);
-  background: var(--cr-surface-inset);
-}
-
-.recent-design {
-  border-color: transparent;
-  border-left: 2px solid var(--cr-line-strong);
-  border-radius: var(--cr-radius-md);
-  background: var(--cr-surface-inset);
-}
-
-.recent-design:hover {
-  background: var(--cr-surface-3);
-}
-
-.recent-design.selected {
-  border-color: var(--cr-accent);
-  background: var(--cr-accent-wash);
-}
-
-.routing-content,
-.table-scroll {
-  border-radius: var(--cr-radius-md);
-}
-
-.routing-table {
-  overflow: hidden;
-  border: 1px solid var(--cr-line-subtle);
-  border-radius: var(--cr-radius-md);
-  background: var(--cr-surface-1);
-}
-
-.routing-table th {
-  background: var(--cr-surface-inset);
-  color: var(--cr-text-secondary);
-}
-
-.routing-table tr:hover td {
-  background: color-mix(in srgb, var(--cr-accent-wash) 58%, transparent);
-}
-
-.detail-surface {
-  border-color: var(--cr-line-strong);
-  background: var(--cr-surface-1);
-  box-shadow: var(--cr-shadow-3);
-}
-
-.detail-header {
-  padding: var(--cr-space-4) var(--cr-space-5);
-  background: linear-gradient(145deg, var(--cr-surface-2), var(--cr-surface-1));
-}
-
-#transcript-title {
-  margin-top: var(--cr-space-1);
-  font-size: var(--cr-text-lg);
-  color: var(--cr-text-primary);
-}
-
-.transcript-feed {
-  border-color: var(--cr-line-subtle);
-  border-radius: var(--cr-radius-md);
-  background: var(--cr-surface-inset);
-}
-
-.transcript-controls {
-  padding: var(--cr-space-2);
-  border: 1px solid var(--cr-line-subtle);
-  border-radius: var(--cr-radius-md);
-  background: var(--cr-surface-2);
-}
-
-.detail-controls {
-  border-color: var(--cr-line-subtle);
-}
-
-button {
-  border-color: transparent;
-  border-radius: var(--cr-radius-sm);
-  background: var(--cr-surface-3);
-  transition: color var(--cr-motion-fast) var(--cr-ease-standard),
-    background var(--cr-motion-fast) var(--cr-ease-standard),
-    border-color var(--cr-motion-fast) var(--cr-ease-standard),
-    transform var(--cr-motion-fast) var(--cr-ease-standard);
-}
-
-button:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--cr-surface-3) 78%, var(--cr-line-strong));
-}
-
-button:active:not(:disabled) {
-  transform: translateY(1px);
-}
-
-.primary-action {
-  border-color: var(--cr-accent);
-  background: var(--cr-accent);
-  box-shadow: 0 8px 20px rgba(139, 124, 255, 0.18);
-}
-
-.primary-action:hover:not(:disabled) {
-  background: var(--cr-accent-hover);
-}
-
-.danger-action {
-  border-color: color-mix(in srgb, var(--attention-off-track) 76%, transparent);
-  background: color-mix(in srgb, var(--attention-off-track) 8%, transparent);
-}
-
-.control-form,
-.validation-panel,
-.interrupt-door {
-  border-color: var(--cr-line-subtle);
-  border-radius: var(--cr-radius-lg);
-  background: var(--cr-surface-2);
-}
-
-.interrupt-door {
-  border-color: color-mix(in srgb, var(--attention-off-track) 62%, transparent);
-  background: color-mix(in srgb, var(--attention-off-track) 9%, var(--cr-surface-2));
-}
-
-input[type="text"],
-input[type="search"],
-input[type="date"],
-input[type="number"],
-select,
-textarea {
-  border-color: var(--cr-line-subtle);
-  border-radius: var(--cr-radius-sm);
-  background: var(--cr-surface-inset);
-}
-
-input:focus,
-select:focus,
-textarea:focus {
-  border-color: var(--cr-accent);
-  box-shadow: 0 0 0 3px var(--cr-accent-wash);
-  outline: 0;
-}
-
-.system-sheet {
-  border-color: var(--cr-line-strong);
-  background: var(--cr-surface-1);
-  box-shadow: var(--cr-shadow-3);
-}
-
-.sheet-header {
-  padding: var(--cr-space-4) var(--cr-space-5);
-  background: linear-gradient(145deg, var(--cr-surface-2), var(--cr-surface-1));
-}
-
-.scrim {
-  background: var(--cr-overlay);
-  backdrop-filter: blur(5px);
-}
-
-:focus-visible {
-  outline-color: var(--cr-focus-ring);
-  outline-offset: 3px;
-}
-
-@keyframes cr-live-breathe {
-  0%, 100% { opacity: 0.45; transform: scale(0.85); }
-  50% { opacity: 1; transform: scale(1); }
-}
-
-@keyframes cr-skeleton {
-  0% { background-position: 100% 0; }
-  100% { background-position: -100% 0; }
-}
-
-@media (min-width: 760px) {
-  /* At 768px, a fixed 448px Detail panel left less than one readable fleet card. Keep the dock
-     compact until the wide layout grants it the full c2 detail width. */
-  :root { --detail-width: min(320px, 38vw); }
-
-  .command-rail {
-    padding-right: var(--cr-space-6);
-    padding-left: var(--cr-space-6);
-  }
-
-  .destination {
-    min-height: 3.25rem;
-  }
-
-  .destination[aria-current="page"] {
-    background: var(--cr-accent-wash);
-  }
-
-  .board {
-    padding: var(--cr-space-8);
-  }
-
-  .fleet-grid {
-    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-  }
-
-  .fleet-grid.density-compact {
-    grid-template-columns: repeat(auto-fill, minmax(136px, 1fr));
-  }
-
-  .fleet-grid.density-compact .cell-select {
-    min-height: 5.5rem;
-  }
-}
-
-@media (min-width: 1200px) {
-  :root { --detail-width: 512px; }
-
-  .board { padding: var(--cr-space-10); }
-
-  .fleet-grid {
-    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  }
-}
-
-@media (forced-colors: active) {
-  :focus-visible,
-  input:focus,
-  select:focus,
-  textarea:focus {
-    outline: 2px solid CanvasText;
-    outline-offset: 3px;
-  }
-}
-
-@media (max-width: 420px) {
-  .command-rail {
-    gap: var(--cr-space-2);
-    padding-right: var(--cr-space-2);
-    padding-left: var(--cr-space-2);
-  }
-
-  .rail-status-line time {
-    display: none;
-  }
-
-  .state-badge {
-    padding: 0 var(--cr-space-1);
-  }
-
-  .metric-hero .metric-value {
-    font-size: var(--cr-text-2xl);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .state-live::before,
-  .pipeline-stage.stage-running::after,
-  .skeleton-card {
-    animation: none;
-  }
+  gap: 12px;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--line);
+  background: var(--panel);
+}
+.wb-head h2 { margin: 0; font-size: 12px; letter-spacing: 0.08em; }
+.wb-nav { flex: 1 1 auto; display: flex; flex-wrap: wrap; gap: 4px; }
+.wb-tab {
+  font: inherit; font-size: 11px; color: var(--muted);
+  background: transparent; border: 1px solid transparent; border-radius: 4px;
+  padding: 3px 9px; cursor: pointer;
+}
+.wb-tab:hover { color: var(--text); }
+.wb-tab[aria-selected="true"] { color: var(--text); border-color: var(--line); background: var(--panel-2); }
+.wb-tab:focus-visible { outline: var(--focus-ring); outline-offset: 1px; }
+.wb-body { flex: 1 1 auto; min-height: 0; overflow: auto; padding: 16px; }
+.wb-panel[hidden] { display: none; }
+.wb-panel { max-width: 1120px; margin: 0 auto; }
+
+/* Panel primitives (values-first, never a dashboard card wall). */
+.panel-head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 8px; }
+.panel-title { margin: 0; font-size: 12px; letter-spacing: 0.07em; color: var(--text); }
+.panel-note { font-size: 11px; color: var(--muted); }
+/* The money lens' labeled metric rows reuse the kv table; the detail is a muted annotation. */
+.usage-metric-detail { color: var(--muted); font-size: 10px; }
+.panel-controls { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
+.panel-input,
+.panel-select {
+  font: inherit; font-size: 11px; color: var(--text); background: var(--panel);
+  border: 1px solid var(--line); border-radius: 4px; padding: 4px 8px;
+}
+.panel-input { min-width: 220px; }
+.panel-actions { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
+.panel-section { margin-top: 14px; }
+.section-title { margin: 0 0 6px; font-size: 11px; letter-spacing: 0.06em; color: var(--muted); }
+.panel-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.panel-item { border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; background: var(--panel); }
+.item-title { display: block; font-family: var(--mono); font-size: 12px; color: var(--text); }
+.item-meta { display: block; font-size: 10px; color: var(--muted); margin-top: 2px; }
+.item-why { margin: 4px 0 0; font-size: 11px; color: var(--muted); }
+.item-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin-top: 6px; }
+.panel-state { font-size: 12px; color: var(--muted); padding: 8px 0; }
+.panel-state.error { color: var(--bad); }
+.panel-state.empty { color: var(--dim); }
+.panel-table { width: 100%; border-collapse: collapse; font-size: 11px; }
+.panel-table th {
+  text-align: left; font-size: 10px; letter-spacing: 0.05em; color: var(--muted);
+  border-bottom: 1px solid var(--line); padding: 4px 8px;
+}
+.panel-table td { font-family: var(--mono); color: var(--text); padding: 4px 8px; border-bottom: 1px solid var(--line); }
+.panel-compact .panel-table td { padding: 1px 8px; }
+.link-button { font: inherit; font-size: 11px; color: var(--accent); background: none; border: none; cursor: pointer; padding: 0; }
+.link-button:hover { text-decoration: underline; }
+.panel-form { margin-top: 12px; display: flex; flex-direction: column; gap: 6px; max-width: 520px; }
+.agent-log {
+  margin-top: 8px; max-height: 220px; overflow: auto; font-family: var(--mono); font-size: 10px;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 4px; padding: 8px;
+  white-space: pre-wrap; word-break: break-word; color: var(--muted);
+}
+
+/* Generic values-first key/value table (provider-specific payloads). */
+.kv-table { border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; background: var(--panel); }
+.kv-row { display: flex; gap: 10px; padding: 2px 0; font-size: 11px; border-bottom: 1px solid var(--line); }
+.kv-row:last-child { border-bottom: none; }
+.kv-key { flex: 0 0 180px; color: var(--muted); word-break: break-word; }
+.kv-val { flex: 1 1 auto; min-width: 0; color: var(--text); font-family: var(--mono); }
+.kv-scalar, .kv-empty { color: var(--text); }
+.kv-empty { color: var(--dim); }
+.kv-details summary { cursor: pointer; color: var(--accent); }
+.kv-inner { margin-left: 12px; }
+
+/* ── The confirmation door (non-native; irreversible acts keep a composed two-step) ───────── */
+.confirm-bar {
+  position: fixed;
+  left: 50%;
+  bottom: 24px;
+  transform: translateX(-50%);
+  z-index: 60;
+  width: min(560px, 92vw);
+  background: var(--panel-2);
+  border: 1px solid var(--warn);
+  border-radius: 8px;
+  box-shadow: var(--overlay-shadow);
+  padding: 12px 16px;
+}
+.confirm-bar[hidden] { display: none; }
+.confirm-message { margin: 0 0 6px; font-size: 12px; color: var(--text); }
+.confirm-hint { margin: 0 0 6px; font-size: 11px; color: var(--warn); font-family: var(--mono); }
+.confirm-input {
+  font: inherit; font-size: 12px; color: var(--text); background: var(--bg);
+  border: 1px solid var(--line); border-radius: 4px; padding: 4px 8px; width: 100%;
+  margin-bottom: 8px;
+}
+.confirm-actions { display: flex; justify-content: flex-end; gap: 8px; }
+.danger-action { color: var(--bad); border-color: var(--bad); }
+.danger-action:hover { background: rgba(248, 81, 73, 0.12); }
+.danger-action[disabled] { opacity: 0.5; cursor: default; }
+.secondary-action { color: var(--muted); }
+.secondary-action:hover { color: var(--text); }
+
+@media (max-width: 759px) {
+  .wb-body { padding: 10px; }
+  .kv-key { flex-basis: 120px; }
 }
 
 /* ── Step 5/6/7 read views (Operations + Surfaces boards) ────────────────────────────────
@@ -2962,4 +1549,27 @@ textarea:focus {
   border-radius: var(--cr-radius-md);
   background: var(--cr-surface-1);
   padding: var(--cr-space-3);
+}
+
+/* ── Step-11/12 read views inside the refreshed workbench ───────────────────────────────
+   The operations/surfaces lenses are re-housed from main's destination boards; the panels
+   render the payloads' own states verbatim (unknown/pending/scenario/unavailable). These
+   rules are presentation only and never imply a value the payload did not carry. */
+.table-scroll {
+  overflow-x: auto;
+  max-width: 100%;
+}
+
+.drawer-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--cr-space-2);
+  margin-bottom: var(--cr-space-2);
+}
+
+.run-detail-content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--cr-space-2);
 }

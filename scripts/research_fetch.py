@@ -21,6 +21,7 @@ import hashlib
 import json
 import sys
 import urllib.error
+import urllib.parse
 import urllib.request
 from datetime import datetime, timezone
 from html.parser import HTMLParser
@@ -93,10 +94,43 @@ def _extract_text(body: bytes, content_type: str) -> tuple[str, str]:
     return "", body.decode("utf-8", errors="replace")
 
 
+#: How many redirects to chase before giving up. 301/302/303/307 are followed by urllib itself;
+#: only 308 is chased here (see :func:`_open`), so the loop is really a 308-safety bound.
+MAX_REDIRECTS = 6
+
+
+def _open(request: urllib.request.Request, *, timeout: int):
+    """Open a request, following HTTP 308 as the redirected-GET urllib on 3.10 will not.
+
+    urllib's redirect handler recognizes 301/302/303/307 only (308 support landed in Python
+    3.11). The tool's own contract promises a redirect-resolved ``final_url``, and the primary
+    docs seeds (docs.langchain.com, langfuse.com) answer 308 — so a 308 is treated as "follow
+    the Location and re-request", with a bounded loop. Relative ``Location`` values are resolved
+    against the current URL (langfuse returns path-relative redirects). Every other status is
+    surfaced unchanged, and a redirect with no Location is an error rather than a silent dead end.
+    """
+    for _ in range(MAX_REDIRECTS):
+        try:
+            return urllib.request.urlopen(request, timeout=timeout)  # noqa: S310 — research fetch
+        except urllib.error.HTTPError as exc:
+            if exc.code != 308:
+                raise
+            location = exc.headers.get("Location") if exc.headers else None
+            if not location:
+                raise
+            request = urllib.request.Request(
+                urllib.parse.urljoin(request.full_url, location),
+                headers={"User-Agent": USER_AGENT},
+            )
+    raise urllib.error.HTTPError(
+        request.full_url, 308, "too many redirects", None, None
+    )
+
+
 def fetch_source(url: str, *, timeout: int = 45) -> dict:
     """Fetch one URL and return its record fields (no filesystem writes)."""
     request = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
-    with urllib.request.urlopen(request, timeout=timeout) as response:  # noqa: S310 — research fetch
+    with _open(request, timeout=timeout) as response:
         body = response.read()
         content_type = response.headers.get("Content-Type", "")
         final_url = response.geturl()

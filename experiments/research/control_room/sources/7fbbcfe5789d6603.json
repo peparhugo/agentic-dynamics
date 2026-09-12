@@ -1,0 +1,11 @@
+{
+  "uri": "https://nivo.rocks/line/",
+  "final_url": "https://nivo.rocks/line/",
+  "status": 200,
+  "content_type": "text/html; charset=utf-8",
+  "sha256": "7fbbcfe5789d6603605343628b21fca0bd5d19289ec47820b2c02b91a75b50ee",
+  "title": "Line chart | nivo",
+  "text": "Why nivo? About References Components Guides Scales Axes Colors Legends Gradients Patterns Theming storybook Donate\nlight dark\nLine\n@nivo/line\nsvg canvas http api\nLine chart with stacking ability.\nGiven an array of data series having an id and a nested array of points\n(with x, y properties), it will compute the line for each data series.\nAll datum having null x or y will be treated as holes, thus portions\nof the corresponding line will be skipped.\nchart code data\nroll the dice\nActions Logs\nStart interacting with the chart to log actions\nBase\nDimensions\nStyle\nCustomization\nPoints\nGrid & Axes\nInteractivity\nLegends\nMotion\nAccessibility\nRecipes\nstacked lines linear scale time scale logarithmic scale real time chart custom point symbol none linear values adding markers holes in data different serie lengths custom min/max y formatting axis values formatting values adding custom layers area gradients axes custom styles",
+  "bytes": 109847,
+  "fetched_at": "2026-09-11T01:05:44.954140+00:00"
+}

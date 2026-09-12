@@ -11,7 +11,7 @@ It still re-exports the names the tests monkeypatch (``_redis``, ``_design_sessi
 ``DATA_MANIFEST_PATH``, …): the injected services delegate back to those names at call time, so
 the existing test suite is behaviour-identical.
 
-Endpoints (44 routes across 9 API categories, plus the static shell):
+Endpoints (46 routes across 10 API categories, plus the static shell):
 
     Legacy telemetry (8):
         GET  /api/matrix · GET /api/status · GET /api/events/<cell_id>
@@ -22,6 +22,8 @@ Endpoints (44 routes across 9 API categories, plus the static shell):
         GET  /api/flags · POST /api/flags/<session_id>/steer · /interrupt
     Registry (2):
         GET  /api/registry · GET /api/registry/<entity_id>
+    Recording (2):
+        GET  /api/recording-audit · POST /api/recording-sweep/run
     Design sessions (7):
         GET/POST /api/design-sessions · /<portal_id>/spec · /input · /interrupt · /save · /run
     Claude background sessions (9):
@@ -29,17 +31,17 @@ Endpoints (44 routes across 9 API categories, plus the static shell):
         /daemon · /daemon/stop
     Docs health (2):
         GET  /api/docs-health · POST /api/docs-health/approve
-    Recording (2):
-        GET  /api/recording-audit · POST /api/recording-sweep/run
     Operations (2):
         GET  /api/operations · GET /api/runs/<run_id>
     Analytics (8):
-        GET  /api/quality · GET /api/stories/<name>/arc · GET /api/value ·
+        GET  /api/quality · GET /api/stories/<name>/arc · GET  /api/value ·
         GET  /api/arms/compare   (step-6 projections P3/P4/P5/P6)
-        GET  /api/queue/sla · GET /api/escalations · GET /api/batch · GET /api/energy
+        GET  /api/queue/sla · GET /api/escalations · GET  /api/batch · GET  /api/energy
         (step-7 rules 9/8/6/4 — measured where owned, labeled scenarios where not)
+    Glance / events (2) — the facelift's one resting-screen projection:
+        GET  /api/glance · GET  /api/events
     Static shell (1):
-        GET  / — static dashboard (apps/control_room/static)
+        GET / — the one resting screen (apps/control_room/static)
 
 Run:
     python3 apps/control_room/server.py      # default port 8000 (FINOPS_PORT override)
@@ -150,9 +152,7 @@ def _design_sessions() -> DesignSessionManager:
     if _design_manager is None:
         configured = os.environ.get("FINOPS_DESIGN_WORKDIRS")
         paths = (
-            [Path(item) for item in configured.split(os.pathsep) if item]
-            if configured
-            else [ROOT]
+            [Path(item) for item in configured.split(os.pathsep) if item] if configured else [ROOT]
         )
         workdirs = {
             "repository" if index == 0 else f"repository-{index + 1}": path

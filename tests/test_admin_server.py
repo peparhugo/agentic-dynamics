@@ -1083,7 +1083,11 @@ def test_experiments_accepts_tailnet_peer(monkeypatch):
         headers={"Idempotency-Key": "exp-tailnet"},
         environ_overrides={"REMOTE_ADDR": "100.83.229.3", "HTTP_HOST": "100.83.229.3:8001"},
     )
-    assert response.status_code in (200, 400, 422)  # passed the trust gate (any later refusal is semantic)
+    assert response.status_code in (
+        200,
+        400,
+        422,
+    )  # passed the trust gate (any later refusal is semantic)
 
 
 def test_experiments_rejects_unknown_action(monkeypatch):
@@ -1197,7 +1201,7 @@ def test_design_session_input_forwards_allowlisted_delivery(monkeypatch):
 
 
 def test_route_inventory_covers_all_registered_routes():
-    """F2: the inventory's 44 routes match the actual url_map exactly.
+    """F2: the inventory's 46 routes match the actual url_map exactly.
 
     The count tracks the documented inventory in ``apps/control_room/server.py``'s module
     docstring and ``scripts/CONTEXT.md``. It went 28 -> 29 when ``GET /api/subscription-usage``
@@ -1208,19 +1212,19 @@ def test_route_inventory_covers_all_registered_routes():
     34 -> 36 when the step-5 operational slice landed (``GET /api/operations`` +
     ``GET /api/runs/<run_id>``), 36 -> 40 when the step-6 analytics projections landed
     (``GET /api/quality`` · ``GET /api/stories/<name>/arc`` · ``GET /api/value`` ·
-    ``GET /api/arms/compare``), and 40 -> 44 when the step-7 surfaces landed
-    (``GET /api/queue/sla`` · ``GET /api/escalations`` · ``GET /api/batch`` ·
-    ``GET /api/energy``); this guard is what catches a route shipped without its inventory
-    entry, so a bump here must always be paired with the doc update (never the other way
-    round).
+    ``GET /api/arms/compare``), 40 -> 44 when the step-7 surfaces landed
+    (``GET /api/queue/sla`` · ``GET /api/escalations`` · ``GET /api/batch`` · ``GET /api/energy``),
+    and 44 -> 46 when the facelift added the read-only ``GET /api/glance`` + ``GET /api/events``
+    projection pair; this guard is what catches a route shipped without its inventory entry, so a
+    bump here must always be paired with the doc update (never the other way round).
     """
     rules = [
         rule for rule in server.app.url_map.iter_rules() if not rule.rule.startswith("/static")
     ]
 
     # GET and POST on the same path register two Rule objects; count them
-    # (44), then dedupe for path-membership assertions below.
-    assert len(rules) == 44
+    # (46), then dedupe for path-membership assertions below.
+    assert len(rules) == 46
     routes = {rule.rule for rule in rules}
 
     # The surfaces the stale inventory omitted are all registered.
@@ -1252,6 +1256,8 @@ def test_route_inventory_covers_all_registered_routes():
         "/api/escalations",
         "/api/batch",
         "/api/energy",
+        "/api/glance",
+        "/api/events",
     ):
         assert required in routes, f"missing route in inventory: {required}"
 

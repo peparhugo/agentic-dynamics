@@ -1,0 +1,168 @@
+name: control_room_rules_design
+question: >-
+  Run the full user-design thought process for the Control Room, grounded in the published
+  10 rules and the shared engine (cell -> compile -> jobs -> attempts -> ledger -> measure ->
+  policy -> compare -> adapt). For every rule: the operator decision it enables, the evidence
+  (measured [M] / computed [C] / modeled [P],[X]), the records the backend must expose, the
+  surface at rest / drill-down / alert, and the action. Then the information-gap inventory,
+  the backend requirements spec (workflow-management records: jobs, attempts, step timings,
+  retries, escalations, queue waits, batch, budgets, SLAs), and a control-room design with
+  per-state screens and job walkthroughs. Ends at a CONTROLLER CHECKPOINT: the signed wireframe
+  gates all implementation. PINNED SOURCES: d0 freezes the website pages with hashes; later
+  phases read only the frozen records.
+version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: false
+repeatable: true
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: true
+    rag:
+      emit_self: false
+    context:
+      pinned_sources:
+        - https://ai-finops-rulebook.web.app/framework.html
+        - https://ai-finops-rulebook.web.app/evidence.html
+        - https://ai-finops-rulebook.web.app/methodology.html
+        - https://ai-finops-rulebook.web.app/index.html
+      hard_rules: >-
+        (1) The published 10 rules and the engine diagram are the mandate of record; every
+        design element must trace to a rule or an operator job. (2) Distinguish measured /
+        computed / modeled evidence and NAME which is missing. (3) Records the backend does not
+        emit are gaps, not assumptions. (4) Design artifacts are wireframes + tables +
+        walkthroughs, never prose about looks. (5) Implementation is BLOCKED until the
+        controller signs the checkpoint.
+    phases:
+      - name: d0_pin_sources
+        kind: agent
+        scope: implementation
+        requires_deliverable: true
+        timeout: 3600
+        prompt: |
+          GOAL: {goal}
+          Steps:
+          1) Fetch exactly the pinned_sources with scripts/research_fetch.py into
+             experiments/control_room_rules/sources/.
+          2) Write docs/research/control_room_rules_sources.md: the pin table (uri, final_url,
+             fetched_at, sha256, title, extraction quality) + the exact commands.
+          3) Extract the TEN RULES verbatim (name, status M/C/P, inputs, limitation, next test)
+             and the ENGINE chain (cell -> compile -> jobs -> attempts -> ledger -> measurement
+             -> policy -> compare -> adapt) into docs/research/control_room_rules.md with
+             citations to the frozen records.
+          ACCEPTANCE: 10 rules + engine chain present, each with a source citation. Commit.
+      - name: d1_rule_decision_map
+        kind: agent
+        scope: implementation
+        requires_deliverable: true
+        timeout: 10800
+        prompt: |
+          GOAL: {goal}
+          For EACH of the 10 rules write a record in experiments/control_room_rules/rule_map.json:
+          {rule, status, operator_decision, evidence_fields (from the frozen docs), evidence_class
+          (M/C/P), existing_backend_source (file/table/endpoint in THIS repo, or "NONE"),
+          missing_record_fields, surface (rest|drill|alert), action, cost_of_missing, acceptance
+          walkthrough}. Cover both workforces (augmented 1-5, autonomous 6-9, value 10) and the
+          operator's daily loop (glance, triage, decide, inspect, intervene, budget, audit).
+          Write docs/reviews/control_room_rule_map.md. ACCEPTANCE: 10/10 rules with every field
+          populated; "NONE" is allowed and explicit. Commit.
+      - name: d2_information_gaps
+        kind: agent
+        scope: implementation
+        requires_deliverable: true
+        timeout: 7200
+        prompt: |
+          GOAL: {goal}
+          Build experiments/control_room_rules/information_gaps.json: every decision/evidence
+          item from d1 the room CANNOT show today, with: the missing data, where it should come
+          from (ledger events, job/attempt tables, lease/settlement, queue, supervisor, the
+          control packet, run ledgers), the granularity (per attempt/step/job/model/task), and
+          the update cadence. Explicitly include WORKFLOW-MANAGEMENT records: job state, attempt
+          number/retries, step timings, escalations (from/to/reason), queue wait, batch flags,
+          budget/SLA fields. Write docs/reviews/control_room_information_gaps.md. Commit.
+      - name: d3_backend_requirements
+        kind: agent
+        scope: implementation
+        requires_deliverable: true
+        timeout: 10800
+        prompt: |
+          GOAL: {goal}
+          Turn d2 into a backend requirements spec: docs/designs/current/control_room_backend_requirements.md.
+          For each gap: the source of truth in this repo, the projection/query to add (name,
+          inputs, fields, cadence), the API shape (read-only), and the acceptance test. Include
+          a single "workflow records" projection the room can consume (jobs/attempts/steps with
+          timings, retries, escalations, queue waits, batch, budget/SLA). Mark anything already
+          emitted by the ledger/control packet so we do not rebuild it. Commit.
+      - name: d4_room_design
+        kind: agent
+        scope: implementation
+        requires_deliverable: true
+        timeout: 14400
+        prompt: |
+          GOAL: {goal}
+          Design the room against d1-d3:
+          1) experiments/control_room_rules/surface_map.json: for every rule and every operator
+             job, its surface (rest region | drill-down | alert), the fields shown, and the
+             action available.
+          2) docs/research/control_room_state_screens.md: the per-STATE truth table (running,
+             blocked, stalled, failed, escalated, done) — what is on screen for each.
+          3) docs/research/control_room_wireframe.md: an ANNOTATED wireframe (ASCII grid +
+             element list with dimensions) for the resting screen at 1440x900 and 390x844, plus
+             each drill-down; each element labeled with the rule/job it serves.
+          4) experiments/control_room_rules/job_walkthroughs.md: numbered click-paths for each
+             operator job, with the expected information at each step and a PASS/FAIL assertion
+             the future render gate can implement.
+          ACCEPTANCE: every d1 decision appears in surface_map; every rule appears in the
+          wireframe labels; every job has a walkthrough. Commit.
+      - name: d5_controller_checkpoint
+        kind: agent
+        scope: implementation
+        requires_deliverable: true
+        checkpoint: true
+        timeout: 3600
+        prompt: |
+          GOAL: {goal}
+          Prepare the controller review packet: docs/reviews/control_room_design_review.md with
+          (a) the wireframe summary and the state table, (b) the 10-rule map with evidence
+          classes and gaps, (c) the backend requirements, (d) the job walkthroughs, and (e) the
+          explicit OPEN QUESTIONS for the controller. This phase is a CHECKPOINT: on success the
+          run stops awaiting_operator_approval; no implementation wave may start until the
+          controller commits approvals/control_room_rules_design/d5_controller_checkpoint_approval.md.
+          Commit.
+factors:
+  - {name: model, levels: [deepseek/deepseek-v4-flash]}
+design: factorial
+rules:
+  - name: rules_pinned
+    plane: measurement
+    evidence_class: "[X]"
+    requires: []
+    produces: [frozen_rule_mandate]
+  - name: rule_decision_map
+    plane: measurement
+    evidence_class: "[M]"
+    requires: [frozen_rule_mandate]
+    produces: [rule_operator_mapping]
+  - name: gaps_and_backend_requirements
+    plane: measurement
+    evidence_class: "[M]"
+    requires: [rule_operator_mapping]
+    produces: [backend_requirements]
+  - name: room_design_wireframe
+    plane: measurement
+    evidence_class: "[H]"
+    requires: [backend_requirements]
+    produces: [signed_design]
+metrics:
+  - {name: frozen_rule_mandate, agg: mean, over: cell}
+  - {name: rule_operator_mapping, agg: mean, over: cell}
+  - {name: backend_requirements, agg: mean, over: cell}
+  - {name: signed_design, agg: mean, over: cell}
+comparison: null
+writeup: {format: lab_book, sections: [question, d0_pin_sources, d1_rule_decision_map, d2_information_gaps, d3_backend_requirements, d4_room_design, d5_controller_checkpoint]}
+stop: {budget_usd: 20.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}

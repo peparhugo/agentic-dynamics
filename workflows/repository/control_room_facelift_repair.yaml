@@ -1,0 +1,123 @@
+name: control_room_facelift_repair
+question: >-
+  Fix every disposition in the facelift's two screenshot verdicts
+  (docs/reviews/control_room_facelift_design.md, control_room_facelift_ia.md): make the surface
+  pass the stranger test (recognizably the control surface for multiple CLI agents) and PROVE
+  the canonical glance contract at rest (presence is not proof — make each ON-G answer
+  self-evidently sufficient and demonstrate it in the gate). Then re-run the render gate and
+  both screenshot adversaries against explicit PASS conditions.
+version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: false
+repeatable: true
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: true
+    rag:
+      emit_self: false
+    context:
+      hard_rules: >-
+        (1) Read BOTH verdict docs and close every finding; a working route is not a pass. (2)
+        Screenshots + the gate report are the evidence; adversaries judge screenshots only. (3)
+        No regressions; the portal still starts and serves.
+    phases:
+      - name: r0_fix_design
+        kind: agent
+        scope: implementation
+        requires_deliverable: true
+        timeout: 10800
+        prompt: |
+          GOAL: {goal}
+          Read docs/reviews/control_room_facelift_design.md and close every finding in
+          apps/control_room/static/{index.html,style.css,app.js}. Requirements: a stranger
+          looking ONLY at the desktop screenshot must state (a) these are live CLI agent
+          sessions, (b) that run needs a decision, (c) spend is against budget, (d) evidence
+          is inspectable — because the elements are unmistakable, not because of labels. Add a
+          `recognizability` comment block listing the exact selector for each claim. Keep the
+          eight distinctive moves. Commit.
+      - name: r1_fix_ia
+        kind: agent
+        scope: implementation
+        requires_deliverable: true
+        timeout: 10800
+        prompt: |
+          GOAL: {goal}
+          Read docs/reviews/control_room_facelift_ia.md and close every finding: make each
+          ON-G1..G7 answer self-evidently sufficient AT REST (a number/state/decision where the
+          operator looks, not a pointer to drill in). Reconcile any answer that still requires
+          interpretation: show the operator-facing value/state inline. Update
+          docs/research/control_room_ia.md if a mapping changes. Commit.
+      - name: r2_render_gate
+        kind: agent
+        scope: implementation
+        requires_deliverable: true
+        timeout: 10800
+        prompt: |
+          GOAL: {goal}
+          Extend scripts/verify_control_room_rendering.py to ASSERT the IA contract
+          semantically: for each ON-G answer anchor, verify the expected inline content is
+          present (text/number/element selectors from the ia doc), in-viewport, non-zero, and
+          contrast-clean at 1440x900 and 390x844. Run until PASS; refresh screenshots +
+          report in apps/control_room/verification/. Commit.
+      - name: r3_adversary_design
+        kind: agent
+        scope: adversarial_readonly
+        requires_deliverable: true
+        run_model: openai/gpt-5.6-luna
+        timeout: 7200
+        prompt: |
+          GOAL: {goal}
+          PASS CONDITION: from the desktop screenshot alone (no prose), the four stranger
+          statements (live CLI agent sessions / a run needs a decision / spend vs budget /
+          evidence inspectable) each read as true. Otherwise FAIL with the exact element to
+          change. Write docs/reviews/control_room_facelift_repair_design.md. Commit.
+      - name: r4_adversary_ia
+        kind: agent
+        scope: adversarial_readonly
+        requires_deliverable: true
+        run_model: openai/gpt-5.6-sol
+        timeout: 7200
+        prompt: |
+          GOAL: {goal}
+          PASS CONDITION: for every ON-G1..G7, the screenshot shows the actual answer value or
+          state inline at rest (not a link/placeholder), with no scroll, at both breakpoints.
+          Otherwise FAIL naming the need and the missing inline answer. Write
+          docs/reviews/control_room_facelift_repair_ia.md. Commit.
+      - name: r5_tests
+        kind: test
+        scope: implementation
+        timeout: 600
+        tests:
+          - tests/test_research_fetch.py
+factors:
+  - {name: model, levels: [deepseek/deepseek-v4-flash]}
+design: factorial
+rules:
+  - name: facelift_repaired
+    plane: measurement
+    evidence_class: "[H]"
+    requires: []
+    produces: [facelift_repair_screens]
+  - name: facelift_repair_gated
+    plane: measurement
+    evidence_class: "[M]"
+    requires: [facelift_repair_screens]
+    produces: [semantic_render_gate_pass]
+  - name: facelift_repair_checked
+    plane: measurement
+    evidence_class: "[H]"
+    requires: [semantic_render_gate_pass]
+    produces: [screenshot_adversary_passes]
+metrics:
+  - {name: facelift_repair_screens, agg: mean, over: cell}
+  - {name: semantic_render_gate_pass, agg: mean, over: cell}
+  - {name: screenshot_adversary_passes, agg: mean, over: cell}
+comparison: null
+writeup: {format: lab_book, sections: [question, r0_fix_design, r1_fix_ia, r2_render_gate, r3_adversary_design, r4_adversary_ia]}
+stop: {budget_usd: 18.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}

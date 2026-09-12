@@ -1,0 +1,102 @@
+{
+  "schema": "research-corpus/v1",
+  "family": "dashboards",
+  "family_label": "Operational dashboards & design systems",
+  "family_budget": 50,
+  "budget_band_pm20": [
+    40,
+    60
+  ],
+  "seeds_file": "experiments/research/control_room/seeds/dashboards.txt",
+  "seed_products": [
+    "Linear",
+    "Vercel",
+    "Grafana",
+    "Datadog",
+    "Sentry",
+    "PostHog",
+    "Railway",
+    "Fly.io",
+    "Modal",
+    "Supabase",
+    "Stripe"
+  ],
+  "stored_sources": 66,
+  "facet_records": 58,
+  "excluded_from_facet_corpus": [
+    {
+      "uri": "https://linear.app/method",
+      "reason": "JS shell - 1006 chars"
+    },
+    {
+      "uri": "https://linear.app/docs",
+      "reason": "thin docs index - 1262 chars"
+    },
+    {
+      "uri": "https://vercel.com/geist/introduction",
+      "reason": "JS shell - 1557 chars, no title"
+    },
+    {
+      "uri": "https://grafana.com/developers/saga/",
+      "reason": "JS shell - 0 chars extracted (design-system page needs a browser)"
+    },
+    {
+      "uri": "https://posthog.com/docs",
+      "reason": "thin docs hub/index - 1178 chars"
+    },
+    {
+      "uri": "https://modal.com/docs",
+      "reason": "duplicate of /docs/guide"
+    },
+    {
+      "uri": "https://modal.com/blog",
+      "reason": "JS shell - 707 chars"
+    },
+    {
+      "uri": "https://grafana.com/developers/",
+      "reason": "thin developer-portal index - 1011 chars"
+    }
+  ],
+  "missing_or_unstored": [
+    "https://vercel.com/geist/spacing",
+    "https://vercel.com/geist/overview",
+    "https://vercel.com/geist",
+    "https://www.datadoghq.com/product/dashboards/",
+    "https://sentry.io/product/dashboards/",
+    "https://modal.com/docs/guide/dashboard"
+  ],
+  "source_catalog": "experiments/research/control_room/sources.jsonl",
+  "facet_corpus": "experiments/research/control_room/corpus/dashboards.jsonl",
+  "tool": "scripts/research_fetch.py",
+  "fetched_at_range": [
+    "2026-09-11T01:02:56.943366+00:00",
+    "2026-09-11T01:03:46.635472+00:00"
+  ],
+  "stop_reason": "stopped after five batches: 66 sources fetched from 72 seeds (higher survival than the budget assumed). Curated to 58 facet records \u2014 within the +20% band (40-60) \u2014 by excluding 8 JS-shell/duplicate/thin pages (listed in excluded_from_facet_corpus; retained in sources.jsonl).",
+  "coverage_note": "F2 is the IA/design-system family: strong on dashboard/panel/widget/alert/incident IA, keyboard/command-palette interaction, and dark/light theming claims. Aesthetic is the product's known visual language (flagged inferred in notes where text alone cannot show pixels); the Geist and Saga design-system pages are JS shells, so their token content did not extract.",
+  "facet_rollup": {
+    "by_category": {
+      "product-ops": 7,
+      "design-system": 3,
+      "ops-dashboard": 48
+    },
+    "top_techniques": {
+      "dashboards": 22,
+      "table-view": 19,
+      "logs": 18,
+      "widget-catalog": 17,
+      "dashboard-grid": 12,
+      "keyboard-shortcuts": 11,
+      "alerting": 10,
+      "metrics": 10,
+      "deployments": 10,
+      "issues-list": 9,
+      "dashboard": 9,
+      "alerting-rules": 9,
+      "status": 9,
+      "real-time": 9
+    },
+    "open_implementation_true": 36,
+    "demonstrates_true": 36
+  }
+}

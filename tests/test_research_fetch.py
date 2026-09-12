@@ -79,6 +79,65 @@ def test_fetch_source_reads_through_a_fake_response(monkeypatch):
     assert len(record["sha256"]) == 64
 
 
+def test_fetch_source_follows_http_308(monkeypatch):
+    """Python 3.10 does not follow 308; the tool must chase the Location itself.
+
+    The primary docs seeds answer 308 (docs.langchain.com, langfuse.com), and the tool's
+    contract promises a redirect-resolved ``final_url``. Provenance must keep BOTH the
+    originally-requested ``uri`` and the resolved ``final_url``.
+    """
+    seen: list[str] = []
+
+    class _Response:
+        status = 200
+        headers = {"Content-Type": "text/html"}
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc):
+            return False
+
+        def read(self):
+            return HTML
+
+        def geturl(self):
+            return "https://example.com/final"
+
+    def fake_urlopen(request, timeout):
+        seen.append(request.full_url)
+        if len(seen) == 1:
+            raise mod.urllib.error.HTTPError(
+                request.full_url,
+                308,
+                "Permanent Redirect",
+                {"Location": "https://example.com/final"},
+                None,
+            )
+        return _Response()
+
+    monkeypatch.setattr(mod.urllib.request, "urlopen", fake_urlopen)
+    record = mod.fetch_source("https://example.com/start")
+    assert record["uri"] == "https://example.com/start"
+    assert record["final_url"] == "https://example.com/final"
+    assert seen == ["https://example.com/start", "https://example.com/final"]
+
+
+def test_open_stops_on_redirect_without_location(monkeypatch):
+    """A 308 with no Location is a loud error, never a silent dead end."""
+
+    def fake_urlopen(request, timeout):
+        raise mod.urllib.error.HTTPError(request.full_url, 308, "Permanent Redirect", {}, None)
+
+    monkeypatch.setattr(mod.urllib.request, "urlopen", fake_urlopen)
+    try:
+        mod.fetch_source("https://example.com/loop")
+    except mod.urllib.error.HTTPError as exc:
+        assert exc.code == 308
+    else:  # pragma: no cover - the call must raise
+        raise AssertionError("expected HTTPError for a 308 with no Location")
+
+
 def test_thin_extraction_is_flagged(monkeypatch):
     class _Response:
         status = 200

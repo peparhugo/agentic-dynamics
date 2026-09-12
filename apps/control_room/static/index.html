@@ -1,847 +1,321 @@
 <!DOCTYPE html>
 <!--
-  Control Room — application shell.
+  Control Room — the one resting screen (facelift a0; repaired to close the a5 design adversary).
 
-  Structure follows docs/control_room_ui/design.md §1 (information architecture):
+  Structure follows docs/research/control_room_ia.md §1–§3: a persistent machine rail (`R0`)
+  over a three-column body whose dominant region is the agent-run roster (`R2`), with the
+  attention work queue (`R1`) and the constraint ledger (`R3a/b/c`) as annotation gutters. There
+  is NO navigation: every `ON-G1..G7` answer is visible at rest, above the fold, with no page
+  scroll, no region scroll, and no interaction.
 
-    command rail (sticky, slim)          — identity + mirrored headline telemetry + System gear
-    destinations nav (one DOM element)   — left rail >=760px, sticky bottom tab bar below  [design §1.4]
-    boards region (only one visible)     — Fleet | Status | Flags | Sessions | Routing      [design §1.2]
-    detail surface (transversal)         — transcript + the four control panels            [design §1.5]
-    system sheet (overflow)              — Registry + Queue actions                        [design §7.2]
+  ── recognizability (the a5 design-adversary contract) ──────────────────────────────────────
+  The a5 adversary judges the RESTING screenshot only: no selection, no hover, no prose. Every
+  stranger-test claim below must read as true from the named element alone — because the element
+  is unmistakable, not because a label annotates it. These are the exact selectors (verified by
+  scripts/verify_control_room_rendering.py's STYLE carrier probe and the a5 pass):
 
-  Three rules the markup obeys, because breaking any of them breaks a documented invariant:
+    (a) "these are live CLI agent sessions, not services"
+        .run-row[data-run-id] .session-band[data-agent]        — prompt glyph + agent token (Move 1)
+        .run-row[data-run-id] [data-field="terminal.target"]   — worktree/host the agent writes to
+        .run-row[data-run-id] [data-field="command.current"]   — the command/tool now running
+        .run-row[data-run-id] [data-field="model.provider"]    — provider×model driving the session
+        .run-row[data-run-id] [data-field="run.live"][data-state] — live/not-live state mark
+        .run-row[data-run-id] .row-status                      — the left status rail of the object
 
-  1. Every element id the data layer (app.js) binds to appears EXACTLY once. The rebuild moves
-     nodes between boards; it never clones them. Where the design asks for one region on two
-     boards (the pipeline strip, §5.2), shell.js re-parents the single node rather than
-     duplicating an id — see `adoptRegions()`.
-  2. Only one transcript feed exists (`#transcript-feed`), because only one selected-detail
-     EventSource may exist at a time (design §1.1 principle 3, docs/supervisor_design.md §2).
-  3. The read/act boundary is stated in markup, not only in CSS: READ ONLY / INTERACTIVE mode
-     line, danger-styled irreversible actions, and the typed-confirmation door (design §3.4).
+    (b) "that run needs a decision"
+        [data-region=R1] [data-attention-class=decision] .queue-kind   — DECISION work item
+        [data-answer=ON-G5] [data-field="decision.state"]                — pending / none pending
+        [data-answer=ON-G5] [data-field="decision.eligibility"]          — approve eligibility token
+        [data-answer=ON-G5] [data-authority="controller"]                — authority: controller
+        .run-row[data-run-id][data-decision="approve"] .row-decision       — the same door on the row
 
-  No build step: six classic scripts, loaded so that each one's dependencies are already
-  defined when it runs (core -> keyed list -> fleet vocabulary -> shell -> detail sheet -> app),
-  and so the chrome is interactive before the polling data layer starts.
+    (c) "spend is against a hard budget"
+        .run-row[data-run-id] .row-lease[data-budget-state]    — the attached headroom bar (Move 6)
+        .run-row[data-run-id] [data-budget-reserved]           — reserved spend on this attempt
+        .run-row[data-run-id] [data-budget-settled]            — settled/reconciled spend
+        .run-row[data-run-id] [data-budget-cap]                — the hard cap
+        .run-row[data-run-id] [data-budget-headroom]           — headroom percent
+        .run-row[data-run-id] [data-budget-settlement]         — matched|underspent|overspent|unsettled
+        [data-region=R3a] [data-money-risk]                  — the bounded cap exception (not a KPI)
+
+    (d) "evidence is inspectable"
+        .run-row[data-run-id] .row-evidence [data-evidence-class="advisory"]  — said/claimed mark
+        .run-row[data-run-id] .row-evidence [data-evidence-class="measured"]  — measured proof mark
+        .run-row[data-run-id] [data-field="decision.receipt"]                 — recorded receipt
+        #selection-dock [data-evidence-ladder][data-attempt-boundary]         — the causal ladder
+        #selection-dock [data-attempt-feed] [data-feed-follow]                — bounded follow/pause feed
+
+  ── selector contract (fixed by docs/research/control_room_ia.md §10.2, consumed by the gate) ─
+  1. Exactly one element per layout region (values R0/R1/R2/R3a/R3b/R3c on `data-region`)
+     and exactly one per answer anchor (`ON-G1`..`ON-G7` on `data-answer`).
+  2. The container hooks `[data-glance-shell]`, `[data-glance-body]`, `[data-r3-stack]` are
+     unique and carry the geometry the pixel budget (§3.2) requires.
+  3. `R4` (the selection dock) is hidden at rest and is NOT a layout region.
+  4. The seven answer anchors live in their single canonical regions:
+     `G1→R0, G2→R2, G3→R1, G4→R3a, G5→R1, G6→R0, G7→R3c`.
+  5. All content is built with `element()`/`textContent` (never an HTML string), so the shell
+     can carry a safe no-JS fallback and the client never parses model output as markup.
+  6. The eight distinctive moves (direction §4.1) are preserved and carried by the elements named
+     in each section comment below; the recognizability block above is their screenshot contract.
+
+  No build step: classic scripts in dependency order. `app.js` hydrates the resting regions from
+  `GET /api/glance` and follows `GET /api/events`; `charts.js`/`visuals.js` draw the trends lens
+  and the R4 causal ladder; `parity.js` re-houses the old room's operational surfaces (the R4b
+  worker event stream + action band, R4d step timings, and the workbench lenses: fleet, attention,
+  money, registry, sessions, queue, routing, docs, audit, health, workforce). The pre-existing
+  destination-board portal is superseded; its server routes are untouched and remain registered
+  and served, and the parity layer lazy-loads them only when the operator opens a lens.
 -->
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <!-- Both themes are real (design §8.1): the shell resolves dark|light onto <html data-theme>
-       before first paint via the inline script below, so there is no light-flash on reload. -->
+  <!-- Both themes are real; the inline resolver below picks the stored/system theme before
+       first paint so a reload never flashes the wrong surface colour. -->
   <meta name="color-scheme" content="dark light">
-  <title>Control Room · dynamic-code</title>
+  <title>Control Room · agent runs</title>
   <link rel="stylesheet" href="/static/style.css">
   <script>
-    // Pre-paint theme resolution. Kept inline and tiny on purpose: any deferred script would
-    // run after the first paint and flash the wrong surface color.
+    // Pre-paint theme resolution, kept inline and tiny on purpose.
     try {
-      var stored = window.localStorage.getItem("control-room-theme")
-      var system = window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark"
-      document.documentElement.dataset.theme = stored === "light" || stored === "dark" ? stored : system
+      var stored = window.localStorage.getItem("control-room-theme");
+      var system = window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
+      document.documentElement.dataset.theme =
+        stored === "light" || stored === "dark" ? stored : system;
     } catch (_error) {
-      document.documentElement.dataset.theme = "dark"
+      document.documentElement.dataset.theme = "dark";
     }
   </script>
 </head>
 <body>
-  <!-- shell.js records the active destination on `body[data-board]` (for styling hooks and
-       debugging) while board VISIBILITY is carried by the `hidden` attribute on each board.
-       Using `hidden` rather than a CSS-only class means an inactive board leaves the tab order
-       and the accessibility tree, not just the viewport — progressive disclosure applies to
-       keyboards and screen readers too (design §1.1 principle 2). -->
-  <div class="app-shell" id="app-shell">
-
-    <!-- ── Command rail ────────────────────────────────────────────────────────────────────
-         Slim and sticky (design §1.4, [R §2.6]). It carries identity, connection state, and
-         MIRRORS of the canonical telemetry outputs that live on the Status board — mirrors,
-         not copies, because ids must stay unique; shell.js syncs them with a MutationObserver.
-    -->
-    <header class="command-rail" aria-label="Live reported telemetry">
-      <div class="rail-identity">
-        <span class="eyebrow">dynamic-code</span>
-        <h1>CONTROL ROOM</h1>
+  <!-- [data-render-state] is the render gate's readiness contract: it flips to "ready" only
+       after the initial /api/glance payload has rendered, the SSE replay boundary has landed,
+       fonts have settled, and two animation frames have completed. -->
+  <div class="glance-shell" data-glance-shell data-render-state="loading" data-control-epoch="">
+    <!-- ── R0 · MACHINE RAIL (full width, 72px) ─────────────────────────────────────────
+         Recomposed from a "trust bar" into a terminal machine rail: a prompt glyph and the
+         control plane's name at the left, the two complete answers (`ON-G1` system dimensions,
+         `ON-G6` trust verdict) read inline on the rail, and the deliberate lenses at the right.
+         Both answers are rendered here and nowhere else. -->
+    <header class="r0" data-region="R0" role="region" aria-label="Machine and trust">
+      <div class="r0-scope">
+        <span class="machine-prompt" aria-hidden="true">&#x276F;</span>
+        <span class="scope-name" id="scope-name">control-room</span>
+        <span class="scope-sub" id="scope-epoch">epoch —</span>
       </div>
-
-      <div class="rail-status-line">
-        <span id="overall-state" class="state-badge state-connecting">CONNECTING</span>
-        <time id="utc-clock" datetime="">--:--:-- UTC</time>
+      <div class="r0-answers">
+        <div class="r0-answer" data-answer="ON-G1">
+          <span class="answer-kicker">SYSTEM</span>
+          <span class="answer-cells" id="system-cells" aria-label="System dimensions"></span>
+        </div>
+        <div class="r0-answer" data-answer="ON-G6">
+          <span class="answer-kicker">TRUST</span>
+          <span class="answer-cells" id="trust-cells" aria-label="Trust verdict"></span>
+        </div>
       </div>
-
-      <div class="rail-mirrors" aria-hidden="true">
-        <span class="rail-mirror"><span class="metric-label">Spend</span><span class="mirror-value cost-value" data-mirror="reported-spend">--</span></span>
-        <span class="rail-mirror"><span class="metric-label">Burn</span><span class="mirror-value cost-value" data-mirror="burn-rate">--</span></span>
-        <span class="rail-mirror"><span class="metric-label">Running</span><span class="mirror-value" data-mirror="running-count">--</span></span>
-        <span class="rail-mirror"><span class="metric-label">Redis</span><span class="mirror-value" data-mirror="redis-state">--</span></span>
-      </div>
-
-      <div class="rail-actions">
-        <button id="theme-toggle" class="icon-button" type="button" aria-pressed="false" title="Toggle light theme">
-          <svg class="icon-svg" aria-hidden="true" viewBox="0 0 24 24"><path d="M20.5 14.3A8.5 8.5 0 0 1 9.7 3.5a8.5 8.5 0 1 0 10.8 10.8Z"/></svg><span class="sr-only">Toggle light or dark theme</span>
+      <!-- Grouped so mobile can lift the controls out of the answers' flex width (the 72px bar
+           has no room to spare for two 28px buttons beside a wrapping trust row). -->
+      <div class="r0-actions">
+        <!-- The workbench is where the re-housed operational surfaces live: fleet, attention,
+             money, registry, sessions, queue, routing, docs, audit, health, workforce step
+             timings, and the step-11/12 Operations/Surfaces read views. It is a deliberate
+             drill-down (like the trends lens), never navigation at rest; each panel lazy-loads
+             the same endpoint the old room used. -->
+        <button class="icon-button" id="workbench-open" type="button" aria-expanded="false"
+                aria-controls="workbench" title="Open the workbench lenses">
+          <svg class="icon-svg" aria-hidden="true" viewBox="0 0 24 24">
+            <path d="M4 6h16M4 12h16M4 18h16"/>
+            <path d="M8 4v4M14 10v4M10 16v4"/>
+          </svg>
+          <span class="sr-only">Open the workbench (fleet, attention, money, registry, sessions,
+            queue, routing, docs, audit, health, workforce, operations, surfaces)</span>
         </button>
-        <!-- Mobile reaches the System overflow from a persistent gear in the shell (design §1.4);
-             desktop reaches it from the nav rail's bottom entry (#system-nav). Two affordances,
-             one handler, one sheet. -->
-        <button id="system-toggle" class="icon-button system-gear" type="button" aria-expanded="false" aria-controls="system-sheet">
-          <svg class="icon-svg" aria-hidden="true" viewBox="0 0 24 24"><path d="m12 2 1.3 2.7 3 .5.8 2.9 2.5 1.8-1.5 2.6 1.5 2.6-2.5 1.8-.8 2.9-3 .5L12 22l-1.3-2.7-3-.5-.8-2.9-2.5-1.8 1.5-2.6-1.5-2.6L6.9 8l.8-2.9 3-.5L12 2Zm0 6.5A3.5 3.5 0 1 0 12 15.5 3.5 3.5 0 0 0 12 8.5Z"/></svg><span class="sr-only">Open System: registry and queue actions</span>
+        <!-- The trends lens is deliberate drill-down, not navigation: the resting regions stay
+             in place and the lens opens over the room only when asked (brief §3, §7). -->
+        <button class="icon-button" id="lens-open" type="button" aria-expanded="false"
+                aria-controls="chart-lens" title="Open the trends lens">
+          <svg class="icon-svg" aria-hidden="true" viewBox="0 0 24 24">
+            <path d="M4 19V5m0 14h16M8 15l3-4 3 2 4-6"/>
+          </svg>
+          <span class="sr-only">Open the trends lens (spend, throughput, failure, dependency health)</span>
+        </button>
+        <button class="icon-button" id="theme-toggle" type="button" aria-pressed="false"
+                title="Toggle light theme">
+          <svg class="icon-svg" aria-hidden="true" viewBox="0 0 24 24">
+            <path d="M20.5 14.3A8.5 8.5 0 0 1 9.7 3.5a8.5 8.5 0 1 0 10.8 10.8Z"/>
+          </svg>
+          <span class="sr-only">Toggle light or dark theme</span>
         </button>
       </div>
     </header>
 
-    <!-- ── Destinations ────────────────────────────────────────────────────────────────────
-         ONE nav element, restyled per breakpoint: sticky bottom tab bar below 760px, left rail
-         at or above it (design §1.4, [R §1.4.1] Material 3 NavigationBar 3–5 destinations).
-         Seven destinations; System is the overflow and deliberately not a tab.
-    -->
-    <nav id="destinations" class="destinations" aria-label="Control Room boards">
-      <button class="destination" type="button" data-board="fleet" aria-current="page">
-        <span class="destination-glyph" aria-hidden="true"><svg class="icon-svg" viewBox="0 0 24 24"><path d="M4 4h6v6H4V4Zm10 0h6v6h-6V4ZM4 14h6v6H4v-6Zm10 0h6v6h-6v-6Z"/></svg></span>
-        <span class="destination-label">Fleet</span>
-      </button>
-      <button class="destination" type="button" data-board="status">
-        <span class="destination-glyph" aria-hidden="true"><svg class="icon-svg" viewBox="0 0 24 24"><path d="M4 19V9m5 10V5m5 14v-8m5 8V3"/></svg></span>
-        <span class="destination-label">Status</span>
-      </button>
-      <button class="destination" type="button" data-board="flags">
-        <span class="destination-glyph" aria-hidden="true"><svg class="icon-svg" viewBox="0 0 24 24"><path d="M6 21V4m0 1h11l-2 4 2 4H6"/></svg></span>
-        <span class="destination-label">Flags</span>
-        <!-- Mirrors #supervisor-count. A nonzero badge suggests attention; it never switches
-             boards for the operator (design §4.2, [R §2.5]). -->
-        <span class="destination-badge" data-mirror="supervisor-count" hidden>0</span>
-      </button>
-      <button class="destination" type="button" data-board="sessions">
-        <span class="destination-glyph" aria-hidden="true"><svg class="icon-svg" viewBox="0 0 24 24"><circle cx="12" cy="8" r="3"/><path d="M5 21c.7-4 3-6 7-6s6.3 2 7 6"/></svg></span>
-        <span class="destination-label">Sessions</span>
-      </button>
-      <button class="destination" type="button" data-board="routing">
-        <span class="destination-glyph" aria-hidden="true"><svg class="icon-svg" viewBox="0 0 24 24"><path d="m7 7 3-3m-3 3 3 3M4 7h13a3 3 0 0 1 3 3v1m-3 6-3 3m3-3-3-3m3 3H7a3 3 0 0 1-3-3v-1"/></svg></span>
-        <span class="destination-label">Routing</span>
-      </button>
-      <button class="destination" type="button" data-board="operations">
-        <span class="destination-glyph" aria-hidden="true"><svg class="icon-svg" viewBox="0 0 24 24"><path d="M4 5h16v4H4V5Zm0 6h16v4H4v-4Zm0 6h16v2H4v-2Z"/></svg></span>
-        <span class="destination-label">Operations</span>
-      </button>
-      <button class="destination" type="button" data-board="surfaces">
-        <span class="destination-glyph" aria-hidden="true"><svg class="icon-svg" viewBox="0 0 24 24"><path d="M4 4h7v7H4V4Zm9 0h7v4h-7V4ZM4 13h7v7H4v-7Zm9-3h7v10h-7V10Z"/></svg></span>
-        <span class="destination-label">Surfaces</span>
-      </button>
-      <button id="system-nav" class="destination destination-system" type="button" aria-expanded="false" aria-controls="system-sheet">
-        <span class="destination-glyph" aria-hidden="true"><svg class="icon-svg" viewBox="0 0 24 24"><path d="m12 2 1.3 2.7 3 .5.8 2.9 2.5 1.8-1.5 2.6 1.5 2.6-2.5 1.8-.8 2.9-3 .5L12 22l-1.3-2.7-3-.5-.8-2.9-2.5-1.8 1.5-2.6-1.5-2.6L6.9 8l.8-2.9 3-.5L12 2Zm0 6.5A3.5 3.5 0 1 0 12 15.5 3.5 3.5 0 0 0 12 8.5Z"/></svg></span>
-        <span class="destination-label">System</span>
-      </button>
-    </nav>
+    <div class="glance-body" data-glance-body>
+      <!-- ── R1 · ATTENTION WORK QUEUE (Move 8) ────────────────────────────────────────
+           A durable, ranked, deduplicated work queue of run-linked items, not repeated alert
+           cards: the reserved decision (`ON-G5`) and risk (`ON-G3`) items carry lifecycle,
+           owner/authority and the next governed action; remaining capacity collapses into ONE
+           continuous "queue clear" state (the DOM keeps the exact item count the gate measures,
+           the CSS merges the filler into a single empty state so it never reads as a card stack). -->
+      <section class="r1" data-region="R1" role="region" aria-label="Attention work queue">
+        <h2 class="region-title">ATTENTION</h2>
+        <ol class="attention-list" id="attention-list"></ol>
+      </section>
 
-    <!-- ── Detail surface (transversal — not a destination) ────────────────────────────────
-         Right column at >=760px, modal bottom sheet below (design §1.5, §3, [R §2.7]).
-         Reached only by drilling down from a board; never arrived at cold.
-
-         Authored ahead of the boards region even though it paints to the RIGHT of it: the
-         shell is a CSS grid, so visual placement comes from `grid-template-areas`, not source
-         order. Keeping it out of (and before) the scrolling `<main>` means the sheet is never
-         a child of the region it overlays, and the just-drilled-into surface is the next thing
-         a keyboard reaches after the nav.
-    -->
-    <aside id="detail-surface" class="detail-surface" aria-labelledby="transcript-title" data-open="false">
-      <!-- Drag affordance for the mobile sheet: dragging it (or the header) down dismisses the
-           sheet, matching the Material 3 / iOS sheet gesture [R §2.7]. It is a button so the
-           gesture has a keyboard- and screen-reader-reachable equivalent. -->
-      <button id="detail-handle" class="sheet-handle" type="button">
-        <span class="sr-only">Drag down or activate to close the detail sheet</span>
-      </button>
-
-      <!-- Field order is the design's glanceable-first rule (§3.2): identity, then state, then
-           where it is in the pipeline, then what it has cost. Those first three lines answer
-           "what is it, is it healthy, where is it" without scrolling; everything below is
-           secondary, and the long prose is clamped at the bottom of the control panels. -->
-      <header class="detail-header">
-        <div class="transcript-identity">
-          <span id="transcript-mode" class="eyebrow">Cell / Transcript</span>
-          <h2 id="transcript-title">NO CELL SELECTED</h2>
-          <div class="inline-state">
-            <span id="selected-status" class="status-word status-unknown">UNKNOWN</span>
-            <span id="selected-phase" class="phase-badge" hidden></span>
-            <span>stream: <strong id="selected-stream-state">DISCONNECTED</strong></span>
-          </div>
-          <div id="selected-glance" class="detail-glance" hidden>
-            <span id="selected-cost" class="glance-metric">--</span>
-            <span id="selected-tokens" class="glance-metric">--</span>
-          </div>
+      <!-- ── R2 · AGENT RUN ROSTER (Move 1, Move 4, Move 6) ────────────────────────────
+           The dominant surface: a bounded, attention-ranked sample of live CLI agent sessions.
+           Each row is a run OBJECT, not a service row — a left status rail, a monospace session
+           identity band (agent → worktree → command → model → attempt), the exact running/queued/
+           failed/live counts (`ON-G2`), a paired ADVISORY/MEASURED evidence/decision footer, and
+           an attached lease headroom bar (reserved vs settled vs hard cap) along its bottom edge. -->
+      <section class="r2" data-region="R2" role="region" aria-label="Agent run roster">
+        <div class="r2-head">
+          <h2 class="region-title">AGENT RUNS</h2>
+          <div class="r2-counts" data-answer="ON-G2" id="run-counts"></div>
         </div>
-        <!-- Back on a phone (the sheet is a pushed depth), close on desktop (it is a docked
-             column). One control, one handler; the label swaps at the breakpoint. -->
-        <button id="detail-close" class="icon-button detail-close" type="button">
-          <span class="detail-close-glyph" aria-hidden="true">✕</span>
-          <span class="detail-back-label" aria-hidden="true">Back</span>
-          <span class="sr-only">Close detail and return to the board</span>
+        <ul class="run-list" id="run-list"></ul>
+      </section>
+
+      <!-- ── R3 · CONSTRAINT LEDGER (Move 6) ───────────────────────────────────────────
+           Three fixed-height, non-scrolling annotations attached to the roster — an unboxed
+           ledger, not a KPI rail: R3a money vs the hard cap (`ON-G4`), R3b health detail (a
+           mirror only), R3c bounded composition (`ON-G7`). -->
+      <div class="r3" data-r3-stack>
+        <section class="r3a" data-region="R3a" role="region" aria-label="Cost against budget">
+          <h2 class="region-title">COST <span class="region-prov" id="cost-prov" data-region-prov="R3a"></span></h2>
+          <div class="cost-grid" data-answer="ON-G4" id="cost-grid"></div>
+        </section>
+        <section class="r3b" data-region="R3b" role="region" aria-label="Health detail">
+          <h2 class="region-title">HEALTH</h2>
+          <div class="health-lines" id="health-lines"></div>
+        </section>
+        <section class="r3c" data-region="R3c" role="region" aria-label="Composition">
+          <h2 class="region-title sr-only">COMPOSITION</h2>
+          <div class="composition" data-answer="ON-G7" id="composition"></div>
+        </section>
+      </div>
+    </div>
+
+    <!-- ── R4 · SELECTION DOCK (drill-down only; Move 2, Move 5, Move 7) ───────────────
+         Hidden at rest. Opening it is drill-down, never navigation; the resting regions stay
+         in place and the roster is never hidden behind a modal. Per the reconciled IA
+         (docs/research/control_room_ia.md §2 R4), it has four named sub-regions:
+           R4a address/identity · R4b per-worker event stream + action band ·
+           R4c evidence ladder · R4d step timings.
+         `data-dock-region` (not `data-region`) keeps the resting `[data-region]` contract
+         untouched; the dock never carries a `data-answer`. -->
+    <aside class="selection-dock" id="selection-dock" hidden
+           role="dialog" aria-modal="true" aria-label="Selected run evidence">
+      <header class="dock-head">
+        <h2 id="dock-title">RUN DETAIL</h2>
+        <!-- Move 5: a stable, copyable typed address for the object under inspection. -->
+        <code class="dock-address" id="dock-address" data-dock-address></code>
+        <button class="icon-button" id="dock-close" type="button">
+          <span aria-hidden="true">&#x2715;</span><span class="sr-only">Close run detail</span>
         </button>
       </header>
-
-      <div class="detail-body">
-        <section id="transcript-panel" class="transcript-pane" aria-label="Selected node transcript">
-          <div class="transcript-controls" aria-label="Local transcript controls">
-            <button id="follow-button" type="button" aria-pressed="true">Follow: on</button>
-            <button id="pause-button" type="button">Pause</button>
-            <button id="clear-button" type="button">Clear view</button>
-          </div>
-          <div id="transcript-feed" class="transcript-feed" role="log" aria-label="Selected cell event transcript" tabindex="0">
-            <div class="terminal-empty">Select a fleet card to inspect retained events and watch live work.</div>
-          </div>
-          <button id="jump-live" class="jump-live" type="button" hidden>Jump to live</button>
-          <p id="transcript-note" class="pane-note">Clear view affects this browser only; Redis history and the experiment are unchanged.</p>
-        </section>
-
-        <section class="detail-controls" aria-labelledby="control-title">
-          <!-- The read/act mode line. `#ownership-badge` swaps between READ ONLY and
-               INTERACTIVE; color alone never carries the distinction (design §3.4). -->
-          <header class="pane-header control-header">
-            <div>
-              <span id="control-mode" class="eyebrow">Read-only attachment</span>
-              <h3 id="control-title">SESSION CONTROL</h3>
-            </div>
-            <span id="ownership-badge" class="readonly-badge">READ ONLY</span>
-          </header>
-
-          <section id="cell-control-panel">
-            <dl class="control-facts">
-              <div>
-                <dt>Cell</dt>
-                <dd id="control-cell">No cell selected</dd>
-              </div>
-              <div>
-                <dt>Status</dt>
-                <dd id="control-status">UNKNOWN</dd>
-              </div>
-              <div>
-                <dt>Stream</dt>
-                <dd id="control-stream">DISCONNECTED</dd>
-              </div>
-              <div>
-                <dt>OpenCode session</dt>
-                <dd id="control-session">Session identity not observed yet</dd>
-              </div>
-            </dl>
-            <button id="copy-session" class="secondary-action" type="button" hidden>Copy session ID</button>
-            <button id="watch-button" class="primary-action" type="button" disabled>Select a cell</button>
-            <p id="control-guidance" class="control-guidance">Select a cell to inspect telemetry.</p>
-            <p class="boundary-copy">Watching does not send input or control the experiment.</p>
-          </section>
-
-          <section id="supervisor-control-panel" class="supervisor-control-panel" hidden>
-            <a class="mobile-anchor" href="#transcript-panel">Jump to observed activity</a>
-            <p class="supervisor-boundary">Supervisor flags. You decide.</p>
-            <dl class="control-facts supervisor-facts">
-              <div><dt>Session</dt><dd><span id="supervisor-title">--</span><br><span id="supervisor-session-id">--</span></dd></div>
-              <div><dt>Model / assessment</dt><dd><span id="supervisor-model">--</span><br><span id="supervisor-status">ATTENTION</span></dd></div>
-              <!-- Long prose comes last and is clamped; tapping expands it (design §3.2). -->
-              <div><dt>Reason</dt><dd id="supervisor-reason" class="prose-clamp" role="button" tabindex="0" aria-expanded="false">--</dd></div>
-              <div><dt>Review stream</dt><dd id="supervisor-review">Review unavailable</dd></div>
-              <div><dt>Last activity</dt><dd id="supervisor-activity">unavailable</dd></div>
-            </dl>
-            <form id="supervisor-steer-form" class="control-form composer-form">
-              <label>
-                <span>Steer this session</span>
-                <textarea id="supervisor-steer-prompt" rows="5" maxlength="12000" required></textarea>
-              </label>
-              <p class="control-guidance">Delivered as a steer to the active session; the supervisor will not send this.</p>
-              <button id="supervisor-steer" class="primary-action" type="submit" disabled>Steer selected session</button>
-              <output id="supervisor-steer-result" class="inline-result" aria-live="polite"></output>
-            </form>
-            <div class="supervisor-stream-actions">
-              <button id="supervisor-interrupt" class="danger-action" type="button" disabled>Interrupt</button>
-              <button id="detach-supervisor" type="button">Detach</button>
-            </div>
-            <!-- Two-step door with typed confirmation — the model for every irreversible
-                 action in this app (design §3.4, [R §2.8]). -->
-            <section id="supervisor-interrupt-door" class="interrupt-door" aria-labelledby="interrupt-door-title" hidden>
-              <h4 id="interrupt-door-title">ONE-WAY DOOR</h4>
-              <p>Active generation and tool execution will stop. Detach is the non-destructive alternative.</p>
-              <p>Type <code id="supervisor-confirmation-phrase">INTERRUPT</code> to continue.</p>
-              <label>
-                <span class="sr-only">Interrupt confirmation</span>
-                <input id="supervisor-interrupt-confirmation" type="text" autocomplete="off">
-              </label>
-              <div class="form-actions">
-                <button id="cancel-supervisor-interrupt" type="button">Cancel</button>
-                <button id="confirm-supervisor-interrupt" class="danger-action" type="button" disabled>Interrupt permanently</button>
-              </div>
-            </section>
-            <output id="supervisor-interrupt-result" class="inline-result supervisor-result" aria-live="polite"></output>
-          </section>
-
-          <section id="design-control-panel" class="design-control-panel" hidden>
-            <a class="mobile-anchor" href="#transcript-panel">Jump to design terminal</a>
-            <dl class="control-facts design-facts">
-              <div><dt>Kind</dt><dd id="design-kind">--</dd></div>
-              <div><dt>Portal / OpenCode</dt><dd><span id="design-portal-id">--</span><br><span id="design-opencode-id">--</span></dd></div>
-              <div><dt>Model / Workdir</dt><dd><span id="design-session-model">--</span><br><span id="design-session-workdir">--</span></dd></div>
-              <div><dt>Draft</dt><dd><span id="design-draft-name">--</span> · revision <span id="design-revision">0</span></dd></div>
-            </dl>
-            <section class="validation-panel" aria-labelledby="validation-title">
-              <div class="validation-heading">
-                <h4 id="validation-title">VALIDATION</h4>
-                <span id="validation-badge" class="validation-badge">NO DRAFT</span>
-              </div>
-              <p id="validation-summary">Waiting for the assigned draft.</p>
-              <ul id="validation-errors"></ul>
-              <details id="matrix-preview" hidden>
-                <summary id="matrix-summary">Matrix preview</summary>
-                <pre id="matrix-cells"></pre>
-              </details>
-            </section>
-            <form id="save-spec-form" class="control-form compact-form">
-              <label><span>Spec basename</span><input id="save-spec-name" type="text" placeholder="experiment-name.yaml" required></label>
-              <button id="save-spec-button" type="submit" disabled>Save spec</button>
-              <output id="save-spec-result" class="inline-result" aria-live="polite"></output>
-            </form>
-            <form id="run-workflow-form" class="control-form compact-form" hidden>
-              <h4>RUN WORKFLOW</h4>
-              <label><span>Goal</span><textarea id="run-goal" rows="3" required></textarea></label>
-              <label><span>Model</span><input id="run-model" type="text" required></label>
-              <label><span>Approved workdir</span><select id="run-workdir" required></select></label>
-              <label><span>Backend</span><select id="run-backend"><option value="">Auto</option><option value="opencode">OpenCode</option><option value="claude_cli">Claude CLI</option></select></label>
-              <label><span>Per-phase timeout (seconds)</span><input id="run-timeout" type="number" min="1" max="7200" value="1800" required></label>
-              <label><span>Thinking token budget</span><input id="run-thinking-budget" type="number" min="0" value="0"></label>
-              <label><span>Output token limit</span><input id="run-output-limit" type="number" min="0" value="0"></label>
-              <label class="check-label"><input id="run-commit" type="checkbox" checked> Commit successful phases</label>
-              <p class="boundary-copy">Running can modify the approved worktree and spend model budget. Launch parameters are confirmed before execution.</p>
-              <button id="run-workflow-button" type="submit" disabled>Run workflow</button>
-              <output id="run-workflow-result" class="inline-result" aria-live="polite"></output>
-            </form>
-            <form id="design-composer" class="control-form composer-form">
-              <label><span>Ask for a change</span><textarea id="design-prompt" rows="4" maxlength="12000" required></textarea></label>
-              <div class="form-actions">
-                <button id="send-design-input" type="submit">Send</button>
-                <button id="steer-design-input" type="button">Steer</button>
-              </div>
-              <output id="design-input-result" class="inline-result" aria-live="polite"></output>
-            </form>
-            <div class="design-stream-actions">
-              <button id="interrupt-design" class="danger-action" type="button">Interrupt</button>
-              <button id="detach-design" type="button">Detach</button>
-            </div>
-          </section>
-
-          <section id="claude-agent-control-panel" class="claude-agent-control-panel" hidden>
-            <a class="mobile-anchor" href="#transcript-panel">Jump to transcript</a>
-            <dl class="control-facts">
-              <div><dt>Session</dt><dd id="claude-agent-control-id">--</dd></div>
-              <div><dt>Status</dt><dd id="claude-agent-control-status">UNKNOWN</dd></div>
-              <div><dt>Ownership</dt><dd id="claude-agent-control-ownership">--</dd></div>
-              <div><dt>Model / Workdir</dt><dd><span id="claude-agent-control-model">--</span><br><span id="claude-agent-control-cwd">--</span></dd></div>
-            </dl>
-            <p id="claude-agent-transcript-note" class="boundary-copy"></p>
-            <form id="claude-agent-steer-form" class="control-form compact-form">
-              <label><span>Adjust and continue (steer)</span><textarea id="claude-agent-steer-prompt" rows="3" maxlength="12000" placeholder="Resume the session's conversation with these new instructions"></textarea></label>
-              <div class="form-actions">
-                <button id="claude-agent-steer" class="primary-action" type="submit">Steer</button>
-              </div>
-              <p class="boundary-copy">Steering interrupts the running session and resumes its conversation with the new prompt under a new session id.</p>
-              <output id="claude-agent-steer-result" class="inline-result" aria-live="polite"></output>
-            </form>
-            <div id="claude-agent-owned-controls" class="design-stream-actions">
-              <button id="claude-agent-stop" class="danger-action" type="button">Stop</button>
-              <button id="claude-agent-respawn" type="button">Respawn</button>
-              <button id="claude-agent-rm" class="danger-action" type="button">Rm</button>
-              <button id="claude-agent-detach" type="button">Detach</button>
-            </div>
-            <div id="claude-agent-external-controls" class="design-stream-actions" hidden>
-              <button id="claude-agent-fetch-logs" type="button">Fetch latest log tail</button>
-              <button id="claude-agent-detach-external" type="button">Detach</button>
-            </div>
-            <pre id="claude-agent-external-log" class="claude-agent-external-log"></pre>
-            <output id="claude-agent-action-result" class="inline-result" aria-live="polite"></output>
-          </section>
-        </section>
+      <!-- R4a — identity/scope facts for the selected run (re-housed cell panel). -->
+      <div class="dock-region dock-address-region" data-dock-region="address"
+           id="dock-address-region" aria-label="Selected run identity"></div>
+      <!-- R4b — the restored per-worker surface: one live event stream plus the governed
+           action band. The stream is the same endpoint the old room used
+           (`GET /api/events/<cell_id>`); the action band fires the same mutation routes. -->
+      <div class="dock-region dock-worker" data-dock-region="worker" id="dock-worker">
+        <div class="dock-region-head">
+          <h3 class="dock-region-title">WORKER</h3>
+          <span class="dock-worker-target" id="dock-worker-target">—</span>
+          <button class="feed-toggle" id="dock-stream-toggle" type="button"
+                  data-feed-follow="follow" aria-pressed="false">Pause</button>
+        </div>
+        <ol class="feed-list" id="dock-event-feed" data-event-feed aria-live="off"></ol>
+        <div class="dock-actions" id="dock-actions" data-action-band></div>
+      </div>
+      <!-- R4c — the attempt-scoped causal ladder (visuals.js) + the bounded attempt feed. -->
+      <div class="dock-region dock-evidence" data-dock-region="evidence" id="dock-evidence">
+        <div class="evidence-ladder" id="evidence-ladder"></div>
+      </div>
+      <!-- R4d — per-attempt step timings (queue wait, service time, first token, duration,
+           retries, tokens by answer/explanation, cost, exit, verification). A value the
+           portal cannot observe renders as an explicit `unknown`, never a fabricated 0. -->
+      <div class="dock-region dock-timing" data-dock-region="timing" id="dock-timing">
+        <h3 class="dock-region-title">STEP TIMINGS</h3>
+        <div class="timing-grid" id="timing-grid" data-timing-grid></div>
       </div>
     </aside>
 
-    <!-- ── Boards ──────────────────────────────────────────────────────────────────────────
-         Exactly one board is visible at a time. Inactive boards keep `hidden` so they are out
-         of the accessibility tree and the tab order, not merely off-screen.
-    -->
-    <main class="boards" id="boards">
+    <!-- ── TRENDS LENS (drill-down; hidden at rest) ────────────────────────────────────
+         The four catalog-derived charts (spend · throughput · failure · dependency health).
+         Every card states its question, decision, baseline, scope and fallback; a missing
+         value is a gap, fewer than two samples is an explicit empty state, and a failed
+         projection is an explicit error state — never a blank panel. -->
+    <section class="chart-lens" id="chart-lens" data-chart-lens hidden
+             role="dialog" aria-modal="false" aria-labelledby="lens-title">
+      <header class="lens-head">
+        <h2 id="lens-title">TRENDS</h2>
+        <span class="lens-scope" id="lens-scope">retained window: this browser session</span>
+        <button class="icon-button" id="lens-close" type="button">
+          <span aria-hidden="true">&#x2715;</span><span class="sr-only">Close the trends lens</span>
+        </button>
+      </header>
+      <div class="chart-grid" id="chart-grid"></div>
+    </section>
 
-      <!-- FLEET (home) — design §2 -->
-      <section id="board-fleet" class="board board-fleet" data-board="fleet" aria-labelledby="fleet-title">
-        <header class="board-header">
-          <div>
-            <span class="eyebrow">Fleet</span>
-            <h2 id="fleet-title"><span id="fleet-total">--</span> CELLS</h2>
-          </div>
-          <span id="matrix-age" class="last-update">connecting</span>
-        </header>
-
-        <!-- Mount point for the single pipeline-stage strip. The strip itself is adopted here
-             (compact) or into the Status board (expanded) by shell.js — design §5.2 asks for
-             both without duplicating the id. -->
-        <div class="region-mount" data-mount="stages"></div>
-
-        <section id="pipeline-stages" class="pipeline-stages" aria-label="Pipeline stages">
-          <div class="pipeline-stage empty-stage"><span class="stage-name">EXECUTE</span><span class="stage-counts">waiting for matrix</span></div>
-          <div class="pipeline-stage empty-stage"><span class="stage-name">ANALYZE</span><span class="stage-counts">waiting for matrix</span></div>
-          <div class="pipeline-stage empty-stage"><span class="stage-name">REVIEW</span><span class="stage-counts">waiting for matrix</span></div>
-        </section>
-
-        <!-- DOCS HEALTH — the docs-drift rail's answer to "is the docs current?", as a number.
-             Sits beside the pipeline strip because it is the same kind of thing: one line of
-             standing state an operator reads before deciding anything. Three conditions
-             (clean / findings / warranted, plus unmeasured) each carry a WORD as well as a
-             colour — colour is never the only signal (board-fleet.js's standing doctrine).
-             The approve affordance is hidden unless a proposal is actually approvable, and it
-             posts through the same mutation trust gate as every other Control Room mutation. -->
-        <section id="docs-health" class="docs-health" aria-labelledby="docs-health-title" data-condition="unknown">
-          <header class="docs-health-header">
-            <div class="docs-health-heading">
-              <span class="eyebrow">Docs health</span>
-              <h3 id="docs-health-title">
-                <span id="docs-health-glyph" class="docs-health-glyph" aria-hidden="true">·</span>
-                <span id="docs-health-word">CHECKING</span>
-              </h3>
-            </div>
-            <span id="docs-health-scanned" class="last-update">reading the rail</span>
-          </header>
-          <p id="docs-health-headline" class="docs-health-headline">Loading the last docs-drift scan…</p>
-          <dl id="docs-health-axes" class="docs-health-axes" aria-label="Drift findings by axis"></dl>
-          <div id="docs-health-inventory" class="docs-health-inventory" aria-label="Drift finding inventory"></div>
-
-          <!-- The proposal half. Hidden entirely when nothing stands: an empty approve box on a
-               green board is an invitation to click something that does not exist. -->
-          <div id="docs-health-proposal" class="docs-health-proposal" hidden>
-            <p id="docs-health-proposal-detail" class="docs-health-proposal-detail"></p>
-            <form id="docs-health-approve-form" class="docs-health-approve" hidden>
-              <p class="boundary-copy">The machine proposes; the controller decides. Approving records an attributed, durable signature and dispatches the remediation exactly once — a second approval while it runs is a no-op, never a second run.</p>
-              <label><span>Signing as</span><input id="docs-health-by" type="text" maxlength="200" placeholder="operator name" required></label>
-              <label><span>Reason (optional)</span><input id="docs-health-reason" type="text" maxlength="2000" placeholder="why this is being approved now"></label>
-              <button id="docs-health-approve-button" type="submit">Approve remediation</button>
-            </form>
-            <p id="docs-health-approve-result" class="docs-health-approve-result" role="status"></p>
-          </div>
-        </section>
-
-        <!-- LIVE NOW — the phases board's live dimension (the live-board audit p2). Sits above
-             the full fleet board and lists the runs whose last phase was published within the
-             live window (10 minutes, the watchdog horizon) or whose runner telemetry is still
-             active, newest first, with the i-of-N phase and its age. Past the window a run
-             leaves LIVE NOW and shows its age in the historical list below; a run with no
-             timestamp at all renders age-unknown, never mislabeled. The section is a read-only
-             highlight, not a second grid: every row drills into the same detail surface as a
-             fleet card, and the grid underneath remains the full list. -->
-        <section id="live-now" class="live-now" aria-labelledby="live-now-title" hidden>
-          <header class="live-now-header">
-            <div class="live-now-heading">
-              <span class="eyebrow">Live board</span>
-              <h3 id="live-now-title"><span id="live-now-count" class="live-now-count">0</span> LIVE NOW</h3>
-            </div>
-            <span class="live-now-window last-update">window: 10m · last published phase</span>
-          </header>
-          <div id="live-now-list" class="live-now-list" aria-busy="true">
-            <p class="empty-state">No runs are live within the window.</p>
-          </div>
-        </section>
-
-        <div class="fleet-controls" aria-label="Fleet filters">
-          <div class="filter-group" role="group" aria-label="Status filter">
-            <button class="filter-chip active" type="button" data-filter="all" aria-pressed="true">All</button>
-            <button class="filter-chip" type="button" data-filter="live" aria-pressed="false">Live</button>
-            <button class="filter-chip" type="button" data-filter="running" aria-pressed="false">Running</button>
-            <button class="filter-chip" type="button" data-filter="risk" aria-pressed="false">Risk</button>
-          </div>
-          <label class="search-label">
-            <span class="sr-only">Search full cell ID</span>
-            <input id="cell-search" type="search" placeholder="Search cell ID" autocomplete="off">
-          </label>
-          <!-- Density is layout-only: it toggles a class on #fleet-grid and persists to
-               localStorage (design §2.3, [R §1.3.1] Linear). -->
-          <button id="density-toggle" class="density-toggle" type="button" aria-pressed="false" title="Toggle compact density">
-            <span aria-hidden="true">▤</span><span class="sr-only">Toggle compact fleet density</span>
-          </button>
-        </div>
-
-        <div id="fleet-grid" class="fleet-grid" aria-busy="true">
-          <div class="skeleton-card" aria-hidden="true"></div>
-          <div class="skeleton-card" aria-hidden="true"></div>
-          <div class="skeleton-card" aria-hidden="true"></div>
-        </div>
-        <div id="fleet-counts" class="fleet-counts" aria-label="Fleet status counts"></div>
-      </section>
-
-      <!-- STATUS — money and throughput, design §5 -->
-      <section id="board-status" class="board board-status" data-board="status" aria-labelledby="status-title" hidden>
-        <header class="board-header">
-          <div>
-            <span class="eyebrow">Live telemetry</span>
-            <h2 id="status-title">STATUS</h2>
-          </div>
-          <span class="bottom-provenance">telemetry: retained window</span>
-        </header>
-
-        <div class="metric-grid">
-          <section class="metric-card metric-hero" aria-labelledby="spend-label">
-            <div id="spend-label" class="metric-label">Reported spend</div>
-            <output id="reported-spend" class="metric-value cost-value">WAITING FOR COST TELEMETRY</output>
-            <span id="spend-provenance" class="provenance">RETAINED WINDOW</span>
-          </section>
-
-          <section class="metric-card metric-burn" aria-labelledby="burn-label">
-            <div id="burn-label" class="metric-label">Reported burn · rolling 60s</div>
-            <output id="burn-rate" class="metric-value cost-value">WAITING FOR LIVE COST</output>
-            <!-- Full-width trace: the rail keeps only the number (design §5.2). -->
-            <!-- Full-width trace: the design gives the rail a number and this board the whole
-                 series (§5.2), so the viewBox is wide enough to hold the full 60s window at
-                 one point per sample instead of the rail-sized 20-sample slice. -->
-            <svg id="burn-trace" class="burn-trace" viewBox="0 0 240 48" preserveAspectRatio="none" role="img" aria-label="No live cost samples"></svg>
-          </section>
-
-          <section class="metric-card" aria-label="Token totals">
-            <div class="metric-label">Tokens</div>
-            <dl class="metric-pairs">
-              <div><dt>Input</dt><dd><strong id="input-tokens" title="Unavailable">--</strong></dd></div>
-              <div><dt>Output</dt><dd><strong id="output-tokens" title="Unavailable">--</strong></dd></div>
-            </dl>
-          </section>
-
-          <section class="metric-card" aria-label="Fleet and connection state">
-            <div class="metric-label">Throughput</div>
-            <dl class="metric-pairs">
-              <div><dt>Running</dt><dd><strong id="running-count">--</strong></dd></div>
-              <div><dt>Redis</dt><dd><strong id="redis-state">CONNECTING</strong></dd></div>
-            </dl>
-          </section>
-        </div>
-
-        <!-- The pipeline strip is adopted here (expanded variant) while Status is active. -->
-        <div class="region-mount" data-mount="stages"></div>
-      </section>
-
-      <!-- FLAGS — the alert queue, promoted from a buried rail to a full board (design §4) -->
-      <section id="board-flags" class="board board-flags" data-board="flags" aria-labelledby="flags-title" hidden>
-        <header class="board-header">
-          <div>
-            <span class="eyebrow">Supervisor</span>
-            <h2 id="flags-title">NEEDS ATTENTION</h2>
-          </div>
-          <div class="board-header-meta">
-            <!-- Which store answered (redis | file | none). A "file" answer means the board is
-                 showing a retained snapshot, which is why it pairs with the delay notice. -->
-            <span id="supervisor-source" class="provenance">source: unknown</span>
-            <span id="supervisor-count" class="attention-count">--</span>
-          </div>
-        </header>
-
-        <section id="supervisor-rail" class="supervisor-rail">
-          <p id="supervisor-delay" class="supervisor-delay" hidden>Supervisor data delayed</p>
-          <div id="supervisor-flag-list" class="supervisor-flag-list" aria-busy="true">
-            <p class="empty-state">Loading supervisor flags…</p>
-          </div>
-          <!-- The flag-only invariant, visible on the board itself (docs/supervisor_design.md §1). -->
-          <footer class="supervisor-boundary">Supervisor flags. You decide.</footer>
-        </section>
-      </section>
-
-      <!-- SESSIONS — the management surface for both session fleets (design §6) -->
-      <section id="board-sessions" class="board board-sessions" data-board="sessions" aria-labelledby="sessions-title" hidden>
-        <header class="board-header">
-          <div>
-            <span class="eyebrow">Design + background</span>
-            <h2 id="sessions-title">SESSIONS</h2>
-          </div>
-        </header>
-
-        <section class="design-launchers" aria-labelledby="design-launchers-title">
-          <h3 id="design-launchers-title">DESIGN SESSIONS</h3>
-          <div class="design-launcher-grid">
-            <button id="new-workflow-design" type="button">Workflow design</button>
-            <button id="new-experiment-design" type="button">Experiment design</button>
-          </div>
-        </section>
-
-        <section class="recent-designs" aria-labelledby="recent-designs-title">
-          <h3 id="recent-designs-title">RECENT DESIGN SESSIONS</h3>
-          <div id="recent-design-list"><p class="empty-state">No portal-owned design sessions yet.</p></div>
-        </section>
-
-        <!-- On-demand form: hidden until a launcher above is pressed, so the board's resting
-             layout reads launchers -> recent sessions. shell.js scrolls it into view when the
-             data layer reveals it, keeping the pressed launcher and the form connected. -->
-        <form id="design-start-form" class="control-form" hidden>
-          <h3 id="design-start-title">NEW DESIGN SESSION</h3>
-          <label>
-            <span id="design-intent-label">Feature goal</span>
-            <textarea id="design-intent" rows="5" maxlength="12000" required></textarea>
-          </label>
-          <label>
-            <span>Model</span>
-            <input id="design-model" type="text" placeholder="provider/model" autocomplete="off" required>
-          </label>
-          <label>
-            <span>Approved workdir</span>
-            <select id="design-workdir" required><option value="">Loading approved workdirs…</option></select>
-          </label>
-          <div class="form-actions">
-            <button id="cancel-design-start" type="button">Cancel</button>
-            <button id="start-design-session" class="primary-action" type="submit">Start design session</button>
-          </div>
-          <output id="design-start-result" class="inline-result" aria-live="polite"></output>
-        </form>
-
-
-        <section id="claude-agents" class="claude-agents-pane" aria-labelledby="claude-agents-title">
-          <header class="pane-header claude-agents-header">
-            <div>
-              <span class="eyebrow">Claude background sessions</span>
-              <h3 id="claude-agents-title"><span id="claude-agent-total">--</span> SESSIONS</h3>
-            </div>
-            <button id="new-claude-agent" type="button">Start background session</button>
-          </header>
-
-          <div id="claude-agent-daemon-panel" class="daemon-panel" aria-labelledby="daemon-panel-title">
-            <h4 id="daemon-panel-title">DAEMON</h4>
-            <dl class="control-facts">
-              <div><dt>Status</dt><dd id="daemon-status">UNKNOWN</dd></div>
-              <div><dt>PID</dt><dd id="daemon-pid">--</dd></div>
-            </dl>
-            <div class="daemon-stop-controls">
-              <label class="check-label">
-                <input id="daemon-end-sessions" type="checkbox">
-                Also end every hosted session (keep_workers: false)
-              </label>
-              <!-- Irreversible and machine-wide: danger-styled and confirmed (design §3.4). -->
-              <button id="daemon-stop-button" class="danger-action" type="button">Stop daemon</button>
-            </div>
-            <p class="boundary-copy">Stopping the daemon affects every background session on this machine, not just ones started from the Control Room.</p>
-            <output id="daemon-stop-result" class="inline-result" aria-live="polite"></output>
-          </div>
-
-          <form id="claude-agent-start-form" class="control-form" hidden>
-            <h4>NEW BACKGROUND SESSION</h4>
-            <label>
-              <span>Task</span>
-              <textarea id="claude-agent-task" rows="4" maxlength="12000" required></textarea>
-            </label>
-            <label>
-              <span>Model (optional)</span>
-              <input id="claude-agent-model" type="text" placeholder="provider/model" autocomplete="off">
-            </label>
-            <label>
-              <span>Advisor (optional)</span>
-              <select id="claude-agent-advisor">
-                <option value="">None</option>
-                <option value="fable">fable</option>
-                <option value="opus">opus</option>
-                <option value="sonnet">sonnet</option>
-              </select>
-            </label>
-            <label>
-              <span>Approved workdir</span>
-              <select id="claude-agent-workdir" required><option value="">Loading approved workdirs…</option></select>
-            </label>
-            <p class="boundary-copy">Launched unattended with --dangerously-skip-permissions, the same as every other headless run this framework makes.</p>
-            <div class="form-actions">
-              <button id="cancel-claude-agent-start" type="button">Cancel</button>
-              <button id="start-claude-agent" class="primary-action" type="submit">Start session</button>
-            </div>
-            <output id="claude-agent-start-result" class="inline-result" aria-live="polite"></output>
-          </form>
-
-          <div id="claude-agent-grid" class="fleet-grid claude-agent-grid" aria-busy="true">
-            <p class="empty-state">Loading Claude background sessions…</p>
-          </div>
-        </section>
-      </section>
-
-      <!-- ROUTING — read-only analysis board, promoted from the bottom drawer (design §7.1) -->
-      <section id="board-routing" class="board board-routing" data-board="routing" aria-labelledby="routing-title" hidden>
-        <header class="board-header">
-          <div>
-            <span class="eyebrow">Model operations</span>
-            <h2 id="routing-title">ROUTING BOARD</h2>
-          </div>
-          <div class="board-header-actions">
-            <!-- Kept as the board's explicit load/collapse control. shell.js presses it once on
-                 first activation so the board is populated without a manual step, preserving
-                 the existing lazy-load + focus-return behavior in app.js. -->
-            <button id="routing-toggle" class="drawer-toggle" type="button" aria-expanded="false" aria-controls="routing-drawer">
-              Show routing data
-            </button>
-            <button id="routing-refresh" type="button">Refresh</button>
-          </div>
-        </header>
-        <section id="routing-drawer" class="routing-drawer" aria-label="Routing recommendations" hidden>
-          <div id="routing-content" class="routing-content">
-            <p class="empty-state">Open the drawer to load routing data.</p>
-          </div>
-        </section>
-      </section>
-
-      <section id="board-operations" class="board board-operations" data-board="operations" aria-labelledby="operations-title" hidden>
-        <header class="board-header">
-          <div>
-            <span class="eyebrow">The one packet</span>
-            <h2 id="operations-title">OPERATIONS</h2>
-          </div>
-          <div class="board-header-actions">
-            <button id="operations-refresh" type="button">Refresh</button>
-          </div>
-        </header>
-        <div id="operations-content" class="operations-content" data-loaded="false">
-          <p class="empty-state">Open this board to load the operational snapshot.</p>
-        </div>
-        <section id="run-detail-drawer" class="run-detail-drawer" aria-label="Run detail" hidden>
-          <header class="drawer-header">
-            <h3 id="run-detail-title">RUN DETAIL</h3>
-            <button id="run-detail-close" class="icon-button" type="button" aria-label="Close run detail"><span aria-hidden="true">✕</span></button>
-          </header>
-          <div id="run-detail-content" class="run-detail-content"></div>
-        </section>
-      </section>
-
-      <section id="board-surfaces" class="board board-surfaces" data-board="surfaces" aria-labelledby="surfaces-title" hidden>
-        <header class="board-header">
-          <div>
-            <span class="eyebrow">Read models</span>
-            <h2 id="surfaces-title">SURFACES</h2>
-          </div>
-          <div class="board-header-actions">
-            <button id="surfaces-refresh" type="button">Refresh</button>
-          </div>
-        </header>
-        <div id="surfaces-content" class="surfaces-content" data-loaded="false">
-          <p class="empty-state">Open this board to load the read models.</p>
-        </div>
-      </section>
-    </main>
-
-  </div>
-
-  <!-- ── System overflow (Registry + Queue actions) — design §7.2 ──────────────────────────
-       Bottom sheet on mobile, centered panel on desktop. Registry is read-only by
-       construction; Queue actions are the only actuation here and carry §3.4 gating.
-       Placed last in the document so the sheet's stacking context is unambiguous.
-  -->
-  <div id="scrim" class="scrim" hidden></div>
-
-  <section id="system-sheet" class="system-sheet" role="dialog" aria-modal="true" aria-labelledby="system-title" data-open="false" hidden>
-    <div class="sheet-handle" aria-hidden="true"></div>
-    <header class="sheet-header">
-      <div>
-        <span class="eyebrow">Overflow</span>
-        <h2 id="system-title">SYSTEM</h2>
+    <!-- ── WORKBENCH (drill-down only; the re-housed destination boards) ───────────────
+         The facelift dropped the old room's five destination boards and System overflow. Per
+         the reconciled IA (docs/research/control_room_ia.md §6/§14), each is re-housed as a
+         deliberate lens: fleet, attention, money, registry, sessions, queue, routing, docs,
+         audit, health, the workforce step-timing aggregate, and the step-11/12
+         Operations/Surfaces read views (including the batch lane). Hidden at rest; every panel
+         lazy-loads the SAME endpoint the old room used, so no capability is a stub. The panel
+         nav is an accelerator, not navigation-from-rest (§4.3). -->
+    <section class="workbench" id="workbench" data-workbench hidden
+             role="dialog" aria-modal="true" aria-labelledby="workbench-title">
+      <header class="wb-head">
+        <h2 id="workbench-title">WORKBENCH</h2>
+        <nav class="wb-nav" id="workbench-nav" aria-label="Workbench lenses"></nav>
+        <button class="icon-button" id="workbench-close" type="button">
+          <span aria-hidden="true">&#x2715;</span><span class="sr-only">Close the workbench</span>
+        </button>
+      </header>
+      <div class="wb-body" id="workbench-body">
+        <section class="wb-panel" data-lens="fleet" id="wb-fleet" hidden aria-label="Fleet"></section>
+        <section class="wb-panel" data-lens="attention" id="wb-attention" hidden aria-label="Attention"></section>
+        <section class="wb-panel" data-lens="money" id="wb-money" hidden aria-label="Money"></section>
+        <section class="wb-panel" data-lens="registry" id="wb-registry" hidden aria-label="Registry"></section>
+        <section class="wb-panel" data-lens="sessions" id="wb-sessions" hidden aria-label="Sessions"></section>
+        <section class="wb-panel" data-lens="queue" id="wb-queue" hidden aria-label="Queue"></section>
+        <section class="wb-panel" data-lens="routing" id="wb-routing" hidden aria-label="Routing"></section>
+        <section class="wb-panel" data-lens="docs" id="wb-docs" hidden aria-label="Docs health"></section>
+        <section class="wb-panel" data-lens="audit" id="wb-audit" hidden aria-label="Recording audit"></section>
+        <section class="wb-panel" data-lens="health" id="wb-health" hidden aria-label="Projection health"></section>
+        <section class="wb-panel" data-lens="workforce" id="wb-workforce" hidden aria-label="Workforce step timings"></section>
+        <!-- Step-11/12 read views (kept from main inside the refreshed presentation): the
+             operational packet + run detail and the step-5/6/7 read-model surfaces (including
+             the batch discount lane). Each panel renders the payload's own states verbatim. -->
+        <section class="wb-panel" data-lens="operations" id="wb-operations" hidden aria-label="Operations"></section>
+        <section class="wb-panel" data-lens="surfaces" id="wb-surfaces" hidden aria-label="Surfaces"></section>
       </div>
-      <button id="system-close" class="icon-button" type="button">
-        <span aria-hidden="true">✕</span><span class="sr-only">Close System</span>
-      </button>
-    </header>
+    </section>
 
-    <div class="sheet-body">
-      <section class="system-section" aria-labelledby="registry-title">
-        <header class="drawer-header">
-          <div>
-            <span class="eyebrow">Canonical state</span>
-            <h3 id="registry-title">REGISTRY</h3>
-          </div>
-          <div class="board-header-actions">
-            <button id="registry-toggle" class="drawer-toggle" type="button" aria-expanded="false" aria-controls="registry-drawer">
-              Show registry
-            </button>
-            <button id="registry-refresh" type="button">Refresh</button>
-          </div>
-        </header>
-        <section id="registry-drawer" class="routing-drawer" aria-label="Canonical state registry" hidden>
-          <form id="registry-filters" class="registry-filters">
-            <label>
-              Record type
-              <select id="registry-filter-type">
-                <option value="">All</option>
-                <option value="story">story</option>
-                <option value="review">review</option>
-                <option value="ledger_job">ledger_job</option>
-                <option value="ledger_attempt">ledger_attempt</option>
-                <option value="observation">observation</option>
-                <option value="flag">flag</option>
-                <option value="meta_session">meta_session</option>
-                <option value="actuation">actuation</option>
-              </select>
-            </label>
-            <label>
-              Lifecycle
-              <select id="registry-filter-lifecycle">
-                <option value="">All</option>
-                <option value="current">current</option>
-                <option value="superseded">superseded</option>
-                <option value="tombstoned">tombstoned</option>
-              </select>
-            </label>
-            <label>
-              Since
-              <input id="registry-filter-since" type="date" />
-            </label>
-            <button type="submit">Apply</button>
-          </form>
-          <div id="registry-content" class="routing-content">
-            <p class="empty-state">Open the drawer to load the registry.</p>
-          </div>
-          <div id="registry-lineage" class="registry-lineage" hidden>
-            <h4>Lineage</h4>
-            <div id="registry-lineage-content"></div>
-          </div>
-        </section>
-      </section>
+    <!-- One polite live region announces transitions only; ordinary changing metrics are
+         labelled and readable but never announced. -->
+    <div class="sr-only" id="announcer" aria-live="polite" role="status"></div>
 
-      <section class="system-section" aria-labelledby="queue-title">
-        <h3 id="queue-title">QUEUE</h3>
-        <div class="queue-actions">
-          <!-- Reversible: one explicit press, primary-styled (design §3.4). -->
-          <button id="enqueue-button" class="primary-action" type="button">Enqueue experiment</button>
-          <!-- Irreversible: danger-styled AND behind the two-step door below, the same pattern
-               as the supervisor Interrupt (design §3.4, §7.2). Color alone never distinguishes
-               "will do something" from "just viewing"; the typed phrase does. -->
-          <button id="clear-queue-button" class="danger-action" type="button" aria-expanded="false" aria-controls="queue-clear-door">Clear queued work</button>
-        </div>
-        <p class="boundary-copy">Clearing removes queued metadata only; running work is unaffected and is never cancelled from here.</p>
-        <section id="queue-clear-door" class="interrupt-door" aria-labelledby="queue-door-title" hidden>
-          <h4 id="queue-door-title">ONE-WAY DOOR</h4>
-          <p>Every queued job record is removed. Work already leased by a worker keeps running and is not cancelled.</p>
-          <p>Type <code id="queue-confirmation-phrase">CLEAR QUEUE</code> to continue.</p>
-          <label>
-            <span class="sr-only">Clear queue confirmation</span>
-            <input id="queue-clear-confirmation" type="text" autocomplete="off">
-          </label>
-          <div class="form-actions">
-            <button id="cancel-queue-clear" type="button">Cancel</button>
-            <button id="confirm-queue-clear" class="danger-action" type="button" disabled>Clear queued work permanently</button>
-          </div>
-        </section>
-        <output id="queue-result" class="inline-result" aria-live="polite"></output>
-      </section>
-
-      <section class="system-section" aria-labelledby="usage-title">
-        <header class="drawer-header">
-          <div>
-            <span class="eyebrow">Provider quota</span>
-            <h3 id="usage-title">SUBSCRIPTION USAGE</h3>
-          </div>
-          <div class="board-header-actions">
-            <button id="usage-refresh" type="button">Refresh</button>
-          </div>
-        </header>
-        <p class="boundary-copy">Read from the providers' own usage endpoints through a 15-minute cache; Refresh never queries them more than once per minute.</p>
-        <div id="usage-content" class="routing-content">
-          <p class="empty-state">Open System to load subscription usage.</p>
-        </div>
-      </section>
-    </div>
-  </section>
-
-  <div id="polite-status" class="sr-only" aria-live="polite" aria-atomic="true"></div>
-  <div id="alert-status" class="sr-only" role="alert" aria-live="assertive" aria-atomic="true"></div>
-
-  <script src="/static/control-room-core.js"></script>
+    <!-- Static no-JS fallback: if the client never runs, the resting contract is still stated. -->
+    <noscript>
+      <p class="noscript">The Control Room needs JavaScript to stream live run state.</p>
+    </noscript>
+  </div>
+  <!-- keyed-list.js is main's shared reconciler, loaded first (as main loaded it): parity.js's
+       re-housed polled lenses consume `window.ControlRoomKeyedList` so a refresh updates rows in
+       place rather than rebuilding the list and losing focus/scroll. It is dependency-free. -->
   <script src="/static/keyed-list.js"></script>
-  <script src="/static/board-fleet.js"></script>
-  <script src="/static/shell.js"></script>
-  <script src="/static/detail-sheet.js"></script>
   <script src="/static/app.js"></script>
+  <!-- charts.js / visuals.js are classic scripts loaded after app.js: app.js calls their
+       `update` / `render` seams at render/selection time, always after all scripts parsed.
+       parity.js re-houses the old room's operational surfaces (R4b/R4d + the workbench
+       lenses) and is loaded last so it can extend window.ControlRoom* seams. -->
+  <script src="/static/charts.js"></script>
+  <script src="/static/visuals.js"></script>
+  <script src="/static/parity.js"></script>
 </body>
 </html>
