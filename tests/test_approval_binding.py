@@ -77,7 +77,7 @@ def test_a_wrong_scope_approval_is_refused(tmp_path):
     """The review's reproduction: wrong spec AND phase AND candidate AND tree was ACCEPTED."""
     wd = _repo(tmp_path)
     ck = _git(wd, "rev-parse", "HEAD")
-    path = _approval(
+    _approval(
         wd, spec="WRONG_SPEC", phase="WRONG_PHASE",
         candidate="f" * 40, tree="e" * 40,
     )
