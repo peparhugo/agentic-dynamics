@@ -964,28 +964,95 @@ def cell_scope(workdir: str | Path) -> str:
     return f"self-{identity}"
 
 
-def _run_test_gate(pr: PhaseResult, wd: Path, language: str, timeout: int,
-                   target: str | list[str] | None = None) -> None:
-    """Run the independent suite for an agent phase that declared ``test_gate: true``.
+def _run_test_gate(
+    pr: PhaseResult,
+    wd: Path,
+    language: str,
+    timeout: int,
+    target: str | list[str] | None = None,
+    *,
+    verifier_executor: StepExecutor | None = None,
+    containerized_path: bool = False,
+    phase_def: dict[str, Any] | None = None,
+    name: str = "",
+    model: str = "",
+    goal: str = "",
+    spec_name: str = "",
+    empty_refuses: bool = True,
+) -> None:
+    """Run ONE verification for a phase and apply the ONE post-verdict rule set (wave A3).
 
-    The test_runner (``run_suite``) is the sole source of truth for the outcome — never the
-    model's self-report (the workflow's ``no_self_reported_tests`` policy). Mirrors the
-    ``kind == "test"`` branch: a failed suite fails the phase, so the commit gate skips it and
-    ``stop_on_error`` honours the failure. When the runner did not execute (no gate, or the
-    agent phase already failed) the caller leaves ``test_executed_success`` at its ``None``
-    default — null-not-zero, never a fabricated value.
+    The three verification shapes now share this function — an agent phase's required
+    ``test_gate: true``, an explicit ``kind: test`` phase, and (under ``--orchestrator``) the
+    dispatched READ-ONLY verifier container — so their semantics cannot drift:
 
-    ``target`` (test_suite_speed p2 scoping) is the phase's declared test target — an agent
-    phase may pair ``test_gate: true`` with ``tests:`` so its gate runs the spec's tests
-    instead of the whole tree.
+    * ``verifier_executor`` present → dispatch the suite to the independent verifier; the
+      verdict lands on the same fields from the same source semantics;
+    * ``containerized_path`` with no verifier → REFUSE loudly (``VERIFIER_REFUSED``): a
+      declared verification never silently runs in the orchestrator's privileged parent;
+    * otherwise → the in-process LocalVerifier (``run_suite``), unchanged.
+
+    Then the shared rules, applied identically to every shape:
+
+    * ``empty_refuses`` and **zero tests executed** → the phase FAILS: a required gate that
+      ran nothing is a false green, not a skip (the review's #5 reproduction — a required
+      native gate with zero tests previously read ``ok=True`` with
+      ``test_executed_success=False``);
+    * a DECLARED ``target`` that produced no passing suite → the phase FAILS (the b5
+      phantom-target rule). A no-target empty tree stays honest: ``test_executed_success``
+      records False and the caller decides — never a fabricated pass.
+
+    When the gate does not execute (no gate, or the agent phase already failed) the caller
+    leaves ``test_executed_success`` at its ``None`` default — null-not-zero.
     """
-    suite = run_suite(wd, language, timeout=timeout, target=target)
-    pr.tests_passed = suite["passed"]
-    pr.tests_total = suite["total"]
-    pr.test_executed_success = suite_succeeded(suite)
-    if suite.get("failed", 0) > 0 or suite.get("errors", 0) > 0:
+    if verifier_executor is not None:
+        test_request = StepRequest(
+            phase_name=name or pr.phase,
+            phase_kind=(phase_def or {}).get("kind", "test"),
+            prompt="",
+            model=model,
+            goal=goal,
+            spec_name=spec_name,
+            workdir=str(wd),
+            language=language,
+            timeout=timeout,
+            phase_def=dict(phase_def or {}),
+        )
+        try:
+            verdict = verifier_executor.execute(test_request)
+        except Exception as exc:  # a verifier failure is a state, never a crash
+            pr.status = "failed"
+            pr.error = f"VERIFIER_ERROR: {exc!r}"
+        else:
+            _apply_verifier_verdict(pr, verdict)
+    elif containerized_path:
         pr.status = "failed"
-        pr.error = suite.get("tail", "")[-400:]
+        pr.error = _verifier_refused_error(pr.phase)
+    else:
+        suite = run_suite(wd, language, timeout=timeout, target=target)
+        pr.tests_passed = suite["passed"]
+        pr.tests_total = suite["total"]
+        pr.test_executed_success = suite_succeeded(suite)
+        if suite.get("failed", 0) > 0 or suite.get("errors", 0) > 0:
+            pr.status = "failed"
+            pr.error = suite.get("tail", "")[-400:]
+
+    if pr.status == "failed":
+        return  # an already-failed verdict keeps its own evidence
+    if empty_refuses and int(pr.tests_total or 0) == 0:
+        pr.status = "failed"
+        pr.error = (
+            "TEST_GATE: required verification ran no tests (total 0 — a required gate needs "
+            "a nonempty passing suite or an explicit refusal)"
+        )
+        return
+    if target and not bool(pr.test_executed_success):
+        pr.status = "failed"
+        pr.error = pr.error or (
+            "TEST_GATE: declared verification ran no tests "
+            f"(total {int(pr.tests_total or 0)} — target {target!r} resolved to nothing; "
+            "a missing file or an empty collection)"
+        )
 
 
 def _apply_verifier_verdict(pr: PhaseResult, verdict: StepResult) -> None:
@@ -2844,10 +2911,18 @@ def _build_attempt_records(result: WorkflowRunResult, job_id: str) -> list[Attem
                         attempt_number=attempt_number,
                         parent_attempt_id=parent_id,
                         retry_reason=str(row.get("retry_reason") or ""),
+                        # Wave A3 #5a: ACCEPTANCE is the GATED outcome, never the adapter's
+                        # pre-gate status. A final attempt whose phase later failed a required
+                        # gate must not record accepted=True (the review's reproduction); an
+                        # earlier escalated attempt is a failed pass by construction. The
+                        # single-attempt path above already used the post-gate phase status —
+                        # this is the same contract for multi-attempt phases.
+                        accepted=((phase.status == "ok") if is_final else False),
                         first_pass=(
-                            (row.get("status") != "failed") if attempt_number == 1 else None
+                            ((phase.status == "ok") if is_final else False)
+                            if attempt_number == 1
+                            else None
                         ),
-                        accepted=row.get("status") == "ok",
                         escalation_from=row.get("escalation_from"),
                         escalation_to=row.get("escalation_to"),
                         model=str(row.get("model") or phase.model),
@@ -3304,60 +3379,16 @@ def run_workflow(
                 # The phase receives the resolved test target + language so the suite the
                 # verifier runs is the SAME target list the in-process path uses (local
                 # parity — test_suite_speed p2 scoping preserved on both sides).
-                if verifier_executor is not None:
-                    test_request = StepRequest(
-                        phase_name=name,
-                        phase_kind="test",
-                        prompt="",
-                        model=model,
-                        goal=goal,
-                        spec_name=spec.name,
-                        workdir=str(wd),
-                        language=language,
-                        timeout=phase_timeout,
-                        phase_def=dict(phase_def),
-                    )
-                    try:
-                        verdict = verifier_executor.execute(test_request)
-                    except Exception as exc:  # a verifier failure is a state, never a crash
-                        pr.status = "failed"
-                        pr.error = f"VERIFIER_ERROR: {exc!r}"
-                    else:
-                        _apply_verifier_verdict(pr, verdict)
-                elif containerized_path:
-                    # The containerized path (a step executor was injected — the operator
-                    # asked for sibling-cell isolation) with no verifier to dispatch to.
-                    # Refuse loudly: a declared verification must not silently run in the
-                    # orchestrator's own privileged container, and must never be skipped.
-                    pr.status = "failed"
-                    pr.error = _verifier_refused_error(name)
-                else:
-                    # test_suite_speed p2 scoping: a test phase may declare ``tests:`` (a file,
-                    # node id, or list thereof — e.g. ``tests/test_<spec>.py``) so the phase runs
-                    # the spec's own tests, never the whole multi-thousand-test tree. Without the
-                    # field the historical whole-tree scope is preserved.
-                    suite = run_suite(wd, language, timeout=phase_timeout,
-                                      target=phase_def.get("tests"))
-                    pr.tests_passed = suite["passed"]
-                    pr.tests_total = suite["total"]
-                    pr.test_executed_success = suite_succeeded(suite)
-                    # A zero-test run is a FALSE GREEN only when a target was DECLARED but
-                    # resolved to nothing (the b5 phantom-target lesson, fleet_launch_boundary
-                    # F5): a ``tests:`` file/node-id that collects no tests means the declared
-                    # verification never ran — total 0 / failed 0 / errors 0 read ok under the
-                    # old failed/errors-only check while test_executed_success was False.
-                    # A phase with NO declared target runs the whole tree; an empty tree
-                    # (a fresh worktree with no test files) collecting 0 is honest, not a
-                    # false green — suite_succeeded(total>0) still records False, and the
-                    # phase status honors it only when a target was declared.
-                    declared_target = phase_def.get("tests")
-                    if declared_target and not suite_succeeded(suite):
-                        pr.status = "failed"
-                        pr.error = suite.get("tail", "")[-400:] or (
-                            "TEST_GATE: declared verification ran no tests "
-                            f"(total 0 — target {declared_target!r} resolved to "
-                            "nothing; a missing file or an empty collection)"
-                        )
+                _run_test_gate(
+                    pr, wd, language, phase_timeout, target=phase_def.get("tests"),
+                    verifier_executor=verifier_executor,
+                    containerized_path=containerized_path,
+                    phase_def=phase_def, name=name, model=model, goal=goal,
+                    spec_name=spec.name,
+                    # The explicit phase's b5 rule: zero tests refuse when a target was
+                    # DECLARED; a whole-tree empty collection stays honest (no target).
+                    empty_refuses=bool(phase_def.get("tests")),
+                )
             else:
                 if phase_def.get("_prepared_step"):
                     # Wave A2: a prepared step's prompt is the parent's FINAL instruction — the
@@ -3667,7 +3698,15 @@ def run_workflow(
         # (null-not-zero — no defaulting, no fabrication). A failing gate fails the phase so the
         # commit below is skipped, exactly like the ``kind == "test"`` branch.
         if kind != "test" and phase_def.get("test_gate") and pr.status == "ok":
-            _run_test_gate(pr, git_wd, language, phase_timeout, target=phase_def.get("tests"))
+            _run_test_gate(
+                pr, git_wd, language, phase_timeout, target=phase_def.get("tests"),
+                verifier_executor=verifier_executor,
+                containerized_path=containerized_path,
+                phase_def=phase_def, name=name, model=model, goal=goal,
+                spec_name=spec.name,
+                # A required native gate refuses a zero-test suite outright (wave A3 #5).
+                empty_refuses=True,
+            )
 
         # Deploy gate (cap_runner_hardening p2) — post-phase, agent phases only. Scan the
         # phase's session transcript for firebase production-deploy commands; a hit in a phase
