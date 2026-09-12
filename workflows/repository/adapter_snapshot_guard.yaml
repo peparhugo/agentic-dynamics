@@ -1,0 +1,70 @@
+name: adapter_snapshot_guard
+question: >-
+  Guard the opencode adapter's workdir snapshot. run_opencode_agentic calls _list_files,
+  which sha256-hashes EVERY file in the workdir before and after the agent turn for
+  change detection. A real workdir holding 1.33M files (observed 2026-09-13: /tmp) ground
+  for minutes hashing before the model was ever invoked — a silent hang for the caller.
+  The snapshot must degrade honestly above a cap: no hashing above
+  FINOPS_ADAPTER_MAX_SNAPSHOT_FILES (default 50000), a named log line, and a
+  change-detection path that never fabricates an empty diff (a skipped snapshot must
+  fall back or report the degradation — the caller can always tell that detection was
+  unavailable, and git status remains a truthful fallback for the commit step).
+version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: false
+repeatable: false
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: false
+    context:
+      domain_context: >-
+        canonical_sources: [src/agentic_dynamics/adapters/opencode.py (_list_files at ~line
+        565, its two call sites at ~369 and ~548, the change-detection/auto-commit path),
+        tests/test_opencode_events.py (adapter-adjacent pins), the run_workflow/run_story
+        callers that pass workdir]
+        policies: [never hash an unbounded tree; a skipped snapshot is REPORTED, never a
+        silent empty diff; normal-size workdirs keep byte-identical behavior; no new
+        dependency]
+        verification: [the adapter/events tests, the fast lane, a synthetic large-tree
+        timing assertion (bounded runtime, not a hard wall-clock number)]
+    phases:
+      - name: g1_guard
+        kind: agent
+        scope: implementation
+        timeout: 1800
+        prompt: |
+          GOAL: {goal}
+          1. Read _list_files and both call sites; understand what the before/after dicts
+             feed (the changed-file set for auto-commit / session artifacts).
+          2. Implement the cap: while walking, count entries; above
+             FINOPS_ADAPTER_MAX_SNAPSHOT_FILES (env, default 50000) stop hashing and
+             return a result the callers can distinguish from a real empty snapshot
+             (e.g. None / a sentinel with the observed count + the cap), with ONE named
+             log line: "workdir snapshot skipped: N files > cap (FINOPS_ADAPTER_MAX_SNAPSHOT_FILES)".
+          3. Make the consumers honest: when the snapshot was skipped, do NOT report "no
+             changes" — fall back to `git status --porcelain` for the changed set where
+             available, else report change-detection unavailable. Never crash the turn.
+          4. Keep behavior byte-identical for workdirs under the cap.
+          5. Tests: (a) a synthetic tree above a tiny cap (env override, e.g. 100) is not
+             hashed and reports the named degradation; (b) the fallback path yields the
+             changed set from git when the snapshot was skipped; (c) an under-cap workdir
+             behaves exactly as today.
+      - name: g2_verify
+        kind: test
+        scope: implementation
+        timeout: 600
+        tests: "tests/test_opencode_events.py tests/test_fast_path_gate.py"
+        prompt: |
+          The declared target verifies the guard. Fix the code, not the pins.
+factors:
+  - {name: model, levels: [deepseek/deepseek-v4-flash]}
+design: factorial
+rules: []
+metrics: []
+writeup: {format: lab_book, sections: [question]}
+stop: {budget_usd: 1.0, max_attempts: 1}
