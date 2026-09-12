@@ -183,6 +183,7 @@ def _promote_decision(
     *,
     status: str,
     requested_action: dict | None = None,
+    command_id: str = "",
 ) -> dict:
     """The promote decision/act dict the emission seam consumes (verb/run/candidate/operator).
 
@@ -190,6 +191,10 @@ def _promote_decision(
     ledger was filed under — the same identity the control-row close uses), falling back to
     ``spec_id``/spec name only for a legacy pre-db ledger; a spec id is not a run id.
     The candidate sha is the verified worktree HEAD.
+
+    Wave B5: ``why`` is the operator's TRUE ``--rationale`` (the synthetic "workflow X → base"
+    explanation is deleted), and ``command_id`` is the journal receipt this act binds — the
+    emitted decision and act now carry the receipt the command journal recorded.
     """
     run_id = (
         _ledger_run_id(ledger)
@@ -197,14 +202,20 @@ def _promote_decision(
         or str(ledger.get("spec_name") or "")
         or args.spec
     )
+    why = str(args.rationale or "").strip()
+    rationale_ref = str(getattr(args, "rationale_ref", "") or "").strip()
+    if rationale_ref:
+        why = f"{why} (ref: {rationale_ref})"
     decision = {
         "verb": "promote",
         "run_id": run_id,
         "candidate_sha": candidate,
         "operator": args.operator,
         "status": status,
-        "why": f"workflow {args.spec} → {args.base}",
+        "why": why,
     }
+    if command_id:
+        decision["command_id"] = command_id
     if requested_action:
         decision["requested_action"] = requested_action
     return decision
@@ -284,26 +295,33 @@ def _default_decision_record(decision: dict) -> dict:
     }
 
 
-def _promote_decision_record(args: argparse.Namespace, ledger: dict, candidate: str) -> dict:
+def _promote_decision_record(
+    args: argparse.Namespace, ledger: dict, candidate: str, *, command_id: str = ""
+) -> dict:
     """The s2 decision dict this promote records: what/why/category/actor + run/candidate.
 
-    ``what`` names the permanence act in human terms; ``why`` is the decision's rationale (the
-    candidate passed every gate the promotion verified); ``run_id``/``candidate_sha`` bind the
-    record to the exact run + tree the promotion acted on (the DONE_WHEN). ``decided_at`` is the
-    moment of the decision — recorded at invocation, not at some later derivation.
+    ``what`` names the permanence act in human terms; ``why`` is the operator's TRUE
+    ``--rationale`` (wave B5: the synthetic gate-count explanation is deleted), with the journal
+    command id appended when present so the record names its receipt; ``run_id``/``candidate_sha``
+    bind the record to the exact run + tree the promotion acted on (the DONE_WHEN).
+    ``decided_at`` is the moment of the decision — recorded at invocation, not at some later
+    derivation.
     """
-    phases = ledger.get("phases") or []
-    cost = float(ledger.get("total_cost_usd", 0) or 0)
     run_id = (
         _ledger_run_id(ledger)
         or str(ledger.get("spec_id") or "")
         or str(ledger.get("spec_name") or "")
         or args.spec
     )
+    why = str(args.rationale or "").strip()
+    rationale_ref = str(getattr(args, "rationale_ref", "") or "").strip()
+    if rationale_ref:
+        why = f"{why} (ref: {rationale_ref})"
+    if command_id:
+        why = f"{why} (command {command_id})"
     return {
         "what": f"promote workflow {args.spec} to {args.base}",
-        "why": f"candidate {candidate[:12]} passed {len(phases)} verified phase gate(s) "
-        f"(${cost:.4f}) — promoted as '{PROMOTION_PREFIX} {args.spec}'",
+        "why": why,
         "alternatives": [],
         "category": DECISION_CATEGORY,
         "decided_at": datetime.now(timezone.utc).isoformat(),
@@ -652,7 +670,8 @@ def _run_promotion(
     # awaiting operator approval and is now bound by a valid approval promotes as "approved";
     # a straight verified run promotes as "requested" (routed on the packet's promotable_runs).
     decision = _promote_decision(
-        args, ledger, candidate, status="approved" if awaiting else "requested"
+        args, ledger, candidate, status="approved" if awaiting else "requested",
+        command_id=command.command_id,
     )
     emitted = _emit_best_effort("promote decision", lambda: emit_decision(decision))
     observation_id = (emitted or {}).get("observation_id")
@@ -711,7 +730,9 @@ def _run_promotion(
     # record never blocks (the durable act already happened).
     _emit_best_effort(
         "promote decision record",
-        lambda: record_decision(_promote_decision_record(args, ledger, candidate)),
+        lambda: record_decision(
+            _promote_decision_record(args, ledger, candidate, command_id=command.command_id)
+        ),
     )
 
     # 10 ── the act emits AFTER it lands: an actuation record whose ``causes`` links back to
@@ -725,6 +746,7 @@ def _run_promotion(
                 candidate,
                 status="approved" if awaiting else "requested",
                 requested_action={"outcome": "pushed", "pushed_sha": pushed, "base": base},
+                command_id=command.command_id,
             ),
             causes=observation_id or "",
         ),

@@ -119,6 +119,15 @@ class TestBuildObservation:
         assert obs.subject_status == "publish:requested"
         assert _CANDIDATE_SHA in obs.text
 
+    def test_observation_carries_the_true_rationale_and_command_id(self):
+        """Wave B5: the observation's text carries the operator's TRUE rationale + the journal
+        receipt id — the decision is the one the command journal recorded."""
+        obs = aio_emission.build_observation(
+            _decision(why="ships the B5 receipts", command_id="cmd-42")
+        )
+        assert "ships the B5 receipts" in obs.text
+        assert "command cmd-42" in obs.text
+
     def test_observation_without_candidate_sha_refuses(self):
         with pytest.raises(ValueError, match="no candidate_sha"):
             aio_emission.build_observation(_decision(candidate_sha=""))
@@ -150,6 +159,18 @@ class TestBuildActuation:
         assert body["requested_by"] == "drseuss"
         assert body["requested_action"]["candidate_sha"] == _CANDIDATE_SHA
         assert body["requested_action"]["pushed_sha"] == "abc123"
+
+    def test_actuation_carries_the_command_id(self):
+        """Wave B5: the act names its journal receipt — the command id lands in
+        ``requested_action`` beside the candidate."""
+        obs = aio_emission.build_observation(_decision(command_id="cmd-42"))
+        act = aio_emission.build_actuation(
+            _decision(command_id="cmd-42", requested_action={"outcome": "pushed"}),
+            causes=obs.knowledge_id,
+        )
+        body = json.loads(act.text)
+        assert body["requested_action"]["command_id"] == "cmd-42"
+        assert body["requested_action"]["outcome"] == "pushed"
 
     def test_empty_causes_refuses_at_construction(self):
         # the producer's one hard construction-time requirement is preserved through the seam.
@@ -358,10 +379,17 @@ class TestPromoteCallSiteEmits:
         assert len(pushes) == 1  # the act happened
         # the decision dict the call site built (deterministic from args+ledger) is what the
         # observation must carry: run_id + candidate_sha + operator.
-        decision = _promote_decision(args, ledger, head, status="requested")
+        # The call site threads the journal command id (the fake's `cmd-a5test`); deriving the
+        # same dict here must reproduce EXACTLY what was emitted, receipt binding included.
+        decision = _promote_decision(
+            args, ledger, head, status="requested", command_id="cmd-a5test"
+        )
         assert decision["run_id"] == "promote_test@0.1"
         assert decision["candidate_sha"] == head
         assert decision["operator"] == "drseuss"
+        # Wave B5: the why is the operator's TRUE rationale, never a synthetic explanation.
+        assert decision["why"] == "aio emission test"
+        assert decision["command_id"] == "cmd-a5test"
 
         # (a) the streamed observation is exactly that decision's record — carrying run_id
         # (subject_id) + candidate sha (in its text) — and it landed BEFORE the actuation.
@@ -407,10 +435,32 @@ class TestPromoteCallSiteEmits:
         assert len(calls["act"]) == 1
         decision, causes = calls["act"][0]
         assert calls["decision"][0]["candidate_sha"] == head
+        # Wave B5: the call site threads the TRUE rationale + the journal command id
+        # (the `_journal_fakes` command) into both the decision and the act.
+        assert calls["decision"][0]["why"] == "aio emission test"
+        assert calls["decision"][0]["command_id"] == "cmd-a5test"
+        assert decision["command_id"] == "cmd-a5test"  # build_actuation folds it into the record
         # the act's causes == the observation id the decision emitter returned.
         assert causes == observation_ids[0]
         assert decision["requested_action"]["outcome"] == "pushed"
         assert decision["requested_action"]["pushed_sha"] == "feedfacefeedfacefeedface"
+
+
+def test_publish_decision_and_record_carry_the_true_rationale_and_command_id():
+    """Wave B5: the publish emission + its s2 decision record carry the operator's rationale
+    (never the synthetic receipt-hash summary) and the journal command id."""
+    from types import SimpleNamespace
+
+    args = SimpleNamespace(
+        rationale="ship the release", rationale_ref="", run_id="",
+        candidate_sha="ab" * 20, operator="drseuss",
+    )
+    receipt = {"repo_sha": "cd" * 20}
+    decision = pr._publish_decision(args, receipt, command_id="cmd-9")
+    assert decision["why"] == "ship the release"
+    assert decision["command_id"] == "cmd-9"
+    record = pr._publish_decision_record(args, receipt, command_id="cmd-9")
+    assert record["why"] == "ship the release (command cmd-9)"
 
     def test_emission_failure_never_blocks_the_act(self, tmp_path):
         """(c) best-effort is structural: a raising emitter cannot stop a verified promotion."""

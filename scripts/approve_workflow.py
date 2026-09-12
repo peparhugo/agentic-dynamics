@@ -159,7 +159,13 @@ def _run_approval(args: argparse.Namespace) -> None:
             approval = None
 
         # 4 ── emit the decision (verb=approve) so the AIO's approval is observable.
-        emission = _emit_approval_decision(args) if not args.dry_run else {}
+        emission = (
+            _emit_approval_decision(
+                args, command_id=getattr(command, "command_id", "") if command else ""
+            )
+            if not args.dry_run
+            else {}
+        )
     except Exception as exc:
         if command is not None:
             try:
@@ -290,8 +296,12 @@ def _commit_artifact(args: argparse.Namespace, artifact: Path) -> str:
     return _git("rev-parse", "HEAD")
 
 
-def _emit_approval_decision(args: argparse.Namespace) -> dict:
-    """Best-effort AIO decision emission (verb=approve) — never blocks the approval."""
+def _emit_approval_decision(args: argparse.Namespace, *, command_id: str = "") -> dict:
+    """Best-effort AIO decision emission (verb=approve) — never blocks the approval.
+
+    Wave B5: ``why`` is the operator's true ``--reason``; ``command_id`` is the journal receipt
+    this approval binds (the emitted decision carries the receipt the command journal recorded).
+    """
     from agentic_dynamics.control import aio_emission
 
     decision = {
@@ -304,6 +314,8 @@ def _emit_approval_decision(args: argparse.Namespace) -> dict:
         "why": args.reason or "operator approval",
         "status": "approved",
     }
+    if command_id:
+        decision["command_id"] = command_id
     try:
         return aio_emission.emit_decision(decision)
     except Exception as exc:  # best-effort by contract
