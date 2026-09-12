@@ -83,7 +83,11 @@ workflow:
         kind: test
         scope: implementation
         timeout: 900
-        tests: "tests/test_lab_contract.py tests/test_lab_outputs_canonical.py tests/test_lab_manifest.py tests/test_fast_path_gate.py"
+        tests:
+          - tests/test_lab_contract.py
+          - tests/test_lab_outputs_canonical.py
+          - tests/test_lab_manifest.py
+          - tests/test_fast_path_gate.py
         prompt: |
           The declared test target verifies the extension end to end. Every failure must be
           fixed by repairing the artifact via regeneration or by the fingerprint's declared

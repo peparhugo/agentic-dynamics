@@ -68,7 +68,9 @@ workflow:
         kind: test
         scope: implementation
         timeout: 600
-        tests: "tests/test_aggregate_workflow_metrics.py tests/test_fast_path_gate.py"
+        tests:
+          - tests/test_aggregate_workflow_metrics.py
+          - tests/test_fast_path_gate.py
         prompt: |
           The declared target verifies the dedup + reporting. Fix failures in the code, not
           the pins.
