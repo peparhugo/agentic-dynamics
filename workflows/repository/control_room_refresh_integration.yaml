@@ -1,0 +1,103 @@
+name: control_room_refresh_integration
+question: >-
+  Land the Control Room UI/UX refresh. Integrate the completed
+  feature/control-room-research lineage (66 commits: the 200-source research corpus, the
+  u0/u2 UX foundation, the f-series facelift with render-verified screenshots at three
+  breakpoints, the repair passes, and the signed d0-d5 rules design) with current main.
+  A trial merge shows exactly nine conflicted files: apps/control_room/server.py,
+  apps/control_room/static/app.js, apps/control_room/static/index.html,
+  tests/test_admin_server.py, tests/test_research_fetch.py, README.md,
+  scripts/CONTEXT.md, and the two generated spec-index files. The integration keeps BOTH
+  sides: main's newer surfaces (A7's unavailability rendering, the step-11
+  Operations/Surfaces boards, the step-12 batch lane) AND the refresh's design system.
+  Then re-verify with the branch's own render gate plus the control-room test subset, and
+  produce the screenshot set the controller reviews before the permanence decision.
+version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: false
+repeatable: false
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: false
+    context:
+      domain_context: >-
+        canonical_sources: [the origin branch feature/control-room-research (the lineage),
+        apps/control_room/ (server.py + routes/ + services/ + static/),
+        scripts/verify_control_room_rendering.py (the branch's render gate),
+        docs/reviews/control_room_facelift_*.md (design brief + adversary verdicts),
+        experiments/control_room_rules/ (the signed d0-d5 design)]
+        policies: [keep both sides of every conflict, no functional regression,
+        vanilla JS only, no build step, preserve SSE contracts, the live portal on the
+        host is not to be restarted or touched]
+        verification: [the control-room test subset, the fast lane,
+        scripts/verify_control_room_rendering.py at desktop/mobile/narrow dark breakpoints]
+    phases:
+      - name: i1_integrate
+        kind: agent
+        scope: implementation
+        timeout: 1800
+        prompt: |
+          GOAL: {goal}
+          Produce the integration branch and resolve the merge; nothing else.
+          1. git fetch origin feature/control-room-research
+          2. git fetch origin main
+          3. git checkout -b refresh_integration origin/feature/control-room-research
+          4. git merge origin/main  (create a merge commit; expect conflicts in the nine
+             files named in this spec's question)
+          5. Resolve every conflict KEEPING BOTH SIDES: the refresh's layout and visual
+             system AND main's newer surfaces (A7 unavailability rendering, the step-11
+             Operations/Surfaces boards, the step-12 batch lane). Where the refresh
+             predates a main surface, keep main's behavior inside the refreshed
+             presentation.
+          6. Regenerate the generated artifacts rather than hand-merging them:
+             python scripts/spec_status.py   (rewrites experiments/specs/STATUS.md +
+             experiments/specs/index.json). For scripts/CONTEXT.md and README.md resolve
+             by hand, keeping main's newer entries plus the branch's additions.
+          7. Commit the merge.
+          Constraints: do NOT push; do NOT touch the host portal (control-room.service);
+          do NOT run firebase; do NOT restart services.
+      - name: i2_verify
+        kind: test
+        scope: implementation
+        timeout: 900
+        tests: "tests/test_admin_server.py tests/test_admin_design_sessions.py tests/test_control_room_parity.py tests/test_research_fetch.py tests/test_fast_path_gate.py tests/test_relabel_tree_gate.py"
+        prompt: |
+          The declared test target runs the control-room + research + guard subset on the
+          integration branch. Fix regressions WITHOUT weakening assertions; keep both
+          sides' behavior.
+      - name: i3_render_gate
+        kind: agent
+        scope: implementation
+        timeout: 1800
+        prompt: |
+          Run the branch's render gate on the integration branch and repair what it flags:
+          python scripts/verify_control_room_rendering.py   (read the script first: use its
+          actual flags and output paths). Requirements: the gate passes at desktop /
+          mobile / narrow dark breakpoints, per-page screenshots regenerate under the
+          branch's verification directory, no console errors, no overflow/aspect
+          failures. Fix the UI, never the gate's assertions.
+      - name: i4_adversarial
+        kind: agent
+        scope: implementation
+        timeout: 1200
+        prompt: |
+          Adversarial pass over the integrated tree. Would a strong designer or an
+          operator monitoring a parallel agent fleet call the result generic, cluttered,
+          or regressed? Compare the regenerated screenshots against the branch's original
+          verdicts (docs/reviews/control_room_facelift_*.md). Verify NO functional
+          regression: every main-side route/board still renders (grep the static modules
+          for the boards' anchors; run the relevant test subset). Record findings in
+          docs/reviews/control_room_refresh_integration.md with a fix-or-justify line
+          each; fix what you can, justify the rest.
+factors:
+  - {name: model, levels: [deepseek/deepseek-v4-flash]}
+design: factorial
+rules: []
+metrics: []
+writeup: {format: lab_book, sections: [question]}
+stop: {budget_usd: 3.0, max_attempts: 1}
