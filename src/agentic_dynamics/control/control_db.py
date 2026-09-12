@@ -477,6 +477,11 @@ class RunRecord:
     #: fallback source of truth. A run with no ledger is fully reconstructible from this db.
     ledger_path: str
     cost_usd: float
+    #: Wave B3: sha256 over the EXACT bytes of the ledger file at ``ledger_path``, stamped in
+    #: the SAME terminal transaction as the outcome. ``''`` for runs predating the binding.
+    #: Consumers (promote) recompute the file's hash and refuse a mismatch — the artifact can
+    #: never be swapped or edited after its outcome was recorded without the gate noticing.
+    result_digest: str = ""
     #: The split-run family link (engine_gaps_followups g1, F5). ``parent_run_id`` is the run
     #: this run CONTINUES — a ``--resume`` child records its parent. ``family_id`` is the family
     #: ROOT's run id, shared by every member of the resume lineage (a fresh run is its own
@@ -908,6 +913,9 @@ CREATE TABLE IF NOT EXISTS runs (
     started_at           TEXT NOT NULL DEFAULT '',
     ended_at             TEXT NOT NULL DEFAULT '',
     ledger_path          TEXT NOT NULL DEFAULT '',
+    -- Wave B3: sha256 of the ledger file's exact bytes, stamped in the SAME atomic
+    -- transaction as the terminal outcome — the artifact-outcome binding consumers verify.
+    result_digest        TEXT NOT NULL DEFAULT '',
     cost_usd             REAL NOT NULL DEFAULT 0.0,
     parent_run_id        TEXT NOT NULL DEFAULT '',
     family_id            TEXT NOT NULL DEFAULT ''
@@ -1388,6 +1396,9 @@ class ControlDB:
         self._migrate_runs_family_columns()
         # v4 → v5 (step 2, 2026-09-11): approvals GAIN the typed-decision columns.
         self._migrate_approvals_columns()
+        # v6 → v7 (wave B3): runs GAIN the result_digest column — the artifact the terminal
+        # outcome describes, bound in the same atomic write.
+        self._migrate_runs_result_digest_column()
         with self.transaction():
             self._conn.execute(
                 "INSERT OR IGNORE INTO control_meta(key, value) VALUES ('schema_version', ?)",
@@ -1446,6 +1457,25 @@ class ControlDB:
             )
             self._conn.execute(
                 "CREATE INDEX IF NOT EXISTS idx_runs_parent_run_id ON runs(parent_run_id)"
+            )
+        finally:
+            self._conn.execute("COMMIT")
+
+    def _migrate_runs_result_digest_column(self) -> None:
+        """Idempotently add the ``result_digest`` column to ``runs`` (v6 → v7, wave B3).
+
+        Guarded by column presence so re-opening a v7 database is a no-op; additive, so
+        existing rows default to ``''`` (a pre-B3 run carries no artifact binding).
+        """
+        existing = {
+            row["name"] for row in self._conn.execute("PRAGMA table_info(runs)").fetchall()
+        }
+        if "result_digest" in existing:
+            return
+        self._conn.execute("BEGIN IMMEDIATE")
+        try:
+            self._conn.execute(
+                "ALTER TABLE runs ADD COLUMN result_digest TEXT NOT NULL DEFAULT ''"
             )
         finally:
             self._conn.execute("COMMIT")
@@ -1679,6 +1709,7 @@ class ControlDB:
         cost_usd: float | None = None,
         candidate_sha: str | None = None,
         ledger_path: str | None = None,
+        result_digest: str | None = None,
         ended_at: str | None = None,
     ) -> RunRecord:
         """Move a run to ``new_state``, appending an immutable transition row.
@@ -1731,7 +1762,8 @@ class ControlDB:
                        ended_at = ?,
                        cost_usd = ?,
                        candidate_sha = ?,
-                       ledger_path = ?
+                       ledger_path = ?,
+                       result_digest = ?
                  WHERE run_id = ?
                 """,
                 (
@@ -1740,6 +1772,7 @@ class ControlDB:
                     current.cost_usd if cost_usd is None else float(cost_usd),
                     current.candidate_sha if candidate_sha is None else candidate_sha,
                     current.ledger_path if ledger_path is None else ledger_path,
+                    current.result_digest if result_digest is None else result_digest,
                     run_id,
                 ),
             )
@@ -2793,6 +2826,7 @@ def _run_from_row(row: sqlite3.Row) -> RunRecord:
         ended_at=row["ended_at"],
         ledger_path=row["ledger_path"],
         cost_usd=float(row["cost_usd"]),
+        result_digest=row["result_digest"] if "result_digest" in cols else "",
         parent_run_id=row["parent_run_id"] if "parent_run_id" in cols else "",
         family_id=row["family_id"] if "family_id" in cols else "",
     )

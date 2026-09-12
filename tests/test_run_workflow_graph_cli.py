@@ -516,3 +516,15 @@ def test_ledger_path_is_collision_proof_and_identity_carrying(tmp_path, monkeypa
 
     assert parse_timestamp(first.stem) == now
     assert parse_timestamp(second.stem) == now
+
+
+def test_ledger_digest_hashes_the_file_and_is_honest_when_absent(tmp_path):
+    """Wave B3: the digest is sha256 over the ledger's exact bytes; a missing file yields the
+    honest empty string (never a fabricated hash) with a warning."""
+    import hashlib
+
+    module = _load_module()
+    ledger = tmp_path / "ledger.json"
+    ledger.write_text('{"a": 1}')
+    assert module._ledger_digest(ledger) == hashlib.sha256(b'{"a": 1}').hexdigest()
+    assert module._ledger_digest(tmp_path / "missing.json") == ""

@@ -639,12 +639,14 @@ def test_the_terminal_write_records_transition_envelope_and_events(db, run_id):
         payloads=payloads,
         cost_usd=1.25,
         ledger_path="experiments/results/workflows/x/20260902T000000Z.json",
+        result_digest="d" * 64,
         candidate_sha="c" * 40,
     )
 
     assert write.run.state is RunState.PROMOTABLE  # 1. the transition
     assert write.run.cost_usd == 1.25  # 2. the result envelope
     assert write.run.ledger_path.endswith("20260902T000000Z.json")
+    assert write.run.result_digest == "d" * 64  # wave B3: the artifact binding is atomic too
     assert write.run.candidate_sha == "c" * 40
     assert len(write.events) == 3  # 3. the events it owes
     assert all(e.status is OutboxStatus.PENDING for e in db.outbox_events(run_id=run_id))
