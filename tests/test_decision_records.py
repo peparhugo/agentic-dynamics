@@ -764,10 +764,28 @@ def _promote_args(tmp_path: Path, wt: Path, ledger: dict, **overrides):
         "approval": None,
         "base": "main",
         "operator": "drseuss",
+        "rationale": "decision record test",
+        "rationale_ref": "",
         "dry_run": False,
     }
     args.update(overrides)
     return SimpleNamespace(**args)
+
+
+def _journal_fakes() -> dict:
+    """Step 10's journal seams: hermetic fakes so the real control db is never touched.
+
+    Tolerant kwargs: promote's intent receives ``ledger``/``candidate``/``run_id``; publish's
+    receives ``receipt``.
+    """
+    from types import SimpleNamespace
+
+    return {
+        "journal_intent": lambda args, **kwargs: SimpleNamespace(
+            command_id="cmd-decrec-test", state="intent"
+        ),
+        "journal_receipt": lambda args, command, *, state, receipt: None,
+    }
 
 
 def _promote_ledger(head_sha: str, **overrides) -> dict:
@@ -815,6 +833,7 @@ class TestPromoteEmission:
             _promote_args(tmp_path, wt, ledger),
             push=fake_push, emit_decision=emit_decision, emit_act=emit_act,
             record_decision=seam,
+            **_journal_fakes(),
         )
 
         assert len(pushes) == 1  # the promotion happened
@@ -858,6 +877,7 @@ class TestPromoteEmission:
             _promote_args(tmp_path, wt, ledger),
             push=fake_push, emit_decision=emit_decision, emit_act=emit_act,
             record_decision=boom,
+            **_journal_fakes(),
         )
         assert len(pushes) == 1
 
@@ -907,6 +927,7 @@ class TestPromoteEmission:
         _run_promotion(
             _promote_args(tmp_path, wt, ledger),
             push=fake_push, emit_decision=emit_decision, emit_act=emit_act,
+            **_journal_fakes(),
         )
         assert len(pushes) == 1
         records, warnings = di.scan_decision_records(category="promote", artifact_dir=tmp_path / "kb")
@@ -968,11 +989,13 @@ class TestPublishEmission:
 
         rc = pr_mod.main(
             ["--candidate-sha", "deadbeef", "--run-id", "publish_run_9",
-             "--operator", "operator-test", "--db", str(db_path)],
+             "--operator", "operator-test", "--rationale", "decision record test",
+             "--db", str(db_path)],
             deployer=deploy, builder=lambda: (True, "built"),
             live_checker=lambda host, receipt: "",
             emit_decision=emit_decision, emit_act=emit_act,
             record_decision=seam,
+            **_journal_fakes(),
         )
         assert rc == pr_mod.EXIT_OK
         assert len(seam.decisions) == 1
@@ -1006,11 +1029,13 @@ class TestPublishEmission:
             raise RuntimeError("record seam exploded")
 
         rc = pr_mod.main(
-            ["--candidate-sha", "deadbeef", "--operator", "operator-test", "--db", str(db_path)],
+            ["--candidate-sha", "deadbeef", "--operator", "operator-test",
+             "--rationale", "decision record test", "--db", str(db_path)],
             deployer=deploy, builder=lambda: (True, "built"),
             live_checker=lambda host, receipt: "",
             emit_decision=emit_decision, emit_act=emit_act,
             record_decision=boom,
+            **_journal_fakes(),
         )
         assert rc == pr_mod.EXIT_OK  # published despite the record failure
 
@@ -1053,10 +1078,12 @@ class TestPublishEmission:
 
         rc = pr_mod.main(
             ["--candidate-sha", "deadbeef", "--run-id", "publish_run_9",
-             "--operator", "operator-test", "--db", str(db_path)],
+             "--operator", "operator-test", "--rationale", "decision record test",
+             "--db", str(db_path)],
             deployer=deploy, builder=lambda: (True, "built"),
             live_checker=lambda host, receipt: "",
             emit_decision=emit_decision, emit_act=emit_act,
+            **_journal_fakes(),
         )
         assert rc == pr_mod.EXIT_OK
         records, warnings = di.scan_decision_records(category="publish", artifact_dir=tmp_path / "kb")

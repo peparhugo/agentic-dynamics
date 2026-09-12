@@ -22,8 +22,10 @@ CONTEXT = SCRIPTS_DIR / "CONTEXT.md"
 BUCKETS = ("maintained", "historical", "one-time", "fleet")
 
 # Helper modules (underscore-prefixed) are shared infrastructure, not commands: `_bootstrap.py`
-# inserts src/ onto sys.path; `_gen_instructions.py` regenerates the instruction surfaces.
-HELPERS = {"_bootstrap.py", "_gen_instructions.py"}
+# inserts src/ onto sys.path; `_gen_instructions.py` regenerates the instruction surfaces;
+# `_command_journal.py` is the shared intent/receipt mechanism the two permanence commands call
+# (step 10).
+HELPERS = {"_bootstrap.py", "_gen_instructions.py", "_command_journal.py"}
 
 _START = "<!-- scripts-classification: start -->"
 _END = "<!-- scripts-classification: end -->"

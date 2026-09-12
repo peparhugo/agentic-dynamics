@@ -18,9 +18,17 @@ The authority rules (the deep review's P0-4):
 - approval (when the run stopped awaiting) must bind to the same candidate SHA.
 
 Usage:
-    python scripts/promote.py --spec <name> --workdir <worktree> [--ledger <path>]
-                              [--approval <path>] [--operator <name>] [--db <path>] [--dry-run]
+    python scripts/promote.py --spec <name> --workdir <worktree> --operator <name>
+                              --rationale "<why>" [--rationale-ref <ref>]
+                              [--ledger <path>] [--approval <path>] [--db <path>] [--dry-run]
     agentic-dynamics workflow promote --spec <name> --workdir <worktree>
+
+Command journal (step 10): a real promotion REQUIRES ``--operator`` and ``--rationale`` and
+records a durable INTENT in the control database's ``command_journal`` BEFORE the push (the
+receipt — completed/failed with the squash sha — lands after). "Recording is part of the act":
+if the intent cannot be written the command refuses and nothing is pushed; a receipt failure
+after a landed push warns (the intent row stays in state ``intent`` as the evidence) and never
+unwinds the push. A journal row already ``completed`` for this act refuses a replay.
 
 AIO emission (Wave-3 a5): promoting is the AIO's strongest permanence verb, so the decision
 and the act are emitted into the knowledge base at this call site — an observation of the
@@ -64,6 +72,8 @@ try:
 except ImportError:  # imported as scripts.promote — repo root is on sys.path
     from scripts import _bootstrap  # noqa: F401
 
+import _command_journal  # noqa: E402  # the shared intent/receipt mechanism (step 10)
+
 from agentic_dynamics.core import decision_contract as dc  # noqa: E402  # needs _bootstrap
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -98,6 +108,17 @@ def main() -> None:
         "aio emission, never inferred)",
     )
     ap.add_argument(
+        "--rationale",
+        default="",
+        help="why this promotion — REQUIRED for a real promote; recorded in the command "
+        "journal (intent before act). The command does not act unrecorded.",
+    )
+    ap.add_argument(
+        "--rationale-ref",
+        default="",
+        help="optional reference for the rationale (a decision id, PR, or artifact path)",
+    )
+    ap.add_argument(
         "--db",
         default=None,
         help="control database path (default: FINOPS_CONTROL_DB or "
@@ -109,6 +130,23 @@ def main() -> None:
         help="verify everything, print the plan, write nothing, push nothing",
     )
     args = ap.parse_args()
+
+    # Step 10 — the two flags a real promotion cannot run without: the operator's name (the
+    # journal requires an actor; an anonymous intent is not a record) and the rationale
+    # (recording is part of the act). Dry-run is observation, not an act: it needs neither.
+    if not args.dry_run:
+        missing = []
+        if not args.operator.strip():
+            missing.append("--operator")
+        if not args.rationale.strip():
+            missing.append("--rationale")
+        if missing:
+            print(
+                f"promote: {' and '.join(missing)} required for a real promote — the command "
+                "journal records the intent before the act (use --dry-run to verify only)",
+                file=sys.stderr,
+            )
+            raise SystemExit(30)  # the documented invalid_request code
 
     try:
         _run_promotion(args)
@@ -450,22 +488,40 @@ def _run_promotion(
     emit_act=None,
     record_decision=None,
     close_row=None,
+    journal_intent=None,
+    journal_receipt=None,
 ) -> None:
     """Verify and promote a candidate. The side-effecting/emitting steps are injectable.
 
     ``push`` (the squash-merge + ``git push``), the two a5 emission steps
     (``emit_decision`` — the promote-decision observation before the push, ``emit_act`` — the
-    actuation after a successful push), the s2b ``record_decision``, and the a1 control-row
-    ``close_row`` (``promotable -> merged`` + the promotions row after the push) default to the
-    real implementations; the tests inject fakes so the whole transaction is testable without a
-    remote, a live knowledge stream, or a control database — the same injectable pattern
-    ``publish_release.main`` uses for its deployer/builder.
+    actuation after a successful push), the s2b ``record_decision``, the a1 control-row
+    ``close_row`` (``promotable -> merged`` + the promotions row after the push), and the
+    step-10 command journal (``journal_intent`` — the durable intent BEFORE the push;
+    ``journal_receipt`` — the outcome after) default to the real implementations; the tests
+    inject fakes so the whole transaction is testable without a remote, a live knowledge
+    stream, or a control database — the same injectable pattern ``publish_release.main`` uses
+    for its deployer/builder.
     """
     push = push or _push_squashed
     emit_decision = emit_decision or _aio_emit_decision
     emit_act = emit_act or _aio_emit_act
     record_decision = record_decision or _default_decision_record
     close_row = close_row or _default_close_row
+    journal_intent = journal_intent or _default_journal_intent
+    journal_receipt = journal_receipt or _default_journal_receipt
+
+    # Step 10 to guard the direct-caller path too (main() guards the CLI): an act that cannot
+    # carry an actor + rationale cannot be recorded, and an unrecorded act is not allowed.
+    if not args.dry_run:
+        if not str(getattr(args, "operator", "") or "").strip():
+            raise _PromoteRefusedError(
+                "--operator is required for a real promote — the command journal requires an actor"
+            )
+        if not str(getattr(args, "rationale", "") or "").strip():
+            raise _PromoteRefusedError(
+                "--rationale is required for a real promote — recording is part of the act"
+            )
 
     workdir = Path(args.workdir).resolve()
     if not workdir.is_dir():
@@ -561,6 +617,17 @@ def _run_promotion(
     if not diff:
         raise _PromoteRefusedError("candidate has no changes vs the base — nothing to promote")
 
+    # 5b ── the command journal (step 10): the durable INTENT lands BEFORE any base mutation or
+    # push. "Recording is part of the act": an intent that cannot be written refuses the command
+    # (the default implementation raises; nothing is pushed). A prior COMPLETED row for this act
+    # means the promotion already happened — refuse rather than replay a second push.
+    command = journal_intent(args, ledger=ledger, candidate=candidate, run_id=run_id)
+    if command.state == "completed":
+        raise _PromoteRefusedError(
+            f"this promotion is already recorded completed (command {command.command_id}) — "
+            "a second push would duplicate the act"
+        )
+
     # 6 ── the AIO's decision emits BEFORE the act (best-effort, never blocking): an
     # observation of the promote decision with the run identity + candidate sha + operator.
     # The status reflects what actually authorized this promotion: a run that stopped
@@ -576,8 +643,31 @@ def _run_promotion(
     # move on a push): the pre-push base head is the ``base_sha`` the promotions row records,
     # so the merge is independently re-derivable (check out the base, replay the squash).
     base_head = _git(workdir, "rev-parse", base)
-    pushed = push(workdir, base, subject, candidate)
+    try:
+        pushed = push(workdir, base, subject, candidate)
+    except Exception as exc:  # noqa: BLE001 — record the observed outcome, then re-raise
+        _record_journal_receipt(
+            args,
+            command,
+            state="failed",
+            receipt={"error": repr(exc), "base": base, "candidate_sha": candidate},
+            journal_receipt=journal_receipt,
+        )
+        raise
     print(f"promote: pushed {base} → {pushed[:12]} (squash of {candidate[:12]})")
+    _record_journal_receipt(
+        args,
+        command,
+        state="completed",
+        receipt={
+            "base": base,
+            "base_sha": base_head,
+            "squash_sha": pushed,
+            "candidate_sha": candidate,
+            "subject": subject,
+        },
+        journal_receipt=journal_receipt,
+    )
 
     # 8 ── the run's control row closes AFTER the push lands (a1, hard rule 2's ordering): the
     # push has LANDED, so the close is best-effort bookkeeping. A control-db failure prints a
@@ -621,6 +711,61 @@ def _run_promotion(
             causes=observation_id or "",
         ),
     )
+
+
+# ── the command journal (step 10) ─────────────────────────────────────────────
+# The durable intent/receipt rows behind the push. "Recording is part of the act": the intent
+# must land BEFORE the act (a promote whose intent cannot be recorded is refused, nothing
+# pushed); the receipt is recorded after and may warn — it never raises, because an exception
+# after a landed push would invite an unwind of something that happened. A missing receipt
+# leaves the intent row in state 'intent', which IS the crash evidence the journal preserves.
+
+
+def _default_journal_intent(args: argparse.Namespace, *, ledger: dict, candidate: str, run_id: str):
+    """Record the promote's intent via the shared helper; refuse when it cannot be recorded."""
+    try:
+        return _command_journal.begin_command(
+            args.db,
+            verb="promote",
+            actor=args.operator,
+            rationale=args.rationale,
+            rationale_ref=args.rationale_ref,
+            act_key=f"promote:{args.spec}:{candidate[:12]}",
+            run_id=run_id,
+            candidate_sha=candidate,
+            target_kind="run" if run_id else "spec",
+            target_id=run_id or args.spec,
+            detail={
+                "spec": args.spec,
+                "base": args.base,
+                "subject": f"{PROMOTION_PREFIX} {args.spec}",
+                "total_cost_usd": float(ledger.get("total_cost_usd", 0) or 0),
+            },
+        )
+    except _command_journal.CommandJournalError as exc:
+        raise _PromoteRefusedError(
+            f"{exc} — recording is part of the act; nothing was pushed"
+        ) from exc
+
+
+def _default_journal_receipt(args: argparse.Namespace, command, *, state: str, receipt: dict):
+    """Record the promote's outcome via the shared helper (returns a warning or None)."""
+    return _command_journal.finish_command(
+        args.db, command_id=command.command_id, state=state, receipt=receipt
+    )
+
+
+def _record_journal_receipt(
+    args: argparse.Namespace, command, *, state: str, receipt: dict, journal_receipt
+) -> None:
+    """Record the outcome; a warning is printed, never raised (the push outcome stands)."""
+    warning = journal_receipt(args, command, state=state, receipt=receipt)
+    if warning:
+        print(
+            f"promote: WARNING — {warning} (the command intent {command.command_id} remains "
+            f"in state 'intent' as evidence; the push outcome stands)",
+            file=sys.stderr,
+        )
 
 
 # ── verification helpers ──────────────────────────────────────────────────────

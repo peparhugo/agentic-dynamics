@@ -25,6 +25,7 @@ from __future__ import annotations
 import json
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -90,6 +91,18 @@ def _noop_emitter():
         return {"status": "no-op", "knowledge_id": "test", "artifact": "", "warnings": []}
 
     return emit_decision, emit_act, record_decision
+
+
+def _noop_journal():
+    """Step 10's journal fakes: an untouched intent row + a no-op receipt — hermetic."""
+
+    def journal_intent(args, *, receipt):
+        return SimpleNamespace(command_id="cmd-publish-test", state="intent")
+
+    def journal_receipt(args, command, *, state, receipt):
+        return None
+
+    return journal_intent, journal_receipt
 
 
 def _now_iso() -> str:
@@ -231,11 +244,13 @@ def test_failed_deploy_is_recorded(monkeypatch, tmp_path):
     monkeypatch.setattr(pub, "DATA_JS", site / "data.js")
     calls, deploy = _fail_first_deployer()
     emit_decision, emit_act, record_decision = _noop_emitter()
+    journal_intent, journal_receipt = _noop_journal()
     rc = pr.main(["--candidate-sha", "deadbeef", "--operator", "operator-test",
-                  "--db", str(path)],
+                  "--rationale", "test rationale", "--db", str(path)],
                  deployer=deploy, builder=_ok_builder(), live_checker=_ok_live_checker(),
                  emit_decision=emit_decision, emit_act=emit_act,
-                 record_decision=record_decision)
+                 record_decision=record_decision,
+                 journal_intent=journal_intent, journal_receipt=journal_receipt)
     assert rc == pr.EXIT_DEPLOY_FAILED
     assert calls == ["canonical", "mirror"]  # BOTH were attempted
     # ...and the failure is in the database, not lost:
@@ -309,11 +324,13 @@ def test_publish_run_does_not_touch_the_production_receipt_dir(monkeypatch, tmp_
     monkeypatch.setattr(pub, "DATA_JS", site / "data.js")
     calls, deploy = _fail_first_deployer()
     emit_decision, emit_act, record_decision = _noop_emitter()
+    journal_intent, journal_receipt = _noop_journal()
     rc = pr.main(["--candidate-sha", "deadbeef", "--operator", "operator-test",
-                  "--db", str(path)],
+                  "--rationale", "test rationale", "--db", str(path)],
                  deployer=deploy, builder=_ok_builder(), live_checker=_ok_live_checker(),
                  emit_decision=emit_decision, emit_act=emit_act,
-                 record_decision=record_decision)
+                 record_decision=record_decision,
+                 journal_intent=journal_intent, journal_receipt=journal_receipt)
     assert rc == pr.EXIT_DEPLOY_FAILED
     after = sorted(p.name for p in pub.RECEIPT_DIR.glob("*")) if pub.RECEIPT_DIR.exists() else []
     assert after == before  # the production dir did not grow a receipt
@@ -352,3 +369,117 @@ def test_production_receipt_dir_is_hermetic():
         "production experiments/results/publication/ contains operator-test artifacts — "
         "a test wrote into a production path (see the e3 hermeticity finding)"
     )
+
+
+# ── step 10: the command journal (intent before act, receipt after) ───────────
+
+
+def test_real_publication_refuses_without_rationale(tmp_path):
+    """A rationale-less real publication fails fast — before the build, the deploy, the db."""
+    calls, deploy = _ok_deployer()
+    rc = pr.main(
+        ["--candidate-sha", "deadbeef", "--operator", "operator-test",
+         "--db", str(tmp_path / "x.db")],
+        deployer=deploy, builder=_ok_builder(), live_checker=_ok_live_checker(),
+    )
+    assert rc == pr.EXIT_PRECONDITION_FAILED
+    assert calls == []
+
+
+def test_step10_journal_intent_before_deploy_and_completed_receipt(monkeypatch, tmp_path):
+    """The durable intent fires before the FIRST deploy; the completed receipt carries hosts."""
+    path = _db_with_fresh_projections(tmp_path)
+    monkeypatch.setattr(pr, "read_head_sha", lambda: "deadbeef")
+    site = _consistent_site(tmp_path)
+    monkeypatch.setattr(pub, "SITE_ROOT", site)
+    monkeypatch.setattr(pub, "DATA_JS", site / "data.js")
+    events = []
+    calls, deploy = _ok_deployer()
+
+    def deployer(host):
+        events.append(("deploy", host.role))
+        return deploy(host)
+
+    def journal_intent(args, *, receipt):
+        events.append(("intent", args.candidate_sha, args.rationale))
+        return SimpleNamespace(command_id="cmd-p10", state="intent")
+
+    def journal_receipt(args, command, *, state, receipt):
+        events.append(("receipt", state, receipt))
+        return None
+
+    emit_decision, emit_act, record_decision = _noop_emitter()
+    rc = pr.main(
+        ["--candidate-sha", "deadbeef", "--operator", "operator-test",
+         "--rationale", "step 10 test", "--db", str(path)],
+        deployer=deployer, builder=_ok_builder(), live_checker=_ok_live_checker(),
+        emit_decision=emit_decision, emit_act=emit_act, record_decision=record_decision,
+        journal_intent=journal_intent, journal_receipt=journal_receipt,
+    )
+    assert rc == pr.EXIT_OK
+    kinds = [event[0] for event in events]
+    assert kinds.index("intent") < kinds.index("deploy") < kinds.index("receipt")
+    intent = events[kinds.index("intent")]
+    assert intent[1:] == ("deadbeef", "step 10 test")
+    receipt = events[kinds.index("receipt")]
+    assert receipt[1] == "completed"
+    assert receipt[2]["hosts"] == {
+        "canonical": {"ok": True, "release_id": "rel-canonical"},
+        "mirror": {"ok": True, "release_id": "rel-mirror"},
+    }
+
+
+def test_step10_failed_deploy_records_a_failed_receipt(monkeypatch, tmp_path):
+    """A partial deploy is recorded as failed, preserving which host landed."""
+    path = _db_with_fresh_projections(tmp_path)
+    monkeypatch.setattr(pr, "read_head_sha", lambda: "deadbeef")
+    site = _consistent_site(tmp_path)
+    monkeypatch.setattr(pub, "SITE_ROOT", site)
+    monkeypatch.setattr(pub, "DATA_JS", site / "data.js")
+    receipts = []
+    calls, deploy = _fail_first_deployer()
+
+    def journal_receipt(args, command, *, state, receipt):
+        receipts.append((state, receipt))
+        return None
+
+    emit_decision, emit_act, record_decision = _noop_emitter()
+    rc = pr.main(
+        ["--candidate-sha", "deadbeef", "--operator", "operator-test",
+         "--rationale", "step 10 test", "--db", str(path)],
+        deployer=deploy, builder=_ok_builder(), live_checker=_ok_live_checker(),
+        emit_decision=emit_decision, emit_act=emit_act, record_decision=record_decision,
+        journal_intent=_noop_journal()[0], journal_receipt=journal_receipt,
+    )
+    assert rc == pr.EXIT_DEPLOY_FAILED
+    assert len(receipts) == 1
+    state, receipt = receipts[0]
+    assert state == "failed"
+    assert receipt["hosts"]["canonical"]["ok"] is False
+    assert receipt["hosts"]["mirror"]["ok"] is True
+
+
+def test_step10_unwritable_intent_refuses_before_deploying(monkeypatch, tmp_path):
+    """An intent that cannot be recorded refuses the publication — nothing deploys."""
+    from _command_journal import CommandJournalError
+
+    path = _db_with_fresh_projections(tmp_path)
+    monkeypatch.setattr(pr, "read_head_sha", lambda: "deadbeef")
+    site = _consistent_site(tmp_path)
+    monkeypatch.setattr(pub, "SITE_ROOT", site)
+    monkeypatch.setattr(pub, "DATA_JS", site / "data.js")
+    calls, deploy = _ok_deployer()
+
+    def refusing_intent(args, *, receipt):
+        raise CommandJournalError("control journal unavailable (test)")
+
+    emit_decision, emit_act, record_decision = _noop_emitter()
+    rc = pr.main(
+        ["--candidate-sha", "deadbeef", "--operator", "operator-test",
+         "--rationale", "step 10 test", "--db", str(path)],
+        deployer=deploy, builder=_ok_builder(), live_checker=_ok_live_checker(),
+        emit_decision=emit_decision, emit_act=emit_act, record_decision=record_decision,
+        journal_intent=refusing_intent, journal_receipt=_noop_journal()[1],
+    )
+    assert rc == pr.EXIT_NO_CONTROL_DB
+    assert calls == []

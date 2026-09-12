@@ -265,6 +265,8 @@ def _promote_args(tmp_path: Path, wt: Path, ledger: dict, **overrides):
         "approval": None,
         "base": "main",
         "operator": "drseuss",
+        "rationale": "aio emission test",
+        "rationale_ref": "",
         "dry_run": False,
     }
     args.update(overrides)
@@ -303,6 +305,22 @@ def _noop_record_decision(decision):
     return {"status": "no-op", "knowledge_id": "test", "artifact": "", "warnings": []}
 
 
+def _journal_fakes() -> dict:
+    """Step 10's journal seams: hermetic fakes so the real control db is never touched.
+
+    Tolerant kwargs: promote's intent receives ``ledger``/``candidate``/``run_id``; publish's
+    receives ``receipt``.
+    """
+    from types import SimpleNamespace
+
+    return {
+        "journal_intent": lambda args, **kwargs: SimpleNamespace(
+            command_id="cmd-a5test", state="intent"
+        ),
+        "journal_receipt": lambda args, command, *, state, receipt: None,
+    }
+
+
 class TestPromoteCallSiteEmits:
     def test_promote_decision_and_act_emit_end_to_end(self, tmp_path, monkeypatch):
         """Run the real promote path against a fake knowledge stream + fake push.
@@ -330,7 +348,12 @@ class TestPromoteCallSiteEmits:
         monkeypatch.setattr(ks, "connect", lambda: redis)
         pushes: list = []
         args = _promote_args(tmp_path, wt, ledger)
-        _run_promotion(args, push=_fake_push(pushes), record_decision=_noop_record_decision)
+        _run_promotion(
+            args,
+            push=_fake_push(pushes),
+            record_decision=_noop_record_decision,
+            **_journal_fakes(),
+        )
 
         assert len(pushes) == 1  # the act happened
         # the decision dict the call site built (deterministic from args+ledger) is what the
@@ -377,6 +400,7 @@ class TestPromoteCallSiteEmits:
             _promote_args(tmp_path, wt, ledger),
             push=_fake_push([]), emit_decision=emit_decision, emit_act=emit_act,
             record_decision=_noop_record_decision,
+            **_journal_fakes(),
         )
 
         assert len(calls["decision"]) == 1
@@ -405,6 +429,7 @@ class TestPromoteCallSiteEmits:
             _promote_args(tmp_path, wt, ledger),
             push=_fake_push(pushes), emit_decision=boom_decision, emit_act=boom_act,
             record_decision=_noop_record_decision,
+            **_journal_fakes(),
         )
         assert len(pushes) == 1
 
@@ -481,11 +506,13 @@ class TestPublishCallSiteEmits:
             return {"actuation_id": "act-1", "entry_ids": ["1-2"]}
 
         rc = pr.main(
-            ["--candidate-sha", "deadbeef", "--operator", "operator-test", "--db", str(db_path)],
+            ["--candidate-sha", "deadbeef", "--operator", "operator-test",
+             "--rationale", "aio emission test", "--db", str(db_path)],
             deployer=deploy, builder=lambda: (True, "built"),
             live_checker=lambda host, receipt: "",
             emit_decision=emit_decision, emit_act=emit_act,
             record_decision=_noop_record_decision,
+            **_journal_fakes(),
         )
         assert rc == pr.EXIT_OK
         assert len(calls["decision"]) == 1
@@ -522,11 +549,13 @@ class TestPublishCallSiteEmits:
             return {"actuation_id": "act-1", "entry_ids": ["1-2"]}
 
         rc = pr.main(
-            ["--candidate-sha", "deadbeef", "--operator", "operator-test", "--db", str(db_path)],
+            ["--candidate-sha", "deadbeef", "--operator", "operator-test",
+             "--rationale", "aio emission test", "--db", str(db_path)],
             deployer=failing_deploy, builder=lambda: (True, "built"),
             live_checker=lambda host, receipt: "",
             emit_decision=emit_decision, emit_act=emit_act,
             record_decision=_noop_record_decision,
+            **_journal_fakes(),
         )
         assert rc == pr.EXIT_DEPLOY_FAILED
         assert deployed == ["canonical", "mirror"]

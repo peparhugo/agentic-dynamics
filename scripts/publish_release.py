@@ -62,6 +62,8 @@ except ImportError:  # imported as scripts.<name> — repo root is on sys.path
     from scripts import _bootstrap  # noqa: F401
 
 
+import _command_journal  # noqa: E402  # the shared intent/receipt mechanism (step 10)
+
 from agentic_dynamics.control import aio_emission  # noqa: E402
 from agentic_dynamics.control import publication as pub  # noqa: E402
 from agentic_dynamics.control.control_db import ControlDB, ControlDBError  # noqa: E402
@@ -214,6 +216,53 @@ _RELEASE_ID_PATTERNS = (
 )
 
 
+# ── the command journal (step 10) ─────────────────────────────────────────────
+# The durable intent/receipt rows behind the deploy. "Recording is part of the act": the intent
+# must land BEFORE the first deploy (an unwritable intent refuses — nothing deploys); the
+# receipt is recorded after the deploys and may warn — it never raises, because an exception
+# after landed deploys would invite an unwind of something that happened. A missing receipt
+# leaves the intent row in state 'intent', which IS the crash evidence.
+
+
+def _default_journal_intent(args: argparse.Namespace, *, receipt: dict[str, Any]):
+    """Record the publication's intent via the shared helper; raises when unrecordable."""
+    return _command_journal.begin_command(
+        args.db,
+        verb="publish_release",
+        actor=args.operator,
+        rationale=args.rationale,
+        rationale_ref=args.rationale_ref,
+        act_key=f"publish:{args.candidate_sha[:12]}",
+        run_id=args.run_id,
+        candidate_sha=args.candidate_sha,
+        target_kind="release",
+        target_id=args.candidate_sha[:12],
+        detail={"hosts": [host.project for host in pub.FIREBASE_HOSTS]},
+    )
+
+
+def _default_journal_receipt(
+    args: argparse.Namespace, command, *, state: str, receipt: dict[str, Any]
+):
+    """Record the publication's outcome via the shared helper (returns a warning or None)."""
+    return _command_journal.finish_command(
+        args.db, command_id=command.command_id, state=state, receipt=receipt
+    )
+
+
+def _record_journal_receipt(
+    args: argparse.Namespace, command, *, state: str, receipt: dict[str, Any], journal_receipt
+) -> None:
+    """Record the outcome; a warning is printed, never raised (the deploy outcome stands)."""
+    warning = journal_receipt(args, command, state=state, receipt=receipt)
+    if warning:
+        print(
+            f"publish: WARNING — {warning} (the command intent {command.command_id} remains "
+            f"in state 'intent' as evidence; the deploy outcome stands)",
+            file=sys.stderr,
+        )
+
+
 def parse_release_id(output: str) -> str:
     """Best-effort extraction of a deployment identifier from ``firebase deploy`` output.
 
@@ -362,6 +411,17 @@ def build_parser() -> argparse.ArgumentParser:
         help="Who is publishing. Required for a real deploy; recorded on the receipt.",
     )
     parser.add_argument(
+        "--rationale",
+        default="",
+        help="Why this publication — REQUIRED for a real deploy; recorded in the command "
+        "journal (intent before act). The command does not act unrecorded.",
+    )
+    parser.add_argument(
+        "--rationale-ref",
+        default="",
+        help="Optional reference for the rationale (a decision id, PR, or artifact path).",
+    )
+    parser.add_argument(
         "--run-id", default="", help="Control-db run that produced the candidate, if any."
     )
     parser.add_argument(
@@ -413,6 +473,8 @@ def main(
     emit_decision: Callable[[dict], dict] | None = None,
     emit_act: Callable[..., dict] | None = None,
     record_decision: Callable[[dict], dict] | None = None,
+    journal_intent: Callable[..., Any] | None = None,
+    journal_receipt: Callable[..., Any] | None = None,
 ) -> int:
     """Run the publication transaction.
 
@@ -436,14 +498,24 @@ def main(
     emit_decision = emit_decision or _default_emit_decision
     emit_act = emit_act or _default_emit_act
     record_decision = record_decision or _default_decision_record
+    journal_intent = journal_intent or _default_journal_intent
+    journal_receipt = journal_receipt or _default_journal_receipt
 
     # ── P0 guard ─────────────────────────────────────────────────────────────────────────
     # Named before any work is done, so an operator-less invocation fails in a second rather
-    # than after a ten-minute data build.
+    # than after a ten-minute data build. Step 10 adds the rationale: the command journal
+    # records the intent before the act, and an intent without a why is not a record.
     if not args.dry_run and not args.operator:
         print(
             "publish: --operator is required for a real publication (deploying the website is a "
             "P0 controller-only action). Use --dry-run to see the plan without deploying.",
+            file=sys.stderr,
+        )
+        return EXIT_PRECONDITION_FAILED
+    if not args.dry_run and not str(args.rationale or "").strip():
+        print(
+            "publish: --rationale is required for a real publication — the command journal "
+            "records the intent before the act (use --dry-run to verify only).",
             file=sys.stderr,
         )
         return EXIT_PRECONDITION_FAILED
@@ -545,6 +617,22 @@ def main(
         return EXIT_OK
 
     # ── Step 6: deploy BOTH hosts ────────────────────────────────────────────────────────
+    # Step 6a (step 10) — the command journal's durable INTENT lands BEFORE the first deploy.
+    # "Recording is part of the act": an intent that cannot be written refuses the publication
+    # (nothing deploys). A re-publish of the same candidate is a legitimate recovery path (the
+    # failed-host branch below says so): the shared helper walks terminal rows to a NEW attempt,
+    # so a completed prior publication never blocks a re-deploy, and a crashed attempt's row is
+    # reused (its receipt resolves it).
+    try:
+        command = journal_intent(args, receipt=receipt)
+    except _command_journal.CommandJournalError as exc:
+        print(
+            f"publish: refusing — {exc}\n"
+            "publish: recording is part of the act; nothing was deployed.",
+            file=sys.stderr,
+        )
+        return EXIT_NO_CONTROL_DB
+
     # Both are attempted even if the first fails: the operator needs to know the state of both
     # hosts, and stopping early would leave the second one's status unknown as well as unchanged.
     # The AIO's decision emits BEFORE the act (best-effort, never blocking): an observation of
@@ -554,15 +642,44 @@ def main(
         "publish decision", lambda: emit_decision(_publish_decision(args, receipt))
     )
     outcomes = []
-    for host in pub.FIREBASE_HOSTS:
-        _emit(f"[6/8] deploying {host.role} ({host.project})…", quiet=quiet)
-        outcome = deploy(host)
-        outcomes.append(outcome)
-        _emit(
-            f"      {host.role}: {'ok' if outcome.ok else 'FAILED'}"
-            + (f" release={outcome.release_id}" if outcome.release_id else ""),
-            quiet=quiet,
+    try:
+        for host in pub.FIREBASE_HOSTS:
+            _emit(f"[6/8] deploying {host.role} ({host.project})…", quiet=quiet)
+            outcome = deploy(host)
+            outcomes.append(outcome)
+            _emit(
+                f"      {host.role}: {'ok' if outcome.ok else 'FAILED'}"
+                + (f" release={outcome.release_id}" if outcome.release_id else ""),
+                quiet=quiet,
+            )
+    except Exception as exc:  # noqa: BLE001 — record the observed outcome, then re-raise
+        _record_journal_receipt(
+            args,
+            command,
+            state="failed",
+            receipt={
+                "error": repr(exc),
+                "candidate_sha": head,
+                "hosts": {o.host.role: {"ok": o.ok, "release_id": o.release_id} for o in outcomes},
+            },
+            journal_receipt=journal_receipt,
         )
+        raise
+
+    # The act's outcome — completed only when BOTH hosts deployed; a partial deploy is recorded
+    # as failed (the receipt preserves which host landed). The receipt never raises (a landed
+    # deploy must not be unwound by a bookkeeping failure); the intent row remains as evidence.
+    _record_journal_receipt(
+        args,
+        command,
+        state="completed" if all(o.ok for o in outcomes) else "failed",
+        receipt={
+            "candidate_sha": head,
+            "receipt_sha256": pub.receipt_sha256(receipt),
+            "hosts": {o.host.role: {"ok": o.ok, "release_id": o.release_id} for o in outcomes},
+        },
+        journal_receipt=journal_receipt,
+    )
 
     # ── Step 7: record — receipt first, then one row per host ────────────────────────────
     # Recorded even when a deploy failed. A failed host that left no row would be invisible; a
