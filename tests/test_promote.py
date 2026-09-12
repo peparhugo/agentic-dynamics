@@ -686,6 +686,74 @@ def test_step10_push_failure_records_a_failed_receipt_and_still_raises(tmp_path)
     assert "push failed" in receipt["error"]
 
 
+# ── wave B3: the artifact binding (ledger digest ↔ durable control outcome) ──
+
+
+def _bind_ledger_to_run(tmp_path, wt, *, tamper: float | None = None):
+    """Write the run's ledger and a matching BOUND runs row (promotable, digest stamped);
+    optionally tamper the file afterwards — the exact defect the gate must catch."""
+    import hashlib
+
+    from agentic_dynamics.control.control_db import ControlDB, RunState
+
+    ledger_data = _ledger(wt)
+    path = tmp_path / "ledgers" / "promote_test" / "20260901T000000Z.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    db_path = tmp_path / "control.db"
+    with ControlDB.open(db_path) as db:
+        run = db.create_run(spec_name="promote_test")
+        db.transition_run(run.run_id, RunState.RUNNING, actor="orchestrator")
+        ledger_data["run_id"] = run.run_id
+        path.write_text(json.dumps(ledger_data))
+        db.transition_run(
+            run.run_id,
+            RunState.PROMOTABLE,
+            actor="orchestrator",
+            ledger_path=str(path),
+            result_digest=hashlib.sha256(path.read_bytes()).hexdigest(),
+        )
+    if tamper is not None:
+        edited = json.loads(path.read_text())
+        edited["total_cost_usd"] = tamper
+        path.write_text(json.dumps(edited))
+    return path, db_path
+
+
+def test_b3_ledger_tampered_after_the_outcome_refuses_before_the_push(tmp_path):
+    """A post-outcome edit of the ledger — same run_id, same git_sha, different bytes —
+    refuses at the permanence gate BEFORE any push (exit 20 shape)."""
+    wt = _make_candidate_ahead_of_main(tmp_path)
+    path, db_path = _bind_ledger_to_run(tmp_path, wt, tamper=99.0)
+
+    with pytest.raises(_PromoteRefusedError, match="not the artifact"):
+        _run_promotion(_promote_args(tmp_path, wt, path, db=str(db_path)))
+
+
+def test_b3_matching_digest_passes_and_a_pre_binding_row_only_notes(tmp_path, capsys):
+    """The check never over-refuses: a matching digest verifies silently; a run row without a
+    digest (pre-binding) proceeds with an honest note, never a fabricated hash."""
+    wt = _make_candidate_ahead_of_main(tmp_path)
+    path, db_path = _bind_ledger_to_run(tmp_path, wt)
+    _run_promotion(_promote_args(tmp_path, wt, path, db=str(db_path)))
+    assert "pre-binding" not in capsys.readouterr().err
+
+    from agentic_dynamics.control.control_db import ControlDB, RunState
+
+    with ControlDB.open(db_path) as db:
+        run2 = db.create_run(spec_name="promote_test")
+        db.transition_run(run2.run_id, RunState.RUNNING, actor="orchestrator")
+        ledger2 = _ledger(wt)
+        ledger2["run_id"] = run2.run_id
+        path2 = tmp_path / "ledgers2" / "promote_test" / "20260901T000000Z.json"
+        path2.parent.mkdir(parents=True, exist_ok=True)
+        path2.write_text(json.dumps(ledger2))
+        db.transition_run(
+            run2.run_id, RunState.PROMOTABLE, actor="orchestrator", ledger_path=str(path2)
+        )
+    _run_promotion(_promote_args(tmp_path, wt, path2, db=str(db_path)))
+    assert "pre-binding run" in capsys.readouterr().err
+
+
 def test_step10_a_completed_command_refuses_the_replay(tmp_path):
     """A journal row already completed for this act refuses BEFORE the push — no second act."""
     wt = _make_candidate_ahead_of_main(tmp_path)

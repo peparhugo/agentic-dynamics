@@ -61,6 +61,7 @@ Exit codes (the same vocabulary as run_workflow.py):
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import subprocess
 import sys
@@ -527,7 +528,7 @@ def _run_promotion(
     if not workdir.is_dir():
         raise _PromoteRefusedError(f"workdir not found: {workdir}")
 
-    ledger = _load_ledger(args)
+    ledger, ledger_path = _load_ledger(args)
     candidate = _git_head(workdir)
     ledger_sha = str(ledger.get("git_sha", "") or "")
     if not ledger_sha:
@@ -595,6 +596,11 @@ def _run_promotion(
     stale = _stale_candidate_refusal(workdir, base, candidate)
     if stale:
         raise _PromoteRefusedError(stale)
+
+    # 4b ── the artifact binding (wave B3): the ledger bytes being promoted must hash to the
+    # digest the run's durable outcome recorded. Before any push, and before the dry-run
+    # return (a dry run refuses too); see :func:`_verify_ledger_binding`.
+    _verify_ledger_binding(args, ledger, ledger_path)
 
     # 5 ── promote: squash the candidate's phase commits onto the base with the canonical
     # subject. Normalization happens HERE, never in the runtime.
@@ -783,19 +789,69 @@ def _record_journal_receipt(
 # ── verification helpers ──────────────────────────────────────────────────────
 
 
-def _load_ledger(args: argparse.Namespace) -> dict:
+def _load_ledger(args: argparse.Namespace) -> tuple[dict, Path]:
+    """Load the ledger AND return the path it was read from (Wave B3's digest check hashes
+    exactly these bytes — a path resolved here and hashed later cannot drift)."""
     if args.ledger:
         path = Path(args.ledger)
         if not path.is_file():
             raise _PromoteRefusedError(f"ledger not found: {path}")
-        return json.loads(path.read_text(encoding="utf-8"))
+        return json.loads(path.read_text(encoding="utf-8")), path
     spec_dir = ROOT / "experiments" / "results" / "workflows" / args.spec
     if not spec_dir.is_dir():
         raise _PromoteRefusedError(f"no ledgers under {spec_dir} — pass --ledger explicitly")
     latest = sorted(spec_dir.glob("*.json"))
     if not latest:
         raise _PromoteRefusedError(f"no ledgers under {spec_dir} — pass --ledger explicitly")
-    return json.loads(latest[-1].read_text(encoding="utf-8"))
+    path = latest[-1]
+    return json.loads(path.read_text(encoding="utf-8")), path
+
+
+def _verify_ledger_binding(args: argparse.Namespace, ledger: dict, ledger_path: Path) -> None:
+    """Refuse when the ledger is not the artifact the run's durable outcome recorded (Wave B3).
+
+    The terminal write stamps ``runs.result_digest`` — sha256 over the ledger's exact bytes —
+    in the SAME atomic transaction as the outcome. Before any push (and before the dry-run
+    return, so a dry run refuses too), promote recomputes the digest of the file it verified
+    and compares: a post-outcome edit, or a different file carrying the same run_id/git_sha,
+    refuses at the permanence gate.
+
+    Posture, matching the close's availability semantics: a legacy ledger with no run id, a
+    run row without a digest (pre-binding), or an unopenable control db each proceed with a
+    printed note — the binding is enforced whenever it is checkable, never approximated.
+    """
+    run_id = _ledger_run_id(ledger)
+    if not run_id:
+        return
+    from agentic_dynamics.control.control_db import ControlDB
+
+    try:
+        with ControlDB.open(args.db) as db:
+            run = db.get_run(run_id)
+    except Exception as exc:  # noqa: BLE001 — db availability is the close's concern too
+        print(
+            f"promote: note — could not check the artifact binding for {run_id} ({exc}); "
+            "proceeding (the close below reports db availability)",
+            file=sys.stderr,
+        )
+        return
+    if run is None:
+        return
+    expected = str(getattr(run, "result_digest", "") or "")
+    if not expected:
+        print(
+            f"promote: note — control row {run_id} carries no result_digest "
+            "(pre-binding run); the artifact binding is not checked",
+            file=sys.stderr,
+        )
+        return
+    actual = hashlib.sha256(ledger_path.read_bytes()).hexdigest()
+    if actual != expected:
+        raise _PromoteRefusedError(
+            f"the ledger is not the artifact the control outcome recorded: {ledger_path} "
+            f"hashes {actual[:16]}…, but the runs row for {run_id} binds {expected[:16]}… — "
+            "the artifact was modified (or swapped) after its outcome was recorded"
+        )
 
 
 def _load_approval(args: argparse.Namespace, ledger: dict) -> dict:

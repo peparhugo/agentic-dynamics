@@ -334,6 +334,7 @@ def record_terminal_run(
     actor: str = "orchestrator",
     cost_usd: float | None = None,
     ledger_path: str | None = None,
+    result_digest: str | None = None,
     candidate_sha: str | None = None,
     ended_at: str | None = None,
     at: str | None = None,
@@ -347,10 +348,12 @@ def record_terminal_run(
        outcome maps to (``promotable``/``awaiting_approval``/``failed``/``cancelled``, via
        :func:`~agentic_dynamics.control.control_db.run_state_from_ledger_state`);
     2. **the run result envelope** — the run row's ``ledger_path`` (the pointer to the envelope
-       JSON the runner just wrote), ``cost_usd``, ``candidate_sha`` and ``ended_at``. These are
-       passed to :meth:`ControlDB.transition_run` rather than written afterwards because a
-       terminal state is immutable: the terminal transition is the *last* moment they can be
-       recorded at all;
+       JSON the runner just wrote) AND ``result_digest`` (sha256 over that file's exact bytes —
+       Wave B3's artifact-outcome binding: the pointer names the artifact, the digest pins its
+       content in the same atomic write), plus ``cost_usd``, ``candidate_sha`` and ``ended_at``.
+       These are passed to :meth:`ControlDB.transition_run` rather than written afterwards
+       because a terminal state is immutable: the terminal transition is the *last* moment they
+       can be recorded at all;
     3. **the events the run owes the knowledge stream** — one ``pending`` outbox row per
        payload.
 
@@ -376,6 +379,7 @@ def record_terminal_run(
             cost_usd=cost_usd,
             candidate_sha=candidate_sha,
             ledger_path=ledger_path,
+            result_digest=result_digest,
             ended_at=ended_at,
         )
         for payload in payloads:

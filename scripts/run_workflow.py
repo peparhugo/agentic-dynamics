@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import argparse
 import contextlib
+import hashlib
 import json
 import os
 import subprocess
@@ -1347,6 +1348,23 @@ def _derived(label: str, derive) -> list[dict]:
     return payloads
 
 
+def _ledger_digest(ledger_path: Path) -> str:
+    """sha256 over the ledger file's exact bytes — the artifact-outcome binding (Wave B3).
+
+    Best-effort by design (P0-1): a digest problem must never fail a finished run's terminal
+    write. The empty string is HONEST — a consumer that requires the binding refuses on its
+    own terms (promote notes a pre-binding run; it never sees a fabricated hash).
+    """
+    try:
+        return hashlib.sha256(Path(ledger_path).read_bytes()).hexdigest()
+    except OSError as exc:
+        print(
+            f"warning: could not digest the run ledger ({exc}) — binding omitted",
+            file=sys.stderr,
+        )
+        return ""
+
+
 def _control_terminal_write(
     spec: ExperimentSpec,
     args: argparse.Namespace,
@@ -1450,6 +1468,10 @@ def _control_terminal_write(
             reason=f"workflow run ended ({result.state})",
             cost_usd=result.total_cost_usd,
             ledger_path=str(ledger_path),
+            # Wave B3: the artifact-outcome binding — sha256 over the exact bytes of the
+            # ledger file this outcome describes, stamped in the SAME atomic transaction.
+            # Consumers (promote) recompute and refuse a mismatch.
+            result_digest=_ledger_digest(ledger_path) if ledger_path else "",
             candidate_sha=result.git_sha,
             ended_at=result.ended_at or None,
         )
