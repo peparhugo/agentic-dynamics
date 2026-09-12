@@ -1047,6 +1047,13 @@ EXECUTORS: dict[str, Any] = {
 }
 
 
+# ── Plan runner ───────────────────────────────────────────────────
+
+# Max wall-clock (seconds) a polling phase (matrix/review) may run before the
+# runner aborts rather than polling forever (P1-4).
+MAX_PHASE_WALLCLOCK = int(os.environ.get("FINOPS_MAX_PHASE_WALLCLOCK", str(6 * 3600)))
+
+
 # ── Status & utilities ────────────────────────────────────────────
 
 

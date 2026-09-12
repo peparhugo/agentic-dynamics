@@ -16,8 +16,6 @@ import sys
 from pathlib import Path
 from types import SimpleNamespace
 
-import pytest
-
 _ROOT = Path(__file__).resolve().parent.parent
 for _path in (_ROOT, _ROOT / "src", _ROOT / "scripts"):
     if str(_path) not in sys.path:
@@ -86,7 +84,7 @@ def test_matrix_completes_on_its_own_cells_not_unrelated_rows(monkeypatch):
 
     assert pl._execute_matrix(_phase("matrix", workers=4), {"plan_name": "t"}) is False
     # progress recorded honestly (0 of its own done), and no done state written
-    assert all(not w[1].get("status") == "done" for w in fake.writes)
+    assert all(w[1].get("status") != "done" for w in fake.writes)
 
     # its own cell completes -> the phase completes
     fake.statuses["own-1"] = "done"
