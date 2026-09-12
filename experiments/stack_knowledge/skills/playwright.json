@@ -1,0 +1,16 @@
+{
+  "subject": "skill/stack/playwright",
+  "claim": "The website SVG rendering gate uses Playwright's direct async API (async_playwright), launches Chromium itself, waits for document completion, then applies an explicit 700ms settle delay before probing rendered SVG. It captures full-page screenshots with page.screenshot(..., full_page=True). This repository does not currently use the pytest-playwright fixture model.",
+  "conformance": "repo-conformant",
+  "repo_anchors": ["apps/website/verify_svg_rendering.py:431", "apps/website/verify_svg_rendering.py:441", "apps/website/verify_svg_rendering.py:561"],
+  "population": "agentic-dynamics stack",
+  "conditions": ["playwright", "e2e", "pytest", "screenshots", "auto-waiting"],
+  "support": 2,
+  "uncertainty": 0.25,
+  "source_experiment": "tech_stack_seed_2026-09-11",
+  "evidence": [
+    "uri:https://playwright.dev/python/docs/intro",
+    "uri:https://playwright.dev/python/docs/screenshots"
+  ],
+  "notes": "Repo conformance edit: corrected the pytest-playwright fixture claim. The maintained rendering gate imports and drives async_playwright directly and intentionally uses a bounded settle delay before capture."
+}

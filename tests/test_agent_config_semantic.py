@@ -162,11 +162,26 @@ def _violations(check: Callable[[str, str], list[str]]) -> list[str]:
 # --- the checks ---------------------------------------------------------------
 
 
+#: Runtime-data roots whose contents are untracked by design (corpus migration, 2026-09-08):
+#: an instruction may name them as where runtime artifacts land, but artifact existence is a
+#: property of the machine, not the repo — a fresh checkout / CI fixture legitimately has none.
+_RUNTIME_DATA_PREFIXES = ("experiments/results/",)
+
+
+def _is_runtime_data_path(token: str) -> bool:
+    """True for a reference under a runtime-data root (absence is the documented CI state)."""
+    return _LINE_REF.sub("", token).startswith(_RUNTIME_DATA_PREFIXES)
+
+
 def _check_paths(text: str, rel: str) -> list[str]:
     bad: list[str] = []
     for m in _BACKTICK.finditer(text):
         tok = m.group(1).strip()
-        if _is_path_candidate(tok) and not _path_exists(tok):
+        if (
+            _is_path_candidate(tok)
+            and not _is_runtime_data_path(tok)
+            and not _path_exists(tok)
+        ):
             bad.append(f"{rel}: referenced path does not exist: `{tok}`")
     return bad
 
@@ -229,6 +244,8 @@ def _check_counts(text: str, rel: str) -> list[str]:
 
 
 def test_referenced_repo_paths_exist():
+    """Backticked repo paths in agent_config resolve; runtime-data refs are exempt (their
+    absence is the documented fresh-checkout/CI state — corpus migration 2026-09-08)."""
     violations = _violations(_check_paths)
     assert not violations, "agent_config references paths that do not exist:\n" + "\n".join(
         sorted(violations)

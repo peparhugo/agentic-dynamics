@@ -1,0 +1,16 @@
+{
+  "subject": "skill/stack/flask",
+  "claim": "The Control Room creates a module-global Flask application and registers route modules through _routes.register(app, build_services()). Its app.run(threaded=True) path is documented as a local development server; the module provides a threaded Gunicorn command for multi-operator deployment.",
+  "conformance": "repo-conformant",
+  "repo_anchors": ["apps/control_room/server.py:35", "apps/control_room/server.py:119", "apps/control_room/server.py:197", "apps/control_room/server.py:214"],
+  "population": "agentic-dynamics stack",
+  "conditions": ["flask", "web", "blueprints", "app-factory", "security"],
+  "support": 2,
+  "uncertainty": 0.25,
+  "source_experiment": "tech_stack_seed_2026-09-11",
+  "evidence": [
+    "uri:https://flask.palletsprojects.com/en/stable/quickstart/",
+    "uri:https://flask.palletsprojects.com/en/stable/patterns/"
+  ],
+  "notes": "Repo conformance edit: replaced application-factory and Blueprint guidance with the module-global Control Room application and its route-registration seam. The previous claim did not describe the maintained Flask server."
+}

@@ -475,6 +475,9 @@ LEGITIMATE_CALLERS = frozenset(
     {
         "src/agentic_dynamics/control/fact_ingestion.py",
         "scripts/kb_produce_facts.py",
+        # Flash-exploration C4 (preregistration addendum 13): the skill producer mints its
+        # pattern/v1 fact through the verified projection path (disclosed in the prereg).
+        "scripts/kb_produce_skill.py",
         "src/agentic_dynamics/control/context_compiler.py",
         "src/agentic_dynamics/control/rules.py",
         "src/agentic_dynamics/control/validator.py",

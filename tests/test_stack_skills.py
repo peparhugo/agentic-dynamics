@@ -54,5 +54,16 @@ def test_stack_skills_schema_and_evidence():
             assert ref.startswith("uri:"), ref
             assert ref[4:] in corpus, f"{path.name}: evidence not in corpus: {ref[4:]}"
         assert skill["notes"].strip(), f"{path.name}: no notes"
+        # Repo-conformance gate: a skill claiming our practice must anchor to file:line; a
+        # doc-generic skill must say so (the review that caught the Playwright mismatch).
+        assert skill.get("conformance") in {
+            "repo-conformant",
+            "generic-guidance",
+        }, f"{path.name}: conformance missing/invalid"
+        anchors = skill.get("repo_anchors") or []
+        if skill["conformance"] == "repo-conformant":
+            assert anchors, f"{path.name}: repo-conformant with no repo_anchors"
+            for anchor in anchors:
+                assert ":" in anchor, f"{path.name}: anchor is not file:line: {anchor}"
     missing = _EXPECTED - seen
     assert not missing, f"missing subjects: {sorted(missing)}"

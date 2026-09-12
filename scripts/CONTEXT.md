@@ -1,6 +1,7 @@
 # `scripts/` — Scripts Reference (classification manifest)
 
-85 command scripts plus two helper modules (`_bootstrap.py`, `_gen_instructions.py`), each
+85 command scripts plus three helper modules (`_bootstrap.py`, `_gen_instructions.py`,
+`_command_journal.py`), each
 command in exactly one bucket (critique rec 5). The classification below is machine-parsed by
 `tests/test_script_classification.py` — keep the marker lines intact. The `one-time` bucket
 lives under `scripts/archive/`; the other buckets live at the top of `scripts/`.
@@ -100,7 +101,9 @@ the `fast`-marked subset = the sub-minute guard family + the audited pure-unit f
 subprocesses, no Redis/stores/ports, no real git worktrees, no runtime-corpus reads — the
 parallel-safety audit in `tests/test_fast_path_gate.py` enforces this on every run). Target:
 sub-3-minutes (measured ~25s). **The full suite stays the gate** — the fast path is a smoke
-subset, never a replacement; run `python3 -m pytest tests/ -q` on demand and keep it green.
+subset, never a replacement; run `python3 -m pytest tests/ -q` on demand and keep it green
+(add `-n auto --dist loadfile` with `pytest-xdist` for ~3x wall-clock — measured 254s -> 90s
+on the CI fixture corpus; the CI `test` job runs the suite parallel).
 
 **Budget gate** — `tests/test_fast_path_gate.py`: the fast path must stay under 180s (a slow
 regression trips the wire) and every `fast`-marked module must pass the parallel-safety audit.
@@ -109,8 +112,10 @@ case) is a corpus-contract test, never `fast`-marked: on a full data root those 
 unbounded (the g10 budget failure) and in a corpus-less checkout they fail the smoke outright.
 
 **Wired into the guard cadence** (test_suite_speed p3-d): CI runs `bash scripts/test_fast.sh`
-as the fast smoke in the `test` job of `.github/workflows/pytest.yml` (before the deterministic
-suite), and the docs-drift rail's `fast_path` axis (`scripts/scan_docs_drift.py`) re-derives the
+as the fast smoke in its own `fast-path` job of `.github/workflows/pytest.yml` (velocity,
+2026-09-12: concurrently with the deterministic suite's two shards, and required through the
+`test` fan-in so the required check name stays exactly `test`), and the docs-drift rail's
+`fast_path` axis (`scripts/scan_docs_drift.py`) re-derives the
 command + budget this section documents from the code and compares them — a doc that drifts from
 the gate (`FAST_BUDGET_SECONDS`) is a docs-drift finding, and a fast path the doc stops
 documenting errors the axis unmeasurable (exit 2), never clean.
@@ -205,7 +210,7 @@ documenting errors the axis unmeasurable (exit 2), never clean.
 | `control_sweep_zombies.py` | ~190 | **The zombie-run sweep** (control_db_evidence e2) — finds `running` control runs whose run heartbeat (`run_heartbeats`, kept fresh by `run_lifecycle.RunHeartbeatThread` in the `run_workflow` composition root) has EXPIRED and transitions each to `CANCELLED` with a reason naming the staleness evidence — through `ControlDB.transition_run` over `ALLOWED_TRANSITIONS`, never raw SQL, so the append-only `run_transitions` log stays the single honest history (the deep review's two killed runs previously needed manual cancellation). Liveness is three-valued: `live` (fresh heartbeat, untouched) / `zombie` (expired heartbeat, cancelled) / `unknown` (no heartbeat row — absence of evidence of life is not evidence of death, reported not cancelled). Flag/transition-only: never steers a live run. `--dry-run` previews, `--json`, `--db`, `--stale-after-min`, `--actor`. Rules in `agentic_dynamics/control/run_lifecycle.py`. CLI: `agentic-dynamics control sweep-zombies`. |
 | `orphan_sweep.py` | ~170 | Server-level orphan sweep daemon (cap_runner_hardening2 §Gap 1) — observes the opencode session store read-only, detects orphaned delegations (a task whose parent session has no meaningful step after the spawn AND whose subagent terminated), records each as a dated, flagged event (durable `experiments/results/orphans/orphans.jsonl` + Redis `orphan_events` hot list + canonical registry `source_type=orphan`), reaps the orphaned subagent process if still alive, and surfaces the record. FLAG-ONLY (hard rule 2) — never restarts/retries/steers. Cadence `ORPHAN_SWEEP_INTERVAL` (default 300s); `--once` for one pass; core rule in `agentic_dynamics/control/orphan_sweep.py`. CLI: `agentic-dynamics supervise orphans`. |
 | `record_discarded_tree.py` | ~80 | Relabel tree-identity gate's reset/rollback path (cap_runner_hardening2 §Gap 2) — records the tree a worktree is about to discard (`git rev-parse <commit>^{tree}`) onto the discarded-trees ledger `experiments/results/workflows/<spec>/discarded_trees.jsonl`, keyed (spec, branch, tree_hash, discarded_at); idempotent. The gate fails any phase whose committed tree is EXACTLY a recorded discarded tree (RELABEL + identical-tree proof) unless an operator-signed `approvals/<spec>/<phase>_tree_reuse.md` (committed before the phase) authorizes the reuse. FLAG-ONLY — records, never steers. CLI: `agentic-dynamics workflow discard-tree`. |
-| `promote.py` | ~300 | The P0-4 promoter (control-plane stabilization) — the ONLY path that updates `main`. Non-LLM and mechanical: verifies the candidate worktree HEAD matches the run ledger's `git_sha` (a rewritten candidate refuses), every phase recorded `ok` with a `commit_hash`, every `kind: test` phase carries an independent `test_executed_success` verdict (None = never ran = refuse), and an awaiting run is bound by a real operator approval naming THIS candidate; then squash-commits the candidate onto the base with the canonical `[workflow] <spec>` subject and pushes. Exit codes: 0 promoted / 10 awaiting (no binding approval) / 20 refused (evidence mismatch). `--dry-run` verifies + prints without pushing. Message normalization happens HERE (squash), never in the runtime (the commit-gate default is strict — P0-4). CLI: `agentic-dynamics workflow promote`. |
+| `promote.py` | ~300 | The P0-4 promoter (control-plane stabilization) — the ONLY path that updates `main`. Non-LLM and mechanical: verifies the candidate worktree HEAD matches the run ledger's `git_sha` (a rewritten candidate refuses), the ledger's bytes hash to the run row's `result_digest` (the Wave-B3 artifact binding — a post-outcome edit or swap refuses; pre-binding rows note and proceed), every phase recorded `ok` with a `commit_hash`, every `kind: test` phase carries an independent `test_executed_success` verdict (None = never ran = refuse), and an awaiting run is bound by a real operator approval naming THIS candidate; then squash-commits the candidate onto the base with the canonical `[workflow] <spec>` subject and pushes. Exit codes: 0 promoted / 10 awaiting (no binding approval) / 20 refused (evidence mismatch). `--dry-run` verifies + prints without pushing. Message normalization happens HERE (squash), never in the runtime (the commit-gate default is strict — P0-4). CLI: `agentic-dynamics workflow promote`. |
 | `workflow_new.py` | ~130 | The authoring entry point (Wave-3 a3) — `workflow new <name>` scaffolds a minimal valid workflow-v1 definition from `workflows/examples/minimal-agent-workflow.yaml` into `workflows/repository/<name>.yaml` and validates it against the schema + the a1 linter AS IT IS WRITTEN (a scaffold that would not be clean refuses and writes nothing). Backing logic in `workflows/scaffold_workflow.py`. `--output-dir`, `--template`. CLI: `agentic-dynamics workflow new`. |
 | `workflow_lint.py` | ~150 | The CI-able surface of the a1 linter (Wave-3 a3) — `workflow lint <file>` runs `workflows/lint_workflow.py` on ONE workflow-v1 definition and reports its named findings; a clean file prints nothing. Exit codes: 0 clean / 1 findings / 2 invalid (missing, unparseable, or NOT a workflow-v1 definition — an ExperimentSpec corpus document can never "pass" lint). `--json` emits the `workflow-lint/v1` report. CLI: `agentic-dynamics workflow lint`. |
 | `workflow_plan.py` | ~140 | The look-before-you-run surface (Wave-3 a3) — `workflow plan <file>` renders a workflow-v1 definition's step DAG (`needs`/`candidateFrom` edges), its gates and what each binds, and its promotion contract, embedding the a1 lint report inline so a violating definition still renders with its findings visible. `--json` emits the machine `workflow-plan/v1` document. Backing logic in `workflows/plan_workflow.py`. CLI: `agentic-dynamics workflow plan`. |
@@ -276,10 +281,10 @@ reasoning_divergence, semantic_clusters. Superseded by `semantic_validation.py`.
 
 | File | Purpose |
 |------|---------|
-| `apps/control_room/server.py` | Flask backend — the **Control Room portal**, 36 routes across 9 API categories plus the static shell (below). Serves `apps/control_room/static/`. Port 8000 (`FINOPS_PORT`). |
-| `apps/control_room/static/` | The one resting screen (facelift a0, parity-restored u4): one run ledger answering `ON-G1..G7` at rest, no navigation. `index.html` + `style.css` + `app.js` hydrate from `GET /api/glance` and follow `GET /api/events`; `parity.js` re-houses the dropped operational surfaces — the R4b per-worker event stream + governed action band, R4d step timings, and the workbench lenses (fleet, attention, money, registry, sessions, queue, routing, docs, audit, health, workforce step timings) — each lazy-loading the same endpoint the old room used. |
+| `apps/control_room/server.py` | Flask backend — the **Control Room portal**, 46 routes across 10 API categories plus the static shell (below). Serves `apps/control_room/static/`. Port 8000 (`FINOPS_PORT`). |
+| `apps/control_room/static/` | The one resting screen (facelift a0, parity-restored u4): one run ledger answering `ON-G1..G7` at rest, no navigation. `index.html` + `style.css` + `app.js` hydrate from `GET /api/glance` and follow `GET /api/events`; `parity.js` re-houses the dropped operational surfaces — the R4b per-worker event stream + governed action band, R4d step timings, and the workbench lenses (fleet, attention, money, registry, sessions, queue, routing, docs, audit, health, workforce step timings, plus the step-11 Operations/Surfaces boards and the step-12 batch lane) — each lazy-loading the same endpoint the old room used. |
 
-`apps/control_room/server.py`'s 36 routes, categorized:
+`apps/control_room/server.py`'s 46 routes, categorized:
 - **Legacy telemetry** (8): `/api/matrix`, `/api/status` (SSE), `/api/events/<cell_id>` (SSE), `/api/projections`, `/api/routing`, `/api/subscription-usage`, `POST /api/experiments`, `POST /api/queue/reinterleave`
 - **Supervisor flags** (3): `/api/flags`, `POST /api/flags/<session_id>/steer`, `POST /api/flags/<session_id>/interrupt`
 - **Registry** (2): `/api/registry`, `/api/registry/<entity_id>`
@@ -288,6 +293,8 @@ reasoning_divergence, semantic_clusters. Superseded by `semantic_validation.py`.
 - **Design sessions** (7): `/api/design-sessions`, `POST /api/design-sessions`, `/api/design-sessions/<portal_id>/spec`, `POST /api/design-sessions/<portal_id>/input`, `POST /api/design-sessions/<portal_id>/interrupt`, `POST /api/design-sessions/<portal_id>/save`, `POST /api/design-sessions/<portal_id>/run`
 - **Claude background sessions** (9): `/api/claude-agents`, `POST /api/claude-agents`, `/api/claude-agents/<session_id>/logs`, `POST /api/claude-agents/<session_id>/stop`, `POST /api/claude-agents/<session_id>/respawn`, `POST /api/claude-agents/<session_id>/rm`, `POST /api/claude-agents/<session_id>/steer`, `/api/claude-agents/daemon`, `POST /api/claude-agents/daemon/stop`
 - **Docs health** (2): `/api/docs-health`, `POST /api/docs-health/approve` — the docs-drift rail's surface (green/yellow/red + the controller's approve affordance; see `scripts/scan_docs_drift.py` → `docs_drift_watchdog.py` → `docs_proposal_gate.py`)
+- **Operations** (2): `/api/operations`, `/api/runs/<run_id>` — the operational read models (step 5): the packet + attention/triage, and P1/P2 per-run detail over the control records
+- **Analytics** (8): `/api/quality`, `/api/stories/<name>/arc`, `/api/value`, `/api/arms/compare` — the step-6 projections (P3 model quality, P4 story arc, P5 observed-only value, P6 arm comparison); `/api/queue/sla`, `/api/escalations`, `/api/batch`, `/api/energy` — the step-7 rule-4/6/8/9 surfaces (measured where owned, labeled scenarios/unknowns where not)
 - **Static shell** (1): `GET /`
 
 Full endpoint reference: `docs/architecture/current/supervisor_design.md`, `docs/architecture/current/spec.md`.

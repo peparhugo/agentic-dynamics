@@ -22,8 +22,8 @@
  *   BOARDS            — the destination names, in nav order
  */
 (function initControlRoomShell(root, core) {
-  /** The five destinations, in nav order. System is an overflow, not a destination (§1.2). */
-  const BOARDS = ["fleet", "status", "flags", "sessions", "routing"]
+  /** The seven destinations, in nav order. System is an overflow, not a destination (§1.2). */
+  const BOARDS = ["fleet", "status", "flags", "sessions", "routing", "operations", "surfaces"]
 
   /** localStorage keys. Namespaced so a shared origin cannot collide with other tools. */
   const THEME_KEY = "control-room-theme"
@@ -117,10 +117,23 @@
    *  Routing loads on demand in app.js behind `#routing-toggle`; rather than duplicating that
    *  logic, the shell presses the existing control once so the board is never blank. */
   function autoLoadBoard(board) {
-    if (board !== "routing") return
-    const drawer = $("#routing-drawer")
-    const toggle = $("#routing-toggle")
-    if (drawer && toggle && drawer.hidden) toggle.click()
+    if (board === "routing") {
+      const drawer = $("#routing-drawer")
+      const toggle = $("#routing-toggle")
+      if (drawer && toggle && drawer.hidden) toggle.click()
+      return
+    }
+    // Step 5/6/7 read boards: press their Refresh once when the content is not loaded yet.
+    // A board WITHOUT a loader gets no query at all: `document.querySelector("")` throws a
+    // SyntaxError, which would abort the rest of showBoard — board visibility changes first,
+    // then preference persistence and the scroll reset are skipped (the review's small shell
+    // failure; it applied to the four original boards on every switch).
+    const loaders = { operations: "#operations-refresh", surfaces: "#surfaces-refresh" }
+    const selector = loaders[board]
+    if (!selector) return
+    const refresh = $(selector)
+    const content = $(`#${board}-content`)
+    if (refresh && content && content.dataset.loaded !== "true") refresh.click()
   }
 
   /** Activate one destination; unknown names fall back to the home board. */

@@ -1,6 +1,6 @@
 ---
 name: run-workflow
-description: Validate/compile an ExperimentSpec YAML (compile_experiment.py's requires/produces gate) and execute an agent_task workflow through a git worktree, phase by phase (run_workflow.py). Use when asked to run a spec-driven workflow, check whether a spec's control rules have their information requirements met, or execute a multi-phase agent task with per-phase commits.
+description: Validate/compile an ExperimentSpec YAML (compile_experiment.py's requires/produces gate) or a workflow-v1 definition (workflows/compile_workflow.py's refusal-first bridge — unsupported semantics refuse before submission) and execute an agent_task workflow through a git worktree, phase by phase (run_workflow.py). Use when asked to run a spec-driven workflow, check whether a spec's control rules have their information requirements met, or execute a multi-phase agent task with per-phase commits.
 disable-model-invocation: false
 user-invocable: false
 argument-hint: ""
@@ -11,6 +11,18 @@ argument-hint: ""
 This skill wraps the *execute* half of the spec→DAG pipeline described in
 `docs/architecture/current/2026-08-14_experiment-spec-and-compiler-design.md`: validate/compile an
 `ExperimentSpec` YAML, then run it as a phased `agent_task` workflow inside a git worktree.
+
+`--spec` accepts EITHER document kind (step 1: authoring connects to execution):
+
+* an **ExperimentSpec** loads directly, exactly as before;
+* a **workflow-v1** definition (the `workflow new`/`lint`/`plan` format — `apiVersion:
+  agentic-dynamics.io/v1` + `kind: Workflow` under `workflows/`) compiles through
+  `workflows/compile_workflow.py` into the engine's `agent_task` spec. A gate compiles to
+  the producing phase's native `test_gate: true` (the independent test_runner verdict —
+  never prompt text), and every semantic the engine cannot execute 1:1 REFUSES with a
+  named `refused-*` error before any run state exists (task/approval kinds, command/human
+  executors, joins, readonly/shared workspaces, bounded concurrency, non-squash
+  strategies, optional gates, per-step images).
 
 ## When to use this
 
@@ -82,7 +94,9 @@ Confirmed flag set (`scripts/run_workflow.py` — the runner-hardened CLI, cap_r
 p1/p2):
 
 ```
---spec PATH                   required — an ExperimentSpec YAML
+--spec PATH                   required — an ExperimentSpec YAML OR a workflow-v1 definition
+                              (workflow-v1 compiles via workflows/compile_workflow.py; a
+                              refusal surfaces before any run state exists)
 --goal TEXT                   required — feature/task prompt, substituted for {goal}
 --model PROVIDER/MODEL        required — e.g. deepseek/deepseek-v4-pro
 --workdir PATH                required — git worktree to run in
@@ -177,12 +191,13 @@ not a hard prerequisite the script itself checks for.
    checked BEFORE the typed launch request is emitted). The container never holds the docker
    socket: the orchestrator emits each launch over the host broker's unix-socket seam, and the
    broker (the socket's only home, the ONLY Docker API caller) performs the docker call — no
-   in-container code calls docker. The fleet runs one orchestrator at a time, so don't start
-   a second orchestrator while one is running.
-4. In-process (`python3 scripts/run_workflow.py` without `--orchestrator`) is the
-   **fallback**, not the default: use it only when the fleet is occupied (an orchestrator
-   run is in flight) or the run is trivial (deterministic measurement execution, e.g. a
-   lab run). In-process phases are documented scopes, not enforced ones.
+   in-container code calls docker. The fleet runs one orchestrator at a time: a submission
+   while one runs QUEUES on the same isolation path — occupancy means waiting, never a
+   different execution shape, and never starting a second orchestrator by hand.
+4. In-process (`python3 scripts/run_workflow.py` without `--orchestrator`) is a **separate,
+   explicitly requested mode** for trivial deterministic runs (e.g. a lab execution) —
+   never the default and never the fallback for a busy fleet. In-process phases are
+   documented scopes, not enforced ones.
 5. Each phase commits to the worktree (`"[workflow] <phase>"`) unless `--no-commit` is set.
 6. Use `--resume` to re-run after an interrupted workflow — it skips phases whose commit
    already exists (falling back to the spec index's ok phases when the worktree has none)

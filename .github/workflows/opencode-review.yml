@@ -1,8 +1,11 @@
 name: Opencode PR Review
 
+# DISABLED 2026-09-12 (controller instruction): this action's backend fails on EVERY PR with a
+# 502 app-token exchange — an external, non-required check that only adds noise to every CI run.
+# Kept runnable by hand: re-enable by restoring the ``pull_request`` trigger once upstream auth
+# is fixed (or point it at a working reviewer).
 on:
-  pull_request:
-    types: [opened, synchronize, reopened]
+  workflow_dispatch:
 
 jobs:
   review:
@@ -11,6 +14,7 @@ jobs:
       contents: read
       pull-requests: write
       issues: read
+      id-token: write  # the opencode action's OIDC auth (its failure log asks for this)
 
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2

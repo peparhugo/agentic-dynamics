@@ -104,12 +104,18 @@ def _git_init(workdir: Path) -> None:
 
 
 
-def _approval_text(*, operator: str = "jane@example.com", date: str = "2026-08-27") -> str:
-    return (
-        f"# Operator approval\n\n"
-        f"- operator: {operator}\n"
-        f"- date: {date}\n"
-    )
+def _approval_text(*, operator: str = "jane@example.com", date: str = "2026-08-27",
+                   binding: dict | None = None) -> str:
+    """An operator approval artifact; ``binding`` adds the wave-A4 contract fields
+    (spec/phase/candidate/tree) a passing fixture must carry."""
+    lines = [
+        "# Operator approval\n\n",
+        f"- operator: {operator}\n",
+        f"- date: {date}\n",
+    ]
+    for key, value in (binding or {}).items():
+        lines.append(f"- {key}: {value}\n")
+    return "".join(lines)
 
 
 # ── the revamp3 REPLAY (the regression proof) ────────────────────────────────
@@ -288,9 +294,15 @@ def test_resume_proceeds_with_signed_artifact_committed_after(tmp_path):
     proceeds past the checkpoint and runs the later phases."""
     spec = _minimal_spec(tmp_path)
     wd = _completed_checkpoint_wd(tmp_path)
+    ck = _git("rev-parse", "HEAD", cwd=wd).stdout.strip()
+    tree = _git("rev-parse", "HEAD^{tree}", cwd=wd).stdout.strip()
     ap = wd / "approvals" / spec.name
     ap.mkdir(parents=True)
-    (ap / "design_approval.md").write_text(_approval_text())
+    (ap / "design_approval.md").write_text(
+        _approval_text(binding={
+            "spec": spec.name, "phase": "design", "candidate": ck, "tree": tree,
+        })
+    )
     _git("add", "-Af", cwd=wd)
     _git("commit", "-qm", "operator approval (descendant of the checkpoint)", cwd=wd)
 

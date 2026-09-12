@@ -119,6 +119,15 @@ class TestBuildObservation:
         assert obs.subject_status == "publish:requested"
         assert _CANDIDATE_SHA in obs.text
 
+    def test_observation_carries_the_true_rationale_and_command_id(self):
+        """Wave B5: the observation's text carries the operator's TRUE rationale + the journal
+        receipt id — the decision is the one the command journal recorded."""
+        obs = aio_emission.build_observation(
+            _decision(why="ships the B5 receipts", command_id="cmd-42")
+        )
+        assert "ships the B5 receipts" in obs.text
+        assert "command cmd-42" in obs.text
+
     def test_observation_without_candidate_sha_refuses(self):
         with pytest.raises(ValueError, match="no candidate_sha"):
             aio_emission.build_observation(_decision(candidate_sha=""))
@@ -150,6 +159,18 @@ class TestBuildActuation:
         assert body["requested_by"] == "drseuss"
         assert body["requested_action"]["candidate_sha"] == _CANDIDATE_SHA
         assert body["requested_action"]["pushed_sha"] == "abc123"
+
+    def test_actuation_carries_the_command_id(self):
+        """Wave B5: the act names its journal receipt — the command id lands in
+        ``requested_action`` beside the candidate."""
+        obs = aio_emission.build_observation(_decision(command_id="cmd-42"))
+        act = aio_emission.build_actuation(
+            _decision(command_id="cmd-42", requested_action={"outcome": "pushed"}),
+            causes=obs.knowledge_id,
+        )
+        body = json.loads(act.text)
+        assert body["requested_action"]["command_id"] == "cmd-42"
+        assert body["requested_action"]["outcome"] == "pushed"
 
     def test_empty_causes_refuses_at_construction(self):
         # the producer's one hard construction-time requirement is preserved through the seam.
@@ -265,6 +286,8 @@ def _promote_args(tmp_path: Path, wt: Path, ledger: dict, **overrides):
         "approval": None,
         "base": "main",
         "operator": "drseuss",
+        "rationale": "aio emission test",
+        "rationale_ref": "",
         "dry_run": False,
     }
     args.update(overrides)
@@ -303,6 +326,22 @@ def _noop_record_decision(decision):
     return {"status": "no-op", "knowledge_id": "test", "artifact": "", "warnings": []}
 
 
+def _journal_fakes() -> dict:
+    """Step 10's journal seams: hermetic fakes so the real control db is never touched.
+
+    Tolerant kwargs: promote's intent receives ``ledger``/``candidate``/``run_id``; publish's
+    receives ``receipt``.
+    """
+    from types import SimpleNamespace
+
+    return {
+        "journal_intent": lambda args, **kwargs: SimpleNamespace(
+            command_id="cmd-a5test", state="intent"
+        ),
+        "journal_receipt": lambda args, command, *, state, receipt: None,
+    }
+
+
 class TestPromoteCallSiteEmits:
     def test_promote_decision_and_act_emit_end_to_end(self, tmp_path, monkeypatch):
         """Run the real promote path against a fake knowledge stream + fake push.
@@ -330,15 +369,27 @@ class TestPromoteCallSiteEmits:
         monkeypatch.setattr(ks, "connect", lambda: redis)
         pushes: list = []
         args = _promote_args(tmp_path, wt, ledger)
-        _run_promotion(args, push=_fake_push(pushes), record_decision=_noop_record_decision)
+        _run_promotion(
+            args,
+            push=_fake_push(pushes),
+            record_decision=_noop_record_decision,
+            **_journal_fakes(),
+        )
 
         assert len(pushes) == 1  # the act happened
         # the decision dict the call site built (deterministic from args+ledger) is what the
         # observation must carry: run_id + candidate_sha + operator.
-        decision = _promote_decision(args, ledger, head, status="requested")
+        # The call site threads the journal command id (the fake's `cmd-a5test`); deriving the
+        # same dict here must reproduce EXACTLY what was emitted, receipt binding included.
+        decision = _promote_decision(
+            args, ledger, head, status="requested", command_id="cmd-a5test"
+        )
         assert decision["run_id"] == "promote_test@0.1"
         assert decision["candidate_sha"] == head
         assert decision["operator"] == "drseuss"
+        # Wave B5: the why is the operator's TRUE rationale, never a synthetic explanation.
+        assert decision["why"] == "aio emission test"
+        assert decision["command_id"] == "cmd-a5test"
 
         # (a) the streamed observation is exactly that decision's record — carrying run_id
         # (subject_id) + candidate sha (in its text) — and it landed BEFORE the actuation.
@@ -377,16 +428,39 @@ class TestPromoteCallSiteEmits:
             _promote_args(tmp_path, wt, ledger),
             push=_fake_push([]), emit_decision=emit_decision, emit_act=emit_act,
             record_decision=_noop_record_decision,
+            **_journal_fakes(),
         )
 
         assert len(calls["decision"]) == 1
         assert len(calls["act"]) == 1
         decision, causes = calls["act"][0]
         assert calls["decision"][0]["candidate_sha"] == head
+        # Wave B5: the call site threads the TRUE rationale + the journal command id
+        # (the `_journal_fakes` command) into both the decision and the act.
+        assert calls["decision"][0]["why"] == "aio emission test"
+        assert calls["decision"][0]["command_id"] == "cmd-a5test"
+        assert decision["command_id"] == "cmd-a5test"  # build_actuation folds it into the record
         # the act's causes == the observation id the decision emitter returned.
         assert causes == observation_ids[0]
         assert decision["requested_action"]["outcome"] == "pushed"
         assert decision["requested_action"]["pushed_sha"] == "feedfacefeedfacefeedface"
+
+
+def test_publish_decision_and_record_carry_the_true_rationale_and_command_id():
+    """Wave B5: the publish emission + its s2 decision record carry the operator's rationale
+    (never the synthetic receipt-hash summary) and the journal command id."""
+    from types import SimpleNamespace
+
+    args = SimpleNamespace(
+        rationale="ship the release", rationale_ref="", run_id="",
+        candidate_sha="ab" * 20, operator="drseuss",
+    )
+    receipt = {"repo_sha": "cd" * 20}
+    decision = pr._publish_decision(args, receipt, command_id="cmd-9")
+    assert decision["why"] == "ship the release"
+    assert decision["command_id"] == "cmd-9"
+    record = pr._publish_decision_record(args, receipt, command_id="cmd-9")
+    assert record["why"] == "ship the release (command cmd-9)"
 
     def test_emission_failure_never_blocks_the_act(self, tmp_path):
         """(c) best-effort is structural: a raising emitter cannot stop a verified promotion."""
@@ -405,6 +479,7 @@ class TestPromoteCallSiteEmits:
             _promote_args(tmp_path, wt, ledger),
             push=_fake_push(pushes), emit_decision=boom_decision, emit_act=boom_act,
             record_decision=_noop_record_decision,
+            **_journal_fakes(),
         )
         assert len(pushes) == 1
 
@@ -481,11 +556,13 @@ class TestPublishCallSiteEmits:
             return {"actuation_id": "act-1", "entry_ids": ["1-2"]}
 
         rc = pr.main(
-            ["--candidate-sha", "deadbeef", "--operator", "operator-test", "--db", str(db_path)],
+            ["--candidate-sha", "deadbeef", "--operator", "operator-test",
+             "--rationale", "aio emission test", "--db", str(db_path)],
             deployer=deploy, builder=lambda: (True, "built"),
             live_checker=lambda host, receipt: "",
             emit_decision=emit_decision, emit_act=emit_act,
             record_decision=_noop_record_decision,
+            **_journal_fakes(),
         )
         assert rc == pr.EXIT_OK
         assert len(calls["decision"]) == 1
@@ -522,11 +599,13 @@ class TestPublishCallSiteEmits:
             return {"actuation_id": "act-1", "entry_ids": ["1-2"]}
 
         rc = pr.main(
-            ["--candidate-sha", "deadbeef", "--operator", "operator-test", "--db", str(db_path)],
+            ["--candidate-sha", "deadbeef", "--operator", "operator-test",
+             "--rationale", "aio emission test", "--db", str(db_path)],
             deployer=failing_deploy, builder=lambda: (True, "built"),
             live_checker=lambda host, receipt: "",
             emit_decision=emit_decision, emit_act=emit_act,
             record_decision=_noop_record_decision,
+            **_journal_fakes(),
         )
         assert rc == pr.EXIT_DEPLOY_FAILED
         assert deployed == ["canonical", "mirror"]
@@ -589,18 +668,37 @@ def test_approval_is_a_supported_permanence_verb():
 # ── A2 closure: the approve verb has a real call site ─────────────────────────
 
 def test_approve_command_records_and_emits(tmp_path, monkeypatch):
-    """A2 (authoring_product_aio adversarial, 2026-09-03): the approve permanence verb
-    was declared but unwired. The workflow approve command now records the approval in
-    the control db (operator + candidate bound), writes the resume-path artifact, and
-    emits the decision through the AIO emission seam (verb=approve)."""
+    """A2 (authoring_product_aio adversarial, 2026-09-03) + step 2 (2026-09-11): the approve
+    permanence verb records the approval in the control db (operator + candidate bound),
+    writes AND COMMITS the resume-path artifact on the candidate worktree (the runner's
+    checkpoint contract requires the committed approval), and emits the decision through
+    the AIO emission seam (verb=approve)."""
     import importlib.util
+    import subprocess as sp
 
     from agentic_dynamics.control.control_db import ControlDB, RunState
+
+    # a real candidate worktree: the approval must land ON the exact candidate sha.
+    workdir = tmp_path / "wt"
+    workdir.mkdir()
+
+    def _git(*argv: str) -> str:
+        proc = sp.run(["git", *argv], cwd=workdir, capture_output=True, text=True)
+        assert proc.returncode == 0, proc.stderr
+        return proc.stdout.strip()
+
+    _git("init", "-q", "-b", "main")
+    _git("config", "user.email", "t@example.com")
+    _git("config", "user.name", "t")
+    (workdir / "base.txt").write_text("base", encoding="utf-8")
+    _git("add", ".")
+    _git("commit", "-q", "-m", "base")
+    candidate = _git("rev-parse", "HEAD")
 
     db_path = tmp_path / "control.db"
     with ControlDB.open(db_path) as db:
         run = db.create_run(spec_name="t", model="m", state=RunState.RUNNING,
-                            reason="start", candidate_sha="abcd1234567890")
+                            reason="start", candidate_sha=candidate)
         db.transition_run(run.run_id, RunState.AWAITING_APPROVAL, reason="checkpoint")
 
     monkeypatch.setenv("FINOPS_CONTROL_DB", str(db_path))
@@ -611,8 +709,8 @@ def test_approve_command_records_and_emits(tmp_path, monkeypatch):
     monkeypatch.setattr(
         sys, "argv",
         ["approve", "--run-id", run.run_id, "--gate-id", "approval",
-         "--candidate-sha", "abcd1234567890", "--spec", "t", "--phase", "p2",
-         "--operator", "Dr. Seuss", "--workdir", str(tmp_path)],
+         "--candidate-sha", candidate, "--spec", "t", "--phase", "p2",
+         "--operator", "Dr. Seuss", "--workdir", str(workdir)],
     )
     m.main()
 
@@ -620,8 +718,18 @@ def test_approve_command_records_and_emits(tmp_path, monkeypatch):
         approvals = db.approvals(run_id=run.run_id)
         assert len(approvals) == 1
         assert approvals[0].operator == "Dr. Seuss"
-        assert approvals[0].candidate_sha == "abcd1234567890"
-    assert (tmp_path / "approvals" / "t" / "p2_approval.md").exists()
+        assert approvals[0].candidate_sha == candidate
+    assert (workdir / "approvals" / "t" / "p2_approval.md").exists()
+    # step 2: the artifact is COMMITTED on the candidate — the resume contract's requirement.
+    assert _git("log", "-1", "--format=%s").startswith("[approval] t/p2")
+    # step 2e: the command journal carries the intent + the durable receipt.
+    with ControlDB.open_read_only(db_path) as db:
+        journal = db.commands(run_id=run.run_id)
+    assert [(c.verb, c.state) for c in journal] == [("approve", "completed")]
+    assert '"artifact_commit"' in journal[0].receipt_json
+    committed = _git("show", "HEAD:approvals/t/p2_approval.md")
+    assert "operator: Dr. Seuss" in committed
+    assert "purpose: checkpoint" in committed
 
 
 def test_approve_placeholder_operator_refused(tmp_path, monkeypatch):

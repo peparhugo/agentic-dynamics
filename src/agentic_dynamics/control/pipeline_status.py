@@ -42,6 +42,8 @@ def stage_summary(
     queue_key: str,
     status_key: str,
     results_key: str | None = None,
+    *,
+    batch_key: str | None = None,
 ) -> dict[str, Any]:
     """Summarize one pipeline stage from its queue list + status hash.
 
@@ -58,9 +60,11 @@ def stage_summary(
     counts = Counter(statuses.values())
     retry = sum(value for key, value in counts.items() if key.startswith("retry_"))
     running = counts.get("running", 0) + retry
+    batch_depth = redis_client.llen(batch_key) if batch_key else 0
     return {
         "total": len(statuses),
-        "remaining_in_queue": redis_client.llen(queue_key),
+        "remaining_in_queue": redis_client.llen(queue_key) + batch_depth,
+        "batch_remaining": batch_depth,
         "queued": counts.get("queued", 0),
         "running": running,
         "done": counts.get("done", 0),

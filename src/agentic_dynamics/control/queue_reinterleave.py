@@ -104,16 +104,20 @@ def reinterleave_cells(cells: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return out
 
 
-def read_queue(r: redis.Redis) -> list[dict[str, Any]]:
-    """Read queued cells in consumption order (tail-first)."""
-    raw = r.lrange(QUEUE_KEY, 0, -1)
+def read_queue(r: redis.Redis, *, key: str = QUEUE_KEY) -> list[dict[str, Any]]:
+    """Read queued cells in consumption order (tail-first).
+
+    ``key`` defaults to the on-demand lane; callers may read the deferred batch lane
+    (``story_jobs_batch``) with the same consumption-order semantics.
+    """
+    raw = r.lrange(key, 0, -1)
     cells = [json.loads(c) for c in raw]
     # BRPOP pops from the tail; lrange runs head -> tail, so consumption order
     # is the reverse.
     return list(reversed(cells))
 
 
-def write_queue(r: redis.Redis, target_order: list[dict[str, Any]]) -> None:
+def write_queue(r: redis.Redis, target_order: list[dict[str, Any]], *, key: str = QUEUE_KEY) -> None:
     """Atomically replace the queue so consumption order == ``target_order``.
 
     ``target_order`` is the consumption order, but Redis stores the list
@@ -122,9 +126,9 @@ def write_queue(r: redis.Redis, target_order: list[dict[str, Any]]) -> None:
     partially-rewritten state.
     """
     pipe = r.pipeline(transaction=True)
-    pipe.delete(QUEUE_KEY)
+    pipe.delete(key)
     for cell in reversed(target_order):
-        pipe.rpush(QUEUE_KEY, json.dumps(cell))
+        pipe.rpush(key, json.dumps(cell))
     pipe.execute()
 
 

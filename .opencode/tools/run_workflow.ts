@@ -2,9 +2,9 @@ import { tool } from "@opencode-ai/plugin"
 
 export default tool({
   description:
-    "Run an agent_task workflow (the execute phase of the spec/compiler DAG) against a goal inside a git worktree, committing + ledgering each phase.",
+    "Run an agent_task workflow (the execute phase of the spec/compiler DAG) against a goal inside a git worktree, committing + ledgering each phase. `spec` accepts an ExperimentSpec YAML OR a workflow-v1 definition (compiled through workflows/compile_workflow.py; unsupported semantics refuse before submission).",
   args: {
-    spec: tool.schema.string().describe("Path to an ExperimentSpec YAML"),
+    spec: tool.schema.string().describe("Path to an ExperimentSpec OR a workflow-v1 YAML"),
     goal: tool.schema.string().describe("Feature/task prompt (substituted for {goal})"),
     model: tool.schema.string().describe("provider/model id"),
     workdir: tool.schema.string().describe("Git worktree path to run in"),
@@ -15,6 +15,9 @@ export default tool({
     timeout_min: tool.schema.number().optional().default(30).describe("Per-phase timeout in minutes"),
     no_commit: tool.schema.boolean().optional().default(false),
     resume: tool.schema.boolean().optional().default(false),
+    orchestrator: tool.schema.boolean().optional().default(true).describe(
+      "Run each agent phase as a sibling cell container — the DEFAULT execution path per the project rules. Pass false only for an explicitly requested deterministic local run (in-process is a separate supported mode, not the busy-fleet fallback).",
+    ),
   },
   async execute(args, ctx) {
     const flags: string[] = [
@@ -30,6 +33,7 @@ export default tool({
     if (args.backend) flags.push("--backend", args.backend)
     if (args.no_commit) flags.push("--no-commit")
     if (args.resume) flags.push("--resume")
+    if (args.orchestrator) flags.push("--orchestrator")
 
     const result = await Bun.$`python3 scripts/run_workflow.py ${flags}`.cwd(ctx.directory).nothrow()
     const output = result.stdout.toString().trim()

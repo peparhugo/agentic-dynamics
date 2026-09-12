@@ -9,7 +9,10 @@ permission:
     "git push *": ask
     "firebase deploy *": ask
     "rm -rf /tmp/exp_*": ask
-  task: allow
+  task:
+    "*": deny
+    explore: allow
+    data-analysis: allow
   external_directory: allow
   webfetch: allow
   skill: allow

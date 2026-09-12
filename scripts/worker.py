@@ -72,11 +72,15 @@ from agentic_dynamics.core.admission_context import (
     validate_lease_fields,
 )
 from agentic_dynamics.core.constants import SESSION_TIMEOUT, STORY_SESSIONS
+from agentic_dynamics.runtime.queue_timings import append_timing, timing_row
 
 REDIS_HOST = os.environ.get("FINOPS_REDIS_HOST", "127.0.0.1")
 REDIS_PORT = int(os.environ.get("FINOPS_REDIS_PORT", "6380"))
 REDIS_DB = int(os.environ.get("FINOPS_REDIS_DB", "1"))
 QUEUE_KEY = "story_jobs"
+#: The DEFERRED batch lane (rule 6, step 12): BRPOP checks keys in ORDER (left to right), so
+#: on-demand work always pops first and a batch cell runs only when the on-demand lane is empty.
+BATCH_QUEUE_KEY = "story_jobs_batch"
 STATUS_KEY = "story_status"
 WORKER_PREFIX = "worker"
 
@@ -329,6 +333,32 @@ def _trigger_analysis(r: redis.Redis, stdout: str, cell_id: str) -> None:
         log(f"[{cell_id}] analysis trigger failed (non-fatal): {e}")
 
 
+def _dequeue(r) -> tuple | None:
+    """The ordered pop: ONE keys list, on-demand first, the deferred batch lane second.
+
+    redis-py's signature is ``brpop(keys: List, timeout=0)`` — passing two positional keys
+    binds the second to ``timeout`` and raises BEFORE any I/O (the 2026-09-12 review's
+    reproduction). The list form is the only correct call; ``tests/test_worker_queue.py``
+    pins it against an autospecced client so a regression fails at binding time in CI.
+    """
+    return r.brpop([QUEUE_KEY, BATCH_QUEUE_KEY], timeout=BLOCK_TIMEOUT)
+
+
+def _record_timing(cell: dict, *, status: str, started_at: float) -> None:
+    """Append this job's measured queue/service timings (step 8, G-30) — loud but never fatal.
+
+    The worker is the only actor that observes both the enqueue stamp and the serve window;
+    a disk failure here must not kill a finished job, so the append reports a warning and the
+    row is simply absent (the P8 surface then shows the completion without timings — an
+    explicit absence, never a fabricated number).
+    """
+    warning = append_timing(
+        timing_row(cell, status=status, started_at=started_at, ended_at=time.time())
+    )
+    if warning:
+        log(f"[{cell.get('cell_id')}] WARNING — {warning} (the job's result stands)")
+
+
 def main() -> None:
     log(f"Started (pid={os.getpid()})")
 
@@ -353,7 +383,7 @@ def main() -> None:
 
     while True:
         try:
-            result = r.brpop(QUEUE_KEY, timeout=BLOCK_TIMEOUT)
+            result = _dequeue(r)
         except Exception as e:
             log(f"Redis brpop error: {e}, reconnecting...")
             time.sleep(10)
@@ -364,7 +394,7 @@ def main() -> None:
             empty_polls += 1
             if empty_polls >= IDLE_POLLS_BEFORE_EXIT:
                 try:
-                    remaining = r.llen(QUEUE_KEY)
+                    remaining = r.llen(QUEUE_KEY) + r.llen(BATCH_QUEUE_KEY)
                 except Exception:
                     remaining = 0
                 if remaining == 0:
@@ -386,9 +416,11 @@ def main() -> None:
         _safe_hset(r, STATUS_KEY, cell_id, "running")
         publisher = LivePublisher(cell_id)
         publisher.publish_status("running")
-        log(f"[{cell_id}] Starting ({completed+failed+1}/30)")
+        lane = " [batch]" if cell.get("batch_mode") is True else ""
+        log(f"[{cell_id}] Starting ({completed+failed+1}/30){lane}")
 
         t0 = time.monotonic()
+        started_at = time.time()
         # The spend gate (admission_leases p2). An ExitStack so the leases are released by the
         # same ``finally`` on every path — success, failure, timeout, or refusal.
         admission_gate = contextlib.ExitStack()
@@ -482,12 +514,14 @@ def main() -> None:
                     error_log = log_dir / f"{cell_id}.error.log"
                     error_log.write_text(proc.stderr or proc.stdout)
                     failed += 1
+                    _record_timing(cell, status="failed", started_at=started_at)
                     continue
                 log(f"[{cell_id}] OK ({elapsed:.0f}s)")
                 _safe_hset(r, STATUS_KEY, cell_id, "done")
                 publisher.publish_status("done")
                 _trigger_analysis(r, proc.stdout, cell_id)
                 completed += 1
+                _record_timing(cell, status="done", started_at=started_at)
             else:
                 log(f"[{cell_id}] FAILED ret={proc.returncode} ({elapsed:.0f}s)")
                 _safe_hset(r, STATUS_KEY, cell_id, "failed")
@@ -496,6 +530,7 @@ def main() -> None:
                 error_log = log_dir / f"{cell_id}.error.log"
                 error_log.write_text(proc.stderr or proc.stdout)
                 failed += 1
+                _record_timing(cell, status="failed", started_at=started_at)
 
         except AdmissionDenied as e:
             # REFUSED — nothing was spawned and nothing was spent. The cell is NOT dead-lettered:
@@ -510,7 +545,8 @@ def main() -> None:
             try:
                 # LPUSH against a BRPOP consumer puts it at the BACK of the queue, so the other
                 # jobs get a turn before this one is retried.
-                r.lpush(QUEUE_KEY, job_json)
+                requeue_key = BATCH_QUEUE_KEY if cell.get("batch_mode") is True else QUEUE_KEY
+                r.lpush(requeue_key, job_json)
             except Exception as exc:  # noqa: BLE001 — a lost re-queue must not kill the worker
                 log(f"[{cell_id}] could not re-queue after denial: {exc}")
                 _safe_record_dead(r, QUEUE_KEY, cell, f"admission denied + re-queue failed: {e}")
@@ -531,6 +567,7 @@ def main() -> None:
             publisher.publish_status("timeout")
             _safe_record_dead(r, QUEUE_KEY, cell, "timeout")
             failed += 1
+            _record_timing(cell, status="timeout", started_at=started_at)
 
         except Exception as e:
             log(f"[{cell_id}] EXCEPTION: {e}")
@@ -538,6 +575,7 @@ def main() -> None:
             publisher.publish_status("failed")
             _safe_record_dead(r, QUEUE_KEY, cell, f"exception: {e}")
             failed += 1
+            _record_timing(cell, status="failed", started_at=started_at)
             # Reconnect — the exception may have been a Redis error mid-run
             r = _connect_redis()
 

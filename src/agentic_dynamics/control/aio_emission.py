@@ -28,7 +28,9 @@ Decision vocabulary (the dict every call site constructs)::
         "candidate_sha": str,                        # the tree the act targets
         "operator": str,                             # whose name the act carries
         "status": str,                               # observation status (requested/approved/...)
-        "why": str,                                  # free-text reason (optional)
+        "why": str,                                  # the operator's TRUE rationale (wave B5)
+        "command_id": str,                           # the command-journal receipt this act binds
+                                                     # (optional; projected into both records)
         "requested_action": dict,                    # actuation detail (optional)
     }
 
@@ -101,21 +103,25 @@ def _run_id(decision: dict[str, Any]) -> str:
 
 
 def _candidate_text(decision: dict[str, Any]) -> str:
-    """The human-readable candidate/operator context folded into the observation's ``why``.
+    """The human-readable candidate/operator/command context folded into the observation's ``why``.
 
     The observation producer's extra surface is fixed (``subject_id``/``subject_status`` only —
-    a5 does not change its contract), so the candidate sha and the operator name travel in the
-    ``why`` text, where a reader and a test can both find them. A decision that carries no
-    operator is recorded with the ``unknown`` fallback so the observation is never silent about
-    whose name the act would carry.
+    a5 does not change its contract), so the candidate sha, the operator name, and the journal
+    command id (wave B5: the receipt this decision binds) travel in the ``why`` text, where a
+    reader and a test can both find them. A decision that carries no operator is recorded with
+    the ``unknown`` fallback so the observation is never silent about whose name the act would
+    carry.
     """
     parts = []
     candidate_sha = str(decision.get("candidate_sha") or "").strip()
     operator = str(decision.get("operator") or "").strip() or DEFAULT_OPERATOR
+    command_id = str(decision.get("command_id") or "").strip()
     if candidate_sha:
         parts.append(f"candidate {candidate_sha}")
     if operator:
         parts.append(f"operator {operator}")
+    if command_id:
+        parts.append(f"command {command_id}")
     why = str(decision.get("why") or "").strip()
     if why:
         parts.append(why)
@@ -137,8 +143,9 @@ def build_observation(
     through :func:`observation_ingestion.derive_observation_record` with the producer's own
     verdict shape: ``run_id`` becomes the ``cell_id``/``subject_id`` (the record's subject is
     the run the candidate came from), ``subject_status`` is ``"<verb>:<status>"``, and the
-    candidate sha + operator name ride in the ``why`` text. Raises ``ValueError`` for an
-    unknown verb or an empty candidate (a permanence decision with no candidate is not one).
+    candidate sha, operator name, command id (when present), and the operator's TRUE rationale
+    ride in the ``why`` text. Raises ``ValueError`` for an unknown verb or an empty candidate
+    (a permanence decision with no candidate is not one).
     """
     verb = _verb(decision)
     run_id = _run_id(decision)
@@ -175,8 +182,9 @@ def build_actuation(
     :func:`actuation_ingestion.derive_actuation_record`, and the link that makes the AIO's
     permanence auditable ("why did the system act": the observation that justified it, resolved
     through the same lineage gate the stream enforces at publish time). The record body carries
-    the verb, the run identity, and a ``requested_action`` dict naming the candidate (plus any
-    call-site outcome detail, e.g. the pushed sha or the receipt id).
+    the verb, the run identity, and a ``requested_action`` dict naming the candidate (plus the
+    journal command id when the decision carries one, and any call-site outcome detail, e.g.
+    the pushed sha or the release ids).
     """
     verb = _verb(decision)
     run_id = _run_id(decision)
@@ -186,6 +194,9 @@ def build_actuation(
     candidate_sha = str(decision.get("candidate_sha") or "").strip()
     if candidate_sha:
         requested_action.setdefault("candidate_sha", candidate_sha)
+    command_id = str(decision.get("command_id") or "").strip()
+    if command_id:
+        requested_action.setdefault("command_id", command_id)
 
     return derive_actuation_record(
         {

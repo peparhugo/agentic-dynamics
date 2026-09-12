@@ -34,7 +34,10 @@ never points from a plane into ``scripts/``.
 
 from __future__ import annotations
 
+import hashlib
+import json
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any, Protocol
 
 
@@ -63,6 +66,75 @@ class StepRequest:
     silent_mode: bool = False
     enforce_pytest: bool = False
     phase_def: dict[str, Any] = field(default_factory=dict)
+    #: Step 3: the attempt ordinal within the phase (1-based) — the engine's retry counter, so
+    #: executor state is keyed by run/ATTEMPT, never shared across retries of one phase.
+    attempt: int = 1
+
+    @property
+    def prompt_sha256(self) -> str:
+        """The immutable identity of the prepared instruction (sha256 of ``prompt``)."""
+        return hashlib.sha256(self.prompt.encode("utf-8")).hexdigest()
+
+    def to_prepared_dict(self) -> dict[str, Any]:
+        """The transport form of this step (``prepared-step/v1``) for a sibling executor.
+
+        The child consumes THIS — never a re-derivation from the spec — so the prompt the
+        parent readied (and may have augmented) is exactly the prompt that executes, and its
+        hash is carried for verification.
+        """
+        return {
+            "schema": "prepared-step/v1",
+            "phase_name": self.phase_name,
+            "phase_kind": self.phase_kind,
+            "prompt": self.prompt,
+            "prompt_sha256": self.prompt_sha256,
+            "model": self.model,
+            "backend": self.backend,
+            "goal": self.goal,
+            "spec_name": self.spec_name,
+            "workdir": self.workdir,
+            "language": self.language,
+            "thinking_effort": self.thinking_effort,
+            "thinking_budget_tokens": self.thinking_budget_tokens,
+            "output_token_limit": self.output_token_limit,
+            "timeout": self.timeout,
+            "silent_mode": self.silent_mode,
+            "enforce_pytest": self.enforce_pytest,
+            "attempt": self.attempt,
+        }
+
+
+def load_prepared_step(path: Path | str) -> dict[str, Any]:
+    """Load and VERIFY a ``prepared-step/v1`` transport file (the child side of step 3).
+
+    Refuses — never repairs — when the file is absent, not a prepared step, missing its
+    prompt/hash, or when the prompt does not hash to the carried ``prompt_sha256``. A
+    mismatch means the instruction was changed in transit; executing it would let the
+    recorded parent decision and the actual run disagree, which is the defect this transport
+    exists to close.
+    """
+    prepared_path = Path(path)
+    try:
+        payload = json.loads(prepared_path.read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        raise ValueError(f"prepared step not found: {prepared_path}") from None
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"prepared step is not valid JSON: {prepared_path}: {exc}") from None
+    if not isinstance(payload, dict) or payload.get("schema") != "prepared-step/v1":
+        raise ValueError(f"not a prepared-step/v1 document: {prepared_path}")
+    prompt = payload.get("prompt")
+    if not isinstance(prompt, str) or not prompt.strip():
+        raise ValueError(f"prepared step carries no prompt: {prepared_path}")
+    if not payload.get("phase_name"):
+        raise ValueError(f"prepared step carries no phase_name: {prepared_path}")
+    carried = str(payload.get("prompt_sha256") or "")
+    actual = hashlib.sha256(prompt.encode("utf-8")).hexdigest()
+    if carried != actual:
+        raise ValueError(
+            f"prepared step prompt hash mismatch ({carried[:12] or '<empty>'} != {actual[:12]}): "
+            f"the instruction was changed in transit — refusing to execute"
+        )
+    return payload
 
 
 @dataclass

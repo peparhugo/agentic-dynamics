@@ -1183,6 +1183,527 @@
     });
   }
 
+  // ── Step-11/12 read views: Operations + Surfaces (re-housed from main) ────────────────────
+  //
+  // These lenses keep the destination boards main added after the facelift branched — the
+  // operational packet + run detail (`/api/operations`, `/api/runs/<run_id>`) and the
+  // step-5/6/7 read models (`/api/quality`, `/api/stories/<name>/arc`, `/api/value`,
+  // `/api/arms/compare`, `/api/queue/sla`, `/api/escalations`, `/api/batch`, `/api/energy`) —
+  // inside the refreshed presentation. Every value renders as the payload returned it: a named
+  // `unavailable`/scenario state stays verbatim (never a fabricated 0 or an all-clear), and the
+  // batch lane keeps its "not measurable" label until a batch transport actually exists.
+
+  /** Render a payload value (including its state blocks) without inventing one. */
+  function stateText(value) {
+    if (value === null || value === undefined) return "—";
+    if (typeof value === "object") {
+      if (value.state) return value.state + (value.reason ? " — " + value.reason : "");
+      return "—";
+    }
+    return String(value);
+  }
+
+  /** A data table; rows can carry a run id for the click-through run detail. */
+  function table(captionText, headers, rows, opts) {
+    opts = opts || {};
+    var wrap = element("div", "table-scroll");
+    var node = element("table", "routing-table panel-table");
+    node.appendChild(element("caption", "sr-only", null, captionText));
+    var thead = element("thead");
+    var headRow = element("tr");
+    headers.forEach(function (header) { headRow.appendChild(element("th", null, null, header)); });
+    thead.appendChild(headRow);
+    node.appendChild(thead);
+    var tbody = element("tbody");
+    (rows || []).forEach(function (cells, index) {
+      var tr = element("tr");
+      var runId = opts.runIds ? opts.runIds[index] : null;
+      if (runId) {
+        tr.setAttribute("data-run-id", runId);
+        tr.className = "clickable";
+        tr.setAttribute("tabindex", "0");
+        tr.setAttribute("role", "button");
+        tr.setAttribute("aria-label", "Open run " + runId + " detail");
+      }
+      cells.forEach(function (value) { tr.appendChild(element("td", null, null, stateText(value))); });
+      tbody.appendChild(tr);
+    });
+    node.appendChild(tbody);
+    wrap.appendChild(node);
+    return wrap;
+  }
+
+  function note(text) { return element("p", "panel-note", null, text); }
+
+  /** A relative age for a producer timestamp, or an honest unknown. */
+  function ageText(value) {
+    if (!value) return "—";
+    var then = new Date(value).getTime();
+    if (isNaN(then)) return String(value);
+    return ago((Date.now() - then) / 1000);
+  }
+
+  var RUN_HEADERS = ["Run", "Spec", "State", "Phases", "Model", "Candidate", "Started"];
+
+  function runRow(entry) {
+    var progress = entry.phases_completed === undefined && entry.phases_total === undefined
+      ? "—" : (entry.phases_completed || 0) + "/" + (entry.phases_total || 0);
+    return [entry.run_id, entry.spec_name, entry.state, progress, entry.model,
+      entry.candidate_sha ? String(entry.candidate_sha).slice(0, 12) : "—",
+      entry.started_at ? ageText(entry.started_at) : "—"];
+  }
+
+  /** A titled block inside the operations lens. */
+  function sectionBlock(title, body) {
+    var block = element("section", "panel-section surface-block");
+    block.appendChild(element("h4", "section-title", null, title));
+    block.appendChild(body);
+    return block;
+  }
+
+  /** Operations lens: the packet-derived snapshot + click-through per-run detail. */
+  function loadOperations(host) {
+    panelState(host, "loading", "Loading operations…");
+    getJSON("/api/operations").then(function (result) {
+      if (!result.ok) {
+        panelState(host, "error", "Operations unavailable (HTTP " + result.status + ")");
+        return;
+      }
+      clear(host);
+      host.appendChild(panelHeader("OPERATIONS", "the one packet · run detail on click"));
+      renderOperations(host, result.data || {});
+    });
+  }
+
+  function renderOperations(host, data) {
+    var source = data.source || {};
+    var active = data.active_runs || [];
+    var promotable = data.promotable_runs || [];
+    var attention = data.attention || [];
+    var degraded = data.degraded || [];
+    var lag = data.projection_lag || {};
+    // A degraded control DB means every count derived from it reads "unavailable", never 0.
+    var dbDegraded = degraded.some(function (entry) { return entry.surface === "control_db"; });
+
+    var summary = element("div", "kv-table");
+    [
+      ["Control epoch", String(source.control_epoch || "—")],
+      ["Repo head", String(source.repo_head_sha || "—").slice(0, 9)],
+      ["Active runs", dbDegraded ? "unavailable" : String(active.length)],
+      ["Decisions owed", dbDegraded ? "unavailable" : String(attention.length)],
+      ["Promotable runs", dbDegraded ? "unavailable" : String(promotable.length)],
+      ["Unhealthy workers", String((data.unhealthy_workers || []).length)],
+    ].forEach(function (pair) {
+      var row = element("div", "kv-row");
+      span(row, "kv-key", pair[0]);
+      row.appendChild(element("div", "kv-val", null, pair[1]));
+      summary.appendChild(row);
+    });
+    host.appendChild(summary);
+
+    if (degraded.length) {
+      host.appendChild(sectionBlock("DEGRADED SURFACES", table("Degraded surfaces",
+        ["Surface", "Reason"], degraded.map(function (e) { return [e.surface, e.reason]; }))));
+    }
+
+    host.appendChild(sectionBlock("ATTENTION", attention.length ? table(
+      "Attention (decisions owed)",
+      ["Kind", "Run", "Spec", "Gate", "Candidate", "Purpose"],
+      attention.map(function (e) {
+        return [e.kind, e.run_id, e.spec_name, e.gate_id || "(run)",
+          e.candidate_sha ? String(e.candidate_sha).slice(0, 12) : "—",
+          e.purpose || e.reason || "—"];
+      }),
+      { runIds: attention.map(function (e) { return e.run_id; }) })
+      : note(dbDegraded
+        ? "The control database could not be read — decisions owed cannot be listed."
+        : "No decisions owed.")));
+
+    var safe = data.safe_actions || [];
+    host.appendChild(sectionBlock("SAFE ACTIONS", safe.length ? table(
+      "Safe actions (from the enforced transition graph)",
+      ["Action", "Run", "Candidate", "Gate"],
+      safe.map(function (e) {
+        return [e.action, e.run_id || "—",
+          e.candidate_sha ? String(e.candidate_sha).slice(0, 12) : "—", e.gate_id || "—"];
+      }),
+      { runIds: safe.map(function (e) { return e.run_id || null; }) })
+      : note(dbDegraded
+        ? "The control database could not be read — safe actions cannot be derived."
+        : "No safe actions offered.")));
+
+    var runs = active.concat(promotable);
+    host.appendChild(sectionBlock("ACTIVE + PROMOTABLE RUNS", runs.length ? table(
+      "Active and promotable runs", RUN_HEADERS, runs.map(runRow),
+      { runIds: runs.map(function (e) { return e.run_id; }) })
+      : note(dbDegraded
+        ? "The control database could not be read — active runs cannot be listed."
+        : "No active or promotable runs.")));
+
+    var lagRows = Object.keys(lag).map(function (key) { return [key, stateText(lag[key])]; });
+    host.appendChild(sectionBlock("PROJECTION LAG", lagRows.length
+      ? table("Projection lag", ["Projection", "Unconfirmed events"], lagRows)
+      : note("No projection watermarks reported.")));
+
+    // The run-detail drawer: a click on any run row fetches /api/runs/<id>. A named error
+    // (unreadable/incomplete read) renders by name, never as a blank detail.
+    var drawer = element("section", "run-detail-drawer", { id: "run-detail-drawer", hidden: true });
+    var dhead = element("header", "drawer-header");
+    dhead.appendChild(element("h3", "panel-title", { id: "run-detail-title" }, "RUN DETAIL"));
+    var dclose = element("button", "icon-button",
+      { type: "button", "aria-label": "Close run detail" }, "✕");
+    dhead.appendChild(dclose);
+    drawer.appendChild(dhead);
+    var detailContent = element("div", "run-detail-content", { id: "run-detail-content" });
+    drawer.appendChild(detailContent);
+    host.appendChild(drawer);
+    dclose.addEventListener("click", function () { drawer.hidden = true; clear(detailContent); });
+    function activate(event) {
+      var row = event.target.closest("tr[data-run-id]");
+      if (!row) return;
+      if (event.type === "keydown") {
+        if (event.key !== "Enter" && event.key !== " ") return;
+        event.preventDefault();
+      }
+      openRunDetail(row.getAttribute("data-run-id"), drawer, detailContent);
+    }
+    host.addEventListener("click", activate);
+    host.addEventListener("keydown", activate);
+  }
+
+  function openRunDetail(runId, drawer, content) {
+    if (!runId) return;
+    drawer.hidden = false;
+    clear(content);
+    content.appendChild(note("Loading run detail…"));
+    getJSON("/api/runs/" + encodeURIComponent(runId)).then(function (result) {
+      clear(content);
+      if (!result.ok) {
+        content.appendChild(note("Run detail unavailable (HTTP " + result.status + ")"));
+        return;
+      }
+      if (result.data && result.data.error) {
+        content.appendChild(note("Run detail unavailable: " + result.data.error));
+        return;
+      }
+      renderRunDetail(content, result.data || {});
+    });
+  }
+
+  /** A generic object table over whatever keys the control record actually carries. */
+  function objectTable(captionText, rows, preferredKeys) {
+    if (!rows || !rows.length) return note("None recorded.");
+    var keys = preferredKeys.filter(function (key) {
+      return rows.some(function (row) { return key in row; });
+    });
+    var extra = [];
+    rows.forEach(function (row) {
+      Object.keys(row).forEach(function (key) {
+        if (keys.indexOf(key) === -1 && key.slice(-5) !== "_json" && extra.indexOf(key) === -1) {
+          extra.push(key);
+        }
+      });
+    });
+    var headers = keys.concat(extra);
+    return table(captionText, headers, rows.map(function (row) {
+      return headers.map(function (key) { return row[key]; });
+    }));
+  }
+
+  function renderRunDetail(content, data) {
+    var run = data.run || {};
+    var identity = element("div", "kv-table");
+    [
+      ["Spec", run.spec_name || "—"], ["State", run.state || "—"], ["Model", run.model || "—"],
+      ["Candidate", run.candidate_sha ? String(run.candidate_sha).slice(0, 12) : "—"],
+      ["Started", run.started_at ? ageText(run.started_at) : "—"],
+      ["Cost", run.cost_usd === null || run.cost_usd === undefined
+        ? "unavailable" : "$" + Number(run.cost_usd).toFixed(4)],
+    ].forEach(function (pair) {
+      var row = element("div", "kv-row");
+      span(row, "kv-key", pair[0]);
+      row.appendChild(element("div", "kv-val", null, pair[1]));
+      identity.appendChild(row);
+    });
+    content.appendChild(identity);
+    content.appendChild(sectionBlock("ATTEMPTS", objectTable("Attempts", data.attempts || [],
+      ["attempt_number", "phase", "model", "status", "first_pass", "accepted", "retry_reason",
+        "escalation_from", "escalation_to", "cost_usd"])));
+    content.appendChild(sectionBlock("GATES", objectTable("Gates", data.gates || [],
+      ["gate_id", "candidate_sha", "status", "verdict", "created_at"])));
+    content.appendChild(sectionBlock("APPROVALS", objectTable("Approvals", data.approvals || [],
+      ["gate_id", "candidate_sha", "purpose", "operator", "created_at"])));
+    content.appendChild(sectionBlock("COMMAND JOURNAL", objectTable("Command journal", data.commands || [],
+      ["verb", "state", "actor", "rationale", "candidate_sha", "created_at"])));
+  }
+
+  //: The step-6/7 read models, one panel each (the batch lane is `renderBatchPanel`).
+  var SURFACE_ROUTES = [
+    ["quality", "/api/quality"],
+    ["value", "/api/value"],
+    ["arms", "/api/arms/compare"],
+    ["sla", "/api/queue/sla"],
+    ["escalations", "/api/escalations"],
+    ["batch", "/api/batch"],
+    ["energy", "/api/energy"],
+  ];
+
+  /** Surfaces lens: every read model independent; a failed fetch renders its own state. */
+  function loadSurfaces(host) {
+    panelState(host, "loading", "Loading surfaces…");
+    Promise.all(SURFACE_ROUTES.map(function (pair) { return getJSON(pair[1]); }))
+      .then(function (results) {
+        clear(host);
+        host.appendChild(panelHeader("SURFACES", "step-5/6/7 read models · states rendered verbatim"));
+        var grid = element("div", "surface-grid");
+        SURFACE_ROUTES.forEach(function (pair, index) {
+          var result = results[index];
+          grid.appendChild(result.ok
+            ? renderSurfacePanel(pair[0], result.data || {})
+            : surfacePanel(pair[0], pair[0].toUpperCase(),
+                "unavailable — HTTP " + result.status + " (" + pair[1] + ")"));
+        });
+        grid.appendChild(renderStoryArcPanel(null));
+        host.appendChild(grid);
+      });
+  }
+
+  function surfacePanel(name, title, body) {
+    var panel = element("section", "surface-panel", { "data-surface": name });
+    panel.appendChild(element("h3", null, null, title));
+    if (typeof body === "string") panel.appendChild(note(body));
+    else if (body) panel.appendChild(body);
+    return panel;
+  }
+
+  function renderSurfacePanel(name, data) {
+    switch (name) {
+      case "quality": return renderQualityPanel(data);
+      case "value": return renderValuePanel(data);
+      case "arms": return renderArmsPanel(data);
+      case "sla": return renderSlaPanel(data);
+      case "escalations": return renderEscalationPanel(data);
+      case "batch": return renderBatchPanel(data);
+      case "energy": return renderEnergyPanel(data);
+      default: return surfacePanel(name, name.toUpperCase(), stateText(data));
+    }
+  }
+
+  /** Grit — the one formal definition — per model, with its coverage beside it. */
+  function renderQualityPanel(data) {
+    var body = element("div");
+    var population = data.population || {};
+    var excluded = Object.keys(population.exclusions || {}).map(function (key) {
+      return key + "=" + population.exclusions[key];
+    }).join(", ");
+    body.appendChild(note("cells " + (population.eligible_cells === undefined ? "—"
+      : population.eligible_cells) + "/" + (population.resolved_cells === undefined ? "—"
+      : population.resolved_cells) + " eligible" + (excluded ? " (excluded: " + excluded + ")" : "")));
+    var rows = (data.models || []).map(function (model) {
+      var grit = (model.grit && model.grit.overall) || {};
+      var first = model.first_pass || {};
+      var narration = model.narration || {};
+      var gritty = grit.grit === null || grit.grit === undefined
+        ? (grit.insufficient_support ? "insufficient support" : "—")
+        : grit.grit + " (n=" + grit.n + (grit.insufficient_support ? ", low" : "") + ")";
+      return [model.model, gritty, stateText(first.first_pass_rate), stateText(first.accepted_rate),
+        stateText(narration.explanation_ratio),
+        (first.n_eligible === undefined ? "—" : first.n_eligible) + "/"
+          + (first.n_total === undefined ? "—" : first.n_total) + " attempts"];
+    });
+    body.appendChild(table("Model quality",
+      ["Model", "Grit", "First-pass", "Accepted", "Explanation ratio", "First-pass coverage"], rows));
+    if ((data.degraded || []).length) {
+      body.appendChild(note("degraded: " + data.degraded.map(function (d) { return d.surface; }).join(", ")));
+    }
+    return surfacePanel("quality", "MODEL QUALITY (rules 1/2/5)", body);
+  }
+
+  /** observed-only value: accepted outcomes and cost per accepted outcome, verbatim. */
+  function renderValuePanel(data) {
+    var body = element("div");
+    body.appendChild(note(data.formula || ""));
+    body.appendChild(note("BVI: " + stateText(data.bvi)));
+    body.appendChild(table("Observed value",
+      ["Run", "Arm", "Accepted", "Total cost", "Cost / accepted", "Cost coverage"],
+      (data.rows || []).map(function (row) {
+        return [row.run, row.arm, row.accepted_outcomes, row.total_cost_usd,
+          row.cost_per_accepted === undefined
+            ? (row.cost_per_accepted_reason || "—") : row.cost_per_accepted,
+          row.cost_captured_records + "/" + row.outcomes_total + " costs"];
+      })));
+    return surfacePanel("value", "RUN VALUE (rule 10, observed-only)", body);
+  }
+
+  /** the compare/adapt ranking, exactly as compare_arms returned it. */
+  function renderArmsPanel(data) {
+    var body = element("div");
+    var comparison = data.comparison || {};
+    body.appendChild(note((data.state || "—")
+      + (data.state_reason ? " — " + data.state_reason : "")
+      + " · best: " + (comparison.best_arm === undefined ? "—" : comparison.best_arm)
+      + " · n=" + (data.n_outcomes === undefined ? 0 : data.n_outcomes)));
+    var rows = Object.keys(comparison.arms || {}).map(function (arm) {
+      var stats = comparison.arms[arm];
+      var coverage = stats.coverage || {};
+      return [arm, stats.n, stats.eligible === false ? "no" : "yes",
+        stats.weighted_loss === undefined
+          ? (stats.missing_objectives ? "missing " + stats.missing_objectives.join(",") : "—")
+          : stats.weighted_loss,
+        coverage.cost ? coverage.cost.n + "/" + coverage.cost.of : "—"];
+    });
+    body.appendChild(table("Arms", ["Arm", "n", "Eligible", "Weighted loss", "Cost coverage"], rows));
+    return surfacePanel("arms", "ARM COMPARISON (P6)", body);
+  }
+
+  /** queue depth, burn, the breach value and the settled completions. */
+  function renderSlaPanel(data) {
+    var body = element("div");
+    if ((data.degraded || []).length) {
+      body.appendChild(note("degraded: " + data.degraded.map(function (entry) {
+        return entry.surface + " — " + entry.reason;
+      }).join("; ")));
+    }
+    var queue = data.queue || {};
+    var burn = data.burn || {};
+    var sla = data.sla || {};
+    body.appendChild(note("depth " + (queue.depth === undefined ? "—" : queue.depth)
+      + " · burn " + stateText(burn.burn_per_h) + "/h over " + stateText(burn.span_h)
+      + "h · horizon " + stateText(sla.horizon)));
+    var breach = sla.breach_rate || {};
+    body.appendChild(note("breach: " + (breach.state === "measured"
+      ? "timeouts " + breach.value.timeout_breaches + "/" + breach.value.total_phases_with_breach_fields
+        + ", gates " + breach.value.gate_breaches
+      : stateText(breach))));
+    body.appendChild(note("2× rule: "
+      + stateText(sla.twice_depth_rule && sla.twice_depth_rule.threshold_jobs) + " jobs ("
+      + ((sla.twice_depth_rule && sla.twice_depth_rule.basis) || "—") + ")"));
+    var completions = (data.recent_completions && data.recent_completions.rows) || [];
+    body.appendChild(table("Recent completions",
+      ["Cell", "Status", "Queue wait (ms)", "Service (ms)", "Deadline slack (ms)"],
+      completions.slice(0, 10).map(function (row) {
+        return [row.cell_id, row.status, row.queue_wait_ms === undefined ? "—" : row.queue_wait_ms,
+          row.service_time_ms === undefined ? "—" : row.service_time_ms,
+          row.deadline_slack_ms === undefined ? "—" : row.deadline_slack_ms];
+      })));
+    return surfacePanel("sla", "QUEUE / SLA (rule 9)", body);
+  }
+
+  /** the cascade surface: recorded events only, the armed flag, and E_x labeled. */
+  function renderEscalationPanel(data) {
+    var body = element("div");
+    body.appendChild(note("armed: " + (data.armed === true ? "yes" : "no")
+      + (data.armed_note ? " — " + data.armed_note : "")));
+    body.appendChild(table("Escalation events", ["From", "To", "Reason", "Cost"],
+      (data.events || []).map(function (event) {
+        return [event.from, event.to, event.reason || "—",
+          event.cost_usd === undefined ? "—" : event.cost_usd];
+      })));
+    body.appendChild(note("E_x: " + stateText(data.e_x) + " (" + ((data.e_x && data.e_x.class) || "—") + ")"));
+    return surfacePanel("escalations", "ESCALATION CASCADE (rule 8)", body);
+  }
+
+  /** explicitly not-measurable until a batch transport exists; the scenario is labeled. */
+  function renderBatchPanel(data) {
+    var body = element("div");
+    if ((data.degraded || []).length) {
+      body.appendChild(note("degraded: " + data.degraded.map(function (entry) {
+        return entry.surface + " — " + entry.reason;
+      }).join("; ")));
+    }
+    body.appendChild(note(data.measurable
+      ? "batch fraction " + data.batch_fraction + " (" + data.batch_jobs + "/" + data.marked_jobs + ")"
+      : "not measurable — " + (data.reason || "no marker")
+        + " (scanned " + (data.scanned_jobs === undefined ? 0 : data.scanned_jobs) + " jobs)"));
+    var modeled = data.modeled || {};
+    body.appendChild(note("modeled scenario: discount " + modeled.discount
+      + " / horizon " + modeled.horizon_h + "h · class " + (modeled.class || "—")));
+    return surfacePanel("batch", "BATCH DISCOUNT (rule 6)", body);
+  }
+
+  /** energy/EPM: external + modeled sources labeled; the measured gap named. */
+  function renderEnergyPanel(data) {
+    var body = element("div");
+    var model = data.energy_model || {};
+    body.appendChild(note("model: " + model.per_prompt_token_j + " J/prompt · "
+      + model.per_output_token_j + " J/output · " + model.per_reasoning_token_j
+      + " J/reasoning (" + (model.class || "—") + ")"));
+    var epm = data.epm || {};
+    body.appendChild(note(epm.state === "published"
+      ? "EPM: " + ((epm.baseline && epm.baseline.value) === undefined ? "—" : epm.baseline.value)
+        + " baseline / " + ((epm.aggressive && epm.aggressive.value) === undefined ? "—" : epm.aggressive.value)
+        + " aggressive (" + epm.class + ")"
+      : "EPM: " + stateText(epm)));
+    var ranking = data.energy_ranking || {};
+    var models = Array.isArray(ranking.models) ? ranking.models : [];
+    body.appendChild(table("Energy ranking", ["Model", "Avg energy (J)", "J per LOC"],
+      models.slice(0, 8).map(function (row) {
+        return [row.id || row.model || "—",
+          row.avg_energy_j === undefined ? "—" : row.avg_energy_j,
+          row.avg_energy_j_per_loc === undefined ? "—" : row.avg_energy_j_per_loc];
+      })));
+    body.appendChild(note("measured session energy: " + stateText(data.measured_session_energy)));
+    body.appendChild(note("flip horizon: " + stateText(data.flip_horizon)));
+    return surfacePanel("energy", "ENERGY / EPM (rule 4)", body);
+  }
+
+  /** the story arc panel: a name input + the fetched arc, or explicit guidance. */
+  function renderStoryArcPanel(data, name) {
+    var panel = element("section", "surface-panel", { "data-surface": "story-arc" });
+    panel.appendChild(element("h3", null, null, "STORY ARC (rule 3)"));
+    var controls = element("div", "surface-controls");
+    var input = element("input", "surface-input",
+      { type: "text", id: "story-arc-name", placeholder: "story_id or story_name", value: name || "" });
+    var button = element("button", null, { type: "button", "data-story-arc-load": "true" }, "Load arc");
+    button.addEventListener("click", loadStoryArc);
+    input.addEventListener("keydown", function (event) {
+      if (event.key === "Enter") { event.preventDefault(); loadStoryArc(); }
+    });
+    controls.appendChild(input);
+    controls.appendChild(button);
+    panel.appendChild(controls);
+    var body = element("div", null, { id: "story-arc-body" });
+    body.appendChild(note(data ? "" : "Enter a story_id or story_name and load its arc."));
+    if (data) renderStoryArcBody(data);
+    panel.appendChild(body);
+    return panel;
+  }
+
+  function renderStoryArcBody(data) {
+    var body = document.getElementById("story-arc-body");
+    if (!body) return;
+    clear(body);
+    if (data === null) { body.appendChild(note("Story not found.")); return; }
+    body.appendChild(note(data.matched_by + " · " + data.stories_matched + " story(ies) · snowball "
+      + stateText(data.snowball_factor) + " · velocity " + stateText(data.velocity) + " · β "
+      + stateText(data.beta && data.beta.value) + " (" + ((data.beta && data.beta.class) || "—") + ")"));
+    body.appendChild(table("Sessions", ["Session", "Cost", "Code lines", "n"],
+      (data.sessions || []).map(function (row) {
+        return [row.session_number, stateText(row.cost_usd),
+          row.code_lines === undefined ? "—" : row.code_lines, row.n];
+      })));
+    if (data.snowball_reason) body.appendChild(note(data.snowball_reason));
+  }
+
+  function loadStoryArc() {
+    var input = document.getElementById("story-arc-name");
+    var name = (input && input.value.trim()) || "";
+    var body = document.getElementById("story-arc-body");
+    if (!name) {
+      if (body) { clear(body); body.appendChild(note("Enter a story_id or story_name first.")); }
+      return;
+    }
+    if (body) { clear(body); body.appendChild(note("Loading " + name + "…")); }
+    getJSON("/api/stories/" + encodeURIComponent(name) + "/arc").then(function (result) {
+      if (result.status === 404) { renderStoryArcBody(null); return; }
+      if (!result.ok) {
+        if (body) { clear(body); body.appendChild(note("Arc unavailable (HTTP " + result.status + ")")); }
+        return;
+      }
+      renderStoryArcBody(result.data || {});
+    });
+  }
+
   //: The workbench registry: order = nav order; `load(host)` is called the first time the panel
   //: is shown (and by an explicit refresh) so no endpoint is touched at rest.
   var PANELS = [
@@ -1197,6 +1718,8 @@
     { id: "audit", label: "Audit", load: loadAudit },
     { id: "health", label: "Health", load: loadHealth },
     { id: "workforce", label: "Workforce", load: loadWorkforce },
+    { id: "operations", label: "Operations", load: loadOperations },
+    { id: "surfaces", label: "Surfaces", load: loadSurfaces },
   ];
 
   var workbenchOrigin = null;

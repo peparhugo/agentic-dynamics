@@ -199,7 +199,7 @@ def main() -> int:
     if r is None:
         add(f"- redis (6380/db1): {r_err}")
     else:
-        add(f"- redis (6380/db1): alive — story_jobs {r.llen('story_jobs')} · story_status {r.hlen('story_status')}")
+        add(f"- redis (6380/db1): alive — story_jobs {r.llen('story_jobs')} · story_batch {r.llen('story_jobs_batch')} · story_status {r.hlen('story_status')}")
         pipeline = sorted(k for k in r.keys("pipeline:*:current") if k.startswith("pipeline:"))
         for k in pipeline:
             add(f"- {k}: phase `{r.get(k)}`")

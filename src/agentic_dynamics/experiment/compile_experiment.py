@@ -21,6 +21,7 @@ Design: ``code_reviews/2026-08-14_experiment-spec-and-compiler-design.md``.
 
 from __future__ import annotations
 
+import math
 from collections import defaultdict, deque
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -138,6 +139,29 @@ DEFAULT_OBJECTIVE_FIELDS: dict[str, str] = {
     "value": "value",
 }
 
+#: What to do with an arm that does not cover every comparison objective:
+#:
+#: - ``exclude`` (default, fail-closed): the arm is NOT ranked; it is reported under
+#:   ``ineligible_arms`` with the exact missing/under-covered objectives. An arm with an
+#:   unmeasured cost must never win a cost-weighted comparison by omission.
+#: - ``ignore`` (explicit opt-in): the arm is ranked, the missing objective contributes
+#:   nothing — the pre-fix semantics, made visible in the payload (``missing_objectives``
+#:   + ``missing_policy``) instead of silent.
+MISSING_POLICIES: tuple[str, ...] = ("exclude", "ignore")
+
+
+def _usable_metric(value: Any) -> bool:
+    """True when ``value`` is a rankable numeric metric.
+
+    ``None``, non-numerics, NaN and infinities are NOT usable: the measurement rules mark an
+    unmeasured metric with NaN (never 0.0), so NaN must be treated as missing, not averaged in.
+    """
+    if isinstance(value, bool):
+        return True  # boolean metrics (e.g. correctness) are summable
+    if isinstance(value, (int, float)):
+        return math.isfinite(value)
+    return False
+
 
 def compare_arms(
     results: list[dict[str, Any]],
@@ -145,6 +169,8 @@ def compare_arms(
     arm_factor: str,
     loss: dict[str, float],
     objective_fields: dict[str, str] | None = None,
+    missing_policy: str = "exclude",
+    min_coverage: float = 1.0,
 ) -> dict[str, Any]:
     """Compare arms by weighted loss and regret (generalizes ``simulate_strategies``).
 
@@ -153,8 +179,27 @@ def compare_arms(
     minimize, negative = benefit to maximize). Regret is each arm's weighted loss minus
     the best arm's.
 
-    Returns ``{arm_factor, loss, arms, best_arm, regrets}``.
+    **Comparable coverage before ranking** (the coverage rule). An objective participates
+    only when at least one row carries a usable value for it; an arm is ELIGIBLE only when
+    each participating objective is covered for at least ``min_coverage`` of the arm's rows
+    (default 1.0 = full). Ineligible arms are excluded from ``best_arm``/``regrets`` and
+    reported under ``ineligible_arms`` with their missing/under-covered objectives — an
+    unmeasured-cost arm cannot win a cost-weighted comparison by silently dropping the cost
+    term. ``missing_policy="ignore"`` is the explicit opt-in to the legacy behavior; it is
+    echoed in the payload so the choice is visible.
+
+    Every arm carries a ``coverage`` block (``{objective: {n, of, rate}}``) so a mean is
+    never reported without its eligible sample count.
+
+    Returns ``{arm_factor, loss, comparison_objectives, unmeasured_objectives,
+    unmapped_objectives, missing_policy, min_coverage, arms, eligible_arms,
+    ineligible_arms, best_arm, regrets}``.
     """
+    if missing_policy not in MISSING_POLICIES:
+        raise ValueError(f"missing_policy must be one of {MISSING_POLICIES}, got {missing_policy!r}")
+    if not 0.0 <= min_coverage <= 1.0:
+        raise ValueError(f"min_coverage must be within [0, 1], got {min_coverage!r}")
+
     fields = dict(DEFAULT_OBJECTIVE_FIELDS)
     if objective_fields:
         fields.update(objective_fields)
@@ -165,45 +210,89 @@ def compare_arms(
         if arm is not None:
             arms[str(arm)].append(r)
 
-    objectives = [
-        obj
-        for obj in loss
-        if obj in fields and any(fields[obj] in r for r in results)
-    ]
+    # An objective participates only when its field is mapped AND measured somewhere; a loss
+    # name with no field mapping or no measured value anywhere is reported, never silent.
+    comparison_objectives: list[str] = []
+    unmapped_objectives: list[str] = []
+    unmeasured_objectives: list[str] = []
+    for obj in loss:
+        if obj not in fields:
+            unmapped_objectives.append(obj)
+            continue
+        fld = fields[obj]
+        if any(_usable_metric(r.get(fld)) for r in results):
+            comparison_objectives.append(obj)
+        else:
+            unmeasured_objectives.append(obj)
 
     arm_stats: dict[str, dict[str, Any]] = {}
+    ineligible_arms: dict[str, dict[str, list[str]]] = {}
     for arm, group in arms.items():
         stats: dict[str, Any] = {"n": len(group)}
+        coverage: dict[str, dict[str, Any]] = {}
+        missing: list[str] = []
+        under: list[str] = []
         weighted = 0.0
-        for obj in objectives:
+        for obj in comparison_objectives:
             fld = fields[obj]
-            vals = [r[fld] for r in group if fld in r]
+            vals = [r[fld] for r in group if _usable_metric(r.get(fld))]
+            rate = len(vals) / len(group) if group else 0.0
+            coverage[obj] = {"n": len(vals), "of": len(group), "rate": round(rate, 4)}
             if not vals:
-                continue
+                missing.append(obj)
+                continue  # no measured value → no contribution (eligibility decides ranking)
             mean = sum(vals) / len(vals)
             stats[f"avg_{fld}"] = round(mean, 4)
             weighted += loss[obj] * mean
-        stats["weighted_loss"] = round(weighted, 4)
+            if rate < min_coverage:
+                under.append(obj)
+        stats["coverage"] = coverage
+        if missing:
+            stats["missing_objectives"] = missing
+        if under:
+            stats["under_coverage"] = under
+        eligible = not missing and not under
+        if missing_policy == "ignore":
+            eligible = True
+        stats["eligible"] = eligible
+        if eligible:
+            stats["weighted_loss"] = round(weighted, 4)
+        else:
+            ineligible_arms[arm] = {"missing_objectives": missing, "under_coverage": under}
         arm_stats[arm] = stats
 
-    if not arm_stats:
+    eligible_arms = [arm for arm, stats in arm_stats.items() if stats["eligible"]]
+    header = {
+        "arm_factor": arm_factor,
+        "loss": loss,
+        "comparison_objectives": comparison_objectives,
+        "unmeasured_objectives": unmeasured_objectives,
+        "unmapped_objectives": unmapped_objectives,
+        "missing_policy": missing_policy,
+        "min_coverage": min_coverage,
+    }
+    if not arm_stats or not eligible_arms:
+        # Fail closed: with no eligible arm there is NO ranking — not a winner from the
+        # arms that happened to cover the most.
         return {
-            "arm_factor": arm_factor,
-            "loss": loss,
-            "arms": {},
+            **header,
+            "arms": arm_stats,
+            "eligible_arms": eligible_arms,
+            "ineligible_arms": ineligible_arms,
             "best_arm": None,
             "regrets": {},
         }
 
-    best_arm = min(arm_stats, key=lambda a: arm_stats[a]["weighted_loss"])
+    best_arm = min(eligible_arms, key=lambda a: arm_stats[a]["weighted_loss"])
     regrets = {
         arm: round(arm_stats[arm]["weighted_loss"] - arm_stats[best_arm]["weighted_loss"], 4)
-        for arm in arm_stats
+        for arm in eligible_arms
     }
     return {
-        "arm_factor": arm_factor,
-        "loss": loss,
+        **header,
         "arms": arm_stats,
+        "eligible_arms": eligible_arms,
+        "ineligible_arms": ineligible_arms,
         "best_arm": best_arm,
         "regrets": regrets,
     }

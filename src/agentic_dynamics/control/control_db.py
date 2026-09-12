@@ -131,7 +131,7 @@ CONTROL_DB_ENV = "FINOPS_CONTROL_DB"
 #:   ROOT's ``family_id`` so spec_status can derive completion from the family UNION. Column
 #:   ADDITION to an existing table — handled by the guarded ``_ensure_family_link_columns``
 #:   migration below (``CREATE TABLE IF NOT EXISTS`` cannot add columns to a v3 table).
-SCHEMA_VERSION = 4
+SCHEMA_VERSION = 6
 
 
 # ── The state vocabularies ───────────────────────────────────────────────────────────────────
@@ -477,6 +477,11 @@ class RunRecord:
     #: fallback source of truth. A run with no ledger is fully reconstructible from this db.
     ledger_path: str
     cost_usd: float
+    #: Wave B3: sha256 over the EXACT bytes of the ledger file at ``ledger_path``, stamped in
+    #: the SAME terminal transaction as the outcome. ``''`` for runs predating the binding.
+    #: Consumers (promote) recompute the file's hash and refuse a mismatch — the artifact can
+    #: never be swapped or edited after its outcome was recorded without the gate noticing.
+    result_digest: str = ""
     #: The split-run family link (engine_gaps_followups g1, F5). ``parent_run_id`` is the run
     #: this run CONTINUES — a ``--resume`` child records its parent. ``family_id`` is the family
     #: ROOT's run id, shared by every member of the resume lineage (a fresh run is its own
@@ -582,6 +587,58 @@ class ApprovalRecord:
     decided_at: str
     #: Where the signed artifact lives (a decision doc, a checkpoint contract file).
     artifact_path: str
+    #: Step 2: the act this approval authorizes (``checkpoint`` / ``tree_reuse``; ``''`` for a
+    #: pre-purpose legacy row) — an approval for one act never clears a gate for another.
+    purpose: str = ""
+    #: Step 2: the parsed decision record (contract fields + artifact/commit identity) as JSON.
+    decision_json: str = ""
+
+
+@dataclass(frozen=True)
+class CommandRecord:
+    """One row of ``command_journal`` — a consequential command's intent and its receipt (2e).
+
+    The intent is written BEFORE the external effect and the outcome AFTER; ``state`` moves
+    ``intent`` -> ``accepted`` -> ``completed``/``failed``/``refused``. ``idempotency_key``
+    makes a re-invocation return the existing row instead of manufacturing a duplicate.
+    """
+
+    command_id: str
+    verb: str
+    actor: str
+    rationale: str
+    rationale_ref: str
+    run_id: str
+    candidate_sha: str
+    target_kind: str
+    target_id: str
+    idempotency_key: str
+    state: str
+    detail_json: str
+    receipt_json: str
+    created_at: str
+    updated_at: str
+
+
+def _command_from_row(row) -> CommandRecord:
+    """Map a ``command_journal`` row to its record (the one place the columns are read)."""
+    return CommandRecord(
+        command_id=row["command_id"],
+        verb=row["verb"],
+        actor=row["actor"],
+        rationale=row["rationale"],
+        rationale_ref=row["rationale_ref"],
+        run_id=row["run_id"],
+        candidate_sha=row["candidate_sha"],
+        target_kind=row["target_kind"],
+        target_id=row["target_id"],
+        idempotency_key=row["idempotency_key"],
+        state=row["state"],
+        detail_json=row["detail_json"],
+        receipt_json=row["receipt_json"],
+        created_at=row["created_at"],
+        updated_at=row["updated_at"],
+    )
 
 
 @dataclass(frozen=True)
@@ -856,6 +913,9 @@ CREATE TABLE IF NOT EXISTS runs (
     started_at           TEXT NOT NULL DEFAULT '',
     ended_at             TEXT NOT NULL DEFAULT '',
     ledger_path          TEXT NOT NULL DEFAULT '',
+    -- Wave B3: sha256 of the ledger file's exact bytes, stamped in the SAME atomic
+    -- transaction as the terminal outcome — the artifact-outcome binding consumers verify.
+    result_digest        TEXT NOT NULL DEFAULT '',
     cost_usd             REAL NOT NULL DEFAULT 0.0,
     parent_run_id        TEXT NOT NULL DEFAULT '',
     family_id            TEXT NOT NULL DEFAULT ''
@@ -940,9 +1000,40 @@ CREATE TABLE IF NOT EXISTS approvals (
     candidate_sha TEXT NOT NULL CHECK (candidate_sha <> ''),
     operator      TEXT NOT NULL CHECK (operator <> ''),
     decided_at    TEXT NOT NULL,
-    artifact_path TEXT NOT NULL DEFAULT ''
+    artifact_path TEXT NOT NULL DEFAULT '',
+    -- step 2 (2026-09-11): the typed decision. ``purpose`` is the act the approval authorizes
+    -- (checkpoint / tree_reuse; '' = a pre-purpose legacy row); ``decision_json`` is the parsed
+    -- decision record the contract produced (the durable receipt half).
+    purpose       TEXT NOT NULL DEFAULT '',
+    decision_json TEXT NOT NULL DEFAULT ''
 );
 CREATE INDEX IF NOT EXISTS idx_approvals_run ON approvals(run_id);
+
+-- command_journal — the durable intent/receipt record for consequential commands (step 2e).
+-- "Recording is part of the act": a command persists its intent BEFORE the external effect and
+-- the observed outcome AFTER, so a crash between the two leaves visible evidence rather than a
+-- gap. ``idempotency_key`` is the rerun-safe handle a caller supplies (a re-record returns the
+-- existing row); ``state`` moves intent -> accepted -> completed|failed|refused.
+CREATE TABLE IF NOT EXISTS command_journal (
+    command_id      TEXT PRIMARY KEY,
+    verb            TEXT NOT NULL CHECK (verb <> ''),
+    actor           TEXT NOT NULL CHECK (actor <> ''),
+    rationale       TEXT NOT NULL DEFAULT '',
+    rationale_ref   TEXT NOT NULL DEFAULT '',
+    run_id          TEXT NOT NULL DEFAULT '',
+    candidate_sha   TEXT NOT NULL DEFAULT '',
+    target_kind     TEXT NOT NULL DEFAULT '',
+    target_id       TEXT NOT NULL DEFAULT '',
+    idempotency_key TEXT NOT NULL DEFAULT '',
+    state           TEXT NOT NULL CHECK (state IN ('intent','accepted','completed','failed','refused')),
+    detail_json     TEXT NOT NULL DEFAULT '',
+    receipt_json    TEXT NOT NULL DEFAULT '',
+    created_at      TEXT NOT NULL,
+    updated_at      TEXT NOT NULL
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_command_journal_idem
+    ON command_journal(idempotency_key) WHERE idempotency_key <> '';
+CREATE INDEX IF NOT EXISTS idx_command_journal_run ON command_journal(run_id);
 
 -- promotions — append-only. Keyed by (run_id, candidate_sha): one promotion per sha per run,
 -- so a re-promotion of the SAME sha is refused as the duplicate it is, while promoting a
@@ -1303,6 +1394,11 @@ class ControlDB:
         # they are absent, then let the generic version bump below record v4. Column additions
         # are additive — existing rows get the '' default (a pre-g1 run is its own family).
         self._migrate_runs_family_columns()
+        # v4 → v5 (step 2, 2026-09-11): approvals GAIN the typed-decision columns.
+        self._migrate_approvals_columns()
+        # v6 → v7 (wave B3): runs GAIN the result_digest column — the artifact the terminal
+        # outcome describes, bound in the same atomic write.
+        self._migrate_runs_result_digest_column()
         with self.transaction():
             self._conn.execute(
                 "INSERT OR IGNORE INTO control_meta(key, value) VALUES ('schema_version', ?)",
@@ -1362,6 +1458,49 @@ class ControlDB:
             self._conn.execute(
                 "CREATE INDEX IF NOT EXISTS idx_runs_parent_run_id ON runs(parent_run_id)"
             )
+        finally:
+            self._conn.execute("COMMIT")
+
+    def _migrate_runs_result_digest_column(self) -> None:
+        """Idempotently add the ``result_digest`` column to ``runs`` (v6 → v7, wave B3).
+
+        Guarded by column presence so re-opening a v7 database is a no-op; additive, so
+        existing rows default to ``''`` (a pre-B3 run carries no artifact binding).
+        """
+        existing = {
+            row["name"] for row in self._conn.execute("PRAGMA table_info(runs)").fetchall()
+        }
+        if "result_digest" in existing:
+            return
+        self._conn.execute("BEGIN IMMEDIATE")
+        try:
+            self._conn.execute(
+                "ALTER TABLE runs ADD COLUMN result_digest TEXT NOT NULL DEFAULT ''"
+            )
+        finally:
+            self._conn.execute("COMMIT")
+
+    def _migrate_approvals_columns(self) -> None:
+        """Idempotently add the typed-decision columns to ``approvals`` (v4 → v5).
+
+        ``CREATE TABLE IF NOT EXISTS`` only adds tables, never columns, so a v4 database needs
+        ``ALTER TABLE`` (step 2: an approval is a typed decision — the act it authorizes plus
+        the parsed decision record). Guarded by column presence, so re-opening a v5 database is
+        a no-op and every pre-2d approval reads as a legacy row (purpose '', decision_json '').
+        """
+        existing = {
+            row["name"] for row in self._conn.execute("PRAGMA table_info(approvals)").fetchall()
+        }
+        self._conn.execute("BEGIN IMMEDIATE")
+        try:
+            if "purpose" not in existing:
+                self._conn.execute(
+                    "ALTER TABLE approvals ADD COLUMN purpose TEXT NOT NULL DEFAULT ''"
+                )
+            if "decision_json" not in existing:
+                self._conn.execute(
+                    "ALTER TABLE approvals ADD COLUMN decision_json TEXT NOT NULL DEFAULT ''"
+                )
         finally:
             self._conn.execute("COMMIT")
 
@@ -1570,6 +1709,7 @@ class ControlDB:
         cost_usd: float | None = None,
         candidate_sha: str | None = None,
         ledger_path: str | None = None,
+        result_digest: str | None = None,
         ended_at: str | None = None,
     ) -> RunRecord:
         """Move a run to ``new_state``, appending an immutable transition row.
@@ -1622,7 +1762,8 @@ class ControlDB:
                        ended_at = ?,
                        cost_usd = ?,
                        candidate_sha = ?,
-                       ledger_path = ?
+                       ledger_path = ?,
+                       result_digest = ?
                  WHERE run_id = ?
                 """,
                 (
@@ -1631,6 +1772,7 @@ class ControlDB:
                     current.cost_usd if cost_usd is None else float(cost_usd),
                     current.candidate_sha if candidate_sha is None else candidate_sha,
                     current.ledger_path if ledger_path is None else ledger_path,
+                    current.result_digest if result_digest is None else result_digest,
                     run_id,
                 ),
             )
@@ -1924,6 +2066,20 @@ class ControlDB:
         sql += " ORDER BY started_at ASC, step_id ASC, attempt_no ASC"
         return [_attempt_from_row(r) for r in self._conn.execute(sql, params).fetchall()]
 
+    def recent_attempts(self, *, limit: int = 200) -> list[StepAttemptRecord]:
+        """The most recently COMPLETED attempts across all runs (newest first).
+
+        A fleet-level READ accessor for the Control Room's queue/SLA surface: ordered by
+        ``ended_at`` descending — a never-ended attempt has an empty ``ended_at`` and orders
+        last, never first — capped at ``limit``. It never writes, and like every read it does
+        not advance the control epoch.
+        """
+        rows = self._conn.execute(
+            "SELECT * FROM step_attempts ORDER BY ended_at DESC, started_at DESC LIMIT ?",
+            (int(limit),),
+        ).fetchall()
+        return [_attempt_from_row(r) for r in rows]
+
     # ── gate_results ─────────────────────────────────────────────────────────────────────
 
     def record_gate_result(
@@ -2016,6 +2172,8 @@ class ControlDB:
         artifact_path: str = "",
         decided_at: str | None = None,
         approval_id: str | None = None,
+        purpose: str = "",
+        decision_json: str = "",
     ) -> ApprovalRecord:
         """Append a human approval, bound to a gate and a candidate sha.
 
@@ -2033,10 +2191,11 @@ class ControlDB:
             conn.execute(
                 """
                 INSERT INTO approvals (approval_id, run_id, gate_id, candidate_sha, operator,
-                                       decided_at, artifact_path)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
+                                       decided_at, artifact_path, purpose, decision_json)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
-                (aid, run_id, gate_id, sha, who, decided_at or _now(), artifact_path),
+                (aid, run_id, gate_id, sha, who, decided_at or _now(), artifact_path,
+                 purpose, decision_json),
             )
         rows = [a for a in self.approvals(run_id) if a.approval_id == aid]
         return rows[0]
@@ -2058,9 +2217,118 @@ class ControlDB:
                 operator=row["operator"],
                 decided_at=row["decided_at"],
                 artifact_path=row["artifact_path"],
+                purpose=row["purpose"],
+                decision_json=row["decision_json"],
             )
             for row in self._conn.execute(sql, params).fetchall()
         ]
+
+    # ── command journal (step 2e: intent before act, durable receipt) ────────────────────────
+
+    #: Legal state moves for a command journal row; anything else refuses (the same
+    #: enforced-graph discipline as run transitions, at command granularity).
+    COMMAND_TRANSITIONS: Mapping[str, frozenset[str]] = {
+        "intent": frozenset({"accepted", "completed", "failed", "refused"}),
+        "accepted": frozenset({"completed", "failed", "refused"}),
+        "completed": frozenset(),
+        "failed": frozenset(),
+        "refused": frozenset(),
+    }
+
+    def record_command_intent(
+        self,
+        verb: str,
+        *,
+        actor: str,
+        rationale: str = "",
+        rationale_ref: str = "",
+        run_id: str = "",
+        candidate_sha: str = "",
+        target_kind: str = "",
+        target_id: str = "",
+        idempotency_key: str = "",
+        detail: Mapping[str, Any] | None = None,
+        command_id: str | None = None,
+        now: str | None = None,
+    ) -> CommandRecord:
+        """Persist a command's INTENT before its external effect; rerun-safe by key.
+
+        A repeated ``idempotency_key`` returns the EXISTING row — the command was already
+        started, and a caller must not manufacture a second intent for the same act. ``verb``
+        and ``actor`` are required: an anonymous intent is not a record.
+        """
+        self._require_writable()
+        v = _require(verb, "verb")
+        who = _require(actor, "actor")
+        stamp = now or _now()
+        if idempotency_key:
+            for existing in self.commands():
+                if existing.idempotency_key == idempotency_key:
+                    return existing
+        cid = command_id or _new_id("cmd")
+        with self.transaction() as conn:
+            conn.execute(
+                """
+                INSERT INTO command_journal (command_id, verb, actor, rationale, rationale_ref,
+                                             run_id, candidate_sha, target_kind, target_id,
+                                             idempotency_key, state, detail_json, receipt_json,
+                                             created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'intent', ?, '', ?, ?)
+                """,
+                (cid, v, who, rationale, rationale_ref, run_id, candidate_sha, target_kind,
+                 target_id, idempotency_key, json.dumps(dict(detail or {}), sort_keys=True),
+                 stamp, stamp),
+            )
+        return self.command(cid)
+
+    def command(self, command_id: str) -> CommandRecord:
+        """One journal row by id (ControlDBError when absent)."""
+        row = self._conn.execute(
+            "SELECT * FROM command_journal WHERE command_id = ?", (command_id,)
+        ).fetchone()
+        if row is None:
+            raise ControlDBError(f"control_db: no command {command_id!r}")
+        return _command_from_row(row)
+
+    def complete_command(
+        self,
+        command_id: str,
+        *,
+        state: str,
+        receipt: Mapping[str, Any] | None = None,
+        now: str | None = None,
+    ) -> CommandRecord:
+        """Record a command's observed outcome; an illegal state move refuses."""
+        self._require_writable()
+        current = self.command(command_id)
+        allowed = self.COMMAND_TRANSITIONS.get(current.state, frozenset())
+        if state not in allowed:
+            raise ControlDBError(
+                f"control_db: command {command_id} cannot move {current.state!r} -> {state!r}"
+            )
+        with self.transaction() as conn:
+            conn.execute(
+                "UPDATE command_journal SET state = ?, receipt_json = ?, updated_at = ? "
+                "WHERE command_id = ?",
+                (state, json.dumps(dict(receipt or {}), sort_keys=True), now or _now(), command_id),
+            )
+        return self.command(command_id)
+
+    def commands(self, *, run_id: str = "", state: str = "") -> list[CommandRecord]:
+        """Journal rows, oldest first, optionally filtered by run or state."""
+        sql = "SELECT * FROM command_journal"
+        where: list[str] = []
+        params: list[Any] = []
+        if run_id:
+            where.append("run_id = ?")
+            params.append(run_id)
+        if state:
+            where.append("state = ?")
+            params.append(state)
+        if where:
+            sql += " WHERE " + " AND ".join(where)
+        sql += " ORDER BY created_at ASC, command_id ASC"
+        return [_command_from_row(row) for row in self._conn.execute(sql, params).fetchall()]
 
     # ── promotions ───────────────────────────────────────────────────────────────────────
 
@@ -2558,6 +2826,7 @@ def _run_from_row(row: sqlite3.Row) -> RunRecord:
         ended_at=row["ended_at"],
         ledger_path=row["ledger_path"],
         cost_usd=float(row["cost_usd"]),
+        result_digest=row["result_digest"] if "result_digest" in cols else "",
         parent_run_id=row["parent_run_id"] if "parent_run_id" in cols else "",
         family_id=row["family_id"] if "family_id" in cols else "",
     )
@@ -2735,6 +3004,7 @@ __all__ = [
     "ALLOWED_TRANSITIONS",
     "AttemptState",
     "ApprovalRecord",
+    "CommandRecord",
     "CONTROL_DB_ENV",
     "CONTROL_DB_PATH",
     "CONTROL_DB_REL",

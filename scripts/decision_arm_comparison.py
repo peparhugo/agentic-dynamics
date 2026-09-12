@@ -28,6 +28,10 @@ flipping ``workflow.params.control_route`` on for a real spec. Neither signal al
 it safe" — that judgment call is the operator's (design §9 I7's explicit gate), this script only
 assembles the measured inputs to it.
 
+Step 6: the derivation moved to ``control.projections.arm_comparison`` — this script is now a
+renderer over that ONE implementation (the Control Room's ``GET /api/arms/compare`` serves the
+same payload), so the report and the room can never disagree on the ranking.
+
     python scripts/decision_arm_comparison.py                # human-readable summary
     python scripts/decision_arm_comparison.py --json           # machine-readable
 """
@@ -45,42 +49,14 @@ try:
 except ImportError:  # imported as scripts.<name> — repo root is on sys.path
     from scripts import _bootstrap  # noqa: E402,F401
 
+from agentic_dynamics.control.projections import arm_comparison as projection  # noqa: E402
 from agentic_dynamics.control.rules import load_shadow_decisions  # noqa: E402
 from agentic_dynamics.core.paths import PROJECT_ROOT  # noqa: E402
-from agentic_dynamics.experiment.compile_experiment import (  # noqa: E402
-    compare_arms,
-    decision_calibration,
-)
 
 WORKFLOWS_RESULTS_DIR = PROJECT_ROOT / "experiments" / "results" / "workflows"
 
-#: The default loss (design §6.1's `route_next_job` contract objectives, inverted into a loss):
-#: cost is a cost to minimize (weight 1.0), correctness a benefit to maximize (negative weight).
-DEFAULT_LOSS: dict[str, float] = {"cost": 1.0, "quality": -5.0}
-
-
-def load_phase_outcomes(*, results_dir: Path = WORKFLOWS_RESULTS_DIR) -> list[dict[str, Any]]:
-    """One row per AGENT phase across every recorded workflow run — the real, measured
-    executed-phase corpus ``compare_arms`` scores. ``correctness`` is ``1.0``/``0.0`` from the
-    phase's own recorded ``status`` (no independent quality signal is wired here; a future
-    increment could join ``test_executed_success`` for a stricter measure)."""
-    if not results_dir.is_dir():
-        return []
-    rows: list[dict[str, Any]] = []
-    for path in sorted(results_dir.rglob("*.json")):
-        try:
-            data = json.loads(path.read_text())
-        except (OSError, json.JSONDecodeError):
-            continue
-        for phase in data.get("phases", []) or []:
-            if phase.get("kind") != "agent" or not phase.get("model"):
-                continue
-            rows.append({
-                "model": phase["model"],
-                "cost": phase.get("cost_usd", 0.0),
-                "correctness": 1.0 if phase.get("status") == "ok" else 0.0,
-            })
-    return rows
+#: The default loss lives with the derivation (one definition, not two).
+DEFAULT_LOSS: dict[str, float] = projection.DEFAULT_LOSS
 
 
 def compute_report(
@@ -88,16 +64,16 @@ def compute_report(
     results_dir: Path = WORKFLOWS_RESULTS_DIR,
     loss: dict[str, float] | None = None,
 ) -> dict[str, Any]:
-    outcomes = load_phase_outcomes(results_dir=results_dir)
-    arms = compare_arms(outcomes, arm_factor="model", loss=loss or DEFAULT_LOSS)
-    calibration = decision_calibration(load_shadow_decisions())
+    """The report payload: the shared projection's comparison + calibration summary."""
+    outcomes, n_ledgers = projection.load_phase_outcomes(results_dir)
+    payload = projection.build_arm_comparison(
+        outcomes, loss=loss, decisions=load_shadow_decisions()
+    )
     return {
         "n_executed_phases": len(outcomes),
-        "arms": arms,
-        "decision_calibration": {
-            "n_decisions": calibration.produces.get("n_decisions", 0),
-            "decision_regret": calibration.produces.get("decision_regret"),
-        },
+        "n_workflow_ledgers": n_ledgers,
+        "arms": payload["comparison"],
+        "decision_calibration": payload["decision_calibration"],
     }
 
 

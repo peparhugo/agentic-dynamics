@@ -85,6 +85,7 @@ class FakeRedis:
         review_statuses=None,
         analysis_queue=0,
         review_queue=0,
+        batch_queue=0,
         phases=None,
     ):
         self.statuses = statuses or {}
@@ -93,6 +94,7 @@ class FakeRedis:
         self.review_statuses = review_statuses or {}
         self.analysis_queue = analysis_queue
         self.review_queue = review_queue
+        self.batch_queue = batch_queue
         self.logs = logs or {}
         self.phases = phases or {}
         self.pubsub_client = FakePubSub(messages)
@@ -101,6 +103,8 @@ class FakeRedis:
     def llen(self, key):
         if key == "story_jobs":
             return 2
+        if key == "story_jobs_batch":
+            return self.batch_queue  # the deferred lane (rule 6)
         if key == "analysis_jobs":
             return self.analysis_queue
         if key == "review_jobs":
@@ -388,6 +392,23 @@ def test_matrix_liveness_uses_the_newer_of_phase_and_telemetry(monkeypatch):
 
     assert phase["live"] is True
     assert phase["age_seconds"] == 60
+
+
+def test_matrix_stale_running_keeps_lifecycle_and_names_staleness(monkeypatch):
+    """Health vs lifecycle (step 5): a quiet running cell keeps its lifecycle status — the
+    telemetry silence is NAMED in ``stale_cells``, never relabeled as a lifecycle "ended"."""
+    monkeypatch.setattr(server, "_utc_now", lambda: "2026-09-01T12:00:00Z")
+    redis = FakeRedis(
+        statuses={"quiet": "running"},
+        phases={"quiet": _phase("quiet", published_at="2026-09-01T10:00:00Z")},  # age 7200
+    )
+    monkeypatch.setattr(server, "_redis", lambda: redis)
+
+    matrix = server.app.test_client().get("/api/matrix").get_json()
+
+    assert matrix["cells"]["quiet"] == "running"  # durable lifecycle kept (authoritative)
+    assert matrix["stale_cells"] == ["quiet"]  # health named as its own dimension
+    assert matrix["stale_running"] == 1
 
 
 def test_matrix_marks_exactly_the_window_says(monkeypatch):
@@ -1036,22 +1057,37 @@ def test_experiments_rejects_non_loopback_remote():
     assert response.get_json()["error"] == "loopback or tailnet peer required"
 
 
-def test_experiments_accepts_tailnet_peer():
+def test_experiments_accepts_tailnet_peer(monkeypatch):
     """F1: the portal binds Tailscale-only, so a tailnet-CGNAT peer IS the operator —
-    the remote approve path (the docs gate's portal affordance) must not need loopback."""
+    the remote approve path (the docs gate's portal affordance) must not need loopback.
+
+    The passing gate reaches the route's ``subprocess.run([..., 'scripts/enqueue.py'])``;
+    the spawn is MOCKED because the subject is the trust gate, never a queue fill. This test
+    once ran the real command — every suite run pushed 30 subscription-default cells into
+    the live ``story_jobs`` (the 2026-09-12 queue-refill leak; the sibling
+    ``test_experiments_enqueue_spawns_subprocess`` had always mocked it).
+    """
     redis = QueueRedis(queue=[])
-    monkeypatch = __import__("pytest").MonkeyPatch()
     monkeypatch.setattr(server, "_redis", lambda: redis)
-    try:
-        response = server.app.test_client().post(
-            "/api/experiments",
-            json={"action": "enqueue"},
-            headers={"Idempotency-Key": "exp-tailnet"},
-            environ_overrides={"REMOTE_ADDR": "100.83.229.3", "HTTP_HOST": "100.83.229.3:8001"},
-        )
-        assert response.status_code in (200, 400, 422)  # passed the trust gate (any later refusal is semantic)
-    finally:
-        monkeypatch.undo()
+
+    class _FakeProc:
+        returncode = 0
+        stdout = "enqueued 0 cells (mocked)\n"
+        stderr = ""
+
+    monkeypatch.setattr(server.subprocess, "run", lambda *a, **kw: _FakeProc())
+
+    response = server.app.test_client().post(
+        "/api/experiments",
+        json={"action": "enqueue"},
+        headers={"Idempotency-Key": "exp-tailnet"},
+        environ_overrides={"REMOTE_ADDR": "100.83.229.3", "HTTP_HOST": "100.83.229.3:8001"},
+    )
+    assert response.status_code in (
+        200,
+        400,
+        422,
+    )  # passed the trust gate (any later refusal is semantic)
 
 
 def test_experiments_rejects_unknown_action(monkeypatch):
@@ -1165,25 +1201,30 @@ def test_design_session_input_forwards_allowlisted_delivery(monkeypatch):
 
 
 def test_route_inventory_covers_all_registered_routes():
-    """F2: the inventory's 36 routes match the actual url_map exactly.
+    """F2: the inventory's 46 routes match the actual url_map exactly.
 
     The count tracks the documented inventory in ``apps/control_room/server.py``'s module
     docstring and ``scripts/CONTEXT.md``. It went 28 -> 29 when ``GET /api/subscription-usage``
     landed, 29 -> 31 when the docs-health pair (``GET /api/docs-health`` +
     ``POST /api/docs-health/approve``) landed with the docs-drift rail's p4, 31 -> 32 when
-    ``GET /api/projections`` landed with ``control_db_publication`` p3, 32 -> 34 when the
-    recording audit/sweep pair landed, and 34 -> 36 when the facelift added the read-only
-    ``GET /api/glance`` + ``GET /api/events`` projection pair; this guard is what catches a route
-    shipped without its inventory entry, so a bump here must always be paired with the doc update
-    (never the other way round).
+    ``GET /api/projections`` landed with ``control_db_publication`` p3, and 32 -> 34 when the
+    recording rail (``GET /api/recording-audit`` + ``POST /api/recording-sweep/run``) landed,
+    34 -> 36 when the step-5 operational slice landed (``GET /api/operations`` +
+    ``GET /api/runs/<run_id>``), 36 -> 40 when the step-6 analytics projections landed
+    (``GET /api/quality`` · ``GET /api/stories/<name>/arc`` · ``GET /api/value`` ·
+    ``GET /api/arms/compare``), 40 -> 44 when the step-7 surfaces landed
+    (``GET /api/queue/sla`` · ``GET /api/escalations`` · ``GET /api/batch`` · ``GET /api/energy``),
+    and 44 -> 46 when the facelift added the read-only ``GET /api/glance`` + ``GET /api/events``
+    projection pair; this guard is what catches a route shipped without its inventory entry, so a
+    bump here must always be paired with the doc update (never the other way round).
     """
     rules = [
         rule for rule in server.app.url_map.iter_rules() if not rule.rule.startswith("/static")
     ]
 
     # GET and POST on the same path register two Rule objects; count them
-    # (36), then dedupe for path-membership assertions below.
-    assert len(rules) == 36
+    # (46), then dedupe for path-membership assertions below.
+    assert len(rules) == 46
     routes = {rule.rule for rule in rules}
 
     # The surfaces the stale inventory omitted are all registered.
@@ -1205,6 +1246,16 @@ def test_route_inventory_covers_all_registered_routes():
         "/api/projections",
         "/api/recording-audit",
         "/api/recording-sweep/run",
+        "/api/operations",
+        "/api/runs/<run_id>",
+        "/api/quality",
+        "/api/stories/<name>/arc",
+        "/api/value",
+        "/api/arms/compare",
+        "/api/queue/sla",
+        "/api/escalations",
+        "/api/batch",
+        "/api/energy",
         "/api/glance",
         "/api/events",
     ):

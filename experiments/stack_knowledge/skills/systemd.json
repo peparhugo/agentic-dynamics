@@ -1,0 +1,15 @@
+{
+  "subject": "skill/stack/systemd",
+  "claim": "When authoring a future systemd unit, choose Type for its lifecycle, select a deliberate restart policy for daemons, and configure stop and start-rate-limit behavior when the service requires it. The current launch broker is a Type=simple, Restart=on-failure daemon; other repository units demonstrate Type=oneshot and RemainAfterExit=yes.",
+  "conformance": "generic-guidance",
+  "repo_anchors": ["infrastructure/agentic-dynamics-launch-broker.service:67", "infrastructure/docs-drift-scan.service:42", "infrastructure/fleet-bootstrap.service:17"],
+  "population": "agentic-dynamics stack",
+  "conditions": ["systemd", "service-unit", "restart-policy", "daemon", "launch-broker"],
+  "support": 1,
+  "uncertainty": 0.35,
+  "source_experiment": "tech_stack_seed_2026-09-11",
+  "evidence": [
+    "uri:https://www.freedesktop.org/software/systemd/man/latest/systemd.service.html"
+  ],
+  "notes": "Repo conformance edit: the previous claim implied that every current daemon uses stop and start-limit settings. The launch broker does not configure ExecStop, TimeoutStopSec, or StartLimit settings. applies_to: creating or reviewing future systemd units; this is guidance, not a repository-wide implementation contract."
+}

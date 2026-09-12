@@ -108,8 +108,11 @@ def test_fetch_source_follows_http_308(monkeypatch):
         seen.append(request.full_url)
         if len(seen) == 1:
             raise mod.urllib.error.HTTPError(
-                request.full_url, 308, "Permanent Redirect",
-                {"Location": "https://example.com/final"}, None,
+                request.full_url,
+                308,
+                "Permanent Redirect",
+                {"Location": "https://example.com/final"},
+                None,
             )
         return _Response()
 
@@ -122,6 +125,7 @@ def test_fetch_source_follows_http_308(monkeypatch):
 
 def test_open_stops_on_redirect_without_location(monkeypatch):
     """A 308 with no Location is a loud error, never a silent dead end."""
+
     def fake_urlopen(request, timeout):
         raise mod.urllib.error.HTTPError(request.full_url, 308, "Permanent Redirect", {}, None)
 
@@ -132,3 +136,26 @@ def test_open_stops_on_redirect_without_location(monkeypatch):
         assert exc.code == 308
     else:  # pragma: no cover - the call must raise
         raise AssertionError("expected HTTPError for a 308 with no Location")
+
+
+def test_thin_extraction_is_flagged(monkeypatch):
+    class _Response:
+        status = 200
+        headers = {"Content-Type": "text/html"}
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc):
+            return False
+
+        def read(self):
+            return b"<html><body><script>app()</script></body></html>"
+
+        def geturl(self):
+            return "https://example.com/app"
+
+    monkeypatch.setattr(mod.urllib.request, "urlopen", lambda request, timeout: _Response())
+    record = mod.fetch_source("https://example.com/app")
+    assert record["extraction_quality"] == "thin"
+    assert record["text_chars"] < 200

@@ -1,7 +1,7 @@
 """Dynamic-code admin portal backend (the Control Room).
 
 Serves the admin dashboard and exposes live experiment telemetry over SSE. This module is now
-the *composition root* (refactor-repair Debt-1): the 32 routes live in ``routes/``, the business
+the *composition root* (refactor-repair Debt-1): the 44 routes live in ``routes/``, the business
 logic in ``services/``, the external-interface clients in ``clients/``, and the filesystem paths
 in ``paths.py``. This file keeps the shared context — configuration constants, the Redis /
 manager / client factories, the parsed-manifest cache, and the Flask ``app`` — and builds the
@@ -11,7 +11,7 @@ It still re-exports the names the tests monkeypatch (``_redis``, ``_design_sessi
 ``DATA_MANIFEST_PATH``, …): the injected services delegate back to those names at call time, so
 the existing test suite is behaviour-identical.
 
-Endpoints (36 routes across 9 API categories, plus the static shell):
+Endpoints (46 routes across 10 API categories, plus the static shell):
 
     Legacy telemetry (8):
         GET  /api/matrix · GET /api/status · GET /api/events/<cell_id>
@@ -31,8 +31,15 @@ Endpoints (36 routes across 9 API categories, plus the static shell):
         /daemon · /daemon/stop
     Docs health (2):
         GET  /api/docs-health · POST /api/docs-health/approve
+    Operations (2):
+        GET  /api/operations · GET /api/runs/<run_id>
+    Analytics (8):
+        GET  /api/quality · GET /api/stories/<name>/arc · GET  /api/value ·
+        GET  /api/arms/compare   (step-6 projections P3/P4/P5/P6)
+        GET  /api/queue/sla · GET /api/escalations · GET  /api/batch · GET  /api/energy
+        (step-7 rules 9/8/6/4 — measured where owned, labeled scenarios where not)
     Glance / events (2) — the facelift's one resting-screen projection:
-        GET  /api/glance · GET /api/events
+        GET  /api/glance · GET  /api/events
     Static shell (1):
         GET / — the one resting screen (apps/control_room/static)
 
@@ -91,6 +98,7 @@ REDIS_HOST = os.environ.get("FINOPS_REDIS_HOST", "127.0.0.1")
 REDIS_PORT = int(os.environ.get("FINOPS_REDIS_PORT", "6380"))
 REDIS_DB = int(os.environ.get("FINOPS_REDIS_DB", "1"))
 QUEUE_KEY = "story_jobs"
+BATCH_QUEUE_KEY = "story_jobs_batch"  # the deferred lane (rule 6)
 RESULTS_KEY = "story_results"
 # Post-hoc pipeline stages. The execute stage is the story queue above; the analyze and review
 # stages are separate Redis pairs written by enqueue_analysis.py/analysis_worker.py and
@@ -144,9 +152,7 @@ def _design_sessions() -> DesignSessionManager:
     if _design_manager is None:
         configured = os.environ.get("FINOPS_DESIGN_WORKDIRS")
         paths = (
-            [Path(item) for item in configured.split(os.pathsep) if item]
-            if configured
-            else [ROOT]
+            [Path(item) for item in configured.split(os.pathsep) if item] if configured else [ROOT]
         )
         workdirs = {
             "repository" if index == 0 else f"repository-{index + 1}": path

@@ -1,0 +1,16 @@
+{
+  "subject": "skill/stack/celery-redis",
+  "claim": "For an application that implements Celery with Redis, make task side effects idempotent, choose acknowledgement behavior deliberately, bound retries with backoff, and route long-running tasks explicitly. Agentic Dynamics does not operate a maintained Celery task system; Celery appears only as a requirement in a built-in story prompt.",
+  "conformance": "generic-guidance",
+  "repo_anchors": ["src/agentic_dynamics/runtime/story/builtins.py:76"],
+  "population": "agentic-dynamics stack",
+  "conditions": ["celery", "redis", "broker", "retry", "idempotency", "acks-late"],
+  "support": 2,
+  "uncertainty": 0.2,
+  "source_experiment": "tech_stack_seed_2026-09-11",
+  "evidence": [
+    "uri:https://docs.celeryq.dev/en/stable/userguide/tasks.html",
+    "uri:https://docs.celeryq.dev/en/stable/userguide/calling.html"
+  ],
+  "notes": "Repo conformance edit: removed framework-specific Celery operational claims. applies_to: generated or user application code that adopts Celery. Do not treat this guidance as framework queue behavior; the only repository Celery reference is a story-under-test prompt."
+}

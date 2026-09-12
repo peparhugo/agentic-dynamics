@@ -103,6 +103,17 @@ def _git_init(workdir: Path) -> None:
     _git("init", "-q", cwd=workdir)
     _git("config", "user.email", "t@t", cwd=workdir)
     _git("config", "user.name", "t", cwd=workdir)
+    # Auto-gc OFF in every test repo this module builds. The materialized attempt-A tree is
+    # 27,504 files (~30k loose objects — far above gc.auto=6700), so the fixture's `git
+    # commit` detaches a background `git gc` that repacks and DELETES the loose objects
+    # WHILE the replay tests hardlink-copy them: `os.link` → ENOENT → `shutil.Error`
+    # (the 2026-09-12 CI flake, confirmed from the raw CI log — thousands of
+    # `[Errno 2] ... .git/objects/74/...` entries). The hardlink-copy contract holds only
+    # if nothing mutates the object store; the copies inherit this config (.git/ is copied)
+    # so their own commits stay stable too.
+    _git("config", "gc.auto", "0", cwd=workdir)
+    _git("config", "gc.autoDetach", "false", cwd=workdir)
+    _git("config", "maintenance.auto", "false", cwd=workdir)
 
 
 def _materialize_commit_tree(commit: str, target: Path) -> str:
@@ -121,10 +132,10 @@ def _materialize_commit_tree(commit: str, target: Path) -> str:
 
 
 #: The 298MB real-tree extraction is materialized ONCE per module run, then each replay test
-#: copies it via hardlinks (``os.link`` — git never mutates objects/index in place, so the
-#: shared inodes are safe; a fresh commit in one copy never leaks into another). This keeps the
-#: revamp2 REPLAY on the REAL byte-identical tree while cutting the 4×12s materializations to
-#: one (test_suite_speed p2).
+#: copies it via hardlinks (``os.link`` — git never mutates objects/index in place, and the repo
+#: carries ``gc.auto=0`` so nothing DELETES them either; a fresh commit in one copy never leaks
+#: into another). This keeps the revamp2 REPLAY on the REAL byte-identical tree while cutting
+#: the 4×12s materializations to one (test_suite_speed p2).
 @pytest.fixture(scope="module")
 def attempt_a_template(tmp_path_factory):
     """The hermetic attempt-A tree materialized once; the replay tests copy it in ~1s."""
@@ -132,6 +143,8 @@ def attempt_a_template(tmp_path_factory):
     wd.mkdir()
     tree = _materialize_commit_tree(REVAMP2_ATTEMPT_A, wd)
     assert tree == REVAMP2_TREE  # the materialization proof, validated once per module run
+    # The hardlink-copy contract: a background gc must not race the copies (2026-09-12 flake).
+    assert _git("config", "gc.auto", cwd=wd).stdout.strip() == "0"
     return wd
 
 

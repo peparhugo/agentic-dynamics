@@ -14,6 +14,7 @@ import json
 import subprocess
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -99,6 +100,8 @@ def _promote_args(tmp_path, wt, ledger, **overrides):
         "approval": None,
         "base": "main",
         "operator": "test-operator",
+        "rationale": "test rationale",
+        "rationale_ref": "",
         "db": None,
         "dry_run": True,
     }
@@ -203,10 +206,15 @@ def test_awaiting_run_with_binding_approval_promotes(tmp_path):
     data["awaiting"] = True
     data["ok"] = False
     ledger = _write_ledger(tmp_path, data)
+    tree = subprocess.run(
+        ["git", "rev-parse", f"{sha}^{{tree}}"], cwd=wt, capture_output=True, text=True,
+        check=True,
+    ).stdout.strip()
     approval = tmp_path / "approval.md"
     approval.write_text(
         "---\nstatus: accepted\n---\n\n# Approval\n\n"
-        f"candidate: {sha}\noperator: Dr. Seuss\ndate: 2026-09-01\n"
+        f"candidate: {sha}\nspec: promote_test\ntree: {tree}\n"
+        "operator: Dr. Seuss\ndate: 2026-09-01\n"
     )
     args = _promote_args(tmp_path, wt, ledger, approval=str(approval))
     _run_promotion(args)  # must not raise (dry-run)
@@ -263,12 +271,20 @@ _PUSHED = "abcd1234abcd1234abcd1234abcd1234abcd1234"
 
 
 def _noop_emissions() -> dict:
-    """Fakes for every post-push seam: a fake push (returns a squash sha), no-op emissions."""
+    """Fakes for every post-push seam: a fake push (returns a squash sha), no-op emissions.
+
+    Step 10's command journal joins them: the real tests never touch a control database, and
+    an intent fake returns an untouched row (state ``intent``) so the push proceeds.
+    """
     return {
         "push": lambda workdir, base, subject, candidate: _PUSHED,
         "emit_decision": lambda decision: {"observation_id": "obs-000000000001"},
         "emit_act": lambda decision, causes: None,
         "record_decision": lambda decision: None,
+        "journal_intent": lambda args, *, ledger, candidate, run_id: SimpleNamespace(
+            command_id="cmd-promote-test", state="intent"
+        ),
+        "journal_receipt": lambda args, command, *, state, receipt: None,
     }
 
 
@@ -595,3 +611,240 @@ def test_a2_genuinely_new_candidate_still_promotes(tmp_path):
     _run_promotion(args, close_row=fake_close_row, **em)  # must not raise
     assert len(calls) == 1
     assert calls[0][0] == "run-a2fresh0001"
+
+
+# ── step 10: the command journal (intent before act, receipt after) ───────────
+
+
+def test_step10_intent_lands_before_the_push_and_the_receipt_after(tmp_path):
+    """The durable intent fires BEFORE the push; the completed receipt carries the squash sha."""
+    wt = _make_candidate_ahead_of_main(tmp_path)
+    sha = _candidate_sha(wt)
+    data = _ledger(wt)
+    data["run_id"] = "run-j10seam001"
+    ledger = _write_ledger(tmp_path, data)
+    events = []
+
+    def journal_intent(args, *, ledger, candidate, run_id):
+        events.append(("intent", args.spec, candidate, run_id, args.rationale))
+        return SimpleNamespace(command_id="cmd-j10", state="intent")
+
+    def journal_receipt(args, command, *, state, receipt):
+        events.append(("receipt", command.command_id, state, receipt))
+        return None
+
+    def push(workdir, base, subject, candidate):
+        events.append(("push", base))
+        return _PUSHED
+
+    em = _noop_emissions()
+    em["push"] = push
+    em.pop("journal_intent"), em.pop("journal_receipt")
+    args = _promote_args(tmp_path, wt, ledger, dry_run=False)
+    _run_promotion(
+        args,
+        close_row=lambda run_id, **kwargs: {"closed": False, "reason": "test"},
+        journal_intent=journal_intent,
+        journal_receipt=journal_receipt,
+        **em,
+    )
+    kinds = [e[0] for e in events]
+    assert kinds.index("intent") < kinds.index("push") < kinds.index("receipt")
+    intent = events[kinds.index("intent")]
+    assert intent[1:] == ("promote_test", sha, "run-j10seam001", "test rationale")
+    receipt = events[kinds.index("receipt")]
+    assert receipt[1] == "cmd-j10"
+    assert receipt[2] == "completed"
+    assert receipt[3]["squash_sha"] == _PUSHED
+    assert receipt[3]["candidate_sha"] == sha
+
+
+def test_step10_push_failure_records_a_failed_receipt_and_still_raises(tmp_path):
+    """A failed push is recorded as the observed outcome, and the error still propagates."""
+    wt = _make_candidate_ahead_of_main(tmp_path)
+    data = _ledger(wt)
+    data["run_id"] = "run-j10fail001"
+    ledger = _write_ledger(tmp_path, data)
+    receipts = []
+
+    def journal_receipt(args, command, *, state, receipt):
+        receipts.append((state, receipt))
+        return None
+
+    def boom_push(workdir, base, subject, candidate):
+        raise RuntimeError("push failed: non-fast-forward")
+
+    em = _noop_emissions()
+    em["push"] = boom_push
+    em.pop("journal_intent"), em.pop("journal_receipt")
+    args = _promote_args(tmp_path, wt, ledger, dry_run=False)
+    with pytest.raises(RuntimeError, match="push failed"):
+        _run_promotion(args, journal_receipt=journal_receipt, **em)
+    assert len(receipts) == 1
+    state, receipt = receipts[0]
+    assert state == "failed"
+    assert "push failed" in receipt["error"]
+
+
+# ── wave B3: the artifact binding (ledger digest ↔ durable control outcome) ──
+
+
+def _bind_ledger_to_run(tmp_path, wt, *, tamper: float | None = None):
+    """Write the run's ledger and a matching BOUND runs row (promotable, digest stamped);
+    optionally tamper the file afterwards — the exact defect the gate must catch."""
+    import hashlib
+
+    from agentic_dynamics.control.control_db import ControlDB, RunState
+
+    ledger_data = _ledger(wt)
+    path = tmp_path / "ledgers" / "promote_test" / "20260901T000000Z.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    db_path = tmp_path / "control.db"
+    with ControlDB.open(db_path) as db:
+        run = db.create_run(spec_name="promote_test")
+        db.transition_run(run.run_id, RunState.RUNNING, actor="orchestrator")
+        ledger_data["run_id"] = run.run_id
+        path.write_text(json.dumps(ledger_data))
+        db.transition_run(
+            run.run_id,
+            RunState.PROMOTABLE,
+            actor="orchestrator",
+            ledger_path=str(path),
+            result_digest=hashlib.sha256(path.read_bytes()).hexdigest(),
+        )
+    if tamper is not None:
+        edited = json.loads(path.read_text())
+        edited["total_cost_usd"] = tamper
+        path.write_text(json.dumps(edited))
+    return path, db_path
+
+
+def test_b3_ledger_tampered_after_the_outcome_refuses_before_the_push(tmp_path):
+    """A post-outcome edit of the ledger — same run_id, same git_sha, different bytes —
+    refuses at the permanence gate BEFORE any push (exit 20 shape)."""
+    wt = _make_candidate_ahead_of_main(tmp_path)
+    path, db_path = _bind_ledger_to_run(tmp_path, wt, tamper=99.0)
+
+    with pytest.raises(_PromoteRefusedError, match="not the artifact"):
+        _run_promotion(_promote_args(tmp_path, wt, path, db=str(db_path)))
+
+
+def test_b3_matching_digest_passes_and_a_pre_binding_row_only_notes(tmp_path, capsys):
+    """The check never over-refuses: a matching digest verifies silently; a run row without a
+    digest (pre-binding) proceeds with an honest note, never a fabricated hash."""
+    wt = _make_candidate_ahead_of_main(tmp_path)
+    path, db_path = _bind_ledger_to_run(tmp_path, wt)
+    _run_promotion(_promote_args(tmp_path, wt, path, db=str(db_path)))
+    assert "pre-binding" not in capsys.readouterr().err
+
+    from agentic_dynamics.control.control_db import ControlDB, RunState
+
+    with ControlDB.open(db_path) as db:
+        run2 = db.create_run(spec_name="promote_test")
+        db.transition_run(run2.run_id, RunState.RUNNING, actor="orchestrator")
+        ledger2 = _ledger(wt)
+        ledger2["run_id"] = run2.run_id
+        path2 = tmp_path / "ledgers2" / "promote_test" / "20260901T000000Z.json"
+        path2.parent.mkdir(parents=True, exist_ok=True)
+        path2.write_text(json.dumps(ledger2))
+        db.transition_run(
+            run2.run_id, RunState.PROMOTABLE, actor="orchestrator", ledger_path=str(path2)
+        )
+    _run_promotion(_promote_args(tmp_path, wt, path2, db=str(db_path)))
+    assert "pre-binding run" in capsys.readouterr().err
+
+
+# ── wave B5: the decision receipt carries the TRUE rationale + command id ────
+
+
+def test_b5_decision_record_carries_the_true_rationale_and_command_id(tmp_path):
+    """The s2 decision record's ``why`` is the operator's ``--rationale`` + the journal command
+    id — the synthetic gate-count explanation is deleted."""
+    from promote import _promote_decision_record
+
+    wt = _make_candidate(tmp_path)
+    args = _promote_args(tmp_path, wt, tmp_path / "ledger.json", rationale="because green")
+    record = _promote_decision_record(
+        args, _ledger(wt), _candidate_sha(wt), command_id="cmd-b5"
+    )
+    assert record["why"] == "because green (command cmd-b5)"
+
+
+def test_step10_a_completed_command_refuses_the_replay(tmp_path):
+    """A journal row already completed for this act refuses BEFORE the push — no second act."""
+    wt = _make_candidate_ahead_of_main(tmp_path)
+    data = _ledger(wt)
+    data["run_id"] = "run-j10done001"
+    ledger = _write_ledger(tmp_path, data)
+    pushed = []
+
+    def journal_intent(args, *, ledger, candidate, run_id):
+        return SimpleNamespace(command_id="cmd-j10done", state="completed")
+
+    em = _noop_emissions()
+    em["push"] = lambda *a, **k: pushed.append(True) or _PUSHED
+    em.pop("journal_intent"), em.pop("journal_receipt")
+    args = _promote_args(tmp_path, wt, ledger, dry_run=False)
+    with pytest.raises(_PromoteRefusedError, match="already recorded completed"):
+        _run_promotion(args, journal_intent=journal_intent, **em)
+    assert pushed == []
+
+
+def test_step10_dry_run_never_journals(tmp_path):
+    """A dry run is observation, not an act: the journal seams must never fire."""
+    wt = _make_candidate_ahead_of_main(tmp_path)
+    ledger = _write_ledger(tmp_path, _ledger(wt))
+
+    def boom(*a, **k):
+        raise AssertionError("a dry run must not journal")
+
+    _run_promotion(
+        _promote_args(tmp_path, wt, ledger),
+        journal_intent=boom,
+        journal_receipt=boom,
+        push=boom,
+    )  # must not raise
+
+
+def test_step10_real_promote_requires_rationale_and_operator(tmp_path):
+    """The direct-caller guard: no rationale or no operator refuses before anything runs."""
+    wt = _make_candidate_ahead_of_main(tmp_path)
+    ledger = _write_ledger(tmp_path, _ledger(wt))
+
+    with pytest.raises(_PromoteRefusedError, match="rationale"):
+        _run_promotion(_promote_args(tmp_path, wt, ledger, dry_run=False, rationale="  "))
+    with pytest.raises(_PromoteRefusedError, match="operator"):
+        _run_promotion(_promote_args(tmp_path, wt, ledger, dry_run=False, operator=""))
+
+
+def test_replay_through_the_real_journal_refuses_the_duplicate_act(tmp_path):
+    """The review's caller-through-journal gate: with the real default journal, a COMPLETED
+    row for this act must stop the command before the push — the step-10 guard was dead code
+    because ``begin_command`` advanced completed rows instead of returning them."""
+    from _command_journal import begin_command, finish_command
+
+    wt = _make_candidate_ahead_of_main(tmp_path)
+    sha = _candidate_sha(wt)
+    data = _ledger(wt)
+    data["run_id"] = "run-replay0001"
+    data["git_sha"] = sha
+    ledger = _write_ledger(tmp_path, data)
+    db = tmp_path / "control.db"
+
+    # A prior, COMPLETED act recorded through the real helper, keyed exactly as promote keys it.
+    command = begin_command(
+        db, verb="promote", actor="drseuss", rationale="first attempt",
+        act_key=f"promote:promote_test:{sha[:12]}",
+    )
+    finish_command(db, command_id=command.command_id, state="completed", receipt={"squash": "x"})
+
+    pushed = []
+    em = _noop_emissions()
+    em["push"] = lambda *args, **kwargs: pushed.append(True) or _PUSHED
+    em.pop("journal_intent")   # use the REAL default journal
+    em.pop("journal_receipt")
+    args = _promote_args(tmp_path, wt, ledger, dry_run=False, db=str(db))
+
+    with pytest.raises(_PromoteRefusedError, match="already recorded completed"):
+        _run_promotion(args, **em)
+    assert pushed == []  # the duplicate push never happened

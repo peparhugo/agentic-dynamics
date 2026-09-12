@@ -204,7 +204,7 @@ def _stub_result():
 
 def _run_main(module, tmp_path, monkeypatch, *, fake_run):
     monkeypatch.setattr(module, "ROOT", tmp_path)
-    monkeypatch.setattr(module, "load_spec", lambda p: _stub_spec())
+    monkeypatch.setattr(module, "load_spec_any", lambda p: _stub_spec())
     monkeypatch.setattr(module, "run_workflow", fake_run)
     # Keep the post-run best-effort hooks quiet in the hermetic environment.
     monkeypatch.setenv("FINOPS_FACT_AUTO_EMIT", "0")
@@ -250,7 +250,7 @@ def test_main_no_analyzer_no_client_without_flag(tmp_path, monkeypatch):
     module = _load_module()
     monkeypatch.setenv("FINOPS_NEO4J_URI", "bolt://env:7687")
     monkeypatch.setattr(module, "ROOT", tmp_path)
-    monkeypatch.setattr(module, "load_spec", lambda p: _stub_spec())
+    monkeypatch.setattr(module, "load_spec_any", lambda p: _stub_spec())
     seen = {}
 
     def fake_run(spec, **kwargs):
@@ -305,7 +305,7 @@ def test_child_mode_records_no_run_and_injects_no_recorder(tmp_path, monkeypatch
         )
 
     monkeypatch.setattr(module, "ROOT", tmp_path)
-    monkeypatch.setattr(module, "load_spec", spec_stub)
+    monkeypatch.setattr(module, "load_spec_any", spec_stub)
     monkeypatch.setattr(module, "run_workflow", fake_run)
     monkeypatch.setenv("FINOPS_FACT_AUTO_EMIT", "0")
     monkeypatch.setattr(sys, "argv", [
@@ -379,7 +379,7 @@ def test_child_mode_starts_no_run_heartbeat(tmp_path, monkeypatch):
             workflow=SimpleNamespace(params={"phases": [{"name": "scope"}]}),
         )
 
-    monkeypatch.setattr(module, "load_spec", spec_stub)
+    monkeypatch.setattr(module, "load_spec_any", spec_stub)
     monkeypatch.setattr(module, "run_workflow", lambda spec, **kw: _stub_result())
     monkeypatch.setenv("FINOPS_FACT_AUTO_EMIT", "0")
     monkeypatch.setattr(sys, "argv", [
@@ -390,3 +390,141 @@ def test_child_mode_starts_no_run_heartbeat(tmp_path, monkeypatch):
         module.main()
 
     assert events == {"started": 0, "stopped": 0}
+
+
+# ── Wave B1: explicit resume identity + collision-proof ledger storage ───────
+
+
+class _PriorRun:
+    def __init__(self, run_id, state, *, spec_name="demo"):
+        self.run_id = run_id
+        self.state = state
+        self.spec_name = spec_name
+        self.family_id = run_id
+
+
+class _ResumeDB:
+    """The three reads/writes ``_control_open_run`` makes: runs / get_run / create_run."""
+
+    def __init__(self, runs, known):
+        self._runs = list(runs)
+        self._known = dict(known)
+        self.created: list[dict] = []
+
+    def runs(self, *, spec_name):
+        return [r for r in self._runs if r.spec_name == spec_name]
+
+    def get_run(self, run_id):
+        return self._known.get(run_id)
+
+    def create_run(self, **kwargs):
+        self.created.append(kwargs)
+        parent = kwargs.get("parent_run_id") or ""
+        return SimpleNamespace(
+            run_id="run-new",
+            state=SimpleNamespace(value="running"),
+            parent_run_id=parent,
+            family_id=parent or "run-new",
+        )
+
+    def close(self):
+        pass
+
+
+def _resume_args(**over):
+    base = dict(only_phase=None, model="m", resume=False, parent_run_id="")
+    base.update(over)
+    return SimpleNamespace(**base)
+
+
+def _demo_spec():
+    return SimpleNamespace(name="demo", workflow_revision_id="rev1")
+
+
+def test_resume_links_only_the_explicit_parent_run(monkeypatch):
+    module = _load_module()
+    prior = _PriorRun("run-old", module.RunState.FAILED)
+    db = _ResumeDB([prior], {"run-old": prior})
+    monkeypatch.setattr(module, "_control_db", lambda: db)
+    run_id, _ = module._control_open_run(
+        _demo_spec(), _resume_args(resume=True, parent_run_id="run-old")
+    )
+    assert run_id == "run-new"
+    assert db.created[0]["parent_run_id"] == "run-old"
+
+
+def test_resume_refuses_a_bad_explicit_parent_before_any_run_is_created(monkeypatch, capsys):
+    """An explicit identity that does not validate (unknown id / another spec's run /
+    a run that is not continuable) refuses the whole run — never a silently ignored link."""
+    module = _load_module()
+    known = {
+        "run-a": _PriorRun("run-a", module.RunState.FAILED),
+        "run-other": _PriorRun("run-other", module.RunState.FAILED, spec_name="other"),
+        "run-done": _PriorRun("run-done", module.RunState.PROMOTABLE),
+    }
+    db = _ResumeDB(list(known.values()), known)
+    monkeypatch.setattr(module, "_control_db", lambda: db)
+    for bad in ("run-ghost", "run-other", "run-done"):
+        with pytest.raises(SystemExit) as exc:
+            module._control_open_run(_demo_spec(), _resume_args(resume=True, parent_run_id=bad))
+        assert exc.value.code == 2
+    assert "REFUSED" in capsys.readouterr().err
+    assert db.created == []  # refused BEFORE any run row was created
+
+
+def test_resume_never_picks_by_recency_when_ambiguous(monkeypatch, capsys):
+    """Two continuable runs: no ordering guess, no family link — the candidates are named
+    so the operator can pass --parent-run-id, and the run proceeds as its own family root."""
+    module = _load_module()
+    runs = [
+        _PriorRun("run-a", module.RunState.FAILED),
+        _PriorRun("run-b", module.RunState.CANCELLED),
+    ]
+    db = _ResumeDB(runs, {})
+    monkeypatch.setattr(module, "_control_db", lambda: db)
+    module._control_open_run(_demo_spec(), _resume_args(resume=True))
+    assert db.created[0]["parent_run_id"] == ""
+    err = capsys.readouterr().err
+    assert "AMBIGUOUS" in err and "run-a" in err and "run-b" in err
+
+
+def test_resume_links_the_single_continuable_candidate(monkeypatch):
+    """One continuable candidate beside a non-continuable newer run: deterministic link."""
+    module = _load_module()
+    done = _PriorRun("run-done", module.RunState.PROMOTABLE)
+    continuable = _PriorRun("run-failed", module.RunState.FAILED)
+    db = _ResumeDB([done, continuable], {})
+    monkeypatch.setattr(module, "_control_db", lambda: db)
+    module._control_open_run(_demo_spec(), _resume_args(resume=True))
+    assert db.created[0]["parent_run_id"] == "run-failed"
+
+
+def test_ledger_path_is_collision_proof_and_identity_carrying(tmp_path, monkeypatch):
+    """Wave B1 storage: microsecond precision + the run id in the name; a same-second
+    sibling never overwrites, and spec_status's fallback parser reads the name back."""
+    module = _load_module()
+    monkeypatch.setattr(module, "ROOT", tmp_path)
+    now = module.datetime(2026, 9, 12, 16, 41, 42, 123456, tzinfo=module.timezone.utc)
+    first = module._ledger_out_path("demo", run_id="run-abc", now=now)
+    first.write_text("{}")
+    second = module._ledger_out_path("demo", run_id="run-abc", now=now)
+    third = module._ledger_out_path("demo", run_id="run-other", now=now)
+    assert first.name == "20260912T164142123456Z_run-abc.json"
+    assert second.name == "20260912T164142123456Z_run-abc.1.json"  # never overwrites
+    assert third.name == "20260912T164142123456Z_run-other.json"  # same second, distinct runs
+    from agentic_dynamics.experiment.spec_status import parse_timestamp
+
+    assert parse_timestamp(first.stem) == now
+    assert parse_timestamp(second.stem) == now
+
+
+def test_ledger_digest_hashes_the_file_and_is_honest_when_absent(tmp_path):
+    """Wave B3: the digest is sha256 over the ledger's exact bytes; a missing file yields the
+    honest empty string (never a fabricated hash) with a warning."""
+    import hashlib
+
+    module = _load_module()
+    ledger = tmp_path / "ledger.json"
+    ledger.write_text('{"a": 1}')
+    assert module._ledger_digest(ledger) == hashlib.sha256(b'{"a": 1}').hexdigest()
+    assert module._ledger_digest(tmp_path / "missing.json") == ""

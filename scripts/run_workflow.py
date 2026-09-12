@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import argparse
 import contextlib
+import hashlib
 import json
 import os
 import subprocess
@@ -53,7 +54,7 @@ from agentic_dynamics.control.reducers._common import cell_id as _reducer_cell_i
 from agentic_dynamics.control.run_lifecycle import RunHeartbeatThread  # noqa: E402
 from agentic_dynamics.control.signal_store import build_signal_store, load_results  # noqa: E402
 from agentic_dynamics.control.step_routing import ModelSignals, route_step  # noqa: E402
-from agentic_dynamics.experiment.experiment_spec import ExperimentSpec, load_spec  # noqa: E402
+from agentic_dynamics.experiment.experiment_spec import ExperimentSpec  # noqa: E402
 from agentic_dynamics.experiment.spec_status import refresh_spec_status  # noqa: E402
 from agentic_dynamics.knowledge import belief_update as bu  # noqa: E402
 from agentic_dynamics.knowledge import spec_ingestion as si  # noqa: E402
@@ -63,11 +64,13 @@ from agentic_dynamics.knowledge.knowledge_ingestion import (  # noqa: E402
     record_to_event,
 )
 from agentic_dynamics.knowledge.record_factory import _now_iso  # noqa: E402
+from agentic_dynamics.runtime.executor import load_prepared_step  # noqa: E402
 from agentic_dynamics.runtime.run_clone import (  # noqa: E402
     RUN_CLONE_ENV,
     create_run_clone,
 )
 from agentic_dynamics.runtime.workflow_runner import cell_scope, run_workflow  # noqa: E402
+from workflows.compile_workflow import load_spec_any  # noqa: E402
 
 #: CAP fact auto-emit (docs/architecture/current/cap_fact_auto_emit_design.md §4): the disable-flag
 #: env var. Deliberately the ONE default-ON flag in the FINOPS_* family (every other gate —
@@ -429,6 +432,12 @@ def main() -> None:
                     help="skip phases that already have a [workflow] <phase> commit; when the "
                          "worktree has no such commits, fall back to the phases the derived "
                          "spec index (experiments/specs/index.json) shows as ok for this goal")
+    ap.add_argument("--parent-run-id", default="",
+                    help="the run a --resume CONTINUES (Wave B1: the explicit family link — "
+                         "never a recency guess). Validated: known run, same spec, in a "
+                         "continuable state (failed/cancelled/awaiting-approval); a bad id "
+                         "refuses the run. Without it, a resume links only a single "
+                         "unambiguous continuable candidate and refuses to guess among many.")
     ap.add_argument("--signals", default=None,
                     help="path to a JSON file mapping model id -> measured signals "
                          "(overrides the auto-built signal store)")
@@ -503,6 +512,10 @@ def main() -> None:
                          "one-time sonar-scanner docker run, scripts/archive/backfill_sonar.py, "
                          "ws3_stragglers) executes it; a phase "
                          "whose scope fails validation refuses BEFORE the broker is reached.")
+    ap.add_argument("--prepared-step", default=None, metavar="PATH",
+                    help="path to a prepared-step/v1 transport file (step 3): the child "
+                         "executes the parent's exact step — prompt + hash verified — instead "
+                         "of re-deriving the phase from the spec (sibling-cell path)")
     ap.add_argument("--only-phase", default=None, metavar="NAME",
                     help="run a SINGLE phase (name) only — the sibling-cell entrypoint the "
                          "--orchestrator mode spawns for each phase. When set, the spec's phase "
@@ -519,7 +532,10 @@ def main() -> None:
                          "image override never reaches the broker unless it is in the namespace).")
     args = ap.parse_args()
 
-    spec = load_spec(Path(args.spec))
+    # Either document kind compiles to the engine's spec (step 1, authoring -> execution):
+    # a workflow-v1 definition goes through workflows.compile_workflow — a refusal surfaces
+    # HERE, before any run state exists — and an ExperimentSpec loads exactly as before.
+    spec = load_spec_any(Path(args.spec))
 
     # --orchestrator: the sibling-container execution path (slice 2). P0-2 (control-plane
     # stabilization): this is NO LONGER a second phase loop. It injects a DockerAgentExecutor
@@ -562,6 +578,9 @@ def _run_workflow_cli(
     # phase's true position are carried through so the Control Room publishes "i of N".
     only_phase_total: int | None = None
     only_phase_index: int | None = None
+    # Wave A2: the prepared-child flag is a FUNCTION-scope fact (the routing/signals
+    # composition below consults it on EVERY run, not only the child path).
+    prepared_child = False
     if args.only_phase:
         phases = spec.workflow.params.get("phases") or []
         names = [str(p.get("name", "")) for p in phases]
@@ -571,14 +590,53 @@ def _run_workflow_cli(
             )
         only_phase_index = names.index(args.only_phase)
         only_phase_total = len(phases)
-        spec.workflow.params["phases"] = [phases[only_phase_index]]
+        phase = dict(phases[only_phase_index])
+        # Step 3: the PREPARED step is the authority for this phase's prompt — the child
+        # executes what the parent readied (and may have augmented), never a re-derivation.
+        # The transport file is verified (schema + prompt hash) and must name THIS phase; a
+        # missing/tampered/foreign step refuses before anything executes.
+        if args.prepared_step:
+            prepared = load_prepared_step(args.prepared_step)
+            if str(prepared.get("phase_name")) != args.only_phase:
+                raise SystemExit(
+                    f"--prepared-step {args.prepared_step!r} names phase "
+                    f"{prepared.get('phase_name')!r}, not {args.only_phase!r} — refusing to "
+                    f"execute a step prepared for another phase"
+                )
+            # Wave A2 — prepared mode is EXACT: every execution setting comes from the payload
+            # (the parent resolved it), never from this child's flags, spec, or environment.
+            # The parent owns preparation, routing, augmentation and retry policy; the child
+            # executes ONE adapter invocation that matches the prepared request.
+            prepared_child = True
+            args.model = str(prepared.get("model") or args.model)
+            if prepared.get("backend"):
+                args.backend = prepared["backend"]
+            args.goal = str(prepared.get("goal") or args.goal)
+            args.thinking_effort = str(prepared.get("thinking_effort") or args.thinking_effort)
+            args.thinking_budget_tokens = int(prepared.get("thinking_budget_tokens") or 0)
+            args.output_token_limit = int(prepared.get("output_token_limit") or 0)
+            args.timeout = int(prepared.get("timeout") or args.timeout)
+            phase["prompt"] = prepared["prompt"]
+            phase["_prepared_step"] = True
+            # Continue the PARENT's attempt numbering (executor namespace + identity).
+            spec.workflow.params["_attempt_base"] = int(prepared.get("attempt") or 1)
+            # The parent alone owns retry policy and augmentation: the child must not rerun an
+            # escalation ladder (the review's two-call reproduction) nor re-augment a prompt
+            # the parent already readied.
+            spec.workflow.params.pop("escalation", None)
+            spec.workflow.params["rag_augment"] = False
+        spec.workflow.params["phases"] = [phase]
 
     # Signal-store wiring (docs/routing_next_steps.md item 1): when the spec declares routing
     # and no explicit --signals override was supplied, build the store from the measured
     # corpus so the router consumes real data instead of cold-starting. The explicit
     # signals/preferences kwargs on run_workflow remain the override hook.
     signals: dict[str, ModelSignals] | None = None
-    if args.signals:
+    if prepared_child:
+        # The parent owns routing/signals; the payload is the resolved result. (No-op branch:
+        # signals stays None.)
+        pass
+    elif args.signals:
         signals = _load_signals(args.signals)
     elif _spec_declares_routing(spec):
         try:
@@ -588,7 +646,11 @@ def _run_workflow_cli(
             signals = None
 
     router = route_step
-    if bool(spec.workflow.params.get("control_route", False)):
+    if prepared_child:
+        # The child executes the prepared step; routing is the parent's decision. No router at
+        # all: the run-level model IS the payload's model, and no routing code path executes.
+        router = None
+    elif bool(spec.workflow.params.get("control_route", False)):
         # CAP I7 seam (design §9 I7): a PER-SPEC opt-in — only a spec that explicitly sets
         # `workflow.params.control_route: true` ever has the plane's route choice applied, and
         # only when a fresh validate_decision() admits it. OFF by default; no committed spec
@@ -602,7 +664,7 @@ def _run_workflow_cli(
             cell_id=_reducer_cell_id(spec.name, args.model),
             repository_id=cell_scope(args.workdir),
         )
-    elif args.cap_shadow:
+    elif not prepared_child and args.cap_shadow:
         # CAP I6 seam: a drop-in Router that ALSO runs + validates + records the fact-based
         # shadow decision (design §9 I6 row) — a superset of --cap-snapshot. Built here, at the
         # composition root, exactly where `route_step` is injected — `runtime.workflow_runner`
@@ -614,7 +676,7 @@ def _run_workflow_cli(
             cell_id=_reducer_cell_id(spec.name, args.model),
             repository_id=cell_scope(args.workdir),
         )
-    elif args.cap_snapshot:
+    elif not prepared_child and args.cap_snapshot:
         # CAP I4 seam: a drop-in Router that also compiles + records a snapshot (design §9 I4
         # row). Built here, at the composition root, exactly where `route_step` is injected —
         # `runtime.workflow_runner` never imports `control` either way (Debt-2).
@@ -782,10 +844,7 @@ def _run_workflow_cli(
     # stays the default below in child mode (never written, never referenced).
     out_path: str = ""
     if not args.only_phase:
-        out_dir = ROOT / "experiments" / "results" / "workflows" / spec.name
-        out_dir.mkdir(parents=True, exist_ok=True)
-        ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-        out_path = out_dir / f"{ts}.json"
+        out_path = _ledger_out_path(spec.name, run_id=control_run_id or "")
         out_path.write_text(json.dumps(result.to_dict(), indent=2))
         print(f"\nledger: {out_path}", file=sys.stderr)
     # ``getattr`` so the composition-root tests that substitute a minimal result namespace
@@ -1106,6 +1165,98 @@ def _control_db() -> ControlDB | None:
         return None
 
 
+def _ledger_out_path(spec_name: str, *, run_id: str = "", now: datetime | None = None) -> Path:
+    """The run ledger's path — collision-proof and run-identity-carrying (Wave B1).
+
+    The old name was ``%Y%m%dT%H%M%SZ.json``: second resolution, so two runs of one spec
+    finishing in the same second OVERWROTE each other (one run vanished from the index),
+    and the name carried no identity a consumer could select by. The name is now
+    microsecond-precision (still lexicographically chronological) with the control-run id
+    as a suffix when the control plane is open (``<ts>Z_run-abc123.json``); a residual
+    collision appends ``.N`` — a ledger is never overwritten.
+    """
+    out_dir = ROOT / "experiments" / "results" / "workflows" / spec_name
+    out_dir.mkdir(parents=True, exist_ok=True)
+    ts = (now or datetime.now(timezone.utc)).strftime("%Y%m%dT%H%M%S%fZ")
+    stem = f"{ts}_{run_id}" if run_id else ts
+    path = out_dir / f"{stem}.json"
+    n = 1
+    while path.exists():
+        path = out_dir / f"{stem}.{n}.json"
+        n += 1
+    return path
+
+
+class ParentRunRefused(Exception):  # noqa: N818 — the domain verb is the CLI's REFUSED vocabulary
+    """A --parent-run-id naming a run that cannot be the continuation's parent.
+
+    Named for the refusal it raises (the ``REFUSED:`` stderr line + exit 2), mirroring the
+    admission gate's justified ``AdmissionDenied`` exception: ``ParentRunRefusedError``
+    would read as a generic error rather than this specific, named refusal.
+    """
+
+
+#: The run states a --resume may continue: failed, cancelled (a timed-out run the zombie
+#: sweep cancelled), awaiting-approval (a checkpoint stop with phases remaining).
+_CONTINUABLE_RUN_STATES = (RunState.FAILED, RunState.CANCELLED, RunState.AWAITING_APPROVAL)
+
+
+def _resolve_parent_run(
+    db: ControlDB, spec: ExperimentSpec, args: argparse.Namespace, *, resume: bool
+) -> str:
+    """The EXPLICIT parent for a --resume (Wave B1) — never a recency guess.
+
+    The old selection took ``db.runs(spec_name=...)[0]`` — the newest run of the spec — and
+    linked whatever it found. Two prior runs, or another worktree's run of the same spec,
+    silently mislinked the family whose UNION ``spec_status`` reads for completion. Now:
+
+    * an explicit ``--parent-run-id`` is authoritative and must VALIDATE (known run, same
+      spec, continuable) — a bad id REFUSES the run before it starts;
+    * without one, only a SINGLE continuable candidate links (deterministic — no ordering
+      guess); two or more candidates refuse to guess and name themselves so the operator
+      can pass the intended id. The run then proceeds as its own family root, loudly.
+    """
+    explicit = (getattr(args, "parent_run_id", "") or "").strip()
+    if explicit:
+        if not resume:
+            raise ParentRunRefused(
+                "--parent-run-id requires --resume (a parent link is a continuation's)"
+            )
+        record = db.get_run(explicit)
+        if record is None:
+            raise ParentRunRefused(f"--parent-run-id {explicit!r} is not a known run")
+        if record.spec_name != spec.name:
+            raise ParentRunRefused(
+                f"--parent-run-id {explicit!r} belongs to spec {record.spec_name!r}, "
+                f"not {spec.name!r}"
+            )
+        if record.state not in _CONTINUABLE_RUN_STATES:
+            raise ParentRunRefused(
+                f"--parent-run-id {explicit!r} is {record.state.value!r} — only "
+                "failed/cancelled/awaiting-approval runs can be a resume's parent"
+            )
+        return explicit
+    if not resume:
+        return ""
+    candidates = [r for r in db.runs(spec_name=spec.name) if r.state in _CONTINUABLE_RUN_STATES]
+    if len(candidates) == 1:
+        print(
+            f"control: --resume links the single continuable run {candidates[0].run_id} "
+            f"(family {candidates[0].family_id})",
+            file=sys.stderr,
+        )
+        return candidates[0].run_id
+    if len(candidates) > 1:
+        named = ", ".join(f"{r.run_id} ({r.state.value})" for r in candidates[:5])
+        print(
+            f"control: --resume is AMBIGUOUS — {len(candidates)} continuable runs for "
+            f"{spec.name!r}: {named}; pass --parent-run-id to link the intended one "
+            "(no family link applied)",
+            file=sys.stderr,
+        )
+    return ""
+
+
 def _control_open_run(spec: ExperimentSpec, args: argparse.Namespace) -> tuple[str | None, ControlDB | None]:
     """Record this run in the control database as ``running``; return ``(run_id, db)``.
 
@@ -1139,21 +1290,12 @@ def _control_open_run(spec: ExperimentSpec, args: argparse.Namespace) -> tuple[s
         return None, None
     try:
         parent_run_id = ""
-        if getattr(args, "resume", False):
-            # The run this --resume continues: the NEWEST prior run of the same spec, when
-            # that run is itself in a continuable state (failed / cancelled — a timed-out run
-            # the zombie sweep cancelled — / awaiting operator approval, a checkpoint stop
-            # with phases remaining). If the newest prior run reached a success-forward state
-            # (promotable/published/…), the resume is not continuing it — genuinely fresh
-            # work, its own family. Continuable-only gating keeps an old failed run from
-            # swallowing a genuinely new attempt that happens to reuse --resume.
-            prior = db.runs(spec_name=spec.name)
-            if prior and prior[0].state in (
-                RunState.FAILED,
-                RunState.CANCELLED,
-                RunState.AWAITING_APPROVAL,
-            ):
-                parent_run_id = prior[0].run_id
+        if getattr(args, "resume", False) or (getattr(args, "parent_run_id", "") or "").strip():
+            # Wave B1: the link is EXPLICIT (or uniquely inferable) — see
+            # :func:`_resolve_parent_run`. No "newest run of the spec" selection survives.
+            parent_run_id = _resolve_parent_run(
+                db, spec, args, resume=bool(getattr(args, "resume", False))
+            )
         run = db.create_run(
             spec_name=spec.name,
             # w2 (revision identity): record the canonical spec digest this run executes so
@@ -1171,6 +1313,13 @@ def _control_open_run(spec: ExperimentSpec, args: argparse.Namespace) -> tuple[s
             file=sys.stderr,
         )
         return run.run_id, db
+    except ParentRunRefused as exc:
+        # An explicit identity claim that does not validate: REFUSE before any work starts.
+        # Silently ignoring a bad parent id would record a family link the operator did not
+        # ask for — the guessing Wave B1 removes.
+        print(f"REFUSED: {exc}", file=sys.stderr)
+        db.close()
+        raise SystemExit(2) from exc
     except (ControlDBError, OSError) as exc:
         print(f"warning: control db run creation failed ({exc}) — run itself unaffected",
               file=sys.stderr)
@@ -1197,6 +1346,23 @@ def _derived(label: str, derive) -> list[dict]:
     payloads = produced if isinstance(produced, list) else [produced]
     print(f"{label}: {len(payloads)} event(s) queued", file=sys.stderr)
     return payloads
+
+
+def _ledger_digest(ledger_path: Path) -> str:
+    """sha256 over the ledger file's exact bytes — the artifact-outcome binding (Wave B3).
+
+    Best-effort by design (P0-1): a digest problem must never fail a finished run's terminal
+    write. The empty string is HONEST — a consumer that requires the binding refuses on its
+    own terms (promote notes a pre-binding run; it never sees a fabricated hash).
+    """
+    try:
+        return hashlib.sha256(Path(ledger_path).read_bytes()).hexdigest()
+    except OSError as exc:
+        print(
+            f"warning: could not digest the run ledger ({exc}) — binding omitted",
+            file=sys.stderr,
+        )
+        return ""
 
 
 def _control_terminal_write(
@@ -1302,6 +1468,10 @@ def _control_terminal_write(
             reason=f"workflow run ended ({result.state})",
             cost_usd=result.total_cost_usd,
             ledger_path=str(ledger_path),
+            # Wave B3: the artifact-outcome binding — sha256 over the exact bytes of the
+            # ledger file this outcome describes, stamped in the SAME atomic transaction.
+            # Consumers (promote) recompute and refuse a mismatch.
+            result_digest=_ledger_digest(ledger_path) if ledger_path else "",
             candidate_sha=result.git_sha,
             ended_at=result.ended_at or None,
         )

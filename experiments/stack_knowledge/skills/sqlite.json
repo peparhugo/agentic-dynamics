@@ -1,0 +1,16 @@
+{
+  "subject": "skill/stack/sqlite",
+  "claim": "The control database enables WAL and a configurable 5-second busy timeout for its one-orchestrator, many-observer deployment shape. Consumers open SQLite with mode=ro; a missing control database is an error rather than an empty database, and read-only handles reject writes.",
+  "conformance": "repo-conformant",
+  "repo_anchors": ["src/agentic_dynamics/control/control_db.py:1213", "src/agentic_dynamics/control/control_db.py:1231", "src/agentic_dynamics/control/control_db.py:1251", "src/agentic_dynamics/control/control_db.py:1255", "src/agentic_dynamics/control/control_db.py:1405"],
+  "population": "agentic-dynamics stack",
+  "conditions": ["sqlite", "wal", "control-db", "concurrency", "busy-timeout"],
+  "support": 2,
+  "uncertainty": 0.3,
+  "source_experiment": "tech_stack_seed_2026-09-11",
+  "evidence": [
+    "uri:https://sqlite.org/wal.html",
+    "uri:https://sqlite.org/lang.html"
+  ],
+  "notes": "Repo conformance edit: retained the configured WAL, busy-timeout, and read-only contracts while removing unverified local practices about checkpointing, transaction size, reader lifetime, and filesystem placement."
+}

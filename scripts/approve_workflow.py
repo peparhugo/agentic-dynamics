@@ -20,6 +20,8 @@ Exit codes: 0 approved / 10 not awaiting (no approval needed) / 20 refused
 from __future__ import annotations
 
 import argparse
+import json
+import subprocess
 import sys
 from pathlib import Path
 
@@ -96,29 +98,105 @@ def _run_approval(args: argparse.Namespace) -> None:
                 f"no approval is needed"
             )
 
-    # 2 ── write the operator-signed artifact the resume path requires.
-    artifact = _write_artifact(args)
-
-    # 3 ── record the approval in the control db (operator + candidate bound).
+    # 1b ── persist the command's INTENT before the act (step 2e: recording is part of the
+    # act). If this process dies between here and the commit, the row survives with
+    # state=intent — an uncertain outcome made visible, never a vanished act.
+    command = None
     if not args.dry_run:
         with ControlDB.open() as db:
-            approval = db.record_approval(
-                args.run_id,
-                gate_id=args.gate_id,
+            command = db.record_command_intent(
+                "approve",
+                actor="aio",
+                rationale=args.reason,
+                run_id=args.run_id,
                 candidate_sha=args.candidate_sha,
-                operator=args.operator,
-                artifact_path=str(artifact),
+                target_kind="gate",
+                target_id=args.gate_id or f"{args.spec}/{args.phase}",
+                idempotency_key=f"approve:{args.run_id}:{args.candidate_sha}",
+                detail={
+                    "gate_id": args.gate_id,
+                    "spec": args.spec,
+                    "phase": args.phase,
+                    "operator": args.operator,
+                },
             )
-    else:
-        approval = None
 
-    # 4 ── emit the decision (verb=approve) so the AIO's approval is observable.
-    emission = _emit_approval_decision(args) if not args.dry_run else {}
+    # 2 ── write AND COMMIT the operator-signed artifact in the run's worktree. The resume
+    # path requires the approval committed at HEAD (absent at the checkpoint commit); an
+    # uncommitted artifact can never authorize, and the commit must land on the exact
+    # candidate the approval names — a rewritten worktree refuses.
+    try:
+        artifact = _write_artifact(args)
+        artifact_commit = ""
+        if not args.dry_run:
+            artifact_commit = _commit_artifact(args, artifact)
+
+        # 3 ── record the approval in the control db (operator + candidate bound).
+        if not args.dry_run:
+            decision_record = {
+                "schema": "approval-decision/v1",
+                "purpose": "checkpoint",
+                "run_id": args.run_id,
+                "gate_id": args.gate_id,
+                "candidate_sha": args.candidate_sha,
+                "operator": args.operator,
+                "date": _today(),
+                "artifact": str(artifact),
+                "artifact_commit": artifact_commit,
+                "status": "approved",
+            }
+            with ControlDB.open() as db:
+                approval = db.record_approval(
+                    args.run_id,
+                    gate_id=args.gate_id,
+                    candidate_sha=args.candidate_sha,
+                    operator=args.operator,
+                    artifact_path=str(artifact),
+                    purpose="checkpoint",
+                    decision_json=json.dumps(decision_record, sort_keys=True),
+                )
+        else:
+            approval = None
+
+        # 4 ── emit the decision (verb=approve) so the AIO's approval is observable.
+        emission = (
+            _emit_approval_decision(
+                args, command_id=getattr(command, "command_id", "") if command else ""
+            )
+            if not args.dry_run
+            else {}
+        )
+    except Exception as exc:
+        if command is not None:
+            try:
+                with ControlDB.open() as db:
+                    db.complete_command(
+                        command.command_id,
+                        state="refused" if isinstance(exc, _ApproveRefusedError) else "failed",
+                        receipt={"error": str(exc)[:400]},
+                    )
+            except Exception:  # the receipt write must never mask the refusal
+                pass
+        raise
+
+    # 5 ── the durable receipt: the observed outcome, recorded at the moment of the act.
+    if command is not None:
+        with ControlDB.open() as db:
+            db.complete_command(
+                command.command_id,
+                state="completed",
+                receipt={
+                    "approval_id": approval.approval_id if approval else "",
+                    "artifact": str(artifact),
+                    "artifact_commit": artifact_commit,
+                },
+            )
 
     print(
         f"approve: run {args.run_id} approved by {args.operator} "
         f"(candidate {args.candidate_sha[:12]})"
         + (f" — approval {approval.approval_id}" if approval else " — dry-run, nothing written")
+        + (f" — committed {artifact_commit[:12]}" if artifact_commit else "")
     )
     if emission:
         print(f"approve: decision emitted ({emission.get('observation_id', '')[:16]}…)")
@@ -135,12 +213,28 @@ def _write_artifact(args: argparse.Namespace) -> Path:
     art_dir = workdir / "approvals" / args.spec
     art_dir.mkdir(parents=True, exist_ok=True)
     artifact = art_dir / f"{args.phase}_approval.md"
+    # Wave A4: the artifact binds EVERY field the contract validates — spec/phase (also in
+    # the path, but the CONTENT must name them or a moved/renamed artifact would still read
+    # as binding), the run, the gate, the candidate sha, and the candidate's TREE (immutable
+    # content identity, not just the sha label).
+    tree = ""
+    try:
+        tree = subprocess.run(
+            ["git", "rev-parse", f"{args.candidate_sha}^{{tree}}"],
+            cwd=workdir, capture_output=True, text=True, timeout=30,
+        ).stdout.strip()
+    except (OSError, subprocess.SubprocessError):
+        tree = ""
     if not args.dry_run:
         artifact.write_text(
             f"---\nstatus: accepted\n---\n\n# Approval\n\n"
+            f"spec: {args.spec}\n"
+            f"phase: {args.phase}\n"
             f"run: {args.run_id}\n"
-             f"gate: {args.gate_id or '(the run approval gate)'}\n"
+            f"purpose: checkpoint\n"
+            f"gate: {args.gate_id or '(the run approval gate)'}\n"
             f"candidate: {args.candidate_sha}\n"
+            f"tree: {tree}\n"
             f"operator: {args.operator}\n"
             f"date: {_today()}\n"
             f"reason: {args.reason or 'operator approval'}\n"
@@ -148,8 +242,66 @@ def _write_artifact(args: argparse.Namespace) -> Path:
     return artifact
 
 
-def _emit_approval_decision(args: argparse.Namespace) -> dict:
-    """Best-effort AIO decision emission (verb=approve) — never blocks the approval."""
+def _commit_artifact(args: argparse.Namespace, artifact: Path) -> str:
+    """Commit the approval in the run's worktree; refuse unless HEAD is the bound candidate.
+
+    The commit carries the operator's name (the signer is the act's author) and the resume
+    path's contract checks it lands after the checkpoint commit and is absent at it. A HEAD
+    that no longer matches the candidate the approval names refuses — approving a rewritten
+    worktree would bind a signature to work nobody verified.
+    """
+    workdir = Path(args.workdir)
+
+    def _git(*argv: str) -> str:
+        run = subprocess.run(
+            ["git", *argv], cwd=workdir, capture_output=True, text=True, timeout=60
+        )
+        if run.returncode != 0:
+            raise _ApproveRefusedError(
+                f"git {' '.join(argv)} failed in {workdir}: "
+                f"{(run.stderr or '').strip()[:300]}"
+            )
+        return run.stdout.strip()
+
+    head = _git("rev-parse", "HEAD")
+    if not (head.startswith(args.candidate_sha) or args.candidate_sha.startswith(head)):
+        raise _ApproveRefusedError(
+            f"worktree HEAD {head[:12]} is not the candidate this approval binds "
+            f"({args.candidate_sha[:12]}) — rebuild or rebind the run before approving"
+        )
+    # Wave A4 (commit isolation): the approval commit must contain ONLY the approval
+    # artifact. A pre-existing staged change would ride along — the review's reproduction
+    # showed a staged source edit included in the approval commit, which the checkpoint
+    # then accepted. Refuse a dirty index outright.
+    staged = _git("diff", "--cached", "--name-only")
+    if staged.strip():
+        raise _ApproveRefusedError(
+            "the worktree index already has staged changes "
+            f"({', '.join(staged.splitlines()[:5])}) — commit or unstage them before "
+            "approving; an approval commit must contain ONLY its artifact"
+        )
+    try:
+        rel = artifact.resolve().relative_to(workdir.resolve()).as_posix()
+    except ValueError:
+        raise _ApproveRefusedError(
+            f"artifact {artifact} is outside the run worktree {workdir} — the resume "
+            f"contract reads approvals from the worktree"
+        ) from None
+    _git("add", rel)
+    _git(
+        "-c", f"user.name={args.operator}",
+        "-c", "user.email=operator@operators.local",
+        "commit", "-m", f"[approval] {args.spec}/{args.phase} — approved by {args.operator}",
+    )
+    return _git("rev-parse", "HEAD")
+
+
+def _emit_approval_decision(args: argparse.Namespace, *, command_id: str = "") -> dict:
+    """Best-effort AIO decision emission (verb=approve) — never blocks the approval.
+
+    Wave B5: ``why`` is the operator's true ``--reason``; ``command_id`` is the journal receipt
+    this approval binds (the emitted decision carries the receipt the command journal recorded).
+    """
     from agentic_dynamics.control import aio_emission
 
     decision = {
@@ -159,9 +311,11 @@ def _emit_approval_decision(args: argparse.Namespace) -> dict:
         "gate_id": args.gate_id,
         "candidate_sha": args.candidate_sha,
         "operator": args.operator,
-        "reason": args.reason,
+        "why": args.reason or "operator approval",
         "status": "approved",
     }
+    if command_id:
+        decision["command_id"] = command_id
     try:
         return aio_emission.emit_decision(decision)
     except Exception as exc:  # best-effort by contract

@@ -1,0 +1,17 @@
+{
+  "subject": "skill/stack/web-svg-css",
+  "claim": "The Control Room constructs inline SVG with document.createElementNS and sets geometry such as viewBox, points, and rx on SVG nodes. Meaningful burn-trace SVGs receive an aria-label; decorative sparklines are aria-hidden and have accompanying screen-reader text. Control Room styles use CSS custom properties. The website SVG rendering gate enforces a minimum 4.5:1 text contrast threshold; it does not by itself enforce the broader WCAG thresholds.",
+  "conformance": "repo-conformant",
+  "repo_anchors": ["apps/control_room/static/app.js:265", "apps/control_room/static/app.js:299", "apps/control_room/static/style.css:85", "apps/website/verify_svg_rendering.py:64", "apps/website/verify_svg_rendering.py:360"],
+  "population": "agentic-dynamics stack",
+  "conditions": ["svg", "css", "accessibility", "wcag", "contrast", "aria"],
+  "support": 3,
+  "uncertainty": 0.25,
+  "source_experiment": "tech_stack_seed_2026-09-11",
+  "evidence": [
+    "uri:https://developer.mozilla.org/en-US/docs/Web/SVG",
+    "uri:https://developer.mozilla.org/en-US/docs/Web/CSS",
+    "uri:https://developer.mozilla.org/en-US/docs/Web/Accessibility/Understanding_WCAG/Perceivable"
+  ],
+  "notes": "Repo conformance edit: limited the accessibility claim to the ARIA behavior and 4.5:1 text-contrast check the code enforces. The prior claim overstated the SVG gate as enforcement of 3:1, 7:1, non-text, and color-independence requirements."
+}

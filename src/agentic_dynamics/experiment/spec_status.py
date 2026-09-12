@@ -96,6 +96,10 @@ RUNNING_WINDOW = timedelta(hours=24)
 #: Timestamp format of a run-ledger filename (``20260819T142530Z.json``) — the fallback
 #: when the ledger body carries no ``ended_at``/``started_at``.
 _FILENAME_TS_FORMAT = "%Y%m%dT%H%M%SZ"
+#: Wave B1's collision-proof ledger names add microsecond precision (``...T142530123456Z``)
+#: and an optional identity suffix (``...Z_run-abc123`` / ``...Z_run-abc123.1``); the
+#: filename parser reads the LEADING timestamp of either shape.
+_FILENAME_TS_FORMAT_MICROS = "%Y%m%dT%H%M%S%fZ"
 
 
 # ── Timestamp normalization ─────────────────────────────────────
@@ -119,7 +123,9 @@ def parse_timestamp(text: str | None) -> datetime | None:
     * ``2026-08-19T14:25:30.123456+00:00`` — ``workflow_runner._now()`` (ISO with offset)
     * ``2026-08-19T14:25:30Z`` — ISO with a ``Z`` suffix (``fromisoformat`` rejects this
       on Python < 3.11, hence the explicit swap)
-    * ``20260819T142530Z`` — the run-ledger *filename* stem
+    * ``20260819T142530Z`` — the run-ledger *filename* stem, in either of the two name
+      shapes: second precision (legacy) or Wave B1's microsecond-precision identity names
+      (``20260819T142530123456Z_run-abc123[.N]``)
 
     Returns ``None`` for anything unparseable, so a corrupt field degrades to "no
     timestamp" instead of raising in the middle of an index refresh.
@@ -132,9 +138,17 @@ def parse_timestamp(text: str | None) -> datetime | None:
     try:
         moment = datetime.fromisoformat(raw.replace("Z", "+00:00"))
     except ValueError:
-        try:
-            moment = datetime.strptime(raw, _FILENAME_TS_FORMAT)
-        except ValueError:
+        # The ledger-filename stem: <ts>Z[_<run-id>][.<n>]. Only the LEADING timestamp is
+        # parsed — the identity suffix (Wave B1) is deliberate and not a time field.
+        core = raw.split("_", 1)[0].split(".", 1)[0]
+        moment = None
+        for fmt in (_FILENAME_TS_FORMAT, _FILENAME_TS_FORMAT_MICROS):
+            try:
+                moment = datetime.strptime(core, fmt)
+                break
+            except ValueError:
+                continue
+        if moment is None:
             return None
     # A naive timestamp is treated as UTC: everything in this repo is written in UTC, and
     # leaving it naive would make it uncomparable with the aware ones.

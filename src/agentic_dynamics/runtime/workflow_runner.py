@@ -130,6 +130,7 @@ from pathlib import Path
 from typing import Any
 
 from agentic_dynamics.adapters.backends import run_agentic
+from agentic_dynamics.core import decision_contract as dc
 from agentic_dynamics.core.admission_context import AdmissionRefused
 from agentic_dynamics.core.cost_provenance import CostSource
 from agentic_dynamics.core.language import build_code_snapshot, compute_code_delta, detect_language
@@ -158,6 +159,7 @@ from agentic_dynamics.runtime.change_analyzer import (
     ChangeInput,
     run_change_analysis,
 )
+from agentic_dynamics.runtime.escalation import EscalationPlan
 from agentic_dynamics.runtime.executor import (
     LocalAgentExecutor,
     StepExecutor,
@@ -249,6 +251,12 @@ class PhaseResult:
     files_modified: list[str] = field(default_factory=list)
     final_response: str = ""
     confidence: float | None = None  # [H] execution-confidence signal (agent phases)
+    #: Per-attempt records when the phase had MORE THAN ONE attempt (step 9 escalation: the
+    #: cascade retried the phase on a successor model). Empty for the historical
+    #: single-attempt phase — the ledger's top-level ``attempts`` array derives from these
+    #: rows when present. Each row: attempt_number / model / status / cost_usd / tokens /
+    #: escalation_from / escalation_to / retry_reason.
+    attempts: list[dict[str, Any]] = field(default_factory=list)
     # augmentation provenance (populated only when rag_augment is enabled)
     raw_prompt_hash: str = ""
     pre_phase_commit: str = ""
@@ -312,6 +320,9 @@ class PhaseResult:
             "files_created": self.files_created,
             "files_modified": self.files_modified,
             "confidence": self.confidence,
+            # ADDED key (step 9 escalation — never renames an existing key): the per-attempt
+            # rows of a multi-attempt phase (empty for the historical single-attempt phase).
+            "attempts": self.attempts,
             # augmentation provenance — persisted structured, never in-memory-only
             "raw_prompt_hash": self.raw_prompt_hash,
             "pre_phase_commit": self.pre_phase_commit,
@@ -404,6 +415,10 @@ class WorkflowRunResult:
     run_id: str = ""
     parent_run_id: str = ""
     family_id: str = ""
+    #: Step 2 (2026-09-11): a RESUME whose completion set already covered every declared phase
+    #: (the final-checkpoint approval is the canonical case) executes nothing — that is LOGICAL
+    #: COMPLETION, never a cancelled run. Additive key; pre-2d ledgers lack it and parse False.
+    already_complete: bool = False
 
     @property
     def total_cost_usd(self) -> float:
@@ -417,7 +432,9 @@ class WorkflowRunResult:
         a designed stop, not an error — prefer :attr:`state` for the lossless terminal label
         (``awaiting_approval``), which the spec index now derives instead of ``failed``.
         """
-        return bool(self.phases) and all(p.status == "ok" for p in self.phases)
+        return (bool(self.phases) and all(p.status == "ok" for p in self.phases)) or (
+            self.already_complete
+        )
 
     @property
     def state(self) -> str:
@@ -429,9 +446,11 @@ class WorkflowRunResult:
            refused past an unsatisfied checkpoint);
         2. all phases ``ok``    → ``succeeded`` (identical condition to :attr:`ok`);
         3. any phase not ok     → ``failed`` (only when not awaiting);
-        4. nothing ran          → ``cancelled`` (a resume whose every phase was already
-           completed, or an aborted launch — no work was performed by this run, so it is
-           neither a success nor a failure).
+        4. nothing ran          → ``cancelled`` (an aborted launch — no work was performed by
+           this run and nothing was already complete). A resume whose completion set covered
+           every declared phase is ``already_complete`` and reports ``succeeded`` above: the
+           work WAS performed (by the parent), and manufacturing a failure out of it was the
+           final-checkpoint defect step 2 closes.
 
         ``ok == (state == RunState.SUCCEEDED.value)`` — the terminal-success bool stays
         the same for every run the ledger already records.
@@ -461,6 +480,7 @@ class WorkflowRunResult:
             "awaiting": self.awaiting,
             "awaiting_phase": self.awaiting_phase,
             "awaiting_reason": self.awaiting_reason,
+            "already_complete": self.already_complete,
             # ADDED key (I10 — never renames an existing key): the typed checkpoint ledger,
             # one record per checkpoint event (mechanical stop + resume-decided contract
             # reads). Old ledgers lack the key; consumers read it via ``.get("checkpoints",
@@ -944,28 +964,95 @@ def cell_scope(workdir: str | Path) -> str:
     return f"self-{identity}"
 
 
-def _run_test_gate(pr: PhaseResult, wd: Path, language: str, timeout: int,
-                   target: str | list[str] | None = None) -> None:
-    """Run the independent suite for an agent phase that declared ``test_gate: true``.
+def _run_test_gate(
+    pr: PhaseResult,
+    wd: Path,
+    language: str,
+    timeout: int,
+    target: str | list[str] | None = None,
+    *,
+    verifier_executor: StepExecutor | None = None,
+    containerized_path: bool = False,
+    phase_def: dict[str, Any] | None = None,
+    name: str = "",
+    model: str = "",
+    goal: str = "",
+    spec_name: str = "",
+    empty_refuses: bool = True,
+) -> None:
+    """Run ONE verification for a phase and apply the ONE post-verdict rule set (wave A3).
 
-    The test_runner (``run_suite``) is the sole source of truth for the outcome — never the
-    model's self-report (the workflow's ``no_self_reported_tests`` policy). Mirrors the
-    ``kind == "test"`` branch: a failed suite fails the phase, so the commit gate skips it and
-    ``stop_on_error`` honours the failure. When the runner did not execute (no gate, or the
-    agent phase already failed) the caller leaves ``test_executed_success`` at its ``None``
-    default — null-not-zero, never a fabricated value.
+    The three verification shapes now share this function — an agent phase's required
+    ``test_gate: true``, an explicit ``kind: test`` phase, and (under ``--orchestrator``) the
+    dispatched READ-ONLY verifier container — so their semantics cannot drift:
 
-    ``target`` (test_suite_speed p2 scoping) is the phase's declared test target — an agent
-    phase may pair ``test_gate: true`` with ``tests:`` so its gate runs the spec's tests
-    instead of the whole tree.
+    * ``verifier_executor`` present → dispatch the suite to the independent verifier; the
+      verdict lands on the same fields from the same source semantics;
+    * ``containerized_path`` with no verifier → REFUSE loudly (``VERIFIER_REFUSED``): a
+      declared verification never silently runs in the orchestrator's privileged parent;
+    * otherwise → the in-process LocalVerifier (``run_suite``), unchanged.
+
+    Then the shared rules, applied identically to every shape:
+
+    * ``empty_refuses`` and **zero tests executed** → the phase FAILS: a required gate that
+      ran nothing is a false green, not a skip (the review's #5 reproduction — a required
+      native gate with zero tests previously read ``ok=True`` with
+      ``test_executed_success=False``);
+    * a DECLARED ``target`` that produced no passing suite → the phase FAILS (the b5
+      phantom-target rule). A no-target empty tree stays honest: ``test_executed_success``
+      records False and the caller decides — never a fabricated pass.
+
+    When the gate does not execute (no gate, or the agent phase already failed) the caller
+    leaves ``test_executed_success`` at its ``None`` default — null-not-zero.
     """
-    suite = run_suite(wd, language, timeout=timeout, target=target)
-    pr.tests_passed = suite["passed"]
-    pr.tests_total = suite["total"]
-    pr.test_executed_success = suite_succeeded(suite)
-    if suite.get("failed", 0) > 0 or suite.get("errors", 0) > 0:
+    if verifier_executor is not None:
+        test_request = StepRequest(
+            phase_name=name or pr.phase,
+            phase_kind=(phase_def or {}).get("kind", "test"),
+            prompt="",
+            model=model,
+            goal=goal,
+            spec_name=spec_name,
+            workdir=str(wd),
+            language=language,
+            timeout=timeout,
+            phase_def=dict(phase_def or {}),
+        )
+        try:
+            verdict = verifier_executor.execute(test_request)
+        except Exception as exc:  # a verifier failure is a state, never a crash
+            pr.status = "failed"
+            pr.error = f"VERIFIER_ERROR: {exc!r}"
+        else:
+            _apply_verifier_verdict(pr, verdict)
+    elif containerized_path:
         pr.status = "failed"
-        pr.error = suite.get("tail", "")[-400:]
+        pr.error = _verifier_refused_error(pr.phase)
+    else:
+        suite = run_suite(wd, language, timeout=timeout, target=target)
+        pr.tests_passed = suite["passed"]
+        pr.tests_total = suite["total"]
+        pr.test_executed_success = suite_succeeded(suite)
+        if suite.get("failed", 0) > 0 or suite.get("errors", 0) > 0:
+            pr.status = "failed"
+            pr.error = suite.get("tail", "")[-400:]
+
+    if pr.status == "failed":
+        return  # an already-failed verdict keeps its own evidence
+    if empty_refuses and int(pr.tests_total or 0) == 0:
+        pr.status = "failed"
+        pr.error = (
+            "TEST_GATE: required verification ran no tests (total 0 — a required gate needs "
+            "a nonempty passing suite or an explicit refusal)"
+        )
+        return
+    if target and not bool(pr.test_executed_success):
+        pr.status = "failed"
+        pr.error = pr.error or (
+            "TEST_GATE: declared verification ran no tests "
+            f"(total {int(pr.tests_total or 0)} — target {target!r} resolved to nothing; "
+            "a missing file or an empty collection)"
+        )
 
 
 def _apply_verifier_verdict(pr: PhaseResult, verdict: StepResult) -> None:
@@ -1309,6 +1396,10 @@ def _executor_as_run_agent(
     """
     def _call(prompt: str, **agent_kwargs: Any) -> Any:
         phase = dict(phase_def)
+        # Wave A2: the engine's loop hands the real attempt ordinal here; CONSUME it into the
+        # StepRequest and never forward it to the adapter through ``_agent_kwargs`` (the
+        # adapters do not take an ``attempt`` kwarg).
+        attempt = int(agent_kwargs.pop("attempt", 1) or 1)
         # The engine's phase-loop may also hand executor-internal kwargs (watchdog seam,
         # transcript path, session_id/fork for cache chaining). The StepRequest carries the
         # public contract; these ride through on the phase dict so the LOCAL executor can
@@ -1336,6 +1427,7 @@ def _executor_as_run_agent(
                 timeout=int(agent_kwargs.get("timeout", 1800) or 1800),
                 silent_mode=bool(agent_kwargs.get("silent_mode", False)),
                 enforce_pytest=bool(agent_kwargs.get("enforce_pytest", False)),
+                attempt=attempt,
                 phase_def=phase,
             )
         )
@@ -2283,34 +2375,25 @@ def _approval_path(wd: Path, spec_name: str, phase_name: str) -> Path:
 
 
 def _parse_approval(text: str) -> dict[str, str]:
-    """Extract ``tree`` / ``phase`` / ``operator`` / ``date`` from the approval markdown.
+    """Extract ``tree`` / ``phase`` / ``operator`` / ``date`` via the ONE contract.
 
-    The artifact is a simple ``- key: value`` list (the operator fills it by hand); the parser
-    accepts any ``key: value`` line whose key is one of the four contract fields, so an
-    approval written with natural prose around it still parses. Missing/empty fields simply
-    fail their check downstream (no defaulting).
+    The parsing dialect lives in ``core.decision_contract`` (migration step 2): tolerant about
+    how an operator writes (canonical ``- key: value`` lines, ``SIGNED-BY-OPERATOR:``, bold
+    decorations, an inline date on the signature line), strict about the fields. Missing or
+    placeholder fields simply fail their check downstream (no defaulting).
     """
-    out: dict[str, str] = {}
-    for line in text.splitlines():
-        stripped = line.strip().lstrip("-* ").strip()
-        if ":" not in stripped:
-            continue
-        key, _, value = stripped.partition(":")
-        key = key.strip().lower()
-        if key in ("tree", "phase", "operator", "date"):
-            out[key] = value.strip()
-    return out
+    decision = dc.parse_approval_decision(text)
+    return {
+        "tree": decision.tree,
+        "phase": decision.phase,
+        "operator": decision.operator,
+        "date": decision.date,
+    }
 
 
 def _date_is_valid(value: str) -> bool:
-    """A real date (ISO-8601 or ``YYYY-MM-DD``); empty/unparseable is not a signature date."""
-    if not value:
-        return False
-    try:
-        datetime.fromisoformat(value.replace("Z", "+00:00"))
-        return True
-    except ValueError:
-        return False
+    """A real date (ISO-8601 or ``YYYY-MM-DD``) — the one contract's check (step 2)."""
+    return dc.date_is_valid(value)
 
 
 def _operator_is_placeholder(operator: str) -> bool:
@@ -2322,13 +2405,7 @@ def _operator_is_placeholder(operator: str) -> bool:
     An angle-bracketed template value (``<name>``, ``<required: ...>``, ``<your signature>``) is
     a placeholder even when the generic-word list does not name it.
     """
-    stripped = operator.strip()
-    norm = " ".join(stripped.lower().split())
-    return (
-        norm in PLACEHOLDER_OPERATORS
-        or len(stripped) < 2
-        or (stripped.startswith("<") and stripped.endswith(">"))
-    )
+    return dc.operator_is_placeholder(operator)
 
 
 def approval_authorizes_tree(
@@ -2355,8 +2432,8 @@ def approval_authorizes_tree(
         "present_at_pre_head": False,
     }
     path = _approval_path(wd, spec_name, phase_name)
+    rel = path.relative_to(wd).as_posix()
     if pre_head:
-        rel = path.relative_to(wd).as_posix()
         try:
             present = subprocess.run(
                 ["git", "cat-file", "-e", f"{pre_head}:{rel}"],
@@ -2369,22 +2446,25 @@ def approval_authorizes_tree(
         evidence["failed_checks"] = ["committed_before_phase"]
         return False, evidence
 
-    parsed = _parse_approval(path.read_text(encoding="utf-8"))
-    evidence["parsed"] = parsed
-    failed: list[str] = []
-    if parsed.get("tree") != tree_hash:
-        failed.append("tree")
-    if parsed.get("phase") != phase_name:
-        failed.append("phase")
-    if _operator_is_placeholder(parsed.get("operator", "")):
-        failed.append("operator")
-    if not _date_is_valid(parsed.get("date", "")):
-        failed.append("date")
+    # Step 2: the decision is a fact about the COMMIT it authorized from, never about the
+    # checkout — an uncommitted edit to the same path reads nothing here.
+    text = dc.read_committed(wd, pre_head, rel)
+    if text is None:
+        evidence["failed_checks"] = ["committed_before_phase"]
+        return False, evidence
+    decision = dc.parse_approval_decision(text)
+    evidence["parsed"] = decision.as_dict()
+    failed = dc.validate_decision(
+        decision,
+        purpose=dc.PURPOSE_TREE_REUSE,
+        phase=phase_name,
+        tree=tree_hash,
+    )
     evidence["failed_checks"] = failed
     if not failed:
         evidence["authorized"] = True
-        evidence["operator"] = parsed["operator"]
-        evidence["date"] = parsed["date"]
+        evidence["operator"] = decision.operator
+        evidence["date"] = decision.date
     return evidence["authorized"], evidence
 
 
@@ -2561,6 +2641,21 @@ class CheckpointRecord:
         }
 
 
+def _tree_of(wd: Path, commit: str) -> str | None:
+    """The git TREE sha of ``commit`` (immutable content identity), or None when unresolvable."""
+    if not commit:
+        return None
+    try:
+        out = subprocess.run(
+            ["git", "rev-parse", f"{commit}^{{tree}}"],
+            cwd=wd, capture_output=True, text=True, timeout=30,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    value = out.stdout.strip()
+    return value or None
+
+
 def _checkpoint_approval_path(wd: Path, spec_name: str, phase_name: str) -> Path:
     """``approvals/<spec>/<phase>_approval.md`` inside the worktree."""
     return wd / APPROVALS_DIRNAME / spec_name / f"{phase_name}_approval.md"
@@ -2667,16 +2762,35 @@ def _checkpoint_approval_valid(
     if not ancestor:
         failed.append("checkpoint_lineage_intact")
     if not failed:
-        parsed = _parse_checkpoint_approval(path.read_text(encoding="utf-8"))
-        evidence["parsed"] = parsed
-        if _operator_is_placeholder(parsed.get("operator", "")):
-            failed.append("operator")
-        if not _date_is_valid(parsed.get("date", "")):
-            failed.append("date")
+        # Step 2: validate the COMMITTED bytes at HEAD — never the checkout's working copy.
+        text = dc.read_committed(wd, "HEAD", rel)
+        if text is None:
+            failed.append("committed_at_head")
+        else:
+            decision = dc.parse_approval_decision(text)
+            evidence["parsed"] = decision.as_dict()
+            # Wave A4: bind WHAT the human approved — the spec, the phase, and the exact
+            # reviewed candidate/tree — not merely that some checkpoint-shaped artifact
+            # exists (the review's reproduction accepted an artifact naming the wrong spec,
+            # phase, run, gate and candidate because this call passed only ``purpose``).
+            # The candidate is the phase's own commit (the run's stop point the operator
+            # reviewed); a rewritten worktree fails the lineage checks above and a foreign
+            # artifact fails here. ``run_id``/``gate_id`` join once run identity reaches the
+            # engine (the Wave-B item); today they are validated when a consumer knows them.
+            failed.extend(
+                dc.validate_decision(
+                    decision,
+                    purpose=dc.PURPOSE_CHECKPOINT,
+                    spec=spec_name,
+                    phase=phase_name,
+                    candidate_sha=checkpoint_commit,
+                    tree=_tree_of(wd, checkpoint_commit),
+                )
+            )
         if not failed:
             evidence["valid"] = True
-            evidence["operator"] = parsed["operator"]
-            evidence["date"] = parsed["date"]
+            evidence["operator"] = decision.operator
+            evidence["date"] = decision.date
     evidence["failed_checks"] = failed
     return evidence["valid"], evidence
 
@@ -2768,6 +2882,27 @@ def _first_unsatisfied_checkpoint(
     return unsatisfied
 
 
+def _apply_attempt_totals(
+    pr: PhaseResult, rows: list[dict[str, Any]], *, include_last: bool
+) -> None:
+    """Add the retried attempts' cost/tokens to the phase and attach the attempt rows (step 9).
+
+    The result-processing block records the FINAL attempt's cost/tokens from its ``ar``; the
+    PRIOR attempts (failed ladder steps) spent real money too, so their totals are added here —
+    the phase carries what the run actually paid, each row carries its own split.
+    ``include_last=True`` adds every row (the exception path, where no ``ar`` was processed).
+    A single-attempt phase is a byte-for-byte no-op (no totals, no ``attempts`` key content).
+    """
+    if not rows:
+        return
+    for attempt_row in (rows if include_last else rows[:-1]):
+        pr.cost_usd = round(pr.cost_usd + float(attempt_row.get("cost_usd") or 0.0), 6)
+        for key, value in (attempt_row.get("tokens") or {}).items():
+            pr.tokens[key] = int(pr.tokens.get(key, 0)) + int(value)
+    if len(rows) > 1:
+        pr.attempts = rows
+
+
 def _build_attempt_records(result: WorkflowRunResult, job_id: str) -> list[AttemptRecord]:
     """Derive one :class:`AttemptRecord` per agent phase from the finished run's phases.
 
@@ -2776,14 +2911,61 @@ def _build_attempt_records(result: WorkflowRunResult, job_id: str) -> list[Attem
     invocations and are therefore the attempts; test phases run the language suite in-process
     and produce no attempt record (they are independent verification, not a model call).
 
-    The emitted values are the schema's EXACT semantics, never invented: one attempt per phase
-    (``attempt_number=1``), no retry (``retry_reason=""``), no model escalation
-    (``escalation_from``/``escalation_to`` are ``None``), ``first_pass`` = the single attempt
-    did not fail, and ``accepted`` = the outcome was accepted (``status == "ok"``).
+    Two shapes, both the schema's exact semantics:
+
+    * the historical single-attempt phase (no escalation): one record with
+      ``attempt_number=1``, ``retry_reason=""``, ``escalation_from``/``escalation_to``
+      ``None``, ``first_pass`` = the attempt did not fail, ``accepted`` = ``status == "ok"``;
+    * a MULTI-attempt phase (step 9 escalation fired, ``phase.attempts`` carries the rows):
+      one record per row with its own model/status/cost/tokens, ``attempt_number`` incrementing,
+      ``parent_attempt_id`` chaining, and ``escalation_from``/``escalation_to``/``retry_reason``
+      exactly as recorded. ``first_pass`` is meaningful for attempt 1 only (later attempts are
+      ``None`` — they are not the first pass); ``accepted`` stays per attempt. Phase-level
+      verification/confidence signals attach to the FINAL attempt (the outcome that was
+      gated); prior attempts carry ``None``.
     """
     records: list[AttemptRecord] = []
     for phase in result.phases:
         if phase.kind == "test":
+            continue
+        rows = list(getattr(phase, "attempts", None) or [])
+        if len(rows) > 1:
+            parent_id: str | None = None
+            for index, row in enumerate(rows, start=1):
+                attempt_number = int(row.get("attempt_number") or index)
+                is_final = index == len(rows)
+                attempt_id = f"{job_id}_{phase.phase}_a{attempt_number}"
+                records.append(
+                    AttemptRecord(
+                        attempt_id=attempt_id,
+                        job_id=job_id,
+                        phase=phase.phase,
+                        attempt_number=attempt_number,
+                        parent_attempt_id=parent_id,
+                        retry_reason=str(row.get("retry_reason") or ""),
+                        # Wave A3 #5a: ACCEPTANCE is the GATED outcome, never the adapter's
+                        # pre-gate status. A final attempt whose phase later failed a required
+                        # gate must not record accepted=True (the review's reproduction); an
+                        # earlier escalated attempt is a failed pass by construction. The
+                        # single-attempt path above already used the post-gate phase status —
+                        # this is the same contract for multi-attempt phases.
+                        accepted=((phase.status == "ok") if is_final else False),
+                        first_pass=(
+                            ((phase.status == "ok") if is_final else False)
+                            if attempt_number == 1
+                            else None
+                        ),
+                        escalation_from=row.get("escalation_from"),
+                        escalation_to=row.get("escalation_to"),
+                        model=str(row.get("model") or phase.model),
+                        status=str(row.get("status") or ""),
+                        cost_usd=float(row.get("cost_usd") or 0.0),
+                        tokens=dict(row.get("tokens") or {}),
+                        test_executed_success=(phase.test_executed_success if is_final else None),
+                        confidence=(phase.confidence if is_final else None),
+                    )
+                )
+                parent_id = attempt_id
             continue
         records.append(
             AttemptRecord(
@@ -2990,6 +3172,15 @@ def run_workflow(
     if not phases:
         raise ValueError("workflow.params.phases is empty")
 
+    # The escalation plan (step 9, G-27) — opt-in via ``workflow.params.escalation``. Parsed
+    # EAGERLY: a malformed ladder is a loud spec error here, never a silent no-op that looks
+    # like "escalation is disabled" (a load-bearing difference for the operator).
+    escalation = EscalationPlan.from_params(spec.workflow.params)
+    # Wave A2: the attempt ordinal base. Prepared steps carry the PARENT's attempt number; a
+    # child continuing attempt 7 must label its executor request/namespace a7, not a1. Default
+    # 1 (an ordinary run) — the child sets this from the prepared payload.
+    attempt_base = int(spec.workflow.params.get("_attempt_base", 1) or 1)
+
     wd = Path(workdir).resolve()
     if not wd.is_dir():
         raise ValueError(f"workdir not found: {wd}")
@@ -3091,6 +3282,17 @@ def run_workflow(
                 start_idx = i + 1
             else:
                 break
+
+    # Step 2: a resume that skipped EVERY phase because its completion set already covered
+    # them executed no work — that is logical completion (the final-checkpoint approval is the
+    # canonical case), never a cancelled run. The flag travels on the ledger so the
+    # spec-status family union reads succeeded instead of manufacturing a failure.
+    result.already_complete = bool(
+        resume
+        and phases
+        and start_idx >= len(phases)
+        and {str(p.get("name", "?")) for p in phases} <= completed
+    )
 
     # Mechanical human checkpoint (cap_runner_hardening2 §Gap 3) — resume gating. BEFORE any
     # further phase runs, every completed checkpoint phase's approval contract must be valid;
@@ -3209,62 +3411,24 @@ def run_workflow(
                 # The phase receives the resolved test target + language so the suite the
                 # verifier runs is the SAME target list the in-process path uses (local
                 # parity — test_suite_speed p2 scoping preserved on both sides).
-                if verifier_executor is not None:
-                    test_request = StepRequest(
-                        phase_name=name,
-                        phase_kind="test",
-                        prompt="",
-                        model=model,
-                        goal=goal,
-                        spec_name=spec.name,
-                        workdir=str(wd),
-                        language=language,
-                        timeout=phase_timeout,
-                        phase_def=dict(phase_def),
-                    )
-                    try:
-                        verdict = verifier_executor.execute(test_request)
-                    except Exception as exc:  # a verifier failure is a state, never a crash
-                        pr.status = "failed"
-                        pr.error = f"VERIFIER_ERROR: {exc!r}"
-                    else:
-                        _apply_verifier_verdict(pr, verdict)
-                elif containerized_path:
-                    # The containerized path (a step executor was injected — the operator
-                    # asked for sibling-cell isolation) with no verifier to dispatch to.
-                    # Refuse loudly: a declared verification must not silently run in the
-                    # orchestrator's own privileged container, and must never be skipped.
-                    pr.status = "failed"
-                    pr.error = _verifier_refused_error(name)
-                else:
-                    # test_suite_speed p2 scoping: a test phase may declare ``tests:`` (a file,
-                    # node id, or list thereof — e.g. ``tests/test_<spec>.py``) so the phase runs
-                    # the spec's own tests, never the whole multi-thousand-test tree. Without the
-                    # field the historical whole-tree scope is preserved.
-                    suite = run_suite(wd, language, timeout=phase_timeout,
-                                      target=phase_def.get("tests"))
-                    pr.tests_passed = suite["passed"]
-                    pr.tests_total = suite["total"]
-                    pr.test_executed_success = suite_succeeded(suite)
-                    # A zero-test run is a FALSE GREEN only when a target was DECLARED but
-                    # resolved to nothing (the b5 phantom-target lesson, fleet_launch_boundary
-                    # F5): a ``tests:`` file/node-id that collects no tests means the declared
-                    # verification never ran — total 0 / failed 0 / errors 0 read ok under the
-                    # old failed/errors-only check while test_executed_success was False.
-                    # A phase with NO declared target runs the whole tree; an empty tree
-                    # (a fresh worktree with no test files) collecting 0 is honest, not a
-                    # false green — suite_succeeded(total>0) still records False, and the
-                    # phase status honors it only when a target was declared.
-                    declared_target = phase_def.get("tests")
-                    if declared_target and not suite_succeeded(suite):
-                        pr.status = "failed"
-                        pr.error = suite.get("tail", "")[-400:] or (
-                            "TEST_GATE: declared verification ran no tests "
-                            f"(total 0 — target {declared_target!r} resolved to "
-                            "nothing; a missing file or an empty collection)"
-                        )
+                _run_test_gate(
+                    pr, wd, language, phase_timeout, target=phase_def.get("tests"),
+                    verifier_executor=verifier_executor,
+                    containerized_path=containerized_path,
+                    phase_def=phase_def, name=name, model=model, goal=goal,
+                    spec_name=spec.name,
+                    # The explicit phase's b5 rule: zero tests refuse when a target was
+                    # DECLARED; a whole-tree empty collection stays honest (no target).
+                    empty_refuses=bool(phase_def.get("tests")),
+                )
             else:
-                prompt = _build_phase_prompt(phase_def, goal, prior)
+                if phase_def.get("_prepared_step"):
+                    # Wave A2: a prepared step's prompt is the parent's FINAL instruction — the
+                    # child neither re-renders placeholders nor lets any later transform
+                    # rewrite it. The hash the parent carried covers exactly these bytes.
+                    prompt = str(phase_def.get("prompt", ""))
+                else:
+                    prompt = _build_phase_prompt(phase_def, goal, prior)
                 # Point the agent's built-in publisher at this workflow's cell so the
                 # fine-grained session events stream into the Control Room.
                 prev_cell = os.environ.get("FINOPS_CELL_ID")
@@ -3272,6 +3436,9 @@ def run_workflow(
                 ar = None
                 stall: dict[str, Any] | None = None
                 pre_head = ""
+                # Step 9 (G-27): every agent attempt is recorded here (one row by default; one
+                # per ladder step when escalation fires).
+                attempt_rows: list[dict[str, Any]] = []
                 # The per-phase spend gate (admission_leases p2). An ExitStack rather
                 # than a nested ``with`` because the leases can only be reserved once
                 # the phase's model is KNOWN (the budget lease's currency follows the
@@ -3353,33 +3520,6 @@ def run_workflow(
                         pr.augmentation_latency_ms = outcome.latency_ms
                         pr.fallback_mode = outcome.fallback_mode
 
-                    agent_kwargs: dict[str, Any] = {
-                        "model": model_i,
-                        "backend": backend,
-                        "workdir": str(wd),
-                        "thinking_effort": thinking_effort,
-                        "thinking_budget_tokens": thinking_budget_tokens,
-                        "output_token_limit": output_token_limit,
-                        "timeout": phase_timeout,
-                        "silent_mode": silent_mode,
-                        "enforce_pytest": bool(
-                            phase_def.get("enforce_pytest", enforce_pytest)
-                        ),
-                    }
-                    # Cache-aware forking: reuse the previous phase's session prefix so
-                    # the shared context is served as provider cache reads (DeepSeek
-                    # cache read ~120x cheaper than input). A model switch breaks the
-                    # cache prefix, so only fork when the model is unchanged. Both
-                    # backends support it (opencode --session/--fork; claude --resume/--fork-session).
-                    if (
-                        fork_enabled
-                        and prev_session_id
-                        and prev_model == model_i
-                    ):
-                        agent_kwargs["session_id"] = prev_session_id
-                        agent_kwargs["fork"] = True
-                    pr.model = model_i
-
                     # Commit-prefix enforcement (cap_runner_hardening p3): record the worktree
                     # HEAD before the agent runs, so after the phase the runner can list exactly
                     # the commits the agent made during it (git log pre-head..HEAD).
@@ -3393,37 +3533,127 @@ def run_workflow(
                     # installs no hook (violations must stay visible for the evidence).
                     _install_commit_msg_hook(git_wd, name, goal)
 
-                    # Phase watchdog (cap_runner_hardening p1) — wrap the agent invocation in a
-                    # stall monitor. The monitor polls the session transcript's last-step age
-                    # (``.instrument/session.jsonl``, appended live by the adapters while the seam
-                    # is present) and fails the phase deterministically — SIGTERM + STALLED +
-                    # evidence — when no new step appears for the threshold (explicit arg >
-                    # ``FINOPS_PHASE_WATCHDOG_MIN`` env > default 20 min; a value <= 0 disables
-                    # it). Only agent phases are wrapped; test phases run in-process, never
-                    # through this path.
-                    watchdog_min = _resolve_watchdog_min(phase_watchdog_min)
-                    watchdog = PhaseWatchdog(git_wd, watchdog_min) if watchdog_min > 0 else None
-                    if watchdog is not None:
-                        agent_kwargs["watchdog"] = watchdog.seam
-                        agent_kwargs["transcript_path"] = str(watchdog.transcript)
-                    # P0-2 (control-plane stabilization): the ONE engine. Agent phases route
-                    # through the injected step executor (the default LocalAgentExecutor is
-                    # the historical in-process call; the DockerAgentExecutor under
-                    # --orchestrator runs the step in a sibling container). The engine —
-                    # not the executor — owns stop-on-failure, checkpoints, gates, and the
-                    # aggregate ledger: ``ar`` is whatever the executor returned, and every
-                    # downstream decision (tokens/cost/fail/commit/await) reads it the same
-                    # way for both paths.
-                    step_call = _executor_as_run_agent(
-                        step_executor, phase_def=phase_def, spec_name=spec.name, goal=goal
-                    )
-                    ar, stall = _run_agent_phase(step_call, prompt, agent_kwargs, watchdog)
-                    if stall is not None:
-                        # The stalled agent was SIGTERM'd; the phase fails with the evidence
-                        # (last-step timestamp, stale age, transcript tail) on the ledger.
-                        pr.status = "failed"
-                        pr.error = _format_stall_evidence(stall)
-                        pr.stall_evidence = stall
+                    # Step 9 (G-27) — the escalation loop. ONE attempt by default (the
+                    # historical engine); when the spec's ladder names a successor for the
+                    # model that just FAILED, the phase retries on it, and every attempt is
+                    # recorded (per-attempt model/status/cost/tokens/escalation) for the
+                    # ledger and the Control Room's cascade surface. A retry is a SECOND paid
+                    # invocation: each one reserves its own admission below.
+                    attempt_model = model_i
+                    attempt_no = 1
+                    while True:
+                        if attempt_no > 1:
+                            # The retry's own reservation — the budget gate refuses when the
+                            # campaign is exhausted (fail-closed: no unbudgeted retry).
+                            admission_gate.enter_context(
+                                phase_admission_scope(phase_admission, name, attempt_model)
+                            )
+                            # The failed attempt's outcome evidence lives on its row; the
+                            # phase's fields take the retry's result. (The escalation's
+                            # from/to stamp lives on the RETRY row below — one event per
+                            # escalation, never a half-stamp on the failed attempt.)
+                            pr.error = ""
+                            pr.stall_evidence = None
+                        agent_kwargs: dict[str, Any] = {
+                            "model": attempt_model,
+                            "attempt": attempt_base + attempt_no - 1,
+                            "backend": backend,
+                            "workdir": str(wd),
+                            "thinking_effort": thinking_effort,
+                            "thinking_budget_tokens": thinking_budget_tokens,
+                            "output_token_limit": output_token_limit,
+                            "timeout": phase_timeout,
+                            "silent_mode": silent_mode,
+                            "enforce_pytest": bool(
+                                phase_def.get("enforce_pytest", enforce_pytest)
+                            ),
+                        }
+                        # Cache-aware forking: reuse the previous phase's session prefix so
+                        # the shared context is served as provider cache reads (DeepSeek
+                        # cache read ~120x cheaper than input). A model switch breaks the
+                        # cache prefix, so only fork when the model is unchanged. Both
+                        # backends support it (opencode --session/--fork; claude --resume/--fork-session).
+                        if (
+                            fork_enabled
+                            and prev_session_id
+                            and prev_model == attempt_model
+                        ):
+                            agent_kwargs["session_id"] = prev_session_id
+                            agent_kwargs["fork"] = True
+                        pr.model = attempt_model
+
+                        # Phase watchdog (cap_runner_hardening p1) — wrap the agent invocation
+                        # in a stall monitor. The monitor polls the session transcript's
+                        # last-step age (``.instrument/session.jsonl``, appended live by the
+                        # adapters while the seam is present) and fails the phase
+                        # deterministically — SIGTERM + STALLED + evidence — when no new step
+                        # appears for the threshold (explicit arg > ``FINOPS_PHASE_WATCHDOG_MIN``
+                        # env > default 20 min; a value <= 0 disables it). Only agent phases are
+                        # wrapped; test phases run in-process, never through this path. FRESH
+                        # per attempt: one invocation, one stall window — an escalated retry
+                        # must not inherit the failed attempt's stale clock.
+                        watchdog_min = _resolve_watchdog_min(phase_watchdog_min)
+                        watchdog = (
+                            PhaseWatchdog(git_wd, watchdog_min) if watchdog_min > 0 else None
+                        )
+                        if watchdog is not None:
+                            agent_kwargs["watchdog"] = watchdog.seam
+                            agent_kwargs["transcript_path"] = str(watchdog.transcript)
+                        # P0-2 (control-plane stabilization): the ONE engine. Agent phases
+                        # route through the injected step executor (the default
+                        # LocalAgentExecutor is the historical in-process call; the
+                        # DockerAgentExecutor under --orchestrator runs the step in a sibling
+                        # container). The engine — not the executor — owns stop-on-failure,
+                        # checkpoints, gates, and the aggregate ledger: ``ar`` is whatever the
+                        # executor returned, and every downstream decision
+                        # (tokens/cost/fail/commit/await) reads it the same way for both paths.
+                        step_call = _executor_as_run_agent(
+                            step_executor, phase_def=phase_def, spec_name=spec.name, goal=goal
+                        )
+                        ar, stall = _run_agent_phase(step_call, prompt, agent_kwargs, watchdog)
+                        if stall is not None:
+                            # The stalled agent was SIGTERM'd; the phase fails with the evidence
+                            # (last-step timestamp, stale age, transcript tail) on the ledger;
+                            # the attempt row below carries the same model.
+                            pr.status = "failed"
+                            pr.error = _format_stall_evidence(stall)
+                            pr.stall_evidence = stall
+
+                        attempt_failed = stall is not None or not getattr(ar, "ok", True)
+                        attempt_rows.append(
+                            {
+                                "attempt_number": attempt_no,
+                                "model": attempt_model,
+                                "status": "failed" if attempt_failed else "ok",
+                                "cost_usd": float(getattr(ar, "estimated_cost_usd", 0.0) or 0.0),
+                                "tokens": {
+                                    "in": int(getattr(ar, "prompt_tokens", 0) or 0),
+                                    "out": int(getattr(ar, "completion_tokens", 0) or 0),
+                                    "reasoning": int(getattr(ar, "reasoning_tokens", 0) or 0),
+                                    "answer": int(getattr(ar, "answer_tokens", 0) or 0),
+                                    "explanation": int(getattr(ar, "explanation_tokens", 0) or 0),
+                                    "total": int(getattr(ar, "total_tokens", 0) or 0),
+                                },
+                                "escalation_from": (
+                                    attempt_rows[-1]["model"] if attempt_no > 1 else None
+                                ),
+                                "escalation_to": (attempt_model if attempt_no > 1 else None),
+                                "retry_reason": "escalation" if attempt_no > 1 else "",
+                            }
+                        )
+                        next_model = (
+                            escalation.successor(attempt_model, attempts_made=attempt_no)
+                            if (
+                                escalation is not None
+                                and attempt_failed
+                                and not phase_def.get("_prepared_step")
+                            )
+                            else None
+                        )
+                        if next_model is None:
+                            break
+                        attempt_model = next_model
+                        attempt_no += 1
                 finally:
                     # Release the phase's leases before anything else: the headroom is
                     # returned as soon as the phase stops spending, whether it finished,
@@ -3471,6 +3701,11 @@ def run_workflow(
                     if not getattr(ar, "ok", True):
                         pr.status = "failed"
                         pr.error = getattr(ar, "error", "") or f"exit_code={getattr(ar, 'exit_code', '?')}"
+                # Step 9 escalation totals: the processing block above recorded the FINAL
+                # attempt's cost/tokens from its ``ar``; the prior (failed-ladder) attempts
+                # spent real money too, so they are added here. A single-attempt phase is a
+                # byte-for-byte no-op (no totals, no ``attempts`` content).
+                _apply_attempt_totals(pr, attempt_rows, include_last=False)
         except AdmissionRefused as exc:
             # The spend gate refused this phase — and refusal means NO invocation
             # happened: ``phase_admission_scope`` is entered before the prompt is built
@@ -3479,9 +3714,12 @@ def run_workflow(
             # phase 4's quarantine rail can key off it.
             pr.status = "failed"
             pr.error = f"ADMISSION_DENIED: {exc}"
+            # An escalated RETRY refused by the budget still owes the prior attempt's spend.
+            _apply_attempt_totals(pr, attempt_rows, include_last=True)
         except Exception as exc:  # one bad phase must not crash the runner
             pr.status = "failed"
             pr.error = repr(exc)
+            _apply_attempt_totals(pr, attempt_rows, include_last=True)
 
         # CAP test-runner wiring (the named seam, docs/designs/current/cap_test_runner_wiring.md
         # §1): an agent phase that declares ``test_gate: true`` gets the independent test_runner
@@ -3492,7 +3730,15 @@ def run_workflow(
         # (null-not-zero — no defaulting, no fabrication). A failing gate fails the phase so the
         # commit below is skipped, exactly like the ``kind == "test"`` branch.
         if kind != "test" and phase_def.get("test_gate") and pr.status == "ok":
-            _run_test_gate(pr, git_wd, language, phase_timeout, target=phase_def.get("tests"))
+            _run_test_gate(
+                pr, git_wd, language, phase_timeout, target=phase_def.get("tests"),
+                verifier_executor=verifier_executor,
+                containerized_path=containerized_path,
+                phase_def=phase_def, name=name, model=model, goal=goal,
+                spec_name=spec.name,
+                # A required native gate refuses a zero-test suite outright (wave A3 #5).
+                empty_refuses=True,
+            )
 
         # Deploy gate (cap_runner_hardening p2) — post-phase, agent phases only. Scan the
         # phase's session transcript for firebase production-deploy commands; a hit in a phase

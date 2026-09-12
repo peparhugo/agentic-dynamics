@@ -200,7 +200,7 @@ def test_clear_removes_all_three_stage_keys(monkeypatch, capsys):
     monitor.main()
 
     assert sorted(deleted) == sorted([
-        "story_jobs", "story_status", "story_results",
+        "story_jobs", "story_jobs_batch", "story_status", "story_results",
         "analysis_jobs", "analysis_status",
         "review_jobs", "review_status",
     ])

@@ -1,12 +1,13 @@
 """Enqueue experiment cells into Redis for parallel execution.
 
 Usage:
-    python scripts/enqueue.py                      # Fill queue with all cells (DeepSeek)
-    python scripts/enqueue.py --model anthropic/claude-sonnet-4-5   # Claude cells
+    python scripts/enqueue.py                      # Fill queue with all cells (default model)
+    python scripts/enqueue.py --model openai/gpt-6-astra   # a specific model's cells
     python scripts/enqueue.py --missing-only       # Skip cells that already have a result
     python scripts/enqueue.py --interleave         # Weave new cells across models/providers
     python scripts/enqueue.py --dry-run            # Print the plan without enqueueing
     python scripts/enqueue.py --clear              # Clear the queue (reset)
+    python scripts/enqueue.py --due-hours 6        # Stamp an SLA horizon per cell (G-32/G-33)
 
 Model is read from FINOPS_MODEL env var or --model flag.
 
@@ -50,6 +51,7 @@ from agentic_dynamics.control.admission import (
 from agentic_dynamics.control.model_policy import SUBSCRIPTION_DEFAULT, ensure_model_allowed
 from agentic_dynamics.core.admission_context import admission_required
 from agentic_dynamics.core.constants import model_slug
+from agentic_dynamics.runtime.queue_timings import stamp_enqueue
 
 # ── Matrix Definition ──────────────────────────────────────────
 
@@ -65,6 +67,32 @@ REDIS_HOST = "127.0.0.1"
 REDIS_PORT = int(os.environ.get("FINOPS_REDIS_PORT", "6380"))
 REDIS_DB = int(os.environ.get("FINOPS_REDIS_DB", "1"))
 QUEUE_KEY = "story_jobs"
+#: The DEFERRED lane (rule 6, the batch executor): batch-mode cells wait here and are popped
+#: only when the on-demand lane is empty (the worker's ordered BRPOP checks keys left to right).
+BATCH_QUEUE_KEY = "story_jobs_batch"
+
+
+def queued_cell_ids(r: "redis.Redis") -> set[str]:
+    """Cell ids currently queued in EITHER lane (on-demand + batch), parsed defensively.
+
+    The queued-aware skip for ``--missing-only``: a saved result means done, but a cell
+    sitting in a lane has NOT run yet — re-filling would copy it (the mechanism behind the
+    ~65x duplication the controller had cleared on 2026-09-12).
+    """
+    ids: set[str] = set()
+    for key in (QUEUE_KEY, BATCH_QUEUE_KEY):
+        try:
+            raw_rows = r.lrange(key, 0, -1)
+        except Exception:  # noqa: BLE001 — a fill must not crash on a lane read
+            continue
+        for raw in raw_rows:
+            try:
+                cell = json.loads(raw)
+            except (TypeError, ValueError):
+                continue
+            if isinstance(cell, dict) and cell.get("cell_id"):
+                ids.add(str(cell["cell_id"]))
+    return ids
 STATUS_KEY = "story_status"       # Redis hash: cell_id -> status
 RESULTS_KEY = "story_results"     # Redis hash: cell_id -> result path
 
@@ -109,16 +137,32 @@ def completed_cells(model: str) -> set[str]:
     return completed
 
 
-def build_cells(model: str = MODEL, missing_only: bool = False) -> list[dict[str, Any]]:
-    """Build the full experiment matrix, optionally skipping completed cells."""
+def build_cells(
+    model: str = MODEL,
+    missing_only: bool = False,
+    *,
+    stories: list[str] | None = None,
+    tiers: list[str] | None = None,
+    conditions: dict[str, list[str]] | None = None,
+) -> list[dict[str, Any]]:
+    """Build the experiment matrix, optionally skipping completed cells.
+
+    The ONE matrix builder (Wave B4): ``pipeline.py``'s matrix phases call this with their
+    plan's stories/tiers/conditions, so cell ids and the saved-result skip can never drift
+    between the CLI fill and a plan fill — the old pipeline copy had already diverged (it
+    carried its own result parser, the queued-aware skip was missing, and it owed no
+    admission).
+    """
+    stories = stories or STORIES
+    tiers = tiers or TIERS
+    conds_by_quality = conditions or {"good": GOOD_CONDITIONS, "bad": BAD_CONDITIONS}
     done = completed_cells(model) if missing_only else set()
     slug = model_slug(model)
 
     cells = []
-    for story in STORIES:
-        for tier in TIERS:
-            for quality in ["good", "bad"]:
-                conds = GOOD_CONDITIONS if quality == "good" else BAD_CONDITIONS
+    for story in stories:
+        for tier in tiers:
+            for quality, conds in conds_by_quality.items():
                 for condition in conds:
                     if f"{story}|{tier}|{quality}|{condition}" in done:
                         continue
@@ -131,6 +175,30 @@ def build_cells(model: str = MODEL, missing_only: bool = False) -> list[dict[str
                         "model": model,
                     })
     return cells
+
+
+def select_new_cells(r: "redis.Redis", cells: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Drop cells already waiting in either lane (the queued-aware skip, factored out).
+
+    The shared fill contract's second stage (Wave B4): a caller that fills a plan's matrix
+    must run this too — the old pipeline fill re-pushed queued cells, which is exactly the
+    duplication class the controller had to clear by hand.
+    """
+    queued = queued_cell_ids(r)
+    return [cell for cell in cells if cell["cell_id"] not in queued]
+
+
+def push_cells(r: "redis.Redis", cells: list[dict[str, Any]], *, lane: str = QUEUE_KEY) -> int:
+    """Push cells onto a lane and mark each ``queued`` — the ONE fill write (Wave B4).
+
+    Every fill has to do exactly this pair (``lpush`` the payload + seed ``story_status``);
+    keeping it in one function is what lets the pipeline's fills be the SAME submission the
+    CLI's fills are, instead of a parallel write path.
+    """
+    for cell in cells:
+        r.lpush(lane, json.dumps(cell))
+        r.hset(STATUS_KEY, mapping={cell["cell_id"]: "queued"})
+    return len(cells)
 
 
 def _provider(model: str) -> str:
@@ -240,6 +308,11 @@ def main() -> None:
     clear = "--clear" in sys.argv
     missing_only = "--missing-only" in sys.argv
     interleave = "--interleave" in sys.argv
+    batch = "--batch" in sys.argv
+    if batch and interleave:
+        print("--batch and --interleave are mutually exclusive (batch is a deferred FIFO lane; "
+              "interleave is on-demand scheduling)", file=sys.stderr)
+        raise SystemExit(2)
     model = MODEL
     if "--model" in sys.argv:
         idx = sys.argv.index("--model")
@@ -248,6 +321,25 @@ def main() -> None:
 
     cells = build_cells(model=model, missing_only=missing_only)
     total = len(cells)
+
+    # Transport timestamps (step 8, G-30/G-32): stamp the enqueue moment (and, when declared,
+    # the SLA horizon) BEFORE any push, so the worker can measure a real queue wait and the
+    # room can serve a real deadline slack. Idempotent per cell object.
+    due_hours = None
+    if "--due-hours" in sys.argv:
+        idx = sys.argv.index("--due-hours")
+        if idx + 1 >= len(sys.argv):
+            print("--due-hours needs a value", file=sys.stderr)
+            raise SystemExit(2)
+        try:
+            due_hours = float(sys.argv[idx + 1])
+        except ValueError:
+            print(f"--due-hours must be a number, got {sys.argv[idx + 1]!r}", file=sys.stderr)
+            raise SystemExit(2) from None
+    if batch:
+        for cell in cells:
+            cell["batch_mode"] = True
+    stamp_enqueue(cells, due_hours=due_hours)
 
     # Admission (p2) — every cell's budget is reserved BEFORE it enters the queue. Skipped for
     # --dry-run (a read-only flag must not take real leases) and for --clear (which enqueues
@@ -263,6 +355,16 @@ def main() -> None:
     if interleave or not dry_run:
         r = redis.Redis(host=REDIS_HOST, port=REDIS_PORT, db=REDIS_DB, decode_responses=True)
 
+    # Queued-aware skip: drop cells already waiting in either lane (a saved result is not the
+    # only reason a cell needs no second push). The same helper every fill path runs (Wave B4).
+    if missing_only and not clear and r is not None:
+        before = len(cells)
+        cells = select_new_cells(r, cells)
+        total = len(cells)
+        skipped = before - total
+        if skipped:
+            print(f"Skipped {skipped} cell(s) already queued (on-demand or batch lane).")
+
     final_cells = cells
     if interleave:
         existing = [json.loads(c) for c in reversed(r.lrange(QUEUE_KEY, 0, -1))]
@@ -270,6 +372,8 @@ def main() -> None:
 
     if dry_run:
         mode = " (missing-only)" if missing_only else ""
+        if batch:
+            mode += " (batch — deferred lane)"
         if interleave:
             print(f"Would interleave {total} new cells into {len(existing)} queued → {len(final_cells)} total:")
             for i, cell in enumerate(final_cells[:15]):
@@ -284,9 +388,10 @@ def main() -> None:
 
     if clear:
         r.delete(QUEUE_KEY)
+        r.delete(BATCH_QUEUE_KEY)  # a reset clears BOTH lanes (the deferred lane included)
         r.delete(STATUS_KEY)
         r.delete(RESULTS_KEY)
-        print("Queue cleared.")
+        print("Queue cleared (both lanes).")
         return
 
     if interleave:
@@ -297,10 +402,9 @@ def main() -> None:
             r.hset(STATUS_KEY, cell["cell_id"], "queued")
         print(f"Interleaved {total} new cells into queue (now {len(final_cells)} total) (model={model})")
     else:
-        for cell in cells:
-            r.lpush(QUEUE_KEY, json.dumps(cell))
-            r.hset(STATUS_KEY, cell["cell_id"], "queued")
-        print(f"Enqueued {total} cells into '{QUEUE_KEY}' (model={model})")
+        lane = BATCH_QUEUE_KEY if batch else QUEUE_KEY
+        push_cells(r, cells, lane=lane)
+        print(f"Enqueued {total} cells into '{lane}' (model={model})")
 
     print(f"Status tracker: '{STATUS_KEY}'")
     print()

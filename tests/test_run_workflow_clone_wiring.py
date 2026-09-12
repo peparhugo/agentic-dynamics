@@ -105,7 +105,7 @@ def _run_main(module, tmp_path, monkeypatch, *, fake_run, argv_extra):
     ``["--orchestrator"]`` and a non-orchestrator test passes ``[]``.
     """
     monkeypatch.setattr(module, "ROOT", tmp_path)
-    monkeypatch.setattr(module, "load_spec", lambda p: _stub_spec())
+    monkeypatch.setattr(module, "load_spec_any", lambda p: _stub_spec())
     monkeypatch.setattr(module, "run_workflow", fake_run)
     # Keep the post-run best-effort hooks quiet in the hermetic environment: the outbox drain
     # would touch Redis, and the spec-index refresh would read the real index.
@@ -248,7 +248,7 @@ def test_orchestrator_refuses_without_a_control_run_id(tmp_path, monkeypatch):
     monkeypatch.setattr(module, "_control_open_run", no_db)
     monkeypatch.setattr(module, "run_workflow", lambda spec, **kw: _stub_result())
     monkeypatch.setattr(module, "ROOT", tmp_path)
-    monkeypatch.setattr(module, "load_spec", lambda p: _stub_spec())
+    monkeypatch.setattr(module, "load_spec_any", lambda p: _stub_spec())
     monkeypatch.setattr(module, "_refresh_index", lambda *a, **k: None)
     monkeypatch.setenv("FINOPS_FACT_AUTO_EMIT", "0")
     monkeypatch.setattr(sys, "argv", [
@@ -317,3 +317,32 @@ def test_clone_path_shape_is_runs_root_run_id_repo(tmp_path):
     assert clone.path == runs_root / run_id / "repo"
     assert list(rel.parts) == [run_id, "repo"]
     assert (clone.path / ".git").is_dir()
+
+
+# ── (e): the loader seam — a workflow-v1 --spec routes through load_spec_any (step 1) ──
+
+def test_spec_loading_goes_through_load_spec_any(tmp_path, monkeypatch):
+    """The composition root calls ``load_spec_any``, not the bare ExperimentSpec loader: a
+    workflow-v1 ``--spec`` therefore compiles to the engine's spec (step 1 — authoring
+    connects to execution) instead of raising, and an ExperimentSpec still loads normally.
+    The compiler itself is covered by tests/test_workflow_compile.py; this pins the seam."""
+    module = _load_module()
+    seen: dict = {}
+
+    def recorded(path):
+        seen["path"] = path
+        return _stub_spec()
+
+    monkeypatch.setattr(module, "load_spec_any", recorded)
+    monkeypatch.setattr(module, "run_workflow", lambda spec, **kw: _stub_result())
+    monkeypatch.setattr(module, "ROOT", tmp_path)
+    monkeypatch.setattr(module, "_control_terminal_write", lambda *a, **k: None)
+    monkeypatch.setattr(module, "_refresh_index", lambda *a, **k: None)
+    monkeypatch.setenv("FINOPS_FACT_AUTO_EMIT", "0")
+    spec_path = PROJECT_ROOT / "workflows" / "examples" / "minimal-agent-workflow.yaml"
+    monkeypatch.setattr(sys, "argv", [
+        "run_workflow.py", "--spec", str(spec_path), "--goal", "g", "--model", "m",
+        "--workdir", str(tmp_path),
+    ])
+    module.main()
+    assert seen["path"] == spec_path

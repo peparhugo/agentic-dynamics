@@ -639,6 +639,10 @@ class TestSessionCloseAppends:
         ]
         assert sc.main(argv) == 0
 
+        session = dict(session)
+        session["close_seq"] = si._close_sequence_number(
+            session["session_date"], session["slug"], tmp_path
+        )
         spine = si.derive_session_record(session)
         reflection = ri.derive_reflection_record(session)
         assert {path.name for path in tmp_path.glob("*.json")} == {
@@ -720,6 +724,10 @@ class TestSessionCloseAppends:
                 ]
             )
             == 0
+        )
+        session = dict(session)
+        session["close_seq"] = si._close_sequence_number(
+            session["session_date"], session["slug"], tmp_path
         )
         spine = si.derive_session_record(session)
         assert {path.name for path in tmp_path.glob("*.json")} == {f"{spine.knowledge_id}.json"}

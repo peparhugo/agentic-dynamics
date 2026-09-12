@@ -117,9 +117,10 @@
            has no room to spare for two 28px buttons beside a wrapping trust row). -->
       <div class="r0-actions">
         <!-- The workbench is where the re-housed operational surfaces live: fleet, attention,
-             money, registry, sessions, queue, routing, docs, audit, health and workforce step
-             timings. It is a deliberate drill-down (like the trends lens), never navigation at
-             rest; each panel lazy-loads the same endpoint the old room used. -->
+             money, registry, sessions, queue, routing, docs, audit, health, workforce step
+             timings, and the step-11/12 Operations/Surfaces read views. It is a deliberate
+             drill-down (like the trends lens), never navigation at rest; each panel lazy-loads
+             the same endpoint the old room used. -->
         <button class="icon-button" id="workbench-open" type="button" aria-expanded="false"
                 aria-controls="workbench" title="Open the workbench lenses">
           <svg class="icon-svg" aria-hidden="true" viewBox="0 0 24 24">
@@ -127,7 +128,7 @@
             <path d="M8 4v4M14 10v4M10 16v4"/>
           </svg>
           <span class="sr-only">Open the workbench (fleet, attention, money, registry, sessions,
-            queue, routing, docs, audit, health, workforce)</span>
+            queue, routing, docs, audit, health, workforce, operations, surfaces)</span>
         </button>
         <!-- The trends lens is deliberate drill-down, not navigation: the resting regions stay
              in place and the lens opens over the room only when asked (brief §3, §7). -->
@@ -262,7 +263,8 @@
          The facelift dropped the old room's five destination boards and System overflow. Per
          the reconciled IA (docs/research/control_room_ia.md §6/§14), each is re-housed as a
          deliberate lens: fleet, attention, money, registry, sessions, queue, routing, docs,
-         audit, health, and the workforce step-timing aggregate. Hidden at rest; every panel
+         audit, health, the workforce step-timing aggregate, and the step-11/12
+         Operations/Surfaces read views (including the batch lane). Hidden at rest; every panel
          lazy-loads the SAME endpoint the old room used, so no capability is a stub. The panel
          nav is an accelerator, not navigation-from-rest (§4.3). -->
     <section class="workbench" id="workbench" data-workbench hidden
@@ -286,6 +288,11 @@
         <section class="wb-panel" data-lens="audit" id="wb-audit" hidden aria-label="Recording audit"></section>
         <section class="wb-panel" data-lens="health" id="wb-health" hidden aria-label="Projection health"></section>
         <section class="wb-panel" data-lens="workforce" id="wb-workforce" hidden aria-label="Workforce step timings"></section>
+        <!-- Step-11/12 read views (kept from main inside the refreshed presentation): the
+             operational packet + run detail and the step-5/6/7 read-model surfaces (including
+             the batch discount lane). Each panel renders the payload's own states verbatim. -->
+        <section class="wb-panel" data-lens="operations" id="wb-operations" hidden aria-label="Operations"></section>
+        <section class="wb-panel" data-lens="surfaces" id="wb-surfaces" hidden aria-label="Surfaces"></section>
       </div>
     </section>
 

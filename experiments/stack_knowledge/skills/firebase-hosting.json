@@ -1,0 +1,16 @@
+{
+  "subject": "skill/stack/firebase-hosting",
+  "claim": "The website Firebase configuration serves apps/website with public: \".\" and defines three legacy-page redirects. The project aliases identify ai-finops-rulebook as canonical and agentic-dynamics as the mirror; the documented deployment procedure requires deploying Hosting to both projects.",
+  "conformance": "repo-conformant",
+  "repo_anchors": ["apps/website/firebase.json:1", "apps/website/firebase.json:32", "apps/website/.firebaserc:1", "apps/website/CONTEXT.md:47"],
+  "population": "agentic-dynamics stack",
+  "conditions": ["firebase", "hosting", "static-site", "rewrites", "deploy"],
+  "support": 2,
+  "uncertainty": 0.2,
+  "source_experiment": "tech_stack_seed_2026-09-11",
+  "evidence": [
+    "uri:https://firebase.google.com/docs/hosting/full-config",
+    "uri:https://firebase.google.com/docs/hosting/deploying"
+  ],
+  "notes": "Repo conformance edit: replaced generic Firebase precedence and preview-channel procedure with the local hosting root, redirect set, project aliases, and required dual deployment."
+}

@@ -16,6 +16,7 @@ import json
 import subprocess
 import sys
 import time
+from typing import TYPE_CHECKING
 
 from flask import Response, jsonify, request
 
@@ -43,7 +44,7 @@ from agentic_dynamics.control.queue_reinterleave import (
     write_queue,
 )
 from agentic_dynamics.control.routing import compute_routing
-from apps.control_room.services.context import ControlRoomServices
+from agentic_dynamics.reporting.canonical_corpus import load_canonical_tables
 from apps.control_room.services.design_sessions import DESIGN_SESSIONS_KEY
 from apps.control_room.services.mutations import _design_mutation_body, _idempotent_design_response
 from apps.control_room.services.subscription_usage import (
@@ -53,6 +54,9 @@ from apps.control_room.services.subscription_usage import (
     history_summary,
     load_or_refresh,
 )
+
+if TYPE_CHECKING:  # pragma: no cover - import only for static typing
+    from apps.control_room.services.context import ControlRoomServices
 from apps.control_room.services.telemetry import (
     _parse_phases,
     _retained_telemetry,
@@ -68,7 +72,10 @@ def api_matrix() -> Response:
     """Return the legacy fleet matrix plus the three-stage pipeline view."""
     try:
         r = _services.redis()
-        execute = stage_summary(r, _services.queue_key, STATUS_KEY, _services.results_key)
+        execute = stage_summary(
+            r, _services.queue_key, STATUS_KEY, _services.results_key,
+            batch_key=_services.batch_queue_key,
+        )
         analyze = stage_summary(r, _services.analysis_queue_key, _services.analysis_status_key)
         # The review population comes from the INJECTED authority, never a hard-wired import:
         # the composition root binds the file-derived source in production (see
@@ -88,25 +95,22 @@ def api_matrix() -> Response:
     # runner's telemetry — and a run with neither renders age-unknown, never mislabeled.
     tails = _tail_stamps(r, list(phase_payloads))
     phases = _parse_phases(phase_payloads, tails=tails)
-    # Runner-truth liveness (live_board follow-up, 2026-09-01): a cell whose status is
-    # "running" but whose phase liveness says DEFINITIVELY historical is an ENDED run with a
-    # stale status — a killed/interrupted runner never publishes its terminal status, so
-    # story_status keeps "running" forever. The window, not the publishing process, decides.
-    # Age-UNKNOWN phases are never flipped (the "never mislabeled" rule — no stamps means we
-    # do not know, so the legacy status stands); only a phase with a real age past the window
-    # re-presents the cell as "ended" (outcome unknown-but-over) rather than falsely live.
+    # Health vs lifecycle (step 5): a cell whose status is "running" but whose phase liveness
+    # says DEFINITIVELY historical is a QUIET run — a killed/interrupted runner never
+    # publishes its terminal status, so story_status keeps "running" forever. Silence is
+    # HEALTH, not a lifecycle transition: only an authoritative transition may end a run, so
+    # the durable status is KEPT and the staleness is exposed as its own dimension
+    # (``stale_cells`` + ``stale_running``, plus the per-phase live/age fields). The window
+    # still decides the HEALTH reading; the presentation no longer relabels lifecycle
+    # ("ended") behind the runner's back. Age-UNKNOWN phases are never called stale — no
+    # stamps means we do not know.
     stale_running = {
         cid
         for cid, p in phases.items()
         if not p.get("live") and isinstance(p.get("age_seconds"), (int, float))
     }
     cells = dict(execute["cells"])
-    stale_running_flipped = 0
-    for cid, status in cells.items():
-        if status == "running" and cid in stale_running:
-            cells[cid] = "ended"
-            stale_running_flipped += 1
-    running = execute["running"] - stale_running_flipped
+    running = execute["running"]
     response = {
         "total": execute["total"],
         "remaining_in_queue": execute["remaining_in_queue"],
@@ -118,6 +122,9 @@ def api_matrix() -> Response:
         "completed": execute["completed"],
         "results_saved": execute["results_saved"],
         "cells": cells,
+        # the staleness dimension, additive: which running cells are quiet (and how many).
+        "stale_cells": sorted(stale_running),
+        "stale_running": len(stale_running),
         "phases": phases,
     }
     response["stages"] = {"execute": execute, "analyze": analyze, "review": review}
@@ -253,20 +260,50 @@ def api_events(cell_id) -> Response:
 
 
 def api_routing() -> Response:
-    summary_path = _services.root / "experiments" / "results" / "_results_summary.json"
+    """The routing board, sourced from the CANONICAL corpus.
+
+    Retired path (step 6, one-fact-one-writer): this route used to read
+    ``experiments/results/_results_summary.json`` — the corpus the repo retired
+    (``data_integrity_findings`` rule 4; every lab still reading it is quarantined). The
+    entries are now mapped from the canonical finding rows (the one input door) onto
+    ``compute_routing``'s entry shape; an unreadable corpus is a NAMED state, never numbers
+    from the retired summary.
+    """
     try:
-        data = json.loads(summary_path.read_text())
-        entries = data.get("entries", [])
-    except (OSError, json.JSONDecodeError):
+        tables = load_canonical_tables("finding")
+    except Exception as exc:  # noqa: BLE001 — named unavailability, never stale numbers
         return jsonify(
             {
-                "_meta": {"tasks_analyzed": 0},
+                "_meta": {
+                    "tasks_analyzed": 0,
+                    "total_valid_entries": 0,
+                    "state": "unavailable",
+                    "reason": f"{type(exc).__name__}: {exc}",
+                },
                 "per_task": [],
                 "strategies": {},
-                "note": "no results summary yet",
+                "routing_distribution": {},
             }
         )
-    return jsonify(compute_routing(entries))
+    entries = [
+        {
+            "model": row.get("model"),
+            # compute_routing groups by ``experiment`` (normalized); the canonical finding
+            # row's task family is its ``_experiment`` provenance.
+            "experiment": row.get("_experiment") or "",
+            "correctness": row.get("correctness"),
+            "cost": row.get("cost_usd"),
+        }
+        for row in tables.findings
+    ]
+    payload = compute_routing(entries)
+    payload["_meta"] = {
+        **payload.get("_meta", {}),
+        "source": "canonical_corpus",
+        "input_dataset_id": tables.input_dataset_id,
+        "registry_version": tables.identity.registry_version,
+    }
+    return jsonify(payload)
 
 #: The lease counters the admission board reports beside the provider usage snapshot. Fixed
 #: rather than discovered, because a dashboard needs a stable set of rows: these are the scopes

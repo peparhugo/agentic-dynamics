@@ -1,7 +1,7 @@
 """Subscription usage normalizer tests — pure functions, no network."""
 
 import json
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from scripts.subscription_usage import (
     _iso,
@@ -243,15 +243,35 @@ def _ms(year, month, day, hour=12):
     return int(datetime(year, month, day, hour, tzinfo=timezone.utc).timestamp() * 1000)
 
 
+def _ms_days_ago(days: int, *, now: datetime, hour: int = 12) -> int:
+    """A timestamp ``days`` before ``now`` at ``hour`` UTC — never a fixed calendar date.
+
+    The aggregate lookback is wall-clock relative (``now - 13 days``), so a test built on
+    hardcoded dates silently time-bombs as the calendar moves past them.
+    """
+    stamp = (now - timedelta(days=days)).replace(hour=hour, minute=0, second=0, microsecond=0)
+    return int(stamp.timestamp() * 1000)
+
+
+def _day_days_ago(days: int, *, now: datetime) -> str:
+    """The ISO date ``days`` before ``now`` — the bucket label the aggregate reports."""
+    return (now - timedelta(days=days)).date().isoformat()
+
+
 def test_aggregate_deepseek_day_buckets_and_subagent_split():
+    now = datetime.now(timezone.utc)
     rows = [
-        ("deepseek/deepseek-v4-pro", False, 5.0, 1_000_000, 100_000, _ms(2026, 8, 30)),
-        ("deepseek/deepseek-v4-pro", True, 0.5, 100_000, 0, _ms(2026, 8, 30)),
-        ("deepseek/deepseek-v4-flash", False, 0.05, 10_000, 5_000, _ms(2026, 8, 31)),
-        ("deepseek/deepseek-v4-pro", False, 2.0, 500_000, 0, _ms(2026, 8, 28)),
+        ("deepseek/deepseek-v4-pro", False, 5.0, 1_000_000, 100_000, _ms_days_ago(3, now=now)),
+        ("deepseek/deepseek-v4-pro", True, 0.5, 100_000, 0, _ms_days_ago(3, now=now)),
+        ("deepseek/deepseek-v4-flash", False, 0.05, 10_000, 5_000, _ms_days_ago(2, now=now)),
+        ("deepseek/deepseek-v4-pro", False, 2.0, 500_000, 0, _ms_days_ago(5, now=now)),
     ]
     out = aggregate_deepseek(rows)
-    assert [d["date"] for d in out["days"]] == ["2026-08-28", "2026-08-30", "2026-08-31"]
+    assert [d["date"] for d in out["days"]] == [
+        _day_days_ago(5, now=now),
+        _day_days_ago(3, now=now),
+        _day_days_ago(2, now=now),
+    ]
     aug30 = out["days"][1]
     assert aug30["cost_usd"] == 5.5
     assert aug30["sessions"] == 2
