@@ -726,3 +726,36 @@ def test_step10_real_promote_requires_rationale_and_operator(tmp_path):
         _run_promotion(_promote_args(tmp_path, wt, ledger, dry_run=False, rationale="  "))
     with pytest.raises(_PromoteRefusedError, match="operator"):
         _run_promotion(_promote_args(tmp_path, wt, ledger, dry_run=False, operator=""))
+
+
+def test_replay_through_the_real_journal_refuses_the_duplicate_act(tmp_path):
+    """The review's caller-through-journal gate: with the real default journal, a COMPLETED
+    row for this act must stop the command before the push — the step-10 guard was dead code
+    because ``begin_command`` advanced completed rows instead of returning them."""
+    from _command_journal import begin_command, finish_command
+
+    wt = _make_candidate_ahead_of_main(tmp_path)
+    sha = _candidate_sha(wt)
+    data = _ledger(wt)
+    data["run_id"] = "run-replay0001"
+    data["git_sha"] = sha
+    ledger = _write_ledger(tmp_path, data)
+    db = tmp_path / "control.db"
+
+    # A prior, COMPLETED act recorded through the real helper, keyed exactly as promote keys it.
+    command = begin_command(
+        db, verb="promote", actor="drseuss", rationale="first attempt",
+        act_key=f"promote:promote_test:{sha[:12]}",
+    )
+    finish_command(db, command_id=command.command_id, state="completed", receipt={"squash": "x"})
+
+    pushed = []
+    em = _noop_emissions()
+    em["push"] = lambda *args, **kwargs: pushed.append(True) or _PUSHED
+    em.pop("journal_intent")   # use the REAL default journal
+    em.pop("journal_receipt")
+    args = _promote_args(tmp_path, wt, ledger, dry_run=False, db=str(db))
+
+    with pytest.raises(_PromoteRefusedError, match="already recorded completed"):
+        _run_promotion(args, **em)
+    assert pushed == []  # the duplicate push never happened

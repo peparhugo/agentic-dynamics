@@ -233,6 +233,9 @@ def _default_journal_intent(args: argparse.Namespace, *, receipt: dict[str, Any]
         rationale=args.rationale,
         rationale_ref=args.rationale_ref,
         act_key=f"publish:{args.candidate_sha[:12]}",
+        # A completed publication does NOT block a re-deploy (the documented failed-host
+        # recovery); publish opts into advancing to a new attempt.
+        completed="advance",
         run_id=args.run_id,
         candidate_sha=args.candidate_sha,
         target_kind="release",

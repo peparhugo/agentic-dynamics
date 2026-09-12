@@ -62,12 +62,27 @@ def begin_command(
     target_kind: str = "",
     target_id: str = "",
     detail: dict[str, Any] | None = None,
+    completed: str = "return",
 ) -> CommandRecord:
     """Record the command's INTENT (or reuse/advance to the right row). Raises on failure.
 
     ``act_key`` is the stable identity of the act (verb + target + candidate); the helper owns
     the per-attempt suffixing so callers never think about it.
+
+    ``completed`` — the PER-VERB replay policy for an act whose row is already ``completed``:
+
+    * ``"return"`` (default, fail-safe): return the completed row so the CALLER decides. A
+      promote uses this to refuse a duplicate push (its guard inspects ``state``); a new
+      attempt must never be manufactured behind a finished act.
+    * ``"advance"``: treat the completed row as a prior attempt and mint a new suffixed one —
+      for verbs whose re-execution is a legitimate recovery (a publication re-deployed after
+      a host failure).
+
+    ``failed``/``refused`` rows ALWAYS advance: a retry after a recorded failure is a new
+    authorized attempt of the same act, not a replay.
     """
+    if completed not in ("return", "advance"):
+        raise CommandJournalError(f"completed must be 'return' or 'advance', got {completed!r}")
     if not actor.strip():
         raise CommandJournalError("the command journal requires an actor — an anonymous intent is not a record")
     try:
@@ -92,11 +107,16 @@ def begin_command(
                         detail=detail,
                     )
                 if existing.state == "intent":
-                    # The prior attempt started and never recorded an outcome (a crash between
+                    # A prior attempt recorded its intent and never an outcome (a crash between
                     # intent and receipt). Reuse the row: the receipt below resolves it, and the
                     # first attempt's evidence survives on the row.
                     return existing
-                suffix += 1  # terminal prior attempt: the same act's NEXT attempt
+                if existing.state == "completed" and completed == "return":
+                    # The act is DONE. Return the row so the caller's guard can refuse; never
+                    # manufacture a second intent behind a finished act (the review's replay
+                    # reproduction: promote's guard could never fire when this advanced).
+                    return existing
+                suffix += 1  # failed/refused (always) or completed under "advance"
             raise CommandJournalError(
                 f"command journal: too many attempts recorded for act {act_key!r} (99)"
             )

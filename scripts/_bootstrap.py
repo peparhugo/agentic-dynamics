@@ -13,6 +13,14 @@ Python puts ``scripts/`` on ``sys.path[0]`` and this module lives beside them.
 import sys
 from pathlib import Path
 
-SRC = Path(__file__).resolve().parent.parent / "src"
+REPO_ROOT = Path(__file__).resolve().parent.parent
+SRC = REPO_ROOT / "src"
+# The repo root is required by direct-run scripts that import the top-level ``workflows/``
+# package (a namespace package beside ``scripts/``) — e.g. ``scripts/run_workflow.py``'s
+# ``from workflows.compile_workflow import load_spec_any``. Pytest puts the root on the path,
+# which masked the missing entry; a clean ``env -u PYTHONPATH python scripts/...`` run did not.
+# ``tests/test_direct_run_contract.py`` pins the clean-environment invocation.
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
