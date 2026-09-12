@@ -378,3 +378,119 @@ def test_framework_comparison_places_measured_beside_constants(tmp_path):
     )
     # The E_x values are price ratios [X], not the measured multiplier — the two are kept apart.
     assert comp["escalation"]["measured_ex"]["values"] == []  # no score file in this tree
+
+
+# ── Identity-aware phase pooling (the campaign-ledger join) ────────────────────
+
+
+def _phase(
+    name="p1",
+    *,
+    started="2026-08-30T00:00:00+00:00",
+    ended="2026-08-30T00:01:00+00:00",
+    status="ok",
+    cost=1.0,
+    duration=60.0,
+    model="m",
+):
+    """One normalized phase row carrying the full identity (window + outcome + model)."""
+    return agg.Phase(
+        phase=name,
+        kind="agent",
+        status=status,
+        cost_usd=cost,
+        duration_s=duration,
+        model=model,
+        started_at=started,
+        ended_at=ended,
+    )
+
+
+def _campaign_corpus(path, phases):
+    return agg.LedgerCorpus(name="camp", paths=[path], phases=list(phases))
+
+
+def test_duplicate_phase_row_deduped_and_reported():
+    """The same full phase row in two ledgers of one campaign pools ONCE + is reported."""
+    first = _campaign_corpus("experiments/results/camp/aggregate.json", [_phase("shared")])
+    second = _campaign_corpus("experiments/results/camp/cell_01.json", [_phase("shared")])
+
+    merged = agg.merge_corpora([first, second])
+
+    assert len(merged) == 1
+    pooled = merged[0]
+    # Kept exactly once — the double-count the join used to produce is gone.
+    assert [p.phase for p in pooled.phases] == ["shared"]
+
+    # The drop is recorded, never silent: full identity + BOTH source paths + the count.
+    assert len(pooled.duplicate_phase_rows) == 1
+    entry = pooled.duplicate_phase_rows[0]
+    assert entry.identity["phase"] == "shared"
+    assert entry.identity["started_at"] == "2026-08-30T00:00:00+00:00"
+    assert entry.occurrences == 2
+    assert set(entry.paths) == {
+        "experiments/results/camp/aggregate.json",
+        "experiments/results/camp/cell_01.json",
+    }
+
+    # Both the campaign row and the coverage row surface the audit block.
+    campaign = agg.compute_campaign_metrics(pooled)
+    assert campaign["n_phases"] == 1
+    assert campaign["duplicate_phase_rows"]["count"] == 1
+    assert campaign["duplicate_phase_rows"]["entries"][0]["paths"] == entry.paths
+    coverage = agg.coverage_table([campaign])[0]
+    assert coverage["n_duplicate_phase_rows"] == 1
+
+
+def test_same_phase_different_timestamps_counts_twice_no_duplicate():
+    """Same phase name, different execution window => TWO observations, no duplicate reported."""
+    first = _campaign_corpus(
+        "experiments/results/camp/a.json",
+        [_phase("build", started="2026-08-30T00:00:00+00:00", ended="2026-08-30T00:01:00+00:00")],
+    )
+    second = _campaign_corpus(
+        "experiments/results/camp/b.json",
+        [_phase("build", started="2026-08-30T01:00:00+00:00", ended="2026-08-30T01:01:00+00:00")],
+    )
+
+    pooled = agg.merge_corpora([first, second])[0]
+
+    assert len(pooled.phases) == 2
+    assert sorted(p.started_at for p in pooled.phases) == [
+        "2026-08-30T00:00:00+00:00",
+        "2026-08-30T01:00:00+00:00",
+    ]
+    assert pooled.duplicate_phase_rows == []
+
+    campaign = agg.compute_campaign_metrics(pooled)
+    assert campaign["n_phases"] == 2
+    assert campaign["duplicate_phase_rows"]["count"] == 0
+    assert agg.coverage_table([campaign])[0]["n_duplicate_phase_rows"] == 0
+
+
+def test_distinct_rows_same_window_pool_twice_not_deduped():
+    """A row differing in ANY measured field (here cost) is distinct even with an equal window."""
+    first = _campaign_corpus("experiments/results/camp/a.json", [_phase("build", cost=1.0)])
+    second = _campaign_corpus("experiments/results/camp/b.json", [_phase("build", cost=2.0)])
+
+    pooled = agg.merge_corpora([first, second])[0]
+
+    assert len(pooled.phases) == 2
+    assert pooled.duplicate_phase_rows == []
+    assert agg.compute_campaign_metrics(pooled)["duplicate_phase_rows"]["count"] == 0
+
+
+def test_duplicate_occurrences_accumulate_across_three_ledgers():
+    """A row seen in three ledgers keeps one, counts three occurrences, and names all paths."""
+    corpora = [
+        _campaign_corpus(f"experiments/results/camp/l{i}.json", [_phase("shared")])
+        for i in range(3)
+    ]
+
+    pooled = agg.merge_corpora(corpora)[0]
+
+    assert len(pooled.phases) == 1
+    assert len(pooled.duplicate_phase_rows) == 1
+    entry = pooled.duplicate_phase_rows[0]
+    assert entry.occurrences == 3
+    assert entry.paths == [f"experiments/results/camp/l{i}.json" for i in range(3)]
