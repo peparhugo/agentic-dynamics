@@ -58,7 +58,9 @@ workflow:
         kind: test
         scope: implementation
         timeout: 600
-        tests: "tests/test_opencode_events.py tests/test_fast_path_gate.py"
+        tests:
+          - tests/test_opencode_events.py
+          - tests/test_fast_path_gate.py
         prompt: |
           The declared target verifies the guard. Fix the code, not the pins.
 factors:

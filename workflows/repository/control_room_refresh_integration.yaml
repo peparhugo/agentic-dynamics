@@ -65,7 +65,13 @@ workflow:
         kind: test
         scope: implementation
         timeout: 900
-        tests: "tests/test_admin_server.py tests/test_admin_design_sessions.py tests/test_control_room_parity.py tests/test_research_fetch.py tests/test_fast_path_gate.py tests/test_relabel_tree_gate.py"
+        tests:
+          - tests/test_admin_server.py
+          - tests/test_admin_design_sessions.py
+          - tests/test_control_room_parity.py
+          - tests/test_research_fetch.py
+          - tests/test_fast_path_gate.py
+          - tests/test_relabel_tree_gate.py
         prompt: |
           The declared test target runs the control-room + research + guard subset on the
           integration branch. Fix regressions WITHOUT weakening assertions; keep both
