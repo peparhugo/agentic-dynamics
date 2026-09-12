@@ -381,13 +381,22 @@ class ControlRoomServices:
         views, n_ledgers = sq.load_breach_views(
             self.root / "experiments" / "results" / "workflows"
         )
+        timings, n_skipped = sq.load_job_timings(
+            self.root / "experiments" / "results" / "queue_timings.jsonl"
+        )
         payload = sq.build_sla_queue(
             queue_jobs,
             attempts,
             views,
+            timings=timings,
             window_h=window_h,
             now=now,
-            source={"workflow_ledgers": n_ledgers, "recent_attempts": len(attempts)},
+            source={
+                "workflow_ledgers": n_ledgers,
+                "recent_attempts": len(attempts),
+                "timing_rows": len(timings),
+                "timing_rows_skipped": n_skipped,
+            },
         )
         payload["degraded"] = list(payload.get("degraded", [])) + degraded
         return payload, 200

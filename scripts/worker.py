@@ -72,6 +72,7 @@ from agentic_dynamics.core.admission_context import (
     validate_lease_fields,
 )
 from agentic_dynamics.core.constants import SESSION_TIMEOUT, STORY_SESSIONS
+from agentic_dynamics.runtime.queue_timings import append_timing, timing_row
 
 REDIS_HOST = os.environ.get("FINOPS_REDIS_HOST", "127.0.0.1")
 REDIS_PORT = int(os.environ.get("FINOPS_REDIS_PORT", "6380"))
@@ -329,6 +330,21 @@ def _trigger_analysis(r: redis.Redis, stdout: str, cell_id: str) -> None:
         log(f"[{cell_id}] analysis trigger failed (non-fatal): {e}")
 
 
+def _record_timing(cell: dict, *, status: str, started_at: float) -> None:
+    """Append this job's measured queue/service timings (step 8, G-30) — loud but never fatal.
+
+    The worker is the only actor that observes both the enqueue stamp and the serve window;
+    a disk failure here must not kill a finished job, so the append reports a warning and the
+    row is simply absent (the P8 surface then shows the completion without timings — an
+    explicit absence, never a fabricated number).
+    """
+    warning = append_timing(
+        timing_row(cell, status=status, started_at=started_at, ended_at=time.time())
+    )
+    if warning:
+        log(f"[{cell.get('cell_id')}] WARNING — {warning} (the job's result stands)")
+
+
 def main() -> None:
     log(f"Started (pid={os.getpid()})")
 
@@ -389,6 +405,7 @@ def main() -> None:
         log(f"[{cell_id}] Starting ({completed+failed+1}/30)")
 
         t0 = time.monotonic()
+        started_at = time.time()
         # The spend gate (admission_leases p2). An ExitStack so the leases are released by the
         # same ``finally`` on every path — success, failure, timeout, or refusal.
         admission_gate = contextlib.ExitStack()
@@ -482,12 +499,14 @@ def main() -> None:
                     error_log = log_dir / f"{cell_id}.error.log"
                     error_log.write_text(proc.stderr or proc.stdout)
                     failed += 1
+                    _record_timing(cell, status="failed", started_at=started_at)
                     continue
                 log(f"[{cell_id}] OK ({elapsed:.0f}s)")
                 _safe_hset(r, STATUS_KEY, cell_id, "done")
                 publisher.publish_status("done")
                 _trigger_analysis(r, proc.stdout, cell_id)
                 completed += 1
+                _record_timing(cell, status="done", started_at=started_at)
             else:
                 log(f"[{cell_id}] FAILED ret={proc.returncode} ({elapsed:.0f}s)")
                 _safe_hset(r, STATUS_KEY, cell_id, "failed")
@@ -496,6 +515,7 @@ def main() -> None:
                 error_log = log_dir / f"{cell_id}.error.log"
                 error_log.write_text(proc.stderr or proc.stdout)
                 failed += 1
+                _record_timing(cell, status="failed", started_at=started_at)
 
         except AdmissionDenied as e:
             # REFUSED — nothing was spawned and nothing was spent. The cell is NOT dead-lettered:
@@ -531,6 +551,7 @@ def main() -> None:
             publisher.publish_status("timeout")
             _safe_record_dead(r, QUEUE_KEY, cell, "timeout")
             failed += 1
+            _record_timing(cell, status="timeout", started_at=started_at)
 
         except Exception as e:
             log(f"[{cell_id}] EXCEPTION: {e}")
@@ -538,6 +559,7 @@ def main() -> None:
             publisher.publish_status("failed")
             _safe_record_dead(r, QUEUE_KEY, cell, f"exception: {e}")
             failed += 1
+            _record_timing(cell, status="failed", started_at=started_at)
             # Reconnect — the exception may have been a Redis error mid-run
             r = _connect_redis()
 

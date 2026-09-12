@@ -7,6 +7,7 @@ Usage:
     python scripts/enqueue.py --interleave         # Weave new cells across models/providers
     python scripts/enqueue.py --dry-run            # Print the plan without enqueueing
     python scripts/enqueue.py --clear              # Clear the queue (reset)
+    python scripts/enqueue.py --due-hours 6        # Stamp an SLA horizon per cell (G-32/G-33)
 
 Model is read from FINOPS_MODEL env var or --model flag.
 
@@ -50,6 +51,7 @@ from agentic_dynamics.control.admission import (
 from agentic_dynamics.control.model_policy import SUBSCRIPTION_DEFAULT, ensure_model_allowed
 from agentic_dynamics.core.admission_context import admission_required
 from agentic_dynamics.core.constants import model_slug
+from agentic_dynamics.runtime.queue_timings import stamp_enqueue
 
 # ── Matrix Definition ──────────────────────────────────────────
 
@@ -248,6 +250,22 @@ def main() -> None:
 
     cells = build_cells(model=model, missing_only=missing_only)
     total = len(cells)
+
+    # Transport timestamps (step 8, G-30/G-32): stamp the enqueue moment (and, when declared,
+    # the SLA horizon) BEFORE any push, so the worker can measure a real queue wait and the
+    # room can serve a real deadline slack. Idempotent per cell object.
+    due_hours = None
+    if "--due-hours" in sys.argv:
+        idx = sys.argv.index("--due-hours")
+        if idx + 1 >= len(sys.argv):
+            print("--due-hours needs a value", file=sys.stderr)
+            raise SystemExit(2)
+        try:
+            due_hours = float(sys.argv[idx + 1])
+        except ValueError:
+            print(f"--due-hours must be a number, got {sys.argv[idx + 1]!r}", file=sys.stderr)
+            raise SystemExit(2) from None
+    stamp_enqueue(cells, due_hours=due_hours)
 
     # Admission (p2) — every cell's budget is reserved BEFORE it enters the queue. Skipped for
     # --dry-run (a read-only flag must not take real leases) and for --clear (which enqueues
