@@ -23,9 +23,9 @@ for _path in (_REPO_ROOT, _REPO_ROOT / "src", _REPO_ROOT / "scripts"):
     if str(_path) not in sys.path:
         sys.path.insert(0, str(_path))
 
-from agentic_dynamics.runtime.executor import StepExecutor, StepRequest, StepResult  # noqa: E402
-
 from types import SimpleNamespace  # noqa: E402
+
+from agentic_dynamics.runtime.executor import StepExecutor, StepRequest, StepResult  # noqa: E402
 from agentic_dynamics.runtime.workflow_runner import run_workflow  # noqa: E402
 from workflows import compile_workflow as cw  # noqa: E402
 from workflows import lint_workflow as lw  # noqa: E402
