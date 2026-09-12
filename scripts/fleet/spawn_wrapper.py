@@ -74,6 +74,7 @@ import os
 import re
 import sys
 import time
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any
 
@@ -1490,11 +1491,89 @@ def _latest_ledger(spec_name: str) -> str | None:
     return str(files[-1]) if files else None
 
 
+def _dispatch_command(
+    client: Any,
+    command: dict[str, Any],
+    dry_run: bool,
+    fleet_manager: Any,
+    dlq: Any,
+) -> None:
+    """Run ONE validated fleet command through the broker seam and resolve its board record.
+
+    Step 4: this is the unit of work the consumer dispatches — inline for control actions and
+    on the bounded pool for submits — so a running container never blocks the BRPOP loop.
+    Every failure below resolves the job loudly (failed + DLQ), exactly as the inline path did.
+    """
+    action = command["action"]
+    service = command.get("service")
+    job_id = command.get("job_id") if action == "submit" else None
+    if job_id:
+        fleet_manager.record_job_status(client, job_id, "running")
+    if not dry_run:
+        try:
+            outcome = _broker_client().fleet_command(command, dry_run=False)
+        except BrokerError as exc:
+            # The SEAM itself failed (the host broker unit is down / the socket is absent) —
+            # record the job failed with the socket path; never a silent pass.
+            print(f"[spawn-wrapper] BROKER UNREACHABLE {command}: {exc}", flush=True)
+            if job_id:
+                reason = f"launch broker unreachable: {exc}"
+                fleet_manager.record_job_status(client, job_id, "failed", error=reason)
+                dlq.record_dead(client, "fleet_jobs", command, reason)
+            return
+        state = outcome.get("state")
+        if state == "REFUSED":
+            # The broker re-validated what it will execute and refused (should not fire after
+            # the wrapper's own validation — fail-closed anyway).
+            errors = outcome.get("errors") or ["the launch broker refused the command"]
+            print(f"[spawn-wrapper] BROKER REFUSED {command}: {errors}", flush=True)
+            if job_id:
+                reason = "; ".join(errors)
+                fleet_manager.record_job_status(client, job_id, "failed", error=reason)
+                dlq.record_dead(client, "fleet_jobs", command, reason)
+            return
+        if state in ("DOCKER_UNAVAILABLE", "SERVER_ERROR"):
+            reason = outcome.get("stderr") or f"broker state {state}"
+            print(f"[spawn-wrapper] {state} {command}: {reason}", flush=True)
+            if job_id:
+                fleet_manager.record_job_status(client, job_id, "failed", error=reason)
+                dlq.record_dead(client, "fleet_jobs", command, reason)
+            return
+        argv = outcome.get("argv", [])
+        print(f"[spawn-wrapper] DISPATCH {action} {service or job_id}: {argv}", flush=True)
+        if job_id:
+            ledger = _latest_ledger(_spec_name_for_ledger(str(command.get("spec", ""))))
+            if outcome.get("returncode") == 0:
+                fleet_manager.record_job_status(
+                    client, job_id, "completed",
+                    returncode=outcome.get("returncode"), ledger=ledger,
+                )
+            else:
+                reason = f"compose run exited {outcome.get('returncode')}"
+                fleet_manager.record_job_status(
+                    client, job_id, "failed",
+                    returncode=outcome.get("returncode"), ledger=ledger, error=reason,
+                )
+                dlq.record_dead(client, "fleet_jobs", command, reason)
+    else:
+        try:
+            argv = _broker_client().fleet_command(command, dry_run=True).get("argv", [])
+        except BrokerError as exc:
+            print(
+                f"[spawn-wrapper] BROKER UNREACHABLE {command}: {exc} (dry-run)",
+                flush=True,
+            )
+            return
+        print(f"[spawn-wrapper] DISPATCH {action} {service or job_id}: {argv} (dry-run)",
+              flush=True)
+
+
 def consume_fleet_commands(
     *,
     client: Any | None = None,
     dry_run: bool = False,
     once: bool = False,
+    max_commands: int | None = None,
 ) -> None:
     """BRPOP ``fleet:commands`` and dispatch validated scale/drain/restart/submit commands (D-14).
 
@@ -1523,6 +1602,14 @@ def consume_fleet_commands(
     ``client`` is an injectable redis connection (tests pass a fake; the real consumer loop
     leaves it ``None`` and connects via :func:`_connect_redis`) — the same "the caller may own
     the connection" shape ``fleet_manager.py``'s own functions already use.
+
+    Step 4 (bounded concurrent dispatch): a SUBMIT is long-running — the broker waits for the
+    whole container run — so submits are dispatched to a bounded worker pool
+    (``FINOPS_FLEET_DISPATCH_WORKERS``, default 4) and the BRPOP loop returns to the queue
+    immediately. Busy means QUEUED in the pool: never dropped, never serialising the fleet, and
+    never blocking a control action. ``scale``/``drain``/``restart`` stay inline so a saturated
+    fleet still answers control promptly. ``max_commands`` bounds a batch (tests use it);
+    ``None`` (the default) consumes forever.
     """
     # Sibling script modules (scripts/fleet/ is a dir, not a package — no __init__.py, so a
     # bare "import dlq" only resolves once this dir is on sys.path; this module may itself be
@@ -1537,8 +1624,13 @@ def consume_fleet_commands(
     import fleet_manager  # noqa: PLC0415
 
     client = client if client is not None else _connect_redis()
+    # Step 4: the bounded dispatch pool. Submits run here; the loop keeps polling, so a
+    # saturated pool QUEUES (the executor's own queue) instead of serialising the fleet.
+    workers = max(int(os.environ.get("FINOPS_FLEET_DISPATCH_WORKERS", "4") or "4"), 1)
+    pool = ThreadPoolExecutor(max_workers=workers, thread_name_prefix="fleet-dispatch")
+    processed = 0
 
-    print(f"[spawn-wrapper] consuming {COMMANDS_KEY}", flush=True)
+    print(f"[spawn-wrapper] consuming {COMMANDS_KEY} (dispatch workers: {workers})", flush=True)
     while True:
         try:
             result = client.brpop(COMMANDS_KEY, timeout=10)
@@ -1549,19 +1641,20 @@ def consume_fleet_commands(
             # mid-fleet, leaving a queued submit marked "launching" with no consumer.
             print(f"[spawn-wrapper] redis read interrupted ({type(exc).__name__}); retrying", flush=True)
             if once:
-                return
+                break
             continue
         if result is None:
             if once:
-                return
+                break
             continue
         _key, raw = result
         try:
             command = json.loads(raw)
         except json.JSONDecodeError:
             print(f"[spawn-wrapper] dropping malformed command: {raw!r}", flush=True)
-            if once:
-                return
+            processed += 1
+            if once or (max_commands is not None and processed >= max_commands):
+                break
             continue
         errors = validate_fleet_command(command)
         if errors:
@@ -1570,81 +1663,39 @@ def consume_fleet_commands(
                 reason = "; ".join(errors)
                 fleet_manager.record_job_status(client, command["job_id"], "failed", error=reason)
                 dlq.record_dead(client, "fleet_jobs", command, reason)
-            if once:
-                return
+            processed += 1
+            if once or (max_commands is not None and processed >= max_commands):
+                break
             continue
         action = command["action"]
-        service = command.get("service")
         job_id = command.get("job_id") if action == "submit" else None
-        if job_id:
-            fleet_manager.record_job_status(client, job_id, "running")
-        if not dry_run:
-            try:
-                outcome = _broker_client().fleet_command(command, dry_run=False)
-            except BrokerError as exc:
-                # The SEAM itself failed (the host broker unit is down / the socket is absent) —
-                # record the job failed with the socket path; never a silent pass.
-                print(f"[spawn-wrapper] BROKER UNREACHABLE {command}: {exc}", flush=True)
-                if job_id:
-                    reason = f"launch broker unreachable: {exc}"
-                    fleet_manager.record_job_status(client, job_id, "failed", error=reason)
-                    dlq.record_dead(client, "fleet_jobs", command, reason)
-                if once:
-                    return
-                continue
-            state = outcome.get("state")
-            if state == "REFUSED":
-                # The broker re-validated what it will execute and refused (should not fire
-                # after the wrapper's own validation — fail-closed anyway).
-                errors = outcome.get("errors") or ["the launch broker refused the command"]
-                print(f"[spawn-wrapper] BROKER REFUSED {command}: {errors}", flush=True)
-                if job_id:
-                    reason = "; ".join(errors)
-                    fleet_manager.record_job_status(client, job_id, "failed", error=reason)
-                    dlq.record_dead(client, "fleet_jobs", command, reason)
-                if once:
-                    return
-                continue
-            if state in ("DOCKER_UNAVAILABLE", "SERVER_ERROR"):
-                reason = outcome.get("stderr") or f"broker state {state}"
-                print(f"[spawn-wrapper] {state} {command}: {reason}", flush=True)
-                if job_id:
-                    fleet_manager.record_job_status(client, job_id, "failed", error=reason)
-                    dlq.record_dead(client, "fleet_jobs", command, reason)
-                if once:
-                    return
-                continue
-            argv = outcome.get("argv", [])
-            print(f"[spawn-wrapper] DISPATCH {action} {service or job_id}: {argv}", flush=True)
+        if action == "submit" and not dry_run:
+            # Step 4 (bounded concurrent dispatch): a SUBMIT is long-running — the broker waits
+            # for the whole container run — so it is dispatched to the bounded worker pool and
+            # the BRPOP loop returns immediately. Saturation QUEUES in the pool (never dropped,
+            # never blocking a control action); the board records the accepted state here and
+            # the worker resolves it.
             if job_id:
-                ledger = _latest_ledger(_spec_name_for_ledger(str(command.get("spec", ""))))
-                if outcome.get("returncode") == 0:
-                    fleet_manager.record_job_status(
-                        client, job_id, "completed",
-                        returncode=outcome.get("returncode"), ledger=ledger,
-                    )
-                else:
-                    reason = f"compose run exited {outcome.get('returncode')}"
-                    fleet_manager.record_job_status(
-                        client, job_id, "failed",
-                        returncode=outcome.get("returncode"), ledger=ledger, error=reason,
-                    )
-                    dlq.record_dead(client, "fleet_jobs", command, reason)
-        else:
-            try:
-                argv = _broker_client().fleet_command(command, dry_run=True).get("argv", [])
-            except BrokerError as exc:
-                print(
-                    f"[spawn-wrapper] BROKER UNREACHABLE {command}: {exc} (dry-run)",
-                    flush=True,
+                fleet_manager.record_job_status(
+                    client, job_id, "queued",
+                    reason=f"accepted (fleet dispatch workers: {workers})",
                 )
-                if once:
-                    return
-                continue
-            print(f"[spawn-wrapper] DISPATCH {action} {service or job_id}: {argv} (dry-run)",
-                  flush=True)
-        if once:
-            return
+            print(
+                f"[spawn-wrapper] QUEUED submit {job_id} (fleet dispatch workers: {workers})",
+                flush=True,
+            )
+            pool.submit(_dispatch_command, client, command, dry_run, fleet_manager, dlq)
+        else:
+            # Control actions (scale/drain/restart) and dry-run submits stay INLINE: fast, and
+            # answered promptly even while submits saturate the pool.
+            _dispatch_command(client, command, dry_run, fleet_manager, dlq)
+        processed += 1
+        if once or (max_commands is not None and processed >= max_commands):
+            break
+
+    # Every exit path (--once, a bounded batch) drains dispatched submits before returning,
+    # so a caller that returns also knows the work it accepted has resolved.
+    pool.shutdown(wait=True)
 
 
 def main(argv: list[str] | None = None) -> int:
