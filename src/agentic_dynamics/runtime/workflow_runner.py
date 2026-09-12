@@ -159,6 +159,7 @@ from agentic_dynamics.runtime.change_analyzer import (
     ChangeInput,
     run_change_analysis,
 )
+from agentic_dynamics.runtime.escalation import EscalationPlan
 from agentic_dynamics.runtime.executor import (
     LocalAgentExecutor,
     StepExecutor,
@@ -250,6 +251,12 @@ class PhaseResult:
     files_modified: list[str] = field(default_factory=list)
     final_response: str = ""
     confidence: float | None = None  # [H] execution-confidence signal (agent phases)
+    #: Per-attempt records when the phase had MORE THAN ONE attempt (step 9 escalation: the
+    #: cascade retried the phase on a successor model). Empty for the historical
+    #: single-attempt phase — the ledger's top-level ``attempts`` array derives from these
+    #: rows when present. Each row: attempt_number / model / status / cost_usd / tokens /
+    #: escalation_from / escalation_to / retry_reason.
+    attempts: list[dict[str, Any]] = field(default_factory=list)
     # augmentation provenance (populated only when rag_augment is enabled)
     raw_prompt_hash: str = ""
     pre_phase_commit: str = ""
@@ -313,6 +320,9 @@ class PhaseResult:
             "files_created": self.files_created,
             "files_modified": self.files_modified,
             "confidence": self.confidence,
+            # ADDED key (step 9 escalation — never renames an existing key): the per-attempt
+            # rows of a multi-attempt phase (empty for the historical single-attempt phase).
+            "attempts": self.attempts,
             # augmentation provenance — persisted structured, never in-memory-only
             "raw_prompt_hash": self.raw_prompt_hash,
             "pre_phase_commit": self.pre_phase_commit,
@@ -2768,6 +2778,27 @@ def _first_unsatisfied_checkpoint(
     return unsatisfied
 
 
+def _apply_attempt_totals(
+    pr: PhaseResult, rows: list[dict[str, Any]], *, include_last: bool
+) -> None:
+    """Add the retried attempts' cost/tokens to the phase and attach the attempt rows (step 9).
+
+    The result-processing block records the FINAL attempt's cost/tokens from its ``ar``; the
+    PRIOR attempts (failed ladder steps) spent real money too, so their totals are added here —
+    the phase carries what the run actually paid, each row carries its own split.
+    ``include_last=True`` adds every row (the exception path, where no ``ar`` was processed).
+    A single-attempt phase is a byte-for-byte no-op (no totals, no ``attempts`` key content).
+    """
+    if not rows:
+        return
+    for attempt_row in (rows if include_last else rows[:-1]):
+        pr.cost_usd = round(pr.cost_usd + float(attempt_row.get("cost_usd") or 0.0), 6)
+        for key, value in (attempt_row.get("tokens") or {}).items():
+            pr.tokens[key] = int(pr.tokens.get(key, 0)) + int(value)
+    if len(rows) > 1:
+        pr.attempts = rows
+
+
 def _build_attempt_records(result: WorkflowRunResult, job_id: str) -> list[AttemptRecord]:
     """Derive one :class:`AttemptRecord` per agent phase from the finished run's phases.
 
@@ -2776,14 +2807,53 @@ def _build_attempt_records(result: WorkflowRunResult, job_id: str) -> list[Attem
     invocations and are therefore the attempts; test phases run the language suite in-process
     and produce no attempt record (they are independent verification, not a model call).
 
-    The emitted values are the schema's EXACT semantics, never invented: one attempt per phase
-    (``attempt_number=1``), no retry (``retry_reason=""``), no model escalation
-    (``escalation_from``/``escalation_to`` are ``None``), ``first_pass`` = the single attempt
-    did not fail, and ``accepted`` = the outcome was accepted (``status == "ok"``).
+    Two shapes, both the schema's exact semantics:
+
+    * the historical single-attempt phase (no escalation): one record with
+      ``attempt_number=1``, ``retry_reason=""``, ``escalation_from``/``escalation_to``
+      ``None``, ``first_pass`` = the attempt did not fail, ``accepted`` = ``status == "ok"``;
+    * a MULTI-attempt phase (step 9 escalation fired, ``phase.attempts`` carries the rows):
+      one record per row with its own model/status/cost/tokens, ``attempt_number`` incrementing,
+      ``parent_attempt_id`` chaining, and ``escalation_from``/``escalation_to``/``retry_reason``
+      exactly as recorded. ``first_pass`` is meaningful for attempt 1 only (later attempts are
+      ``None`` — they are not the first pass); ``accepted`` stays per attempt. Phase-level
+      verification/confidence signals attach to the FINAL attempt (the outcome that was
+      gated); prior attempts carry ``None``.
     """
     records: list[AttemptRecord] = []
     for phase in result.phases:
         if phase.kind == "test":
+            continue
+        rows = list(getattr(phase, "attempts", None) or [])
+        if len(rows) > 1:
+            parent_id: str | None = None
+            for index, row in enumerate(rows, start=1):
+                attempt_number = int(row.get("attempt_number") or index)
+                is_final = index == len(rows)
+                attempt_id = f"{job_id}_{phase.phase}_a{attempt_number}"
+                records.append(
+                    AttemptRecord(
+                        attempt_id=attempt_id,
+                        job_id=job_id,
+                        phase=phase.phase,
+                        attempt_number=attempt_number,
+                        parent_attempt_id=parent_id,
+                        retry_reason=str(row.get("retry_reason") or ""),
+                        first_pass=(
+                            (row.get("status") != "failed") if attempt_number == 1 else None
+                        ),
+                        accepted=row.get("status") == "ok",
+                        escalation_from=row.get("escalation_from"),
+                        escalation_to=row.get("escalation_to"),
+                        model=str(row.get("model") or phase.model),
+                        status=str(row.get("status") or ""),
+                        cost_usd=float(row.get("cost_usd") or 0.0),
+                        tokens=dict(row.get("tokens") or {}),
+                        test_executed_success=(phase.test_executed_success if is_final else None),
+                        confidence=(phase.confidence if is_final else None),
+                    )
+                )
+                parent_id = attempt_id
             continue
         records.append(
             AttemptRecord(
@@ -2989,6 +3059,11 @@ def run_workflow(
     phases = spec.workflow.params.get("phases", [])
     if not phases:
         raise ValueError("workflow.params.phases is empty")
+
+    # The escalation plan (step 9, G-27) — opt-in via ``workflow.params.escalation``. Parsed
+    # EAGERLY: a malformed ladder is a loud spec error here, never a silent no-op that looks
+    # like "escalation is disabled" (a load-bearing difference for the operator).
+    escalation = EscalationPlan.from_params(spec.workflow.params)
 
     wd = Path(workdir).resolve()
     if not wd.is_dir():
@@ -3283,6 +3358,9 @@ def run_workflow(
                 ar = None
                 stall: dict[str, Any] | None = None
                 pre_head = ""
+                # Step 9 (G-27): every agent attempt is recorded here (one row by default; one
+                # per ladder step when escalation fires).
+                attempt_rows: list[dict[str, Any]] = []
                 # The per-phase spend gate (admission_leases p2). An ExitStack rather
                 # than a nested ``with`` because the leases can only be reserved once
                 # the phase's model is KNOWN (the budget lease's currency follows the
@@ -3364,33 +3442,6 @@ def run_workflow(
                         pr.augmentation_latency_ms = outcome.latency_ms
                         pr.fallback_mode = outcome.fallback_mode
 
-                    agent_kwargs: dict[str, Any] = {
-                        "model": model_i,
-                        "backend": backend,
-                        "workdir": str(wd),
-                        "thinking_effort": thinking_effort,
-                        "thinking_budget_tokens": thinking_budget_tokens,
-                        "output_token_limit": output_token_limit,
-                        "timeout": phase_timeout,
-                        "silent_mode": silent_mode,
-                        "enforce_pytest": bool(
-                            phase_def.get("enforce_pytest", enforce_pytest)
-                        ),
-                    }
-                    # Cache-aware forking: reuse the previous phase's session prefix so
-                    # the shared context is served as provider cache reads (DeepSeek
-                    # cache read ~120x cheaper than input). A model switch breaks the
-                    # cache prefix, so only fork when the model is unchanged. Both
-                    # backends support it (opencode --session/--fork; claude --resume/--fork-session).
-                    if (
-                        fork_enabled
-                        and prev_session_id
-                        and prev_model == model_i
-                    ):
-                        agent_kwargs["session_id"] = prev_session_id
-                        agent_kwargs["fork"] = True
-                    pr.model = model_i
-
                     # Commit-prefix enforcement (cap_runner_hardening p3): record the worktree
                     # HEAD before the agent runs, so after the phase the runner can list exactly
                     # the commits the agent made during it (git log pre-head..HEAD).
@@ -3404,37 +3455,122 @@ def run_workflow(
                     # installs no hook (violations must stay visible for the evidence).
                     _install_commit_msg_hook(git_wd, name, goal)
 
-                    # Phase watchdog (cap_runner_hardening p1) — wrap the agent invocation in a
-                    # stall monitor. The monitor polls the session transcript's last-step age
-                    # (``.instrument/session.jsonl``, appended live by the adapters while the seam
-                    # is present) and fails the phase deterministically — SIGTERM + STALLED +
-                    # evidence — when no new step appears for the threshold (explicit arg >
-                    # ``FINOPS_PHASE_WATCHDOG_MIN`` env > default 20 min; a value <= 0 disables
-                    # it). Only agent phases are wrapped; test phases run in-process, never
-                    # through this path.
-                    watchdog_min = _resolve_watchdog_min(phase_watchdog_min)
-                    watchdog = PhaseWatchdog(git_wd, watchdog_min) if watchdog_min > 0 else None
-                    if watchdog is not None:
-                        agent_kwargs["watchdog"] = watchdog.seam
-                        agent_kwargs["transcript_path"] = str(watchdog.transcript)
-                    # P0-2 (control-plane stabilization): the ONE engine. Agent phases route
-                    # through the injected step executor (the default LocalAgentExecutor is
-                    # the historical in-process call; the DockerAgentExecutor under
-                    # --orchestrator runs the step in a sibling container). The engine —
-                    # not the executor — owns stop-on-failure, checkpoints, gates, and the
-                    # aggregate ledger: ``ar`` is whatever the executor returned, and every
-                    # downstream decision (tokens/cost/fail/commit/await) reads it the same
-                    # way for both paths.
-                    step_call = _executor_as_run_agent(
-                        step_executor, phase_def=phase_def, spec_name=spec.name, goal=goal
-                    )
-                    ar, stall = _run_agent_phase(step_call, prompt, agent_kwargs, watchdog)
-                    if stall is not None:
-                        # The stalled agent was SIGTERM'd; the phase fails with the evidence
-                        # (last-step timestamp, stale age, transcript tail) on the ledger.
-                        pr.status = "failed"
-                        pr.error = _format_stall_evidence(stall)
-                        pr.stall_evidence = stall
+                    # Step 9 (G-27) — the escalation loop. ONE attempt by default (the
+                    # historical engine); when the spec's ladder names a successor for the
+                    # model that just FAILED, the phase retries on it, and every attempt is
+                    # recorded (per-attempt model/status/cost/tokens/escalation) for the
+                    # ledger and the Control Room's cascade surface. A retry is a SECOND paid
+                    # invocation: each one reserves its own admission below.
+                    attempt_model = model_i
+                    attempt_no = 1
+                    while True:
+                        if attempt_no > 1:
+                            # The retry's own reservation — the budget gate refuses when the
+                            # campaign is exhausted (fail-closed: no unbudgeted retry).
+                            admission_gate.enter_context(
+                                phase_admission_scope(phase_admission, name, attempt_model)
+                            )
+                            # The failed attempt's outcome evidence lives on its row; the
+                            # phase's fields take the retry's result. (The escalation's
+                            # from/to stamp lives on the RETRY row below — one event per
+                            # escalation, never a half-stamp on the failed attempt.)
+                            pr.error = ""
+                            pr.stall_evidence = None
+                        agent_kwargs: dict[str, Any] = {
+                            "model": attempt_model,
+                            "backend": backend,
+                            "workdir": str(wd),
+                            "thinking_effort": thinking_effort,
+                            "thinking_budget_tokens": thinking_budget_tokens,
+                            "output_token_limit": output_token_limit,
+                            "timeout": phase_timeout,
+                            "silent_mode": silent_mode,
+                            "enforce_pytest": bool(
+                                phase_def.get("enforce_pytest", enforce_pytest)
+                            ),
+                        }
+                        # Cache-aware forking: reuse the previous phase's session prefix so
+                        # the shared context is served as provider cache reads (DeepSeek
+                        # cache read ~120x cheaper than input). A model switch breaks the
+                        # cache prefix, so only fork when the model is unchanged. Both
+                        # backends support it (opencode --session/--fork; claude --resume/--fork-session).
+                        if (
+                            fork_enabled
+                            and prev_session_id
+                            and prev_model == attempt_model
+                        ):
+                            agent_kwargs["session_id"] = prev_session_id
+                            agent_kwargs["fork"] = True
+                        pr.model = attempt_model
+
+                        # Phase watchdog (cap_runner_hardening p1) — wrap the agent invocation
+                        # in a stall monitor. The monitor polls the session transcript's
+                        # last-step age (``.instrument/session.jsonl``, appended live by the
+                        # adapters while the seam is present) and fails the phase
+                        # deterministically — SIGTERM + STALLED + evidence — when no new step
+                        # appears for the threshold (explicit arg > ``FINOPS_PHASE_WATCHDOG_MIN``
+                        # env > default 20 min; a value <= 0 disables it). Only agent phases are
+                        # wrapped; test phases run in-process, never through this path. FRESH
+                        # per attempt: one invocation, one stall window — an escalated retry
+                        # must not inherit the failed attempt's stale clock.
+                        watchdog_min = _resolve_watchdog_min(phase_watchdog_min)
+                        watchdog = (
+                            PhaseWatchdog(git_wd, watchdog_min) if watchdog_min > 0 else None
+                        )
+                        if watchdog is not None:
+                            agent_kwargs["watchdog"] = watchdog.seam
+                            agent_kwargs["transcript_path"] = str(watchdog.transcript)
+                        # P0-2 (control-plane stabilization): the ONE engine. Agent phases
+                        # route through the injected step executor (the default
+                        # LocalAgentExecutor is the historical in-process call; the
+                        # DockerAgentExecutor under --orchestrator runs the step in a sibling
+                        # container). The engine — not the executor — owns stop-on-failure,
+                        # checkpoints, gates, and the aggregate ledger: ``ar`` is whatever the
+                        # executor returned, and every downstream decision
+                        # (tokens/cost/fail/commit/await) reads it the same way for both paths.
+                        step_call = _executor_as_run_agent(
+                            step_executor, phase_def=phase_def, spec_name=spec.name, goal=goal
+                        )
+                        ar, stall = _run_agent_phase(step_call, prompt, agent_kwargs, watchdog)
+                        if stall is not None:
+                            # The stalled agent was SIGTERM'd; the phase fails with the evidence
+                            # (last-step timestamp, stale age, transcript tail) on the ledger;
+                            # the attempt row below carries the same model.
+                            pr.status = "failed"
+                            pr.error = _format_stall_evidence(stall)
+                            pr.stall_evidence = stall
+
+                        attempt_failed = stall is not None or not getattr(ar, "ok", True)
+                        attempt_rows.append(
+                            {
+                                "attempt_number": attempt_no,
+                                "model": attempt_model,
+                                "status": "failed" if attempt_failed else "ok",
+                                "cost_usd": float(getattr(ar, "estimated_cost_usd", 0.0) or 0.0),
+                                "tokens": {
+                                    "in": int(getattr(ar, "prompt_tokens", 0) or 0),
+                                    "out": int(getattr(ar, "completion_tokens", 0) or 0),
+                                    "reasoning": int(getattr(ar, "reasoning_tokens", 0) or 0),
+                                    "answer": int(getattr(ar, "answer_tokens", 0) or 0),
+                                    "explanation": int(getattr(ar, "explanation_tokens", 0) or 0),
+                                    "total": int(getattr(ar, "total_tokens", 0) or 0),
+                                },
+                                "escalation_from": (
+                                    attempt_rows[-1]["model"] if attempt_no > 1 else None
+                                ),
+                                "escalation_to": (attempt_model if attempt_no > 1 else None),
+                                "retry_reason": "escalation" if attempt_no > 1 else "",
+                            }
+                        )
+                        next_model = (
+                            escalation.successor(attempt_model, attempts_made=attempt_no)
+                            if (escalation is not None and attempt_failed)
+                            else None
+                        )
+                        if next_model is None:
+                            break
+                        attempt_model = next_model
+                        attempt_no += 1
                 finally:
                     # Release the phase's leases before anything else: the headroom is
                     # returned as soon as the phase stops spending, whether it finished,
@@ -3482,6 +3618,11 @@ def run_workflow(
                     if not getattr(ar, "ok", True):
                         pr.status = "failed"
                         pr.error = getattr(ar, "error", "") or f"exit_code={getattr(ar, 'exit_code', '?')}"
+                # Step 9 escalation totals: the processing block above recorded the FINAL
+                # attempt's cost/tokens from its ``ar``; the prior (failed-ladder) attempts
+                # spent real money too, so they are added here. A single-attempt phase is a
+                # byte-for-byte no-op (no totals, no ``attempts`` content).
+                _apply_attempt_totals(pr, attempt_rows, include_last=False)
         except AdmissionRefused as exc:
             # The spend gate refused this phase — and refusal means NO invocation
             # happened: ``phase_admission_scope`` is entered before the prompt is built
@@ -3490,9 +3631,12 @@ def run_workflow(
             # phase 4's quarantine rail can key off it.
             pr.status = "failed"
             pr.error = f"ADMISSION_DENIED: {exc}"
+            # An escalated RETRY refused by the budget still owes the prior attempt's spend.
+            _apply_attempt_totals(pr, attempt_rows, include_last=True)
         except Exception as exc:  # one bad phase must not crash the runner
             pr.status = "failed"
             pr.error = repr(exc)
+            _apply_attempt_totals(pr, attempt_rows, include_last=True)
 
         # CAP test-runner wiring (the named seam, docs/designs/current/cap_test_runner_wiring.md
         # §1): an agent phase that declares ``test_gate: true`` gets the independent test_runner
