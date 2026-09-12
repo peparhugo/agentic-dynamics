@@ -48,8 +48,7 @@ Output:
 """
 
 import json
-import math
-from collections import Counter, defaultdict
+from collections import defaultdict
 from datetime import datetime
 from pathlib import Path
 
@@ -60,138 +59,20 @@ except ImportError:  # imported as scripts.<name> — repo root is on sys.path
 
 
 from agentic_dynamics.reporting.canonical_corpus import load_canonical_tables
+from agentic_dynamics.reporting.grit_metric import (
+    METRIC_DEFINITION,
+    MIN_CELLS_FOR_RATE,
+    collect_cells,
+    rate_row,
+)
 from agentic_dynamics.reporting.lab_contract import (
     ContributionReport,
     attach_contribution,
-    record_id,
 )
 
 #: This script's name, as classified in scripts/lab_manifest.json — the contract key.
 LAB = "lab_grit.py"
 OUTPUT_PATH = Path("experiments/results/lab_grit.json")
-
-#: The metric definition, carried in the output so a reader never has to look it up — and
-#: so a guard test can assert the README, the website and this lab state the same thing.
-METRIC_DEFINITION = "G(s) = P(test_executed_success | perturbation_strength = s)"
-
-#: Minimum cells before a breakdown row is reported as a rate. Below this a proportion is
-#: noise; the row is still emitted (with ``grit: null``) so the gap is visible rather than
-#: silently dropped.
-MIN_CELLS_FOR_RATE = 5
-
-
-def _short_model(model: str) -> str:
-    return model.split("/")[-1]
-
-
-def wilson_interval(successes: int, n: int, z: float = 1.96) -> tuple[float, float]:
-    """95% Wilson score interval for a binomial proportion.
-
-    Chosen over a bootstrap for two reasons: it is **deterministic** (the lab must produce
-    byte-identical output across runs — see the s3 determinism check), and it behaves
-    correctly at the extremes, where several of these cells sit (a normal-approximation
-    interval around p=1.0 would extend above 1).
-    """
-    if n <= 0:
-        return (0.0, 0.0)
-    p = successes / n
-    denom = 1 + z**2 / n
-    centre = (p + z**2 / (2 * n)) / denom
-    margin = z * math.sqrt((p * (1 - p) + z**2 / (4 * n)) / n) / denom
-    return (round(max(0.0, centre - margin), 4), round(min(1.0, centre + margin), 4))
-
-
-def _rate_row(label_key: str, label: str | float, successes: int, n: int, **extra) -> dict:
-    """One reported proportion, with its interval and an explicit small-sample marker."""
-    lo, hi = wilson_interval(successes, n)
-    sufficient = n >= MIN_CELLS_FOR_RATE
-    return {
-        label_key: label,
-        "n": n,
-        "successes": successes,
-        # None below the threshold: an under-powered proportion is not a measurement.
-        "grit": round(successes / n, 4) if (n and sufficient) else None,
-        "ci95_lo": lo if sufficient else None,
-        "ci95_hi": hi if sufficient else None,
-        "insufficient_support": not sufficient,
-        **extra,
-    }
-
-
-def _exclusion_reason(has_strength: bool, has_verdict: bool) -> str:
-    """The canonical reason a cell was excluded from the metric.
-
-    Both ``perturbation_strength`` and ``test_executed_success`` are required; missing
-    either (or both) is one canonical reason — ``missing_required_field`` — the public-truth
-    review's P1 vocabulary (the finer strength-vs-verdict split was informational only and
-    is folded here so the contract uses exactly the four named reasons).
-    """
-    return "missing_required_field"
-
-
-def collect_cells(
-    findings: list[dict], stories: list[dict]
-) -> tuple[list[dict], dict[str, int], list[str], list[str]]:
-    """Every canonical cell carrying BOTH fields the metric needs, plus the exclusion tally.
-
-    A cell missing either field is excluded outright — the metric is a conditional
-    probability, and a cell with no strength or no executed verdict cannot condition on
-    anything. It is never imputed to 0.0 / False. The returned ``exclusions`` maps each
-    reason to its count, so the lab's contract can report *why* cells dropped out (review
-    P2: ``n_resolved`` vs ``n_eligible`` vs ``n_excluded``). The returned ``used_refs`` /
-    ``excluded_refs`` are the table-qualified record refs of the cells that DID / did NOT
-    contribute (m3 ContributionReport; f2 exact contributor attestation).
-    """
-    cells: list[dict] = []
-    exclusions: Counter = Counter()
-    used_refs: list[str] = []
-    excluded_refs: list[str] = []
-
-    for run in findings:
-        strength = run.get("perturbation_strength")
-        verdict = run.get("test_executed_success")
-        if not isinstance(strength, (int, float)) or not isinstance(verdict, bool):
-            exclusions[
-                _exclusion_reason(isinstance(strength, (int, float)), isinstance(verdict, bool))
-            ] += 1
-            excluded_refs.append(record_id(run))
-            continue
-        used_refs.append(record_id(run))
-        cells.append(
-            {
-                "source": "finding",
-                "strength": float(strength),
-                "success": verdict,
-                "model": _short_model(str(run.get("model") or "unknown")),
-                "perturbation_class": run.get("perturbation_class") or "unknown",
-                "operator": run.get("operator") or "unknown",
-            }
-        )
-
-    for story in stories:
-        strength = story.get("perturbation_strength")
-        verdict = story.get("test_executed_success")
-        if not isinstance(strength, (int, float)) or not isinstance(verdict, bool):
-            exclusions[
-                _exclusion_reason(isinstance(strength, (int, float)), isinstance(verdict, bool))
-            ] += 1
-            excluded_refs.append(record_id(story))
-            continue
-        used_refs.append(record_id(story))
-        cells.append(
-            {
-                "source": "story",
-                "strength": float(strength),
-                "success": verdict,
-                "model": _short_model(str(story.get("model") or "unknown")),
-                # Stories carry a condition, not an operator class; label it as such rather
-                # than forcing it into the finding corpus's vocabulary.
-                "perturbation_class": f"story:{story.get('_canonical_condition') or 'clean'}",
-                "operator": "story_condition",
-            }
-        )
-
-    return cells, dict(exclusions), used_refs, excluded_refs
 
 
 def _group_rates(cells: list[dict], key: str, label_key: str) -> list[dict]:
@@ -204,7 +85,7 @@ def _group_rates(cells: list[dict], key: str, label_key: str) -> list[dict]:
     for c in cells:
         groups[c[key]].append(c)
     rows = [
-        _rate_row(label_key, label, sum(1 for c in items if c["success"]), len(items))
+        rate_row(label_key, label, sum(1 for c in items if c["success"]), len(items))
         for label, items in groups.items()
     ]
     rows.sort(key=lambda r: str(r[label_key]))
@@ -229,7 +110,7 @@ def compute(findings: list[dict], stories: list[dict]) -> tuple[dict, Contributi
     strength_rows = []
     for s in sorted(by_strength):
         items = by_strength[s]
-        row = _rate_row(
+        row = rate_row(
             "strength",
             s,
             sum(1 for c in items if c["success"]),
