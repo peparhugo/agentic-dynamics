@@ -279,7 +279,7 @@ reasoning_divergence, semantic_clusters. Superseded by `semantic_validation.py`.
 | File | Purpose |
 |------|---------|
 | `apps/control_room/server.py` | Flask backend — the **Control Room portal**, 44 routes across 9 API categories plus the static shell (below). Serves `apps/control_room/static/`. Port 8000 (`FINOPS_PORT`). |
-| `apps/control_room/static/` | Vanilla-JS dashboard: Matrix grid, Cell Inspector (live transcript), Routing board, supervisor flags, design sessions, Claude background sessions. |
+| `apps/control_room/static/` | Vanilla-JS dashboard: Matrix grid, Cell Inspector (live transcript), Routing board, Operations board (packet + run detail), Surfaces board (step-5/6/7 read models), supervisor flags, design sessions, Claude background sessions. |
 
 `apps/control_room/server.py`'s 44 routes, categorized:
 - **Legacy telemetry** (8): `/api/matrix`, `/api/status` (SSE), `/api/events/<cell_id>` (SSE), `/api/projections`, `/api/routing`, `/api/subscription-usage`, `POST /api/experiments`, `POST /api/queue/reinterleave`
