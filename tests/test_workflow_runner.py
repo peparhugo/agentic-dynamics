@@ -2898,3 +2898,101 @@ def test_test_phase_with_phantom_target_is_a_false_green_guard(tmp_path):
     assert test_phase.tests_total == 0
     assert "TEST_GATE" in test_phase.error or "no tests" in test_phase.error
     assert result.ok is False  # the run must not report success
+
+
+# ── wave C follow-up: runner/fleet honesty ───────────────────────────────────
+
+
+def _init_repo(path) -> None:
+    import subprocess as sp
+
+    sp.run(["git", "init", "-q"], cwd=path, check=True, capture_output=True)
+    sp.run(["git", "config", "user.email", "t@t"], cwd=path, check=True, capture_output=True)
+    sp.run(["git", "config", "user.name", "t"], cwd=path, check=True, capture_output=True)
+
+
+def test_git_commit_verbose_names_the_reason(tmp_path):
+    """Wave C follow-up: every non-commit outcome carries a NAME (this used to be a bare "")."""
+    from agentic_dynamics.runtime.workflow_runner import _git_commit_verbose
+
+    _init_repo(tmp_path)
+    # clean tree → nothing to commit
+    h, reason = _git_commit_verbose(tmp_path, "p1", "goal")
+    assert (h, reason) == ("", "nothing_to_commit")
+    # staged work → committed
+    (tmp_path / "a.txt").write_text("x")
+    h, reason = _git_commit_verbose(tmp_path, "p1", "goal")
+    assert h and reason == ""
+    # a git REFUSAL is named with its detail, never a bare ""
+    hook = tmp_path / ".git" / "hooks" / "pre-commit"
+    hook.write_text("#!/bin/sh\nexit 1\n")
+    hook.chmod(0o755)
+    (tmp_path / "b.txt").write_text("y")
+    h, reason = _git_commit_verbose(tmp_path, "p1", "goal")
+    assert h == "" and reason.startswith("commit_failed:")
+
+
+def test_an_ok_phase_with_uncommitted_work_fails_loudly(tmp_path, monkeypatch):
+    """An ok phase whose commit cannot land must fail with COMMIT_SKIPPED + the reason —
+    never a green phase over work nobody can commit (the three-run loss, 2026-09-12)."""
+    import agentic_dynamics.runtime.workflow_runner as wr
+
+    spec = load_spec(SPEC)
+
+    def agent(prompt, *, model, backend, workdir, **kwargs):
+        d = Path(workdir) / "docs"
+        d.mkdir(parents=True, exist_ok=True)
+        (d / "scope.md").write_text("scope")
+        return _fake_agent()
+
+    monkeypatch.setattr(
+        wr, "_git_commit_verbose", lambda *a, **k: ("", "commit_failed: deliberate")
+    )
+    result = run_workflow(spec, goal="g", model="m", workdir=tmp_path, run_agentic_fn=agent)
+
+    phase = result.phases[0]
+    assert phase.status == "failed"
+    assert phase.commit_status == "commit_failed: deliberate"
+    assert "COMMIT_SKIPPED" in phase.error
+    assert result.ok is False
+
+
+def test_commit_prefix_gate_is_merge_aware(tmp_path, monkeypatch):
+    """Wave C follow-up: a phase that MERGES a branch is not charged with the merged
+    lineage's commits (first-parent view); a direct nonconforming commit still fails."""
+    import subprocess as sp
+
+    from agentic_dynamics.runtime.workflow_runner import PhaseResult, _enforce_commit_prefix
+
+    monkeypatch.delenv("FINOPS_COMMIT_GATE", raising=False)
+
+    def git(repo, *args):
+        return sp.run(["git", *args], cwd=repo, check=True, capture_output=True, text=True)
+
+    repo = tmp_path / "r"
+    repo.mkdir()
+    _init_repo(repo)
+    (repo / "a").write_text("1")
+    git(repo, "add", "-A")
+    git(repo, "commit", "-qm", "base")
+    base = git(repo, "rev-parse", "HEAD").stdout.strip()
+    # a side branch with a NON-conforming commit, merged with the canonical subject
+    git(repo, "checkout", "-q", "-b", "side")
+    (repo / "b").write_text("2")
+    git(repo, "add", "-A")
+    git(repo, "commit", "-qm", "plain side commit")
+    git(repo, "checkout", "-q", "-")
+    git(repo, "merge", "--no-ff", "side", "-m", "[workflow] p1 — goal")
+
+    pr = PhaseResult(phase="p1", kind="agent", status="ok")
+    _enforce_commit_prefix(pr, repo, "p1", "goal", base)
+    assert pr.status == "ok" and not pr.commit_gate  # the merge is the phase's work
+
+    # negative control: a DIRECT nonconforming commit after the baseline still fails
+    (repo / "c").write_text("3")
+    git(repo, "add", "-A")
+    git(repo, "commit", "-qm", "plain direct commit")
+    pr2 = PhaseResult(phase="p1", kind="agent", status="ok")
+    _enforce_commit_prefix(pr2, repo, "p1", "goal", base)
+    assert pr2.status == "failed"
+    assert pr2.commit_gate and pr2.commit_gate.get("reason") == "COMMIT_PREFIX"

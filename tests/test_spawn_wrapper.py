@@ -1614,3 +1614,17 @@ def test_run_ledger_binds_by_difference_not_recency(tmp_path, monkeypatch):
     # (5) an absent spec dir is an empty diff, never an error
     assert sw._ledger_files("nope") == set()
     assert sw._run_ledger("nope", set()) is None
+
+
+# ── wave C follow-up: the spec-resolution refusal names its root ─────────────
+
+
+def test_resolve_spec_path_names_the_root(tmp_path):
+    """A missing spec names the ROOT it was resolved under (the container's /repo mount is
+    often not the tree the operator edited — the bare refusal cost two deploy cycles)."""
+    from scripts.fleet import spawn_wrapper as sw
+
+    path, errors = sw._resolve_spec_path("workflows/repository/nope.yaml", tmp_path)
+    assert path is None and len(errors) == 1
+    assert "does not resolve to a file under" in errors[0]
+    assert str(tmp_path) in errors[0]
