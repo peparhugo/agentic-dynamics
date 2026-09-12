@@ -102,16 +102,31 @@ class PlanState:
     status: str = "pending"
     jobs_total: int = 0
     jobs_done: int = 0
+    #: Wave A5: the cell ids THIS phase enqueued (JSON list in the Redis hash). Completion
+    #: counts only these — the old model counted every done/failed row in the SHARED status
+    #: hash, so an unrelated job's completion could mark this phase done while its own work
+    #: still ran (the review's reproduction).
+    jobs_ids: list[str] = field(default_factory=list)
 
     def to_dict(self) -> dict:
-        return {"status": self.status, "jobs_total": str(self.jobs_total), "jobs_done": str(self.jobs_done)}
+        return {
+            "status": self.status,
+            "jobs_total": str(self.jobs_total),
+            "jobs_done": str(self.jobs_done),
+            "jobs_ids": json.dumps(self.jobs_ids),
+        }
 
     @classmethod
     def from_dict(cls, d: dict) -> PlanState:
+        try:
+            ids = json.loads(d.get("jobs_ids") or "[]")
+        except ValueError:
+            ids = []
         return cls(
             status=d.get("status", "pending"),
             jobs_total=int(d.get("jobs_total", 0)),
             jobs_done=int(d.get("jobs_done", 0)),
+            jobs_ids=[str(i) for i in ids] if isinstance(ids, list) else [],
         )
 
 
@@ -476,26 +491,38 @@ def _execute_matrix(phase: PlanPhase, context: dict) -> bool:
             rdb.lpush(STORY_QUEUE, json.dumps(job))
             rdb.hset(STORY_STATUS, job["cell_id"], "queued")
 
-        _set_state(plan_name, phase.id, status="running", jobs_total=len(jobs))
+        state.jobs_total = len(jobs)
+        state.jobs_ids = [str(job["cell_id"]) for job in jobs]
+        _set_state(
+            plan_name, phase.id, status="running",
+            jobs_total=state.jobs_total, jobs_ids=json.dumps(state.jobs_ids),
+        )
         _set_current(plan_name, phase.id)
+        state.status = "running"
 
     if state.status in ("pending", "running"):
         _set_current(plan_name, phase.id)
 
+        # Wave A5: completion counts THIS phase's OWN cells. The shared story_status hash
+        # carries every plan's jobs; the old global done+failed count let an unrelated
+        # completion mark this phase done while its own work still ran (the review's
+        # reproduction: its own job running, an unrelated job done, phase marked done).
+        statuses = rdb.hgetall(STORY_STATUS)
+        done = sum(1 for cid in state.jobs_ids if statuses.get(cid) in ("done", "failed"))
+        pending = len(state.jobs_ids) - done
+        total = len(state.jobs_ids) or state.jobs_total
+
         alive = _workers_alive("scripts/worker.py")
-        queue_size = rdb.llen(STORY_QUEUE)
-        if queue_size > 0 and alive < workers:
+        if pending > 0 and alive < workers:
             needed = workers - alive
             print(f"  Launching {needed} workers...")
             _spawn_workers("scripts/worker.py", needed, phase.id)
 
-        done = sum(1 for v in rdb.hgetall(STORY_STATUS).values()
-                   if v in ("done", "failed"))
-        total = state.jobs_total or len(_gen_matrix_cells(kind_params)) + done
+        _set_state(plan_name, phase.id, jobs_done=done)
         pct = f"{done}/{total}" if total > 0 else "?"
-        print(f"  {pct} done, {queue_size} in queue, {alive} workers")
+        print(f"  {pct} done, {len(state.jobs_ids)} tracked, {alive} workers")
 
-        if queue_size == 0 and done >= total and total > 0:
+        if state.jobs_ids and pending == 0:
             _set_state(plan_name, phase.id, status="done", jobs_done=done)
             return True
 
@@ -517,10 +544,17 @@ def _execute_review(phase: PlanPhase, context: dict) -> bool:
     # replaces the retired Redis review worker (WS-09 — resolves the "superseded but still
     # spawned" contradiction). The deeper shared-runner rewire is deferred (design §5).
     print("  Running review_all.py (synchronous)…")
-    subprocess.run(
+    result = subprocess.run(
         [sys.executable, str(ROOT / "scripts" / "review_all.py"), "--workers", str(workers)],
         check=False,
     )
+    # Wave A5: the review subprocess's exit code is the phase's outcome. The old code ran
+    # with check=False and unconditionally wrote done — the review's reproduction returned
+    # exit 17 and the phase still reported success.
+    if result.returncode != 0:
+        print(f"  review_all.py failed (exit {result.returncode}) — phase failed")
+        _set_state(plan_name, phase.id, status="failed")
+        return False
     _set_state(plan_name, phase.id, status="done")
     return True
 
@@ -608,45 +642,21 @@ def _execute_pipeline(phase: PlanPhase, context: dict) -> bool:
 
 
 def _execute_ship(phase: PlanPhase, context: dict) -> bool:
-    remote = phase.kind_params.get("remote", "origin")
-    cwd = _resolve_cwd(phase, context)
+    """RETIRED (wave A5): direct main permanence is not a pipeline act.
 
-    status = subprocess.run(
-        ["git", "status", "--porcelain"],
-        capture_output=True, text=True, cwd=cwd, timeout=10,
+    The follow-up review found supported plans merging through raw git/GitHub commands,
+    bypassing the promotion approval/journal path. Permanence belongs to the governed
+    commands — ``agentic-dynamics workflow promote`` for workflow candidates, and the
+    controller's PR merge for feature branches. This executor now REFUSES with guidance:
+    a plan that still names ``kind: ship`` fails closed instead of merging.
+    """
+    print(
+        "  REFUSED: direct merge/push to main is retired (wave A5). A feature branch "
+        "becomes permanent through the controller's PR merge; a workflow candidate through "
+        "`agentic-dynamics workflow promote`. The pipeline proposes (kind: pr_create); the "
+        "governed commands dispose."
     )
-    if status.stdout.strip():
-        print("  Working tree dirty — commit before shipping")
-        return False
-
-    branch = subprocess.run(
-        ["git", "rev-parse", "--abbrev-ref", "HEAD"],
-        capture_output=True, text=True, cwd=cwd, timeout=10,
-    ).stdout.strip()
-
-    if branch in ("main", "master"):
-        print(f"  On {branch} — ship is for feature branches")
-        return False
-
-    print(f"  Merging {branch} into main...")
-    subprocess.run(["git", "checkout", "main"], cwd=cwd, timeout=30)
-    result = subprocess.run(
-        ["git", "merge", "--squash", branch], cwd=cwd, timeout=30,
-    )
-    if result.returncode != 0:
-        print("  Merge conflict — resolve manually")
-        subprocess.run(["git", "checkout", branch], cwd=cwd, timeout=10)
-        return False
-
-    subprocess.run(
-        ["git", "commit", "-m", phase.kind_params.get("message", f"Merge {branch}")],
-        cwd=cwd, timeout=30,
-    )
-    push_result = subprocess.run(
-        ["git", "push", remote, "main"], cwd=cwd, timeout=60,
-    )
-    subprocess.run(["git", "checkout", branch], cwd=cwd, timeout=10)
-    return push_result.returncode == 0
+    return False
 
 
 # ── Workstream sidecar ────────────────────────────────────────────
@@ -910,96 +920,18 @@ def _execute_pr_create(phase: PlanPhase, context: dict) -> bool:
 
 
 def _execute_pr_merge(phase: PlanPhase, context: dict) -> bool:
-    plan_name = context.get("plan_name", "plan")
-    kind_params = phase.kind_params
-    from_fanout = kind_params.get("from_fanout")
-    base = kind_params.get("base_branch") or _default_branch(str(ROOT))
-    strategy = kind_params.get("conflict_strategy", "rebase")
-    squash = kind_params.get("squash", True)
-    sidecar = _load_sidecar(plan_name, from_fanout or "")
+    """RETIRED (wave A5): merging PRs is the controller's P0 act, never a pipeline phase.
 
-    if not sidecar:
-        print(f"  No workstream sidecar found for fan_out '{from_fanout}'")
-        return False
-
-    merge_flag = "--squash" if squash else "--merge"
-    ok = True
-
-    for name, ws in sidecar.items():
-        branch = ws["branch"]
-        merge = subprocess.run(
-            ["gh", "pr", "merge", branch, merge_flag],
-            capture_output=True, text=True, timeout=180,
-        )
-
-        if merge.returncode != 0:
-            if strategy == "abort":
-                print(f"  Merge failed for {branch}: {merge.stderr.strip()}")
-                ok = False
-                continue
-            print(f"  Merge conflict on {branch} — retrying with {strategy}...")
-
-            subprocess.run(
-                ["git", "worktree", "add", "--detach", str(Path("/tmp/pipeline") / f"merge_{name}"), branch],
-                capture_output=True, cwd=str(ROOT), timeout=120,
-            )
-            merge_wt = Path("/tmp/pipeline") / f"merge_{name}"
-            rebase = subprocess.run(
-                ["git", "rebase", base],
-                capture_output=True, text=True, cwd=str(merge_wt), timeout=120,
-            )
-            if rebase.returncode != 0:
-                subprocess.run(["git", "rebase", "--abort"], cwd=str(merge_wt), timeout=30)
-                print(f"  Rebase conflict on {branch} — requires manual resolution")
-                ok = False
-                continue
-
-            push = subprocess.run(
-                ["git", "push", "--force-with-lease"],
-                capture_output=True, text=True, cwd=str(merge_wt), timeout=120,
-            )
-            if push.returncode != 0:
-                print(f"  Force-push failed for {branch}")
-                ok = False
-                continue
-
-            merge = subprocess.run(
-                ["gh", "pr", "merge", branch, merge_flag],
-                capture_output=True, text=True, timeout=180,
-            )
-            if merge.returncode != 0:
-                print(f"  Merge retry failed for {branch}")
-                ok = False
-                continue
-
-        print(f"  Merged {branch}")
-
-    return ok
-
-
-# ── Kind dispatch table ────────────────────────────────────────────
-
-EXECUTORS: dict[str, Any] = {
-    "shell": _execute_shell,
-    "test": _execute_test,
-    "lint": _execute_lint,
-    "matrix": _execute_matrix,
-    "review": _execute_review,
-    "pipeline": _execute_pipeline,
-    "ship": _execute_ship,
-    "fan_out": _execute_fan_out,
-    "conflict_detect": _execute_conflict_detect,
-    "pr_create": _execute_pr_create,
-    "pr_merge": _execute_pr_merge,
-}
-
-
-# ── Plan runner ───────────────────────────────────────────────────
-
-# Max wall-clock (seconds) a polling phase (matrix/review) may run before the
-# runner aborts rather than polling forever (P1-4).
-MAX_PHASE_WALLCLOCK = int(os.environ.get("FINOPS_MAX_PHASE_WALLCLOCK", str(6 * 3600)))
-
+    ``gh pr merge`` performed permanence directly, bypassing the promotion approval/journal
+    path (the review's #1). This executor refuses; merge the PRs the controller has approved,
+    by hand or through the governed command that records the act.
+    """
+    print(
+        "  REFUSED: `gh pr merge` is retired (wave A5) — merging is the controller's "
+        "permanence decision, made through the governed path, not a pipeline phase. The "
+        "PRs created by `kind: pr_create` await that decision."
+    )
+    return False
 
 def _set_current(plan_name: str, phase_id: str) -> None:
     try:
@@ -1092,6 +1024,27 @@ def run_plan(plan: PlanDefinition, *, from_phase: str | None = None,
 
     print(f"\n{'=' * 60}")
     print(f"Plan '{plan.name}' complete.")
+
+
+
+# ── Kind dispatch table ────────────────────────────────────────────
+
+# ``ship`` and ``pr_merge`` remain registered DELIBERATELY (wave A5): they now refuse with
+# governed-path guidance, so a plan that still names one fails closed with a message instead
+# of raising KeyError — no silent merge, no silent skip.
+EXECUTORS: dict[str, Any] = {
+    "shell": _execute_shell,
+    "test": _execute_test,
+    "lint": _execute_lint,
+    "matrix": _execute_matrix,
+    "review": _execute_review,
+    "pipeline": _execute_pipeline,
+    "ship": _execute_ship,
+    "fan_out": _execute_fan_out,
+    "conflict_detect": _execute_conflict_detect,
+    "pr_create": _execute_pr_create,
+    "pr_merge": _execute_pr_merge,
+}
 
 
 # ── Status & utilities ────────────────────────────────────────────

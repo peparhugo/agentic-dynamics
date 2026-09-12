@@ -650,11 +650,10 @@ class TestFanOutYaml:
         assert prs.kind == "pr_create"
         assert prs.depends_on == ["conflicts"]
 
-        merge = sf.phases[3]
-        assert merge.kind == "pr_merge"
-        assert merge.kind_params["conflict_strategy"] == "rebase"
-        assert merge.kind_params["squash"] is True
-        assert merge.depends_on == ["prs"]
+        # Wave A5: the direct `pr_merge` phase is RETIRED — merging is the controller's
+        # governed act (the executor remains registered only to fail closed with guidance).
+        assert len(sf.phases) == 3
+        assert "pr_merge" not in {p.kind for p in sf.phases}
 
     def test_nested_phase_depends_on(self):
         plan_path = (
