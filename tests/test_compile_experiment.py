@@ -114,6 +114,114 @@ def test_compare_arms_empty_results():
     out = compare_arms([], arm_factor="policy", loss={"cost": 1.0})
     assert out["best_arm"] is None
     assert out["regrets"] == {}
+    assert out["eligible_arms"] == []
+    assert out["arms"] == {}
+
+
+def test_compare_arms_excludes_uncovered_arm_from_ranking():
+    """The reproduced defect: an unmeasured-cost arm must not win a cost-weighted comparison.
+
+    Pre-fix, the arm missing ``cost`` silently skipped the cost term and won with a LOWER
+    weighted loss than the arm whose cost was measured. The coverage rule makes that arm
+    ineligible for ranking instead.
+    """
+    results = [
+        {"policy": "measured_cost", "cost": 0.10, "correctness": 0.80},
+        {"policy": "measured_cost", "cost": 0.10, "correctness": 0.80},
+        {"policy": "unmeasured_cost", "correctness": 0.80},
+        {"policy": "unmeasured_cost", "correctness": 0.80},
+    ]
+    out = compare_arms(results, arm_factor="policy", loss={"cost": 1.0, "quality": -5.0})
+
+    assert out["comparison_objectives"] == ["cost", "quality"]
+    assert out["missing_policy"] == "exclude"
+    assert out["best_arm"] == "measured_cost"
+    assert out["eligible_arms"] == ["measured_cost"]
+    assert out["regrets"] == {"measured_cost": 0.0}
+    assert out["ineligible_arms"]["unmeasured_cost"]["missing_objectives"] == ["cost"]
+    # no rankable number is emitted for an excluded arm — coverage is.
+    assert "weighted_loss" not in out["arms"]["unmeasured_cost"]
+    assert out["arms"]["unmeasured_cost"]["eligible"] is False
+    assert out["arms"]["unmeasured_cost"]["coverage"]["cost"] == {"n": 0, "of": 2, "rate": 0.0}
+    assert out["arms"]["measured_cost"]["coverage"]["cost"] == {"n": 2, "of": 2, "rate": 1.0}
+
+
+def test_compare_arms_ignore_policy_is_the_explicit_legacy_opt_in():
+    """``missing_policy="ignore"`` ranks anyway — the pre-fix behavior, made visible."""
+    results = [
+        {"policy": "measured_cost", "cost": 0.10, "correctness": 0.80},
+        {"policy": "unmeasured_cost", "correctness": 0.80},
+    ]
+    out = compare_arms(
+        results,
+        arm_factor="policy",
+        loss={"cost": 1.0, "quality": -5.0},
+        missing_policy="ignore",
+    )
+    assert out["missing_policy"] == "ignore"
+    # the unmeasured arm wins ONLY because the caller explicitly chose to ignore the gap…
+    assert out["best_arm"] == "unmeasured_cost"
+    # …and the gap is still named in the payload.
+    assert out["arms"]["unmeasured_cost"]["missing_objectives"] == ["cost"]
+
+
+def test_compare_arms_all_arms_ineligible_fails_closed():
+    results = [
+        {"policy": "cost_only", "cost": 0.1},
+        {"policy": "quality_only", "correctness": 0.9},
+    ]
+    out = compare_arms(results, arm_factor="policy", loss={"cost": 1.0, "quality": -5.0})
+    assert out["best_arm"] is None
+    assert out["regrets"] == {}
+    assert set(out["ineligible_arms"]) == {"cost_only", "quality_only"}
+
+
+def test_compare_arms_nan_is_missing_not_a_measured_value():
+    """NaN is the measurement rules' unmeasured marker — never averaged in."""
+    results = [
+        {"policy": "a", "cost": float("nan"), "correctness": 0.5},
+        {"policy": "a", "cost": 0.2, "correctness": 0.5},
+        {"policy": "b", "cost": 0.3, "correctness": 0.5},
+        {"policy": "b", "cost": 0.3, "correctness": 0.5},
+    ]
+    out = compare_arms(results, arm_factor="policy", loss={"cost": 1.0, "quality": -5.0})
+    assert out["arms"]["a"]["coverage"]["cost"] == {"n": 1, "of": 2, "rate": 0.5}
+    assert out["ineligible_arms"]["a"]["under_coverage"] == ["cost"]
+    assert out["best_arm"] == "b"
+
+
+def test_compare_arms_min_coverage_is_explicit_and_enforced():
+    results = [
+        {"policy": "a", "cost": float("nan"), "correctness": 0.5},  # 1/2 covered
+        {"policy": "a", "cost": 0.2, "correctness": 0.5},
+        {"policy": "b", "cost": 0.3, "correctness": 0.5},
+    ]
+    strict = compare_arms(results, arm_factor="policy", loss={"cost": 1.0})
+    assert strict["best_arm"] == "b"
+
+    tolerant = compare_arms(results, arm_factor="policy", loss={"cost": 1.0}, min_coverage=0.5)
+    assert tolerant["best_arm"] == "a"  # 0.2 < 0.3, at the caller's explicit 50% threshold
+    assert tolerant["arms"]["a"]["coverage"]["cost"]["rate"] == 0.5
+
+
+def test_compare_arms_reports_unmapped_and_unmeasured_objectives():
+    results = [{"policy": "a", "cost": 0.1, "correctness": 0.9}]
+    out = compare_arms(
+        results,
+        arm_factor="policy",
+        loss={"cost": 1.0, "quality": -5.0, "energy": 1.0, "value": 1.0},
+    )
+    assert out["comparison_objectives"] == ["cost", "quality"]
+    assert out["unmapped_objectives"] == ["energy"]  # named in loss, no field mapping
+    assert out["unmeasured_objectives"] == ["value"]  # mapped, no row carries a value
+    assert out["best_arm"] == "a"
+
+
+def test_compare_arms_rejects_unknown_policy_and_bad_threshold():
+    with pytest.raises(ValueError):
+        compare_arms([], arm_factor="policy", loss={"cost": 1.0}, missing_policy="wink")
+    with pytest.raises(ValueError):
+        compare_arms([], arm_factor="policy", loss={"cost": 1.0}, min_coverage=1.5)
 
 
 def test_first_pass_quality():
