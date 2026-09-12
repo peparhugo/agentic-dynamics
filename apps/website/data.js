@@ -1,12 +1,12 @@
-/* Generated 2026-09-12 21:50:56 UTC by build_data.py */
+/* Generated 2026-09-12 20:46:55 UTC by build_data.py */
 /* DO NOT EDIT — regenerate with: python scripts/build_data.py */
 window.DYNAMICS_DATA = {
   "_meta": {
-    "generated_at": "2026-09-12T21:50:52.332824+00:00",
+    "generated_at": "2026-09-12T20:46:50.637748+00:00",
     "provenance_note": "All values tagged [M]easured, [C]omputed, [H]euristic, or e[X]ternal. See methodology.html."
   },
   "summary": {
-    "worktrees_total": 2207,
+    "worktrees_total": 1837,
     "sessions_total": 1027,
     "game_reports": 348,
     "total_cost": 309.1685,
@@ -66,7 +66,7 @@ window.DYNAMICS_DATA = {
     "data_integrity_policy_version": "data-integrity/v1",
     "normalization_version": "canonical-projection/v2",
     "waiver_digest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-    "generator_source_tree_identity": "b82f48cd50e79b3c20045627db7d0ea2a8d82d2d3af9fc61318b1343aa1f8c1c"
+    "generator_source_tree_identity": "f6e9efa4ed75bbd5ccd7c0add390611cc8baeb7e95089a77b48fa0d6fbb826fc"
   },
   "public_statistics": {
     "story_sessions": 1027,
@@ -3993,7 +3993,7 @@ window.DYNAMICS_DATA = {
       "successful": 1007,
       "failed": 20
     },
-    "generated_at": "2026-09-12T21:50:52.489010+00:00"
+    "generated_at": "2026-09-12T20:46:50.809659+00:00"
   },
   "reviews": {
     "models": [
@@ -4654,7 +4654,7 @@ window.DYNAMICS_DATA = {
   "labs": {
     "cache_economics": {
       "experiment_id": "lab_cache_economics",
-      "generated_at": "2026-09-09T00:12:55.175059",
+      "generated_at": "2026-09-12T20:42:01.595109",
       "summary": {
         "models": 7,
         "stories": 207
@@ -4906,7 +4906,7 @@ window.DYNAMICS_DATA = {
         "resolved_input_sha256": "38a1f5dbe586890f453f846aa185f75e150bed7de0d3de007b8c66e3811b1be6",
         "registry_version": "data-manifest/1.0+18392rows",
         "metric_definition_version": "cache_economics/v2",
-        "metric_source_sha256": "c3c4ea9e7f5875b281d24905d28cdaacd4e9cb3be779327c77e856f486f47d5a",
+        "metric_source_sha256": "2e7b999cbe072091dbb467a8c10f6d48520fcfce7b5ede641e9e066de4d71fab",
         "n_resolved_records": 207,
         "n_eligible_records": 207,
         "n_used_records": 207,
@@ -4922,13 +4922,13 @@ window.DYNAMICS_DATA = {
         "outside_analysis_population": 0,
         "data_integrity_policy": "docs/data_integrity_findings.md",
         "requires_external_service": null,
-        "contract_version": "lab-contract/v6",
-        "generated_at": "2026-09-08T22:12:55.175656+00:00"
+        "contract_version": "lab-contract/v7",
+        "generated_at": "2026-09-12T20:42:01.595894+00:00"
       }
     },
     "condition_effects": {
       "experiment_id": "lab_condition_effects",
-      "generated_at": "2026-09-09T00:12:52.941544",
+      "generated_at": "2026-09-12T20:42:02.385450",
       "summary": {
         "conditions": 2,
         "stories": 207,
@@ -4975,7 +4975,7 @@ window.DYNAMICS_DATA = {
         "resolved_input_sha256": "8c90d86e0573b3f1e71982d544672cf90ef94cb1097452b3c857baf343d008a6",
         "registry_version": "data-manifest/1.0+18392rows",
         "metric_definition_version": "condition_effects/v2",
-        "metric_source_sha256": "c7023d1bd40fa57e38cc738cca8a9a71780532be3f60898f74954fb6c80f7b32",
+        "metric_source_sha256": "4ff763b686c0d61f9145a27b65dba2b088c0ccbb4a4d08e020d3c69574e25159",
         "n_resolved_records": 449,
         "n_eligible_records": 362,
         "n_used_records": 362,
@@ -4991,13 +4991,292 @@ window.DYNAMICS_DATA = {
         "outside_analysis_population": 0,
         "data_integrity_policy": "docs/data_integrity_findings.md",
         "requires_external_service": null,
-        "contract_version": "lab-contract/v6",
-        "generated_at": "2026-09-08T22:12:52.942298+00:00"
+        "contract_version": "lab-contract/v7",
+        "generated_at": "2026-09-12T20:42:02.386251+00:00"
+      }
+    },
+    "grit": {
+      "experiment_id": "lab_grit",
+      "generated_at": "2026-09-12T20:42:03.310095",
+      "metric_definition": "G(s) = P(test_executed_success | perturbation_strength = s)",
+      "summary": {
+        "cells": 136,
+        "successes": 108,
+        "grit_overall": 0.7941,
+        "strength_levels": [
+          0.0,
+          0.5
+        ],
+        "findings": 64,
+        "stories": 207,
+        "controlled_delta_grit": 0.0037,
+        "excluded": 135,
+        "exclusions": {
+          "missing_required_field": 135
+        }
+      },
+      "by_strength": [
+        {
+          "strength": 0.0,
+          "n": 10,
+          "successes": 7,
+          "grit": 0.7,
+          "ci95_lo": 0.3968,
+          "ci95_hi": 0.8922,
+          "insufficient_support": false,
+          "sources": {
+            "finding": 10,
+            "story": 0
+          }
+        },
+        {
+          "strength": 0.5,
+          "n": 126,
+          "successes": 101,
+          "grit": 0.8016,
+          "ci95_lo": 0.7235,
+          "ci95_hi": 0.8618,
+          "insufficient_support": false,
+          "sources": {
+            "finding": 54,
+            "story": 72
+          }
+        }
+      ],
+      "by_strength_finding_corpus": [
+        {
+          "strength": 0.0,
+          "n": 10,
+          "successes": 7,
+          "grit": 0.7,
+          "ci95_lo": 0.3968,
+          "ci95_hi": 0.8922,
+          "insufficient_support": false
+        },
+        {
+          "strength": 0.5,
+          "n": 54,
+          "successes": 38,
+          "grit": 0.7037,
+          "ci95_lo": 0.5717,
+          "ci95_hi": 0.8086,
+          "insufficient_support": false
+        }
+      ],
+      "by_model_perturbed": [
+        {
+          "model": "claude-sonnet-5",
+          "n": 18,
+          "successes": 16,
+          "grit": 0.8889,
+          "ci95_lo": 0.672,
+          "ci95_hi": 0.969,
+          "insufficient_support": false
+        },
+        {
+          "model": "deepseek-v4-flash",
+          "n": 15,
+          "successes": 13,
+          "grit": 0.8667,
+          "ci95_lo": 0.6212,
+          "ci95_hi": 0.9626,
+          "insufficient_support": false
+        },
+        {
+          "model": "deepseek-v4-pro",
+          "n": 28,
+          "successes": 24,
+          "grit": 0.8571,
+          "ci95_lo": 0.6851,
+          "ci95_hi": 0.943,
+          "insufficient_support": false
+        },
+        {
+          "model": "claude-haiku-4-5",
+          "n": 14,
+          "successes": 11,
+          "grit": 0.7857,
+          "ci95_lo": 0.5241,
+          "ci95_hi": 0.9243,
+          "insufficient_support": false
+        },
+        {
+          "model": "gpt-5.6-luna",
+          "n": 18,
+          "successes": 14,
+          "grit": 0.7778,
+          "ci95_lo": 0.5478,
+          "ci95_hi": 0.91,
+          "insufficient_support": false
+        },
+        {
+          "model": "gpt-5.6-sol",
+          "n": 17,
+          "successes": 12,
+          "grit": 0.7059,
+          "ci95_lo": 0.4687,
+          "ci95_hi": 0.8672,
+          "insufficient_support": false
+        },
+        {
+          "model": "gpt-5.6-terra",
+          "n": 16,
+          "successes": 11,
+          "grit": 0.6875,
+          "ci95_lo": 0.444,
+          "ci95_hi": 0.8584,
+          "insufficient_support": false
+        }
+      ],
+      "by_perturbation_class_perturbed": [
+        {
+          "perturbation_class": "objective_mutation",
+          "n": 14,
+          "successes": 11,
+          "grit": 0.7857,
+          "ci95_lo": 0.5241,
+          "ci95_hi": 0.9243,
+          "insufficient_support": false
+        },
+        {
+          "perturbation_class": "process_perturbation",
+          "n": 26,
+          "successes": 15,
+          "grit": 0.5769,
+          "ci95_lo": 0.3895,
+          "ci95_hi": 0.7446,
+          "insufficient_support": false
+        },
+        {
+          "perturbation_class": "specification_corruption",
+          "n": 14,
+          "successes": 12,
+          "grit": 0.8571,
+          "ci95_lo": 0.6006,
+          "ci95_hi": 0.9599,
+          "insufficient_support": false
+        },
+        {
+          "perturbation_class": "story:early_degrade",
+          "n": 72,
+          "successes": 63,
+          "grit": 0.875,
+          "ci95_lo": 0.7792,
+          "ci95_hi": 0.9328,
+          "insufficient_support": false
+        }
+      ],
+      "by_operator_perturbed": [
+        {
+          "operator": "force_abandonment",
+          "n": 3,
+          "successes": 1,
+          "grit": null,
+          "ci95_lo": null,
+          "ci95_hi": null,
+          "insufficient_support": true
+        },
+        {
+          "operator": "inject_alien_vocab",
+          "n": 10,
+          "successes": 5,
+          "grit": 0.5,
+          "ci95_lo": 0.2366,
+          "ci95_hi": 0.7634,
+          "insufficient_support": false
+        },
+        {
+          "operator": "inject_competing_goal",
+          "n": 7,
+          "successes": 5,
+          "grit": 0.7143,
+          "ci95_lo": 0.3589,
+          "ci95_hi": 0.9178,
+          "insufficient_support": false
+        },
+        {
+          "operator": "inject_phantom_success",
+          "n": 7,
+          "successes": 6,
+          "grit": 0.8571,
+          "ci95_lo": 0.4869,
+          "ci95_hi": 0.9743,
+          "insufficient_support": false
+        },
+        {
+          "operator": "invert_constraint",
+          "n": 7,
+          "successes": 6,
+          "grit": 0.8571,
+          "ci95_lo": 0.4869,
+          "ci95_hi": 0.9743,
+          "insufficient_support": false
+        },
+        {
+          "operator": "remove_critical_constraint",
+          "n": 7,
+          "successes": 6,
+          "grit": 0.8571,
+          "ci95_lo": 0.4869,
+          "ci95_hi": 0.9743,
+          "insufficient_support": false
+        },
+        {
+          "operator": "reverse_causality",
+          "n": 3,
+          "successes": 3,
+          "grit": null,
+          "ci95_lo": null,
+          "ci95_hi": null,
+          "insufficient_support": true
+        },
+        {
+          "operator": "shift_framing",
+          "n": 10,
+          "successes": 6,
+          "grit": 0.6,
+          "ci95_lo": 0.3127,
+          "ci95_hi": 0.8318,
+          "insufficient_support": false
+        }
+      ],
+      "caveats": [
+        "Only two perturbation strengths exist in the canonical corpus (0.0 and 0.5); G(s) is two points, not a dose-response curve.",
+        "The s=0.0 level is baseline-only and comes entirely from the finding corpus, while s=0.5 mixes finding and story cells \u2014 read 'by_strength_finding_corpus' for the design-controlled comparison.",
+        "A cell missing perturbation_strength or test_executed_success is excluded, never imputed; test_executed_success is the independent runner's verdict, never the agent's self-report.",
+        "Rows with fewer than 5 cells report grit=null (insufficient_support) rather than an under-powered proportion.",
+        "Observational corpus: no multiple-comparison correction across models, operators, or classes; differences are not claimed to be causal."
+      ],
+      "lab_contract": {
+        "lab": "lab_grit.py",
+        "input_dataset_id": "canonical_registry/finding+story",
+        "registry_identity_sha256": "cf8e0b3ec7851f83f9918bda3c8c18a9f3500680959686a9568532de36446c3a",
+        "resolved_input_sha256": "66cb2de70d47e50269d54829a673734d7b7acc5768004a2e112623d5c811837d",
+        "registry_version": "data-manifest/1.0+18392rows",
+        "metric_definition_version": "grit/v2",
+        "metric_source_sha256": "20e77df2ca1eef8342758b6c0e6ceb83504ec106d1a8e0f8b1e7fede5e0e101c",
+        "n_resolved_records": 271,
+        "n_eligible_records": 136,
+        "n_used_records": 136,
+        "n_excluded_records": 135,
+        "n_unused_eligible_records": 0,
+        "used_record_refs_sha256": "e5754e8893e767ad81ed56ced90e2b7841c5ab3e0e3b9993c01406279bf53e19",
+        "excluded_record_refs_sha256": "406e4dcfb0de6257038bf88643c3577caf680c24ba5dd5009f64e7bc119b4edf",
+        "used_unique_records": 136,
+        "used_contributions": 136,
+        "review_without_current_story": 0,
+        "story_without_review": 0,
+        "missing_required_field": 135,
+        "outside_analysis_population": 0,
+        "data_integrity_policy": "docs/data_integrity_findings.md",
+        "requires_external_service": null,
+        "contract_version": "lab-contract/v7",
+        "generated_at": "2026-09-12T20:42:03.310712+00:00"
       }
     },
     "quality_frontier": {
       "experiment_id": "lab_quality_frontier",
-      "generated_at": "2026-09-09T00:12:52.226672",
+      "generated_at": "2026-09-12T20:42:04.216512",
       "summary": {
         "models": 7,
         "stories": 207,
@@ -5244,7 +5523,7 @@ window.DYNAMICS_DATA = {
         "resolved_input_sha256": "00753f57e1b20017872d1cf16f347439a54a568b26c3b6d69d0a28cf5901cad6",
         "registry_version": "data-manifest/1.0+18392rows",
         "metric_definition_version": "quality_frontier/v2",
-        "metric_source_sha256": "4bf5e2c7953d5ffe68ed0499541f12143991be7b4ebbf25dd8622f1cadcf4d1c",
+        "metric_source_sha256": "d8d5ab69c8c935d2f6c52c138e70b01f227b4c09c5a33e197944002fefd02e83",
         "n_resolved_records": 414,
         "n_eligible_records": 414,
         "n_used_records": 414,
@@ -5260,13 +5539,13 @@ window.DYNAMICS_DATA = {
         "outside_analysis_population": 0,
         "data_integrity_policy": "docs/data_integrity_findings.md",
         "requires_external_service": null,
-        "contract_version": "lab-contract/v6",
-        "generated_at": "2026-09-08T22:12:52.227434+00:00"
+        "contract_version": "lab-contract/v7",
+        "generated_at": "2026-09-12T20:42:04.217275+00:00"
       }
     },
     "story_arc": {
       "experiment_id": "lab_story_arc",
-      "generated_at": "2026-09-09T00:12:54.489949",
+      "generated_at": "2026-09-12T20:42:04.997224",
       "summary": {
         "snowball_factor": 2.32,
         "session1_cost": 0.173207,
@@ -5410,7 +5689,7 @@ window.DYNAMICS_DATA = {
         "resolved_input_sha256": "38a1f5dbe586890f453f846aa185f75e150bed7de0d3de007b8c66e3811b1be6",
         "registry_version": "data-manifest/1.0+18392rows",
         "metric_definition_version": "story_arc/v2",
-        "metric_source_sha256": "1e10f13a3df8657c2e75ca2045a1bb8835fb3880b6c475f5d2da6747b40a7c95",
+        "metric_source_sha256": "b3d35d6e73036069a3eb5bcc9a487a6c55ae8fa6e9f82952a50dc7bc3973bf43",
         "n_resolved_records": 207,
         "n_eligible_records": 207,
         "n_used_records": 207,
@@ -5426,13 +5705,13 @@ window.DYNAMICS_DATA = {
         "outside_analysis_population": 0,
         "data_integrity_policy": "docs/data_integrity_findings.md",
         "requires_external_service": null,
-        "contract_version": "lab-contract/v6",
-        "generated_at": "2026-09-08T22:12:54.490613+00:00"
+        "contract_version": "lab-contract/v7",
+        "generated_at": "2026-09-12T20:42:04.997915+00:00"
       }
     },
     "verification_frontier": {
       "experiment_id": "lab_verification_frontier",
-      "generated_at": "2026-09-09T00:12:56.708447",
+      "generated_at": "2026-09-12T20:42:06.709371",
       "summary": {
         "models": 7,
         "stories": 207,
@@ -5550,7 +5829,7 @@ window.DYNAMICS_DATA = {
         "resolved_input_sha256": "38a1f5dbe586890f453f846aa185f75e150bed7de0d3de007b8c66e3811b1be6",
         "registry_version": "data-manifest/1.0+18392rows",
         "metric_definition_version": "verification_frontier/v2",
-        "metric_source_sha256": "3c9ec2ce0be32ac9c6ae3e3ba3e3cdb4e2930a11d87dbb07c0933472b356457c",
+        "metric_source_sha256": "d07b0c256d5cdffc96b02795ef0747df22c39bba878cc4aed4d8965935b82234",
         "n_resolved_records": 207,
         "n_eligible_records": 207,
         "n_used_records": 207,
@@ -5566,13 +5845,13 @@ window.DYNAMICS_DATA = {
         "outside_analysis_population": 0,
         "data_integrity_policy": "docs/data_integrity_findings.md",
         "requires_external_service": null,
-        "contract_version": "lab-contract/v6",
-        "generated_at": "2026-09-08T22:12:56.709028+00:00"
+        "contract_version": "lab-contract/v7",
+        "generated_at": "2026-09-12T20:42:06.710069+00:00"
       }
     },
     "verification_value": {
       "experiment_id": "lab_verification_value",
-      "generated_at": "2026-09-09T00:12:57.419062",
+      "generated_at": "2026-09-12T20:42:07.480909",
       "summary": {
         "correlation_tests_vs_worse_rate": null,
         "cells": 105,
@@ -6325,7 +6604,7 @@ window.DYNAMICS_DATA = {
         "resolved_input_sha256": "8c90d86e0573b3f1e71982d544672cf90ef94cb1097452b3c857baf343d008a6",
         "registry_version": "data-manifest/1.0+18392rows",
         "metric_definition_version": "verification_value/v2",
-        "metric_source_sha256": "f8331d35688c569a39b7247378995514661aa372eef25b879a4536ce544e339a",
+        "metric_source_sha256": "946aefe002096a7cff25c2f9c290dd93b13ffef308e5a7afc936e502233b64de",
         "n_resolved_records": 449,
         "n_eligible_records": 310,
         "n_used_records": 310,
@@ -6341,8 +6620,8 @@ window.DYNAMICS_DATA = {
         "outside_analysis_population": 0,
         "data_integrity_policy": "docs/data_integrity_findings.md",
         "requires_external_service": null,
-        "contract_version": "lab-contract/v6",
-        "generated_at": "2026-09-08T22:12:57.419849+00:00"
+        "contract_version": "lab-contract/v7",
+        "generated_at": "2026-09-12T20:42:07.481732+00:00"
       }
     }
   },
