@@ -59,6 +59,40 @@ def test_recorded_events_are_served_and_arm_the_surface():
     assert payload["rate_by_tier"]["m/two"] == {"attempts": 1, "events": 1}
 
 
+def test_runner_vocabulary_maps_retry_reason_to_the_event_reason(tmp_path):
+    """The runner's AttemptRecord carries the WHY as ``retry_reason`` (the schema declares only
+    escalation_from/to) — the projection must read THAT, not an undeclared ``escalation_reason``."""
+    spec_dir = tmp_path / "workflows" / "spec"
+    spec_dir.mkdir(parents=True)
+    (spec_dir / "run.json").write_text(
+        json.dumps(
+            {
+                "spec_name": "spec",
+                "attempts": [
+                    {
+                        "model": "m/one",
+                        "escalation_from": None,
+                        "escalation_to": None,
+                        "retry_reason": "",
+                    },
+                    {
+                        "model": "m/two",
+                        "escalation_from": "m/one",
+                        "escalation_to": None,
+                        "retry_reason": "escalation",
+                        "cost_usd": 1.0,
+                    },
+                ],
+            }
+        )
+    )
+    rows, _ = load_escalation_attempts(tmp_path / "workflows")
+    payload = build_escalation_cascade(rows, now=_NOW)
+    assert payload["armed"] is True
+    assert payload["events"][0]["reason"] == "escalation"
+    assert payload["events"][0]["cost_usd"] == 1.0
+
+
 def test_spec_filter_narrows_the_population():
     attempts = [
         _attempt("a", "m/one", frm="m/one", to="m/two"),

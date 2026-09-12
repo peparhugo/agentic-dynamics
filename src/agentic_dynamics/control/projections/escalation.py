@@ -64,7 +64,12 @@ def load_escalation_attempts(results_dir: Path) -> tuple[list[dict[str, Any]], i
                     "model": str(attempt.get("model") or ""),
                     "escalation_from": attempt.get("escalation_from"),
                     "escalation_to": attempt.get("escalation_to"),
-                    "escalation_reason": attempt.get("escalation_reason"),
+                    # The reason vocabulary the runner actually writes: the schema declares
+                    # only ``escalation_from``/``escalation_to`` on the attempt; the WHY rides
+                    # ``retry_reason`` ("escalation"). ``escalation_reason`` is read first as
+                    # the forward-compatible name if a future writer adds it.
+                    "escalation_reason": attempt.get("escalation_reason")
+                    or attempt.get("retry_reason"),
                     "cost_usd": attempt.get("cost_usd"),
                 }
             )
@@ -137,8 +142,9 @@ def build_escalation_cascade(
         "armed_note": (
             ""
             if events
-            else "no cascade mechanism (G-27) — escalation fields are declared and "
-            "currently never written; the projection never invents events"
+            else "no escalation events recorded — the cascade exists (step 9, G-27) but is "
+            "opt-in via workflow.params.escalation, and no attempt has escalated in this "
+            "corpus; the projection never invents events"
         ),
         "e_x": e_x,
         "degraded": [],
