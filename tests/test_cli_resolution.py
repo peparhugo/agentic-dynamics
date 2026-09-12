@@ -103,6 +103,11 @@ DOCUMENTED_RESOLUTIONS: list[tuple[tuple[str, ...], str, tuple[str, ...]]] = [
     (("validate", "prereq"), "evidence_prereq_gate.py", ()),
     # validate preexisting — the pre-existing-drift guard (control_db_evidence e5).
     (("validate", "preexisting"), "check_preexisting.py", ()),
+    # validate render — the Control Room render gate (wave W0: the refreshed UI's
+    # deterministic fixture renderer; added to the CLI with the refresh integration, and
+    # the table row landed with it only when this guard caught the drift — main was red
+    # between #48's merge and this fix).
+    (("validate", "render"), "verify_control_room_rendering.py", ()),
     # supervise — the P1-2 regression: the two forms MUST resolve to different scripts.
     (("supervise",), "supervise.py", ()),
     (("supervise", "claude-agents"), "claude_agents_supervisor.py", ()),
