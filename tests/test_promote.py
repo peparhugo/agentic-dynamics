@@ -728,7 +728,7 @@ def test_step10_real_promote_requires_rationale_and_operator(tmp_path):
         _run_promotion(_promote_args(tmp_path, wt, ledger, dry_run=False, operator=""))
 
 
-def test_replay_through_the_REAL_journal_refuses_the_duplicate_act(tmp_path):
+def test_replay_through_the_real_journal_refuses_the_duplicate_act(tmp_path):
     """The review's caller-through-journal gate: with the real default journal, a COMPLETED
     row for this act must stop the command before the push — the step-10 guard was dead code
     because ``begin_command`` advanced completed rows instead of returning them."""

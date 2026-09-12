@@ -63,7 +63,7 @@ def test_a_rerun_reuses_a_crashed_attempts_intent_row(tmp_path):
         assert len(reader.commands()) == 1
 
 
-def test_a_completed_row_RETURNS_by_default_so_the_guard_can_fire(tmp_path):
+def test_a_completed_row_returns_by_default_so_the_guard_can_fire(tmp_path):
     """The review's replay reproduction: promote guards on ``state == "completed"`` — with the
     old helper behavior (always advancing) that guard could NEVER fire, because a replay minted
     a fresh intent instead of returning the finished row."""
