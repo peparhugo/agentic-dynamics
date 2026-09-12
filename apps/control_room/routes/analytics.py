@@ -1,10 +1,16 @@
-"""Analytic read-model routes (step 6, P3/P4/P5/P6): the room's quality/value/arm surfaces.
+"""Analytic read-model routes (steps 6–7): quality/value/arms + queue-SLA/escalation/batch/energy.
 
 ``GET /api/quality`` — model quality: Grit (the one formal definition), first-pass,
 narration (answer/explanation split), coverage. ``GET /api/stories/<name>/arc`` — the
 story session arc (snowball/velocity/β). ``GET /api/value`` — observed-only accepted
 outcomes + cost per accepted outcome. ``GET /api/arms/compare`` — the compare/adapt arm
 ranking over real executed phases.
+
+Step 7 (rule 4/6/8/9 surfaces, measured where owned): ``GET /api/queue/sla`` — queue depth
++ measured burn/completion trace + the 2× depth rule (writer-less timings named unknown);
+``GET /api/escalations`` — recorded cascade events only, E_x labeled; ``GET /api/batch`` —
+not-measurable until a ``batch_mode`` marker exists; ``GET /api/energy`` — the EPM/energy
+scenario sources ([X]/[C]) + the named measured-energy gap.
 
 Read-only by construction: all handlers are GET and serve the injected services' pure
 projections. Absence stays absent (a missing corpus is NAMED in ``degraded``, an unknown
@@ -31,6 +37,10 @@ def register(app, services: ControlRoomServices) -> None:
     app.get("/api/stories/<name>/arc")(api_story_arc)
     app.get("/api/value")(api_value)
     app.get("/api/arms/compare")(api_arms_compare)
+    app.get("/api/queue/sla")(api_queue_sla)
+    app.get("/api/escalations")(api_escalations)
+    app.get("/api/batch")(api_batch)
+    app.get("/api/energy")(api_energy)
 
 
 def api_quality() -> Response:
@@ -57,4 +67,29 @@ def api_value() -> Response:
 def api_arms_compare() -> Response:
     """P6: the arm comparison; optional ``spec`` filter (a named empty state, never an error)."""
     payload, status = _services.arm_comparison(spec=request.args.get("spec") or None)
+    return jsonify(payload), status
+
+
+def api_queue_sla() -> Response:
+    """P8: queue depth + measured burn/trace + the 2× depth rule; ``window=<hours>``."""
+    window = request.args.get("window", type=int) or 72
+    payload, status = _services.sla_queue(window_h=max(1, min(window, 720)))
+    return jsonify(payload), status
+
+
+def api_escalations() -> Response:
+    """P9: the cascade surface; optional ``spec`` filter, no invented events."""
+    payload, status = _services.escalation(spec=request.args.get("spec") or None)
+    return jsonify(payload), status
+
+
+def api_batch() -> Response:
+    """P10: the batch surface (not-measurable + the labeled rule-6 scenario while unowned)."""
+    payload, status = _services.batch()
+    return jsonify(payload), status
+
+
+def api_energy() -> Response:
+    """Rule 4: the EPM/energy scenario surface (published sources, labeled)."""
+    payload, status = _services.energy()
     return jsonify(payload), status

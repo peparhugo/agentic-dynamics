@@ -332,6 +332,111 @@ class ControlRoomServices:
         )
         return payload, 200
 
+    # -- the step-7 modeled/scenario surfaces (rule 4/6/8/9; measured where owned) --
+
+    def _published_website_data(self) -> tuple[dict[str, Any] | None, list[dict[str, str]]]:
+        """Read the generated site data best-effort; a failure is a NAMED degradation."""
+        from apps.control_room.services.published import load_published_data
+
+        try:
+            return load_published_data(self.root / "apps" / "website" / "data.js"), []
+        except Exception as exc:  # noqa: BLE001 — scenario surfaces degrade to named unknowns
+            return None, [
+                {"surface": "published_data", "reason": f"{type(exc).__name__}: {exc}"}
+            ]
+
+    def _queue_jobs(self) -> tuple[list[dict[str, Any]], list[dict[str, str]]]:
+        """Read the live queue best-effort; a failure is a NAMED degradation, never a 500."""
+        from agentic_dynamics.control.queue_reinterleave import read_queue
+
+        try:
+            return list(read_queue(self.redis()) or []), []
+        except Exception as exc:  # noqa: BLE001 — dashboard telemetry may degrade
+            return [], [{"surface": "queue", "reason": f"{type(exc).__name__}: {exc}"}]
+
+    def sla_queue(self, window_h: int = 72) -> tuple[Any, int]:
+        """P8: queue depth + measured completions + the 2× depth rule (writer-less fields named)."""
+        from datetime import datetime, timezone
+
+        from agentic_dynamics.control.control_db import ControlDB
+        from agentic_dynamics.control.projections import sla_queue as sq
+
+        now = datetime.now(timezone.utc).isoformat()
+        queue_jobs, degraded = self._queue_jobs()
+        attempts: list[dict[str, Any]] = []
+        try:
+            with ControlDB.open_read_only() as db:
+                attempts = [
+                    {
+                        "job_id": attempt.step_id,
+                        "model": attempt.model,
+                        "state": attempt.state.value,
+                        "started_at": attempt.started_at,
+                        "ended_at": attempt.ended_at,
+                    }
+                    for attempt in db.recent_attempts(limit=200)
+                ]
+        except Exception as exc:  # noqa: BLE001 — named degradation, never a 500
+            degraded.append({"surface": "control_db", "reason": f"{type(exc).__name__}: {exc}"})
+        views, n_ledgers = sq.load_breach_views(
+            self.root / "experiments" / "results" / "workflows"
+        )
+        payload = sq.build_sla_queue(
+            queue_jobs,
+            attempts,
+            views,
+            window_h=window_h,
+            now=now,
+            source={"workflow_ledgers": n_ledgers, "recent_attempts": len(attempts)},
+        )
+        payload["degraded"] = list(payload.get("degraded", [])) + degraded
+        return payload, 200
+
+    def escalation(self, spec: str | None = None) -> tuple[Any, int]:
+        """P9: the cascade surface — recorded events only; E_x from the published measurement."""
+        from datetime import datetime, timezone
+
+        from agentic_dynamics.control.projections import escalation as esc
+
+        now = datetime.now(timezone.utc).isoformat()
+        rows, n_ledgers = esc.load_escalation_attempts(
+            self.root / "experiments" / "results" / "workflows"
+        )
+        published, degraded = self._published_website_data()
+        payload = esc.build_escalation_cascade(
+            rows,
+            spec=spec,
+            published=published,
+            now=now,
+            source={"workflow_ledgers": n_ledgers},
+        )
+        payload["degraded"] = list(payload.get("degraded", [])) + degraded
+        return payload, 200
+
+    def batch(self) -> tuple[Any, int]:
+        """P10: the batch surface — not-measurable until a ``batch_mode`` marker exists."""
+        from datetime import datetime, timezone
+
+        from agentic_dynamics.control.projections import batch as batch_projection
+
+        now = datetime.now(timezone.utc).isoformat()
+        jobs, degraded = self._queue_jobs()
+        payload = batch_projection.build_batch(jobs, now=now, source={"queue_scanned": True})
+        payload["degraded"] = list(payload.get("degraded", [])) + degraded
+        return payload, 200
+
+    def energy(self) -> tuple[Any, int]:
+        """Rule 4: the EPM/energy scenario surface (published sources + the named measured gap)."""
+        from datetime import datetime, timezone
+
+        from agentic_dynamics.control.projections import energy as energy_projection
+
+        now = datetime.now(timezone.utc).isoformat()
+        published, degraded = self._published_website_data()
+        payload = energy_projection.build_energy(published, now=now)
+        payload["degraded"] = list(payload.get("degraded", [])) + degraded
+        return payload, 200
+
 
 def build_services() -> ControlRoomServices:
     """Build the application context from the server module's live configuration.

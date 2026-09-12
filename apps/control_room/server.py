@@ -1,7 +1,7 @@
 """Dynamic-code admin portal backend (the Control Room).
 
 Serves the admin dashboard and exposes live experiment telemetry over SSE. This module is now
-the *composition root* (refactor-repair Debt-1): the 40 routes live in ``routes/``, the business
+the *composition root* (refactor-repair Debt-1): the 44 routes live in ``routes/``, the business
 logic in ``services/``, the external-interface clients in ``clients/``, and the filesystem paths
 in ``paths.py``. This file keeps the shared context — configuration constants, the Redis /
 manager / client factories, the parsed-manifest cache, and the Flask ``app`` — and builds the
@@ -11,7 +11,7 @@ It still re-exports the names the tests monkeypatch (``_redis``, ``_design_sessi
 ``DATA_MANIFEST_PATH``, …): the injected services delegate back to those names at call time, so
 the existing test suite is behaviour-identical.
 
-Endpoints (40 routes across 9 API categories, plus the static shell):
+Endpoints (44 routes across 9 API categories, plus the static shell):
 
     Legacy telemetry (8):
         GET  /api/matrix · GET /api/status · GET /api/events/<cell_id>
@@ -33,9 +33,11 @@ Endpoints (40 routes across 9 API categories, plus the static shell):
         GET  /api/recording-audit · POST /api/recording-sweep/run
     Operations (2):
         GET  /api/operations · GET /api/runs/<run_id>
-    Analytics (4):
+    Analytics (8):
         GET  /api/quality · GET /api/stories/<name>/arc · GET /api/value ·
         GET  /api/arms/compare   (step-6 projections P3/P4/P5/P6)
+        GET  /api/queue/sla · GET /api/escalations · GET /api/batch · GET /api/energy
+        (step-7 rules 9/8/6/4 — measured where owned, labeled scenarios where not)
     Static shell (1):
         GET  / — static dashboard (apps/control_room/static)
 

@@ -53,6 +53,19 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+try:
+    import _bootstrap  # noqa: F401  # direct run: scripts/ is sys.path[0]
+except ImportError:  # imported as scripts.<name> — repo root is on sys.path
+    from scripts import _bootstrap  # noqa: F401
+
+from agentic_dynamics.reporting.workflow_metrics import (  # noqa: E402
+    BREACH_FIELDS,
+    SLA_BEHAVIOR_DEFINITION,
+)
+from agentic_dynamics.reporting.workflow_metrics import (
+    sla_behavior as _sla_behavior_values,
+)
+
 ROOT = Path(__file__).resolve().parent.parent
 
 # ── Pinned mandate ────────────────────────────────────────────────────────────
@@ -69,7 +82,7 @@ PINNED_METRIC_DEFINITIONS: dict[str, str] = {
     "throughput": "throughput = cells or phases per hour per campaign",
     "cost_per_accepted": "cost-per-accepted = the accepted outcomes' cost",
     "checkpoint_latency": "the checkpoint latency = decided_at - reached_at per approval",
-    "sla_behavior": "SLA = the timeouts/deadline breaches / total",
+    "sla_behavior": SLA_BEHAVIOR_DEFINITION,
 }
 
 #: The attempt-level fields the pinned definitions consume but the runtime declares-not-writes
@@ -89,12 +102,11 @@ KIND_CAMPAIGN_PHASE = "campaign_phase"
 KIND_ATTEMPT = "attempt"
 KIND_OTHER = "other"
 
-#: The per-phase runner fields that carry the SLA/limit-breach evidence (a timeout via the
-#: phase watchdog ``stall_evidence``, and the mechanical gate breaches). A phase from a
-#: post-hardening runner carries these keys (``None`` = no breach); a pre-hardening ledger omits
-#: them entirely. The sla_behavior metric is only measurable over phases that actually carry them.
-BREACH_FIELDS = ("stall_evidence", "deploy_gate", "commit_gate", "relabel_gate")
-
+#: The per-phase runner fields that carry the SLA/limit-breach evidence — moved to
+#: ``agentic_dynamics.reporting.workflow_metrics`` (step 7) so the Control Room's P8
+#: projection computes the SAME metric; imported above, re-exported here for the instrument's
+#: consumers/tests.
+#
 #: The framework's own scenario/design constants, cited verbatim from ``apps/website/framework.html``
 #: for the framework-comparison stage. These are the values the website uses for the Rules 6-9
 #: levers; the comparison stage places the *measured* values beside them, never conflating the two.
@@ -713,36 +725,29 @@ def compute_sla_behavior(corpus: LedgerCorpus) -> MetricValue:
     actually recorded the fields (``breach_fields_recorded``): a pre-hardening ledger omits the
     keys entirely, and "absent key" must not be read as "zero breaches" — that would impute a
     clean record onto a ledger that never recorded one.
+
+    The counting itself lives in ``reporting.workflow_metrics.sla_behavior`` (step 7) — the SAME
+    implementation the Control Room's P8 projection consumes, so the website pipeline and the
+    room can never report different breach numbers for the same phases.
     """
-    recorded = [p for p in corpus.phases if p.breach_fields_recorded]
-    if not recorded:
+    views = [
+        {
+            "breach_fields_recorded": p.breach_fields_recorded,
+            "stall_evidence": p.stall_evidence,
+            "deploy_gate": p.deploy_gate,
+            "commit_gate": p.commit_gate,
+            "relabel_gate": p.relabel_gate,
+        }
+        for p in corpus.phases
+    ]
+    value = _sla_behavior_values(views)
+    if value is None:
         return _not_measurable("sla_behavior", list(BREACH_FIELDS))
-
-    def _breach(evidence: dict[str, Any] | None) -> bool:
-        """A breach is a non-empty evidence dict (the runner writes ``None`` for no breach)."""
-        return isinstance(evidence, dict) and bool(evidence)
-
-    stall = sum(1 for p in recorded if _breach(p.stall_evidence))
-    deploy = sum(1 for p in recorded if _breach(p.deploy_gate))
-    commit = sum(1 for p in recorded if _breach(p.commit_gate))
-    relabel = sum(1 for p in recorded if _breach(p.relabel_gate))
-    total = len(recorded)
     return MetricValue(
         name="sla_behavior",
         definition=PINNED_METRIC_DEFINITIONS["sla_behavior"],
         measurable=True,
-        value={
-            "total_phases_with_breach_fields": total,
-            "timeout_breaches": stall,
-            "gate_breaches": deploy + commit + relabel,
-            "breakdown": {
-                "stall": stall,
-                "deploy_gate": deploy,
-                "commit_gate": commit,
-                "relabel_gate": relabel,
-            },
-            "timeout_breach_rate": round(stall / total, 6) if total else None,
-        },
+        value=value,
         basis="measured",
         source_fields=list(BREACH_FIELDS),
     )

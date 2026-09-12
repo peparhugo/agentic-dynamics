@@ -2033,6 +2033,20 @@ class ControlDB:
         sql += " ORDER BY started_at ASC, step_id ASC, attempt_no ASC"
         return [_attempt_from_row(r) for r in self._conn.execute(sql, params).fetchall()]
 
+    def recent_attempts(self, *, limit: int = 200) -> list[StepAttemptRecord]:
+        """The most recently COMPLETED attempts across all runs (newest first).
+
+        A fleet-level READ accessor for the Control Room's queue/SLA surface: ordered by
+        ``ended_at`` descending — a never-ended attempt has an empty ``ended_at`` and orders
+        last, never first — capped at ``limit``. It never writes, and like every read it does
+        not advance the control epoch.
+        """
+        rows = self._conn.execute(
+            "SELECT * FROM step_attempts ORDER BY ended_at DESC, started_at DESC LIMIT ?",
+            (int(limit),),
+        ).fetchall()
+        return [_attempt_from_row(r) for r in rows]
+
     # ── gate_results ─────────────────────────────────────────────────────────────────────
 
     def record_gate_result(
