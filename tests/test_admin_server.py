@@ -390,6 +390,23 @@ def test_matrix_liveness_uses_the_newer_of_phase_and_telemetry(monkeypatch):
     assert phase["age_seconds"] == 60
 
 
+def test_matrix_stale_running_keeps_lifecycle_and_names_staleness(monkeypatch):
+    """Health vs lifecycle (step 5): a quiet running cell keeps its lifecycle status — the
+    telemetry silence is NAMED in ``stale_cells``, never relabeled as a lifecycle "ended"."""
+    monkeypatch.setattr(server, "_utc_now", lambda: "2026-09-01T12:00:00Z")
+    redis = FakeRedis(
+        statuses={"quiet": "running"},
+        phases={"quiet": _phase("quiet", published_at="2026-09-01T10:00:00Z")},  # age 7200
+    )
+    monkeypatch.setattr(server, "_redis", lambda: redis)
+
+    matrix = server.app.test_client().get("/api/matrix").get_json()
+
+    assert matrix["cells"]["quiet"] == "running"  # durable lifecycle kept (authoritative)
+    assert matrix["stale_cells"] == ["quiet"]  # health named as its own dimension
+    assert matrix["stale_running"] == 1
+
+
 def test_matrix_marks_exactly_the_window_says(monkeypatch):
     """LIVE is exactly the window predicate: age <= 600s, regardless of who wrote the phase."""
     monkeypatch.setattr(server, "_utc_now", lambda: "2026-09-01T12:00:00Z")
@@ -1165,7 +1182,7 @@ def test_design_session_input_forwards_allowlisted_delivery(monkeypatch):
 
 
 def test_route_inventory_covers_all_registered_routes():
-    """F2: the inventory's 34 routes match the actual url_map exactly.
+    """F2: the inventory's 36 routes match the actual url_map exactly.
 
     The count tracks the documented inventory in ``apps/control_room/server.py``'s module
     docstring and ``scripts/CONTEXT.md``. It went 28 -> 29 when ``GET /api/subscription-usage``
@@ -1181,8 +1198,8 @@ def test_route_inventory_covers_all_registered_routes():
     ]
 
     # GET and POST on the same path register two Rule objects; count them
-    # (34), then dedupe for path-membership assertions below.
-    assert len(rules) == 34
+    # (36), then dedupe for path-membership assertions below.
+    assert len(rules) == 36
     routes = {rule.rule for rule in rules}
 
     # The surfaces the stale inventory omitted are all registered.
@@ -1204,6 +1221,8 @@ def test_route_inventory_covers_all_registered_routes():
         "/api/projections",
         "/api/recording-audit",
         "/api/recording-sweep/run",
+        "/api/operations",
+        "/api/runs/<run_id>",
     ):
         assert required in routes, f"missing route in inventory: {required}"
 

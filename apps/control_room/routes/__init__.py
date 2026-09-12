@@ -1,6 +1,6 @@
 """Control Room route modules (refactor-repair Debt-1; review P2 service context).
 
-The 34 routes, grouped by surface, extracted from ``server.py``. Each submodule exposes a
+The 36 routes, grouped by surface, extracted from ``server.py``. Each submodule exposes a
 ``register(app, services)`` function; :func:`register` wires them all, forwarding the injected
 ``ControlRoomServices`` application context. Route handlers read shared state through the injected
 ``services`` object (``services.redis()``, ``services.design_manager()``, …) rather than importing
@@ -31,6 +31,7 @@ def register(app: Flask, services: ControlRoomServices) -> None:
         docs_health,
         flags,
         index,
+        operations,
         recording,
         registry,
         telemetry,
@@ -44,3 +45,4 @@ def register(app: Flask, services: ControlRoomServices) -> None:
     claude_agents.register(app, services)
     docs_health.register(app, services)
     index.register(app, services)
+    operations.register(app, services)

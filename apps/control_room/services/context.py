@@ -152,6 +152,67 @@ class ControlRoomServices:
         return server.DOCS_DRIFT_RESULTS_DIR
 
 
+    def operations_snapshot(self) -> tuple[Any, int]:
+        """The room's operational read model (step 5): the ONE packet + the attention block.
+
+        The collectors are the CLI's own (``control_status.read_repo_head_sha`` /
+        ``read_worker_heartbeats``) and their failures ride the packet's ``degraded`` surface:
+        an uncollected git sha or an unreadable Redis is NAMED, never a fabricated value. A
+        control plane that cannot be opened is named degraded too — the room must render the
+        outage, not 500 on it.
+        """
+        from agentic_dynamics.control import control_status as cs
+        from agentic_dynamics.control.control_db import ControlDB
+        from apps.control_room.services import operations as ops
+
+        repo_head_sha, git_error = cs.read_repo_head_sha()
+        degraded: list[dict[str, str]] = []
+        if git_error:
+            degraded.append({"surface": "repo_head_sha", "reason": git_error})
+        heartbeats: Any = None
+        heartbeats, redis_error = cs.read_worker_heartbeats()
+        if redis_error:
+            heartbeats = None
+            degraded.append({"surface": "unhealthy_workers", "reason": redis_error})
+        try:
+            with ControlDB.open_read_only() as db:
+                snapshot = ops.operational_snapshot(
+                    db, repo_head_sha=repo_head_sha, heartbeats=heartbeats
+                )
+        except Exception as exc:  # noqa: BLE001 — an unreadable control plane is degraded data
+            return {
+                "schema": ops.SCHEMA,
+                "source": {},
+                "attention": [],
+                "active_runs": [],
+                "promotable_runs": [],
+                "unhealthy_workers": [],
+                "projection_lag": {},
+                "safe_actions": [],
+                "degraded": degraded
+                + [{"surface": "control_db", "reason": f"{type(exc).__name__}: {exc}"}],
+            }, 200
+        snapshot["degraded"] = list(snapshot.get("degraded", [])) + degraded
+        return snapshot, 200
+
+    def run_detail(self, run_id: str) -> tuple[Any, int]:
+        """The P1/P2 per-run detail; unknown run -> 404, unreadable control plane -> named 200."""
+        from agentic_dynamics.control.control_db import ControlDB
+        from apps.control_room.services import operations as ops
+
+        try:
+            with ControlDB.open_read_only() as db:
+                detail = ops.run_detail(db, run_id)
+        except Exception as exc:  # noqa: BLE001 — named degradation, never a 500
+            return {
+                "error": "control_db_unavailable",
+                "reason": f"{type(exc).__name__}: {exc}",
+            }, 200
+        if detail is None:
+            return {"error": "run not found", "run_id": run_id}, 404
+        return detail, 200
+
+
 def build_services() -> ControlRoomServices:
     """Build the application context from the server module's live configuration.
 
