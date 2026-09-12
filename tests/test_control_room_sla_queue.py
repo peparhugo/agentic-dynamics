@@ -20,6 +20,7 @@ from agentic_dynamics.control.projections.sla_queue import (  # noqa: E402
     SCHEMA,
     build_sla_queue,
     load_breach_views,
+    load_job_timings,
 )
 from agentic_dynamics.reporting.workflow_metrics import (  # noqa: E402
     BREACH_FIELDS,
@@ -28,6 +29,13 @@ from agentic_dynamics.reporting.workflow_metrics import (  # noqa: E402
 )
 
 _NOW = "2026-09-12T12:00:00+00:00"
+
+
+def _iso(epoch: float) -> str:
+    """An ISO-8601 UTC stamp for an epoch second (timezone-aware, matching the payload)."""
+    from datetime import datetime, timezone
+
+    return datetime.fromtimestamp(epoch, tz=timezone.utc).isoformat()
 
 
 def _attempt(step_id, started, ended, model="m/one", state="ok"):
@@ -52,21 +60,84 @@ def test_depth_drives_the_twice_depth_rule():
     assert rule["class"] == "[P]"
 
 
-def test_per_job_timings_are_named_unknowns_never_numbers():
-    jobs = [{"job_id": "j1", "state": "queued"}]
+def test_a_payload_without_stamps_keeps_named_unknowns():
+    """A pre-step-8 cell has no enqueue stamp: the wait is a named absence, never a number."""
+    jobs = [{"job_id": "old-job", "state": "queued"}]
     payload = build_sla_queue(jobs, [], [], now=_NOW)
     row = payload["per_job"][0]
-    assert row["job_id"] == "j1"
-    for field in ("queue_wait_ms", "service_time_ms", "due_at", "deadline_slack"):
-        block = row[field]
-        assert block["state"] == "unknown"
-        assert "no writer" in block["reason"]
-        assert not any(isinstance(v, (int, float)) for v in block.values() if not isinstance(v, bool))
+    assert row["job_id"] == "old-job"
+    assert row["queue_wait_ms"]["state"] == "unknown"
+    assert "no enqueue stamp" in row["queue_wait_ms"]["reason"]
     assert row["queue_wait_ms"]["gap"] == "G-30"
+    # service time has not happened yet — pending, not unknown and not zero
+    assert row["service_time_ms"]["state"] == "pending"
     assert row["due_at"]["gap"] == "G-32"
-    # the horizon has no writer either — unset, never defaulted.
-    assert payload["sla"]["horizon"]["state"] == "unknown"
+    # the horizon is unset (no policy stamped) — still named, never defaulted
+    assert payload["sla"]["horizon"]["state"] == "unset"
     assert payload["sla"]["horizon"]["gap"] == "G-33"
+
+
+def test_live_wait_is_measured_and_pending_fields_stay_pending():
+    """Step 8: enqueue stamps enqueued_at -> the live wait is a subtraction the room CAN do."""
+    enqueued = 1_756_900_000.0  # 2026-09-...T10:26:40Z — any fixed epoch works
+    jobs = [{"cell_id": "c1", "state": "queued", "enqueued_at": enqueued, "due_at": enqueued + 7200}]
+    now = 1_756_900_060.0  # 60s later
+    payload = build_sla_queue(jobs, [], [], now=_iso(now))
+    row = payload["per_job"][0]
+    assert row["job_id"] == "c1"
+    assert row["queue_wait_so_far_ms"] == 60000.0
+    assert row["queue_wait_ms"]["state"] == "pending"
+    assert row["service_time_ms"]["state"] == "pending"
+    assert row["due_at"] == enqueued + 7200
+    assert row["deadline_slack_so_far_ms"] == 7140000.0  # 2h - 60s
+    assert payload["sla"]["horizon"]["state"] == "stamped"
+    assert payload["sla"]["horizon"]["stamped_jobs"] == 1
+
+
+def test_recent_completions_serve_the_settled_timings_and_coverage():
+    timings = [
+        {
+            "cell_id": "c1",
+            "story": "task_manager_api",
+            "model": "m/one",
+            "status": "done",
+            "enqueued_at": 100.0,
+            "started_at": 130.0,
+            "ended_at": 190.0,
+            "queue_wait_ms": 30000.0,
+            "service_time_ms": 60000.0,
+        },
+        {
+            "cell_id": "c2",
+            "status": "failed",
+            "started_at": 200.0,
+            "ended_at": 260.0,
+            "service_time_ms": 60000.0,
+        },
+    ]
+    payload = build_sla_queue([], [], [], timings=timings, now=_NOW)
+    block = payload["recent_completions"]
+    assert block["n_rows"] == 2
+    assert block["n_with_queue_wait"] == 1
+    assert block["n_with_deadline"] == 0
+    # newest ended first; measured keys present only where measured
+    assert [row["cell_id"] for row in block["rows"]] == ["c2", "c1"]
+    assert block["rows"][1]["queue_wait_ms"] == 30000.0
+    assert "queue_wait_ms" not in block["rows"][0]
+
+
+def test_loader_reads_the_timing_ledger_and_counts_skips(tmp_path):
+    path = tmp_path / "queue_timings.jsonl"
+    path.write_text(
+        '{"cell_id": "c1", "queue_wait_ms": 1.0}\n'
+        "not json\n"
+        '{"no_cell": true}\n'
+        '{"cell_id": "c2", "service_time_ms": 2.0}\n'
+    )
+    rows, skipped = load_job_timings(path)
+    assert [r["cell_id"] for r in rows] == ["c1", "c2"]
+    assert skipped == 2
+    assert load_job_timings(tmp_path / "nope.jsonl") == ([], 0)
 
 
 def test_burn_and_trace_come_from_measured_timestamps_only():
