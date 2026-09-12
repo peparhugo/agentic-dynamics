@@ -22,9 +22,15 @@ Manual `sys.argv` parse, confirmed `scripts/enqueue.py:143-152`:
 ```
 --dry-run        in sys.argv — print the plan only, don't write to Redis
 --clear          in sys.argv — reset the queue (destructive)
---missing-only   in sys.argv — skip cells that already have a saved result
+--missing-only   in sys.argv — skip cells that already have a saved result OR are already
+                  queued in either lane (queued-not-yet-run is not done; without this, a
+                  re-fill re-pushes the same cells — the ~65x duplication of 2026-09-12)
 --interleave     in sys.argv — round-robin fill across models/providers so concurrent
                   workers spread across providers instead of hammering one
+--batch          in sys.argv — stamp batch_mode: true and push to the DEFERRED lane
+                  (story_jobs_batch); the worker drains it only when the on-demand lane is
+                  empty (ordered BRPOP). Mutually exclusive with --interleave
+--due-hours N    in sys.argv — stamp an SLA horizon per cell (G-32/G-33)
 --model VALUE    read via sys.argv.index("--model") + 1
                   default: $FINOPS_MODEL, else "deepseek/deepseek-v4-pro"
 ```
@@ -34,8 +40,9 @@ python3 scripts/enqueue.py                                    # fill queue, defa
 python3 scripts/enqueue.py --model anthropic/claude-sonnet-5   # target a specific model
 python3 scripts/enqueue.py --missing-only                      # skip cells with a saved result
 python3 scripts/enqueue.py --interleave                        # round-robin across providers
+python3 scripts/enqueue.py --batch                             # deferred lane (rule 6)
 python3 scripts/enqueue.py --dry-run                           # print the plan only
-python3 scripts/enqueue.py --clear                             # reset the queue (destructive)
+python3 scripts/enqueue.py --clear                             # reset BOTH lanes (destructive)
 ```
 
 **Safety convention: never run `--clear` without checking queue state first.** The
@@ -71,13 +78,29 @@ Run N workers in parallel for N-way concurrency (`AGENTS.md`'s Commands block: "
 — BRPOP worker — run N in parallel") — start multiple `python3 scripts/worker.py &`
 processes.
 
+### The deferred batch lane (rule 6)
+
+Two lanes, one worker: on-demand cells (`story_jobs`) and **batch** cells
+(`story_jobs_batch`, stamped `batch_mode: true` by `--batch`). The worker's pop is an ORDERED
+`BRPOP story_jobs story_jobs_batch` — Redis checks keys left to right, so on-demand work
+always drains first and a batch cell runs only when no on-demand work waits (the deferral is
+the executor; no provider batch transport exists, so the 50% discount stays a labeled
+scenario while the batch-vs-on-demand SPLIT is measured). Details that matter:
+
+- a batch cell that gets admission-denied is requeued to ITS OWN lane (never promoted to
+  on-demand by accident);
+- the idle-exit check counts both lanes;
+- `monitor.py`, the fleet board, and the Control Room count both lanes (batch depth is also
+  reported separately);
+- `--interleave` never touches the batch lane (deferral preserved).
+
 ## 3. `monitor.py` — check status
 
 Manual `sys.argv` parse, confirmed `scripts/monitor.py:114-116`:
 
 ```
 --watch    in sys.argv — live 5s-refresh loop, needs an interactive terminal
---clear    in sys.argv — deletes story_jobs/story_status/story_results (destructive)
+--clear    in sys.argv — deletes story_jobs + story_jobs_batch + the status/results hashes (destructive)
 --json     in sys.argv — machine-readable output
 ```
 

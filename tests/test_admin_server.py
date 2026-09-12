@@ -85,6 +85,7 @@ class FakeRedis:
         review_statuses=None,
         analysis_queue=0,
         review_queue=0,
+        batch_queue=0,
         phases=None,
     ):
         self.statuses = statuses or {}
@@ -93,6 +94,7 @@ class FakeRedis:
         self.review_statuses = review_statuses or {}
         self.analysis_queue = analysis_queue
         self.review_queue = review_queue
+        self.batch_queue = batch_queue
         self.logs = logs or {}
         self.phases = phases or {}
         self.pubsub_client = FakePubSub(messages)
@@ -101,6 +103,8 @@ class FakeRedis:
     def llen(self, key):
         if key == "story_jobs":
             return 2
+        if key == "story_jobs_batch":
+            return self.batch_queue  # the deferred lane (rule 6)
         if key == "analysis_jobs":
             return self.analysis_queue
         if key == "review_jobs":

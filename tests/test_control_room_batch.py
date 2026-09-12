@@ -59,3 +59,28 @@ def test_a_non_boolean_marker_is_not_a_measurement():
     payload = build_batch(jobs, now=_NOW)
     assert payload["measurable"] is False
     assert payload["reason"] == "no batch_mode marker"
+
+
+def test_an_empty_queue_classifies_nothing():
+    """No jobs is not 'no marker' — the reason names the empty queue, never a fake zero."""
+    payload = build_batch([], now=_NOW)
+    assert payload["measurable"] is False
+    assert payload["reason"] == "queue empty — nothing to classify"
+    assert payload["scanned_jobs"] == 0
+
+
+def test_lane_tagged_jobs_measure_the_split_and_label_the_discount():
+    """The room tags each job by its lane (the lane IS the mode) — the split is measured."""
+    jobs = [
+        {"cell_id": "a", "batch_mode": False},
+        {"cell_id": "b", "batch_mode": True},
+        {"cell_id": "c", "batch_mode": True},
+        {"cell_id": "d", "batch_mode": True},
+    ]
+    payload = build_batch(jobs, now=_NOW)
+    assert payload["measurable"] is True
+    assert payload["batch_fraction"] == 0.75
+    assert payload["batch_jobs"] == 3
+    assert payload["on_demand_jobs"] == 1
+    # the 50% economics stay a labeled scenario — no provider batch transport exists
+    assert payload["modeled"]["class"] == "X/P"
