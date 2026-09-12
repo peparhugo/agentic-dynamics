@@ -147,3 +147,30 @@ def test_run_detail_carries_every_control_record(tmp_path):
 def test_run_detail_unknown_run_is_none_not_a_skeleton(tmp_path):
     with _db(tmp_path) as db:
         assert run_detail(db, "run-does-not-exist") is None
+
+
+def test_operations_handlers_serve_the_services_payload():
+    """The route layer is thin: it renders whatever the injected services return, with the
+    services' status codes — 200 for the packet, 404 for an unknown run."""
+    from flask import Flask
+
+    from apps.control_room.routes import operations as route_ops
+
+    class _FakeServices:
+        def operations_snapshot(self):
+            return {"schema": "control-room-operations/v1", "degraded": []}, 200
+
+        def run_detail(self, run_id):
+            if run_id == "run-1":
+                return {"schema": "control-room-run-detail/v1", "run": {"run_id": run_id}}, 200
+            return {"error": "run not found", "run_id": run_id}, 404
+
+    app = Flask(__name__)
+    route_ops.register(app, _FakeServices())
+    client = app.test_client()
+
+    assert client.get("/api/operations").status_code == 200
+    detail = client.get("/api/runs/run-1")
+    assert detail.status_code == 200
+    assert detail.get_json()["run"]["run_id"] == "run-1"
+    assert client.get("/api/runs/nope").status_code == 404

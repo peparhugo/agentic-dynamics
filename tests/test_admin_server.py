@@ -1165,7 +1165,7 @@ def test_design_session_input_forwards_allowlisted_delivery(monkeypatch):
 
 
 def test_route_inventory_covers_all_registered_routes():
-    """F2: the inventory's 34 routes match the actual url_map exactly.
+    """F2: the inventory's 36 routes match the actual url_map exactly.
 
     The count tracks the documented inventory in ``apps/control_room/server.py``'s module
     docstring and ``scripts/CONTEXT.md``. It went 28 -> 29 when ``GET /api/subscription-usage``
@@ -1181,8 +1181,8 @@ def test_route_inventory_covers_all_registered_routes():
     ]
 
     # GET and POST on the same path register two Rule objects; count them
-    # (34), then dedupe for path-membership assertions below.
-    assert len(rules) == 34
+    # (36), then dedupe for path-membership assertions below.
+    assert len(rules) == 36
     routes = {rule.rule for rule in rules}
 
     # The surfaces the stale inventory omitted are all registered.
@@ -1204,6 +1204,8 @@ def test_route_inventory_covers_all_registered_routes():
         "/api/projections",
         "/api/recording-audit",
         "/api/recording-sweep/run",
+        "/api/operations",
+        "/api/runs/<run_id>",
     ):
         assert required in routes, f"missing route in inventory: {required}"
 

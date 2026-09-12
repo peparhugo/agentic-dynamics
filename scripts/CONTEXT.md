@@ -277,10 +277,10 @@ reasoning_divergence, semantic_clusters. Superseded by `semantic_validation.py`.
 
 | File | Purpose |
 |------|---------|
-| `apps/control_room/server.py` | Flask backend — the **Control Room portal**, 34 routes across 7 API categories plus the static shell (below). Serves `apps/control_room/static/`. Port 8000 (`FINOPS_PORT`). |
+| `apps/control_room/server.py` | Flask backend — the **Control Room portal**, 36 routes across 8 API categories plus the static shell (below). Serves `apps/control_room/static/`. Port 8000 (`FINOPS_PORT`). |
 | `apps/control_room/static/` | Vanilla-JS dashboard: Matrix grid, Cell Inspector (live transcript), Routing board, supervisor flags, design sessions, Claude background sessions. |
 
-`apps/control_room/server.py`'s 34 routes, categorized:
+`apps/control_room/server.py`'s 36 routes, categorized:
 - **Legacy telemetry** (8): `/api/matrix`, `/api/status` (SSE), `/api/events/<cell_id>` (SSE), `/api/projections`, `/api/routing`, `/api/subscription-usage`, `POST /api/experiments`, `POST /api/queue/reinterleave`
 - **Supervisor flags** (3): `/api/flags`, `POST /api/flags/<session_id>/steer`, `POST /api/flags/<session_id>/interrupt`
 - **Registry** (2): `/api/registry`, `/api/registry/<entity_id>`
@@ -288,6 +288,7 @@ reasoning_divergence, semantic_clusters. Superseded by `semantic_validation.py`.
 - **Claude background sessions** (9): `/api/claude-agents`, `POST /api/claude-agents`, `/api/claude-agents/<session_id>/logs`, `POST /api/claude-agents/<session_id>/stop`, `POST /api/claude-agents/<session_id>/respawn`, `POST /api/claude-agents/<session_id>/rm`, `POST /api/claude-agents/<session_id>/steer`, `/api/claude-agents/daemon`, `POST /api/claude-agents/daemon/stop`
 - **Docs health** (2): `/api/docs-health`, `POST /api/docs-health/approve` — the docs-drift rail's surface (green/yellow/red + the controller's approve affordance; see `scripts/scan_docs_drift.py` → `docs_drift_watchdog.py` → `docs_proposal_gate.py`)
 - **Recording** (2): `/api/recording-audit`, `POST /api/recording-sweep/run` — the recording rail's read + sweep trigger (`scripts/recording_sweep.py`)
+- **Operations** (2): `/api/operations`, `/api/runs/<run_id>` — the operational read models (step 5): the packet + attention/triage, and P1/P2 per-run detail over the control records
 - **Static shell** (1): `GET /`
 
 Full endpoint reference: `docs/architecture/current/supervisor_design.md`, `docs/architecture/current/spec.md`.

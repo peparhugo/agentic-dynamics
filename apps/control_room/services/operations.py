@@ -37,7 +37,7 @@ def operational_snapshot(
     db: Any,
     *,
     repo_head_sha: str,
-    heartbeats: Mapping[str, Mapping[str, Any]],
+    heartbeats: Mapping[str, Mapping[str, Any]] | None,
     now: Any | None = None,
 ) -> dict[str, Any]:
     """The room's operational view: the packet, plus a triage-ordered ``attention`` block.
