@@ -224,7 +224,8 @@ plans:
         - --project
         - agentic-dynamics
   feature:
-    description: Spec → implement → lint → test → review → ship
+    description: Spec → implement → lint → test → review (permanence = the controller's
+      governed PR merge / workflow promote — waves A5 retired the direct ship phase)
     phases:
     - id: spec
       kind: shell
@@ -260,12 +261,9 @@ plans:
       - lint
       - test
       review_model: deepseek/deepseek-v4-flash
-    - id: push
-      kind: ship
-      depends_on:
-      - review
   ship_features:
-    description: Parallel feature workstreams → conflict detect → PR → merge
+    description: Parallel feature workstreams → conflict detect → PR create (the controller
+      merges — waves A5 retired the direct pr_merge phase)
     phases:
     - id: build
       kind: fan_out
@@ -337,10 +335,4 @@ plans:
       - conflicts
       from_fanout: build
       title: 'Feature: {name}'
-    - id: merge
-      kind: pr_merge
-      depends_on:
-      - prs
-      from_fanout: build
-      conflict_strategy: rebase
       squash: true
