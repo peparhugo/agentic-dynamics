@@ -63,19 +63,49 @@ def test_a_rerun_reuses_a_crashed_attempts_intent_row(tmp_path):
         assert len(reader.commands()) == 1
 
 
-def test_a_terminal_row_advances_to_a_new_attempt(tmp_path):
+def test_a_completed_row_RETURNS_by_default_so_the_guard_can_fire(tmp_path):
+    """The review's replay reproduction: promote guards on ``state == "completed"`` — with the
+    old helper behavior (always advancing) that guard could NEVER fire, because a replay minted
+    a fresh intent instead of returning the finished row."""
     db = tmp_path / "control.db"
     first = _begin(db)
     assert finish_command(db, command_id=first.command_id, state="completed", receipt={"ok": 1}) is None
 
-    second = _begin(db)
+    again = _begin(db)
+    assert again.command_id == first.command_id
+    assert again.state == "completed"
+    assert again.idempotency_key == "promote:spec:abc123"
+
+
+def test_completed_advance_is_the_explicit_redeploy_policy(tmp_path):
+    """``completed="advance"`` is a per-verb choice (publish's recovery path), never a default."""
+    db = tmp_path / "control.db"
+    first = _begin(db)
+    finish_command(db, command_id=first.command_id, state="completed", receipt={})
+
+    second = _begin(db, completed="advance")
     assert second.command_id != first.command_id
     assert second.idempotency_key == "promote:spec:abc123#2"
     assert second.state == "intent"
-    # a third attempt keeps walking the suffix chain
-    finish_command(db, command_id=second.command_id, state="failed", receipt={"err": "push"})
+
+
+def test_failed_and_refused_rows_always_advance(tmp_path):
+    """A retry after a recorded failure is a new authorized attempt, not a replay."""
+    db = tmp_path / "control.db"
+    first = _begin(db)
+    finish_command(db, command_id=first.command_id, state="failed", receipt={"err": "push"})
+
+    second = _begin(db)  # default policy: failed rows still advance
+    assert second.idempotency_key == "promote:spec:abc123#2"
+
+    finish_command(db, command_id=second.command_id, state="refused", receipt={})
     third = _begin(db)
     assert third.idempotency_key == "promote:spec:abc123#3"
+
+
+def test_an_unknown_completed_policy_refuses(tmp_path):
+    with pytest.raises(CommandJournalError, match="completed must be"):
+        _begin(tmp_path / "control.db", completed="replay")
 
 
 def test_an_actorless_begin_refuses(tmp_path):

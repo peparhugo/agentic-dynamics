@@ -333,6 +333,17 @@ def _trigger_analysis(r: redis.Redis, stdout: str, cell_id: str) -> None:
         log(f"[{cell_id}] analysis trigger failed (non-fatal): {e}")
 
 
+def _dequeue(r) -> tuple | None:
+    """The ordered pop: ONE keys list, on-demand first, the deferred batch lane second.
+
+    redis-py's signature is ``brpop(keys: List, timeout=0)`` — passing two positional keys
+    binds the second to ``timeout`` and raises BEFORE any I/O (the 2026-09-12 review's
+    reproduction). The list form is the only correct call; ``tests/test_worker_queue.py``
+    pins it against an autospecced client so a regression fails at binding time in CI.
+    """
+    return r.brpop([QUEUE_KEY, BATCH_QUEUE_KEY], timeout=BLOCK_TIMEOUT)
+
+
 def _record_timing(cell: dict, *, status: str, started_at: float) -> None:
     """Append this job's measured queue/service timings (step 8, G-30) — loud but never fatal.
 
@@ -372,9 +383,7 @@ def main() -> None:
 
     while True:
         try:
-            # Ordered BRPOP: Redis checks keys left to right — on-demand first, the deferred
-            # batch lane only when no on-demand work waits.
-            result = r.brpop(QUEUE_KEY, BATCH_QUEUE_KEY, timeout=BLOCK_TIMEOUT)
+            result = _dequeue(r)
         except Exception as e:
             log(f"Redis brpop error: {e}, reconnecting...")
             time.sleep(10)
