@@ -13,6 +13,12 @@ and the control db's ``record_approval`` makes "the machine approved itself" a
 detectable condition (operator is the discriminator). The AIO carries the
 controller's name; it never invents one.
 
+The run's own identity is REQUIRED too, and it is RESOLVED from the durable
+control-db record, not the command line: the waiting run must execute the named
+spec, carry the named candidate, and its pending gate context must contain the
+named gate (a run-level approval carries none). A committed approval naming a
+foreign run, spec, candidate, or gate refuses before anything is written.
+
 Exit codes: 0 approved / 10 not awaiting (no approval needed) / 20 refused
 (invalid run, wrong state, placeholder operator, no candidate) / 30 bad usage.
 """
@@ -85,7 +91,13 @@ def _run_approval(args: argparse.Namespace) -> None:
             f"bind a real candidate"
         )
 
-    # 1 ── the run exists and is genuinely awaiting.
+    # 1 ── the run exists and is genuinely awaiting — and the approval must match the
+    # DURABLE run's own approval context. The expected identity (spec, candidate, pending
+    # gate) is resolved HERE, from the control db, never trusted from the command line: a
+    # committed approval naming a foreign spec/candidate/gate used to pass because the only
+    # check was "the run exists and is awaiting".
+    from agentic_dynamics.control.control_status import run_gate_context
+
     with ControlDB.open_read_only() as db:
         run = db.get_run(args.run_id)
         if run is None:
@@ -96,6 +108,35 @@ def _run_approval(args: argparse.Namespace) -> None:
             raise _NotAwaitingError(
                 f"run {args.run_id} is {run.state.value}, not awaiting_approval — "
                 f"no approval is needed"
+            )
+        if run.spec_name != args.spec:
+            raise _ApproveRefusedError(
+                f"run {args.run_id} executes spec {run.spec_name!r}, not {args.spec!r} — "
+                f"the approval must bind the waiting run's own spec"
+            )
+        row_sha = (run.candidate_sha or "").strip()
+        if not row_sha:
+            raise _ApproveRefusedError(
+                f"run {args.run_id} names no candidate sha — there is no tree to bind "
+                f"the approval to"
+            )
+        if not (row_sha.startswith(args.candidate_sha) or args.candidate_sha.startswith(row_sha)):
+            raise _ApproveRefusedError(
+                f"candidate {args.candidate_sha[:12]} is not run {args.run_id}'s candidate "
+                f"({row_sha[:12]}) — the approval must bind the run's own tree"
+            )
+        expected_gates = run_gate_context(db, run, pending_only=True)
+        if not expected_gates:
+            raise _NotAwaitingError(
+                f"run {args.run_id} has no pending approval gate for its candidate — "
+                f"nothing is awaiting a decision"
+            )
+        if args.gate_id not in expected_gates:
+            named = ", ".join(repr(g) for g in expected_gates)
+            raise _ApproveRefusedError(
+                f"gate {args.gate_id!r} is not in run {args.run_id}'s pending gate context "
+                f"({named}) — a run-level approval carries no gate; an unrelated gate "
+                f"never authorizes this run"
             )
 
     # 1b ── persist the command's INTENT before the act (step 2e: recording is part of the
@@ -216,7 +257,9 @@ def _write_artifact(args: argparse.Namespace) -> Path:
     # Wave A4: the artifact binds EVERY field the contract validates — spec/phase (also in
     # the path, but the CONTENT must name them or a moved/renamed artifact would still read
     # as binding), the run, the gate, the candidate sha, and the candidate's TREE (immutable
-    # content identity, not just the sha label).
+    # content identity, not just the sha label). The gate is written VERBATIM: a run-level
+    # approval carries an empty gate (the writer's resolution permits no unrelated gate), and
+    # a placeholder here would make the artifact un-matchable by the consumers that expect it.
     tree = ""
     try:
         tree = subprocess.run(
@@ -232,7 +275,7 @@ def _write_artifact(args: argparse.Namespace) -> Path:
             f"phase: {args.phase}\n"
             f"run: {args.run_id}\n"
             f"purpose: checkpoint\n"
-            f"gate: {args.gate_id or '(the run approval gate)'}\n"
+            f"gate: {args.gate_id}\n"
             f"candidate: {args.candidate_sha}\n"
             f"tree: {tree}\n"
             f"operator: {args.operator}\n"

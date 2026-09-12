@@ -2753,14 +2753,19 @@ def _checkpoint_approval_valid(
     spec_name: str,
     phase_name: str,
     checkpoint_commit: str,
+    *,
+    run_id: str | None = None,
+    gate_id: str | None = None,
 ) -> tuple[bool, dict[str, Any]]:
     """Verify the approval contract for one completed checkpoint phase. ``(valid, evidence)``.
 
     The contract: the artifact ``approvals/<spec>/<phase>_approval.md`` is committed at HEAD,
     was NOT present at the checkpoint commit (it was authored AFTER the checkpoint's work), the
     checkpoint commit is an ancestor of HEAD (the lineage is intact), and the artifact carries a
-    REAL operator signature (non-placeholder) + a date. Any failure → ``(False, evidence)`` with
-    the named reason — the resume refuses to proceed.
+    REAL operator signature (non-placeholder) + a date. ``run_id``/``gate_id`` are the durable
+    approval identity when the caller can prove it (the waiting run the continuation resumes +
+    its gate context): an artifact naming a FOREIGN run or gate fails with those named checks.
+    Any failure → ``(False, evidence)`` with the named reason — the resume refuses to proceed.
     """
     evidence: dict[str, Any] = {
         "valid": False,
@@ -2811,14 +2816,16 @@ def _checkpoint_approval_valid(
         else:
             decision = dc.parse_approval_decision(text)
             evidence["parsed"] = decision.as_dict()
-            # Wave A4: bind WHAT the human approved — the spec, the phase, and the exact
-            # reviewed candidate/tree — not merely that some checkpoint-shaped artifact
-            # exists (the review's reproduction accepted an artifact naming the wrong spec,
-            # phase, run, gate and candidate because this call passed only ``purpose``).
-            # The candidate is the phase's own commit (the run's stop point the operator
-            # reviewed); a rewritten worktree fails the lineage checks above and a foreign
-            # artifact fails here. ``run_id``/``gate_id`` join once run identity reaches the
-            # engine (the Wave-B item); today they are validated when a consumer knows them.
+            # Wave A4 + the Astra finding: bind WHAT the human approved — the spec, the
+            # phase, the exact reviewed candidate/tree, and the durable run/gate identity —
+            # not merely that some checkpoint-shaped artifact exists (the review's
+            # reproductions accepted an artifact naming the wrong spec, phase, run, gate and
+            # candidate because this call passed only ``purpose``). The candidate is the
+            # phase's own commit (the run's stop point the operator reviewed); a rewritten
+            # worktree fails the lineage checks above and a foreign artifact fails here.
+            # ``run_id``/``gate_id`` are supplied by the resume path from the durable run
+            # the continuation resumes; an unprovable expectation stays ``None`` and the
+            # contract validates what it can prove.
             failed.extend(
                 dc.validate_decision(
                     decision,
@@ -2827,6 +2834,8 @@ def _checkpoint_approval_valid(
                     phase=phase_name,
                     candidate_sha=checkpoint_commit,
                     tree=_tree_of(wd, checkpoint_commit),
+                    run_id=run_id,
+                    gate_id=gate_id,
                 )
             )
         if not failed:
@@ -2877,6 +2886,9 @@ def _checkpoint_contract_decisions(
     phases: list[dict[str, Any]],
     completed: set[str],
     goal: str,
+    *,
+    run_id: str | None = None,
+    gate_id: str | None = None,
 ) -> tuple[list[tuple[str, bool, dict[str, Any]]], tuple[str, dict[str, Any]] | None]:
     """Evaluate every completed checkpoint phase's approval contract, in phase order.
 
@@ -2887,6 +2899,14 @@ def _checkpoint_contract_decisions(
     ``(phase_name, evidence)`` whose contract failed (in phase order), or ``None`` when
     every contract holds — the resume gate's refusal point. Identical semantics to the
     pre-I10 ``_first_unsatisfied_checkpoint``, which now delegates here.
+
+    ``run_id``/``gate_id`` are the durable approval identity of the run this continuation
+    resumes (resolved by the composition root from the control db). They are applied to the
+    checkpoint the resumed run itself left awaiting — its ledger's ``checkpoint_reached``
+    (``awaiting``) or refused (``rejected``) record. A phase already decided by an EARLIER
+    lineage run carries an artifact naming THAT run, so expecting the immediate parent would
+    refuse a valid approval; those phases are validated against spec/phase/candidate/tree
+    alone (the provenance checks the artifact itself can prove).
     """
     decisions: list[tuple[str, bool, dict[str, Any]]] = []
     first_unsatisfied: tuple[str, dict[str, Any]] | None = None
@@ -2897,7 +2917,16 @@ def _checkpoint_contract_decisions(
         if name not in completed:
             continue
         commit_sha = _phase_commit_sha(wd, name, goal)
-        valid, evidence = _checkpoint_approval_valid(wd, spec.name, name, commit_sha)
+        expected_run, expected_gate = run_id, gate_id
+        if run_id is not None or gate_id is not None:
+            previous = _previous_checkpoint_state(spec, name)
+            if previous is not None and (
+                str(previous.get("decision") or "") == CHECKPOINT_DECISION_APPROVED
+            ):
+                expected_run, expected_gate = None, None
+        valid, evidence = _checkpoint_approval_valid(
+            wd, spec.name, name, commit_sha, run_id=expected_run, gate_id=expected_gate
+        )
         decisions.append((name, valid, evidence))
         if not valid and first_unsatisfied is None:
             first_unsatisfied = (name, evidence)
@@ -2910,6 +2939,9 @@ def _first_unsatisfied_checkpoint(
     phases: list[dict[str, Any]],
     completed: set[str],
     goal: str,
+    *,
+    run_id: str | None = None,
+    gate_id: str | None = None,
 ) -> tuple[str, dict[str, Any]] | None:
     """The first completed checkpoint phase whose approval contract is unsatisfied, or ``None``.
 
@@ -2920,7 +2952,9 @@ def _first_unsatisfied_checkpoint(
     Delegates to :func:`_checkpoint_contract_decisions` (I10) so the typed-capture and the
     gate read the contracts exactly once each.
     """
-    _, unsatisfied = _checkpoint_contract_decisions(wd, spec, phases, completed, goal)
+    _, unsatisfied = _checkpoint_contract_decisions(
+        wd, spec, phases, completed, goal, run_id=run_id, gate_id=gate_id
+    )
     return unsatisfied
 
 
@@ -3066,6 +3100,8 @@ def run_workflow(
     step_executor: StepExecutor | None = None,
     verifier_executor: StepExecutor | None = None,
     phase_evidence_recorder: PhaseEvidenceRecorder | None = None,
+    approval_run_id: str | None = None,
+    approval_gate_id: str | None = None,
 ) -> WorkflowRunResult:
     """Run a compiled ``agent_task`` spec against a goal in a git worktree.
 
@@ -3182,7 +3218,11 @@ def run_workflow(
     (``approvals/<spec>/<phase>_approval.md``, committed at HEAD, authored AFTER the checkpoint
     commit, with a non-placeholder operator signature + a date) BEFORE proceeding; an
     unsatisfied checkpoint stops the resume with ``awaiting_operator_approval`` (reason
-    ``"approval_refused"``) and NO further phase runs.
+    ``"approval_refused"``) and NO further phase runs. ``approval_run_id``/``approval_gate_id``
+    are the durable identity of the run the continuation resumes (resolved by the composition
+    root from the control db): the checkpoint that run left awaiting must carry an approval
+    naming it, plus its gate context, or the resume refuses. ``None`` means "not provable
+    here" and the contract validates what it can.
 
     Per-phase control-db evidence (``phase_evidence_recorder``, ``control_db_evidence`` e1): when
     a recorder is injected at the composition root, the engine records, for every executed phase,
@@ -3349,7 +3389,10 @@ def run_workflow(
         # reducer) sees the full decision trace even when the run stops again. The reached_at
         # + cost/token summary ride over from the previous run's typed record (best-effort)
         # so the operator-await latency survives the ledger boundary.
-        decisions, unsatisfied = _checkpoint_contract_decisions(wd, spec, phases, completed, goal)
+        decisions, unsatisfied = _checkpoint_contract_decisions(
+            wd, spec, phases, completed, goal,
+            run_id=approval_run_id, gate_id=approval_gate_id,
+        )
         for cphase, valid, evidence in decisions:
             prev = _previous_checkpoint_state(spec, cphase)
             now = _now()

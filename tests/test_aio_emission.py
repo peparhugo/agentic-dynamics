@@ -700,6 +700,11 @@ def test_approve_command_records_and_emits(tmp_path, monkeypatch):
         run = db.create_run(spec_name="t", model="m", state=RunState.RUNNING,
                             reason="start", candidate_sha=candidate)
         db.transition_run(run.run_id, RunState.AWAITING_APPROVAL, reason="checkpoint")
+        # the approval writer now resolves the run's pending gate from the durable record:
+        # the named gate must be one the run's candidate actually carries (an unrelated
+        # gate refuses), so record the real gate row the operator is approving.
+        db.record_gate_result(run.run_id, step_id="p2", verdict="pass",
+                              candidate_sha=candidate, gate_id="approval")
 
     monkeypatch.setenv("FINOPS_CONTROL_DB", str(db_path))
     spec = importlib.util.spec_from_file_location(

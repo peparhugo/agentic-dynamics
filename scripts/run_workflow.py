@@ -39,6 +39,7 @@ try:
 except ImportError:  # imported as scripts.run_workflow — repo root is on sys.path
     from scripts import kb_produce_facts  # noqa: E402
 
+from agentic_dynamics.control import control_status as cs  # noqa: E402
 from agentic_dynamics.control import fact_ingestion as fi  # noqa: E402
 from agentic_dynamics.control import outbox as ob  # noqa: E402
 from agentic_dynamics.control.control_db import (  # noqa: E402
@@ -768,6 +769,12 @@ def _run_workflow_cli(
                 file=sys.stderr,
             )
 
+    # The expected approval identity (Wave A4 follow-up): a --resume continues a specific
+    # durable run, and the approval artifact for the checkpoint that run left awaiting must
+    # name it — plus its gate context — or the checkpoint consumer refuses. Resolved HERE
+    # (the composition root owns the control db); the engine consumes only the strings.
+    approval_run_id, approval_gate_id = _resolve_approval_identity(control_db, run_identity)
+
     # e2 (control_db_evidence): while this process runs the engine, a daemon heartbeat thread
     # proves to the zombie-run sweep that the run is ALIVE. A killed orchestrator stops beating
     # (the thread dies with the process), so the sweep can later cancel the dangling 'running'
@@ -815,6 +822,8 @@ def _run_workflow_cli(
             step_executor=step_executor,
             verifier_executor=verifier_executor,
             phase_evidence_recorder=phase_evidence_recorder,
+            approval_run_id=approval_run_id,
+            approval_gate_id=approval_gate_id,
         )
     finally:
         if run_heartbeat is not None:
@@ -1325,6 +1334,33 @@ def _control_open_run(spec: ExperimentSpec, args: argparse.Namespace) -> tuple[s
               file=sys.stderr)
         db.close()
         return None, None
+
+
+def _resolve_approval_identity(
+    control_db: ControlDB | None, run_identity: dict[str, str]
+) -> tuple[str | None, str | None]:
+    """The expected approval identity a resume carries into the engine: ``(run_id, gate_id)``.
+
+    A ``--resume`` continues a specific durable run (``run_identity["parent_run_id"]``), and
+    the approval artifact for the checkpoint that run left awaiting must name it — plus its
+    gate context — or the checkpoint consumer refuses. The gate context is the parent's own
+    gate rows for its candidate: no rows means the run-level approval (``""``), a single gate
+    id means that gate; a multi-gate context is ambiguous, so only the run identity is
+    enforced. A resume with no resolvable parent, or a down control db, returns
+    ``(None, None)`` — the consumer then validates what it can prove, never a fabricated
+    identity.
+    """
+    parent_run_id = run_identity.get("parent_run_id") or ""
+    if not parent_run_id or control_db is None:
+        return None, None
+    parent = control_db.get_run(parent_run_id)
+    if parent is None:
+        return None, None
+    try:
+        context = cs.run_gate_context(control_db, parent)
+    except (ControlDBError, OSError):
+        return parent.run_id, None
+    return parent.run_id, (context[0] if len(context) == 1 else None)
 
 
 def _derived(label: str, derive) -> list[dict]:
