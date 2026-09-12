@@ -124,8 +124,14 @@
       return
     }
     // Step 5/6/7 read boards: press their Refresh once when the content is not loaded yet.
+    // A board WITHOUT a loader gets no query at all: `document.querySelector("")` throws a
+    // SyntaxError, which would abort the rest of showBoard — board visibility changes first,
+    // then preference persistence and the scroll reset are skipped (the review's small shell
+    // failure; it applied to the four original boards on every switch).
     const loaders = { operations: "#operations-refresh", surfaces: "#surfaces-refresh" }
-    const refresh = $(loaders[board] || "")
+    const selector = loaders[board]
+    if (!selector) return
+    const refresh = $(selector)
     const content = $(`#${board}-content`)
     if (refresh && content && content.dataset.loaded !== "true") refresh.click()
   }

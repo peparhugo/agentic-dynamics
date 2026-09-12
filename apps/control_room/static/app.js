@@ -3062,14 +3062,18 @@
     const attention = data.attention || []
     const degraded = data.degraded || []
     const lag = data.projection_lag || {}
+    // The packet names what it could not read. When the control database is one of those
+    // surfaces, counts derived from it must read "unavailable" — NOT zero, which would read
+    // as an all-clear (the review's unavailable-data finding).
+    const dbDegraded = degraded.some((entry) => entry.surface === "control_db")
 
     const summary = element("div", "metric-grid")
     const cards = [
       ["Control epoch", String(source.control_epoch ?? "—")],
       ["Repo head", (source.repo_head_sha || "—").slice(0, 9)],
-      ["Active runs", String(active.length)],
-      ["Decisions owed", String(attention.length)],
-      ["Promotable runs", String(promotable.length)],
+      ["Active runs", dbDegraded ? "unavailable" : String(active.length)],
+      ["Decisions owed", dbDegraded ? "unavailable" : String(attention.length)],
+      ["Promotable runs", dbDegraded ? "unavailable" : String(promotable.length)],
       ["Unhealthy workers", String((data.unhealthy_workers || []).length)],
     ]
     cards.forEach(([label, value]) => {
@@ -3096,7 +3100,11 @@
     const attentionBlock = element("section", "surface-block")
     attentionBlock.appendChild(element("h3", "", "Attention"))
     if (attention.length === 0) {
-      attentionBlock.appendChild(paragraph("No decisions owed."))
+      attentionBlock.appendChild(paragraph(
+        dbDegraded
+          ? "The control database could not be read — decisions owed cannot be listed."
+          : "No decisions owed.",
+      ))
     } else {
       attentionBlock.appendChild(
         dataTable(
@@ -3116,11 +3124,41 @@
     }
     children.push(attentionBlock)
 
+    const safeBlock = element("section", "surface-block")
+    safeBlock.appendChild(element("h3", "", "Safe actions"))
+    const safe = data.safe_actions || []
+    if (safe.length === 0) {
+      safeBlock.appendChild(paragraph(
+        dbDegraded
+          ? "The control database could not be read — safe actions cannot be derived."
+          : "No safe actions offered.",
+      ))
+    } else {
+      safeBlock.appendChild(
+        dataTable(
+          "Safe actions (from the enforced transition graph)",
+          ["Action", "Run", "Candidate", "Gate"],
+          safe.map((entry) => [
+            entry.action,
+            entry.run_id || "—",
+            entry.candidate_sha ? String(entry.candidate_sha).slice(0, 12) : "—",
+            entry.gate_id || "—",
+          ]),
+          { runIds: safe.map((entry) => entry.run_id || null) },
+        ),
+      )
+    }
+    children.push(safeBlock)
+
     const runsBlock = element("section", "surface-block")
     runsBlock.appendChild(element("h3", "", "Active + promotable runs"))
     const runs = active.concat(promotable)
     if (runs.length === 0) {
-      runsBlock.appendChild(paragraph("No active or promotable runs."))
+      runsBlock.appendChild(paragraph(
+        dbDegraded
+          ? "The control database could not be read — active runs cannot be listed."
+          : "No active or promotable runs.",
+      ))
     } else {
       runsBlock.appendChild(
         dataTable("Active and promotable runs", RUN_HEADERS, runs.map(runRow), {
@@ -3156,6 +3194,12 @@
       const response = await fetch(`/api/runs/${encodeURIComponent(runId)}`)
       const data = await response.json()
       if (!response.ok) throw new Error(data.error || "run unavailable")
+      if (data.error) {
+        // The service names an unreadable/incomplete read as a 200 error object — render the
+        // name instead of a blank detail (the review's unavailable-service finding).
+        content.replaceChildren(paragraph(`Run detail unavailable: ${data.error}`))
+        return
+      }
       renderRunDetail(data)
     } catch (error) {
       content.replaceChildren(paragraph(`Run detail unavailable: ${error.message}`))
@@ -3389,6 +3433,12 @@
   /** queue depth, burn, the breach value and the settled completions. */
   function renderSlaPanel(data) {
     const body = element("div")
+    if ((data.degraded || []).length) {
+      body.appendChild(paragraph(
+        `degraded: ${data.degraded.map((entry) => `${entry.surface} — ${entry.reason}`).join("; ")}`,
+        "pane-note",
+      ))
+    }
     const queue = data.queue || {}
     const burn = data.burn || {}
     const sla = data.sla || {}
@@ -3434,6 +3484,12 @@
   /** explicitly not-measurable until a batch transport exists; the scenario is labeled. */
   function renderBatchPanel(data) {
     const body = element("div")
+    if ((data.degraded || []).length) {
+      body.appendChild(paragraph(
+        `degraded: ${data.degraded.map((entry) => `${entry.surface} — ${entry.reason}`).join("; ")}`,
+        "pane-note",
+      ))
+    }
     body.appendChild(paragraph(
       data.measurable ? `batch fraction ${data.batch_fraction} (${data.batch_jobs}/${data.marked_jobs})`
                       : `not measurable — ${data.reason || "no marker"} (scanned ${data.scanned_jobs ?? 0} jobs)`,

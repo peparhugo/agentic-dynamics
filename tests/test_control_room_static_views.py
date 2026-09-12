@@ -95,3 +95,32 @@ def test_the_board_content_areas_carry_loaded_markers():
         assert re.search(rf'id="{container}"[^>]*data-loaded="false"', index), (
             f"{container} must start unloaded so the shell triggers its first fetch"
         )
+
+
+# ── wave A7: availability handling + the shell guard ─────────────────────────
+
+
+def test_shell_never_queries_an_empty_selector():
+    """The review's small shell failure: `$("")` throws and skips persistence/scroll-reset."""
+    shell = (STATIC / "shell.js").read_text(encoding="utf-8")
+    assert 'loaders[board] || ""' not in shell
+    assert "if (!selector) return" in shell
+
+
+def test_unavailable_payloads_render_their_names_not_blanks():
+    """200-with-error objects and `degraded` lists are rendered, never shown as empty truth."""
+    app = (STATIC / "app.js").read_text(encoding="utf-8")
+    # the run detail surfaces the service's named error object
+    assert "Run detail unavailable:" in app
+    # SLA + batch + quality panels all render their degraded list
+    assert app.count("data.degraded || []") >= 3
+    # operations treats a degraded control db as unavailable, not zero, and offers no
+    # fabricated all-clear
+    assert "dbDegraded" in app
+    assert "could not be read — decisions owed cannot be listed" in app
+
+
+def test_operations_renders_the_packet_safe_actions():
+    app = (STATIC / "app.js").read_text(encoding="utf-8")
+    assert "data.safe_actions" in app
+    assert "Safe actions" in app
