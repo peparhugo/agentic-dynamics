@@ -30,6 +30,17 @@ if the intent cannot be written the command refuses and nothing is pushed; a rec
 after a landed push warns (the intent row stays in state ``intent`` as the evidence) and never
 unwinds the push. A journal row already ``completed`` for this act refuses a replay.
 
+Pre-act claim (astra ae212a0 finding 1): before the push, the managed path (a ledger carrying
+a control ``run_id``) TRANSACTIONALLY CLAIMS the run through ``ControlDB.transition_run`` —
+``promotable -> promoting`` in one ``BEGIN IMMEDIATE`` transaction that re-reads the row inside
+it. Eligibility is current permission to act, never a post-push observation: a cancelled or
+otherwise terminal run, a wrong state, a candidate mismatch, or an unknown identity refuses
+BEFORE the push, and the intent row is reconciled with a ``refused`` receipt. The digest check
+(4b) proves WHICH artifact; the claim proves the run may still act. After a landed push the
+close completes the claim (``promoting -> merged``); under a failed push the failed receipt and
+the ``promoting`` row are the unreconciled evidence an operator acts on — the run is never
+silently promotable again.
+
 AIO emission (Wave-3 a5): promoting is the AIO's strongest permanence verb, so the decision
 and the act are emitted into the knowledge base at this call site — an observation of the
 promote decision (with the run identity + candidate sha + operator name) before the push, and
@@ -372,7 +383,7 @@ def _default_close_row(
     by: str = "",
     db_path=None,
 ) -> dict:
-    """Close the promoted run's control row: ``promotable -> merged`` + the promotions row.
+    """Close the promoted run's control row: ``promoting -> merged`` + the promotions row.
 
     Best-effort by contract (hard rule 2): the push has LANDED, so every failure below is a
     printed warning naming the run_id + the close-out sweep as backstop — never a raise and
@@ -383,14 +394,16 @@ def _default_close_row(
     * the database cannot be opened;
     * the run row is absent;
     * the row's ``candidate_sha`` does not match the promoted tree (never close the wrong row);
-    * the row is not ``promotable`` (already merged/cancelled/failed — idempotent, no double
+    * the row is already ``merged`` or any other non-promoting state (idempotent, no double
       transition; a re-promote of an already-merged run must not mint a second transition).
 
     The close uses ``ControlDB.transition_run`` — never raw SQL — so the append-only
-    ``run_transitions`` log stays the single history. The lifecycle routes ``promotable``
-    through ``promoting`` into ``merged`` (the state machine has no single-hop edge), so the
-    two hop transitions and the ``promotions`` insert are committed as ONE transaction: a row
-    that reads ``merged`` always carries both hops and its promotion record.
+    ``run_transitions`` log stays the single history. The normal path finds the row
+    ``promoting`` (claimed before the push, astra ae212a0 finding 1) and completes the claim
+    to ``merged``. A direct caller that skipped the claim may still find ``promotable``; the
+    historical two-hop ``promotable -> promoting -> merged`` is preserved for it. Either way
+    the hops and the ``promotions`` insert are committed as ONE transaction: a row that reads
+    ``merged`` always carries the claim and its promotion record.
     """
     if not run_id:
         print(
@@ -429,29 +442,40 @@ def _default_close_row(
                     file=sys.stderr,
                 )
                 return {"closed": False, "run_id": run_id, "reason": "candidate_mismatch"}
-            if run.state != RunState.PROMOTABLE:
-                # Already terminal on this path, or already moved by another promoter run:
-                # there is no promotable row to close, and forcing a transition would be a lie
-                # (or an InvalidTransitionError). Idempotence: a re-promote of an already-merged
-                # run must not double-transition.
+            if run.state == RunState.MERGED:
+                # Idempotence: a re-promote of an already-merged run must not double-transition.
                 print(
-                    f"promote: control row {run_id} is {run.state.value}, not promotable — "
-                    "no close performed (already closed or moved; the push stands)",
+                    f"promote: control row {run_id} is merged, not promoting — no close "
+                    "performed (already closed; the push stands)",
+                    file=sys.stderr,
+                )
+                return {"closed": False, "run_id": run_id, "reason": "state_merged"}
+            if run.state not in (RunState.PROMOTING, RunState.PROMOTABLE):
+                # Cancelled/failed/quarantined, or otherwise moved by another writer: there is
+                # no claimed row to close, and forcing a transition would be a lie (or an
+                # InvalidTransitionError).
+                print(
+                    f"promote: control row {run_id} is {run.state.value}, not promoting or "
+                    "promotable — no close performed (already closed or moved; the push stands)",
                     file=sys.stderr,
                 )
                 return {"closed": False, "run_id": run_id, "reason": f"state_{run.state.value}"}
 
+            from_state = run.state.value
             reason = _row_close_reason(base, squash_sha, candidate_sha)
             with db.transaction():
-                # Two hops, one transaction: promotable -> promoting -> merged. The state
-                # machine has no direct promotable -> merged edge (promoting exists for the
-                # promoter's squash-merge), and transition_run enforces the graph.
-                db.transition_run(
-                    run_id,
-                    RunState.PROMOTING,
-                    reason=reason,
-                    actor=ROW_CLOSE_ACTOR,
-                )
+                if run.state == RunState.PROMOTABLE:
+                    # A direct caller that skipped the pre-act claim: preserve the historical
+                    # two hops. The normal path arrives here already ``promoting`` and needs
+                    # only the completion. The state machine has no direct
+                    # promotable -> merged edge (promoting exists for the promoter's
+                    # squash-merge), and transition_run enforces the graph either way.
+                    db.transition_run(
+                        run_id,
+                        RunState.PROMOTING,
+                        reason=reason,
+                        actor=ROW_CLOSE_ACTOR,
+                    )
                 db.transition_run(
                     run_id,
                     RunState.MERGED,
@@ -466,7 +490,7 @@ def _default_close_row(
                     by=by,
                 )
         print(
-            f"promote: closed control row {run_id} (promotable → merged, actor "
+            f"promote: closed control row {run_id} ({from_state} → merged, actor "
             f"{ROW_CLOSE_ACTOR}, promotions row recorded)"
         )
         return {"closed": True, "run_id": run_id, "reason": "closed"}
@@ -499,6 +523,90 @@ def _close_row_best_effort(run_id: str, fn):
         return None
 
 
+# ── The pre-act claim (astra ae212a0 finding 1) ─────────────────────────────────
+# The digest check (4b) proves WHICH artifact is being promoted; it says nothing about whether
+# the run may still act — the review reproduced a cancelled run reaching the push with its
+# digest intact because eligibility was only consulted after the push (in the close). The
+# managed path (a ledger carrying a control run_id) therefore CLAIMS the run before the
+# external act: one ``BEGIN IMMEDIATE`` transaction re-reads the row, checks current
+# eligibility, and writes the enforced ``promotable -> promoting`` edge. The refusal classes
+# are exactly the review's: cancelled/terminal, wrong state, unknown identity (plus a
+# candidate mismatch, so a row bound to another tree can never be claimed). The push can only
+# run on a row this command holds; the close then completes the claim to ``merged``.
+
+
+def _claim_reason(candidate_sha: str, base: str) -> str:
+    """The claim hop's transition reason — names the candidate + base, pre-push."""
+    return f"claiming promotion of {candidate_sha[:12]} to {base}"
+
+
+def _default_claim_run(
+    run_id: str,
+    *,
+    candidate_sha: str,
+    base: str = "main",
+    db_path=None,
+) -> dict:
+    """Transactionally claim the run for this promotion BEFORE the push (finding 1).
+
+    Runs inside ONE ``BEGIN IMMEDIATE`` transaction (``ControlDB.transaction`` is re-entrant,
+    so ``transition_run`` joins it): the row read, the eligibility checks, and the
+    ``promotable -> promoting`` transition either all commit or none do. A second promoter
+    attempting the same run blocks on the write lock, then sees ``promoting`` and refuses —
+    the claim is the mutual-exclusion primitive the command lacked.
+
+    Refusals (all :class:`_PromoteRefusedError`, all BEFORE any external act):
+
+    * unknown identity — no row for the run id (the managed path acts only on a known run);
+    * candidate mismatch — the row is bound to a different tree;
+    * a terminal run (``cancelled``/``failed``/``published``/``quarantined``) or any state
+      the transition graph does not allow into ``promoting`` (e.g. ``running``).
+
+    Returns ``{"claimed": True, "run_id": run_id, "candidate_sha": candidate_sha}``.
+    """
+    import sqlite3
+
+    from agentic_dynamics.control.control_db import ControlDB, ControlDBError, RunState
+
+    try:
+        with ControlDB.open(db_path) as db, db.transaction():
+            run = db.get_run(run_id)
+            if run is None:
+                raise _PromoteRefusedError(
+                    f"control row {run_id} is unknown to the control db — the managed "
+                    "promotion path acts only on a run the control plane knows; nothing "
+                    "was pushed"
+                )
+            row_sha = (run.candidate_sha or "").strip()
+            if row_sha and not candidate_sha.startswith(row_sha):
+                raise _PromoteRefusedError(
+                    f"control row {run_id} is bound to candidate {row_sha[:12]}, not the "
+                    f"promoted {candidate_sha[:12]} — refusing to claim a different tree; "
+                    "nothing was pushed"
+                )
+            if run.state != RunState.PROMOTABLE:
+                raise _PromoteRefusedError(
+                    f"control row {run_id} is {run.state.value}, not promotable — the run "
+                    "is not eligible to act (cancelled, in flight, or already moved); "
+                    "nothing was pushed"
+                )
+            db.transition_run(
+                run_id,
+                RunState.PROMOTING,
+                reason=_claim_reason(candidate_sha, base),
+                actor=ROW_CLOSE_ACTOR,
+            )
+    except _PromoteRefusedError:
+        raise
+    except (ControlDBError, OSError, sqlite3.Error) as exc:
+        # An unclaimable run must never reach the act: any control-plane failure here is a
+        # refusal, not a note (the claim is current permission to act, not bookkeeping).
+        raise _PromoteRefusedError(
+            f"could not claim control row {run_id} for promotion ({exc}); nothing was pushed"
+        ) from exc
+    return {"claimed": True, "run_id": run_id, "candidate_sha": candidate_sha}
+
+
 def _run_promotion(
     args: argparse.Namespace,
     *,
@@ -506,6 +614,7 @@ def _run_promotion(
     emit_decision=None,
     emit_act=None,
     record_decision=None,
+    claim_run=None,
     close_row=None,
     journal_intent=None,
     journal_receipt=None,
@@ -514,9 +623,10 @@ def _run_promotion(
 
     ``push`` (the squash-merge + ``git push``), the two a5 emission steps
     (``emit_decision`` — the promote-decision observation before the push, ``emit_act`` — the
-    actuation after a successful push), the s2b ``record_decision``, the a1 control-row
-    ``close_row`` (``promotable -> merged`` + the promotions row after the push), and the
-    step-10 command journal (``journal_intent`` — the durable intent BEFORE the push;
+    actuation after a successful push), the s2b ``record_decision``, the pre-act ``claim_run``
+    (the enforced ``promotable -> promoting`` claim that must succeed BEFORE the push), the a1
+    control-row ``close_row`` (``promoting -> merged`` + the promotions row after the push),
+    and the step-10 command journal (``journal_intent`` — the durable intent BEFORE the push;
     ``journal_receipt`` — the outcome after) default to the real implementations; the tests
     inject fakes so the whole transaction is testable without a remote, a live knowledge
     stream, or a control database — the same injectable pattern ``publish_release.main`` uses
@@ -526,6 +636,7 @@ def _run_promotion(
     emit_decision = emit_decision or _aio_emit_decision
     emit_act = emit_act or _aio_emit_act
     record_decision = record_decision or _default_decision_record
+    claim_run = claim_run or _default_claim_run
     close_row = close_row or _default_close_row
     journal_intent = journal_intent or _default_journal_intent
     journal_receipt = journal_receipt or _default_journal_receipt
@@ -634,8 +745,9 @@ def _run_promotion(
         # and there is no push in a dry run.
         if run_id:
             print(
-                f"promote: dry-run — would close control row {run_id} "
-                "(promotable → merged + promotions row) after the push (nothing written)"
+                f"promote: dry-run — would claim control row {run_id} "
+                "(promotable → promoting) before the push, then close it "
+                "(promoting → merged + promotions row) after (nothing written)"
             )
         else:
             print(
@@ -663,6 +775,30 @@ def _run_promotion(
             f"this promotion is already recorded completed (command {command.command_id}) — "
             "a second push would duplicate the act"
         )
+
+    # 5c ── the pre-act claim (astra ae212a0 finding 1): the managed path CLAIMS the run for
+    # this promotion BEFORE the external act — never after it. Eligibility is current
+    # permission to act: a cancelled/terminal run, a wrong state, a candidate mismatch, or an
+    # unknown identity refuses HERE, before any emission and before the push. The digest check
+    # (4b) proved WHICH artifact is promoted; the claim proves the run may still act. The
+    # refusal is reconciled onto the journal as a 'refused' receipt, so the intent row never
+    # masquerades as an outcome and the push never runs on a run the control plane has ended.
+    if run_id:
+        try:
+            claim_run(run_id, candidate_sha=candidate, base=base, db_path=args.db)
+        except _PromoteRefusedError as exc:
+            _record_journal_receipt(
+                args,
+                command,
+                state="refused",
+                receipt={
+                    "base": base,
+                    "candidate_sha": candidate,
+                    "refusal": str(exc),
+                },
+                journal_receipt=journal_receipt,
+            )
+            raise
 
     # 6 ── the AIO's decision emits BEFORE the act (best-effort, never blocking): an
     # observation of the promote decision with the run identity + candidate sha + operator.
@@ -798,12 +934,12 @@ def _default_journal_receipt(args: argparse.Namespace, command, *, state: str, r
 def _record_journal_receipt(
     args: argparse.Namespace, command, *, state: str, receipt: dict, journal_receipt
 ) -> None:
-    """Record the outcome; a warning is printed, never raised (the push outcome stands)."""
+    """Record the outcome; a warning is printed, never raised (the observed outcome stands)."""
     warning = journal_receipt(args, command, state=state, receipt=receipt)
     if warning:
         print(
             f"promote: WARNING — {warning} (the command intent {command.command_id} remains "
-            f"in state 'intent' as evidence; the push outcome stands)",
+            f"in state 'intent' as evidence; the observed outcome stands)",
             file=sys.stderr,
         )
 
