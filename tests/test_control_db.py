@@ -1056,3 +1056,23 @@ def test_summarize_states_reports_every_state_including_the_zeros(db):
     assert set(counts) == set(MANDATED_RUN_STATES)
     assert counts["running"] == 1
     assert counts["failed"] == 0
+
+
+def test_recent_attempts_orders_by_completion_and_is_a_read(db):
+    """The fleet read behind the Control Room's queue/SLA surface: newest completion first."""
+    run_a = make_run(db)
+    run_b = make_run(db)
+    first = db.start_attempt(run_a, step_id="p1", model="m")
+    db.finish_attempt(first.attempt_id, AttemptState.OK, ended_at="2026-09-12T10:00:00Z")
+    second = db.start_attempt(run_b, step_id="p1", model="m")
+    db.finish_attempt(second.attempt_id, AttemptState.OK, ended_at="2026-09-12T11:00:00Z")
+    running = db.start_attempt(run_a, step_id="p2", model="m")  # never ended
+
+    rows = db.recent_attempts(limit=10)
+    # newest completed first; the never-ended attempt (empty ended_at) orders last
+    assert [r.attempt_id for r in rows] == [second.attempt_id, first.attempt_id, running.attempt_id]
+    assert len(db.recent_attempts(limit=1)) == 1
+
+    before = db.control_epoch()
+    db.recent_attempts()
+    assert db.control_epoch() == before  # a read is not an event

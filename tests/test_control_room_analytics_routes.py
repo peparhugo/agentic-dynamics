@@ -1,4 +1,4 @@
-"""Tests for the analytic route layer (step 6): the four GET routes are thin shells.
+"""Tests for the analytic route layer (steps 6–7): the GET routes are thin shells.
 
 The routes render whatever the injected services return, with the services' status codes —
 200 for a served projection, 404 for an unknown story — and never touch the filesystem
@@ -35,6 +35,18 @@ class _FakeServices:
     def arm_comparison(self, spec=None):
         return {"schema": "arm-comparison/v1", "spec": spec, "state": "empty"}, 200
 
+    def sla_queue(self, window_h=72):
+        return {"schema": "sla-queue/v1", "window_h": window_h, "degraded": []}, 200
+
+    def escalation(self, spec=None):
+        return {"schema": "escalation-cascade/v1", "spec": spec, "armed": False}, 200
+
+    def batch(self):
+        return {"schema": "batch/v1", "measurable": False, "degraded": []}, 200
+
+    def energy(self):
+        return {"schema": "energy-epm/v1", "degraded": []}, 200
+
 
 def _client(monkeypatch):
     """A test app wired to the fake services, with the module global restored on teardown."""
@@ -67,6 +79,26 @@ def test_arms_compare_route_passes_the_spec_filter_through(monkeypatch):
     assert payload["spec"] == "x"
 
 
+def test_queue_sla_route_passes_and_clamps_the_window(monkeypatch):
+    client = _client(monkeypatch)
+    assert client.get("/api/queue/sla?window=24").get_json()["window_h"] == 24
+    # invalid/absent window defaults; out-of-range clamps into the supported band
+    assert client.get("/api/queue/sla").get_json()["window_h"] == 72
+    assert client.get("/api/queue/sla?window=99999").get_json()["window_h"] == 720
+    assert client.get("/api/queue/sla?window=nope").get_json()["window_h"] == 72
+
+
+def test_escalations_route_passes_the_spec_filter_through(monkeypatch):
+    payload = _client(monkeypatch).get("/api/escalations?spec=x").get_json()
+    assert payload["spec"] == "x"
+
+
+def test_batch_and_energy_routes_serve_their_payloads(monkeypatch):
+    client = _client(monkeypatch)
+    assert client.get("/api/batch").get_json()["schema"] == "batch/v1"
+    assert client.get("/api/energy").get_json()["schema"] == "energy-epm/v1"
+
+
 def test_analytics_routes_are_read_only_get(monkeypatch):
     monkeypatch.setattr(route_analytics, "_services", _FakeServices())
     app = Flask(__name__)
@@ -81,6 +113,10 @@ def test_analytics_routes_are_read_only_get(monkeypatch):
         "/api/stories/<name>/arc",
         "/api/value",
         "/api/arms/compare",
+        "/api/queue/sla",
+        "/api/escalations",
+        "/api/batch",
+        "/api/energy",
     }
     for rule, allowed in methods.items():
         assert allowed == {"GET", "HEAD", "OPTIONS"}, f"{rule} allows {allowed}"
