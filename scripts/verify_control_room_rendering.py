@@ -1489,9 +1489,12 @@ def run_browser_gate(
                             )
                         page = context.new_page()
                         console_errors: list[str] = []
-                        page.on("console", lambda message: console_errors.append(message.text)
+                        # Bind the sink into each handler (B023): the loop rebinds
+                        # ``console_errors`` every iteration, and a closure over the bare
+                        # name would append into whatever list the cell points at LATER.
+                        page.on("console", lambda message, sink=console_errors: sink.append(message.text)
                                 if message.type == "error" else None)
-                        page.on("pageerror", lambda error: console_errors.append(str(error)))
+                        page.on("pageerror", lambda error, sink=console_errors: sink.append(str(error)))
 
                         # Playwright resolves the LAST matching handler first, so the catch-all
                         # abort must be registered BEFORE the two fixture routes it must not
@@ -1940,7 +1943,7 @@ def _check_geometry(
     for region, want in expected.items():
         box = geometry["regions"][region]["rect"]
         got = (box["x"], box["y"], box["width"], box["height"])
-        if any(abs(a - b) > 1 for a, b in zip(got, want)):
+        if any(abs(a - b) > 1 for a, b in zip(got, want, strict=True)):
             _row(errors, label, fixture_id, "G-7",
                  f"{region} box {tuple(round(v,1) for v in got)} want {want}")
 

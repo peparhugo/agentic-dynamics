@@ -34,7 +34,7 @@ import json
 import time
 from collections.abc import Iterator
 from datetime import datetime, timezone
-from typing import Any, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from flask import Response, jsonify, stream_with_context
 
@@ -339,7 +339,7 @@ def _run_row(run: dict[str, Any], *, epoch: int) -> dict[str, Any]:
     }
 
 
-def _cost_block(services: "ControlRoomServices") -> dict[str, Any]:
+def _cost_block(services: ControlRoomServices) -> dict[str, Any]:
     """The five `ON-G4` values from the subscription-usage snapshot, or explicit unknowns.
 
     The snapshot shape is provider-specific; this projection reads the well-known aggregate keys
@@ -438,7 +438,7 @@ def _composition_block(packet: dict[str, Any] | None) -> dict[str, Any]:
     }
 
 
-def build_glance(services: "ControlRoomServices") -> dict[str, Any]:
+def build_glance(services: ControlRoomServices) -> dict[str, Any]:
     """Render the whole glance projection from the authoritative read-only sources.
 
     Pure with respect to the caller: it only reads the control database, Redis, and the usage
@@ -484,7 +484,7 @@ def _sse_frame(event: str, payload: dict[str, Any]) -> str:
     return f"event: {event}\ndata: {json.dumps(payload, separators=(',', ':'))}\n\n"
 
 
-def _event_stream(services: "ControlRoomServices") -> Iterator[str]:
+def _event_stream(services: ControlRoomServices) -> Iterator[str]:
     """Yield the snapshot, the replay boundary, then epoch transitions until the cap.
 
     The generator is intentionally small and stateless across reconnects: the client treats the
@@ -506,7 +506,7 @@ def _event_stream(services: "ControlRoomServices") -> Iterator[str]:
             yield _sse_frame("transition", {"control_epoch": epoch, "glance": fresh})
 
 
-def register(app: "Flask", services: "ControlRoomServices") -> None:
+def register(app: Flask, services: ControlRoomServices) -> None:
     """Register ``GET /api/glance`` and ``GET /api/events`` on the Flask app."""
     def api_glance() -> Response:
         """The one resting-screen projection (read-only; never creates the control database)."""

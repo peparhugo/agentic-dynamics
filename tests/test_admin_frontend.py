@@ -171,7 +171,7 @@ def test_styles_hold_the_ia_pixel_budget_and_accessibility_bar() -> None:
     css = _read("style.css")
 
     # Desktop geometry tokens (the gate asserts the computed boxes these produce).
-    for token, value in (
+    for token, _value in (
         ("--r0h: 72px", None),
         ("--r1h: 800px", None),
         ("--r2h: 800px", None),
@@ -269,7 +269,7 @@ def test_visual_module_renders_accessible_svg_without_a_runtime() -> None:
     assert "stroke-dasharray" in visuals
     # Typed evidence classes are carried by shape AND label word.
     for cls in ("advisory", "measured", "source", "policy", "lifecycle"):
-        assert f'data-evidence-class' in visuals and cls in visuals, cls
+        assert 'data-evidence-class' in visuals and cls in visuals, cls
     # Actionable + live: the affected record and the lens action are rendered.
     assert "data-visual-affected" in visuals
     assert "data-visual-action" in visuals
