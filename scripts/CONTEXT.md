@@ -1,6 +1,7 @@
 # `scripts/` — Scripts Reference (classification manifest)
 
-84 command scripts plus two helper modules (`_bootstrap.py`, `_gen_instructions.py`), each
+84 command scripts plus three helper modules (`_bootstrap.py`, `_gen_instructions.py`,
+`_command_journal.py`), each
 command in exactly one bucket (critique rec 5). The classification below is machine-parsed by
 `tests/test_script_classification.py` — keep the marker lines intact. The `one-time` bucket
 lives under `scripts/archive/`; the other buckets live at the top of `scripts/`.

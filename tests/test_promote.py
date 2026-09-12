@@ -14,6 +14,7 @@ import json
 import subprocess
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -99,6 +100,8 @@ def _promote_args(tmp_path, wt, ledger, **overrides):
         "approval": None,
         "base": "main",
         "operator": "test-operator",
+        "rationale": "test rationale",
+        "rationale_ref": "",
         "db": None,
         "dry_run": True,
     }
@@ -263,12 +266,20 @@ _PUSHED = "abcd1234abcd1234abcd1234abcd1234abcd1234"
 
 
 def _noop_emissions() -> dict:
-    """Fakes for every post-push seam: a fake push (returns a squash sha), no-op emissions."""
+    """Fakes for every post-push seam: a fake push (returns a squash sha), no-op emissions.
+
+    Step 10's command journal joins them: the real tests never touch a control database, and
+    an intent fake returns an untouched row (state ``intent``) so the push proceeds.
+    """
     return {
         "push": lambda workdir, base, subject, candidate: _PUSHED,
         "emit_decision": lambda decision: {"observation_id": "obs-000000000001"},
         "emit_act": lambda decision, causes: None,
         "record_decision": lambda decision: None,
+        "journal_intent": lambda args, *, ledger, candidate, run_id: SimpleNamespace(
+            command_id="cmd-promote-test", state="intent"
+        ),
+        "journal_receipt": lambda args, command, *, state, receipt: None,
     }
 
 
@@ -595,3 +606,123 @@ def test_a2_genuinely_new_candidate_still_promotes(tmp_path):
     _run_promotion(args, close_row=fake_close_row, **em)  # must not raise
     assert len(calls) == 1
     assert calls[0][0] == "run-a2fresh0001"
+
+
+# ── step 10: the command journal (intent before act, receipt after) ───────────
+
+
+def test_step10_intent_lands_before_the_push_and_the_receipt_after(tmp_path):
+    """The durable intent fires BEFORE the push; the completed receipt carries the squash sha."""
+    wt = _make_candidate_ahead_of_main(tmp_path)
+    sha = _candidate_sha(wt)
+    data = _ledger(wt)
+    data["run_id"] = "run-j10seam001"
+    ledger = _write_ledger(tmp_path, data)
+    events = []
+
+    def journal_intent(args, *, ledger, candidate, run_id):
+        events.append(("intent", args.spec, candidate, run_id, args.rationale))
+        return SimpleNamespace(command_id="cmd-j10", state="intent")
+
+    def journal_receipt(args, command, *, state, receipt):
+        events.append(("receipt", command.command_id, state, receipt))
+        return None
+
+    def push(workdir, base, subject, candidate):
+        events.append(("push", base))
+        return _PUSHED
+
+    em = _noop_emissions()
+    em["push"] = push
+    em.pop("journal_intent"), em.pop("journal_receipt")
+    args = _promote_args(tmp_path, wt, ledger, dry_run=False)
+    _run_promotion(
+        args,
+        close_row=lambda run_id, **kwargs: {"closed": False, "reason": "test"},
+        journal_intent=journal_intent,
+        journal_receipt=journal_receipt,
+        **em,
+    )
+    kinds = [e[0] for e in events]
+    assert kinds.index("intent") < kinds.index("push") < kinds.index("receipt")
+    intent = events[kinds.index("intent")]
+    assert intent[1:] == ("promote_test", sha, "run-j10seam001", "test rationale")
+    receipt = events[kinds.index("receipt")]
+    assert receipt[1] == "cmd-j10"
+    assert receipt[2] == "completed"
+    assert receipt[3]["squash_sha"] == _PUSHED
+    assert receipt[3]["candidate_sha"] == sha
+
+
+def test_step10_push_failure_records_a_failed_receipt_and_still_raises(tmp_path):
+    """A failed push is recorded as the observed outcome, and the error still propagates."""
+    wt = _make_candidate_ahead_of_main(tmp_path)
+    data = _ledger(wt)
+    data["run_id"] = "run-j10fail001"
+    ledger = _write_ledger(tmp_path, data)
+    receipts = []
+
+    def journal_receipt(args, command, *, state, receipt):
+        receipts.append((state, receipt))
+        return None
+
+    def boom_push(workdir, base, subject, candidate):
+        raise RuntimeError("push failed: non-fast-forward")
+
+    em = _noop_emissions()
+    em["push"] = boom_push
+    em.pop("journal_intent"), em.pop("journal_receipt")
+    args = _promote_args(tmp_path, wt, ledger, dry_run=False)
+    with pytest.raises(RuntimeError, match="push failed"):
+        _run_promotion(args, journal_receipt=journal_receipt, **em)
+    assert len(receipts) == 1
+    state, receipt = receipts[0]
+    assert state == "failed"
+    assert "push failed" in receipt["error"]
+
+
+def test_step10_a_completed_command_refuses_the_replay(tmp_path):
+    """A journal row already completed for this act refuses BEFORE the push — no second act."""
+    wt = _make_candidate_ahead_of_main(tmp_path)
+    data = _ledger(wt)
+    data["run_id"] = "run-j10done001"
+    ledger = _write_ledger(tmp_path, data)
+    pushed = []
+
+    def journal_intent(args, *, ledger, candidate, run_id):
+        return SimpleNamespace(command_id="cmd-j10done", state="completed")
+
+    em = _noop_emissions()
+    em["push"] = lambda *a, **k: pushed.append(True) or _PUSHED
+    em.pop("journal_intent"), em.pop("journal_receipt")
+    args = _promote_args(tmp_path, wt, ledger, dry_run=False)
+    with pytest.raises(_PromoteRefusedError, match="already recorded completed"):
+        _run_promotion(args, journal_intent=journal_intent, **em)
+    assert pushed == []
+
+
+def test_step10_dry_run_never_journals(tmp_path):
+    """A dry run is observation, not an act: the journal seams must never fire."""
+    wt = _make_candidate_ahead_of_main(tmp_path)
+    ledger = _write_ledger(tmp_path, _ledger(wt))
+
+    def boom(*a, **k):
+        raise AssertionError("a dry run must not journal")
+
+    _run_promotion(
+        _promote_args(tmp_path, wt, ledger),
+        journal_intent=boom,
+        journal_receipt=boom,
+        push=boom,
+    )  # must not raise
+
+
+def test_step10_real_promote_requires_rationale_and_operator(tmp_path):
+    """The direct-caller guard: no rationale or no operator refuses before anything runs."""
+    wt = _make_candidate_ahead_of_main(tmp_path)
+    ledger = _write_ledger(tmp_path, _ledger(wt))
+
+    with pytest.raises(_PromoteRefusedError, match="rationale"):
+        _run_promotion(_promote_args(tmp_path, wt, ledger, dry_run=False, rationale="  "))
+    with pytest.raises(_PromoteRefusedError, match="operator"):
+        _run_promotion(_promote_args(tmp_path, wt, ledger, dry_run=False, operator=""))
