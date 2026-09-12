@@ -191,12 +191,13 @@ not a hard prerequisite the script itself checks for.
    checked BEFORE the typed launch request is emitted). The container never holds the docker
    socket: the orchestrator emits each launch over the host broker's unix-socket seam, and the
    broker (the socket's only home, the ONLY Docker API caller) performs the docker call — no
-   in-container code calls docker. The fleet runs one orchestrator at a time, so don't start
-   a second orchestrator while one is running.
-4. In-process (`python3 scripts/run_workflow.py` without `--orchestrator`) is the
-   **fallback**, not the default: use it only when the fleet is occupied (an orchestrator
-   run is in flight) or the run is trivial (deterministic measurement execution, e.g. a
-   lab run). In-process phases are documented scopes, not enforced ones.
+   in-container code calls docker. The fleet runs one orchestrator at a time: a submission
+   while one runs QUEUES on the same isolation path — occupancy means waiting, never a
+   different execution shape, and never starting a second orchestrator by hand.
+4. In-process (`python3 scripts/run_workflow.py` without `--orchestrator`) is a **separate,
+   explicitly requested mode** for trivial deterministic runs (e.g. a lab execution) —
+   never the default and never the fallback for a busy fleet. In-process phases are
+   documented scopes, not enforced ones.
 5. Each phase commits to the worktree (`"[workflow] <phase>"`) unless `--no-commit` is set.
 6. Use `--resume` to re-run after an interrupted workflow — it skips phases whose commit
    already exists (falling back to the spec index's ok phases when the worktree has none)
