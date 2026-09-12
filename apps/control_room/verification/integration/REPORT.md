@@ -13,6 +13,6 @@ No violations.
 
 ## Captures
 
-- `/tmp/opencode/w0_render/F-0_desktop_dark_1440x900.png` — F-0/desktop
-- `/tmp/opencode/w0_render/F-0_narrow_dark_1024x768.png` — F-0/narrow
-- `/tmp/opencode/w0_render/F-0_mobile_dark_390x844.png` — F-0/mobile
+- `/tmp/opencode/w0_rework_render/F-0_desktop_dark_1440x900.png` — F-0/desktop
+- `/tmp/opencode/w0_rework_render/F-0_narrow_dark_1024x768.png` — F-0/narrow
+- `/tmp/opencode/w0_rework_render/F-0_mobile_dark_390x844.png` — F-0/mobile
