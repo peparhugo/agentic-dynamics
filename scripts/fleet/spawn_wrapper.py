@@ -802,7 +802,16 @@ def _resolve_spec_path(spec_rel: str, repo_root: Path) -> tuple[Path | None, lis
         return None, errors
 
     if not resolved.is_file():
-        errors.append(f"submit: spec path {spec_rel!r} does not resolve to a file")
+        # Name the ROOT (wave C follow-up): a containerized consumer resolves against ITS
+        # mounted /repo (whatever worktree the container was created with), which is often
+        # not the tree the operator edited — the bare "does not resolve to a file" cost two
+        # deploy cycles to diagnose live on 2026-09-12. The root in the message makes the
+        # next occurrence self-explaining.
+        errors.append(
+            f"submit: spec path {spec_rel!r} does not resolve to a file under {repo_root} "
+            f"(the resolving root; a container consumer resolves against its /repo mount — "
+            f"a new spec must exist in THAT tree)"
+        )
         return None, errors
 
     return resolved, errors

@@ -89,11 +89,11 @@ Efficiency (durable outcome value / total cost).
 
 | Metric | Value |
 |--------|-------|
-| Story sessions | 1,027 (6,333 DB sessions total) |
+| Story sessions | 1,027 (6,848 DB sessions total) |
 | Game reports | 348 |
 | Model variants | 7 (3 providers: DeepSeek, Anthropic, OpenAI) |
 | Experiment configs | 0 |
-| Experiment + workflow specs | 214 (11 experiments + 203 workflows) |
+| Experiment + workflow specs | 219 (11 experiments + 208 workflows) |
 | Perturbation operators | 10 (specification corruption, objective mutation, process perturbation) |
 | Lab books | 21 (8 canonical + 12 quarantined) |
 | Story-corpus measured spend | $309.17 |
@@ -104,7 +104,7 @@ count = the generated lifecycle index `experiments/specs/index.json`; spend = th
 corpus's total measured cost). The spend figure is **story-corpus scoped**: workflow-run
 ledger spend is not published (the run ledgers under `experiments/results/workflows/` are
 gitignored, local-transient), so it must never be read as the whole-repo total. The DB
-session total (6,333) is the broader raw session count from the opencode database, reported
+session total (6,848) is the broader raw session count from the opencode database, reported
 separately from the 1,027 canonical story sessions.
 
 ---

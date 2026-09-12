@@ -9,7 +9,7 @@ question: >-
   no later phase may read the live web or make a claim from memory.
 version: "0.1"
 artifact_kind: workflow
-intent: read
+intent: mutate
 side_effects:
   repository: true
   external_services: false

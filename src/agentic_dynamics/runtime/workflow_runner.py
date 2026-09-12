@@ -231,6 +231,13 @@ class PhaseResult:
     #: ok=True).
     timed_out: bool = False
     commit_hash: str = ""
+    #: Why a phase's work was NOT committed (runner/fleet honesty, wave C follow-up): empty =
+    #: committed (or legitimately nothing to commit); otherwise a named reason —
+    #: ``nothing_to_commit`` / ``commit_failed: <git stderr>`` / ``uncommitted_work``. An ok
+    #: phase whose tree is still dirty after the runner's own commit attempt is flipped to
+    #: failed with this reason recorded — a green phase over uncommitted work was how three
+    #: fleet runs silently lost their commits (2026-09-12).
+    commit_status: str = ""
     error: str = ""
     # agent phases
     tokens: dict[str, int] = field(default_factory=dict)
@@ -307,6 +314,7 @@ class PhaseResult:
             "duration_s": self.duration_s,
             "timed_out": self.timed_out,
             "commit_hash": self.commit_hash,
+            "commit_status": self.commit_status,
             "error": self.error,
             "tokens": self.tokens,
             "cost_usd": self.cost_usd,
@@ -582,8 +590,20 @@ def _build_phase_prompt(phase: dict[str, Any], goal: str, prior: list[str]) -> s
     return prompt.replace("{goal}", goal).replace("{prior_phases}", prior_summary)
 
 
-def _git_commit(workdir: Path, phase: str, goal: str) -> str:
-    """Stage and commit the worktree; return the short hash, or "" if nothing to commit.
+def _git_commit_verbose(workdir: Path, phase: str, goal: str) -> tuple[str, str]:
+    """Stage and commit the worktree; return ``(short_hash, reason)``.
+
+    ``reason`` is non-empty exactly when the commit did NOT happen, and it says WHY
+    (runner/fleet honesty, wave C follow-up — this function used to return a bare ``""``
+    for every outcome, so a git REFUSAL looked identical to "nothing to commit" and a
+    successful phase's work could sit uncommitted with the ledger recording
+    ``commit_hash: ''`` and no error anywhere; observed live across three fleet runs on
+    2026-09-12):
+
+    * ``"nothing_to_commit"`` — the index holds no changes;
+    * ``"commit_failed: <git stderr>"`` — git REFUSED the commit (identity, hook, lock,
+      timeout — the detail is carried so the next occurrence is self-diagnosing);
+    * ``"git_error: <exception>"`` — a git call raised.
 
     ``.instrument/`` (the runner's own session transcripts) is excluded from the snapshot
     via a pathspec so ephemeral transcripts stop entering history (docs/routing_next_steps.md
@@ -599,15 +619,24 @@ def _git_commit(workdir: Path, phase: str, goal: str) -> str:
             ["git", "diff", "--cached", "--quiet"], cwd=workdir, capture_output=True
         )
         if staged.returncode == 0:
-            return ""
+            return "", "nothing_to_commit"
         msg = f"[workflow] {phase} — {goal[:60]}"
-        c = subprocess.run(["git", "commit", "-q", "-m", msg], cwd=workdir, capture_output=True, timeout=120)
+        c = subprocess.run(
+            ["git", "commit", "-q", "-m", msg], cwd=workdir, capture_output=True,
+            text=True, timeout=120,
+        )
         if c.returncode != 0:
-            return ""
+            detail = (c.stderr or c.stdout or "").strip().replace("\n", " ")[:200]
+            return "", f"commit_failed: {detail or f'git commit exited {c.returncode}'}"
         h = subprocess.run(["git", "rev-parse", "--short", "HEAD"], cwd=workdir, capture_output=True, text=True)
-        return h.stdout.strip()
-    except Exception:
-        return ""
+        return h.stdout.strip(), ""
+    except Exception as exc:
+        return "", f"git_error: {exc!r}"
+
+
+def _git_commit(workdir: Path, phase: str, goal: str) -> str:
+    """Back-compat wrapper: the short hash, or "" — see :func:`_git_commit_verbose`."""
+    return _git_commit_verbose(workdir, phase, goal)[0]
 
 
 def _git_head(workdir: Path) -> str:
@@ -1763,8 +1792,15 @@ def _commit_subject_matches(subject: str, phase_name: str, goal_prefix: str) -> 
     return bool(m and m.group(1) == phase_name and m.group(2).startswith(goal_prefix))
 
 
-def _git_log_commits(workdir: Path, rev_range: str) -> list[tuple[str, str, str]]:
+def _git_log_commits(
+    workdir: Path, rev_range: str, *, first_parent: bool = False
+) -> list[tuple[str, str, str]]:
     """``(sha, subject, author_email)`` triples for commits in ``rev_range``, or [] on any git problem.
+
+    ``first_parent=True`` walks only the first-parent chain — the COMMIT_PREFIX gate's view
+    (wave C follow-up): a phase that legitimately MERGES a branch must not be charged with
+    the merged lineage's commits as "commits made during the phase", which is exactly how the
+    W0 integration run (run-f88593727919) was failed by the gate while doing the ordered work.
 
     The full 40-char sha rides along so the enforcement can (a) exempt the runner's OWN
     execution-layer commits (the adapter's fresh-worktree ``Initial`` commit) by author, and
@@ -1773,9 +1809,12 @@ def _git_log_commits(workdir: Path, rev_range: str) -> list[tuple[str, str, str]
     so the canonicalize path must know the offender is HEAD).
     """
     try:
+        argv = ["git", "log"]
+        if first_parent:
+            argv.append("--first-parent")
+        argv += ["--format=%H|%s|%ae", rev_range]
         log = subprocess.run(
-            ["git", "log", "--format=%H|%s|%ae", rev_range],
-            cwd=workdir, capture_output=True, text=True, timeout=30,
+            argv, cwd=workdir, capture_output=True, text=True, timeout=30,
         )
     except Exception:  # noqa: BLE001 — a git problem degrades to "no commits to check"
         return []
@@ -2066,10 +2105,13 @@ def _enforce_commit_prefix(
     relabel — a discarded tree re-presented) are NEVER canonicalized.
     """
     goal_prefix = _goal_prefix(goal)
+    # FIRST-PARENT (wave C follow-up): the phase's own commits are the first-parent chain —
+    # a merge's incoming ancestry was authored and gated on its own branch/run, and charging
+    # it here failed a correct integration merge (run-f88593727919, 66 inherited commits).
     commits = (
-        _git_log_commits(wd, f"{pre_head}..HEAD")
+        _git_log_commits(wd, f"{pre_head}..HEAD", first_parent=True)
         if pre_head
-        else _git_log_commits(wd, "HEAD")
+        else _git_log_commits(wd, "HEAD", first_parent=True)
     )
     # NO_CHANGES gate (the revamp3 vacuous-pass post-mortem): an agent phase whose committed
     # TREE is identical to its pre-phase tree certified itself ok while producing no
@@ -2164,9 +2206,9 @@ def _enforce_commit_prefix(
         if rewritten_sha:
             # Re-read the WHOLE range: a successful rewrite must leave zero violations.
             recheck = (
-                _git_log_commits(wd, f"{pre_head}..HEAD")
+                _git_log_commits(wd, f"{pre_head}..HEAD", first_parent=True)
                 if pre_head
-                else _git_log_commits(wd, "HEAD")
+                else _git_log_commits(wd, "HEAD", first_parent=True)
             )
             remaining = [
                 (sha, subject)
@@ -3779,7 +3821,7 @@ def run_workflow(
         # ok=True), and a clean ok must not mask a wall-burning run.
         pr.timed_out = pr.duration_s >= phase_timeout - 0.5
         if commit and pr.status == "ok":
-            pr.commit_hash = _git_commit(git_wd, name, goal)
+            pr.commit_hash, commit_reason = _git_commit_verbose(git_wd, name, goal)
             # Self-commit adoption (kb_finding_layer k6 — the witness gap). ``_git_commit``
             # stages + commits the phase's *uncommitted* work and returns its short sha, but a
             # phase whose agent ALREADY committed its own conforming work (the orchestration
@@ -3794,6 +3836,32 @@ def run_workflow(
                 phase_head = _git_head(git_wd)
                 if phase_head and phase_head != phase_head_before:
                     pr.commit_hash = phase_head
+            if not pr.commit_hash:
+                # runner/fleet honesty (wave C follow-up): NEVER silent. A phase that reports
+                # ok while its work sits uncommitted in the run clone is a bookkeeping lie —
+                # no ledger row points at the deliverable, and nothing downstream can commit
+                # a cell's clone (observed live across three fleet runs, 2026-09-12, each
+                # needing hand-salvage). Record WHY and flip the phase to failed so the
+                # campaign stops for the operator instead of losing the work under a green ok.
+                tree_dirty = True
+                try:
+                    st = subprocess.run(
+                        ["git", "status", "--porcelain"], cwd=git_wd,
+                        capture_output=True, text=True, timeout=30,
+                    )
+                    tree_dirty = st.returncode != 0 or bool(st.stdout.strip())
+                except Exception:  # noqa: BLE001 — unreadable git state counts as dirty (fail-closed)
+                    tree_dirty = True
+                if tree_dirty:
+                    pr.commit_status = commit_reason or "uncommitted_work"
+                    skipped = (
+                        f"COMMIT_SKIPPED — phase '{name}' left uncommitted work "
+                        f"({pr.commit_status}); its ok cannot be trusted: nobody can commit "
+                        f"this clone's work downstream"
+                    )
+                    pr.status = "failed"
+                    pr.error = (pr.error + "\n" if pr.error else "") + skipped
+                    print(f"[workflow] {skipped}", flush=True)
             # Phase-boundary evidence (design §5.7 — e6): when a ChangeAnalyzer is injected,
             # hand the committed change to it (typed snapshots + delta materialized from git)
             # and record its analysis on the phase. Best-effort — never affects the phase.
