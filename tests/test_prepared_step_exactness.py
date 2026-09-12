@@ -26,6 +26,7 @@ for _path in (_ROOT, _ROOT / "src", _ROOT / "scripts"):
         sys.path.insert(0, str(_path))
 
 import run_workflow as rw_mod  # noqa: E402
+
 from agentic_dynamics.experiment.experiment_spec import load_spec  # noqa: E402
 from agentic_dynamics.runtime import workflow_runner  # noqa: E402
 from agentic_dynamics.runtime.executor import StepRequest  # noqa: E402
