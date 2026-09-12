@@ -24,6 +24,8 @@ for _path in (_REPO_ROOT, _REPO_ROOT / "src", _REPO_ROOT / "scripts"):
         sys.path.insert(0, str(_path))
 
 from agentic_dynamics.runtime.executor import StepExecutor, StepRequest, StepResult  # noqa: E402
+
+from types import SimpleNamespace  # noqa: E402
 from agentic_dynamics.runtime.workflow_runner import run_workflow  # noqa: E402
 from workflows import compile_workflow as cw  # noqa: E402
 from workflows import lint_workflow as lw  # noqa: E402
@@ -77,8 +79,23 @@ def test_authored_workflow_scaffolds_lints_plans_compiles_and_executes(tmp_path)
     assert phases[0]["test_gate"] is True  # the gate compiled to the native seam
 
     # ── execute: through the SAME seam the CLI uses, then the ONE engine ──
+    # Wave A3: with a step executor present the run is the CONTAINERIZED path — the compiled
+    # gate must dispatch to the independent verifier (or refuse); it never silently runs the
+    # suite in the orchestrator's privileged parent. This E2E therefore injects a scripted
+    # verifier and asserts the compiled gate reached it.
+    class FakeVerifier(StepExecutor):
+        def __init__(self) -> None:
+            self.requests: list[StepRequest] = []
+
+        def execute(self, request: StepRequest) -> StepResult:
+            self.requests.append(request)
+            return SimpleNamespace(
+                ok=True, tests_passed=1, tests_total=1, test_executed_success=True, error=""
+            )
+
     spec = cw.load_spec_any(path)
     executor = FakeStepExecutor()
+    verifier = FakeVerifier()
     result = run_workflow(
         spec,
         goal="e2e",
@@ -86,11 +103,16 @@ def test_authored_workflow_scaffolds_lints_plans_compiles_and_executes(tmp_path)
         workdir=tmp_path,
         commit=False,
         step_executor=executor,
+        verifier_executor=verifier,
     )
 
     # the authored phase executed, with the authored prompt untouched by the compiler
     assert [request.phase_name for request in executor.requests] == ["implement"]
     assert "Implement the requested change" in executor.requests[0].prompt
+    # the compiled gate dispatched to the verifier and its nonempty passing verdict landed
+    assert [r.phase_name for r in verifier.requests] == ["implement"]
+    assert result.phases[0].test_executed_success is True
+    assert result.phases[0].tests_total == 1
 
     assert result.ok is True
     assert result.state == "succeeded"
