@@ -1,0 +1,101 @@
+"""Tests for the Control Room's operational read models (step 5, Phase 0).
+
+The properties pinned here are the Phase-0 truth rules:
+
+* the room's live identifiers come FROM THE PACKET — the parity test asserts the attention
+  block matches ``build_packet``'s blocks block-for-block (no re-derivation);
+* absent data stays absent: an empty packet area renders empty/null and a degraded read is
+  named in ``degraded`` — never a fabricated zero or all-clear;
+* the read model is pure given its inputs (no clock, no sockets — ``now`` is injected).
+"""
+
+from __future__ import annotations
+
+import sys
+from pathlib import Path
+
+_REPO_ROOT = Path(__file__).resolve().parent.parent
+for _path in (_REPO_ROOT, _REPO_ROOT / "src"):
+    if str(_path) not in sys.path:
+        sys.path.insert(0, str(_path))
+
+from agentic_dynamics.control.control_db import ControlDB, RunState  # noqa: E402
+from agentic_dynamics.control.control_status import build_packet  # noqa: E402
+from apps.control_room.services.operations import SCHEMA, operational_snapshot  # noqa: E402
+
+_NOW = "2026-09-12T00:00:00+00:00"
+
+
+def _db(tmp_path) -> ControlDB:
+    return ControlDB.open(tmp_path / "control.db")
+
+
+def _seed_awaiting(db: ControlDB) -> str:
+    run = db.create_run(
+        spec_name="flow", model="m", state=RunState.RUNNING, reason="start",
+        candidate_sha="a" * 40,
+    )
+    db.transition_run(run.run_id, RunState.AWAITING_APPROVAL, reason="checkpoint")
+    return run.run_id
+
+
+def _seed_failed(db: ControlDB) -> str:
+    run = db.create_run(
+        spec_name="flow", model="m", state=RunState.RUNNING, reason="start",
+        candidate_sha="b" * 40,
+    )
+    db.transition_run(run.run_id, RunState.FAILED, reason="phase failed")
+    return run.run_id
+
+
+def test_attention_is_a_projection_of_the_packet(tmp_path):
+    with _db(tmp_path) as db:
+        awaiting_id = _seed_awaiting(db)
+        failed_id = _seed_failed(db)
+
+        packet = build_packet(db, repo_head_sha="c" * 40, heartbeats={}, now=_NOW)
+        snapshot = operational_snapshot(db, repo_head_sha="c" * 40, heartbeats={}, now=_NOW)
+
+    assert snapshot["schema"] == SCHEMA
+    assert snapshot["source"]["packet_schema"] == packet["schema"]
+    assert snapshot["source"]["control_epoch"] == packet["control_epoch"]
+
+    # parity: the approval rows are the packet's rows (same run/gate/candidate ids), plus kind.
+    approval_ids = {
+        (row["run_id"], row["gate_id"], row["candidate_sha"])
+        for row in snapshot["attention"]
+        if row["kind"] == "approval"
+    }
+    packet_ids = {
+        (row["run_id"], row["gate_id"], row["candidate_sha"])
+        for row in packet["awaiting_approvals"]
+    }
+    assert approval_ids == packet_ids
+    assert any(row["run_id"] == awaiting_id for row in snapshot["attention"])
+
+    # the failed run reaches attention with the packet's identifiers.
+    failed_ids = {
+        (row["run_id"], row["spec_name"])
+        for row in snapshot["attention"]
+        if row["kind"] == "failed"
+    }
+    assert (failed_id, "flow") in failed_ids
+
+    # the packet blocks flow through unchanged.
+    assert snapshot["active_runs"] == list(packet["active_runs"])
+    assert snapshot["projection_lag"] == packet["projection_lag"]
+
+
+def test_absent_data_stays_absent_and_degraded_is_named(tmp_path):
+    with _db(tmp_path) as db:
+        snapshot = operational_snapshot(db, repo_head_sha="c" * 40, heartbeats={}, now=_NOW)
+
+    assert snapshot["attention"] == []
+    assert snapshot["active_runs"] == []
+    # an unreadable surface is NAMED in degraded (the packet's null-not-zero discipline) —
+    # never a healthy-looking empty block: with no watermark rows, projection lag is unknown.
+    assert any(row.get("surface") == "projection_lag" for row in snapshot["degraded"]), (
+        snapshot["degraded"]
+    )
+    # the lag block itself stays the packet's value (possibly null per projection), never zeros.
+    assert isinstance(snapshot["projection_lag"], dict)
