@@ -571,6 +571,9 @@ def _run_workflow_cli(
     # phase's true position are carried through so the Control Room publishes "i of N".
     only_phase_total: int | None = None
     only_phase_index: int | None = None
+    # Wave A2: the prepared-child flag is a FUNCTION-scope fact (the routing/signals
+    # composition below consults it on EVERY run, not only the child path).
+    prepared_child = False
     if args.only_phase:
         phases = spec.workflow.params.get("phases") or []
         names = [str(p.get("name", "")) for p in phases]
@@ -593,7 +596,28 @@ def _run_workflow_cli(
                     f"{prepared.get('phase_name')!r}, not {args.only_phase!r} — refusing to "
                     f"execute a step prepared for another phase"
                 )
+            # Wave A2 — prepared mode is EXACT: every execution setting comes from the payload
+            # (the parent resolved it), never from this child's flags, spec, or environment.
+            # The parent owns preparation, routing, augmentation and retry policy; the child
+            # executes ONE adapter invocation that matches the prepared request.
+            prepared_child = True
+            args.model = str(prepared.get("model") or args.model)
+            if prepared.get("backend"):
+                args.backend = prepared["backend"]
+            args.goal = str(prepared.get("goal") or args.goal)
+            args.thinking_effort = str(prepared.get("thinking_effort") or args.thinking_effort)
+            args.thinking_budget_tokens = int(prepared.get("thinking_budget_tokens") or 0)
+            args.output_token_limit = int(prepared.get("output_token_limit") or 0)
+            args.timeout = int(prepared.get("timeout") or args.timeout)
             phase["prompt"] = prepared["prompt"]
+            phase["_prepared_step"] = True
+            # Continue the PARENT's attempt numbering (executor namespace + identity).
+            spec.workflow.params["_attempt_base"] = int(prepared.get("attempt") or 1)
+            # The parent alone owns retry policy and augmentation: the child must not rerun an
+            # escalation ladder (the review's two-call reproduction) nor re-augment a prompt
+            # the parent already readied.
+            spec.workflow.params.pop("escalation", None)
+            spec.workflow.params["rag_augment"] = False
         spec.workflow.params["phases"] = [phase]
 
     # Signal-store wiring (docs/routing_next_steps.md item 1): when the spec declares routing
@@ -601,7 +625,11 @@ def _run_workflow_cli(
     # corpus so the router consumes real data instead of cold-starting. The explicit
     # signals/preferences kwargs on run_workflow remain the override hook.
     signals: dict[str, ModelSignals] | None = None
-    if args.signals:
+    if prepared_child:
+        # The parent owns routing/signals; the payload is the resolved result. (No-op branch:
+        # signals stays None.)
+        pass
+    elif args.signals:
         signals = _load_signals(args.signals)
     elif _spec_declares_routing(spec):
         try:
@@ -611,7 +639,11 @@ def _run_workflow_cli(
             signals = None
 
     router = route_step
-    if bool(spec.workflow.params.get("control_route", False)):
+    if prepared_child:
+        # The child executes the prepared step; routing is the parent's decision. No router at
+        # all: the run-level model IS the payload's model, and no routing code path executes.
+        router = None
+    elif bool(spec.workflow.params.get("control_route", False)):
         # CAP I7 seam (design §9 I7): a PER-SPEC opt-in — only a spec that explicitly sets
         # `workflow.params.control_route: true` ever has the plane's route choice applied, and
         # only when a fresh validate_decision() admits it. OFF by default; no committed spec
@@ -625,7 +657,7 @@ def _run_workflow_cli(
             cell_id=_reducer_cell_id(spec.name, args.model),
             repository_id=cell_scope(args.workdir),
         )
-    elif args.cap_shadow:
+    elif not prepared_child and args.cap_shadow:
         # CAP I6 seam: a drop-in Router that ALSO runs + validates + records the fact-based
         # shadow decision (design §9 I6 row) — a superset of --cap-snapshot. Built here, at the
         # composition root, exactly where `route_step` is injected — `runtime.workflow_runner`
@@ -637,7 +669,7 @@ def _run_workflow_cli(
             cell_id=_reducer_cell_id(spec.name, args.model),
             repository_id=cell_scope(args.workdir),
         )
-    elif args.cap_snapshot:
+    elif not prepared_child and args.cap_snapshot:
         # CAP I4 seam: a drop-in Router that also compiles + records a snapshot (design §9 I4
         # row). Built here, at the composition root, exactly where `route_step` is injected —
         # `runtime.workflow_runner` never imports `control` either way (Debt-2).

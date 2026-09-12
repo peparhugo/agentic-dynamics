@@ -1329,6 +1329,10 @@ def _executor_as_run_agent(
     """
     def _call(prompt: str, **agent_kwargs: Any) -> Any:
         phase = dict(phase_def)
+        # Wave A2: the engine's loop hands the real attempt ordinal here; CONSUME it into the
+        # StepRequest and never forward it to the adapter through ``_agent_kwargs`` (the
+        # adapters do not take an ``attempt`` kwarg).
+        attempt = int(agent_kwargs.pop("attempt", 1) or 1)
         # The engine's phase-loop may also hand executor-internal kwargs (watchdog seam,
         # transcript path, session_id/fork for cache chaining). The StepRequest carries the
         # public contract; these ride through on the phase dict so the LOCAL executor can
@@ -1356,6 +1360,7 @@ def _executor_as_run_agent(
                 timeout=int(agent_kwargs.get("timeout", 1800) or 1800),
                 silent_mode=bool(agent_kwargs.get("silent_mode", False)),
                 enforce_pytest=bool(agent_kwargs.get("enforce_pytest", False)),
+                attempt=attempt,
                 phase_def=phase,
             )
         )
@@ -3064,6 +3069,10 @@ def run_workflow(
     # EAGERLY: a malformed ladder is a loud spec error here, never a silent no-op that looks
     # like "escalation is disabled" (a load-bearing difference for the operator).
     escalation = EscalationPlan.from_params(spec.workflow.params)
+    # Wave A2: the attempt ordinal base. Prepared steps carry the PARENT's attempt number; a
+    # child continuing attempt 7 must label its executor request/namespace a7, not a1. Default
+    # 1 (an ordinary run) — the child sets this from the prepared payload.
+    attempt_base = int(spec.workflow.params.get("_attempt_base", 1) or 1)
 
     wd = Path(workdir).resolve()
     if not wd.is_dir():
@@ -3350,7 +3359,13 @@ def run_workflow(
                             "nothing; a missing file or an empty collection)"
                         )
             else:
-                prompt = _build_phase_prompt(phase_def, goal, prior)
+                if phase_def.get("_prepared_step"):
+                    # Wave A2: a prepared step's prompt is the parent's FINAL instruction — the
+                    # child neither re-renders placeholders nor lets any later transform
+                    # rewrite it. The hash the parent carried covers exactly these bytes.
+                    prompt = str(phase_def.get("prompt", ""))
+                else:
+                    prompt = _build_phase_prompt(phase_def, goal, prior)
                 # Point the agent's built-in publisher at this workflow's cell so the
                 # fine-grained session events stream into the Control Room.
                 prev_cell = os.environ.get("FINOPS_CELL_ID")
@@ -3478,6 +3493,7 @@ def run_workflow(
                             pr.stall_evidence = None
                         agent_kwargs: dict[str, Any] = {
                             "model": attempt_model,
+                            "attempt": attempt_base + attempt_no - 1,
                             "backend": backend,
                             "workdir": str(wd),
                             "thinking_effort": thinking_effort,
@@ -3564,7 +3580,11 @@ def run_workflow(
                         )
                         next_model = (
                             escalation.successor(attempt_model, attempts_made=attempt_no)
-                            if (escalation is not None and attempt_failed)
+                            if (
+                                escalation is not None
+                                and attempt_failed
+                                and not phase_def.get("_prepared_step")
+                            )
                             else None
                         )
                         if next_model is None:
