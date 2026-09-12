@@ -81,6 +81,11 @@ PROVIDER_PRICING: dict[str, dict[str, float]] = {
         "cache_read": 0.25, "cache_write": 3.125,
         "source": "models.dev — GPT-5.6 Terra pricing (Aug 2026)",
     },
+    "openai-astra": {
+        "input": 10.00, "output": 50.00, "reasoning": 50.00,
+        "cache_read": 1.00, "cache_write": 12.50,
+        "source": "models.dev — GPT-6 Astra catalog pricing (2026-09-04)",
+    },
 }
 
 # OpenAI long-context tier (context > 200k tokens) — applies to input/output/cache
@@ -96,6 +101,10 @@ CONTEXT_OVER_200K_PRICING: dict[str, dict[str, float]] = {
     "openai-terra": {
         "input": 5.00, "output": 22.50, "reasoning": 22.50,
         "cache_read": 0.50, "cache_write": 6.25,
+    },
+    "openai-astra": {
+        "input": 20.00, "output": 75.00, "reasoning": 75.00,
+        "cache_read": 2.00, "cache_write": 25.00,
     },
 }
 
@@ -166,6 +175,8 @@ def _resolve_pricing_key(provider_id: str, model_id: str = "") -> str:
         return "openai-sol"
     if "terra" in combined:
         return "openai-terra"
+    if "astra" in combined:
+        return "openai-astra"
     if any(k in combined for k in ("anthropic", "claude")):
         return "anthropic"
     if any(k in combined for k in ("openai", "gpt")):
