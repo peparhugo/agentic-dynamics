@@ -91,6 +91,32 @@ def test_get_pricing_terra():
     assert pricing["cache_write"] == 3.125
 
 
+def test_get_pricing_astra():
+    """De-Claude switch: the new default model resolves to its own pricing arm (base tier)."""
+    pricing = get_pricing("openai", "gpt-6-astra")
+    assert pricing["input"] == 10.00
+    assert pricing["output"] == 50.00
+    assert pricing["reasoning"] == 50.00
+    assert pricing["cache_read"] == 1.00
+    assert pricing["cache_write"] == 12.50
+
+
+def test_compute_cost_estimate_astra_applies_long_context_tier():
+    tiered = compute_cost_estimate(
+        prompt_tokens=200_000, completion_tokens=0, reasoning_tokens=0,
+        cache_read_tokens=200_000, context_tokens=400_000,
+        provider="openai", model="gpt-6-astra",
+    )
+    assert tiered["pricing_key"] == "openai-astra"
+    assert tiered["long_context_tier"] is True
+    # 400k context: 50% of input+cache tokens billed at base, 50% at the astra tier
+    expected_input = 200_000 * (10.00 * 0.5 + 20.00 * 0.5)
+    expected_cache = 200_000 * (1.00 * 0.5 + 2.00 * 0.5)
+    assert tiered["total_cost_usd"] == pytest.approx(
+        (expected_input + expected_cache) / 1_000_000
+    )
+
+
 def test_get_pricing_sol_does_not_fall_through_to_generic_openai():
     assert get_pricing("", "gpt-5.6-sol")["output"] == 30.00
     assert get_pricing("", "gpt-5")["output"] == 10.00

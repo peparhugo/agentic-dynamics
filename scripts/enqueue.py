@@ -1,8 +1,8 @@
 """Enqueue experiment cells into Redis for parallel execution.
 
 Usage:
-    python scripts/enqueue.py                      # Fill queue with all cells (DeepSeek)
-    python scripts/enqueue.py --model anthropic/claude-sonnet-4-5   # Claude cells
+    python scripts/enqueue.py                      # Fill queue with all cells (default model)
+    python scripts/enqueue.py --model openai/gpt-6-astra   # a specific model's cells
     python scripts/enqueue.py --missing-only       # Skip cells that already have a result
     python scripts/enqueue.py --interleave         # Weave new cells across models/providers
     python scripts/enqueue.py --dry-run            # Print the plan without enqueueing

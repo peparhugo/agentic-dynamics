@@ -18,8 +18,18 @@ from agentic_dynamics.control.model_policy import (
 
 
 def test_subscription_models_always_allowed():
-    for model in (SUBSCRIPTION_DEFAULT, "anthropic/claude-haiku-4-5", "openai/gpt-5.6-sol"):
+    for model in (SUBSCRIPTION_DEFAULT, "openai/gpt-5.6-sol"):
         ensure_model_allowed(model)
+
+
+def test_the_default_model_is_the_openai_arm_and_not_claude():
+    """De-Claude pin (2026-09-12): the maintained default is the OpenAI subscription arm.
+
+    Claude is decommissioned on this host (the OAuth family was revoked server-side and
+    re-logins are brittle), so no maintained default may point at ``anthropic/*`` again.
+    """
+    assert SUBSCRIPTION_DEFAULT == "openai/gpt-6-astra"
+    assert not SUBSCRIPTION_DEFAULT.startswith("anthropic/")
 
 
 def test_flash_always_allowed():
