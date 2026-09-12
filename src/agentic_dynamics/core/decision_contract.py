@@ -235,6 +235,8 @@ def validate_decision(
     phase: str | None = None,
     candidate_sha: str | None = None,
     tree: str | None = None,
+    run_id: str | None = None,
+    gate_id: str | None = None,
 ) -> list[str]:
     """Bind the decision to the act it authorizes; returns the named failed checks.
 
@@ -257,6 +259,12 @@ def validate_decision(
         failed.append("candidate_sha")
     if tree is not None and decision.tree != tree:
         failed.append("tree")
+    # Wave A4: the run and the gate the approval authorizes — the review's reproduction
+    # accepted an artifact naming the WRONG run/gate because no consumer ever passed these.
+    if run_id is not None and decision.run_id != run_id:
+        failed.append("run_id")
+    if gate_id is not None and decision.gate_id != gate_id:
+        failed.append("gate_id")
     if operator_is_placeholder(decision.operator):
         failed.append("operator")
     if not date_is_valid(decision.date):

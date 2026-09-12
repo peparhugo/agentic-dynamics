@@ -568,7 +568,19 @@ def _run_promotion(
     awaiting = bool(ledger.get("awaiting", False))
     if awaiting:
         approval = _load_approval(args, ledger)
-        _verify_approval(approval, ledger, candidate)
+        # Wave A4: pass every expectation the caller can prove — the spec, the awaiting
+        # phase, the candidate's immutable tree, and the run identity when the ledger names
+        # it. The approval must match ALL of them.
+        approval_tree = _git(workdir, "rev-parse", f"{candidate}^{{tree}}", check=False)
+        _verify_approval(
+            approval,
+            ledger,
+            candidate,
+            spec=args.spec,
+            phase=str(ledger.get("awaiting_phase") or ""),
+            tree=approval_tree,
+            run_id=str(ledger.get("run_id") or ""),
+        )
 
     # 3 ── the base is present and the promotion is fast-forwardable onto it.
     base = args.base
@@ -816,12 +828,35 @@ def _load_approval(args: argparse.Namespace, ledger: dict) -> dict:
     except ValueError:
         rel = ""
     committed = dc.read_committed(workdir, "HEAD", rel) if rel else None
-    text = committed if committed is not None else path.read_text(encoding="utf-8")
+    if rel:
+        # Wave A4: an artifact INSIDE the worktree authorizes only from its COMMITTED bytes —
+        # a working-copy edit is not a decision (the review's mutable-fallback reproduction:
+        # an untracked approval was accepted because this fell back to the filesystem).
+        if committed is None:
+            raise _PromoteAwaitingError(
+                f"approval artifact {path} exists but is not committed at HEAD — approvals "
+                "must be committed (the resume contract reads committed bytes; commit the "
+                "artifact before promoting)"
+            )
+        text = committed
+    else:
+        # An explicit --approval path OUTSIDE the worktree is the file the operator handed
+        # over; it has no committed baseline to prefer.
+        text = path.read_text(encoding="utf-8")
     lines = [ln.strip() for ln in text.splitlines() if ln.strip()]
     return {"path": path, "text": text, "lines": lines}
 
 
-def _verify_approval(approval: dict, ledger: dict, candidate: str) -> None:
+def _verify_approval(
+    approval: dict,
+    ledger: dict,
+    candidate: str,
+    *,
+    spec: str = "",
+    phase: str = "",
+    tree: str = "",
+    run_id: str = "",
+) -> None:
     """The approval must bind THIS candidate through the ONE contract (migration step 2).
 
     The old substring checks accepted ``date: nonsense`` and an approval carrying no operator
@@ -833,6 +868,12 @@ def _verify_approval(approval: dict, ledger: dict, candidate: str) -> None:
         decision,
         purpose=dc.PURPOSE_CHECKPOINT,
         candidate_sha=candidate,
+        # Wave A4: bind the rest of the act when the caller knows it. An expectation that is
+        # not knowable is not passed (None) — the contract validates what it can prove.
+        spec=spec or None,
+        phase=phase or None,
+        tree=tree or None,
+        run_id=run_id or None,
     )
     if failed:
         if "candidate_sha" in failed:

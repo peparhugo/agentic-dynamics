@@ -2754,10 +2754,14 @@ def test_resume_with_approval_records_approved_checkpoint_decision(tmp_path, mon
     monkeypatch.delenv("FINOPS_CELL_ID", raising=False)
     spec = _checkpoint_spec(tmp_path)
     wd = _completed_checkpoint_wd(tmp_path / "wd")
+    import subprocess as _sp
+    ck = _sp.run(["git", "rev-parse", "HEAD"], cwd=wd, capture_output=True, text=True).stdout.strip()
+    tree = _sp.run(["git", "rev-parse", "HEAD^{tree}"], cwd=wd, capture_output=True, text=True).stdout.strip()
     ap = wd / "approvals" / spec.name
     ap.mkdir(parents=True)
     (ap / "design_approval.md").write_text(
         "# Operator approval\n\n- operator: jane@example.com\n- date: 2026-08-27\n"
+        f"- spec: {spec.name}\n- phase: design\n- candidate: {ck}\n- tree: {tree}\n"
     )
     _commit_file(wd, "operator approval (descendant of the checkpoint)", 2)
 

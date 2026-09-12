@@ -206,10 +206,15 @@ def test_awaiting_run_with_binding_approval_promotes(tmp_path):
     data["awaiting"] = True
     data["ok"] = False
     ledger = _write_ledger(tmp_path, data)
+    tree = subprocess.run(
+        ["git", "rev-parse", f"{sha}^{{tree}}"], cwd=wt, capture_output=True, text=True,
+        check=True,
+    ).stdout.strip()
     approval = tmp_path / "approval.md"
     approval.write_text(
         "---\nstatus: accepted\n---\n\n# Approval\n\n"
-        f"candidate: {sha}\noperator: Dr. Seuss\ndate: 2026-09-01\n"
+        f"candidate: {sha}\nspec: promote_test\ntree: {tree}\n"
+        "operator: Dr. Seuss\ndate: 2026-09-01\n"
     )
     args = _promote_args(tmp_path, wt, ledger, approval=str(approval))
     _run_promotion(args)  # must not raise (dry-run)

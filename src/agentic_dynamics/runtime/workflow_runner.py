@@ -2569,6 +2569,21 @@ class CheckpointRecord:
         }
 
 
+def _tree_of(wd: Path, commit: str) -> str | None:
+    """The git TREE sha of ``commit`` (immutable content identity), or None when unresolvable."""
+    if not commit:
+        return None
+    try:
+        out = subprocess.run(
+            ["git", "rev-parse", f"{commit}^{{tree}}"],
+            cwd=wd, capture_output=True, text=True, timeout=30,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    value = out.stdout.strip()
+    return value or None
+
+
 def _checkpoint_approval_path(wd: Path, spec_name: str, phase_name: str) -> Path:
     """``approvals/<spec>/<phase>_approval.md`` inside the worktree."""
     return wd / APPROVALS_DIRNAME / spec_name / f"{phase_name}_approval.md"
@@ -2682,7 +2697,24 @@ def _checkpoint_approval_valid(
         else:
             decision = dc.parse_approval_decision(text)
             evidence["parsed"] = decision.as_dict()
-            failed.extend(dc.validate_decision(decision, purpose=dc.PURPOSE_CHECKPOINT))
+            # Wave A4: bind WHAT the human approved — the spec, the phase, and the exact
+            # reviewed candidate/tree — not merely that some checkpoint-shaped artifact
+            # exists (the review's reproduction accepted an artifact naming the wrong spec,
+            # phase, run, gate and candidate because this call passed only ``purpose``).
+            # The candidate is the phase's own commit (the run's stop point the operator
+            # reviewed); a rewritten worktree fails the lineage checks above and a foreign
+            # artifact fails here. ``run_id``/``gate_id`` join once run identity reaches the
+            # engine (the Wave-B item); today they are validated when a consumer knows them.
+            failed.extend(
+                dc.validate_decision(
+                    decision,
+                    purpose=dc.PURPOSE_CHECKPOINT,
+                    spec=spec_name,
+                    phase=phase_name,
+                    candidate_sha=checkpoint_commit,
+                    tree=_tree_of(wd, checkpoint_commit),
+                )
+            )
         if not failed:
             evidence["valid"] = True
             evidence["operator"] = decision.operator
