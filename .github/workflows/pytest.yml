@@ -30,6 +30,10 @@ jobs:
         uses: actions/setup-python@0b93645e9fea7318ecaed2b359559ac225c90a2b  # v5.3.0
         with:
           python-version: "3.10"
+          # Velocity (2026-09-12): pip's wheel cache survives runs — the ~48s dependency
+          # install drops to ~10-15s on repeat.
+          cache: pip
+          cache-dependency-path: pyproject.toml
 
       - name: Lint (ruff, whole active surface)
         run: |
@@ -55,6 +59,8 @@ jobs:
         uses: actions/setup-python@0b93645e9fea7318ecaed2b359559ac225c90a2b  # v5.3.0
         with:
           python-version: "3.10"
+          # No pip cache here: this job installs nothing (stdlib gates only), and the
+          # cache's save step fails when there is no pip cache path to persist.
 
       - name: Gate — generated instruction surfaces match agent_config/
         run: |
@@ -74,13 +80,49 @@ jobs:
           # untracked data plane legitimately breaks data-file anchors.
           python3 scripts/scan_docs_drift.py --check spec_lifecycle --fail-on-drift
 
-  test:
+  # ── the test family: fast-path + 2 suite shards + verify layers, fanned into "test" ────
+  # Velocity (2026-09-12): the deterministic suite sharded 2 ways (~4 min → ~2 min wall) and
+  # the fast path promoted to its own job (a green light ~90s after a push). The
+  # branch-protection REQUIRED context must stay exactly "test" (docs/release/
+  # branch_protection_settings.md; scripts/check_branch_protection.py) — the fan-in job at
+  # the bottom keeps that name while the heavy work runs concurrently. The shard matrix
+  # deliberately does NOT carry the required name: a matrix renames checks ("test (1)"),
+  # which once policy-blocked every PR until an admin override.
+  fast-path:
     runs-on: ubuntu-latest
-    # No strategy matrix. A single-entry matrix renames the check to "test (3.10)", which
-    # can never satisfy the branch-protection required context "test"
-    # (docs/release/branch_protection_settings.md; machine twin
-    # scripts/check_branch_protection.py) — every PR was policy-BLOCKED until the operator
-    # merged with an admin override. The check name must stay exactly "test".
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python 3.10
+        uses: actions/setup-python@0b93645e9fea7318ecaed2b359559ac225c90a2b  # v5.3.0
+        with:
+          python-version: "3.10"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+
+      - name: Install dependencies (cached)
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest pytest-timeout pytest-xdist pytest-split pyyaml numpy scikit-learn tree-sitter==0.21.3 tree-sitter-languages
+          pip install -e ".[admin]"
+          pip install neo4j chromadb ollama duckdb pyarrow
+
+      - name: Run the fast path (the smoke the guards run on every change)
+        run: |
+          # test_suite_speed p3-d wiring: the fast path is CI's fast smoke — the `fast`-marked
+          # subset (the sub-minute guard family + the audited pure-unit families: no real
+          # subprocesses, no Redis/stores/ports, no real git worktrees). It must stay green AND
+          # under its 180s budget (the slow-regression trip wire in tests/test_fast_path_gate.py).
+          bash scripts/test_fast.sh
+
+  test-shard:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2]
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
         with:
@@ -93,16 +135,18 @@ jobs:
         uses: actions/setup-python@0b93645e9fea7318ecaed2b359559ac225c90a2b  # v5.3.0
         with:
           python-version: "3.10"
+          cache: pip
+          cache-dependency-path: pyproject.toml
 
       - name: Configure git identity (tests commit in temp worktrees)
         run: |
           git config --global user.name "CI"
           git config --global user.email "ci@localhost"
 
-      - name: Install core dependencies
+      - name: Install core dependencies (cached)
         run: |
           python -m pip install --upgrade pip
-          pip install pytest pytest-timeout pytest-xdist pyyaml numpy scikit-learn tree-sitter==0.21.3 tree-sitter-languages
+          pip install pytest pytest-timeout pytest-xdist pytest-split pyyaml numpy scikit-learn tree-sitter==0.21.3 tree-sitter-languages
           # The deterministic suite imports the knowledge clients at collection time
           # (test_graph -> neo4j, embeddings -> chromadb, ollama_analyzer -> ollama,
           # sync_data --check -> duckdb+pyarrow) — the [admin] extra is not enough;
@@ -111,19 +155,8 @@ jobs:
           pip install -e ".[admin]"
           pip install neo4j chromadb ollama duckdb pyarrow
 
-      - name: Run the fast path (the smoke the guards run on every change)
-        run: |
-          # test_suite_speed p3-d wiring: the fast path is CI's fast smoke — the `fast`-marked
-          # subset (the sub-minute guard family + the audited pure-unit families: no real
-          # subprocesses, no Redis/stores/ports, no real git worktrees). It must stay green AND
-          # under its 180s budget (the slow-regression trip wire in tests/test_fast_path_gate.py).
-          bash scripts/test_fast.sh
-
-      # `if: ${{ always() }}` on every verification layer below: a failing step must not
-      # hide the steps after it. On 2026-09-11 the fast path failed on two doc-lifecycle
-      # guards and GitHub skipped the rest of the job — a second layer of 10 pre-existing
-      # failures stayed invisible behind the first red. The JOB still fails if any step
-      # fails; `always()` only means every layer reports.
+      # `if: ${{ always() }}`: a failing step must not hide the steps after it (the
+      # 2026-09-11 lesson: one red step hid ten more). The JOB still fails if any step fails.
       - name: Restore the corpus fixture (post-migration CI coverage)
         if: ${{ always() }}
         run: |
@@ -135,16 +168,45 @@ jobs:
           cp -r tests/fixtures/corpus/* experiments/results/
           ls experiments/results/ | head -3
 
-      - name: Run deterministic test suite (external-service tests excluded; parallel)
+      - name: Run deterministic test suite — shard ${{ matrix.shard }}/2 (external excluded; parallel)
         if: ${{ always() }}
         run: |
           # --timeout: a hanging test is a failure, never an infinite block
           # (cap_stabilization_release p3 post-mortem: the Chroma live tests hung the
           # suite ~60 min; the heartbeat guards + this timeout make hangs impossible to miss)
           # -n auto --dist loadfile: parallel workers, one test FILE per worker (file-local
-          # fixtures/state never interleave). Measured on the CI fixture corpus: 254s serial
-          # -> 90s with -n auto, all 3871 pass (2026-09-11, local 12-core; CI runner 4 vCPU).
-          pytest tests/ -m "not external" -n auto --dist loadfile -v --timeout=600
+          # fixtures/state never interleave).
+          # --splits/--group (pytest-split, velocity 2026-09-12): the suite is cut into two
+          # near-equal shards running as concurrent jobs; the `test` fan-in requires both.
+          pytest tests/ -m "not external" -n auto --dist loadfile -v --timeout=600 --splits 2 --group ${{ matrix.shard }}
+
+  # The cheap verification layers, as their own concurrent job so a shard failure can never
+  # hide them (the same every-layer-reports principle as the `always()` steps).
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python 3.10
+        uses: actions/setup-python@0b93645e9fea7318ecaed2b359559ac225c90a2b  # v5.3.0
+        with:
+          python-version: "3.10"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+
+      - name: Install core dependencies (cached)
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest pytest-timeout pytest-xdist pyyaml numpy scikit-learn tree-sitter==0.21.3 tree-sitter-languages
+          pip install -e ".[admin]"
+          pip install neo4j chromadb ollama duckdb pyarrow
+
+      - name: Restore the corpus fixture (post-migration CI coverage)
+        run: |
+          mkdir -p experiments/results
+          cp -r tests/fixtures/corpus/* experiments/results/
 
       - name: Verify build_data imports cleanly (no DB required)
         if: ${{ always() }}
@@ -185,6 +247,26 @@ jobs:
         run: |
           python -c "import agentic_dynamics; print('agentic_dynamics imports OK')"
 
+  # The REQUIRED "test" check — the fan-in. The name must stay exactly "test": a renamed or
+  # matrix job can never satisfy the branch-protection required context (docs/release/
+  # branch_protection_settings.md; the 2026-09-11 incident policy-blocked every PR until an
+  # admin override). `if: always()` + explicit result checks make a failed or skipped
+  # dependency a RED "test", never a silently skipped required check.
+  test:
+    if: ${{ always() }}
+    needs: [fast-path, test-shard, verify]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require every test-family job green
+        run: |
+          echo "fast-path:  ${{ needs.fast-path.result }}"
+          echo "test-shard: ${{ needs.test-shard.result }}"
+          echo "verify:     ${{ needs.verify.result }}"
+          [ "${{ needs.fast-path.result }}"  = "success" ] || { echo "::error::fast-path not green"; exit 1; }
+          [ "${{ needs.test-shard.result }}" = "success" ] || { echo "::error::suite shards not green"; exit 1; }
+          [ "${{ needs.verify.result }}"     = "success" ] || { echo "::error::verification layers not green"; exit 1; }
+          echo "all test-family jobs green"
+
   # P0-2 (control-plane stabilization): the workflow-parity contract. The ONE semantic
   # engine must produce identical parent states whether an agent step runs in-process
   # (LocalAgentExecutor) or in a sibling container (DockerAgentExecutor). This job runs
@@ -201,6 +283,10 @@ jobs:
         uses: actions/setup-python@0b93645e9fea7318ecaed2b359559ac225c90a2b  # v5.3.0
         with:
           python-version: "3.10"
+          # Velocity (2026-09-12): pip's wheel cache survives runs — the ~48s dependency
+          # install drops to ~10-15s on repeat.
+          cache: pip
+          cache-dependency-path: pyproject.toml
 
       - name: Install core dependencies
         run: |
@@ -227,6 +313,10 @@ jobs:
         uses: actions/setup-python@0b93645e9fea7318ecaed2b359559ac225c90a2b  # v5.3.0
         with:
           python-version: "3.10"
+          # Velocity (2026-09-12): pip's wheel cache survives runs — the ~48s dependency
+          # install drops to ~10-15s on repeat.
+          cache: pip
+          cache-dependency-path: pyproject.toml
 
       - name: Install package (console entry point)
         run: |
@@ -304,6 +394,10 @@ jobs:
         uses: actions/setup-python@0b93645e9fea7318ecaed2b359559ac225c90a2b  # v5.3.0
         with:
           python-version: "3.10"
+          # Velocity (2026-09-12): pip's wheel cache survives runs — the ~48s dependency
+          # install drops to ~10-15s on repeat.
+          cache: pip
+          cache-dependency-path: pyproject.toml
 
       - name: Build wheel
         run: python -m pip wheel . --no-deps -w dist/

@@ -111,8 +111,10 @@ case) is a corpus-contract test, never `fast`-marked: on a full data root those 
 unbounded (the g10 budget failure) and in a corpus-less checkout they fail the smoke outright.
 
 **Wired into the guard cadence** (test_suite_speed p3-d): CI runs `bash scripts/test_fast.sh`
-as the fast smoke in the `test` job of `.github/workflows/pytest.yml` (before the deterministic
-suite), and the docs-drift rail's `fast_path` axis (`scripts/scan_docs_drift.py`) re-derives the
+as the fast smoke in its own `fast-path` job of `.github/workflows/pytest.yml` (velocity,
+2026-09-12: concurrently with the deterministic suite's two shards, and required through the
+`test` fan-in so the required check name stays exactly `test`), and the docs-drift rail's
+`fast_path` axis (`scripts/scan_docs_drift.py`) re-derives the
 command + budget this section documents from the code and compares them — a doc that drifts from
 the gate (`FAST_BUDGET_SECONDS`) is a docs-drift finding, and a fast path the doc stops
 documenting errors the axis unmeasurable (exit 2), never clean.
