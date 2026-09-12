@@ -88,25 +88,22 @@ def api_matrix() -> Response:
     # runner's telemetry — and a run with neither renders age-unknown, never mislabeled.
     tails = _tail_stamps(r, list(phase_payloads))
     phases = _parse_phases(phase_payloads, tails=tails)
-    # Runner-truth liveness (live_board follow-up, 2026-09-01): a cell whose status is
-    # "running" but whose phase liveness says DEFINITIVELY historical is an ENDED run with a
-    # stale status — a killed/interrupted runner never publishes its terminal status, so
-    # story_status keeps "running" forever. The window, not the publishing process, decides.
-    # Age-UNKNOWN phases are never flipped (the "never mislabeled" rule — no stamps means we
-    # do not know, so the legacy status stands); only a phase with a real age past the window
-    # re-presents the cell as "ended" (outcome unknown-but-over) rather than falsely live.
+    # Health vs lifecycle (step 5): a cell whose status is "running" but whose phase liveness
+    # says DEFINITIVELY historical is a QUIET run — a killed/interrupted runner never
+    # publishes its terminal status, so story_status keeps "running" forever. Silence is
+    # HEALTH, not a lifecycle transition: only an authoritative transition may end a run, so
+    # the durable status is KEPT and the staleness is exposed as its own dimension
+    # (``stale_cells`` + ``stale_running``, plus the per-phase live/age fields). The window
+    # still decides the HEALTH reading; the presentation no longer relabels lifecycle
+    # ("ended") behind the runner's back. Age-UNKNOWN phases are never called stale — no
+    # stamps means we do not know.
     stale_running = {
         cid
         for cid, p in phases.items()
         if not p.get("live") and isinstance(p.get("age_seconds"), (int, float))
     }
     cells = dict(execute["cells"])
-    stale_running_flipped = 0
-    for cid, status in cells.items():
-        if status == "running" and cid in stale_running:
-            cells[cid] = "ended"
-            stale_running_flipped += 1
-    running = execute["running"] - stale_running_flipped
+    running = execute["running"]
     response = {
         "total": execute["total"],
         "remaining_in_queue": execute["remaining_in_queue"],
@@ -118,6 +115,9 @@ def api_matrix() -> Response:
         "completed": execute["completed"],
         "results_saved": execute["results_saved"],
         "cells": cells,
+        # the staleness dimension, additive: which running cells are quiet (and how many).
+        "stale_cells": sorted(stale_running),
+        "stale_running": len(stale_running),
         "phases": phases,
     }
     response["stages"] = {"execute": execute, "analyze": analyze, "review": review}

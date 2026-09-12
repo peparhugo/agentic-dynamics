@@ -149,6 +149,70 @@ def test_run_detail_unknown_run_is_none_not_a_skeleton(tmp_path):
         assert run_detail(db, "run-does-not-exist") is None
 
 
+def test_operator_loop_blocked_to_durable_receipt(tmp_path):
+    """The step-5 acceptance, end to end over the read models.
+
+    blocked run -> inspect the evidence through ``run_detail`` -> take the packet's eligible
+    action -> the decision and its durable receipt are visible, and the packet stops asking.
+    """
+    with _db(tmp_path) as db:
+        run_id = _seed_awaiting(db)
+        db.record_gate_result(
+            run_id,
+            step_id="d5",
+            verdict=GateVerdict.PASS,
+            candidate_sha="a" * 40,
+            executor="pytest",
+            gate_id="gate-d5",
+        )
+
+        packet_before = build_packet(db, repo_head_sha="c" * 40, heartbeats={}, now=_NOW)
+        snapshot_before = operational_snapshot(
+            db, repo_head_sha="c" * 40, heartbeats={}, now=_NOW
+        )
+        detail_before = run_detail(db, run_id)
+
+        # 1) blocked: the packet offers approve, bound to the exact gate + candidate.
+        assert {
+            "action": "approve",
+            "run_id": run_id,
+            "gate_id": "gate-d5",
+            "candidate_sha": "a" * 40,
+        } in packet_before["safe_actions"]
+        # 2) the room shows the SAME identifiers (parity with the authority).
+        assert any(
+            row["run_id"] == run_id and row["gate_id"] == "gate-d5"
+            for row in snapshot_before["attention"]
+            if row["kind"] == "approval"
+        )
+        # 3) evidence: the gate is on record; no approval yet; no fabricated attempts.
+        assert [gate["gate_id"] for gate in detail_before["gates"]] == ["gate-d5"]
+        assert detail_before["approvals"] == []
+        assert detail_before["attempts"] == []  # absent stays absent (never attempt=1)
+
+        # 4) take the eligible action: approve (intent + approval + durable receipt).
+        command = db.record_command_intent(
+            "approve", actor="aio", run_id=run_id, candidate_sha="a" * 40
+        )
+        db.record_approval(
+            run_id, gate_id="gate-d5", candidate_sha="a" * 40, operator="dr-seuss"
+        )
+        db.complete_command(
+            command.command_id, state="completed", receipt={"approval_id": "apr-1"}
+        )
+
+        packet_after = build_packet(db, repo_head_sha="c" * 40, heartbeats={}, now=_NOW)
+        detail_after = run_detail(db, run_id)
+
+    # 5) the decision is recorded and the packet stops asking; the receipt is durable.
+    assert packet_after["awaiting_approvals"] == []
+    assert [apr["operator"] for apr in detail_after["approvals"]] == ["dr-seuss"]
+    assert [(c["verb"], c["state"]) for c in detail_after["commands"]] == [
+        ("approve", "completed")
+    ]
+    assert '"approval_id"' in detail_after["commands"][0]["receipt_json"]
+
+
 def test_operations_handlers_serve_the_services_payload():
     """The route layer is thin: it renders whatever the injected services return, with the
     services' status codes — 200 for the packet, 404 for an unknown run."""

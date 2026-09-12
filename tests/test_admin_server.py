@@ -390,6 +390,23 @@ def test_matrix_liveness_uses_the_newer_of_phase_and_telemetry(monkeypatch):
     assert phase["age_seconds"] == 60
 
 
+def test_matrix_stale_running_keeps_lifecycle_and_names_staleness(monkeypatch):
+    """Health vs lifecycle (step 5): a quiet running cell keeps its lifecycle status — the
+    telemetry silence is NAMED in ``stale_cells``, never relabeled as a lifecycle "ended"."""
+    monkeypatch.setattr(server, "_utc_now", lambda: "2026-09-01T12:00:00Z")
+    redis = FakeRedis(
+        statuses={"quiet": "running"},
+        phases={"quiet": _phase("quiet", published_at="2026-09-01T10:00:00Z")},  # age 7200
+    )
+    monkeypatch.setattr(server, "_redis", lambda: redis)
+
+    matrix = server.app.test_client().get("/api/matrix").get_json()
+
+    assert matrix["cells"]["quiet"] == "running"  # durable lifecycle kept (authoritative)
+    assert matrix["stale_cells"] == ["quiet"]  # health named as its own dimension
+    assert matrix["stale_running"] == 1
+
+
 def test_matrix_marks_exactly_the_window_says(monkeypatch):
     """LIVE is exactly the window predicate: age <= 600s, regardless of who wrote the phase."""
     monkeypatch.setattr(server, "_utc_now", lambda: "2026-09-01T12:00:00Z")
