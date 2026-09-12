@@ -30,6 +30,7 @@ import pytest
 from conftest import requires_corpus, requires_full_corpus
 
 from agentic_dynamics.reporting import canonical_corpus as cc
+from agentic_dynamics.reporting import lab_contract as lc
 from agentic_dynamics.reporting.lab_contract import (
     CONTRACT_KEY,
     CONTRACT_VERSION,
@@ -853,3 +854,171 @@ def test_waiver_set_digest_is_a_function_of_the_waivers():
     assert empty != one
     # Deterministic: same list → same digest.
     assert cc.waiver_set_digest([]) == empty
+
+
+# ---------------------------------------------------------------------------
+# 7. Metric-fingerprint scope — lab source + declared shared sources (l1, v7)
+# ---------------------------------------------------------------------------
+
+
+def _lab_metric_imports(script: str) -> set[str]:
+    """Repo-relative paths of the ``agentic_dynamics`` modules ``script`` imports.
+
+    The two modules every canonical lab shares that are NOT metric sources are excluded:
+    the canonical input door (``canonical_corpus`` — its selection/content identity is
+    already the registry/content hashes) and the contract module itself (hashing the
+    fingerprinter into its own fingerprint would be circular). Every other imported module
+    is code that shapes the metric, so it must appear in that lab's declared sources.
+    """
+    tree = ast.parse((SCRIPTS_DIR / script).read_text(encoding="utf-8"), filename=script)
+    found: set[str] = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.ImportFrom):
+            names = [node.module] if node.module else []
+        elif isinstance(node, ast.Import):
+            names = [alias.name for alias in node.names]
+        else:
+            continue
+        for name in names:
+            if not name.startswith("agentic_dynamics") or name in lc.NON_METRIC_SOURCE_MODULES:
+                continue
+            candidate = ROOT / "src" / Path(*name.split(".")).with_suffix(".py")
+            if not candidate.is_file():
+                candidate = ROOT / "src" / Path(*name.split(".")) / "__init__.py"
+            if candidate.is_file():
+                found.add(candidate.relative_to(ROOT).as_posix())
+    return found
+
+
+@pytest.mark.parametrize("entry", _publication_scripts(), ids=lambda e: e.script)
+def test_publication_lab_declares_its_metric_sources(entry: LabEntry):
+    """v7 guard: every publication-eligible lab declares its shared metric sources.
+
+    The declaration is the central :data:`lab_contract.METRIC_SOURCES` registry. A lab
+    absent from that registry, or whose declaration omits a shared metric module the lab
+    actually imports, fails — so a NEW shared module cannot be added to a lab without
+    joining the fingerprint. Declared paths must resolve, so a typo'd/renamed source is
+    caught here rather than silently dropping a file out of the digest.
+    """
+    assert entry.script in lc.METRIC_SOURCES, (
+        f"{entry.script} is publication-eligible but has no METRIC_SOURCES entry — its "
+        f"shared metric code would not be fingerprinted"
+    )
+    declared = set(lc.METRIC_SOURCES[entry.script])
+    missing = _lab_metric_imports(entry.script) - declared
+    assert not missing, (
+        f"{entry.script} imports shared metric module(s) {sorted(missing)} not declared in "
+        f"lab_contract.METRIC_SOURCES — a change to that code would not invalidate the artifact"
+    )
+    for rel in declared:
+        assert (ROOT / rel).is_file(), (
+            f"{entry.script}: declared metric source {rel} does not exist"
+        )
+
+
+def test_metric_sources_registry_is_scoped_to_publication_labs():
+    """The registry mirrors the manifest: no non-publication lab carries a stale entry."""
+    publication = {e.script for e in _publication_scripts()}
+    for script in lc.METRIC_SOURCES:
+        assert script in publication, (
+            f"{script} declares metric sources but is not publication-eligible — the registry "
+            f"must mirror the manifest instead of carrying stale entries"
+        )
+
+
+def test_missing_shared_module_declaration_is_detected():
+    """The guard's completeness check is non-vacuous: it sees the real imported module.
+
+    Dropping a declared module from a lab's declaration leaves a non-empty difference —
+    exactly the condition :func:`test_publication_lab_declares_its_metric_sources` fails on,
+    so a NEW shared import cannot pass by omission.
+    """
+    imported = _lab_metric_imports("lab_grit.py")
+    assert imported == {"src/agentic_dynamics/reporting/grit_metric.py"}
+    # A declaration that omits the imported module leaves a non-empty difference.
+    omitted_declaration: set[str] = set()
+    assert imported - omitted_declaration == imported
+
+
+def test_build_contract_refuses_a_publication_lab_without_a_declaration(
+    tables_factory, monkeypatch
+):
+    """The producer fails closed when a publication lab is absent from the registry.
+
+    Enforced at write time, not only in the guard test: an absent entry would fingerprint
+    only the lab script, silently reinstating the inverted-scope defect.
+    """
+    monkeypatch.delitem(lc.METRIC_SOURCES, "lab_story_arc.py")
+    tables = tables_factory([_row("aaaaaaaaaaaa")])
+    with pytest.raises(ValueError, match="METRIC_SOURCES"):
+        build_contract("lab_story_arc.py", tables, n_eligible_records=0, n_used_records=0)
+
+
+def test_metric_fingerprint_paths_cover_lab_and_declared_sources():
+    """The fingerprint's path set is the lab script plus its declared shared sources.
+
+    ``lab_grit`` is the regression the phase exists for: step 6b moved the Grit primitives
+    into ``reporting.grit_metric``, and v7 must fold them back into the fingerprint.
+    """
+    rels = {p.relative_to(ROOT).as_posix() for p in lc.lab_fingerprint_paths("lab_grit.py")}
+    assert rels == {
+        "scripts/lab_grit.py",
+        "src/agentic_dynamics/reporting/grit_metric.py",
+    }
+
+
+def _seed_fingerprint_fixture(tmp_path, monkeypatch) -> None:
+    """Point the fingerprinter at a throwaway tree with an injectable declaration.
+
+    Keeps the semantics unit-testable without touching real lab/source bytes: the two
+    module globals the fingerprinter reads (``PROJECT_ROOT``, ``METRIC_SOURCES``) are
+    monkeypatched to the temp tree.
+    """
+    (tmp_path / "scripts").mkdir()
+    (tmp_path / "src").mkdir()
+    (tmp_path / "scripts" / "lab_x.py").write_text("LAB = 'x'\n", encoding="utf-8")
+    (tmp_path / "src" / "shared_metric.py").write_text("VALUE = 1\n", encoding="utf-8")
+    (tmp_path / "src" / "unrelated.py").write_text("VALUE = 0\n", encoding="utf-8")
+    monkeypatch.setattr(lc, "PROJECT_ROOT", tmp_path)
+    monkeypatch.setattr(lc, "METRIC_SOURCES", {"lab_x.py": ("src/shared_metric.py",)})
+
+
+def test_declared_shared_source_change_moves_the_fingerprint(tmp_path, monkeypatch):
+    """A change to a declared shared-metric source changes the fingerprint (v7 semantics)."""
+    _seed_fingerprint_fixture(tmp_path, monkeypatch)
+    before = lc.lab_source_sha256("lab_x.py")
+    (tmp_path / "src" / "shared_metric.py").write_text("VALUE = 2\n", encoding="utf-8")
+    assert lc.lab_source_sha256("lab_x.py") != before
+
+
+def test_lab_source_change_moves_the_fingerprint(tmp_path, monkeypatch):
+    """The lab's own source still moves the fingerprint (no regression from v6)."""
+    _seed_fingerprint_fixture(tmp_path, monkeypatch)
+    before = lc.lab_source_sha256("lab_x.py")
+    (tmp_path / "scripts" / "lab_x.py").write_text("LAB = 'y'\n", encoding="utf-8")
+    assert lc.lab_source_sha256("lab_x.py") != before
+
+
+def test_unrelated_module_change_does_not_move_the_fingerprint(tmp_path, monkeypatch):
+    """A change to a module outside the declaration leaves the fingerprint unchanged."""
+    _seed_fingerprint_fixture(tmp_path, monkeypatch)
+    before = lc.lab_source_sha256("lab_x.py")
+    (tmp_path / "src" / "unrelated.py").write_text("VALUE = 999\n", encoding="utf-8")
+    assert lc.lab_source_sha256("lab_x.py") == before
+
+
+def test_fingerprint_is_deterministic_and_path_relative(tmp_path, monkeypatch):
+    """Same bytes + same relative paths -> same digest; the absolute root never leaks in.
+
+    A digest that folded the absolute path in would differ between two checkouts of the same
+    commit, which would make every contract unusable on a second machine.
+    """
+    _seed_fingerprint_fixture(tmp_path, monkeypatch)
+    first = lc.lab_source_sha256("lab_x.py")
+    # A second, differently-named root with identical relative content must match.
+    clone = tmp_path / "clone"
+    (clone / "scripts").mkdir(parents=True)
+    (clone / "src").mkdir()
+    (clone / "scripts" / "lab_x.py").write_text("LAB = 'x'\n", encoding="utf-8")
+    (clone / "src" / "shared_metric.py").write_text("VALUE = 1\n", encoding="utf-8")
+    assert lc.lab_source_sha256("lab_x.py", root=clone) == first

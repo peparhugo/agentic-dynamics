@@ -1,6 +1,6 @@
 {
   "experiment_id": "lab_condition_effects",
-  "generated_at": "2026-09-09T00:12:52.941544",
+  "generated_at": "2026-09-12T20:42:02.385450",
   "summary": {
     "conditions": 2,
     "stories": 207,
@@ -47,7 +47,7 @@
     "resolved_input_sha256": "8c90d86e0573b3f1e71982d544672cf90ef94cb1097452b3c857baf343d008a6",
     "registry_version": "data-manifest/1.0+18392rows",
     "metric_definition_version": "condition_effects/v2",
-    "metric_source_sha256": "c7023d1bd40fa57e38cc738cca8a9a71780532be3f60898f74954fb6c80f7b32",
+    "metric_source_sha256": "4ff763b686c0d61f9145a27b65dba2b088c0ccbb4a4d08e020d3c69574e25159",
     "n_resolved_records": 449,
     "n_eligible_records": 362,
     "n_used_records": 362,
@@ -63,7 +63,7 @@
     "outside_analysis_population": 0,
     "data_integrity_policy": "docs/data_integrity_findings.md",
     "requires_external_service": null,
-    "contract_version": "lab-contract/v6",
-    "generated_at": "2026-09-08T22:12:52.942298+00:00"
+    "contract_version": "lab-contract/v7",
+    "generated_at": "2026-09-12T20:42:02.386251+00:00"
   }
 }

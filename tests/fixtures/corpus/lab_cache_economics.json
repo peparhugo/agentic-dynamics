@@ -1,6 +1,6 @@
 {
   "experiment_id": "lab_cache_economics",
-  "generated_at": "2026-09-09T00:12:55.175059",
+  "generated_at": "2026-09-12T20:42:01.595109",
   "summary": {
     "models": 7,
     "stories": 207
@@ -252,7 +252,7 @@
     "resolved_input_sha256": "38a1f5dbe586890f453f846aa185f75e150bed7de0d3de007b8c66e3811b1be6",
     "registry_version": "data-manifest/1.0+18392rows",
     "metric_definition_version": "cache_economics/v2",
-    "metric_source_sha256": "c3c4ea9e7f5875b281d24905d28cdaacd4e9cb3be779327c77e856f486f47d5a",
+    "metric_source_sha256": "2e7b999cbe072091dbb467a8c10f6d48520fcfce7b5ede641e9e066de4d71fab",
     "n_resolved_records": 207,
     "n_eligible_records": 207,
     "n_used_records": 207,
@@ -268,7 +268,7 @@
     "outside_analysis_population": 0,
     "data_integrity_policy": "docs/data_integrity_findings.md",
     "requires_external_service": null,
-    "contract_version": "lab-contract/v6",
-    "generated_at": "2026-09-08T22:12:55.175656+00:00"
+    "contract_version": "lab-contract/v7",
+    "generated_at": "2026-09-12T20:42:01.595894+00:00"
   }
 }
