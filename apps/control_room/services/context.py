@@ -212,6 +212,126 @@ class ControlRoomServices:
             return {"error": "run not found", "run_id": run_id}, 404
         return detail, 200
 
+    # -- the analytic projections (step 6, P3/P4/P5/P6; read-only, on-demand) --
+
+    def quality(self) -> tuple[Any, int]:
+        """P3 ``model_quality``: Grit / first-pass / narration / coverage.
+
+        The canonical corpus is the input door (never a re-derivation); an unreadable corpus
+        is NAMED degraded with empty models — never a fabricated zero population. The
+        workflow-ledger half (first-pass) degrades to zero attempt rows.
+        """
+        from datetime import datetime, timezone
+
+        from agentic_dynamics.control.projections import model_quality as mq
+        from agentic_dynamics.reporting.canonical_corpus import load_canonical_tables
+
+        now = datetime.now(timezone.utc).isoformat()
+        degraded: list[dict[str, str]] = []
+        source: dict[str, Any] = {}
+        findings: list[dict[str, Any]] = []
+        stories: list[dict[str, Any]] = []
+        try:
+            tables = load_canonical_tables("finding", "story")
+            findings, stories = tables.findings, tables.stories
+            source = {
+                "input_dataset_id": tables.input_dataset_id,
+                "registry_version": tables.identity.registry_version,
+            }
+        except Exception as exc:  # noqa: BLE001 — named degradation, never a 500
+            degraded.append(
+                {"surface": "canonical_corpus", "reason": f"{type(exc).__name__}: {exc}"}
+            )
+        attempts, n_ledgers = mq.load_workflow_attempts(
+            self.root / "experiments" / "results" / "workflows"
+        )
+        source["workflow_ledgers"] = n_ledgers
+        payload = mq.build_model_quality(findings, stories, attempts, now=now, source=source)
+        payload["degraded"] = list(payload.get("degraded", [])) + degraded
+        return payload, 200
+
+    def story_arc(self, name: str) -> tuple[Any, int]:
+        """P4 ``story_arc``: the named story's session arc; unknown name -> 404."""
+        from datetime import datetime, timezone
+
+        from agentic_dynamics.control.projections import story_arc as sa
+        from agentic_dynamics.reporting.canonical_corpus import load_canonical_tables
+
+        now = datetime.now(timezone.utc).isoformat()
+        degraded: list[dict[str, str]] = []
+        source: dict[str, Any] = {}
+        stories: list[dict[str, Any]] = []
+        try:
+            tables = load_canonical_tables("story")
+            stories = tables.stories
+            source = {
+                "input_dataset_id": tables.input_dataset_id,
+                "registry_version": tables.identity.registry_version,
+            }
+        except Exception as exc:  # noqa: BLE001 — named degradation, never a 500
+            degraded.append(
+                {"surface": "canonical_corpus", "reason": f"{type(exc).__name__}: {exc}"}
+            )
+        payload = sa.build_story_arc(stories, name, now=now, source=source)
+        if payload is None:
+            if degraded:
+                return {
+                    "schema": sa.SCHEMA,
+                    "story": name,
+                    "state": "unavailable",
+                    "degraded": degraded,
+                }, 200
+            return {"error": "story not found", "story": name}, 404
+        payload["degraded"] = list(payload.get("degraded", [])) + degraded
+        return payload, 200
+
+    def run_value(self, *, run: str | None = None, arm: str | None = None) -> tuple[Any, int]:
+        """P5 ``run_value``: observed-only accepted outcomes + cost per accepted outcome.
+
+        Rows come from the attempt ledgers; optional ``run``/``arm`` exact-match filters
+        narrow the population. No ledger directory is an honest empty population.
+        """
+        from datetime import datetime, timezone
+
+        from agentic_dynamics.control.projections import run_value as rv
+
+        now = datetime.now(timezone.utc).isoformat()
+        rows, paths = rv.load_attempt_value_rows(self.root / "experiments" / "results")
+        if run is not None:
+            rows = [r for r in rows if r["run"] == run]
+        if arm is not None:
+            rows = [r for r in rows if r["arm"] == arm]
+        payload = rv.build_run_value(rows, now=now, source={"attempt_ledgers": paths})
+        return payload, 200
+
+    def arm_comparison(self, spec: str | None = None) -> tuple[Any, int]:
+        """P6 ``arm_comparison``: the compare/adapt ranking over real executed phases.
+
+        The shadow-decision calibration is best-effort (a missing decision store yields the
+        unmeasured calibration, never an error).
+        """
+        from datetime import datetime, timezone
+
+        from agentic_dynamics.control.projections import arm_comparison as ac
+        from agentic_dynamics.control.rules import load_shadow_decisions
+
+        now = datetime.now(timezone.utc).isoformat()
+        rows, n_ledgers = ac.load_phase_outcomes(
+            self.root / "experiments" / "results" / "workflows"
+        )
+        try:
+            decisions = load_shadow_decisions()
+        except Exception:  # noqa: BLE001 — calibration is best-effort telemetry
+            decisions = []
+        payload = ac.build_arm_comparison(
+            rows,
+            spec=spec,
+            decisions=decisions,
+            now=now,
+            source={"workflow_ledgers": n_ledgers},
+        )
+        return payload, 200
+
 
 def build_services() -> ControlRoomServices:
     """Build the application context from the server module's live configuration.
