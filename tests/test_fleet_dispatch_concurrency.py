@@ -51,6 +51,34 @@ class _FakeCommandsRedis:
             return None
         return key, lst.pop()
 
+    # Wave B2 claim lane: BLMOVE (claim), LREM (release), LRANGE (recovery scan).
+    def blmove(self, first: str, second: str, timeout: int | None = None,
+               src: str = "LEFT", dest: str = "RIGHT"):
+        lst = self._lists.get(first)
+        if not lst:
+            return None
+        value = lst.pop(0) if src == "LEFT" else lst.pop()
+        dst = self._lists.setdefault(second, [])
+        if dest == "LEFT":
+            dst.insert(0, value)
+        else:
+            dst.append(value)
+        return value
+
+    def lrem(self, key: str, count: int, value: str) -> int:
+        lst = self._lists.get(key, [])
+        removed = 0
+        while value in lst and (count == 0 or removed < count):
+            lst.remove(value)
+            removed += 1
+        return removed
+
+    def lrange(self, key: str, start: int, end: int) -> list[str]:
+        lst = self._lists.get(key, [])
+        if end == -1:
+            return list(lst[start:])
+        return list(lst[start : end + 1])
+
     def hset(self, key: str, mapping: dict | None = None, **_kw) -> None:
         self._hashes.setdefault(key, {}).update({k: str(v) for k, v in (mapping or {}).items()})
 
@@ -97,22 +125,21 @@ class _FakeBroker:
         return {"state": "OK", "argv": ["docker", "compose", action], "returncode": 0}
 
 
+def _submit_command(job_id: str) -> dict:
+    return {
+        "action": "submit",
+        "job_id": job_id,
+        "spec": "workflows/repository/launch_handler_dry_run.yaml",
+        "goal": "g",
+        "model": "anthropic/claude-sonnet-5",
+        "workdir": "/tmp/wt-x",
+        "ts": 0.0,
+        "nonce": "n",
+    }
+
+
 def _submit(r: _FakeCommandsRedis, job_id: str) -> None:
-    r.lpush(
-        spawn_wrapper.COMMANDS_KEY,
-        json.dumps(
-            {
-                "action": "submit",
-                "job_id": job_id,
-                "spec": "workflows/repository/launch_handler_dry_run.yaml",
-                "goal": "g",
-                "model": "anthropic/claude-sonnet-5",
-                "workdir": "/tmp/wt-x",
-                "ts": 0.0,
-                "nonce": "n",
-            }
-        ),
-    )
+    r.lpush(spawn_wrapper.COMMANDS_KEY, json.dumps(_submit_command(job_id)))
 
 
 def _scale(r: _FakeCommandsRedis) -> None:
@@ -197,3 +224,113 @@ def test_saturated_pool_queues_and_never_drops(monkeypatch):
     jobs = _jobs(r)
     assert jobs["job-1"]["status"] == "completed"
     assert jobs["job-2"]["status"] == "completed"
+
+
+# ── Wave B2: the durable claim lane + restart recovery ──────────────────────
+
+
+def _seed_claim(r: _FakeCommandsRedis, command: dict, *, job_status: str) -> str:
+    """The exact state a killed wrapper leaves: the raw command in the claim lane plus
+    whatever the board had recorded before the death."""
+    raw = json.dumps(command)
+    r.rpush(spawn_wrapper.PROCESSING_KEY, raw)
+    if command.get("action") == "submit":
+        r.hset(
+            "fleet:jobs",
+            mapping={
+                command["job_id"]: json.dumps(
+                    {"job_id": command["job_id"], "status": job_status}
+                )
+            },
+        )
+    return raw
+
+
+def test_waiting_work_is_claimable_again_after_a_restart(monkeypatch):
+    """The core B2 acceptance: a submit a dead wrapper left WAITING (claimed, queued,
+    never started — the in-memory pool is gone with the process) is requeued at startup
+    and runs to completion."""
+    r = _FakeCommandsRedis()
+    broker = _FakeBroker()
+    monkeypatch.setattr(spawn_wrapper, "_broker_client", lambda: broker)
+    _seed_claim(r, _submit_command("job-waiting"), job_status="queued")
+
+    spawn_wrapper.consume_fleet_commands(client=r, once=True)
+
+    assert broker.started == ["job-waiting"]
+    assert _jobs(r)["job-waiting"]["status"] == "completed"
+    assert r.llen(spawn_wrapper.PROCESSING_KEY) == 0
+    assert r.llen(spawn_wrapper.COMMANDS_KEY) == 0
+
+
+def test_a_submit_caught_mid_dispatch_resolves_failed_not_a_ghost(monkeypatch):
+    """A submit whose board row says 'running' when the wrapper died cannot be safely
+    re-run (the container may still be alive host-side): it resolves to an honest terminal
+    failure on the board + the DLQ — never a forever-running ghost — and its claim is
+    released."""
+    r = _FakeCommandsRedis()
+    broker = _FakeBroker()
+    monkeypatch.setattr(spawn_wrapper, "_broker_client", lambda: broker)
+    _seed_claim(r, _submit_command("job-caught"), job_status="running")
+
+    spawn_wrapper.consume_fleet_commands(client=r, once=True)
+
+    assert broker.started == []  # never re-dispatched
+    job = _jobs(r)["job-caught"]
+    assert job["status"] == "failed"
+    assert "restarted mid-dispatch" in job["error"]
+    assert r.llen(spawn_wrapper.PROCESSING_KEY) == 0
+    dead = [json.loads(e) for e in r._lists.get("fleet_jobs:dead_letter", [])]
+    assert any("restarted mid-dispatch" in entry.get("reason", "") for entry in dead)
+
+
+def test_recovery_requeues_a_control_request_for_replay(monkeypatch):
+    """Control actions are REQUESTS: a claim interrupted mid-action is replayed, never
+    dropped (a shaping scale/drain/restart is safe to repeat)."""
+    r = _FakeCommandsRedis()
+    broker = _FakeBroker()
+    monkeypatch.setattr(spawn_wrapper, "_broker_client", lambda: broker)
+    r.rpush(
+        spawn_wrapper.PROCESSING_KEY,
+        json.dumps({"action": "scale", "service": "workflow-runner", "count": 2,
+                    "ts": 0.0, "nonce": "n2"}),
+    )
+
+    spawn_wrapper.consume_fleet_commands(client=r, once=True)
+
+    assert broker.control == ["scale"]  # replayed after the restart
+    assert r.llen(spawn_wrapper.PROCESSING_KEY) == 0
+
+
+def test_a_pool_queued_submit_waits_in_the_durable_claim_lane(monkeypatch):
+    """Busy means queued — and the queued work is in the CLAIM LANE, not only the in-memory
+    pool: while job-2 waits behind a saturated worker it is already durable, so a restart
+    at that instant requeues it rather than losing it."""
+    monkeypatch.setenv("FINOPS_FLEET_DISPATCH_WORKERS", "1")
+    r = _FakeCommandsRedis()
+    broker = _FakeBroker()
+    monkeypatch.setattr(spawn_wrapper, "_broker_client", lambda: broker)
+    _submit(r, "job-1")
+    _submit(r, "job-2")
+
+    consumer = threading.Thread(
+        target=spawn_wrapper.consume_fleet_commands,
+        kwargs={"client": r, "max_commands": 2},
+        daemon=True,
+    )
+    consumer.start()
+    try:
+        assert _wait_until(lambda: broker.started == ["job-1"])
+        assert _wait_until(lambda: _jobs(r).get("job-2", {}).get("status") == "queued")
+        # BOTH raw commands are in the durable claim lane: job-1 dispatching, job-2 waiting.
+        lane = r._lists.get(spawn_wrapper.PROCESSING_KEY, [])
+        ids = sorted(json.loads(raw).get("job_id") for raw in lane)
+        assert ids == ["job-1", "job-2"], f"claim lane missing waiting work: {ids}"
+        broker.gate("job-1").set()
+        assert _wait_until(lambda: broker.started == ["job-1", "job-2"])
+    finally:
+        broker.gate("job-1").set()
+        broker.gate("job-2").set()
+        consumer.join(timeout=10)
+
+    assert r.llen(spawn_wrapper.PROCESSING_KEY) == 0  # released on terminal

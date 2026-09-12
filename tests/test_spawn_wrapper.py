@@ -1358,6 +1358,34 @@ class _FakeCommandsRedis:
             return None
         return key, lst.pop()
 
+    # Wave B2 claim lane: BLMOVE (claim), LREM (release), LRANGE (recovery scan).
+    def blmove(self, first: str, second: str, timeout: int | None = None,
+               src: str = "LEFT", dest: str = "RIGHT"):
+        lst = self._lists.get(first)
+        if not lst:
+            return None
+        value = lst.pop(0) if src == "LEFT" else lst.pop()
+        dst = self._lists.setdefault(second, [])
+        if dest == "LEFT":
+            dst.insert(0, value)
+        else:
+            dst.append(value)
+        return value
+
+    def lrem(self, key: str, count: int, value: str) -> int:
+        lst = self._lists.get(key, [])
+        removed = 0
+        while value in lst and (count == 0 or removed < count):
+            lst.remove(value)
+            removed += 1
+        return removed
+
+    def lrange(self, key: str, start: int, end: int) -> list[str]:
+        lst = self._lists.get(key, [])
+        if end == -1:
+            return list(lst[start:])
+        return list(lst[start : end + 1])
+
     def hset(self, key: str, mapping: dict | None = None, **_kw) -> None:
         self._hashes.setdefault(key, {}).update({k: str(v) for k, v in (mapping or {}).items()})
 
