@@ -176,6 +176,19 @@ def test_parse_timestamp_returns_none_for_garbage():
     assert parse_timestamp("not-a-date") is None
 
 
+def test_parse_timestamp_reads_the_wave_b1_ledger_names():
+    """Wave B1 storage names: microsecond precision + an optional run-id identity suffix
+    (and a ``.N`` collision suffix) — the parser reads the LEADING timestamp; the legacy
+    second-precision name keeps parsing unchanged."""
+    legacy = parse_timestamp("20260818T153000Z")
+    micros = parse_timestamp("20260818T153000123456Z")
+    with_run = parse_timestamp("20260818T153000123456Z_run-abc123")
+    with_collision = parse_timestamp("20260818T153000123456Z_run-abc123.1")
+    assert micros is not None and micros.microsecond == 123456
+    assert micros.replace(microsecond=0) == legacy
+    assert with_run == micros == with_collision
+
+
 def test_naive_timestamp_is_read_as_utc():
     assert parse_timestamp("2026-08-18T15:30:00") == parse_timestamp("2026-08-18T15:30:00Z")
 
