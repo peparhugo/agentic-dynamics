@@ -1,6 +1,6 @@
 {
   "experiment_id": "lab_verification_frontier",
-  "generated_at": "2026-09-09T00:12:56.708447",
+  "generated_at": "2026-09-12T20:42:06.709371",
   "summary": {
     "models": 7,
     "stories": 207,
@@ -118,7 +118,7 @@
     "resolved_input_sha256": "38a1f5dbe586890f453f846aa185f75e150bed7de0d3de007b8c66e3811b1be6",
     "registry_version": "data-manifest/1.0+18392rows",
     "metric_definition_version": "verification_frontier/v2",
-    "metric_source_sha256": "3c9ec2ce0be32ac9c6ae3e3ba3e3cdb4e2930a11d87dbb07c0933472b356457c",
+    "metric_source_sha256": "d07b0c256d5cdffc96b02795ef0747df22c39bba878cc4aed4d8965935b82234",
     "n_resolved_records": 207,
     "n_eligible_records": 207,
     "n_used_records": 207,
@@ -134,7 +134,7 @@
     "outside_analysis_population": 0,
     "data_integrity_policy": "docs/data_integrity_findings.md",
     "requires_external_service": null,
-    "contract_version": "lab-contract/v6",
-    "generated_at": "2026-09-08T22:12:56.709028+00:00"
+    "contract_version": "lab-contract/v7",
+    "generated_at": "2026-09-12T20:42:06.710069+00:00"
   }
 }
