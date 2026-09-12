@@ -80,6 +80,12 @@
     routingLoaded: false,
     routingOpen: false,
     routingReturnFocus: null,
+    // Step 5/6/7 read views (Operations + Surfaces boards): loaded lazily per board switch.
+    operationsLoaded: false,
+    operationsRequestInFlight: false,
+    surfacesLoaded: false,
+    surfacesRequestInFlight: false,
+    runDetailReturnFocus: null,
     registryLoaded: false,
     registryOpen: false,
     registryReturnFocus: null,
@@ -2949,6 +2955,632 @@
     if (selectedSupervisorFlag()) renderSupervisorControls(selectedSupervisorFlag())
   }
 
+  /* ── Operations + read-model surfaces (steps 5/6/7): the final read views ───────────────
+     Every identifier and every value rendered here comes from the payload the route returned.
+     Degraded surfaces render by name; an unknown/pending/scenario state renders VERBATIM
+     (`unknown — reason`), never as a blank, a zero, or an all-clear. */
+
+  /** Render any value, including the payloads' state blocks, without inventing one. */
+  function stateText(value) {
+    if (value === null || value === undefined) return "—"
+    if (typeof value === "object") {
+      if (value.state) {
+        const extra = value.reason ? ` — ${value.reason}` : ""
+        return `${value.state}${extra}`
+      }
+      return "—"
+    }
+    return String(value)
+  }
+
+  /** A table whose rows can carry a run id for click-through rows. */
+  function dataTable(captionText, headers, rows, { runIds = null } = {}) {
+    const wrap = element("div", "table-scroll")
+    const table = element("table", "routing-table")
+    table.appendChild(element("caption", "sr-only", captionText))
+    const head = element("thead")
+    const headRow = element("tr")
+    headers.forEach((header) => {
+      const cell = element("th", "", header)
+      cell.scope = "col"
+      headRow.appendChild(cell)
+    })
+    head.appendChild(headRow)
+    table.appendChild(head)
+    const body = element("tbody")
+    ;(rows || []).forEach((cells, index) => {
+      const tr = element("tr")
+      const runId = runIds ? runIds[index] : null
+      if (runId) {
+        tr.dataset.runId = runId
+        tr.className = "clickable"
+        tr.tabIndex = 0
+        tr.setAttribute("role", "button")
+        tr.setAttribute("aria-label", `Open run ${runId} detail`)
+      }
+      cells.forEach((value) => tr.appendChild(element("td", "", stateText(value))))
+      body.appendChild(tr)
+    })
+    table.appendChild(body)
+    wrap.appendChild(table)
+    return wrap
+  }
+
+  function paragraph(text, className = "empty-state") {
+    return element("p", className, text)
+  }
+
+  /** One run-reference row -> table cells (packet fields, never re-derived). */
+  function runRow(entry) {
+    const progress =
+      entry.phases_completed === undefined && entry.phases_total === undefined
+        ? "—"
+        : `${entry.phases_completed ?? 0}/${entry.phases_total ?? 0}`
+    return [
+      entry.run_id,
+      entry.spec_name,
+      entry.state,
+      progress,
+      entry.model,
+      entry.candidate_sha ? String(entry.candidate_sha).slice(0, 12) : "—",
+      entry.started_at ? formatAge(entry.started_at) : "—",
+    ]
+  }
+
+  const RUN_HEADERS = ["Run", "Spec", "State", "Phases", "Model", "Candidate", "Started"]
+
+  /** The Operations board: the packet-derived snapshot, rendered as it was returned. */
+  async function loadOperations(force = false) {
+    if (state.operationsRequestInFlight) return
+    if (state.operationsLoaded && !force) return
+    state.operationsRequestInFlight = true
+    const content = $("#operations-content")
+    if (content.dataset.loaded !== "true") {
+      content.replaceChildren(paragraph("Loading operations…"))
+    }
+    try {
+      const response = await fetch("/api/operations")
+      const data = await response.json()
+      if (!response.ok) throw new Error(data.error || "operations unavailable")
+      renderOperations(data)
+      content.dataset.loaded = "true"
+      state.operationsLoaded = true
+    } catch (error) {
+      content.dataset.loaded = "false"
+      state.operationsLoaded = false
+      content.replaceChildren(paragraph(`Operations unavailable: ${error.message}`))
+    } finally {
+      state.operationsRequestInFlight = false
+    }
+  }
+
+  function renderOperations(data) {
+    const content = $("#operations-content")
+    const source = data.source || {}
+    const active = data.active_runs || []
+    const promotable = data.promotable_runs || []
+    const attention = data.attention || []
+    const degraded = data.degraded || []
+    const lag = data.projection_lag || {}
+
+    const summary = element("div", "metric-grid")
+    const cards = [
+      ["Control epoch", String(source.control_epoch ?? "—")],
+      ["Repo head", (source.repo_head_sha || "—").slice(0, 9)],
+      ["Active runs", String(active.length)],
+      ["Decisions owed", String(attention.length)],
+      ["Promotable runs", String(promotable.length)],
+      ["Unhealthy workers", String((data.unhealthy_workers || []).length)],
+    ]
+    cards.forEach(([label, value]) => {
+      const card = element("article", "metric-card")
+      card.appendChild(element("span", "metric-label", label))
+      card.appendChild(element("strong", "metric-value", value))
+      summary.appendChild(card)
+    })
+    const children = [summary]
+
+    if (degraded.length) {
+      const block = element("section", "surface-block")
+      block.appendChild(element("h3", "", "Degraded surfaces"))
+      block.appendChild(
+        dataTable(
+          "Degraded surfaces",
+          ["Surface", "Reason"],
+          degraded.map((entry) => [entry.surface, entry.reason]),
+        ),
+      )
+      children.push(block)
+    }
+
+    const attentionBlock = element("section", "surface-block")
+    attentionBlock.appendChild(element("h3", "", "Attention"))
+    if (attention.length === 0) {
+      attentionBlock.appendChild(paragraph("No decisions owed."))
+    } else {
+      attentionBlock.appendChild(
+        dataTable(
+          "Attention (decisions owed)",
+          ["Kind", "Run", "Spec", "Gate", "Candidate", "Purpose"],
+          attention.map((entry) => [
+            entry.kind,
+            entry.run_id,
+            entry.spec_name,
+            entry.gate_id || "(run)",
+            entry.candidate_sha ? String(entry.candidate_sha).slice(0, 12) : "—",
+            entry.purpose || entry.reason || "—",
+          ]),
+          { runIds: attention.map((entry) => entry.run_id) },
+        ),
+      )
+    }
+    children.push(attentionBlock)
+
+    const runsBlock = element("section", "surface-block")
+    runsBlock.appendChild(element("h3", "", "Active + promotable runs"))
+    const runs = active.concat(promotable)
+    if (runs.length === 0) {
+      runsBlock.appendChild(paragraph("No active or promotable runs."))
+    } else {
+      runsBlock.appendChild(
+        dataTable("Active and promotable runs", RUN_HEADERS, runs.map(runRow), {
+          runIds: runs.map((entry) => entry.run_id),
+        }),
+      )
+    }
+    children.push(runsBlock)
+
+    const lagBlock = element("section", "surface-block")
+    lagBlock.appendChild(element("h3", "", "Projection lag"))
+    const lagRows = Object.entries(lag).map(([projection, events]) => [projection, stateText(events)])
+    lagBlock.appendChild(
+      lagRows.length ? dataTable("Projection lag", ["Projection", "Unconfirmed events"], lagRows)
+                     : paragraph("No projection watermarks reported.")
+    )
+    children.push(lagBlock)
+
+    content.replaceChildren(...children)
+  }
+
+  /** The P1/P2 run detail: identity, attempts, gates, approvals, command receipts. */
+  async function openRunDetail(runId) {
+    if (!runId) return
+    const drawer = $("#run-detail-drawer")
+    const content = $("#run-detail-content")
+    const title = $("#run-detail-title")
+    title.textContent = `RUN ${runId}`
+    drawer.hidden = false
+    state.runDetailReturnFocus = document.activeElement
+    content.replaceChildren(paragraph("Loading run detail…"))
+    try {
+      const response = await fetch(`/api/runs/${encodeURIComponent(runId)}`)
+      const data = await response.json()
+      if (!response.ok) throw new Error(data.error || "run unavailable")
+      renderRunDetail(data)
+    } catch (error) {
+      content.replaceChildren(paragraph(`Run detail unavailable: ${error.message}`))
+    }
+  }
+
+  function closeRunDetail() {
+    $("#run-detail-drawer").hidden = true
+    $("#run-detail-content").replaceChildren()
+    state.runDetailReturnFocus?.focus?.()
+  }
+
+  /** A generic object table over whatever keys the control record actually carries. */
+  function objectTable(captionText, rows, preferredKeys) {
+    if (!rows.length) return paragraph("None recorded.")
+    const keys = preferredKeys.filter((key) => rows.some((row) => key in row))
+    const extra = new Set()
+    rows.forEach((row) => Object.keys(row).forEach((key) => {
+      if (!keys.includes(key) && !key.endsWith("_json")) extra.add(key)
+    }))
+    const headers = keys.concat([...extra])
+    return dataTable(
+      captionText,
+      headers,
+      rows.map((row) => headers.map((key) => row[key])),
+    )
+  }
+
+  function renderRunDetail(data) {
+    const content = $("#run-detail-content")
+    const run = data.run || {}
+    const children = []
+    const identity = element("div", "metric-grid")
+    ;[
+      ["Spec", run.spec_name || "—"],
+      ["State", run.state || "—"],
+      ["Model", run.model || "—"],
+      ["Candidate", run.candidate_sha ? String(run.candidate_sha).slice(0, 12) : "—"],
+      ["Started", run.started_at ? formatAge(run.started_at) : "—"],
+      ["Cost", formatCost(run.cost_usd) ?? "unavailable"],
+    ].forEach(([label, value]) => {
+      const card = element("article", "metric-card")
+      card.appendChild(element("span", "metric-label", label))
+      card.appendChild(element("strong", "metric-value", value))
+      identity.appendChild(card)
+    })
+    children.push(identity)
+
+    const attempts = data.attempts || []
+    const attemptBlock = element("section", "surface-block")
+    attemptBlock.appendChild(element("h3", "", "Attempts"))
+    attemptBlock.appendChild(
+      objectTable(
+        "Attempts",
+        attempts,
+        ["attempt_number", "phase", "model", "status", "first_pass", "accepted", "retry_reason", "escalation_from", "escalation_to", "cost_usd"],
+      ),
+    )
+    children.push(attemptBlock)
+
+    const gates = element("section", "surface-block")
+    gates.appendChild(element("h3", "", "Gates"))
+    gates.appendChild(objectTable("Gates", data.gates || [], ["gate_id", "candidate_sha", "status", "verdict", "created_at"]))
+    children.push(gates)
+
+    const approvals = element("section", "surface-block")
+    approvals.appendChild(element("h3", "", "Approvals"))
+    approvals.appendChild(objectTable("Approvals", data.approvals || [], ["gate_id", "candidate_sha", "purpose", "operator", "created_at"]))
+    children.push(approvals)
+
+    const commands = element("section", "surface-block")
+    commands.appendChild(element("h3", "", "Command journal"))
+    commands.appendChild(
+      objectTable("Command journal", data.commands || [], ["verb", "state", "actor", "rationale", "candidate_sha", "created_at"]),
+    )
+    children.push(commands)
+    content.replaceChildren(...children)
+  }
+
+  /* ── The Surfaces board: the step-6/7 read models, each panel independent ─────────────── */
+
+  const SURFACE_ROUTES = [
+    ["quality", "/api/quality"],
+    ["value", "/api/value"],
+    ["arms", "/api/arms/compare"],
+    ["sla", "/api/queue/sla"],
+    ["escalations", "/api/escalations"],
+    ["batch", "/api/batch"],
+    ["energy", "/api/energy"],
+  ]
+
+  async function loadSurfaces(force = false) {
+    if (state.surfacesRequestInFlight) return
+    if (state.surfacesLoaded && !force) return
+    state.surfacesRequestInFlight = true
+    const content = $("#surfaces-content")
+    if (content.dataset.loaded !== "true") content.replaceChildren(paragraph("Loading surfaces…"))
+    const results = await Promise.allSettled(
+      SURFACE_ROUTES.map(([, url]) => fetch(url).then(async (response) => {
+        const data = await response.json().catch(() => ({}))
+        if (!response.ok) throw new Error(data.error || `${url} returned ${response.status}`)
+        return data
+      })),
+    )
+    const panels = SURFACE_ROUTES.map(([name, url], index) => {
+      const outcome = results[index]
+      return outcome.status === "fulfilled"
+        ? renderSurfacePanel(name, outcome.value)
+        : renderSurfaceError(name, url, outcome.reason)
+    })
+    panels.push(renderStoryArcPanel(null))
+    const grid = element("div", "surface-grid")
+    panels.forEach((panel) => grid.appendChild(panel))
+    content.replaceChildren(grid)
+    content.dataset.loaded = "true"
+    state.surfacesLoaded = true
+    state.surfacesRequestInFlight = false
+  }
+
+  /* ── The surface panels: one per read model, each rendering ONLY what it returned ─────── */
+
+  function surfacePanel(name, title, body) {
+    const panel = element("section", "surface-panel")
+    panel.dataset.surface = name
+    panel.appendChild(element("h3", "", title))
+    if (typeof body === "string") panel.appendChild(paragraph(body))
+    else if (body) panel.appendChild(body)
+    return panel
+  }
+
+  function renderSurfaceError(name, url, error) {
+    const reason = error && error.message ? error.message : String(error)
+    return surfacePanel(name, name.toUpperCase(), `unavailable — ${reason} (${url})`)
+  }
+
+  function renderSurfacePanel(name, data) {
+    switch (name) {
+      case "quality": return renderQualityPanel(data)
+      case "value": return renderValuePanel(data)
+      case "arms": return renderArmsPanel(data)
+      case "sla": return renderSlaPanel(data)
+      case "escalations": return renderEscalationPanel(data)
+      case "batch": return renderBatchPanel(data)
+      case "energy": return renderEnergyPanel(data)
+      default: return surfacePanel(name, name.toUpperCase(), stateText(data))
+    }
+  }
+
+  /** Grit — the one formal definition — per model, with its coverage beside it. */
+  function renderQualityPanel(data) {
+    const body = element("div")
+    const population = data.population || {}
+    const excluded = Object.entries(population.exclusions || {}).map(([k, v]) => `${k}=${v}`).join(", ")
+    body.appendChild(paragraph(
+      `cells ${population.eligible_cells ?? "—"}/${population.resolved_cells ?? "—"} eligible` +
+      (excluded ? ` (excluded: ${excluded})` : ""),
+      "pane-note",
+    ))
+    const rows = (data.models || []).map((model) => {
+      const grit = (model.grit && model.grit.overall) || {}
+      const first = model.first_pass || {}
+      const narration = model.narration || {}
+      const gritty = grit.grit === null || grit.grit === undefined
+        ? (grit.insufficient_support ? "insufficient support" : "—")
+        : `${grit.grit} (n=${grit.n}${grit.insufficient_support ? ", low" : ""})`
+      return [
+        model.model,
+        gritty,
+        stateText(first.first_pass_rate),
+        stateText(first.accepted_rate),
+        stateText(narration.explanation_ratio),
+        `${first.n_eligible ?? "—"}/${first.n_total ?? "—"} attempts`,
+      ]
+    })
+    body.appendChild(dataTable(
+      "Model quality",
+      ["Model", "Grit", "First-pass", "Accepted", "Explanation ratio", "First-pass coverage"],
+      rows,
+    ))
+    if ((data.degraded || []).length) {
+      body.appendChild(paragraph(`degraded: ${data.degraded.map((d) => d.surface).join(", ")}`, "pane-note"))
+    }
+    return surfacePanel("quality", "MODEL QUALITY (rules 1/2/5)", body)
+  }
+
+  /** observed-only value: accepted outcomes and cost per accepted outcome, verbatim. */
+  function renderValuePanel(data) {
+    const body = element("div")
+    body.appendChild(paragraph(data.formula || "", "pane-note"))
+    body.appendChild(paragraph(
+      `BVI: ${stateText(data.bvi)}`,
+      "pane-note",
+    ))
+    const rows = (data.rows || []).map((row) => [
+      row.run, row.arm, row.accepted_outcomes, row.total_cost_usd,
+      row.cost_per_accepted ?? (row.cost_per_accepted_reason || "—"),
+      `${row.cost_captured_records}/${row.outcomes_total} costs`,
+    ])
+    body.appendChild(dataTable(
+      "Observed value",
+      ["Run", "Arm", "Accepted", "Total cost", "Cost / accepted", "Cost coverage"],
+      rows,
+    ))
+    return surfacePanel("value", "RUN VALUE (rule 10, observed-only)", body)
+  }
+
+  /** the compare/adapt ranking, exactly as compare_arms returned it. */
+  function renderArmsPanel(data) {
+    const body = element("div")
+    const comparison = data.comparison || {}
+    body.appendChild(paragraph(
+      `${data.state || "—"}${data.state_reason ? ` — ${data.state_reason}` : ""} · best: ${comparison.best_arm ?? "—"} · n=${data.n_outcomes ?? 0}`,
+      "pane-note",
+    ))
+    const arms = comparison.arms || {}
+    const rows = Object.entries(arms).map(([arm, stats]) => {
+      const coverage = stats.coverage || {}
+      const costCov = coverage.cost ? `${coverage.cost.n}/${coverage.cost.of}` : "—"
+      return [
+        arm,
+        stats.n,
+        stats.eligible === false ? "no" : "yes",
+        stats.weighted_loss ?? (stats.missing_objectives ? `missing ${stats.missing_objectives.join(",")}` : "—"),
+        costCov,
+      ]
+    })
+    body.appendChild(dataTable("Arms", ["Arm", "n", "Eligible", "Weighted loss", "Cost coverage"], rows))
+    return surfacePanel("arms", "ARM COMPARISON (P6)", body)
+  }
+
+  /** queue depth, burn, the breach value and the settled completions. */
+  function renderSlaPanel(data) {
+    const body = element("div")
+    const queue = data.queue || {}
+    const burn = data.burn || {}
+    const sla = data.sla || {}
+    body.appendChild(paragraph(
+      `depth ${queue.depth ?? "—"} · burn ${stateText(burn.burn_per_h)}/h over ${stateText(burn.span_h)}h · horizon ${stateText(sla.horizon)}`,
+      "pane-note",
+    ))
+    const breach = sla.breach_rate || {}
+    body.appendChild(paragraph(
+      `breach: ${breach.state === "measured" ? `timeouts ${breach.value.timeout_breaches}/${breach.value.total_phases_with_breach_fields}, gates ${breach.value.gate_breaches}` : stateText(breach)}`,
+      "pane-note",
+    ))
+    body.appendChild(paragraph(`2× rule: ${stateText(sla.twice_depth_rule?.threshold_jobs)} jobs (${sla.twice_depth_rule?.basis || "—"})`, "pane-note"))
+    const completions = (data.recent_completions && data.recent_completions.rows) || []
+    body.appendChild(dataTable(
+      "Recent completions",
+      ["Cell", "Status", "Queue wait (ms)", "Service (ms)", "Deadline slack (ms)"],
+      completions.slice(0, 10).map((row) => [
+        row.cell_id, row.status,
+        row.queue_wait_ms ?? "—", row.service_time_ms ?? "—", row.deadline_slack_ms ?? "—",
+      ]),
+    ))
+    return surfacePanel("sla", "QUEUE / SLA (rule 9)", body)
+  }
+
+  /** the cascade surface: recorded events only, the armed flag, and E_x labeled. */
+  function renderEscalationPanel(data) {
+    const body = element("div")
+    body.appendChild(paragraph(
+      `armed: ${data.armed === true ? "yes" : "no"}${data.armed_note ? ` — ${data.armed_note}` : ""}`,
+      "pane-note",
+    ))
+    const events = data.events || []
+    body.appendChild(dataTable(
+      "Escalation events",
+      ["From", "To", "Reason", "Cost"],
+      events.map((event) => [event.from, event.to, event.reason || "—", event.cost_usd ?? "—"]),
+    ))
+    body.appendChild(paragraph(`E_x: ${stateText(data.e_x)} (${data.e_x?.class || "—"})`, "pane-note"))
+    return surfacePanel("escalations", "ESCALATION CASCADE (rule 8)", body)
+  }
+
+  /** explicitly not-measurable until a batch transport exists; the scenario is labeled. */
+  function renderBatchPanel(data) {
+    const body = element("div")
+    body.appendChild(paragraph(
+      data.measurable ? `batch fraction ${data.batch_fraction} (${data.batch_jobs}/${data.marked_jobs})`
+                      : `not measurable — ${data.reason || "no marker"} (scanned ${data.scanned_jobs ?? 0} jobs)`,
+      "pane-note",
+    ))
+    const modeled = data.modeled || {}
+    body.appendChild(paragraph(
+      `modeled scenario: discount ${modeled.discount} / horizon ${modeled.horizon_h}h · class ${modeled.class || "—"}`,
+      "pane-note",
+    ))
+    return surfacePanel("batch", "BATCH DISCOUNT (rule 6)", body)
+  }
+
+  /** energy/EPM: external + modeled sources labeled; the measured gap named. */
+  function renderEnergyPanel(data) {
+    const body = element("div")
+    const model = data.energy_model || {}
+    body.appendChild(paragraph(
+      `model: ${model.per_prompt_token_j} J/prompt · ${model.per_output_token_j} J/output · ${model.per_reasoning_token_j} J/reasoning (${model.class || "—"})`,
+      "pane-note",
+    ))
+    const epm = data.epm || {}
+    body.appendChild(paragraph(
+      epm.state === "published"
+        ? `EPM: ${epm.baseline?.value ?? "—"} baseline / ${epm.aggressive?.value ?? "—"} aggressive (${epm.class})`
+        : `EPM: ${stateText(epm)}`,
+      "pane-note",
+    ))
+    const ranking = data.energy_ranking || {}
+    const models = Array.isArray(ranking.models) ? ranking.models : []
+    body.appendChild(dataTable(
+      "Energy ranking",
+      ["Model", "Avg energy (J)", "J per LOC"],
+      models.slice(0, 8).map((row) => [row.id || row.model || "—", row.avg_energy_j ?? "—", row.avg_energy_j_per_loc ?? "—"]),
+    ))
+    body.appendChild(paragraph(`measured session energy: ${stateText(data.measured_session_energy)}`, "pane-note"))
+    body.appendChild(paragraph(`flip horizon: ${stateText(data.flip_horizon)}`, "pane-note"))
+    return surfacePanel("energy", "ENERGY / EPM (rule 4)", body)
+  }
+
+  /** the story arc panel: a name input + the fetched arc, or explicit guidance. */
+  function renderStoryArcPanel(data, name = "") {
+    const panel = element("section", "surface-panel")
+    panel.dataset.surface = "story-arc"
+    panel.appendChild(element("h3", "", "STORY ARC (rule 3)"))
+    const controls = element("div", "surface-controls")
+    const input = element("input", "surface-input")
+    input.type = "text"
+    input.id = "story-arc-name"
+    input.placeholder = "story_id or story_name"
+    input.value = name
+    const button = element("button", "", "Load arc")
+    button.type = "button"
+    button.dataset.storyArcLoad = "true"
+    controls.appendChild(input)
+    controls.appendChild(button)
+    panel.appendChild(controls)
+    const body = element("div")
+    body.id = "story-arc-body"
+    body.appendChild(paragraph(
+      data ? "" : "Enter a story_id or story_name and load its arc.",
+    ))
+    if (data) renderStoryArcBody(data)
+    panel.appendChild(body)
+    return panel
+  }
+
+  function renderStoryArcBody(data) {
+    const body = $("#story-arc-body")
+    if (!body) return
+    if (data === null) {
+      body.replaceChildren(paragraph("Story not found."))
+      return
+    }
+    const children = [
+      paragraph(
+        `${data.matched_by} · ${data.stories_matched} story(ies) · snowball ${stateText(data.snowball_factor)} · velocity ${stateText(data.velocity)} · β ${stateText(data.beta?.value)} (${data.beta?.class || "—"})`,
+        "pane-note",
+      ),
+      dataTable(
+        "Sessions",
+        ["Session", "Cost", "Code lines", "n"],
+        (data.sessions || []).map((row) => [
+          row.session_number, row.cost_usd ?? stateText(row.cost_usd), row.code_lines ?? "—", row.n,
+        ]),
+      ),
+    ]
+    if (data.snowball_reason) children.push(paragraph(data.snowball_reason, "pane-note"))
+    body.replaceChildren(...children)
+  }
+
+  async function loadStoryArc() {
+    const input = $("#story-arc-name")
+    const name = (input && input.value.trim()) || ""
+    const body = $("#story-arc-body")
+    if (!name) {
+      if (body) body.replaceChildren(paragraph("Enter a story_id or story_name first."))
+      return
+    }
+    if (body) body.replaceChildren(paragraph(`Loading ${name}…`))
+    try {
+      const response = await fetch(`/api/stories/${encodeURIComponent(name)}/arc`)
+      if (response.status === 404) {
+        renderStoryArcBody(null)
+        return
+      }
+      const data = await response.json()
+      if (!response.ok) throw new Error(data.error || "arc unavailable")
+      renderStoryArcBody(data)
+    } catch (error) {
+      if (body) body.replaceChildren(paragraph(`Arc unavailable: ${error.message}`))
+    }
+  }
+
+  /** Wire the Operations + Surfaces controls (kept out of bindControls for focus). */
+  function bindSurfaceViews() {
+    $("#operations-refresh").addEventListener("click", () => loadOperations(true))
+    $("#operations-content").addEventListener("click", (event) => {
+      const row = event.target.closest("tr[data-run-id]")
+      if (row) openRunDetail(row.dataset.runId)
+    })
+    $("#operations-content").addEventListener("keydown", (event) => {
+      if (event.key !== "Enter" && event.key !== " ") return
+      const row = event.target.closest("tr[data-run-id]")
+      if (!row) return
+      event.preventDefault()
+      openRunDetail(row.dataset.runId)
+    })
+    $("#run-detail-close").addEventListener("click", closeRunDetail)
+    $("#run-detail-drawer").addEventListener("keydown", (event) => {
+      if (event.key !== "Escape") return
+      event.stopPropagation()
+      closeRunDetail()
+    })
+    $("#surfaces-refresh").addEventListener("click", () => loadSurfaces(true))
+    $("#surfaces-content").addEventListener("click", (event) => {
+      if (event.target.closest("button[data-story-arc-load]")) loadStoryArc()
+    })
+    $("#surfaces-content").addEventListener("keydown", (event) => {
+      if (event.key !== "Enter") return
+      if (event.target.id === "story-arc-name") {
+        event.preventDefault()
+        loadStoryArc()
+      }
+    })
+  }
+
   /** Register all local controls after the immediate shell has rendered. */
   function bindControls() {
     $("#supervisor-steer-form").addEventListener("submit", submitSupervisorSteer)
@@ -3396,6 +4028,7 @@
   }
 
   bindControls()
+  bindSurfaceViews()
   bindDocsHealthControls()
   renderFleet()
   renderPipelineStages()

@@ -2901,3 +2901,65 @@ textarea:focus {
     animation: none;
   }
 }
+
+/* ── Step 5/6/7 read views (Operations + Surfaces boards) ────────────────────────────────
+   The panels render the payloads' own states verbatim (unknown/pending/scenario); these
+   rules are presentation only and never imply a value the payload did not carry. */
+.surface-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+  gap: var(--cr-space-3);
+}
+
+.surface-panel {
+  border: 1px solid var(--cr-line-subtle);
+  border-radius: var(--cr-radius-md);
+  background: var(--cr-surface-1);
+  padding: var(--cr-space-3);
+}
+
+.surface-panel h3 {
+  margin: 0 0 var(--cr-space-2);
+  font-size: 0.8rem;
+  letter-spacing: 0.06em;
+  color: var(--cr-text-secondary);
+}
+
+.surface-block {
+  margin: var(--cr-space-3) 0;
+}
+
+.surface-block h3 {
+  margin: 0 0 var(--cr-space-2);
+  font-size: 0.85rem;
+  letter-spacing: 0.05em;
+  color: var(--cr-text-secondary);
+}
+
+.surface-controls {
+  display: flex;
+  gap: var(--cr-space-2);
+  margin-bottom: var(--cr-space-2);
+}
+
+.surface-input {
+  flex: 1;
+  min-width: 0;
+  padding: var(--cr-space-1) var(--cr-space-2);
+  background: var(--cr-surface-inset);
+  color: var(--cr-text-primary);
+  border: 1px solid var(--cr-line-subtle);
+  border-radius: var(--cr-radius-sm);
+}
+
+.routing-table tr.clickable {
+  cursor: pointer;
+}
+
+.run-detail-drawer {
+  margin-top: var(--cr-space-3);
+  border: 1px solid var(--cr-line-strong);
+  border-radius: var(--cr-radius-md);
+  background: var(--cr-surface-1);
+  padding: var(--cr-space-3);
+}
