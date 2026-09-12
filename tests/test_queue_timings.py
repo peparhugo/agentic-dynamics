@@ -113,3 +113,13 @@ def test_rows_are_valid_json_lines(tmp_path):
     lines = [ln for ln in path.read_text(encoding="utf-8").splitlines() if ln]
     assert len(lines) == 2
     assert [json.loads(ln)["cell_id"] for ln in lines] == ["a", "b"]
+
+
+def test_batch_mode_is_recorded_only_for_batch_cells():
+    """The deferred lane's accounting: present on batch rows, ABSENT on on-demand rows."""
+    batch = timing_row(
+        {"cell_id": "c1", "batch_mode": True}, status="done", started_at=1.0, ended_at=2.0
+    )
+    on_demand = timing_row({"cell_id": "c2"}, status="done", started_at=1.0, ended_at=2.0)
+    assert batch["batch_mode"] is True
+    assert "batch_mode" not in on_demand  # absence IS the on-demand classification

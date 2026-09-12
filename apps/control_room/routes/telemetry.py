@@ -72,7 +72,10 @@ def api_matrix() -> Response:
     """Return the legacy fleet matrix plus the three-stage pipeline view."""
     try:
         r = _services.redis()
-        execute = stage_summary(r, _services.queue_key, STATUS_KEY, _services.results_key)
+        execute = stage_summary(
+            r, _services.queue_key, STATUS_KEY, _services.results_key,
+            batch_key=_services.batch_queue_key,
+        )
         analyze = stage_summary(r, _services.analysis_queue_key, _services.analysis_status_key)
         # The review population comes from the INJECTED authority, never a hard-wired import:
         # the composition root binds the file-derived source in production (see

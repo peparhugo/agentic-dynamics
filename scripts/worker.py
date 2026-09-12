@@ -78,6 +78,9 @@ REDIS_HOST = os.environ.get("FINOPS_REDIS_HOST", "127.0.0.1")
 REDIS_PORT = int(os.environ.get("FINOPS_REDIS_PORT", "6380"))
 REDIS_DB = int(os.environ.get("FINOPS_REDIS_DB", "1"))
 QUEUE_KEY = "story_jobs"
+#: The DEFERRED batch lane (rule 6, step 12): BRPOP checks keys in ORDER (left to right), so
+#: on-demand work always pops first and a batch cell runs only when the on-demand lane is empty.
+BATCH_QUEUE_KEY = "story_jobs_batch"
 STATUS_KEY = "story_status"
 WORKER_PREFIX = "worker"
 
@@ -369,7 +372,9 @@ def main() -> None:
 
     while True:
         try:
-            result = r.brpop(QUEUE_KEY, timeout=BLOCK_TIMEOUT)
+            # Ordered BRPOP: Redis checks keys left to right — on-demand first, the deferred
+            # batch lane only when no on-demand work waits.
+            result = r.brpop(QUEUE_KEY, BATCH_QUEUE_KEY, timeout=BLOCK_TIMEOUT)
         except Exception as e:
             log(f"Redis brpop error: {e}, reconnecting...")
             time.sleep(10)
@@ -380,7 +385,7 @@ def main() -> None:
             empty_polls += 1
             if empty_polls >= IDLE_POLLS_BEFORE_EXIT:
                 try:
-                    remaining = r.llen(QUEUE_KEY)
+                    remaining = r.llen(QUEUE_KEY) + r.llen(BATCH_QUEUE_KEY)
                 except Exception:
                     remaining = 0
                 if remaining == 0:
@@ -402,7 +407,8 @@ def main() -> None:
         _safe_hset(r, STATUS_KEY, cell_id, "running")
         publisher = LivePublisher(cell_id)
         publisher.publish_status("running")
-        log(f"[{cell_id}] Starting ({completed+failed+1}/30)")
+        lane = " [batch]" if cell.get("batch_mode") is True else ""
+        log(f"[{cell_id}] Starting ({completed+failed+1}/30){lane}")
 
         t0 = time.monotonic()
         started_at = time.time()
@@ -530,7 +536,8 @@ def main() -> None:
             try:
                 # LPUSH against a BRPOP consumer puts it at the BACK of the queue, so the other
                 # jobs get a turn before this one is retried.
-                r.lpush(QUEUE_KEY, job_json)
+                requeue_key = BATCH_QUEUE_KEY if cell.get("batch_mode") is True else QUEUE_KEY
+                r.lpush(requeue_key, job_json)
             except Exception as exc:  # noqa: BLE001 — a lost re-queue must not kill the worker
                 log(f"[{cell_id}] could not re-queue after denial: {exc}")
                 _safe_record_dead(r, QUEUE_KEY, cell, f"admission denied + re-queue failed: {e}")

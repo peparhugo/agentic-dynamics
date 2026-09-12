@@ -39,7 +39,11 @@ def build_batch(
             "generated_at": now,
             "source": dict(source or {}),
             "measurable": False,
-            "reason": "no batch_mode marker",
+            "reason": (
+                "queue empty — nothing to classify"
+                if not jobs
+                else "no batch_mode marker"
+            ),
             "scanned_jobs": len(jobs),
             "missing_fields": ["batch_mode", "batch vs on-demand accounting", "batch fraction"],
             "modeled": dict(MODELED),
@@ -47,15 +51,19 @@ def build_batch(
         }
 
     batch = sum(1 for j in marked if j["batch_mode"])
+    fraction = batch / len(marked)
     return {
         "schema": SCHEMA,
         "generated_at": now,
         "source": dict(source or {}),
         "measurable": True,
-        "batch_fraction": round(batch / len(marked), 6),
+        "batch_fraction": round(fraction, 6),
         "batch_jobs": batch,
+        "on_demand_jobs": len(marked) - batch,
         "marked_jobs": len(marked),
         "scanned_jobs": len(jobs),
+        # The DISCOUNT stays a labeled design scenario: no provider batch transport exists, so
+        # the split is measured but the 50% economics are not (rule 6's own condition).
         "modeled": dict(MODELED),
         "degraded": [],
     }

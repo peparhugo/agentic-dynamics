@@ -67,6 +67,32 @@ REDIS_HOST = "127.0.0.1"
 REDIS_PORT = int(os.environ.get("FINOPS_REDIS_PORT", "6380"))
 REDIS_DB = int(os.environ.get("FINOPS_REDIS_DB", "1"))
 QUEUE_KEY = "story_jobs"
+#: The DEFERRED lane (rule 6, the batch executor): batch-mode cells wait here and are popped
+#: only when the on-demand lane is empty (the worker's ordered BRPOP checks keys left to right).
+BATCH_QUEUE_KEY = "story_jobs_batch"
+
+
+def queued_cell_ids(r: "redis.Redis") -> set[str]:
+    """Cell ids currently queued in EITHER lane (on-demand + batch), parsed defensively.
+
+    The queued-aware skip for ``--missing-only``: a saved result means done, but a cell
+    sitting in a lane has NOT run yet — re-filling would copy it (the mechanism behind the
+    ~65x duplication the controller had cleared on 2026-09-12).
+    """
+    ids: set[str] = set()
+    for key in (QUEUE_KEY, BATCH_QUEUE_KEY):
+        try:
+            raw_rows = r.lrange(key, 0, -1)
+        except Exception:  # noqa: BLE001 — a fill must not crash on a lane read
+            continue
+        for raw in raw_rows:
+            try:
+                cell = json.loads(raw)
+            except (TypeError, ValueError):
+                continue
+            if isinstance(cell, dict) and cell.get("cell_id"):
+                ids.add(str(cell["cell_id"]))
+    return ids
 STATUS_KEY = "story_status"       # Redis hash: cell_id -> status
 RESULTS_KEY = "story_results"     # Redis hash: cell_id -> result path
 
@@ -242,6 +268,11 @@ def main() -> None:
     clear = "--clear" in sys.argv
     missing_only = "--missing-only" in sys.argv
     interleave = "--interleave" in sys.argv
+    batch = "--batch" in sys.argv
+    if batch and interleave:
+        print("--batch and --interleave are mutually exclusive (batch is a deferred FIFO lane; "
+              "interleave is on-demand scheduling)", file=sys.stderr)
+        raise SystemExit(2)
     model = MODEL
     if "--model" in sys.argv:
         idx = sys.argv.index("--model")
@@ -265,6 +296,9 @@ def main() -> None:
         except ValueError:
             print(f"--due-hours must be a number, got {sys.argv[idx + 1]!r}", file=sys.stderr)
             raise SystemExit(2) from None
+    if batch:
+        for cell in cells:
+            cell["batch_mode"] = True
     stamp_enqueue(cells, due_hours=due_hours)
 
     # Admission (p2) — every cell's budget is reserved BEFORE it enters the queue. Skipped for
@@ -281,6 +315,17 @@ def main() -> None:
     if interleave or not dry_run:
         r = redis.Redis(host=REDIS_HOST, port=REDIS_PORT, db=REDIS_DB, decode_responses=True)
 
+    # Queued-aware skip: drop cells already waiting in either lane (a saved result is not the
+    # only reason a cell needs no second push).
+    if missing_only and not clear and r is not None:
+        queued = queued_cell_ids(r)
+        before = len(cells)
+        cells = [cell for cell in cells if cell["cell_id"] not in queued]
+        total = len(cells)
+        skipped = before - total
+        if skipped:
+            print(f"Skipped {skipped} cell(s) already queued (on-demand or batch lane).")
+
     final_cells = cells
     if interleave:
         existing = [json.loads(c) for c in reversed(r.lrange(QUEUE_KEY, 0, -1))]
@@ -288,6 +333,8 @@ def main() -> None:
 
     if dry_run:
         mode = " (missing-only)" if missing_only else ""
+        if batch:
+            mode += " (batch — deferred lane)"
         if interleave:
             print(f"Would interleave {total} new cells into {len(existing)} queued → {len(final_cells)} total:")
             for i, cell in enumerate(final_cells[:15]):
@@ -302,9 +349,10 @@ def main() -> None:
 
     if clear:
         r.delete(QUEUE_KEY)
+        r.delete(BATCH_QUEUE_KEY)  # a reset clears BOTH lanes (the deferred lane included)
         r.delete(STATUS_KEY)
         r.delete(RESULTS_KEY)
-        print("Queue cleared.")
+        print("Queue cleared (both lanes).")
         return
 
     if interleave:
@@ -315,10 +363,11 @@ def main() -> None:
             r.hset(STATUS_KEY, cell["cell_id"], "queued")
         print(f"Interleaved {total} new cells into queue (now {len(final_cells)} total) (model={model})")
     else:
+        lane = BATCH_QUEUE_KEY if batch else QUEUE_KEY
         for cell in cells:
-            r.lpush(QUEUE_KEY, json.dumps(cell))
+            r.lpush(lane, json.dumps(cell))
             r.hset(STATUS_KEY, cell["cell_id"], "queued")
-        print(f"Enqueued {total} cells into '{QUEUE_KEY}' (model={model})")
+        print(f"Enqueued {total} cells into '{lane}' (model={model})")
 
     print(f"Status tracker: '{STATUS_KEY}'")
     print()

@@ -26,6 +26,7 @@ REDIS_HOST = os.environ.get("FINOPS_REDIS_HOST", "127.0.0.1")
 REDIS_PORT = int(os.environ.get("FINOPS_REDIS_PORT", "6380"))
 REDIS_DB = int(os.environ.get("FINOPS_REDIS_DB", "1"))
 QUEUE_KEY = "story_jobs"
+BATCH_QUEUE_KEY = "story_jobs_batch"  # the deferred lane (rule 6); depth counts BOTH
 STATUS_KEY = "story_status"
 RESULTS_KEY = "story_results"
 # Post-hoc pipeline stages (execute → analyze → review). The execute/analyze stages are
@@ -57,7 +58,7 @@ def _parse_cell_id(cell_id: str) -> tuple[str, str, str, str]:
 
 def get_status(r: redis.Redis) -> dict:
     """Get current experiment status across all three pipeline stages."""
-    execute = stage_summary(r, QUEUE_KEY, STATUS_KEY, RESULTS_KEY)
+    execute = stage_summary(r, QUEUE_KEY, STATUS_KEY, RESULTS_KEY, batch_key=BATCH_QUEUE_KEY)
     analyze = stage_summary(r, ANALYSIS_QUEUE_KEY, ANALYSIS_STATUS_KEY)
     review = review_stage_summary(r)
 
@@ -153,7 +154,7 @@ def main() -> None:
 
     if clear:
         for key in (
-            QUEUE_KEY, STATUS_KEY, RESULTS_KEY,
+            QUEUE_KEY, BATCH_QUEUE_KEY, STATUS_KEY, RESULTS_KEY,
             ANALYSIS_QUEUE_KEY, ANALYSIS_STATUS_KEY,
             REVIEW_QUEUE_KEY, REVIEW_STATUS_KEY,
         ):

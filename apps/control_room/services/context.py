@@ -78,6 +78,7 @@ class ControlRoomServices:
 
     # -- stable configuration (copied once at build; never monkeypatched) --
     queue_key: str
+    batch_queue_key: str  # the deferred lane (rule 6): depth counts BOTH queues
     results_key: str
     analysis_queue_key: str
     analysis_status_key: str
@@ -346,11 +347,24 @@ class ControlRoomServices:
             ]
 
     def _queue_jobs(self) -> tuple[list[dict[str, Any]], list[dict[str, str]]]:
-        """Read the live queue best-effort; a failure is a NAMED degradation, never a 500."""
+        """Read BOTH lanes best-effort, tagging each job with its lane and ``batch_mode``.
+
+        The lane IS the mode (rule 6, step 12): on-demand jobs carry ``batch_mode: false``,
+        deferred-lane jobs ``true`` — so the split is measured from the queue itself, and a
+        job that never carried the marker is still classified by where it waits. A failure is
+        a NAMED degradation, never a 500.
+        """
         from agentic_dynamics.control.queue_reinterleave import read_queue
 
         try:
-            return list(read_queue(self.redis()) or []), []
+            rows: list[dict[str, Any]] = []
+            for lane, key in (("on_demand", "story_jobs"), ("batch", "story_jobs_batch")):
+                for job in read_queue(self.redis(), key=key) or []:
+                    row = dict(job)
+                    row["lane"] = lane
+                    row["batch_mode"] = lane == "batch"
+                    rows.append(row)
+            return rows, []
         except Exception as exc:  # noqa: BLE001 — dashboard telemetry may degrade
             return [], [{"surface": "queue", "reason": f"{type(exc).__name__}: {exc}"}]
 
@@ -462,6 +476,7 @@ def build_services() -> ControlRoomServices:
         mutations=mutations,
         docs_health=docs_health,
         queue_key=server.QUEUE_KEY,
+        batch_queue_key=server.BATCH_QUEUE_KEY,
         results_key=server.RESULTS_KEY,
         analysis_queue_key=server.ANALYSIS_QUEUE_KEY,
         analysis_status_key=server.ANALYSIS_STATUS_KEY,

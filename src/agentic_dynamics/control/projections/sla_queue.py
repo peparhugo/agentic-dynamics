@@ -135,6 +135,8 @@ def _live_job_row(job: dict[str, Any], now_ts: float) -> dict[str, Any]:
     row: dict[str, Any] = {
         "job_id": str(job.get("job_id") or job.get("id") or job.get("cell_id") or "")
     }
+    if job.get("batch_mode") is True:
+        row["batch"] = True  # the deferred lane (rule 6); absent = on-demand by construction
     enqueued = finite_number(job.get("enqueued_at"))
     if enqueued is not None:
         row["enqueued_at"] = enqueued

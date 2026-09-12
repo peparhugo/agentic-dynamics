@@ -96,6 +96,7 @@ REDIS_HOST = os.environ.get("FINOPS_REDIS_HOST", "127.0.0.1")
 REDIS_PORT = int(os.environ.get("FINOPS_REDIS_PORT", "6380"))
 REDIS_DB = int(os.environ.get("FINOPS_REDIS_DB", "1"))
 QUEUE_KEY = "story_jobs"
+BATCH_QUEUE_KEY = "story_jobs_batch"  # the deferred lane (rule 6)
 RESULTS_KEY = "story_results"
 # Post-hoc pipeline stages. The execute stage is the story queue above; the analyze and review
 # stages are separate Redis pairs written by enqueue_analysis.py/analysis_worker.py and

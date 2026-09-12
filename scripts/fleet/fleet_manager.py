@@ -78,6 +78,7 @@ DEFAULT_INTERVAL = 15.0  # seconds between board refreshes
 # The queues the watcher surfaces (mirrors dlq.QUEUE_KEYS).
 STATUS_KEYS = {
     "story_jobs": "story_status",
+    "story_jobs_batch": "story_status",  # the deferred batch lane (rule 6); same tracker
     "analysis_jobs": "analysis_status",
     "review_jobs": "review_status",
 }

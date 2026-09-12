@@ -83,6 +83,10 @@ def timing_row(
         "ended_at": ended_at,
         "service_time_ms": round((ended_at - started_at) * 1000.0, 3),
     }
+    if cell.get("batch_mode") is True:
+        # The deferred lane's split (rule 6 accounting): present only for batch cells — an
+        # on-demand row's absence of the key IS the on-demand classification.
+        row["batch_mode"] = True
     enqueued = finite_number(enqueued_at) or finite_number(cell.get("enqueued_at"))
     if enqueued is not None:
         row["enqueued_at"] = enqueued
