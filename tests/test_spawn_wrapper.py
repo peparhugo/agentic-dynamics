@@ -1434,8 +1434,10 @@ def test_consume_fleet_commands_valid_submit_reaches_running_then_completed_with
     fleet_manager = _fleet_manager_module()
     spec_path, ledger_dir = _noop_spec
     ledger_dir.mkdir(parents=True, exist_ok=True)
-    ledger_file = ledger_dir / "20260901T000000Z.json"
-    ledger_file.write_text("{}")
+    # ANOTHER run's pre-existing ledger: the job must never be pointed at it (Wave B1 —
+    # the association is by difference, not by "newest file in the directory").
+    other_run = ledger_dir / "20260901T000000Z.json"
+    other_run.write_text("{}")
 
     r = _FakeCommandsRedis()
     cmd = fleet_manager._send_submit_command(
@@ -1445,9 +1447,12 @@ def test_consume_fleet_commands_valid_submit_reaches_running_then_completed_with
     assert fleet_manager.build_board(r)["jobs"][0]["status"] == "launching"
 
     calls = []
+    this_run = ledger_dir / "20260912T164142123456Z_run-new.json"
 
     def fake_run(argv, check=False):
         calls.append(argv)
+        # The dispatched run writes ITS OWN ledger as it completes (Wave B1 name shape).
+        this_run.write_text("{}")
         return subprocess.CompletedProcess(argv, returncode=0)
 
     monkeypatch.setattr(subprocess, "run", fake_run)
@@ -1463,7 +1468,7 @@ def test_consume_fleet_commands_valid_submit_reaches_running_then_completed_with
     assert job["model"] == "anthropic/claude-sonnet-5"
     assert job["status"] == "completed"
     assert job["returncode"] == 0
-    assert job["ledger"] == str(ledger_file)
+    assert job["ledger"] == str(this_run)  # ITS ledger — never the pre-existing other run's
 
 
 def test_consume_fleet_commands_nonzero_exit_marks_failed_and_files_the_dlq(
@@ -1546,3 +1551,38 @@ def test_consume_fleet_commands_dry_run_never_calls_subprocess(_noop_spec, monke
     # fabricated completed/failed.
     job = fleet_manager.build_board(r)["jobs"][0]
     assert job["status"] == "running"
+
+
+# ── Wave B1: a job's ledger is the file ITS dispatch wrote ──────────────────
+
+
+def test_run_ledger_binds_by_difference_not_recency(tmp_path, monkeypatch):
+    """The board pointer is the dispatch's OWN new ledger — never the newest file in the
+    spec dir (the old recency bug: another run's ledger misattributed to this job), and a
+    dispatch that wrote nothing gets None rather than someone else's file."""
+    from scripts.fleet import spawn_wrapper as sw
+
+    monkeypatch.setattr(sw, "_REPO_ROOT", tmp_path)
+    ledger_dir = tmp_path / "experiments" / "results" / "workflows" / "demo"
+    ledger_dir.mkdir(parents=True)
+    (ledger_dir / "20260101T000000Z.json").write_text("{}")
+
+    # (1) nothing new since the snapshot → honest absence, even though a ledger exists
+    snap = sw._ledger_files("demo")
+    assert sw._run_ledger("demo", snap) is None
+
+    # (2) a later-named file that appeared DURING the window IS the dispatch's — returned
+    (ledger_dir / "99991231T235959Z.json").write_text("{}")
+    assert sw._run_ledger("demo", snap).endswith("99991231T235959Z.json")
+
+    # (3) once snapshotted again, that same pre-existing max is NOT recency-picked
+    snap2 = sw._ledger_files("demo")
+    assert sw._run_ledger("demo", snap2) is None
+
+    # (4) exactly the dispatch's new file is returned (Wave B1 name shape)
+    (ledger_dir / "20260912T164142123456Z_run-new.json").write_text("{}")
+    assert sw._run_ledger("demo", snap2).endswith("20260912T164142123456Z_run-new.json")
+
+    # (5) an absent spec dir is an empty diff, never an error
+    assert sw._ledger_files("nope") == set()
+    assert sw._run_ledger("nope", set()) is None

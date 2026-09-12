@@ -431,6 +431,12 @@ def main() -> None:
                     help="skip phases that already have a [workflow] <phase> commit; when the "
                          "worktree has no such commits, fall back to the phases the derived "
                          "spec index (experiments/specs/index.json) shows as ok for this goal")
+    ap.add_argument("--parent-run-id", default="",
+                    help="the run a --resume CONTINUES (Wave B1: the explicit family link — "
+                         "never a recency guess). Validated: known run, same spec, in a "
+                         "continuable state (failed/cancelled/awaiting-approval); a bad id "
+                         "refuses the run. Without it, a resume links only a single "
+                         "unambiguous continuable candidate and refuses to guess among many.")
     ap.add_argument("--signals", default=None,
                     help="path to a JSON file mapping model id -> measured signals "
                          "(overrides the auto-built signal store)")
@@ -837,10 +843,7 @@ def _run_workflow_cli(
     # stays the default below in child mode (never written, never referenced).
     out_path: str = ""
     if not args.only_phase:
-        out_dir = ROOT / "experiments" / "results" / "workflows" / spec.name
-        out_dir.mkdir(parents=True, exist_ok=True)
-        ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-        out_path = out_dir / f"{ts}.json"
+        out_path = _ledger_out_path(spec.name, run_id=control_run_id or "")
         out_path.write_text(json.dumps(result.to_dict(), indent=2))
         print(f"\nledger: {out_path}", file=sys.stderr)
     # ``getattr`` so the composition-root tests that substitute a minimal result namespace
@@ -1161,6 +1164,98 @@ def _control_db() -> ControlDB | None:
         return None
 
 
+def _ledger_out_path(spec_name: str, *, run_id: str = "", now: datetime | None = None) -> Path:
+    """The run ledger's path — collision-proof and run-identity-carrying (Wave B1).
+
+    The old name was ``%Y%m%dT%H%M%SZ.json``: second resolution, so two runs of one spec
+    finishing in the same second OVERWROTE each other (one run vanished from the index),
+    and the name carried no identity a consumer could select by. The name is now
+    microsecond-precision (still lexicographically chronological) with the control-run id
+    as a suffix when the control plane is open (``<ts>Z_run-abc123.json``); a residual
+    collision appends ``.N`` — a ledger is never overwritten.
+    """
+    out_dir = ROOT / "experiments" / "results" / "workflows" / spec_name
+    out_dir.mkdir(parents=True, exist_ok=True)
+    ts = (now or datetime.now(timezone.utc)).strftime("%Y%m%dT%H%M%S%fZ")
+    stem = f"{ts}_{run_id}" if run_id else ts
+    path = out_dir / f"{stem}.json"
+    n = 1
+    while path.exists():
+        path = out_dir / f"{stem}.{n}.json"
+        n += 1
+    return path
+
+
+class ParentRunRefused(Exception):  # noqa: N818 — the domain verb is the CLI's REFUSED vocabulary
+    """A --parent-run-id naming a run that cannot be the continuation's parent.
+
+    Named for the refusal it raises (the ``REFUSED:`` stderr line + exit 2), mirroring the
+    admission gate's justified ``AdmissionDenied`` exception: ``ParentRunRefusedError``
+    would read as a generic error rather than this specific, named refusal.
+    """
+
+
+#: The run states a --resume may continue: failed, cancelled (a timed-out run the zombie
+#: sweep cancelled), awaiting-approval (a checkpoint stop with phases remaining).
+_CONTINUABLE_RUN_STATES = (RunState.FAILED, RunState.CANCELLED, RunState.AWAITING_APPROVAL)
+
+
+def _resolve_parent_run(
+    db: ControlDB, spec: ExperimentSpec, args: argparse.Namespace, *, resume: bool
+) -> str:
+    """The EXPLICIT parent for a --resume (Wave B1) — never a recency guess.
+
+    The old selection took ``db.runs(spec_name=...)[0]`` — the newest run of the spec — and
+    linked whatever it found. Two prior runs, or another worktree's run of the same spec,
+    silently mislinked the family whose UNION ``spec_status`` reads for completion. Now:
+
+    * an explicit ``--parent-run-id`` is authoritative and must VALIDATE (known run, same
+      spec, continuable) — a bad id REFUSES the run before it starts;
+    * without one, only a SINGLE continuable candidate links (deterministic — no ordering
+      guess); two or more candidates refuse to guess and name themselves so the operator
+      can pass the intended id. The run then proceeds as its own family root, loudly.
+    """
+    explicit = (getattr(args, "parent_run_id", "") or "").strip()
+    if explicit:
+        if not resume:
+            raise ParentRunRefused(
+                "--parent-run-id requires --resume (a parent link is a continuation's)"
+            )
+        record = db.get_run(explicit)
+        if record is None:
+            raise ParentRunRefused(f"--parent-run-id {explicit!r} is not a known run")
+        if record.spec_name != spec.name:
+            raise ParentRunRefused(
+                f"--parent-run-id {explicit!r} belongs to spec {record.spec_name!r}, "
+                f"not {spec.name!r}"
+            )
+        if record.state not in _CONTINUABLE_RUN_STATES:
+            raise ParentRunRefused(
+                f"--parent-run-id {explicit!r} is {record.state.value!r} — only "
+                "failed/cancelled/awaiting-approval runs can be a resume's parent"
+            )
+        return explicit
+    if not resume:
+        return ""
+    candidates = [r for r in db.runs(spec_name=spec.name) if r.state in _CONTINUABLE_RUN_STATES]
+    if len(candidates) == 1:
+        print(
+            f"control: --resume links the single continuable run {candidates[0].run_id} "
+            f"(family {candidates[0].family_id})",
+            file=sys.stderr,
+        )
+        return candidates[0].run_id
+    if len(candidates) > 1:
+        named = ", ".join(f"{r.run_id} ({r.state.value})" for r in candidates[:5])
+        print(
+            f"control: --resume is AMBIGUOUS — {len(candidates)} continuable runs for "
+            f"{spec.name!r}: {named}; pass --parent-run-id to link the intended one "
+            "(no family link applied)",
+            file=sys.stderr,
+        )
+    return ""
+
+
 def _control_open_run(spec: ExperimentSpec, args: argparse.Namespace) -> tuple[str | None, ControlDB | None]:
     """Record this run in the control database as ``running``; return ``(run_id, db)``.
 
@@ -1194,21 +1289,12 @@ def _control_open_run(spec: ExperimentSpec, args: argparse.Namespace) -> tuple[s
         return None, None
     try:
         parent_run_id = ""
-        if getattr(args, "resume", False):
-            # The run this --resume continues: the NEWEST prior run of the same spec, when
-            # that run is itself in a continuable state (failed / cancelled — a timed-out run
-            # the zombie sweep cancelled — / awaiting operator approval, a checkpoint stop
-            # with phases remaining). If the newest prior run reached a success-forward state
-            # (promotable/published/…), the resume is not continuing it — genuinely fresh
-            # work, its own family. Continuable-only gating keeps an old failed run from
-            # swallowing a genuinely new attempt that happens to reuse --resume.
-            prior = db.runs(spec_name=spec.name)
-            if prior and prior[0].state in (
-                RunState.FAILED,
-                RunState.CANCELLED,
-                RunState.AWAITING_APPROVAL,
-            ):
-                parent_run_id = prior[0].run_id
+        if getattr(args, "resume", False) or (getattr(args, "parent_run_id", "") or "").strip():
+            # Wave B1: the link is EXPLICIT (or uniquely inferable) — see
+            # :func:`_resolve_parent_run`. No "newest run of the spec" selection survives.
+            parent_run_id = _resolve_parent_run(
+                db, spec, args, resume=bool(getattr(args, "resume", False))
+            )
         run = db.create_run(
             spec_name=spec.name,
             # w2 (revision identity): record the canonical spec digest this run executes so
@@ -1226,6 +1312,13 @@ def _control_open_run(spec: ExperimentSpec, args: argparse.Namespace) -> tuple[s
             file=sys.stderr,
         )
         return run.run_id, db
+    except ParentRunRefused as exc:
+        # An explicit identity claim that does not validate: REFUSE before any work starts.
+        # Silently ignoring a bad parent id would record a family link the operator did not
+        # ask for — the guessing Wave B1 removes.
+        print(f"REFUSED: {exc}", file=sys.stderr)
+        db.close()
+        raise SystemExit(2) from exc
     except (ControlDBError, OSError) as exc:
         print(f"warning: control db run creation failed ({exc}) — run itself unaffected",
               file=sys.stderr)

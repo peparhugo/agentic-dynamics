@@ -1473,22 +1473,29 @@ def _spec_name_for_ledger(spec_rel: str) -> str:
     return Path(spec_rel).stem
 
 
-def _latest_ledger(spec_name: str) -> str | None:
-    """The most recently written ledger for a spec name — a submitted job's board pointer.
+def _ledger_files(spec_name: str) -> set[str]:
+    """The spec's run-ledger file names present on disk — a pre-dispatch snapshot."""
+    ledger_dir = _REPO_ROOT / "experiments" / "results" / "workflows" / spec_name
+    if not ledger_dir.is_dir():
+        return set()
+    return {path.name for path in ledger_dir.glob("*.json")}
 
-    An ``--orchestrator`` run has no single top-level ledger of its own: each phase spawns as
-    its own sibling running ``run_workflow.py --only-phase <name>``, and THAT single-phase run
-    is what writes the timestamped ledger JSON under ``experiments/results/workflows/
-    <spec_name>/`` (``run_workflow.py``'s own ``main()``). The lexicographic
-    ``YYYYMMDDTHHMMSSZ.json`` naming sorts chronologically, so the last file is the job's most
-    recent phase result — the pointer :func:`fleet_manager.record_job_status` attaches to a
-    completed/failed submit record.
+
+def _run_ledger(spec_name: str, before: set[str]) -> str | None:
+    """The ledger THIS dispatch wrote — the newest file absent from the ``before`` snapshot.
+
+    Wave B1: the old ``_latest_ledger`` took the lexicographically last file in the spec's
+    directory, so a job's board pointer could name ANOTHER run's ledger (a newer sibling
+    submission, another worktree's run of the same spec) — and under the pre-B1 same-second
+    filename collisions "latest" was arbitrary besides. The association is now by
+    DIFFERENCE: only files this dispatch created; when the dispatch wrote none, the pointer
+    is ``None`` — an honest absence, never another run's ledger.
     """
     ledger_dir = _REPO_ROOT / "experiments" / "results" / "workflows" / spec_name
     if not ledger_dir.is_dir():
         return None
-    files = sorted(ledger_dir.glob("*.json"))
-    return str(files[-1]) if files else None
+    new = sorted(path for path in ledger_dir.glob("*.json") if path.name not in before)
+    return str(new[-1]) if new else None
 
 
 def _dispatch_command(
@@ -1509,6 +1516,10 @@ def _dispatch_command(
     job_id = command.get("job_id") if action == "submit" else None
     if job_id:
         fleet_manager.record_job_status(client, job_id, "running")
+    # Wave B1 — the job's ledger association is by DIFFERENCE, not recency: snapshot the
+    # spec's ledger dir before the dispatch, diff after (a dry-run has no job row).
+    spec_name = _spec_name_for_ledger(str(command.get("spec", ""))) if job_id else ""
+    ledgers_before = _ledger_files(spec_name) if spec_name else set()
     if not dry_run:
         try:
             outcome = _broker_client().fleet_command(command, dry_run=False)
@@ -1542,7 +1553,7 @@ def _dispatch_command(
         argv = outcome.get("argv", [])
         print(f"[spawn-wrapper] DISPATCH {action} {service or job_id}: {argv}", flush=True)
         if job_id:
-            ledger = _latest_ledger(_spec_name_for_ledger(str(command.get("spec", ""))))
+            ledger = _run_ledger(spec_name, ledgers_before)
             if outcome.get("returncode") == 0:
                 fleet_manager.record_job_status(
                     client, job_id, "completed",
