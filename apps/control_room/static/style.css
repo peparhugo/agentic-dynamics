@@ -1407,6 +1407,8 @@ body {
 .panel-head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 8px; }
 .panel-title { margin: 0; font-size: 12px; letter-spacing: 0.07em; color: var(--text); }
 .panel-note { font-size: 11px; color: var(--muted); }
+/* The money lens' labeled metric rows reuse the kv table; the detail is a muted annotation. */
+.usage-metric-detail { color: var(--muted); font-size: 10px; }
 .panel-controls { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
 .panel-input,
 .panel-select {

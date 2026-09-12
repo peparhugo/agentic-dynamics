@@ -27,6 +27,23 @@
 "use strict";
 
 (function () {
+  // ── Shared keyed-list reconciler (main's `keyed-list.js`, loaded before this module) ──────
+  //
+  // Main loaded `keyed-list.js` and destructured `root.ControlRoomKeyedList`, then reconciled
+  // every polled list by STABLE KEY instead of calling `replaceChildren()` and rebuilding —
+  // "calm under poll": focus, scroll anchoring and text selection survive a no-op refresh. The
+  // re-housed registry lens below consumes the same module; a page that never loaded it falls
+  // back to write-only-on-change helpers, so the contract degrades gracefully, never errors.
+  var keyedList = (typeof window !== "undefined" && window.ControlRoomKeyedList) || null;
+
+  /** Set text through the shared reconciler when present (write only when it changed). */
+  function setKeyedText(node, text) {
+    if (!node) return;
+    if (keyedList && keyedList.setText) { keyedList.setText(node, text); return; }
+    var value = String(text);
+    if (node.textContent !== value) node.textContent = value;
+  }
+
   // ── DOM helpers (self-contained; the file has no dependency on app.js internals) ─────────
 
   /** Create an element with attributes and text; `true` means a bare attribute. */
@@ -752,73 +769,409 @@
     });
   }
 
-  /** Money: provider windows + wallet + the reserved-lease admission board. */
-  function loadMoney(host, refresh) {
-    panelState(host, "loading", "Loading subscription usage…");
-    var path = "/api/subscription-usage" + (refresh ? "?refresh=1" : "");
+  // ── Money board: provider quota + the authoritative local/platform meter ──────────────────
+  //
+  // Re-housed from main's subscription-usage board (`loadSubscriptionUsage`): provider windows,
+  // the local per-token cash estimate, and the deepseek platform meter. Main's money-honesty
+  // rule is preserved: a missing provider value formats as "Unavailable", NEVER a fake $0.00.
+
+  /** Format usage dollars without turning missing provider data into a fake zero. */
+  function usageUsd(value) {
+    if (value === null || value === undefined || value === "" || isNaN(Number(value))) {
+      return "Unavailable";
+    }
+    return "$" + Number(value).toFixed(2);
+  }
+
+  /** A compact, labeled metric group (the refresh's values-first table, not a card wall). */
+  function usageMetrics(metrics) {
+    var grid = element("div", "kv-table usage-metric-grid");
+    metrics.forEach(function (metric) {
+      var row = element("div", "kv-row usage-metric");
+      span(row, "kv-key", metric.label);
+      var val = element("div", "kv-val");
+      val.appendChild(element("span", "usage-metric-value", null, metric.value));
+      if (metric.detail) {
+        val.appendChild(element("span", "usage-metric-detail", null, " · " + metric.detail));
+      }
+      row.appendChild(val);
+      grid.appendChild(row);
+    });
+    return grid;
+  }
+
+  /** Render an explicit no-data state instead of an empty table. */
+  function usageEmpty(text) {
+    return element("p", "panel-state empty", null, text);
+  }
+
+  /** Render a provider or request failure with an actionable, visible state. */
+  function usageError(text) {
+    return element("p", "panel-state error", null, text);
+  }
+
+  /**
+   * Subscription usage — provider quota from the polite cache (15 min TTL, server-side refetch
+   * floor) plus the authoritative deepseek platform meter. `force` sends `?refresh=1`; a
+   * refresh failure keeps the last snapshot rendered and names the reason, never blanking it.
+   */
+  function loadSubscriptionUsage(host, force) {
+    var hadContent = host.getAttribute("data-usage-loaded") === "1";
+    if (!hadContent) panelState(host, "loading", "Loading subscription usage…");
+    var path = force ? "/api/subscription-usage?refresh=1" : "/api/subscription-usage";
     getJSON(path).then(function (result) {
-      if (!result.ok) { panelState(host, "error", "Usage unavailable (HTTP " + result.status + ")"); return; }
+      if (!result.ok) {
+        var message = "Subscription usage unavailable (HTTP " + result.status + ")";
+        if (hadContent) {
+          // Keep the last snapshot rendered; name the refresh failure above it (main's rule).
+          var previous = host.querySelectorAll("[data-usage-refresh-error]");
+          Array.prototype.forEach.call(previous, function (node) { node.remove(); });
+          var notice = usageError("Refresh failed; showing the last snapshot. " + message);
+          notice.setAttribute("data-usage-refresh-error", "1");
+          host.insertBefore(notice, host.firstChild);
+        } else {
+          panelState(host, "error", message);
+        }
+        return;
+      }
+      var data = result.data || {};
       clear(host);
+      host.setAttribute("data-usage-loaded", "1");
       host.appendChild(panelHeader("MONEY", "consumed + reserved (lease admission)"));
-      var refreshBtn = element("button", "wb-action", { type: "button", "data-action": "refresh",
-        "data-action-target": "money", "data-action-authority": "aios", "data-action-reversible": "true",
-        "data-action-confirmation": "none" }, "Refresh usage");
-      refreshBtn.addEventListener("click", function () { loadMoney(host, true); });
-      host.appendChild(refreshBtn);
-      var kv = element("div", "kv-table");
-      renderKV(kv, result.data);
-      host.appendChild(kv);
+
+      var actions = element("div", "panel-actions");
+      var refresh = element("button", "wb-action", {
+        type: "button", id: "usage-refresh", "data-action": "refresh",
+        "data-action-target": "money", "data-action-authority": "aios",
+        "data-action-reversible": "true", "data-action-confirmation": "none",
+      }, "Refresh usage");
+      refresh.addEventListener("click", function () { loadSubscriptionUsage(host, true); });
+      actions.appendChild(refresh);
+      host.appendChild(actions);
+
+      // Cache provenance: stale/fresh, age, the server's refetch floor, and the serving store.
+      var cache = data.cache || {};
+      var cacheState = data.stale ? "stale" : "fresh";
+      host.appendChild(note("Cache: " + cacheState + " · age "
+        + (cache.age_seconds === undefined || cache.age_seconds === null
+          ? "unavailable" : cache.age_seconds + "s")
+        + " · refresh floor " + (cache.min_refresh_seconds === undefined
+          ? "?" : cache.min_refresh_seconds) + "s · served_from " + (data.served_from || "?")
+        + " · " + ((data.history && data.history.count) || 0) + " saved snapshots"));
+      if (data.refresh_error) {
+        host.appendChild(usageError("Refresh failed; showing the last snapshot: " + data.refresh_error));
+      }
+
+      // Provider windows (anthropic/openai): one table per provider, its windows verbatim.
+      Object.keys(data.providers || {}).forEach(function (provider) {
+        var info = data.providers[provider] || {};
+        host.appendChild(element("h4", "section-title", null,
+          provider + " — " + (info.plan || "?")));
+        if (info.ok === false) {
+          host.appendChild(usageError(provider + " unavailable: "
+            + (info.error || "unknown provider error")));
+          return;
+        }
+        var windows = Array.isArray(info.windows) ? info.windows : [];
+        var rows = windows.map(function (window) {
+          return [
+            window.name || window.label || "?",
+            (window.used_percent === undefined || window.used_percent === null
+              ? "?" : window.used_percent) + "%",
+            window.limit_seconds ? Math.round(window.limit_seconds / 3600) + "h" : "—",
+            window.resets_at ? String(window.resets_at).slice(0, 16).replace("T", " ") + "Z" : "—",
+          ];
+        });
+        host.appendChild(rows.length
+          ? routingTable(provider + " subscription usage windows",
+              ["Window", "Used", "Length", "Resets (UTC)"], rows)
+          : usageEmpty(provider + " has no usage windows in the provider response."));
+      });
+
+      // Local per-token cash (opencode.db), when the route carried it.
+      if (data.deepseek) {
+        var deepseek = data.deepseek || {};
+        host.appendChild(element("h4", "section-title", null,
+          "deepseek — per-token cash (local opencode.db)"));
+        if (deepseek.ok === false) {
+          host.appendChild(usageError("DeepSeek local cash unavailable: "
+            + (deepseek.error || "unknown local DB error")));
+        } else {
+          var totals = deepseek.totals || {};
+          host.appendChild(usageMetrics([
+            { label: "Local 14d cash estimate", value: usageUsd(totals.cost_usd),
+              detail: "per-token local estimate" },
+            { label: "Local tokens", value: Number(totals.tokens || 0).toLocaleString(),
+              detail: "opencode.db" },
+            { label: "Local sessions", value: totals.sessions === undefined
+              ? "Unavailable" : String(totals.sessions), detail: "14-day window" },
+          ]));
+          var days = Array.isArray(deepseek.days) ? deepseek.days : [];
+          var dayRows = days.map(function (day) {
+            return [day.date || "?", usageUsd(day.cost_usd),
+              day.sessions === undefined ? "?" : day.sessions,
+              Number(day.tokens || 0).toLocaleString(), usageUsd(day.subagent_cost_usd)];
+          });
+          host.appendChild(dayRows.length
+            ? routingTable("DeepSeek per-day cash spend (local DB estimates)",
+                ["Date", "Cost $", "Sessions", "Tokens", "Subagent $"], dayRows)
+            : usageEmpty("DeepSeek local cash has no sessions in the 14-day window."));
+        }
+      }
+
+      // The authoritative platform meter.
+      if (data.deepseek_platform) {
+        var meter = data.deepseek_platform || {};
+        host.appendChild(element("h4", "section-title", null,
+          "deepseek platform — authoritative meter"));
+        var wallet = meter.wallet || {};
+        var mtotals = meter.totals || {};
+        host.appendChild(usageMetrics([
+          { label: "DeepSeek wallet balance",
+            value: wallet.ok === false ? "Unavailable" : usageUsd(wallet.balance_usd),
+            detail: wallet.ok === false
+              ? (wallet.error || "wallet summary unavailable") : "platform wallet" },
+          { label: "DeepSeek platform meter · 14d",
+            value: meter.ok === false ? "Unavailable" : usageUsd(mtotals.estimated_cost_usd),
+            detail: mtotals.pricing_complete === false
+              ? "unpriced model data present" : "meter tokens × off-peak rates" },
+          { label: "DeepSeek lifetime spend",
+            value: wallet.ok === false ? "Unavailable" : usageUsd(wallet.lifetime_cost_usd),
+            detail: "platform wallet total" },
+        ]));
+        if (meter.ok === false) {
+          host.appendChild(usageError("DeepSeek platform meter unavailable: "
+            + (meter.error || "unknown meter error")));
+        } else {
+          var meterDays = Array.isArray(meter.days) ? meter.days : [];
+          var meterRows = meterDays.map(function (day) {
+            return [day.date || "?", usageUsd(day.estimated_cost_usd),
+              Number(day.requests || 0).toLocaleString(),
+              Number(day.response_tokens || 0).toLocaleString(),
+              Number(day.cache_hit_tokens || 0).toLocaleString() + " / "
+                + Number(day.cache_miss_tokens || 0).toLocaleString()];
+          });
+          host.appendChild(meterRows.length
+            ? routingTable("DeepSeek per-day meter spend (authoritative tokens, estimated $)",
+                ["Date", "Est $", "Requests", "Resp tokens", "Cache hit / miss"], meterRows)
+            : usageEmpty("DeepSeek platform meter returned no usage days in the 14-day window."));
+        }
+      }
     });
   }
 
-  /** Registry: canonical records + one-hop lineage. */
+  // ── Registry board: filters + a click-through one-hop lineage view ────────────────────────
+  //
+  // Re-housed from main's canonical-state registry board: the three filter controls
+  // (`record_type` / `lifecycle` / `since`), a table keyed by `knowledge_id`, and a row
+  // activation that loads that entity's one-hop lineage (the route is file-only by design). The
+  // tbody is reconciled by stable key through the shared `ControlRoomKeyedList`, so a filter
+  // refresh updates rows in place rather than rebuilding the list. GET-only: never mutates.
+
+  //: Persistent key -> {node} map backing the registry tbody reconciliation across refreshes.
+  var registryRowEntries = new Map();
+
+  /** The stable key for one canonical registry row. */
+  function registryRowKey(record) {
+    return record.knowledge_id || record.entity_id || JSON.stringify(record).slice(0, 64);
+  }
+
+  /** Build one registry row (a keyboard-activatable lineage link). */
+  function buildRegistryRow(record) {
+    var tr = element("tr", {
+      tabindex: "0", role: "button", "data-registry-row": registryRowKey(record),
+      "aria-label": "View lineage for " + (record.logical_locator || record.entity_id || "entry"),
+    });
+    [
+      record.knowledge_id || record.entity_id || "?",
+      record.source_type || "?",
+      record.lifecycle_state || "?",
+      String(record.observed_at || "").slice(0, 19) || "?",
+      record.logical_locator || "—",
+    ].forEach(function (value, index) {
+      tr.appendChild(element("td", null, { "data-registry-cell": String(index) },
+        String(value).slice(0, 60)));
+    });
+    var open = function () { loadRegistryLineage(record.entity_id); };
+    tr.addEventListener("click", open);
+    tr.addEventListener("keydown", function (event) {
+      if (event.key !== "Enter" && event.key !== " ") return;
+      event.preventDefault();
+      open();
+    });
+    return { node: tr, record: record };
+  }
+
+  /**
+   * Render the canonical registry rows into `#registry-content`: the pinned columns
+   * (`knowledge_id` first) and the caption, reconciled by key when the shared module is present.
+   */
+  function renderRegistryTable(rows) {
+    var content = document.getElementById("registry-content");
+    if (!content) return;
+    clear(content);
+    if (!rows.length) {
+      content.appendChild(usageEmpty("No registry entries match this filter."));
+      return;
+    }
+    var wrap = element("div", "table-scroll");
+    var table = element("table", "routing-table panel-table", { "data-registry-table": "" });
+    table.appendChild(element("caption", "sr-only", null,
+      "Canonical-state registry entries — activate a row for its lineage"));
+    var thead = element("thead");
+    var headRow = element("tr");
+    ["knowledge_id", "source_type", "lifecycle_state", "observed_at", "logical_locator"]
+      .forEach(function (header) {
+        var cell = element("th", null, null, header);
+        cell.setAttribute("scope", "col");
+        headRow.appendChild(cell);
+      });
+    thead.appendChild(headRow);
+    table.appendChild(thead);
+    var body = element("tbody");
+    var rowByKey = {};
+    rows.forEach(function (record) { rowByKey[registryRowKey(record)] = record; });
+    var keys = rows.map(registryRowKey);
+    if (keyedList && keyedList.reconcile) {
+      keyedList.reconcile({
+        container: body,
+        keys: keys,
+        entries: registryRowEntries,
+        create: function (key) { return buildRegistryRow(rowByKey[key]); },
+        update: function (entry, key) {
+          var cells = entry.node.querySelectorAll("[data-registry-cell]");
+          [
+            entry.record.knowledge_id || entry.record.entity_id || "?",
+            entry.record.source_type || "?",
+            entry.record.lifecycle_state || "?",
+            String(entry.record.observed_at || "").slice(0, 19) || "?",
+            entry.record.logical_locator || "—",
+          ].forEach(function (value, index) {
+            if (cells[index]) setKeyedText(cells[index], String(value).slice(0, 60));
+          });
+        },
+      });
+    } else {
+      keys.forEach(function (key) { body.appendChild(buildRegistryRow(rowByKey[key]).node); });
+    }
+    table.appendChild(body);
+    wrap.appendChild(table);
+    content.appendChild(wrap);
+    content.appendChild(note(rows.length + " record(s)"));
+  }
+
+  /** Build the registry lens shell once, then load its rows (filters are preserved on refresh). */
   function loadRegistry(host) {
-    panelState(host, "loading", "Loading the registry…");
-    getJSON("/api/registry").then(function (result) {
-      if (!result.ok) { panelState(host, "error", "Registry unavailable (HTTP " + result.status + ")"); return; }
+    if (!document.getElementById("registry-content")) {
       clear(host);
-      var rows = (result.data && result.data.registry) || [];
-      host.appendChild(panelHeader("REGISTRY", rows.length + " canonical records"));
-      if (!rows.length) { panelState(host, "empty", "No canonical records in the manifest."); return; }
-      var table = element("table", "panel-table", { "data-registry-table": "" });
-      var headRow = element("tr");
-      ["ENTITY", "TYPE", "LIFECYCLE", "AUTHORITY", "OBSERVED"].forEach(function (label) {
-        headRow.appendChild(element("th", null, null, label));
+      host.appendChild(panelHeader("REGISTRY", "canonical-state records · click a row for lineage"));
+      var controls = element("div", "panel-controls");
+      var type = element("select", "panel-select",
+        { id: "registry-filter-type", "aria-label": "Filter by record type" });
+      type.appendChild(element("option", null, { value: "" }, "all record types"));
+      ["finding", "code", "report", "policy", "story", "review", "ledger_job",
+        "ledger_attempt", "observation", "flag", "actuation"].forEach(function (value) {
+        type.appendChild(element("option", null, { value: value }, value));
       });
-      table.appendChild(element("thead", null, null)).appendChild(headRow);
-      var body = element("tbody");
-      rows.slice(0, 200).forEach(function (record) {
-        var row = element("tr", null, { "data-entity-id": record.entity_id || "" });
-        var entity = element("td");
-        var link = element("button", "link-button", { type: "button", "data-lineage": record.entity_id || "" },
-          (record.entity_id || "unknown").slice(0, 24));
-        link.addEventListener("click", function () { showLineage(host, record.entity_id); });
-        entity.appendChild(link);
-        row.appendChild(entity);
-        row.appendChild(element("td", null, null, record.source_type || "?"));
-        row.appendChild(element("td", null, null, record.lifecycle_state || "?"));
-        row.appendChild(element("td", null, null, record.authority || "?"));
-        row.appendChild(element("td", null, null, String(record.observed_at || "").slice(0, 19) || "?"));
-        body.appendChild(row);
+      var lifecycle = element("select", "panel-select",
+        { id: "registry-filter-lifecycle", "aria-label": "Filter by lifecycle" });
+      lifecycle.appendChild(element("option", null, { value: "" }, "all lifecycles"));
+      ["current", "superseded", "tombstoned"].forEach(function (value) {
+        lifecycle.appendChild(element("option", null, { value: value }, value));
       });
-      table.appendChild(body);
-      host.appendChild(table);
+      var since = element("input", "panel-input", {
+        id: "registry-filter-since", type: "text",
+        placeholder: "since (ISO, e.g. 2026-09-01)", "aria-label": "Filter since",
+      });
+      var apply = element("button", "wb-action", {
+        type: "button", "data-action": "filter", "data-action-target": "registry",
+        "data-action-authority": "aios", "data-action-reversible": "true",
+        "data-action-confirmation": "none",
+      }, "Apply filters");
+      apply.addEventListener("click", function () { loadRegistryRows(); });
+      var refresh = element("button", "wb-action", {
+        type: "button", id: "registry-refresh", "data-action": "refresh",
+        "data-action-target": "registry", "data-action-authority": "aios",
+        "data-action-reversible": "true", "data-action-confirmation": "none",
+      }, "Refresh registry");
+      refresh.addEventListener("click", function () { loadRegistryRows(); });
+      type.addEventListener("change", loadRegistryRows);
+      lifecycle.addEventListener("change", loadRegistryRows);
+      since.addEventListener("keydown", function (event) {
+        if (event.key === "Enter") { event.preventDefault(); loadRegistryRows(); }
+      });
+      controls.appendChild(type);
+      controls.appendChild(lifecycle);
+      controls.appendChild(since);
+      controls.appendChild(apply);
+      controls.appendChild(refresh);
+      host.appendChild(controls);
+      host.appendChild(element("div", null, { id: "registry-content" }));
+      var lineage = element("section", "panel-section", { id: "registry-lineage", hidden: true });
+      lineage.appendChild(element("h4", "section-title", null, "LINEAGE"));
+      lineage.appendChild(element("div", null, { id: "registry-lineage-content" }));
+      host.appendChild(lineage);
+    }
+    loadRegistryRows();
+  }
+
+  /** Fetch registry rows honoring the three filter controls, then render them. */
+  function loadRegistryRows() {
+    var content = document.getElementById("registry-content");
+    if (!content) return;
+    panelState(content, "loading", "Loading registry…");
+    var lineage = document.getElementById("registry-lineage");
+    if (lineage) lineage.hidden = true;
+    var params = new URLSearchParams();
+    var typeEl = document.getElementById("registry-filter-type");
+    var lifecycleEl = document.getElementById("registry-filter-lifecycle");
+    var sinceEl = document.getElementById("registry-filter-since");
+    var recordType = typeEl ? typeEl.value : "";
+    var lifecycleValue = lifecycleEl ? lifecycleEl.value : "";
+    var sinceValue = sinceEl ? sinceEl.value : "";
+    if (recordType) params.set("record_type", recordType);
+    if (lifecycleValue) params.set("lifecycle", lifecycleValue);
+    if (sinceValue) params.set("since", sinceValue);
+    var query = params.toString();
+    getJSON("/api/registry" + (query ? "?" + query : "")).then(function (result) {
+      if (!result.ok) {
+        panelState(content, "error", "Registry unavailable (HTTP " + result.status + ")");
+        return;
+      }
+      renderRegistryTable((result.data && result.data.registry) || []);
     });
   }
 
-  /** Show one entity's lineage inline (one-hop; the route is file-only by design). */
-  function showLineage(host, entityId) {
+  /**
+   * Fetch one entity's one-hop lineage (file-only, so it resolves quickly) and render it into
+   * `#registry-lineage-content`; a `causes_record` (the justifying observation) renders beside it.
+   */
+  function loadRegistryLineage(entityId) {
     if (!entityId) return;
+    var panel = document.getElementById("registry-lineage");
+    var content = document.getElementById("registry-lineage-content");
+    if (!panel || !content) return;
+    panel.hidden = false;
+    clear(content);
+    content.appendChild(note("Loading lineage…"));
     getJSON("/api/registry/" + encodeURIComponent(entityId)).then(function (result) {
-      if (!result.ok) { panelState(host, "error", "Lineage unavailable (HTTP " + result.status + ")"); return; }
-      clear(host);
-      host.appendChild(panelHeader("LINEAGE", entityId));
-      var back = element("button", "wb-action", { type: "button" }, "← Back to registry");
-      back.addEventListener("click", function () { loadRegistry(host); });
-      host.appendChild(back);
-      var kv = element("div", "kv-table");
-      renderKV(kv, result.data);
-      host.appendChild(kv);
+      clear(content);
+      if (!result.ok) {
+        content.appendChild(usageError((result.data && result.data.error)
+          || ("Lineage unavailable (HTTP " + result.status + ")")));
+        return;
+      }
+      var data = result.data || {};
+      content.appendChild(element("pre", "agent-log", null,
+        JSON.stringify(data.record || data, null, 2)));
+      if (data.causes_record) {
+        content.appendChild(element("h4", "section-title", null,
+          "Causes (justifying observation)"));
+        content.appendChild(element("pre", "agent-log", null,
+          JSON.stringify(data.causes_record, null, 2)));
+      } else if (data.record && data.record.source_type === "actuation") {
+        content.appendChild(note("causes citation unresolved"));
+      }
     });
   }
 
@@ -1021,16 +1374,73 @@
     });
   }
 
-  /** Routing: model/strategy recommendations (the re-housed routing board). */
+  /**
+   * Routing: structured per-task recommendations + the strategy simulation (not a KV dump).
+   *
+   * Re-housed from main's routing board. It renders main's field names when present
+   * (`best_correctness_model` / `best_efficiency_model`, `strategies[].total_cost` /
+   * `avg_correctness`) and falls back to the compact server shape (`task_type` / `recommended`,
+   * `strategies[].cost_usd` / `correctness`), so no payload renders empty.
+   */
   function loadRouting(host) {
-    panelState(host, "loading", "Loading routing…");
+    panelState(host, "loading", "Loading routing data…");
     getJSON("/api/routing").then(function (result) {
-      if (!result.ok) { panelState(host, "error", "Routing unavailable (HTTP " + result.status + ")"); return; }
       clear(host);
       host.appendChild(panelHeader("ROUTING", "recommendation inputs beside the run"));
-      var kv = element("div", "kv-table");
-      renderKV(kv, result.data);
-      host.appendChild(kv);
+      var actions = element("div", "panel-actions");
+      var refresh = element("button", "wb-action", {
+        type: "button", id: "routing-refresh", "data-action": "refresh",
+        "data-action-target": "routing", "data-action-authority": "aios",
+        "data-action-reversible": "true", "data-action-confirmation": "none",
+      }, "Refresh routing");
+      refresh.addEventListener("click", function () { loadRouting(host); });
+      actions.appendChild(refresh);
+      host.appendChild(actions);
+      if (!result.ok) {
+        host.appendChild(usageError("Routing unavailable. Live workspace remains connected."));
+        return;
+      }
+      var data = result.data || {};
+      var perTask = Array.isArray(data.per_task) ? data.per_task : [];
+      if (!perTask.length) {
+        host.appendChild(usageEmpty(
+          "No routing data yet. Run experiments across multiple models first."));
+      } else {
+        host.appendChild(element("h4", "section-title", null, "Per-task routing"));
+        host.appendChild(routingTable(
+          "Per-task model routing recommendations",
+          ["Task", "Route", "Target", "Best correctness", "Best efficiency"],
+          perTask.map(function (task) {
+            var route = task.routing === "escalate" ? "escalate" : "default";
+            var taskName = task.task !== undefined ? task.task : (task.task_type || "?");
+            var target = task.routing === "escalate" ? task.escalate_model : task.default_model;
+            if (target === undefined) target = task.recommended;
+            var bestCorrectness = task.best_correctness_model;
+            if (bestCorrectness === undefined && task.correctness !== undefined) {
+              bestCorrectness = "accuracy " + task.correctness;
+            }
+            var bestEfficiency = task.best_efficiency_model;
+            if (bestEfficiency === undefined && task.cost_usd !== undefined) {
+              bestEfficiency = formatCost(task.cost_usd);
+            }
+            return [taskName, route, target, bestCorrectness, bestEfficiency];
+          })));
+        var strategies = data.strategies || {};
+        host.appendChild(element("h4", "section-title", null, "Strategy simulation"));
+        host.appendChild(routingTable(
+          "Routing strategy simulation",
+          ["Strategy", "N", "Total cost", "Avg correctness"],
+          Object.keys(strategies).map(function (name) {
+            var strategy = strategies[name] || {};
+            var cost = strategy.total_cost !== undefined ? strategy.total_cost : strategy.cost_usd;
+            var correctness = strategy.avg_correctness !== undefined
+              ? strategy.avg_correctness : strategy.correctness;
+            return [name, strategy.n === undefined ? 0 : strategy.n,
+              cost === undefined || cost === null ? "unavailable" : formatCost(cost),
+              correctness === undefined || correctness === null
+                ? "unavailable" : (Number(correctness) * 100).toFixed(0) + "%"];
+          })));
+      }
     });
   }
 
@@ -1203,6 +1613,43 @@
     return String(value);
   }
 
+  /** Format a dollar figure; a missing value is never rendered as a fake zero. */
+  function formatCost(value) {
+    if (value === null || value === undefined || isNaN(Number(value))) return "unavailable";
+    return "$" + Number(value).toFixed(4);
+  }
+
+  /**
+   * Build a semantic routing table using text nodes rather than HTML strings (main's helper).
+   * Shares the refreshed `.panel-table` styling so it reads through the same visual system.
+   */
+  function routingTable(captionText, headers, rows) {
+    var wrap = element("div", "table-scroll");
+    var node = element("table", "routing-table panel-table");
+    node.appendChild(element("caption", "sr-only", null, captionText));
+    var thead = element("thead");
+    var headRow = element("tr");
+    headers.forEach(function (header) {
+      var cell = element("th", null, null, header);
+      cell.setAttribute("scope", "col");
+      headRow.appendChild(cell);
+    });
+    thead.appendChild(headRow);
+    node.appendChild(thead);
+    var tbody = element("tbody");
+    (rows || []).forEach(function (row) {
+      var tr = element("tr");
+      row.forEach(function (value) {
+        tr.appendChild(element("td", null, null,
+          value === null || value === undefined ? "?" : String(value)));
+      });
+      tbody.appendChild(tr);
+    });
+    node.appendChild(tbody);
+    wrap.appendChild(node);
+    return wrap;
+  }
+
   /** A data table; rows can carry a run id for the click-through run detail. */
   function table(captionText, headers, rows, opts) {
     opts = opts || {};
@@ -1271,6 +1718,15 @@
       }
       clear(host);
       host.appendChild(panelHeader("OPERATIONS", "the one packet · run detail on click"));
+      var actions = element("div", "panel-actions");
+      var refresh = element("button", "wb-action", {
+        type: "button", id: "operations-refresh", "data-action": "refresh",
+        "data-action-target": "operations", "data-action-authority": "aios",
+        "data-action-reversible": "true", "data-action-confirmation": "none",
+      }, "Refresh operations");
+      refresh.addEventListener("click", function () { loadOperations(host); });
+      actions.appendChild(refresh);
+      host.appendChild(actions);
       renderOperations(host, result.data || {});
     });
   }
@@ -1357,7 +1813,16 @@
     var detailContent = element("div", "run-detail-content", { id: "run-detail-content" });
     drawer.appendChild(detailContent);
     host.appendChild(drawer);
-    dclose.addEventListener("click", function () { drawer.hidden = true; clear(detailContent); });
+    // A stable return target: closing (button or Escape) restores focus to the row that opened
+    // the drawer, so keyboard navigation never falls back to the document body (main's repair).
+    var drawerOrigin = null;
+    function closeRunDetail() {
+      drawer.hidden = true;
+      clear(detailContent);
+      if (drawerOrigin && typeof drawerOrigin.focus === "function") drawerOrigin.focus();
+      drawerOrigin = null;
+    }
+    dclose.addEventListener("click", closeRunDetail);
     function activate(event) {
       var row = event.target.closest("tr[data-run-id]");
       if (!row) return;
@@ -1365,10 +1830,14 @@
         if (event.key !== "Enter" && event.key !== " ") return;
         event.preventDefault();
       }
+      drawerOrigin = row;
       openRunDetail(row.getAttribute("data-run-id"), drawer, detailContent);
     }
     host.addEventListener("click", activate);
     host.addEventListener("keydown", activate);
+    drawer.addEventListener("keydown", function (event) {
+      if (event.key === "Escape") closeRunDetail();
+    });
   }
 
   function openRunDetail(runId, drawer, content) {
@@ -1455,17 +1924,38 @@
       .then(function (results) {
         clear(host);
         host.appendChild(panelHeader("SURFACES", "step-5/6/7 read models · states rendered verbatim"));
+        var actions = element("div", "panel-actions");
+        var refresh = element("button", "wb-action", {
+          type: "button", id: "surfaces-refresh", "data-action": "refresh",
+          "data-action-target": "surfaces", "data-action-authority": "aios",
+          "data-action-reversible": "true", "data-action-confirmation": "none",
+        }, "Refresh surfaces");
+        refresh.addEventListener("click", function () { loadSurfaces(host); });
+        actions.appendChild(refresh);
+        host.appendChild(actions);
         var grid = element("div", "surface-grid");
         SURFACE_ROUTES.forEach(function (pair, index) {
           var result = results[index];
           grid.appendChild(result.ok
             ? renderSurfacePanel(pair[0], result.data || {})
-            : surfacePanel(pair[0], pair[0].toUpperCase(),
-                "unavailable — HTTP " + result.status + " (" + pair[1] + ")"));
+            : renderSurfaceError(pair[0], pair[1], surfaceErrorReason(result)));
         });
         grid.appendChild(renderStoryArcPanel(null));
         host.appendChild(grid);
       });
+  }
+
+  /** The named reason a surfaces read failed (A7: never a blank panel). */
+  function surfaceErrorReason(result) {
+    if (result && result.data && result.data.error) return result.data.error;
+    if (result && result.error) return result.error;
+    return "HTTP " + ((result && result.status) || 0);
+  }
+
+  /** Render one failed surface with its named reason AND the url it tried (main's A7 repair). */
+  function renderSurfaceError(name, url, error) {
+    var reason = error && error.message ? error.message : String(error);
+    return surfacePanel(name, name.toUpperCase(), "unavailable — " + reason + " (" + url + ")");
   }
 
   function surfacePanel(name, title, body) {
@@ -1709,7 +2199,7 @@
   var PANELS = [
     { id: "fleet", label: "Fleet", load: loadFleet },
     { id: "attention", label: "Attention", load: loadAttention },
-    { id: "money", label: "Money", load: loadMoney },
+    { id: "money", label: "Money", load: loadSubscriptionUsage },
     { id: "registry", label: "Registry", load: loadRegistry },
     { id: "sessions", label: "Sessions", load: loadSessions },
     { id: "queue", label: "Queue", load: loadQueue },

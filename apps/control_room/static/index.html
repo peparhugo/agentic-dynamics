@@ -305,6 +305,10 @@
       <p class="noscript">The Control Room needs JavaScript to stream live run state.</p>
     </noscript>
   </div>
+  <!-- keyed-list.js is main's shared reconciler, loaded first (as main loaded it): parity.js's
+       re-housed polled lenses consume `window.ControlRoomKeyedList` so a refresh updates rows in
+       place rather than rebuilding the list and losing focus/scroll. It is dependency-free. -->
+  <script src="/static/keyed-list.js"></script>
   <script src="/static/app.js"></script>
   <!-- charts.js / visuals.js are classic scripts loaded after app.js: app.js calls their
        `update` / `render` seams at render/selection time, always after all scripts parsed.
