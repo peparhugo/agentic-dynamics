@@ -1,0 +1,11 @@
+{
+  "uri": "https://htop.dev/",
+  "final_url": "https://htop.dev/",
+  "status": 200,
+  "content_type": "text/html; charset=utf-8",
+  "sha256": "15907617513df69da452c53c61ac12fce4216e51fc5a692920285bd4503aecd0",
+  "title": "htop - an interactive process viewer",
+  "text": "Download\nScreenshots\nSightings\nList\nFAQ\nBug tracker\nSupport htop\nhtop - an interactive process viewer\nThis is htop, a cross-platform interactive process viewer.\nIt is a text-mode application (for console or X terminals)\nand requires ncurses.\nLatest release.\nWhat's new in htop\nIf you want to support htop, consider donating at Hack Club. This US IRS-approved 501(c)(3) nonprofit organization is\nhosting htop as our fiscal sponsor since March 2024.\nPlease check out the changelog for details and credits of our releases!\nHere is Hisham's lightning talk at FOSDEM 2018 presenting the latest and upcoming features at the time:\nSince version 2.0, htop is now cross-platform! Check out the video and slides of Hisham's presentation at FOSDEM 2016 about how this came to be.\nThe current releases support Linux, FreeBSD, NetBSD, OpenBSD, DragonFly BSD, MacOS and Solaris.",
+  "bytes": 4092,
+  "fetched_at": "2026-09-11T01:08:06.908159+00:00"
+}

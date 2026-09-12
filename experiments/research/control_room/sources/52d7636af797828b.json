@@ -1,0 +1,11 @@
+{
+  "uri": "https://openllmetry.com/",
+  "final_url": "https://traceloop.com/openllmetry",
+  "status": 200,
+  "content_type": "text/html; charset=utf-8",
+  "sha256": "52d7636af797828b3df202a11695af233dbe4726957c061c7e1820fdb5eb3f42",
+  "title": "Open-source Observability for LLMs with OpenTelemetry",
+  "text": "Home Traceloop\nObservability Platforms\nInstana\nDynatrace\nGrafana Tempo\nHoneycomb\nNew Relic\nDatadog\nSplunk\nTraceloop\nHighlight\nLLM Providers\nAnthropic\nBedrock\nChroma\nCohere\nGemini\nLangChain\nLlamaIndex\nMistral AI\nOllama\nOpenAI\ntogether.ai\nWatsonx\nGithub\nOpen-source Observability for LLMs with OpenTelemetry\nStart now with just 2 lines of code\nPython\nTypescript\nimport os\nfrom openai import OpenAI\nfrom traceloop.sdk import Traceloop\nfrom traceloop.sdk.decorators import workflow\nclient = OpenAI(api_key=os.environ[\"OPENAI_API_KEY\"])\nTraceloop.init(app_name=\"joke_generation_service\")\n@workflow(name=\"joke_creation\")\ndef create_joke():\ncompletion = client.chat.completions.create(\nmodel=\"gpt-3.5-turbo\",\nmessages=[{\"role\": \"user\", \"content\": \"Tell me a joke about opentelemetry\"}],\n)\nreturn completion.choices[0].message.content\nimport * as traceloop from \"@traceloop/node-server-sdk\";\nimport OpenAI from \"openai\";\ntraceloop.initialize({ appName: \"joke_generation_service\" })\nconst openai = new OpenAI();\nclass MyLLM {\n@traceloop.workflow(\"joke_creation\")\nasync create_joke():\ncompletion = await openai.chat.completions.create({\nmodel: \"gpt-3.5-turbo\",\nmessages: [{\"role\": \"user\", \"content\": \"Tell me a joke about opentelemetry\"}],\n})\nreturn completion.choices[0].message.content\n}\nDocs\n\u00a9 2025 Traceloop",
+  "bytes": 48681,
+  "fetched_at": "2026-09-11T01:00:56.933063+00:00"
+}

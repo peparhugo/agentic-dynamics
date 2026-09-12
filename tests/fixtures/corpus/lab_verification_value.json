@@ -1,6 +1,6 @@
 {
   "experiment_id": "lab_verification_value",
-  "generated_at": "2026-09-09T00:12:57.419062",
+  "generated_at": "2026-09-12T20:42:07.480909",
   "summary": {
     "correlation_tests_vs_worse_rate": null,
     "cells": 105,
@@ -753,7 +753,7 @@
     "resolved_input_sha256": "8c90d86e0573b3f1e71982d544672cf90ef94cb1097452b3c857baf343d008a6",
     "registry_version": "data-manifest/1.0+18392rows",
     "metric_definition_version": "verification_value/v2",
-    "metric_source_sha256": "f8331d35688c569a39b7247378995514661aa372eef25b879a4536ce544e339a",
+    "metric_source_sha256": "946aefe002096a7cff25c2f9c290dd93b13ffef308e5a7afc936e502233b64de",
     "n_resolved_records": 449,
     "n_eligible_records": 310,
     "n_used_records": 310,
@@ -769,7 +769,7 @@
     "outside_analysis_population": 0,
     "data_integrity_policy": "docs/data_integrity_findings.md",
     "requires_external_service": null,
-    "contract_version": "lab-contract/v6",
-    "generated_at": "2026-09-08T22:12:57.419849+00:00"
+    "contract_version": "lab-contract/v7",
+    "generated_at": "2026-09-12T20:42:07.481732+00:00"
   }
 }

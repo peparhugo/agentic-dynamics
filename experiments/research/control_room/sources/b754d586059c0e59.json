@@ -1,0 +1,11 @@
+{
+  "uri": "https://vercel.com/geist/introduction",
+  "final_url": "https://vercel.com/geist/introduction",
+  "status": 200,
+  "content_type": "text/markdown; charset=utf-8",
+  "sha256": "b754d586059c0e59f6fa501fe9e176d9e574ba76bb120aa9f6204562d618b1b8",
+  "title": "",
+  "text": "# Geist Design System\n\nVercel's design system for building consistent web experiences. Geist provides the colors, typography, materials, layout, and React components behind Vercel's products. Components are published as `@vercel/geistcn`; icons, logos, and pixel icons as `@vercel/geistcn-assets`.\n\n---\n\n## Foundations\n\n- **Colors** \u2014 A high contrast, accessible color system. See `/geist/colors`.\n- **Typography** \u2014 Typeset with Geist Sans and Geist Mono. See `/geist/typography`.\n- **Materials** \u2014 Presets for radii, fills, strokes, and shadows. See `/geist/materials`.\n- **Grid** \u2014 A core part of the Vercel aesthetic. See `/geist/grid`.\n\n---\n\n## Assets\n\n- **Brand Assets** \u2014 Logos and brand guidelines. See `/geist/brands`.\n- **Icons** \u2014 An icon set tailored for developer tools. See `/geist/icons`.\n- **Typeface** \u2014 Geist Sans and Geist Mono. See `/font`.\n\n---\n\n## Components\n\nBuilding blocks for React applications, available via `@vercel/geistcn`. Import from the barrel module:\n\n```tsx\nimport { Button, Modal, Toggle } from '@vercel/geistcn/components';\nimport { IconPencilEdit } from '@vercel/geistcn-assets/icons';\n```\n\nBrowse individual components under `/geist/<component>` (for example `/geist/button`).\n\n---\n\n## Markdown for agents\n\nEvery docs page is available as Markdown: append `.md` to any URL (for example `/geist/colors.md`), or send an `Accept: text/markdown` header. For official Vercel-authored report websites such as proposals, briefs, benchmarks, and calculators (not product UI or docs), use the provider-neutral designer skill at `/design.md`.\n",
+  "bytes": 1587,
+  "fetched_at": "2026-09-11T01:03:01.020753+00:00"
+}

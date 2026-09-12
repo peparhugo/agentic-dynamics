@@ -1,0 +1,178 @@
+name: control_room_research_repair2
+question: >-
+  Second, in-the-weeds repair of the Control Room research artifacts, closing the exact defects
+  the re-check verdicts named: (1) ENTAILMENT — the crosswalk is still an arithmetic pass; some
+  support counts assert narrow techniques no source text states. Fix by semantic repair:
+  every surviving technique must quote the sentence from a stored source that states it, else
+  collapse to the parent label or downgrade to [P] (docs/reviews/control_room_repair_entailment.md).
+  (2) DESIGN — the direction is disciplined but not recognizably a multi-CLI-agent control
+  surface. Fix with exemplar-grounded distinctive moves + a recognizability test
+  (docs/reviews/control_room_repair_design.md). (3) IA — one resting screen must PROVE it
+  answers ON-G1..G7 with no navigation at 1440x900 and 390x844; reconcile the differing glance
+  contracts into one canonical list (docs/reviews/control_room_repair_ia.md). Then re-run all
+  three adversaries against explicit pass conditions and make the brief unconditional or list
+  waived blockers with reasons.
+version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: false
+repeatable: true
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: true
+    rag:
+      emit_self: false
+    context:
+      hard_rules: >-
+        (1) A support count requires a QUOTED sentence from the cited source record stating the
+        technique; no quote, no count. (2) Every [P] carries a one-line reason. (3) Adversaries
+        write only their review docs and judge against the explicit pass conditions in this
+        spec. (4) Deliverables under docs/research/ and experiments/research/control_room/;
+        commit every phase.
+    phases:
+      - name: q0_semantic_crosswalk
+        kind: agent
+        scope: implementation
+        requires_deliverable: true
+        timeout: 10800
+        prompt: |
+          GOAL: {goal}
+          Read docs/reviews/control_room_repair_entailment.md fully. For EVERY taxonomy node
+          with a support count, open the cited source records and find the sentence that states
+          the node's technique. Produce a semantic table (node, support, quoted sentence +
+          source uri, verdict: PASS/PROMOTION/ABSENT). Then FIX:
+          - PASS → keep the count with the quote stored in the artifact (`evidence_quotes`).
+          - PROMOTION (the quote states a broader label, not the narrow technique) → either
+            collapse the node into its parent label or downgrade to [P] with a reason.
+          - ABSENT → delete the node.
+          Regenerate taxonomy.json, skills.json, catalogs.json from this table. Write
+          docs/reviews/control_room_semantic_crosswalk.md (the full table). Verify no artifact
+          cites a support without an `evidence_quotes` entry. Commit.
+      - name: q1_distinctive_direction
+        kind: agent
+        scope: implementation
+        requires_deliverable: true
+        timeout: 10800
+        prompt: |
+          GOAL: {goal}
+          Read docs/reviews/control_room_repair_design.md fully. Rewrite the DISTINCTIVE
+          section of docs/research/control_room_direction.md around at least SIX moves, each
+          with: the exemplar source (repaired catalog ref) that inspires it, what the exemplar
+          does, and what OURS does differently for multi-CLI-agent operations. Add a
+          RECOGNIZABILITY TEST section: 5 specific things a stranger must be able to say about
+          the screen within 10 seconds (e.g., "these are agent sessions", "that run needs a
+          decision", "this is spend against budget"), each tied to a visible element. Delete
+          any remaining element that could belong to a generic Grafana-style dashboard and say
+          so in a `removed` list with reasons. Keep accessibility/no-regression constraints.
+          Commit.
+      - name: q2_glance_proof
+        kind: agent
+        scope: implementation
+        requires_deliverable: true
+        timeout: 10800
+        prompt: |
+          GOAL: {goal}
+          Read docs/reviews/control_room_repair_ia.md fully. Produce ONE canonical glance
+          contract: a single ON-G1..G7 list (reconcile the differing versions across the docs).
+          Then docs/research/control_room_ia.md must contain, for EACH need: the exact region,
+          the visible content, and an above-the-fold assertion at BOTH 1440x900 and 390x844
+          (no scrolling required). Add a pixel-budget table for the resting screen (region →
+          max height) whose sums fit both viewports. Add an ACCEPTANCE-CHECK section the
+          Playwright render gate can implement (element present, in viewport, non-zero box,
+          text contrast, no scroll needed) with concrete selectors/regions. Commit.
+      - name: q3_adversary_entailment
+        kind: agent
+        scope: adversarial_readonly
+        requires_deliverable: true
+        run_model: openai/gpt-5.6-terra
+        timeout: 7200
+        prompt: |
+          GOAL: {goal}
+          PASS CONDITION (be explicit): every support count in taxonomy/skills/catalogs has a
+          stored `evidence_quotes` entry; each quote is a real sentence from the cited stored
+          source and states the technique; no PROMOTION or ABSENT node survives. Independently
+          sample at least 15 nodes (including the previously flagged ones) by reading the
+          sources. Write docs/reviews/control_room_repair2_entailment.md with PASS/FAIL and a
+          findings table. Commit.
+      - name: q4_adversary_design
+        kind: agent
+        scope: adversarial_readonly
+        requires_deliverable: true
+        run_model: openai/gpt-5.6-luna
+        timeout: 7200
+        prompt: |
+          GOAL: {goal}
+          PASS CONDITION (be explicit): the direction names ≥6 exemplar-grounded distinctive
+          moves, none of which reads as generic dashboard grammar; the recognizability test is
+          concrete and would hold for a stranger seeing a screenshot. Judge the thesis, not the
+          prose. If it still reads as a monitoring console, FAIL with the specific elements to
+          kill. Write docs/reviews/control_room_repair2_design.md. Commit.
+      - name: q5_adversary_ia
+        kind: agent
+        scope: adversarial_readonly
+        requires_deliverable: true
+        run_model: openai/gpt-5.6-sol
+        timeout: 7200
+        prompt: |
+          GOAL: {goal}
+          PASS CONDITION (be explicit): the single canonical glance contract exists; each need
+          maps to a region in the pixel-budget table; both viewports' budgets fit; the
+          acceptance checks are implementable by the render gate. Walk every need against the
+          table and fail on any scroll, split answer, or below-fold placement. Write
+          docs/reviews/control_room_repair2_ia.md. Commit.
+      - name: q6_final_brief
+        kind: agent
+        scope: implementation
+        requires_deliverable: true
+        timeout: 3600
+        prompt: |
+          GOAL: {goal}
+          Update the facelift brief with the repaired supports, the distinctive moves, and the
+          canonical glance contract + acceptance checks. For each open finding in the 25-item
+          disposition ledger: mark CLOSED (with the fix) or WAIVED (with a one-line reason).
+          Write docs/reviews/control_room_repair2_verify.md summarizing: endpoint status, the
+          three PASS/FAIL verdicts, and the closed/waived ledger. The brief must be
+          unconditional except for explicitly waived items. Commit.
+      - name: q7_tests
+        kind: test
+        scope: implementation
+        timeout: 600
+        tests:
+          - tests/test_research_fetch.py
+factors:
+  - {name: model, levels: [deepseek/deepseek-v4-flash]}
+design: factorial
+rules:
+  - name: semantic_crosswalk
+    plane: measurement
+    evidence_class: "[X]"
+    requires: []
+    produces: [evidence_quoted_support]
+  - name: distinctive_direction
+    plane: measurement
+    evidence_class: "[H]"
+    requires: [evidence_quoted_support]
+    produces: [exemplar_grounded_moves]
+  - name: canonical_glance_contract
+    plane: measurement
+    evidence_class: "[H]"
+    requires: [exemplar_grounded_moves]
+    produces: [single_glance_contract]
+  - name: repair2_adversarially_checked
+    plane: measurement
+    evidence_class: "[H]"
+    requires: [single_glance_contract]
+    produces: [three_explicit_pass_verdicts]
+metrics:
+  - {name: evidence_quoted_support, agg: mean, over: cell}
+  - {name: exemplar_grounded_moves, agg: mean, over: cell}
+  - {name: single_glance_contract, agg: mean, over: cell}
+  - {name: three_explicit_pass_verdicts, agg: mean, over: cell}
+comparison: null
+writeup: {format: lab_book, sections: [question, q0_semantic_crosswalk, q1_distinctive_direction, q2_glance_proof, q3_adversary_entailment, q4_adversary_design, q5_adversary_ia, q6_final_brief]}
+stop: {budget_usd: 18.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}

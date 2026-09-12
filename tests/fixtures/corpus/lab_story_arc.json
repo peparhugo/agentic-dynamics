@@ -1,6 +1,6 @@
 {
   "experiment_id": "lab_story_arc",
-  "generated_at": "2026-09-09T00:12:54.489949",
+  "generated_at": "2026-09-12T20:42:04.997224",
   "summary": {
     "snowball_factor": 2.32,
     "session1_cost": 0.173207,
@@ -144,7 +144,7 @@
     "resolved_input_sha256": "38a1f5dbe586890f453f846aa185f75e150bed7de0d3de007b8c66e3811b1be6",
     "registry_version": "data-manifest/1.0+18392rows",
     "metric_definition_version": "story_arc/v2",
-    "metric_source_sha256": "1e10f13a3df8657c2e75ca2045a1bb8835fb3880b6c475f5d2da6747b40a7c95",
+    "metric_source_sha256": "b3d35d6e73036069a3eb5bcc9a487a6c55ae8fa6e9f82952a50dc7bc3973bf43",
     "n_resolved_records": 207,
     "n_eligible_records": 207,
     "n_used_records": 207,
@@ -160,7 +160,7 @@
     "outside_analysis_population": 0,
     "data_integrity_policy": "docs/data_integrity_findings.md",
     "requires_external_service": null,
-    "contract_version": "lab-contract/v6",
-    "generated_at": "2026-09-08T22:12:54.490613+00:00"
+    "contract_version": "lab-contract/v7",
+    "generated_at": "2026-09-12T20:42:04.997915+00:00"
   }
 }

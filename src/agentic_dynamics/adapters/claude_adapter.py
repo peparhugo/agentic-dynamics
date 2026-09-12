@@ -428,7 +428,12 @@ def run_claude_agentic(
     result.session_id = captured_session_id
 
     result.duration_s = time.monotonic() - t0
-    result.files_created, result.files_modified = _diff_workdir(workdir, files_before)
+    # ``_diff_workdir`` returns a ``WorkdirDiff`` (a tuple subclass): unpacking preserves
+    # the historical contract, and ``detection`` records whether the changed set came from
+    # the full hash snapshot, the git fallback, or was unavailable entirely.
+    _diff = _diff_workdir(workdir, files_before)
+    result.files_created, result.files_modified = _diff
+    result.change_detection = _diff.detection
 
     # Resolve the cost's PROVENANCE. Anthropic is subscription-class: a Claude Code run has no
     # per-call charge, so the CLI usually reports no ``total_cost_usd`` at all and the price-table

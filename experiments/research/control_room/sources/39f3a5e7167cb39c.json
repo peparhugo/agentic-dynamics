@@ -1,0 +1,11 @@
+{
+  "uri": "https://alacritty.org/",
+  "final_url": "https://alacritty.org/",
+  "status": 200,
+  "content_type": "text/html",
+  "sha256": "39f3a5e7167cb39ccff76fff64efd83645f16ad78cd7f56318cd89cfebae6546",
+  "title": "Alacritty - A cross-platform, OpenGL terminal emulator",
+  "text": "lacritty Configuration Changelog\nInstallation\nLinux/BSD Build Instructions\nmacOS Alacritty-v0.17.0.dmg\nWindows\nAlacritty-v0.17.0-installer.msi Alacritty-v0.17.0-portable.exe\nAbout\nAlacritty is a modern terminal emulator that comes with sensible defaults, but\nallows for extensive configuration. By integrating with other applications,\nrather than reimplementing their functionality, it manages to provide a flexible\nset of features with high performance. The supported platforms currently\nconsist of BSD, Linux, macOS and Windows.\nThe software is considered to be at a beta level of readiness; there are\na few missing features and bugs to be fixed, but it is already used by many as\na daily driver.\nFeatures\nBesides Alacritty's functionality as a terminal emulator, there are a couple of\nfeatures targeted at making life easier for people that spend a lot of time with\ntheir terminal.\nThese are some of Alacritty's noteworthy features:\nVi Mode\n\u2014\nMove around and create selections using vi bindings\nSearch\n\u2014\nSearch for any text within the scrollback buffer\nRegex Hints\n\u2014\nMark any text for mouse or keyboard interaction\nMulti-Window\n\u2014\nImprove resource usage by using only a single Alacritty process\nA full list of features can be found in Alacritty's documentation",
+  "bytes": 4709,
+  "fetched_at": "2026-09-11T01:08:08.161164+00:00"
+}

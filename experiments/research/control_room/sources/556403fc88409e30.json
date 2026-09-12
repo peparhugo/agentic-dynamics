@@ -1,0 +1,11 @@
+{
+  "uri": "https://vega.github.io/vega-lite/docs/transform.html",
+  "final_url": "https://vega.github.io/vega-lite/docs/transform.html",
+  "status": 200,
+  "content_type": "text/html; charset=utf-8",
+  "sha256": "556403fc88409e30537774ad83c5bfe537ca42924a1a88ca7ec9e02617a8af2a",
+  "title": "Transformation | Vega-Lite",
+  "text": "Vega-Lite\nVega Altair Vega-Lite API\nExamples Tutorials Documentation Usage Ecosystem\nGitHub Try Online\nOverview\nView Specification\nTitle\nWidth / Height\nData / Datasets\nTransform\nAggregate\nBin\nCalculate\nDensity\nExtent\nFilter\nFlatten\nFold\nImpute\nJoin Aggregate\nLoess\nLookup\nPivot\nQuantile\nRegression\nSample\nStack\nTime Unit\nWindow\nMark\nArc\nArea\nBar\nBox Plot\nCircle\nError Band\nError Bar\nGeoshape\nImage\nLine\nPoint\nRect\nRule\nSquare\nText\nTick\nTrail\nEncoding\nAggregate\nAxis\nBand Position\nBin\nCondition\nDatum\nField\nFormat\nHeader\nImpute\nLegend\nScale\nStack\nSort\nTime Unit\nType\nValue\nProjection\nView Composition\nFacet\nLayer\nConcat\nRepeat\nResolve\nParameter\nValue\nExpr\nBind\nSelect\nConfig\nProperty Types\nDate Time\nGradient\nPredicate\nTooltip\nInvalid Data\nTransformation\nEdit this page\nData transformations in Vega-Lite are described via either view-level transforms (the transform property) or field transforms inside encoding ( bin , timeUnit , aggregate , sort , and stack ).\nWhen both types of transforms are specified, the view-level transform s are executed first based on the order in the array. Then the inline transforms are executed in this order: bin , timeUnit , aggregate , sort , and stack .\nView-level Transform Property\n{\n\"data\": ... ,\n\"transform\": [\n...\n],\n\"mark\": ... ,\n\"encoding\": ... ,\n...\n}\nThe View-level transform object is an array of objects describing transformations. The transformations are executed in the order in which they are specified in the array. Vega-Lite\u2019s transform supports the following types of transformations:\nAggregate\nBin\nCalculate\nDensity\nExtent\nFilter\nFlatten\nFold\nImpute\nJoin Aggregate\nLookup\nPivot\nQuantile\nRegression and Loess Regression\nSample\nStack\nTime Unit\nWindow\nEdit this page and submit a pull request!",
+  "bytes": 19467,
+  "fetched_at": "2026-09-11T01:06:18.139431+00:00"
+}

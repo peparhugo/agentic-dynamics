@@ -1,0 +1,101 @@
+name: lab_metric_fingerprints
+question: >-
+  Fix the lab freshness fingerprint's inverted scope. Today
+  lab_contract.metric_source_sha256 hashes ONLY the lab's own script file, so an edit to
+  the shared metric code no longer invalidates a published artifact (step 6b moved the
+  Grit primitives into agentic_dynamics/reporting/grit_metric.py and no lab fingerprint
+  covers it), while glue edits to the lab file do stale it. The confirmed live symptom:
+  tests/fixtures/corpus/lab_grit.json records efffc47f... while main's lab_grit.py hashes
+  c474cfdc... — stale, and the check only runs where a full corpus exists. Extend the
+  fingerprint to the lab's DECLARED shared-metric sources (a per-lab declaration, e.g. a
+  METRIC_SOURCES list or a central registry keyed by lab script in lab_contract), bump
+  CONTRACT_VERSION to v7, regenerate the canonical lab artifacts and the committed corpus
+  fixture so their contract blocks match the new computation, and add the guard test that
+  every publication-eligible lab declares its metric sources.
+version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: false
+repeatable: false
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: false
+    context:
+      domain_context: >-
+        canonical_sources: [src/agentic_dynamics/reporting/lab_contract.py (the fingerprint +
+        verify function), src/agentic_dynamics/reporting/grit_metric.py (the extracted shared
+        metric), scripts/lab_*.py (the canonical labs), scripts/lab_manifest.json (lab statuses),
+        tests/test_lab_contract.py + tests/test_lab_outputs_canonical.py (the pins),
+        tests/fixtures/corpus/lab_*.json (the committed fixture artifacts)]
+        policies: [honest fingerprints only — never hash a file that does not define the
+        metric, never fabricate a hash; the corpus fingerprint stays the registry identity;
+        keep the contract additive; a stale artifact must be REPAIRED by regeneration, not
+        grandfathered]
+        verification: [tests/test_lab_contract.py, tests/test_lab_outputs_canonical.py,
+        tests/test_lab_manifest.py, the fast lane]
+    phases:
+      - name: l1_fingerprint
+        kind: agent
+        scope: implementation
+        timeout: 1800
+        prompt: |
+          GOAL: {goal}
+          1. Read lab_contract.py's lab_source_sha256 / CONTRACT_VERSION / the verify path
+             and the f2 contributor-attestation fields; read how the canonical labs compute
+             their metrics (which agentic_dynamics modules each lab actually imports — e.g.
+             lab_grit.py imports reporting.grit_metric).
+          2. Implement the SCOPE EXTENSION: the per-lab metric fingerprint is computed over
+             the lab's own source PLUS its declared shared-metric source modules. Declare
+             the sources per lab (a METRIC_SOURCES constant in each canonical lab, or a
+             central registry in lab_contract — pick the one that cannot silently escape a
+             NEW shared module; if central, the guard test enforces every
+             publication-eligible lab has an entry). Keep the corpus/registry identity
+             fields untouched.
+          3. Bump CONTRACT_VERSION to v7 and update the version comment block.
+          4. Add the guard test: every publication-eligible lab (per lab_manifest.json)
+             declares its metric sources; a lab whose shared metric module is missing from
+             the declaration fails.
+          5. Unit-test the semantics: a change to a declared shared-metric source changes
+             the fingerprint; an unrelated module does not.
+          Do NOT edit tests/fixtures or artifacts in this phase.
+      - name: l2_regen
+        kind: agent
+        scope: implementation
+        timeout: 2400
+        prompt: |
+          Regenerate so every published artifact matches the v7 fingerprint — honest values
+          only, never hand-patched hashes:
+          1. Run each canonical lab against the current corpus (agentic-dynamics analyze lab
+             <name>, or the labs' documented invocation) and rewrite
+             experiments/results/lab_*.json.
+          2. Rebuild the committed fixture artifacts: restore/point at the fixture corpus as
+             the labs' input where the labs support it, re-run them, and update
+             tests/fixtures/corpus/lab_*.json with the regenerated contract blocks (metric
+             values may legitimately change if the corpus moved — that is the honest diff;
+             record what changed and why in the commit message).
+          3. If a lab cannot be re-run for a missing input, STOP and record the gap
+             explicitly in the commit message; do not fabricate its contract block.
+      - name: l3_verify
+        kind: test
+        scope: implementation
+        timeout: 900
+        tests:
+          - tests/test_lab_contract.py
+          - tests/test_lab_outputs_canonical.py
+          - tests/test_lab_manifest.py
+          - tests/test_fast_path_gate.py
+        prompt: |
+          The declared test target verifies the extension end to end. Every failure must be
+          fixed by repairing the artifact via regeneration or by the fingerprint's declared
+          semantics — never by weakening a pin.
+factors:
+  - {name: model, levels: [deepseek/deepseek-v4-flash]}
+design: factorial
+rules: []
+metrics: []
+writeup: {format: lab_book, sections: [question]}
+stop: {budget_usd: 3.0, max_attempts: 1}

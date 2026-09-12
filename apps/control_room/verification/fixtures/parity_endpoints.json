@@ -1,0 +1,131 @@
+{
+  "_schema": "control-room-parity-fixtures/v1",
+  "_purpose": "Deterministic payloads for the u5 FEATURE-PARITY gate class. One entry per old-room endpoint the parity layer re-houses (parity_inventory.json). Keys are URL paths (query strings ignored); the gate's single router serves them, records every request, fulfills POSTs with a stub success, and aborts anything unmapped. This is the non-empty-data contract for the workbench lenses and the R4 dock.",
+  "/api/matrix": {
+    "total": 3,
+    "remaining_in_queue": 1,
+    "queued": 1,
+    "running": 1,
+    "done": 1,
+    "failed": 0,
+    "timeout": 0,
+    "completed": 1,
+    "results_saved": 1,
+    "cells": {"cell-1": "running", "cell-2": "done", "cell-3": "failed"},
+    "phases": {
+      "cell-1": {"name": "build", "index": 2, "total": 4, "live": true,
+        "last_phase_ts": "2026-09-11T11:59:55Z", "age_seconds": 5},
+      "cell-2": {"name": "verify", "index": 4, "total": 4, "live": false,
+        "last_phase_ts": "2026-09-11T11:40:00Z", "age_seconds": 1205}
+    },
+    "telemetry": {
+      "available": true,
+      "provenance": "retained_window",
+      "partial": true,
+      "reported_cost": 0.42,
+      "input_tokens": 900,
+      "output_tokens": 300,
+      "history_capped": false,
+      "cells": {
+        "cell-1": {
+          "reported_cost": 0.12, "input_tokens": 600, "output_tokens": 180,
+          "latest_cost": 0.03, "partial": true, "history_capped": false,
+          "samples": [
+            {"timestamp": "2026-09-11T11:59:55Z", "cost": 0.03, "input_tokens": 300, "output_tokens": 80, "total_tokens": 380},
+            {"timestamp": "2026-09-11T11:59:45Z", "cost": 0.02, "input_tokens": 200, "output_tokens": 60, "total_tokens": 260},
+            {"timestamp": "2026-09-11T11:59:35Z", "cost": 0.01, "input_tokens": 100, "output_tokens": 40, "total_tokens": 140}
+          ]
+        },
+        "cell-3": {
+          "reported_cost": 0.30, "input_tokens": 300, "output_tokens": 120,
+          "latest_cost": 0.30, "partial": true, "history_capped": false,
+          "samples": [
+            {"timestamp": "2026-09-11T11:50:00Z", "cost": 0.30, "input_tokens": 300, "output_tokens": 120, "total_tokens": 420}
+          ]
+        }
+      }
+    },
+    "projections": [
+      {"projection": "registry", "health": "current", "lag_events": 0, "age_seconds": 4, "last_error": ""},
+      {"projection": "chroma", "health": "lagging", "lag_events": 3, "age_seconds": 90, "last_error": ""}
+    ]
+  },
+  "/api/flags": {
+    "source": "redis",
+    "degraded": false,
+    "flags": [
+      {"at": "2026-09-11T11:58:00Z", "session_id": "agent-01", "title": "agent-01",
+        "model": "openai/gpt-5.6-sol", "status": "attention", "why": "repeated tool retries",
+        "last_activity_at": "2026-09-11T11:59:50Z", "review": {"cell_id": "cell-1", "source": "redis"}}
+    ]
+  },
+  "/api/projections": {
+    "projections": [
+      {"projection": "registry", "health": "current", "lag_events": 0, "age_seconds": 4, "last_error": ""},
+      {"projection": "ledger", "health": "current", "lag_events": 0, "age_seconds": 6, "last_error": ""},
+      {"projection": "chroma", "health": "lagging", "lag_events": 3, "age_seconds": 90, "last_error": ""},
+      {"projection": "neo4j", "health": "stale", "lag_events": 12, "age_seconds": 901, "last_error": "consumer idle"}
+    ],
+    "stale_after_seconds": 900
+  },
+  "/api/subscription-usage": {
+    "providers": {"anthropic": {"windows": [{"label": "5h", "used_percent": 61}], "status": "ok"}},
+    "deepseek_platform": {"wallet_usd": 7.6, "meter_date": "2026-09-11"},
+    "admission": {"available": true, "scopes": [
+      {"kind": "budget", "scope": "provider/deepseek", "outstanding": 2.1, "cap": 10.0, "headroom": 7.9},
+      {"kind": "concurrency", "scope": "fleet/default", "outstanding": 3, "cap": 8, "headroom": 5}
+    ]},
+    "served_from": "cache",
+    "age_seconds": 42
+  },
+  "/api/registry": {
+    "count": 2,
+    "registry": [
+      {"entity_id": "run-approve", "source_type": "finding", "lifecycle_state": "current",
+        "authority": "MEASURED", "observed_at": "2026-09-11T11:59:00Z"},
+      {"entity_id": "policy-1", "source_type": "policy", "lifecycle_state": "current",
+        "authority": "POLICY", "observed_at": "2026-09-10T09:00:00Z"}
+    ]
+  },
+  "/api/registry/run-approve": {
+    "record": {"entity_id": "run-approve", "source_type": "finding", "lifecycle_state": "current",
+      "authority": "MEASURED", "observed_at": "2026-09-11T11:59:00Z", "text": "run approved"},
+    "causes_record": null
+  },
+  "/api/routing": {
+    "_meta": {"tasks_analyzed": 1},
+    "per_task": [{"task_type": "api", "recommended": "deepseek/deepseek-v4-flash",
+      "correctness": 0.82, "cost_usd": 0.04}],
+    "strategies": {"cheapest": {"cost_usd": 0.04, "correctness": 0.8},
+      "premium_static": {"cost_usd": 0.31, "correctness": 0.86}},
+    "note": "fixture"
+  },
+  "/api/docs-health": {
+    "available": true,
+    "condition": "warranted",
+    "headline": "2 stale docs, 1 missing anchor",
+    "scanned_at": "2026-09-11T11:00:00Z",
+    "axes": {"stale": 2, "missing": 1},
+    "proposal": {"id": "prop-2026-09-11", "state": "warranted", "budget_usd": 4.0}
+  },
+  "/api/recording-audit": {
+    "coverage": 0.9,
+    "records": 18,
+    "missing": 2,
+    "generated_at": "2026-09-11T11:00:00Z"
+  },
+  "/api/design-sessions": {
+    "sessions": [
+      {"portal_id": "portal-1", "kind": "workflow", "model": "deepseek/deepseek-v4-flash",
+        "workdir_key": "wt/control-room", "draft_name": "control-room-ux", "revision": 3}
+    ]
+  },
+  "/api/claude-agents": {
+    "agents": [
+      {"id": "claude_bg_abc123", "owned": true, "status": "running",
+        "model": "anthropic/claude-sonnet-5", "cwd": "/tmp/control_room_research_wt", "task": "review"}
+    ],
+    "workdirs": ["/tmp/control_room_research_wt"]
+  },
+  "/api/claude-agents/daemon": {"running": true, "pid": 4242}
+}

@@ -1,0 +1,11 @@
+{
+  "uri": "https://www.vis4.net/blog/",
+  "final_url": "https://www.vis4.net/blog/",
+  "status": 200,
+  "content_type": "text/html; charset=UTF-8",
+  "sha256": "0ae7581a43afbde2e25e7506222996b0b763748f85481173864d0dca6266a11d",
+  "title": "vis4.net",
+  "text": "vis4.net\nHome\nAbout\nArchive\nRSS\nRandom thoughts on visualization and data journalism by Gregor Aisch\nRecent writing\nMay 23, 2025\nSay Hi to SveltePlot\nOct 24, 2024\nRetrospective on 15 years of data visualization projects\nJan 17, 2024\nObservable Plot + Svelte = SveltePlot?\nDec 18, 2023\nFour pitfalls of spatiotemporal data analysis and how to avoid them\nDec 15, 2023\nGoodbye Hexo, hello SvelteKit\nOct 6, 2023\nUsing DuckDB to analyze over 95 million NYC taxi rides\nOct 5, 2023\nWhy you should consider adding DuckDB (and SQL!) to your data analysis toolbelt\nSep 21, 2023\nReview of Observable Plot\nNov 18, 2022\nWhere our CO2 emissions are coming from\nNov 8, 2022\nGoodbye, Twitter \ud83d\udc4b\nshow more...\nOldies but goldies\nMar 31, 2017\nIn Defense of Interactive Graphics\nNov 14, 2016\nWhy we used jittery gauges in our live election forecast\nMar 7, 2015\nSeven Features You'll Want In Your Next Charting Tool\nSep 20, 2013\nAnalyzing bias in opinion polls with R\nSep 9, 2013\nMastering Multi-hued Color Scales with Chroma.js\nOct 24, 2012\nMaking Pictographs? Choose Your Icons Wisely!\nDec 13, 2011\nHow To Avoid Equidistant HSV Colors\nNotable projects\nSveltePlot : A Svelte-native visualization framework based on the layered grammar of graphics principles.\nDatawrapper : A tool to create embeddable charts, maps and tables, since turned into a company.\nchroma.js : A tiny JS library for dealing with colors\nschnack.js : Disqus-like drop-in for self-hosted comments on static websites (used in this blog)\ncolor palettte helper : A tool for designing better color palettes for charts and maps\ncanvid : tiny JS library for playing silent video on canvas elements\nd3-jetpack : Convenience wrappers that speed up your daily work with d3.js (archived)\nKartograph : A (now archived) mapping framework based on Raphael.js\ndriven-by-data.net : My graphics portfolio\nMade with \u2661 using SvelteKit , \u00a9 2009-2025 Gregor Aisch\nHome\nAbout\nArchive\nRSS",
+  "bytes": 47961,
+  "fetched_at": "2026-09-11T01:06:18.474752+00:00"
+}

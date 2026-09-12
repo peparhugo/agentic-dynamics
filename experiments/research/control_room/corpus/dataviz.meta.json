@@ -1,0 +1,102 @@
+{
+  "schema": "research-corpus/v1",
+  "family": "dataviz",
+  "family_label": "Charts & data-visualization craft",
+  "family_budget": 40,
+  "budget_band_pm20": [
+    32,
+    48
+  ],
+  "seeds_file": "experiments/research/control_room/seeds/dataviz.txt",
+  "seed_products": [
+    "Observable/D3",
+    "ECharts",
+    "Vega-Lite",
+    "visx",
+    "Nivo",
+    "uPlot",
+    "Tremor",
+    "shadcn charts"
+  ],
+  "stored_sources": 46,
+  "facet_records": 41,
+  "excluded_from_facet_corpus": [
+    {
+      "uri": "https://airbnb.io/visx/",
+      "reason": "JS shell - 0 chars; visx represented via github.com/airbnb/visx"
+    },
+    {
+      "uri": "https://nivo.rocks/",
+      "reason": "JS shell home - 352 chars; Nivo represented via bar/line/heatmap"
+    },
+    {
+      "uri": "https://nivo.rocks/storybook/",
+      "reason": "Storybook shell - 0 chars"
+    },
+    {
+      "uri": "https://leeoniya.github.io/uPlot/demos/time-periods.html",
+      "reason": "demo shell - 0 chars; uPlot represented via homepage + GitHub"
+    },
+    {
+      "uri": "https://echarts.apache.org/handbook/en/how-to/label/",
+      "reason": "wrong URL - directory listing (119 chars)"
+    }
+  ],
+  "missing_or_unstored": [
+    "https://observablehq.com/",
+    "https://observablehq.com/@d3/gallery",
+    "https://observablehq.com/plot/",
+    "https://observablehq.com/plot/features/plots",
+    "https://observablehq.com/plot/marks",
+    "https://airbnb.io/visx/gallery",
+    "https://airbnb.io/visx/docs",
+    "https://www.tremor.so/docs",
+    "https://www.tremor.so/docs/components/area-chart",
+    "https://ui.shadcn.com/charts/area",
+    "https://blog.datawrapper.de/",
+    "https://observablehq.com/@observablehq/plot",
+    "https://observablehq.com/@d3/bar-chart",
+    "https://observablehq.com/@d3/line-chart",
+    "https://observablehq.com/@d3/heatmap"
+  ],
+  "unavailable_named_seed": {
+    "observablehq.com": "9 URLs blocked with HTTP 429 from this egress; Observable Plot covered via github.com/observablehq/plot, D3 via d3js.org"
+  },
+  "source_catalog": "experiments/research/control_room/sources.jsonl",
+  "facet_corpus": "experiments/research/control_room/corpus/dataviz.jsonl",
+  "tool": "scripts/research_fetch.py",
+  "fetched_at_range": [
+    "2026-09-11T01:05:33.123771+00:00",
+    "2026-09-11T01:06:18.717395+00:00"
+  ],
+  "stop_reason": "stopped after six fetch batches: 46 sources stored from 61 seeds. Observable (a named seed) is unavailable from this egress (HTTP 429); substituted with the Plot GitHub README and d3js.org. Curated to 41 facet records (within 32-48) by excluding 5 JS-shell/junk pages.",
+  "coverage_note": "F3 is strong on chart-selection/grammar (D3, Plot, Vega-Lite, ECharts, visx, Nivo, uPlot, Tremor, shadcn) and craft (Data to Viz, ColorBrewer, Datawrapper, vis4, eagereyes); accessibility evidence is thin but present (ECharts ARIA, shadcn). uPlot+ECharts carry streaming/performance/canvas-vs-svg evidence.",
+  "facet_rollup": {
+    "by_category": {
+      "chart-library": 25,
+      "chart-gallery": 3,
+      "component-kit": 7,
+      "dataviz-craft": 6
+    },
+    "top_techniques": {
+      "chart-types": 10,
+      "grammar-of-graphics": 7,
+      "copy-paste": 7,
+      "svg": 5,
+      "line-chart": 5,
+      "area-chart": 5,
+      "canvas": 4,
+      "recharts": 4,
+      "chart-container": 4,
+      "theming": 4,
+      "dashboard-blocks": 4,
+      "data-join": 3,
+      "dom-binding": 3,
+      "declarative-spec": 3,
+      "react": 3,
+      "bar-chart": 3
+    },
+    "open_implementation_true": 35,
+    "demonstrates_true": 41
+  }
+}

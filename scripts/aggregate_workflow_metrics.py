@@ -28,6 +28,16 @@ for the authoritative schema):
   ``retry_reason`` / ``status`` / ``actual_cost``). The committed exemplar is
   ``experiments/results/cap_grit_grid_ledger.json``.
 
+Phase pooling is **identity-aware** (:func:`merge_corpora`): a campaign's phase ledgers often
+contain the same phase row twice (an aggregate ledger plus a per-cell copy, or a re-run artifact
+left beside its predecessor). Pooling by campaign name alone double-counted those rows silently.
+The join now keeps one row per full phase identity (:func:`phase_identity_fields` — name, kind,
+status, execution window, model, cost/duration, error, test verdict, and the recorded gate
+evidence), records every dedup on ``LedgerCorpus.duplicate_phase_rows``, and surfaces the block
+(``count`` + ``entries`` with identity and source paths) in the per-campaign and coverage output.
+Rows that differ in any identifying field pool exactly as before — only exact duplicates are
+collapsed, and never silently.
+
 The pinned attempt-level fields ``attempt_count`` / ``first_pass`` / ``accepted`` /
 ``escalation_from`` / ``escalation_to`` are DECLARED in ``LEDGER_FIELDS``
 (``experiment_spec.py``) but declared-not-written by the runtime
@@ -48,7 +58,7 @@ import csv
 import io
 import json
 import sys
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -169,6 +179,37 @@ class Phase:
     deploy_gate: dict[str, Any] | None = None
     commit_gate: dict[str, Any] | None = None
     relabel_gate: dict[str, Any] | None = None
+    #: The execution window of THIS phase observation. The runner's current PhaseResult does not
+    #: serialize a per-phase timestamp, so these default to "" on the historical corpus; the
+    #: campaign wrappers/aggregate ledgers that do carry them give the phase join its strongest
+    #: discriminators — the same phase name run at two different times is TWO observations, and
+    #: the identity-aware pooling in :func:`merge_corpora` must keep both.
+    started_at: str = ""
+    ended_at: str = ""
+
+
+@dataclass
+class DuplicatePhaseRow:
+    """One phase identity observed in MORE than one source ledger of a single campaign.
+
+    Recorded so the dedup in :func:`merge_corpora` is auditable — the pooled corpus keeps one
+    row, and this entry preserves the identity plus the provenance (every source ledger path
+    the row appeared in). A silently-dropped duplicate is a double-count waiting to be read as
+    truth; an entry here makes the join honest.
+    """
+
+    identity: dict[str, Any]
+    paths: list[str] = field(default_factory=list)
+    #: How many times the identity was observed (>= 2 by construction — the first sighting plus
+    #: each duplicate). ``len(paths)`` may be smaller when one ledger carries the row twice.
+    occurrences: int = 2
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "identity": self.identity,
+            "paths": list(self.paths),
+            "occurrences": self.occurrences,
+        }
 
 
 @dataclass
@@ -193,6 +234,9 @@ class LedgerCorpus:
     attempts: list[Attempt] = field(default_factory=list)
     phases: list[Phase] = field(default_factory=list)
     checkpoints: list[Checkpoint] = field(default_factory=list)
+    #: Phase identities found in more than one of this campaign's source ledgers, with the
+    #: dedup provenance. Populated by :func:`merge_corpora`; empty on a per-file corpus.
+    duplicate_phase_rows: list[DuplicatePhaseRow] = field(default_factory=list)
     started_at: str = ""
     ended_at: str = ""
 
@@ -445,6 +489,11 @@ def _extract_run_like_ledger(payload: dict[str, Any], path: str) -> LedgerCorpus
                 relabel_gate=p.get("relabel_gate")
                 if isinstance(p.get("relabel_gate"), dict)
                 else None,
+                # Per-phase execution window — present on the wrappers/aggregate ledgers that
+                # carry it, "" on the runner's historical PhaseResult. It is a first-class
+                # identity field: the same phase run twice is two observations.
+                started_at=str(p.get("started_at") or ""),
+                ended_at=str(p.get("ended_at") or ""),
             )
         )
     for c in _checkpoints_from(payload):
@@ -473,30 +522,100 @@ def extract_ledger(payload: dict[str, Any], path: str) -> LedgerCorpus:
     return LedgerCorpus(name=_campaign_name(path), paths=[path])
 
 
+def phase_identity_fields(phase: Phase) -> dict[str, Any]:
+    """The full field set that identifies one observed phase row.
+
+    Identity is the WHOLE normalized row — phase name, kind, status, the execution window
+    (``started_at``/``ended_at``), model, cost/duration, error, the independent test verdict,
+    and the recorded stall/deploy/commit/relabel gate evidence — not a name+timestamp subset.
+    That is the conservative reading of the pooling policy ("never drop rows that differ in any
+    measured field"): two rows are called duplicates only when every field the extractor
+    observed is equal, so a re-run that differs in cost, duration, a gate record, or a test
+    outcome stays a distinct observation. ``asdict`` is used deliberately so a field added to
+    :class:`Phase` later joins the identity automatically instead of silently being ignored.
+    """
+    return asdict(phase)
+
+
+def phase_identity(phase: Phase) -> str:
+    """A stable, hashable key for a phase row: canonical JSON of :func:`phase_identity_fields`.
+
+    ``sort_keys`` + compact separators make the key order-independent and byte-stable across
+    processes; ``default=str`` degrades any value the JSON encoder cannot handle to its string
+    form rather than crashing the whole aggregation.
+    """
+    return json.dumps(
+        phase_identity_fields(phase), sort_keys=True, separators=(",", ":"), default=str
+    )
+
+
 def merge_corpora(corpora: list[LedgerCorpus]) -> list[LedgerCorpus]:
     """Merge corpora that share a campaign name into a single corpus (sorted, stable).
 
     The phase ledgers of a campaign are spread across many files (e.g. the 26 session-routing
     ledgers); each file is its own ``LedgerCorpus`` under the same name. Pooling them by name
     is what turns the per-file phase rows into a per-campaign table.
+
+    The pooling is **identity-aware**: a phase row that appears in more than one of a
+    campaign's ledgers — an aggregate ledger plus a per-cell copy, or a re-run artifact left
+    beside its predecessor — is kept ONCE, and the drop is recorded on the pooled corpus's
+    :attr:`LedgerCorpus.duplicate_phase_rows` with the identity and every source path. Rows
+    that differ in ANY identifying field (see :func:`phase_identity_fields`) pool exactly as
+    before. The dedup never silently discards: the duplicate block is the audit trail.
     """
     by_name: dict[str, LedgerCorpus] = {}
     order: list[str] = []
+    # identity -> position in the pooled corpus, for O(1) duplicate detection per campaign.
+    phase_positions: dict[str, dict[str, int]] = {}
+    # identity -> the source paths already attributed to that phase row.
+    phase_sources: dict[str, dict[str, list[str]]] = {}
+    # identity -> the duplicate entry being accumulated (created on the second sighting).
+    duplicates: dict[str, dict[str, DuplicatePhaseRow]] = {}
     for corpus in corpora:
         if corpus.name not in by_name:
             by_name[corpus.name] = LedgerCorpus(name=corpus.name)
             order.append(corpus.name)
+            phase_positions[corpus.name] = {}
+            phase_sources[corpus.name] = {}
+            duplicates[corpus.name] = {}
         target = by_name[corpus.name]
+        positions = phase_positions[corpus.name]
+        sources = phase_sources[corpus.name]
+        dup_index = duplicates[corpus.name]
         target.paths.extend(corpus.paths)
         target.jobs.extend(corpus.jobs)
         target.attempts.extend(corpus.attempts)
-        target.phases.extend(corpus.phases)
+        for phase in corpus.phases:
+            key = phase_identity(phase)
+            if key not in positions:
+                positions[key] = len(target.phases)
+                sources[key] = list(corpus.paths)
+                target.phases.append(phase)
+                continue
+            # A row we have already pooled: keep the first, record the duplicate + provenance.
+            entry = dup_index.get(key)
+            if entry is None:
+                # Second sighting: the entry starts at two occurrences (first + this one).
+                entry = DuplicatePhaseRow(
+                    identity=phase_identity_fields(phase),
+                    paths=list(sources[key]),
+                )
+                dup_index[key] = entry
+            else:
+                entry.occurrences += 1
+            for source_path in corpus.paths:
+                if source_path not in entry.paths:
+                    entry.paths.append(source_path)
+                if source_path not in sources[key]:
+                    sources[key].append(source_path)
         target.checkpoints.extend(corpus.checkpoints)
         # A campaign's span is the min started_at to max ended_at across its ledgers.
         if corpus.started_at and (not target.started_at or corpus.started_at < target.started_at):
             target.started_at = corpus.started_at
         if corpus.ended_at and (not target.ended_at or corpus.ended_at > target.ended_at):
             target.ended_at = corpus.ended_at
+    for name in order:
+        by_name[name].duplicate_phase_rows = list(duplicates[name].values())
     return [by_name[name] for name in order]
 
 
@@ -805,6 +924,13 @@ def compute_campaign_metrics(corpus: LedgerCorpus) -> dict[str, Any]:
         "n_attempts": len(corpus.attempts),
         "n_phases": len(corpus.phases),
         "n_checkpoints": len(corpus.checkpoints),
+        # The audit trail for the identity-aware phase join: how many phase identities were
+        # seen in >1 source ledger (count) and the identity + provenance of each. An empty
+        # block is a valid, clean result — it means no duplicate was found, not "not measured".
+        "duplicate_phase_rows": {
+            "count": len(corpus.duplicate_phase_rows),
+            "entries": [d.to_dict() for d in corpus.duplicate_phase_rows],
+        },
         "started_at": corpus.started_at,
         "ended_at": corpus.ended_at,
         "workload_volume": {
@@ -860,6 +986,7 @@ def coverage_table(campaign_rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
                 "n_attempts": row["n_attempts"],
                 "n_phases": row["n_phases"],
                 "n_checkpoints": row["n_checkpoints"],
+                "n_duplicate_phase_rows": row["duplicate_phase_rows"]["count"],
                 "retry_rate_measurable": metrics["retry_rate"]["measurable"],
                 "first_call_resolution_measurable": metrics["first_call_resolution"]["measurable"],
                 "escalation_rate_measurable": metrics["escalation_rate"]["measurable"],
@@ -1019,7 +1146,15 @@ def rows_to_csv(campaign_rows: list[dict[str, Any]]) -> str:
     out = io.StringIO()
     writer = csv.writer(out)
     metric_names = [name for name, _ in METRIC_COMPUTERS]
-    header = ["campaign", "n_ledgers", "n_jobs", "n_attempts", "n_phases", "n_checkpoints"]
+    header = [
+        "campaign",
+        "n_ledgers",
+        "n_jobs",
+        "n_attempts",
+        "n_phases",
+        "n_checkpoints",
+        "n_duplicate_phase_rows",
+    ]
     header += [f"{n}_measurable" for n in metric_names]
     header += [f"{n}_value" for n in metric_names]
     writer.writerow(header)
@@ -1031,6 +1166,7 @@ def rows_to_csv(campaign_rows: list[dict[str, Any]]) -> str:
             row["n_attempts"],
             row["n_phases"],
             row["n_checkpoints"],
+            row["duplicate_phase_rows"]["count"],
         ]
         for name in metric_names:
             line.append("true" if row["metrics"][name]["measurable"] else "false")

@@ -113,6 +113,11 @@ _COMMANDS: dict[tuple[str, ...], str] = {
     ("validate", "session"): "validate_session.py",
     ("validate", "tests"): "verify_tests.py",
     ("validate", "prereq"): "evidence_prereq_gate.py",
+    # validate render — the Control Room facelift render gate: serves the resting screen under
+    # committed fixtures, captures screenshots at the three breakpoints in dark/light/
+    # forced-colors, and asserts the IA §10 glance contract (Playwright; --check-fixtures runs
+    # the browser-free half).
+    ("validate", "render"): "verify_control_room_rendering.py",
     # validate preexisting — the pre-existing-drift guard (control_db_evidence e5): a
     # deterministic, model-free check that proves a failing test exists at a merge-base
     # before an author may call it "pre-existing" (a temp worktree + a single pytest run).
@@ -209,7 +214,7 @@ Subcommands (each forwards to its backing script):
   registry    query|show|lineage
   review      all|stories|trigger|enqueue|finalize
   spec        status|pipeline
-  validate    session|tests|prereq|preexisting
+  validate    session|tests|prereq|preexisting|render
   supervise   [claude-agents|orphans|leases]
   control     status|drain-outbox|sweep-zombies|recording-sweep
   session     open|close

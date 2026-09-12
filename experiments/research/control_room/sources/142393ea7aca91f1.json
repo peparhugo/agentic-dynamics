@@ -1,0 +1,11 @@
+{
+  "uri": "https://nivo.rocks/bar/",
+  "final_url": "https://nivo.rocks/bar/",
+  "status": 200,
+  "content_type": "text/html; charset=utf-8",
+  "sha256": "142393ea7aca91f154dac64c9810d39fdc8d886b8c7ca0fdadb6c125ba6c30a2",
+  "title": "Bar chart | nivo",
+  "text": "Why nivo? About References Components Guides Scales Axes Colors Legends Gradients Patterns Theming storybook Donate\nlight dark\nBar\n@nivo/bar\nsvg canvas http api\nBar chart which can display multiple data series, stacked or side by side. Also\nsupports both vertical and horizontal layout, with negative values descending\nbelow the x axis (or y axis if using horizontal layout).\nThe bar item component can be customized to render any valid SVG element, it\nwill receive current bar style, data and event handlers,\nthere's an example in storybook .\nchart code data\nroll the dice\nActions Logs\nStart interacting with the chart to log actions\nBase\nDimensions\nStyle\nCustomization\nLabels\nGrid & Axes\nInteractivity\nLegends\nAccessibility\nMotion\nRecipes\nUsing markers Stacked diverging bar chart Grouped diverging bar chart Custom bar element Formatting values Using custom tooltip Custom axis ticks With symlog scale Race bar chart Initial hidden ids Using custom label for legends Using annotations Using totals Using top labels",
+  "bytes": 109081,
+  "fetched_at": "2026-09-11T01:05:44.781420+00:00"
+}

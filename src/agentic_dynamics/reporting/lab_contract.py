@@ -20,7 +20,7 @@ The contract is a single ``lab_contract`` block embedded in the lab's output JSO
 .. code-block:: json
 
     "lab_contract": {
-      "contract_version": "lab-contract/v4",
+      "contract_version": "lab-contract/v7",
       "lab": "lab_story_arc.py",
       "input_dataset_id": "canonical_registry/story",
       "registry_identity_sha256": "…64 hex…",
@@ -110,8 +110,12 @@ from .lab_manifest import LabEntry, load_lab_manifest
 #: Bumped to v6 in f2 (exact contributor attestation) when the table-qualified ref digests
 #: ``used_record_refs_sha256``/``excluded_record_refs_sha256`` and the unique/contribution
 #: counts were added — the contract now attests WHICH records produced the result, not just
-#: how many.
-CONTRACT_VERSION = "lab-contract/v6"
+#: how many. Bumped to v7 in l1 (lab metric fingerprints) when ``metric_source_sha256`` was
+#: extended from the lab's own source alone to the lab's own source PLUS its declared
+#: shared-metric source modules (:data:`METRIC_SOURCES`) — an edit to extracted shared metric
+#: code (step 6b moved Grit's primitives into ``reporting.grit_metric``) now invalidates the
+#: artifact, instead of only a glue edit to the lab script doing so.
+CONTRACT_VERSION = "lab-contract/v7"
 
 #: The key under which the contract is embedded in a lab's output JSON.
 CONTRACT_KEY = "lab_contract"
@@ -165,6 +169,54 @@ _INPUT_SOURCE_TABLE_RE = re.compile(r"\(([a-z_]+)")
 #: The table names a publication lab may declare. Kept in sync with
 #: ``canonical_corpus.TABLES`` so a typo'd source type is caught rather than hashed.
 _TABLES = ("story", "finding", "review", "analysis")
+
+#: Repository root — this file is ``src/agentic_dynamics/reporting/lab_contract.py``, so three
+#: parents up. Both the lab script and the declared shared-metric sources resolve against it.
+PROJECT_ROOT = Path(__file__).resolve().parents[3]
+
+#: The ``agentic_dynamics`` modules every canonical lab imports that are NOT metric sources:
+#: the canonical input door (whose selection/content identity is already carried by
+#: ``registry_identity_sha256`` / ``resolved_input_sha256``) and this contract module itself
+#: (hashing the fingerprinter into its own fingerprint would be circular — every contract
+#: edit would invalidate every artifact). Every other ``agentic_dynamics`` module a
+#: publication lab imports is code that shapes the metric it reports.
+NON_METRIC_SOURCE_MODULES = (
+    "agentic_dynamics.reporting.canonical_corpus",
+    "agentic_dynamics.reporting.lab_contract",
+)
+
+#: Shared-metric source modules covered by each publication lab's fingerprint (v7), keyed by
+#: lab script and expressed as repo-relative paths. The per-lab fingerprint hashes the lab's
+#: own source PLUS every file listed here, so a change to shared metric code invalidates the
+#: artifact — the inverted-scope fix: before v7 only the lab script was covered, so extracting
+#: primitives into a shared module (``reporting.grit_metric``) removed them from the
+#: fingerprint while a glue edit to the lab still stale it.
+#:
+#: A CENTRAL registry (not a per-lab constant) so the verifier never has to import a lab
+#: script to learn its declaration, and so one place records the whole surface. The guard
+#: test in ``tests/test_lab_contract.py`` derives the expected set from each lab's own import
+#: graph and refuses any publication-eligible lab whose declared sources do not cover the
+#: ``agentic_dynamics`` modules it actually imports — a NEW shared metric module cannot
+#: silently escape. A genuinely source-free publication lab declares an empty tuple.
+METRIC_SOURCES: dict[str, tuple[str, ...]] = {
+    "lab_cache_economics.py": ("src/agentic_dynamics/reporting/measurement_coverage.py",),
+    "lab_condition_effects.py": ("src/agentic_dynamics/reporting/measurement_coverage.py",),
+    "lab_grit.py": ("src/agentic_dynamics/reporting/grit_metric.py",),
+    "lab_quality_frontier.py": ("src/agentic_dynamics/reporting/measurement_coverage.py",),
+    "lab_story_arc.py": ("src/agentic_dynamics/reporting/measurement_coverage.py",),
+    "lab_story_review.py": (
+        "src/agentic_dynamics/reporting/measurement_coverage.py",
+        # ``load_story_result`` is imported through the ``runtime.story`` package, but its
+        # implementation (and the StoryResult model the lab reads fields from) live in the
+        # submodules below — declare them too, or the loader's own code would escape the
+        # fingerprint exactly the way step 6b's grit primitives did.
+        "src/agentic_dynamics/runtime/story/__init__.py",
+        "src/agentic_dynamics/runtime/story/models.py",
+        "src/agentic_dynamics/runtime/story/persistence.py",
+    ),
+    "lab_verification_frontier.py": ("src/agentic_dynamics/reporting/measurement_coverage.py",),
+    "lab_verification_value.py": (),
+}
 
 
 @dataclass(frozen=True)
@@ -433,15 +485,65 @@ def _resolved_count(tables: CanonicalTables) -> int:
     return sum(len(tables.rows(t)) for t in tables.tables)
 
 
-def lab_source_sha256(lab_script: str) -> str:
-    """``sha256`` of the lab's own source file (m4) — the *code* that computed the metric.
+def metric_source_paths(lab_script: str, *, root: Path | None = None) -> tuple[Path, ...]:
+    """The declared shared-metric source files for ``lab_script`` (absolute paths).
 
-    Every lab lives at ``scripts/<lab_script>``. Hashing its bytes lets a contract attest
-    to *which code* produced the numbers — a metric re-implementation is visible even when
-    the corpus and the metric_definition_version are unchanged.
+    Reads :data:`METRIC_SOURCES`; a lab with no entry (or an empty tuple) declares no shared
+    metric sources, so only its own script enters the fingerprint. ``root`` is injectable so
+    the semantics can be unit-tested against a throwaway tree.
     """
-    path = Path(__file__).resolve().parents[3] / "scripts" / lab_script
-    return hashlib.sha256(path.read_bytes()).hexdigest()
+    base = PROJECT_ROOT if root is None else root
+    return tuple(base / rel for rel in METRIC_SOURCES.get(lab_script, ()))
+
+
+def lab_fingerprint_paths(lab_script: str, *, root: Path | None = None) -> tuple[Path, ...]:
+    """Every source file the lab's fingerprint covers: its own script + declared sources.
+
+    Returned as a tuple (lab script first) but the digest itself sorts, so declaration order
+    never changes the value.
+    """
+    base = PROJECT_ROOT if root is None else root
+    return (base / "scripts" / lab_script, *metric_source_paths(lab_script, root=base))
+
+
+def _source_fingerprint(paths: Iterable[Path], *, root: Path) -> str:
+    """``sha256`` over ``(repo-relative path, length, bytes)`` for each source file.
+
+    Deterministic and environment-independent: only the repo-relative path and the bytes
+    enter the digest, never an absolute machine path, so the same checkout hashes the same
+    on every host. The file length is folded in (mirroring ``build_data._source_tree_identity``)
+    so a truncation is distinguishable from a same-name rename, and files are sorted by
+    relative path so declaration order is irrelevant.
+    """
+    entries = sorted(
+        ((p.relative_to(root).as_posix(), p.read_bytes()) for p in paths),
+        key=lambda item: item[0],
+    )
+    hasher = hashlib.sha256()
+    for rel, data in entries:
+        hasher.update(rel.encode("utf-8"))
+        hasher.update(b"\0")
+        hasher.update(str(len(data)).encode("utf-8"))
+        hasher.update(b"\0")
+        hasher.update(data)
+        hasher.update(b"\0")
+    return hasher.hexdigest()
+
+
+def lab_source_sha256(lab_script: str, *, root: Path | None = None) -> str:
+    """``sha256`` of the lab's own source PLUS its declared shared-metric sources (v7).
+
+    Every lab lives at ``scripts/<lab_script>`` and declares its shared metric modules in
+    :data:`METRIC_SOURCES`. Hashing all of their bytes lets a contract attest to *which code*
+    produced the numbers. Before v7 only the lab script was covered, so extracting a metric's
+    primitives into a shared module (step 6b moved Grit's into ``reporting.grit_metric``)
+    removed them from the fingerprint: an edit to shared metric code could no longer
+    invalidate a published artifact while a glue edit to the lab still did. The v7 fix is
+    inclusive — the lab's own source and every declared shared metric source are hashed
+    together. ``root`` and :data:`METRIC_SOURCES` are injectable for the unit tests.
+    """
+    base = PROJECT_ROOT if root is None else root
+    return _source_fingerprint(lab_fingerprint_paths(lab_script, root=base), root=base)
 
 
 def build_contract(
@@ -485,6 +587,18 @@ def build_contract(
     """
     entry = _lab_entry(lab_script)
     stamp = (now or datetime.now(timezone.utc)).isoformat()
+
+    # ── v7: a publication-eligible lab must declare its shared metric sources ────────────
+    # Enforced at the producer (not only in the guard test) so a missing declaration fails
+    # loudly at write time: an absent entry would silently fingerprint only the lab script,
+    # which is exactly the inverted-scope defect v7 closes. An empty tuple is a valid
+    # declaration for a lab with no shared metric code.
+    if entry.publication_eligible and lab_script not in METRIC_SOURCES:
+        raise ValueError(
+            f"{lab_script}: publication-eligible but absent from lab_contract.METRIC_SOURCES "
+            f"— declare its shared metric sources (an empty tuple is valid) so a change to "
+            f"that shared code invalidates the artifact"
+        )
 
     resolved = int(
         n_resolved_records if n_resolved_records is not None else _resolved_count(tables)

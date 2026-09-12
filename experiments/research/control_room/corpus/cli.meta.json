@@ -1,0 +1,114 @@
+{
+  "schema": "research-corpus/v1",
+  "family": "cli",
+  "family_label": "Terminal / CLI aesthetics",
+  "family_budget": 30,
+  "budget_band_pm20": [
+    24,
+    36
+  ],
+  "seeds_file": "experiments/research/control_room/seeds/cli.txt",
+  "seed_products": [
+    "Warp",
+    "Wave",
+    "Ghostty",
+    "Charm (bubbletea/gum)",
+    "Textual",
+    "nvitop",
+    "asciinema",
+    "TUI friends (ratatui, tview, k9s, lazygit, fzf, btop, bottom, gdu, htop, WezTerm, Alacritty, kitty)"
+  ],
+  "stored_sources": 46,
+  "facet_records": 34,
+  "excluded_from_facet_corpus": [
+    {
+      "uri": "https://docs.waveterm.dev/",
+      "reason": "docs duplicate of waveterm.dev product page"
+    },
+    {
+      "uri": "https://github.com/wavetermdev/waveterm",
+      "reason": "repo duplicate of waveterm.dev"
+    },
+    {
+      "uri": "https://ghostty.org/docs/config",
+      "reason": "config reference; peripheral to the Ghostty docs set"
+    },
+    {
+      "uri": "https://rich.readthedocs.io/",
+      "reason": "docs rendered from the rich README; represented by github.com/Textualize/rich"
+    },
+    {
+      "uri": "https://docs.asciinema.org/",
+      "reason": "docs duplicate of asciinema.org product page"
+    },
+    {
+      "uri": "https://htop.dev/",
+      "reason": "splash page; htop represented by github.com/htop-dev/htop"
+    },
+    {
+      "uri": "https://github.com/wez/wezterm",
+      "reason": "repo duplicate of wezterm.org"
+    },
+    {
+      "uri": "https://alacritty.org/",
+      "reason": "splash page; Alacritty represented by its GitHub repo"
+    },
+    {
+      "uri": "https://github.com/charmbracelet/glamour",
+      "reason": "peripheral Charm markdown renderer"
+    },
+    {
+      "uri": "https://github.com/charmbracelet/wish",
+      "reason": "peripheral Charm SSH-app lib"
+    },
+    {
+      "uri": "https://github.com/charmbracelet/log",
+      "reason": "peripheral Charm logging lib (not a TUI surface)"
+    },
+    {
+      "uri": "https://github.com/charmbracelet/huh",
+      "reason": "peripheral Charm forms lib (covered by gum/bubbles)"
+    }
+  ],
+  "missing_or_unstored": [],
+  "source_catalog": "experiments/research/control_room/sources.jsonl",
+  "facet_corpus": "experiments/research/control_room/corpus/cli.jsonl",
+  "tool": "scripts/research_fetch.py",
+  "fetched_at_range": [
+    "2026-09-11T01:07:42.866740+00:00",
+    "2026-09-11T01:08:08.878124+00:00"
+  ],
+  "stop_reason": "stopped after three batches: 46 sources stored from 46 seeds (all seeds resolved). Curated to 34 facet records (within 24-36) by excluding 12 splash/peripheral/duplicate pages.",
+  "coverage_note": "F4 is strong and cohesive: terminal-native aesthetic evidence, keyboard-first/command-palette interaction, TUI layout/widget models (Bubble Tea, Textual, Ratatui, tview), terminal emulators (truecolor/GPU/splits), and live monitors (nvitop/btop/bottom/htop) with sparkline/braille/color-bar techniques. Accessibility evidence is absent (terminal UIs).",
+  "facet_rollup": {
+    "by_category": {
+      "terminal-app": 4,
+      "terminal-emulator": 5,
+      "design-craft": 1,
+      "tui-framework": 11,
+      "cli-tool": 3,
+      "tui-monitor": 5,
+      "terminal-recording": 2,
+      "tui-tool": 3
+    },
+    "top_techniques": {
+      "widgets": 9,
+      "layout": 7,
+      "keyboard-first": 6,
+      "gpu-rendering": 5,
+      "blocks": 4,
+      "css-like-styling": 4,
+      "async": 4,
+      "command-palette": 3,
+      "panes": 3,
+      "truecolor": 3,
+      "reactive": 3,
+      "process-monitor": 3,
+      "config": 3,
+      "ai-suggestions": 2,
+      "ligatures": 2,
+      "split-panes": 2
+    },
+    "open_implementation_true": 33
+  }
+}

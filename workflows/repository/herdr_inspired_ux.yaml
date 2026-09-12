@@ -1,0 +1,183 @@
+name: herdr_inspired_ux
+question: >-
+  Study Herdr (https://herdr.dev/, the agent-runtime product) against our system and turn the
+  adoptable ideas into concrete specs: explicit working/blocked/idle agent semantics with a
+  blocked-first triage surface, a session-state path contract (detach/restore/history replay/
+  native resume/live handoff) for runs and cells, one typed API for humans/scripts/agents plus
+  a wait-until-blocked primitive, and plugin-style manifest+event-hook packaging for campaign
+  operators. PINNED-STEP CONVENTION: phase h0 freezes every source into the repo with hashes;
+  no later phase may read the live web or make a claim from memory.
+version: "0.1"
+artifact_kind: workflow
+intent: read
+side_effects:
+  repository: true
+  external_services: false
+repeatable: true
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: true
+    rag:
+      emit_self: false
+    context:
+      pinned_sources:
+        - https://herdr.dev/
+        - https://herdr.dev/docs/
+        - https://herdr.dev/docs/agents/
+        - https://herdr.dev/docs/session-state/
+        - https://herdr.dev/docs/socket-api/
+        - https://herdr.dev/docs/plugins/
+        - https://herdr.dev/docs/connecting-machines/
+        - https://herdr.dev/docs/configuration/
+        - https://herdr.dev/compare/
+        - https://herdr.dev/agent-guide.md
+        - https://github.com/herdrdev/herdr
+      hard_rules: >-
+        (1) h0 is the ONLY phase allowed to fetch; it stores every source via
+        scripts/research_fetch.py (URI + final_url + fetched_at + sha256 + text) under
+        experiments/herdr_inspiration/sources/ and writes the pin table; downstream phases
+        cite only those frozen records. (2) Every adoptable idea cites its source record.
+        (3) Specs name exact files/functions in THIS repo and concrete acceptance checks.
+        (4) The adversary verifies adoption claims against the frozen text and flags overreach
+        or infeasibility; it writes only its review doc.
+    phases:
+      - name: h0_pin_sources
+        kind: agent
+        scope: implementation
+        requires_deliverable: true
+        timeout: 3600
+        prompt: |
+          GOAL: {goal}
+          Create experiments/herdr_inspiration/sources/ and fetch EXACTLY the pinned_sources
+          with: python3 scripts/research_fetch.py <url> --out-dir experiments/herdr_inspiration
+          (one invocation per URL or a seeds file). For each stored record confirm
+          extraction_quality != "thin" (if a page is JS-rendered/thin, try at most two
+          alternate URLs under herdr.dev and record the substitution). Write
+          docs/research/herdr_sources.md: the pin table (uri, final_url, fetched_at, sha256,
+          title, quality) and the exact command used. Commit. This table is the ONLY evidence
+          base for the rest of the workflow.
+      - name: h1_extract_adoptable
+        kind: agent
+        scope: implementation
+        requires_deliverable: true
+        timeout: 7200
+        prompt: |
+          GOAL: {goal}
+          Read ONLY experiments/herdr_inspiration/sources/*.json. Write
+          docs/research/herdr_adoption.md with one section per candidate idea, each containing:
+          (a) what Herdr does (quote the sentence + source uri/sha); (b) why it matters to OUR
+          system (name the plane: control_room, supervisor, fleet/broker, self-knowledge/
+          session, workflows/campaign operators); (c) disposition: adopt-now | adopt-later |
+          reject, WITH a reason. Cover at minimum: working/blocked/idle semantics; blocked-first
+          triage; the detached-server contract ("nobody is attached"); one API for
+          humans/scripts/agents; wait-until-blocked; session-state paths (detach, restart
+          restore, pane history replay, native agent resume, live handoff); multi-machine
+          combined list + independent reconnects; plugin manifest + event hooks; the
+          agent-guide onboarding. Commit.
+      - name: h2_gap_map
+        kind: agent
+        scope: implementation
+        requires_deliverable: true
+        timeout: 7200
+        prompt: |
+          GOAL: {goal}
+          For each adopt-now/adopt-later item, map the gap against THIS repo with file:line
+          references: supervisor flags vs blocked semantics (scripts/supervise.py,
+          control/supervisor.py); run/cell recovery vs state paths
+          (runtime/workflow_runner.py, scripts/fleet/spawn_wrapper.py, the resume paths);
+          control packet/broker vs one-API + wait-until-blocked (control/control_status.py,
+          scripts/fleet/launch_broker.py, the unix-socket seam); campaign operators vs
+          manifest+hooks (scripts/run_*_grid.py, scripts/score_*.py); the Control Room parity
+          (apps/control_room/server.py, static/*). Write docs/research/herdr_gap_map.md. Commit.
+      - name: h3_spec_blocked_state
+        kind: agent
+        scope: implementation
+        requires_deliverable: true
+        timeout: 7200
+        prompt: |
+          GOAL: {goal}
+          Write docs/designs/current/herdr_blocked_state.md: the implementation spec for
+          explicit agent/run state semantics (working | blocked | idle | done) in the Control
+          Room, sourced from supervisor flags + the control packet + Redis telemetry; the
+          blocked-first triage surface (who is waiting on the operator, what they need, the
+          action); exact UI selectors/regions; and acceptance checks (render gate + parity
+          inventory additions). Include the mapping rules that decide each state. Commit.
+      - name: h4_spec_session_state
+        kind: agent
+        scope: implementation
+        requires_deliverable: true
+        timeout: 7200
+        prompt: |
+          GOAL: {goal}
+          Write docs/designs/current/herdr_session_state.md: a session-state path contract for
+          RUNS and CELLS — detach (process death: what survives), restart restore, history
+          replay (from the ledger/session.jsonl), native resume (per-backend), and live
+          handoff — each with required durable fields, the current gap in our implementation
+          (cite file:line), the acceptance tests, and the failure modes it removes (reference
+          the observed false-failure/recovery incidents). Commit.
+      - name: h5_spec_fleet_api
+        kind: agent
+        scope: implementation
+        requires_deliverable: true
+        timeout: 7200
+        prompt: |
+          GOAL: {goal}
+          Write docs/designs/current/herdr_fleet_api.md: (a) the ONE typed surface principle
+          applied to our control plane (same request/response contract for humans via CLI,
+          scripts, and agents; what exists today vs what changes); (b) a wait-until-blocked
+          primitive for the AIO/fleet: request shape (scope, predicate: run/cell/flag, timeout,
+          return), transport (the existing control packet + broker seam), semantics (no
+          polling), and acceptance tests; (c) adoption criteria for running the fleet under a
+          persistent agent runtime (evaluate vs build, no commitment). Commit.
+      - name: h6_adversary
+        kind: agent
+        scope: adversarial_readonly
+        requires_deliverable: true
+        run_model: openai/gpt-5.6-terra
+        timeout: 7200
+        prompt: |
+          GOAL: {goal}
+          Against the FROZEN sources: (1) entailment — every quoted Herdr claim matches its
+          source text; (2) no-import — no idea is adopted beyond what the sources say; (3)
+          feasibility — each spec names real files/functions and has implementable acceptance
+          checks; (4) conflicts — call out anything that contradicts our existing contracts
+          (authority gates, single-writer, lease rules). Write
+          docs/reviews/herdr_adoption_review.md with a findings table and PASS/FAIL per spec.
+          Commit.
+      - name: h7_tests
+        kind: test
+        scope: implementation
+        timeout: 600
+        tests:
+          - tests/test_research_fetch.py
+factors:
+  - {name: model, levels: [deepseek/deepseek-v4-flash]}
+design: factorial
+rules:
+  - name: herdr_sources_pinned
+    plane: measurement
+    evidence_class: "[X]"
+    requires: []
+    produces: [pinned_herdr_corpus]
+  - name: herdr_ideas_specced
+    plane: measurement
+    evidence_class: "[H]"
+    requires: [pinned_herdr_corpus]
+    produces: [blocked_state_spec, session_state_spec, fleet_api_spec]
+  - name: herdr_adoption_reviewed
+    plane: measurement
+    evidence_class: "[H]"
+    requires: [blocked_state_spec, session_state_spec, fleet_api_spec]
+    produces: [adoption_review]
+metrics:
+  - {name: pinned_herdr_corpus, agg: mean, over: cell}
+  - {name: blocked_state_spec, agg: mean, over: cell}
+  - {name: session_state_spec, agg: mean, over: cell}
+  - {name: fleet_api_spec, agg: mean, over: cell}
+  - {name: adoption_review, agg: mean, over: cell}
+comparison: null
+writeup: {format: lab_book, sections: [question, h0_pin_sources, h1_extract_adoptable, h2_gap_map, h3_spec_blocked_state, h4_spec_session_state, h5_spec_fleet_api, h6_adversary]}
+stop: {budget_usd: 12.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}

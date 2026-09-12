@@ -1,0 +1,440 @@
+{
+  "schema": "control_room_surface_map/v1",
+  "generated_by": "d4_room_design",
+  "workflow": "workflows/repository/control_room_rules_design.yaml",
+  "sources": {
+    "d1_rule_map": "experiments/control_room_rules/rule_map.json",
+    "d2_gaps": "experiments/control_room_rules/information_gaps.json",
+    "d3_backend": "docs/designs/current/control_room_backend_requirements.md",
+    "resting_contract": "docs/research/control_room_ia.md (§2 regions, §4 ON-G1..G7, §14 palette)",
+    "lifecycle": "docs/research/control_room_interaction_model.md (§1 states, §3 actions, §4 alerts)"
+  },
+  "surface_vocabulary": {
+    "rest": "visible on the one resting screen with no interaction; a fixed, non-scrolling region from the closed palette",
+    "drill": "revealed by one selection (a run/attention item) into the R4 dock, or by opening a named lens",
+    "alert": "raised as an R1 attention item on a state transition; ranked severity x actionability",
+    "rest_regions": ["R0", "R1a", "R1b", "R1c", "R2", "R3a", "R3b", "R3c"],
+    "drill_regions": ["R4a", "R4b", "R4c", "R4d"],
+    "lenses": ["L-FLEET", "L-ATTENTION", "L-MONEY", "L-COMPOSITION", "L-HEALTH", "L-WORKFORCE", "L-REGISTRY", "L-SESSIONS", "QUEUE", "DOCS", "AUDIT", "SEARCH", "SYSTEM", "A11Y"],
+    "alerts": ["ON-A1", "ON-A2", "ON-A3", "ON-A4", "ON-A5", "ON-A6"]
+  },
+  "rules": [
+    {
+      "rule": "1. Grit (Ground-Truth Integrity)",
+      "rule_number": 1,
+      "workforce": "augmented",
+      "d1_decision": "Which models may be trusted with unsupervised work at a given perturbation strength: default-route to high-Grit models and exclude low-Grit models from autonomous work.",
+      "surface": {
+        "type": "rest",
+        "rest_regions": ["R2", "R3c"],
+        "drilldown": ["L-WORKFORCE", "R4c"],
+        "alert": ["ON-A1"]
+      },
+      "fields_shown": [
+        {"field": "test_executed_success", "class": "M", "where": "R2 row MEASURED proof / R4c evidence rung / L-WORKFORCE"},
+        {"field": "perturbation_strength + operator", "class": "M", "where": "R4c attempt rung / L-WORKFORCE"},
+        {"field": "G(s) by strength", "class": "C", "where": "L-WORKFORCE (per model x strength)"},
+        {"field": "model marginal", "class": "M", "where": "R3c composition"}
+      ],
+      "action": "Route: default-route to high-Grit models and exclude low-Grit models from unsupervised work (J9).",
+      "action_verbs": ["route"],
+      "jobs": ["J1", "J2", "J4", "J9"],
+      "d3_projection": "P3 model_quality (fields also on P2 attempt_evidence)",
+      "acceptance": "R2 row carries a measured test verdict; L-WORKFORCE shows G(s) per model x strength; a low-Grit failure raises ON-A1."
+    },
+    {
+      "rule": "2. Explanation Tax (epsilon)",
+      "rule_number": 2,
+      "workforce": "augmented",
+      "d1_decision": "Whether to pay the narration tax for a task type: keep verbose reasoning only where auditability is worth the overhead, and force silent mode where it is waste.",
+      "surface": {
+        "type": "drill",
+        "rest_regions": ["R2"],
+        "drilldown": ["R4d", "L-WORKFORCE", "L-MONEY"],
+        "alert": []
+      },
+      "fields_shown": [
+        {"field": "tokens.answer", "class": "M", "where": "R4d step timings"},
+        {"field": "tokens.explanation", "class": "M", "where": "R4d step timings"},
+        {"field": "thinking_ratio (epsilon)", "class": "C", "where": "R4c cost rung / L-WORKFORCE"},
+        {"field": "flail rate / narration penalty", "class": "C", "where": "L-WORKFORCE per model"}
+      ],
+      "action": "Intervene: set the narration/silent-inference policy for the task type (pay the tax only for auditable work).",
+      "action_verbs": ["policy"],
+      "jobs": ["J4", "J5", "J9"],
+      "d3_projection": "P2 attempt_evidence + P3 model_quality",
+      "acceptance": "R4d renders answer and explanation tokens as separate [data-timing] rows; L-WORKFORCE shows a per-model narration penalty with its class."
+    },
+    {
+      "rule": "3. Snowball Rule (N^2)",
+      "rule_number": 3,
+      "workforce": "augmented",
+      "d1_decision": "Whether to commit to a compounding (one-way-door) architecture and how to budget the N-session cost arc before the quadratic growth locks in.",
+      "surface": {
+        "type": "drill",
+        "rest_regions": ["R3a"],
+        "drilldown": ["L-MONEY", "R4c"],
+        "alert": ["ON-A3"]
+      },
+      "fields_shown": [
+        {"field": "session arc cost (S1..SN)", "class": "M", "where": "L-MONEY story-arc chart"},
+        {"field": "snowball_factor S5/S1", "class": "C", "where": "L-MONEY headline"},
+        {"field": "velocity v (code_lines/session)", "class": "C", "where": "L-MONEY arc table"},
+        {"field": "beta (calibrated)", "class": "P", "where": "L-MONEY provenance chip"}
+      ],
+      "action": "Budget: decide the architecture on the projected N^2 curve and reserve the multi-session cost (one-way door; decision record).",
+      "action_verbs": ["budget", "record-decision"],
+      "jobs": ["J5", "J7"],
+      "d3_projection": "P4 story_arc + P7 spend_budget + P11 decision_ledger",
+      "acceptance": "L-MONEY shows the session cost arc and snowball factor with beta labeled [P]; a one-way-door decision has a receipt."
+    },
+    {
+      "rule": "4. EPM Horizon",
+      "rule_number": 4,
+      "workforce": "augmented",
+      "d1_decision": "Which energy-price scenario and hedge horizon to budget against, and the year local energy costs would flip the model/provider selection.",
+      "surface": {
+        "type": "drill",
+        "rest_regions": ["R3a"],
+        "drilldown": ["L-MONEY"],
+        "alert": ["ON-A3"]
+      },
+      "fields_shown": [
+        {"field": "EPM(t) scenario + annual rate", "class": "X", "where": "L-MONEY scenario selector"},
+        {"field": "energy_per_token / energy_total_j", "class": "P/C", "where": "L-MONEY / L-WORKFORCE"},
+        {"field": "energy ranking / provider-region split", "class": "X", "where": "L-MONEY (or explicit gap)"}
+      ],
+      "action": "Budget: pick the energy scenario and hedge horizon; recalibrate EPM for the operator's region.",
+      "action_verbs": ["budget"],
+      "jobs": ["J5"],
+      "d3_projection": "P7 spend_budget + P2 attempt_evidence (measured energy)",
+      "acceptance": "The active EPM scenario and rate show beside spend, labeled [P]/[X]; switching the scenario updates the projection."
+    },
+    {
+      "rule": "5. First-Pass Rule",
+      "rule_number": 5,
+      "workforce": "augmented",
+      "d1_decision": "Whether to retry, escalate, or abandon a failed attempt: price the accepted outcome, not the prompt, using the attempt ledger's first-pass and independent-evaluator verdicts.",
+      "surface": {
+        "type": "alert",
+        "rest_regions": ["R1b", "R2"],
+        "drilldown": ["R4a", "R4b", "R4c"],
+        "alert": ["ON-A1"]
+      },
+      "fields_shown": [
+        {"field": "attempt_number", "class": "M", "where": "R2 row attempt / R4c attempt boundary"},
+        {"field": "first_pass / accepted", "class": "M", "where": "R2 row / R4c rung"},
+        {"field": "test_executed_success", "class": "M", "where": "R4c independent-verification rung"},
+        {"field": "evaluator_independent", "class": "M", "where": "R4c rung (unknown until writer lands)"},
+        {"field": "WOC = 1/(1+r)", "class": "C", "where": "L-COMPOSITION / L-WORKFORCE"}
+      ],
+      "action": "Triage/decide: on a failed verification, retry or escalate (J2/J3) and set the retry budget by accepted outcome.",
+      "action_verbs": ["retry", "escalate", "cancel"],
+      "jobs": ["J1", "J2", "J3", "J4", "J7"],
+      "d3_projection": "P1 workflow_records + P2 attempt_evidence + P5 run_value",
+      "acceptance": "A failed verification raises ON-A1 whose item opens the attempt chain with first_pass/accepted and the independent test verdict; a bounded retry action is offered."
+    },
+    {
+      "rule": "6. Batch Discount",
+      "rule_number": 6,
+      "workforce": "autonomous",
+      "d1_decision": "What fraction of jobs to run in cheaper deferred batch mode vs on-demand, trading 50% cost for a 72-hour completion horizon.",
+      "surface": {
+        "type": "drill",
+        "rest_regions": [],
+        "drilldown": ["L-MONEY", "QUEUE"],
+        "alert": []
+      },
+      "fields_shown": [
+        {"field": "batch fraction (b)", "class": "P", "where": "L-MONEY batch scenario (explicit modeleds)"},
+        {"field": "batch_mode flag", "class": "M", "where": "P1 workflow_records (unknown until writer lands)"},
+        {"field": "provider batch pricing / horizon", "class": "X/P", "where": "L-MONEY reference"},
+        {"field": "batch queue depth", "class": "P", "where": "QUEUE (once batch exists)"}
+      ],
+      "action": "Budget: (future) split workstreams batch vs on-demand; today a modeled scenario toggle only.",
+      "action_verbs": ["budget"],
+      "jobs": ["J5", "J8"],
+      "d3_projection": "P10 batch + P1 workflow_records",
+      "acceptance": "The batch panel renders measurable:false with the missing batch_mode reason, or a measured fraction once the producer lands; never a fabricated number."
+    },
+    {
+      "rule": "7. Budget Ceiling",
+      "rule_number": 7,
+      "workforce": "autonomous",
+      "d1_decision": "Whether to raise or lower the budget cap, and what autonomous throughput the cap buys: T_max = Budget / (cost per job x (1 + retry)).",
+      "surface": {
+        "type": "rest",
+        "rest_regions": ["R1a", "R3a"],
+        "drilldown": ["L-MONEY", "R4c"],
+        "alert": ["ON-A3", "ON-A4"]
+      },
+      "fields_shown": [
+        {"field": "money.spend / money.burn", "class": "M", "where": "R3a (ON-G4)"},
+        {"field": "money.quota / money.wallet / money.leases", "class": "M", "where": "R3a (ON-G4)"},
+        {"field": "hard_cap / reserved / headroom", "class": "M", "where": "L-MONEY / R4c cost rung"},
+        {"field": "retry rate r", "class": "M", "where": "L-WORKFORCE / L-COMPOSITION"},
+        {"field": "T_max throughput projection", "class": "C/P", "where": "L-MONEY"},
+        {"field": "cap-raise decision", "class": "P", "where": "R1a decision item / AUDIT"}
+      ],
+      "action": "Decide/budget: raise or lower the budget cap (P0 raise-cap) and size autonomous throughput from the cap.",
+      "action_verbs": ["raise-cap", "budget"],
+      "jobs": ["J1", "J3", "J5", "J7"],
+      "d3_projection": "P7 spend_budget + P11 decision_ledger",
+      "acceptance": "R3a shows the five money values with unknown never $0.00; a money-risk raises ON-A3 and a cap change raises ON-A4 with a signed receipt."
+    },
+    {
+      "rule": "8. Cascade Rule",
+      "rule_number": 8,
+      "workforce": "autonomous",
+      "d1_decision": "Whether and how to escalate a failed attempt through model tiers (Flash -> Sonnet -> Opus -> Human), designed to keep human escalation under 1%.",
+      "surface": {
+        "type": "alert",
+        "rest_regions": ["R1b", "R2"],
+        "drilldown": ["R4b", "R4c", "L-WORKFORCE"],
+        "alert": ["ON-A1"]
+      },
+      "fields_shown": [
+        {"field": "escalation_from / escalation_to", "class": "M", "where": "R4c attempt rung (unknown until mechanism lands)"},
+        {"field": "escalation_reason", "class": "M", "where": "R4c attempt rung"},
+        {"field": "escalated-attempt cost", "class": "M", "where": "R4c cost rung"},
+        {"field": "E_x price ratio", "class": "C/X", "where": "L-WORKFORCE / L-MONEY"},
+        {"field": "escalation_rate / human_rate", "class": "P", "where": "L-WORKFORCE"}
+      ],
+      "action": "Intervene: escalate a failed attempt to the next tier (or human) and design the cascade bound to <1% human.",
+      "action_verbs": ["escalate", "interrupt"],
+      "jobs": ["J2", "J4", "J6"],
+      "d3_projection": "P9 escalation_cascade + P1 workflow_records",
+      "acceptance": "An escalation event shows from->to + reason + cost, or the dock states 'no cascade armed'; E_x is labeled [C]/[X]."
+    },
+    {
+      "rule": "9. SLA Buffer",
+      "rule_number": 9,
+      "workforce": "autonomous",
+      "d1_decision": "What SLA buffer to set and whether to batch: never batch jobs whose SLA is under 2x observed queue depth; always keep an on-demand fallback.",
+      "surface": {
+        "type": "alert",
+        "rest_regions": ["R2", "R3b"],
+        "drilldown": ["R4d", "L-WORKFORCE", "QUEUE"],
+        "alert": ["ON-A1", "ON-A2"]
+      },
+      "fields_shown": [
+        {"field": "queue depth", "class": "M", "where": "R2 counts / QUEUE / L-WORKFORCE"},
+        {"field": "queue_wait_ms / service_time_ms", "class": "M", "where": "R4d step timings (unknown until writer lands)"},
+        {"field": "due_at / deadline_slack", "class": "P", "where": "P1 workflow_records (unknown until writer lands)"},
+        {"field": "SLA breach rate / 2x rule", "class": "C", "where": "QUEUE / L-WORKFORCE"}
+      ],
+      "action": "Intervene: add an on-demand fallback and hold batch work when queue depth threatens the SLA.",
+      "action_verbs": ["hold", "fallback", "interrupt"],
+      "jobs": ["J2", "J4", "J6", "J8"],
+      "d3_projection": "P8 sla_queue + P1 workflow_records",
+      "acceptance": "R4d shows queue_wait/service_time as measured or explicit unknown; the 2x rule is computed only from measured values; a breach raises ON-A1/ON-A2."
+    },
+    {
+      "rule": "10. Outcome Multiplier",
+      "rule_number": 10,
+      "workforce": "value",
+      "d1_decision": "Which policy arm to keep, judged by outcomes per dollar (BVI = successful outcomes / (AI + human cost)) rather than by lowest cost.",
+      "surface": {
+        "type": "rest",
+        "rest_regions": ["R3a", "R3c"],
+        "drilldown": ["L-COMPOSITION", "L-MONEY", "P5"],
+        "alert": []
+      },
+      "fields_shown": [
+        {"field": "accepted/verified outcomes", "class": "M", "where": "L-COMPOSITION per-arm / R2 receipt"},
+        {"field": "total AI cost", "class": "M", "where": "R3a / L-MONEY"},
+        {"field": "human cost H", "class": "P", "where": "L-MONEY input (modeled)"},
+        {"field": "BVI = WOC/(C_job + H/W)", "class": "C", "where": "L-COMPOSITION headline"},
+        {"field": "arm comparison", "class": "C", "where": "L-COMPOSITION compare table"}
+      ],
+      "action": "Decide/audit: compare arms on outcomes per dollar and keep the value-maximizing policy; record the verdict.",
+      "action_verbs": ["decide", "record-decision"],
+      "jobs": ["J1", "J3", "J5", "J7"],
+      "d3_projection": "P5 run_value + P6 arm_comparison + P7 spend_budget",
+      "acceptance": "L-COMPOSITION shows accepted outcomes and cost per arm with BVI (or its explicit [P] gap); a compare-arm decision has a receipt."
+    }
+  ],
+  "jobs": [
+    {
+      "job": "J1",
+      "name": "Glance",
+      "frequency": "continuous; no interaction",
+      "cost_of_failure": "HIGH",
+      "primary_surface": {"type": "rest", "regions": ["R0", "R1", "R2", "R3a", "R3b", "R3c"]},
+      "drilldown": [],
+      "alert": [],
+      "fields_shown": ["ON-G1 system state+age", "ON-G6 epoch/worst age/stale/partial/unknown", "ON-G2 running/queued/failed/live + row sample", "ON-G3 risk row", "ON-G5 decision row", "ON-G4 five money values", "ON-G7 four marginals"],
+      "action": "none (read-only at rest)",
+      "rules": [1, 2, 5, 7, 10],
+      "walkthrough_ref": "job_walkthroughs.md#j1--glance",
+      "acceptance": "A screenshot at 1440x900 and 390x844 contains exactly one anchor for ON-G1..G7 in its canonical region (ia.md §4)."
+    },
+    {
+      "job": "J2",
+      "name": "Triage a stalled/failed run",
+      "frequency": "per incident",
+      "cost_of_failure": "HIGH",
+      "primary_surface": {"type": "alert", "regions": ["R1b"]},
+      "drilldown": ["R4a", "R4c", "R4b"],
+      "alert": ["ON-A1", "ON-A2"],
+      "fields_shown": ["run identity", "lifecycle state", "phase n/total", "attempt chain + retry_reason", "measured test verdict vs narration", "cost/lease state", "safe next action + blast radius"],
+      "action": "retry | escalate | cancel (safe-action preview)",
+      "rules": [1, 5, 8, 9],
+      "walkthrough_ref": "job_walkthroughs.md#j2--triage",
+      "acceptance": "R1b carries a failure item that opens R4c with the attempt chain; the offered action is a subset of packet.safe_actions."
+    },
+    {
+      "job": "J3",
+      "name": "Decide approve/cancel (and promote/retire)",
+      "frequency": "per gated run",
+      "cost_of_failure": "CRITICAL",
+      "primary_surface": {"type": "alert", "regions": ["R1a"]},
+      "drilldown": ["R4a", "R4b", "R4c"],
+      "alert": ["ON-A4"],
+      "fields_shown": ["target + decision kind", "candidate_sha", "gate id", "control epoch", "authority", "eligibility token", "scope/blast radius", "budget effect", "reversibility", "receipt"],
+      "action": "approve | promote | cancel | retire | raise-cap (P0; typed confirmation for irreversible)",
+      "rules": [5, 7, 8, 10],
+      "walkthrough_ref": "job_walkthroughs.md#j3--decide",
+      "acceptance": "R1a shows the pending decision with its eligibility; the action set equals ALLOWED_TRANSITIONS intersect packet.safe_actions."
+    },
+    {
+      "job": "J4",
+      "name": "Inspect evidence and step timings",
+      "frequency": "per decision/review",
+      "cost_of_failure": "HIGH",
+      "primary_surface": {"type": "drill", "regions": ["R4c", "R4d", "L-WORKFORCE"]},
+      "drilldown": ["R4c", "R4d", "L-WORKFORCE"],
+      "alert": [],
+      "fields_shown": ["evidence ladder: narration/measured/independent test/commit/cost/decision/registry", "step timings: queue_wait/service_time/first_token/duration/retries/tokens.answer/tokens.explanation/cost/exit_code/verification"],
+      "action": "none (read-only) — evidence informs J2/J3",
+      "rules": [1, 2, 3, 5, 8, 9],
+      "walkthrough_ref": "job_walkthroughs.md#j4--inspect",
+      "acceptance": "R4c shows one [data-attempt-boundary] per attempt; R4d shows the exact timing field set with [data-state=measured|unknown]; an unknown never renders 0."
+    },
+    {
+      "job": "J5",
+      "name": "Watch spend",
+      "frequency": "continuous; decisions at thresholds",
+      "cost_of_failure": "HIGH",
+      "primary_surface": {"type": "rest", "regions": ["R3a"]},
+      "drilldown": ["L-MONEY"],
+      "alert": ["ON-A3"],
+      "fields_shown": ["spend", "burn", "provider quota", "wallet/token headroom", "reserved-unspent leases", "money-risk exception", "settlement status", "cost provenance (measured|estimated|unknown)"],
+      "action": "raise-cap (P0) | budget scenario (EPM/batch)",
+      "rules": [3, 4, 6, 7, 10],
+      "walkthrough_ref": "job_walkthroughs.md#j5--watch-spend",
+      "acceptance": "R3a shows all five money values plus the exception marker; unknown renders as explicit unknown, never $0.00."
+    },
+    {
+      "job": "J6",
+      "name": "Intervene per worker/session",
+      "frequency": "per incident",
+      "cost_of_failure": "HIGH",
+      "primary_surface": {"type": "drill", "regions": ["R4b"]},
+      "drilldown": ["R4b"],
+      "alert": ["ON-A1", "ON-A5"],
+      "fields_shown": ["worker/session identity", "ownership (owned|external)", "status", "current command", "lease", "logs", "action target/authority/reversibility/receipt"],
+      "action": "attach | detach | copy-session | steer | interrupt | stop | respawn | rm",
+      "rules": [8, 9],
+      "walkthrough_ref": "job_walkthroughs.md#j6--intervene",
+      "acceptance": "Each action chip carries target, authority, reversibility, confirmation, and receipt; exactly one event stream is open."
+    },
+    {
+      "job": "J7",
+      "name": "Audit what happened",
+      "frequency": "per session/campaign close",
+      "cost_of_failure": "MED-HIGH",
+      "primary_surface": {"type": "drill", "regions": ["L-REGISTRY", "AUDIT", "R1c"]},
+      "drilldown": ["L-REGISTRY", "AUDIT"],
+      "alert": ["ON-A4"],
+      "fields_shown": ["who did what/when/authority", "decision record", "registry lineage (supersedes/causes)", "recording coverage"],
+      "action": "record-decision (P0/P1) | view receipt",
+      "rules": [1, 5, 7, 10],
+      "walkthrough_ref": "job_walkthroughs.md#j7--audit",
+      "acceptance": "A decision opens a receipt; L-REGISTRY shows canonical lineage distinct from the runtime trace; recording coverage shows recorded|missing."
+    },
+    {
+      "job": "J8",
+      "name": "Start / enqueue work",
+      "frequency": "per campaign/fill",
+      "cost_of_failure": "MED-HIGH",
+      "primary_surface": {"type": "drill", "regions": ["QUEUE"]},
+      "drilldown": ["QUEUE"],
+      "alert": [],
+      "fields_shown": ["what will be enqueued", "budget/lease", "queue depth", "batch flags", "clear/enqueue confirmation"],
+      "action": "enqueue | clear | reinterleave (confirm doors)",
+      "rules": [6, 9],
+      "walkthrough_ref": "job_walkthroughs.md#j8--enqueue",
+      "acceptance": "Unbudgeted work cannot be enqueued (admission fail-closed); the preview shows target/order/budget and returns a receipt."
+    },
+    {
+      "job": "J9",
+      "name": "Route / choose the model for a task",
+      "frequency": "per task type/campaign",
+      "cost_of_failure": "MEDIUM",
+      "primary_surface": {"type": "drill", "regions": ["R4a", "L-COMPOSITION"]},
+      "drilldown": ["R4a", "L-COMPOSITION"],
+      "alert": [],
+      "fields_shown": ["recommendation inputs + evidence", "per-model Grit/first-pass", "cost/correctness simulation", "coverage"],
+      "action": "route: choose the model/policy arm",
+      "rules": [1, 2, 5],
+      "walkthrough_ref": "job_walkthroughs.md#j9--route",
+      "acceptance": "Routing inputs show beside the run context with their evidence class; no peer routing board is required."
+    },
+    {
+      "job": "J10",
+      "name": "Manage background Claude sessions",
+      "frequency": "per session",
+      "cost_of_failure": "MEDIUM",
+      "primary_surface": {"type": "drill", "regions": ["L-SESSIONS"]},
+      "drilldown": ["L-SESSIONS", "R4b"],
+      "alert": ["ON-A5"],
+      "fields_shown": ["roster with ownership", "daemon status/PID", "owned vs external controls", "logs"],
+      "action": "start | stop | respawn | rm | steer | logs",
+      "rules": [],
+      "walkthrough_ref": "job_walkthroughs.md#j10--claude-sessions",
+      "acceptance": "Owned actions only on OWNED sessions; daemon status is labeled; stop preserves the conversation for respawn."
+    },
+    {
+      "job": "J11",
+      "name": "Record / close the session",
+      "frequency": "per session close",
+      "cost_of_failure": "HIGH",
+      "primary_surface": {"type": "drill", "regions": ["AUDIT", "R1c", "L-REGISTRY"]},
+      "drilldown": ["AUDIT", "L-REGISTRY"],
+      "alert": [],
+      "fields_shown": ["session record", "decision records", "beliefs", "scoreboard", "reflections", "recording coverage"],
+      "action": "session close (record) | decision record",
+      "rules": [1, 5, 7, 10],
+      "walkthrough_ref": "job_walkthroughs.md#j11--record-close",
+      "acceptance": "A session close writes its record and shows a receipt; an unrecorded consequential act is surfaced as a process item in R1c."
+    }
+  ],
+  "decision_coverage": {
+    "note": "Every d1 operator_decision must appear in the surface map. rule_number -> surface that carries it.",
+    "1": {"decision": "model trust under perturbation", "surface": "rest R2/R3c + drill L-WORKFORCE + alert ON-A1"},
+    "2": {"decision": "narration tax per task type", "surface": "drill R4d + L-WORKFORCE"},
+    "3": {"decision": "budget the N^2 arc / one-way door", "surface": "drill L-MONEY + alert ON-A3 + record AUDIT"},
+    "4": {"decision": "energy scenario + hedge horizon", "surface": "drill L-MONEY + alert ON-A3"},
+    "5": {"decision": "retry/escalate/abandon on accepted outcome", "surface": "rest R1b/R2 + drill R4c/R4b + alert ON-A1"},
+    "6": {"decision": "batch vs on-demand split", "surface": "drill L-MONEY/QUEUE"},
+    "7": {"decision": "raise/lower the budget cap; size throughput", "surface": "rest R1a/R3a + drill L-MONEY + alert ON-A3/ON-A4"},
+    "8": {"decision": "escalate through tiers; bound human escalation", "surface": "rest R1b/R2 + drill R4b/R4c + alert ON-A1"},
+    "9": {"decision": "set SLA buffer; 2x queue depth", "surface": "rest R2/R3b + drill R4d/QUEUE + alert ON-A1/ON-A2"},
+    "10": {"decision": "keep the value-maximizing arm (BVI)", "surface": "rest R3a/R3c + drill L-COMPOSITION + record AUDIT"}
+  },
+  "rule_surface_summary": {
+    "rest": [1, 5, 7, 9, 10],
+    "drill": [2, 3, 4, 6, 8, 9],
+    "alert": [1, 5, 7, 8, 9],
+    "note": "a rule may occupy more than one surface; the primary surface is in rules[].surface.type"
+  },
+  "alert_rule_map": {
+    "ON-A1": [1, 5, 8, 9],
+    "ON-A2": [9],
+    "ON-A3": [3, 4, 7],
+    "ON-A4": [7],
+    "ON-A5": [8],
+    "ON-A6": []
+  }
+}

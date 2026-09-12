@@ -1,0 +1,105 @@
+name: control_room_refresh_rework
+question: >-
+  Rework the Control Room refresh integration so BOTH sides survive. The merge (0244f3315)
+  resolved apps/control_room/static/app.js to the refresh side WHOLESALE: main's step-5/6/7
+  read views are GONE from the frontend (main's app.js has ~43 operations/surfaces markers
+  including loadOperations()/loadSurfaces(); the merged tree has ~1), taking A7's
+  unavailability rendering, the Operations + Surfaces boards, and the step-12 batch lane out
+  of the UI. server.py kept main's routes; index.html was partially merged. Port main's
+  read-view code into the refreshed presentation (the refresh's design language stays),
+  add the durable feature-parity test that would have caught this loss, and make the
+  control-room tests + the render gate's fixture check pass. Acceptance: every feature in
+  the a1 checklist is present in the refreshed UI and pinned by
+  tests/test_control_room_feature_parity.py; both the
+  static feature anchors AND the refreshed design are present in one tree.
+version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: false
+repeatable: false
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: false
+    context:
+      domain_context: >-
+        canonical_sources: [the merge parents in this clone's history — main side
+        1457b9299 (the merge's second parent) and refresh side b16891b3a (the first parent);
+        apps/control_room/static/ (app.js, index.html, shell.js, keyed-list.js, board-fleet.js,
+        style.css + the refresh's charts.js/parity.js/visuals.js), apps/control_room/server.py
+        + routes/, tests/test_admin_frontend.py, tests/test_control_room_parity.py,
+        scripts/verify_control_room_rendering.py]
+        policies: [keep BOTH sides — the refreshed design AND every main-side read view;
+        never weaken the parity test to make it pass; vanilla JS only; no build step;
+        preserve SSE contracts; the live portal on the host is not to be restarted or touched;
+        keep the tree lint-clean (the CI lint job runs ruff over src/ scripts/ apps/ tests/)]
+        verification: [tests/test_control_room_feature_parity.py (new), tests/test_admin_frontend.py,
+        tests/test_admin_server.py, tests/test_control_room_parity.py, tests/test_fast_path_gate.py,
+        tests/test_relabel_tree_gate.py, scripts/verify_control_room_rendering.py --check-fixtures]
+    phases:
+      - name: a1_parity_audit
+        kind: agent
+        scope: implementation
+        timeout: 1800
+        prompt: |
+          GOAL: {goal}
+          1. Diff the UI surfaces between the merge's TWO parents in this clone's history:
+             main side `git show 1457b9299:...`, refresh side `git show b16891b3a:...`, and the
+             current tree — for apps/control_room/static/*.js, index.html, style.css, and
+             apps/control_room/server.py + routes/.
+          2. Enumerate EVERY main-side (1457b9299) read-view feature missing or degraded in
+             the current tree, with exact anchors: function names (e.g. loadOperations,
+             loadSurfaces and their helpers/state), DOM ids/classes they bind, event wiring,
+             and the A7 semantics (unavailability rendered, never blanked). At minimum cover
+             the step-5/6/7 Operations + Surfaces boards, the A7 unavailability rendering,
+             the step-12 batch lane, and any routing/keyed-list behavior main added.
+          3. Write the checklist to docs/reviews/control_room_refresh_feature_parity.md
+             (feature → main anchor → where it must live post-rework).
+          4. Write tests/test_control_room_feature_parity.py asserting each checklist anchor
+             is present in the refreshed static modules (read the files, assert the
+             function/identifier/DOM anchors; keep it a real assertion, not a snapshot).
+             It is EXPECTED TO FAIL right now — that failure is the proof of the gap; run it
+             once and record the failing list in the checklist doc.
+          Do NOT modify app.js/index.html in this phase — audit + test only.
+      - name: a2_rework
+        kind: agent
+        scope: implementation
+        timeout: 2400
+        prompt: |
+          Port every feature from docs/reviews/control_room_refresh_feature_parity.md into
+          the refreshed UI so tests/test_control_room_feature_parity.py passes WITHOUT being
+          weakened. Rules:
+          - The refresh's design language stays (its layout/visual system, its modules) —
+            integrate main's read-view code INTO it; never revert the refresh wholesale and
+            never drop a single checklist feature.
+          - index.html: restore the anchors the boards and A7 need, in the refreshed markup.
+          - Keep the tree lint-clean for ruff (CI runs it over src/ scripts/ apps/ tests/).
+          - Run the parity test as you work; it must end green. Then run:
+            python3 scripts/verify_control_room_rendering.py --check-fixtures
+            (fixture-only; the browser layer is unavailable in containers — it must PASS).
+          - Do NOT touch apps/control_room/verification/integration/ (the screenshot set is
+            regenerated on the host after this run).
+      - name: a3_verify
+        kind: test
+        scope: implementation
+        timeout: 900
+        tests:
+          - tests/test_control_room_feature_parity.py
+          - tests/test_admin_frontend.py
+          - tests/test_admin_server.py
+          - tests/test_control_room_parity.py
+          - tests/test_fast_path_gate.py
+          - tests/test_relabel_tree_gate.py
+        prompt: |
+          The declared target verifies the rework end to end. Fix failures in the code;
+          never weaken a pin — the parity test is the acceptance for this work order.
+factors:
+  - {name: model, levels: [deepseek/deepseek-v4-flash]}
+design: factorial
+rules: []
+metrics: []
+writeup: {format: lab_book, sections: [question]}
+stop: {budget_usd: 3.0, max_attempts: 1}

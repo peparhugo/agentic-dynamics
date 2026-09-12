@@ -1,0 +1,168 @@
+{
+  "schema": "research-corpus/v1",
+  "family": "craft",
+  "family_label": "Craft, patterns & reference standards",
+  "family_budget": 40,
+  "budget_band_pm20": [
+    32,
+    48
+  ],
+  "seeds_file": "experiments/research/control_room/seeds/craft.txt",
+  "seed_products": [
+    "MDN (SVG/CSS/a11y)",
+    "web.dev",
+    "NN/g",
+    "Refactoring UI",
+    "Material/Apple HIG (density)",
+    "Smashing Magazine",
+    "CSS-Tricks SVG archive",
+    "SVG-Tutorial",
+    "W3C/WCAG 2.2"
+  ],
+  "stored_sources": 78,
+  "facet_records": 48,
+  "seed_urls": 102,
+  "excluded_from_facet_corpus": [
+    {
+      "uri": "https://developer.apple.com/design/human-interface-guidelines/",
+      "reason": "JS shell - 0 chars extracted; HIG platform pages are client-rendered, so the density/layout guidance did not extract (named seed, unavailable to this tool)"
+    },
+    {
+      "uri": "https://developer.apple.com/design/human-interface-guidelines/layout",
+      "reason": "JS shell - 0 chars (Apple HIG)"
+    },
+    {
+      "uri": "https://developer.apple.com/design/human-interface-guidelines/typography",
+      "reason": "JS shell - 0 chars (Apple HIG)"
+    },
+    {
+      "uri": "https://developer.apple.com/design/human-interface-guidelines/color",
+      "reason": "JS shell - 0 chars (Apple HIG)"
+    },
+    {
+      "uri": "https://developer.apple.com/design/human-interface-guidelines/accessibility",
+      "reason": "JS shell - 0 chars (Apple HIG)"
+    },
+    {
+      "uri": "https://m3.material.io/styles/typography/overview",
+      "reason": "JS shell - 0 chars extracted (Material 3 SPA)"
+    },
+    {
+      "uri": "https://m2.material.io/design/layout/applying-density.html",
+      "reason": "JS shell - 0 chars extracted; the named Material DENSITY page is client-rendered, so it is kept for provenance but contributes no facet record"
+    },
+    {
+      "uri": "https://m3.material.io/styles/color/system/overview",
+      "reason": "JS shell - 0 chars (Material 3 SPA)"
+    },
+    {
+      "uri": "https://m3.material.io/styles/elevation/overview",
+      "reason": "JS shell - 0 chars (Material 3 SPA)"
+    },
+    {
+      "uri": "https://m3.material.io/styles/motion/overview",
+      "reason": "JS shell - 0 chars (Material 3 SPA)"
+    },
+    {
+      "uri": "https://fonts.google.com/knowledge",
+      "reason": "JS shell - 0 chars extracted (Google Fonts knowledge)"
+    },
+    {
+      "uri": "https://css-tricks.com/using-svg/",
+      "reason": "overlaps the SVG compendium (mega-list) and icon-font-vs-SVG; kept in sources.jsonl"
+    },
+    {
+      "uri": "https://css-tricks.com/icon-fonts-vs-svg/",
+      "reason": "icon delivery covered by mega-list/symbol + NN/g icon usability"
+    },
+    {
+      "uri": "https://css-tricks.com/svg-symbol-good-choice-icons/",
+      "reason": "symbol technique covered by MDN <use> + Smashing part 6"
+    },
+    {
+      "uri": "https://css-tricks.com/lodge/svg/",
+      "reason": "course landing duplicate of the SVG compendium"
+    },
+    {
+      "uri": "https://developer.mozilla.org/en-US/docs/Web/SVG/Tutorial/Basic_Shapes",
+      "reason": "covered by the SVG tutorial hub + viewBox/paths references"
+    },
+    {
+      "uri": "https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_container_queries",
+      "reason": "container queries covered by web.dev Learn Responsive Design + Every Layout"
+    },
+    {
+      "uri": "https://developer.mozilla.org/en-US/docs/Web/Accessibility/Understanding_WCAG",
+      "reason": "normative bar carried by W3C WCAG 2.2 Quickref + WAI principles"
+    },
+    {
+      "uri": "https://www.smashingmagazine.com/2025/10/smashing-animations-part-5-building-adaptive-svgs/",
+      "reason": "adaptive-SVG symbols covered by MDN <use> + Smashing part 6"
+    },
+    {
+      "uri": "https://www.smashingmagazine.com/2021/03/svg-generators/",
+      "reason": "tool round-up; technique evidence carried by the path/optimisation articles"
+    },
+    {
+      "uri": "https://www.smashingmagazine.com/2025/08/automating-design-systems-tips-resources/",
+      "reason": "tooling round-up; token naming carried by naming-best-practices"
+    },
+    {
+      "uri": "https://practicaltypography.com/",
+      "reason": "book landing page; the summary-of-key-rules page carries the technique"
+    }
+  ],
+  "missing_or_unstored": [
+    "Material Design density (m3.material.io / m2.material.io) - JS shell, not text-extractable from this egress",
+    "Apple Human Interface Guidelines density/layout - JS shell, not text-extractable from this egress",
+    "fonts.google.com/knowledge - JS shell (0 chars)",
+    "Original Smashing slugs for svg-text-animation/motion-design-principles - HTTP 404; replaced with the 2025 SVG/optimisation/path series",
+    "https://www.nngroup.com/articles/dashboard-design/ - HTTP 404; replaced with /dashboards-preattentive/",
+    "https://www.nngroup.com/articles/notification-and-messaging-guidelines/ - HTTP 404; not substituted (notifications covered by Inclusive Components)"
+  ],
+  "source_catalog": "experiments/research/control_room/sources.jsonl",
+  "source_dir": "experiments/research/control_room/sources/",
+  "facet_corpus": "experiments/research/control_room/corpus/craft.jsonl",
+  "tool": "scripts/research_fetch.py",
+  "fetched_at_range": [
+    "2026-09-11T01:12:12.528487+00:00",
+    "2026-09-11T01:14:06.583936+00:00"
+  ],
+  "stop_reason": "Stopped at the +20% band ceiling: 48 facet records (band 32-48) from 102 URL seeds; 78 craft sources stored. A first fetch pass also sent the seed file's section comments as URLs (they failed ValueError); the comments were then stripped from seeds/craft.txt. Curated to 48 by dropping JS-shell SPAs (Material/Apple HIG/Fonts Knowledge), duplicates, and technique-overlapping pages, all listed in excluded_from_facet_corpus. VOCABULARY DRIFT (per r1 \u00a73.1): added techniques live-regions (MDN Live Regions), responsive-layout (web.dev/NN-g/Every Layout), lazy-rendering (web.dev content-visibility), svg-optimization (Smashing part 4), aria (Smashing ARIA), table-semantics (W3C Tables); aesthetics used: unspecified/light-minimal/hybrid-theme/dark-dense/precision-instrument/editorial. No live-KB writes.",
+  "coverage_note": "F5 is the normative/craft family. STRONG: accessibility (WCAG 2.2 Quickref + contrast SC + WAI tables/APG + MDN live regions/forced-colors + web.dev Learn Accessibility), SVG craft (MDN tutorial/paths/text/use/viewBox, four CSS-Tricks archive pieces, SVG-Tutorial, four Smashing SVG articles), motion (MDN/web.dev reduced-motion, NN/g microinteractions, spring physics), typography (Practical Typography, Smashing fintech typefaces), and token/theming systems (MDN custom properties/color-mix, design-token naming). GAP: the named Material/Apple HIG DENSITY bar is unavailable to text extraction (client-rendered SPAs return 0 chars), so the density ladder is evidenced indirectly via Every Layout, web.dev Learn Responsive Design, NN/g table density and Refactoring UI - r3/r5 must carry that caveat. Some SVG archive pieces are dated (2014-2019) but canonical and kept for that reason. No performance-measured evidence beyond web.dev content-visibility; no repo-level a11y audits, so accessibility_evidence is audited only on standards bodies.",
+  "facet_rollup": {
+    "by_category": {
+      "design-craft": 28,
+      "reference-standard": 20
+    },
+    "top_techniques": {
+      "micro-visual": 12,
+      "theme-aware-svg": 11,
+      "motion-easing": 7,
+      "reduced-motion": 6,
+      "colorblind-safe-status": 6,
+      "dark-first-theming": 6,
+      "design-tokens": 6,
+      "focus-management": 6,
+      "path-tracer": 5,
+      "accessible-svg": 5,
+      "accent-economy": 5,
+      "type-scale": 5,
+      "icon-family": 4,
+      "forced-colors": 4,
+      "keyboard-first": 4,
+      "progressive-disclosure": 4,
+      "master-detail": 4,
+      "print-safe-svg": 3
+    },
+    "demonstrates_true": 44,
+    "open_implementation_true": 31,
+    "accessibility_audited": 12,
+    "by_authority": {
+      "practitioner": 18,
+      "standards-body": 14,
+      "independent-analysis": 10,
+      "vendor-primary": 6
+    }
+  }
+}

@@ -1,0 +1,293 @@
+{
+  "schema": "control_room_rule_map/v1",
+  "generated_by": "d1_rule_decision_map",
+  "workflow": "workflows/repository/control_room_rules_design.yaml",
+  "mandate": {
+    "rules_extract": "docs/research/control_room_rules.md",
+    "pinned_sources": "docs/research/control_room_rules_sources.md",
+    "engine_chain": "cell -> compile -> jobs -> attempts -> ledger -> measurement -> policy -> compare -> adapt"
+  },
+  "field_legend": {
+    "status": "published rule status from the frozen mandate: 'instrumented [M]' | 'proposed [C]' | 'decided'",
+    "evidence_class": "provenance of the rule's inputs per the frozen mandate: M measured | C computed | P modeled/policy | X external",
+    "existing_backend_source": "a real file/table/endpoint in THIS repo, or the literal NONE. Declaration in LEDGER_FIELDS without a writer is NOT a source; it is listed in missing_record_fields.",
+    "surface": "the PRIMARY operator surface: rest = visible at rest on the resting screen | drill = requires selecting a run/lens | alert = raised to the operator for triage",
+    "surfaces": "every surface the rule would occupy once implemented",
+    "missing_record_fields": "fields the backend does not emit today (gaps, not assumptions)"
+  },
+  "operator_loop": ["glance", "triage", "decide", "inspect", "intervene", "budget", "audit"],
+  "workforce_groups": [
+    {"group": "augmented", "rules": [1, 2, 3, 4, 5], "basis": "human + AI, per session (frozen mandate: Rules 1-5)"},
+    {"group": "autonomous", "rules": [6, 7, 8, 9], "basis": "bounded autonomy, per job (frozen mandate: Rules 6-9)"},
+    {"group": "value", "rules": [10], "basis": "business value (frozen mandate: Rule 10)"}
+  ],
+  "loop_coverage": {
+    "glance": [1, 2, 5, 7, 10],
+    "triage": [1, 5, 8, 9],
+    "decide": [5, 7, 8, 10],
+    "inspect": [1, 2, 3, 5, 8, 9],
+    "intervene": [8, 9],
+    "budget": [3, 4, 6, 7, 10],
+    "audit": [1, 5, 7, 10]
+  },
+  "loop_to_jobs": {
+    "glance": "J1",
+    "triage": "J2",
+    "decide": "J3",
+    "inspect": "J4",
+    "intervene": "J6",
+    "budget": "J5",
+    "audit": "J7"
+  },
+  "rules": [
+    {
+      "rule": "1. Grit (Ground-Truth Integrity)",
+      "rule_number": 1,
+      "workforce": "augmented",
+      "status": "instrumented [M]",
+      "operator_decision": "Which models may be trusted with unsupervised work at a given perturbation strength: default-route to high-Grit models and exclude low-Grit models from autonomous work.",
+      "loop_stages": ["glance", "triage", "inspect", "audit"],
+      "evidence_fields": [
+        {"field": "test_executed_success", "class": "M", "source": "experiment_spec.py:410; ledger_ingestion.py:264; test_runner.py:151-153"},
+        {"field": "perturbation_strength", "class": "M", "source": "experiment_spec.py:409; ledger_ingestion.py:181"},
+        {"field": "operator / perturbation_class", "class": "M", "source": "measurement/perturb.py:599-667; canonical_corpus.resolve_findings"},
+        {"field": "model", "class": "M", "source": "experiment_spec.py:353"},
+        {"field": "G(s) grit summary", "class": "C", "source": "scripts/lab_grit.py:277"}
+      ],
+      "evidence_class": "M/C",
+      "existing_backend_source": "ledger AttemptRecord fields test_executed_success + perturbation_strength (experiment_spec.py:409-410; writers knowledge/ledger_ingestion.py:180-181,264-266, runtime/test_runner.py:151-153, scripts/verify_tests.py:71-73); derived by scripts/lab_grit.py:277 and published at apps/website/data.js labs.grit (~:4998). No Control Room endpoint or LEDGER projection exposes Grit or the per-attempt fields.",
+      "missing_record_fields": ["room projection of test_executed_success by model/operator", "room projection of perturbation_strength coverage", "G(s) per strength on /api/glance or a Grit lens", "per-attempt operator label in the live run sample"],
+      "surface": "rest",
+      "surfaces": ["rest", "alert", "drill"],
+      "action": "Route: default-route to high-Grit models; exclude low-Grit models from unsupervised jobs (J9 / R4a routing).",
+      "cost_of_missing": "A low-Grit model stays in unsupervised production; correctness silently collapses under degraded input and the operator cannot see which model or operator caused it.",
+      "acceptance_walkthrough": "1. Open R0 (J1). 2. Confirm a Grit/fleet-quality signal is present for the active models. 3. Drill the run's R4c evidence ladder and confirm the model's measured test_executed_success and perturbation_strength. PASS: an at-rest Grit signal exists and each run row carries its model's measured test_executed_success; FAIL: Grit appears only on the website, never in the room."
+    },
+    {
+      "rule": "2. Explanation Tax (epsilon)",
+      "rule_number": 2,
+      "workforce": "augmented",
+      "status": "instrumented [M]",
+      "operator_decision": "Whether to pay the narration tax for a task type: keep verbose reasoning only where auditability is worth the overhead, and force silent mode where it is waste.",
+      "loop_stages": ["glance", "inspect", "budget"],
+      "evidence_fields": [
+        {"field": "tokens_answer", "class": "M", "source": "experiment_spec.py:385; opencode.py:720-724; models.py:115-116"},
+        {"field": "tokens_explanation", "class": "M", "source": "experiment_spec.py:386; opencode.py:720-724; models.py:115-116"},
+        {"field": "thinking_ratio (epsilon proxy)", "class": "C", "source": "measurement/efficiency.py:257"},
+        {"field": "flail rate (sessions producing zero code)", "class": "C", "source": "DERIVED: sessions.parquet code_lines==0 / files_changed==0 (sync_data.py:75,82); no named field"},
+        {"field": "narration_rate / avg_narration_penalty", "class": "H", "source": "apps/website/data.js models[].narration_rate (:139-140) - currently null"}
+      ],
+      "evidence_class": "M/C",
+      "existing_backend_source": "answer/explanation token split is EMITTED (experiment_spec.py:385-386; adapters/opencode.py:720-724; runtime/story/models.py:115-116,171-172). thinking_ratio computed in measurement/efficiency.py:257. Website narration_rate/avg_narration_penalty fields exist but are null. No Control Room endpoint exposes the split; there is no named flail field.",
+      "missing_record_fields": ["named flail field (zero-code session) in the ledger", "per-model narration penalty aggregation", "room surface for answer/explanation tokens", "silent-mode policy toggle surfaced as an arm"],
+      "surface": "drill",
+      "surfaces": ["drill", "budget"],
+      "action": "Intervene: set the narration/silent-inference policy for the task type (pay the tax only for auditable work).",
+      "cost_of_missing": "Operators pay a 0.3%-30% narration penalty on routine work (or lose auditability on consequential work) with no visible split to decide which.",
+      "acceptance_walkthrough": "1. Open R4d step timings (J4). 2. Select an attempt and confirm tokens.answer and tokens.explanation are both shown. 3. Confirm the model's narration penalty is visible in L-WORKFORCE. PASS: answer and explanation tokens are separately rendered and a per-model narration penalty is present; FAIL: only a single token total is shown."
+    },
+    {
+      "rule": "3. Snowball Rule (N^2)",
+      "rule_number": 3,
+      "workforce": "augmented",
+      "status": "proposed [C]",
+      "operator_decision": "Whether to commit to a compounding (one-way-door) architecture and how to budget the N-session cost arc before the quadratic growth locks in.",
+      "loop_stages": ["inspect", "budget"],
+      "evidence_fields": [
+        {"field": "session arc cost (session1_cost, session5_cost)", "class": "M", "source": "scripts/lab_story_arc.py:149-150; sessions.parquet cost_usd (sync_data.py:67)"},
+        {"field": "snowball_factor (S5/S1)", "class": "C", "source": "scripts/lab_story_arc.py:139-142"},
+        {"field": "v velocity (code_lines / session)", "class": "C", "source": "sync_data.py:82 code_lines; lab_story_arc.py:128-135"},
+        {"field": "beta context inflation", "class": "P", "source": "website design_parameters.beta (~:3687); calibrated, not measured"}
+      ],
+      "evidence_class": "C/P",
+      "existing_backend_source": "scripts/lab_story_arc.py (snowball_factor:139-142, session costs:149-150) reads the canonical corpus (canonical_corpus.load_canonical_tables) and publishes apps/website/data.js labs.story_arc (~:5546); design_parameters.beta (~:3687). beta is a calibrated input, not measured. No Control Room endpoint projects the arc or beta.",
+      "missing_record_fields": ["per-session cost arc in the room", "velocity (code_lines/session) by model", "beta provenance (calibrated vs measured) surfaced with the projection", "one-way-door / architecture decision marker"],
+      "surface": "drill",
+      "surfaces": ["drill", "budget"],
+      "action": "Budget: decide the architecture on the projected N^2 curve and reserve the multi-session cost before committing (one-way door).",
+      "cost_of_missing": "A one-way-door architecture is chosen without seeing the quadratic cost arc; the overrun appears only after the compounding is irreversible.",
+      "acceptance_walkthrough": "1. Open L-MONEY or the story-arc drill-down. 2. Confirm session1..sessionN costs and the snowball_factor are shown for a selected story. 3. Confirm beta is labeled calibrated [P]. PASS: the arc trend and its beta provenance are visible before an architecture decision; FAIL: only a single total cost is shown."
+    },
+    {
+      "rule": "4. EPM Horizon",
+      "rule_number": 4,
+      "workforce": "augmented",
+      "status": "proposed [C]",
+      "operator_decision": "Which energy-price scenario and hedge horizon to budget against, and the year local energy costs would flip the model/provider selection.",
+      "loop_stages": ["budget"],
+      "evidence_fields": [
+        {"field": "EPM baseline / aggressive rate", "class": "X", "source": "apps/website/data.js design_parameters.epm_baseline (~:3717), epm_aggressive (~:3722)"},
+        {"field": "energy scenario ranking", "class": "X", "source": "apps/website/data.js energy_ranking (~:3430)"},
+        {"field": "energy_per_token constants", "class": "P", "source": "measurement/efficiency.py ENERGY_PER_* (:30-31)"},
+        {"field": "energy_total_j / quality_per_joule", "class": "C", "source": "measurement/efficiency.py (:269-278); build_data.py:193-194"}
+      ],
+      "evidence_class": "X/P",
+      "existing_backend_source": "apps/website/data.js energy_ranking (~:3430), design_parameters.epm_baseline (~:3717)/epm_aggressive (~:3722), external_sources (~:3716); energy constants in measurement/efficiency.py:30-31 and computed energy_total_j/quality_per_joule in build_data.py:193-194. EPM(t) itself is an external/modeled scenario. No Control Room endpoint and no ledger field carries energy price.",
+      "missing_record_fields": ["EPM(t) scenario field in the room", "provider/region split for energy prices", "horizon alert when the flip year approaches", "measured (not modeled) energy cost per session"],
+      "surface": "drill",
+      "surfaces": ["drill", "budget", "alert"],
+      "action": "Budget: pick the energy scenario and hedge horizon; recalibrate EPM for the operator's region.",
+      "cost_of_missing": "Long-horizon compute inflation is invisible; the model/provider selection is made without the horizon at which local energy flips it.",
+      "acceptance_walkthrough": "1. Open the money/budget lens. 2. Confirm the active EPM scenario and annual rate are shown next to spend. 3. Confirm the modeled [P]/[X] provenance is labeled. PASS: the operator can see and switch the EPM scenario with its provenance; FAIL: energy is absent from the room."
+    },
+    {
+      "rule": "5. First-Pass Rule",
+      "rule_number": 5,
+      "workforce": "augmented",
+      "status": "instrumented [M]",
+      "operator_decision": "Whether to retry, escalate, or abandon a failed attempt: price the accepted outcome, not the prompt, using the attempt ledger's first-pass and independent-evaluator verdicts.",
+      "loop_stages": ["glance", "triage", "decide", "inspect", "audit"],
+      "evidence_fields": [
+        {"field": "attempt_number", "class": "M", "source": "experiment_spec.py:362; workflow_runner.py:2793; run_cap_grit_grid.py:146"},
+        {"field": "accepted / first_pass", "class": "M", "source": "experiment_spec.py:377-379; workflow_runner.py:2795-2796"},
+        {"field": "evaluator_independent", "class": "M", "source": "experiment_spec.py:380 - DECLARED, NO WRITER"},
+        {"field": "test_executed_success", "class": "M", "source": "test_runner.py:151-153; verify_tests.py:71-73"},
+        {"field": "WOC = 1/(1+r)", "class": "C", "source": "website calculator.woc_ratio (~:1492); aggregate_workflow_metrics.py:64-73"}
+      ],
+      "evidence_class": "C",
+      "existing_backend_source": "attempt_number/accepted/first_pass EMITTED on the workflow-run ledger (experiment_spec.py:362,377-379; runtime/workflow_runner.py:2793-2796); test_executed_success from runtime/test_runner.py. evaluator_independent has NO writer (declared only). apps/website/data.js publishes derived.overall_pass_rate (~:1497) and verdicts.cap_2b verified_success_rate (~:6634). No Control Room endpoint exposes first_pass/accepted; /api/glance shows only attempt.number.",
+      "missing_record_fields": ["evaluator_independent (declared, never written)", "first_pass / accepted in the live run sample", "per-task/per-model first-pass coverage", "cost-per-accepted-outcome on the room", "room projection of the attempt chain (parent_attempt_id)"],
+      "surface": "alert",
+      "surfaces": ["alert", "rest", "drill"],
+      "action": "Triage/decide: on a failed verification, retry or escalate (J2/J3) and set the retry budget by accepted outcome, not by prompt price.",
+      "cost_of_missing": "A cheaper model keeps a false price advantage because retries, failed verification, and escalation are not priced into the accepted outcome; the operator retries blind.",
+      "acceptance_walkthrough": "1. Wait for a verification-failure alert (ON-A1) on R1 (J2). 2. Drill R4a/R4c and confirm attempt_number, first_pass/accepted, and the independent test verdict are shown. 3. Confirm a safe retry/escalate action with remaining budget. PASS: a failed attempt raises with its first_pass/evaluator evidence and a bounded retry action; FAIL: failure is visible only as a status with no attempt-chain evidence."
+    },
+    {
+      "rule": "6. Batch Discount",
+      "rule_number": 6,
+      "workforce": "autonomous",
+      "status": "proposed [C]",
+      "operator_decision": "What fraction of jobs to run in cheaper deferred batch mode vs on-demand, trading 50% cost for a 72-hour completion horizon.",
+      "loop_stages": ["budget"],
+      "evidence_fields": [
+        {"field": "batch fraction (b)", "class": "P", "source": "aggregate_workflow_metrics.py:68 pinned definition; compute_batch_fraction (:536-538) hard-coded NOT-MEASURABLE"},
+        {"field": "batch_mode job marker", "class": "P", "source": "ABSENT - no batch_mode marker anywhere"},
+        {"field": "provider batch pricing", "class": "X", "source": "measurement/efficiency.py:104 comment only"},
+        {"field": "queue model", "class": "P", "source": "modeled; no batch queue"}
+      ],
+      "evidence_class": "X/P",
+      "existing_backend_source": "NONE. No batch execution mode exists; batch is mentioned only as a comment (measurement/efficiency.py:104) and a pinned-but-not-measurable metric (scripts/aggregate_workflow_metrics.py:536-538). scripts/generate_manifest.py:396 records 'Rules 6-9 are modeled, not experimentally validated - batch/cascade/SLA experiments not executed'.",
+      "missing_record_fields": ["batch_mode flag on jobs", "batch vs on-demand cost accounting", "batch queue depth and horizon", "batch-fraction measurement", "any executed batch arm"],
+      "surface": "drill",
+      "surfaces": ["drill", "budget"],
+      "action": "Budget: (future) split workstreams batch vs on-demand once a batch arm exists; today the action is a modeled scenario toggle only.",
+      "cost_of_missing": "The 50% batch discount is unusable and unbudgetable; operators cannot decide the cost-of-immediacy split, and the room cannot show that it is unmeasured.",
+      "acceptance_walkthrough": "1. Open the budget lens. 2. Confirm the batch fraction is either a measured value or an explicit 'not measured / modeled [P]' token. PASS: the room labels batch as modeled [P]/[X] and names the missing batch_mode record; FAIL: batch is shown as a real number or silently omitted."
+    },
+    {
+      "rule": "7. Budget Ceiling",
+      "rule_number": 7,
+      "workforce": "autonomous",
+      "status": "proposed [C]",
+      "operator_decision": "Whether to raise or lower the budget cap, and what autonomous throughput the cap buys: T_max = Budget / (cost per job x (1 + retry)).",
+      "loop_stages": ["glance", "decide", "budget", "audit"],
+      "evidence_fields": [
+        {"field": "hard_cap_usd / reserved_cost_usd", "class": "M", "source": "control/lease_registry.py:431-448 (AdmissionRecord), :882 reserve_budget, :502-517 validate; control/admission.py:486,573-576"},
+        {"field": "campaign budget cap", "class": "P", "source": "scripts/run_workflow.py:308 (set_cap from --campaign-budget-usd)"},
+        {"field": "retry rate r", "class": "M", "source": "aggregate_workflow_metrics.py:64-73; website calculator.retry_rate_measured (~:1491)"},
+        {"field": "settlement status", "class": "M", "source": "control/settlement.py:100-110; experiments/results/settlement/settlements.jsonl"},
+        {"field": "StopSpec.budget_usd (run ceiling)", "class": "P", "source": "experiment_spec.py:606 - parsed/modeled, not enforced"},
+        {"field": "forecast_cost / budget ledger field", "class": "P", "source": "experiment_spec.py:337,339 - DECLARED, NO WRITER"}
+      ],
+      "evidence_class": "C/P",
+      "existing_backend_source": "Lease/admission hard cap + reservation EMITTED (control/lease_registry.py:431-448,882; control/admission.py), campaign cap set at scripts/run_workflow.py:308, settlement statuses in control/settlement.py:100-110. Control Room exposes the admission board via GET /api/subscription-usage (apps/control_room/routes/telemetry.py:298-303) and the five money values on /api/glance (routes/glance.py:342-388). Retry rate is derived (aggregate_workflow_metrics.py:64-73). StopSpec.budget_usd and the ledger budget/forecast_cost are modeled only.",
+      "missing_record_fields": ["StopSpec.budget_usd enforcement at run time", "per-job actual vs budget", "forecast_cost / forecast_latency (declared, no writer)", "T_max throughput projection in the room", "cap-raise decision record surfaced at rest"],
+      "surface": "rest",
+      "surfaces": ["rest", "alert", "decide"],
+      "action": "Decide/budget: raise or lower the budget cap (P0 raise-cap), and size autonomous throughput from the cap.",
+      "cost_of_missing": "The room can show spend but not the throughput the cap buys or the enforcement gap; the operator cannot tell budget-constrained capacity from infrastructure, and a declared ceiling that is not enforced is mistaken for one.",
+      "acceptance_walkthrough": "1. Open R3a (J5) and the money lens. 2. Confirm spend, budget, headroom, and lease reservations are shown with provenance (unknown never $0.00). 3. Confirm a raise-cap action and its record. PASS: spend vs hard cap and reserved headroom are at rest with a raise-cap door; FAIL: only a spend number is shown, or reserved-but-unspent is invisible."
+    },
+    {
+      "rule": "8. Cascade Rule",
+      "rule_number": 8,
+      "workforce": "autonomous",
+      "status": "proposed [C]",
+      "operator_decision": "Whether and how to escalate a failed attempt through model tiers (Flash -> Sonnet -> Opus -> Human), designed to keep human escalation under 1% because each escalation multiplies cost.",
+      "loop_stages": ["triage", "decide", "inspect", "intervene"],
+      "evidence_fields": [
+        {"field": "escalation_from / escalation_to", "class": "M", "source": "experiment_spec.py:365-366 - DECLARED; workflow_runner.py:528-529 writes None only"},
+        {"field": "escalation cost multiplier E_x", "class": "C", "source": "website verdicts.escalation (~:6698) fix_cost_usd/E_x; cap_cascade_retrospective.py"},
+        {"field": "escalation_rate", "class": "P", "source": "aggregate_workflow_metrics.py:64-73 pinned; cascade not run"},
+        {"field": "escalation target price ratio", "class": "X", "source": "website calculator.escalation_tiers (~:1461)"}
+      ],
+      "evidence_class": "X/P",
+      "existing_backend_source": "escalation_from/escalation_to are declared (experiment_spec.py:365-366) but runtime/workflow_runner.py:528-529 always writes None ('never retries a phase and never escalates a model mid-phase'). No automatic cascade exists; control/routing.py:110 is an offline recommendation and control/decisions.py:37 is proposal-only, never applied. scripts/cap_cascade_retrospective.py is retrospective-only. apps/website/data.js publishes verdicts.escalation E_x (~:6698). No Control Room endpoint and no recorded escalation cost.",
+      "missing_record_fields": ["actual escalation events (from/to/reason)", "escalated-attempt cost", "escalation rate per model tier", "an armed cascade policy arm", "human-escalation (<1%) counter"],
+      "surface": "alert",
+      "surfaces": ["alert", "drill", "intervene"],
+      "action": "Intervene: escalate a failed attempt to the next tier (or human) and design the cascade bound to <1% human.",
+      "cost_of_missing": "Failures do not escalate automatically and escalation cost is never recorded, so the 28.2x price multiplier is a surprise; the operator cannot see or design the cascade as a policy arm.",
+      "acceptance_walkthrough": "1. On a failed attempt, open R4a/R4c. 2. Confirm an escalation event is shown from -> to with its reason and cost, or an explicit 'no cascade armed' state. PASS: escalation tier, reason, and measured E_x cost are shown, or the absence is explicit; FAIL: escalation is a silent status change with no cost."
+    },
+    {
+      "rule": "9. SLA Buffer",
+      "rule_number": 9,
+      "workforce": "autonomous",
+      "status": "proposed [C]",
+      "operator_decision": "What SLA buffer to set and whether to batch: never batch jobs whose SLA is under 2x observed queue depth; always keep an on-demand fallback.",
+      "loop_stages": ["triage", "inspect", "intervene", "budget"],
+      "evidence_fields": [
+        {"field": "queue_length", "class": "M", "source": "control/pipeline_status.py:61-73; scripts/monitor.py:58-96; GET /api/matrix"},
+        {"field": "queue_wait_ms / service_time_ms", "class": "M", "source": "experiment_spec.py:373-374 - DECLARED, NO WRITER (worker.py:391,434 elapsed logged, never persisted)"},
+        {"field": "due_at / deadline_slack", "class": "P", "source": "experiment_spec.py:338,342 - DECLARED, NO WRITER"},
+        {"field": "SLA breach rate", "class": "C", "source": "aggregate_workflow_metrics.py:706-748 from BREACH_FIELDS:96 (aggregate only)"}
+      ],
+      "evidence_class": "P",
+      "existing_backend_source": "Queue COUNTS are EMITTED (control/pipeline_status.py:61-73; scripts/monitor.py; GET /api/matrix) and an aggregate SLA breach rate is computed (scripts/aggregate_workflow_metrics.py:706-748). queue_wait_ms/service_time_ms/due_at/deadline_slack are declared (experiment_spec.py:338-374) with ZERO writers; worker.py:391,434 computes elapsed but only logs it. The Control Room parity TIMING_FIELDS (apps/control_room/static/parity.js:458-471) marks queue_wait/service_time 'unknown'. No SLA buffer arithmetic exists anywhere.",
+      "missing_record_fields": ["queue_wait_ms (declared, never written)", "service_time_ms (declared, never written)", "due_at / deadline_slack enforcement", "per-job SLA buffer / horizon", "live burn and completion-time trace"],
+      "surface": "alert",
+      "surfaces": ["alert", "drill", "intervene"],
+      "action": "Intervene: add an on-demand fallback and hold batch work when queue depth threatens the SLA; set the 2x queue-depth rule.",
+      "cost_of_missing": "Queue wait and service time are invisible, so the 2x queue-depth rule cannot be applied; batch work silently breaches its SLA and the operator sees only a stuck queue.",
+      "acceptance_walkthrough": "1. Open the queue lens (J8/J2). 2. Confirm queue depth and, per job, queue_wait/service_time or an explicit 'unknown'. 3. Confirm an SLA/fallback action when depth x 2 exceeds the horizon. PASS: queue wait and service time are measured (or explicitly unknown) and the 2x rule surfaces; FAIL: only raw counts are shown as if they were timings."
+    },
+    {
+      "rule": "10. Outcome Multiplier",
+      "rule_number": 10,
+      "workforce": "value",
+      "status": "proposed [C]",
+      "operator_decision": "Which policy arm to keep, judged by outcomes per dollar (BVI = successful outcomes / (AI + human cost)) rather than by lowest cost.",
+      "loop_stages": ["glance", "decide", "budget", "audit"],
+      "evidence_fields": [
+        {"field": "accepted / verified outcomes", "class": "M", "source": "verdicts.cap_2b verified_success_rate (~:6634); experiment_spec.py:379 accepted"},
+        {"field": "total AI cost", "class": "M", "source": "summary.total_cost (data.js :12); ledger cost fields; control/settlement.py"},
+        {"field": "human cost H", "class": "P", "source": "modeled; website engineer loaded cost input (calculator)"},
+        {"field": "W workload volume", "class": "P", "source": "modeled; website calculator workload input"},
+        {"field": "BVI = WOC/(C_job + H/W)", "class": "C", "source": "frozen mandate formula; not computed in-repo"}
+      ],
+      "evidence_class": "C/P",
+      "existing_backend_source": "accepted/verified outcomes and total cost are MEASURED (ledger accepted field experiment_spec.py:379; control/settlement.py; apps/website/data.js verdicts.cap_2b cpvo_ratio/verified_success_rate ~:6634). Human cost H and workload W are modeled [P] calculator inputs. No in-repo computation of BVI exists. Control Room shows cost on /api/glance (routes/glance.py:342-388) but no outcomes-per-dollar or arm comparison.",
+      "missing_record_fields": ["accepted-outcome count surfaced per run/arm", "human-cost H input in the room", "BVI / outcomes-per-dollar computation", "arm-comparison (compare phase) surface", "value-weighted verdict row"],
+      "surface": "rest",
+      "surfaces": ["rest", "drill", "decide"],
+      "action": "Decide/audit: compare arms on outcomes per dollar and keep the value-maximizing policy; record the verdict.",
+      "cost_of_missing": "The room optimizes visible cost, not outcomes per dollar; a cheaper arm that loses outcomes looks better, and the compare/adapt phase of the engine chain has no operator surface.",
+      "acceptance_walkthrough": "1. Open R0 and the money lens (J1/J5). 2. Confirm accepted outcomes and total cost are shown together with a BVI/outcomes-per-dollar figure or an explicit modeled label. 3. Confirm an arm-comparison drill and a decision/verdict receipt. PASS: outcomes per dollar (or its explicit [P] gap) is at rest and a compare-arm decision can be recorded; FAIL: only cost is shown with no outcome denominator."
+    }
+  ],
+  "gap_rollup": {
+    "measured_and_room_exposed": [7],
+    "measured_but_room_unexposed": [1, 2, 5, 10],
+    "modeled_or_external_only": [3, 4, 8, 9],
+    "absent_no_writer_or_no_mechanism": [6, 9, 8],
+    "workflow_management_records_missing": [
+      "queue_wait_ms",
+      "service_time_ms",
+      "leased_at",
+      "first_token_at",
+      "due_at",
+      "deadline_slack",
+      "forecast_cost",
+      "forecast_latency",
+      "evaluator_independent",
+      "cost_inference",
+      "cost_orchestration",
+      "reuse_value",
+      "batch_mode",
+      "actual escalation events (from/to/reason)",
+      "escalated-attempt cost"
+    ]
+  }
+}

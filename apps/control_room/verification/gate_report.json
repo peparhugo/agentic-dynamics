@@ -1,0 +1,240 @@
+{
+  "status": "PASS",
+  "screenshots": [
+    {
+      "fixture": "F-0",
+      "viewport": "desktop",
+      "theme": "dark",
+      "screenshot": "/tmp/control_room_research_wt/apps/control_room/verification/F-0_desktop_dark_1440x900.png"
+    },
+    {
+      "fixture": "F-0",
+      "viewport": "narrow",
+      "theme": "dark",
+      "screenshot": "/tmp/control_room_research_wt/apps/control_room/verification/F-0_narrow_dark_1024x768.png"
+    },
+    {
+      "fixture": "F-0",
+      "viewport": "mobile",
+      "theme": "dark",
+      "screenshot": "/tmp/control_room_research_wt/apps/control_room/verification/F-0_mobile_dark_390x844.png"
+    },
+    {
+      "fixture": "F-1",
+      "viewport": "desktop",
+      "theme": "dark",
+      "screenshot": "/tmp/control_room_research_wt/apps/control_room/verification/F-1_desktop_dark_1440x900.png"
+    },
+    {
+      "fixture": "F-1",
+      "viewport": "narrow",
+      "theme": "dark",
+      "screenshot": "/tmp/control_room_research_wt/apps/control_room/verification/F-1_narrow_dark_1024x768.png"
+    },
+    {
+      "fixture": "F-1",
+      "viewport": "mobile",
+      "theme": "dark",
+      "screenshot": "/tmp/control_room_research_wt/apps/control_room/verification/F-1_mobile_dark_390x844.png"
+    },
+    {
+      "fixture": "F-2",
+      "viewport": "desktop",
+      "theme": "dark",
+      "screenshot": "/tmp/control_room_research_wt/apps/control_room/verification/F-2_desktop_dark_1440x900.png"
+    },
+    {
+      "fixture": "F-2",
+      "viewport": "narrow",
+      "theme": "dark",
+      "screenshot": "/tmp/control_room_research_wt/apps/control_room/verification/F-2_narrow_dark_1024x768.png"
+    },
+    {
+      "fixture": "F-2",
+      "viewport": "mobile",
+      "theme": "dark",
+      "screenshot": "/tmp/control_room_research_wt/apps/control_room/verification/F-2_mobile_dark_390x844.png"
+    },
+    {
+      "fixture": "F-3",
+      "viewport": "desktop",
+      "theme": "dark",
+      "screenshot": "/tmp/control_room_research_wt/apps/control_room/verification/F-3_desktop_dark_1440x900.png"
+    },
+    {
+      "fixture": "F-3",
+      "viewport": "narrow",
+      "theme": "dark",
+      "screenshot": "/tmp/control_room_research_wt/apps/control_room/verification/F-3_narrow_dark_1024x768.png"
+    },
+    {
+      "fixture": "F-3",
+      "viewport": "mobile",
+      "theme": "dark",
+      "screenshot": "/tmp/control_room_research_wt/apps/control_room/verification/F-3_mobile_dark_390x844.png"
+    },
+    {
+      "fixture": "F-4",
+      "viewport": "desktop",
+      "theme": "dark",
+      "screenshot": "/tmp/control_room_research_wt/apps/control_room/verification/F-4_desktop_dark_1440x900.png"
+    },
+    {
+      "fixture": "F-4",
+      "viewport": "narrow",
+      "theme": "dark",
+      "screenshot": "/tmp/control_room_research_wt/apps/control_room/verification/F-4_narrow_dark_1024x768.png"
+    },
+    {
+      "fixture": "F-4",
+      "viewport": "mobile",
+      "theme": "dark",
+      "screenshot": "/tmp/control_room_research_wt/apps/control_room/verification/F-4_mobile_dark_390x844.png"
+    },
+    {
+      "fixture": "F-5",
+      "viewport": "desktop",
+      "theme": "dark",
+      "screenshot": "/tmp/control_room_research_wt/apps/control_room/verification/F-5_desktop_dark_1440x900.png"
+    },
+    {
+      "fixture": "F-5",
+      "viewport": "narrow",
+      "theme": "dark",
+      "screenshot": "/tmp/control_room_research_wt/apps/control_room/verification/F-5_narrow_dark_1024x768.png"
+    },
+    {
+      "fixture": "F-5",
+      "viewport": "mobile",
+      "theme": "dark",
+      "screenshot": "/tmp/control_room_research_wt/apps/control_room/verification/F-5_mobile_dark_390x844.png"
+    },
+    {
+      "fixture": "F-6",
+      "viewport": "desktop",
+      "theme": "dark",
+      "screenshot": "/tmp/control_room_research_wt/apps/control_room/verification/F-6_desktop_dark_1440x900.png"
+    },
+    {
+      "fixture": "F-6",
+      "viewport": "narrow",
+      "theme": "dark",
+      "screenshot": "/tmp/control_room_research_wt/apps/control_room/verification/F-6_narrow_dark_1024x768.png"
+    },
+    {
+      "fixture": "F-6",
+      "viewport": "mobile",
+      "theme": "dark",
+      "screenshot": "/tmp/control_room_research_wt/apps/control_room/verification/F-6_mobile_dark_390x844.png"
+    },
+    {
+      "fixture": "F-7",
+      "viewport": "desktop",
+      "theme": "dark",
+      "screenshot": "/tmp/control_room_research_wt/apps/control_room/verification/F-7_desktop_dark_1440x900.png"
+    },
+    {
+      "fixture": "F-7",
+      "viewport": "narrow",
+      "theme": "dark",
+      "screenshot": "/tmp/control_room_research_wt/apps/control_room/verification/F-7_narrow_dark_1024x768.png"
+    },
+    {
+      "fixture": "F-7",
+      "viewport": "mobile",
+      "theme": "dark",
+      "screenshot": "/tmp/control_room_research_wt/apps/control_room/verification/F-7_mobile_dark_390x844.png"
+    },
+    {
+      "case": "history",
+      "viewport": "desktop",
+      "screenshot": "/tmp/control_room_research_wt/apps/control_room/verification/charts_desktop_dark_1440x900.png"
+    },
+    {
+      "case": "history",
+      "viewport": "narrow",
+      "screenshot": "/tmp/control_room_research_wt/apps/control_room/verification/charts_narrow_dark_1024x768.png"
+    },
+    {
+      "case": "history",
+      "viewport": "mobile",
+      "screenshot": "/tmp/control_room_research_wt/apps/control_room/verification/charts_mobile_dark_390x844.png"
+    },
+    {
+      "case": "visuals",
+      "viewport": "desktop",
+      "screenshot": "/tmp/control_room_research_wt/apps/control_room/verification/visuals_desktop_dark_1440x900.png"
+    },
+    {
+      "case": "visuals",
+      "viewport": "narrow",
+      "screenshot": "/tmp/control_room_research_wt/apps/control_room/verification/visuals_narrow_dark_1024x768.png"
+    },
+    {
+      "case": "visuals",
+      "viewport": "mobile",
+      "screenshot": "/tmp/control_room_research_wt/apps/control_room/verification/visuals_mobile_dark_390x844.png"
+    },
+    {
+      "case": "style",
+      "viewport": "desktop",
+      "screenshot": "/tmp/control_room_research_wt/apps/control_room/verification/style_desktop_dark_1440x900.png"
+    },
+    {
+      "case": "style",
+      "viewport": "narrow",
+      "screenshot": "/tmp/control_room_research_wt/apps/control_room/verification/style_narrow_dark_1024x768.png"
+    },
+    {
+      "case": "style",
+      "viewport": "mobile",
+      "screenshot": "/tmp/control_room_research_wt/apps/control_room/verification/style_mobile_dark_390x844.png"
+    },
+    {
+      "case": "a11y",
+      "viewport": "desktop",
+      "screenshot": "/tmp/control_room_research_wt/apps/control_room/verification/a11y_desktop_dark_1440x900.png"
+    },
+    {
+      "case": "a11y",
+      "viewport": "mobile",
+      "screenshot": "/tmp/control_room_research_wt/apps/control_room/verification/a11y_mobile_dark_390x844.png"
+    },
+    {
+      "case": "parity-workbench",
+      "viewport": "desktop",
+      "screenshot": "/tmp/control_room_research_wt/apps/control_room/verification/parity_workbench_desktop.png"
+    },
+    {
+      "case": "parity-dock",
+      "viewport": "desktop",
+      "screenshot": "/tmp/control_room_research_wt/apps/control_room/verification/parity_dock_desktop.png"
+    },
+    {
+      "case": "parity-workbench",
+      "viewport": "mobile",
+      "screenshot": "/tmp/control_room_research_wt/apps/control_room/verification/parity_workbench_mobile.png"
+    },
+    {
+      "case": "parity-dock",
+      "viewport": "mobile",
+      "screenshot": "/tmp/control_room_research_wt/apps/control_room/verification/parity_dock_mobile.png"
+    },
+    {
+      "case": "live",
+      "viewport": "desktop",
+      "screenshot": "/tmp/control_room_research_wt/apps/control_room/verification/live_desktop_dark_1440x900.png"
+    },
+    {
+      "case": "live",
+      "viewport": "narrow",
+      "screenshot": "/tmp/control_room_research_wt/apps/control_room/verification/live_narrow_dark_1024x768.png"
+    },
+    {
+      "case": "live",
+      "viewport": "mobile",
+      "screenshot": "/tmp/control_room_research_wt/apps/control_room/verification/live_mobile_dark_390x844.png"
+    }
+  ],
+  "errors": []
+}

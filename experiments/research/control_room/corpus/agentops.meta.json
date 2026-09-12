@@ -1,0 +1,62 @@
+{
+  "schema": "research-corpus/v1",
+  "family": "agentops",
+  "family_label": "LLM/agent-operations rooms",
+  "family_budget": 40,
+  "budget_band_pm20": [
+    32,
+    48
+  ],
+  "seeds_file": "experiments/research/control_room/seeds/agentops.txt",
+  "seed_products": [
+    "LangSmith",
+    "Langfuse",
+    "Braintrust",
+    "Helicone",
+    "AgentOps",
+    "W&B Weave",
+    "Arize Phoenix"
+  ],
+  "adjacent_products": [
+    "OpenLLMetry/Traceloop",
+    "Patronus",
+    "Galileo",
+    "HoneyHive",
+    "Confident AI/DeepEval",
+    "Latitude"
+  ],
+  "stored_sources": 48,
+  "facet_records": 48,
+  "usable_facet_records": 46,
+  "unusable_facet_records": 2,
+  "source_catalog": "experiments/research/control_room/sources.jsonl",
+  "source_dir": "experiments/research/control_room/sources/",
+  "facet_corpus": "experiments/research/control_room/corpus/agentops.jsonl",
+  "tool": "scripts/research_fetch.py",
+  "tool_note": "Repaired in this phase: follow HTTP 308 (docs.langchain.com, langfuse.com answer 308; urllib on Python 3.10 does not follow it). The repair preserves the requested uri AND the redirect-resolved final_uri; tests/test_research_fetch.py covers it.",
+  "fetched_at_range": [
+    "2026-09-11T00:59:39.294103+00:00",
+    "2026-09-11T01:01:00.629823+00:00"
+  ],
+  "stop_reason": "budget met at the +20% band ceiling: 48 stored sources / 48 facet records (46 text-usable; 2 wandb.ai site fetches returned binary/undecoded bodies and are flagged UNUSABLE, kept only for provenance). No further seeds run.",
+  "coverage_note": "F1 is strong on the agent-ops DATA MODEL and IA vocabulary (traces/spans/sessions, eval/datasets/prompts, cost+latency) and on open-source implementations; it is WEAK on visual aesthetic evidence \u2014 text extraction cannot see the products' dashboards, so aesthetic=unspecified throughout. The aesthetic and design-system burden is carried by family F2 (dashboards/design systems) and F5 (craft), per the r1 facet matrix.",
+  "facet_rollup": {
+    "category": {
+      "agent-ops-room": 39,
+      "case-study": 6,
+      "opentelemetry-instrumentation": 1,
+      "eval-platform": 1,
+      "eval-framework": 1
+    },
+    "top_techniques": {
+      "session-grouping": 14,
+      "trace-waterfall": 13,
+      "cost-tracking": 13,
+      "span-tree": 12,
+      "latency-metrics": 11,
+      "online-evaluation": 6
+    },
+    "open_implementation_true": 21,
+    "demonstrates_true": 37
+  }
+}
