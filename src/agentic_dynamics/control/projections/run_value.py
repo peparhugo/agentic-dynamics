@@ -73,14 +73,20 @@ def load_attempt_value_rows(results_dir: Path) -> tuple[list[dict[str, Any]], li
         if not any(isinstance(c, dict) and isinstance(c.get("attempts"), list) for c in cells):
             continue
         paths.append(str(path))
-        spec = str(payload.get("spec_id") or path.stem)
+        # Wave C1: the group identity prefers the ledger's OWN run id (stamped since the
+        # run-identity work) and falls back to spec_id only for legacy payloads. Keying by
+        # spec_id alone pooled EVERY run of a spec — a parent run and its resumed child, or
+        # two executions of one grid — into one population, so a mixed cohort reported a
+        # single pooled cost/accepted (the review's P5 repro class). A spec with no run id
+        # keeps the old grouping exactly.
+        run = str(payload.get("run_id") or "").strip() or str(payload.get("spec_id") or path.stem)
         for cell in cells:
             if not isinstance(cell, dict):
                 continue
             cost = cell.get("realized_cost")
             rows.append(
                 {
-                    "run": spec,
+                    "run": run,
                     "arm": str(cell.get("policy_arm") or cell.get("model") or "unknown"),
                     "accepted": _accepted_from_status(str(cell.get("status") or "")),
                     "cost_usd": float(cost)

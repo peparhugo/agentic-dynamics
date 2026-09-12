@@ -156,6 +156,29 @@ def test_burn_and_trace_come_from_measured_timestamps_only():
     assert payload["completion_trace"][-1]["duration_s"] is None
 
 
+def test_a_single_completion_has_no_rate_not_a_fabricated_1e6():
+    """Wave C1 — the P8 fix: ONE completion is a single sample. The old ``max(span_h, 1e-6)``
+    floor divided by ~zero and fabricated exactly 1,000,000/h (1 / 1e-6); an unmeasurable
+    rate is None with a named reason, never a fabricated maximum."""
+    attempts = [_attempt("a1", "2026-09-12T09:00:00Z", "2026-09-12T09:30:00Z")]
+    payload = build_sla_queue([], attempts, [], now=_NOW)
+    assert payload["burn"]["completions"] == 1
+    assert payload["burn"]["burn_per_h"] is None
+    assert "single_sample" in payload["burn"]["reason"]
+
+
+def test_two_completions_sharing_a_timestamp_have_no_rate():
+    """Two completions at one timestamp span zero hours — still not a throughput."""
+    attempts = [
+        _attempt("a1", "2026-09-12T09:00:00Z", "2026-09-12T09:30:00Z"),
+        _attempt("a2", "2026-09-12T09:05:00Z", "2026-09-12T09:30:00Z"),
+    ]
+    payload = build_sla_queue([], attempts, [], now=_NOW)
+    assert payload["burn"]["completions"] == 2
+    assert payload["burn"]["burn_per_h"] is None
+    assert "zero_span" in payload["burn"]["reason"]
+
+
 def test_breach_rate_reuses_the_shared_definition():
     phases = [
         {"phase": "p1", "stall_evidence": {"limit_min": 30}},  # recorded breach
