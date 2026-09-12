@@ -98,3 +98,32 @@ def test_loader_maps_attempt_ledger_statuses_without_inventing_outcomes(tmp_path
     ]
     assert {r["run"] for r in rows} == {"grit@1"}
     assert load_attempt_value_rows(tmp_path / "nope") == ([], [])
+
+
+def test_two_runs_of_one_spec_are_not_pooled(tmp_path):
+    """Wave C1 — the P5 group identity prefers the ledger's OWN run id (stamped since the
+    run-identity work): a parent run and its resumed child (same spec_id) no longer pool
+    into one population and report a single mixed cost/accepted (the review's P5 repro
+    class). A legacy payload without a run id keeps the old spec_id grouping (pinned above)."""
+    base = {"spec_id": "grit@1"}
+    (tmp_path / "a.json").write_text(json.dumps({
+        **base, "run_id": "run-parent",
+        "cells": [
+            {"policy_arm": "retry", "status": "accepted", "realized_cost": 2.0, "attempts": [{}]},
+        ],
+    }))
+    (tmp_path / "b.json").write_text(json.dumps({
+        **base, "run_id": "run-child",
+        "cells": [
+            {"policy_arm": "retry", "status": "failed", "realized_cost": 4.0, "attempts": [{}]},
+        ],
+    }))
+
+    rows, _ = load_attempt_value_rows(tmp_path)
+    assert {r["run"] for r in rows} == {"run-parent", "run-child"}
+
+    payload = build_run_value(rows)
+    assert [
+        (block["run"], block["accepted_outcomes"], block["total_cost_usd"])
+        for block in payload["rows"]
+    ] == [("run-parent", 1, 2.0), ("run-child", 0, 4.0)]

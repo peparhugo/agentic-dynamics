@@ -259,12 +259,28 @@ def build_sla_queue(
     if completions:
         span_end = max(completions)
         span_start = min(completions)
-        span_h = max((span_end - span_start).total_seconds() / 3600, 1e-6)
-        burn: dict[str, Any] = {
-            "completions": len(completions),
-            "span_h": round(span_h, 4),
-            "burn_per_h": round(len(completions) / span_h, 4),
-        }
+        span_h = (span_end - span_start).total_seconds() / 3600
+        if len(completions) < 2 or span_h <= 0:
+            # A throughput needs a real sample: ONE completion (or completions sharing a
+            # timestamp) has no measurable rate. The old ``max(span_h, 1e-6)`` floor divided
+            # by ~zero and fabricated exactly 1,000,000/h (the review's P8 repro: 1 / 1e-6).
+            # Unknown is ``None`` with a named reason — never a fabricated maximum.
+            burn: dict[str, Any] = {
+                "completions": len(completions),
+                "span_h": round(span_h, 6) if span_h > 0 else None,
+                "burn_per_h": None,
+                "reason": (
+                    "single_sample — one completion has no throughput"
+                    if len(completions) < 2
+                    else "zero_span — the completions share one timestamp"
+                ),
+            }
+        else:
+            burn = {
+                "completions": len(completions),
+                "span_h": round(span_h, 4),
+                "burn_per_h": round(len(completions) / span_h, 4),
+            }
     else:
         burn = {
             "completions": 0,
