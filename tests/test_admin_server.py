@@ -1057,22 +1057,33 @@ def test_experiments_rejects_non_loopback_remote():
     assert response.get_json()["error"] == "loopback or tailnet peer required"
 
 
-def test_experiments_accepts_tailnet_peer():
+def test_experiments_accepts_tailnet_peer(monkeypatch):
     """F1: the portal binds Tailscale-only, so a tailnet-CGNAT peer IS the operator —
-    the remote approve path (the docs gate's portal affordance) must not need loopback."""
+    the remote approve path (the docs gate's portal affordance) must not need loopback.
+
+    The passing gate reaches the route's ``subprocess.run([..., 'scripts/enqueue.py'])``;
+    the spawn is MOCKED because the subject is the trust gate, never a queue fill. This test
+    once ran the real command — every suite run pushed 30 subscription-default cells into
+    the live ``story_jobs`` (the 2026-09-12 queue-refill leak; the sibling
+    ``test_experiments_enqueue_spawns_subprocess`` had always mocked it).
+    """
     redis = QueueRedis(queue=[])
-    monkeypatch = __import__("pytest").MonkeyPatch()
     monkeypatch.setattr(server, "_redis", lambda: redis)
-    try:
-        response = server.app.test_client().post(
-            "/api/experiments",
-            json={"action": "enqueue"},
-            headers={"Idempotency-Key": "exp-tailnet"},
-            environ_overrides={"REMOTE_ADDR": "100.83.229.3", "HTTP_HOST": "100.83.229.3:8001"},
-        )
-        assert response.status_code in (200, 400, 422)  # passed the trust gate (any later refusal is semantic)
-    finally:
-        monkeypatch.undo()
+
+    class _FakeProc:
+        returncode = 0
+        stdout = "enqueued 0 cells (mocked)\n"
+        stderr = ""
+
+    monkeypatch.setattr(server.subprocess, "run", lambda *a, **kw: _FakeProc())
+
+    response = server.app.test_client().post(
+        "/api/experiments",
+        json={"action": "enqueue"},
+        headers={"Idempotency-Key": "exp-tailnet"},
+        environ_overrides={"REMOTE_ADDR": "100.83.229.3", "HTTP_HOST": "100.83.229.3:8001"},
+    )
+    assert response.status_code in (200, 400, 422)  # passed the trust gate (any later refusal is semantic)
 
 
 def test_experiments_rejects_unknown_action(monkeypatch):
