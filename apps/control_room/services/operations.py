@@ -21,12 +21,16 @@ sockets, reads no clock (``now`` is injected through to ``build_packet``), and n
 from __future__ import annotations
 
 from collections.abc import Mapping
+from dataclasses import asdict
 from typing import Any
 
 from agentic_dynamics.control.control_status import build_packet
 
 #: The read model's schema id (additive; the source packet's schema rides in ``source``).
 SCHEMA = "control-room-operations/v1"
+
+#: The per-run detail's schema id (step 5, P1/P2).
+RUN_DETAIL_SCHEMA = "control-room-run-detail/v1"
 
 
 def operational_snapshot(
@@ -68,4 +72,25 @@ def operational_snapshot(
         "projection_lag": packet.get("projection_lag", {}),
         "safe_actions": list(packet.get("safe_actions", [])),
         "degraded": list(packet.get("degraded", [])),
+    }
+
+
+def run_detail(db: Any, run_id: str) -> dict[str, Any] | None:
+    """The P1/P2 per-run view: identity, attempts, gates, approvals, command receipts.
+
+    Every block is read from the control records AS THEY ARE: a record the database has never
+    seen yields an empty list (the DB said none), and an unknown run is ``None`` (the route
+    renders 404) — never an invented skeleton. Records pass through via ``dataclasses.asdict``
+    so this layer can not curate away a field or invent one.
+    """
+    run = db.get_run(run_id)
+    if run is None:
+        return None
+    return {
+        "schema": RUN_DETAIL_SCHEMA,
+        "run": asdict(run) | {"state": run.state.value},
+        "attempts": [asdict(row) for row in db.attempts(run_id)],
+        "gates": [asdict(row) for row in db.gate_results(run_id)],
+        "approvals": [asdict(row) for row in db.approvals(run_id)],
+        "commands": [asdict(row) for row in db.commands(run_id=run_id)],
     }

@@ -19,9 +19,18 @@ for _path in (_REPO_ROOT, _REPO_ROOT / "src"):
     if str(_path) not in sys.path:
         sys.path.insert(0, str(_path))
 
-from agentic_dynamics.control.control_db import ControlDB, RunState  # noqa: E402
+from agentic_dynamics.control.control_db import (  # noqa: E402
+    ControlDB,
+    GateVerdict,
+    RunState,
+)
 from agentic_dynamics.control.control_status import build_packet  # noqa: E402
-from apps.control_room.services.operations import SCHEMA, operational_snapshot  # noqa: E402
+from apps.control_room.services.operations import (  # noqa: E402
+    RUN_DETAIL_SCHEMA,
+    SCHEMA,
+    operational_snapshot,
+    run_detail,
+)
 
 _NOW = "2026-09-12T00:00:00+00:00"
 
@@ -99,3 +108,42 @@ def test_absent_data_stays_absent_and_degraded_is_named(tmp_path):
     )
     # the lag block itself stays the packet's value (possibly null per projection), never zeros.
     assert isinstance(snapshot["projection_lag"], dict)
+
+
+def test_run_detail_carries_every_control_record(tmp_path):
+    """P1/P2: attempts, gates, approvals, and command receipts come from the records as-is."""
+    with _db(tmp_path) as db:
+        run_id = _seed_awaiting(db)
+        db.record_gate_result(
+            run_id,
+            step_id="p1",
+            verdict=GateVerdict.PASS,
+            candidate_sha="a" * 40,
+            executor="pytest",
+            gate_id="gate-checkpoint",
+        )
+        db.record_approval(
+            run_id, gate_id="gate-checkpoint", candidate_sha="a" * 40, operator="dr-seuss"
+        )
+        command = db.record_command_intent(
+            "approve", actor="aio", run_id=run_id, candidate_sha="a" * 40
+        )
+        db.complete_command(command.command_id, state="completed", receipt={"approval_id": "x"})
+
+        detail = run_detail(db, run_id)
+
+    assert detail is not None
+    assert detail["schema"] == RUN_DETAIL_SCHEMA
+    assert detail["run"]["run_id"] == run_id
+    assert detail["run"]["state"] == "awaiting_approval"
+    assert [gate["gate_id"] for gate in detail["gates"]] == ["gate-checkpoint"]
+    assert [apr["operator"] for apr in detail["approvals"]] == ["dr-seuss"]
+    assert [(c["verb"], c["state"]) for c in detail["commands"]] == [("approve", "completed")]
+    assert '"approval_id"' in detail["commands"][0]["receipt_json"]
+    # no invented keys: exactly the documented blocks, each as the database returned it.
+    assert set(detail) == {"schema", "run", "attempts", "gates", "approvals", "commands"}
+
+
+def test_run_detail_unknown_run_is_none_not_a_skeleton(tmp_path):
+    with _db(tmp_path) as db:
+        assert run_detail(db, "run-does-not-exist") is None
