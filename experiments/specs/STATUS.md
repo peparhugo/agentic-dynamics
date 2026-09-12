@@ -3,11 +3,12 @@
 **Generated — do not edit by hand.** Regenerate with `python scripts/spec_status.py`;
 `scripts/run_workflow.py` also refreshes it at the end of every run.
 
-Generated at: `2026-09-12T20:47:31.842875+00:00`  ·  214 spec(s)
-**Work remaining:** 203 open · 11 completed/retired
+Generated at: `2026-09-12T21:50:45.422523+00:00`  ·  219 spec(s)
+**Work remaining:** 208 open · 11 completed/retired
 
 | name | kind | repeatable | status | version | supersedes | last_run | ok | model | cost | n_runs |
 |---|---|---|---|---|---|---|---|---|---|---|
+| `adapter_snapshot_guard` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `admission_leases` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `agentic_dynamics_rebrand` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `aio_controller_postmortem` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
@@ -15,6 +16,7 @@ Generated at: `2026-09-12T20:47:31.842875+00:00`  ·  214 spec(s)
 | `auto_posthoc_wiring` | workflow | yes | runnable | 0.1 | — | — | — | — | — | 0 |
 | `automatic_docs_sync` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `beta_lab_execution` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
+| `campaign_join_dedup` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `canonical_publication_closure` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `canonical_state_design` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `canonical_state_finalize` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
@@ -99,6 +101,8 @@ Generated at: `2026-09-12T20:47:31.842875+00:00`  ·  214 spec(s)
 | `control_room_portal` | workflow | no | runnable | 0.2 | — | — | — | — | — | 0 |
 | `control_room_posthoc_visibility` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `control_room_refresh` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
+| `control_room_refresh_integration` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
+| `control_room_refresh_rework` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `control_room_research` | workflow | yes | runnable | 0.1 | — | — | — | — | — | 0 |
 | `control_room_research_repair` | workflow | yes | runnable | 0.1 | — | — | — | — | — | 0 |
 | `control_room_research_repair2` | workflow | yes | runnable | 0.1 | — | — | — | — | — | 0 |
@@ -151,6 +155,7 @@ Generated at: `2026-09-12T20:47:31.842875+00:00`  ·  214 spec(s)
 | `kb_producer_factory` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `kb_record_fidelity` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `kb_write_path` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
+| `lab_metric_fingerprints` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
 | `labbook_refresh` | workflow | yes | runnable | 0.1 | — | — | — | — | — | 0 |
 | `launch_handler_dry_run` | workflow | yes | runnable | 0.1 | — | — | — | — | — | 0 |
 | `ledger_instrumentation` | workflow | no | runnable | 0.1 | — | — | — | — | — | 0 |
