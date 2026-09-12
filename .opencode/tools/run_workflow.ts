@@ -15,8 +15,8 @@ export default tool({
     timeout_min: tool.schema.number().optional().default(30).describe("Per-phase timeout in minutes"),
     no_commit: tool.schema.boolean().optional().default(false),
     resume: tool.schema.boolean().optional().default(false),
-    orchestrator: tool.schema.boolean().optional().default(false).describe(
-      "Run each agent phase as a sibling cell container (the documented default path; in-process is the fallback)",
+    orchestrator: tool.schema.boolean().optional().default(true).describe(
+      "Run each agent phase as a sibling cell container — the DEFAULT execution path per the project rules. Pass false only for an explicitly requested deterministic local run (in-process is a separate supported mode, not the busy-fleet fallback).",
     ),
   },
   async execute(args, ctx) {
