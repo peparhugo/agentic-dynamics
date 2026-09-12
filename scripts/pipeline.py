@@ -22,7 +22,8 @@ Phase kinds:
   shell    — subprocess.run(cmd); gates on exit 0
   test     — pytest wrapper with sensible defaults
   lint     — ruff check + optional mypy
-  matrix   — build story job cells, enqueue to Redis, spawn workers, poll
+  matrix   — select new cells through the shared enqueue contract (build → queued-skip →
+             admission → stamp → push), spawn workers, poll
   review   — enqueue review jobs, spawn review workers, poll
   pipeline — sequence of shell-like steps executed in order
   ship     — git merge --squash + push (feature branches)
@@ -411,65 +412,6 @@ def _execute_lint(phase: PlanPhase, context: dict) -> bool:
     return ok
 
 
-def _gen_matrix_cells(kind_params: dict) -> list[dict]:
-    model = kind_params["model"]
-    model_filter = kind_params.get("model_filter", model.split("/")[-1])
-    stories = kind_params.get("stories", ["task_manager_api", "static_site_gen", "notification_service"])
-    tiers = kind_params.get("tiers", ["tier1_minimal", "tier2_small"])
-    conditions = kind_params.get("conditions", {
-        "good": ["clean", "bad_seed", "early_degrade"],
-        "bad": ["clean", "early_degrade"],
-    })
-
-    completed = _completed_cells(model_filter, stories, conditions)
-    jobs = []
-    for story in stories:
-        for tier in tiers:
-            for quality, conds in conditions.items():
-                for condition in conds:
-                    key = f"{story}|{tier}|{quality}|{condition}"
-                    if key in completed:
-                        continue
-                    slug = model.split("/", 1)[-1].replace("-", "_").replace(".", "_")
-                    short = f"{slug}_{story}_{tier}_{quality}_{condition}"
-                    jobs.append({
-                        "cell_id": short,
-                        "story": story, "tier": tier,
-                        "quality": quality, "condition": condition,
-                        "model": model,
-                    })
-    return jobs
-
-
-def _completed_cells(model_filter: str, stories: list[str], conditions: dict) -> set[str]:
-    from agentic_dynamics.runtime.story import load_story_result
-
-    completed = set()
-    results_dir = ROOT / "experiments" / "results" / "stories"
-    for f in results_dir.glob("*.json"):
-        if "dvs" in f.name or "log" in f.name:
-            continue
-        try:
-            story = load_story_result(f)
-        except Exception:
-            continue
-        if model_filter not in (story.model or "").lower():
-            continue
-        if story.story_name not in stories:
-            continue
-        condition = story.perturbation_condition or ""
-        if not condition:
-            for cond in ["bad_seed", "early_degrade", "clean"]:
-                if cond in f.name:
-                    condition = cond
-                    break
-        cp = Path(story.codebase_path or "")
-        tier = cp.parts[-2] if len(cp.parts) >= 2 else "?"
-        quality = cp.parts[-1] if len(cp.parts) >= 2 else "?"
-        completed.add(f"{story.story_name}|{tier}|{quality}|{condition}")
-    return completed
-
-
 def _execute_matrix(phase: PlanPhase, context: dict) -> bool:
     rdb = _r()
     plan_name = context.get("plan_name", "matrix")
@@ -482,14 +424,36 @@ def _execute_matrix(phase: PlanPhase, context: dict) -> bool:
         return True
 
     if state.status == "pending":
-        jobs = _gen_matrix_cells(kind_params)
+        # Wave B4: the plan's fill IS the shared fill contract (enqueue.py) — the ONE builder
+        # (cell ids + the saved-result skip cannot drift between the CLI and a plan), the
+        # queued-aware skip, the admission gate (the queue never carries unbudgeted work),
+        # the transport stamps, and the ONE push write. The old code hand-rolled its own
+        # builder and raw-LPUSHed the queue, bypassing admission entirely.
+        try:
+            import enqueue  # scripts/ is on sys.path (the _bootstrap convention)
+        except ImportError:  # imported as scripts.pipeline — repo root is on sys.path
+            from scripts import enqueue  # type: ignore[no-redef]
+
+        jobs = enqueue.build_cells(
+            model=kind_params["model"],
+            missing_only=True,
+            stories=kind_params.get("stories"),
+            tiers=kind_params.get("tiers"),
+            conditions=kind_params.get("conditions"),
+        )
+        jobs = enqueue.select_new_cells(rdb, jobs)
         if not jobs:
             _set_state(plan_name, phase.id, status="done")
             return True
 
-        for job in jobs:
-            rdb.lpush(STORY_QUEUE, json.dumps(job))
-            rdb.hset(STORY_STATUS, job["cell_id"], "queued")
+        enqueue.stamp_enqueue(jobs)
+        try:
+            jobs = enqueue.admit_cells(jobs)
+        except enqueue.AdmissionDenied as exc:
+            print(f"  fill REFUSED by admission: {exc}")
+            _set_state(plan_name, phase.id, status="failed")
+            return False
+        enqueue.push_cells(rdb, jobs, lane=enqueue.QUEUE_KEY)
 
         state.jobs_total = len(jobs)
         state.jobs_ids = [str(job["cell_id"]) for job in jobs]
