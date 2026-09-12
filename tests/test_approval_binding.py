@@ -24,13 +24,13 @@ for _path in (_ROOT, _ROOT / "src", _ROOT / "scripts"):
     if str(_path) not in sys.path:
         sys.path.insert(0, str(_path))
 
+import approve_workflow as aw  # noqa: E402
+import promote as pr  # noqa: E402
+
 from agentic_dynamics.core import decision_contract as dc  # noqa: E402
 from agentic_dynamics.runtime.workflow_runner import (  # noqa: E402
     _checkpoint_approval_valid,
 )
-
-import approve_workflow as aw  # noqa: E402
-import promote as pr  # noqa: E402
 
 
 def _git(wd: Path, *argv: str) -> str:
@@ -66,7 +66,7 @@ def _approval(wd: Path, *, spec: str, phase: str, candidate: str, tree: str,
 def test_a_correctly_bound_approval_is_accepted(tmp_path):
     wd = _repo(tmp_path)
     ck, tree = _git(wd, "rev-parse", "HEAD"), _git(wd, "rev-parse", "HEAD^{tree}")
-    path = _approval(wd, spec="right_spec", phase="p1", candidate=ck, tree=tree)
+    _approval(wd, spec="right_spec", phase="p1", candidate=ck, tree=tree)
     _git(wd, "add", "-A")
     _git(wd, "commit", "-qm", "[approval] right_spec/p1")
     valid, evidence = _checkpoint_approval_valid(wd, "right_spec", "p1", ck)
