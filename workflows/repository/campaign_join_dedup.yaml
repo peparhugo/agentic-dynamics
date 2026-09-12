@@ -1,0 +1,81 @@
+name: campaign_join_dedup
+question: >-
+  Harden the campaign-ledger join. aggregate_workflow_metrics.merge_corpora pools phase
+  rows by path-derived campaign name with NO per-row identity check: when the same phase
+  is represented in two ledgers (an aggregate ledger plus a per-cell copy, or a re-run
+  artifact left beside its predecessor), every downstream metric double-counts it
+  silently. The join must become identity-aware: dedup exact-duplicate phase rows across
+  a campaign's ledgers (identity = phase name + started_at + ended_at + model + status
+  and the recorded gate/commit fields), keep genuinely distinct executions (same phase
+  name, different timestamps = two rows), and REPORT the duplicate count with provenance
+  in the aggregate output so the pooling is auditable rather than invisible. Regenerate
+  the local workflow-metrics aggregate and pin both directions in tests.
+version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: false
+repeatable: false
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: false
+    context:
+      domain_context: >-
+        canonical_sources: [scripts/aggregate_workflow_metrics.py (classify, extract_ledger,
+        merge_corpora, the per-campaign metric arithmetic), tests/test_aggregate_workflow_metrics.py,
+        experiments/results/workflow_metrics/aggregate.json (the local aggregate),
+        experiments/results/workflow_metrics/coverage or the tool's coverage block]
+        policies: [dedup by FULL row identity only — never drop rows that differ in any
+        measured field; report every duplicate (count + the source paths); an empty diff is
+        a valid result, not a failure; never change the metric definitions (PINNED_METRIC_DEFINITIONS)]
+        verification: [tests/test_aggregate_workflow_metrics.py, the fast lane]
+    phases:
+      - name: j1_dedup
+        kind: agent
+        scope: implementation
+        timeout: 1800
+        prompt: |
+          GOAL: {goal}
+          1. Read merge_corpora and the Phase/LedgerCorpus dataclasses: identify the full
+             field set that identifies one observed phase row.
+          2. Implement identity-aware pooling: when the same phase row (all identifying
+             fields equal) appears in more than one source ledger of one campaign, keep
+             ONE row in the pooled corpus and record a duplicate entry (the phase identity
+             + the source ledger paths). Distinct rows (any identifying field differs)
+             pool exactly as today.
+          3. Surface the result honestly in the aggregate output: add a
+             `duplicate_phase_rows` block (count + entries) to the campaign/coverage
+             output so the pooling is auditable. Never silently drop.
+          4. Do not change any metric formula or PINNED_METRIC_DEFINITIONS entry.
+          5. Tests (tests/test_aggregate_workflow_metrics.py): (a) the same phase row in
+             two ledger files of one campaign counts ONCE and is reported as a duplicate
+             with both paths; (b) the same phase name with different timestamps counts
+             TWICE and reports no duplicate; (c) existing corpus tests stay green.
+      - name: j2_regen
+        kind: agent
+        scope: implementation
+        timeout: 1200
+        prompt: |
+          Regenerate the local aggregate after the change (the tool's documented
+          invocation, e.g. python scripts/aggregate_workflow_metrics.py) and report in the
+          commit message whether any existing campaign's counts changed (they should not
+          on the current corpus — the seam is dormant today; if they DO change, investigate
+          which real ledgers carried duplicates and record it).
+      - name: j3_verify
+        kind: test
+        scope: implementation
+        timeout: 600
+        tests: "tests/test_aggregate_workflow_metrics.py tests/test_fast_path_gate.py"
+        prompt: |
+          The declared target verifies the dedup + reporting. Fix failures in the code, not
+          the pins.
+factors:
+  - {name: model, levels: [deepseek/deepseek-v4-flash]}
+design: factorial
+rules: []
+metrics: []
+writeup: {format: lab_book, sections: [question]}
+stop: {budget_usd: 1.5, max_attempts: 1}
