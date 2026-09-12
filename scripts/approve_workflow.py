@@ -207,13 +207,28 @@ def _write_artifact(args: argparse.Namespace) -> Path:
     art_dir = workdir / "approvals" / args.spec
     art_dir.mkdir(parents=True, exist_ok=True)
     artifact = art_dir / f"{args.phase}_approval.md"
+    # Wave A4: the artifact binds EVERY field the contract validates — spec/phase (also in
+    # the path, but the CONTENT must name them or a moved/renamed artifact would still read
+    # as binding), the run, the gate, the candidate sha, and the candidate's TREE (immutable
+    # content identity, not just the sha label).
+    tree = ""
+    try:
+        tree = subprocess.run(
+            ["git", "rev-parse", f"{args.candidate_sha}^{{tree}}"],
+            cwd=workdir, capture_output=True, text=True, timeout=30,
+        ).stdout.strip()
+    except (OSError, subprocess.SubprocessError):
+        tree = ""
     if not args.dry_run:
         artifact.write_text(
             f"---\nstatus: accepted\n---\n\n# Approval\n\n"
+            f"spec: {args.spec}\n"
+            f"phase: {args.phase}\n"
             f"run: {args.run_id}\n"
             f"purpose: checkpoint\n"
             f"gate: {args.gate_id or '(the run approval gate)'}\n"
             f"candidate: {args.candidate_sha}\n"
+            f"tree: {tree}\n"
             f"operator: {args.operator}\n"
             f"date: {_today()}\n"
             f"reason: {args.reason or 'operator approval'}\n"
@@ -247,6 +262,17 @@ def _commit_artifact(args: argparse.Namespace, artifact: Path) -> str:
         raise _ApproveRefusedError(
             f"worktree HEAD {head[:12]} is not the candidate this approval binds "
             f"({args.candidate_sha[:12]}) — rebuild or rebind the run before approving"
+        )
+    # Wave A4 (commit isolation): the approval commit must contain ONLY the approval
+    # artifact. A pre-existing staged change would ride along — the review's reproduction
+    # showed a staged source edit included in the approval commit, which the checkpoint
+    # then accepted. Refuse a dirty index outright.
+    staged = _git("diff", "--cached", "--name-only")
+    if staged.strip():
+        raise _ApproveRefusedError(
+            "the worktree index already has staged changes "
+            f"({', '.join(staged.splitlines()[:5])}) — commit or unstage them before "
+            "approving; an approval commit must contain ONLY its artifact"
         )
     try:
         rel = artifact.resolve().relative_to(workdir.resolve()).as_posix()
