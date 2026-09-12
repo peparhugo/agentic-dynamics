@@ -46,7 +46,8 @@ fixed contract this module enforces):
     build_phase_request    — build a scope-driven typed launch request from a workflow phase
                              (the campaign-wrapper→sibling-cell mechanism, D-16); the request's
                              mounts are the broker's profile expansion (shared).
-    consume_fleet_commands — BRPOP ``fleet:commands`` (db1 / 6380) and dispatch validated
+    consume_fleet_commands — claim ``fleet:commands`` (db1 / 6380; BLMOVE into the durable
+                             processing lane) and dispatch validated
                              resize/drain/restart/submit commands THROUGH the broker,
                              wiring a submitted job's board record through
                              launching -> running -> completed/failed (+ the ``fleet_jobs``
@@ -62,7 +63,7 @@ imports ``control``/``runtime``/``adapters`` and NEVER imports the broker module
 (``launch_broker``) — the admission *decision* stays in ``control.admission``; the docker call
 stays in the host-side broker's process, reached only over the seam. The structural validators
 above remain pure and stdlib-only (validation never requires ``redis``); only the
-fleet:commands BRPOP consumer and the seam client touch a socket, and the seam client
+fleet:commands claim consumer and the seam client touch a socket, and the seam client
 (``broker_client``) is itself stdlib-only.
 """
 
@@ -414,6 +415,13 @@ JOB_IMAGE_PATTERN = re.compile(r"^fleet/job-[a-z0-9][a-z0-9_-]*$")
 
 #: The fleet:commands + review-trigger Redis keys (db1 / 6380 — the D-14 channel).
 COMMANDS_KEY = "fleet:commands"
+
+#: The claim lane (Wave B2): a command read off COMMANDS_KEY is atomically MOVED here
+#: (BLMOVE), never removed, so a wrapper restart can requeue whatever was still WAITING —
+#: a submit queued behind a busy dispatch pool, a command never started. An entry leaves
+#: only when its dispatch reaches a terminal resolution, or when startup recovery resolves
+#: it from the board state (:func:`_recover_processing`).
+PROCESSING_KEY = "fleet:commands:processing"
 
 
 class SpawnValidationError(ValueError):
@@ -1429,7 +1437,7 @@ def dispatch_submit(
     return _broker_outcome_or_raise(outcome)
 
 
-# ── The fleet:commands BRPOP consumer (D-14) ─────────────────────────────────
+# ── The fleet:commands claim consumer (D-14) ─────────────────────────────────
 
 
 def _connect_redis() -> Any:
@@ -1508,7 +1516,7 @@ def _dispatch_command(
     """Run ONE validated fleet command through the broker seam and resolve its board record.
 
     Step 4: this is the unit of work the consumer dispatches — inline for control actions and
-    on the bounded pool for submits — so a running container never blocks the BRPOP loop.
+    on the bounded pool for submits — so a running container never blocks the claim loop.
     Every failure below resolves the job loudly (failed + DLQ), exactly as the inline path did.
     """
     action = command["action"]
@@ -1579,6 +1587,135 @@ def _dispatch_command(
               flush=True)
 
 
+# ── Wave B2: the durable claim lane + restart recovery ──────────────────────
+
+
+def _claim_command(client: Any) -> str | None:
+    """Claim the oldest command: BLMOVE ``COMMANDS_KEY`` -> ``PROCESSING_KEY`` (10s block).
+
+    RIGHT->RIGHT preserves the old BRPOP's FIFO order exactly: LPUSHed commands have the
+    oldest at the TAIL, and appending the claim to the processing lane's tail keeps the
+    lane in claim order (oldest first) for recovery.
+
+    BLMOVE (not BRPOP) is the durability point: a command leaves the queue only into a lane
+    that SURVIVES the process, so a restart can requeue whatever was still waiting.
+    """
+    return client.blmove(COMMANDS_KEY, PROCESSING_KEY, 10, "RIGHT", "RIGHT")
+
+
+def _release_command(client: Any, raw: str) -> None:
+    """Release a claimed command — its dispatch reached a terminal resolution.
+
+    Best-effort by design: if Redis is unreachable the claim stays on disk and startup
+    recovery resolves it (never a silent drop, never a crash in a pool thread).
+    """
+    try:
+        client.lrem(PROCESSING_KEY, 1, raw)
+    except Exception as exc:  # noqa: BLE001 — release is best-effort; recovery re-claims
+        print(f"[spawn-wrapper] claim release failed ({exc}); recovery will resolve it", flush=True)
+
+
+def _job_status(client: Any, fleet_manager: Any, job_id: str) -> str:
+    """The board's current status for a job, or ``""`` when the record is absent/unreadable."""
+    try:
+        raw = client.hget(fleet_manager.JOBS_KEY, job_id)
+        record = json.loads(raw) if raw else {}
+        return str(record.get("status") or "")
+    except (TypeError, ValueError):
+        return ""
+
+
+def _dispatch_claimed(
+    client: Any, raw: str, command: dict[str, Any], dry_run: bool, fleet_manager: Any, dlq: Any
+) -> None:
+    """Dispatch ONE claimed command, releasing the claim on every ordinary exit.
+
+    An exception caught here is TERMINAL (never a silent retry, never a zombie claim): the
+    job is marked failed + filed on the DLQ, then the claim is released. A process KILLED
+    mid-dispatch releases nothing — startup recovery (:func:`_recover_processing`) resolves
+    the claim from the board state.
+    """
+    try:
+        _dispatch_command(client, command, dry_run, fleet_manager, dlq)
+    except Exception as exc:  # noqa: BLE001 — a dispatch crash is terminal, not a lost claim
+        job_id = command.get("job_id") if command.get("action") == "submit" else None
+        reason = f"dispatch crashed: {exc!r}"
+        print(f"[spawn-wrapper] DISPATCH CRASH {command}: {exc!r}", flush=True)
+        if job_id:
+            fleet_manager.record_job_status(client, job_id, "failed", error=reason)
+            dlq.record_dead(client, "fleet_jobs", command, reason)
+    finally:
+        _release_command(client, raw)
+
+
+def _recover_processing(client: Any, fleet_manager: Any, dlq: Any) -> dict[str, int]:
+    """Startup recovery for the claim lane (Wave B2) — waiting work is claimable again.
+
+    Assumes the single-consumer topology (the wrapper is ONE service): every entry in
+    ``PROCESSING_KEY`` was claimed by a previous process that never reached its terminal
+    release. The BOARD decides each entry's fate:
+
+    * a submit still at ``launching``/``queued`` (or with no record) NEVER STARTED — it is
+      moved back onto ``COMMANDS_KEY`` (FIFO preserved), claimable again;
+    * a submit at ``running`` died mid-dispatch: its outcome is unobservable, so it is
+      resolved ``failed`` with the reason naming the restart and filed on the DLQ — an
+      honest terminal state, never a forever-running ghost;
+    * a submit already terminal (``completed``/``failed``) is released silently (the crash
+      landed between the board write and the release);
+    * control actions (scale/drain/restart) are REQUESTS that must not be dropped — moved
+      back for replay (a shaping action is safe to repeat);
+    * malformed entries are dropped loudly.
+
+    Returns a tally (``requeued``/``failed``/``released``/``dropped``) for the log + tests.
+    """
+    tally = {"requeued": 0, "failed": 0, "released": 0, "dropped": 0}
+    entries = client.lrange(PROCESSING_KEY, 0, -1)
+    if not entries:
+        return tally
+    # Reversed so requeued entries preserve FIFO: the OLDEST claim ends up first.
+    for raw in reversed(entries):
+        try:
+            command = json.loads(raw)
+            if not isinstance(command, dict):
+                raise ValueError("the claim is not a command object")
+        except (TypeError, ValueError):
+            client.lrem(PROCESSING_KEY, 1, raw)
+            tally["dropped"] += 1
+            print(f"[spawn-wrapper] recovery: dropping malformed claim {raw!r}", flush=True)
+            continue
+        if command.get("action") != "submit":
+            client.lrem(PROCESSING_KEY, 1, raw)
+            client.lpush(COMMANDS_KEY, raw)
+            tally["requeued"] += 1
+            continue
+        job_id = str(command.get("job_id") or "")
+        status = _job_status(client, fleet_manager, job_id) if job_id else ""
+        if status == "running":
+            reason = (
+                "wrapper restarted mid-dispatch; outcome unobservable "
+                "(the container's own run ledger, if any, is authoritative)"
+            )
+            if job_id:
+                fleet_manager.record_job_status(client, job_id, "failed", error=reason)
+            dlq.record_dead(client, "fleet_jobs", command, reason)
+            client.lrem(PROCESSING_KEY, 1, raw)
+            tally["failed"] += 1
+        elif status in ("completed", "failed"):
+            client.lrem(PROCESSING_KEY, 1, raw)
+            tally["released"] += 1
+        else:
+            # launching / queued / absent — never started; claimable again.
+            client.lrem(PROCESSING_KEY, 1, raw)
+            client.lpush(COMMANDS_KEY, raw)
+            tally["requeued"] += 1
+    print(
+        f"[spawn-wrapper] recovery: requeued {tally['requeued']}, "
+        f"failed {tally['failed']}, released {tally['released']}, dropped {tally['dropped']}",
+        flush=True,
+    )
+    return tally
+
+
 def consume_fleet_commands(
     *,
     client: Any | None = None,
@@ -1586,11 +1723,17 @@ def consume_fleet_commands(
     once: bool = False,
     max_commands: int | None = None,
 ) -> None:
-    """BRPOP ``fleet:commands`` and dispatch validated scale/drain/restart/submit commands (D-14).
+    """Claim ``fleet:commands`` and dispatch validated scale/drain/restart/submit commands (D-14).
 
-    Each popped command is validated against :func:`validate_fleet_command` BEFORE anything is
+    Each claimed command is validated against :func:`validate_fleet_command` BEFORE anything is
     dispatched; an invalid command is logged and dropped (never acted on). This is the
     orchestrator's "hands" — the supervisor LPUSHes, this consumer validates + emits.
+
+    Durable claims + restart recovery (Wave B2): a command is read by BLMOVE into
+    ``fleet:commands:processing`` (never removed), so work that is still WAITING — a submit
+    queued behind a busy pool, a command never started — survives a restart and is requeued
+    by :func:`_recover_processing` at startup. An entry leaves the claim lane only when its
+    dispatch reaches a terminal resolution.
 
     Every ``docker compose`` call is performed by the HOST launch broker over the seam
     (:func:`_broker_client` → the broker's ``fleet-command`` verb), which re-validates the
@@ -1616,8 +1759,9 @@ def consume_fleet_commands(
 
     Step 4 (bounded concurrent dispatch): a SUBMIT is long-running — the broker waits for the
     whole container run — so submits are dispatched to a bounded worker pool
-    (``FINOPS_FLEET_DISPATCH_WORKERS``, default 4) and the BRPOP loop returns to the queue
-    immediately. Busy means QUEUED in the pool: never dropped, never serialising the fleet, and
+    (``FINOPS_FLEET_DISPATCH_WORKERS``, default 4) and the claim loop returns to the queue
+    immediately. Busy means QUEUED in the pool — AND still in the claim lane, so a restart
+    requeues it (Wave B2); never dropped, never serialising the fleet, and
     never blocking a control action. ``scale``/``drain``/``restart`` stay inline so a saturated
     fleet still answers control promptly. ``max_commands`` bounds a batch (tests use it);
     ``None`` (the default) consumes forever.
@@ -1641,10 +1785,15 @@ def consume_fleet_commands(
     pool = ThreadPoolExecutor(max_workers=workers, thread_name_prefix="fleet-dispatch")
     processed = 0
 
+    # Wave B2: resolve the claim lane BEFORE consuming — work a previous process left
+    # waiting becomes claimable again (its ghost records resolved honestly); see
+    # :func:`_recover_processing`.
+    _recover_processing(client, fleet_manager, dlq)
+
     print(f"[spawn-wrapper] consuming {COMMANDS_KEY} (dispatch workers: {workers})", flush=True)
     while True:
         try:
-            result = client.brpop(COMMANDS_KEY, timeout=10)
+            raw = _claim_command(client)
         except (TimeoutError, ConnectionError, OSError) as exc:
             # A transient Redis socket timeout (the client's socket timeout can trip before
             # the BRPOP's own 10s) must not kill the orchestrator's hands — retry the read.
@@ -1654,15 +1803,15 @@ def consume_fleet_commands(
             if once:
                 break
             continue
-        if result is None:
+        if raw is None:
             if once:
                 break
             continue
-        _key, raw = result
         try:
             command = json.loads(raw)
         except json.JSONDecodeError:
             print(f"[spawn-wrapper] dropping malformed command: {raw!r}", flush=True)
+            _release_command(client, raw)
             processed += 1
             if once or (max_commands is not None and processed >= max_commands):
                 break
@@ -1674,6 +1823,7 @@ def consume_fleet_commands(
                 reason = "; ".join(errors)
                 fleet_manager.record_job_status(client, command["job_id"], "failed", error=reason)
                 dlq.record_dead(client, "fleet_jobs", command, reason)
+            _release_command(client, raw)
             processed += 1
             if once or (max_commands is not None and processed >= max_commands):
                 break
@@ -1695,11 +1845,11 @@ def consume_fleet_commands(
                 f"[spawn-wrapper] QUEUED submit {job_id} (fleet dispatch workers: {workers})",
                 flush=True,
             )
-            pool.submit(_dispatch_command, client, command, dry_run, fleet_manager, dlq)
+            pool.submit(_dispatch_claimed, client, raw, command, dry_run, fleet_manager, dlq)
         else:
             # Control actions (scale/drain/restart) and dry-run submits stay INLINE: fast, and
             # answered promptly even while submits saturate the pool.
-            _dispatch_command(client, command, dry_run, fleet_manager, dlq)
+            _dispatch_claimed(client, raw, command, dry_run, fleet_manager, dlq)
         processed += 1
         if once or (max_commands is not None and processed >= max_commands):
             break
@@ -1710,11 +1860,11 @@ def consume_fleet_commands(
 
 
 def main(argv: list[str] | None = None) -> int:
-    """CLI: ``validate`` (a spawn request JSON on stdin) or ``consume`` (the BRPOP loop)."""
+    """CLI: ``validate`` (a spawn request JSON on stdin) or ``consume`` (the claim loop)."""
     parser = argparse.ArgumentParser(description="The sibling-spawn wrapper (D-14/D-16).")
     sub = parser.add_subparsers(dest="command", required=True)
     sub.add_parser("validate", help="validate a spawn request (JSON on stdin)")
-    p_consume = sub.add_parser("consume", help="BRPOP fleet:commands and dispatch")
+    p_consume = sub.add_parser("consume", help="claim fleet:commands and dispatch")
     p_consume.add_argument("--once", action="store_true")
     p_consume.add_argument("--dry-run", action="store_true")
     args = parser.parse_args(argv)
