@@ -754,6 +754,22 @@ def test_b3_matching_digest_passes_and_a_pre_binding_row_only_notes(tmp_path, ca
     assert "pre-binding run" in capsys.readouterr().err
 
 
+# ── wave B5: the decision receipt carries the TRUE rationale + command id ────
+
+
+def test_b5_decision_record_carries_the_true_rationale_and_command_id(tmp_path):
+    """The s2 decision record's ``why`` is the operator's ``--rationale`` + the journal command
+    id — the synthetic gate-count explanation is deleted."""
+    from promote import _promote_decision_record
+
+    wt = _make_candidate(tmp_path)
+    args = _promote_args(tmp_path, wt, tmp_path / "ledger.json", rationale="because green")
+    record = _promote_decision_record(
+        args, _ledger(wt), _candidate_sha(wt), command_id="cmd-b5"
+    )
+    assert record["why"] == "because green (command cmd-b5)"
+
+
 def test_step10_a_completed_command_refuses_the_replay(tmp_path):
     """A journal row already completed for this act refuses BEFORE the push — no second act."""
     wt = _make_candidate_ahead_of_main(tmp_path)

@@ -125,21 +125,29 @@ def _default_decision_record(decision: dict) -> dict:
     }
 
 
-def _publish_decision_record(args: argparse.Namespace, receipt: dict[str, Any]) -> dict:
+def _publish_decision_record(
+    args: argparse.Namespace, receipt: dict[str, Any], *, command_id: str = ""
+) -> dict:
     """The s2 decision dict this publish records: what/why/category/actor + run/candidate.
 
-    ``what`` names the permanence act in human terms; ``why`` is the decision's rationale (the
-    publication receipt + the projection/consistency gates it passed); ``run_id``/``candidate_sha``
-    bind the record to the exact run + tree the release acted on (the DONE_WHEN). A publish with
-    no ``--run-id`` is cleanly a decision without a run binding — the candidate sha is always
-    present (publication refuses without one).
+    ``what`` names the permanence act in human terms; ``why`` is the operator's TRUE
+    ``--rationale`` (wave B5: the synthetic receipt-summary explanation is deleted), with the
+    journal command id appended when present so the record names its receipt;
+    ``run_id``/``candidate_sha`` bind the record to the exact run + tree the release acted on
+    (the DONE_WHEN). A publish with no ``--run-id`` is cleanly a decision without a run binding
+    — the candidate sha is always present (publication refuses without one).
     """
     head = str(receipt.get("repo_sha") or "")
     candidate = args.candidate_sha or head
+    why = str(args.rationale or "").strip()
+    rationale_ref = str(getattr(args, "rationale_ref", "") or "").strip()
+    if rationale_ref:
+        why = f"{why} (ref: {rationale_ref})"
+    if command_id:
+        why = f"{why} (command {command_id})"
     record = {
         "what": f"publish website release {candidate[:12]} to both Firebase hosts",
-        "why": f"publication receipt {pub.receipt_sha256(receipt)[:12]} — projections fresh, "
-               "site consistent, data.js built; release deployed",
+        "why": why,
         "alternatives": [],
         "category": DECISION_CATEGORY,
         "decided_at": datetime.now(timezone.utc).isoformat(),
@@ -174,17 +182,33 @@ def _emit_best_effort(label: str, fn) -> dict | None:
         return None
 
 
-def _publish_decision(args: argparse.Namespace, receipt: dict[str, Any], *, requested_action: dict | None = None) -> dict:
-    """The publish decision/act dict the emission seam consumes."""
+def _publish_decision(
+    args: argparse.Namespace,
+    receipt: dict[str, Any],
+    *,
+    requested_action: dict | None = None,
+    command_id: str = "",
+) -> dict:
+    """The publish decision/act dict the emission seam consumes.
+
+    Wave B5: ``why`` is the operator's TRUE ``--rationale`` (the synthetic receipt-hash text is
+    deleted); ``command_id`` is the journal receipt this act binds.
+    """
     head = str(receipt.get("repo_sha") or "")
+    why = str(args.rationale or "").strip()
+    rationale_ref = str(getattr(args, "rationale_ref", "") or "").strip()
+    if rationale_ref:
+        why = f"{why} (ref: {rationale_ref})"
     decision = {
         "verb": "publish",
         "run_id": args.run_id,
         "candidate_sha": args.candidate_sha or head,
         "operator": args.operator,
         "status": "requested",
-        "why": f"publication receipt {pub.receipt_sha256(receipt)[:12]}",
+        "why": why,
     }
+    if command_id:
+        decision["command_id"] = command_id
     if requested_action:
         decision["requested_action"] = requested_action
     return decision
@@ -642,7 +666,10 @@ def main(
     # the publish decision with the run_id + candidate sha + operator. A dry run never emits —
     # it deploys nothing, so there is no permanence decision to record.
     emitted_decision = _emit_best_effort(
-        "publish decision", lambda: emit_decision(_publish_decision(args, receipt))
+        "publish decision",
+        lambda: emit_decision(
+            _publish_decision(args, receipt, command_id=command.command_id)
+        ),
     )
     outcomes = []
     try:
@@ -744,7 +771,10 @@ def main(
     _emit_best_effort(
         "publish act",
         lambda: emit_act(
-            _publish_decision(args, receipt, requested_action=requested_action),
+            _publish_decision(
+                args, receipt, requested_action=requested_action,
+                command_id=command.command_id,
+            ),
             causes=observation_id or "",
         ),
     )
@@ -756,7 +786,9 @@ def main(
     # partial deploy emits nothing — there is no completed permanence decision to record.
     _emit_best_effort(
         "publish decision record",
-        lambda: record_decision(_publish_decision_record(args, receipt)),
+        lambda: record_decision(
+            _publish_decision_record(args, receipt, command_id=command.command_id)
+        ),
     )
 
     # ── Step 8: post-deploy check ────────────────────────────────────────────────────────
