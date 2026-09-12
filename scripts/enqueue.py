@@ -137,16 +137,32 @@ def completed_cells(model: str) -> set[str]:
     return completed
 
 
-def build_cells(model: str = MODEL, missing_only: bool = False) -> list[dict[str, Any]]:
-    """Build the full experiment matrix, optionally skipping completed cells."""
+def build_cells(
+    model: str = MODEL,
+    missing_only: bool = False,
+    *,
+    stories: list[str] | None = None,
+    tiers: list[str] | None = None,
+    conditions: dict[str, list[str]] | None = None,
+) -> list[dict[str, Any]]:
+    """Build the experiment matrix, optionally skipping completed cells.
+
+    The ONE matrix builder (Wave B4): ``pipeline.py``'s matrix phases call this with their
+    plan's stories/tiers/conditions, so cell ids and the saved-result skip can never drift
+    between the CLI fill and a plan fill — the old pipeline copy had already diverged (it
+    carried its own result parser, the queued-aware skip was missing, and it owed no
+    admission).
+    """
+    stories = stories or STORIES
+    tiers = tiers or TIERS
+    conds_by_quality = conditions or {"good": GOOD_CONDITIONS, "bad": BAD_CONDITIONS}
     done = completed_cells(model) if missing_only else set()
     slug = model_slug(model)
 
     cells = []
-    for story in STORIES:
-        for tier in TIERS:
-            for quality in ["good", "bad"]:
-                conds = GOOD_CONDITIONS if quality == "good" else BAD_CONDITIONS
+    for story in stories:
+        for tier in tiers:
+            for quality, conds in conds_by_quality.items():
                 for condition in conds:
                     if f"{story}|{tier}|{quality}|{condition}" in done:
                         continue
@@ -159,6 +175,30 @@ def build_cells(model: str = MODEL, missing_only: bool = False) -> list[dict[str
                         "model": model,
                     })
     return cells
+
+
+def select_new_cells(r: "redis.Redis", cells: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Drop cells already waiting in either lane (the queued-aware skip, factored out).
+
+    The shared fill contract's second stage (Wave B4): a caller that fills a plan's matrix
+    must run this too — the old pipeline fill re-pushed queued cells, which is exactly the
+    duplication class the controller had to clear by hand.
+    """
+    queued = queued_cell_ids(r)
+    return [cell for cell in cells if cell["cell_id"] not in queued]
+
+
+def push_cells(r: "redis.Redis", cells: list[dict[str, Any]], *, lane: str = QUEUE_KEY) -> int:
+    """Push cells onto a lane and mark each ``queued`` — the ONE fill write (Wave B4).
+
+    Every fill has to do exactly this pair (``lpush`` the payload + seed ``story_status``);
+    keeping it in one function is what lets the pipeline's fills be the SAME submission the
+    CLI's fills are, instead of a parallel write path.
+    """
+    for cell in cells:
+        r.lpush(lane, json.dumps(cell))
+        r.hset(STATUS_KEY, mapping={cell["cell_id"]: "queued"})
+    return len(cells)
 
 
 def _provider(model: str) -> str:
@@ -316,11 +356,10 @@ def main() -> None:
         r = redis.Redis(host=REDIS_HOST, port=REDIS_PORT, db=REDIS_DB, decode_responses=True)
 
     # Queued-aware skip: drop cells already waiting in either lane (a saved result is not the
-    # only reason a cell needs no second push).
+    # only reason a cell needs no second push). The same helper every fill path runs (Wave B4).
     if missing_only and not clear and r is not None:
-        queued = queued_cell_ids(r)
         before = len(cells)
-        cells = [cell for cell in cells if cell["cell_id"] not in queued]
+        cells = select_new_cells(r, cells)
         total = len(cells)
         skipped = before - total
         if skipped:
@@ -364,9 +403,7 @@ def main() -> None:
         print(f"Interleaved {total} new cells into queue (now {len(final_cells)} total) (model={model})")
     else:
         lane = BATCH_QUEUE_KEY if batch else QUEUE_KEY
-        for cell in cells:
-            r.lpush(lane, json.dumps(cell))
-            r.hset(STATUS_KEY, cell["cell_id"], "queued")
+        push_cells(r, cells, lane=lane)
         print(f"Enqueued {total} cells into '{lane}' (model={model})")
 
     print(f"Status tracker: '{STATUS_KEY}'")
