@@ -109,6 +109,10 @@ COPY src/ ./src/
 # and mounted rw at runtime; `experiments/definitions` + `experiments/specs` + `experiments/
 # waivers` are baked read-only inputs (matching the reproduction image).
 COPY scripts/ ./scripts/
+# The top-level ``workflows/`` namespace package (compile/lint/plan): every agent
+# phase's run_workflow.py imports ``workflows.compile_workflow``; the base cell image
+# lacked the directory and every phase died ModuleNotFoundError (observed 2026-09-12).
+COPY workflows/ ./workflows/
 COPY conventions/ ./conventions/
 COPY apps/ ./apps/
 COPY experiments/definitions/ ./experiments/definitions/

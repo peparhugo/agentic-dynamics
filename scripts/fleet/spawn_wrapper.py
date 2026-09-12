@@ -79,10 +79,16 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any
 
-# scripts/fleet/ -> the repo root is two parents up; put src/ on sys.path so the experiment
-# plane resolves (the same "scripts/ is sys.path[0]" convention as the other scripts).
+# scripts/fleet/ -> the repo root is two parents up; put the REPO ROOT and src/ on sys.path
+# so the experiment plane resolves AND the top-level ``workflows/`` namespace package (used
+# below by ``from workflows.compile_workflow import load_spec_any``) imports on a clean
+# direct run — the same repo-root bootstrap scripts/_bootstrap.py applies to the other
+# entrypoints (wave A1's clean-environment contract; spawn_wrapper was missed, and the
+# container consumer crash-looped on it: ModuleNotFoundError: No module named 'workflows').
 _REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 _SRC = _REPO_ROOT / "src"
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
 if str(_SRC) not in sys.path:
     sys.path.insert(0, str(_SRC))
 
@@ -919,6 +925,20 @@ def validate_submit_request(
         phases = [p for p in (spec.workflow.params.get("phases") or []) if isinstance(p, dict)]
         if not phases:
             errors.append(f"submit: spec {spec_rel!r} declares no phases")
+        # Scope resolution with the DOCUMENTED order (experiment_spec.phase_scope, the F3 cs4
+        # fix): a phase's DECLARED ``scope:`` wins; the static table is the fallback. The
+        # caller-supplied ``phase_scopes`` (a test override) keeps precedence for the names it
+        # carries. Without this wiring, a custom spec whose phase names are absent from the
+        # static table was refused at validate_spawn step 2 despite declaring its scopes.
+        overrides = dict(phase_scopes or {})
+        resolved = dict(overrides)
+        for phase in phases:
+            name = str(phase.get("name") or "")
+            if name and name not in overrides:
+                scope = phase_scope(phase, phase_name=name)
+                if scope is not None:
+                    resolved[name] = scope
+        submit_scopes = resolved or None
         for phase in phases:
             phase_request = build_phase_request(
                 phase,
@@ -926,11 +946,11 @@ def validate_submit_request(
                 workdir=workdir or "/tmp",
                 model=model,
                 spec_name=spec.name,
-                phase_scopes=phase_scopes,
+                phase_scopes=submit_scopes,
                 path_config=path_config,
             )
             for e in validate_spawn(
-                phase_request, phase_scopes=phase_scopes, path_config=path_config
+                phase_request, phase_scopes=submit_scopes, path_config=path_config
             ):
                 errors.append(f"submit: phase {phase.get('name')!r}: {e}")
 

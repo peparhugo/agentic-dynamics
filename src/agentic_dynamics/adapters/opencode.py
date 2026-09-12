@@ -10,6 +10,7 @@ This is the measurement layer the instrument was designed for.
 from __future__ import annotations
 
 import json
+import logging
 import os
 import subprocess
 import tempfile
@@ -39,6 +40,72 @@ else:
     OPENCODE_BIN = "opencode"  # fall back to $PATH
 
 
+logger = logging.getLogger(__name__)
+
+#: Environment override for the workdir snapshot cap. ``_list_files`` walks a directory
+#: hashing every file for before/after change detection; an unbounded tree (a real workdir
+#: observed at 1.33M files ground for minutes before the model was ever invoked) turns that
+#: bookkeeping into a silent hang. Above this many files the walk stops and returns a
+#: :class:`SnapshotSkipped` sentinel instead of an unbounded (and incomplete) dict.
+SNAPSHOT_CAP_ENV = "FINOPS_ADAPTER_MAX_SNAPSHOT_FILES"
+DEFAULT_SNAPSHOT_MAX_FILES = 50_000
+
+
+@dataclass(frozen=True)
+class SnapshotSkipped:
+    """Returned by :func:`_list_files` when a workdir exceeds the snapshot cap.
+
+    Deliberately NOT a ``dict`` (and so distinguishable from a real empty snapshot ``{}``):
+    a caller that read a capped walk as "no files" would report "no changes" for a turn that
+    may have rewritten the entire tree. ``observed`` is the file count seen when the walk
+    stopped (``> cap``); ``cap`` is the configured limit.
+    """
+
+    observed: int
+    cap: int
+
+
+class WorkdirDiff(tuple):
+    """The changed set ``(created, modified)`` plus HOW it was determined.
+
+    Subclasses ``tuple`` so the historical ``created, modified = _diff_workdir(...)``
+    unpacking contract is preserved exactly; ``detection`` carries the provenance the
+    consumers need to avoid reporting a skipped snapshot as "no changes":
+
+    ``"hashed"``
+        The full byte-level before/after snapshot compared cleanly.
+    ``"git_status"``
+        The snapshot was skipped; the changed set came from ``git status --porcelain``.
+    ``"unavailable"``
+        The snapshot was skipped AND git could not answer — the (empty) lists are NOT
+        evidence of "no changes".
+    """
+
+    def __new__(
+        cls,
+        created: list[str],
+        modified: list[str],
+        detection: str = "hashed",
+        observed: int | None = None,
+        cap: int | None = None,
+    ) -> WorkdirDiff:
+        obj = super().__new__(cls, (list(created), list(modified)))
+        # A tuple subclass gains a ``__dict__`` when no ``__slots__`` is declared; these
+        # attributes are the provenance the two-element tuple cannot carry.
+        obj.detection = detection
+        obj.observed = observed
+        obj.cap = cap
+        return obj
+
+    @property
+    def created(self) -> list[str]:
+        return self[0]
+
+    @property
+    def modified(self) -> list[str]:
+        return self[1]
+
+
 @dataclass
 class AgenticResult:
     """Complete result of an agentic opencode session."""
@@ -57,6 +124,14 @@ class AgenticResult:
     final_response: str = ""
     files_created: list[str] = field(default_factory=list)
     files_modified: list[str] = field(default_factory=list)
+
+    #: How ``files_created``/``files_modified`` were derived (see :class:`WorkdirDiff`).
+    #: ``"hashed"`` is the full before/after snapshot; ``"git_status"`` means the snapshot
+    #: was skipped (tree above FINOPS_ADAPTER_MAX_SNAPSHOT_FILES) and the changed set came
+    #: from git; ``"unavailable"`` means the snapshot was skipped AND git could not answer,
+    #: so the (empty) lists must NOT be read as "no changes". Default preserves the
+    #: historical reading for callers that never look at this field.
+    change_detection: str = "hashed"
 
     # Tool call trace
     tool_calls: list[dict[str, Any]] = field(default_factory=list)
@@ -420,7 +495,11 @@ def run_opencode_agentic(
         elif publisher is not None:
             publisher.publish_event(obj)
 
-    on_line = _on_line if (on_event is not None or publisher is not None or watchdog is not None) else None
+    on_line = (
+        _on_line
+        if (on_event is not None or publisher is not None or watchdog is not None)
+        else None
+    )
     try:
         stream = stream_subprocess(
             cmd, workdir=workdir, timeout=timeout, on_line=on_line, watchdog=watchdog
@@ -483,8 +562,12 @@ def run_opencode_agentic(
 
     result.duration_s = time.monotonic() - t0
 
-    # Detect file changes (filter out venv, pip, pytest cache)
-    result.files_created, result.files_modified = _diff_workdir(workdir, files_before)
+    # Detect file changes (filter out venv, pip, pytest cache). ``_diff_workdir`` returns a
+    # ``WorkdirDiff`` carrying the detection provenance so a skipped snapshot is never
+    # silently reported as "no changes".
+    _diff = _diff_workdir(workdir, files_before)
+    result.files_created, result.files_modified = _diff
+    result.change_detection = _diff.detection
 
     # Persist session transcript for post-hoc artifact bundling
     if result.raw_transcript:
@@ -512,9 +595,10 @@ def _init_git_workdir(workdir: str) -> None:
     identity, and only commits when something is actually staged (an empty "Initial" commit is
     skipped).
     """
-    has_head = subprocess.run(
-        ["git", "rev-parse", "HEAD"], cwd=workdir, capture_output=True
-    ).returncode == 0
+    has_head = (
+        subprocess.run(["git", "rev-parse", "HEAD"], cwd=workdir, capture_output=True).returncode
+        == 0
+    )
     if has_head:
         return
 
@@ -536,42 +620,166 @@ def _init_git_workdir(workdir: str) -> None:
     subprocess.run(["git", "commit", "-m", "Initial"], cwd=workdir, capture_output=True)
 
 
-def _diff_workdir(
-    workdir: str, files_before: dict[str, str]
-) -> tuple[list[str], list[str]]:
+#: Directory names whose contents are never part of the changed set (build/test caches,
+#: dependency trees, the worktree's own git metadata). Shared by the hashed comparison and
+#: the git-status fallback so both paths expose the same shape.
+_ARTIFACT_DIRS = (".venv", "venv", "__pycache__", ".pytest_cache", "node_modules", ".git")
+
+
+def _is_artifact(p: str) -> bool:
+    """True when any path segment names an artifact directory (see ``_ARTIFACT_DIRS``)."""
+    return any(skip in p.split("/") for skip in _ARTIFACT_DIRS)
+
+
+def _snapshot_max_files() -> int:
+    """Resolve the snapshot cap from the environment, defaulting to 50000.
+
+    A missing, non-integer, or negative override falls back to the default rather than
+    crashing a turn — malformed configuration is never allowed to kill a run. ``0`` is
+    honored (it disables hashing entirely, useful for tests and pathological trees).
+    """
+    raw = os.environ.get(SNAPSHOT_CAP_ENV)
+    if not raw:
+        return DEFAULT_SNAPSHOT_MAX_FILES
+    try:
+        cap = int(raw)
+    except (TypeError, ValueError):
+        return DEFAULT_SNAPSHOT_MAX_FILES
+    return cap if cap >= 0 else DEFAULT_SNAPSHOT_MAX_FILES
+
+
+def _diff_workdir(workdir: str, files_before: dict[str, str] | SnapshotSkipped) -> WorkdirDiff:
     """Compute files created/modified relative to a prior snapshot.
 
     ``files_modified`` is the CHANGED-set (content hash differs), not the
     pre-existing-set: a file that existed before the run with unchanged content is
     untouched, not "modified".
+
+    When EITHER snapshot was skipped (the tree exceeded ``FINOPS_ADAPTER_MAX_SNAPSHOT_FILES``)
+    the hashes cannot be compared. Rather than fabricate an empty diff, fall back to
+    ``git status --porcelain`` (``detection="git_status"``); when git cannot answer, return
+    ``detection="unavailable"`` so the caller never mistakes the empty lists for "no
+    changes". Under the cap the returned ``WorkdirDiff`` is byte-identical to the historical
+    ``(created, modified)`` tuple.
     """
+    if isinstance(files_before, SnapshotSkipped):
+        # The before-snapshot already told us the tree is over the cap; do not re-walk it.
+        return _diff_workdir_from_git(workdir, observed=files_before.observed, cap=files_before.cap)
+
     files_after = _list_files(workdir)
+    if isinstance(files_after, SnapshotSkipped):
+        return _diff_workdir_from_git(workdir, observed=files_after.observed, cap=files_after.cap)
 
-    def _is_artifact(p: str) -> bool:
-        return any(
-            skip in p.split("/")
-            for skip in (".venv", "venv", "__pycache__", ".pytest_cache", "node_modules", ".git")
-        )
-
-    files_created = sorted(f for f in (files_after.keys() - files_before.keys()) if not _is_artifact(f))
+    files_created = sorted(
+        f for f in (files_after.keys() - files_before.keys()) if not _is_artifact(f)
+    )
     files_modified = sorted(
         f
         for f in (files_after.keys() & files_before.keys())
         if not _is_artifact(f) and files_after[f] != files_before[f]
     )
-    return files_created, files_modified
+    return WorkdirDiff(files_created, files_modified, detection="hashed")
 
 
-def _list_files(dirpath: str) -> dict[str, str]:
-    """Snapshot files in a directory: relative path -> sha256 content hash."""
+def _diff_workdir_from_git(workdir: str, *, observed: int | None, cap: int | None) -> WorkdirDiff:
+    """Best-effort changed set from git when the hashed snapshot was skipped.
+
+    ``git status`` is a truthful fallback: it names the worktree entries git considers
+    changed without hashing every file. When git is unavailable (not a repo, binary absent,
+    or the command fails) the result is ``detection="unavailable"`` — the empty lists are an
+    honest "we could not tell", never a claim of "no changes".
+    """
+    changes = _git_status_changes(workdir)
+    if changes is None:
+        return WorkdirDiff([], [], detection="unavailable", observed=observed, cap=cap)
+    created, modified = changes
+    return WorkdirDiff(created, modified, detection="git_status", observed=observed, cap=cap)
+
+
+def _git_status_changes(workdir: str) -> tuple[list[str], list[str]] | None:
+    """Parse ``git status --porcelain`` into (created, modified), or None if unavailable.
+
+    Untracked (``??``) and added (``A``) entries are "created"; every other tracked change
+    is "modified"; deletions are omitted (matching the hashed path, which only ever lists
+    files that exist after the turn). Artifact directories are filtered so the fallback's
+    shape matches the hashed comparison. Any failure (no repo, no git, timeout) yields
+    ``None`` — the caller degrades to "change detection unavailable", never an exception.
+    """
+    try:
+        proc = subprocess.run(
+            ["git", "status", "--porcelain"],
+            cwd=workdir,
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    if proc.returncode != 0:
+        return None
+
+    created: list[str] = []
+    modified: list[str] = []
+    for line in proc.stdout.splitlines():
+        if len(line) < 4:
+            continue
+        xy, path = line[:2], line[3:]
+        if " -> " in path:  # rename/copy: report the destination path
+            path = path.split(" -> ", 1)[1]
+        path = _unquote_git_path(path)
+        if not path or _is_artifact(path):
+            continue
+        if xy == "??" or "A" in xy:
+            created.append(path)
+        elif "D" in xy:
+            continue
+        else:
+            modified.append(path)
+    return sorted(created), sorted(modified)
+
+
+def _unquote_git_path(path: str) -> str:
+    """Undo git's C-style quoting of paths that contain special characters."""
+    if len(path) >= 2 and path.startswith('"') and path.endswith('"'):
+        try:
+            return json.loads(path)
+        except json.JSONDecodeError:
+            return path[1:-1]
+    return path
+
+
+def _list_files(dirpath: str) -> dict[str, str] | SnapshotSkipped:
+    """Snapshot files in a directory: relative path -> sha256 content hash.
+
+    Walks ``dirpath`` counting files; once the count exceeds
+    ``FINOPS_ADAPTER_MAX_SNAPSHOT_FILES`` (default 50000) the walk STOPS without hashing
+    further and returns a :class:`SnapshotSkipped` carrying the observed count and the cap.
+    The cap bounds an otherwise unbounded walk — a large tree (a real workdir observed at
+    1.33M files) would otherwise grind for minutes before the model was invoked, and the
+    resulting dict would be too incomplete to compare honestly anyway.
+
+    Below the cap the return value is byte-identical to the historical snapshot: a
+    ``{relative_path: sha256}`` dict. A walk that raises is likewise reported as
+    ``SnapshotSkipped`` (an unknown snapshot), never as an empty one.
+    """
     import hashlib
 
+    cap = _snapshot_max_files()
+    observed = 0
     try:
         root = Path(dirpath)
         snapshot: dict[str, str] = {}
         for p in root.rglob("*"):
             if not p.is_file():
                 continue
+            observed += 1
+            if observed > cap:
+                logger.warning(
+                    "workdir snapshot skipped: %d files > cap (%s)",
+                    observed,
+                    SNAPSHOT_CAP_ENV,
+                )
+                return SnapshotSkipped(observed=observed, cap=cap)
             rel = str(p.relative_to(root))
             try:
                 digest = hashlib.sha256(p.read_bytes()).hexdigest()
@@ -580,7 +788,10 @@ def _list_files(dirpath: str) -> dict[str, str]:
             snapshot[rel] = digest
         return snapshot
     except Exception:
-        return {}
+        # A failed walk is an UNKNOWN snapshot, not an empty one: returning ``{}`` here (the
+        # historical behavior) would make the diff read a broken walk as "the tree is empty".
+        # Report it as skipped so the consumer falls back to git / degrades honestly.
+        return SnapshotSkipped(observed=observed, cap=cap)
 
 
 def _extract_session_id(stdout: str) -> str:

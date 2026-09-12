@@ -89,6 +89,12 @@ from typing import Any
 # planes resolve (the same "scripts/ is sys.path[0]" convention as the other scripts).
 _REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 _SRC = _REPO_ROOT / "src"
+# The repo root itself is required: the broker validates a submit's spec through
+# ``load_spec_any`` -> the top-level ``workflows/`` namespace package, which resolves only
+# with the repo root on sys.path. Missing here, the broker raised ModuleNotFoundError for
+# every valid submit whose spec path resolved (observed 2026-09-12, the wave-C batch).
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
 if str(_SRC) not in sys.path:
     sys.path.insert(0, str(_SRC))
 
