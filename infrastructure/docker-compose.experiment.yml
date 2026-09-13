@@ -27,14 +27,15 @@ services:
   #   run flushdb()/flushall() against it as a test sandbox.
   #
   # Persistence: the knowledge stream and the framework queue are durable state and
-  # should survive a container restart. Enable AOF (appendonly yes) for this instance so
-  # stream entries and queue jobs are not lost on a crash; RDB alone would lose the most
-  # recent XADD/BRPOP state between snapshots. (No behavior change here — this is the
-  # operational note for where AOF must be turned on.)
+  # should survive a container restart. AOF is ENABLED below (`--appendonly yes`) so
+  # stream entries and queue jobs are not lost on a crash; RDB snapshots are left at
+  # their Redis 7 defaults (AOF and RDB coexist), because RDB alone would lose the most
+  # recent XADD/BRPOP state between snapshots.
   queue:
     image: redis:7-alpine
     container_name: finops-queue
     restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
     ports:
       - "127.0.0.1:6380:6379"
     volumes:

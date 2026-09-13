@@ -90,7 +90,7 @@ def api_docs_health() -> Response:
     cannot tell an empty rail from a broken portal through a stack trace. The "nothing here yet"
     case is data (``available: false``, ``condition: "unmeasured"``), not an error.
     """
-    envelope = _services.docs_health.load_docs_health(_services.docs_drift_results_dir)
+    envelope = _services.docs_health.load_docs_health(_services.docs_drift_results_dir())
     return jsonify(envelope)
 
 
@@ -148,7 +148,7 @@ def api_docs_health_approve() -> Response:
             proposal_id=proposal_id.strip(),
             reason=reason.strip(),
             dispatch=dispatch,
-            results_dir=_services.docs_drift_results_dir,
+            results_dir=_services.docs_drift_results_dir(),
         )
         status = OUTCOME_STATUS.get(decision.outcome, 503)
         payload = decision.to_json()

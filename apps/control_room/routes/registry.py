@@ -1,8 +1,8 @@
 """Manifest-registry routes (table + lineage).
 
 Extracted from ``server.py`` (refactor-repair Debt-1). Pure file reads over the cached compacted
-registry; ``_services.data_manifest_path`` is read through ``server.*`` so the tests' monkeypatch
-keeps working.
+registry; ``_services.data_manifest_path()`` is a composition-root-injected accessor (bound by
+``server.build_services``) so the tests' monkeypatch of the path keeps working.
 """
 from __future__ import annotations
 
@@ -32,7 +32,7 @@ def api_registry() -> Response:
     argparse's dash-to-underscore convention already applied since these are query
     string keys, not flags).
     """
-    rows = _load_registry_cached(_services.data_manifest_path)
+    rows = _load_registry_cached(_services.data_manifest_path())
 
     record_type = request.args.get("record_type")
     if record_type:
@@ -63,7 +63,7 @@ def api_registry_lineage(entity_id) -> Response:
     heavier dependency than this read-only surface needs for the one-hop view it exists
     to serve.
     """
-    rows = _load_registry_cached(_services.data_manifest_path)
+    rows = _load_registry_cached(_services.data_manifest_path())
     matches = [r for r in rows if r.get("entity_id") == entity_id]
     if not matches:
         return jsonify({"error": "not_found", "entity_id": entity_id}), 404

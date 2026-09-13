@@ -6,6 +6,15 @@ imports, which are resolved against the package layout so ``from ..control impor
 longer bypass the cross-plane analysis. The tier map is *descriptive*; the forbidden edges are
 the explicit rules — not a blanket tier DAG.
 
+**Node identity is PATH-BASED.** Every graph node is the file's dotted module path
+(``agentic_dynamics.runtime.workflow_runner``, ``apps.control_room.services.registry``), never
+the bare filename stem. The pre-fix graph keyed on ``(plane, stem)``, so same-named files in one
+plane — e.g. ``apps/control_room/services/registry.py`` and ``apps/control_room/routes/registry.py``
+(both ``("apps", "registry")``) — silently merged into ONE node whose edge list was whichever file
+the filesystem walk read last. The same class of collision hit ``telemetry``, ``design_sessions``,
+``docs_health``, ``operations`` and every ``__init__`` under ``apps/``. Path-based keys make each
+file its own node, and ``test_graph_nodes_are_path_based_and_collision_free`` pins that.
+
 Tier map:
 
 * tier 0 ``core`` — ``core``
@@ -21,6 +30,32 @@ are the two adapter telemetry edges (``opencode``/``claude_adapter`` → ``contr
 with the control implementations injected at the composition root (``scripts/run_workflow.py``),
 per the Debt-2 dependency inversion. The two data-flow guards (retrieval never supplies POLICY
 facts / never writes the KB; knowledge never actuates) live in ``tests/test_data_flow.py``.
+
+**Checkout-only surfaces (``scripts/``, ``workflows/``) — what IS and is NOT gated.** These
+namespace packages (no ``__init__.py``; a wheel does not ship them) are walked as graph nodes so
+that ONE real edge is enforced: the package planes must never import them
+(``test_package_does_not_import_scripts_or_workflows``). That is the direction that protects the
+library from re-acquiring checkout-only CLI logic. The rest of their import graph stays OUTSIDE
+the ruleset, deliberately and precisely — not by omission:
+
+* The tier map ends at ``apps``; there is no terminal tier for entry points, and BOTH cross-edges
+  exist TODAY: ``apps/control_room/server.py``, ``services/docs_health.py``,
+  ``services/registry.py``, ``services/subscription_usage.py`` and ``routes/registry.py`` import
+  ``scripts.*`` (apps → scripts), and ``scripts/verify_control_room_rendering.py`` imports
+  ``apps.control_room.server`` (scripts → apps). Gating those edges means either a sanctioned
+  tier rule or migrating the CLI logic into the package — and the latter is explicitly deferred
+  (``pyproject.toml``: the CLI is CHECKOUT-ONLY; script-logic migration is post-repair
+  hardening). A rule that quietly allowed every scripts edge would fake coverage, so the edges
+  are named here instead.
+* ``tests/**`` stays out of scope by convention: tests import both surfaces on purpose and assert
+  against them.
+
+**Known limitation (unchanged by this hardening).** ``from pkg.mod import submod`` records the
+target as ``pkg.mod``, not ``pkg.mod.submod`` — the alias name is not resolved to a submodule
+node. The named forbidden-module check therefore matches direct module imports
+(``from agentic_dynamics.knowledge.retrieval import …``) and that module's descendants, exactly
+as the pre-fix check did; tightening it would change which imports count as edges and belongs to
+a separate, deliberate widening of the gate.
 """
 
 from __future__ import annotations
@@ -35,11 +70,18 @@ pytestmark = pytest.mark.fast
 ROOT = Path(__file__).resolve().parent.parent
 AD = ROOT / "src" / "agentic_dynamics"
 APPS = ROOT / "apps"
+SCRIPTS = ROOT / "scripts"
+WORKFLOWS = ROOT / "workflows"
 
 CORE = "core"
 PLANES = {"experiment", "measurement", "runtime", "adapters", "knowledge", "reporting"}
 CONTROL = "control"
 LEGACY = "legacy"
+
+#: Checkout-only surfaces walked for the package→scripts/workflows guard only. A wheel does not
+#: ship them (they are namespace packages), and their own import graphs stay outside the ruleset
+#: — the module docstring names the apps↔scripts edges that would fail if they were gated today.
+CHECKOUT_ONLY = {"scripts", "workflows"}
 
 TIER1 = PLANES
 TIER2 = {CONTROL}
@@ -50,84 +92,88 @@ TIER2 = {CONTROL}
 #: + TelemetryPublisher protocols instead of importing ``control``. Any other plane module
 #: importing ``control`` is a rec-8 violation.
 PINNED_T1_TO_T2 = frozenset({
-    ("adapters.opencode", "control.live"),
-    ("adapters.claude_adapter", "control.live"),
+    ("agentic_dynamics.adapters.opencode", "agentic_dynamics.control.live"),
+    ("agentic_dynamics.adapters.claude_adapter", "agentic_dynamics.control.live"),
+})
+
+#: The control-plane modules whose import from ``control`` is forbidden (rule 7): control
+#: consumes facts, not arbitrary retrieved text.
+RETRIEVAL_MODULES = frozenset({
+    "agentic_dynamics.knowledge.retrieval",
+    "agentic_dynamics.knowledge.prompt_constructor",
 })
 
 
-def _plane_of(rel: Path) -> str | None:
-    """The plane (or ``apps``) a source file belongs to, or ``None`` if out of scope.
+def _module_path(path: Path) -> str:
+    """The dotted-path identity of a source file, e.g. ``agentic_dynamics.runtime.foo``.
 
-    Paths are repo-relative: ``src/agentic_dynamics/<plane>/<file>.py`` for the package and
-    ``apps/...`` for the (Stage 5) application tier.
-    """
-    parts = rel.parts
-    if not parts:
-        return None
-    if parts[0] == "apps":
-        return "apps"
-    if len(parts) >= 3 and parts[0] == "src" and parts[1] == "agentic_dynamics":
-        return parts[2]
-    return None
-
-
-def _module_files() -> list[tuple[str, str, Path]]:
-    """Every linted source file as ``(plane, stem, path)``.
-
-    ``legacy/`` is quarantined dead code (retired in phase E) and deliberately excluded from
-    the tier map; ``apps/`` is included when it exists (Stage 5).
-    """
-    files: list[tuple[str, str, Path]] = []
-    for p in AD.rglob("*.py"):
-        rel = p.relative_to(ROOT)
-        plane = _plane_of(rel)
-        if plane is None or plane == LEGACY:
-            continue
-        files.append((plane, p.stem, p))
-    if APPS.exists():
-        for p in APPS.rglob("*.py"):
-            files.append(("apps", p.stem, p))
-    return files
-
-
-def _resolve_target(import_name: str) -> tuple[str, str | None] | None:
-    """Resolve an absolute import target to ``(plane, module)`` or ``None`` if not internal."""
-    parts = import_name.split(".")
-    if parts[0] == "agentic_dynamics":
-        if len(parts) == 1:
-            return None  # `import agentic_dynamics` — no plane
-        plane = parts[1]
-        if plane in (CORE, *PLANES, CONTROL):
-            module = parts[2] if len(parts) >= 3 else None
-            return (plane, module)
-        return None  # legacy / unknown — out of scope
-    if parts[0] == "apps":
-        return ("apps", parts[1] if len(parts) >= 2 else None)
-    return None  # stdlib / third-party
-
-
-def _module_parts(path: Path) -> list[str]:
-    """The dotted module path of a source file, e.g. ``agentic_dynamics.runtime.foo``.
-
-    ``apps/**`` files keep the ``apps`` prefix; ``src/agentic_dynamics/**`` files drop the
-    ``src`` container so the parts line up with the import vocabulary.
+    Path-based, never stem-based: ``src/agentic_dynamics/**`` drops the ``src`` container so the
+    parts line up with the import vocabulary, while ``apps/**``/``scripts/**`` keep their prefix.
     """
     parts = list(path.relative_to(ROOT).parts)
     parts[-1] = Path(parts[-1]).stem
     if parts and parts[0] == "src":
         parts = parts[1:]
-    return parts
+    return ".".join(parts)
+
+
+def _plane_of_module(module: str) -> str | None:
+    """The plane (or ``apps``/``scripts``/``workflows``) of a dotted module path, else ``None``.
+
+    ``legacy`` and unknown roots return ``None`` — ``legacy/`` is quarantined dead code
+    (retired in phase E) and deliberately excluded from the tier map.
+    """
+    parts = module.split(".")
+    if parts[0] == "apps":
+        return "apps"
+    if parts[0] in CHECKOUT_ONLY:
+        return parts[0]
+    if len(parts) >= 2 and parts[0] == "agentic_dynamics" and parts[1] in (CORE, *PLANES, CONTROL):
+        return parts[1]
+    return None
+
+
+def _module_files() -> list[Path]:
+    """Every linted source file: ``src/agentic_dynamics/**`` (legacy excluded), ``apps/**``, and
+    the checkout-only ``scripts/**`` (archive excluded) + ``workflows/**`` surfaces."""
+    files = [p for p in AD.rglob("*.py") if _plane_of_module(_module_path(p)) is not None]
+    if APPS.exists():
+        files.extend(APPS.rglob("*.py"))
+    for surface in (SCRIPTS, WORKFLOWS):
+        if surface.exists():
+            files.extend(
+                p for p in surface.rglob("*.py")
+                if "archive" not in p.relative_to(surface).parts
+            )
+    return files
+
+
+def _resolve_target(import_name: str) -> str | None:
+    """Resolve an absolute import target to its dotted repo module path, or ``None`` if external.
+
+    Only the internal roots are mapped: ``agentic_dynamics.<known plane>…``, ``apps.*`` and the
+    checkout-only ``scripts.*`` / ``workflows.*`` surfaces. Everything else (stdlib/third-party)
+    is out of scope.
+    """
+    parts = import_name.split(".")
+    if parts[0] == "agentic_dynamics":
+        if len(parts) >= 2 and parts[1] in (CORE, *PLANES, CONTROL):
+            return import_name
+        return None
+    if parts[0] in ("apps", *CHECKOUT_ONLY):
+        return import_name
+    return None
 
 
 def _resolve_relative(
     module_parts: list[str], level: int, module: str | None
-) -> tuple[str, str | None] | None:
-    """Resolve a relative import to ``(plane, module)``, or ``None`` if out of scope.
+) -> str | None:
+    """Resolve a relative import to its dotted module path, or ``None`` if out of scope.
 
     ``level`` is the ``ast.ImportFrom.level`` (1 = current package, 2 = parent, …); ``module``
     is the relative target (``None`` for ``from . import …``). Walks ``level - 1`` package
-    segments up from the current module, appends ``module``, then reuses the same
-    ``agentic_dynamics``/``apps`` mapping as ``_resolve_target``.
+    segments up from the current module, appends ``module``, then keeps the result only when it
+    lands on an in-scope root.
     """
     package = module_parts[:-1]
     up = level - 1
@@ -135,26 +181,20 @@ def _resolve_relative(
         return None  # escapes the package entirely — out of scope
     base = package[: len(package) - up]
     parts = base + (module.split(".") if module else [])
-    if parts and parts[0] == "agentic_dynamics" and len(parts) >= 2:
-        plane = parts[1]
-        if plane in (CORE, *PLANES, CONTROL):
-            return (plane, parts[2] if len(parts) >= 3 else None)
-        return None
-    if parts and parts[0] == "apps":
-        return ("apps", parts[1] if len(parts) >= 2 else None)
-    return None
+    joined = ".".join(parts)
+    return joined if _plane_of_module(joined) is not None else None
 
 
-def _imports_of(path: Path) -> list[tuple[str, str | None]]:
-    """The package-internal import targets ``(plane, module)`` of one source file.
+def _imports_of(path: Path) -> list[str]:
+    """The package-internal import targets (dotted module paths) of one source file.
 
     Both absolute and *relative* imports are resolved: a relative ``from ..control import X``
     is walked against the package layout (``_resolve_relative``) so it can no longer bypass the
     cross-plane analysis (refactor-repair Debt-2).
     """
     tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
-    module_parts = _module_parts(path)
-    out: list[tuple[str, str | None]] = []
+    module_parts = _module_path(path).split(".")
+    out: list[str] = []
     for node in ast.walk(tree):
         if isinstance(node, ast.Import):
             for alias in node.names:
@@ -173,28 +213,25 @@ def _imports_of(path: Path) -> list[tuple[str, str | None]]:
     return out
 
 
-def _graph() -> dict[tuple[str, str], list[tuple[str, str | None]]]:
-    """Source ``(plane, module)`` → its internal import targets ``(plane, module)``."""
-    return {
-        (plane, stem): _imports_of(path)
-        for plane, stem, path in _module_files()
-    }
+def _graph() -> dict[str, list[str]]:
+    """Source dotted module path → its internal import targets (dotted module paths)."""
+    return {_module_path(path): _imports_of(path) for path in _module_files()}
 
 
 GRAPH = _graph()
 
 
-def _sources_in(planes: set[str]) -> list[tuple[str, str]]:
-    return sorted(k for k in GRAPH if k[0] in planes)
+def _sources_in(planes: set[str]) -> list[str]:
+    return sorted(node for node in GRAPH if _plane_of_module(node) in planes)
 
 
 def _assert_no_edge(sources: set[str], forbidden: set[str], *, reason: str) -> None:
-    """Assert no source in ``sources`` imports any target in ``forbidden``."""
+    """Assert no source in ``sources`` imports any target whose plane is in ``forbidden``."""
     violations = []
     for src in _sources_in(sources):
-        for target_plane, target_module in GRAPH[src]:
-            if target_plane in forbidden:
-                violations.append(f"{src[0]}.{src[1]} -> {target_plane}.{target_module}")
+        for target in GRAPH[src]:
+            if _plane_of_module(target) in forbidden:
+                violations.append(f"{src} -> {target}")
     assert not violations, f"{reason}:\n" + "\n".join(sorted(violations))
 
 
@@ -232,9 +269,12 @@ def test_control_does_not_import_retrieval_or_prompt_constructor():
     """Rule 7 (rec-8 verbatim) — control consumes facts, not arbitrary retrieved text."""
     violations = []
     for src in _sources_in(TIER2):
-        for target_plane, target_module in GRAPH[src]:
-            if target_plane == "knowledge" and target_module in {"retrieval", "prompt_constructor"}:
-                violations.append(f"{src[0]}.{src[1]} -> {target_plane}.{target_module}")
+        for target in GRAPH[src]:
+            if any(
+                target == module or target.startswith(module + ".")
+                for module in RETRIEVAL_MODULES
+            ):
+                violations.append(f"{src} -> {target}")
     assert not violations, "control imports retrieval/prompt_constructor:\n" + "\n".join(sorted(violations))
 
 
@@ -242,12 +282,27 @@ def test_tier1_to_tier2_edges_are_exactly_pinned():
     """The two execution→control observation edges are the COMPLETE tier-1→tier-2 set."""
     edges: set[tuple[str, str]] = set()
     for src in _sources_in(PLANES):
-        for target_plane, target_module in GRAPH[src]:
-            if target_plane in TIER2:
-                edges.add((f"{src[0]}.{src[1]}", f"{target_plane}.{target_module}"))
+        for target in GRAPH[src]:
+            if _plane_of_module(target) in TIER2:
+                edges.add((src, target))
     assert edges == PINNED_T1_TO_T2, (
         f"unexpected tier-1→tier-2 edges: {sorted(edges - PINNED_T1_TO_T2)}; "
         f"missing pinned edges: {sorted(PINNED_T1_TO_T2 - edges)}"
+    )
+
+
+def test_package_does_not_import_scripts_or_workflows():
+    """The package planes never import the checkout-only CLI/workflow surfaces.
+
+    Probe the graph is actually populated for both surfaces — the guard must not pass because
+    the nodes were never walked.
+    """
+    assert any(node.startswith("scripts.") for node in GRAPH), "scripts nodes missing from graph"
+    assert any(node.startswith("workflows.") for node in GRAPH), "workflows nodes missing from graph"
+    _assert_no_edge(
+        {CORE} | PLANES | TIER2,
+        CHECKOUT_ONLY,
+        reason="a package plane imports checkout-only scripts/workflows logic",
     )
 
 
@@ -255,8 +310,7 @@ def test_apps_contain_no_domain_rules():
     """Rule 8 (rec-8 verbatim) — apps may compose layers but contain no domain rules.
 
     Enforced as an AST-marker scan: no ``ExperimentSpec(`` / ``RuleSpec(`` / ``Factor(``
-    construction anywhere in ``apps/**``. ``apps/`` is created in Stage 5; absent now, so
-    this is vacuously green until then.
+    construction anywhere in ``apps/**``.
     """
     if not APPS.exists():
         return
@@ -275,6 +329,26 @@ def test_apps_contain_no_domain_rules():
                 assert name not in markers, f"{path}: apps contain domain-rule construction {name}(...)"
 
 
+def test_graph_nodes_are_path_based_and_collision_free():
+    """Every source file is its own node, keyed by dotted path — same-stem files never merge.
+
+    The pre-fix graph used ``(plane, stem)``: these two registry modules were one node under
+    ``("apps", "registry")``, so the gate saw only whichever file's edges the walk read last. The
+    same collision class covered ``telemetry``/``design_sessions``/``docs_health``/``operations``
+    and every ``apps/**/__init__.py``.
+    """
+    nodes = list(GRAPH)
+    assert len(nodes) == len(set(nodes)), "graph node identities are not unique"
+    assert "apps.control_room.services.registry" in GRAPH
+    assert "apps.control_room.routes.registry" in GRAPH
+    # Distinct nodes with distinct edge sets (the service is a pure file reader; the route
+    # composes the service + Flask — a merged node would have lost one of the two).
+    assert GRAPH["apps.control_room.services.registry"] != GRAPH["apps.control_room.routes.registry"]
+    # Both same-stem __init__ packages are distinct too.
+    assert "apps.control_room.routes.__init__" in GRAPH
+    assert "apps.control_room.services.__init__" in GRAPH
+
+
 def test_relative_imports_resolve_across_planes():
     """``from ..control import X`` resolves to ``control`` — no longer ignored (Debt-2).
 
@@ -283,18 +357,30 @@ def test_relative_imports_resolve_across_planes():
     resolver now walks the package layout, so that hole is closed.
     """
     parts = ["agentic_dynamics", "runtime", "foo"]  # src/agentic_dynamics/runtime/foo.py
-    assert _resolve_relative(parts, 1, "bar") == ("runtime", "bar")  # `from .bar import …`
-    assert _resolve_relative(parts, 1, None) == ("runtime", None)  # `from . import …`
-    assert _resolve_relative(parts, 2, "control") == ("control", None)  # `from ..control …`
-    assert _resolve_relative(parts, 2, "control.step_routing") == ("control", "step_routing")
-    assert _resolve_relative(parts, 2, "measurement") == ("measurement", None)
+    assert _resolve_relative(parts, 1, "bar") == "agentic_dynamics.runtime.bar"  # `from .bar …`
+    assert _resolve_relative(parts, 1, None) == "agentic_dynamics.runtime"  # `from . import …`
+    assert _resolve_relative(parts, 2, "control") == "agentic_dynamics.control"  # `from ..control`
+    assert (
+        _resolve_relative(parts, 2, "control.step_routing")
+        == "agentic_dynamics.control.step_routing"
+    )
+    assert _resolve_relative(parts, 2, "measurement") == "agentic_dynamics.measurement"
     # A level that escapes the package entirely is out of scope, not a false edge.
     assert _resolve_relative(parts, 5, "x") is None
+    # Apps files resolve relative to the apps package prefix the same way.
+    app_parts = ["apps", "control_room", "routes", "flags"]
+    assert _resolve_relative(app_parts, 1, "helpers") == "apps.control_room.routes.helpers"
+    assert _resolve_relative(app_parts, 2, "services") == "apps.control_room.services"
 
 
-def test_module_parts_align_with_the_import_vocabulary():
-    """``_module_parts`` maps a source file to the dotted module path ``_resolve_relative`` uses."""
-    assert _module_parts(AD / "runtime" / "workflow_runner.py") == [
-        "agentic_dynamics", "runtime", "workflow_runner",
-    ]
-    assert _module_parts(AD / "core" / "paths.py") == ["agentic_dynamics", "core", "paths"]
+def test_module_path_aligns_with_the_import_vocabulary():
+    """``_module_path`` maps a source file to the dotted path the resolver uses."""
+    assert _module_path(AD / "runtime" / "workflow_runner.py") == (
+        "agentic_dynamics.runtime.workflow_runner"
+    )
+    assert _module_path(AD / "core" / "paths.py") == "agentic_dynamics.core.paths"
+    assert _module_path(APPS / "control_room" / "services" / "context.py") == (
+        "apps.control_room.services.context"
+    )
+    assert _module_path(SCRIPTS / "kb_worker.py") == "scripts.kb_worker"
+    assert _module_path(WORKFLOWS / "compile_workflow.py") == "workflows.compile_workflow"

@@ -210,13 +210,72 @@ def _claude_agent_workdirs() -> dict[str, Path]:
 # ``server._authorize_supervisor_action`` resolves through this module's namespace; the routes
 # are then registered on ``app`` with the explicit application context (review P2 — routes receive
 # ``ControlRoomServices`` rather than importing this module as a service locator).
+from agentic_dynamics.control.pipeline_status import review_stage_summary  # noqa: E402
 from apps.control_room import routes as _routes  # noqa: E402
-from apps.control_room.services.context import build_services  # noqa: E402
+from apps.control_room.services import (  # noqa: E402
+    design_sessions,
+    docs_health,
+    mutations,
+    registry,
+    supervisor,
+    telemetry,
+)
+from apps.control_room.services.context import ControlRoomServices  # noqa: E402
 from apps.control_room.services.supervisor import (  # noqa: E402,F401
     _authorize_supervisor_action,
     _emit_actuation_record,
     _load_supervisor_flags,
 )
+
+
+def build_services() -> ControlRoomServices:
+    """Build the application context (the composition root's one wiring surface).
+
+    Service modules and stable config are resolved eagerly. The live accessors are bound as
+    late-binding callables (a lambda, never the function object itself) so the tests'
+    ``monkeypatch.setattr(server, "_redis", …)`` keeps winning on every later call — the same
+    behaviour ``context.py``'s delegated methods had before the injection was moved here.
+    """
+    return ControlRoomServices(
+        telemetry=telemetry,
+        registry=registry,
+        supervisor=supervisor,
+        design_sessions=design_sessions,
+        mutations=mutations,
+        docs_health=docs_health,
+        queue_key=QUEUE_KEY,
+        batch_queue_key=BATCH_QUEUE_KEY,
+        results_key=RESULTS_KEY,
+        analysis_queue_key=ANALYSIS_QUEUE_KEY,
+        analysis_status_key=ANALYSIS_STATUS_KEY,
+        review_queue_key=REVIEW_QUEUE_KEY,
+        review_status_key=REVIEW_STATUS_KEY,
+        heartbeat_seconds=HEARTBEAT_SECONDS,
+        root=ROOT,
+        max_design_prompt_chars=MAX_DESIGN_PROMPT_CHARS,
+        design_delivery_modes=DESIGN_DELIVERY_MODES,
+        claude_agent_advisors=frozenset(CLAUDE_AGENT_ADVISORS),
+        claude_agent_advisor_id_pattern=CLAUDE_AGENT_ADVISOR_ID_PATTERN,
+        max_claude_agent_log_bytes=MAX_CLAUDE_AGENT_LOG_BYTES,
+        max_claude_agent_task_chars=MAX_CLAUDE_AGENT_TASK_CHARS,
+        # The production review authority: the review FILES on disk. The legacy
+        # review_jobs/review_status Redis state was retired from the display (the trigger →
+        # review_all cut-over never wrote it), so binding it here would report a stale zero.
+        review_stage_source=review_stage_summary,
+        redis=lambda: _redis(),
+        design_manager=lambda: _design_sessions(),
+        opencode_client=lambda: _opencode_client(),
+        claude_agents=lambda: _claude_agents(),
+        claude_agent_workdirs=lambda: _claude_agent_workdirs(),
+        load_supervisor_flags=lambda limit: _load_supervisor_flags(limit),
+        authorize_supervisor_action=lambda session_id, cell_id: _authorize_supervisor_action(
+            session_id, cell_id
+        ),
+        emit_actuation_record=lambda *args, **kwargs: _emit_actuation_record(*args, **kwargs),
+        data_manifest_path=lambda: DATA_MANIFEST_PATH,
+        docs_drift_results_dir=lambda: DOCS_DRIFT_RESULTS_DIR,
+    )
+
 
 _routes.register(app, build_services())
 
