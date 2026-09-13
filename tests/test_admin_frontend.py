@@ -389,6 +389,50 @@ def test_attention_items_expand_in_place_and_keep_mutations_behind_the_confirm_b
     assert "POST" not in client
 
 
+def test_run_tiles_show_a_segmented_phase_bar_and_never_clip_mid_word() -> None:
+    """R2 (build step 5): run tiles carry a segmented phase bar and wrap, never clip, values.
+
+    The tile shows identity, spec, model, the ``n/m`` phase as a segmented bar, the state
+    language, cost with provenance, and staleness. The bar is built ONLY from the packet's
+    ``phase.progress`` value (an unknown/malformed value degrades to one explicit unknown
+    segment). No run-tile value is truncated mid-word at any viewport: the row declares a
+    two-line allowance and CSS wraps at word boundaries instead of ellipsising.
+    """
+    client = _read("app.js")
+    assert "function renderPhaseBar(" in client
+    for anchor in (
+        '"data-phase-bar": ""',
+        '"data-phase-total"',
+        '"data-phase-complete"',
+        '"data-phase-segment": ""',
+        '"data-phase-state": index < complete ? "done" : "pending"',
+        '"data-phase-state": "unknown"',
+        'renderPhaseBar(run["phase.progress"])',
+        "PHASE_SEGMENT_MAX",
+    ):
+        assert anchor in client, anchor
+    # The packet value is the only source: the helper never invents a denominator.
+    assert 'run["phase.progress"]' in client
+    # Staleness renders as a recorded-age word, never from an unknown age.
+    assert "function settledFacets(" in client
+    assert '"data-stale-marker": "true"' in client
+    assert "settledState.stale" in client
+
+    css = _read("style.css")
+    # The tile explicitly allows TWO lines (the step-5 allowance).
+    assert '"data-max-lines": "2"' in client
+    # A run-tile value wraps; it is never ellipsised, and the roster overrides the shared
+    # identifier middle-elide so a session/model is never shown as a clipped prefix.
+    assert ".run-row .field [data-value][data-identifier]" in css
+    assert "overflow-wrap: break-word" in css
+    assert "text-overflow: clip" in css
+    assert ".run-row .field [data-value][data-no-ellipsis]" in css
+    # The phase bar + stale marker are styled.
+    assert ".row-phase" in css and ".row-phase-seg" in css
+    assert '.row-phase-seg[data-phase-state="done"]' in css
+    assert ".row-stale" in css
+
+
 def test_render_gate_implements_the_acceptance_classes() -> None:
     """The gate (a4) carries the IA acceptance classes, the live mode, and the report writer."""
     gate = (

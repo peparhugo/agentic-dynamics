@@ -198,6 +198,9 @@
   .chart-gauge-fill { background: Highlight; }
   .chart-card { border-color: CanvasText; }
   .chart-card[data-focus="1"] { border-color: Highlight; }
+  /* The phase bar keeps progress legible by SHAPE: a filled done segment vs a dashed pending. */
+  .row-phase-seg[data-phase-state="done"] { background: LinkText; border-color: LinkText; }
+  .row-phase-seg[data-phase-state="pending"] { background: Canvas; border: 1px dashed CanvasText; }
 }
 
 * { box-sizing: border-box; }
@@ -726,12 +729,15 @@ body {
 
 /* The run OBJECT. Not a service row: a left status rail, a monospace session identity band, a
    coupled evidence/decision footer, and a lease headroom bar attached along the bottom edge
-   (Move 1, Move 4, Move 6). The bottom padding reserves the strip so the 3 declared row-lines
-   still fit the fixed 88px box the gate measures. */
+   (Move 1, Move 4, Move 6). The bottom padding reserves the strip, and the 3 declared row-lines
+   carry the fixed 88px box the gate measures. A tile whose values need room may render a line on
+   TWO lines (build step 5 — "two-line tiles allowed"): `min-height` sets the floor, `height:auto`
+   lets a long, wrapping value grow the tile instead of clipping it mid-word. */
 .run-row {
   position: relative;
   flex: 0 0 auto;
-  height: 88px;
+  min-height: 88px;
+  height: auto;
   padding: 6px 8px 10px;
   /* A roster entry, not a card: a left status rail and a hairline separator only. The density
      comes from alignment, so removing the box keeps the surface from reading as a card stack
@@ -741,7 +747,9 @@ body {
   border-bottom: 1px solid var(--line);
   border-radius: 0;
   background: transparent;
-  overflow: hidden;
+  /* No clipping: a required value may never be cut mid-word. The row grows to its two-line
+     allowance instead (build step 5). */
+  overflow: visible;
   cursor: pointer;
 }
 
@@ -760,13 +768,34 @@ body {
   align-items: baseline;
   gap: 10px;
   min-width: 0;
-  height: 24px;
-  overflow: hidden;
+  min-height: 24px;
+  height: auto;
+  /* Build step 5: a wrapped value grows the line rather than being cut off. */
+  overflow: visible;
 }
 
-.row-line .field { gap: 3px; min-width: 0; overflow: hidden; }
+.row-line .field { gap: 3px; min-width: 0; overflow: visible; }
 .row-line .field [data-label] { font-size: 11px; }
 .row-line .field [data-value] { font-size: 13px; }
+
+/* Build step 5 — no mid-word truncation in a run tile. Required values and identifiers WRAP at
+   word boundaries (the tile may then occupy two lines); the shared `[data-identifier]` rule above
+   is overridden inside the roster so a run never shows `agent-0…`. This is the E10 / adversary
+   A5-D3 legibility fix. `overflow-wrap:break-word` prefers a word boundary and only falls back to
+   breaking a genuinely unbreakable token (a 40-char sha), which is never a silent clip. */
+.run-row .field [data-value],
+.run-row .field [data-value][data-identifier],
+.run-row .field [data-value][data-no-ellipsis] {
+  white-space: normal;
+  overflow-wrap: break-word;
+  word-break: normal;
+}
+.run-row .field [data-value][data-identifier] {
+  display: inline;
+  max-width: none;
+  overflow: visible;
+  text-overflow: clip;
+}
 
 /* Move 1 — the session identity band leads the row: prompt glyph, agent token, worktree target,
    current command, provider×model, attempt. Monospace and heavier than the state lines, so a
@@ -842,6 +871,49 @@ body {
 .row-lease[data-budget-state="unknown"] { background: repeating-linear-gradient(
   90deg, var(--line) 0 6px, transparent 6px 12px); }
 .row-lease[data-budget-state="unknown"] .row-lease-fill { display: none; }
+
+/* Build step 5 — the segmented phase bar. One segment per phase the packet's `phase.progress`
+   declares, filled to its completed count: shape carries progress beside the `n/m` field. An
+   unknown progress is a single dashed segment, never a fabricated full/empty bar. */
+.row-phase {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: 2px;
+}
+.row-phase-seg {
+  display: inline-block;
+  width: 8px;
+  height: 6px;
+  border-radius: 1px;
+  border: 1px solid var(--line-strong);
+  background: transparent;
+}
+.row-phase-seg[data-phase-state="done"] {
+  background: var(--machine);
+  border-color: var(--machine);
+}
+.row-phase-seg[data-phase-state="pending"] { background: transparent; border-style: dashed; }
+.row-phase-seg[data-phase-state="unknown"] {
+  width: 14px;
+  border-style: dashed;
+}
+.row-phase-overflow { font-family: var(--mono); font-size: 9px; color: var(--muted); }
+
+/* Build step 5 — staleness as a WORD as well as a dimmed row (state language): a recorded age
+   past the stale floor names itself. A non-field token, so the 16-field row schema is untouched. */
+.row-stale {
+  flex: 0 0 auto;
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--warn);
+  border: 1px solid var(--warn);
+  border-radius: 2px;
+  padding: 0 2px;
+}
 
 /* Evidence classes are visibly different materials (direction §4.4, Move 4). */
 /* The governed-decision authority marker (recognizability §4.2 #2): a compact chip beside the
@@ -1410,8 +1482,8 @@ body {
     --r3ch: 116px;
   }
   .attention-item { height: 52px; }
-  .run-row { height: 84px; padding: 5px 8px 9px; }
-  .run-row .row-line { height: 23px; }
+  .run-row { min-height: 84px; height: auto; padding: 5px 8px 9px; }
+  .run-row .row-line { min-height: 23px; height: auto; }
   .run-row .row-lease { bottom: 3px; height: 4px; }
   .region-title { padding-top: 6px; }
   /* Narrow R0 truth strip: the 60px bar has no width for the per-cell source+age text, so the
@@ -1461,8 +1533,8 @@ body {
   .r2 .region-title { display: none; }
   .r2-head { height: 32px; padding: 4px 8px 0; }
   .run-list { gap: 0; padding: 4px 8px 4px; }
-  .run-row { height: 80px; padding: 3px 6px 8px; }
-  .row-line { height: 23px; gap: 8px; }
+  .run-row { min-height: 80px; height: auto; padding: 3px 6px 8px; }
+  .row-line { min-height: 23px; height: auto; gap: 8px; }
   .row-line .field [data-value] { font-size: 13px; }
   .run-lease { left: 6px; right: 6px; bottom: 3px; height: 4px; }
   /* Mobile is triage: the row shows VALUES (a terminal-style band) and keeps the field labels

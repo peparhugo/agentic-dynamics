@@ -610,6 +610,51 @@
     };
   }
 
+  //: The most phase segments a tile draws. The packet's `phases_total` is a workflow's declared
+  //: phase count and is small in practice; the bound stops an absurd total from minting an
+  //: unbounded DOM. Past the cap the bar reports the overflow instead of silently growing.
+  var PHASE_SEGMENT_MAX = 24;
+
+  /**
+   * Build the segmented phase bar for one run tile (build step 5).
+   *
+   * An R2 run tile shows progress as a FRACTION (`phase.progress` `n/m`, the required field) AND
+   * as a segmented bar, so a stranger reads it as shape and not only as text. Every number comes
+   * from the packet's own `phase.progress` value: the client never invents a denominator or a
+   * completion count. A progress value that is `unknown`, malformed or non-positive renders ONE
+   * explicit `unknown` segment (`data-phase-state="unknown"`), never a fabricated full or empty
+   * bar. The bar is a NON-FIELD affordance, so the exact 16-field row schema is untouched.
+   */
+  function renderPhaseBar(progress) {
+    var bar = element("span", "row-phase", { "data-phase-bar": "" });
+    var raw = progress === undefined || progress === null ? "" : String(progress);
+    var match = /^(\d+)\/(\d+)$/.exec(raw);
+    var total = match ? parseInt(match[2], 10) : 0;
+    if (!match || total <= 0) {
+      bar.setAttribute("data-phase-complete", "unknown");
+      bar.setAttribute("data-phase-total", "unknown");
+      bar.appendChild(element("span", "row-phase-seg",
+        { "data-phase-segment": "", "data-phase-state": "unknown" }));
+      return bar;
+    }
+    var complete = Math.max(0, Math.min(parseInt(match[1], 10), total));
+    bar.setAttribute("data-phase-complete", String(complete));
+    bar.setAttribute("data-phase-total", String(total));
+    var drawn = Math.min(total, PHASE_SEGMENT_MAX);
+    for (var index = 0; index < drawn; index += 1) {
+      bar.appendChild(element("span", "row-phase-seg", {
+        "data-phase-segment": "",
+        "data-phase-state": index < complete ? "done" : "pending",
+      }));
+    }
+    if (total > PHASE_SEGMENT_MAX) {
+      var overflow = total - PHASE_SEGMENT_MAX;
+      bar.setAttribute("data-phase-overflow", String(overflow));
+      bar.appendChild(element("span", "row-phase-overflow", null, "+" + overflow));
+    }
+    return bar;
+  }
+
   /**
    * One agent-run OBJECT (Move 1, Move 4, Move 6): the 16-field schema split across three
    * declared lines with the agent/session identity band first, a paired ADVISORY/MEASURED
@@ -682,7 +727,7 @@
 
     // ── Line 1 · the session identity band (Move 1) ────────────────────────────────────────
     var lineOne = element("div", "row-line session-band",
-      { "data-row-line": "", "data-max-lines": "1", "data-agent": session });
+      { "data-row-line": "", "data-max-lines": "2", "data-agent": session });
     lineOne.appendChild(element("span", "agent-prompt", { "aria-hidden": "true" }, "\u276F"));
     // The status rail IS the state language: the glyph and the word are both visible, and the
     // CSS supplies the colour from `data-state`. The glyph is decorative (`aria-hidden`) so the
@@ -713,13 +758,15 @@
       mark("att", run["attempt.number"]), { maxLines: 1 });
 
     // ── Line 2 · lifecycle state + the lease cost pair (Move 6) ────────────────────────────
-    var lineTwo = element("div", "row-line run-state", { "data-row-line": "", "data-max-lines": "1" });
+    var lineTwo = element("div", "row-line run-state", { "data-row-line": "", "data-max-lines": "2" });
     // `spec/cell` names the experiment cell this session belongs to (IA §2 R2 / §10.2): without
     // it the row is a run without its assignment, and the stranger cannot place it in the grid.
     appendField(lineTwo, "spec.cell", lab("spec.cell", "spec"),
       mark("spec", run["spec.cell"]), { maxLines: 1 });
     appendField(lineTwo, "phase.progress", lab("phase.progress", "phase"),
       mark("ph", run["phase.progress"]), { maxLines: 1 });
+    // Build step 5 — the same `n/m` value as a segmented bar. Packet-derived only, non-field.
+    lineTwo.appendChild(renderPhaseBar(run["phase.progress"]));
     appendField(lineTwo, "lifecycle.state", lab("lifecycle.state", "lifecycle"),
       mark("life", lifecycle), { maxLines: 1 });
     // The settled marker is a NON-FIELD affordance (the row's 16-field schema is exact — the
@@ -731,6 +778,12 @@
       "data-age-seconds": settledState.age === null ? null : String(settledState.age),
       title: settledState.title,
     }, settledState.text));
+    // Build step 5 — staleness as a WORD, not only a dimmed row (`data-stale` above). It renders
+    // only from the recorded-age verdict, never from an unknown age.
+    if (settledState.stale) {
+      lineTwo.appendChild(element("span", "row-stale",
+        { "data-stale-marker": "true", title: settledState.title }, "stale"));
+    }
     appendField(lineTwo, "run.live", lab("run.live", "live"), mark("live", live), { maxLines: 1 });
     appendField(lineTwo, "source.commit", lab("source.commit", "commit"),
       mark("cmt", sourceValue), { identifier: true, maxLines: 1 });
@@ -750,7 +803,7 @@
 
     // ── Line 3 · the coupled evidence/decision footer (Move 3, Move 4) ─────────────────────
     var lineThree = element("div", "row-line row-evidence row-decision",
-      { "data-row-line": "", "data-max-lines": "1" });
+      { "data-row-line": "", "data-max-lines": "2" });
     appendField(lineThree, "evidence.advisory", lab("evidence.advisory", "said"),
       mark("said", advisory), { evidenceClass: "advisory", maxLines: 1 });
     appendField(lineThree, "evidence.measured", lab("evidence.measured", "measured"),
