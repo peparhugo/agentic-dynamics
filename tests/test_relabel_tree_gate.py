@@ -117,25 +117,34 @@ def _git_init(workdir: Path) -> None:
 
 
 def _materialize_commit_tree(commit: str, target: Path) -> str:
-    """Materialize ``commit``'s full tree into ``target`` (a fresh git repo) and commit it.
+    """Materialize ``commit``'s full tree into ``target`` (a standalone git repo).
 
-    git trees are content-addressed: extracting the archive and committing it with
-    ``git add -Af`` (forcing past .gitignore) reproduces the EXACT tree hash — so the
-    hermetic copy is byte-identical to the real revamp2 commit's tree. Returns the hash.
+    Git-native by construction (2026-09-13 CI fix): a shared clone + detached checkout
+    materializes the tree from the commit OBJECTS — no ``git archive | tar`` + ``git add``
+    round-trip through the filesystem. That round-trip proved environment-sensitive: newer
+    CI runner images (tar/mode/eol drift) reproduced a DIFFERENT tree hash for the same
+    commit while every local run stayed byte-identical. Git trees are content-addressed, so
+    checking the commit out reproduces the EXACT tree hash by construction — the
+    byte-identity the replay tests depend on. Returns the hash.
     """
-    archive = subprocess.run(["git", "archive", commit], cwd=REPO, capture_output=True, check=True)
-    subprocess.run(["tar", "-x", "-C", str(target)], input=archive.stdout, check=True)
+    subprocess.run(
+        ["git", "clone", "-q", "--shared", "--no-checkout", str(REPO), str(target)],
+        check=True, capture_output=True,
+    )
+    subprocess.run(
+        ["git", "checkout", "-q", "--detach", commit],
+        cwd=target, check=True, capture_output=True,
+    )
     _git_init(target)
-    _git("add", "-Af", cwd=target)
-    _git("commit", "-qm", "attempt A", cwd=target)
     return _git("rev-parse", "HEAD^{tree}", cwd=target).stdout.strip()
 
 
-#: The 298MB real-tree extraction is materialized ONCE per module run, then each replay test
-#: copies it via hardlinks (``os.link`` — git never mutates objects/index in place, and the repo
-#: carries ``gc.auto=0`` so nothing DELETES them either; a fresh commit in one copy never leaks
-#: into another). This keeps the revamp2 REPLAY on the REAL byte-identical tree while cutting
-#: the 4×12s materializations to one (test_suite_speed p2).
+#: The real-tree materialization runs ONCE per module run (a shared clone + detached
+#: checkout — git-native, no tar round-trip), then each replay test copies it via hardlinks
+#: (``os.link`` — git never mutates objects/index in place, and the repo carries ``gc.auto=0``
+#: so nothing DELETES them either; a fresh commit in one copy never leaks into another). This
+#: keeps the revamp2 REPLAY on the REAL byte-identical tree while cutting the repeated
+#: materializations to one (test_suite_speed p2).
 @pytest.fixture(scope="module")
 def attempt_a_template(tmp_path_factory):
     """The hermetic attempt-A tree materialized once; the replay tests copy it in ~1s."""
@@ -151,9 +160,25 @@ def attempt_a_template(tmp_path_factory):
 def _copy_attempt_a(template: Path, target: Path) -> str:
     """Hardlink-copy the shared attempt-A tree into ``target``; return its tree hash.
 
-    ``target`` must not already exist (``shutil.copytree`` creates it).
+    ``target`` must not already exist (``shutil.copytree`` creates it). The copy is then
+    reset to a pristine HEAD (``reset --hard`` + ``clean -fdx``): the shared module fixture
+    can accumulate runtime junk (pytest bytecode, SQLite WAL sidecars under the corpus
+    artifacts) from concurrent suite activity, and a phase commit sweeps whatever sits in
+    the worktree — the CI-only tree drift (2026-09-13). A pristine copy keeps every replay
+    phase's tree exactly ``base + what the test writes``.
     """
     shutil.copytree(template, target, copy_function=os.link)
+    subprocess.run(["git", "reset", "--hard", "-q", "HEAD"], cwd=target, check=True)
+    subprocess.run(["git", "clean", "-fdxq"], cwd=target, check=True)
+    # Runtime junk the wider suite can drop into shared corpus paths (SQLite WAL sidecars,
+    # bytecode) must never enter a replay phase's commit: exclude it in THIS copy's
+    # info/exclude (worktree-local; no effect on the tree hash).
+    exclude = target / ".git" / "info" / "exclude"
+    exclude.parent.mkdir(parents=True, exist_ok=True)
+    exclude.write_text(
+        (exclude.read_text() if exclude.exists() else "")
+        + "\n__pycache__/\n*.pyc\n*.pyo\n*.db-shm\n*.db-wal\n"
+    )
     return _git("rev-parse", "HEAD^{tree}", cwd=target).stdout.strip()
 
 
@@ -208,7 +233,7 @@ def test_git_tree_hash_excludes_approvals_and_matches_plain_when_absent(tmp_path
     wd.mkdir()
     (wd / "work.txt").write_text("fresh work")
     _git_init(wd)
-    _git("add", "-Af", cwd=wd)
+    _git("add", "-A", cwd=wd)
     _git("commit", "-qm", "seed", cwd=wd)
     plain = _git("rev-parse", "HEAD^{tree}", cwd=wd).stdout.strip()
     assert _git_tree_hash(wd) == plain
@@ -216,7 +241,7 @@ def test_git_tree_hash_excludes_approvals_and_matches_plain_when_absent(tmp_path
     ap = wd / "approvals" / "relabel_gate_test"
     ap.mkdir(parents=True)
     (ap / "scope_tree_reuse.md").write_text(_approval_text(plain))
-    _git("add", "-Af", cwd=wd)
+    _git("add", "-A", cwd=wd)
     _git("commit", "-qm", "approval", cwd=wd)
     assert _git("rev-parse", "HEAD^{tree}", cwd=wd).stdout.strip() != plain
     assert _git_tree_hash(wd) == plain
@@ -230,7 +255,7 @@ def test_record_and_load_discarded_tree_round_trip_and_dedup(tmp_path):
     wd.mkdir()
     (wd / "work.txt").write_text("attempt A work")
     _git_init(wd)
-    _git("add", "-Af", cwd=wd)
+    _git("add", "-A", cwd=wd)
     _git("commit", "-qm", "attempt A", cwd=wd)
     ledger = tmp_path / "discarded_trees.jsonl"
 
@@ -298,6 +323,54 @@ def test_relabel_without_approval_fails_with_identical_tree_proof(tmp_path, atte
     assert result.ok is False
 
 
+def _gate_diag(wd: Path, spec_name: str, ledger: Path) -> str:
+    """Diagnose why the relabel gate did not fire (used only in assertion messages).
+
+    The gate is silent by design when its (tree, branch) match finds nothing, so a CI-only
+    miss needs the raw comparison values in the failure output (2026-09-13). When the
+    approvals-excluded phase tree still differs from the base commit, the diff names the
+    offending paths outright — the phase tree is compared against ``REVAMP2_ATTEMPT_A``
+    (available in the copy via the shared object store).
+    """
+    import subprocess
+
+    from agentic_dynamics.runtime.workflow_runner import (
+        _git_tree_hash,
+        _worktree_branch,
+        load_discarded_trees,
+    )
+
+    def _ls(rev: str) -> dict[str, tuple[str, str]]:
+        out = subprocess.run(
+            ["git", "ls-tree", "-r", rev], cwd=wd, capture_output=True, text=True,
+        ).stdout
+        entries: dict[str, tuple[str, str]] = {}
+        for line in out.splitlines():
+            if not line:
+                continue
+            meta, path = line.split("\t", 1)
+            mode, _otype, sha = meta.split()
+            entries[path] = (mode, sha)
+        return entries
+
+    try:
+        head, base = _ls("HEAD"), _ls(REVAMP2_ATTEMPT_A)
+        extra = sorted(set(head) - set(base) - {"approvals"})
+        extra = [p for p in extra if not p.startswith("approvals/")][:12]
+        missing = sorted(set(base) - set(head))[:12]
+        changed = sorted(
+            p for p in (set(head) & set(base)) if head[p] != base[p]
+        )[:12]
+        diff = f" extra_paths={extra!r} missing_paths={missing!r} changed_paths={changed!r}"
+    except Exception as exc:  # noqa: BLE001 — diagnosis only
+        diff = f" (path diff unavailable: {exc})"
+
+    return (
+        f"phase_tree={_git_tree_hash(wd)!r} branch={_worktree_branch(wd)!r} "
+        f"ledger={load_discarded_trees(spec_name, ledger_path=ledger)!r}{diff}"
+    )
+
+
 def test_relabel_with_operator_approval_passes(tmp_path, attempt_a_template):
     """The revamp2 replay, PASS direction: the same discarded tree re-presented, but the
     operator approved the reuse FIRST (an approval artifact committed before the phase, present
@@ -312,7 +385,7 @@ def test_relabel_with_operator_approval_passes(tmp_path, attempt_a_template):
     ap = wd / "approvals" / spec.name
     ap.mkdir(parents=True)
     (ap / "scope_tree_reuse.md").write_text(_approval_text(REVAMP2_TREE))
-    _git("add", "-Af", cwd=wd)
+    _git("add", "-A", "--", "approvals", cwd=wd)
     _git("commit", "-qm", "operator approval", cwd=wd)
 
     def agent(prompt, *, model, backend, workdir, **kwargs):
@@ -329,7 +402,7 @@ def test_relabel_with_operator_approval_passes(tmp_path, attempt_a_template):
     p = result.phases[0]
     assert p.status == "ok"  # the approved reuse keeps the phase ok
     gate = p.relabel_gate
-    assert gate is not None
+    assert gate is not None, _gate_diag(wd, spec.name, ledger)
     assert gate["reason"] == "APPROVED"
     assert gate["phase_tree"] == REVAMP2_TREE
     assert gate["approval"]["authorized"] is True
@@ -351,7 +424,7 @@ def test_approval_committed_during_the_phase_is_not_an_approval(tmp_path, attemp
         ap = Path(workdir) / "approvals" / spec.name
         ap.mkdir(parents=True)
         (ap / "scope_tree_reuse.md").write_text(_approval_text(REVAMP2_TREE))
-        subprocess.run(["git", "add", "-Af"], cwd=workdir, check=True)
+        subprocess.run(["git", "add", "-A", "--", "approvals"], cwd=workdir, check=True)
         subprocess.run(
             ["git", "commit", "-q", "-m", "[workflow] scope — g"],
             cwd=workdir, check=True,
@@ -363,7 +436,7 @@ def test_approval_committed_during_the_phase_is_not_an_approval(tmp_path, attemp
         discarded_trees_ledger=ledger,
     )
     p = result.phases[0]
-    assert p.status == "failed"
+    assert p.status == "failed", f"status={p.status!r} error={p.error!r} {_gate_diag(wd, spec.name, ledger)}"
     assert "RELABEL" in p.error
     assert p.relabel_gate["approval"]["authorized"] is False
     assert p.relabel_gate["approval"]["present_at_pre_head"] is False
@@ -409,7 +482,7 @@ def _approved_unit(tmp_path, **approval_overrides) -> tuple[Path, str, str]:
     wd.mkdir()
     (wd / "work.txt").write_text("x")
     _git_init(wd)
-    _git("add", "-Af", cwd=wd)
+    _git("add", "-A", cwd=wd)
     _git("commit", "-qm", "seed", cwd=wd)
     tree = _git("rev-parse", "HEAD^{tree}", cwd=wd).stdout.strip()
     ledger = tmp_path / "discarded_trees.jsonl"
@@ -441,7 +514,7 @@ def test_approval_authorizes_only_when_all_contract_fields_hold(tmp_path):
     ap = wd / "approvals" / "relabel_gate_test"
     ap.mkdir(parents=True)
     (ap / "scope_tree_reuse.md").write_text(_approval_text(tree))
-    _git("add", "-Af", cwd=wd)
+    _git("add", "-A", cwd=wd)
     _git("commit", "-qm", "approval", cwd=wd)
     pre_head = _git("rev-parse", "HEAD", cwd=wd).stdout.strip()
     authorized, evidence = approval_authorizes_tree(
@@ -452,7 +525,7 @@ def test_approval_authorizes_only_when_all_contract_fields_hold(tmp_path):
 
     # (3) placeholder signature → refused
     (ap / "scope_tree_reuse.md").write_text(_approval_text(tree, operator="your name"))
-    _git("add", "-Af", cwd=wd)
+    _git("add", "-A", cwd=wd)
     _git("commit", "-qm", "placeholder", cwd=wd)
     pre_head = _git("rev-parse", "HEAD", cwd=wd).stdout.strip()
     authorized, evidence = approval_authorizes_tree(
@@ -463,7 +536,7 @@ def test_approval_authorizes_only_when_all_contract_fields_hold(tmp_path):
 
     # (4) wrong tree → refused
     (ap / "scope_tree_reuse.md").write_text(_approval_text("0" * 40))
-    _git("add", "-Af", cwd=wd)
+    _git("add", "-A", cwd=wd)
     _git("commit", "-qm", "wrong tree", cwd=wd)
     pre_head = _git("rev-parse", "HEAD", cwd=wd).stdout.strip()
     authorized, evidence = approval_authorizes_tree(
@@ -474,7 +547,7 @@ def test_approval_authorizes_only_when_all_contract_fields_hold(tmp_path):
 
     # (5) wrong phase → refused
     (ap / "scope_tree_reuse.md").write_text(_approval_text(tree, phase="other_phase"))
-    _git("add", "-Af", cwd=wd)
+    _git("add", "-A", cwd=wd)
     _git("commit", "-qm", "wrong phase", cwd=wd)
     pre_head = _git("rev-parse", "HEAD", cwd=wd).stdout.strip()
     authorized, evidence = approval_authorizes_tree(
@@ -485,7 +558,7 @@ def test_approval_authorizes_only_when_all_contract_fields_hold(tmp_path):
 
     # (6) no date → refused
     (ap / "scope_tree_reuse.md").write_text(_approval_text(tree, date=""))
-    _git("add", "-Af", cwd=wd)
+    _git("add", "-A", cwd=wd)
     _git("commit", "-qm", "no date", cwd=wd)
     pre_head = _git("rev-parse", "HEAD", cwd=wd).stdout.strip()
     authorized, evidence = approval_authorizes_tree(
@@ -506,7 +579,7 @@ def test_approval_without_pre_head_is_refused(tmp_path):
     ap = wd / "approvals" / "relabel_gate_test"
     ap.mkdir(parents=True)
     (ap / "scope_tree_reuse.md").write_text(_approval_text("0" * 40))
-    _git("add", "-Af", cwd=wd)
+    _git("add", "-A", cwd=wd)
     _git("commit", "-qm", "approval", cwd=wd)
     tree = _git("rev-parse", "HEAD^{tree}", cwd=wd).stdout.strip()
     authorized, evidence = approval_authorizes_tree(
@@ -598,7 +671,7 @@ def test_discard_tree_script_records_a_real_discard(tmp_path):
     wd.mkdir()
     (wd / "work.txt").write_text("about to be discarded")
     _git_init(wd)
-    _git("add", "-Af", cwd=wd)
+    _git("add", "-A", cwd=wd)
     _git("commit", "-qm", "attempt A", cwd=wd)
     ledger = tmp_path / "discarded_trees.jsonl"
 
