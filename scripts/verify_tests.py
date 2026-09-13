@@ -71,6 +71,11 @@ def verify_cell(d: dict, node: str) -> dict:
     r = run_suite(Path(worktree), language, node=node)
     result.update(r)
     result["test_executed_success"] = suite_succeeded(r)
+    # G-14 — the independent-evaluator provenance. ``run_suite`` is the harness, so every
+    # verdict it produces is independent (it stamps ``evaluator_independent=True``); a result
+    # that never reached the runner (the worktree-missing branch above) has no key, and the
+    # field stays absent — unknown, never a fabricated False.
+    result["evaluator_independent"] = r.get("evaluator_independent")
     result["duration_s"] = round(time.time() - t0, 2)
     if not result["test_executed_success"] and r.get("tail"):
         result["note"] = r["tail"][-400:]

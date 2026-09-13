@@ -256,6 +256,9 @@ class StepResult:
     estimation_method: str = ""
     reported_cost_usd: float | None = None
     confidence: float | None = None
+    #: G-40 — the first streamed token's ISO-8601 UTC timestamp, carried from the adapter so
+    #: the engine can stamp it on the attempt ledger. ``None`` = the stream produced no token.
+    first_token_at: str | None = None
     cache_read_tokens: int = 0
     cache_write_tokens: int = 0
     cache_hit_rate: float = 0.0
@@ -355,6 +358,7 @@ def _result_from_agentic(ar: Any) -> StepResult:
         estimation_method=getattr(ar, "estimation_method", None),
         reported_cost_usd=getattr(ar, "reported_cost_usd", None),
         confidence=getattr(ar, "confidence", None),
+        first_token_at=getattr(ar, "first_token_at", None),
         cache_read_tokens=int(getattr(ar, "cache_read_tokens", 0) or 0),
         cache_write_tokens=int(getattr(ar, "cache_write_tokens", 0) or 0),
         cache_hit_rate=float(getattr(ar, "cache_hit_rate", 0.0) or 0.0),

@@ -132,7 +132,7 @@ from typing import Any
 from agentic_dynamics.adapters.backends import run_agentic
 from agentic_dynamics.core import decision_contract as dc
 from agentic_dynamics.core.admission_context import AdmissionRefused
-from agentic_dynamics.core.cost_provenance import CostSource
+from agentic_dynamics.core.cost_provenance import TRUSTED_COST_SOURCES, CostSource
 from agentic_dynamics.core.language import build_code_snapshot, compute_code_delta, detect_language
 from agentic_dynamics.core.paths import PROJECT_ROOT
 from agentic_dynamics.experiment.experiment_spec import ExperimentSpec, validate_spec
@@ -143,6 +143,7 @@ from agentic_dynamics.knowledge.augment import (
     default_retrieve_fn,
 )
 from agentic_dynamics.measurement.commit_analysis import _read_commit_files
+from agentic_dynamics.measurement.efficiency import split_cost
 from agentic_dynamics.measurement.lsp_diagnostics import new_error_count, run_diagnostics
 from agentic_dynamics.measurement.sonar import (
     SONAR_STATUS_AVAILABLE,
@@ -243,6 +244,16 @@ class PhaseResult:
     # agent phases
     tokens: dict[str, int] = field(default_factory=dict)
     cost_usd: float = 0.0
+    # G-41 — the per-attempt cost split. ``cost_inference`` is the agent's own model-inference
+    # spend; ``cost_orchestration`` is the augmentation's (prompt-constructor/retrieval) spend.
+    # Both are ``None`` when the component was not measured (an unknown cost is never a zero).
+    cost_inference: float | None = None
+    cost_orchestration: float | None = None
+    # G-40 — attempt timing. ``leased_at`` is stamped at admission-lease acquisition (``None``
+    # when no lease was taken: an inert/absent gate); ``first_token_at`` at the first streamed
+    # token-bearing event (``None`` when the stream never produced one). Absent stays absent.
+    leased_at: str | None = None
+    first_token_at: str | None = None
     # Cost provenance (admission_leases p3). ``cost_usd`` is a float and so cannot say "no
     # figure was reported"; these three say whether to believe it. A phase whose model call
     # never produced a priceable cost ends UNKNOWN, which the admission gate refuses to spend
@@ -289,6 +300,11 @@ class PhaseResult:
     fallback_mode: str = ""
     # test phases
     test_executed_success: bool | None = None
+    # G-14 — True when the verdict above came from the independent test_runner (the harness),
+    # None when no independent verdict ran (the gate was skipped/failed before executing).
+    # Never ``False``: the field asks whether an independent evaluator produced the verdict,
+    # not whether the tests passed.
+    evaluator_independent: bool | None = None
     tests_passed: int = 0
     tests_total: int = 0
     # phase-boundary evidence (populated only when a change_analyzer is injected; design §5.7)
@@ -330,6 +346,10 @@ class PhaseResult:
             "error": self.error,
             "tokens": self.tokens,
             "cost_usd": self.cost_usd,
+            "cost_inference": self.cost_inference,
+            "cost_orchestration": self.cost_orchestration,
+            "leased_at": self.leased_at,
+            "first_token_at": self.first_token_at,
             "cost_source": self.cost_source,
             "estimation_method": self.estimation_method,
             "reported_cost_usd": self.reported_cost_usd,
@@ -361,6 +381,7 @@ class PhaseResult:
             "augmentation_latency_ms": self.augmentation_latency_ms,
             "fallback_mode": self.fallback_mode,
             "test_executed_success": self.test_executed_success,
+            "evaluator_independent": self.evaluator_independent,
             "tests_passed": self.tests_passed,
             "tests_total": self.tests_total,
             "change_analysis": self.change_analysis,
@@ -607,8 +628,16 @@ class AttemptRecord:
     model: str = ""
     status: str = ""
     cost_usd: float = 0.0
+    #: G-41 — the cost split (``None`` = component not measured). See :class:`PhaseResult`.
+    cost_inference: float | None = None
+    cost_orchestration: float | None = None
+    #: G-40 — attempt timing (``None`` = not measured). See :class:`PhaseResult`.
+    leased_at: str | None = None
+    first_token_at: str | None = None
     tokens: dict[str, int] = field(default_factory=dict)
     test_executed_success: bool | None = None
+    #: G-14 — whether an independent evaluator produced the test verdict (``None`` = no verdict).
+    evaluator_independent: bool | None = None
     confidence: float | None = None
 
     def to_dict(self) -> dict[str, Any]:
@@ -627,8 +656,13 @@ class AttemptRecord:
             "model": self.model,
             "status": self.status,
             "cost_usd": self.cost_usd,
+            "cost_inference": self.cost_inference,
+            "cost_orchestration": self.cost_orchestration,
+            "leased_at": self.leased_at,
+            "first_token_at": self.first_token_at,
             "tokens": dict(self.tokens),
             "test_executed_success": self.test_executed_success,
+            "evaluator_independent": self.evaluator_independent,
             "confidence": self.confidence,
         }
 
@@ -1139,6 +1173,9 @@ def _run_test_gate(
         pr.tests_passed = suite["passed"]
         pr.tests_total = suite["total"]
         pr.test_executed_success = suite_succeeded(suite)
+        # G-14 — this verdict is the harness's own run (test_runner), never the authoring
+        # agent's self-report, so an independent evaluator produced it.
+        pr.evaluator_independent = True
         if suite.get("failed", 0) > 0 or suite.get("errors", 0) > 0:
             pr.status = "failed"
             pr.error = suite.get("tail", "")[-400:]
@@ -1176,6 +1213,9 @@ def _apply_verifier_verdict(pr: PhaseResult, verdict: StepResult) -> None:
     pr.tests_passed = int(getattr(verdict, "tests_passed", 0) or 0)
     pr.tests_total = int(getattr(verdict, "tests_total", 0) or 0)
     pr.test_executed_success = getattr(verdict, "test_executed_success", None)
+    # G-14 — a dispatched verifier is an independent evaluator; mark the verdict independent
+    # exactly when it produced one (a verdict that never landed stays unknown, not False).
+    pr.evaluator_independent = True if pr.test_executed_success is not None else None
     if not bool(getattr(verdict, "ok", False)):
         pr.status = "failed"
         pr.error = str(getattr(verdict, "error", "") or "")[:400] or (
@@ -3174,7 +3214,17 @@ def _build_attempt_records(result: WorkflowRunResult, job_id: str) -> list[Attem
                         status=str(row.get("status") or ""),
                         cost_usd=float(row.get("cost_usd") or 0.0),
                         tokens=dict(row.get("tokens") or {}),
+                        # Per-attempt timing is genuinely per-attempt (each attempt has its own
+                        # lease and its own first token) — attach it to every row, not only the
+                        # final one. Phase-level verdicts/costs attach to the final attempt.
+                        leased_at=row.get("leased_at"),
+                        first_token_at=row.get("first_token_at"),
                         test_executed_success=(phase.test_executed_success if is_final else None),
+                        evaluator_independent=(
+                            phase.evaluator_independent if is_final else None
+                        ),
+                        cost_inference=(phase.cost_inference if is_final else None),
+                        cost_orchestration=(phase.cost_orchestration if is_final else None),
                         confidence=(phase.confidence if is_final else None),
                     )
                 )
@@ -3192,8 +3242,13 @@ def _build_attempt_records(result: WorkflowRunResult, job_id: str) -> list[Attem
                 model=phase.model,
                 status=phase.status,
                 cost_usd=phase.cost_usd,
+                cost_inference=phase.cost_inference,
+                cost_orchestration=phase.cost_orchestration,
+                leased_at=phase.leased_at,
+                first_token_at=phase.first_token_at,
                 tokens=dict(phase.tokens),
                 test_executed_success=phase.test_executed_success,
+                evaluator_independent=phase.evaluator_independent,
                 confidence=phase.confidence,
             )
         )
@@ -3730,9 +3785,17 @@ def run_workflow(
                     # subprocess is spawned, or any token is spent — and the phase
                     # handler below records it as a failed phase. Inert (a no-op context)
                     # when no gate was injected or the gate is disarmed.
-                    admission_gate.enter_context(
+                    #
+                    # G-40 — the yielded value is the ``Admission`` when the gate is armed and
+                    # ``None`` when it is inert/absent, so the lease timestamp is stamped only
+                    # when a lease was actually taken (no lease ⇒ no stamp, never a zero).
+                    admission = admission_gate.enter_context(
                         phase_admission_scope(phase_admission, name, model_i)
                     )
+                    attempt_lease_at: str | None = None
+                    if admission is not None:
+                        attempt_lease_at = _now()
+                        pr.leased_at = attempt_lease_at
 
                     # RAG augmentation seam — retrieve -> construct -> render, placed
                     # between route_step and run_agent (never before routing, so the
@@ -3789,9 +3852,13 @@ def run_workflow(
                         if attempt_no > 1:
                             # The retry's own reservation — the budget gate refuses when the
                             # campaign is exhausted (fail-closed: no unbudgeted retry).
-                            admission_gate.enter_context(
+                            retry_admission = admission_gate.enter_context(
                                 phase_admission_scope(phase_admission, name, attempt_model)
                             )
+                            # G-40 — each retry takes its OWN lease; re-stamp per attempt so
+                            # the attempt row carries when ITS lease was acquired (None when
+                            # no lease was taken).
+                            attempt_lease_at = _now() if retry_admission is not None else None
                             # The failed attempt's outcome evidence lives on its row; the
                             # phase's fields take the retry's result. (The escalation's
                             # from/to stamp lives on the RETRY row below — one event per
@@ -3878,6 +3945,9 @@ def run_workflow(
                                     "explanation": int(getattr(ar, "explanation_tokens", 0) or 0),
                                     "total": int(getattr(ar, "total_tokens", 0) or 0),
                                 },
+                                # G-40 — this attempt's own lease/first-token stamps.
+                                "leased_at": attempt_lease_at,
+                                "first_token_at": getattr(ar, "first_token_at", None),
                                 "escalation_from": (
                                     attempt_rows[-1]["model"] if attempt_no > 1 else None
                                 ),
@@ -3929,6 +3999,23 @@ def run_workflow(
                     )
                     pr.estimation_method = getattr(ar, "estimation_method", None)
                     pr.reported_cost_usd = getattr(ar, "reported_cost_usd", None)
+                    # G-40 — the first streamed token (None when the adapter never observed
+                    # one: a stubbed transport, a spawn failure, or a run with no output).
+                    pr.first_token_at = getattr(ar, "first_token_at", None)
+                    # G-41 — the per-attempt cost split. Inference is the agent's own model
+                    # spend; the orchestration component is the augmentation's paid calls
+                    # (present only when the seam ran). An untrusted cost split stays unknown
+                    # rather than becoming zeros — an unknown cost is never free.
+                    try:
+                        _trusted = CostSource(pr.cost_source) in TRUSTED_COST_SOURCES
+                    except ValueError:
+                        _trusted = False
+                    components = split_cost(
+                        inference_usd=(pr.cost_usd if _trusted else None),
+                        orchestration_usd=(pr.augmentation_cost_usd if rag_augment else None),
+                    )
+                    pr.cost_inference = components["cost_inference"]
+                    pr.cost_orchestration = components["cost_orchestration"]
                     pr.confidence = getattr(ar, "confidence", None)
                     pr.cache_read_tokens = getattr(ar, "cache_read_tokens", 0)
                     pr.cache_write_tokens = getattr(ar, "cache_write_tokens", 0)

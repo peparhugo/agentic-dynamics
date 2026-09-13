@@ -13,8 +13,10 @@ from pathlib import Path
 import pytest
 
 from agentic_dynamics.adapters.opencode import AgenticResult, _parse_session_output
+from agentic_dynamics.measurement.efficiency import split_cost
+from agentic_dynamics.runtime.queue_timings import timing_row
 from agentic_dynamics.runtime.story import SessionResult, StoryResult
-from agentic_dynamics.runtime.workflow_runner import PhaseResult
+from agentic_dynamics.runtime.workflow_runner import AttemptRecord, PhaseResult
 
 pytestmark = pytest.mark.fast
 
@@ -151,3 +153,120 @@ def test_run_py_wires_independent_test_success():
     assert "answer_tokens" in src
     assert "explanation_tokens" in src
     assert "perturbation_strength" in src
+
+
+# ── G-14: the independent-evaluator writer ───────────────────────────────────
+
+
+def test_run_suite_stamps_independent_evaluator(monkeypatch, tmp_path):
+    """``run_suite`` (the harness) is the independent evaluator → every verdict is stamped."""
+    from agentic_dynamics.runtime import test_runner
+
+    monkeypatch.setattr(
+        test_runner, "_run_pytest",
+        lambda *a, **k: {"runner": "pytest", "passed": 2, "failed": 0, "errors": 0,
+                         "total": 2, "pass_rate": 1.0, "tail": "2 passed"},
+    )
+    result = test_runner.run_suite(tmp_path, "python")
+    assert result["evaluator_independent"] is True
+    assert test_runner.suite_succeeded(result) is True
+
+
+def test_verify_cell_carries_the_evaluator_provenance(monkeypatch, tmp_path):
+    """The batch verification record (verify_tests) carries G-14; a missing worktree stays unknown."""
+    import importlib
+
+    verify_tests = importlib.import_module("scripts.verify_tests")
+    worktree = tmp_path / "wt"
+    worktree.mkdir()
+    monkeypatch.setattr(
+        verify_tests, "run_suite",
+        lambda *a, **k: {"runner": "pytest", "passed": 3, "failed": 0, "errors": 0,
+                         "total": 3, "pass_rate": 1.0, "tail": "3 passed",
+                         "evaluator_independent": True},
+    )
+    record = verify_tests.verify_cell(
+        {"_file": "cell.json", "worktree": str(worktree), "language": "python"}, node="node"
+    )
+    assert record["test_executed_success"] is True
+    assert record["evaluator_independent"] is True
+
+    missing = verify_tests.verify_cell(
+        {"_file": "cell.json", "worktree": "/does/not/exist", "language": "python"}, node="node"
+    )
+    assert missing.get("evaluator_independent") is None  # no verdict → unknown, never False
+
+
+# ── G-40: first-token + lease timing writers ─────────────────────────────────
+
+
+def test_first_token_at_stamped_on_the_first_streamed_event(monkeypatch, tmp_path):
+    """The adapter records the wall-clock first streamed token; an empty stream stays None."""
+    from agentic_dynamics.adapters import opencode
+
+    transcript = "\n".join(json.dumps(e) for e in [
+        {"type": "step_start", "part": {"type": "step-start"}},
+        {"type": "text", "part": {"type": "text", "text": "the first output"}},
+    ])
+
+    class _Stream:
+        stdout = transcript
+        stderr = ""
+        exit_code = 0
+        timed_out = False
+
+    def _fake_stream(cmd, *, workdir, timeout, on_line=None, watchdog=None):
+        for line in transcript.splitlines():
+            if on_line is not None:
+                on_line(line)
+        return _Stream()
+
+    monkeypatch.setattr(opencode, "stream_subprocess", _fake_stream)
+    monkeypatch.setattr(opencode, "_init_git_workdir", lambda *a, **k: None)
+
+    result = opencode.run_opencode_agentic(
+        "task", model="deepseek/deepseek-v4-pro", workdir=str(tmp_path), init_git=False
+    )
+    assert result.first_token_at is not None
+
+    class _Empty:
+        stdout = ""
+        stderr = ""
+        exit_code = 0
+        timed_out = False
+
+    monkeypatch.setattr(opencode, "stream_subprocess", lambda *a, **k: _Empty())
+    empty = opencode.run_opencode_agentic(
+        "task", model="deepseek/deepseek-v4-pro", workdir=str(tmp_path), init_git=False
+    )
+    assert empty.first_token_at is None
+
+
+def test_timing_row_carries_leased_at_only_when_measured():
+    row = timing_row({"cell_id": "c1"}, status="done", started_at=2.0, ended_at=3.0,
+                     leased_at=1.5)
+    assert row["leased_at"] == 1.5
+    absent = timing_row({"cell_id": "c1"}, status="done", started_at=2.0, ended_at=3.0)
+    assert "leased_at" not in absent  # no lease → absent, never 0
+
+
+# ── G-41: the inference/orchestration split ──────────────────────────────────
+
+
+def test_split_cost_is_null_preserving():
+    assert split_cost(inference_usd=1.0, orchestration_usd=None) == {
+        "cost_inference": 1.0, "cost_orchestration": None,
+    }
+    assert split_cost(inference_usd=None, orchestration_usd=0.5) == {
+        "cost_inference": None, "cost_orchestration": 0.5,
+    }
+    assert split_cost(inference_usd=None, orchestration_usd=None) == {
+        "cost_inference": None, "cost_orchestration": None,
+    }
+
+
+def test_attempt_record_defaults_keep_new_fields_unknown():
+    d = AttemptRecord(attempt_id="a1", job_id="j", phase="scope").to_dict()
+    for field in ("evaluator_independent", "leased_at", "first_token_at",
+                  "cost_inference", "cost_orchestration"):
+        assert d[field] is None, field

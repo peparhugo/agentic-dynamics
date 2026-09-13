@@ -113,6 +113,35 @@ def test_agent_phase_with_gate_records_passing_suite(tmp_path, monkeypatch):
     assert _verified_value(facts, "implement") == "true"
 
 
+# ── G-14: evaluator provenance on the attempt ledger ──────────────────────────
+
+
+def test_gate_records_independent_evaluator_on_phase_and_attempt(tmp_path, monkeypatch):
+    """A gated agent phase's verdict is marked independent wherever the verdict lands."""
+    monkeypatch.setattr(workflow_runner, "run_suite", lambda *a, **k: _PASSING)
+    spec = _spec_with_gate("implement")
+    result = run_workflow(spec, goal="g", model="m", workdir=tmp_path, commit=False,
+                          run_agentic_fn=lambda *a, **k: _fake_agent())
+    implement = next(p for p in result.phases if p.phase == "implement")
+    assert implement.test_executed_success is True
+    assert implement.evaluator_independent is True
+    attempt = next(a for a in result.to_dict()["attempts"] if a["phase"] == "implement")
+    assert attempt["evaluator_independent"] is True
+
+
+def test_ungated_agent_phase_leaves_evaluator_independent_unknown(tmp_path, monkeypatch):
+    """No independent verdict ran → the provenance is unknown (None), never a fabricated False."""
+    monkeypatch.setattr(workflow_runner, "run_suite", lambda *a, **k: _PASSING)
+    spec = load_spec(SPEC)  # no test_gate on any phase
+    result = run_workflow(spec, goal="g", model="m", workdir=tmp_path, commit=False,
+                          run_agentic_fn=lambda *a, **k: _fake_agent())
+    implement = next(p for p in result.phases if p.phase == "implement")
+    assert implement.test_executed_success is None
+    assert implement.evaluator_independent is None
+    attempt = next(a for a in result.to_dict()["attempts"] if a["phase"] == "implement")
+    assert attempt["evaluator_independent"] is None
+
+
 def test_agent_phase_with_gate_records_failing_suite(tmp_path, monkeypatch):
     """Gate + failing runner → the attempt carries ``False``, the phase fails, and the reducer
     mints ``"false"`` — the honest independent verdict, never a self-report."""

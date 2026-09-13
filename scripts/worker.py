@@ -344,16 +344,22 @@ def _dequeue(r) -> tuple | None:
     return r.brpop([QUEUE_KEY, BATCH_QUEUE_KEY], timeout=BLOCK_TIMEOUT)
 
 
-def _record_timing(cell: dict, *, status: str, started_at: float) -> None:
-    """Append this job's measured queue/service timings (step 8, G-30) — loud but never fatal.
+def _record_timing(
+    cell: dict, *, status: str, started_at: float, leased_at: float | None = None
+) -> None:
+    """Append this job's measured queue/service timings (step 8, G-30/G-40) — loud but never fatal.
 
     The worker is the only actor that observes both the enqueue stamp and the serve window;
     a disk failure here must not kill a finished job, so the append reports a warning and the
     row is simply absent (the P8 surface then shows the completion without timings — an
-    explicit absence, never a fabricated number).
+    explicit absence, never a fabricated number). ``leased_at`` is the epoch second the cell's
+    admission lease was acquired; ``None`` (no lease taken) omits the key.
     """
     warning = append_timing(
-        timing_row(cell, status=status, started_at=started_at, ended_at=time.time())
+        timing_row(
+            cell, status=status, started_at=started_at, ended_at=time.time(),
+            leased_at=leased_at,
+        )
     )
     if warning:
         log(f"[{cell.get('cell_id')}] WARNING — {warning} (the job's result stands)")
@@ -440,12 +446,19 @@ def main() -> None:
             "FINOPS_OPENCODE_STATE_DIR": str(job_state / "data"),
         }
 
+        # G-40 — when this cell's admission lease is acquired, stamp the epoch second so the
+        # settled timing row can carry it. A disarmed gate yields ``{}`` (no lease) and the
+        # stamp stays None: absent, never zero.
+        leased_at: float | None = None
+
         try:
             # LEASE BEFORE SPAWN. A refusal raises here, before subprocess.run is reached, so
             # "denied" provably means no run_story.py process ever existed. The returned env
             # block is merged into the child's environment: that is how the admission crosses
             # the process boundary to the adapter's bypass guard.
             admission_env = admission_gate.enter_context(cell_admission(cell))
+            if admission_env:
+                leased_at = time.time()
             consecutive_denials = 0
             proc = subprocess.run(
                 [
@@ -514,14 +527,14 @@ def main() -> None:
                     error_log = log_dir / f"{cell_id}.error.log"
                     error_log.write_text(proc.stderr or proc.stdout)
                     failed += 1
-                    _record_timing(cell, status="failed", started_at=started_at)
+                    _record_timing(cell, leased_at=leased_at, status="failed", started_at=started_at)
                     continue
                 log(f"[{cell_id}] OK ({elapsed:.0f}s)")
                 _safe_hset(r, STATUS_KEY, cell_id, "done")
                 publisher.publish_status("done")
                 _trigger_analysis(r, proc.stdout, cell_id)
                 completed += 1
-                _record_timing(cell, status="done", started_at=started_at)
+                _record_timing(cell, leased_at=leased_at, status="done", started_at=started_at)
             else:
                 log(f"[{cell_id}] FAILED ret={proc.returncode} ({elapsed:.0f}s)")
                 _safe_hset(r, STATUS_KEY, cell_id, "failed")
@@ -530,7 +543,7 @@ def main() -> None:
                 error_log = log_dir / f"{cell_id}.error.log"
                 error_log.write_text(proc.stderr or proc.stdout)
                 failed += 1
-                _record_timing(cell, status="failed", started_at=started_at)
+                _record_timing(cell, leased_at=leased_at, status="failed", started_at=started_at)
 
         except AdmissionDenied as e:
             # REFUSED — nothing was spawned and nothing was spent. The cell is NOT dead-lettered:
@@ -567,7 +580,7 @@ def main() -> None:
             publisher.publish_status("timeout")
             _safe_record_dead(r, QUEUE_KEY, cell, "timeout")
             failed += 1
-            _record_timing(cell, status="timeout", started_at=started_at)
+            _record_timing(cell, leased_at=leased_at, status="timeout", started_at=started_at)
 
         except Exception as e:
             log(f"[{cell_id}] EXCEPTION: {e}")
@@ -575,7 +588,7 @@ def main() -> None:
             publisher.publish_status("failed")
             _safe_record_dead(r, QUEUE_KEY, cell, f"exception: {e}")
             failed += 1
-            _record_timing(cell, status="failed", started_at=started_at)
+            _record_timing(cell, leased_at=leased_at, status="failed", started_at=started_at)
             # Reconnect — the exception may have been a Redis error mid-run
             r = _connect_redis()
 

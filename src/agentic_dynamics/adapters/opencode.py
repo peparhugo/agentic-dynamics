@@ -18,6 +18,7 @@ import tempfile
 import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -42,6 +43,13 @@ else:
 
 
 logger = logging.getLogger(__name__)
+
+#: The stream event types that carry model output — the first of these to arrive is the first
+#: streamed token for ``AgenticResult.first_token_at`` (G-40). ``tool_use`` covers a first step
+#: that emits a tool call before any prose; ``step_finish`` is the usage-bearing fallback.
+_FIRST_TOKEN_EVENT_TYPES = frozenset(
+    {"text", "reasoning", "tool_use", "step_finish", "step-finish"}
+)
 
 #: Environment override for the workdir snapshot cap. ``_list_files`` walks a directory
 #: hashing every file for before/after change detection; an unbounded tree (a real workdir
@@ -156,6 +164,10 @@ class AgenticResult:
     exit_code: int = 0
     duration_s: float = 0.0
     error: str = ""
+    #: ISO-8601 UTC timestamp of the first streamed token-bearing event (G-40). ``None`` means
+    #: the adapter never observed a token on the stream (a spawn failure, an empty run, or a
+    #: stubbed transport) — the ledger's ``first_token_at`` then stays unknown, never zero.
+    first_token_at: str | None = None
 
     # Output
     final_response: str = ""
@@ -540,16 +552,21 @@ def run_opencode_agentic(
             return
         if not isinstance(obj, dict):
             return
+        # G-40 — the first streamed token-bearing event. Set from the reader thread; the
+        # check-and-set is single-threaded (one stdout reader), so the first wins and later
+        # events never move it.
+        if result.first_token_at is None and obj.get("type") in _FIRST_TOKEN_EVENT_TYPES:
+            result.first_token_at = datetime.now(timezone.utc).isoformat()
         if on_event is not None:
             on_event(obj)
         elif publisher is not None:
             publisher.publish_event(obj)
 
-    on_line = (
-        _on_line
-        if (on_event is not None or publisher is not None or watchdog is not None)
-        else None
-    )
+    # The line reader is ALWAYS installed: it is the only live view of the stream, and
+    # ``first_token_at`` (G-40) is measured from it. The callback's other side effects stay
+    # opt-in (live transcript when a watchdog is present, on_event/publisher otherwise), so a
+    # run with no telemetry differs only by the one timestamp it now records.
+    on_line = _on_line
     try:
         stream = stream_subprocess(
             cmd, workdir=workdir, timeout=timeout, on_line=on_line, watchdog=watchdog
