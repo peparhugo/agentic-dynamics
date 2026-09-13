@@ -22,14 +22,40 @@
  */
 
 :root {
-  --bg: #0d1014;
-  --panel: #14181f;
-  --panel-2: #181d26;
-  --line: #262c38;
-  --text: #e7eaf0;
-  --muted: #98a2b3;
-  --dim: #6b7480;
-  --accent: #6ea8fe;
+  /* ── Surfaces: a FOUR-step neutral ramp (synthesis v2 §4.4). Depth is still structure, not
+     ornament, but the steps sit closer together and stay fully neutral, so a long watch reads
+     as one calm plane instead of a stack of cards. `--bg`/`--panel`/`--panel-2` remain as
+     aliases for steps 0–2 (the geometry rules reference them by name); `--surface-3` is the
+     raised/selected step. */
+  --surface-0: #0e1013;   /* page — the deepest step */
+  --surface-1: #15181e;   /* region panel */
+  --surface-2: #1c2029;   /* nested card / tab */
+  --surface-3: #252b36;   /* raised / selected */
+  --bg: var(--surface-0);
+  --panel: var(--surface-1);
+  --panel-2: var(--surface-2);
+  --panel-3: var(--surface-3);
+
+  --line: #2b323f;
+  --line-strong: #3a4353;
+
+  /* Warm-white text (synthesis v2 §4.4): a small warm cast keeps the dark room from reading
+     blue under a long watch; the light theme carries the same warmth as a near-black. */
+  --text: #f2eee6;
+  --text-strong: #ffffff;
+  --muted: #a8a296;
+  --dim: #7c776b;
+
+  /* Two accents, two jobs (synthesis v2 §4.4): amber is the operator/human-attention accent
+     (decisions, governed actions, focus); cyan is the machine/live-activity accent (a live
+     rail, a chart series, a scope). Green/red stay reserved for success/failure. `--accent`
+     is the legacy alias for the operator accent, so human-interaction surfaces keep one name. */
+  --operator: hsl(42 65% 52%);
+  --operator-soft: hsl(42 65% 52% / 0.16);
+  --machine: #00d4ff;
+  --machine-soft: rgba(0, 212, 255, 0.14);
+  --accent: var(--operator);
+
   --ok: #3fb950;
   --warn: #d29922;
   --bad: #f85149;
@@ -37,6 +63,18 @@
   --advisory: #c8a24a;
   --measured: #5fb3a1;
   --source: #7f9cf5;
+
+  /* Glass is for OVERLAYS ONLY (R4 dock, lenses, the confirmation door) — never a resting
+     region, so the glance never floats. Near-opaque on purpose: the blur is a hint, while the
+     AA contrast of every required value is preserved without relying on what sits behind it. */
+  --glass-bg: rgba(19, 23, 30, 0.82);
+  --glass-blur: 14px;
+  --glass-border: rgba(255, 255, 255, 0.08);
+
+  /* Corner brackets mark the ONE active/selected surface and nothing else. */
+  --bracket: var(--machine);
+  --bracket-len: 9px;
+
   --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
   --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 
@@ -50,19 +88,19 @@
   --fs-title: 12px;     /* panel/dock titles */
   --lh-tight: 1.15;
 
-  /* Elevation ladder (cm-elevation): depth is structure, not ornament. */
-  --surface-0: var(--bg);
-  --surface-1: var(--panel);
-  --surface-2: var(--panel-2);
-  --overlay-shadow: 0 16px 48px rgba(0, 0, 0, 0.45);
+  /* Elevation ladder (cm-elevation): depth is structure, not ornament. The four-step surface
+     ramp is defined at the top of this block; only the overlay shadow lives here, so the ramp
+     has exactly one home. */
+  --overlay-shadow: 0 16px 48px rgba(0, 0, 0, 0.5);
 
   /* Motion (cm-motion): state changes only, short and decelerating. */
   --motion-state: 160ms;
   --motion-draw: 220ms;
   --motion-ease: cubic-bezier(0.2, 0.7, 0.3, 1);
 
-  /* Focus ring (a11y): one visible ring everywhere, never removed without a replacement. */
-  --focus-ring: 2px solid var(--accent);
+  /* Focus ring (a11y): one visible ring everywhere in the operator accent, never removed
+     without a replacement. */
+  --focus-ring: 2px solid var(--operator);
 
   /* Geometry tokens — overridden per breakpoint below. */
   --pad: 16px;
@@ -79,14 +117,24 @@
 }
 
 [data-theme="light"] {
-  --bg: #f4f6f9;
-  --panel: #ffffff;
-  --panel-2: #eef1f5;
-  --line: #d5dae2;
-  --text: #12161c;
-  --muted: #5a6472;
-  --dim: #7a8492;
-  --accent: #1f6feb;
+  /* The same four-step ramp, inverted: a warm off-white page, a white panel, and two warmer,
+     deeper selected steps. `--accent` inherits the operator alias from :root. */
+  --surface-0: #f6f4ef;
+  --surface-1: #ffffff;
+  --surface-2: #efece5;
+  --surface-3: #e5e1d7;
+  --line: #d8d3c8;
+  --line-strong: #bdb7aa;
+  --text: #1b1a16;
+  --text-strong: #000000;
+  --muted: #5a564d;
+  --dim: #78736a;
+  /* Operator amber and machine cyan are darkened for the light surface so both clear 4.5:1 as
+     text, not only as a border. */
+  --operator: #8a5a00;
+  --operator-soft: rgba(138, 90, 0, 0.12);
+  --machine: #006b84;
+  --machine-soft: rgba(0, 107, 132, 0.12);
   --ok: #1a7f37;
   /* Darkened for the unboxed constraint ledger: the ruled R3 regions now sit on the page
      background, so warn/unknown must clear 4.5:1 against --bg, not only against a white panel. */
@@ -96,20 +144,33 @@
   --advisory: #7d5a00;
   --measured: #0f6b5c;
   --source: #3b4cca;
-  /* A lighter shadow on light surfaces keeps elevation structural, not muddy. */
+  /* Glass resolves light on the light theme; the overlay shadow stays structural, not muddy. */
+  --glass-bg: rgba(255, 255, 255, 0.8);
+  --glass-border: rgba(20, 30, 50, 0.1);
   --overlay-shadow: 0 16px 40px rgba(20, 30, 50, 0.18);
 }
 
 /* Forced-colours: drop custom colours onto system colours so Windows high-contrast is honoured. */
 @media (forced-colors: active) {
   :root {
+    --surface-0: Canvas;
+    --surface-1: Canvas;
+    --surface-2: Canvas;
+    --surface-3: Canvas;
     --bg: Canvas;
     --panel: Canvas;
     --panel-2: Canvas;
+    --panel-3: Canvas;
     --line: CanvasText;
+    --line-strong: CanvasText;
     --text: CanvasText;
+    --text-strong: CanvasText;
     --muted: GrayText;
     --dim: GrayText;
+    --operator: LinkText;
+    --machine: LinkText;
+    --operator-soft: transparent;
+    --machine-soft: transparent;
     --accent: LinkText;
     --ok: CanvasText;
     --warn: CanvasText;
@@ -118,6 +179,16 @@
     --advisory: CanvasText;
     --measured: CanvasText;
     --source: CanvasText;
+    --glass-bg: Canvas;
+    --glass-border: CanvasText;
+    --bracket: CanvasText;
+  }
+  /* Glass is decoration: forced colors flattens overlays to the system canvas so every value
+     reads on the system background. */
+  .selection-dock, .chart-lens, .confirm-bar {
+    background: Canvas;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
   }
   /* Charts must survive Windows High Contrast: keep the three series distinguishable by
      system color and let the status glyphs/labels carry the meaning, never hue alone. */
@@ -136,7 +207,8 @@
 :focus-visible { outline: var(--focus-ring); outline-offset: 1px; }
 
 /* Tabular numerals (cm-type): every data value and table column aligns on the digit grid, so
-   dense numbers scan as columns rather than proportional-text raggedness. */
+   dense numbers scan as columns rather than proportional-text raggedness. The `--mono` family
+   is the data voice (synthesis v2 §4.4); tabular numerals travel with it. */
 .field [data-value],
 .detail-line [data-value],
 .marginal-bucket,
@@ -144,7 +216,16 @@
 .chart-gauge-value,
 .visual-value,
 .visual-flow-state,
-.scope-sub {
+.scope-sub,
+.queue-id,
+.feed-entry,
+.feed-time,
+.timing-row,
+.dock-fact-value,
+.dock-address,
+.panel-table td,
+.kv-val,
+.item-title {
   font-variant-numeric: tabular-nums;
 }
 
@@ -219,7 +300,8 @@ body {
   font-family: var(--mono);
   font-size: 15px;
   font-weight: 700;
-  color: var(--ok);
+  /* The machine accent: this rail drives CLI agents, and cyan is the live/machine tell. */
+  color: var(--machine);
 }
 
 .scope-name {
@@ -262,7 +344,8 @@ body {
   width: 54px;
   font-size: 11px;
   font-weight: 700;
-  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
   color: var(--muted);
 }
 
@@ -358,7 +441,10 @@ body {
   padding: 8px 8px 2px;
   font-size: 11px;
   font-weight: 700;
-  letter-spacing: 0.07em;
+  /* Region headers are the navigation voice: uppercase + wide tracking (synthesis v2 §4.4),
+     in muted ink so the values below them carry the eye. */
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
   color: var(--muted);
   white-space: nowrap;
   overflow: hidden;
@@ -516,12 +602,13 @@ body {
 }
 
 .run-row:focus-visible {
-  outline: 2px solid var(--accent);
+  outline: var(--focus-ring);
   outline-offset: 1px;
 }
 
 .run-row[data-attention="active"] { border-left-color: var(--bad); }
-.run-row[data-live="live"] { border-left-color: var(--ok); }
+/* Live is machine activity, not a success verdict: the live rail takes the machine accent. */
+.run-row[data-live="live"] { border-left-color: var(--machine); }
 
 .row-line {
   display: flex;
@@ -547,7 +634,7 @@ body {
   font-family: var(--mono);
   font-size: 13px;
   font-weight: 700;
-  color: var(--ok);
+  color: var(--machine);
 }
 
 /* The left status rail's glyph (shape + word, never colour alone). */
@@ -557,9 +644,9 @@ body {
   font-size: 11px;
   color: var(--muted);
 }
-.row-status[data-state="live"] { color: var(--ok); }
+.row-status[data-state="live"] { color: var(--machine); }
 .row-status[data-state="failed"] { color: var(--bad); }
-.row-status[data-state="waiting"] { color: var(--accent); }
+.row-status[data-state="waiting"] { color: var(--machine); }
 
 /* Move 6 — the lease headroom bar attached to the row. Reserved vs hard cap fills the track;
    state (ok/warn/over) is carried by data-budget-state and the cost field's reserved/cap pair,
@@ -814,7 +901,7 @@ body {
   padding: 1px 6px;
   cursor: pointer;
 }
-.feed-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.feed-toggle:focus-visible { outline: var(--focus-ring); outline-offset: 1px; }
 .feed-list {
   list-style: none;
   margin: 0;
@@ -900,7 +987,7 @@ body {
 .visual-spine { stroke: var(--line); stroke-width: 1.5; fill: none; }
 .visual-attempt-rule { stroke: var(--muted); stroke-width: 0.5; stroke-dasharray: 2 3; }
 .visual-phase-rule { stroke: var(--line); stroke-width: 0.5; }
-.visual-scope-label { fill: var(--accent); font-family: var(--sans); font-size: 9px;
+.visual-scope-label { fill: var(--machine); font-family: var(--sans); font-size: 9px;
                       text-anchor: end; }
 .visual-time { fill: var(--muted); font-family: var(--mono); font-size: 9px; text-anchor: end; }
 .visual-block-title {
@@ -917,7 +1004,7 @@ body {
 .visual-rung[data-evidence-class="measured"] .visual-node { fill: var(--measured); stroke: var(--measured); }
 .visual-rung[data-evidence-class="source"] .visual-node { fill: var(--source); stroke: var(--source); }
 .visual-rung[data-evidence-class="policy"] .visual-node { fill: none; stroke: var(--text); }
-.visual-rung[data-evidence-class="lifecycle"] .visual-node { fill: var(--accent); stroke: var(--accent); }
+.visual-rung[data-evidence-class="lifecycle"] .visual-node { fill: var(--machine); stroke: var(--machine); }
 
 /* Real SVG <text> (svg-print): labels and values are selectable, zoomable and printable. */
 .visual-label { fill: var(--muted); font-family: var(--sans); font-size: 10px; }
@@ -946,7 +1033,7 @@ body {
   cursor: pointer;
 }
 .visual-action:hover { border-color: var(--accent); }
-.visual-action:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.visual-action:focus-visible { outline: var(--focus-ring); outline-offset: 1px; }
 
 /* The textual equivalent for screen readers (the SVG's real <text> is the visible carrier and
    the print/zoom equivalent). Visually hidden so the dock stays a diagram, not a duplicate. */
@@ -1035,7 +1122,8 @@ body {
   border-radius: 6px;
 }
 
-.chart-card[data-focus="1"] { border-color: var(--accent); }
+/* Selection is a human act: the focused chart card takes the operator accent. */
+.chart-card[data-focus="1"] { border-color: var(--operator); }
 
 .chart-head { display: flex; align-items: baseline; gap: 8px; }
 .chart-title { margin: 0; font-size: 11px; letter-spacing: 0.06em; color: var(--muted); }
@@ -1046,7 +1134,7 @@ body {
   flex: 0 0 auto;
   min-width: 0;
   overflow: hidden;
-  color: var(--accent); /* currentColor fallback for the marks in forced-colors */
+  color: var(--machine); /* currentColor fallback for the marks in forced-colors */
 }
 
 .chart-svg { display: block; width: 100%; height: 100%; overflow: visible; }
@@ -1055,7 +1143,7 @@ body {
 
 .chart-line { fill: none; stroke: currentColor; stroke-width: 1.4; vector-effect: non-scaling-stroke; }
 .chart-dot { fill: currentColor; }
-.chart-series-0 { color: var(--accent); }
+.chart-series-0 { color: var(--machine); }
 .chart-series-1 { color: var(--ok); }
 .chart-series-2 { color: var(--warn); }
 
@@ -1065,7 +1153,7 @@ body {
 .chart-gauge-label { font-size: 10px; color: var(--muted); }
 .chart-gauge-value { font-family: var(--mono); font-size: 11px; color: var(--text); }
 .chart-gauge-track { height: 4px; background: var(--line); border-radius: 2px; overflow: hidden; }
-.chart-gauge-fill { height: 100%; background: var(--accent); }
+.chart-gauge-fill { height: 100%; background: var(--machine); }
 .chart-gauge-value[data-unknown] { color: var(--unknown); }
 
 .chart-status-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; }
@@ -1124,7 +1212,7 @@ body {
 }
 
 .icon-button:hover { color: var(--text); border-color: var(--line); }
-.icon-button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.icon-button:focus-visible { outline: var(--focus-ring); outline-offset: 1px; }
 .icon-svg { width: 16px; height: 16px; fill: currentColor; }
 
 /* ── Column gaps and widths are exact; never let flex shrink a fixed column ────────────── */
@@ -1275,6 +1363,62 @@ body {
   .answer-cells .field [data-value] { font-size: 12px; }
 }
 
+/* ═══════════════════════════════════════════════════════════════════════════════════════════
+   VISUAL PRIMITIVES (synthesis v2 §4.4) — the token layer put to use.
+
+   Two presentation primitives apply the tokens above: the active/selected corner bracket and
+   the overlay-only glass. Both are placed AFTER the component rules they refine so they win
+   the cascade, and neither changes a box, a size, or the fixed §3.2 geometry the render gate
+   asserts.
+   ═══════════════════════════════════════════════════════════════════════════════════════════ */
+
+/* Corner brackets — the ONE active/selected surface, and nothing else. Two opposing right-angle
+   marks (never a full box) drawn as pseudo-elements, so they never join the text flow and the
+   contrast walker never sees a background-image behind a required value. */
+[data-focus="1"],
+[aria-selected="true"] {
+  position: relative;
+}
+[data-focus="1"]::before,
+[data-focus="1"]::after,
+[aria-selected="true"]::before,
+[aria-selected="true"]::after {
+  content: "";
+  position: absolute;
+  width: var(--bracket-len);
+  height: var(--bracket-len);
+  pointer-events: none;
+}
+[data-focus="1"]::before,
+[aria-selected="true"]::before {
+  top: -1px;
+  left: -1px;
+  border-top: 2px solid var(--bracket);
+  border-left: 2px solid var(--bracket);
+}
+[data-focus="1"]::after,
+[aria-selected="true"]::after {
+  bottom: -1px;
+  right: -1px;
+  border-bottom: 2px solid var(--bracket);
+  border-right: 2px solid var(--bracket);
+}
+
+/* Glass — overlays only. The R4 dock, the chart lens and the confirmation door float above the
+   room; the resting regions stay flat, so the glance never lifts off the bench. The prompt
+   overlays take the glass edge; the confirmation door keeps its warning border. */
+.selection-dock,
+.chart-lens,
+.confirm-bar {
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(1.15);
+  backdrop-filter: blur(var(--glass-blur)) saturate(1.15);
+}
+.selection-dock,
+.chart-lens {
+  border-color: var(--glass-border);
+}
+
 /* ── Motion: state transitions only, and collapse under reduced-motion ─────────────────── */
 
 @media (prefers-reduced-motion: no-preference) {
@@ -1397,7 +1541,7 @@ body {
   padding: 3px 9px; cursor: pointer;
 }
 .wb-tab:hover { color: var(--text); }
-.wb-tab[aria-selected="true"] { color: var(--text); border-color: var(--line); background: var(--panel-2); }
+.wb-tab[aria-selected="true"] { color: var(--text); border-color: var(--line); background: var(--panel-3); }
 .wb-tab:focus-visible { outline: var(--focus-ring); outline-offset: 1px; }
 .wb-body { flex: 1 1 auto; min-height: 0; overflow: auto; padding: 16px; }
 .wb-panel[hidden] { display: none; }
