@@ -177,8 +177,8 @@ def test_verify_cell_carries_the_evaluator_provenance(monkeypatch, tmp_path):
     import importlib
 
     verify_tests = importlib.import_module("scripts.verify_tests")
-    worktree = tmp_path / "wt"
-    worktree.mkdir()
+    cell_dir = tmp_path / "wt"
+    cell_dir.mkdir()
     monkeypatch.setattr(
         verify_tests, "run_suite",
         lambda *a, **k: {"runner": "pytest", "passed": 3, "failed": 0, "errors": 0,
@@ -186,13 +186,15 @@ def test_verify_cell_carries_the_evaluator_provenance(monkeypatch, tmp_path):
                          "evaluator_independent": True},
     )
     record = verify_tests.verify_cell(
-        {"_file": "cell.json", "worktree": str(worktree), "language": "python"}, node="node"
+        {"_file": "cell.json", "worktree": str(cell_dir), "language": "python"},  # fast-safe: KB record key, no live call
+        node="node",
     )
     assert record["test_executed_success"] is True
     assert record["evaluator_independent"] is True
 
     missing = verify_tests.verify_cell(
-        {"_file": "cell.json", "worktree": "/does/not/exist", "language": "python"}, node="node"
+        {"_file": "cell.json", "worktree": "/does/not/exist", "language": "python"},  # fast-safe: KB record key, no live call
+        node="node",
     )
     assert missing.get("evaluator_independent") is None  # no verdict → unknown, never False
 
