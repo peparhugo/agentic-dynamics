@@ -2504,15 +2504,24 @@ def _git_tree_hash(workdir: Path, rev: str = "HEAD") -> str:
                 file=sys.stderr,
             )
             return ""
-        files = subprocess.run(
-            ["git", "ls-files", "-z", "--", "approvals"],
+        # Exclude the approvals/ subtree from the identity in ONE pathspec-based step.
+        # (The previous ``ls-files -z`` + ``update-index --force-remove -z --stdin`` pair
+        # silently removed nothing on the CI git build — the gate then compared the
+        # WITH-approvals tree, missed every match, and the approval/reuse replay tests
+        # failed only in CI; 2026-09-13. ``-f`` skips the safety checks — the throwaway
+        # index is HEAD's tree — and ``--ignore-unmatch`` keeps the no-approvals case a
+        # no-op.)
+        removed = subprocess.run(
+            ["git", "rm", "-r", "-f", "--cached", "-q", "--ignore-unmatch", "--", "approvals"],
             cwd=workdir, env=env, capture_output=True, timeout=30,
         )
-        if files.returncode == 0 and files.stdout:
-            subprocess.run(
-                ["git", "update-index", "--force-remove", "-z", "--stdin"],
-                cwd=workdir, env=env, input=files.stdout, capture_output=True, timeout=30,
+        if removed.returncode != 0:
+            print(
+                "warning: relabel tree hash: approvals exclusion failed "
+                f"({removed.stderr.decode(errors='replace').strip()}) — the gate will not fire",
+                file=sys.stderr,
             )
+            return ""
         written = subprocess.run(
             ["git", "write-tree"], cwd=workdir, env=env, capture_output=True, text=True, timeout=30
         )
