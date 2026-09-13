@@ -160,9 +160,25 @@ def attempt_a_template(tmp_path_factory):
 def _copy_attempt_a(template: Path, target: Path) -> str:
     """Hardlink-copy the shared attempt-A tree into ``target``; return its tree hash.
 
-    ``target`` must not already exist (``shutil.copytree`` creates it).
+    ``target`` must not already exist (``shutil.copytree`` creates it). The copy is then
+    reset to a pristine HEAD (``reset --hard`` + ``clean -fdx``): the shared module fixture
+    can accumulate runtime junk (pytest bytecode, SQLite WAL sidecars under the corpus
+    artifacts) from concurrent suite activity, and a phase commit sweeps whatever sits in
+    the worktree — the CI-only tree drift (2026-09-13). A pristine copy keeps every replay
+    phase's tree exactly ``base + what the test writes``.
     """
     shutil.copytree(template, target, copy_function=os.link)
+    subprocess.run(["git", "reset", "--hard", "-q", "HEAD"], cwd=target, check=True)
+    subprocess.run(["git", "clean", "-fdxq"], cwd=target, check=True)
+    # Runtime junk the wider suite can drop into shared corpus paths (SQLite WAL sidecars,
+    # bytecode) must never enter a replay phase's commit: exclude it in THIS copy's
+    # info/exclude (worktree-local; no effect on the tree hash).
+    exclude = target / ".git" / "info" / "exclude"
+    exclude.parent.mkdir(parents=True, exist_ok=True)
+    exclude.write_text(
+        (exclude.read_text() if exclude.exists() else "")
+        + "\n__pycache__/\n*.pyc\n*.pyo\n*.db-shm\n*.db-wal\n"
+    )
     return _git("rev-parse", "HEAD^{tree}", cwd=target).stdout.strip()
 
 
@@ -369,7 +385,7 @@ def test_relabel_with_operator_approval_passes(tmp_path, attempt_a_template):
     ap = wd / "approvals" / spec.name
     ap.mkdir(parents=True)
     (ap / "scope_tree_reuse.md").write_text(_approval_text(REVAMP2_TREE))
-    _git("add", "-A", cwd=wd)
+    _git("add", "-A", "--", "approvals", cwd=wd)
     _git("commit", "-qm", "operator approval", cwd=wd)
 
     def agent(prompt, *, model, backend, workdir, **kwargs):
@@ -408,7 +424,7 @@ def test_approval_committed_during_the_phase_is_not_an_approval(tmp_path, attemp
         ap = Path(workdir) / "approvals" / spec.name
         ap.mkdir(parents=True)
         (ap / "scope_tree_reuse.md").write_text(_approval_text(REVAMP2_TREE))
-        subprocess.run(["git", "add", "-A"], cwd=workdir, check=True)
+        subprocess.run(["git", "add", "-A", "--", "approvals"], cwd=workdir, check=True)
         subprocess.run(
             ["git", "commit", "-q", "-m", "[workflow] scope — g"],
             cwd=workdir, check=True,
