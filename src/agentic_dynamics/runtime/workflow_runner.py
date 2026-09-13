@@ -424,6 +424,12 @@ class WorkflowRunResult:
     run_id: str = ""
     parent_run_id: str = ""
     family_id: str = ""
+    #: Wave F7 (identity recovery) — the explicit resume provenance: when the composition root
+    #: passes a :class:`ResumeState` (the SELECTED parent's OWN ledger), the engine records
+    #: which run and which ledger its completion set came from. Empty for a fresh run and for
+    #: a legacy ``resume=True`` inference run; old ledgers lack the keys.
+    resumed_from_run_id: str = ""
+    resumed_from_ledger: str = ""
     #: Step 2 (2026-09-11): a RESUME whose completion set already covered every declared phase
     #: (the final-checkpoint approval is the canonical case) executes nothing — that is LOGICAL
     #: COMPLETION, never a cancelled run. Additive key; pre-2d ledgers lack it and parse False.
@@ -519,7 +525,32 @@ class WorkflowRunResult:
             "run_id": self.run_id,
             "parent_run_id": self.parent_run_id,
             "family_id": self.family_id,
+            # ADDED keys (Wave F7 — never renames an existing key): the explicit resume
+            # provenance. Old ledgers lack them; consumers read them via ``.get(...)``.
+            "resumed_from_run_id": self.resumed_from_run_id,
+            "resumed_from_ledger": self.resumed_from_ledger,
         }
+
+
+@dataclass(frozen=True)
+class ResumeState:
+    """The SELECTED parent's snapshot, as EXPLICIT ``--resume`` input (Wave F7).
+
+    Built by the composition root (``scripts/run_workflow.py``) from the parent control-db
+    run's OWN ledger — located by the run id embedded in its name, never by recency and
+    never by the current worktree's git log. ``completed_phases`` is exactly the set of
+    phases that ledger recorded ``ok``; the engine skips THESE and infers nothing else.
+    ``ledger_path`` + ``parent_run_id`` are carried for provenance (stamped onto the result
+    ledger as ``resumed_from_run_id`` / ``resumed_from_ledger``).
+
+    A correct family link (``parent_run_id`` on the control-db row) establishes lineage,
+    not the parent's execution state — this object is what actually makes the selected
+    parent's snapshot the resume input.
+    """
+
+    parent_run_id: str
+    ledger_path: str
+    completed_phases: frozenset[str] = frozenset()
 
 
 @dataclass
@@ -3168,6 +3199,7 @@ def run_workflow(
     commit: bool = True,
     stop_on_error: bool = True,
     resume: bool = False,
+    resume_state: ResumeState | None = None,
     publish: bool = True,
     fork: bool | None = None,
     preferences: RoutingPreferences | None = None,
@@ -3196,6 +3228,11 @@ def run_workflow(
 
     ``resume=True`` skips phases that already have a ``[workflow] <phase>`` commit and
     re-enters from the first incomplete phase (carrying prior-phase context).
+    ``resume_state`` (Wave F7) is the EXPLICIT form and outranks the inference entirely:
+    when the composition root has selected a parent run, it passes the parent's OWN ledger
+    as a :class:`ResumeState` and the engine skips exactly its ``completed_phases`` — the
+    git-log scan and the spec-index fallback are not consulted at all. ``resume_state``
+    implies ``resume``.
     ``publish=True`` emits live telemetry to Redis so the Control Room shows the run as a
     cell (``story_status`` hash + ``status``/``events:<cell>`` channels). Each phase
     publishes a ``step_finish`` event carrying its tokens/cost, which feeds the ticker.
@@ -3437,15 +3474,26 @@ def run_workflow(
     prior: list[str] = []
     start_idx = 0
     completed: set[str] = set()
+    if resume_state is not None:
+        # Wave F7: the explicit parent snapshot IS the resume. The composition root selected
+        # the parent run by identity and loaded its OWN ledger; that ledger's ok phases are
+        # the completion set. The git-log scan and the latest-spec-index fallback are NOT
+        # consulted — they answer "what ran here / what ran last", which a lineage link does
+        # not make the same question as "what did the selected parent complete".
+        resume = True
     if resume:
         phase_names = [str(p.get("name", "?")) for p in phases]
-        # The git-log path stays primary and unchanged: a ``[workflow] <phase>`` commit in
-        # this worktree is the strongest possible evidence a phase already ran here. Only
-        # when it finds nothing — a worktree whose commits were squashed away, or a
-        # --no-commit run — do we fall back to the derived index's latest run ledger.
-        completed = _completed_phases(wd, phase_names, goal)
-        if not completed:
-            completed = _completed_phases_from_index(spec, phase_names, goal)
+        if resume_state is not None:
+            completed = {name for name in resume_state.completed_phases if name in phase_names}
+        else:
+            # The historical inference for direct callers without a control-plane parent:
+            # the git-log path stays primary and unchanged (a ``[workflow] <phase>`` commit
+            # in this worktree is the strongest evidence a phase already ran here), and only
+            # when it finds nothing — a squashed worktree, a --no-commit run — do we fall
+            # back to the derived index's latest run ledger.
+            completed = _completed_phases(wd, phase_names, goal)
+            if not completed:
+                completed = _completed_phases_from_index(spec, phase_names, goal)
         for i, phase_def in enumerate(phases):
             name = str(phase_def.get("name", "?"))
             if name in completed:
@@ -3453,6 +3501,11 @@ def run_workflow(
                 start_idx = i + 1
             else:
                 break
+    if resume_state is not None:
+        # Stamp the explicit provenance so the ledger says which parent snapshot the resume
+        # consumed (and which artifact established it) — auditable, never inferred later.
+        result.resumed_from_run_id = resume_state.parent_run_id
+        result.resumed_from_ledger = resume_state.ledger_path
 
     # Step 2: a resume that skipped EVERY phase because its completion set already covered
     # them executed no work — that is logical completion (the final-checkpoint approval is the

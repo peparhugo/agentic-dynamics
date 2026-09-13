@@ -183,6 +183,45 @@ def test_matrix_fill_skips_cells_already_queued(monkeypatch, tmp_path):
     assert len(pushed_ids) == 30  # 29 new + the pre-existing one
 
 
+def test_matrix_with_all_required_cells_already_queued_stays_pending(monkeypatch, tmp_path):
+    """Dedup must not fake completion (the queue-dedup dependency defect).
+
+    When every required cell is already waiting in the lane, the shared skip returns an
+    EMPTY new-write list — but the phase's work is still queued. The old code marked the
+    phase done on that empty list while its cells remained queued; the phase must instead
+    track the REQUIRED ids and stay running until those cells finish.
+    """
+    import enqueue
+
+    fake = _FakeRedis()
+    _patch_fill_environment(monkeypatch, tmp_path, fake, enqueue)
+
+    required = enqueue.build_cells(model="test/model-b4", missing_only=True)
+    for cell in required:
+        fake.lpush(enqueue.QUEUE_KEY, json.dumps(cell))
+    fake.statuses.update({cell["cell_id"]: "queued" for cell in required})
+
+    assert pl._execute_matrix(_matrix_phase(), {"plan_name": "t"}) is False
+    # No state write claims done, and the running record tracks ALL required ids.
+    assert all(w[1].get("status") != "done" for w in fake.writes)
+    running = [w for w in fake.writes if w[1].get("status") == "running"]
+    assert running, "the phase must enter running, not check out silently"
+    tracked = json.loads(running[-1][1]["jobs_ids"])
+    assert tracked == [cell["cell_id"] for cell in required]
+
+    # Once those queued cells actually finish, the same completion check closes the phase.
+    fake.statuses.update({cell["cell_id"]: "done" for cell in required})
+    monkeypatch.setattr(
+        pl, "_get_state",
+        lambda *a: pl.PlanState(
+            status="running", jobs_total=len(required),
+            jobs_ids=[cell["cell_id"] for cell in required],
+        ),
+    )
+    assert pl._execute_matrix(_matrix_phase(), {"plan_name": "t"}) is True
+    assert fake.writes[-1][1].get("status") == "done"
+
+
 def test_review_phase_honors_the_subprocess_exit_code(monkeypatch):
     fake = _FakeRedis()
     monkeypatch.setattr(pl, "_r", lambda: fake)

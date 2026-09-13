@@ -20,6 +20,7 @@ from agentic_dynamics.experiment.spec_status import SpecStatusEntry
 from agentic_dynamics.knowledge.augment import default_retrieve_fn
 from agentic_dynamics.runtime import workflow_runner
 from agentic_dynamics.runtime.workflow_runner import (
+    ResumeState,
     _build_phase_prompt,
     _completed_phases_from_index,
     cell_scope,
@@ -486,6 +487,75 @@ def test_run_workflow_resume_skips_committed_phases(tmp_path):
                           resume=True, run_agentic_fn=agent2)
     assert [p.phase for p in result.phases] == ["implement", "verify"]
     assert len(calls) == 1  # only implement re-runs; scope/ux skipped
+
+
+# ── Wave F7: the selected parent's snapshot IS the resume input ──
+
+
+def test_resume_state_is_the_completion_input_without_git_or_index(tmp_path, monkeypatch):
+    """An explicit ResumeState skips exactly its completed_phases: no ``[workflow]`` commit
+    is required in the worktree and the spec index is never consulted. The provenance is
+    stamped onto the result ledger."""
+    consulted = []
+    monkeypatch.setattr(
+        spec_status, "index_entry", lambda name, **kw: consulted.append(name)
+    )
+    executed = []
+
+    def agent(prompt, *, model, backend, workdir, **kwargs):
+        executed.append(prompt.splitlines()[1])
+        return _fake_agent()
+
+    spec = load_spec(SPEC)
+    state = ResumeState(
+        parent_run_id="run-parent",
+        ledger_path="/ledgers/20260912T000000Z_run-parent.json",
+        completed_phases=frozenset({"scope", "ux_design"}),
+    )
+    result = run_workflow(spec, goal="g", model="m", workdir=tmp_path, commit=False,
+                          resume_state=state, run_agentic_fn=agent)
+
+    assert [p.phase for p in result.phases] == ["implement", "verify"]
+    assert len(executed) == 1  # only implement re-runs; the parent's ok phases are skipped
+    assert consulted == []     # the spec-index fallback was never reached
+    assert result.resumed_from_run_id == "run-parent"
+    assert result.resumed_from_ledger == state.ledger_path
+    assert result.to_dict()["resumed_from_run_id"] == "run-parent"
+    assert result.to_dict()["resumed_from_ledger"] == state.ledger_path
+
+
+def test_resume_state_overrides_git_history_completion(tmp_path):
+    """The explicit parent snapshot wins over the worktree's git log: a phase committed
+    here but NOT ok in the selected parent re-runs. Correct family linkage alone must not
+    let goal-prefix history decide what the parent completed."""
+    spec = load_spec(SPEC)
+    subprocess.run(["git", "init", "-q"], cwd=tmp_path, check=True)
+    subprocess.run(["git", "config", "user.email", "t@t"], cwd=tmp_path, check=True)
+    subprocess.run(["git", "config", "user.name", "t"], cwd=tmp_path, check=True)
+
+    calls = []
+
+    def agent(prompt, *, model, backend, workdir, **kwargs):
+        calls.append(prompt.splitlines()[1])
+        (Path(workdir) / "docs").mkdir(exist_ok=True)
+        (Path(workdir) / "docs" / "x.md").write_text(str(len(calls)))
+        return _fake_agent()
+
+    # First run commits scope + ux_design + implement, so the worktree's git log would let
+    # the INFERENCE path skip all three.
+    run_workflow(spec, goal="g", model="m", workdir=tmp_path, run_agentic_fn=agent)
+    calls.clear()
+
+    # The selected parent completed ONLY scope; ux_design's commit here must not skip it.
+    state = ResumeState(
+        parent_run_id="run-parent", ledger_path="/ledgers/run-parent.json",
+        completed_phases=frozenset({"scope"}),
+    )
+    result = run_workflow(spec, goal="g", model="m", workdir=tmp_path,
+                          resume_state=state, run_agentic_fn=lambda *a, **k: _fake_agent())
+
+    assert [p.phase for p in result.phases] == ["ux_design", "implement", "verify"]
+    assert result.resumed_from_run_id == "run-parent"
 
 
 # ── RAG augmentation seam ───────────────────────────────────────

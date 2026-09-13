@@ -1347,6 +1347,7 @@ class _FakeCommandsRedis:
     def __init__(self) -> None:
         self._hashes: dict[str, dict[str, str]] = {}
         self._lists: dict[str, list[str]] = {}
+        self.eval_calls: list[tuple[str, tuple[str, ...], tuple[str, ...]]] = []
 
     def lpush(self, key: str, value: str) -> int:
         self._lists.setdefault(key, []).insert(0, value)
@@ -1379,6 +1380,15 @@ class _FakeCommandsRedis:
             lst.remove(value)
             removed += 1
         return removed
+
+    def eval(self, script: str, numkeys: int, *args):
+        """The one server-side script the wrapper uses: `_requeue_claimed`'s atomic move."""
+        self.eval_calls.append((script, tuple(args[:numkeys]), tuple(args[numkeys:])))
+        if "LREM" in script and "LPUSH" in script:
+            self.lrem(args[0], 1, args[2])
+            self.lpush(args[1], args[2])
+            return 1
+        raise NotImplementedError(script)
 
     def lrange(self, key: str, start: int, end: int) -> list[str]:
         lst = self._lists.get(key, [])
@@ -1477,11 +1487,14 @@ def test_consume_fleet_commands_valid_submit_reaches_running_then_completed_with
     calls = []
     this_run = ledger_dir / "20260912T164142123456Z_run-new.json"
 
-    def fake_run(argv, check=False):
+    def fake_run(argv, check=False, **_kwargs):
         calls.append(argv)
-        # The dispatched run writes ITS OWN ledger as it completes (Wave B1 name shape).
-        this_run.write_text("{}")
-        return subprocess.CompletedProcess(argv, returncode=0)
+        # The dispatched run writes ITS OWN ledger and NAMES it on stderr — the identity the
+        # wrapper selects by (Wave F7).
+        this_run.write_text(json.dumps({"run_id": "run-new", "phases": []}))
+        return subprocess.CompletedProcess(
+            argv, returncode=0, stdout="{}", stderr=f"ledger: {this_run}\n",
+        )
 
     monkeypatch.setattr(subprocess, "run", fake_run)
 
@@ -1497,6 +1510,10 @@ def test_consume_fleet_commands_valid_submit_reaches_running_then_completed_with
     assert job["status"] == "completed"
     assert job["returncode"] == 0
     assert job["ledger"] == str(this_run)  # ITS ledger — never the pre-existing other run's
+    assert job["run_id"] == "run-new"      # ... and the run's OWN identity rides the record
+    import hashlib
+
+    assert job["ledger_sha256"] == hashlib.sha256(this_run.read_bytes()).hexdigest()
 
 
 def test_consume_fleet_commands_nonzero_exit_marks_failed_and_files_the_dlq(
@@ -1511,7 +1528,9 @@ def test_consume_fleet_commands_nonzero_exit_marks_failed_and_files_the_dlq(
 
     monkeypatch.setattr(
         subprocess, "run",
-        lambda argv, check=False: subprocess.CompletedProcess(argv, returncode=1),
+        lambda argv, check=False, **kwargs: subprocess.CompletedProcess(
+            argv, returncode=1, stdout="", stderr="",
+        ),
     )
 
     consume_fleet_commands(client=r, once=True)
@@ -1520,6 +1539,8 @@ def test_consume_fleet_commands_nonzero_exit_marks_failed_and_files_the_dlq(
     assert job["job_id"] == cmd["job_id"]
     assert job["status"] == "failed"
     assert job["returncode"] == 1
+    # A failed run that named no ledger gets an honest null — never a directory-diff guess.
+    assert job["ledger"] is None
 
     dead = [json.loads(e) for e in r._lists.get("fleet_jobs:dead_letter", [])]
     assert len(dead) == 1
@@ -1581,39 +1602,168 @@ def test_consume_fleet_commands_dry_run_never_calls_subprocess(_noop_spec, monke
     assert job["status"] == "running"
 
 
-# ── Wave B1: a job's ledger is the file ITS dispatch wrote ──────────────────
+# ── Wave F7: a job's ledger association is the run's OWN identity ───────────
 
 
-def test_run_ledger_binds_by_difference_not_recency(tmp_path, monkeypatch):
-    """The board pointer is the dispatch's OWN new ledger — never the newest file in the
-    spec dir (the old recency bug: another run's ledger misattributed to this job), and a
-    dispatch that wrote nothing gets None rather than someone else's file."""
+def test_run_identity_reads_the_runs_own_ledger_line(tmp_path):
+    """The run names its ledger on stderr; the board record carries the exact path, the
+    ledger's own run_id, and the sha256 over its bytes — identity, not a diff."""
+    import hashlib
+
     from scripts.fleet import spawn_wrapper as sw
 
-    monkeypatch.setattr(sw, "_REPO_ROOT", tmp_path)
     ledger_dir = tmp_path / "experiments" / "results" / "workflows" / "demo"
     ledger_dir.mkdir(parents=True)
-    (ledger_dir / "20260101T000000Z.json").write_text("{}")
+    ledger = ledger_dir / "20260912T164142123456Z_run-new.json"
+    ledger.write_text(json.dumps({"run_id": "run-new", "phases": []}))
 
-    # (1) nothing new since the snapshot → honest absence, even though a ledger exists
-    snap = sw._ledger_files("demo")
-    assert sw._run_ledger("demo", snap) is None
+    identity = sw._run_identity("demo", {
+        "returncode": 0,
+        "stdout": '{"run_id": "run-new"}',
+        "stderr": f"some warning\nledger: {ledger}\n",
+    })
+    assert identity["ledger"] == str(ledger)
+    assert identity["run_id"] == "run-new"
+    assert identity["ledger_sha256"] == hashlib.sha256(ledger.read_bytes()).hexdigest()
 
-    # (2) a later-named file that appeared DURING the window IS the dispatch's — returned
-    (ledger_dir / "99991231T235959Z.json").write_text("{}")
-    assert sw._run_ledger("demo", snap).endswith("99991231T235959Z.json")
 
-    # (3) once snapshotted again, that same pre-existing max is NOT recency-picked
-    snap2 = sw._ledger_files("demo")
-    assert sw._run_ledger("demo", snap2) is None
+def test_run_identity_is_empty_when_the_output_names_no_ledger(tmp_path):
+    """A new ledger file appearing in the spec dir is NOT an association: without the run's
+    own ``ledger:`` line the identity is honestly empty — never diff/recency selection."""
+    from scripts.fleet import spawn_wrapper as sw
 
-    # (4) exactly the dispatch's new file is returned (Wave B1 name shape)
-    (ledger_dir / "20260912T164142123456Z_run-new.json").write_text("{}")
-    assert sw._run_ledger("demo", snap2).endswith("20260912T164142123456Z_run-new.json")
+    ledger_dir = tmp_path / "experiments" / "results" / "workflows" / "demo"
+    ledger_dir.mkdir(parents=True)
+    (ledger_dir / "20260912T164142123456Z_run-someone-else.json").write_text("{}")
 
-    # (5) an absent spec dir is an empty diff, never an error
-    assert sw._ledger_files("nope") == set()
-    assert sw._run_ledger("nope", set()) is None
+    identity = sw._run_identity("demo", {
+        "returncode": 0, "stdout": "{}", "stderr": "no ledger line here",
+    })
+    assert identity == {"ledger": "", "run_id": "", "ledger_sha256": ""}
+
+
+def test_run_identity_rejects_a_ledger_outside_the_specs_directory(tmp_path):
+    """The named path must be THIS spec's ledger: an unrelated (or forged) path printed by
+    a confused run cannot become this job's result association."""
+    from scripts.fleet import spawn_wrapper as sw
+
+    other_dir = tmp_path / "experiments" / "results" / "workflows" / "other_spec"
+    other_dir.mkdir(parents=True)
+    foreign = other_dir / "20260912T164142123456Z_run-x.json"
+    foreign.write_text(json.dumps({"run_id": "run-x"}))
+
+    identity = sw._run_identity("demo", {"stderr": f"ledger: {foreign}\n"})
+    assert identity["ledger"] == ""
+
+
+def test_two_concurrent_same_spec_dispatches_keep_distinct_result_associations(
+    _noop_spec, monkeypatch, broker_seam,
+):
+    """The identity-recovery contract, pinned against true concurrency.
+
+    Both dispatches take their (now removed) directory snapshots BEFORE either run writes,
+    then each run writes its own ledger and names it; the old whole-directory diff resolved
+    BOTH jobs to the lexicographically last new file. With identity selection each board
+    record keeps its OWN run's ledger, run_id, and digest.
+    """
+    import hashlib
+    import threading
+
+    fleet_manager = _fleet_manager_module()
+    _spec_path, ledger_dir = _noop_spec
+    ledger_dir.mkdir(parents=True, exist_ok=True)
+
+    # Two submits of the SAME spec, queued in the claim lane.
+    r = _FakeCommandsRedis()
+    _push_submit(r, job_id="job-noop-1", nonce="one")
+    _push_submit(r, job_id="job-noop-2", nonce="two")
+
+    # Both fake runs meet at the barrier BEFORE writing anything, so both ledgers exist
+    # before either dispatch resolves — the exact window the diff-based selection failed in.
+    barrier = threading.Barrier(2)
+
+    def fake_run(argv, check=False, **_kwargs):
+        barrier.wait(timeout=10)
+        cell_env = next(arg for arg in argv if arg.startswith("FINOPS_CELL_ID="))
+        job_id = cell_env.split("=", 1)[1]
+        ledger = ledger_dir / f"20260912T164142123456Z_{job_id}.json"
+        ledger.write_text(json.dumps({"run_id": f"run-{job_id}", "phases": []}))
+        return subprocess.CompletedProcess(
+            argv, returncode=0, stdout="{}", stderr=f"ledger: {ledger}\n",
+        )
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+
+    # ``once`` processes exactly ONE command; a bounded batch claims and dispatches both.
+    consume_fleet_commands(client=r, max_commands=2)
+
+    by_id = {job["job_id"]: job for job in fleet_manager.build_board(r)["jobs"]}
+    first, second = by_id["job-noop-1"], by_id["job-noop-2"]
+    assert first["ledger"].endswith("_job-noop-1.json")
+    assert second["ledger"].endswith("_job-noop-2.json")
+    assert first["run_id"] == "run-job-noop-1"
+    assert second["run_id"] == "run-job-noop-2"
+    assert first["ledger_sha256"] == hashlib.sha256(
+        (ledger_dir / "20260912T164142123456Z_job-noop-1.json").read_bytes()
+    ).hexdigest()
+    assert first["ledger_sha256"] != second["ledger_sha256"]
+
+
+# ── Wave F7: restart recovery moves commands atomically ─────────────────────
+
+
+def test_recovery_requeues_a_control_action_in_one_atomic_move():
+    """The requeue is ONE server-side script (LREM+LPUSH) — never a client-side pair whose
+    interruption between LREM and LPUSH would leave the command in neither lane."""
+    from scripts.fleet import spawn_wrapper as sw
+
+    r = _FakeCommandsRedis()
+    raw = json.dumps({"action": "scale", "service": "workflow-runner", "count": 2,
+                      "ts": 0.0, "nonce": "n"})
+    r.lpush(sw.PROCESSING_KEY, raw)
+
+    tally = sw._recover_processing(r, _fleet_manager_module(), _fake_dlq())
+
+    assert tally["requeued"] == 1
+    assert r._lists.get(sw.COMMANDS_KEY) == [raw]
+    assert r._lists.get(sw.PROCESSING_KEY, []) == []
+    assert len(r.eval_calls) == 1  # the move was one atomic EVAL, not LREM-then-LPUSH
+
+
+def test_recovery_interrupted_before_the_move_loses_nothing():
+    """If the atomic move cannot run (Redis dropped), the claim stays in PROCESSING — a
+    later recovery pass moves it. The command is never absent from both lanes."""
+    from scripts.fleet import spawn_wrapper as sw
+
+    raw = json.dumps({"action": "drain", "service": "workflow-runner",
+                      "ts": 0.0, "nonce": "n"})
+
+    class _DownMidMove(_FakeCommandsRedis):
+        def eval(self, script, numkeys, *args):
+            raise ConnectionError("redis dropped before the script ran")
+
+    down = _DownMidMove()
+    down.lpush(sw.PROCESSING_KEY, raw)
+
+    with pytest.raises(ConnectionError):
+        sw._recover_processing(down, _fleet_manager_module(), _fake_dlq())
+    # Nothing was moved and nothing was lost: the claim is still recoverable.
+    assert down._lists.get(sw.PROCESSING_KEY) == [raw]
+    assert down._lists.get(sw.COMMANDS_KEY, []) == []
+
+    recovered = _FakeCommandsRedis()
+    recovered.lpush(sw.PROCESSING_KEY, raw)
+    tally = sw._recover_processing(recovered, _fleet_manager_module(), _fake_dlq())
+    assert tally["requeued"] == 1
+    assert recovered._lists.get(sw.COMMANDS_KEY) == [raw]
+
+
+def _fake_dlq():
+    class _DLQ:
+        def record_dead(self, client, queue, command, reason):
+            return None
+
+    return _DLQ()
 
 
 # ── wave C follow-up: the spec-resolution refusal names its root ─────────────

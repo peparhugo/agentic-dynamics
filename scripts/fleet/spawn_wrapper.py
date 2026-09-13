@@ -70,6 +70,7 @@ fleet:commands claim consumer and the seam client touch a socket, and the seam c
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import re
@@ -1510,29 +1511,59 @@ def _spec_name_for_ledger(spec_rel: str) -> str:
     return Path(spec_rel).stem
 
 
-def _ledger_files(spec_name: str) -> set[str]:
-    """The spec's run-ledger file names present on disk — a pre-dispatch snapshot."""
-    ledger_dir = _REPO_ROOT / "experiments" / "results" / "workflows" / spec_name
-    if not ledger_dir.is_dir():
-        return set()
-    return {path.name for path in ledger_dir.glob("*.json")}
+#: The run_workflow ledger line. ``run_workflow.py`` prints the EXACT ledger path its run
+#: wrote to stderr (``print(f"\nledger: {out_path}", file=sys.stderr)``). That line is the
+#: run's own identity claim — the thing a directory snapshot can never be under two
+#: concurrent same-spec dispatches. Deliberately unanchored at the start: a compose
+#: log-prefixed line (``workflow-runner  | ledger: /...json``) still matches, and the
+#: ``.json`` tail keeps ordinary prose containing the word "ledger:" out.
+_LEDGER_LINE_RE = re.compile(r"ledger:\s*(?P<path>\S+\.json)\s*$", re.MULTILINE)
 
 
-def _run_ledger(spec_name: str, before: set[str]) -> str | None:
-    """The ledger THIS dispatch wrote — the newest file absent from the ``before`` snapshot.
+def _run_identity(spec_name: str, outcome: dict[str, Any]) -> dict[str, str]:
+    """The exact run identity a dispatch's OWN output names (identity recovery).
 
-    Wave B1: the old ``_latest_ledger`` took the lexicographically last file in the spec's
-    directory, so a job's board pointer could name ANOTHER run's ledger (a newer sibling
-    submission, another worktree's run of the same spec) — and under the pre-B1 same-second
-    filename collisions "latest" was arbitrary besides. The association is now by
-    DIFFERENCE: only files this dispatch created; when the dispatch wrote none, the pointer
-    is ``None`` — an honest absence, never another run's ledger.
+    A directory DIFF (snapshot before, diff after) cannot associate a ledger to a job when
+    two same-spec dispatches run concurrently: both snapshots predate both writes, both
+    diffs see both new files, and both sort to the same "newest" — one job's board pointer
+    names the other's ledger. The run itself is asked instead: its stderr names the ledger
+    it wrote, and that ledger's bytes carry its ``run_id`` (stamped by the CLI) and a
+    sha256 digest. Selection is by THAT identity, never by recency.
+
+    Returns ``{"ledger", "run_id", "ledger_sha256"}``; every field is the honest empty
+    string when the output names no ledger for THIS spec (a crash before the ledger line,
+    a foreign path) — never a pointer to another run's file.
     """
-    ledger_dir = _REPO_ROOT / "experiments" / "results" / "workflows" / spec_name
-    if not ledger_dir.is_dir():
-        return None
-    new = sorted(path for path in ledger_dir.glob("*.json") if path.name not in before)
-    return str(new[-1]) if new else None
+    identity = {"ledger": "", "run_id": "", "ledger_sha256": ""}
+    if not spec_name:
+        return identity
+    matches = list(_LEDGER_LINE_RE.finditer(str(outcome.get("stderr") or "")))
+    if not matches:
+        return identity
+    # The run prints its ledger AFTER every phase (and after child --only-phase siblings,
+    # which never print one), so the LAST claim is the run's own.
+    named = Path(matches[-1].group("path").strip())
+    candidates = [named]
+    if not named.is_absolute():
+        candidates.append(_REPO_ROOT / named)
+    resolved = next((path.resolve() for path in candidates if path.is_file()), None)
+    # The named file must live in THIS spec's ledger directory: an unrelated path printed
+    # by a confused run is not an identity this job may claim.
+    if resolved is None or resolved.parent.name != spec_name or resolved.parent.parent.name != "workflows":
+        return identity
+    identity["ledger"] = str(resolved)
+    try:
+        raw = resolved.read_bytes()
+    except OSError:
+        return identity
+    identity["ledger_sha256"] = hashlib.sha256(raw).hexdigest()
+    try:
+        payload = json.loads(raw)
+    except ValueError:
+        payload = None
+    if isinstance(payload, dict):
+        identity["run_id"] = str(payload.get("run_id") or "")
+    return identity
 
 
 def _dispatch_command(
@@ -1553,10 +1584,10 @@ def _dispatch_command(
     job_id = command.get("job_id") if action == "submit" else None
     if job_id:
         fleet_manager.record_job_status(client, job_id, "running")
-    # Wave B1 — the job's ledger association is by DIFFERENCE, not recency: snapshot the
-    # spec's ledger dir before the dispatch, diff after (a dry-run has no job row).
+    # The job's ledger association comes from the run's OWN output (its ledger line +
+    # the ledger's run_id/digest) — an identity claim, never a pre-dispatch directory
+    # snapshot whose diff two concurrent same-spec dispatches would resolve identically.
     spec_name = _spec_name_for_ledger(str(command.get("spec", ""))) if job_id else ""
-    ledgers_before = _ledger_files(spec_name) if spec_name else set()
     if not dry_run:
         try:
             outcome = _broker_client().fleet_command(command, dry_run=False)
@@ -1590,17 +1621,24 @@ def _dispatch_command(
         argv = outcome.get("argv", [])
         print(f"[spawn-wrapper] DISPATCH {action} {service or job_id}: {argv}", flush=True)
         if job_id:
-            ledger = _run_ledger(spec_name, ledgers_before)
+            identity = _run_identity(spec_name, outcome)
             if outcome.get("returncode") == 0:
                 fleet_manager.record_job_status(
                     client, job_id, "completed",
-                    returncode=outcome.get("returncode"), ledger=ledger,
+                    returncode=outcome.get("returncode"),
+                    ledger=identity["ledger"] or None,
+                    run_id=identity["run_id"],
+                    ledger_sha256=identity["ledger_sha256"],
                 )
             else:
                 reason = f"compose run exited {outcome.get('returncode')}"
                 fleet_manager.record_job_status(
                     client, job_id, "failed",
-                    returncode=outcome.get("returncode"), ledger=ledger, error=reason,
+                    returncode=outcome.get("returncode"),
+                    ledger=identity["ledger"] or None,
+                    run_id=identity["run_id"],
+                    ledger_sha256=identity["ledger_sha256"],
+                    error=reason,
                 )
                 dlq.record_dead(client, "fleet_jobs", command, reason)
     else:
@@ -1642,6 +1680,28 @@ def _release_command(client: Any, raw: str) -> None:
         client.lrem(PROCESSING_KEY, 1, raw)
     except Exception as exc:  # noqa: BLE001 — release is best-effort; recovery re-claims
         print(f"[spawn-wrapper] claim release failed ({exc}); recovery will resolve it", flush=True)
+
+
+#: The processing→commands requeue, ATOMICALLY: LREM + LPUSH in ONE server-side script.
+#: Two separate client calls can be interrupted between them (LREM committed, LPUSH never
+#: sent) and the command would sit in NEITHER lane — the recovery fix's whole point. Redis
+#: executes one script without interleaving another command, so the move either happens
+#: whole or not at all; a failure leaves the entry in ``PROCESSING_KEY`` for the next pass.
+_REQUEUE_LUA = """
+redis.call('LREM', KEYS[1], 1, ARGV[1])
+redis.call('LPUSH', KEYS[2], ARGV[1])
+return 1
+"""
+
+
+def _requeue_claimed(client: Any, raw: str) -> None:
+    """Move one claimed command back onto ``COMMANDS_KEY`` in ONE atomic operation.
+
+    Requeueing is safe to repeat by design (a shaping action is a repeatable request, and a
+    never-started submit is idempotent at the board level) — the danger the atomic move
+    removes is LOSS, not duplication.
+    """
+    client.eval(_REQUEUE_LUA, 2, PROCESSING_KEY, COMMANDS_KEY, raw)
 
 
 def _job_status(client: Any, fleet_manager: Any, job_id: str) -> str:
@@ -1713,8 +1773,7 @@ def _recover_processing(client: Any, fleet_manager: Any, dlq: Any) -> dict[str, 
             print(f"[spawn-wrapper] recovery: dropping malformed claim {raw!r}", flush=True)
             continue
         if command.get("action") != "submit":
-            client.lrem(PROCESSING_KEY, 1, raw)
-            client.lpush(COMMANDS_KEY, raw)
+            _requeue_claimed(client, raw)
             tally["requeued"] += 1
             continue
         job_id = str(command.get("job_id") or "")
@@ -1734,8 +1793,7 @@ def _recover_processing(client: Any, fleet_manager: Any, dlq: Any) -> dict[str, 
             tally["released"] += 1
         else:
             # launching / queued / absent — never started; claimable again.
-            client.lrem(PROCESSING_KEY, 1, raw)
-            client.lpush(COMMANDS_KEY, raw)
+            _requeue_claimed(client, raw)
             tally["requeued"] += 1
     print(
         f"[spawn-wrapper] recovery: requeued {tally['requeued']}, "
