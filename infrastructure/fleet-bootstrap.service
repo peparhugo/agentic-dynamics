@@ -2,8 +2,14 @@
 #
 # The host's footprint of ours is the docker daemon + this unit: it brings up the
 # supervisor (fleet-manager) container and nothing else. Everything else is a container on
-# the ladder, or the operator's chat. Restart=always keeps the supervisor's own liveness —
-# the one "always" in the fleet.
+# the ladder, or the operator's chat. The supervisor's own liveness is the COMPOSE restart
+# policy on the fleet-manager service (`restart: always` in docker-compose.ladder.yml) —
+# not a systemd Restart=: systemd rejects `Restart=always` on a Type=oneshot unit
+# ("Service has Restart= set to either always or on-success, which isn't allowed for
+# Type=oneshot"), and `docker-compose up -d` exits after creating the container, so a
+# Type=simple unit would be considered dead and restart-loop. oneshot + RemainAfterExit runs
+# the bring-up exactly once at boot, keeps the unit `active (exited)` as the host's record of
+# it, and ExecStop tears the container down on `systemctl stop`.
 #
 # Install (as root):
 #   cp infrastructure/fleet-bootstrap.service /etc/systemd/system/
@@ -23,8 +29,6 @@ Environment=REPO=/home/drseuss/ai-finops-framework
 ExecStartPre=-/usr/bin/docker network create fleet-net
 ExecStart=/usr/bin/docker-compose -f ${REPO}/infrastructure/docker-compose.ladder.yml up -d fleet-manager
 ExecStop=/usr/bin/docker-compose -f ${REPO}/infrastructure/docker-compose.ladder.yml stop fleet-manager
-Restart=always
-RestartSec=10
 
 [Install]
 WantedBy=multi-user.target

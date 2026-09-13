@@ -85,8 +85,12 @@ WORKDIR /app
 COPY .build/sonar-scanner/ /opt/sonar-scanner/
 
 # Python deps — the repo's base dependencies + the [neo4j] extra (the resurrected consumer's
-# driver) + the [admin] extra (flask — the supervisor-tier Control Room portal). This is the
-# cache-root ordering (p3_base_image_caching): only `pyproject.toml` + an empty package stub
+# driver) + the [admin] extra (flask — the supervisor-tier Control Room portal) + the
+# [chromadb] and [ollama] extras (the ENABLED Chroma path: the kb-chroma-v1 consumer and the
+# rag_augment dense leg both construct `ChromaStore`, which imports `chromadb` for the HTTP
+# client and `ollama` for the embedding client — installing only [neo4j,admin] left both
+# imports to fail at first record). This is the cache-root ordering (p3_base_image_caching):
+# only `pyproject.toml` + an empty package stub
 # land before the install, so pip's dependency resolution/download runs against the METADATA
 # alone — a change anywhere under src/ (or scripts/, apps/, etc.) cannot invalidate this layer.
 # The stub is enough for setuptools' src-layout auto-discovery ([tool.setuptools.packages.find]
@@ -98,7 +102,7 @@ COPY .build/sonar-scanner/ /opt/sonar-scanner/
 COPY pyproject.toml ./
 RUN mkdir -p src/agentic_dynamics \
     && touch src/agentic_dynamics/__init__.py \
-    && pip install --no-cache-dir -e ".[neo4j,admin]"
+    && pip install --no-cache-dir -e ".[neo4j,admin,chromadb,ollama]"
 
 # The real source — installed already (deps + the editable link both landed above), so this
 # COPY costs nothing but a cheap layer of its own; it never re-triggers apt or pip.

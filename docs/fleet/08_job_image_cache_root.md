@@ -31,7 +31,7 @@ apt-get (system toolchain)  →  sonar client (baked, staged by build.sh)
     →  COPY src/ (the real source)  →  COPY scripts/ apps/ conventions/ experiments/*
 ```
 
-The deps-install `RUN` step (`pip install -e ".[neo4j,admin]"`) runs against `pyproject.toml`
+The deps-install `RUN` step (`pip install -e ".[neo4j,admin,chromadb,ollama]"`) runs against `pyproject.toml`
 plus an EMPTY stub package (`mkdir -p src/agentic_dynamics && touch
 src/agentic_dynamics/__init__.py`) — enough for setuptools' src-layout auto-discovery
 (`[tool.setuptools.packages.find] where=["src"]`) to register the editable link and pull every
