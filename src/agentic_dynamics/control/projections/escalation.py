@@ -6,8 +6,10 @@ escalates a model mid-phase). The projection therefore says so explicitly:
 
 * **events** — served only from non-empty recorded ``escalation_from``/``escalation_to`` values;
   with none recorded the list is empty and the missing mechanism is named (G-27);
-* **rate_by_tier / human_rate** — computed over the attempts supplied (events per model tier),
-  with the human-escalation count an explicit unknown (no counter exists, G-29);
+* **rate_by_tier / human_rate** — computed over the attempts supplied (events per model tier);
+  the human counter is MEASURED when recorded human-attributed escalation events exist
+  (``human_events``: decision records filed under ``category=escalate`` by a human actor), and a
+  named unknown otherwise — never a fabricated rate (G-29);
 * **armed** — true only when events actually exist; otherwise false with the reason;
 * **E_x** — the measured cascade cost multiplier, served from the published website data
   (``verdicts.escalation``, the cap-escalation measurement) and labeled ``[C]/[X]``; when the
@@ -24,6 +26,17 @@ from pathlib import Path
 from typing import Any
 
 SCHEMA = "escalation-cascade/v1"
+
+#: The decision-record category a human escalation is filed under (the decision-record mechanism
+#: is the recorded human-attribution surface; categories are open by design). A recorded event
+#: under this category whose actor is human IS the G-29 counter's numerator.
+HUMAN_ESCALATION_CATEGORY = "escalate"
+
+#: The machine actors the repo records decisions under: the AIO's own s2a recordings
+#: (``decision_ingestion.ACTOR``) and the verified commands' s2b permanence emissions
+#: (``scripts/promote.py``/``publish_release.py``). A decision attributed to one of these is NOT
+#: a human escalation — attribution to a human is what the counter measures.
+MACHINE_ACTORS = frozenset({"aio", "verified_command"})
 
 
 def _unknown(reason: str, *, gap: str = "", cls: str = "") -> dict[str, Any]:
@@ -76,16 +89,50 @@ def load_escalation_attempts(results_dir: Path) -> tuple[list[dict[str, Any]], i
     return rows, n_ledgers
 
 
+def load_human_escalation_events(artifact_dir: Path) -> tuple[list[dict[str, Any]], list[str]]:
+    """Recorded human-attributed escalation events, from the decision-record read seam.
+
+    A human escalation IS a decision ("hand this to a human"), recorded at the moment of the act
+    through the decision-record mechanism with the human actor in the payload. Returns
+    ``(events, warnings)``; the events are the org-root ``category=escalate`` records whose actor
+    is NOT a machine actor (:data:`MACHINE_ACTORS`) — a machine-recorded escalation is not a
+    human escalation, and an actor-less record proves nothing, so neither enters the counter.
+    A missing artifact directory is simply empty (no recorded events).
+    """
+    from agentic_dynamics.knowledge import decision_ingestion as di
+
+    triples, warnings = di.scan_decision_records(
+        category=HUMAN_ESCALATION_CATEGORY, artifact_dir=artifact_dir
+    )
+    events: list[dict[str, Any]] = []
+    for _path, _artifact, payload in triples:
+        actor = str(payload.get("actor") or "").strip()
+        if not actor or actor in MACHINE_ACTORS:
+            continue
+        events.append(
+            {
+                "decided_at": str(payload.get("decided_at") or ""),
+                "actor": actor,
+                "what": str(payload.get("what") or ""),
+                "run_id": str(payload.get("run_id") or ""),
+                "candidate_sha": str(payload.get("candidate_sha") or ""),
+            }
+        )
+    return events, warnings
+
+
 def build_escalation_cascade(
     attempts: list[dict[str, Any]],
     *,
     spec: str | None = None,
     published: dict[str, Any] | None = None,
+    human_events: list[dict[str, Any]] | None = None,
     now: str | None = None,
     source: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Build the escalation payload. Pure given its inputs; ``published`` is the website data."""
     selected = [a for a in attempts if not spec or str(a.get("spec_name") or "") == spec]
+    human = list(human_events or [])
 
     events: list[dict[str, Any]] = []
     for row in selected:
@@ -130,6 +177,34 @@ def build_escalation_cascade(
             cls="[C]/[X]",
         )
 
+    if human and selected:
+        # Coverage before ratio: numerator AND denominator travel with any measured rate.
+        human_rate: dict[str, Any] = {
+            "state": "measured",
+            "class": "[M]",
+            "events": len(human),
+            "attempts": len(selected),
+            "rate": round(len(human) / len(selected), 6),
+            "source": (
+                "decision records category=escalate with a human actor, over the workflow-ledger "
+                "attempts in this population (org-scope records — not per-spec attributable)"
+            ),
+        }
+    elif human:
+        # Events exist but the denominator is empty: the rate is undeterminable, never 0.0.
+        human_rate = _unknown(
+            "recorded human-escalation events exist but the attempt population is empty — "
+            "rate undeterminable (zero denominator)",
+            gap="G-29",
+            cls="[M]",
+        )
+        human_rate["events"] = len(human)
+        human_rate["attempts"] = 0
+    else:
+        human_rate = _unknown(
+            "no recorded human-escalation events (G-29)", gap="G-29", cls="[M]"
+        )
+
     return {
         "schema": SCHEMA,
         "generated_at": now,
@@ -137,7 +212,7 @@ def build_escalation_cascade(
         "spec": spec or None,
         "events": events,
         "rate_by_tier": {tier: dict(counts) for tier, counts in sorted(by_tier.items())},
-        "human_rate": _unknown("no human-escalation counter (G-29)", gap="G-29", cls="[M]"),
+        "human_rate": human_rate,
         "armed": bool(events),
         "armed_note": (
             ""

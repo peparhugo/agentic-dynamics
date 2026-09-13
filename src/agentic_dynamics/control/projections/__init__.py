@@ -18,6 +18,7 @@ Projections in this package:
 * ``escalation`` (P9, step 7) — the cascade surface: no events invented, E_x labeled.
 * ``batch`` (P10, step 7) — explicitly not-measurable; the rule-6 scenario, never a fraction.
 * ``energy`` (rule 4, step 7) — EPM/energy scenario sources + the named measured gap.
+* ``decision_ledger`` (P11) — recorded cap/one-way-door decisions + P0 acts missing a record.
 """
 
 from agentic_dynamics.control.projections.arm_comparison import (
@@ -29,6 +30,13 @@ from agentic_dynamics.control.projections.arm_comparison import (
 )
 from agentic_dynamics.control.projections.batch import SCHEMA as BATCH_SCHEMA
 from agentic_dynamics.control.projections.batch import build_batch
+from agentic_dynamics.control.projections.decision_ledger import (
+    SCHEMA as DECISION_LEDGER_SCHEMA,
+)
+from agentic_dynamics.control.projections.decision_ledger import (
+    build_decision_ledger,
+    load_decision_records,
+)
 from agentic_dynamics.control.projections.energy import SCHEMA as ENERGY_SCHEMA
 from agentic_dynamics.control.projections.energy import build_energy
 from agentic_dynamics.control.projections.escalation import (
@@ -66,6 +74,7 @@ from agentic_dynamics.control.projections.story_arc import (
 __all__ = [
     "ARM_COMPARISON_SCHEMA",
     "BATCH_SCHEMA",
+    "DECISION_LEDGER_SCHEMA",
     "ENERGY_SCHEMA",
     "ESCALATION_SCHEMA",
     "MODEL_QUALITY_SCHEMA",
@@ -74,6 +83,7 @@ __all__ = [
     "STORY_ARC_SCHEMA",
     "build_arm_comparison",
     "build_batch",
+    "build_decision_ledger",
     "build_energy",
     "build_escalation_cascade",
     "build_model_quality",
@@ -81,6 +91,7 @@ __all__ = [
     "build_sla_queue",
     "build_story_arc",
     "load_breach_views",
+    "load_decision_records",
     "load_escalation_attempts",
     "load_phase_outcomes",
     "load_workflow_attempts",

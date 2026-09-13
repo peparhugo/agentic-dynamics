@@ -11,7 +11,7 @@ It still re-exports the names the tests monkeypatch (``_redis``, ``_design_sessi
 ``DATA_MANIFEST_PATH``, …): the injected services delegate back to those names at call time, so
 the existing test suite is behaviour-identical.
 
-Endpoints (46 routes across 10 API categories, plus the static shell):
+Endpoints (47 routes across 10 API categories, plus the static shell):
 
     Legacy telemetry (8):
         GET  /api/matrix · GET /api/status · GET /api/events/<cell_id>
@@ -33,11 +33,12 @@ Endpoints (46 routes across 10 API categories, plus the static shell):
         GET  /api/docs-health · POST /api/docs-health/approve
     Operations (2):
         GET  /api/operations · GET /api/runs/<run_id>
-    Analytics (8):
+    Analytics (9):
         GET  /api/quality · GET /api/stories/<name>/arc · GET  /api/value ·
         GET  /api/arms/compare   (step-6 projections P3/P4/P5/P6)
         GET  /api/queue/sla · GET /api/escalations · GET  /api/batch · GET  /api/energy
         (step-7 rules 9/8/6/4 — measured where owned, labeled scenarios where not)
+        GET  /api/decisions     (P11 decision ledger — recorded decisions + missing records)
     Glance / events (2) — the facelift's one resting-screen projection:
         GET  /api/glance · GET  /api/events
     Static shell (1):

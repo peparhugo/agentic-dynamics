@@ -28,6 +28,7 @@ def register(app: Flask, services: ControlRoomServices) -> None:
     from . import (
         analytics,
         claude_agents,
+        decisions,
         design_sessions,
         docs_health,
         flags,
@@ -52,3 +53,5 @@ def register(app: Flask, services: ControlRoomServices) -> None:
     index.register(app, services)
     operations.register(app, services)
     analytics.register(app, services)
+    # The P11 decision ledger (d3 §5 P11): a strictly additive read surface; registered last.
+    decisions.register(app, services)

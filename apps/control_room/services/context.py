@@ -416,7 +416,12 @@ class ControlRoomServices:
         return payload, 200
 
     def escalation(self, spec: str | None = None) -> tuple[Any, int]:
-        """P9: the cascade surface — recorded events only; E_x from the published measurement."""
+        """P9: the cascade surface — recorded events only; E_x from the published measurement.
+
+        The human-escalation counter (G-29) reads the recorded human-attributed escalation
+        decision records (category ``escalate``, human actor); a decision-artifact anomaly is
+        NAMED in ``degraded``, never silently dropped.
+        """
         from datetime import datetime, timezone
 
         from agentic_dynamics.control.projections import escalation as esc
@@ -425,14 +430,61 @@ class ControlRoomServices:
         rows, n_ledgers = esc.load_escalation_attempts(
             self.root / "experiments" / "results" / "workflows"
         )
+        human_events, human_warnings = esc.load_human_escalation_events(
+            self.root / "experiments" / "results" / "kb"
+        )
         published, degraded = self._published_website_data()
+        degraded = list(degraded) + [
+            {"surface": "decision_records", "reason": warning} for warning in human_warnings
+        ]
         payload = esc.build_escalation_cascade(
             rows,
             spec=spec,
             published=published,
+            human_events=human_events,
             now=now,
-            source={"workflow_ledgers": n_ledgers},
+            source={"workflow_ledgers": n_ledgers, "human_events": len(human_events)},
         )
+        payload["degraded"] = list(payload.get("degraded", [])) + degraded
+        return payload, 200
+
+    def decisions(self, category: str | None = None) -> tuple[Any, int]:
+        """P11 ``decision_ledger``: recorded decisions + P0 acts whose record is MISSING.
+
+        Reads the durable decision artifacts (the same read seam the record command uses) and the
+        control DB's approvals/promotions. A decision artifact that cannot be classified is NAMED
+        in ``degraded``; an unreachable control plane degrades to the record half with a named
+        reason — never a fabricated approvals/promotions population.
+        """
+        from datetime import datetime, timezone
+
+        from agentic_dynamics.control.control_db import ControlDB
+        from agentic_dynamics.control.projections import decision_ledger as dl
+
+        now = datetime.now(timezone.utc).isoformat()
+        artifact_dir = self.root / "experiments" / "results" / "kb"
+        degraded: list[dict[str, str]] = []
+        records: list[Any] = []
+        try:
+            records, warnings = dl.load_decision_records(artifact_dir=artifact_dir)
+        except Exception as exc:  # noqa: BLE001 — named degradation, never a 500
+            warnings = [f"{type(exc).__name__}: {exc}"]
+        for warning in warnings:
+            degraded.append({"surface": "decision_records", "reason": warning})
+
+        source = {"decision_artifact_dir": str(artifact_dir)}
+        try:
+            with ControlDB.open_read_only() as db:
+                payload = dl.build_decision_ledger(
+                    db, records, category=category, now=now, source=source
+                )
+        except Exception as exc:  # noqa: BLE001 — an unreadable control plane is degraded data
+            degraded.append(
+                {"surface": "control_db", "reason": f"{type(exc).__name__}: {exc}"}
+            )
+            payload = dl.build_decision_ledger(
+                None, records, category=category, now=now, source=source
+            )
         payload["degraded"] = list(payload.get("degraded", [])) + degraded
         return payload, 200
 
