@@ -54,6 +54,30 @@ Three sentences frame every task below.
   flags gain an ack bit, `agent_runtime_landscape.md` §5.1 item 1) and the receipt-verify affordance
   (needs a route-class decision, direction §12.2).
 
+### 0.2 Coverage of the required synthesis
+
+The phase prompt names thirteen deliverables (five regions + state language + visual tokens + the
+five adds + astra). Each maps to at least one task below; the *corrected
+form* column records the v2 §5 reconciliation, so a reviewer cannot mistake a correction for a
+silent drop. `F01a/F01b/F02/F03` (verification substrate) is the enabler every row depends on and
+carries no region of its own.
+
+| Prompt deliverable | Task(s) | Corrected form (v2 §5) |
+|---|---|---|
+| R0 wallboard | F07 | **Not** a KPI wallboard: R0 is the scope/truth strip (`ON-G1`/`ON-G6`) with per-value provenance and counts as filters (v2 §5.1). |
+| R1 inbox | F08, F09, F10 | Counts-as-filters with the refresh-age caveat; one expand-in-place item; flood/pause/grants with pause a *confirmed controller act*. |
+| R2 tiles (incl. E10 row legibility) | F11, F12 | Tiles become run-ledger rows; the E10 `.run-row` contract (identity, target, model×attempt, phase n/t, state, live, claim/proof, commit, cost-provenance, eligibility, receipt; `control_room_wireframe.md:113`) is preserved at both breakpoints. |
+| R3 KPI/health/composition | F13, F14, F15 | Five `ON-G4` values as a bounded constraint ledger (not money cards); degraded summary derived from measured statuses (not a vanity score); composition stated in words. |
+| R4 session surface | F16, F17, F18, F19, F20 | R4b one-stream feed + governed action band; R4c typed ladder + causal spine; R4d step timings; size-gated payloads; governed steer/reply. |
+| State language (glyph/colour/rhythm/seen/ack) | F04, F05, F06 | Rhythm dropped (not identity, v2 §5.2); state = glyph+word+colour+settled timestamp on **two independent axes**; seen/ack watermark; transition-only announcer. |
+| Visual tokens | F25 | Surface ramp, one operator amber + one machine cyan, mono data type, chrome only on active/selected, motion only on transitions — under the restraint budget. |
+| Add: live-log lens | F21 | Off the resting screen; per-cell event kinds with colour + filter. |
+| Add: pipeline lens | F22 | Per-run phase grid from `step_attempts` (`phases_completed/phases_total`). |
+| Add: ask-the-data | F24 | Static `question → lens` map from `spec.rules`; the runtime-LLM variant is **DO-NOT-COPY** (v2 §5.3). |
+| Add: counters-as-filters | F08, F07 | Query-grammar chips; counts link to their lens; never a bare delta from a stale poll. |
+| Add: toast rail | F23 | Bounded, per-kind durations, active-view silent, deep-link only, never a second announcer. |
+| Astra fleet enablement | F26 | Repo-side **verify-only**; the config-mount change is a controller/host act (`control/model_policy.py:27-29`). |
+
 ---
 
 ## 1. The task unit contract
@@ -103,6 +127,7 @@ These are the only acceptance primitives a task may cite. A task that cannot nam
 |---|---|---|
 | Browser-free render gate | `python3 scripts/verify_control_room_rendering.py --check-fixtures` | `scripts/verify_control_room_rendering.py:28-36` |
 | Full render gate (Playwright) | `python3 scripts/verify_control_room_rendering.py` (or `agentic-dynamics validate render`) | same; exit 0 PASS / 1 FAIL / 2 no browser |
+| Style gate | `python3 scripts/verify_control_room_rendering.py --style` | contrast/forced-colors/reduced-motion class; flag at `scripts/verify_control_room_rendering.py:2294` |
 | Static-view contract | `pytest tests/test_control_room_static_views.py` | test asserts read routes + lenses + verbatim packet states |
 | Glance integrity | `pytest tests/test_control_room_glance_integrity.py` | missing DB → `unknown` not zero/all-clear; no client guessing |
 | Feature parity | `python3 scripts/verify_control_room_rendering.py --parity` + `pytest tests/test_control_room_feature_parity.py` + `tests/test_control_room_parity.py` | `experiments/research/control_room/parity_inventory.json` |
@@ -145,7 +170,7 @@ pixels.
 |---|---|---|---|---|---|---|---|
 | **F01a** | Can the gate no longer pass on a duplicate/overwritten selector, an answer that overflows its region, or a label hidden in a 1×1px clip? | `scripts/verify_control_room_rendering.py` G-1/G-3/G-5/G-6 uniqueness/overflow/legibility hardening | Browser-free gate passes on F-0; a **seeded-bad fixture set** (duplicate selector, overflowing answer, clipped label) makes the gate exit 1 | — | verification | [M] | M |
 | **F01b** | Can the gate no longer pass on a value that disagrees with its fixture (money unknowns, marginals, row fields, answer/parent uniqueness)? | gate G-10/G-11/G-13/G-14/G-15 value/fixture semantics | a **seeded-bad fixture set** (wrong `ON-G4` value, wrong `top/other/unknown` count, duplicated answer writer) makes the gate exit 1, independently of F01a | — | verification | [M] | M |
-| **F02** | Do the four canonical test classes (geometry, blind comprehension, browser/a11y, event/state) each exist and fail on a seeded violation? | gate classes B (scorecard schema + recorded pass) and A/E cases; `apps/control_room/verification/b_comprehension.json` | `validate render --a11y` green; `b_comprehension.json` validates against its schema **and a seeded recognition miss makes the class-B check fail** (a cited-but-unbuilt scorecard is not an acceptance) | F01a, F01b | verification | [M]/[P] | M |
+| **F02** | Do the four canonical test classes (geometry, blind comprehension, browser/a11y, event/state) each exist and fail on a seeded violation? | gate classes B (scorecard schema + recorded pass) and A/E cases; `apps/control_room/verification/b_comprehension.json` | `validate render --a11y` green; `b_comprehension.json` validates against its schema **and a seeded recognition miss makes the class-B check fail** (a cited-but-unbuilt scorecard is not an acceptance; the file is absent in the working tree today, so this task is unambiguously net-new) | F01a, F01b | verification | [M]/[P] | M |
 | **F03** | Do the forcing fixtures the new mechanics need exist (saturated inbox, approval flood, stale/queue-unavailable, oversized payload, two-sources-disagree, cost-unknown-never-zero)? | `verification/fixtures/F-8…F-12` + gate assertions | each fixture renders and the gate asserts its distinguishing field; empty fixtures fail | F01a, F01b | verification | [M] | M |
 
 **Size bound (a3 T-2).** F01 is split into **F01a** and **F01b** from the start, each with its own
@@ -251,7 +276,7 @@ screenshot-level carriers of the direction's thesis (state, truth, row identity,
 small and high-value but the wave is kept minimal and self-contained. Nothing in the first wave adds
 a new route, a new persistence plane, or a model call.
 
-Everything else (`F02,F03,F05,F09,F10,F12–F26`) builds on the first wave; the drill-down work
+Everything else (`F03, F05, F06, F08–F10, F12–F26`) builds on the first wave; the drill-down work
 (F16–F20) is deliberately **not** first-wave because the resting screen must pass the recognizability
 test before the inspector is deepened.
 
