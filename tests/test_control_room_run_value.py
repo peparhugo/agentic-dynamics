@@ -66,6 +66,49 @@ def test_unmeasured_cost_and_zero_cost_are_unknown_not_free():
         assert by_run[run]["cost_captured_records"] == 0
 
 
+def test_partial_cost_coverage_refuses_the_ratio_never_2_over_2():
+    """The earlier-open P5 arithmetic: one $2 cost + one unknown among two accepted outcomes
+    must NOT produce $1. The numerator is the preregistered TOTAL arm cost, so a partially
+    priced cohort cannot produce it — the ratio is refused with coverage rendered."""
+    rows = [
+        {"run": "r1", "arm": "a", "accepted": True, "cost_usd": 2.0},
+        {"run": "r1", "arm": "a", "accepted": True, "cost_usd": None},
+    ]
+    block = build_run_value(rows, now=_NOW)["rows"][0]
+    assert block["accepted_outcomes"] == 2
+    assert block["total_cost_usd"] == 2.0  # the observed sum is still reported
+    assert block["cost_captured_records"] == 1
+    assert block["cost_coverage"] == 0.5
+    assert block["cost_per_accepted"] is None  # never $2 / 2 = $1
+    assert block["cost_per_accepted"] != 1.0
+    assert block["cost_per_accepted_reason"] == "unmeasured_cost"
+
+
+def test_partial_cost_coverage_on_a_non_accepted_row_also_refuses():
+    """The denominator is accepted outcomes but the numerator is the arm's total cost: an
+    unknown cost on a NON-accepted row would understate it just the same."""
+    rows = [
+        {"run": "r1", "arm": "a", "accepted": True, "cost_usd": 2.0},
+        {"run": "r1", "arm": "a", "accepted": False, "cost_usd": None},
+    ]
+    block = build_run_value(rows, now=_NOW)["rows"][0]
+    assert block["accepted_outcomes"] == 1
+    assert block["cost_per_accepted"] is None
+    assert block["cost_per_accepted_reason"] == "unmeasured_cost"
+
+
+def test_no_accepted_outcomes_reason_dominates_partial_coverage():
+    """A zero denominator is its own named unknown even when the costs are also partial."""
+    rows = [
+        {"run": "r1", "arm": "a", "accepted": False, "cost_usd": 2.0},
+        {"run": "r1", "arm": "a", "accepted": False, "cost_usd": None},
+    ]
+    block = build_run_value(rows, now=_NOW)["rows"][0]
+    assert block["cost_per_accepted"] is None
+    assert block["cost_per_accepted_reason"] == "no_accepted_outcomes"
+    assert block["total_cost_usd"] == 2.0
+
+
 def test_bvi_is_declared_modeled_never_computed():
     payload = build_run_value([], now=_NOW)
     bvi = payload["bvi"]

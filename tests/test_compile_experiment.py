@@ -116,6 +116,30 @@ def test_compare_arms_empty_results():
     assert out["regrets"] == {}
     assert out["eligible_arms"] == []
     assert out["arms"] == {}
+    assert out["empty_state"] == "no_arms"
+
+
+def test_compare_arms_empty_objective_has_no_winner():
+    """The earlier-open empty-objective item: two UNMEASURED arms must not produce a winner.
+
+    With no participating objective every arm's weighted loss is the default 0.0, so the
+    "winner" was an iteration-order artifact. The default exclusion policy must return the
+    named empty state — and so must the explicit ``ignore`` opt-in, because there is nothing
+    to compare on at all.
+    """
+    results = [{"policy": "a"}, {"policy": "b"}]
+    out = compare_arms(results, arm_factor="policy", loss={"cost": 1.0})
+    assert out["comparison_objectives"] == []
+    assert out["unmeasured_objectives"] == ["cost"]
+    assert out["best_arm"] is None
+    assert out["regrets"] == {}
+    assert out["empty_state"] == "no_measured_objectives"
+
+    ignored = compare_arms(
+        results, arm_factor="policy", loss={"cost": 1.0}, missing_policy="ignore"
+    )
+    assert ignored["best_arm"] is None
+    assert ignored["empty_state"] == "no_measured_objectives"
 
 
 def test_compare_arms_excludes_uncovered_arm_from_ranking():
@@ -173,6 +197,7 @@ def test_compare_arms_all_arms_ineligible_fails_closed():
     out = compare_arms(results, arm_factor="policy", loss={"cost": 1.0, "quality": -5.0})
     assert out["best_arm"] is None
     assert out["regrets"] == {}
+    assert out["empty_state"] == "no_eligible_arms"
     assert set(out["ineligible_arms"]) == {"cost_only", "quality_only"}
 
 
@@ -246,6 +271,7 @@ def test_grit_returns_unmeasured_when_attempts_lack_inputs():
     rr = MEASUREMENT_RULES["grit"]([{"attempt_number": 1, "completed": True}])
     assert math.isnan(rr.metric)
     assert rr.uncertainty == 1.0
+    assert rr.state == "unmeasured"
     assert rr.produces == {}
 
 
@@ -290,15 +316,20 @@ def test_evaluate_rules_runs_measurement_rules_only():
     assert by_name["grit"].uncertainty == 1.0
 
 
-def test_evaluate_rules_missing_implementation_is_unmeasured():
+def test_evaluate_rules_missing_implementation_is_explicit_unknown():
+    """The earlier-open producer-capability item. Validation is deliberately declarative — a
+    spec may declare a producer before it is written — so evaluation must not answer NaN:
+    the missing producer is named, its metric is ``None`` (valid JSON), and every declared
+    output is explicitly ``None`` (an unknown, not a silent gap)."""
     spec = _spec(
         rules=[RuleSpec("outcome_multiplier", "measurement", "[P]", produces=["net_value"])]
     )
     results = evaluate_rules(spec, [])
     assert len(results) == 1
-    assert math.isnan(results[0].metric)
+    assert results[0].metric is None
+    assert results[0].state == "unimplemented"
     assert results[0].uncertainty == 1.0
-    assert results[0].produces == {}
+    assert results[0].produces == {"net_value": None}
 
 
 def test_measurement_rules_registry_has_first_pass_and_grit():

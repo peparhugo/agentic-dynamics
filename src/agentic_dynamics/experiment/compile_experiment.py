@@ -191,8 +191,13 @@ def compare_arms(
     Every arm carries a ``coverage`` block (``{objective: {n, of, rate}}``) so a mean is
     never reported without its eligible sample count.
 
+    When no arm is rankable the payload carries a named ``empty_state`` — ``"no_arms"``,
+    ``"no_measured_objectives"`` (not one participating objective had a usable value), or
+    ``"no_eligible_arms"`` — and ``best_arm`` is ``None``. An empty comparison never names a
+    winner by default order.
+
     Returns ``{arm_factor, loss, comparison_objectives, unmeasured_objectives,
-    unmapped_objectives, missing_policy, min_coverage, arms, eligible_arms,
+    unmapped_objectives, missing_policy, min_coverage, empty_state, arms, eligible_arms,
     ineligible_arms, best_arm, regrets}``.
     """
     if missing_policy not in MISSING_POLICIES:
@@ -271,11 +276,23 @@ def compare_arms(
         "missing_policy": missing_policy,
         "min_coverage": min_coverage,
     }
-    if not arm_stats or not eligible_arms:
-        # Fail closed: with no eligible arm there is NO ranking — not a winner from the
-        # arms that happened to cover the most.
+    # The named empty states. A comparison with NOTHING measured has no winner — even under
+    # ``missing_policy="ignore"``: every arm's weighted loss would be the default 0.0 and the
+    # "winner" would be an artifact of iteration order (the review's empty-objective repro).
+    if not arm_stats:
+        empty_state: str | None = "no_arms"
+    elif not comparison_objectives:
+        empty_state = "no_measured_objectives"
+    elif not eligible_arms:
+        empty_state = "no_eligible_arms"
+    else:
+        empty_state = None
+    if empty_state is not None:
+        # Fail closed: with no measured/eligible arm there is NO ranking — not a winner from
+        # the arms that happened to cover the most.
         return {
             **header,
+            "empty_state": empty_state,
             "arms": arm_stats,
             "eligible_arms": eligible_arms,
             "ineligible_arms": ineligible_arms,
@@ -290,6 +307,7 @@ def compare_arms(
     }
     return {
         **header,
+        "empty_state": None,
         "arms": arm_stats,
         "eligible_arms": eligible_arms,
         "ineligible_arms": ineligible_arms,
@@ -303,13 +321,25 @@ def compare_arms(
 
 @dataclass
 class RuleResult:
-    """What a measurement rule emits: a scalar metric plus the information it produces."""
+    """What a measurement rule emits: a scalar metric plus the information it produces.
+
+    ``state`` names how the result was obtained, so a consumer never has to infer it from
+    the metric's type:
+
+    * ``"measured"`` — a registered implementation ran; ``metric`` is a real number;
+    * ``"unmeasured"`` — a registered implementation ran but the attempts lacked its inputs
+      (``metric`` is NaN, ``uncertainty`` 1.0 — the pre-existing unmeasured convention);
+    * ``"unimplemented"`` — the spec declares the producer but no implementation is
+      registered. ``metric`` is ``None`` (never NaN) and every declared output is named with
+      an explicit ``None`` in ``produces`` — an honest unknown, not a silent gap.
+    """
 
     rule: str
-    metric: float
+    metric: float | None
     evidence_class: str
     uncertainty: float = 0.0
     produces: dict[str, Any] = field(default_factory=dict)
+    state: str = "measured"
 
 
 def first_pass_quality(attempts: list[dict[str, Any]]) -> RuleResult:
@@ -366,6 +396,7 @@ def grit(attempts: list[dict[str, Any]]) -> RuleResult:
             evidence_class="[M]",
             uncertainty=1.0,
             produces={},
+            state="unmeasured",
         )
 
     by_strength: dict[float, list[bool]] = defaultdict(list)
@@ -381,6 +412,7 @@ def grit(attempts: list[dict[str, Any]]) -> RuleResult:
             evidence_class="[M]",
             uncertainty=1.0,
             produces={},
+            state="unmeasured",
         )
 
     retention = {s: g[s] / baseline for s in g}
@@ -439,7 +471,7 @@ def decision_calibration(decisions: list[dict[str, Any]]) -> RuleResult:
     if not decisions:
         return RuleResult(
             rule="decision_calibration", metric=float("nan"), evidence_class="[C]",
-            uncertainty=1.0, produces={},
+            uncertainty=1.0, produces={}, state="unmeasured",
         )
     disagreements = sum(
         1
@@ -478,8 +510,11 @@ def evaluate_rules(
 
     Control rules are skipped here — they consume information and are evaluated at
     enqueue/lease time, not during measurement. A measurement rule with no registered
-    implementation yields an explicit "unmeasured" result (``metric`` is NaN,
-    ``uncertainty`` is 1.0) — never a fabricated number.
+    implementation yields an EXPLICIT unknown: ``metric=None`` (valid JSON, never NaN),
+    ``state="unimplemented"``, and every declared output named with a ``None`` in
+    ``produces``. The spec stays declarative — the validator deliberately admits a rule
+    whose implementation is still being written (hundreds of ledger fields are consumed
+    that way) — but no consumer may read the missing producer's outputs as measured.
     """
     reg = dict(MEASUREMENT_RULES)
     if registry:
@@ -494,10 +529,11 @@ def evaluate_rules(
             out.append(
                 RuleResult(
                     rule=rule.name,
-                    metric=float("nan"),
+                    metric=None,
                     evidence_class=rule.evidence_class,
                     uncertainty=1.0,
-                    produces={},
+                    produces={field: None for field in rule.produces},
+                    state="unimplemented",
                 )
             )
             continue

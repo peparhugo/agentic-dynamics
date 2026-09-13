@@ -17,6 +17,14 @@ validation JSON tracing every verdict number to a field. The ratio and the B tri
 from the recorded facts, never from the proposal text; the pre-registered expectations are reported,
 not re-negotiated.
 
+Two evidence-validity rules (earlier-open measurement items):
+
+* an INVALID repetition join (a cell whose class/arm/repetition/variant does not match the
+  pre-registered table) never counts as accepted — ``accepted`` requires ``join_valid``;
+* a MISSING cost is UNKNOWN, never ``0.0`` (``core.cost_provenance`` semantics). A sum/difference
+  over any unknown contributing cost is reported as ``None`` (with coverage), so the flag-cost
+  ceiling is explicitly unknown instead of computed against a fabricated zero.
+
 Usage:
     python scripts/score_cap_2f.py            # write the score JSON + print the log tables
     python scripts/score_cap_2f.py --dry-run  # print the tables, write nothing
@@ -28,6 +36,13 @@ import argparse
 import json
 from datetime import datetime, timezone
 from pathlib import Path
+
+try:
+    import _bootstrap  # noqa: E402  (direct run: scripts/ is sys.path[0])
+except ImportError:  # imported as scripts.<name> — repo root is on sys.path
+    from scripts import _bootstrap  # noqa: E402, F401
+
+from agentic_dynamics.core.cost_provenance import resolve_cost_observation  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
 RESULTS = ROOT / "experiments" / "results" / "cap_adaptive_2f"
@@ -62,6 +77,35 @@ LOW_INFORMATION_CELLS = ["cap2f_unseen_family_abstention_r1",
 
 def now_ts() -> str:
     return datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+
+
+def cell_cost(cell: dict) -> tuple[float | None, str]:
+    """The cell's recorded total cost + provenance, mirroring ``core.cost_provenance``.
+
+    An absent/None/non-numeric ``cost.total_usd`` is UNKNOWN with ``cost_usd=None`` — never
+    ``0.0`` (the audit's five-state collapse). A recorded number, including a zero, is the
+    provider's own reading and is kept verbatim.
+    """
+    raw = (cell.get("cost") or {}).get("total_usd")
+    observation = resolve_cost_observation(reported_cost_usd=raw)
+    return observation.cost_usd, observation.source.value
+
+
+def complete_cost(rows: list[dict]) -> tuple[float | None, int, int]:
+    """``(captured sum, captured n, total n)`` — the sum is None unless EVERY row is priced.
+
+    The flag-cost difference is a total over all cells; mixing known and unknown costs would
+    treat the unknown as zero. Report the total as unknown with its coverage instead.
+    """
+    captured = [r["cost_usd"] for r in rows if r.get("cost_usd") is not None]
+    if len(captured) == len(rows):
+        return round(sum(captured), 6), len(captured), len(rows)
+    return None, len(captured), len(rows)
+
+
+def cost_coverage(captured_n: int, total_n: int) -> float:
+    """The captured/total rate (4 decimals; 0.0 for an empty population) — m2's shape."""
+    return round(captured_n / total_n, 4) if total_n else 0.0
 
 
 def load_artifacts() -> dict:
@@ -165,8 +209,11 @@ def per_cell_rows(cells: dict, table_rows: dict, joins: list[dict]) -> list[dict
         prop = c.get("proposal") or {}
         app = c.get("application") or {}
         abst = c.get("abstention_decision") or {}
-        accepted = bool(out.get("accepted"))
-        cost = float(c.get("cost", {}).get("total_usd", 0.0) or 0.0)
+        valid = next(j for j in joins if j["cell_id"] == cell_id)["valid"]
+        # An invalid join is not evidence: it must never count as an accepted outcome (the
+        # cell's (class, arm, repetition, variant) does not describe the pre-registered cell).
+        accepted = bool(out.get("accepted")) and valid
+        cost_usd, cost_source = cell_cost(c)
         harm = compute_harm(c)
         trg = b_trigger_check(c) if c["class"] in ("unseen_family", "trivial_clean") else None
         rows.append({
@@ -176,7 +223,8 @@ def per_cell_rows(cells: dict, table_rows: dict, joins: list[dict]) -> list[dict
             "arm": c["arm"],
             "repetition": c["repetition"],
             "slot": row["slot"],
-            "cost_usd": round(cost, 6),
+            "cost_usd": round(cost_usd, 6) if cost_usd is not None else None,
+            "cost_source": cost_source,
             "accepted": accepted,
             "test_executed_success": bool(out.get("test_executed_success")),
             "tests": f"{out.get('tests_passed')}/{out.get('tests_total')}",
@@ -195,7 +243,7 @@ def per_cell_rows(cells: dict, table_rows: dict, joins: list[dict]) -> list[dict
             "harm_28": harm["harm_28"],
             "flagged": bool(c.get("flags")),
             "flags": c.get("flags") or [],
-            "join_valid": next(j for j in joins if j["cell_id"] == cell_id)["valid"],
+            "join_valid": valid,
         })
     return rows
 
@@ -203,13 +251,15 @@ def per_cell_rows(cells: dict, table_rows: dict, joins: list[dict]) -> list[dict
 def arm_aggregate(rows: list[dict], arm: str) -> dict:
     arm_rows = [r for r in rows if r["arm"] == arm]
     n = len(arm_rows)
-    total_cost = sum(r["cost_usd"] for r in arm_rows)
+    total_cost, captured_n, total_n = complete_cost(arm_rows)
     accepted = sum(1 for r in arm_rows if r["accepted"])
     total_harm11 = sum(r["harm_11"] for r in arm_rows)
     total_harm28 = sum(r["harm_28"] for r in arm_rows)
     return {
         "arm": arm, "n": n,
-        "total_cost_usd": round(total_cost, 6),
+        "total_cost_usd": total_cost,
+        "cost_captured_records": captured_n,
+        "cost_coverage": cost_coverage(captured_n, total_n),
         "accepted_outcomes": accepted,
         "total_harm_usd_11": round(total_harm11, 6),
         "total_harm_usd_28": round(total_harm28, 6),
@@ -230,14 +280,16 @@ def per_class_breakdown(rows: list[dict]) -> dict:
         entry = {}
         for arm, arm_rows in arms.items():
             n = len(arm_rows)
-            total_cost = sum(x["cost_usd"] for x in arm_rows)
+            total_cost, captured_n, total_n = complete_cost(arm_rows)
             accepted = sum(1 for x in arm_rows if x["accepted"])
             escaped = sum(x["escaped_defect_count"] for x in arm_rows)
             harm11 = sum(x["harm_11"] for x in arm_rows)
             declines = sum(1 for x in arm_rows if x["abstention_decision"] == "DECLINE")
             trigger_fires = sum(1 for x in arm_rows if (x["b_trigger_check"] or {}).get("fires"))
             entry[arm] = {
-                "n": n, "total_cost_usd": round(total_cost, 6),
+                "n": n, "total_cost_usd": total_cost,
+                "cost_captured_records": captured_n,
+                "cost_coverage": cost_coverage(captured_n, total_n),
                 "accepted_outcomes": accepted,
                 "verified_success_rate": round(accepted / n, 4) if n else None,
                 "escaped_defect_count": escaped, "harm_11": round(harm11, 6),
@@ -276,9 +328,16 @@ def flag_cost_table(rows: list[dict]) -> dict:
     routing on changes that needed nothing)."""
     ab = [r for r in rows if r["arm"] == "abstention" and r["class"] == "trivial_clean"]
     sq = [r for r in rows if r["arm"] == "status_quo" and r["class"] == "trivial_clean"]
-    cost_ab = sum(r["cost_usd"] for r in ab)
-    cost_sq = sum(r["cost_usd"] for r in sq)
-    flag_cost = cost_ab - cost_sq
+    cost_ab, ab_captured, ab_total = complete_cost(ab)
+    cost_sq, sq_captured, sq_total = complete_cost(sq)
+    # A difference of a partially-priced arm is UNKNOWN, never a difference against a
+    # fabricated zero. The captured sums and coverage stay visible beside the unknown.
+    flag_cost = (
+        round(cost_ab - cost_sq, 6)
+        if (cost_ab is not None and cost_sq is not None)
+        else None
+    )
+    unknown_cells = [r["cell_id"] for r in (*ab, *sq) if r["cost_usd"] is None]
     # the saved-escape-harm side: captured escapes x LOSS_11. A captured escape = an escape the
     # abstention arm PREVENTED (present in the matched status-quo cell, absent in the abstention
     # cell). The pilot is flag-only (declines never fix), and the unseen-family escapes stand in
@@ -299,12 +358,19 @@ def flag_cost_table(rows: list[dict]) -> dict:
                                             "leg": r["abstention_leg"]} for r in ab],
         "status_quo_trivial_clean_cells": [{"cell_id": r["cell_id"], "cost_usd": r["cost_usd"],
                                             "abstention_decision": r["abstention_decision"]} for r in sq],
-        "abstention_total_cost_usd": round(cost_ab, 6),
-        "status_quo_total_cost_usd": round(cost_sq, 6),
-        "flag_cost_usd": round(flag_cost, 6),
+        "abstention_total_cost_usd": cost_ab,
+        "abstention_cost_captured_records": ab_captured,
+        "abstention_cost_coverage": cost_coverage(ab_captured, ab_total),
+        "status_quo_total_cost_usd": cost_sq,
+        "status_quo_cost_captured_records": sq_captured,
+        "status_quo_cost_coverage": cost_coverage(sq_captured, sq_total),
+        "flag_cost_usd": flag_cost,
+        "flag_cost_reason": None if flag_cost is not None else "unmeasured_cost",
+        "cost_unknown_cells": unknown_cells,
         "flag_cost_note": "the abstention arm's trivial-clean costs MINUS the status-quo arm's — "
                           "the decline overhead + operator-review routing on changes that needed "
-                          "nothing (the wider net's price; the PRIMARY).",
+                          "nothing (the wider net's price; the PRIMARY). Unknown when a "
+                          "contributing cost is unmeasured (never computed against a zero).",
         "captured_escapes": captured,
         "captured_cells": captured_cells,
         "saved_escape_harm_usd": round(saved_escape_harm, 6),
@@ -312,7 +378,7 @@ def flag_cost_table(rows: list[dict]) -> dict:
                                   "flag-only (declines never fix), and the unseen-family escapes "
                                   "stand in both arms (the wall).",
         "vacuous": vacuous,
-        "ceiling_holds": (not vacuous) and flag_cost < saved_escape_harm,
+        "ceiling_holds": (not vacuous) and flag_cost is not None and flag_cost < saved_escape_harm,
     }
 
 
@@ -359,8 +425,8 @@ def decision_rule(rows: list[dict], capture: dict, flag_cost: dict) -> dict:
     """The pre-registered decision rule (preregistration section 3)."""
     sq = [r for r in rows if r["arm"] == "status_quo"]
     ab = [r for r in rows if r["arm"] == "abstention"]
-    cost_sq = sum(r["cost_usd"] for r in sq)
-    cost_ab = sum(r["cost_usd"] for r in ab)
+    cost_sq = complete_cost(sq)[0]
+    cost_ab = complete_cost(ab)[0]
     harm_sq = sum(r["harm_11"] for r in sq)
     harm_ab = sum(r["harm_11"] for r in ab)
 
@@ -380,8 +446,8 @@ def decision_rule(rows: list[dict], capture: dict, flag_cost: dict) -> dict:
     support = bool(capture_holds and flag_cost_holds)
     return {
         "arms": {
-            "status_quo": {"n": len(sq), "cost_usd": round(cost_sq, 6), "harm_usd_11": round(harm_sq, 6)},
-            "abstention": {"n": len(ab), "cost_usd": round(cost_ab, 6), "harm_usd_11": round(harm_ab, 6)},
+            "status_quo": {"n": len(sq), "cost_usd": cost_sq, "harm_usd_11": round(harm_sq, 6)},
+            "abstention": {"n": len(ab), "cost_usd": cost_ab, "harm_usd_11": round(harm_ab, 6)},
         },
         "condition_a_capture": {
             "n_low_information_cells": capture["n_low_information"],
@@ -394,12 +460,15 @@ def decision_rule(rows: list[dict], capture: dict, flag_cost: dict) -> dict:
         },
         "condition_b_flag_cost_ceiling": {
             "flag_cost_usd": flag_cost["flag_cost_usd"],
+            "flag_cost_reason": flag_cost["flag_cost_reason"],
+            "cost_unknown_cells": flag_cost["cost_unknown_cells"],
             "saved_escape_harm_usd": flag_cost["saved_escape_harm_usd"],
             "vacuous": flag_cost_vacuous,
             "holds": flag_cost_holds,
             "note": "flag cost (the abstention arm's trivial-clean costs minus the status-quo "
                     "arm's) < saved escape harm, non-vacuous. Vacuous when no escape was captured "
-                    "(saved_escape_harm = 0).",
+                    "(saved_escape_harm = 0). Unknown (holds=False) when a contributing cost is "
+                    "unmeasured — never computed against a zero.",
         },
         "decline_records": {
             "n_declines": len(declined),
@@ -457,7 +526,11 @@ def main() -> None:
             reasons.append(f"capture {capture['capture_rate']} < 2/3 (the expected wall — the "
                            "unseen-family ratio wall, the fourth divergence)")
         if not rule["condition_b_flag_cost_ceiling"]["holds"]:
-            reasons.append("the flag-cost ceiling is vacuous or violated")
+            if flag_cost["flag_cost_usd"] is None:
+                reasons.append("the flag-cost ceiling is UNKNOWN — a contributing cost is "
+                               "unmeasured (never treated as zero)")
+            else:
+                reasons.append("the flag-cost ceiling is vacuous or violated")
         verdict = "REFUTE — " + "; ".join(reasons)
 
     score = {
