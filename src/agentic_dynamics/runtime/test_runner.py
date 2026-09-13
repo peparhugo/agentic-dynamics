@@ -118,6 +118,19 @@ def _run_framework(workdir: Path, cmd: list[str], runner: str, timeout: int) -> 
             "tail": output[-600:]}
 
 
+def _as_independent_verdict(result: dict) -> dict:
+    """Stamp evaluator provenance onto a suite result.
+
+    ``run_suite`` IS the independent evaluator: the harness runs the suite itself and derives
+    the verdict from the runner's own output, never from the authoring agent's
+    ``tests_passed``/``tests_total`` self-report. Every result this module produces therefore
+    carries ``evaluator_independent=True`` (G-14). A consumer that never called ``run_suite``
+    (so never produced a verdict) must leave ``evaluator_independent`` unknown — the ABSENCE
+    of the key is that unknown, never a fabricated ``False``.
+    """
+    return {**result, "evaluator_independent": True}
+
+
 def run_suite(
     workdir: Path,
     language: str,
@@ -128,8 +141,11 @@ def run_suite(
 ) -> dict:
     """Run the appropriate test suite for ``language``; return a normalized result.
 
-    Result keys: ``runner, passed, failed, errors, total, pass_rate, tail``. The caller
-    derives ``test_executed_success = total > 0 and failed == 0 and errors == 0``.
+    Result keys: ``runner, passed, failed, errors, total, pass_rate, tail,
+    evaluator_independent``. The caller derives
+    ``test_executed_success = total > 0 and failed == 0 and errors == 0``.
+    ``evaluator_independent`` is ``True`` on every result this function returns — the
+    independent evaluator ran; a caller with no verdict leaves it unknown.
 
     ``target`` (python only) is the scoped-mode selector: run the given file(s)/node ids
     instead of the whole tree — a spec's test phase targets its own tests
@@ -138,14 +154,20 @@ def run_suite(
     if language == "typescript":
         node = node or resolve_node()
         if node is None:
-            return {"runner": "jest", "passed": 0, "failed": 0, "errors": 1, "total": 0,
-                    "pass_rate": 0.0, "tail": "node binary not found"}
-        return _run_jest(workdir, node, timeout)
+            return _as_independent_verdict(
+                {"runner": "jest", "passed": 0, "failed": 0, "errors": 1, "total": 0,
+                 "pass_rate": 0.0, "tail": "node binary not found"}
+            )
+        return _as_independent_verdict(_run_jest(workdir, node, timeout))
     if language == "go":
-        return _run_framework(workdir, ["go", "test", "./..."], "go test", timeout)
+        return _as_independent_verdict(
+            _run_framework(workdir, ["go", "test", "./..."], "go test", timeout)
+        )
     if language == "rust":
-        return _run_framework(workdir, ["cargo", "test", "--quiet"], "cargo test", timeout)
-    return _run_pytest(workdir, timeout, target=target)
+        return _as_independent_verdict(
+            _run_framework(workdir, ["cargo", "test", "--quiet"], "cargo test", timeout)
+        )
+    return _as_independent_verdict(_run_pytest(workdir, timeout, target=target))
 
 
 def suite_succeeded(result: dict) -> bool:

@@ -67,12 +67,17 @@ def timing_row(
     started_at: float,
     ended_at: float,
     enqueued_at: float | None = None,
+    leased_at: float | None = None,
 ) -> dict[str, Any]:
     """One settled job's timing row. Pure; epoch-second inputs.
 
     ``enqueued_at`` defaults to the cell's own stamp when it carries one; a payload without a
     stamp (pre-step-8 or hand-built cells) yields no ``queue_wait_ms`` — the field is absent,
     never a fabricated wait.
+
+    ``leased_at`` (G-40) is an INJECTED measurement — the worker stamps it the moment it
+    acquires the cell's admission lease. Absent (no lease taken) means the key is absent, never
+    ``0``.
     """
     row: dict[str, Any] = {
         "cell_id": str(cell.get("cell_id") or ""),
@@ -83,6 +88,9 @@ def timing_row(
         "ended_at": ended_at,
         "service_time_ms": round((ended_at - started_at) * 1000.0, 3),
     }
+    lease_at = finite_number(leased_at)
+    if lease_at is not None:
+        row["leased_at"] = lease_at
     if cell.get("batch_mode") is True:
         # The deferred lane's split (rule 6 accounting): present only for batch cells — an
         # on-demand row's absence of the key IS the on-demand classification.

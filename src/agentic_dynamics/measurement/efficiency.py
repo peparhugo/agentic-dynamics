@@ -245,6 +245,33 @@ def compute_cost_estimate(
         "long_context_tier": bool(tier and context > 200_000),
     }
 
+
+def split_cost(
+    *,
+    inference_usd: float | None,
+    orchestration_usd: float | None,
+) -> dict[str, float | None]:
+    """Split a measured cost into its inference and orchestration components (G-41).
+
+    The ledger's ``cost_inference``/``cost_orchestration`` pair is a *split* of one run's
+    spend:
+
+    * ``inference_usd`` — the model-inference component (the agent's own paid call);
+    * ``orchestration_usd`` — the surrounding orchestration component (e.g. a RAG
+      augmentation's prompt-constructor/retrieval model calls).
+
+    Null-preserving by contract: a component that was not measured stays ``None`` (unknown) —
+    never coerced to ``0.0``. That is what lets a consumer tell "this run had no orchestration
+    spend" from "nobody measured the orchestration component". The caller is responsible for
+    passing ``None`` for a component whose provenance is untrusted (an unknown cost is not a
+    zero — see ``core.cost_provenance``).
+    """
+    return {
+        "cost_inference": inference_usd,
+        "cost_orchestration": orchestration_usd,
+    }
+
+
 @dataclass
 class EfficiencyMetrics:
     """Complete resource efficiency breakdown for one model run.

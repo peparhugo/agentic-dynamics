@@ -41,6 +41,8 @@ BREACH_FIELDS = ("stall_evidence", "deploy_gate", "commit_gate", "relabel_gate")
 
 #: The attempt-level fields the schema declares and p1 now emits (the "declared-not-written"
 #: finding). ``attempt_count`` is emitted at the run level; the rest ride each attempt record.
+#: The G-14/G-40/G-41 writer wave adds the last five (evaluator provenance, attempt timing,
+#: and the inference/orchestration cost split).
 ATTEMPT_FIELDS = (
     "attempt_id",
     "job_id",
@@ -52,6 +54,11 @@ ATTEMPT_FIELDS = (
     "accepted",
     "escalation_from",
     "escalation_to",
+    "evaluator_independent",
+    "leased_at",
+    "first_token_at",
+    "cost_inference",
+    "cost_orchestration",
 )
 
 
@@ -76,6 +83,10 @@ def _fake_agent(**overrides):
         cache_hit_rate=0.0,
         session_id="s1",
         confidence=0.9,
+        # G-40/G-41 — the adapter now measures a first-token timestamp and a trusted cost
+        # provenance; the runner derives the inference/orchestration split from them.
+        first_token_at="2026-09-13T00:00:01+00:00",
+        cost_source="estimated",
     )
     base.update(overrides)
     return SimpleNamespace(**base)
@@ -156,6 +167,113 @@ def test_run_ledger_carries_attempt_fields(tmp_path):
     for attempt in d["attempts"]:
         for field in ATTEMPT_FIELDS:
             assert field in attempt, f"attempt missing field: {field}"
+
+
+# ── G-14/G-40/G-41: the declared-but-unwritten writers now emit ──────────────
+#
+# The synthetic fake carries a trusted cost provenance and a first-token timestamp and never
+# takes an admission lease (the test injects no gate). A gate-free, RAG-free run therefore
+# measures first_token_at + cost_inference from the adapter, and leaves evaluator_independent,
+# leased_at and cost_orchestration unknown — absent, never fabricated.
+
+
+def _run_with(tmp_path, fake):
+    spec = load_spec(SPEC)
+    return run_workflow(
+        spec, goal="g", model="openai/gpt-5.6-sol", workdir=tmp_path, commit=False,
+        run_agentic_fn=lambda *a, **k: fake,
+    ).to_dict()
+
+
+def test_run_ledger_attempts_carry_measured_new_writer_fields(tmp_path):
+    """The writers that DID measure emit; the ones that cannot stay unknown (never zero)."""
+    _, d = _run_synthetic(tmp_path)
+    assert d["attempts"], "the synthetic run must produce attempt records"
+    for attempt in d["attempts"]:
+        assert attempt["first_token_at"] == "2026-09-13T00:00:01+00:00"
+        assert attempt["cost_inference"] == 0.001          # trusted source → the cost
+        assert attempt["cost_orchestration"] is None       # RAG off → not measured
+        assert attempt["leased_at"] is None                # no admission gate → no lease
+        assert attempt["evaluator_independent"] is None    # no test gate → no verdict
+
+
+def test_new_writer_fields_stay_none_when_unmeasured(tmp_path):
+    """An untrusted cost and an absent first token serialize as ``None`` — never 0.0/epoch 0."""
+    d = _run_with(tmp_path, _fake_agent(first_token_at=None, cost_source=None,
+                                        estimated_cost_usd=0.001))
+    for attempt in d["attempts"]:
+        assert attempt["first_token_at"] is None
+        assert attempt["cost_inference"] is None
+        assert attempt["cost_orchestration"] is None
+
+
+def test_attempt_record_serializes_the_new_writer_fields():
+    rec = AttemptRecord(
+        attempt_id="wf_x_scope_a1", job_id="wf_x", phase="scope",
+        evaluator_independent=True, leased_at="2026-09-13T00:00:00+00:00",
+        first_token_at="2026-09-13T00:00:01+00:00",
+        cost_inference=0.002, cost_orchestration=0.0005,
+    )
+    d = rec.to_dict()
+    assert d["evaluator_independent"] is True
+    assert d["leased_at"] == "2026-09-13T00:00:00+00:00"
+    assert d["first_token_at"] == "2026-09-13T00:00:01+00:00"
+    assert d["cost_inference"] == 0.002
+    assert d["cost_orchestration"] == 0.0005
+
+
+def test_leased_at_is_stamped_when_a_lease_is_acquired(tmp_path):
+    """The G-40 lease writer emits: an armed gate stamps ``leased_at`` on phase + attempt."""
+    import contextlib
+
+    class _Admission:
+        def env(self):
+            return {"FINOPS_ADMISSION_RUN_ID": "r"}
+
+    @contextlib.contextmanager
+    def _gate(phase_name, model):
+        yield _Admission()
+
+    spec = load_spec(SPEC)
+    result = run_workflow(
+        spec, goal="g", model="openai/gpt-5.6-sol", workdir=tmp_path, commit=False,
+        phase_admission=_gate, run_agentic_fn=lambda *a, **k: _fake_agent(),
+    )
+    d = result.to_dict()
+    for attempt in d["attempts"]:
+        assert attempt["leased_at"] is not None
+    for phase in d["phases"]:
+        if phase["kind"] == "agent":
+            assert phase["leased_at"] is not None
+
+
+def test_cost_orchestration_emits_when_the_augmentation_seam_runs(tmp_path):
+    """The G-41 split emits BOTH components on a real RAG-augmented run."""
+    class _Attempt:
+        fallback_mode = "full"
+        selected_evidence = []
+        retrieval_attempt_id = "ra:test"
+
+    class _Aug:
+        prompt = "AUG"
+        fallback = False
+        evidence_ids = []
+        versions = {}
+        token_counts = {}
+        cost_usd = 0.0007
+        constructor_attempt_id = "ca:test"
+
+    spec = load_spec(SPEC)
+    result = run_workflow(
+        spec, goal="g", model="openai/gpt-5.6-sol", workdir=tmp_path, commit=False,
+        rag_augment=True,
+        retrieve_fn=lambda **kw: _Attempt(),
+        construct_fn=lambda req: _Aug(),
+        run_agentic_fn=lambda *a, **k: _fake_agent(),
+    )
+    for attempt in result.to_dict()["attempts"]:
+        assert attempt["cost_inference"] == 0.001
+        assert attempt["cost_orchestration"] == 0.0007
 
 
 def test_run_ledger_carries_breach_fields(tmp_path):
