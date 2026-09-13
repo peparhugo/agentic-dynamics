@@ -117,25 +117,34 @@ def _git_init(workdir: Path) -> None:
 
 
 def _materialize_commit_tree(commit: str, target: Path) -> str:
-    """Materialize ``commit``'s full tree into ``target`` (a fresh git repo) and commit it.
+    """Materialize ``commit``'s full tree into ``target`` (a standalone git repo).
 
-    git trees are content-addressed: extracting the archive and committing it with
-    ``git add -Af`` (forcing past .gitignore) reproduces the EXACT tree hash — so the
-    hermetic copy is byte-identical to the real revamp2 commit's tree. Returns the hash.
+    Git-native by construction (2026-09-13 CI fix): a shared clone + detached checkout
+    materializes the tree from the commit OBJECTS — no ``git archive | tar`` + ``git add``
+    round-trip through the filesystem. That round-trip proved environment-sensitive: newer
+    CI runner images (tar/mode/eol drift) reproduced a DIFFERENT tree hash for the same
+    commit while every local run stayed byte-identical. Git trees are content-addressed, so
+    checking the commit out reproduces the EXACT tree hash by construction — the
+    byte-identity the replay tests depend on. Returns the hash.
     """
-    archive = subprocess.run(["git", "archive", commit], cwd=REPO, capture_output=True, check=True)
-    subprocess.run(["tar", "-x", "-C", str(target)], input=archive.stdout, check=True)
+    subprocess.run(
+        ["git", "clone", "-q", "--shared", "--no-checkout", str(REPO), str(target)],
+        check=True, capture_output=True,
+    )
+    subprocess.run(
+        ["git", "checkout", "-q", "--detach", commit],
+        cwd=target, check=True, capture_output=True,
+    )
     _git_init(target)
-    _git("add", "-Af", cwd=target)
-    _git("commit", "-qm", "attempt A", cwd=target)
     return _git("rev-parse", "HEAD^{tree}", cwd=target).stdout.strip()
 
 
-#: The 298MB real-tree extraction is materialized ONCE per module run, then each replay test
-#: copies it via hardlinks (``os.link`` — git never mutates objects/index in place, and the repo
-#: carries ``gc.auto=0`` so nothing DELETES them either; a fresh commit in one copy never leaks
-#: into another). This keeps the revamp2 REPLAY on the REAL byte-identical tree while cutting
-#: the 4×12s materializations to one (test_suite_speed p2).
+#: The real-tree materialization runs ONCE per module run (a shared clone + detached
+#: checkout — git-native, no tar round-trip), then each replay test copies it via hardlinks
+#: (``os.link`` — git never mutates objects/index in place, and the repo carries ``gc.auto=0``
+#: so nothing DELETES them either; a fresh commit in one copy never leaks into another). This
+#: keeps the revamp2 REPLAY on the REAL byte-identical tree while cutting the repeated
+#: materializations to one (test_suite_speed p2).
 @pytest.fixture(scope="module")
 def attempt_a_template(tmp_path_factory):
     """The hermetic attempt-A tree materialized once; the replay tests copy it in ~1s."""

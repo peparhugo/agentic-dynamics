@@ -2477,20 +2477,32 @@ def _git_tree_hash(workdir: Path, rev: str = "HEAD") -> str:
     not work product: an operator committing ``approvals/<spec>/<phase>_tree_reuse.md``
     into the worktree must not change the identity of the work underneath — and a relabel
     must not be able to dodge the gate by burying the discard under an approval-shaped
-    commit. The excluded hash is computed by re-reading ``rev`` into a throwaway index,
+    commit.     The excluded hash is computed by re-reading ``rev`` into a throwaway index,
     dropping every path under ``approvals/``, and ``git write-tree``-ing the rest —
     deterministic, and byte-equal to the plain ``^{tree}`` hash whenever the tree contains
     no ``approvals/`` (the common case). Best-effort by construction: any git problem
-    degrades to ``""`` (the gate then cannot fire — never a crash, never a blocker).
+    degrades to ``""`` (the gate then cannot fire — never a crash, never a blocker); a
+    degraded evaluation says so on stderr, because a silently empty hash reads as
+    "no relabel" and hid a CI-only environment problem (2026-09-13).
     """
     fd, tmp_index = tempfile.mkstemp(prefix="wf_treeidx_", dir="/tmp")
     os.close(fd)
+    # Hand git a NON-EXISTENT index path: git creates the index itself. A pre-created empty
+    # file is not a valid index (only tolerated by some git builds), and a refused read-tree
+    # would degrade this helper to "" — the gate then silently not firing.
+    with contextlib.suppress(OSError):
+        os.unlink(tmp_index)
     env = dict(os.environ, GIT_INDEX_FILE=tmp_index)
     try:
         read = subprocess.run(
             ["git", "read-tree", rev], cwd=workdir, env=env, capture_output=True, timeout=30
         )
         if read.returncode != 0:
+            print(
+                "warning: relabel tree hash: git read-tree failed "
+                f"({read.stderr.decode(errors='replace').strip()}) — the gate will not fire",
+                file=sys.stderr,
+            )
             return ""
         files = subprocess.run(
             ["git", "ls-files", "-z", "--", "approvals"],
@@ -2504,8 +2516,16 @@ def _git_tree_hash(workdir: Path, rev: str = "HEAD") -> str:
         written = subprocess.run(
             ["git", "write-tree"], cwd=workdir, env=env, capture_output=True, text=True, timeout=30
         )
-        return written.stdout.strip() if written.returncode == 0 else ""
-    except Exception:  # noqa: BLE001 — a git problem degrades to "no tree"
+        if written.returncode != 0:
+            print(
+                "warning: relabel tree hash: git write-tree failed "
+                f"({written.stderr.strip()}) — the gate will not fire",
+                file=sys.stderr,
+            )
+            return ""
+        return written.stdout.strip()
+    except Exception as exc:  # noqa: BLE001 — a git problem degrades to "no tree"
+        print(f"warning: relabel tree hash: {exc} — the gate will not fire", file=sys.stderr)
         return ""
     finally:
         with contextlib.suppress(OSError):
