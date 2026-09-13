@@ -430,6 +430,17 @@ class KnowledgeRecord:
     # ``from_dict()``'s ``.get()``-based construction (missing key -> empty, never a TypeError).
     subject_id: str = ""
     subject_status: str = ""
+    # Economic reading (d3 G-12): the canonical ENERGY_PER_* model applied to this unit's
+    # measured token counts, emitted by ledger_ingestion. ``None`` = no token input was
+    # measured — an absent reading, never a fabricated 0.0 joules. Trailing defaults so every
+    # pre-existing serialized artifact still parses via from_dict(), and omitted from the
+    # durable artifact when unmeasured so no existing record is re-keyed.
+    energy_total_j: float | None = None
+    energy_per_token: float | None = None
+    # Provider/region dimension (d3 G-13). ``None`` = region not measured for this unit — honest
+    # absence, never a defaulted geography. Trailing default + artifact omission keep every
+    # existing record byte-identical.
+    region: str | None = None
     # Typed retrieval surface for a reducer-minted I9 pattern. Kept optional so every existing
     # non-pattern record retains its prior serialized shape and content identity.
     pattern_payload: Any = None
@@ -474,6 +485,14 @@ class KnowledgeRecord:
             "subject_id": self.subject_id,
             "subject_status": self.subject_status,
         }
+        # Optional economic/geographic fields: OMIT when unmeasured so an additive field never
+        # re-keys a record that does not carry it (the same contract pattern_payload follows).
+        if self.energy_total_j is not None:
+            data["energy_total_j"] = self.energy_total_j
+        if self.energy_per_token is not None:
+            data["energy_per_token"] = self.energy_per_token
+        if self.region is not None:
+            data["region"] = self.region
         if self.pattern_payload is not None:
             payload = self.pattern_payload
             if hasattr(payload, "to_dict"):
@@ -523,6 +542,9 @@ class KnowledgeRecord:
             supersedes=d.get("supersedes"),
             subject_id=d.get("subject_id", ""),
             subject_status=d.get("subject_status", ""),
+            energy_total_j=d.get("energy_total_j"),
+            energy_per_token=d.get("energy_per_token"),
+            region=d.get("region"),
             pattern_payload=d.get("pattern_payload"),
             source_fact_id=d.get("source_fact_id", ""),
             evidence_ids=tuple(d.get("evidence_ids", []) or ()),

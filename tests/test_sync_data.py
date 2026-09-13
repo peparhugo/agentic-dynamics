@@ -16,6 +16,7 @@ import json
 import sys
 from pathlib import Path
 
+import pyarrow as pa
 import pyarrow.parquet as pq
 import pytest
 
@@ -42,6 +43,33 @@ def test_atomic_write_leaves_no_tmp_behind(tmp_path):
     sync_data._write_parquet_atomic([{"story_name": "x"}], sync_data.STORY_SCHEMA, final)
     assert final.exists()
     assert not final.with_suffix(final.suffix + ".tmp").exists()
+
+
+def test_session_schema_carries_the_region_dimension():
+    """G-13: region is a nullable session column (NULL = unmeasured, never a default)."""
+    fields = {f.name: f.type for f in sync_data.SESSION_SCHEMA}
+    assert "region" in fields
+    assert fields["region"] == pa.string()
+
+
+def test_build_rows_carries_region_with_honest_absence():
+    """The session table carries a measured region and leaves an unmeasured one NULL."""
+    class _Tables:
+        stories = [
+            {
+                "story_name": "s",
+                "model": "m/x",
+                "codebase_path": "tier1_minimal/good",
+                "sessions": [
+                    {"session_number": 1, "task_type": "greenfield", "region": "us-east-1"},
+                    {"session_number": 2},
+                ],
+            }
+        ]
+        analysis = []
+
+    rows, _ = sync_data._build_rows(_Tables())
+    assert [row["region"] for row in rows] == ["us-east-1", None]
 
 
 def test_identity_sidecar_records_the_resolver_identity(tmp_path, monkeypatch):

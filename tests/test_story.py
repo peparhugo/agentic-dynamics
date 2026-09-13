@@ -103,6 +103,25 @@ class TestStoryResult:
         assert d["summary"]["total_cost"] == 5.0
         assert len(d["sessions"]) == 1
 
+    def test_session_region_is_a_dimension_with_honest_absence(self):
+        """G-13: region travels with the session; unmeasured is None, never a default."""
+        s = SessionResult(1, "greenfield", "Build.")
+        assert s.to_dict()["region"] is None
+        s = SessionResult(1, "greenfield", "Build.", region="us-east-1")
+        assert s.to_dict()["region"] == "us-east-1"
+
+    def test_session_region_round_trips_through_save_and_load(self):
+        result = StoryResult(
+            story_name="test",
+            story_id="abc123",
+            sessions=[SessionResult(1, "greenfield", "Build.", region="eu-central-1")],
+        )
+        with tempfile.TemporaryDirectory() as d:
+            path = Path(d) / "result.json"
+            save_story_result(result, path)
+            loaded = load_story_result(path)
+        assert loaded.sessions[0].region == "eu-central-1"
+
     def test_save_and_load(self):
         result = StoryResult(
             story_name="test",
