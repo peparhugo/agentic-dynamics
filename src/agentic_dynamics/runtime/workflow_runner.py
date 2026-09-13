@@ -3865,20 +3865,11 @@ def run_workflow(
         pr.timed_out = pr.duration_s >= phase_timeout - 0.5
         if commit and pr.status == "ok":
             pr.commit_hash, commit_reason = _git_commit_verbose(git_wd, name, goal)
-            # Self-commit adoption (kb_finding_layer k6 — the witness gap). ``_git_commit``
-            # stages + commits the phase's *uncommitted* work and returns its short sha, but a
-            # phase whose agent ALREADY committed its own conforming work (the orchestration
-            # norm — the commit-prefix gate above certified every commit in the window) leaves
-            # a tree clean of staged changes, so ``_git_commit`` returns "" and the default-on
-            # finding emit (k1) silently never fires for exactly the phases this runner
-            # produces. Adopt the phase's own HEAD as ``commit_hash`` when the tree is clean
-            # AND the HEAD advanced past the pre-phase baseline: the phase DID produce a
-            # commit, and its finding must land like any other's. ``pr.commit_hash`` feeds the
-            # enriched finding text, the run ledger, and the emit's idempotence key.
-            if not pr.commit_hash:
-                phase_head = _git_head(git_wd)
-                if phase_head and phase_head != phase_head_before:
-                    pr.commit_hash = phase_head
+            # ``_git_commit_verbose`` returns "" in two very different situations, and this
+            # block distinguishes them: (1) the phase's work is committed but the runner had
+            # nothing to stage (a self-committing agent — adopt its HEAD below, but ONLY once
+            # the tree is verified clean); (2) the runner's commit was rejected or the tree
+            # legitimately has nothing (the never-silent failure path).
             if not pr.commit_hash:
                 # runner/fleet honesty (wave C follow-up): NEVER silent. A phase that reports
                 # ok while its work sits uncommitted in the run clone is a bookkeeping lie —
@@ -3886,6 +3877,15 @@ def run_workflow(
                 # a cell's clone (observed live across three fleet runs, 2026-09-12, each
                 # needing hand-salvage). Record WHY and flip the phase to failed so the
                 # campaign stops for the operator instead of losing the work under a green ok.
+                #
+                # THE DIRTY CHECK RUNS BEFORE SELF-COMMIT ADOPTION (Astra ae212a0 finding 4).
+                # An advanced HEAD is a valid phase outcome ONLY after verifying the intended
+                # final worktree state is CLEAN and represented by that candidate. If the
+                # runner's final commit was rejected (a pre-commit hook, a lock, a timeout)
+                # while the agent had ALREADY self-committed part of the work, adopting the
+                # earlier HEAD reported ok over a still-uncommitted deliverable — the same
+                # loss class PR #49 set out to eliminate. So: dirty tree → preserve the
+                # failed-commit reason and do NOT adopt; clean tree → adopt (below).
                 tree_dirty = True
                 try:
                     st = subprocess.run(
@@ -3896,6 +3896,8 @@ def run_workflow(
                 except Exception:  # noqa: BLE001 — unreadable git state counts as dirty (fail-closed)
                     tree_dirty = True
                 if tree_dirty:
+                    # Final deliverable changes remain: the failed-commit reason is preserved
+                    # (never a silent success) and the earlier partial HEAD is NOT adopted.
                     pr.commit_status = commit_reason or "uncommitted_work"
                     skipped = (
                         f"COMMIT_SKIPPED — phase '{name}' left uncommitted work "
@@ -3905,6 +3907,22 @@ def run_workflow(
                     pr.status = "failed"
                     pr.error = (pr.error + "\n" if pr.error else "") + skipped
                     print(f"[workflow] {skipped}", flush=True)
+                else:
+                    # Self-commit adoption (kb_finding_layer k6 — the witness gap). ``_git_commit``
+                    # stages + commits the phase's *uncommitted* work and returns its short sha,
+                    # but a phase whose agent ALREADY committed its own conforming work (the
+                    # orchestration norm — the commit-prefix gate above certified every commit in
+                    # the window) leaves a tree clean of staged changes, so ``_git_commit`` returns
+                    # "" and the default-on finding emit (k1) silently never fires for exactly the
+                    # phases this runner produces. Adopt the phase's own HEAD as ``commit_hash``
+                    # when the tree is CLEAN (proven above) AND the HEAD advanced past the
+                    # pre-phase baseline: the phase DID produce a commit, its final worktree state
+                    # is represented by it, and its finding must land like any other's.
+                    # ``pr.commit_hash`` feeds the enriched finding text, the run ledger, and the
+                    # emit's idempotence key.
+                    phase_head = _git_head(git_wd)
+                    if phase_head and phase_head != phase_head_before:
+                        pr.commit_hash = phase_head
             # Phase-boundary evidence (design §5.7 — e6): when a ChangeAnalyzer is injected,
             # hand the committed change to it (typed snapshots + delta materialized from git)
             # and record its analysis on the phase. Best-effort — never affects the phase.
