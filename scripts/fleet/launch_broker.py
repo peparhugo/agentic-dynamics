@@ -409,13 +409,25 @@ def submit_run(
     argv = build_submit_argv(command, compose=compose, compose_file=compose_file)
     if dry_run:
         return {"ok": True, "argv": argv, "returncode": None, "stdout": "", "stderr": ""}
-    proc = subprocess.run(argv, check=False)  # noqa: S603 — the broker owns the compose call
+    # The run's OWN output is captured and returned (then echoed so the journal still shows
+    # it). It carries the run's identity — the ``ledger: <path>`` line on stderr — which the
+    # wrapper uses to associate the exact result with the job (identity recovery). The
+    # sibling ``launch`` path has captured its output the same way since b3.
+    proc = subprocess.run(  # noqa: S603 — the broker owns the compose call
+        argv, check=False, capture_output=True, text=True,
+    )
+    if proc.stdout:
+        sys.stdout.write(proc.stdout)
+        sys.stdout.flush()
+    if proc.stderr:
+        sys.stderr.write(proc.stderr)
+        sys.stderr.flush()
     return {
         "ok": proc.returncode == 0,
         "argv": argv,
         "returncode": proc.returncode,
-        "stdout": "",
-        "stderr": "",
+        "stdout": proc.stdout or "",
+        "stderr": proc.stderr or "",
     }
 
 

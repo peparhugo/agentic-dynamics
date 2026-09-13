@@ -434,29 +434,37 @@ def _execute_matrix(phase: PlanPhase, context: dict) -> bool:
         except ImportError:  # imported as scripts.pipeline — repo root is on sys.path
             from scripts import enqueue  # type: ignore[no-redef]
 
-        jobs = enqueue.build_cells(
+        required = enqueue.build_cells(
             model=kind_params["model"],
             missing_only=True,
             stories=kind_params.get("stories"),
             tiers=kind_params.get("tiers"),
             conditions=kind_params.get("conditions"),
         )
-        jobs = enqueue.select_new_cells(rdb, jobs)
-        if not jobs:
+        # The phase's REQUIRED cells and the NEW queue writes are two different sets: a
+        # cell already waiting in the lane is not written again (the shared dedup), but it
+        # is still this phase's work. Tracking only the new writes let an all-queued fill
+        # (empty dedup result) mark the phase done while its cells remained queued — the
+        # phase's completion must count EVERY required cell, however it entered the lane.
+        required_ids = [str(job["cell_id"]) for job in required]
+        jobs = enqueue.select_new_cells(rdb, required)
+        if jobs:
+            enqueue.stamp_enqueue(jobs)
+            try:
+                jobs = enqueue.admit_cells(jobs)
+            except enqueue.AdmissionDenied as exc:
+                print(f"  fill REFUSED by admission: {exc}")
+                _set_state(plan_name, phase.id, status="failed")
+                return False
+            enqueue.push_cells(rdb, jobs, lane=enqueue.QUEUE_KEY)
+        elif not required_ids:
+            # Nothing missing and nothing queued: every required cell already has a saved
+            # result — the only honest "done" an empty fill can mean.
             _set_state(plan_name, phase.id, status="done")
             return True
 
-        enqueue.stamp_enqueue(jobs)
-        try:
-            jobs = enqueue.admit_cells(jobs)
-        except enqueue.AdmissionDenied as exc:
-            print(f"  fill REFUSED by admission: {exc}")
-            _set_state(plan_name, phase.id, status="failed")
-            return False
-        enqueue.push_cells(rdb, jobs, lane=enqueue.QUEUE_KEY)
-
-        state.jobs_total = len(jobs)
-        state.jobs_ids = [str(job["cell_id"]) for job in jobs]
+        state.jobs_total = len(required_ids)
+        state.jobs_ids = required_ids
         _set_state(
             plan_name, phase.id, status="running",
             jobs_total=state.jobs_total, jobs_ids=json.dumps(state.jobs_ids),

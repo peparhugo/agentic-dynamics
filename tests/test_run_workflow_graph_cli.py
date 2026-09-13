@@ -17,6 +17,7 @@ everywhere; ``run_workflow`` / ``load_spec`` are stubbed; nothing touches the ne
 """
 
 import importlib.util
+import json
 import sys
 from pathlib import Path
 from types import SimpleNamespace
@@ -528,3 +529,116 @@ def test_ledger_digest_hashes_the_file_and_is_honest_when_absent(tmp_path):
     ledger.write_text('{"a": 1}')
     assert module._ledger_digest(ledger) == hashlib.sha256(b'{"a": 1}').hexdigest()
     assert module._ledger_digest(tmp_path / "missing.json") == ""
+
+
+# ── Wave F7: the resume input is the selected parent's OWN snapshot ──────────
+
+
+def _write_parent_ledger(root: Path, spec: str, name: str, payload: dict) -> Path:
+    ledger_dir = root / "experiments" / "results" / "workflows" / spec
+    ledger_dir.mkdir(parents=True, exist_ok=True)
+    path = ledger_dir / name
+    path.write_text(json.dumps(payload))
+    return path
+
+
+def test_load_resume_state_reads_the_selected_parents_own_ledger(tmp_path, monkeypatch):
+    """The explicit resume input comes from the parent's ledger — selected by run id even
+    when a NEWER sibling ledger exists for a different run."""
+    module = _load_module()
+    monkeypatch.setattr(module, "ROOT", tmp_path)
+    own = _write_parent_ledger(tmp_path, "demo", "20260912T164142123456Z_run-parent.json", {
+        "run_id": "run-parent",
+        "phases": [
+            {"phase": "scope", "status": "ok"},
+            {"phase": "ux_design", "status": "failed"},
+            {"phase": "implement", "status": "ok"},
+        ],
+    })
+    # A newer ledger for ANOTHER run — recency would pick this one.
+    _write_parent_ledger(tmp_path, "demo", "99991231T235959000000Z_run-other.json", {
+        "run_id": "run-other",
+        "phases": [{"phase": "scope", "status": "ok"}],
+    })
+
+    state = module._load_resume_state("demo", "run-parent")
+    assert state.parent_run_id == "run-parent"
+    assert state.ledger_path == str(own)
+    assert state.completed_phases == frozenset({"scope", "implement"})  # ok only
+
+
+def test_load_resume_state_matches_only_the_exact_run_identity(tmp_path, monkeypatch):
+    """Name matching is exact: ``run-parent-other`` and a different run id never match, and
+    a collision-suffixed ``<ts>_<run-id>.N.json`` does."""
+    module = _load_module()
+    monkeypatch.setattr(module, "ROOT", tmp_path)
+    _write_parent_ledger(tmp_path, "demo", "20260912T000000000000Z_run-parent-other.json", {
+        "run_id": "run-parent-other", "phases": [{"phase": "scope", "status": "ok"}],
+    })
+    collision = _write_parent_ledger(
+        tmp_path, "demo", "20260912T000000000001Z_run-parent.2.json",
+        {"run_id": "run-parent", "phases": [{"phase": "ux_design", "status": "ok"}]},
+    )
+
+    state = module._load_resume_state("demo", "run-parent")
+    assert state.ledger_path == str(collision)
+    assert state.completed_phases == frozenset({"ux_design"})
+
+
+def test_load_resume_state_refuses_when_the_selected_parent_has_no_ledger(tmp_path, monkeypatch):
+    """No ledger for the selected parent (and a mismatched recorded run_id) both refuse —
+    the resume cannot establish its snapshot and must not guess one."""
+    module = _load_module()
+    monkeypatch.setattr(module, "ROOT", tmp_path)
+    (tmp_path / "experiments" / "results" / "workflows" / "demo").mkdir(parents=True)
+
+    with pytest.raises(module.ParentRunRefused):
+        module._load_resume_state("demo", "run-parent")
+
+    _write_parent_ledger(tmp_path, "demo", "20260912T000000000000Z_run-parent.json", {
+        "run_id": "a-different-run", "phases": [],
+    })
+    with pytest.raises(module.ParentRunRefused):
+        module._load_resume_state("demo", "run-parent")
+
+
+def test_main_passes_the_parent_snapshot_to_the_engine(tmp_path, monkeypatch):
+    """The composition root wires the selected parent's ledger into the engine: a --resume
+    with a linked parent calls run_workflow with the explicit ResumeState (not just a
+    boolean)."""
+    module = _load_module()
+    monkeypatch.setattr(module, "ROOT", tmp_path)
+
+    # A continuable parent row in the hermetic control db (conftest points FINOPS_CONTROL_DB
+    # at a per-test file), then its ledger under the patched ROOT.
+    db = module._control_db()
+    assert db is not None
+    parent = db.create_run(spec_name="demo", model="m", state=module.RunState.RUNNING)
+    db.transition_run(parent.run_id, module.RunState.FAILED, reason="boom")
+    db.close()
+    ledger = _write_parent_ledger(
+        tmp_path, "demo", f"20260912T164142123456Z_{parent.run_id}.json",
+        {"run_id": parent.run_id, "phases": [{"phase": "scope", "status": "ok"}]},
+    )
+
+    seen = {}
+
+    def fake_run(spec, **kwargs):
+        seen.update(kwargs)
+        return _stub_result()
+
+    monkeypatch.setattr(module, "load_spec_any", lambda p: _stub_spec())
+    monkeypatch.setattr(module, "run_workflow", fake_run)
+    monkeypatch.setenv("FINOPS_FACT_AUTO_EMIT", "0")
+    monkeypatch.setattr(sys, "argv", [
+        "run_workflow.py", "--spec", "x.yaml", "--goal", "g", "--model", "m",
+        "--workdir", str(tmp_path), "--resume",
+    ])
+    module.main()
+
+    assert seen["resume"] is True
+    state = seen["resume_state"]
+    assert isinstance(state, module.ResumeState)
+    assert state.parent_run_id == parent.run_id
+    assert state.ledger_path == str(ledger)
+    assert state.completed_phases == frozenset({"scope"})

@@ -71,6 +71,7 @@ from agentic_dynamics.runtime.run_clone import (  # noqa: E402
     create_run_clone,
 )
 from agentic_dynamics.runtime.workflow_runner import (  # noqa: E402
+    ResumeState,
     cell_scope,
     run_concrete_step,
     run_workflow,
@@ -778,6 +779,43 @@ def _run_workflow_cli(
     # (the composition root owns the control db); the engine consumes only the strings.
     approval_run_id, approval_gate_id = _resolve_approval_identity(control_db, run_identity)
 
+    # Wave F7 (identity recovery): a --resume whose parent is linked executes the parent's
+    # OWN snapshot — the explicit ResumeState read from the selected run's ledger (by run
+    # id, never the newest file and never the spec index). A selected parent whose snapshot
+    # cannot be established REFUSES before any phase runs; the freshly minted run row is
+    # recorded cancelled rather than left as a running ghost. A resume with no linked parent
+    # (no control db, or the ambiguous case `_resolve_parent_run` names) keeps the
+    # historical inference and says so on stderr.
+    resume_state: ResumeState | None = None
+    if getattr(args, "resume", False):
+        parent_run_id = str(run_identity.get("parent_run_id") or "")
+        if parent_run_id:
+            try:
+                resume_state = _load_resume_state(spec.name, parent_run_id)
+            except ParentRunRefused as exc:
+                print(f"REFUSED: {exc}", file=sys.stderr)
+                if control_db is not None and control_run_id is not None:
+                    with contextlib.suppress(Exception):
+                        control_db.transition_run(
+                            control_run_id, RunState.CANCELLED,
+                            reason=f"resume parent snapshot unavailable: {exc}",
+                        )
+                    with contextlib.suppress(Exception):
+                        control_db.close()
+                raise SystemExit(2) from exc
+            print(
+                f"control: --resume consumes the parent snapshot {parent_run_id} "
+                f"({len(resume_state.completed_phases)} completed phase(s) from "
+                f"{resume_state.ledger_path})",
+                file=sys.stderr,
+            )
+        else:
+            print(
+                "control: --resume has no linked parent — completion is inferred from this "
+                "worktree's git history / the spec index (no explicit parent snapshot)",
+                file=sys.stderr,
+            )
+
     # e2 (control_db_evidence): while this process runs the engine, a daemon heartbeat thread
     # proves to the zombie-run sweep that the run is ALIVE. A killed orchestrator stops beating
     # (the thread dies with the process), so the sweep can later cancel the dangling 'running'
@@ -814,6 +852,7 @@ def _run_workflow_cli(
             timeout=args.timeout,
             commit=not args.no_commit,
             resume=args.resume,
+            resume_state=resume_state,
             phase_watchdog_min=args.phase_watchdog_min,
             signals=signals,
             router=router,
@@ -1267,6 +1306,71 @@ def _resolve_parent_run(
             file=sys.stderr,
         )
     return ""
+
+
+def _carries_run_identity(stem: str, run_id: str) -> bool:
+    """True when ``stem`` is ``<ts>_<run_id>`` or its collision variant ``<ts>_<run_id>.<n>``.
+
+    Exact-identity matching: ``run-a`` must not select ``run-a-other`` or ``run-ab``. The
+    identity is the underscore-delimited suffix; a trailing ``.<n>`` (``_ledger_out_path``'s
+    collision guard) is stripped before comparison.
+    """
+    marker = f"_{run_id}"
+    idx = stem.rfind(marker)
+    if idx < 0:
+        return False
+    tail = stem[idx + len(marker):]
+    return tail == "" or (tail.startswith(".") and tail[1:].isdigit())
+
+
+def _load_resume_state(spec_name: str, parent_run_id: str) -> ResumeState:
+    """The selected parent's OWN ledger as the explicit resume input (Wave F7).
+
+    Identity selection, no inference: only files whose NAME carries exactly this run id
+    (``_ledger_out_path``'s ``<ts>_<run-id>.json`` shape, collisions included), and only a
+    payload whose own ``run_id`` field (when present) matches. Never the newest sibling,
+    never the spec index. ``completed_phases`` is exactly the phases the parent recorded
+    ``ok`` — a failed/awaiting phase is re-entered.
+
+    Raises :class:`ParentRunRefused` when the selected parent's snapshot cannot be found
+    or read: a resume cannot be established from a ledger that is gone, and guessing would
+    resurrect exactly the mis-association this identity selection removes.
+    """
+    ledger_dir = ROOT / "experiments" / "results" / "workflows" / spec_name
+    matches = [
+        path for path in ledger_dir.glob("*.json")
+        if _carries_run_identity(path.stem, parent_run_id)
+    ] if ledger_dir.is_dir() else []
+    if not matches:
+        raise ParentRunRefused(
+            f"--resume parent {parent_run_id!r} has no ledger under {ledger_dir} — "
+            "its completed phases cannot be established (restore the ledger or start fresh)"
+        )
+    path = sorted(matches)[-1]
+    try:
+        payload = json.loads(path.read_text())
+    except (OSError, ValueError) as exc:
+        raise ParentRunRefused(
+            f"--resume parent ledger {path.name} is unreadable ({exc})"
+        ) from exc
+    if not isinstance(payload, dict):
+        raise ParentRunRefused(f"--resume parent ledger {path.name} is not a run ledger")
+    recorded = str(payload.get("run_id") or "")
+    if recorded and recorded != parent_run_id:
+        raise ParentRunRefused(
+            f"--resume parent ledger {path.name} records run_id {recorded!r}, "
+            f"not {parent_run_id!r}"
+        )
+    completed = frozenset(
+        str(phase.get("phase"))
+        for phase in (payload.get("phases") or [])
+        if isinstance(phase, dict) and phase.get("phase") and phase.get("status") == "ok"
+    )
+    return ResumeState(
+        parent_run_id=parent_run_id,
+        ledger_path=str(path),
+        completed_phases=completed,
+    )
 
 
 def _control_open_run(spec: ExperimentSpec, args: argparse.Namespace) -> tuple[str | None, ControlDB | None]:
