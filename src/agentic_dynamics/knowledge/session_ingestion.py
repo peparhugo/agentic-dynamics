@@ -596,6 +596,14 @@ def _close_sequence_number(session_date: str, slug: str, artifact_dir: Path) -> 
                 )
             except Exception:
                 continue
+            # The 2026-09-13 repair: the KB dir is a MIXED artifact dir, and a non-session
+            # artifact classifies to a payload that is not a dict. The unguarded ``payload.get``
+            # below raised here — caught by the OUTER try — so every same-day close got
+            # ``close_seq = 1`` and ordering fell back to the lexicographic slug. The guard
+            # must live INSIDE the per-artifact try, where the classifier's own failure is
+            # already the skip signal.
+            if not isinstance(payload, dict):
+                continue
             if (
                 str(payload.get("session_date") or "") == session_date
                 and str(payload.get("slug") or "") != slug

@@ -998,7 +998,79 @@ def validate_submit_request(
                 f"fleet/base, fleet/orchestrator, fleet/supervisor, or a third-party image)"
             )
 
+    # Step 9 — the deployment probe (remediation closed-loop, decision f987cde9). The run clone
+    # pins base_sha to the WORKDIR HEAD, so a stale worktree silently mints runs from a dead
+    # tree — the 2026-09-13 fleet failure class (four launches cloned at b57b84688 while main
+    # was 0a29f28b4, each dying at spec load). Refused here, before any container exists.
+    errors.extend(_workdir_base_probe(workdir, repo_root=repo_root))
+
     return errors
+
+
+def _git_probe(workdir: str, args: list[str]) -> str:
+    """One ``git`` call for the deployment probe; ``""`` on any failure (never raises)."""
+    import subprocess as _subprocess  # noqa: PLC0415 — the probe is the only git caller here
+
+    try:
+        proc = _subprocess.run(
+            ["git", "-C", str(workdir), *args],
+            capture_output=True, text=True, timeout=10,
+        )
+    except (OSError, _subprocess.TimeoutExpired):
+        return ""
+    if proc.returncode != 0:
+        return ""
+    return proc.stdout.strip()
+
+
+def _git_probe_rc(workdir: str, args: list[str]) -> int | None:
+    """The return code of one ``git`` call; ``None`` when git itself cannot run."""
+    import subprocess as _subprocess  # noqa: PLC0415
+
+    try:
+        proc = _subprocess.run(
+            ["git", "-C", str(workdir), *args],
+            capture_output=True, text=True, timeout=10,
+        )
+    except (OSError, _subprocess.TimeoutExpired):
+        return None
+    return proc.returncode
+
+
+def _workdir_base_probe(workdir: str, *, repo_root: Path) -> list[str]:
+    """Refuse a submit whose workdir is behind or diverged from the canonical repo's main tip.
+
+    The probe judges only what it can prove: when both paths are git worktrees and the repo's
+    ``main`` resolves, the workdir HEAD must be AT or AHEAD of main (``merge-base
+    --is-ancestor`` exits 0) — at/ahead is legal (a resume worktree carries phase commits),
+    behind (stale) or diverged is the exact silent-failure the probe exists to kill. When
+    either side cannot be judged (not a git tree, no main ref, git unavailable), the probe
+    says nothing — the clone path itself will name those, and a fabricated refusal is worse
+    than none.
+    """
+    wd = Path(workdir) if workdir else None
+    if not wd or not wd.is_dir():
+        return []
+    if not (wd / ".git").exists() or not (repo_root / ".git").exists():
+        return []
+    main_sha = _git_probe(str(repo_root), ["rev-parse", "--verify", "main^{commit}"])
+    if not main_sha:
+        return []
+    head_sha = _git_probe(str(wd), ["rev-parse", "--verify", "HEAD^{commit}"])
+    if not head_sha:
+        return [
+            f"submit: workdir {wd} has no HEAD — create the worktree at the repo's main tip first"
+        ]
+    rc = _git_probe_rc(str(wd), ["merge-base", "--is-ancestor", main_sha, head_sha])
+    if rc == 0:
+        return []  # at or ahead of main — the legal base
+    if rc is None or rc >= 128:  # git error (unjudgeable, e.g. unrelated objects) — never fabricate
+        return []
+    return [
+        f"submit: workdir base {head_sha[:12]} is behind or diverged from the repo main tip "
+        f"{main_sha[:12]} — update the worktree first (git -C {wd} reset --hard origin/main), "
+        "then re-submit; the run clone pins base_sha to the workdir HEAD"
+    ]
 
 
 # ── The spawn mechanism (validate THEN the broker over the seam) ─────────────

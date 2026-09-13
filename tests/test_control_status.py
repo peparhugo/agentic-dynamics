@@ -1033,3 +1033,48 @@ def test_repo_head_sha_reads_the_real_checkout() -> None:
     sha, error = read_repo_head_sha(ROOT)
     assert error == ""
     assert len(sha) == 40
+
+
+# ── packet-read counter (remediation closed-loop, decision f987cde9) ──────────
+
+
+def test_packet_read_counter_appends_one_line_per_read(tmp_path: Path) -> None:
+    """Every successful packet read appends one observation line — a turn that skipped the
+    packet is visible, which is the whole point of the counter."""
+    import os
+
+    with ControlDB.open(tmp_path / "control.db") as writer:
+        seed_run(writer, state=RunState.RUNNING)
+    counter = tmp_path / "packet_reads.jsonl"
+    env = {**os.environ, "FINOPS_PACKET_READS_PATH": str(counter)}
+    for _ in range(2):
+        proc = subprocess.run(
+            [sys.executable, str(ROOT / "scripts" / "control_status.py"),
+             "--db", str(tmp_path / "control.db"), "--no-workers", "--json"],
+            capture_output=True, text=True, cwd=str(ROOT), timeout=120, env=env,
+        )
+        assert proc.returncode == 0
+    lines = counter.read_text(encoding="utf-8").strip().splitlines()
+    assert len(lines) == 2, "each successful read appends exactly one line"
+    for line in lines:
+        entry = json.loads(line)
+        assert entry["schema"] == SCHEMA_ID
+        assert entry["repo_head_sha"], "the read records the checkout sha it observed"
+        assert "epoch" in entry
+
+
+def test_packet_read_counter_honors_no_counter(tmp_path: Path) -> None:
+    """``--no-counter`` skips the append — the explicit opt-out, never the default."""
+    import os
+
+    with ControlDB.open(tmp_path / "control.db") as writer:
+        seed_run(writer, state=RunState.RUNNING)
+    counter = tmp_path / "packet_reads.jsonl"
+    env = {**os.environ, "FINOPS_PACKET_READS_PATH": str(counter)}
+    proc = subprocess.run(
+        [sys.executable, str(ROOT / "scripts" / "control_status.py"),
+         "--db", str(tmp_path / "control.db"), "--no-workers", "--json", "--no-counter"],
+        capture_output=True, text=True, cwd=str(ROOT), timeout=120, env=env,
+    )
+    assert proc.returncode == 0
+    assert not counter.exists(), "--no-counter must not write the counter file"

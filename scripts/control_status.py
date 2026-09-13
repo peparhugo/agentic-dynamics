@@ -33,7 +33,9 @@ Exit codes — the packet's own status line, so a caller can branch without pars
 from __future__ import annotations
 
 import argparse
+import contextlib
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -53,6 +55,39 @@ EXIT_NO_CONTROL_DB = 3
 
 #: Exit code for "the packet we built does not satisfy its own schema" — a builder bug.
 EXIT_INVALID_PACKET = 2
+
+#: Where each successful packet read appends its observation line (remediation closed-loop,
+#: decision f987cde9: a turn that skipped the packet is now visible, because the AIO's own
+#: counter shows it did not read). Overridable via ``FINOPS_PACKET_READS_PATH`` for tests.
+#: Append-only, best-effort — the read itself must never fail on the counter.
+PACKET_READS_DEFAULT = ROOT / "experiments" / "results" / "control" / "packet_reads.jsonl"
+
+
+def _append_packet_read(*, epoch: object, repo_head_sha: str, db_path: str) -> None:
+    """Append one packet-read observation line. Raises on failure — callers catch.
+
+    One line per invocation: ``{ts, schema, epoch, repo_head_sha, db}``. The counter is the
+    packet's own observation of itself (the CLI is ours), so it writes a side file — never the
+    control database, which stays read-only for this command.
+    """
+    from datetime import datetime, timezone
+
+    counter_path = Path(
+        os.environ.get("FINOPS_PACKET_READS_PATH") or PACKET_READS_DEFAULT
+    )
+    counter_path.parent.mkdir(parents=True, exist_ok=True)
+    line = json.dumps(
+        {
+            "ts": datetime.now(timezone.utc).isoformat(),
+            "schema": cs.SCHEMA_ID,
+            "epoch": epoch,
+            "repo_head_sha": repo_head_sha,
+            "db": db_path,
+        },
+        ensure_ascii=False,
+    )
+    with open(counter_path, "a", encoding="utf-8") as handle:
+        handle.write(line + "\n")
 
 
 def _error_envelope(message: str, *, db_path: str) -> dict[str, object]:
@@ -106,6 +141,13 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="with --json, emit one line (no indentation) — for piping and for diffing turns",
     )
+    parser.add_argument(
+        "--no-counter",
+        action="store_true",
+        help="skip the packet-read counter append (tests and programmatic readers only — the "
+        "AIO's contract requires the counter, so a turn that passes this flag has explaining "
+        "to do)",
+    )
     return parser
 
 
@@ -156,6 +198,19 @@ def main(argv: list[str] | None = None) -> int:
     # failure here means one of them is wrong — which an actor downstream must never discover by
     # acting on a malformed packet. Printed to stderr so --json's stdout stays parseable.
     errors = cs.validate_packet(packet)
+
+    # Packet-read counter (remediation closed-loop, decision f987cde9): every successful read
+    # appends one observation line, so a turn that skipped the packet is visible to the
+    # controller, the supervisor, and the AIO's own next session. Best-effort — the read itself
+    # must never fail on the counter, and the packet's JSON surface is untouched.
+    if not args.no_counter:
+        # An unwritable counter must not make the packet unreadable.
+        with contextlib.suppress(OSError):
+            _append_packet_read(
+                epoch=packet.get("control_epoch"),
+                repo_head_sha=str(packet.get("repo_head_sha", "") or ""),
+                db_path=str(args.db or ""),
+            )
 
     if args.json:
         print(cs.packet_json(packet, indent=None if args.compact else 2))

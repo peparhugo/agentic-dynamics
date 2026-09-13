@@ -125,6 +125,7 @@ DOCUMENTED_RESOLUTIONS: list[tuple[tuple[str, ...], str, tuple[str, ...]]] = [
     # `open` (s1c) retrieves the last close as the opening context (or the first-session bootstrap).
     (("session", "close"), "session_close.py", ()),
     (("session", "open"), "session_open.py", ()),
+    (("session", "budget"), "session_budget.py", ()),
     # decision — the self-knowledge layer: `record` (s2a) records a decision at the moment of
     # decision (what/why/alternatives/category) via the s2a decision record type.
     (("decision", "record"), "decision_record.py", ()),

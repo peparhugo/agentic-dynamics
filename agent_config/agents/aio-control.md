@@ -88,7 +88,11 @@ control database; you never write a child's outbox.
 ## Operating rules
 
 1. Every decision turn opens with `agentic-dynamics control status --json`. If it fails
-   (exit 3), say so and stop — do not substitute a stale memory of the state.
+   (exit 3), say so and stop — do not substitute a stale memory of the state. The read is
+   real only when the packet-read counter records it: the packet appends an observation line
+   per successful read (`experiments/results/control/packet_reads.jsonl`), so a turn that
+   skipped the packet is visible — to the controller, the supervisor, and your own next
+   session. Never pass `--no-counter`.
 2. Work from the packet's `safe_actions` and the identifiers it returns. A gate_id you cannot
    find in the packet is not actionable.
 3. For a permanence decision, route it through the verified command and let the command record
@@ -97,3 +101,14 @@ control database; you never write a child's outbox.
    `agent_config/` source.
 5. Keep the control packet read-only. You read live state; you never fake, fork, or mutate it
    to make an action look safe.
+6. **The session budget is binding.** With the packet each turn, run
+   `agentic-dynamics session budget`. `OK` = keep working. `WARN` = no new work — wrap up,
+   close the session, hand off. `CLOSE` = close now and hand off to a fresh session; the
+   next session reads the close record and continues. An `UNJUDGED` verdict is a warning,
+   never permission. This is the 25-hour-session failure class made executable: a session
+   that keeps accepting work past its budget is repeating the exact defect the audit named.
+7. **One deliverable per session.** A session serves one user-visible deliverable with its
+   acceptance test. Reviews, remediation, and meta-work each get their own session; the
+   deliverable session's only job is the deliverable. When the deliverable is a UI change,
+   the acceptance is `verify_control_room_rendering.py --live` with captured screenshots the
+   controller reviews — a gate run that recorded zero captures is a FAIL, structurally.

@@ -5,11 +5,12 @@ The gate is the executable form of ``docs/research/control_room_ia.md`` §10: it
 Flask shell, intercepts every ``/api/*`` request with a committed fixture, captures screenshots
 at the three claimed breakpoints (1440x900, 1024x768, 390x844), and asserts the canonical glance
 contract — all seven ``ON-G1..G7`` answers present, unique, inside their one canonical region,
-above the fold, with no page or region scroll, on WCAG-AA contrast, and with the bounded row /
-item / marginal counts per viewport.
+above the fold, on scrollable pages with no horizontal overflow (the 2026-09-13 re-baseline,
+decision ``9f357fce``: the controller's room scrolls vertically; the no-page-scroll era is
+superseded), on WCAG-AA contrast, and with the bounded row / item / marginal counts per viewport.
 
 Classes implemented (p5 IA8: a screenshot must not be asked to prove what only the network can):
-  * G geometry     — present/unique, in-viewport, non-zero box, no scroll, contrast, schemas
+  * G geometry     — present/unique, in-viewport, non-zero box, no horizontal overflow, contrast, schemas
   * semantics      — every ON-G1..G7 answer's RENDERED value/state/enum vs FIXTURE truth, plus the
                      B-class carriers: presence is not proof, so the gate compares content
   * fixtures       — deterministic F-0..F-7 payloads, no live Redis/clock/network (waiver W2)
@@ -728,7 +729,7 @@ A11Y_JS = r"""
 
 #: The IA-core probe for the live (unfixtured) portal: the acceptance contract's structural
 #: checks that do not depend on any particular data — every anchor present, in viewport, a
-#: non-zero box, no page/region scroll, and a recorded first paint.
+#: non-zero box, no horizontal overflow, and a recorded first paint.
 IA_CORE_JS = r"""
 () => {
   const rect = (el) => { const r = el.getBoundingClientRect();
@@ -861,7 +862,7 @@ def run_chart_gate(out: Path, screenshots: bool) -> tuple[list[dict[str, Any]], 
 
     Cases: ``history`` (six samples → marks), ``empty`` (one sample → explicit empty state),
     ``error`` (failed projection → explicit error state). Each chart body must be non-zero and
-    inside its per-viewport budget, and the page must not scroll while the lens is open.
+    inside its per-viewport budget, and the page must not overflow horizontally while the lens is open.
     """
     from playwright.sync_api import sync_playwright
 
@@ -943,7 +944,7 @@ def run_chart_gate(out: Path, screenshots: bool) -> tuple[list[dict[str, Any]], 
 
 def _check_charts(label: str, viewport: str, case: str, probe: dict[str, Any],
                   errors: list[str]) -> None:
-    """Assert one lens probe: presence, budget, marks/empty/error, a11y name, no page scroll."""
+    """Assert one lens probe: presence, budget, marks/empty/error, a11y name, no horizontal page overflow."""
     if not probe.get("open"):
         _row(errors, label, case, "chart", "lens did not open")
         return
@@ -981,9 +982,11 @@ def _check_charts(label: str, viewport: str, case: str, probe: dict[str, Any],
         elif case == "error":
             if not chart.get("error"):
                 _row(errors, label, case, "chart-error", f"{chart['id']} lacks error state")
-    if probe["scrollHeight"] > probe["innerHeight"] + 1:
-        _row(errors, label, case, "chart-page-scroll",
-             f"page scrollHeight {probe['scrollHeight']} > {probe['innerHeight']}")
+    # Re-baseline (2026-09-13, decision 9f357fce): pages scroll vertically. Horizontal page
+    # overflow is the defect this class still refuses.
+    if probe["scrollWidth"] > probe["innerWidth"] + 1:
+        _row(errors, label, case, "chart-page-h-overflow",
+             f"page scrollWidth {probe['scrollWidth']} > {probe['innerWidth']}")
 
 
 #: Probe the SVG visuals inside the open R4 dock.
@@ -1097,9 +1100,10 @@ def _check_visuals(label: str, viewport: str, probe: dict[str, Any], errors: lis
                  f"{visual} height {box['height']:.0f} > {VISUAL_BUDGET[visual]}")
     if not probe.get("affected") or not probe.get("action"):
         _row(errors, label, "a2", "visual-action", "affected record/action missing")
-    if probe["scrollHeight"] > probe["innerHeight"] + 1:
-        _row(errors, label, "a2", "visual-page-scroll",
-             f"page scrollHeight {probe['scrollHeight']} > {probe['innerHeight']}")
+    # Re-baseline (decision 9f357fce): vertical page scroll is allowed; horizontal overflow is not.
+    if probe["scrollWidth"] > probe["innerWidth"] + 1:
+        _row(errors, label, "a2", "visual-page-h-overflow",
+             f"page scrollWidth {probe['scrollWidth']} > {probe['innerWidth']}")
 
 
 def run_visual_gate(out: Path, screenshots: bool) -> tuple[list[dict[str, Any]], list[str]]:
@@ -1535,7 +1539,8 @@ def _check_ia_core(label: str, viewport: str, probe: dict[str, Any], errors: lis
     """The live IA-core contract: anchors present/unique, in viewport, non-zero, no scroll, paint.
 
     Deliberately data-independent: it asserts the acceptance structure the a4 brief names (each
-    anchor present, in viewport, a non-zero box, no page/region scroll) and the browser/console
+    anchor present, in viewport, a non-zero box, no horizontal overflow; vertical page scroll is
+    allowed by the re-baseline (decision 9f357fce)) and the browser/console
     primitives, but not the fixture-specific row/marginal counts — those belong to the fixture
     class, because a live portal's run count is whatever the machinery actually has.
     """
@@ -1544,11 +1549,9 @@ def _check_ia_core(label: str, viewport: str, probe: dict[str, Any], errors: lis
         _row(errors, label, "live", "ia-regions", f"regions={sorted(probe['regions'])}")
     if set(probe["answers"]) != set(ANSWER_REGION):
         _row(errors, label, "live", "ia-answers", f"answers={sorted(probe['answers'])}")
-    if probe["scrollHeight"] > height + 1:
-        _row(errors, label, "live", "ia-page-scroll",
-             f"scrollHeight {probe['scrollHeight']} > {height}")
+    # Re-baseline (decision 9f357fce): vertical page scroll is allowed. Horizontal overflow is not.
     if probe["scrollWidth"] > width + 1:
-        _row(errors, label, "live", "ia-page-scroll",
+        _row(errors, label, "live", "ia-page-h-overflow",
              f"scrollWidth {probe['scrollWidth']} > {width}")
     for region in REGIONS:
         info = probe["regions"].get(region)
@@ -1560,8 +1563,9 @@ def _check_ia_core(label: str, viewport: str, probe: dict[str, Any], errors: lis
         elif (box["top"] < -0.5 or box["bottom"] > height + 0.5
               or box["left"] < -0.5 or box["right"] > width + 0.5):
             _row(errors, label, "live", "ia-region-fold", f"{region} box={box}")
-        if info["scrollH"] > info["clientH"] + 1 or info["scrollW"] > info["clientW"] + 1:
-            _row(errors, label, "live", "ia-region-scroll", f"{region} scroll")
+        if info["scrollW"] > info["clientW"] + 1:
+            _row(errors, label, "live", "ia-region-h-scroll",
+                 f"{region} scrollW {info['scrollW']} > {info['clientW']}")
     for answer, region in ANSWER_REGION.items():
         info = probe["answers"].get(answer)
         if not info:
@@ -1918,17 +1922,14 @@ def _check_geometry(
         if not (box["width"] > 0 and box["height"] > 0):
             _row(errors, label, fixture_id, "G-1", f"{region} zero box {box}")
 
-    # G-2 page must not scroll.
-    if geometry["scrollHeight"] > height + 1:
-        _row(errors, label, fixture_id, "G-2", f"page scrollHeight {geometry['scrollHeight']}")
+    # G-2 no horizontal page overflow. Vertical page scroll is allowed — the re-baseline
+    # (decision 9f357fce) superseded the no-scroll resting screen.
     if geometry["scrollWidth"] > width + 1:
         _row(errors, label, fixture_id, "G-2", f"page scrollWidth {geometry['scrollWidth']}")
 
-    # G-3 no region/answer internal scroll.
+    # G-3 no region/answer horizontal overflow (vertical overflow scrolls — re-baseline).
     for region in REGIONS:
         info = geometry["regions"][region]
-        if info["scrollH"] > info["clientH"] + 1:
-            _row(errors, label, fixture_id, "G-3", f"{region} scrollH {info['scrollH']}")
         if info["scrollW"] > info["clientW"] + 1:
             _row(errors, label, fixture_id, "G-3", f"{region} scrollW {info['scrollW']}")
 
@@ -2230,6 +2231,15 @@ def write_report(results: list[dict[str, Any]], errors: list[str], report_path: 
     value, so a failure is actionable without re-running the browser.
     """
     status = "PASS" if not errors and check_fixtures_exit == 0 else "FAIL"
+    # Zero-captures rejection (remediation closed-loop, decision f987cde9): acceptance is a
+    # RENDERED artifact. A gate run that produces no screenshot — the 2026-09-13 failure class
+    # ("PASS, Screenshots: 0") — is a FAIL, structurally, whatever the fixture checks say.
+    if not results:
+        errors.append(
+            "GATE-CAPTURES: zero screenshots recorded — acceptance requires rendered proof; "
+            "a PASS with no captures is structurally impossible"
+        )
+        status = "FAIL"
     # Roll the screenshots up by class so the report says what each capture proves.
     by_class: dict[str, int] = {}
     for result in results:
@@ -2246,8 +2256,8 @@ def write_report(results: list[dict[str, Any]], errors: list[str], report_path: 
         "**Fixtures:** F-0..F-7 (deterministic; no live Redis/clock/network — waiver W2)",
         f"**Viewports:** {', '.join(f'{k} {w}x{h}' for k, (w, h) in VIEWPORTS.items())}",
         f"**Themes:** {', '.join(THEMES)}",
-        "**Primitives:** present/unique · in-viewport · non-zero box · no page/region scroll · "
-        "WCAG-AA contrast · first-paint · console-clean",
+        "**Primitives:** present/unique · in-viewport · non-zero box · scrollable pages "
+        "(vertical) · no horizontal overflow · WCAG-AA contrast · first-paint · console-clean",
         "",
         f"**Screenshots:** {len(results)} ({rollup})",
         "",
