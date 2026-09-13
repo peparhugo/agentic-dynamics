@@ -210,3 +210,87 @@ def test_r3_composition_states_buckets_in_words_plus_bounded_token_split_bars():
     assert ".marginal-bar" in css
     assert ".marginal-seg" in css
     assert '.marginal-seg[data-seg="unknown"]' in css
+
+
+# ── R4 (build step 7): the selection dock's transcript / tools / diff affordances ────────────
+#
+# The synthesis turns R4 into a real session surface: a list+detail split whose DETAIL pane offers
+# the selected run's transcript, its tool calls, and its change evidence. The suite has no JS
+# runtime, so these keep the AFFORDANCES honest structurally — the three views exist, they read
+# only routes the server already registers, and none of them fabricates a value it did not read.
+
+
+def test_r4_dock_exposes_transcript_tools_diff_views():
+    """The dock carries exactly the three detail views, and starts on the transcript.
+
+    The switcher is a `role="tablist"` of `data-dock-tab` buttons (never `data-region` /
+    `data-answer`), so it cannot disturb the resting contract; the worker region defaults to
+    `data-dock-view="transcript"` and the recorded-change pane shares its `data-dock-region`.
+    """
+    html = (STATIC / "index.html").read_text(encoding="utf-8")
+
+    assert 'data-dock-region="worker"' in html
+    assert 'data-dock-view="transcript"' in html
+    for view in ("transcript", "tools", "diff"):
+        assert f'data-dock-tab="{view}"' in html, view
+    # The diff pane is app-owned and exists inside the worker region (no new sub-region).
+    assert 'id="dock-change"' in html and "data-dock-change" in html
+    # The switcher is tabs of real buttons, never links that would navigate the roster.
+    assert 'role="tablist"' in html
+    tools_tab = html.split('data-dock-tab="tools"', 1)[1].split(">", 1)[0]
+    assert "href" not in tools_tab
+
+
+def test_r4_tools_view_narrows_the_one_transcript_feed():
+    """TOOLS is a filter over the SAME worker stream — no second stream, no second endpoint.
+
+    A tool frame is marked with `data-tool` and carries an expandable recorded input/output; the
+    tools view hides the non-tool rows via `data-dock-view`, and an empty tools view says so
+    explicitly instead of rendering a blank pane.
+    """
+    client = (STATIC / "parity.js").read_text(encoding="utf-8")
+    css = (STATIC / "style.css").read_text(encoding="utf-8")
+
+    assert "function appendToolDetail(" in client
+    assert '"data-tool"' in client
+    assert '"data-tool-toggle"' in client
+    assert 'data-dock-view="tools"' in css
+    assert ".feed-entry:not([data-tool])" in css
+    # The empty state is a real (hidden) line, shown only when the view has no tool frames.
+    html = (STATIC / "index.html").read_text(encoding="utf-8")
+    assert "No tool calls recorded for this run." in html
+    # The same EventSource helper still opens the one selected stream.
+    assert "new window.EventSource(\"/api/events/" in client
+
+
+def test_r4_diff_view_reads_the_existing_run_route_and_never_fabricates_a_patch():
+    """DIFF is the run's recorded CHANGE evidence over the EXISTING per-run read model.
+
+    The portal owns no git-patch endpoint and step 7 adds none, so the view states what it
+    renders (recorded change receipts) and degrades to a named unavailable state; it never
+    draws a patch it did not read.
+    """
+    client = (STATIC / "parity.js").read_text(encoding="utf-8")
+
+    assert "function loadChangeEvidence(" in client
+    assert '"/api/runs/"' in client  # the existing route only
+    assert '"data-change-candidate"' in client
+    assert "recorded change receipts" in client
+    # The failure modes are named, never blank and never a fabricated all-clear.
+    assert "Change evidence unavailable" in client
+    assert "no recorded run binding" in client
+
+
+def test_r4_detail_views_switch_without_leaving_the_dock():
+    """The three views are a switch on ONE selected run; the roster is never navigated away.
+
+    `setDockView` flips `data-dock-view` and the tabs' `aria-selected`; it calls no navigation
+    and opens no new window, so list+detail holds (the list stays behind the dock).
+    """
+    client = (STATIC / "parity.js").read_text(encoding="utf-8")
+
+    assert "function setDockView(" in client
+    assert '"data-dock-view"' in client
+    assert "aria-selected" in client
+    assert "window.location" not in client
+    assert "window.open(" not in client

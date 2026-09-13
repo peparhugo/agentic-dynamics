@@ -232,14 +232,46 @@
            id="dock-address-region" aria-label="Selected run identity"></div>
       <!-- R4b — the restored per-worker surface: one live event stream plus the governed
            action band. The stream is the same endpoint the old room used
-           (`GET /api/events/<cell_id>`); the action band fires the same mutation routes. -->
-      <div class="dock-region dock-worker" data-dock-region="worker" id="dock-worker">
+           (`GET /api/events/<cell_id>`); the action band fires the same mutation routes.
+
+           Build step 7 — the selected run's DETAIL AFFORDANCES. The synthesis' R4 becomes a
+           real session surface: a list+detail split where the dock shows the ONE selected run's
+           transcript, its tool calls, and its change evidence. All three views read data the
+           portal already serves — no new endpoint:
+             · transcript — the replayed+live worker stream (`GET /api/events/<cell_id>`), the
+               same frames R4b has always rendered;
+             · tools      — that SAME stream filtered to `tool`/`tool_use` frames, each with its
+               recorded input/output expandable in place (a frame that carried none says so);
+             · diff       — the run's recorded CHANGE evidence from the EXISTING per-run read
+               model (`GET /api/runs/<run_id>`: candidate + gate verdicts + command receipts).
+               The portal owns no git-patch endpoint and deliberately adds none, so the view
+               states what it is (recorded change receipts) rather than drawing a fabricated
+               patch.
+           The switcher is `role="tab"`/`data-dock-tab` (never `data-region`/`data-answer`), so
+           the resting contract and the `[data-dock-region]` parity gate are untouched. -->
+      <div class="dock-region dock-worker" data-dock-region="worker" id="dock-worker"
+           data-dock-view="transcript">
         <div class="dock-region-head">
           <h3 class="dock-region-title">WORKER</h3>
           <span class="dock-worker-target" id="dock-worker-target">—</span>
           <button class="feed-toggle" id="dock-stream-toggle" type="button"
                   data-feed-follow="follow" aria-pressed="false">Pause</button>
         </div>
+        <div class="dock-views" id="dock-views" role="tablist" aria-label="Selected run detail view">
+          <button class="dock-tab" id="dock-tab-transcript" type="button" role="tab"
+                  data-dock-tab="transcript" aria-selected="true" aria-controls="dock-event-feed">
+            Transcript</button>
+          <button class="dock-tab" id="dock-tab-tools" type="button" role="tab"
+                  data-dock-tab="tools" aria-selected="false" aria-controls="dock-event-feed">
+            Tools</button>
+          <button class="dock-tab" id="dock-tab-diff" type="button" role="tab"
+                  data-dock-tab="diff" aria-selected="false" aria-controls="dock-change">
+            Diff</button>
+        </div>
+        <div class="dock-change" id="dock-change" data-dock-change
+             aria-label="Recorded change evidence"></div>
+        <p class="dock-empty" id="dock-tools-empty" data-tools-empty hidden
+           role="status">No tool calls recorded for this run.</p>
         <ol class="feed-list" id="dock-event-feed" data-event-feed aria-live="off"></ol>
         <div class="dock-actions" id="dock-actions" data-action-band></div>
       </div>

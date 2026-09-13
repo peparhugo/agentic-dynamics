@@ -5,6 +5,8 @@ from __future__ import annotations
 import dataclasses
 import functools
 import json
+import re
+from pathlib import Path
 
 import pytest
 
@@ -1610,3 +1612,63 @@ def test_matrix_survives_a_missing_control_db(monkeypatch, tmp_path):
 
     assert response.status_code == 200
     assert response.get_json()["projections"] == []
+
+
+# --------------------------------------------------------------------------------------
+# The no-new-endpoint contract (build step 7: the R4 transcript / tools / diff affordances).
+#
+# Step 7 turns R4 into a real session surface by REUSING routes the server already registers:
+# `GET /api/events/<cell_id>` for the live transcript (and the tools filter over it) and
+# `GET /api/runs/<run_id>` for the run's recorded change evidence. "No new endpoints" is a
+# client/server agreement, so this guard makes it mechanical: every `/api/...` string the static
+# client names must resolve to a rule in the live ``url_map``. A view that shipped a fabricated
+# or unregistered endpoint fails here, not silently in the operator's browser.
+# --------------------------------------------------------------------------------------
+
+
+def _api_literals_in_static_client() -> set[str]:
+    """Every quoted `/api/...` path the client scripts name (query strings stripped)."""
+    static = Path(server.__file__).resolve().parent / "static"
+    source = "\n".join(path.read_text(encoding="utf-8") for path in sorted(static.glob("*.js")))
+    return {match.split("?", 1)[0] for match in re.findall(r'"(/api/[^"]*)"', source)}
+
+
+def _registered_route_resolves(literal: str) -> bool:
+    """True when `literal` names or prefixes a registered non-static route.
+
+    A static rule must match exactly. A parameterised rule matches when the literal is its own
+    static prefix (``/api/events/`` for ``/api/events/<cell_id>``) or extends that prefix (a
+    concrete ``/api/claude-agents/daemon`` under ``/api/claude-agents/<session_id>/...``).
+    """
+    for rule in server.app.url_map.iter_rules():
+        if not rule.rule.startswith("/api"):
+            continue
+        if "<" not in rule.rule:
+            if rule.rule == literal:
+                return True
+            continue
+        prefix = rule.rule.split("<", 1)[0]
+        if literal == prefix or literal.startswith(prefix):
+            return True
+    return False
+
+
+def test_client_fetches_only_registered_routes():
+    """The static client may only call routes the server registers (the step-7 rule)."""
+    literals = _api_literals_in_static_client()
+
+    assert literals, "the static client names no /api routes at all"
+    unresolved = sorted(literal for literal in literals if not _registered_route_resolves(literal))
+    assert unresolved == [], f"the client names unregistered routes: {unresolved}"
+
+
+def test_r4_detail_affordances_reuse_existing_routes():
+    """PROOF the R4 views add no endpoint: their two route families are already registered."""
+    literals = _api_literals_in_static_client()
+    routes = {rule.rule for rule in server.app.url_map.iter_rules()}
+
+    # The transcript/tools stream and the recorded-change read model, both pre-existing.
+    assert "/api/events/" in literals and "/api/events/<cell_id>" in routes
+    assert "/api/runs/" in literals and "/api/runs/<run_id>" in routes
+    # No git/patch route family was invented for the diff view.
+    assert not any("patch" in literal or "diff" in literal for literal in literals)

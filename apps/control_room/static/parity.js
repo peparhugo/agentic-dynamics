@@ -350,11 +350,53 @@
       detail = "step " + (part.step || part.name || "started");
     }
     var time = event.timestamp || part.timestamp || event.time || "";
-    var row = element("li", "feed-entry", { "data-feed-entry": "", "data-event-kind": type });
+    var isTool = type === "tool_use" || type === "tool";
+    var attrs = { "data-feed-entry": "", "data-event-kind": type };
+    // A tool frame is both a transcript row and the material of the dock's TOOLS view; the
+    // `data-tool` marker is what that view filters on, so it is set only for real tool frames.
+    if (isTool) attrs["data-tool"] = String(part.name || part.tool || part.tool_name || "tool");
+    var row = element("li", "feed-entry", attrs);
     row.appendChild(element("span", "feed-time", null, formatTime(time)));
     row.appendChild(element("span", "feed-class", null, type.toUpperCase()));
     row.appendChild(element("span", "feed-text", null, detail || "—"));
+    if (isTool) appendToolDetail(row, part);
     return row;
+  }
+
+  /**
+   * Append the recorded input/output a tool frame carried, expandable in place (the synthesis'
+   * "expandable tool calls"). A frame that carried no input/output says so literally — the dock
+   * never invents a call body it did not receive.
+   */
+  function appendToolDetail(row, part) {
+    var state = part.state && typeof part.state === "object" ? part.state : {};
+    var toggle = element("button", "tool-toggle", {
+      type: "button", "data-tool-toggle": "", "aria-expanded": "false",
+    }, "detail");
+    var detail = element("div", "tool-detail", { "data-tool-detail": "", hidden: true });
+    detail.appendChild(toolDetailLine("input",
+      state.input !== undefined ? state.input : part.input));
+    detail.appendChild(toolDetailLine("output",
+      state.output !== undefined ? state.output : part.output));
+    row.appendChild(toggle);
+    row.appendChild(detail);
+  }
+
+  /** One labelled tool input/output line; an unrecorded value is stated, never left blank. */
+  function toolDetailLine(label, value) {
+    var line = element("span", "tool-detail-line");
+    span(line, "tool-detail-key", label);
+    var text;
+    if (value === undefined || value === null) {
+      text = "not recorded";
+    } else if (typeof value === "string") {
+      text = value;
+    } else {
+      try { text = JSON.stringify(value); } catch (_error) { text = String(value); }
+    }
+    if (text.length > 400) text = text.slice(0, 400) + "…";
+    line.appendChild(element("span", "tool-detail-value", null, text));
+    return line;
   }
 
   /** Format a producer timestamp, or an honest arrival marker (never a fabricated clock). */
@@ -457,6 +499,125 @@
     var cell = run["spec.cell"];
     if (!cell || cell === "unknown" || cell === "none") return "";
     return String(cell);
+  }
+
+  // ── R4 detail affordances (build step 7): transcript · tools · diff ───────────────────────
+  //
+  // The synthesis turns R4 into a real session surface: a list+detail split whose DETAIL pane
+  // offers the selected run's transcript, its tool calls, and its change evidence. All three
+  // views read data the portal already serves — the module adds NO endpoint:
+  //   · transcript — the replayed+live worker stream (`GET /api/events/<cell_id>`), unchanged;
+  //   · tools      — that same stream, narrowed to `tool`/`tool_use` frames (the `data-tool`
+  //                  rows normalizeEvent builds) with the recorded input/output expandable;
+  //   · diff       — the recorded CHANGE evidence from the existing per-run read model
+  //                  (`GET /api/runs/<run_id>`). No git-patch route exists and none is added, so
+  //                  the view states that it renders recorded change receipts, never a patch.
+  // Switching a view never re-selects the run and never navigates the roster: the list (R2) is
+  // untouched and focus/scroll state in the other views survives (they stay in the DOM).
+
+  //: The legal detail views. An unknown value degrades to `transcript` (the default).
+  var DOCK_VIEWS = { transcript: true, tools: true, diff: true };
+  //: The run id whose change evidence the diff pane currently holds (cache key).
+  var changeRunId = null;
+
+  /** Switch the selected run's detail affordance and reflect it on `data-dock-view` + the tabs. */
+  function setDockView(view) {
+    if (!DOCK_VIEWS[view]) view = "transcript";
+    var worker = document.getElementById("dock-worker");
+    if (worker) worker.setAttribute("data-dock-view", view);
+    var tabs = document.querySelectorAll("#dock-views [data-dock-tab]");
+    Array.prototype.forEach.call(tabs, function (tab) {
+      tab.setAttribute("aria-selected",
+        tab.getAttribute("data-dock-tab") === view ? "true" : "false");
+    });
+    // The tools view is the ONE view that can legitimately be empty (a run that made no tool
+    // calls); it says so explicitly rather than presenting a blank pane as the whole truth.
+    var empty = document.getElementById("dock-tools-empty");
+    if (empty) {
+      var hasTools = document.querySelectorAll("#dock-event-feed [data-tool]").length > 0;
+      empty.hidden = !(view === "tools" && !hasTools);
+    }
+    // The diff pane is lazy: the existing per-run route is touched only when it is first shown.
+    if (view === "diff" && currentRun) loadChangeEvidence(currentRun);
+  }
+
+  /** One explicit change-evidence state line (loading / unavailable / none) — never a blank. */
+  function changeState(message) {
+    return element("p", "dock-change-state", { "data-change-state": "" }, message);
+  }
+
+  /**
+   * Read the selected run's recorded change evidence from the EXISTING per-run read model.
+   *
+   * The route is `GET /api/runs/<run_id>`; the row's `session.identity` IS the control run id
+   * (glance.py maps it at projection time). A row whose identity is `unknown`/`none` renders the
+   * explicit no-binding state instead of guessing an id and subscribing to the wrong run.
+   */
+  function loadChangeEvidence(run) {
+    var host = document.getElementById("dock-change");
+    if (!host) return;
+    var runId = run && run["session.identity"];
+    if (!runId || runId === "unknown" || runId === "none") {
+      changeRunId = null;
+      clear(host);
+      host.setAttribute("data-change-loaded", "false");
+      host.appendChild(changeState("no recorded run binding — change evidence unavailable"));
+      return;
+    }
+    if (changeRunId === runId && host.getAttribute("data-change-loaded") === "true") return;
+    changeRunId = runId;
+    host.setAttribute("data-change-loaded", "false");
+    clear(host);
+    host.appendChild(changeState("Loading recorded change evidence…"));
+    getJSON("/api/runs/" + encodeURIComponent(runId)).then(function (result) {
+      // A stale response for a run the operator has since left must not paint this dock.
+      if (!currentRun || currentRun["session.identity"] !== runId) return;
+      clear(host);
+      host.setAttribute("data-change-loaded", "true");
+      if (!result.ok) {
+        host.appendChild(changeState("Change evidence unavailable (HTTP " + result.status + ")"));
+        return;
+      }
+      if (result.data && result.data.error) {
+        host.appendChild(changeState("Change evidence unavailable: " + result.data.error));
+        return;
+      }
+      renderChangeEvidence(host, result.data || {});
+    });
+  }
+
+  /** The recorded change receipts: the candidate address, the gate verdicts, the commands. */
+  function renderChangeEvidence(host, data) {
+    var run = data.run || {};
+    host.appendChild(note("recorded change receipts — the portal renders no git patch"));
+    var address = element("div", "change-address", { "data-change-candidate": "" });
+    span(address, "change-key", "candidate");
+    span(address, "change-value",
+      run.candidate_sha ? String(run.candidate_sha) : "uncommitted");
+    host.appendChild(address);
+    var gates = data.gates || [];
+    if (!gates.length) {
+      host.appendChild(changeState("no gate verdicts recorded"));
+    } else {
+      gates.forEach(function (gate) {
+        var row = element("div", "change-row", { "data-change-kind": "gate" });
+        span(row, "change-key", gate.gate_id || "gate");
+        span(row, "change-value", stateText(gate.verdict) + " · " + stateText(gate.status));
+        host.appendChild(row);
+      });
+    }
+    var commands = data.commands || [];
+    if (!commands.length) {
+      host.appendChild(changeState("no command receipts recorded"));
+    } else {
+      commands.forEach(function (command) {
+        var receipt = String(command.receipt_json || "").trim() ? " · receipt" : "";
+        var row = element("div", "change-row", { "data-change-kind": "command" });
+        span(row, "change-key", command.verb || "command");
+        span(row, "change-value", stateText(command.state) + receipt);
+        host.appendChild(row);
+      });
+    }
   }
 
   // ── R4a address + R4d step timings ────────────────────────────────────────────────────────
@@ -653,17 +814,26 @@
   function renderDock(run, glance) {
     currentRun = run || null;
     if (!run) return;
+    // A new selection starts on the transcript with no stale change evidence from the last run.
+    changeRunId = null;
+    var change = document.getElementById("dock-change");
+    if (change) {
+      change.setAttribute("data-change-loaded", "false");
+      clear(change);
+    }
     renderAddress(run);
     renderActions(run);
     renderTimings(run);
     openWorkerStream(cellIdFor(run));
     loadTimingSample(run);
+    setDockView("transcript");
   }
 
   /** Called by app.js `closeDock`. */
   function onDockClose() {
     closeWorkerStream();
     currentRun = null;
+    changeRunId = null;
   }
 
   // ── Workbench panels ──────────────────────────────────────────────────────────────────────
@@ -2330,6 +2500,31 @@
         streamToggle.setAttribute("aria-pressed", paused ? "false" : "true");
         streamToggle.textContent = paused ? "Pause" : "Follow";
         if (list) list.setAttribute("data-feed-paused", paused ? "false" : "true");
+      });
+    }
+
+    // The detail-view tabs (transcript · tools · diff) switch the dock's affordance; a delegated
+    // listener keeps the tabs working after any dock re-render. No button navigates.
+    var views = document.getElementById("dock-views");
+    if (views) {
+      views.addEventListener("click", function (event) {
+        var tab = event.target.closest("[data-dock-tab]");
+        if (tab) setDockView(tab.getAttribute("data-dock-tab"));
+      });
+    }
+
+    // Expand/collapse a tool call's recorded input/output in place (the tools view).
+    var feed = document.getElementById("dock-event-feed");
+    if (feed) {
+      feed.addEventListener("click", function (event) {
+        var toggle = event.target.closest("[data-tool-toggle]");
+        if (!toggle) return;
+        var row = toggle.closest("[data-tool]");
+        var detail = row && row.querySelector("[data-tool-detail]");
+        if (!detail) return;
+        var open = toggle.getAttribute("aria-expanded") === "true";
+        toggle.setAttribute("aria-expanded", open ? "false" : "true");
+        detail.hidden = open;
       });
     }
   }

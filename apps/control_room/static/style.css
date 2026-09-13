@@ -1802,6 +1802,59 @@ body {
 [data-dock-region="worker"] .feed-list { max-height: 104px; padding: 0 12px; }
 .dock-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; padding: 4px 12px 6px; }
 
+/* Build step 7 — the dock detail-view switcher (transcript · tools · diff). The worker region
+   keeps its `data-dock-region`, so the parity gate's sub-region contract is unchanged; the
+   active view is carried by `data-dock-view` and only its pane is displayed. */
+.dock-views { display: flex; gap: 4px; padding: 2px 12px 0; }
+.dock-tab {
+  font: inherit; font-size: 10px; color: var(--muted);
+  background: transparent; border: 1px solid transparent; border-radius: 4px;
+  padding: 2px 8px; cursor: pointer;
+}
+.dock-tab:hover { color: var(--text); }
+.dock-tab[aria-selected="true"] {
+  color: var(--text); border-color: var(--line); background: var(--panel-2);
+}
+.dock-tab:focus-visible { outline: var(--focus-ring); outline-offset: 1px; }
+
+/* TRANSCRIPT vs TOOLS: the tools view narrows the SAME feed to `data-tool` rows; a tool row
+   wraps its expandable recorded input/output beneath the summary line. */
+[data-dock-region="worker"][data-dock-view="tools"] .feed-entry:not([data-tool]) { display: none; }
+.feed-entry[data-tool] { flex-wrap: wrap; white-space: normal; }
+.tool-toggle {
+  font: inherit; font-size: 9px; color: var(--machine);
+  background: transparent; border: 1px solid var(--line); border-radius: 3px;
+  padding: 0 5px; cursor: pointer;
+}
+.tool-toggle:focus-visible { outline: var(--focus-ring); outline-offset: 1px; }
+.tool-detail {
+  flex: 1 1 100%; display: flex; flex-direction: column; gap: 1px; padding: 2px 0 2px 18px;
+}
+.tool-detail[hidden] { display: none; }
+.tool-detail-line { display: flex; gap: 6px; font-size: 10px; }
+.tool-detail-key { flex: 0 0 auto; color: var(--dim); text-transform: uppercase; letter-spacing: 0.03em; }
+.tool-detail-value { color: var(--muted); overflow-wrap: anywhere; }
+
+/* DIFF: the recorded change evidence fetched from the existing per-run route. The live feed and
+   the action band belong to the transcript/tools views and are hidden while the diff is up. */
+[data-dock-region="worker"] .dock-change { display: none; }
+[data-dock-region="worker"][data-dock-view="diff"] .dock-change {
+  display: block; max-height: 150px; overflow: auto; padding: 4px 12px 8px;
+}
+[data-dock-region="worker"][data-dock-view="diff"] .feed-list,
+[data-dock-region="worker"][data-dock-view="diff"] .dock-actions,
+[data-dock-region="worker"][data-dock-view="diff"] .dock-empty { display: none; }
+.dock-change-state { margin: 2px 0; font-size: 10px; color: var(--muted); }
+.dock-change .panel-note { font-size: 10px; margin: 2px 0; }
+.change-address,
+.change-row {
+  display: flex; gap: 8px; font-family: var(--mono); font-size: 10px; color: var(--muted);
+}
+.change-key { flex: 0 0 96px; color: var(--dim); text-transform: uppercase; letter-spacing: 0.03em; }
+.change-value { color: var(--text); overflow-wrap: anywhere; }
+/* The tools-empty note is a real state line, shown only when the tools view has no frames. */
+.dock-empty { margin: 4px 12px; font-size: 10px; color: var(--muted); }
+
 /* R4c — the causal ladder keeps its own scroll; the wrapper scrolls with it. */
 [data-dock-region="evidence"] { flex: 1 1 auto; min-height: 0; overflow: auto; }
 [data-dock-region="evidence"] .evidence-ladder { overflow: visible; }
