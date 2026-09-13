@@ -2957,6 +2957,90 @@ def test_an_ok_phase_with_uncommitted_work_fails_loudly(tmp_path, monkeypatch):
     assert result.ok is False
 
 
+def test_partial_self_commit_with_failed_final_commit_is_not_adopted(tmp_path, monkeypatch):
+    """(Astra ae212a0 finding 4) a phase that self-commits PART of its work and then has the
+    runner's final commit rejected must NOT adopt the earlier partial HEAD as its outcome.
+
+    Real temp-git probe: the agent commits an initial part, writes the final deliverable, and
+    a pre-commit hook rejects the runner's final commit. The partial commit advances HEAD, so
+    the pre-fix commit block adopted it and skipped the dirty-tree check — reporting
+    ``ok=true`` over a still-uncommitted deliverable, the same loss class PR #49 set out to
+    eliminate. The fix verifies the intended final worktree state is clean BEFORE adopting:
+    here the deliverable remains, so the phase fails with the failed-commit reason preserved
+    and the earlier HEAD is not recorded.
+    """
+    monkeypatch.delenv("FINOPS_EMIT_SELF", raising=False)
+    monkeypatch.delenv("FINOPS_CELL_ID", raising=False)
+    _git_init(tmp_path)
+    spec = _emit_synth_spec([{"name": "p1", "kind": "agent", "prompt": "do p1"}])
+
+    def agent(prompt, *, model, backend, workdir, **kwargs):
+        wd = Path(workdir)
+        # (1) the agent self-commits an initial part of the work
+        (wd / "partial.txt").write_text("partial")
+        subprocess.run(["git", "add", "-A"], cwd=wd, check=True)
+        subprocess.run(
+            ["git", "commit", "-q", "-m", "[workflow] p1 — g"], cwd=wd, check=True
+        )
+        # (2) the agent writes the final deliverable, committed only by the runner
+        (wd / "deliverable.txt").write_text("final deliverable")
+        # (3) a pre-commit hook rejects the runner's final commit
+        hook = wd / ".git" / "hooks" / "pre-commit"
+        hook.write_text("#!/bin/sh\nexit 1\n")
+        hook.chmod(0o755)
+        return _fake_agent(files_created=["deliverable.txt"])
+
+    result = run_workflow(spec, goal="g", model="m", workdir=tmp_path, run_agentic_fn=agent)
+    phase = result.phases[0]
+
+    # not green over an uncommitted deliverable
+    assert phase.status == "failed"
+    assert result.ok is False
+    # the failed-commit reason is preserved, never a silent success
+    assert phase.commit_status.startswith("commit_failed:")
+    assert "COMMIT_SKIPPED" in phase.error
+    # the earlier partial HEAD is NOT adopted as the phase outcome
+    assert phase.commit_hash == ""
+    # the final deliverable is still present and still needs committing
+    assert (tmp_path / "deliverable.txt").exists()
+    status = subprocess.run(
+        ["git", "status", "--porcelain"], cwd=tmp_path, capture_output=True, text=True
+    ).stdout
+    assert "deliverable.txt" in status
+
+
+def test_clean_self_commit_is_adopted(tmp_path, monkeypatch):
+    """(Astra ae212a0 finding 4, direction b) the happy path still works: an agent that
+    commits ALL of its work leaves a clean tree, so its own HEAD IS adopted — adoption is
+    gated on the clean-tree verification, not removed."""
+    monkeypatch.delenv("FINOPS_EMIT_SELF", raising=False)
+    monkeypatch.delenv("FINOPS_CELL_ID", raising=False)
+    _git_init(tmp_path)
+    spec = _emit_synth_spec([{"name": "p1", "kind": "agent", "prompt": "do p1"}])
+    monkeypatch.setattr(workflow_runner, "_emit_self_finding", lambda *a, **k: None)
+
+    def agent(prompt, *, model, backend, workdir, **kwargs):
+        wd = Path(workdir)
+        (wd / "work.txt").write_text("agent's own committed work")
+        subprocess.run(["git", "add", "-A"], cwd=wd, check=True)
+        subprocess.run(
+            ["git", "commit", "-q", "-m", "[workflow] p1 — g"], cwd=wd, check=True
+        )
+        return _fake_agent()
+
+    result = run_workflow(spec, goal="g", model="m", workdir=tmp_path, run_agentic_fn=agent)
+    phase = result.phases[0]
+    assert phase.status == "ok"
+    assert phase.commit_hash  # the agent's own clean commit was adopted
+    assert phase.commit_status == ""
+    assert phase.error == ""
+    # the worktree is genuinely clean and represented by the adopted candidate
+    status = subprocess.run(
+        ["git", "status", "--porcelain"], cwd=tmp_path, capture_output=True, text=True
+    ).stdout
+    assert status.strip() == ""
+
+
 def test_commit_prefix_gate_is_merge_aware(tmp_path, monkeypatch):
     """Wave C follow-up: a phase that MERGES a branch is not charged with the merged
     lineage's commits (first-parent view); a direct nonconforming commit still fails."""
