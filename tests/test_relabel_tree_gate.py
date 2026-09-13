@@ -307,6 +307,24 @@ def test_relabel_without_approval_fails_with_identical_tree_proof(tmp_path, atte
     assert result.ok is False
 
 
+def _gate_diag(wd: Path, spec_name: str, ledger: Path) -> str:
+    """Diagnose why the relabel gate did not fire (used only in assertion messages).
+
+    The gate is silent by design when its (tree, branch) match finds nothing, so a CI-only
+    miss needs the raw comparison values in the failure output (2026-09-13).
+    """
+    from agentic_dynamics.runtime.workflow_runner import (
+        _git_tree_hash,
+        _worktree_branch,
+        load_discarded_trees,
+    )
+
+    return (
+        f"phase_tree={_git_tree_hash(wd)!r} branch={_worktree_branch(wd)!r} "
+        f"ledger={load_discarded_trees(spec_name, ledger_path=ledger)!r}"
+    )
+
+
 def test_relabel_with_operator_approval_passes(tmp_path, attempt_a_template):
     """The revamp2 replay, PASS direction: the same discarded tree re-presented, but the
     operator approved the reuse FIRST (an approval artifact committed before the phase, present
@@ -338,7 +356,7 @@ def test_relabel_with_operator_approval_passes(tmp_path, attempt_a_template):
     p = result.phases[0]
     assert p.status == "ok"  # the approved reuse keeps the phase ok
     gate = p.relabel_gate
-    assert gate is not None
+    assert gate is not None, _gate_diag(wd, spec.name, ledger)
     assert gate["reason"] == "APPROVED"
     assert gate["phase_tree"] == REVAMP2_TREE
     assert gate["approval"]["authorized"] is True
@@ -372,7 +390,7 @@ def test_approval_committed_during_the_phase_is_not_an_approval(tmp_path, attemp
         discarded_trees_ledger=ledger,
     )
     p = result.phases[0]
-    assert p.status == "failed"
+    assert p.status == "failed", f"status={p.status!r} error={p.error!r} {_gate_diag(wd, spec.name, ledger)}"
     assert "RELABEL" in p.error
     assert p.relabel_gate["approval"]["authorized"] is False
     assert p.relabel_gate["approval"]["present_at_pre_head"] is False
