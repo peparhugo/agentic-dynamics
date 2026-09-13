@@ -114,6 +114,10 @@ class SessionResult:
     confidence: float | None = None  # [H] execution-confidence signal (opencode.AgenticResult.confidence)
     answer_tokens: int = 0  # output tokens → deliverable (tool-call steps)
     explanation_tokens: int = 0  # output tokens → prose narration
+    # Provider/region dimension (d3 G-13). ``None`` = not measured for this session — honest
+    # absence, never a defaulted geography. A future writer populates it at session start; it
+    # then travels model → canonical story payload → sessions.parquet → ledger attempt.
+    region: str | None = None
     # Backend-reported token in/out split (additive to the flat ``total_tokens``), e.g.
     # ``{"in": 300, "out": 200}``. ``None`` = the backend reported no usage — the split is
     # coverage-not-available and the flat ``total_tokens`` remains the valid fallback.
@@ -151,6 +155,7 @@ class SessionResult:
             "confidence": self.confidence,
             "answer_tokens": self.answer_tokens,
             "explanation_tokens": self.explanation_tokens,
+            "region": self.region,
             "cost_source": self.cost_source,
             "estimation_method": self.estimation_method,
             "reported_cost_usd": self.reported_cost_usd,

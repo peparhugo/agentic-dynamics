@@ -53,6 +53,7 @@ from agentic_dynamics.knowledge.knowledge import (
 )
 from agentic_dynamics.knowledge.knowledge_ingestion import REPOSITORY_ID
 from agentic_dynamics.knowledge.record_factory import build_record as build_record_from_parts
+from agentic_dynamics.measurement.efficiency import energy_joules
 
 # ── Extractor contract constants ────────────────────────────────
 
@@ -201,6 +202,46 @@ def build_job_record(
 # ── Record construction: ledger_attempt / meta_session (one per session) ────
 
 
+def _measured_token(value: Any) -> int | None:
+    """``value`` as a non-negative token count, or ``None`` when it is not measured.
+
+    ``None``/missing/bool/negative and non-numeric values are unmeasured; a real ``0`` is a
+    measured zero and is preserved (it is the caller's job to decide whether a zero-only
+    reading is capturable).
+    """
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    n = int(value)
+    return n if n >= 0 else None
+
+
+def _session_energy(agentic: dict[str, Any]) -> tuple[float | None, float | None]:
+    """``(energy_total_j, energy_per_token)`` for one session's agentic block (d3 G-12).
+
+    Reuses the canonical ``measurement.efficiency.energy_joules`` (the single energy model)
+    and reads only measured token counts. **Unknown when no input is measured**: if none of
+    prompt/completion/reasoning tokens is a positive number, both values are ``None`` — an
+    absent reading is never a zero-joule session. This mirrors ``build_data._optional_economic``'s
+    "a 0.0 economic reading means not captured" convention (the Claude cells whose parser never
+    ran). ``energy_per_token`` is the realized J/token over the tokens the energy model prices
+    (prompt + completion + reasoning; cache tokens are not model compute), so it is ``None``
+    when that denominator is zero/unknown.
+    """
+    prompt = _measured_token(agentic.get("prompt_tokens")) or 0
+    completion = _measured_token(agentic.get("completion_tokens")) or 0
+    reasoning = _measured_token(agentic.get("reasoning_tokens")) or 0
+    if not any((prompt, completion, reasoning)):
+        return None, None
+    total_j = energy_joules(
+        prompt_tokens=prompt,
+        completion_tokens=completion,
+        reasoning_tokens=reasoning,
+    )
+    energy_tokens = prompt + completion + reasoning
+    per_token = round(total_j / energy_tokens, 6) if energy_tokens else None
+    return round(total_j, 2), per_token
+
+
 def build_attempt_record(
     story_result: dict[str, Any],
     session: dict[str, Any],
@@ -246,6 +287,8 @@ def build_attempt_record(
     authority = Authority.ADVISORY if is_meta else Authority.MEASURED
     evidence_class = "[H]" if is_meta else "[M]"
 
+    energy_total_j, energy_per_token = _session_energy(agentic)
+
     # Identity + the content-hash back-fill are the shared factory's job (record_factory).
     return build_record_from_parts(
         source_type=source_type,
@@ -264,6 +307,11 @@ def build_attempt_record(
             "test_executed_success": story_result.get("test_executed_success"),
             "confidence": confidence,
             "perturbation_strength": story_result.get("perturbation_strength"),
+            # G-12: the computed per-attempt energy (None when no token input was measured).
+            "energy_total_j": energy_total_j,
+            "energy_per_token": energy_per_token,
+            # G-13: the session's provider/region dimension — None when not measured.
+            "region": session.get("region"),
         },
         now=now,
     )

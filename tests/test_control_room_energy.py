@@ -24,6 +24,8 @@ from agentic_dynamics.measurement.efficiency import (  # noqa: E402
     ENERGY_PER_OUTPUT_TOKEN,
     ENERGY_PER_PROMPT_TOKEN,
     ENERGY_PER_REASONING_TOKEN,
+    compute_efficiency,
+    energy_joules,
 )
 
 _NOW = "2026-09-12T12:00:00+00:00"
@@ -75,3 +77,20 @@ def test_absent_published_data_is_a_named_unknown():
     assert payload["epm"]["state"] == "unknown"
     assert payload["energy_ranking"]["state"] == "unknown"
     assert payload["energy_ranking"]["class"] == "[C]/[X]"
+
+
+def test_energy_joules_is_the_single_formula_behind_compute_efficiency():
+    """G-12: the ledger writer's per-session energy reuses the ONE energy formula.
+
+    ``energy_joules`` must equal the ``total_energy_j`` ``compute_efficiency`` publishes, so a
+    session's ledger energy can never fork from the model the projection reads.
+    """
+    kwargs = {"prompt_tokens": 4000, "completion_tokens": 1200, "reasoning_tokens": 300}
+    assert energy_joules(**kwargs) == compute_efficiency(
+        provider="deepseek", model="deepseek-v4-pro", **kwargs
+    ).total_energy_j
+    assert energy_joules(**kwargs) == (
+        4000 * ENERGY_PER_PROMPT_TOKEN
+        + 1200 * ENERGY_PER_OUTPUT_TOKEN
+        + 300 * ENERGY_PER_REASONING_TOKEN
+    )

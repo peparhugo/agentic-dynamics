@@ -7,12 +7,18 @@ no-session fallback (Finding 4) and gap (b)'s ``meta_*`` classification (Finding
 """
 
 import hashlib
+import json
 
 import pytest
 
 from agentic_dynamics.knowledge import ledger_ingestion as li
 from agentic_dynamics.knowledge.knowledge import Authority
 from agentic_dynamics.knowledge.knowledge_ingestion import record_to_artifact
+from agentic_dynamics.measurement.efficiency import (
+    ENERGY_PER_OUTPUT_TOKEN,
+    ENERGY_PER_PROMPT_TOKEN,
+    ENERGY_PER_REASONING_TOKEN,
+)
 
 
 def _story_result(**overrides) -> dict:
@@ -230,3 +236,67 @@ def test_build_job_record_raises_without_story_id():
 
 def test_derive_ledger_records_skips_missing_story_id_instead_of_raising():
     assert li.derive_ledger_records(_story_result(story_id=""), _opencode_session_row(), {}) == []
+
+
+# ── G-12: measured per-attempt energy ────────────────────────────
+
+
+def _attempt(story_result, row=None):
+    records = li.derive_ledger_records(story_result, row, {})
+    return next(r for r in records if r.source_type == "ledger_attempt")
+
+
+def test_attempt_carries_measured_energy_from_token_counts():
+    """G-12: the canonical ENERGY_PER_* model is applied to the session's measured tokens."""
+    attempt = _attempt(_story_result(), _opencode_session_row())
+    expected_j = (
+        4000 * ENERGY_PER_PROMPT_TOKEN
+        + 1200 * ENERGY_PER_OUTPUT_TOKEN
+        + 300 * ENERGY_PER_REASONING_TOKEN
+    )
+    assert attempt.energy_total_j == round(expected_j, 2)
+    assert attempt.energy_per_token == round(expected_j / (4000 + 1200 + 300), 6)
+    # The measured fields are on the durable artifact (the ledger the room reads).
+    artifact = json.loads(record_to_artifact(attempt).decode("utf-8"))
+    assert artifact["energy_total_j"] == attempt.energy_total_j
+    assert artifact["energy_per_token"] == attempt.energy_per_token
+
+
+def test_attempt_energy_is_unknown_when_no_token_input_is_measured():
+    """An absent token reading is an unknown, never a fabricated zero-joule session."""
+    story = _story_result()
+    story["sessions"][0]["agentic"] = {}
+    attempt = _attempt(story, _opencode_session_row())
+    assert attempt.energy_total_j is None
+    assert attempt.energy_per_token is None
+    # The unknown is omitted from the artifact, so an unmeasured record keeps its prior bytes
+    # (no re-key from the schema addition).
+    assert "energy_total_j" not in record_to_artifact(attempt).decode("utf-8")
+
+
+def test_attempt_energy_is_unknown_when_all_token_counts_are_zero():
+    """An all-zero reading is 'not captured' (the economic-capture convention), not 0.0 J."""
+    story = _story_result()
+    story["sessions"][0]["agentic"] = {
+        "prompt_tokens": 0,
+        "completion_tokens": 0,
+        "reasoning_tokens": 0,
+        "total_tokens": 0,
+    }
+    attempt = _attempt(story, _opencode_session_row())
+    assert attempt.energy_total_j is None
+    assert attempt.energy_per_token is None
+
+
+# ── G-13: the region session dimension ───────────────────────────
+
+
+def test_attempt_carries_region_when_measured_and_absent_otherwise():
+    story = _story_result()
+    attempt = _attempt(story, _opencode_session_row())
+    assert attempt.region is None  # honest absence, never a defaulted geography
+
+    story["sessions"][0]["region"] = "eu-central-1"
+    attempt = _attempt(story, _opencode_session_row())
+    assert attempt.region == "eu-central-1"
+    assert json.loads(record_to_artifact(attempt).decode("utf-8"))["region"] == "eu-central-1"

@@ -253,7 +253,12 @@ def test_ledger_knowledge_ids_are_byte_identical_to_pre_refactor():
     records = li.derive_ledger_records(story_result, row, {}, now=NOW)
     assert [r.knowledge_id for r in records] == [
         "df1b13f1efa4a33f3bf2103b3e0872cddb395de9428a8bff8fb62388b10eb6fd",  # ledger_job
-        "d0aa8e680312606eee6d136e0ff832379f7d89a9dd40c9b3c6ce671ba65be642",  # ledger_attempt
+        # ledger_attempt moved in the G-12 writer wave: the record now carries the measured
+        # per-attempt energy (energy_total_j / energy_per_token, d3 G-12), so its content hash
+        # — and therefore its content-addressed knowledge_id — deliberately advances for any
+        # attempt whose token counts are measured. The byte-identity guard itself is unchanged:
+        # the same input still yields this id deterministically.
+        "651b6027f161d78102826bddae064a4e0102c9f90cb7665bbeeefe00191496b4",  # ledger_attempt
     ]
 
 

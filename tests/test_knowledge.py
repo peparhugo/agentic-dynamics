@@ -250,6 +250,26 @@ def test_record_round_trip_preserves_optionals_and_enums():
     assert restored.symbols == ["a", "b"]
 
 
+def test_record_energy_and_region_are_optional_and_omit_when_absent():
+    """G-12/G-13: the new fields are optional; absent values are omitted, never re-keyed."""
+    bare = _record()
+    assert bare.energy_total_j is None
+    assert bare.energy_per_token is None
+    assert bare.region is None
+    # Unmeasured fields are omitted from the dict/artifact, so a pre-existing record's bytes
+    # (and therefore its content_hash/knowledge_id) are unchanged by the schema addition.
+    assert "energy_total_j" not in bare.to_dict()
+    assert "energy_per_token" not in bare.to_dict()
+    assert "region" not in bare.to_dict()
+    assert KnowledgeRecord.from_dict(bare.to_dict()) == bare
+
+    measured = _record(energy_total_j=737.0, energy_per_token=0.141731, region="eu-central-1")
+    restored = KnowledgeRecord.from_dict(measured.to_dict())
+    assert restored == measured
+    assert restored.to_dict()["energy_total_j"] == 737.0
+    assert restored.to_dict()["region"] == "eu-central-1"
+
+
 def test_record_from_dict_accepts_lowercase_authority():
     d = _record().to_dict()
     d["authority"] = "source"

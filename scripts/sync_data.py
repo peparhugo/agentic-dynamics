@@ -55,6 +55,9 @@ SESSION_SCHEMA = pa.schema(
         pa.field("condition", pa.string()),
         pa.field("session_number", pa.int32()),
         pa.field("task_type", pa.string()),
+        # Provider/region dimension (d3 G-13). Nullable: NULL = not measured for this session
+        # (honest absence), never a defaulted geography.
+        pa.field("region", pa.string()),
         pa.field("model", pa.string()),
         pa.field("prompt_tokens", pa.int64()),
         pa.field("completion_tokens", pa.int64()),
@@ -223,6 +226,9 @@ def _build_rows(tables) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
                     "condition": condition,
                     "session_number": s.get("session_number", 0),
                     "task_type": s.get("task_type", ""),
+                    # G-13: the session's provider/region dimension; None when unmeasured
+                    # (the parquet column is nullable — NULL, never a fabricated region).
+                    "region": s.get("region"),
                     "model": model,
                     "prompt_tokens": a.get("prompt_tokens", 0) or 0,
                     "completion_tokens": a.get("completion_tokens", 0) or 0,

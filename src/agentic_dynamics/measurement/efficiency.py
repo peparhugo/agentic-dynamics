@@ -326,6 +326,26 @@ class EfficiencyMetrics:
         }
 
 
+def energy_joules(
+    *,
+    prompt_tokens: int = 0,
+    completion_tokens: int = 0,
+    reasoning_tokens: int = 0,
+) -> float:
+    """The canonical per-attempt energy (J) from measured token counts.
+
+    The ONE place the ``ENERGY_PER_*`` constants are combined. ``compute_efficiency`` and the
+    ledger writer (``knowledge.ledger_ingestion``) both call it, so a session's energy can
+    never fork from the model that publishes ``ENERGY_PER_*``. Cache tokens carry no separate
+    energy constant in this model and are not counted (they are not model compute).
+    """
+    return (
+        prompt_tokens * ENERGY_PER_PROMPT_TOKEN
+        + completion_tokens * ENERGY_PER_OUTPUT_TOKEN
+        + reasoning_tokens * ENERGY_PER_REASONING_TOKEN
+    )
+
+
 def compute_efficiency(
     prompt_tokens: int = 0,
     completion_tokens: int = 0,
@@ -380,7 +400,11 @@ def compute_efficiency(
     m.energy_input_j = prompt_tokens * ENERGY_PER_PROMPT_TOKEN
     m.energy_output_j = completion_tokens * ENERGY_PER_OUTPUT_TOKEN
     m.energy_reasoning_j = reasoning_tokens * ENERGY_PER_REASONING_TOKEN
-    m.total_energy_j = m.energy_input_j + m.energy_output_j + m.energy_reasoning_j
+    m.total_energy_j = energy_joules(
+        prompt_tokens=prompt_tokens,
+        completion_tokens=completion_tokens,
+        reasoning_tokens=reasoning_tokens,
+    )
 
     # Solution density — the ratios are None when their denominator is uncaptured (a run with
     # zero tokens / zero cost / zero energy), never a fabricated 0.0 or a ``max(denom, tiny)``

@@ -13,11 +13,15 @@ re-deriving one:
 * **narration** — the answer/explanation token split: ``explanation_ratio =
   explanation_tokens / (answer_tokens + explanation_tokens)``. Absent tokens stay ``None``,
   never 0.
+* **flail** — the G-05 measurement rule from ``measurement.flail``: a session that changed no
+  files and wrote no code (``code_lines == 0 and files_changed == 0``), aggregated per model
+  with coverage first. The rule is derived over the canonical story session rows, so the block
+  is measured (``[C]``) rather than a no-writer unknown.
 
 The coverage discipline (d3 §9, "coverage before ratio") is structural: every metric carries
 its ``n_total`` / ``n_eligible`` / ``coverage`` before any ratio, a zero denominator yields
 ``None`` with a named reason (never ``0.0``), and a field with no writer is rendered as an
-explicit unknown (``flail``, G-05) rather than inferred.
+explicit unknown rather than inferred.
 
 Builders are pure over injected inputs; ``load_workflow_attempts`` is the module's only IO.
 """
@@ -28,6 +32,7 @@ from collections import defaultdict
 from pathlib import Path
 from typing import Any
 
+from agentic_dynamics.measurement import flail as flail_rule
 from agentic_dynamics.reporting.grit_metric import (
     MIN_CELLS_FOR_RATE,
     collect_cells,
@@ -47,12 +52,12 @@ DEFINITIONS: dict[str, str] = {
     "narration": (
         "explanation_ratio = explanation_tokens / (answer_tokens + explanation_tokens)"
     ),
-    "flail": "no named field exists (G-05) — reported as an explicit unknown, never inferred",
+    "flail": flail_rule.FLAIL_DEFINITION,
 }
 
 #: Per-metric evidence classes: grit is measured ([M], the cells are measured verdicts),
-#: the ratios are computed over measured fields ([C]).
-EVIDENCE = {"grit": "[M]", "first_pass": "[M]", "narration": "[C]", "flail": "[M]"}
+#: the ratios — including flail — are computed over measured fields ([C]).
+EVIDENCE = {"grit": "[M]", "first_pass": "[M]", "narration": "[C]", "flail": flail_rule.EVIDENCE_CLASS}
 
 
 def load_workflow_attempts(results_dir: Path) -> tuple[list[dict[str, Any]], int]:
@@ -168,6 +173,31 @@ def _narration_block(cells: list[dict[str, Any]]) -> dict[str, Any]:
     return block
 
 
+def _flail_block(metrics: flail_rule.FlailMetrics) -> dict[str, Any]:
+    """The G-05 flail block for one model, coverage before ratio.
+
+    The raw ``flail_rate`` from the measurement rule is reported only with at least
+    ``MIN_CELLS_FOR_RATE`` eligible sessions (the shared small-sample rule); below that it is
+    ``None`` with a named reason, never an under-powered proportion presented as a rate.
+    """
+    sufficient = metrics.n_eligible >= MIN_CELLS_FOR_RATE
+    block: dict[str, Any] = {
+        "definition": DEFINITIONS["flail"],
+        "evidence_class": EVIDENCE["flail"],
+        "n_total": metrics.n_total,
+        "n_eligible": metrics.n_eligible,
+        "coverage": metrics.coverage,
+        "flail_sessions": metrics.flail_sessions,
+        "flail_rate": metrics.flail_rate if sufficient else None,
+        "insufficient_support": not sufficient,
+    }
+    if not sufficient:
+        block["reason"] = metrics.reason or (
+            f"fewer than {MIN_CELLS_FOR_RATE} eligible sessions"
+        )
+    return block
+
+
 def build_model_quality(
     findings: list[dict[str, Any]],
     stories: list[dict[str, Any]],
@@ -187,11 +217,16 @@ def build_model_quality(
     for row in attempts:
         by_model_attempts[_model_short(row.get("model", ""))].append(row)
 
-    models = sorted(set(by_model_cells) | set(by_model_attempts))
+    by_model_sessions: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    for row in flail_rule.flatten_story_sessions(stories):
+        by_model_sessions[_model_short(row.get("model", ""))].append(row)
+
+    models = sorted(set(by_model_cells) | set(by_model_attempts) | set(by_model_sessions))
     model_blocks: list[dict[str, Any]] = []
     for model in models:
         model_cells = by_model_cells.get(model, [])
         model_attempts = by_model_attempts.get(model, [])
+        model_sessions = by_model_sessions.get(model, [])
 
         by_strength: dict[float, list[dict[str, Any]]] = defaultdict(list)
         for cell in model_cells:
@@ -223,13 +258,7 @@ def build_model_quality(
                 },
                 "first_pass": _first_pass_block(model_attempts),
                 "narration": _narration_block(model_cells),
-                "flail": {
-                    "definition": DEFINITIONS["flail"],
-                    "evidence_class": EVIDENCE["flail"],
-                    "state": "unknown",
-                    "reason": "no_writer",
-                    "gap": "G-05",
-                },
+                "flail": _flail_block(flail_rule.compute_flail(model_sessions)),
             }
         )
 
@@ -245,6 +274,7 @@ def build_model_quality(
             "excluded_cells": sum(exclusions.values()),
             "exclusions": exclusions,
             "n_attempt_rows": len(attempts),
+            "n_session_rows": sum(len(v) for v in by_model_sessions.values()),
         },
         "models": model_blocks,
         "degraded": [],
