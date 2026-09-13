@@ -217,7 +217,7 @@ def test_git_tree_hash_excludes_approvals_and_matches_plain_when_absent(tmp_path
     wd.mkdir()
     (wd / "work.txt").write_text("fresh work")
     _git_init(wd)
-    _git("add", "-Af", cwd=wd)
+    _git("add", "-A", cwd=wd)
     _git("commit", "-qm", "seed", cwd=wd)
     plain = _git("rev-parse", "HEAD^{tree}", cwd=wd).stdout.strip()
     assert _git_tree_hash(wd) == plain
@@ -225,7 +225,7 @@ def test_git_tree_hash_excludes_approvals_and_matches_plain_when_absent(tmp_path
     ap = wd / "approvals" / "relabel_gate_test"
     ap.mkdir(parents=True)
     (ap / "scope_tree_reuse.md").write_text(_approval_text(plain))
-    _git("add", "-Af", cwd=wd)
+    _git("add", "-A", cwd=wd)
     _git("commit", "-qm", "approval", cwd=wd)
     assert _git("rev-parse", "HEAD^{tree}", cwd=wd).stdout.strip() != plain
     assert _git_tree_hash(wd) == plain
@@ -239,7 +239,7 @@ def test_record_and_load_discarded_tree_round_trip_and_dedup(tmp_path):
     wd.mkdir()
     (wd / "work.txt").write_text("attempt A work")
     _git_init(wd)
-    _git("add", "-Af", cwd=wd)
+    _git("add", "-A", cwd=wd)
     _git("commit", "-qm", "attempt A", cwd=wd)
     ledger = tmp_path / "discarded_trees.jsonl"
 
@@ -369,7 +369,7 @@ def test_relabel_with_operator_approval_passes(tmp_path, attempt_a_template):
     ap = wd / "approvals" / spec.name
     ap.mkdir(parents=True)
     (ap / "scope_tree_reuse.md").write_text(_approval_text(REVAMP2_TREE))
-    _git("add", "-Af", cwd=wd)
+    _git("add", "-A", cwd=wd)
     _git("commit", "-qm", "operator approval", cwd=wd)
 
     def agent(prompt, *, model, backend, workdir, **kwargs):
@@ -408,7 +408,7 @@ def test_approval_committed_during_the_phase_is_not_an_approval(tmp_path, attemp
         ap = Path(workdir) / "approvals" / spec.name
         ap.mkdir(parents=True)
         (ap / "scope_tree_reuse.md").write_text(_approval_text(REVAMP2_TREE))
-        subprocess.run(["git", "add", "-Af"], cwd=workdir, check=True)
+        subprocess.run(["git", "add", "-A"], cwd=workdir, check=True)
         subprocess.run(
             ["git", "commit", "-q", "-m", "[workflow] scope — g"],
             cwd=workdir, check=True,
@@ -466,7 +466,7 @@ def _approved_unit(tmp_path, **approval_overrides) -> tuple[Path, str, str]:
     wd.mkdir()
     (wd / "work.txt").write_text("x")
     _git_init(wd)
-    _git("add", "-Af", cwd=wd)
+    _git("add", "-A", cwd=wd)
     _git("commit", "-qm", "seed", cwd=wd)
     tree = _git("rev-parse", "HEAD^{tree}", cwd=wd).stdout.strip()
     ledger = tmp_path / "discarded_trees.jsonl"
@@ -498,7 +498,7 @@ def test_approval_authorizes_only_when_all_contract_fields_hold(tmp_path):
     ap = wd / "approvals" / "relabel_gate_test"
     ap.mkdir(parents=True)
     (ap / "scope_tree_reuse.md").write_text(_approval_text(tree))
-    _git("add", "-Af", cwd=wd)
+    _git("add", "-A", cwd=wd)
     _git("commit", "-qm", "approval", cwd=wd)
     pre_head = _git("rev-parse", "HEAD", cwd=wd).stdout.strip()
     authorized, evidence = approval_authorizes_tree(
@@ -509,7 +509,7 @@ def test_approval_authorizes_only_when_all_contract_fields_hold(tmp_path):
 
     # (3) placeholder signature → refused
     (ap / "scope_tree_reuse.md").write_text(_approval_text(tree, operator="your name"))
-    _git("add", "-Af", cwd=wd)
+    _git("add", "-A", cwd=wd)
     _git("commit", "-qm", "placeholder", cwd=wd)
     pre_head = _git("rev-parse", "HEAD", cwd=wd).stdout.strip()
     authorized, evidence = approval_authorizes_tree(
@@ -520,7 +520,7 @@ def test_approval_authorizes_only_when_all_contract_fields_hold(tmp_path):
 
     # (4) wrong tree → refused
     (ap / "scope_tree_reuse.md").write_text(_approval_text("0" * 40))
-    _git("add", "-Af", cwd=wd)
+    _git("add", "-A", cwd=wd)
     _git("commit", "-qm", "wrong tree", cwd=wd)
     pre_head = _git("rev-parse", "HEAD", cwd=wd).stdout.strip()
     authorized, evidence = approval_authorizes_tree(
@@ -531,7 +531,7 @@ def test_approval_authorizes_only_when_all_contract_fields_hold(tmp_path):
 
     # (5) wrong phase → refused
     (ap / "scope_tree_reuse.md").write_text(_approval_text(tree, phase="other_phase"))
-    _git("add", "-Af", cwd=wd)
+    _git("add", "-A", cwd=wd)
     _git("commit", "-qm", "wrong phase", cwd=wd)
     pre_head = _git("rev-parse", "HEAD", cwd=wd).stdout.strip()
     authorized, evidence = approval_authorizes_tree(
@@ -542,7 +542,7 @@ def test_approval_authorizes_only_when_all_contract_fields_hold(tmp_path):
 
     # (6) no date → refused
     (ap / "scope_tree_reuse.md").write_text(_approval_text(tree, date=""))
-    _git("add", "-Af", cwd=wd)
+    _git("add", "-A", cwd=wd)
     _git("commit", "-qm", "no date", cwd=wd)
     pre_head = _git("rev-parse", "HEAD", cwd=wd).stdout.strip()
     authorized, evidence = approval_authorizes_tree(
@@ -563,7 +563,7 @@ def test_approval_without_pre_head_is_refused(tmp_path):
     ap = wd / "approvals" / "relabel_gate_test"
     ap.mkdir(parents=True)
     (ap / "scope_tree_reuse.md").write_text(_approval_text("0" * 40))
-    _git("add", "-Af", cwd=wd)
+    _git("add", "-A", cwd=wd)
     _git("commit", "-qm", "approval", cwd=wd)
     tree = _git("rev-parse", "HEAD^{tree}", cwd=wd).stdout.strip()
     authorized, evidence = approval_authorizes_tree(
@@ -655,7 +655,7 @@ def test_discard_tree_script_records_a_real_discard(tmp_path):
     wd.mkdir()
     (wd / "work.txt").write_text("about to be discarded")
     _git_init(wd)
-    _git("add", "-Af", cwd=wd)
+    _git("add", "-A", cwd=wd)
     _git("commit", "-qm", "attempt A", cwd=wd)
     ledger = tmp_path / "discarded_trees.jsonl"
 
