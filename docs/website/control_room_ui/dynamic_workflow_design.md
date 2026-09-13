@@ -9,9 +9,22 @@ status: accepted
 **Question it answers:** what workflow *shape* should run the `a1` decomposition (and future design
 work) — a question-driven, self-evolving tree selected by information gain, layered for parallel
 processing, with acceptance gates — **without inventing machinery the compiler does not have**?
-**Companion:** `docs/website/control_room_ui/facelift_task_plan.md` (a1) is the first tree this
+**Companions:** `docs/website/control_room_ui/facelift_task_plan.md` (a1) is the first tree this
 shape grows; `docs/reviews/control_room_facelift_adversarial.md` (a3) is the proof that the
 adversarial loop attacks questions and acceptance, not only answers.
+
+---
+
+## Brief coverage — where each required element is answered
+
+| The brief asks for | Section |
+|---|---|
+| **TASK UNIT** — question + acceptance + kill-criterion; "small" as the one-session bound; expansion into a sub-tree | §1 |
+| **LAYERS** — intent → structure → behavior → verification → presentation; parallel fan-out; cross-layer `requires`/`produces` | §2 |
+| **DRIVE** — next question by information gain; the compiler's adapt strategies; `StopSpec` as the brake | §3 |
+| **SELF-EVOLUTION** — emit (answer, new questions, uncertainty delta); child-spec generation + admission; the minimal new machinery | §4 |
+| **ADVERSARIAL LOOP** — attack the question and the acceptance; findings are corrections | §5 |
+| **WORKED EXAMPLE** — a 10–15 question tree for *this* facelift | §6 |
 
 ---
 
@@ -25,9 +38,15 @@ most. This is novelty/complexity-seeking behaviour, and it is exactly the inform
 loop the repository already names (`agent_config/rules.md`: instrument → derive → write policy →
 grid → campaign → repeat).
 
-The design below keeps the metaphor as the *drive* and the compiler as the *substrate*. **No node in
-the tree is free-form prose.** Every node is a question with a named acceptance and a kill
-criterion, and every edge is a `requires`/`produces` edge the compiler already validates.
+The design keeps the metaphor as the *drive* and the compiler as the *substrate*. **No node in the
+tree is free-form prose.** Every node is a question with a named acceptance and a kill criterion,
+and every edge is a `requires`/`produces` edge the compiler already validates.
+
+The one sentence to hold onto:
+
+> **A tree of executable questions whose next move is chosen by how much its answer would change
+> our uncertainty, and whose every node must survive an adversary that attacks the question before
+> anyone pays to answer it.**
 
 ---
 
@@ -55,12 +74,24 @@ Question:
   source:         "a1:F06"                 # who emitted it (for self-evolved nodes)
 ```
 
+The three fields that make this a *protocol* and not a to-do list:
+
+- **`acceptance`** is exactly one named gate — a test target, a render-gate fixture, or a measured
+  diff. A gate that cannot be written down is not an acceptance.
+- **`kill_criterion`** is what would prove the question *wrong* (not merely unanswered). It is the
+  unit the adversary attacks and the unit that disposes a rejected idea.
+- **`uncertainty`** is the drive's input (§3). It is a *posterior* the moment the acceptance has
+  run, and a sentinel `1.0` while it has been instrumented but not yet answered.
+
 ### 1.1 "Small" is now a two-part bound
 
 1. **One session** produces the artifact (a1's bound).
 2. **One named gate** can turn green *and can turn red on a seeded violation.* A gate that cannot
    fail is not an acceptance (this is the a3 adversary's first attack: "acceptance that can pass
    vacuously").
+
+Both parts are required. Part 1 alone admits a one-session task with no checkable answer; part 2
+alone admits a check that spans a week. The conjunction is what "small" means here.
 
 ### 1.2 How a question expands into a sub-tree
 
@@ -80,13 +111,25 @@ one acceptance because the gate has nine independent holes (a6 G-1/G-3/G-5/G-6/G
 G-15). It expands into `Q11a` (uniqueness/overflow/legibility) and `Q11b` (value/fixture semantics),
 each with its own seeded-bad fixture. The plan ships this split (a1 §3, F01a/F01b).
 
+**The split is the *only* legal expansion.** A question may not expand into "do part of it" — the
+children must each be independently gated, and the parent stays `open` until all children are green
+or killed. This is what keeps the tree convergent (§7): expansion adds gates, never prose.
+
 ---
 
-## 2. Layers and parallel fan-out
+## 2. Layers, fan-out, and how cross-layer edges are typed
 
-The a1 layer grammar (`intent → structure → behavior → verification → presentation`) is the
-tree's depth axis. Two rules govern concurrency:
+The a1 layer grammar (`intent → structure → behavior → verification → presentation`) is the tree's
+**abstraction/typing axis** — the vocabulary used to *name* and *group* questions. It is **not a
+topological order and not a scheduling lane.**
 
+This distinction matters because the a1 plan's true frontier is `F01a/F01b` — **verification**
+questions — even though no pixels exist yet. An intent question (`Q1`) needs the class-B scorecard
+that a verification question (`Q12`) produces; if layers were a barrier, the first admissible
+question would be the last one that can run. So:
+
+- **The layer label is a name, not a gate.** A question is admissible exactly when its `requires`
+  are satisfied (§3's hard readiness filter), regardless of layer.
 - **Same-layer siblings fan out.** They have no `requires` edge between them, so they run in
   parallel (the existing queue: `enqueue.py` → `worker.py`, N concurrent workers). `Q3 (R0)`,
   `Q4 (row)`, `Q5 (inbox)` are independent structure questions and fan out together.
@@ -95,31 +138,45 @@ tree's depth axis. Two rules govern concurrency:
   `RuleSpec.requires`/`produces` gate (`src/agentic_dynamics/experiment/experiment_spec.py:899-963`)
   is the mechanism: `requires` a field a sibling has not `produces` yet → the arm is refused.
 
+### 2.1 Which questions may run in parallel at each layer
+
+| Layer | The question shape | Parallel set at this layer | Cross-layer `requires` it consumes |
+|---|---|---|---|
+| **intent** | *what operator question must this answer?* | all intent questions with satisfied deps | the acceptance gate a lower layer produces (e.g. the scorecard) |
+| **structure** | *what regions/objects/selectors carry the answer?* | independent regions (R0, R1, R2, R3, R4) | intent's acceptance; produces DOM selectors |
+| **behavior** | *what happens on state change / interaction?* | independent mechanics (announcer, filters, pause, steer) | structure selectors |
+| **verification** | *what fixture and gate prove it?* | independent gate holes (`Q11a`/`Q11b`, classes, fixtures) | behavior's transition semantics |
+| **presentation** | *does it read under load and in forced-colors?* | token/theme questions | structure + verification |
+
 ```text
 intent      Q1 thesis-recognized        Q2 disposition-reconciled
-              │                          │
+               │                          │
 structure     ├─ Q3 R0 truth ──┐         ├─ Q6 R4c ladder
-              ├─ Q4 row identity ─┬──────┘
-              └─ Q5 inbox expand ─┘
+               ├─ Q4 row identity ─┬──────┘
+               └─ Q5 inbox expand ─┘
 behavior      Q7 announcer   Q8 counts-filter   Q9 pause-confirmed   Q10 steer-receipt
-              │              │                  │                    │
-verification  Q11 gate-holes  Q12 test-classes  Q13 forcing-fixtures
+               │              │                  │                    │
+verification  Q11a gate-holes  Q11b value-semantics  Q12 test-classes  Q13 forcing-fixtures
 presentation  Q14 tokens
 ```
 
-The DAG is **layer-major**: a layer only opens when the previous layer's frontier is answered or
-parked. This is not a constraint the compiler imposes — it is a scheduling choice the drive
-(§3) makes because a behavior question with an unanswered structure dependency scores low.
+The arrows are `requires` edges, not drawing order. In the diagram, `Q1` (intent) depends on
+`Q11a/Q11b/Q12` (verification) via the scorecard, so the first admissible frontier is verification —
+exactly as the a1 plan states ("F01–F03 are the true frontier, even though they deliver no pixels").
 
-### 2.1 Cross-layer edges are `requires`/`produces`, never hand-waving
+### 2.2 Cross-layer edges are `requires`/`produces`, never hand-waving
 
 | From (layer) | Produces | Consumed by | Compiler representation |
 |---|---|---|---|
 | intent | the acceptance + kill criterion | structure | `RuleSpec(name=…, plane=control, requires=[…])` |
 | structure | `[data-region]`/`[data-answer]` selectors | behavior | a measurement rule producing the selector field |
 | behavior | transition/act semantics | verification | a control rule whose `requires` name the behavior signal |
-| verification | a green/red gate | presentation | the gate result as the accepted-outcome field |
+| verification | a green/red gate | intent + presentation | the gate result as the accepted-outcome field |
 | presentation | theme/contrast state | verification | the style gate's own class |
+
+**Why not just let the queue run everything at once?** Because a behavior question with an
+unanswered structure dependency scores low on the drive anyway (§3), so it is never selected; the
+readiness filter makes that starvation explicit and deterministic instead of accidental.
 
 ---
 
@@ -127,7 +184,8 @@ parked. This is not a constraint the compiler imposes — it is a scheduling cho
 
 The next question is chosen by a **novelty score**, not by document order. The score reuses the
 compiler's declared selection strategies verbatim (`AdaptSpec.selection`,
-`experiment_spec.py:39`):
+`src/agentic_dynamics/experiment/experiment_spec.py:627-640`; the closed set is
+`ADAPT_SELECTIONS` at `experiment_spec.py:39`):
 
 **Readiness is a hard filter, not a score term.** Before any scoring, the candidate set is
 
@@ -153,25 +211,40 @@ next = the unique argmax; remaining ties broken by (layer order, question id) fo
 `AdaptSpec.strategy` remains the mode switch: `coordinate_descent` runs the loop unattended;
 `manual` freezes the candidate set to the controller-pinned frontier.
 
-- **Posterior uncertainty** (a3 `W-2`). `uncertainty(q)` is defined as a *posterior*, not the raw
-  `RuleResult.uncertainty` sentinel: it is `1.0` only while the acceptance is **instrumented but
-  unanswered**, and it falls to `RuleResult.uncertainty` once the acceptance has run. An
-  **unimplemented** acceptance rule never sits in the candidate set — the question first expands
-  into instrumentation children, which are the thing that can reach `uncertainty ≤ threshold`. This
-  is what makes the loop convergent instead of selecting `1.0` forever.
-- `regret(q)` / `effect(q)` come from `compare_arms` over the answered sub-tree
-  (`compile_experiment.py:166-316`); a question whose answer flips the best arm has high regret.
+### 3.1 What `uncertainty` actually is (the convergence fix)
 
-**The convergence brake is `StopSpec`** (`experiment_spec.py:602-623`):
+`uncertainty(q)` is a **posterior**, not the raw `RuleResult.uncertainty` sentinel. The compiler's
+`RuleResult` already distinguishes *how* a rule result was obtained — `state ∈ {measured,
+unmeasured, unimplemented}` (`compile_experiment.py:322-342`):
+
+- **`measured`** — the acceptance ran; the posterior is the rule's own uncertainty.
+- **`unmeasured`** — the rule is implemented but the attempts lacked its inputs; uncertainty is
+  `1.0`, and the question **is** admissible (it is instrumented, just awaiting data).
+- **`unimplemented`** — the producer is declared but no implementation is registered; this question
+  is **inadmissible** and must first expand into instrumentation children.
+
+This is what makes the loop convergent instead of selecting `1.0` forever: an uninstrumented
+acceptance never sits in the candidate set at `1.0`; it expands until each leaf can actually be
+measured. An answered question falls to `RuleResult.uncertainty` and eventually below threshold.
+
+`regret(q)` / `effect(q)` come from `compare_arms` over the answered sub-tree
+(`compile_experiment.py:166-316`); a question whose answer flips the best arm has high regret.
+
+### 3.2 The convergence brakes
+
+The brief names **budget, attempts, time**. Two of these live in `StopSpec`
+(`experiment_spec.py:602-623`); time is enforced by the runner wall, and this design says so
+honestly rather than pretending `StopSpec` owns it:
 
 | Brake | Field | Behaviour |
 |---|---|---|
-| spend | `budget_usd` | no child spec is admitted without a lease once the campaign budget is consumed |
-| attempts | `max_attempts` | a question that exhausts attempts is `parked`, not retried forever |
-| uncertainty | `uncertainty_threshold` | when `next`'s uncertainty is below the threshold, the tree converges and the `writeup` phase runs |
+| spend | `StopSpec.budget_usd` | no child spec is admitted without a lease once the campaign budget is consumed |
+| attempts | `StopSpec.max_attempts` | a question that exhausts attempts is `parked`, not retried forever |
+| uncertainty | `StopSpec.uncertainty_threshold` | when `next`'s uncertainty is below the threshold, the tree converges and the `writeup` phase runs |
+| **time** | per-phase `timeout` + `run_workflow.py --phase-watchdog-min` | a phase that burns its wall is recorded as `timed_out` (a `PhaseResult` truth, `runtime/workflow_runner.py:229-234`); a campaign that overruns its deadline parks the frontier rather than spending unbounded |
 
-`uncertainty_threshold` is **declared and validated today but consumed nowhere**
-(`experiment_spec.py:608`); §6 names consuming it as the one small addition, not a new mechanism.
+`StopSpec.uncertainty_threshold` is **declared and validated today but consumed nowhere**
+(`experiment_spec.py:608`); §4.1 names consuming it as the one small addition, not a new mechanism.
 
 ---
 
@@ -185,22 +258,27 @@ cells → execute → measure → compare → writeup → adapt
                                    └──── feedback ──┘   (compile_experiment.py:96: adapt → cells)
 ```
 
-1. **Emit.** A phase's `PhaseResult` currently carries no structured question fields; its only
-   narrative carrier is `final_response` and a single `confidence` scalar
-   (`runtime/workflow_runner.py:216-392`). The minimal emission contract is therefore:
+1. **Emit.** A phase's `PhaseResult` today carries no structured question fields; its narrative
+   carriers are `final_response` and a single `confidence` scalar
+   (`runtime/workflow_runner.py:282-283`). The minimal emission contract is therefore:
    - the phase definition (already a free-form `phase_def` dict) gains optional
      `question`, `acceptance`, `kill_criterion`, `conclusion` keys;
-   - `workflow_runner` records them on `PhaseResult` and in the `step_attempts` row it already writes
-     (`runtime/workflow_runner.py:1265-1308`);
+   - `workflow_runner` records them on `PhaseResult` (which its `to_dict` serializes into the run
+     ledger); handing them to the control db's `step_attempts` would need a schema change and is a
+     named follow-up, **not** claimed as existing (the `step_attempts` table at
+     `control/control_db.py:957-976` has no such columns; the injected `PhaseEvidence` recorder at
+     `runtime/phase_evidence.py:116-154` carries `gates`, not questions);
    - **emission stops at the phase result / ledger by default.** An open question is neither a
      measured finding nor verified (a3 `W-5`), so it must not enter the knowledge stream with
      `MEASURED` authority. If a question is deliberately registered, it does so through the existing
      producer with an explicit `ADVISORY` source_type and a `causes` link to the observation that
-     raised it; the existing `conclusion` slot
-     (`knowledge/knowledge_ingestion.py:485`) is reused, not extended.
+     raised it; the existing `conclusion` slot (`knowledge/knowledge_ingestion.py:485`) is reused,
+     not extended. The authority split is already implemented:
+     `MEASURED` iff `test_executed_success` is a real bool, else `ADVISORY`
+     (`knowledge/knowledge_ingestion.py:526-540`).
 2. **Measure.** `evaluate_rules` maps attempts → `RuleResult`s; each open question's acceptance
-   rule yields an uncertainty. `compare_arms` yields regret/effect.
-3. **Select.** `select_next_question(...)` (the `adapt` executor, §6) scores the open set.
+   rule yields a posterior uncertainty. `compare_arms` yields regret/effect.
+3. **Select.** `select_next_question(...)` (the `adapt` executor, §4.1) scores the open set.
 4. **Generate + admit.** A selected question compiles to a child `ExperimentSpec` (same
    `compile_spec` DAG, `compile_experiment.py:88-97`) and is **authored by default** (controller
    decision D5/W1): the drive ranks, the controller writes or approves the child. If a future
@@ -214,8 +292,8 @@ cells → execute → measure → compare → writeup → adapt
    **Lease shape** (a3 `W-7`): children reserve against the **campaign** lease; the parent's already
    reserved amount is not double-counted, and an exhausted campaign lease denies the child. The
    parent is settled once (`settlement` status `matched`), so the campaign's cost is counted once.
-5. **Converge.** When `select_next_question` returns `None` (below threshold, or budget/attempts
-   exhausted), the campaign's `writeup` runs and the tree closes.
+5. **Converge.** When `select_next_question` returns `None` (below threshold, or budget/attempts/
+   time exhausted), the campaign's `writeup` runs and the tree closes.
 
 ### 4.1 Exactly what is new (the honest gap list)
 
@@ -225,13 +303,19 @@ gap it closes* — here is the complete list, each located inside an existing mo
 | New thing | Gap it closes | Where it lives |
 |---|---|---|
 | `select_next_question(questions, *, selection, budget, attempts, threshold) -> Question \| None` — **ranks** the open set (children authored by default) | `AdaptSpec.selection` and `StopSpec.uncertainty_threshold` are validated but have **no consumer**; the `adapt` phase has no executor | `src/agentic_dynamics/experiment/compile_experiment.py` (the module that owns the `adapt` phase) |
-| optional `question`/`acceptance`/`kill_criterion`/`conclusion` phase keys + recording on `PhaseResult` | no structured question/acceptance/kill/uncertainty on a phase result; only `final_response` | `runtime/workflow_runner.py` (recording) + `experiment_spec.py` (validation of the keys) |
+| optional `question`/`acceptance`/`kill_criterion`/`conclusion` phase keys + recording on `PhaseResult` | no structured question/acceptance/kill/uncertainty on a phase result; only `final_response`/`confidence` | `runtime/workflow_runner.py` (recording) + `experiment_spec.py` (validation of the keys, alongside the existing `deploy_allowed`/`checkpoint`/`no_emit` phase markers at `experiment_spec.py:1108-1149`) |
 | reuse of the `conclusion` slot in `emit_phase_finding` (ADVISORY only; a question is never a measured finding) | the slot is read but never set | `knowledge/knowledge_ingestion.py:485` (existing consumer, no change to the producer) |
+| persist question fields into `control_db.step_attempts` | **not added by default** — the phase result carries them; a control-db column/JSON field is a bounded follow-up with a migration, named so a future enablement cannot under-build it | `control/control_db.py` + `control/phase_evidence.py` (if ever enabled) |
 | **auto-generation** of child specs (lifecycle index write, parent/child lineage, budget carry-over) | **not added by default** — authoring children is the controller's act; the surface is named in §4 so a future enablement cannot under-build it | `scripts/spec_status.py` + the run ledger + `control.admission` (if ever enabled) |
 
 **Not added:** no new CLI entry point (an existing `agentic-dynamics experiment run` drives it), no
-new persistence plane (the ledger/`step_attempts` carry it), no second queue, no new lease kind, and
-no new node/envelope type in the knowledge stream.
+new persistence plane (the run ledger carries the phase result), no second queue, no new lease kind,
+no new node/envelope type in the knowledge stream, and no runtime adversary scheduler (§5).
+
+**Why a questionnaire function is the right size of addition.** The tree's *drive* is a pure
+selection over already-measured signals; it needs a home to be executable, and the `adapt` phase is
+that home. Everything else the brief asks for (edges, brakes, emission, admission, transport) is
+authored data over machinery the compiler already ships.
 
 ---
 
@@ -251,10 +335,17 @@ is paid for:
 The a3 artifact (`docs/reviews/control_room_facelift_adversarial.md`) is the manual instance of this
 loop: its rows carry severity, the flawed claim/question, the required correction, and the
 acceptance that proves the correction. **The loop is a static, authored phase — exactly the `a3`
-phase the existing spec declares — never a runtime scheduler** (a3 `W-3`): no code path constructs an
-adversary session, and no phase auto-launches an adversary on another phase's output. This keeps the
-portal and the campaign at zero *unnecessary* model spend while still attacking questions before
+phase the existing spec declares — never a runtime scheduler** (a3 `W-3`): no code path constructs
+an adversary session, and no phase auto-launches an adversary on another phase's output. This keeps
+the portal and the campaign at zero *unnecessary* model spend while still attacking questions before
 their answers are paid for.
+
+**Where the loop sits in the tree.** The adversary is not a leaf question and not a per-node hook —
+it is a *review layer* that can be scheduled against any node's emitted
+`(question, acceptance, kill_criterion, conclusion)` tuple. In the facelift workflow it runs as
+`a3_adversarial` over both a1 and a2; a future campaign can instantiate the same shape per
+structure layer without new machinery, because the emitted tuple already carries everything the
+attack table consumes.
 
 ---
 
@@ -265,7 +356,7 @@ five v2 conflicts plus the a6 gate misses, so the tree cannot regrow a rejected 
 
 | Q | Layer | Question | Acceptance (named gate) | Kill criterion | a1 task | Uses (external) |
 |---|---|---|---|---|---|---|
-| Q1 | intent | Does the resting screen communicate the run-first thesis to a stranger? | blind-comprehension scorecard (class B) | a generic-dashboard comparator passes all five §4.2 sentences | F02 (+ first-wave gate) | v2 C12 zero-terminal/rendered proof |
+| Q1 | intent | Does the resting screen communicate the run-first thesis to a stranger? | blind-comprehension scorecard (class B) | a generic-dashboard comparator passes all five direction §4.2 sentences | F02 (+ first-wave gate) | v2 §4.2 C12 |
 | Q2 | intent | Which v1 proposals survive reconciliation with the direction? | v2 §6 table, each row statused | a proposal not in the direction is scheduled as-is | this plan §0 | v2 §5 |
 | Q3 | structure | Can R0 answer `ON-G1`/`ON-G6` with no KPI tile row? | render gate `ON-G1`/`ON-G6` + no-tile assertion | a `.stat-tile` appears in R0 | F07 | v2 T2/T3 |
 | Q4 | structure | Does the row keep the E10 identity+lease+claim/proof contract on mobile? | mobile blind-comprehension fixture + G-13 row values incl. `spec/cell` | any identity field is ellipsised on mobile | F11 | v2 O2/O4 |
@@ -275,17 +366,19 @@ five v2 conflicts plus the a6 gate misses, so the tree cannot regrow a rejected 
 | Q8 | behavior | Do counts filter with a refresh-age caveat (no stale delta)? | gate G-14 + click-through + stale fixture | a bare delta renders from a stale poll | F08 | v2 T3/T4/A-6 |
 | Q9 | behavior | Is approval-pause a confirmed controller act, never automatic? | no unconfirmed pause path + receipt | any threshold auto-steers | F10 | v2 C4/A-4 |
 | Q10 | behavior | Does a steer/reply show target/scope/reversibility + receipt? | authority test + receipt fixture | an unguarded terminal write appears | F20 | v2 H2/A-12 |
-| Q11 | verification | Can the gate no longer pass on a seeded-bad fixture? | seeded-bad fixtures make the gate exit 1 | a gate hole survives | F01/F01a/F01b | a6 G-1…G-15 |
-| Q12 | verification | Do all four canonical test classes exist? | `--a11y` green + a schema-valid `b_comprehension.json` | DOM presence is treated as a pass | F02 | direction §18.5 |
+| Q11a | verification | Can the gate no longer pass on a duplicate/overwritten selector, an overflowing answer, or a clipped label? | seeded-bad fixture set makes the gate exit 1 | a gate hole survives | F01a | a6 G-1/G-3/G-5/G-6 |
+| Q11b | verification | Can the gate no longer pass on a value that disagrees with its fixture? | seeded-bad fixture (wrong `ON-G4`, wrong buckets, duplicate writer) exits 1 | a gate hole survives | F01b | a6 G-10/G-11/G-13/G-14/G-15 |
+| Q12 | verification | Do all four canonical test classes exist and fail on a seeded violation? | `--a11y` green + a schema-valid `b_comprehension.json` with a seeded miss | DOM presence is treated as a pass | F02 | direction §18 gate order |
 | Q13 | verification | Do the forcing fixtures exist? | each fixture renders its distinguishing field | empty fixtures pass | F03 | v2 C7/C11 |
 | Q14 | presentation | Do the tokens hold forced-colors + the restraint budget? | `--style`/`--a11y` in 3 themes + no-pulse assertion | decorative pulse/glow returns | F25 | v2 §4.3 |
 
 **The tree's first move** (readiness filter, then `highest_uncertainty`): `Q1` requires the class-B
 scorecard that `Q12` produces, so `Q1` is **not in the candidate set** until the verification layer
-lands. The frontier is therefore the verification questions `{Q11, Q12, Q13}`, all at posterior
-uncertainty `1.0`; `Q11` (the gate's ability to fail) is the prerequisite for `Q12`/`Q13`, so it is
-attended first, then `Q12`/`Q13`. Once the gate and scorecard are green, `Q1` enters the candidate
-set and is selected; then the structure frontier `{Q3,Q4,Q5,Q6}` fans out. That is the a1 first wave
+lands. The frontier is therefore the verification questions `{Q11a, Q11b, Q12, Q13}`, all at
+posterior uncertainty `1.0`; `Q11a`/`Q11b` (the gate's ability to fail) are the prerequisites for
+`Q12`/`Q13`, so they are attended first (they are the two a1 splits with independent seeded-bad
+fixtures), then `Q12`/`Q13`. Once the gate and scorecard are green, `Q1` enters the candidate set
+and is selected; then the structure frontier `{Q3,Q4,Q5,Q6}` fans out. That is the a1 first wave
 `{F01a,F01b,F02,F04,F07,F11}` passing through the tree's own selection rule — the plan and the drive
 agree, and no ad-hoc tie-break is needed.
 
@@ -293,6 +386,12 @@ agree, and no ad-hoc tie-break is needed.
 one row without overflow, `Q4` expands into `Q4a` (two-line identity band) and `Q4b` (row-lease
 compaction); the parent is `open` until both leaves are green. The overflow measurement is the
 `produces` that makes `Q4b`'s acceptance concrete.
+
+**How the tree proves it is self-evolving, not a relabelled a1.** The a1 plan is a flat table with a
+drawn DAG; the tree is the same content with a *selection function* over it, and the first move it
+derives (verification first) is not the a1 table's row order. The a2 design is falsified if replaying
+its selection rule on the a1 table ever picks a question whose `requires` are not green, or if the
+derived first wave differs from `{F01a,F01b,F02,F04,F07,F11}`.
 
 ---
 
@@ -305,11 +404,12 @@ compaction); the parent is `open` until both leaves are green. The overflow meas
 | **Budget burn** | the drive keeps selecting high-effect but low-value questions | `budget_usd` + admission lease; high regret with no owner is a kill, not a spend |
 | **Vacuous acceptance** | a gate that cannot fail | every acceptance names a seeded violation (a3's first attack) |
 | **Authority drift** | a question quietly expands the mutation surface | the adversary checks for new route classes / auto-actuation; direction §12.2 is the fence |
-| **Unmeasured `requires`** | a control question consumes a signal no rule produces | `validate_rules` refuses it (`experiment_spec.py:948-952`) — the compiler is the guard |
+| **Unmeasured `requires`** | a control question consumes a signal no rule produces | `validate_rules` refuses it (`experiment_spec.py:899-963`) — the compiler is the guard |
+| **Wall-clock runaway** | a phase spins past its window and is counted as success | `PhaseResult.timed_out` is a runner truth (`workflow_runner.py:229-234`); the watchdog parks the frontier |
 
 ---
 
-## 8. What already exists vs the three additions (contract table)
+## 8. What already exists vs what is new (contract table)
 
 | Capability | Status | Anchor |
 |---|---|---|
@@ -318,10 +418,10 @@ compaction); the parent is `open` until both leaves are green. The overflow meas
 | 7-phase DAG + `adapt → cells` feedback | **WRITTEN** | `compile_experiment.py:35,88-97` |
 | factorial fan-out (`experiment_matrix`) | **WRITTEN** | `compile_experiment.py:108-129` |
 | regret/effect (`compare_arms`) | **WRITTEN** | `compile_experiment.py:166-316` |
-| per-rule uncertainty (`RuleResult`) | **WRITTEN** | `compile_experiment.py:322-342` |
-| `AdaptSpec` strategy/selection | **declared + validated, no consumer** | `experiment_spec.py:38-39,1090-1097` |
-| `StopSpec.uncertainty_threshold` | **declared, no consumer** | `experiment_spec.py:608` |
-| structured question/acceptance/kill on a phase result | **ABSENT** | `runtime/workflow_runner.py:216-392` |
+| per-rule uncertainty + `state` (`RuleResult`) | **WRITTEN** | `compile_experiment.py:322-342` |
+| `AdaptSpec` strategy/selection | **declared + validated, no consumer** | `experiment_spec.py:627-640`, `:39`, `:1090-1097` |
+| `StopSpec.uncertainty_threshold` | **declared, no consumer** | `experiment_spec.py:602-623` |
+| structured question/acceptance/kill on a phase result | **ABSENT** | `runtime/workflow_runner.py:216-400` |
 | emission of new questions/conclusion | **slot exists, never set** | `knowledge/knowledge_ingestion.py:485` |
 | child-spec generation from selection | **ABSENT** | — |
 | question-level adversary | **manual instance only** (a3 / this workflow) | — |
@@ -338,9 +438,11 @@ compaction); the parent is `open` until both leaves are green. The overflow meas
   phase, not a new object family.
 - **The edge is the gate.** `requires`/`produces` already refuses an unwritable policy arm; the tree
   inherits that refusal as its correctness property.
-- **The brake is `StopSpec`.** Budget/attempts/threshold already exist.
+- **The brake is `StopSpec` plus the runner wall.** Budget/attempts/threshold already exist; time is
+  the existing phase timeout/watchdog, named rather than invented.
 - **The transport is the queue.** Children are admitted by the lease gate and drained by the
   existing workers.
+- **The adversary is an authored phase.** It is data in the workflow spec, not a scheduling loop.
 
 If a future session wants a runtime self-generating campaign, the only missing piece is the
 `adapt` executor named in §4.1; everything else is authored data.
@@ -363,10 +465,11 @@ If a future session wants a runtime self-generating campaign, the only missing p
 | a3 | Status | Resolution in this design |
 |---|---|---|
 | W-1 new-mechanism surface | **accepted** | Children are **authored by default**; the auto-generation surface (lifecycle index, lineage, budget carry-over) is enumerated in §4.1 so a future enablement cannot under-build it. |
-| W-2 non-convergence | **accepted** | Uncertainty is re-defined as a **posterior**; an unimplemented acceptance expands into instrumentation children instead of scoring `1.0` forever (§3). |
+| W-2 non-convergence | **accepted** | Uncertainty is a **posterior**; an `unimplemented` acceptance expands into instrumentation children instead of scoring `1.0` forever; `unmeasured` is admissible, `unimplemented` is not (§3.1, using `RuleResult.state`). |
 | W-3 runtime adversary | **accepted** | The adversarial loop is a **static authored phase**; no code path launches an adversary session (§5). |
 | W-4 incommensurable score | **accepted** | Weighted sum replaced with a **lexicographic** order over the declared strategies, with deterministic tie-breaks (§3). |
-| W-5 knowledge-authority pollution | **accepted** | Emission stops at the phase result/ledger; KB entry only as explicit `ADVISORY` with a `causes` link (§4 step 1). |
+| W-5 knowledge-authority pollution | **accepted** | Emission stops at the phase result/ledger; KB entry only as explicit `ADVISORY` with a `causes` link; the authority split is already implemented (`MEASURED` iff `test_executed_success` is a bool) (§4). |
 | W-6 readiness tie-break | **accepted** | Readiness is a **hard admissibility filter** before scoring; no depth heuristic (§3, §6). |
 | W-7 budget ownership | **accepted** | Children reserve against the **campaign** lease; the parent reservation is not double-counted and settles once (§4 step 4). |
+| W-8 "time" not in `StopSpec` | **accepted** | The brief's third brake is named honestly as the runner wall (phase `timeout` + watchdog), not smuggled into `StopSpec` (§3.2). |
 | W-1 (auto-gen) | **accepted (deferred)** | Auto-generation is not enabled by default; decision W1 owns it. |
