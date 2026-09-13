@@ -637,16 +637,46 @@ body {
   color: var(--machine);
 }
 
-/* The left status rail's glyph (shape + word, never colour alone). */
+/* The left status rail IS the state language (synthesis v2 §5.2): the glyph and the word are
+   both visible, and `data-state` (set from the lifecycle token) supplies the colour. Each tone
+   maps to one accent, and the glyph shapes stay distinct, so every state survives forced-colors
+   and a colour-blind reader — colour is never the only carrier. */
 .row-status {
   flex: 0 0 auto;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
   font-family: var(--mono);
-  font-size: 11px;
   color: var(--muted);
 }
+.row-status-glyph { font-size: 12px; line-height: 1; }
+.row-status-word { font-size: 10px; letter-spacing: 0.04em; text-transform: uppercase; }
 .row-status[data-state="live"] { color: var(--machine); }
+.row-status[data-state="blocked"],
 .row-status[data-state="failed"] { color: var(--bad); }
-.row-status[data-state="waiting"] { color: var(--machine); }
+.row-status[data-state="waiting"] { color: var(--operator); }
+.row-status[data-state="done"] { color: var(--ok); }
+/* idle / stopped / unknown share the neutral ink: their glyph shape (`○` / `⊘` / `?`), never an
+   unavailable hue, keeps them apart. `--muted` (not `--dim`) is the floor — dim would fall below
+   4.5:1 at this size on the dark surface. */
+.row-status[data-state="idle"],
+.row-status[data-state="stopped"],
+.row-status[data-state="unknown"] { color: var(--muted); }
+
+/* The settled marker: the lifecycle's last RECORDED change and its age, beside the state. It is
+   a NON-FIELD affordance, so the exact 16-field row schema (render-gate G-13) is untouched. */
+.row-settled {
+  flex: 0 0 auto;
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+/* A stale row recedes (direction §3.1 liveness dim). The opacity is mild on purpose: at 0.8 the
+   muted/warn values still clear 4.5:1 against the panel, so dimming a row never makes its own
+   values unreadable. Dimming is a recorded-age verdict (data-stale), never a fabricated one. */
+.run-row[data-stale="true"] { opacity: 0.8; }
+.run-row[data-stale="true"] .row-settled { color: var(--warn); }
 
 /* Move 6 — the lease headroom bar attached to the row. Reserved vs hard cap fills the track;
    state (ok/warn/over) is carried by data-budget-state and the cost field's reserved/cap pair,
@@ -1421,10 +1451,22 @@ body {
 
 /* ── Motion: state transitions only, and collapse under reduced-motion ─────────────────── */
 
+/* State arrival: a finite highlight, never a repeating pulse (direction §11 forbids decorative
+   pulse). The keyed reconciler creates or replaces a row ONLY when its data changed, so this
+   animation marks a genuine state transition — a no-op poll reuses the live node and animates
+   nothing. Stale rows are excluded so their dimming is never animated. */
+@keyframes row-arrive {
+  from { opacity: 0.4; }
+  to   { opacity: 1; }
+}
+
 @media (prefers-reduced-motion: no-preference) {
   .run-row, .attention-item {
     transition: border-color var(--motion-state) var(--motion-ease),
                 background-color var(--motion-state) var(--motion-ease);
+  }
+  .run-row[data-live="live"]:not([data-stale="true"]) {
+    animation: row-arrive var(--motion-state) var(--motion-ease);
   }
 }
 

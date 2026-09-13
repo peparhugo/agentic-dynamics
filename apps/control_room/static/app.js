@@ -41,6 +41,18 @@
  *       marks and `decision.receipt`; `openDock` builds the causal ladder, the typed address and
  *       the bounded follow/pause attempt feed.
  *         selector: `.run-row[data-run-id] .row-evidence [data-evidence-class="measured"]`
+ *
+ * ── state language (s2; synthesis v2 §5.2) ────────────────────────────────────────────────────
+ * Every run row renders the packet's lifecycle as glyph + word + colour + a settled timestamp:
+ * `LIFECYCLE_TOKENS` maps the RunState enum to an operator token (an unmapped enum degrades to
+ * `unknown` — never a guess), `.row-status[data-state]` carries the colour (styled in style.css),
+ * and the NON-FIELD `.row-settled` marker carries the last recorded change plus its age
+ * (`data-settled-at` / `data-age-seconds`, or the literal `settled unknown`). The per-run
+ * `attention.state` is read from the packet and clamped to `active|none` — never derived, never
+ * an invented `unknown`. The roster is triage-ranked (failures and blocked work lead, then the
+ * in-flight fleet, then settled), and a row whose RECORDED age passes the stale floor carries
+ * `data-stale="true"` and dims. Only genuine live transitions animate, and the whole layer
+ * collapses under `prefers-reduced-motion`.
  */
 "use strict";
 
@@ -245,6 +257,135 @@
     return String(value === undefined || value === null ? "unknown" : value).split("/").pop();
   }
 
+  // ── State language (one vocabulary, never colour alone) ────────────────────────────────
+  //
+  // Synthesis v2 §5.2 (the reconciliation of the v1 "state as colour and rhythm" idea): state is
+  // glyph + word + colour + a settled timestamp — colour is never the sole carrier and rhythm is
+  // not identity. This map is the ONE translation from the packet's RunState enum to the
+  // operator-facing token. It is total over the enum the control database enforces
+  // (`control_db.py:140-182`); anything the map does not know — an enum a future producer adds —
+  // degrades to the explicit `unknown` token rather than a guessed word (openhands O1: degrade on
+  // unknown, never throw), and never to a fabricated reassuring state.
+  //
+  //   token.tone  — the presentation key (`data-state`); CSS supplies the colour, so the state
+  //                 survives forced-colors and a colour-blind reader.
+  //   token.rank  — the roster's triage order (direction §3.1: failures first, then running/
+  //                 queued, then settled). Lower leads.
+  var LIFECYCLE_TOKENS = {
+    queued:            { word: "queued",     glyph: "\u25CC", tone: "idle",    rank: 2 },
+    running:           { word: "working",    glyph: "\u25D0", tone: "live",    rank: 2 },
+    verifying:         { word: "verifying",  glyph: "\u25D0", tone: "live",    rank: 2 },
+    promoting:         { word: "promoting",  glyph: "\u25D0", tone: "live",    rank: 2 },
+    projecting:        { word: "projecting", glyph: "\u25D0", tone: "live",    rank: 2 },
+    // `awaiting_approval` is a DESIGNED stop, not a failure: the human owes a decision, so it
+    // leads the roster beside a failure rather than waiting in the settled tail.
+    awaiting_approval: { word: "blocked",    glyph: "\u00D7", tone: "blocked", rank: 1 },
+    promotable:        { word: "ready",      glyph: "\u25B8", tone: "waiting", rank: 1 },
+    merged:            { word: "merged",     glyph: "\u2713", tone: "done",    rank: 3 },
+    published:         { word: "published",  glyph: "\u2713", tone: "done",    rank: 3 },
+    failed:            { word: "failed",     glyph: "\u2715", tone: "failed",  rank: 0 },
+    cancelled:         { word: "cancelled",  glyph: "\u2298", tone: "stopped", rank: 4 },
+    quarantined:       { word: "quarantined", glyph: "\u2298", tone: "stopped", rank: 4 },
+  };
+
+  //: The explicit degradation token — what an unmapped lifecycle renders, never a guess.
+  var UNKNOWN_LIFECYCLE = { word: "unknown", glyph: "?", tone: "unknown", rank: 5 };
+
+  //: A row is stale when its last recorded lifecycle change is older than this ([H] 15 min — the
+  //: same order as the run heartbeat/watchdog floor). Staleness is only ever asserted from a
+  //: RECORDED timestamp; an unknown age is never treated as stale (absence of evidence is not
+  //: evidence of age).
+  var ROW_STALE_SECONDS = 900;
+
+  /** Resolve one packet lifecycle value to its operator token (unknown degrades, never throws). */
+  function lifecycleToken(state) {
+    return LIFECYCLE_TOKENS[String(state)] || UNKNOWN_LIFECYCLE;
+  }
+
+  /**
+   * The packet's per-run attention axis, read VERBATIM and clamped to its closed vocabulary.
+   *
+   * The projection emits exactly `active` or `none` (`glance.py:568`); this axis is NOT the
+   * client's to derive, and `unknown` is deliberately not a member. A value the packet never sent
+   * must not make the room claim an attention state it did not observe, so anything that is not
+   * the literal `active` renders `none` — the packet's own word for "no attention". (The honest
+   * `unknown` lives on the LIFECYCLE axis, which has its own explicit degradation token.)
+   */
+  function attentionToken(value) {
+    return String(value) === "active" ? "active" : "none";
+  }
+
+  /**
+   * The roster's triage rank: lower leads. Failures first, then the blocked/ready work that needs
+   * a human, then the in-flight fleet, then settled runs, then stopped/unknown ones. A live
+   * attention mark lifts an otherwise-in-flight row into the decision group. Ties keep the
+   * packet's own order (a stable sort), so ranking never reshuffles rows the projection ordered.
+   */
+  function triageRank(run) {
+    var token = lifecycleToken(run["lifecycle.state"]);
+    if (run["attention.state"] === "active" && token.rank > 1) return token.rank - 1;
+    return token.rank;
+  }
+
+  /** A stable copy of the roster in triage order (attention first, then in-flight, then settled). */
+  function rankRoster(runs) {
+    return runs.slice().sort(function (a, b) {
+      return triageRank(a) - triageRank(b);
+    });
+  }
+
+  /**
+   * The most recent RECORDED lifecycle timestamp on a run, in epoch ms, or `null` when none was
+   * recorded. The packet's `run.events` is the run's real control-record history (attempts, gate
+   * verdicts, approvals, command receipts — `glance.py:473-532`); its newest timestamp is the
+   * latest provable state change. A packet-provided `lifecycle.changed_at` is honoured too, so a
+   * projection that later stamps the exact transition time wins without a client change.
+   */
+  function settledMs(run) {
+    var latest = timestampMs(run["lifecycle.changed_at"]);
+    var events = Array.isArray(run["run.events"]) ? run["run.events"] : [];
+    events.forEach(function (event) {
+      var ms = timestampMs(event && event.ts);
+      if (ms !== null && (latest === null || ms > latest)) latest = ms;
+    });
+    return latest;
+  }
+
+  /** A short, stable age label (`42s` / `12m` / `3h` / `2d`) — never a raw second count. */
+  function compactAge(seconds) {
+    if (seconds < 60) return seconds + "s";
+    if (seconds < 3600) return Math.floor(seconds / 60) + "m";
+    if (seconds < 86400) return Math.floor(seconds / 3600) + "h";
+    return Math.floor(seconds / 86400) + "d";
+  }
+
+  /**
+   * The run's settled marker: the last recorded lifecycle change, its age, and whether the row has
+   * aged past the stale floor. No recorded timestamp is the literal `unknown` (never a fabricated
+   * `0s`), and an unknown age is never stale.
+   */
+  function settledFacets(run) {
+    var ms = settledMs(run);
+    if (ms === null) {
+      return {
+        iso: null,
+        age: null,
+        stale: false,
+        text: "settled unknown",
+        title: "no recorded lifecycle change for this run",
+      };
+    }
+    var age = Math.max(0, Math.floor((Date.now() - ms) / 1000));
+    var iso = new Date(ms).toISOString();
+    return {
+      iso: iso,
+      age: age,
+      stale: age > ROW_STALE_SECONDS,
+      text: "settled " + compactAge(age),
+      title: "lifecycle last changed " + iso + " (" + compactAge(age) + " ago)",
+    };
+  }
+
   /**
    * One agent-run OBJECT (Move 1, Move 4, Move 6): the 16-field schema split across three
    * declared lines with the agent/session identity band first, a paired ADVISORY/MEASURED
@@ -280,6 +421,13 @@
     var lifecycle = run["lifecycle.state"] || "unknown";
     var governed = GOVERNED[eligibility] === true;
 
+    // The two-axis state language, read from the packet and never re-derived:
+    //   * lifecycle  — the RunState token (glyph + word + tone) and its settled timestamp;
+    //   * attention  — the packet's own `attention.state`, clamped to `active|none`.
+    var lifecycleState = lifecycleToken(lifecycle);
+    var attentionState = attentionToken(run["attention.state"]);
+    var settledState = settledFacets(run);
+
     // Move 6 — lease facets. A missing value is the literal string "unknown", never a zero.
     var reserved = run["budget.reserved"] || "unknown";
     var settled = run["budget.settled"] || "unknown";
@@ -292,28 +440,38 @@
       budgetState = headroom <= 0 ? "over" : (headroom <= 25 ? "warn" : "ok");
     }
     var costPair = (reserved === "unknown" ? "?" : reserved) + "/" + (cap === "unknown" ? "?" : cap);
-    var statusState = live === "live" ? "live"
-      : (lifecycle === "failed" ? "failed" : (governed ? "waiting" : "idle"));
-    var statusGlyph = statusState === "live" ? "\u25CF"
-      : (statusState === "failed" ? "\u2715" : (statusState === "waiting" ? "\u25B8" : "\u25CB"));
 
     var row = element("li", "run-row", {
       "data-run-id": session,
-      "data-attention": run["attention.state"] || "none",
+      "data-attention": attentionState,
       "data-live": live,
+      // The row-level state language: `data-state` is the colour key, `data-lifecycle` the raw
+      // packet enum, and `data-stale` the recorded-age verdict that drives the dimmed row.
+      "data-state": lifecycleState.tone,
+      "data-lifecycle": lifecycle,
+      "data-stale": settledState.stale ? "true" : "false",
       "data-decision": governed ? eligibility : "none",
       role: "button",
       tabindex: "0",
-      "aria-label": "Agent session " + session + ", " + lifecycle,
+      "aria-label": "Agent session " + session + ", " + lifecycleState.word,
     });
 
     // ── Line 1 · the session identity band (Move 1) ────────────────────────────────────────
     var lineOne = element("div", "row-line session-band",
       { "data-row-line": "", "data-max-lines": "1", "data-agent": session });
     lineOne.appendChild(element("span", "agent-prompt", { "aria-hidden": "true" }, "\u276F"));
-    lineOne.appendChild(element("span", "row-status",
-      { "data-state": statusState, title: "session state: " + statusState, "aria-hidden": "true" },
-      statusGlyph));
+    // The status rail IS the state language: the glyph and the word are both visible, and the
+    // CSS supplies the colour from `data-state`. The glyph is decorative (`aria-hidden`) so the
+    // accessible reading is the plain word, and the state is legible with no colour at all.
+    var status = element("span", "row-status", {
+      "data-state": lifecycleState.tone,
+      "data-lifecycle": lifecycle,
+      title: "session state: " + lifecycleState.word + " (" + lifecycle + ")",
+    });
+    status.appendChild(element("span", "row-status-glyph", { "aria-hidden": "true" },
+      lifecycleState.glyph));
+    status.appendChild(element("span", "row-status-word", null, lifecycleState.word));
+    lineOne.appendChild(status);
     appendField(lineOne, "session.identity", lab("session.identity", "session"), session, {
       identifier: true, maxLines: 1, title: "agent session",
     });
@@ -340,6 +498,15 @@
       mark("ph", run["phase.progress"]), { maxLines: 1 });
     appendField(lineTwo, "lifecycle.state", lab("lifecycle.state", "lifecycle"),
       mark("life", lifecycle), { maxLines: 1 });
+    // The settled marker is a NON-FIELD affordance (the row's 16-field schema is exact — the
+    // render gate's G-13), so the lifecycle's last recorded change and its age travel beside the
+    // state without widening the required field set. No recorded timestamp is the literal
+    // `settled unknown`, never a fabricated `0s`; `data-stale` (above) de-emphasises an aged row.
+    lineTwo.appendChild(element("span", "row-settled", {
+      "data-settled-at": settledState.iso || "unknown",
+      "data-age-seconds": settledState.age === null ? null : String(settledState.age),
+      title: settledState.title,
+    }, settledState.text));
     appendField(lineTwo, "run.live", lab("run.live", "live"), mark("live", live), { maxLines: 1 });
     appendField(lineTwo, "source.commit", lab("source.commit", "commit"),
       mark("cmt", sourceValue), { identifier: true, maxLines: 1 });
@@ -347,7 +514,7 @@
       maxLines: 1, title: "reserved/cap · " + settlement + " · " + costSource,
     });
     appendField(lineTwo, "attention.state", lab("attention.state", "attention"),
-      mark("attn", run["attention.state"]), { maxLines: 1 });
+      mark("attn", attentionState), { maxLines: 1 });
     // The settlement state and cost_source are non-field chips, so the money meaning travels on
     // the row without widening the required field schema.
     if (!compact) {
@@ -399,11 +566,16 @@
     return row;
   }
 
-  /** R2 body: the bounded, attention-ranked sample (exactly the viewport's capacity).
-   *  Keyed by run id and write-on-change, so an unchanged row keeps its identity and focus. */
+  /** R2 body: the bounded, triage-ranked sample (exactly the viewport's capacity).
+   *
+   *  Ranking is a presentation of the packet's OWN fields (`lifecycle.state`, `attention.state`),
+   *  not a re-derived state: failures and blocked work lead, then the in-flight fleet, then
+   *  settled runs. The stable sort preserves the projection's order within a rank. The list stays
+   *  keyed by run id and write-on-change, so a re-rank reorders identity-preserving nodes and an
+   *  unchanged row keeps its identity and focus. */
   function renderRunList(glance) {
     var host = document.getElementById("run-list");
-    var sample = (Array.isArray(glance.run_sample) ? glance.run_sample : [])
+    var sample = rankRoster(Array.isArray(glance.run_sample) ? glance.run_sample : [])
       .slice(0, capacities().rows);
     var nodes = sample.map(function (run) {
       var row = renderRunRow(run);
