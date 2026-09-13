@@ -32,6 +32,9 @@
  *   (b) a run needs a decision — `renderAttention` builds the DECISION work item under
  *       `[data-answer="ON-G5"]` with `[data-attention-class="decision"]`, the eligibility token,
  *       the `queue-authority`/`queue-action` chips, and `[data-authority="controller"]`.
+ *       The reserved decision/risk (and a NEAR CAP slot when the packet's `cost.money_risk`
+ *       says so) each carry a REAL `<button data-attention-toggle>` that expands a read-only
+ *       `[data-attention-detail]` panel IN PLACE — packet values only, never a mutation.
  *         selector: `[data-answer="ON-G5"] [data-field="decision.eligibility"]`
  *   (c) spend against a hard budget — `renderRunRow` builds `.row-lease[data-budget-state]` (the
  *       headroom bar) with `data-budget-reserved`, `data-budget-settled`, `data-budget-cap`,
@@ -819,23 +822,116 @@
    * Build one attention work item (Move 8): a `li` with a state class and a body that carries
    * the answer anchor (when it is one) plus exactly two declared lines. The helper returns both
    * the `li` (the reconciliation unit) and the body (where lines are appended).
+   *
+   * STEP 4 — expand in place. An item that has read-only detail carries a REAL native `<button>`
+   * toggle (`[data-attention-toggle]`) with `aria-expanded`/`aria-controls`; activating it reveals
+   * the item's `[data-attention-detail]` panel IN PLACE. The former `role="button"` on the `li`
+   * is GONE: it advertised an interaction no handler implemented (the dead button the synthesis
+   * named). Because the control is a real button, Enter/Space activation needs no bespoke keydown
+   * handler. The detail renders PACKET VALUES ONLY and carries NO mutation control — consequential
+   * acts stay behind the confirm bar in the run detail, never here.
    */
   function attentionItem(config) {
     var item = element("li", "attention-item", {
       "data-attention-class": config.kind,
       "data-item-key": config.key,
-      // An answer-bearing item is an interactive work item (A-4: role + accessible name);
-      // ranked/empty rows are ordinary list items.
-      role: config.answer ? "button" : null,
-      tabindex: config.answer ? "0" : null,
-      "aria-label": config.ariaLabel || null,
     });
     var body = item;
     if (config.answer) {
       body = element("div", null, { "data-answer": config.answer });
       item.appendChild(body);
     }
+    if (config.expandable) {
+      var detailId = "attention-detail-" + config.key;
+      item.classList.add("has-detail");
+      var toggle = element("button", "attention-toggle", {
+        type: "button",
+        "data-attention-toggle": "",
+        "aria-expanded": "false",
+        "aria-controls": detailId,
+        "aria-label": config.toggleLabel || config.ariaLabel || "Show detail",
+      });
+      // The caret is decorative; the accessible name lives on the button itself.
+      toggle.appendChild(element("span", "attention-caret",
+        { "aria-hidden": "true" }, "\u25B8"));
+      item.appendChild(toggle);
+      var panel = element("div", "attention-detail", {
+        "data-attention-detail": "",
+        id: detailId,
+        hidden: true,
+      });
+      item.__toggle = toggle;
+      item.__detail = panel;
+      item.appendChild(panel);
+    }
     return { item: item, body: body };
+  }
+
+  /**
+   * Fill one item's read-only detail panel. `rows` are `[label, value]` pairs whose values are
+   * taken VERBATIM from the glance packet (a value the packet cannot answer renders its own
+   * `unknown`, never a client-derived zero). The note names where the governed act lives, so the
+   * expansion can never be mistaken for an action surface.
+   */
+  function fillAttentionDetail(item, spec) {
+    var panel = item && item.__detail;
+    if (!panel) return;
+    clear(panel);
+    if (spec.heading) {
+      panel.appendChild(element("p", "attention-detail-heading", null, spec.heading));
+    }
+    if (spec.rows && spec.rows.length) {
+      var list = element("dl", "attention-detail-list", null);
+      spec.rows.forEach(function (row) {
+        list.appendChild(element("dt", "attention-detail-key", null, row[0]));
+        list.appendChild(element("dd", "attention-detail-val", null,
+          row[1] === undefined || row[1] === null ? "unknown" : row[1]));
+      });
+      panel.appendChild(list);
+    }
+    panel.appendChild(element("p", "attention-detail-note", null,
+      spec.note || "Read-only. Governed actions are confirmed in the run detail."));
+  }
+
+  /**
+   * Toggle one attention item's read-only detail in place. One detail is open at a time (an
+   * accordion), and opening the detail adds `has-open-detail` to the list so a cramped viewport
+   * may scroll the panel into view; at rest the list is unchanged. This is presentation only —
+   * it calls no fetch and fires no mutation.
+   */
+  function toggleAttention(toggle) {
+    var item = toggle.closest(".attention-item");
+    if (!item) return;
+    var panel = item.querySelector("[data-attention-detail]");
+    if (!panel) return;
+    var open = toggle.getAttribute("aria-expanded") === "true";
+    if (!open) {
+      // Close every OTHER open detail first.
+      Array.prototype.forEach.call(
+        document.querySelectorAll(".attention-item.detail-open"),
+        function (other) { if (other !== item) closeAttentionItem(other); }
+      );
+      item.classList.add("detail-open");
+      toggle.setAttribute("aria-expanded", "true");
+      panel.hidden = false;
+      var list = document.getElementById("attention-list");
+      if (list) list.classList.add("has-open-detail");
+    } else {
+      closeAttentionItem(item);
+    }
+  }
+
+  /** Collapse one item's detail and keep the list's scroll affordance truthful. */
+  function closeAttentionItem(item) {
+    var toggle = item.querySelector("[data-attention-toggle]");
+    var panel = item.querySelector("[data-attention-detail]");
+    item.classList.remove("detail-open");
+    if (toggle) toggle.setAttribute("aria-expanded", "false");
+    if (panel) panel.hidden = true;
+    var list = document.getElementById("attention-list");
+    if (list && !list.querySelector(".attention-item.detail-open")) {
+      list.classList.remove("has-open-detail");
+    }
   }
 
   /**
@@ -885,12 +981,26 @@
     var item = attentionItem({
       key: "rank-" + (entry.id || identity),
       kind: "next",
-      ariaLabel: "Ranked work item " + identity + " (" + severity + ")",
+      expandable: true,
+      toggleLabel: "Show detail for work item " + identity,
     });
     attentionLine(item.body, severity, [], [["queue-id", identity], ["queue-state", state]]);
     attentionLine(item.body, "ACTION", [], [
       ["queue-action", action], ["queue-authority", authority], ["queue-age", "age " + ageSeconds + "s"],
     ]);
+    // The detail repeats the ranked entry's own packet fields VERBATIM (no defaults invented):
+    // the compact line abbreviates, the expansion names the value the packet actually carries.
+    fillAttentionDetail(item.item, {
+      heading: "WORK ITEM (read-only)",
+      rows: [
+        ["identity", entry.identity || entry.id || "unknown"],
+        ["state", entry.state],
+        ["severity", entry.severity],
+        ["authority", entry.authority],
+        ["action", entry.action],
+        ["age", ageSeconds + "s"],
+      ],
+    });
     item.item.__signature = JSON.stringify(entry);
     return item.item;
   }
@@ -913,14 +1023,15 @@
     // filler below must not claim an all-clear the client never observed.
     var attentionKnown = !decisionUnknown && !riskUnknown;
 
-    // ── DECISION (ON-G5) — a governed door, not a button ───────────────────────────────────
+    // ── DECISION (ON-G5) — a governed door that EXPANDS, not a fake button ─────────────────
     var decisionItem = attentionItem({
       key: "decision",
       kind: "decision",
       answer: "ON-G5",
-      ariaLabel: pending
-        ? "Pending controller decision: " + decision.kind + " " + decision.target
-        : (decisionUnknown ? "Decision state could not be read" : "No pending decision"),
+      expandable: true,
+      toggleLabel: pending
+        ? "Show pending controller decision detail: " + decision.kind + " " + decision.target
+        : (decisionUnknown ? "Show decision state (could not be read)" : "Show decision detail"),
     });
     // Line 1 leads with the state + the two decision tokens a stranger needs (`approve`
     // eligibility); the identifier target moves to line 2 where it may middle-elide without
@@ -937,6 +1048,20 @@
       ["decision.authority", "authority", decision.authority, false],
       ["decision.target", "target", decision.target, true],
     ]);
+    // Read-only detail: the SAME packet fields shown un-elided, plus the packet's own provenance.
+    fillAttentionDetail(decisionItem.item, {
+      heading: "DECISION (read-only)",
+      rows: [
+        ["state", decision.state],
+        ["kind", decision.kind],
+        ["target", decision.target],
+        ["control epoch", decision.epoch],
+        ["authority", decision.authority],
+        ["eligibility", decision.eligibility],
+        ["observed", (glance.observed_at || "unknown")],
+      ],
+      note: "Read-only. Approve/promote/cancel is confirmed behind the confirm bar in the run detail.",
+    });
     decisionItem.item.__signature = JSON.stringify(decision);
     nodes.push(decisionItem.item);
 
@@ -945,23 +1070,71 @@
       key: "risk",
       kind: "risk",
       answer: "ON-G3",
-      ariaLabel: riskUnknown
-        ? "Run risk state could not be read"
-        : "Highest-severity run risk: " + risk.identity,
+      expandable: true,
+      toggleLabel: riskUnknown
+        ? "Show run risk detail (could not be read)"
+        : "Show run risk detail: " + risk.identity,
     });
     attentionLine(riskItem.body, "RISK", [
       ["risk.identity", "target", risk.identity, true],
       ["risk.state", "state", risk.state, false],
     ]);
     attentionLine(riskItem.body, "OWNER", [["risk.action", "action", risk.action, false]]);
+    fillAttentionDetail(riskItem.item, {
+      heading: "RUN RISK (read-only)",
+      rows: [
+        ["target", risk.identity],
+        ["state", risk.state],
+        ["next action", risk.action],
+        ["observed", (glance.observed_at || "unknown")],
+      ],
+      note: "Read-only. Inspecting or recovering the run happens in the run detail.",
+    });
     riskItem.item.__signature = JSON.stringify(risk);
     nodes.push(riskItem.item);
 
+    // ── NEAR CAP — the reserved budget-constraint work item (R1, v2 synthesis §4.2) ────────
+    // A budget near its hard cap is attention the operator must see in the inbox, not only in the
+    // R3 ledger. It exists ONLY when the packet's own cost block says so (`money_risk`), and every
+    // value it shows is that block's verbatim value — the client never re-derives a threshold.
+    var cost = glance.cost || {};
+    if (cost.money_risk) {
+      var nearCapQuota = cost.quota === undefined || cost.quota === null ? "unknown" : cost.quota;
+      var nearCapItem = attentionItem({
+        key: "near-cap",
+        kind: "near-cap",
+        expandable: true,
+        toggleLabel: "Show near-cap budget detail",
+      });
+      // Two short lines: the quota that tripped the marker, then the spend it applies to.
+      attentionLine(nearCapItem.body, "NEAR CAP",
+        [["money.quota", "quota", nearCapQuota, false]]);
+      attentionLine(nearCapItem.body, "SPEND",
+        [["money.spend", "spend", cost.spend, false]]);
+      var spendTruth = (glance.truth && glance.truth.spend) || {};
+      fillAttentionDetail(nearCapItem.item, {
+        heading: "BUDGET CONSTRAINT (read-only)",
+        rows: [
+          ["spend", cost.spend],
+          ["burn", cost.burn],
+          ["quota", nearCapQuota],
+          ["wallet", cost.wallet],
+          ["reserved leases", cost.leases],
+          ["source", spendTruth.source],
+          ["age", typeof spendTruth.age_seconds === "number"
+            ? ageLabel(spendTruth.age_seconds) : undefined],
+        ],
+        note: "Read-only. Raising the cap or retiring work is confirmed behind the confirm bar.",
+      });
+      nearCapItem.item.__signature = "near-cap:" + JSON.stringify(cost);
+      nodes.push(nearCapItem.item);
+    }
+
     // ── R1c · the globally-ranked remainder (Move 8, IA §2 R1c) ───────────────────────────
-    // Decision and risk hold the reserved slots above; the remaining capacity is filled by the
-    // ACTUAL ranked collection (`attention.next` plus `attention.items`), so a saturated inbox
-    // cannot bury a new critical item and never degenerates into repeated empty cards. With few
-    // candidates the surplus collapses into ONE continuous `QUEUE CLEAR` state.
+    // Decision, risk and (when present) near-cap hold the reserved slots above; the remaining
+    // capacity is filled by the ACTUAL ranked collection (`attention.next` plus `attention.items`),
+    // so a saturated inbox cannot bury a new critical item and never degenerates into repeated
+    // empty cards. With few candidates the surplus collapses into ONE continuous `QUEUE CLEAR`.
     var cap = capacities().attention;
     var fillSlots = Math.max(0, cap - nodes.length);
     var ageSeconds = (glance.trust && glance.trust.worst_age) || 0;
@@ -1686,6 +1859,15 @@
         var next = document.documentElement.dataset.theme === "light" ? "dark" : "light";
         document.documentElement.dataset.theme = next;
         try { window.localStorage.setItem("control-room-theme", next); } catch (_error) {}
+      });
+    }
+    // R1 step 4: the attention inbox expands IN PLACE. The toggle is a real button, so a click
+    // (mouse, Enter or Space) reaches this one delegated handler; no mutation is ever fired here.
+    var attentionList = document.getElementById("attention-list");
+    if (attentionList) {
+      attentionList.addEventListener("click", function (event) {
+        var toggle = event.target.closest("[data-attention-toggle]");
+        if (toggle) toggleAttention(toggle);
       });
     }
     var runList = document.getElementById("run-list");

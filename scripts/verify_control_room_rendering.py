@@ -715,13 +715,25 @@ A11Y_JS = r"""
 () => {
   const rows = Array.from(document.querySelectorAll('[data-region="R2"] [data-run-id]')).map((r) => ({
     role: r.getAttribute('role'), label: r.getAttribute('aria-label') || '' }));
+  // R1 step 4: the item itself must NOT be a fake `role="button"`; the expand affordance is a
+  // REAL native button carrying an accessible name and `aria-expanded`, controlling a detail
+  // panel. The probe reads that toggle, so the gate proves the interaction exists, not just that
+  // an attribute is absent.
+  const expandInfo = (r) => {
+    const t = r.querySelector('[data-attention-toggle]');
+    const p = r.querySelector('[data-attention-detail]');
+    return {
+      role: r.getAttribute('role'),
+      tag: t ? t.tagName.toLowerCase() : null,
+      label: t ? (t.getAttribute('aria-label') || t.textContent.trim()) : '',
+      expanded: t ? t.getAttribute('aria-expanded') : null,
+      detailHidden: p ? p.hasAttribute('hidden') : null,
+    };
+  };
   const decisions = Array.from(
-    document.querySelectorAll('[data-region="R1"] [data-attention-class="decision"]')
-  ).map((r) => ({ role: r.getAttribute('role'), label: r.getAttribute('aria-label') || '',
-    tabindex: r.getAttribute('tabindex') }));
+    document.querySelectorAll('[data-region="R1"] [data-attention-class="decision"]'), expandInfo);
   const risks = Array.from(
-    document.querySelectorAll('[data-region="R1"] [data-attention-class="risk"]')
-  ).map((r) => ({ role: r.getAttribute('role'), label: r.getAttribute('aria-label') || '' }));
+    document.querySelectorAll('[data-region="R1"] [data-attention-class="risk"]'), expandInfo);
   const dock = document.getElementById('selection-dock');
   const lens = document.getElementById('chart-lens');
   return {
@@ -1330,12 +1342,20 @@ def _check_a11y(name: str, probe: dict[str, Any], errors: list[str]) -> None:
     for row in probe.get("rows", []):
         if row.get("role") != "button" or not row.get("label"):
             _row(errors, name, "a11y", "A-4", f"run row role/label {row}")
-    for item in probe.get("decisions", []):
-        if item.get("role") != "button" or not item.get("label"):
-            _row(errors, name, "a11y", "A-4", f"decision item role/label {item}")
-    for item in probe.get("risks", []):
-        if not item.get("label"):
-            _row(errors, name, "a11y", "A-4", f"risk item lacks accessible name {item}")
+    # R1 step 4: the old dead `role="button"` is gone. The interactive control is a real button
+    # (`tag == "button"`) with an accessible name and a truthful `aria-expanded`.
+    for kind, items in (("decision", probe.get("decisions", [])),
+                        ("risk", probe.get("risks", []))):
+        for item in items:
+            if item.get("role") == "button":
+                _row(errors, name, "a11y", "A-4",
+                     f"{kind} item keeps the dead fake role=button {item}")
+            if item.get("tag") != "button" or not item.get("label"):
+                _row(errors, name, "a11y", "A-4",
+                     f"{kind} item lacks a real expand control {item}")
+            if item.get("expanded") not in {"false", "true"}:
+                _row(errors, name, "a11y", "A-4",
+                     f"{kind} toggle missing aria-expanded {item}")
     # A-5: inactive surfaces are truly hidden (the `hidden` attribute), not CSS-only.
     if not probe.get("dockHidden") or probe.get("dockDisplay") != "none":
         _row(errors, name, "a11y", "A-5", "selection dock is not truly hidden at rest")
@@ -1376,11 +1396,40 @@ def run_a11y_gate(out: Path, screenshots: bool) -> tuple[list[dict[str, Any]], l
                 page.locator('[data-render-state="ready"]').wait_for(timeout=15000)
                 _check_a11y(name, page.evaluate(A11Y_JS), errors)
 
+                # R1 step 4: the decision item's expand control is REAL — activating it reveals the
+                # read-only detail IN PLACE and collapsing hides it again. This is the interaction
+                # the removed `role="button"` only advertised.
+                toggle = page.locator(
+                    '[data-attention-class="decision"] [data-attention-toggle]')
+                if toggle.count() == 0:
+                    _row(errors, name, "a11y", "R1-expand",
+                         "decision item has no expand control")
+                else:
+                    toggle.first.click()
+                    if page.locator(
+                        '[data-attention-class="decision"] [data-attention-detail]:not([hidden])'
+                    ).count() == 0:
+                        _row(errors, name, "a11y", "R1-expand",
+                             "decision detail did not open in place")
+                    if toggle.first.get_attribute("aria-expanded") != "true":
+                        _row(errors, name, "a11y", "R1-expand",
+                             "aria-expanded not true after expand")
+                    toggle.first.click()
+                    if page.locator(
+                        '[data-attention-class="decision"] [data-attention-detail]:not([hidden])'
+                    ).count() != 0:
+                        _row(errors, name, "a11y", "R1-expand",
+                             "decision detail did not collapse")
+
                 # A-6 + A-1: reach a run row by keyboard alone, open with Enter, contain focus,
                 # then Escape and confirm focus returns to the opening row.
                 page.locator("body").click(position={"x": 2, "y": 2})
                 reached = False
-                for _ in range(12):
+                # The resting screen has a long focus chain (truth-strip filters/lens doors, the
+                # three chrome buttons, then the R1 expand toggles). A generous budget keeps the
+                # keyboard contract observable without turning a correct, longer tab path into a
+                # false A-6 miss; the loop still breaks the moment a run row is focused.
+                for _ in range(30):
                     page.keyboard.press("Tab")
                     if page.evaluate(
                         "() => { const el = document.activeElement;"

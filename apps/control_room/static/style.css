@@ -593,6 +593,63 @@ body {
   opacity: 0.6;
 }
 
+/* R1 step 4 — expand-in-place read-only detail. Each expandable work item carries a NATIVE
+   button (never a fake role=button) whose caret rotates when the panel opens; plus a reserved
+   NEAR CAP slot when the packet's cost block marks a budget risk. The detail is IN FLOW, so
+   opening genuinely expands the item; the list is allowed to scroll ONLY while a panel is open,
+   which leaves the resting no-scroll promise untouched. The panel is a read-only ledger of
+   packet values and names the confirm bar as the only mutation door. */
+.attention-item[data-attention-class="near-cap"] { border-left-color: var(--warn); }
+.attention-item.has-detail { position: relative; }
+.attention-toggle {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  line-height: 1;
+}
+.attention-toggle:hover,
+.attention-toggle:focus-visible { color: var(--text); border-color: var(--accent); }
+.attention-caret { font-size: 10px; transition: transform var(--motion-state) var(--motion-ease); }
+.attention-item.detail-open .attention-caret { transform: rotate(90deg); }
+.attention-item.detail-open { height: auto; overflow: visible; }
+.attention-detail { margin: 4px 0 2px; padding: 6px 4px 2px; border-top: 1px dashed var(--line); }
+.attention-detail[hidden] { display: none; }
+.attention-detail-heading {
+  margin: 0 0 3px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+.attention-detail-list {
+  margin: 0;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 1px 6px;
+  font-size: 11px;
+}
+.attention-detail-key { margin: 0; color: var(--muted); }
+.attention-detail-val {
+  margin: 0;
+  color: var(--text);
+  font-family: var(--mono);
+  overflow-wrap: anywhere;
+}
+.attention-detail-note { margin: 4px 0 0; font-size: 10px; color: var(--muted); }
+.attention-list.has-open-detail { overflow-y: auto; }
+
 /* Work-queue chips (non-field, so the answer field schema is untouched). */
 .queue-authority,
 .queue-action {

@@ -350,6 +350,45 @@ def test_client_lists_are_keyed_and_write_on_change() -> None:
     assert "row-authority" in app
 
 
+def test_attention_items_expand_in_place_and_keep_mutations_behind_the_confirm_bar() -> None:
+    """R1 (build step 4): a real expand control replaces the dead ``role="button"``.
+
+    The synthesis named the failure directly: the decision/risk inbox items carried
+    ``role="button"`` with no handler. This guard holds the repair — the item is no longer a
+    fake button, a native toggle with ``aria-expanded``/``aria-controls`` reveals a
+    ``[data-attention-detail]`` panel *in place*, and the panel is assembled from packet values
+    only (read-only, no mutation verb; consequential acts stay behind the confirm bar).
+    """
+    client = _read("app.js")
+
+    # The dead fake button is GONE: attention items no longer mint role="button"/tabindex.
+    assert 'role: config.answer ? "button"' not in client
+    assert 'tabindex: config.answer ? "0"' not in client
+
+    # The expand affordance is a REAL native button controlling an in-place detail panel.
+    assert '"data-attention-toggle": ""' in client
+    assert 'type: "button"' in client
+    assert '"aria-expanded": "false"' in client
+    assert '"aria-controls": detailId' in client
+    assert '"data-attention-detail": ""' in client
+    for helper in ("function attentionItem(", "function fillAttentionDetail(",
+                   "function toggleAttention(", "function closeAttentionItem("):
+        assert helper in client, helper
+
+    # One delegated click handler wiring the toggle (a native button also fires click on Enter).
+    assert 'closest("[data-attention-toggle]")' in client
+
+    # Read-only, packet-only: every detail names the packet's own slice and the confirm bar as
+    # the ONLY mutation door; the near-cap slot is gated on the packet's `money_risk` signal.
+    assert "DECISION (read-only)" in client
+    assert "RUN RISK (read-only)" in client
+    assert "behind the confirm bar" in client
+    assert 'kind: "near-cap"' in client
+    assert "cost.money_risk" in client
+    # app.js is the resting-screen client and never fires a mutation (mutations live in parity.js).
+    assert "POST" not in client
+
+
 def test_render_gate_implements_the_acceptance_classes() -> None:
     """The gate (a4) carries the IA acceptance classes, the live mode, and the report writer."""
     gate = (
