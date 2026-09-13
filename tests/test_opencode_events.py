@@ -10,6 +10,7 @@ from pathlib import Path
 
 from agentic_dynamics.adapters.opencode import (
     SnapshotSkipped,
+    _capture_git_baseline,
     _diff_workdir,
     _init_git_workdir,
     _list_files,
@@ -317,7 +318,7 @@ def test_list_files_skips_hashing_above_cap(tmp_path, monkeypatch, caplog):
 
 
 def test_diff_workdir_falls_back_to_git_when_snapshot_skipped(tmp_path, monkeypatch):
-    """A skipped snapshot yields the changed set from ``git status`` — never "no changes"."""
+    """A skipped snapshot yields the changed set from ``git status`` — a PARTIAL observation."""
     subprocess.run(["git", "init", "-q"], cwd=tmp_path, check=True)
     subprocess.run(["git", "config", "user.email", "a@a"], cwd=tmp_path, check=True)
     subprocess.run(["git", "config", "user.name", "a"], cwd=tmp_path, check=True)
@@ -335,6 +336,7 @@ def test_diff_workdir_falls_back_to_git_when_snapshot_skipped(tmp_path, monkeypa
     diff = _diff_workdir(str(tmp_path), before)
 
     assert diff.detection == "git_status"
+    assert diff.partial is True  # the narrower observation — explicitly marked
     assert "tracked.py" in diff.modified
     assert "untracked.py" in diff.created
 
@@ -350,6 +352,7 @@ def test_diff_workdir_reports_unavailable_when_git_cannot_answer(tmp_path, monke
     diff = _diff_workdir(str(tmp_path), before)
 
     assert diff.detection == "unavailable"
+    assert diff.partial is True
     assert diff.created == [] and diff.modified == []
 
 
@@ -369,6 +372,96 @@ def test_diff_workdir_under_cap_behaves_exactly_as_today(tmp_path, monkeypatch):
     diff = _diff_workdir(str(tmp_path), before)
 
     assert diff.detection == "hashed"
+    assert diff.partial is False
     assert diff.created == ["new.py"]
     assert diff.modified == ["mod.py"]
     assert "keep.py" not in diff.modified
+
+
+# ── git BASELINE fallback: `git status` is not a before/after diff (finding 8b) ──
+
+
+def _init_test_repo(tmp_path):
+    subprocess.run(["git", "init", "-q"], cwd=tmp_path, check=True)
+    subprocess.run(["git", "config", "user.email", "a@a"], cwd=tmp_path, check=True)
+    subprocess.run(["git", "config", "user.name", "a"], cwd=tmp_path, check=True)
+
+
+def test_git_baseline_diff_sees_a_change_committed_during_the_attempt(tmp_path, monkeypatch):
+    """A modified file COMMITTED during the attempt must not become an empty changed set.
+
+    ``git status`` is clean after the commit; the baseline comparison still names the file,
+    as ``detection="git_baseline"`` (the full observation). Without a baseline, status alone
+    is clean — but that narrower observation is explicitly ``partial``, never an ordinary
+    empty set.
+    """
+    _init_test_repo(tmp_path)
+    (tmp_path / "source.py").write_text("v1")
+    subprocess.run(["git", "add", "-A"], cwd=tmp_path, check=True)
+    subprocess.run(["git", "commit", "-q", "-m", "init"], cwd=tmp_path, check=True)
+
+    baseline = _capture_git_baseline(str(tmp_path))
+    assert baseline is not None and baseline.head
+
+    monkeypatch.setenv("FINOPS_ADAPTER_MAX_SNAPSHOT_FILES", "0")
+    before = _list_files(str(tmp_path))
+    assert isinstance(before, SnapshotSkipped)
+
+    (tmp_path / "source.py").write_text("v2")  # modified and committed during the attempt
+    subprocess.run(["git", "add", "-A"], cwd=tmp_path, check=True)
+    subprocess.run(["git", "commit", "-q", "-m", "change"], cwd=tmp_path, check=True)
+
+    diff = _diff_workdir(str(tmp_path), before, baseline=baseline)
+
+    assert diff.detection == "git_baseline"
+    assert diff.partial is False
+    assert "source.py" in diff.modified  # the change is NOT lost
+
+    # The narrower observation the defect was about: status is clean, but it is marked
+    # partial — an empty list no longer masquerades as a measured "no changes".
+    narrow = _diff_workdir(str(tmp_path), before)
+    assert narrow.detection == "git_status"
+    assert narrow.partial is True
+    assert narrow.modified == []
+
+
+def test_git_baseline_handles_initial_dirty_and_untracked_state(tmp_path, monkeypatch):
+    """Pre-existing dirty/untracked files are attributed to the attempt only when they CHANGE."""
+    _init_test_repo(tmp_path)
+    (tmp_path / "tracked.py").write_text("v1")
+    (tmp_path / "dirty.py").write_text("v1")
+    subprocess.run(["git", "add", "-A"], cwd=tmp_path, check=True)
+    subprocess.run(["git", "commit", "-q", "-m", "init"], cwd=tmp_path, check=True)
+
+    # The initial dirty/untracked state BEFORE the attempt starts.
+    (tmp_path / "dirty.py").write_text("dirty v1")  # tracked, dirty vs HEAD
+    (tmp_path / "untouched_untracked.py").write_text("keep")  # untracked
+    (tmp_path / "pre_existing_dir").mkdir()
+    (tmp_path / "pre_existing_dir" / "inside.py").write_text("keep")  # untracked dir contents
+
+    baseline = _capture_git_baseline(str(tmp_path))
+    assert baseline is not None
+    assert "dirty.py" in baseline.dirty_hashes
+    assert "untouched_untracked.py" in baseline.dirty_hashes
+    assert "pre_existing_dir/inside.py" in baseline.dirty_hashes
+
+    monkeypatch.setenv("FINOPS_ADAPTER_MAX_SNAPSHOT_FILES", "0")
+    before = _list_files(str(tmp_path))
+    assert isinstance(before, SnapshotSkipped)
+
+    # The attempt: further modifies the baseline-dirty file, creates + commits a new file,
+    # leaves the baseline-untracked file untouched.
+    (tmp_path / "dirty.py").write_text("dirty v2")
+    (tmp_path / "new.py").write_text("new")
+    subprocess.run(["git", "add", "-A"], cwd=tmp_path, check=True)
+    subprocess.run(["git", "commit", "-q", "-m", "work"], cwd=tmp_path, check=True)
+
+    diff = _diff_workdir(str(tmp_path), before, baseline=baseline)
+
+    assert diff.detection == "git_baseline"
+    assert "dirty.py" in diff.modified  # pre-existing dirt, but changed further during the turn
+    assert "new.py" in diff.created
+    # Untouched pre-existing untracked file: NOT this attempt's work.
+    assert "untouched_untracked.py" not in diff.created + diff.modified
+    # Untouched pre-existing untracked DIRECTORY contents: also not this attempt's work.
+    assert "pre_existing_dir/inside.py" not in diff.created + diff.modified

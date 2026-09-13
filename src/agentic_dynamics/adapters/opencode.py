@@ -9,6 +9,7 @@ This is the measurement layer the instrument was designed for.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 import os
@@ -65,6 +66,30 @@ class SnapshotSkipped:
     cap: int
 
 
+@dataclass(frozen=True)
+class GitBaseline:
+    """The git state captured BEFORE the attempt, for baseline-relative change detection.
+
+    ``git status`` after a turn is not a before/after diff: a change the agent COMMITTED
+    during the attempt leaves the working tree clean, so the status-only fallback would
+    report an empty changed set for a turn that rewrote files. This baseline is the missing
+    "before" for the snapshot-skipped path:
+
+    * ``head`` — the repo's HEAD sha at capture time (``""`` when the repo has no commit
+      yet). Comparing against it later sees every tracked change the attempt made, whether
+      committed or still in the working tree.
+    * ``dirty_hashes`` — path -> content sha256 for every path git reported dirty or
+      untracked at capture (the explicit initial dirty/untracked state). A path whose
+      content is unchanged since capture is pre-existing dirt, not this attempt's work;
+      the baseline comparison attributes it only when its content actually changed.
+
+    A workdir that is not a git repository captures to ``None``.
+    """
+
+    head: str
+    dirty_hashes: dict[str, str] = field(default_factory=dict)
+
+
 class WorkdirDiff(tuple):
     """The changed set ``(created, modified)`` plus HOW it was determined.
 
@@ -74,11 +99,21 @@ class WorkdirDiff(tuple):
 
     ``"hashed"``
         The full byte-level before/after snapshot compared cleanly.
+    ``"git_baseline"``
+        The snapshot was skipped; the changed set was compared against the pre-attempt
+        :class:`GitBaseline` (HEAD + initial dirty/untracked state), so changes committed
+        during the attempt are still seen. The full observation for the skipped path.
     ``"git_status"``
-        The snapshot was skipped; the changed set came from ``git status --porcelain``.
+        The snapshot was skipped AND no baseline was available; the changed set came from
+        ``git status --porcelain`` alone. A PARTIAL observation — a change already committed
+        during the attempt is invisible to it (``partial=True``).
     ``"unavailable"``
         The snapshot was skipped AND git could not answer — the (empty) lists are NOT
-        evidence of "no changes".
+        evidence of "no changes" (``partial=True``).
+
+    ``partial`` is the availability flag the ledger must carry: ``True`` whenever the
+    changed set is the narrower status-only observation or absent entirely, so an empty
+    list can never be read as a measured "no changes".
     """
 
     def __new__(
@@ -88,6 +123,7 @@ class WorkdirDiff(tuple):
         detection: str = "hashed",
         observed: int | None = None,
         cap: int | None = None,
+        partial: bool = False,
     ) -> WorkdirDiff:
         obj = super().__new__(cls, (list(created), list(modified)))
         # A tuple subclass gains a ``__dict__`` when no ``__slots__`` is declared; these
@@ -95,6 +131,7 @@ class WorkdirDiff(tuple):
         obj.detection = detection
         obj.observed = observed
         obj.cap = cap
+        obj.partial = partial
         return obj
 
     @property
@@ -126,12 +163,19 @@ class AgenticResult:
     files_modified: list[str] = field(default_factory=list)
 
     #: How ``files_created``/``files_modified`` were derived (see :class:`WorkdirDiff`).
-    #: ``"hashed"`` is the full before/after snapshot; ``"git_status"`` means the snapshot
-    #: was skipped (tree above FINOPS_ADAPTER_MAX_SNAPSHOT_FILES) and the changed set came
-    #: from git; ``"unavailable"`` means the snapshot was skipped AND git could not answer,
-    #: so the (empty) lists must NOT be read as "no changes". Default preserves the
-    #: historical reading for callers that never look at this field.
+    #: ``"hashed"`` is the full before/after snapshot; ``"git_baseline"`` means the snapshot
+    #: was skipped and the changed set was compared against the pre-attempt git baseline
+    #: (the full observation for the skipped path); ``"git_status"`` means the snapshot was
+    #: skipped AND no baseline was available, so the changed set is the narrower
+    #: ``git status`` observation; ``"unavailable"`` means the snapshot was skipped AND git
+    #: could not answer, so the (empty) lists must NOT be read as "no changes". Default
+    #: preserves the historical reading for callers that never look at this field.
     change_detection: str = "hashed"
+    #: Availability flag for the changed set: ``True`` when ``change_detection`` is the
+    #: narrower status-only observation or absent entirely. Carried through to the workflow
+    #: ledger (``PhaseResult``) so a partial/empty changed set is never read as measured
+    #: "no changes".
+    change_observation_partial: bool = False
 
     # Tool call trace
     tool_calls: list[dict[str, Any]] = field(default_factory=list)
@@ -440,8 +484,14 @@ def run_opencode_agentic(
     if init_git:
         _init_git_workdir(workdir)
 
-    # Store files before for change detection
+    # Store files before for change detection. Capture the git baseline at the SAME moment
+    # (before the agent is invoked): if the hashed snapshot is skipped (tree above
+    # FINOPS_ADAPTER_MAX_SNAPSHOT_FILES), the baseline is what lets the fallback tell a
+    # committed-during-the-attempt change apart from a clean tree — ``git status`` alone
+    # cannot. A non-git workdir captures ``None`` and the fallback degrades to the narrower
+    # partial observation.
     files_before = _list_files(workdir)
+    git_baseline = _capture_git_baseline(workdir)
 
     cmd = [
         OPENCODE_BIN,
@@ -564,10 +614,12 @@ def run_opencode_agentic(
 
     # Detect file changes (filter out venv, pip, pytest cache). ``_diff_workdir`` returns a
     # ``WorkdirDiff`` carrying the detection provenance so a skipped snapshot is never
-    # silently reported as "no changes".
-    _diff = _diff_workdir(workdir, files_before)
+    # silently reported as "no changes"; the pre-attempt git baseline makes the skipped path
+    # see committed changes too, and ``partial`` marks the narrower status-only observation.
+    _diff = _diff_workdir(workdir, files_before, baseline=git_baseline)
     result.files_created, result.files_modified = _diff
     result.change_detection = _diff.detection
+    result.change_observation_partial = _diff.partial
 
     # Persist session transcript for post-hoc artifact bundling
     if result.raw_transcript:
@@ -648,7 +700,11 @@ def _snapshot_max_files() -> int:
     return cap if cap >= 0 else DEFAULT_SNAPSHOT_MAX_FILES
 
 
-def _diff_workdir(workdir: str, files_before: dict[str, str] | SnapshotSkipped) -> WorkdirDiff:
+def _diff_workdir(
+    workdir: str,
+    files_before: dict[str, str] | SnapshotSkipped,
+    baseline: GitBaseline | None = None,
+) -> WorkdirDiff:
     """Compute files created/modified relative to a prior snapshot.
 
     ``files_modified`` is the CHANGED-set (content hash differs), not the
@@ -656,19 +712,26 @@ def _diff_workdir(workdir: str, files_before: dict[str, str] | SnapshotSkipped) 
     untouched, not "modified".
 
     When EITHER snapshot was skipped (the tree exceeded ``FINOPS_ADAPTER_MAX_SNAPSHOT_FILES``)
-    the hashes cannot be compared. Rather than fabricate an empty diff, fall back to
-    ``git status --porcelain`` (``detection="git_status"``); when git cannot answer, return
-    ``detection="unavailable"`` so the caller never mistakes the empty lists for "no
-    changes". Under the cap the returned ``WorkdirDiff`` is byte-identical to the historical
-    ``(created, modified)`` tuple.
+    the hashes cannot be compared. Rather than fabricate an empty diff, compare against the
+    pre-attempt :class:`GitBaseline` (``detection="git_baseline"``) — the full observation for
+    this path, because it includes changes committed during the attempt. Only when no
+    baseline is available does the code fall back to ``git status --porcelain``
+    (``detection="git_status"``, ``partial=True``); when git cannot answer at all it returns
+    ``detection="unavailable"`` (also ``partial=True``), so the caller never mistakes the
+    empty lists for "no changes". Under the cap the returned ``WorkdirDiff`` is
+    byte-identical to the historical ``(created, modified)`` tuple.
     """
     if isinstance(files_before, SnapshotSkipped):
         # The before-snapshot already told us the tree is over the cap; do not re-walk it.
-        return _diff_workdir_from_git(workdir, observed=files_before.observed, cap=files_before.cap)
+        return _diff_workdir_from_git(
+            workdir, observed=files_before.observed, cap=files_before.cap, baseline=baseline
+        )
 
     files_after = _list_files(workdir)
     if isinstance(files_after, SnapshotSkipped):
-        return _diff_workdir_from_git(workdir, observed=files_after.observed, cap=files_after.cap)
+        return _diff_workdir_from_git(
+            workdir, observed=files_after.observed, cap=files_after.cap, baseline=baseline
+        )
 
     files_created = sorted(
         f for f in (files_after.keys() - files_before.keys()) if not _is_artifact(f)
@@ -681,19 +744,199 @@ def _diff_workdir(workdir: str, files_before: dict[str, str] | SnapshotSkipped) 
     return WorkdirDiff(files_created, files_modified, detection="hashed")
 
 
-def _diff_workdir_from_git(workdir: str, *, observed: int | None, cap: int | None) -> WorkdirDiff:
+def _diff_workdir_from_git(
+    workdir: str,
+    *,
+    observed: int | None,
+    cap: int | None,
+    baseline: GitBaseline | None = None,
+) -> WorkdirDiff:
     """Best-effort changed set from git when the hashed snapshot was skipped.
 
-    ``git status`` is a truthful fallback: it names the worktree entries git considers
-    changed without hashing every file. When git is unavailable (not a repo, binary absent,
-    or the command fails) the result is ``detection="unavailable"`` — the empty lists are an
-    honest "we could not tell", never a claim of "no changes".
+    With a pre-attempt baseline the changed set is the baseline RELATIVE diff — committed
+    and uncommitted tracked changes against the baseline HEAD, plus untracked files,
+    with the initial dirty/untracked state subtracted by content hash — so a file the
+    agent modified and committed during the turn is reported (``detection="git_baseline"``,
+    the full observation). Without a baseline (no repo, no HEAD) the changed set is
+    ``git status --porcelain`` only — the narrower observation, explicitly marked
+    ``partial=True`` because changes already committed during the attempt are invisible to
+    it. When git cannot answer at all the result is ``detection="unavailable"``
+    (``partial=True``) — the empty lists are an honest "we could not tell", never a claim
+    of "no changes".
     """
+    if baseline is not None and baseline.head:
+        baseline_changes = _git_baseline_changes(workdir, baseline)
+        if baseline_changes is not None:
+            created, modified = baseline_changes
+            return WorkdirDiff(
+                created,
+                modified,
+                detection="git_baseline",
+                observed=observed,
+                cap=cap,
+                partial=False,
+            )
+
     changes = _git_status_changes(workdir)
     if changes is None:
-        return WorkdirDiff([], [], detection="unavailable", observed=observed, cap=cap)
+        return WorkdirDiff(
+            [], [], detection="unavailable", observed=observed, cap=cap, partial=True
+        )
     created, modified = changes
-    return WorkdirDiff(created, modified, detection="git_status", observed=observed, cap=cap)
+    return WorkdirDiff(
+        created, modified, detection="git_status", observed=observed, cap=cap, partial=True
+    )
+
+
+def _git_head_sha(workdir: str) -> str | None:
+    """The repo's HEAD sha, ``""`` for a repo with no commit yet, or None if not a repo."""
+    try:
+        proc = subprocess.run(
+            ["git", "rev-parse", "HEAD"], cwd=workdir, capture_output=True, text=True, timeout=30
+        )
+        if proc.returncode == 0:
+            return proc.stdout.strip()
+        inside = subprocess.run(
+            ["git", "rev-parse", "--is-inside-work-tree"],
+            cwd=workdir,
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    return "" if inside.returncode == 0 and inside.stdout.strip() == "true" else None
+
+
+def _content_sha256(path: Path) -> str | None:
+    """The file's sha256, or None when it does not exist / cannot be read."""
+    try:
+        if not path.is_file():
+            return None
+        return hashlib.sha256(path.read_bytes()).hexdigest()
+    except OSError:
+        return None
+
+
+def _capture_git_baseline(workdir: str) -> GitBaseline | None:
+    """Capture the pre-attempt git state: HEAD + content hashes of dirty/untracked paths.
+
+    Hashes ONLY the paths git reports dirty or untracked (via the same parse as the status
+    fallback), not the whole tree — the snapshot cap exists precisely because the full walk
+    is unbounded, and this capture must stay cheap. Returns ``None`` for a non-git workdir,
+    which the caller reports as the partial/unavailable observation.
+    """
+    head = _git_head_sha(workdir)
+    if head is None:
+        return None
+    dirty_hashes: dict[str, str] = {}
+    candidates: set[str] = set()
+    changes = _git_status_changes(workdir)
+    if changes is not None:
+        created, modified = changes
+        candidates.update(created)
+        candidates.update(modified)
+    # ``git status`` names an untracked DIRECTORY as one entry; ``ls-files --others`` names its
+    # files individually — the form the after-diff compares against, so capture those too.
+    candidates.update(_git_untracked(workdir))
+    for rel in candidates:
+        digest = _content_sha256(Path(workdir) / rel)
+        if digest is not None:
+            dirty_hashes[rel] = digest
+    return GitBaseline(head=head, dirty_hashes=dirty_hashes)
+
+
+def _git_name_status(workdir: str, commit: str) -> dict[str, str] | None:
+    """``git diff --name-status -z <commit>`` as path -> status letter, or None on failure.
+
+    Compares the working tree (committed + staged + unstaged) against ``commit``. Renames
+    and copies report their DESTINATION path with status ``R`` (the source drops out,
+    mirroring the status fallback's destination-path reading).
+    """
+    try:
+        proc = subprocess.run(
+            ["git", "diff", "--name-status", "-z", commit],
+            cwd=workdir,
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    if proc.returncode != 0:
+        return None
+    fields = proc.stdout.split("\0")
+    changes: dict[str, str] = {}
+    i = 0
+    while i < len(fields):
+        status = fields[i]
+        if not status:
+            i += 1
+            continue
+        letter = status[0]
+        if letter in ("R", "C"):
+            if i + 2 < len(fields):
+                changes[fields[i + 2]] = letter
+            i += 3
+            continue
+        if i + 1 < len(fields) and fields[i + 1]:
+            changes[fields[i + 1]] = letter
+        i += 2
+    return changes
+
+
+def _git_untracked(workdir: str) -> set[str]:
+    """The worktree's untracked (non-ignored) paths, or an empty set when git cannot answer."""
+    try:
+        proc = subprocess.run(
+            ["git", "ls-files", "--others", "--exclude-standard", "-z"],
+            cwd=workdir,
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return set()
+    if proc.returncode != 0:
+        return set()
+    return {p for p in proc.stdout.split("\0") if p}
+
+
+def _git_baseline_changes(workdir: str, baseline: GitBaseline) -> tuple[list[str], list[str]] | None:
+    """The changed set relative to the pre-attempt ``baseline`` (full observation).
+
+    The candidate set is every path git reports changed against the baseline HEAD (committed
+    and uncommitted tracked changes) plus every currently-untracked path. A candidate whose
+    content is unchanged since the baseline — because it was already dirty/untracked BEFORE
+    the attempt — is the pre-existing state, not this attempt's work, and is dropped;
+    a pre-existing dirty/untracked path whose content DID change is reported as modified
+    (the hashed path's semantics for a changed file, regardless of git's A/M lettering).
+    Otherwise git's status decides: ``A`` is created, ``M``/``T`` modified; deletions are
+    omitted, matching the hashed path, which only ever lists files that exist after the turn.
+    """
+    if not baseline.head:
+        return None
+    changes = _git_name_status(workdir, baseline.head)
+    if changes is None:
+        return None
+    untracked = _git_untracked(workdir)
+
+    created: set[str] = set()
+    modified: set[str] = set()
+    for path in set(changes) | untracked:
+        if not path or _is_artifact(path):
+            continue
+        baseline_hash = baseline.dirty_hashes.get(path)
+        if baseline_hash is not None:
+            current_hash = _content_sha256(Path(workdir) / path)
+            if current_hash is not None and current_hash != baseline_hash:
+                modified.add(path)
+            continue
+        if path in untracked or changes.get(path) == "A":
+            created.add(path)
+        elif changes.get(path) in ("M", "T"):
+            modified.add(path)
+    return sorted(created), sorted(modified)
 
 
 def _git_status_changes(workdir: str) -> tuple[list[str], list[str]] | None:

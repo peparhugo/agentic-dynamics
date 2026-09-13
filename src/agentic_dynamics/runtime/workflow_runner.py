@@ -257,6 +257,17 @@ class PhaseResult:
     session_id: str = ""
     files_created: list[str] = field(default_factory=list)
     files_modified: list[str] = field(default_factory=list)
+    #: How ``files_created``/``files_modified`` were derived (adapter ``WorkdirDiff.detection``):
+    #: ``"hashed"`` (full before/after snapshot), ``"git_baseline"`` (snapshot skipped; compared
+    #: against the pre-attempt git baseline — still a full observation), ``"git_status"``
+    #: (snapshot skipped and no baseline; narrower observation), ``"unavailable"`` (no
+    #: observation at all). Empty on legacy ledgers / callers that never recorded it.
+    change_detection: str = ""
+    #: Availability flag for the changed set: ``True`` when ``change_detection`` is the
+    #: narrower status-only observation or absent entirely. A partial observation is carried
+    #: onto the ledger so an empty changed set is never read as a measured "no changes"
+    #: (evidence-validity finding 8b).
+    change_observation_partial: bool = False
     final_response: str = ""
     confidence: float | None = None  # [H] execution-confidence signal (agent phases)
     #: Per-attempt records when the phase had MORE THAN ONE attempt (step 9 escalation: the
@@ -328,6 +339,12 @@ class PhaseResult:
             "session_id": self.session_id,
             "files_created": self.files_created,
             "files_modified": self.files_modified,
+            # ADDED keys (evidence-validity finding 8b — never renames an existing key): the
+            # changed-set provenance + availability, so the ledger can tell a full observation
+            # from the narrower git-status fallback / an unavailable one. Old ledgers lack the
+            # keys; consumers read them via ``.get(...)``.
+            "change_detection": self.change_detection,
+            "change_observation_partial": self.change_observation_partial,
             "confidence": self.confidence,
             # ADDED key (step 9 escalation — never renames an existing key): the per-attempt
             # rows of a multi-attempt phase (empty for the historical single-attempt phase).
@@ -3924,6 +3941,13 @@ def run_workflow(
                     prev_cache_read_tokens = getattr(ar, "cache_read_tokens", 0)
                     pr.files_created = list(getattr(ar, "files_created", []) or [])
                     pr.files_modified = list(getattr(ar, "files_modified", []) or [])
+                    # Carry the changed-set availability onto the ledger (evidence-validity
+                    # finding 8b): a snapshot-skipped git-status observation is partial, and a
+                    # partial empty set must never reach the ledger as an ordinary "no changes".
+                    pr.change_detection = str(getattr(ar, "change_detection", "") or "")
+                    pr.change_observation_partial = bool(
+                        getattr(ar, "change_observation_partial", False)
+                    )
                     pr.final_response = getattr(ar, "final_response", "")
                     if not getattr(ar, "ok", True):
                         pr.status = "failed"
