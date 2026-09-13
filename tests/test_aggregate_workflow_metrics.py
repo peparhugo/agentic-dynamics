@@ -494,3 +494,134 @@ def test_duplicate_occurrences_accumulate_across_three_ledgers():
     entry = pooled.duplicate_phase_rows[0]
     assert entry.occurrences == 3
     assert entry.paths == [f"experiments/results/camp/l{i}.json" for i in range(3)]
+
+
+# ── Canonical observation identity (evidence-validity finding 8a) ──────────────
+#
+# The dedup above must only ever collapse PROVEN copies — full-identity-equal rows. The
+# extraction used to normalize away the execution identity (session/commit/tokens/run
+# timestamps), so two actual `PhaseResult` serializations from distinct executions became one
+# phase whenever their retained duration/cost/status matched. These tests pin the identity
+# through extraction and pooling.
+
+
+def _run_payload(phase_overrides=None, *, run_id="run-a", started="2026-08-30T00:00:00+00:00",
+                 ended="2026-08-30T00:10:00+00:00", spec_name="demo"):
+    """A realistic ``WorkflowRunResult.to_dict()`` payload with one agent phase."""
+    phase = {
+        "phase": "implement",
+        "kind": "agent",
+        "status": "ok",
+        "cost_usd": 1.0,
+        "duration_s": 60.0,
+        "model": "deepseek/deepseek-v4-pro",
+        "commit_hash": "aaaa111",
+        "session_id": "ses_01",
+        "tokens": {"in": 100, "out": 10, "total": 110},
+    }
+    phase.update(phase_overrides or {})
+    return {
+        "spec_name": spec_name,
+        "model": "m",
+        "goal": "g",
+        "run_id": run_id,
+        "started_at": started,
+        "ended_at": ended,
+        "phases": [phase],
+    }
+
+
+def test_extraction_preserves_canonical_observation_identity():
+    """The phase row keeps session/commit/tokens plus the run id + run-level timestamps."""
+    corpus = agg.extract_ledger(_run_payload(), "experiments/results/demo/run.json")
+    p = corpus.phases[0]
+    assert p.session_id == "ses_01"
+    assert p.commit_hash == "aaaa111"
+    assert p.tokens == {"in": 100, "out": 10, "total": 110}
+    assert p.run_id == "run-a"
+    assert p.run_started_at == "2026-08-30T00:00:00+00:00"
+    assert p.run_ended_at == "2026-08-30T00:10:00+00:00"
+
+
+def test_nested_run_ledger_identity_stamped_from_envelope():
+    """A campaign wrapper (`campaign` + `run_ledger`) stamps identity from the inner envelope."""
+    wrapper = {"campaign": "cap_demo", "run_ledger": _run_payload()}
+    corpus = agg.extract_ledger(wrapper, "experiments/results/cap_demo/cell.json")
+    p = corpus.phases[0]
+    assert p.run_id == "run-a"
+    assert p.run_started_at == "2026-08-30T00:00:00+00:00"
+    assert p.run_ended_at == "2026-08-30T00:10:00+00:00"
+    assert corpus.started_at == "2026-08-30T00:00:00+00:00"
+    assert corpus.ended_at == "2026-08-30T00:10:00+00:00"
+
+
+def test_distinct_executions_with_matching_retained_fields_stay_distinct():
+    """Two executions whose retained duration/cost/status match must remain TWO observations."""
+    first = agg.extract_ledger(_run_payload(), "experiments/results/demo/a.json")
+    second = agg.extract_ledger(
+        _run_payload(
+            {
+                "session_id": "ses_02",
+                "commit_hash": "bbbb222",
+                "tokens": {"in": 999, "out": 10, "total": 1009},
+            },
+            run_id="run-b",
+            started="2026-08-30T01:00:00+00:00",
+            ended="2026-08-30T01:10:00+00:00",
+        ),
+        "experiments/results/demo/b.json",
+    )
+
+    pooled = agg.merge_corpora([first, second])[0]
+
+    assert len(pooled.phases) == 2  # the retained fields matched; the identity did not
+    assert pooled.duplicate_phase_rows == []
+    assert agg.compute_campaign_metrics(pooled)["n_phases"] == 2
+
+
+def test_distinct_executions_differing_only_in_tokens_stay_distinct():
+    """A token-measurement difference alone separates two executions (nothing else differs)."""
+    first = agg.extract_ledger(_run_payload(), "experiments/results/demo/a.json")
+    second = agg.extract_ledger(
+        _run_payload({"tokens": {"in": 1, "out": 2, "total": 3}}),
+        "experiments/results/demo/b.json",
+    )
+
+    pooled = agg.merge_corpora([first, second])[0]
+
+    assert len(pooled.phases) == 2
+    assert pooled.duplicate_phase_rows == []
+
+
+def test_proven_full_identity_copies_still_dedup():
+    """The SAME serialization in an aggregate + a per-cell ledger is a proven copy — deduped."""
+    payload = _run_payload()
+    first = agg.extract_ledger(payload, "experiments/results/demo/aggregate.json")
+    second = agg.extract_ledger(payload, "experiments/results/demo/cell_01.json")
+
+    pooled = agg.merge_corpora([first, second])[0]
+
+    assert len(pooled.phases) == 1
+    assert len(pooled.duplicate_phase_rows) == 1
+    entry = pooled.duplicate_phase_rows[0]
+    assert entry.identity["session_id"] == "ses_01"
+    assert entry.identity["commit_hash"] == "aaaa111"
+    assert entry.identity["run_id"] == "run-a"
+    assert entry.occurrences == 2
+
+
+def test_identityless_rows_are_never_collapsed():
+    """A row with no observable identity cannot be PROVEN a copy — it is never pooled away.
+
+    Two legacy serializations with equal retained fields but no session/commit/tokens/window
+    may be distinct executions; collapsing them is exactly the under-count finding 8a names.
+    """
+    identityless = agg.Phase("test", "test", "ok", 0.0, 0.33)  # every identity field empty
+    assert agg.has_observable_identity(identityless) is False
+    first = _campaign_corpus("experiments/results/camp/a.json", [identityless])
+    second = _campaign_corpus("experiments/results/camp/b.json", [identityless])
+
+    pooled = agg.merge_corpora([first, second])[0]
+
+    assert len(pooled.phases) == 2
+    assert pooled.duplicate_phase_rows == []

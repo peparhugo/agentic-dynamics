@@ -239,6 +239,11 @@ class DockerAgentExecutor(StepExecutor):
             sr.estimated_cost_usd = float(phase.get("cost_usd", 0.0) or 0.0)
             sr.files_created = list(phase.get("files_created", []) or [])
             sr.files_modified = list(phase.get("files_modified", []) or [])
+            # Changed-set availability (evidence-validity finding 8b): a snapshot-skipped
+            # git-status observation is partial; carry the provenance across the container
+            # boundary exactly as the in-process path does.
+            sr.change_detection = str(phase.get("change_detection", "") or "")
+            sr.change_observation_partial = bool(phase.get("change_observation_partial", False))
             sr.confidence = phase.get("confidence")
             sr.final_response = str(phase.get("final_response", "") or "")
         return sr

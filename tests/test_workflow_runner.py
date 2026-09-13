@@ -80,6 +80,32 @@ def test_run_workflow_phases_in_order(tmp_path):
     assert result.phases[0].cost_usd == 0.001
 
 
+def test_phase_result_carries_change_detection_availability(tmp_path):
+    """Finding 8b: the adapter's changed-set provenance + availability reach the ledger.
+
+    A snapshot-skipped git-status observation is partial; an empty changed set with that
+    provenance must be legible as partial on the serialized phase, not as measured "no
+    changes".
+    """
+    spec = load_spec(SPEC)
+
+    def agent(prompt, *, model, backend, workdir, **kwargs):
+        return _fake_agent(
+            files_modified=[],
+            change_detection="git_status",
+            change_observation_partial=True,
+        )
+
+    result = run_workflow(spec, goal="g", model="m", workdir=tmp_path, commit=False,
+                          run_agentic_fn=agent)
+
+    assert result.phases[0].change_detection == "git_status"
+    assert result.phases[0].change_observation_partial is True
+    ledger = result.to_dict()["phases"][0]
+    assert ledger["change_detection"] == "git_status"
+    assert ledger["change_observation_partial"] is True
+
+
 def test_run_workflow_publishes_phase_per_phase(tmp_path, monkeypatch):
     """Each phase start publishes {name, index, total} to the live publisher."""
     published = []

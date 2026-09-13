@@ -31,12 +31,17 @@ for the authoritative schema):
 Phase pooling is **identity-aware** (:func:`merge_corpora`): a campaign's phase ledgers often
 contain the same phase row twice (an aggregate ledger plus a per-cell copy, or a re-run artifact
 left beside its predecessor). Pooling by campaign name alone double-counted those rows silently.
-The join now keeps one row per full phase identity (:func:`phase_identity_fields` — name, kind,
-status, execution window, model, cost/duration, error, test verdict, and the recorded gate
-evidence), records every dedup on ``LedgerCorpus.duplicate_phase_rows``, and surfaces the block
-(``count`` + ``entries`` with identity and source paths) in the per-campaign and coverage output.
-Rows that differ in any identifying field pool exactly as before — only exact duplicates are
-collapsed, and never silently.
+The join now keeps one row per full phase identity (:func:`phase_identity_fields` — the phase
+name, kind, status, execution window, model, cost/duration, error, test verdict, the recorded
+gate evidence, AND the canonical observation identity: the backend ``session_id``, the phase's
+``commit_hash``, its ``tokens`` measurements, and the owning run's ``run_id`` /
+``started_at`` / ``ended_at``). Records every dedup on ``LedgerCorpus.duplicate_phase_rows``, and
+surfaces the block (``count`` + ``entries`` with identity and source paths) in the per-campaign
+and coverage output. Rows that differ in any identifying field pool exactly as before — only
+full-identity-equal copies with an observable identity are collapsed, and never silently; a row
+with no observable identity at all is never pooled away, so two DISTINCT executions whose
+retained duration/cost/status happen to match are never merged into one observation
+(evidence-validity finding 8a).
 
 The pinned attempt-level fields ``attempt_count`` / ``first_pass`` / ``accepted`` /
 ``escalation_from`` / ``escalation_to`` are DECLARED in ``LEDGER_FIELDS``
@@ -186,6 +191,21 @@ class Phase:
     #: the identity-aware pooling in :func:`merge_corpora` must keep both.
     started_at: str = ""
     ended_at: str = ""
+    # ── Canonical observation identity (evidence-validity finding 8a) ──────────────────────
+    #
+    # The PhaseResult serialization carries the identity of the execution that produced the
+    # phase: the backend session, the commit the phase wrote, and the token measurements. The
+    # RUN it belongs to adds the run id and run-level timestamps. Before these fields were
+    # extracted, two DISTINCT executions whose retained duration/cost/status happened to match
+    # collapsed into one pooled phase (and were reported as a "duplicate"), silently shrinking
+    # the scientific population. They are first-class identity: :func:`phase_identity_fields`
+    # includes them, so only a full-identity-equal row is ever deduplicated.
+    session_id: str = ""
+    commit_hash: str = ""
+    tokens: dict[str, Any] = field(default_factory=dict)
+    run_id: str = ""
+    run_started_at: str = ""
+    run_ended_at: str = ""
 
 
 @dataclass
@@ -451,6 +471,28 @@ def _checkpoints_from(payload: dict[str, Any]) -> list[dict[str, Any]]:
     return []
 
 
+def _run_envelope(payload: dict[str, Any]) -> dict[str, Any]:
+    """The dict carrying the run-level fields (id/timestamps): the payload or its ``run_ledger``.
+
+    A campaign wrapper hides the runner's ``WorkflowRunResult`` under ``run_ledger``; the
+    run-level identity the phase join needs (``run_id``, ``started_at``, ``ended_at``) must be
+    read from the SAME envelope the phases came from, not from the wrapper's top level.
+    """
+    if isinstance(payload.get("phases"), list):
+        return payload
+    run_ledger = payload.get("run_ledger")
+    if isinstance(run_ledger, dict) and isinstance(run_ledger.get("phases"), list):
+        return run_ledger
+    return payload
+
+
+def _tokens_from(raw: Any) -> dict[str, Any]:
+    """Normalize a phase's token dict (numeric measurements) for the canonical identity."""
+    if not isinstance(raw, dict):
+        return {}
+    return {str(k): v for k, v in raw.items()}
+
+
 def _extract_run_like_ledger(payload: dict[str, Any], path: str) -> LedgerCorpus:
     """Normalize a workflow-run or campaign-phase ledger into phases + checkpoints.
 
@@ -459,10 +501,19 @@ def _extract_run_like_ledger(payload: dict[str, Any], path: str) -> LedgerCorpus
     often minted by a per-cell spec (e.g. the 26 session-routing ledgers all carry
     ``spec_name: cap_session_policy_cell``), and pooling them under the cell-spec name would
     fragment one campaign into a name per cell.
+
+    Each phase row is stamped with its canonical observation identity — the per-phase
+    ``session_id`` / ``commit_hash`` / ``tokens`` and the run-level ``run_id`` /
+    ``started_at`` / ``ended_at`` from the run envelope (evidence-validity finding 8a). That
+    identity is what :func:`merge_corpora` compares: two executions that happen to share
+    duration/cost/status are distinct observations as soon as their session, commit, tokens,
+    or run timestamps differ.
     """
     corpus = LedgerCorpus(name=_campaign_name(path), paths=[path])
-    corpus.started_at = str(payload.get("started_at") or "")
-    corpus.ended_at = str(payload.get("ended_at") or "")
+    envelope = _run_envelope(payload)
+    corpus.started_at = str(envelope.get("started_at") or "")
+    corpus.ended_at = str(envelope.get("ended_at") or "")
+    run_id = str(envelope.get("run_id") or "")
     for p in _phases_from(payload):
         corpus.phases.append(
             Phase(
@@ -494,6 +545,16 @@ def _extract_run_like_ledger(payload: dict[str, Any], path: str) -> LedgerCorpus
                 # identity field: the same phase run twice is two observations.
                 started_at=str(p.get("started_at") or ""),
                 ended_at=str(p.get("ended_at") or ""),
+                # Canonical observation identity (finding 8a): the execution's session, the
+                # commit it wrote, its token measurements, and the run it belongs to. NEVER
+                # dropped — dropping these is how two distinct executions became one pooled
+                # phase whenever their retained duration/cost/status matched.
+                session_id=str(p.get("session_id") or ""),
+                commit_hash=str(p.get("commit_hash") or ""),
+                tokens=_tokens_from(p.get("tokens")),
+                run_id=run_id,
+                run_started_at=corpus.started_at,
+                run_ended_at=corpus.ended_at,
             )
         )
     for c in _checkpoints_from(payload):
@@ -527,14 +588,44 @@ def phase_identity_fields(phase: Phase) -> dict[str, Any]:
 
     Identity is the WHOLE normalized row — phase name, kind, status, the execution window
     (``started_at``/``ended_at``), model, cost/duration, error, the independent test verdict,
-    and the recorded stall/deploy/commit/relabel gate evidence — not a name+timestamp subset.
-    That is the conservative reading of the pooling policy ("never drop rows that differ in any
-    measured field"): two rows are called duplicates only when every field the extractor
-    observed is equal, so a re-run that differs in cost, duration, a gate record, or a test
-    outcome stays a distinct observation. ``asdict`` is used deliberately so a field added to
-    :class:`Phase` later joins the identity automatically instead of silently being ignored.
+    the recorded stall/deploy/commit/relabel gate evidence, AND the canonical observation
+    identity the extraction preserves: ``session_id``, ``commit_hash``, ``tokens``, ``run_id``,
+    ``run_started_at``/``run_ended_at`` (evidence-validity finding 8a). That is the
+    conservative reading of the pooling policy ("never drop rows that differ in any measured
+    field"): two rows are called duplicates only when every field the extractor observed is
+    equal, so a re-run that differs in cost, duration, a gate record, a test outcome, the
+    session/commit it produced, its token measurements, or the run it belongs to stays a
+    distinct observation. ``asdict`` is used deliberately so a field added to :class:`Phase`
+    later joins the identity automatically instead of silently being ignored.
     """
     return asdict(phase)
+
+
+#: The observation-identity fields (evidence-validity finding 8a). At least one must be
+#: present for a phase row to be DEDUP-ELIGIBLE: a row with all of these empty cannot be
+#: proven a copy of another row — two legacy serializations whose retained
+#: duration/cost/status match may be distinct executions — so it is never collapsed.
+PHASE_OBSERVATION_IDENTITY_FIELDS: tuple[str, ...] = (
+    "started_at",
+    "ended_at",
+    "session_id",
+    "commit_hash",
+    "tokens",
+    "run_id",
+    "run_started_at",
+    "run_ended_at",
+)
+
+
+def has_observable_identity(phase: Phase) -> bool:
+    """True when the row carries at least one observable identity field.
+
+    Only observable-identity rows are candidates for the pooling dedup: with no identity at
+    all, full-field equality is all that separates two rows, and matching retained
+    duration/cost/status is exactly what must NOT collapse distinct executions.
+    """
+    fields = phase_identity_fields(phase)
+    return any(fields.get(name) for name in PHASE_OBSERVATION_IDENTITY_FIELDS)
 
 
 def phase_identity(phase: Phase) -> str:
@@ -556,12 +647,16 @@ def merge_corpora(corpora: list[LedgerCorpus]) -> list[LedgerCorpus]:
     ledgers); each file is its own ``LedgerCorpus`` under the same name. Pooling them by name
     is what turns the per-file phase rows into a per-campaign table.
 
-    The pooling is **identity-aware**: a phase row that appears in more than one of a
-    campaign's ledgers — an aggregate ledger plus a per-cell copy, or a re-run artifact left
-    beside its predecessor — is kept ONCE, and the drop is recorded on the pooled corpus's
-    :attr:`LedgerCorpus.duplicate_phase_rows` with the identity and every source path. Rows
-    that differ in ANY identifying field (see :func:`phase_identity_fields`) pool exactly as
-    before. The dedup never silently discards: the duplicate block is the audit trail.
+    The pooling is **identity-aware**, and only PROVEN copies are collapsed: a phase row that
+    appears in more than one of a campaign's ledgers — an aggregate ledger plus a per-cell
+    copy, or a re-run artifact left beside its predecessor — is kept ONCE only when its full
+    canonical observation identity matches (see :func:`phase_identity_fields` — including
+    session/commit/token measurements and the owning run's id/timestamps) AND at least one
+    identity field is observable (:func:`has_observable_identity`). A row with no observable
+    identity is never collapsed: two distinct executions whose retained duration/cost/status
+    match must not merge just because nothing distinguished them. Every drop is recorded on
+    the pooled corpus's :attr:`LedgerCorpus.duplicate_phase_rows` with the identity and every
+    source path; the duplicate block is the audit trail.
     """
     by_name: dict[str, LedgerCorpus] = {}
     order: list[str] = []
@@ -586,6 +681,12 @@ def merge_corpora(corpora: list[LedgerCorpus]) -> list[LedgerCorpus]:
         target.jobs.extend(corpus.jobs)
         target.attempts.extend(corpus.attempts)
         for phase in corpus.phases:
+            if not has_observable_identity(phase):
+                # No observable identity: cannot be PROVEN a copy of any other row, so it is
+                # never pooled away. Two identity-less rows with equal retained fields stay
+                # two observations (evidence-validity finding 8a).
+                target.phases.append(phase)
+                continue
             key = phase_identity(phase)
             if key not in positions:
                 positions[key] = len(target.phases)

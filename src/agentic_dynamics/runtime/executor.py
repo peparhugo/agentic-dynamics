@@ -261,6 +261,12 @@ class StepResult:
     cache_hit_rate: float = 0.0
     files_created: list[str] = field(default_factory=list)
     files_modified: list[str] = field(default_factory=list)
+    #: How the changed set was derived (adapter ``WorkdirDiff.detection``) and whether it is
+    #: a partial observation. Carried so the engine's ledger records the availability of the
+    #: change measurement (evidence-validity finding 8b) — an empty changed set from the
+    #: narrower git-status fallback must not read as measured "no changes".
+    change_detection: str = ""
+    change_observation_partial: bool = False
     final_response: str = ""
     # test-verdict fields (w1, engine_gaps_verifier_revision): filled ONLY by a verifier
     # executor — the object a ``kind: test`` phase's dispatch returns. The engine reads the
@@ -354,6 +360,8 @@ def _result_from_agentic(ar: Any) -> StepResult:
         cache_hit_rate=float(getattr(ar, "cache_hit_rate", 0.0) or 0.0),
         files_created=list(getattr(ar, "files_created", []) or []),
         files_modified=list(getattr(ar, "files_modified", []) or []),
+        change_detection=str(getattr(ar, "change_detection", "") or ""),
+        change_observation_partial=bool(getattr(ar, "change_observation_partial", False)),
         final_response=getattr(ar, "final_response", "") or "",
         # Test-verdict fields ride through when the adapted object carries them (an agentic
         # result normally does not — an agent executor produces no test verdict); absent
