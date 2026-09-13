@@ -1,0 +1,179 @@
+name: control_room_facelift_review
+question: >-
+  Review the Control Room facelift BEFORE any implementation: (a) decompose the proposed
+  design into SMALL, independent, individually-gated tasks; (b) design the question-driven,
+  self-evolving workflow shape the decomposition should run under (novelty/uncertainty-driven
+  selection, layered parallel questions, acceptance gates); (c) run an adversarial review over
+  BOTH the source design and the decomposition (the adversary role stands in for GPT Astra
+  until the fleet gains the astra model entry).
+  Inputs (read-only): docs/research/control_room_direction.md (accepted),
+  docs/research/control_room_ui_reference_synthesis.md (proposed facelift),
+  docs/research/control_room_state_screens.md, docs/research/control_room_wireframe.md,
+  docs/research/agent_runtime_landscape.md, the live room inventory in the synthesis §1,
+  and the current apps/control_room tree. No UI code changes in this run: the outputs are
+  the reviewed task plan + the dynamic-workflow design + the adversarial findings.
+version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: false
+repeatable: false
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: false
+    context:
+      domain_context: >-
+        canonical_sources: [docs/research/control_room_direction.md,
+        docs/research/control_room_ui_reference_synthesis.md,
+        docs/research/control_room_state_screens.md, docs/research/control_room_wireframe.md,
+        docs/research/agent_runtime_landscape.md, apps/control_room/static/ +
+        routes/glance.py (the measured inventory in synthesis §1), docs/website/control_room_ui/
+        (the existing research/design/audit/verify series), the ExperimentSpec compiler
+        (src/agentic_dynamics/experiment/{experiment_spec,compile_experiment}.py — the
+        requires/produces gate + AdaptSpec strategies), docs/architecture/current/
+        2026-08-14_experiment-spec-and-compiler-design.md]
+        policies: [no implementation in this run — docs only; every task in the plan carries
+        ONE question, ONE verifiable acceptance (a named test/gate), explicit dependencies and
+        a size bound (one agent session); no fabricated claims — cite file:line or the doc
+        section; the adversary attacks questions and acceptance, not just answers; keep the
+        tree lint-clean; no new runtime dependency]
+        verification: [tests/test_doc_lifecycle.py, tests/test_fast_path_gate.py]
+    phases:
+      - name: a0_deep_research
+        kind: agent
+        scope: implementation
+        timeout: 3600
+        prompt: |
+          GOAL: {goal}
+          DEEP INTERNET RESEARCH, the same protocol the agent-runtime-ui-research session
+          used: sweep, pin, extract, dispose, reconcile. Write the result to
+          docs/research/control_room_ui_reference_synthesis_v2.md (a v2 that EXTENDS the v1
+          synthesis; never delete v1).
+          1. SWEEP: search the open web for current (2025-2026) UI/UX patterns for operator
+             consoles, agent-fleet dashboards, observability walls, and control rooms —
+             including but not limited to: live-agent TUI/dashboards (candidate repos:
+             GitHub topics for agent-dashboard/ai-ops/observability-ui), wallboard/KPI
+             conventions, incident-response consoles, and creative single-screen
+             information designs. Clone/read the strongest 5+ candidates.
+          2. PIN: every external claim carries the repo URL + full commit SHA (or the URL +
+             access date); no unpinned claims.
+          3. EXTRACT: mechanisms (not screenshots): naming, state vocabularies, layout
+             grammars, interaction patterns, animation policy, accessibility handling, data
+             density decisions — each with a file:line anchor in the source.
+          4. DISPOSE: for each mechanism, one disposition: ADOPT / ADAPT / DO-NOT-COPY with a
+             one-line reason tied to the accepted direction
+             (docs/research/control_room_direction.md) and the facelift brief (v1 §4).
+          5. RECONCILE: a table mapping every new idea to the v1 synthesis + direction
+             (presupposed / extends / conflicts), so the reviewer sees exactly what changed.
+          Budget the sweep: prefer depth on 5-8 sources over breadth on 30. Keep clones under
+          /tmp/opencode/research (ephemeral is fine; the pins are the durable part).
+      - name: a1_decompose
+        kind: agent
+        scope: implementation
+        timeout: 1800
+        prompt: |
+          GOAL: {goal}
+          Decompose the facelift design into SMALL manageable tasks and write the plan to
+          docs/website/control_room_ui/facelift_task_plan.md. Rules:
+          - A task is small iff ONE agent session can produce its artifact and ONE named
+            acceptance check (a test target, a render-gate fixture, or a measured diff) turns
+            green; if not, split it by asking "what must be true for this to hold?" until each
+            leaf satisfies the bound.
+          - Every task: id, the QUESTION it answers, artifact, acceptance (named gate),
+            dependencies, layer (intent/structure/behavior/verification/presentation),
+            evidence class ([M]/[C]/[H]/[P]/[X]) and size estimate.
+          - Cover the whole synthesis: R0 wallboard, R1 inbox, R2 tiles (incl. the E10 row
+            legibility fix), R3 KPI/health/composition, R4 session surface, state language
+            (glyph/color/rhythm/seen/ack), visual tokens, the five adds (live-log, pipeline,
+            ask-the-data, counters-as-filters, toast rail), and the astra fleet enablement
+            (the parked container-config entry) as its own small task.
+          - Mark the minimal first wave (the smallest set that delivers visible improvement)
+            and the exact stopped-by gates.
+          - Reconcile against docs/research/control_room_direction.md (accepted) — the plan
+            must presuppose it, not re-litigate it.
+      - name: a2_dynamic_workflow
+        kind: agent
+        scope: implementation
+        timeout: 1800
+        prompt: |
+          GOAL: {goal}
+          Design the question-driven, self-evolving workflow shape that should run the
+          decomposition above (and future design work), into
+          docs/website/control_room_ui/dynamic_workflow_design.md. Think in the manner the
+          controller described: novelty/complexity-seeking, high abstraction, layered
+          parallel processing — a person with AuDHD does not follow a static checklist, they
+          grow a living question tree. Concretely address:
+          - TASK UNIT: question + acceptance + kill-criterion; "small" as the one-session
+            bound. How a question expands into a sub-tree when its answer is uncertain.
+          - LAYERS: the abstraction layers (intent → structure → behavior → verification →
+            presentation) and which questions may run in PARALLEL at each layer (fan-out),
+            with cross-layer edges expressed as requires/produces (the compiler already
+            encodes this).
+          - DRIVE: selecting the next question by information gain — reuse the compiler's
+            adapt strategies (highest_uncertainty | highest_regret | largest_effect) as the
+            novelty engine; StopSpec budget/attempts/time as the convergence brake.
+          - SELF-EVOLUTION: how a phase emits (answer, new questions, uncertainty delta) and
+            how child specs are generated and admitted (the compiler generalizes cells
+            already; be explicit about the minimal new machinery vs what exists — no
+            hand-waving, no new top-level mechanism without a named gap).
+          - ADVERSARIAL LOOP: questions get attacked (right question? real acceptance?
+            falsifiable?), not just answers; findings must be phrased as corrections to
+            questions or acceptance.
+          - A worked example: apply the protocol to THIS facelift (a 10-15 question tree) so
+            the design is demonstrated, not asserted.
+      - name: a3_adversarial
+        kind: agent
+        scope: implementation
+        timeout: 2400
+        prompt: |
+          GOAL: {goal}
+          You are the ADVERSARY reviewing the facelift design and the two documents produced
+          in a1/a2. Stand in for the GPT Astra adversary (the fleet does not yet whitelist
+          openai/gpt-6-astra; if you can see it is available, say so and use it). Write
+          docs/reviews/control_room_facelift_adversarial.md:
+          - Attack the DESIGN: contradictions against control_room_direction.md and the
+            state-screens truth table; untestable or vague acceptance; client/server
+            authority leaks; accessibility/forced-colors/reduced-motion gaps; missing failure
+            modes (unknown/partial/degraded/two-sources-disagree); scope traps; visual
+            changes that cannot be pinned by the render gate; anything that recreates a second
+            operational truth or fabricates values.
+          - Attack the DECOMPOSITION: tasks too broad to gate, missing dependencies,
+            acceptance that can pass vacuously, ordering that risks a half-migrated room,
+            tasks that quietly expand the authority model or add runtime dependencies.
+          - Attack the DYNAMIC-WORKFLOW DESIGN: does it actually self-evolve within the
+            existing compiler contracts, or does it smuggle in a new ungrounded mechanism?
+            Is the novelty drive convergent? Where can it thrash or burn budget?
+          - Findings format: severity (high/medium), the flawed claim/question, the required
+            correction, and the acceptance that proves the correction. Precision over volume;
+            no praise sections, no restating.
+      - name: a4_revise
+        kind: agent
+        scope: implementation
+        timeout: 1800
+        prompt: |
+          GOAL: {goal}
+          Fold the adversarial findings into both documents (edit them in place): every
+          accepted finding becomes a correction to a task/question/acceptance; every rejected
+          finding gets a one-line reason. Keep the task plan SMALL and gated. End with a
+          short "controller decisions needed" section (the genuinely open choices only).
+          Then run the two declared tests and report their status.
+      - name: a5_verify
+        kind: test
+        scope: implementation
+        timeout: 600
+        tests:
+          - tests/test_doc_lifecycle.py
+          - tests/test_fast_path_gate.py
+        prompt: |
+          The declared target keeps the docs tree honest; fix doc-lifecycle failures in the
+          documents, never weaken the gate.
+factors:
+  - {name: model, levels: [deepseek/deepseek-v4-flash]}
+design: factorial
+rules: []
+metrics: []
+writeup: {format: lab_book, sections: [question]}
+stop: {budget_usd: 4.0, max_attempts: 2}
