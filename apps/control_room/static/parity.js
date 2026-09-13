@@ -189,6 +189,7 @@
       "data-action-confirmation": opts.phrase || "none",
       title: opts.title || opts.label,
     }, opts.label);
+    if (opts.disabled) chip.disabled = true;
     chip.addEventListener("click", function () {
       var gate = Promise.resolve(true);
       if (opts.phrase) gate = requestConfirm(opts.confirm || opts.label, opts.phrase);
@@ -369,23 +370,32 @@
     return date.toISOString().slice(11, 19);
   }
 
-  /** Seed the feed from the run's typed facts so it is useful before any live event arrives. */
+  /** Seed the feed from the run's RECORDED events, or say plainly that none were recorded. */
   function seedWorkerFeed(run) {
     var list = document.getElementById("dock-event-feed");
     if (!list) return;
     clear(list);
-    var seeds = [
-      ["lifecycle", "attempt " + (run["attempt.number"] || "?") + " · " + (run["model.provider"] || "model unknown")],
-      ["advisory", "said " + (run["evidence.advisory"] || "unknown")],
-      ["measured", "measured " + (run["evidence.measured"] || "unknown")],
-      ["source", "commit " + String(run["source.commit"] || "unknown").replace(/^commit\s+/, "")],
-      ["measured", "lease reserved " + (run["budget.reserved"] || "unknown") + " / cap " + (run["budget.cap"] || "unknown")],
-    ];
-    seeds.forEach(function (seed) {
-      var entry = element("li", "feed-entry", { "data-feed-entry": "", "data-event-kind": seed[0] });
-      entry.appendChild(element("span", "feed-time", null, "seed"));
-      entry.appendChild(element("span", "feed-class", null, String(seed[0]).toUpperCase()));
-      entry.appendChild(element("span", "feed-text", null, seed[1]));
+    var recorded = Array.isArray(run["run.events"]) ? run["run.events"] : [];
+    if (!recorded.length) {
+      var empty = element("li", "feed-entry",
+        { "data-feed-entry": "", "data-event-kind": "none" });
+      empty.appendChild(element("span", "feed-time", null, "—"));
+      empty.appendChild(element("span", "feed-class", null, "NONE"));
+      empty.appendChild(element("span", "feed-text", null, "no recorded events for this run"));
+      list.appendChild(empty);
+      return;
+    }
+    recorded.forEach(function (event) {
+      var cls = event["class"] || "event";
+      var entry = element("li", "feed-entry", {
+        "data-feed-entry": "",
+        "data-event-kind": cls,
+        "data-event-id": event.id || "",
+        "data-event-ts": event.ts || "",
+      });
+      entry.appendChild(element("span", "feed-time", null, formatTime(event.ts)));
+      entry.appendChild(element("span", "feed-class", null, String(cls).toUpperCase()));
+      entry.appendChild(element("span", "feed-text", null, event.text || "—"));
       list.appendChild(entry);
     });
   }
@@ -400,6 +410,8 @@
   function openWorkerStream(cellId) {
     closeWorkerStream();
     seedWorkerFeed(currentRun || {});
+    var target = document.getElementById("dock-worker-target");
+    if (target) target.textContent = cellId || "unbound";
     var toggle = document.getElementById("dock-stream-toggle");
     if (toggle) {
       toggle.disabled = false;
@@ -433,13 +445,18 @@
     }
   }
 
-  /** Best-effort cell id for the selected run: its spec cell, else the terminal target. */
+  /**
+   * The EXPLICIT cell binding the executor publishes under — `spec.cell` where recorded.
+   *
+   * Deliberately no fallback to the terminal target or the run id: the executor publishes under
+   * a cell id that can differ from both, so a guessed id would subscribe the operator to the
+   * wrong stream while the dock labels it live. No recorded binding returns "" and the dock
+   * reports the stream `unavailable` instead.
+   */
   function cellIdFor(run) {
     var cell = run["spec.cell"];
-    if (cell && cell !== "unknown" && cell !== "none") return String(cell);
-    var target = String(run["terminal.target"] || "").replace(/^wt\//, "");
-    if (target && target !== "unknown" && target !== "none") return target;
-    return String(run["session.identity"] || "unknown");
+    if (!cell || cell === "unknown" || cell === "none") return "";
+    return String(cell);
   }
 
   // ── R4a address + R4d step timings ────────────────────────────────────────────────────────
@@ -582,8 +599,15 @@
       after: function () { copyText(session); },
     }));
     host.appendChild(actionChip({
-      verb: "attach", label: "Reattach stream", target: cell, authority: "aios",
+      verb: "attach",
+      label: cell ? "Reattach stream" : "Stream unbound",
+      target: cell || "unbound",
+      authority: "aios",
       reversible: true,
+      disabled: !cell,
+      title: cell
+        ? "attach the selected cell's recorded binding"
+        : "no recorded cell binding — refusing to guess a stream id",
       after: function () { openWorkerStream(cell); },
     }));
 

@@ -20,9 +20,11 @@ Two additive, read-only routes live here:
 ``GET /api/events``
     A bounded Server-Sent Events stream for the resting screen: an initial ``snapshot`` frame
     (the whole glance payload), a ``replay_complete`` boundary, then ``transition`` frames when
-    the durable ``control_epoch`` moves. The frame vocabulary mirrors the render gate's commit-
-    ted SSE contract exactly (``event: snapshot`` / ``event: replay_complete`` / ``event:
-    transition``), so the same client code runs under fixtures and in production.
+    the durable ``control_epoch`` moves OR the worker/projection health changes at the same
+    epoch (a health change is not a run-state move and must not wait for one). The frame
+    vocabulary mirrors the render gate's committed SSE contract exactly (``event: snapshot`` /
+    ``event: replay_complete`` / ``event: transition``), so the same client code runs under
+    fixtures and in production.
 
 The routes are additive on purpose: every pre-existing route on ``apps/control_room/routes``
 keeps working and keeps its shape. This module only *reads*; it registers no mutation.
@@ -34,6 +36,7 @@ import json
 import time
 from collections.abc import Iterator
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from flask import Response, jsonify, stream_with_context
@@ -61,17 +64,24 @@ def _unknown_field(age: int = 0) -> dict[str, Any]:
     return {"state": "unknown", "age_seconds": age}
 
 
-def _read_packet() -> dict[str, Any] | None:
-    """Read the ``control-status/v1`` packet, or ``None`` when there is no control database.
+def _read_control_state() -> tuple[dict[str, Any] | None, dict[str, dict[str, Any]]]:
+    """Read the packet AND the per-run detail records it references, or ``(None, {})``.
 
     ``build_packet`` is a pure function of its inputs; the impure collection (git HEAD, worker
     heartbeats) happens here and its failures are passed through as ``degraded`` notes rather
     than raised. A missing control database is a *missing control plane* — distinct from an
     empty one — so it becomes ``None`` and the caller renders ``unknown``/``down`` for the
     control dimension instead of pretending there are no runs.
+
+    The run details are composed from the SAME existing read service the Operations lens uses
+    (``services.operations.run_detail``): attempts, gates, approvals and the command journal.
+    They are read here, on the same read-only handle and in the same pass as the packet, because
+    the glance row must never re-infer an attempt number, a receipt or a workspace binding that
+    the control records already answer (or answer "nothing recorded").
     """
     from agentic_dynamics.control import control_status
     from agentic_dynamics.control.control_db import ControlDB, ControlDBError
+    from apps.control_room.services import operations as ops
 
     try:
         head_sha, head_error = control_status.read_repo_head_sha()
@@ -89,13 +99,26 @@ def _read_packet() -> dict[str, Any] | None:
         degraded.append({"surface": "unhealthy_workers", "reason": str(heartbeat_error)})
     try:
         with ControlDB.open_read_only() as db:
-            return control_status.build_packet(
+            packet = control_status.build_packet(
                 db, repo_head_sha=head_sha, heartbeats=heartbeats, degraded=degraded
             )
+            details: dict[str, dict[str, Any]] = {}
+            refs = list(packet.get("active_runs", [])) + list(packet.get("failed_runs", []))
+            for ref in refs:
+                run_id = str(ref.get("run_id") or "")
+                if not run_id or run_id in details:
+                    continue
+                try:
+                    detail = ops.run_detail(db, run_id)
+                except Exception:  # noqa: BLE001 — one bad run never blanks the whole roster
+                    detail = None
+                if detail is not None:
+                    details[run_id] = detail
+            return packet, details
     except ControlDBError:
-        return None
+        return None, {}
     except Exception:  # noqa: BLE001 — any read failure degrades the projection, never crashes it
-        return None
+        return None, {}
 
 
 def _projection_report() -> list[dict[str, Any]] | None:
@@ -211,19 +234,21 @@ def _trust_block(
 
 
 def _decision(packet: dict[str, Any] | None) -> dict[str, Any]:
-    """The highest-priority pending decision, or an explicit ``none``.
+    """The highest-priority pending decision, or an explicit ``none``/``unknown``.
 
     The queue is the packet's own ``awaiting_approvals`` then ``promotable_runs``; the
     eligibility token is the action the packet's DERIVED ``safe_actions`` already vouch for.
+    A missing control plane yields ``unknown`` — "no pending decision" is an assertion an
+    unread plane cannot support.
     """
     if packet is None:
         return {
-            "state": "none",
-            "target": "none",
-            "kind": "none",
+            "state": "unknown",
+            "target": "unknown",
+            "kind": "unknown",
             "epoch": 0,
-            "authority": "none",
-            "eligibility": "none",
+            "authority": "unknown",
+            "eligibility": "unknown",
         }
     epoch = int(packet.get("control_epoch", 0))
     # The packet's `safe_actions` is the DERIVED authority for what may be done; the decision
@@ -261,9 +286,13 @@ def _decision(packet: dict[str, Any] | None) -> dict[str, Any]:
 
 
 def _risk(packet: dict[str, Any] | None) -> dict[str, Any]:
-    """The highest-severity run failure/stall/risk, or an explicit ``all clear``."""
+    """The highest-severity run failure/stall/risk, or an explicit ``all clear``/``unknown``.
+
+    An unread control plane yields ``unknown``: the absence of a readable failure list is not
+    evidence that there are no failures.
+    """
     if packet is None:
-        return {"identity": "none", "state": "all-clear", "action": "none"}
+        return {"identity": "unknown", "state": "unknown", "action": "unknown"}
     failed = packet.get("failed_runs", [])
     if failed:
         return {"identity": str(failed[0].get("run_id", "none")), "state": "active", "action": "inspect"}
@@ -292,10 +321,15 @@ def _next_item(
     return {"identity": "none", "state": "clear", "action": "none"}
 
 
-def _run_counts(packet: dict[str, Any] | None) -> dict[str, int]:
-    """Exact running/queued/failed/live counts — the complete `ON-G2` answer, any fleet size."""
+def _run_counts(packet: dict[str, Any] | None) -> dict[str, int | None]:
+    """Exact running/queued/failed/live counts — the complete `ON-G2` answer, any fleet size.
+
+    An unread control plane yields ``None`` per count (the wire's null-not-zero vocabulary):
+    a fabricated zero is exactly the reassuring assertion a missing control plane cannot
+    support. The client renders ``null`` as ``unknown``.
+    """
     if packet is None:
-        return {"running": 0, "queued": 0, "failed": 0, "live": 0}
+        return {"running": None, "queued": None, "failed": None, "live": None}
     active = packet.get("active_runs", [])
     running = sum(1 for r in active if r.get("state") in {"running", "verifying", "projecting"})
     queued = sum(1 for r in active if r.get("state") == "queued")
@@ -304,12 +338,212 @@ def _run_counts(packet: dict[str, Any] | None) -> dict[str, int]:
     return {"running": running, "queued": queued, "failed": failed, "live": live}
 
 
-def _run_row(run: dict[str, Any], *, epoch: int) -> dict[str, Any]:
-    """Project one packet run reference into the render contract's 16-field row schema.
+def _token(value: Any) -> str:
+    """Render a control-record token as its string value (Enums via ``.value``)."""
+    if value is None:
+        return "unknown"
+    raw = getattr(value, "value", value)
+    return str(raw)
 
-    Every field the gate requires at rest is present and non-empty. Values that the packet does
-    not carry are rendered as explicit ``unknown`` tokens (for example per-run cost provenance),
-    never as a zero or an empty string.
+
+def _recorded_ledger(detail: dict[str, Any] | None) -> dict[str, Any] | None:
+    """Read the run's recorded ledger artifact, or ``None`` when there is none/unreadable.
+
+    The ledger pointer lives on the run row (``ledger_path``, stamped by the CLI's terminal
+    write). It is the run's own artifact and the only place a workspace binding and prose
+    narration are recorded today; a missing or unreadable file stays ``None`` so every field
+    derived from it renders ``unknown`` rather than a fabricated value.
+    """
+    if not detail:
+        return None
+    path = str((detail.get("run") or {}).get("ledger_path") or "").strip()
+    if not path:
+        return None
+    try:
+        payload = json.loads(Path(path).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    return payload if isinstance(payload, dict) else None
+
+
+def _attempt_number(detail: dict[str, Any] | None) -> str:
+    """The run's current attempt number from its ``step_attempts`` rows, or ``unknown``.
+
+    ``attempt_no`` is per step; the highest number any step reached is the run's current attempt
+    depth (a retried phase records 1, then 2). No rows is ``unknown`` — never a hard-coded 1.
+    """
+    numbers: list[int] = []
+    for attempt in (detail or {}).get("attempts") or []:
+        try:
+            numbers.append(int(attempt.get("attempt_no") or 0))
+        except (TypeError, ValueError):
+            continue
+    current = max(numbers, default=0)
+    return str(current) if current > 0 else "unknown"
+
+
+def _workspace_target(detail: dict[str, Any] | None, ledger: dict[str, Any] | None) -> str:
+    """The recorded workspace binding (the ledger's ``workdir``), or ``unknown``.
+
+    Never ``wt/<run_id>``: a fabricated path pretends to name where the run's work lives and
+    misdirects every downstream use of the row (including the dock's event binding).
+    """
+    if isinstance(ledger, dict):
+        workdir = str(ledger.get("workdir") or "").strip()
+        if workdir:
+            return workdir
+    return "unknown"
+
+
+def _cell_binding(ledger: dict[str, Any] | None) -> str:
+    """The recorded executor cell binding, or ``unknown``.
+
+    The runner does not currently stamp its publish cell id (``FINOPS_CELL_ID`` or the
+    deterministic ``wf_<spec>_<model>`` fallback) into the run ledger or the control database,
+    so no explicit binding exists to read for most runs. When a recorded ledger DOES carry one
+    (``cell_id``), the row exposes exactly that value; otherwise the field is ``unknown`` and
+    the dock refuses to subscribe rather than guessing an id it would then mislabel live.
+    """
+    if isinstance(ledger, dict):
+        cell = str(ledger.get("cell_id") or "").strip()
+        if cell:
+            return cell
+    return "unknown"
+
+
+def _narration_state(
+    detail: dict[str, Any] | None, ledger: dict[str, Any] | None
+) -> str:
+    """Whether recorded prose narration exists — never claimed without the record."""
+    if ledger is None:
+        return "narration unknown"
+    for phase in ledger.get("phases") or []:
+        if isinstance(phase, dict) and str(phase.get("final_response") or "").strip():
+            return "narration recorded"
+    for attempt in ledger.get("attempts") or []:
+        if isinstance(attempt, dict) and attempt.get("confidence") is not None:
+            return "narration recorded"
+    return "no narration recorded"
+
+
+def _measured_state(detail: dict[str, Any] | None, ledger: dict[str, Any] | None) -> str:
+    """The strongest recorded measured verdict: ledger test outcomes, else gate verdicts."""
+    if ledger is not None:
+        tests = [
+            phase
+            for phase in ledger.get("phases") or []
+            if isinstance(phase, dict) and str(phase.get("kind") or "") == "test"
+        ]
+        if tests:
+            outcomes = [phase.get("test_executed_success") for phase in tests]
+            if any(outcome is True for outcome in outcomes):
+                return "tests passed"
+            if any(outcome is False for outcome in outcomes):
+                return "tests failed"
+            return "test result pending"
+    verdicts = [_token(gate.get("verdict")) for gate in (detail or {}).get("gates") or []]
+    if "fail" in verdicts:
+        return "gate failed"
+    if "pass" in verdicts:
+        return "gate passed"
+    return "test result unknown" if ledger is None else "no test recorded"
+
+
+def _receipt_state(detail: dict[str, Any] | None) -> str:
+    """Whether a decision receipt is on record — an awaiting run implies nothing.
+
+    ``recorded`` requires an approval row or a completed command carrying a receipt; a bare
+    intent is ``pending``; a fully readable run with neither is ``missing``; an unreadable
+    detail block is ``unknown``.
+    """
+    if not detail:
+        return "unknown"
+    if detail.get("approvals"):
+        return "recorded"
+    for command in detail.get("commands") or []:
+        if _token(command.get("state")) == "completed" and str(
+            command.get("receipt_json") or ""
+        ).strip():
+            return "recorded"
+    if detail.get("commands"):
+        return "pending"
+    return "missing"
+
+
+def _row_events(
+    detail: dict[str, Any] | None, *, limit: int = 8
+) -> list[dict[str, Any]]:
+    """Recorded events for one run — real ids and timestamps, oldest first, bounded.
+
+    Every entry is derived from a control record the Operations lens already reads (an attempt,
+    a gate verdict, an approval, a command). The dock's feed renders these instead of a
+    fabricated history with fixed ages; an empty list is an empty feed, never invented rows.
+    """
+    if not detail:
+        return []
+    events: list[dict[str, Any]] = []
+    for attempt in detail.get("attempts") or []:
+        events.append(
+            {
+                "id": str(attempt.get("attempt_id") or ""),
+                "ts": str(attempt.get("started_at") or ""),
+                "class": "lifecycle",
+                "text": (
+                    f"attempt {_token(attempt.get('attempt_no'))} "
+                    f"{_token(attempt.get('state'))} · {str(attempt.get('model') or 'model unknown')}"
+                ),
+            }
+        )
+    for gate in detail.get("gates") or []:
+        events.append(
+            {
+                "id": str(gate.get("gate_id") or ""),
+                "ts": str(gate.get("ended_at") or gate.get("started_at") or ""),
+                "class": "measured",
+                "text": (
+                    f"gate {str(gate.get('gate_id') or 'unnamed')} "
+                    f"{_token(gate.get('verdict'))} · {str(gate.get('executor') or 'executor unknown')}"
+                ),
+            }
+        )
+    for approval in detail.get("approvals") or []:
+        events.append(
+            {
+                "id": str(approval.get("approval_id") or ""),
+                "ts": str(approval.get("decided_at") or ""),
+                "class": "policy",
+                "text": f"approved by {str(approval.get('operator') or 'unknown')}",
+            }
+        )
+    for command in detail.get("commands") or []:
+        receipt = " · receipt" if str(command.get("receipt_json") or "").strip() else ""
+        events.append(
+            {
+                "id": str(command.get("command_id") or ""),
+                "ts": str(command.get("created_at") or ""),
+                "class": "source",
+                "text": (
+                    f"{str(command.get('verb') or 'command')} "
+                    f"{_token(command.get('state'))}{receipt}"
+                ),
+            }
+        )
+    events.sort(key=lambda event: (event["ts"], event["id"]))
+    return events[-limit:] if limit > 0 else events
+
+
+def _run_row(
+    run: dict[str, Any], *, epoch: int, detail: dict[str, Any] | None
+) -> dict[str, Any]:
+    """Project one packet run reference + its control records into the 16-field row schema.
+
+    Every field the gate requires at rest is present and non-empty. Fields the records answer
+    are composed from them — the attempt number from ``step_attempts``, the workspace from the
+    run ledger, narration/test evidence from the ledger, the receipt from the approval/command
+    journal. A field with no recorded value renders an explicit ``unknown`` token, never a
+    hard-coded default or a reassuring assertion the records do not support. ``run.events``
+    carries the real recorded event history the dock's feed renders (an additive key; the gate
+    row schema is unchanged).
     """
     state = str(run.get("state", "queued"))
     completed = int(run.get("phases_completed", 0))
@@ -318,24 +552,27 @@ def _run_row(run: dict[str, Any], *, epoch: int) -> dict[str, Any]:
     awaiting = state == "awaiting_approval"
     promotable = state == "promotable"
     eligibility = "approve" if awaiting else ("promote" if promotable else "inspect")
+    ledger = _recorded_ledger(detail)
     return {
         "session.identity": str(run.get("run_id", "unknown")),
-        "terminal.target": f"wt/{run.get('run_id', 'unknown')}",
+        "spec.cell": _cell_binding(ledger),
+        "terminal.target": _workspace_target(detail, ledger),
         "command.current": str(run.get("spec_name") or "unknown"),
         "model.provider": str(run.get("model") or "unknown"),
-        "attempt.number": "1",
+        "attempt.number": _attempt_number(detail),
         "phase.progress": f"{completed}/{total}",
         "lifecycle.state": state,
         "run.live": "live" if state not in {"failed", "cancelled", "quarantined"} else "not-live",
         "source.commit": sha,
         "cost.provenance": "unknown",
         "attention.state": "active" if awaiting else "none",
-        "evidence.advisory": "narration recorded",
-        "evidence.measured": "test result pending",
+        "evidence.advisory": _narration_state(detail, ledger),
+        "evidence.measured": _measured_state(detail, ledger),
         "evidence.source": f"commit {sha}",
         "decision.eligibility": eligibility,
-        "decision.receipt": "recorded" if awaiting else "missing",
+        "decision.receipt": _receipt_state(detail),
         "control_epoch": epoch,
+        "run.events": _row_events(detail),
     }
 
 
@@ -441,20 +678,28 @@ def _composition_block(packet: dict[str, Any] | None) -> dict[str, Any]:
 def build_glance(services: ControlRoomServices) -> dict[str, Any]:
     """Render the whole glance projection from the authoritative read-only sources.
 
-    Pure with respect to the caller: it only reads the control database, Redis, and the usage
-    snapshot, and it never mutates or creates any of them. A missing control plane is rendered
-    honestly (``control: down``, zero runs, epoch 0) rather than raising.
+    Pure with respect to the caller: it only reads the control database, the run ledgers it
+    points at, Redis, and the usage snapshot, and it never mutates or creates any of them. A
+    missing control plane is rendered honestly (``control: down``, counts and decisions
+    ``unknown``, epoch 0) rather than raising or asserting a reassuring all-clear.
     """
-    packet = _read_packet()
+    packet, details = _read_control_state()
     reports = _projection_report()
     workers = _worker_health(packet)
     projections = _projection_health(reports)
     system = _system_block(packet, projections, workers)
     trust = _trust_block(packet, projections, system)
     epoch = trust["epoch"]
-    sample = [_run_row(run, epoch=epoch) for run in (packet or {}).get("active_runs", [])]
+
+    def _rows(runs: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        return [
+            _run_row(run, epoch=epoch, detail=details.get(str(run.get("run_id") or "")))
+            for run in runs
+        ]
+
+    sample = _rows(list((packet or {}).get("active_runs", [])))
     # Failed runs are part of the roster too, ranked after the active ones.
-    sample += [_run_row(run, epoch=epoch) for run in (packet or {}).get("failed_runs", [])]
+    sample += _rows(list((packet or {}).get("failed_runs", [])))
     cost = _cost_block(services)
     return {
         "control_epoch": epoch,
@@ -484,26 +729,58 @@ def _sse_frame(event: str, payload: dict[str, Any]) -> str:
     return f"event: {event}\ndata: {json.dumps(payload, separators=(',', ':'))}\n\n"
 
 
+def _health_signature(payload: dict[str, Any]) -> str:
+    """The health VERDICT slice of a glance payload (states + worker detail, never clock ages).
+
+    Health moves independently of the durable ``control_epoch``: a worker heartbeat ages out, a
+    projector goes stale, a pure supervisor probe flips a worker from up to degraded — none of
+    those is a run-state transition, so an epoch-only trigger leaves the resting screen showing
+    old health until the next unrelated state move. This signature is compared in addition to
+    the epoch and the whole payload is re-emitted on either change.
+
+    Deliberately excludes the wall-clock ``age_seconds`` values every ``build_glance`` call
+    recomputes: including them would make the signature differ on every poll and turn the
+    stream into a frame-per-poll storm. Only the states (and the worker count detail, which has
+    no clock component) decide whether an update is owed.
+    """
+    system = payload.get("system") or {}
+    slice_ = {
+        "states": {
+            name: (dimension or {}).get("state")
+            for name, dimension in system.items()
+        },
+        "projection_state": (payload.get("trust") or {}).get("projection_state"),
+        "workers_detail": (payload.get("health_detail") or {}).get("workers"),
+    }
+    return json.dumps(slice_, sort_keys=True, default=str)
+
+
 def _event_stream(services: ControlRoomServices) -> Iterator[str]:
-    """Yield the snapshot, the replay boundary, then epoch transitions until the cap.
+    """Yield the snapshot, the replay boundary, then change frames until the cap.
 
     The generator is intentionally small and stateless across reconnects: the client treats the
-    first ``snapshot`` as the baseline and re-renders on each ``transition``. When the durable
-    epoch moves, the whole glance payload is re-emitted *inside* the transition frame so the
-    client never has to make a second request to resynchronise.
+    first ``snapshot`` as the baseline and re-renders on each ``transition``. A frame is emitted
+    when EITHER the durable epoch moves OR the health signature changes (the same-epoch worker/
+    projection change the epoch alone cannot express); the whole glance payload is re-emitted
+    inside the frame so the client never has to make a second request to resynchronise. The
+    ``kind`` is a local reason token, additive to the committed frame vocabulary.
     """
     started = time.monotonic()
     payload = build_glance(services)
     epoch = int(payload.get("control_epoch", 0))
+    health = _health_signature(payload)
     yield _sse_frame("snapshot", {"control_epoch": epoch, "glance": payload})
     yield _sse_frame("replay_complete", {"control_epoch": epoch})
     while time.monotonic() - started < _SSE_MAX_SECONDS:
         time.sleep(_SSE_POLL_SECONDS)
         fresh = build_glance(services)
         fresh_epoch = int(fresh.get("control_epoch", 0))
-        if fresh_epoch != epoch:
+        fresh_health = _health_signature(fresh)
+        if fresh_epoch != epoch or fresh_health != health:
+            kind = "epoch" if fresh_epoch != epoch else "health"
             epoch = fresh_epoch
-            yield _sse_frame("transition", {"control_epoch": epoch, "glance": fresh})
+            health = fresh_health
+            yield _sse_frame("transition", {"control_epoch": epoch, "kind": kind, "glance": fresh})
 
 
 def register(app: Flask, services: ControlRoomServices) -> None:

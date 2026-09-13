@@ -225,13 +225,15 @@
     });
   }
 
-  /** R2 `ON-G2`: the exact running/queued/failed/live counts. */
+  /** R2 `ON-G2`: the exact running/queued/failed/live counts; a null count is `unknown`. */
   function renderRunCounts(glance) {
     var host = document.getElementById("run-counts");
     clear(host);
     var counts = glance.run_counts || {};
     ["running", "queued", "failed", "live"].forEach(function (key) {
-      appendField(host, "runs." + key, key, Number(counts[key] || 0), { maxLines: 1 });
+      var value = counts[key];
+      var text = value === undefined || value === null ? "unknown" : Number(value);
+      appendField(host, "runs." + key, key, text, { maxLines: 1 });
     });
   }
 
@@ -496,12 +498,18 @@
   function renderAttention(glance) {
     var host = document.getElementById("attention-list");
     var attention = glance.attention || {};
-    var decision = attention.decision || { state: "none", target: "none", kind: "none",
-      epoch: 0, authority: "none", eligibility: "none" };
-    var risk = attention.risk || { identity: "none", state: "all-clear", action: "none" };
-    var next = attention.next || { identity: "none", state: "clear", action: "none" };
+    var decision = attention.decision || { state: "unknown", target: "unknown", kind: "unknown",
+      epoch: 0, authority: "unknown", eligibility: "unknown" };
+    var risk = attention.risk || { identity: "unknown", state: "unknown", action: "unknown" };
+    var next = attention.next || { identity: "none", state: "unknown", action: "none" };
     var nodes = [];
-    var pending = String(decision.state || "none") !== "none";
+    var decisionState = String(decision.state || "unknown");
+    var pending = decisionState === "pending";
+    var decisionUnknown = decisionState === "unknown";
+    var riskUnknown = String(risk.state || "unknown") === "unknown";
+    // Only the packet's own `pending` opens the decision door; `unknown` is NOT pending, and the
+    // filler below must not claim an all-clear the client never observed.
+    var attentionKnown = !decisionUnknown && !riskUnknown;
 
     // ── DECISION (ON-G5) — a governed door, not a button ───────────────────────────────────
     var decisionItem = attentionItem({
@@ -510,7 +518,7 @@
       answer: "ON-G5",
       ariaLabel: pending
         ? "Pending controller decision: " + decision.kind + " " + decision.target
-        : "No pending decision",
+        : (decisionUnknown ? "Decision state could not be read" : "No pending decision"),
     });
     // Line 1 leads with the state + the two decision tokens a stranger needs (`approve`
     // eligibility); the identifier target moves to line 2 where it may middle-elide without
@@ -522,7 +530,7 @@
     ]);
     // The fields already name the authority (`decision.authority`) and the target; no extra chips
     // are needed in the gutter, where they would only crowd the work item.
-    attentionLine(decisionItem.body, pending ? "waiting on" : "none pending", [
+    attentionLine(decisionItem.body, pending ? "waiting on" : (decisionUnknown ? "unread" : "none pending"), [
       ["decision.epoch", "epoch", decision.epoch, false],
       ["decision.authority", "authority", decision.authority, false],
       ["decision.target", "target", decision.target, true],
@@ -535,7 +543,9 @@
       key: "risk",
       kind: "risk",
       answer: "ON-G3",
-      ariaLabel: "Highest-severity run risk: " + risk.identity,
+      ariaLabel: riskUnknown
+        ? "Run risk state could not be read"
+        : "Highest-severity run risk: " + risk.identity,
     });
     attentionLine(riskItem.body, "RISK", [
       ["risk.identity", "target", risk.identity, true],
@@ -571,10 +581,14 @@
       var lineA = element("div", "item-line", { "data-item-line": "", "data-max-lines": "1" });
       var lineB = element("div", "item-line", { "data-item-line": "", "data-max-lines": "1" });
       if (i === ranked.length) {
-        lineA.appendChild(element("span", "item-kind", null, "QUEUE CLEAR"));
-        lineA.appendChild(element("span", "queue-empty-note", null, "no further attention"));
+        // "QUEUE CLEAR" is a claim: it renders only when the decision and risk blocks were
+        // actually read. An unknown attention state says so instead.
+        lineA.appendChild(element("span", "item-kind", null,
+          attentionKnown ? "QUEUE CLEAR" : "ATTENTION UNKNOWN"));
+        lineA.appendChild(element("span", "queue-empty-note", null,
+          attentionKnown ? "no further attention" : "decision or risk state could not be read"));
         lineB.appendChild(element("span", "queue-empty-note", null,
-          "decision queue drained · 0 waiting"));
+          attentionKnown ? "decision queue drained · 0 waiting" : "no all-clear without the records"));
       }
       empty.body.appendChild(lineA);
       empty.body.appendChild(lineB);
@@ -693,6 +707,12 @@
     lastHistoryEpoch: null,
     //: True when the projection could not be read, so the charts render an error, not a stale.
     glanceError: false,
+    //: The SSE stream's own health: false until a frame/projection arrives, and the wall time
+    //: of the last observation (the age loop above stops trusting old health past its window).
+    streamConnected: false,
+    lastFrameAt: null,
+    //: When the age loop last re-read the projection while the stream was stale (throttle).
+    lastStaleFetchAt: null,
     //: The last rendered payload's signature. A no-op poll (same signature) performs ZERO
     //: writes, which is the direction §12.2 #3 contract for keyed write-on-change lists.
     lastSignature: null,
@@ -820,10 +840,13 @@
       // Move 7 — a transition for the SELECTED run appends one live feed entry. A paused feed
       // buffers it (bounded) instead, so pause genuinely stops the stream demanding attention.
       if (frame.target === AppState.feedRunId) {
-        appendFeed({ age: 0, cls: "lifecycle", text: frame.kind });
+        appendFeed({ ts: new Date().toISOString(), age: 0, cls: "lifecycle", text: frame.kind });
       }
     }
-    if (epoch && epoch !== AppState.announcedEpoch) {
+    if (frame.kind === "health") {
+      // A same-epoch health verdict change: announce it even though the epoch did not move.
+      announce("Health update");
+    } else if (epoch && epoch !== AppState.announcedEpoch) {
       AppState.announcedEpoch = epoch;
       announce(frame.kind ? "Run update: " + frame.kind : "Control epoch " + epoch);
     }
@@ -856,7 +879,47 @@
 
   // ── Data sources ───────────────────────────────────────────────────────────────────────
 
-  /** Fetch the one-shot projection. A failure renders an explicit degraded screen, never a lie. */
+  /**
+   * The explicit "projection unreadable" payload. Every value the failed request could not
+   * answer is `unknown`; nothing is asserted all-clear, zero or none. The shell still renders
+   * (regions and fields must exist), but no region claims a fact the client never observed.
+   */
+  function unavailableGlance() {
+    return {
+      control_epoch: 0,
+      source: "unavailable",
+      observed_at: "",
+      unavailable: true,
+      system: {
+        browser: { state: "up", age_seconds: 0 },
+        control: { state: "unknown", age_seconds: 0 },
+        workers: { state: "unknown", age_seconds: 0 },
+        projections: { state: "unknown", age_seconds: 0 },
+      },
+      trust: { epoch: 0, worst_age: 0, projection_state: "unknown", degraded_count: 0,
+        stale_count: 0, partial_count: 0, unknown_count: 3 },
+      attention: {
+        decision: { state: "unknown", target: "unknown", kind: "unknown", epoch: 0,
+          authority: "unknown", eligibility: "unknown" },
+        risk: { identity: "unknown", state: "unknown", action: "unknown" },
+        next: { identity: "none", state: "unknown", action: "none" },
+        items: [],
+      },
+      run_counts: { running: null, queued: null, failed: null, live: null },
+      run_sample: [],
+      cost: { spend: "unknown", burn: "unknown", quota: "unknown", wallet: "unknown",
+        leases: "unknown", money_risk: false },
+      health_detail: { workers: "unknown", projections: "unavailable" },
+      composition: {
+        model: { top: "unknown", other: "unknown", unknown: "unknown" },
+        condition: { top: "unknown", other: "unknown", unknown: "unknown" },
+        provider: { top: "unknown", other: "unknown", unknown: "unknown" },
+        lifecycle: { top: "unknown", other: "unknown", unknown: "unknown" },
+      },
+    };
+  }
+
+  /** Fetch the one-shot projection. A failure renders explicit unknowns, never a lie. */
   function loadGlance() {
     fetch("/api/glance", { headers: { Accept: "application/json" } })
       .then(function (response) {
@@ -865,68 +928,101 @@
       })
       .then(function (glance) {
         AppState.glanceError = false;
+        // A successful projection fetch is a fresh observation of health even when the SSE
+        // stream itself is down; restart the age window without claiming the stream is open.
+        AppState.lastFrameAt = Date.now();
         renderGlance(glance);
       })
       .catch(function () {
-        // A failed projection is a first-class state: the resting screen degrades honestly and
-        // the charts render their explicit error state (never a blank or stale panel).
+        // A failed projection is a first-class state: every value the room could not read is
+        // rendered `unknown` (never a fabricated zero / none / all-clear), and the charts
+        // render their explicit error state.
         AppState.glanceError = true;
-        renderGlance({
-          control_epoch: 0,
-          system: {
-            browser: { state: "down", age_seconds: 0 },
-            control: { state: "unknown", age_seconds: 0 },
-            workers: { state: "unknown", age_seconds: 0 },
-            projections: { state: "unknown", age_seconds: 0 },
-          },
-          trust: { epoch: 0, worst_age: 0, projection_state: "unknown", degraded_count: 0,
-            stale_count: 0, partial_count: 0, unknown_count: 1 },
-          attention: {
-            decision: { state: "none", target: "none", kind: "none", epoch: 0,
-              authority: "none", eligibility: "none" },
-            risk: { identity: "none", state: "all-clear", action: "none" },
-            next: { identity: "none", state: "clear", action: "none" },
-          },
-          run_counts: { running: 0, queued: 0, failed: 0, live: 0 },
-          run_sample: [],
-          cost: { spend: "unknown", burn: "unknown", quota: "unknown", wallet: "unknown",
-            leases: "unknown", money_risk: false },
-          health_detail: { workers: "unknown", projections: "unknown" },
-          composition: {
-            model: { top: "unknown 0", other: "0", unknown: "0" },
-            condition: { top: "unknown 0", other: "0", unknown: "0" },
-            provider: { top: "unknown 0", other: "0", unknown: "0" },
-            lifecycle: { top: "unknown 0", other: "0", unknown: "0" },
-          },
-        });
+        renderGlance(unavailableGlance());
         AppState.replayComplete = true;
         maybeReady();
       });
+  }
+
+  //: The shell's stream-health attributes the live screen exposes for operators and tests.
+  var STREAM_STALE_SECONDS = 30;
+
+  /** Mark the stream observed-now: a received frame or a successful projection fetch. */
+  function touchStream(frameAt) {
+    AppState.lastFrameAt = frameAt || Date.now();
+    AppState.streamConnected = true;
+    setStreamState("open");
+  }
+
+  /** Set `[data-stream-state]` on the glance shell (connecting/open/disconnected/stale). */
+  function setStreamState(state) {
+    var root = document.querySelector("[data-glance-shell]");
+    if (root) root.setAttribute("data-stream-state", state);
+  }
+
+  /**
+   * Age handling: expose how old the displayed observation is (`data-stream-age-seconds`) and,
+   * past `STREAM_STALE_SECONDS` with no frame, stop trusting it as current — re-read the
+   * one-shot projection once instead of leaving old health on screen indefinitely.
+   */
+  function pollStreamAge() {
+    var root = document.querySelector("[data-glance-shell]");
+    if (!root) return;
+    var age = AppState.lastFrameAt
+      ? Math.max(0, Math.floor((Date.now() - AppState.lastFrameAt) / 1000))
+      : null;
+    root.setAttribute("data-stream-age-seconds", age === null ? "unknown" : String(age));
+    if (age === null || age <= STREAM_STALE_SECONDS) return;
+    if (AppState.streamConnected) {
+      AppState.streamConnected = false;
+      setStreamState("stale");
+      announce("Health display is " + age + "s old; re-reading the projection");
+    }
+    // While the stream is down, re-read the projection once per stale window so the resting
+    // screen never freezes on a stale health verdict.
+    var now = Date.now();
+    if (!AppState.lastStaleFetchAt || now - AppState.lastStaleFetchAt > STREAM_STALE_SECONDS * 1000) {
+      AppState.lastStaleFetchAt = now;
+      loadGlance();
+    }
   }
 
   /** Follow the bounded SSE stream; it is the only open event stream on the screen. */
   function connectEvents() {
     if (typeof window.EventSource !== "function") {
       AppState.replayComplete = true;
+      setStreamState("unavailable");
       maybeReady();
       return;
     }
+    setStreamState("connecting");
     var source = new window.EventSource("/api/events");
+    source.onopen = function () { touchStream(Date.now()); };
+    source.onerror = function () {
+      // The browser's EventSource reconnects on its own; until it does, the screen names the
+      // disconnection and the age loop above keeps the last observation from reading as current.
+      AppState.streamConnected = false;
+      setStreamState("disconnected");
+      announce("Event stream disconnected");
+    };
     source.addEventListener("snapshot", function (event) {
       try {
         var frame = JSON.parse(event.data);
         if (frame && frame.glance) {
           AppState.glanceError = false;
+          touchStream(Date.now());
           renderGlance(frame.glance);
         }
       } catch (_error) { /* a malformed frame is ignored; the polled snapshot stands */ }
     });
     source.addEventListener("replay_complete", function () {
+      touchStream(Date.now());
       AppState.replayComplete = true;
       maybeReady();
     });
     source.addEventListener("transition", function (event) {
       try {
+        touchStream(Date.now());
         applyTransition(JSON.parse(event.data));
       } catch (_error) { /* ignore malformed transition */ }
     });
@@ -937,6 +1033,7 @@
         maybeReady();
       }
     }, 2000);
+    window.setInterval(pollStreamAge, 5000);
   }
 
   // ── Selection dock (R4 drill-down) ──────────────────────────────────────────────────────
@@ -956,30 +1053,58 @@
       + "  lease/" + (run["budget.lease"] || run["cost.provenance"] || "unknown");
   }
 
-  /** The seed attempt facts for a run, in causal order, typed by evidence class (Move 4/7). */
+  /**
+   * The RECORDED events for a run, in causal order, typed by evidence class (Move 4/7).
+   *
+   * Each entry is a control record the server composed (`run.events`: attempts, gate verdicts,
+   * approvals, command receipts) with its real identifier and timestamp. No recorded history is
+   * an explicit single row saying so — never a fabricated sequence with invented ages.
+   */
   function feedSeed(run) {
-    var att = run["attempt.number"] || "?";
-    var advisory = run["evidence.advisory"] || "unknown";
-    var measured = run["evidence.measured"] || "unknown";
-    var source = String(run["source.commit"] || "unknown").replace(/^commit\s+/, "");
-    var reserved = run["budget.reserved"] || "unknown";
-    var cap = run["budget.cap"] || "unknown";
-    return [
-      { age: 0, cls: "lifecycle", text: "attempt " + att + " started · " + (run["model.provider"] || "model unknown") },
-      { age: 2, cls: "advisory", text: "said " + advisory },
-      { age: 4, cls: "measured", text: "measured " + measured },
-      { age: 6, cls: "source", text: "commit " + source },
-      { age: 8, cls: "measured", text: "lease reserved " + reserved + " / cap " + cap },
-    ];
+    var recorded = Array.isArray(run["run.events"]) ? run["run.events"] : [];
+    if (!recorded.length) {
+      return [{ ts: null, age: null, cls: "lifecycle", text: "no recorded events for this run" }];
+    }
+    return recorded.slice(-FEED_MAX).map(function (event) {
+      return {
+        id: event.id || "",
+        ts: event.ts || null,
+        age: null,
+        cls: event["class"] || event.cls || "lifecycle",
+        text: event.text || "unknown event",
+      };
+    });
   }
 
-  /** One bounded feed row: age, evidence class, text — the same typed material as the row. */
+  /** Parse a recorded timestamp into epoch milliseconds, or null when none was recorded. */
+  function timestampMs(value) {
+    if (value === undefined || value === null || value === "") return null;
+    var ms = Date.parse(String(value));
+    return isNaN(ms) ? null : ms;
+  }
+
+  /** The age of a recorded event in seconds, or null when no timestamp was recorded. */
+  function feedAge(entry) {
+    var ms = timestampMs(entry.ts);
+    if (ms !== null) return Math.max(0, Math.floor((Date.now() - ms) / 1000));
+    return typeof entry.age === "number" ? entry.age : null;
+  }
+
+  /** The recorded time of an event (UTC clock), never a fabricated age. */
+  function feedTime(entry, age) {
+    var ms = timestampMs(entry.ts);
+    if (ms !== null) return new Date(ms).toISOString().slice(11, 19);
+    if (age !== null) return "t+" + age + "s";
+    return "—";
+  }
+
+  /** One bounded feed row: recorded time, evidence class, text — same material as the row. */
   function feedRow(entry) {
-    var li = element("li", "feed-entry", {
-      "data-evidence-class": entry.cls,
-      "data-age-seconds": String(entry.age),
-    });
-    li.appendChild(element("span", "feed-time", null, "t+" + entry.age + "s"));
+    var age = feedAge(entry);
+    var attrs = { "data-evidence-class": entry.cls };
+    if (age !== null) attrs["data-age-seconds"] = String(age);
+    var li = element("li", "feed-entry", attrs);
+    li.appendChild(element("span", "feed-time", null, feedTime(entry, age)));
     li.appendChild(element("span", "feed-class", null, String(entry.cls).toUpperCase()));
     li.appendChild(element("span", "feed-text", null, entry.text));
     return li;
@@ -1015,7 +1140,8 @@
       { "data-attempt-feed": "", "data-feed-follow": "follow" });
     var head = element("div", "feed-head", null);
     head.appendChild(element("span", "feed-title", null, "ATTEMPT FEED"));
-    head.appendChild(element("span", "feed-age", { "data-feed-age": "" }, "age 0s · bounded " + FEED_MAX));
+    head.appendChild(element("span", "feed-age", { "data-feed-age": "" },
+      "recorded events · bounded " + FEED_MAX));
     var toggle = element("button", "feed-toggle",
       { type: "button", "data-feed-toggle": "", "aria-pressed": "false" }, "Pause");
     head.appendChild(toggle);

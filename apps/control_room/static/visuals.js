@@ -194,6 +194,20 @@
   }
 
   /**
+   * Map the run's recorded measured-evidence token to a flow state.
+   *
+   * The row carries an explicit vocabulary ("tests passed" / "gate failed" / "test result
+   * unknown" / "no test recorded"); anything that is not a recorded pass/fail — including the
+   * unknown tokens — renders the dashed unknown node, never a green "ok" it cannot support.
+   */
+  function verifyState(measured) {
+    var value = String(measured === undefined || measured === null ? "" : measured).toLowerCase();
+    if (value.indexOf("failed") >= 0) return "down";
+    if (value.indexOf("passed") >= 0) return "ok";
+    return "unknown";
+  }
+
+  /**
    * Render the selected run's dependency flow: LIVE (state read from the glance), SCOPED (the
    * run's provider/commit/projection), ACTIONABLE (a named affected record opens the health
    * lens). Returns the block so the caller can attach the action.
@@ -205,8 +219,7 @@
         state: ((glance || {}).system || {}).control ? glance.system.control.state : "unknown" },
       { id: "provider", label: String(run["model.provider"] || "provider").split("/").pop(),
         state: "ok" },
-      { id: "verify", label: "verify",
-        state: String(run["evidence.measured"] || "").indexOf("pending") >= 0 ? "unknown" : "ok" },
+      { id: "verify", label: "verify", state: verifyState(run["evidence.measured"]) },
       { id: "projections", label: "projections",
         state: ((glance || {}).system || {}).projections ? glance.system.projections.state
           : "unknown" },
