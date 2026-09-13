@@ -14,16 +14,21 @@ Pins the review's #5 reproductions:
 
 from __future__ import annotations
 
+import json
 import sys
 from pathlib import Path
 from types import SimpleNamespace
 
 _ROOT = Path(__file__).resolve().parent.parent
-for _path in (_ROOT, _ROOT / "src"):
+for _path in (_ROOT, _ROOT / "src", _ROOT / "scripts", _ROOT / "scripts" / "fleet"):
     if str(_path) not in sys.path:
         sys.path.insert(0, str(_path))
 
+import spawn_wrapper  # noqa: E402
+from docker_verifier_executor import DockerVerifierExecutor  # noqa: E402
+
 from agentic_dynamics.experiment.experiment_spec import load_spec  # noqa: E402
+from agentic_dynamics.runtime.executor import StepRequest  # noqa: E402
 from agentic_dynamics.runtime.workflow_runner import run_workflow  # noqa: E402
 
 SPEC = _ROOT / "workflows" / "repository" / "control_room_portal.yaml"
@@ -85,15 +90,184 @@ def test_native_gate_dispatches_to_the_injected_verifier(tmp_path):
         run_agentic_fn=lambda *a, **k: _agent(), verifier_executor=verifier,
     )
     phase = result.phases[0]
-    # BOTH verification shapes dispatched to the verifier — the native gate (scope, agent
-    # kind) and the spec's explicit test phase (verify, test kind): one contract, two callers.
+    # BOTH verification shapes dispatched to the verifier — the native gate and the spec's
+    # explicit test phase — as CONCRETE kind:test boundaries: one contract, two callers.
+    # The native gate used to dispatch as the producing phase's kind:agent, which the real
+    # DockerVerifierExecutor refuses (Astra ae212a0 finding 3).
     assert [(r.phase_name, r.phase_kind) for r in verifier.requests] == [
-        ("scope", "agent"),
+        ("scope__test_gate", "test"),
         ("verify", "test"),
     ]
     assert phase.tests_total == 3 and phase.tests_passed == 3
     assert phase.test_executed_success is True
     assert phase.status != "failed"
+
+
+def test_native_gate_request_is_a_concrete_test_boundary(tmp_path):
+    """A producing agent phase's native gate builds a concrete test-only boundary.
+
+    The request carries ``kind=test`` and the gate's own suite/target/candidate — never the
+    producing phase's kind, prompt or ``test_gate`` marker (an agent child must not retain or
+    execute the parent workflow's gates).
+    """
+    spec = _with_gate(load_spec(SPEC))
+    spec.workflow.params["phases"][0]["scope"] = "implementation"
+    spec.workflow.params["phases"][0]["tests"] = ["tests/test_boundary.py"]
+    verifier = _FakeVerifier(
+        SimpleNamespace(ok=True, tests_passed=1, tests_total=1, test_executed_success=True,
+                        error="")
+    )
+    run_workflow(
+        spec, goal="g", model="m/one", workdir=tmp_path, commit=False,
+        run_agentic_fn=lambda *a, **k: _agent(), verifier_executor=verifier,
+    )
+    native = verifier.requests[0]
+    assert native.phase_kind == "test"          # never the producing agent's kind
+    assert native.phase_def["kind"] == "test"
+    assert native.phase_def["tests"] == ["tests/test_boundary.py"]
+    assert native.phase_def["scope"] == "implementation"
+    # the producing phase's own markers are NOT retained
+    assert "test_gate" not in native.phase_def
+    assert "prompt" not in native.phase_def
+    boundary = native.test_boundary
+    assert boundary is not None
+    assert boundary.phase_name == "scope__test_gate"
+    assert boundary.suite == ["tests/test_boundary.py"]     # the concrete suite/target
+    assert boundary.candidate == str(tmp_path)              # the concrete candidate
+    assert boundary.language == "python"
+    assert boundary.scope == "implementation"
+
+
+def _canned_verifier_outcome() -> dict:
+    """A sibling outcome carrying a passing test-phase envelope (the classify contract)."""
+    envelope = {
+        "spec_name": "spec_x", "state": "succeeded", "ok": True, "awaiting": False,
+        "phases": [{
+            "phase": "scope__test_gate", "kind": "test", "status": "ok",
+            "test_executed_success": True, "tests_passed": 1, "tests_total": 1, "error": "",
+        }],
+    }
+    return {
+        "ok": True, "argv": ["docker", "run", "--rm", "-i"], "returncode": 0,
+        "stdout": "noise\n" + json.dumps(envelope, indent=2), "stderr": "",
+    }
+
+
+def test_real_executor_accepts_the_constructed_boundary_and_refuses_agent_kind(
+    tmp_path, monkeypatch
+):
+    """The REAL DockerVerifierExecutor guard: accepts the engine's boundary, refuses agent.
+
+    This is the reproduction the review demanded a real contract for — the permissive fake
+    accepted an agent-kind request production refuses. Here the real executor's ``execute``
+    runs for real (only the docker boundary, ``spawn_sibling``, is injected), so the gate is
+    the production gate.
+    """
+    spec = _with_gate(load_spec(SPEC))
+    spec.workflow.params["phases"][0]["scope"] = "implementation"
+    spec.workflow.params["phases"][0]["tests"] = ["tests/test_boundary.py"]
+    capture = _FakeVerifier(
+        SimpleNamespace(ok=True, tests_passed=1, tests_total=1, test_executed_success=True,
+                        error="")
+    )
+    run_workflow(
+        spec, goal="g", model="m/one", workdir=tmp_path, commit=False,
+        run_agentic_fn=lambda *a, **k: _agent(), verifier_executor=capture,
+    )
+    boundary_request = capture.requests[0]
+
+    executor = DockerVerifierExecutor(
+        spec_path="/repo/workflows/repository/control_room_portal.yaml",
+        spec_name="control_room_portal", goal="g", model="m/one", workdir=str(tmp_path),
+    )
+    spawned: list[dict] = []
+
+    def fake_spawn(request, **kwargs):
+        spawned.append(request)
+        return _canned_verifier_outcome()
+
+    monkeypatch.setattr(spawn_wrapper, "spawn_sibling", fake_spawn)
+
+    verdict = executor.execute(boundary_request)
+    assert spawned, "the guard refused a concrete kind:test boundary"
+    assert verdict.state == "ok"
+    assert verdict.test_executed_success is True and verdict.tests_total == 1
+
+    # an AGENT-kind request is refused before the broker is ever reached
+    spawned.clear()
+    agent_request = StepRequest(
+        phase_name="scope", phase_kind="agent", prompt="do work", model="m/one", goal="g",
+        spec_name="control_room_portal", workdir=str(tmp_path),
+        phase_def={"name": "scope", "kind": "agent", "test_gate": True},
+    )
+    refused = executor.execute(agent_request)
+    assert refused.state == "refused"
+    assert "VERIFIER_REFUSED" in refused.error
+    assert spawned == []
+
+
+def test_verifier_child_never_reloads_the_producing_phase_by_name(tmp_path):
+    """No reload-by-name path: the verifier child loads a GENERATED boundary spec.
+
+    The child command must not point at the original spec or ``--only-phase`` the producing
+    agent phase — that reload would re-run the agent and its parent gates inside the verifier.
+    """
+    spec = _with_gate(load_spec(SPEC))
+    spec.workflow.params["phases"][0]["scope"] = "implementation"
+    spec.workflow.params["phases"][0]["tests"] = ["tests/test_boundary.py"]
+    capture = _FakeVerifier(
+        SimpleNamespace(ok=True, tests_passed=1, tests_total=1, test_executed_success=True,
+                        error="")
+    )
+    run_workflow(
+        spec, goal="g", model="m/one", workdir=tmp_path, commit=False,
+        run_agentic_fn=lambda *a, **k: _agent(), verifier_executor=capture,
+    )
+    request = capture.requests[0]
+    executor = DockerVerifierExecutor(
+        spec_path="/repo/workflows/repository/control_room_portal.yaml",
+        spec_name="control_room_portal", goal="g", model="m/one", workdir=str(tmp_path),
+    )
+    spawn_request = executor.build_request(request)
+    command = [str(c) for c in spawn_request.get("command", [])]
+    command_text = " ".join(command)
+
+    # it runs the boundary phase, never the producing agent phase
+    assert "--only-phase scope__test_gate" in command_text
+    assert "--only-phase scope " not in command_text
+    # and it loads the generated boundary, never the original spec
+    spec_arg = command[command.index("--spec") + 1]
+    assert spec_arg.endswith(".verify.json")
+    assert "/repo/workflows/repository/control_room_portal.yaml" not in command_text
+    generated = Path(spec_arg)
+    assert generated.is_file()
+    document = json.loads(generated.read_text())
+    phase = document["workflow"]["params"]["phases"][0]
+    assert phase["kind"] == "test"
+    assert phase["tests"] == ["tests/test_boundary.py"]
+    assert "prompt" not in phase and "test_gate" not in phase
+    assert document["workflow"]["params"]["language"] == "python"
+
+    # the generated boundary is a RUNNABLE test-only execution boundary: the engine runs the
+    # suite and NEVER invokes the producing agent (which would re-execute the parent's work
+    # in a credential-less verifier cell).
+    (tmp_path / "tests").mkdir(exist_ok=True)
+    (tmp_path / "tests" / "test_boundary.py").write_text(
+        "def test_boundary_ok():\n    assert True\n"
+    )
+
+    def _must_not_run(*args, **kwargs):  # pragma: no cover - the assertion IS the contract
+        raise AssertionError("the verifier child must never invoke the producing agent")
+
+    boundary_spec = load_spec(generated)
+    result = run_workflow(
+        boundary_spec, goal="g", model="m/one", workdir=tmp_path, commit=False,
+        run_agentic_fn=_must_not_run,
+    )
+    assert result.ok is True
+    assert [p.kind for p in result.phases] == ["test"]
+    assert result.phases[0].test_executed_success is True
+    assert result.phases[0].tests_total == 1
 
 
 def test_native_gate_refuses_an_empty_verifier_verdict(tmp_path):
