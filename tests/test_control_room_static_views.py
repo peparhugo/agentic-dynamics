@@ -131,3 +131,82 @@ def test_operations_renders_the_packet_safe_actions():
     source = _presentation_scripts()
     assert "data.safe_actions" in source
     assert "Safe actions" in source
+
+
+# ── R3 (build step 6): the constraint ledger, measured health, composition bars ──────────────
+
+
+def test_r3_cost_is_a_labelled_ledger_with_provenance_not_money_cards():
+    """R3a: the five ``ON-G4`` values render as a RULED constraint ledger.
+
+    Synthesis v2 §5.5 corrects v1's "call-centre KPI treatment": R3a is a bounded constraint
+    ledger attached to the roster, not money cards. Each of the five values is one labelled row
+    carrying the packet's own source + age, and the visible block provenance (`#cost-prov`) the
+    render gate reads stays filled. Unknowns stay labelled.
+    """
+    client = (STATIC / "app.js").read_text(encoding="utf-8")
+    css = (STATIC / "style.css").read_text(encoding="utf-8")
+
+    assert "function renderCost(" in client
+    for field in ("money.spend", "money.burn", "money.quota", "money.wallet", "money.leases"):
+        assert f'"{field}"' in client, field
+    # A ledger row with per-value provenance (source + age travel with the value).
+    assert "cost-row" in client
+    assert '"data-source"' in client
+    assert '"data-age-seconds"' in client
+    assert "cost-prov-row" in client
+    assert 'document.getElementById("cost-prov")' in client
+    # The old 3-column money-card grid is gone; the ledger is a ruled single-column list.
+    assert "grid-template-columns: repeat(3, 1fr); grid-auto-rows: 32px" not in css
+    assert ".cost-grid .field.cost-row" in css
+    assert ".cost-grid .cost-prov-row" in css
+
+
+def test_r3_health_reads_measured_statuses_not_a_composite_score():
+    """R3b: the health detail mirrors the packet's MEASURED state + worst age.
+
+    Synthesis v2 §5.4 retires v1's "one computed health score" (it has no measured source).
+    The two bounded lines read ``health_detail``/``system``/``trust`` verbatim and expose the
+    state, worst age and projector lag as evidence — the renderer computes no aggregate.
+    """
+    client = (STATIC / "app.js").read_text(encoding="utf-8")
+
+    assert "function renderHealth(" in client
+    for anchor in (
+        "glance.health_detail",
+        "glance.trust",
+        "projection_state",
+        '"data-measure"',
+        '"data-state"',
+        '"data-age-seconds"',
+        '"data-lag"',
+    ):
+        assert anchor in client, anchor
+    # No client-derived vanity score over the health fields.
+    assert "healthScore" not in client
+    assert "function healthScore" not in client
+    assert "data-health-score" not in client
+
+
+def test_r3_composition_states_buckets_in_words_plus_bounded_token_split_bars():
+    """R3c: the marginals keep full bucket words and add a packet-derived stacked bar.
+
+    The bar is a NON-FIELD affordance: its proportions come only from the packet's parsed bucket
+    counts, and a split the packet cannot state degrades to ONE explicit unknown segment rather
+    than a fabricated full bar.
+    """
+    client = (STATIC / "app.js").read_text(encoding="utf-8")
+    css = (STATIC / "style.css").read_text(encoding="utf-8")
+
+    assert "function renderComposition(" in client
+    assert "function compositionBar(" in client
+    assert "function bucketCount(" in client
+    assert '"data-composition-bar": ""' in client
+    assert '"data-seg": name' in client
+    assert 'bar.setAttribute("data-bar-state", "unknown")' in client
+    # Buckets stay full words (never t/o/u shorthand).
+    assert '["top", "other", "unknown"]' in client
+    # The bar is styled, and the unknown split keeps a shape in forced colors.
+    assert ".marginal-bar" in css
+    assert ".marginal-seg" in css
+    assert '.marginal-seg[data-seg="unknown"]' in css

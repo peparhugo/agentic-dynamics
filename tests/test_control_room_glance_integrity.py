@@ -351,3 +351,65 @@ def test_client_handles_stream_disconnect_and_age() -> None:
         "pollStreamAge",
     ):
         assert anchor in app, anchor
+
+
+def test_r3_ledger_health_and_bars_degrade_to_a_labelled_unknown() -> None:
+    """R3 (build step 6): an unmeasured constraint/health/composition value stays `unknown`.
+
+    The cost ledger falls back to the literal `unknown` (never a fabricated zero) when the packet
+    carries no value, the composition bars parse the packet's OWN bucket counts and draw one
+    explicit unknown segment when the split cannot be stated, and the health lines read measured
+    packet fields rather than deriving a composite score.
+    """
+    app = _read("app.js")
+    # Cost ledger: the missing-value fallback is the literal `unknown`.
+    assert 'var value = row[2] === undefined || row[2] === null ? "unknown" : row[2];' in app
+    # Per-value provenance defaults to `unknown` when the packet names no source.
+    assert 'var source = spend.source || cost.source || "unknown";' in app
+    # Composition: proportions come only from the packet's parsed counts; no split -> unknown bar.
+    assert "function bucketCount(" in app
+    assert 'bar.setAttribute("data-bar-state", "unknown")' in app
+    # Health: measured packet fields, no client-derived composite score.
+    assert "glance.health_detail" in app
+    assert "healthScore" not in app
+    assert "data-health-score" not in app
+
+
+def test_cost_block_labels_an_unreadable_snapshot_unknown_not_zero(monkeypatch) -> None:
+    """The five `ON-G4` values are `unknown` when the usage snapshot cannot be read — never 0.
+
+    The rule that matters (state-screens `S-7`, a3 D-2): an absent cost is not free. The
+    projection emits the literal `unknown` for a missing value, so the ledger has no number to
+    fabricate and the room cannot read a broken meter as `$0.00`.
+    """
+    import types
+
+    from apps.control_room.services import subscription_usage
+
+    monkeypatch.setattr(subscription_usage, "load_or_refresh", lambda _r, _root: ({}, None, 0))
+    block = glance._cost_block(types.SimpleNamespace(redis=None, root=None))  # fast-safe: mock
+
+    for key in ("spend", "burn", "quota", "wallet", "leases"):
+        assert block[key] == "unknown", key
+    assert block["money_risk"] is False
+
+
+def test_cost_block_formats_a_real_snapshot_without_changing_the_value(monkeypatch) -> None:
+    """A readable snapshot maps its aggregate keys to the five values verbatim (packet only)."""
+    import types
+
+    from apps.control_room.services import subscription_usage
+
+    payload = {"spend_usd": 12.4, "burn_rate": 0.82, "quota_percent": 61,
+               "wallet_usd": 7.6, "reserved_usd": 2.1}
+    monkeypatch.setattr(subscription_usage, "load_or_refresh",
+                        lambda _r, _root: (payload, "cache", 3))
+    block = glance._cost_block(types.SimpleNamespace(redis=None, root=None))  # fast-safe: mock
+
+    assert block["spend"] == "$12.40"
+    assert block["burn"] == "$0.82/h"
+    assert block["quota"] == "61%"
+    assert block["wallet"] == "$7.60"
+    assert block["leases"] == "$2.10"
+    assert block["money_risk"] is False
+    assert block["age_seconds"] == 3

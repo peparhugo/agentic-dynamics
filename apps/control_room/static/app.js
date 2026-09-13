@@ -1226,11 +1226,28 @@
     reconcileList(host, nodes, "data-item-key");
   }
 
-  /** R3a `ON-G4`: exactly five labelled money values + an optional risk marker. */
+  /** R3a `ON-G4`: the five constraint values as a labelled LEDGER, never money cards.
+   *
+   * Synthesis v2 §5.5 corrects v1's "call-centre KPI" treatment: R3a is a bounded constraint
+   * ledger attached to the roster, so each value earns a labelled ROW rather than a
+   * free-floating tile. Every value is taken verbatim from the packet's `cost` block; an absent
+   * value renders the literal `unknown`, never `$0.00`. Per-row provenance (the packet's own
+   * source + age) rides on `data-source`/`data-age-seconds` at every viewport — machine-readable
+   * and shown as a compact age chip where the width allows — while `#cost-prov` carries the full,
+   * visible source + age the render gate reads.
+   */
   function renderCost(glance) {
     var host = document.getElementById("cost-grid");
     clear(host);
     var cost = glance.cost || {};
+    var spend = (glance.truth && glance.truth.spend) || {};
+    // The five values share one subscription snapshot, so they share one source + age. The truth
+    // strip's spend observation is the projection's own provenance carrier for that snapshot, so
+    // it leads; a `cost.source` the projection names explicitly is the fallback, then `unknown`.
+    var source = spend.source || cost.source || "unknown";
+    var age = typeof cost.age_seconds === "number" ? cost.age_seconds
+      : (typeof spend.age_seconds === "number" ? spend.age_seconds : null);
+    var ageText = ageLabel(age);
     var rows = [
       ["money.spend", "spend", cost.spend],
       ["money.burn", "burn", cost.burn],
@@ -1239,25 +1256,26 @@
       ["money.leases", "leases", cost.leases],
     ];
     rows.forEach(function (row) {
-      // A cost cell stacks its label over its value on desktop/narrow (two lines); on mobile it
-      // is inline (one line). The clamp is the desktop shape, so it declares two lines.
-      appendField(host, row[0], row[1], row[2] === undefined ? "unknown" : row[2], { maxLines: 2 });
+      var value = row[2] === undefined || row[2] === null ? "unknown" : row[2];
+      var field = appendField(host, row[0], row[1], value, { maxLines: 1 });
+      field.classList.add("cost-row");
+      // Per-value provenance: the packet's source + age travel WITH the row (F13).
+      field.setAttribute("data-source", source);
+      field.setAttribute("data-age-seconds", age === null ? "unknown" : String(age));
+      field.setAttribute("title", row[1] + " · source " + source + " · age " + ageText);
+      field.appendChild(element("span", "cost-prov-row", { "aria-hidden": "true" }, ageText));
     });
-    // Consequential-value provenance (IA §2 R3a): the money answer names the source and age of
-    // its observation visibly at rest, so spend is never a free-floating KPI.
+    // The block provenance line: the full source + age, visible at rest (the gate reads it).
     var prov = document.getElementById("cost-prov");
-    if (prov) {
-      var ageValue = glance.trust && glance.trust.worst_age !== undefined
-        ? glance.trust.worst_age + "s" : "unknown";
-      prov.textContent = "source " + (glance.source || "unknown") + " · age " + ageValue;
-    }
+    if (prov) prov.textContent = "source " + source + " · age " + ageText;
+    // The bounded cap exception, anchored to the heading line so it never adds a ledger row.
     if (cost.money_risk) {
       var marker = element("span", "money-risk", { "data-money-risk": "" });
       marker.appendChild(element("span", null, null, "⚠ near cap"));
       host.appendChild(marker);
     }
-    // Move 6 — the hard-budget headroom bar for the constraint ledger. `quota` is the cap
-    // fraction; a non-numeric quota draws an explicit unknown track, never a full one.
+    // The hard-budget headroom bar for the ledger. `quota` is the cap fraction; a non-numeric
+    // quota draws an explicit unknown track, never a full one.
     var quotaPct = parseInt(String(cost.quota === undefined ? "" : cost.quota).replace("%", ""), 10);
     var costState = isNaN(quotaPct) ? "unknown" : (quotaPct >= 100 ? "over" : (quotaPct >= 90 ? "warn" : "ok"));
     var budgetBar = element("span", "cost-budget", {
@@ -1272,40 +1290,118 @@
     host.appendChild(budgetBar);
   }
 
-  /** R3b: two bounded worker/projection detail lines (a mirror of R0, never its answer). */
+  /** R3b: the packet's MEASURED health statuses — never a client-derived composite score.
+   *
+   * Synthesis v2 §5.4 retires v1's "one computed health score": it had no measured source in
+   * the packet. R3b mirrors the packet's own health fields instead — the worker heartbeat
+   * verdict and the projection watermark verdict, each carrying its MEASURED state plus the
+   * worst age (and, for projections, the projector lag) as `data-*` evidence. This renderer
+   * computes no aggregate at all, so the room cannot manufacture a reassuring score the packet
+   * never measured (a3 D-6/D-7).
+   */
   function renderHealth(glance) {
     var host = document.getElementById("health-lines");
     clear(host);
     var health = glance.health_detail || {};
-    [["workers", health.workers], ["projections", health.projections]].forEach(function (row) {
-      var line = element("div", "detail-line", { "data-detail-line": "", "data-max-lines": "1" });
-      line.appendChild(element("span", null, { "data-label": "" }, row[0]));
-      appendRawValue(line, row[1] === undefined ? "unknown" : row[1], null);
+    var system = glance.system || {};
+    var trust = glance.trust || {};
+    var lag = (glance.truth && glance.truth.projection_lag) || {};
+    var rows = [
+      { key: "workers", label: "workers", detail: health.workers,
+        state: (system.workers || {}).state, age: (system.workers || {}).age_seconds },
+      { key: "projections", label: "projections", detail: health.projections,
+        state: trust.projection_state, age: trust.worst_age, lag: lag.lag },
+    ];
+    rows.forEach(function (row) {
+      var line = element("div", "detail-line", {
+        "data-detail-line": "",
+        "data-max-lines": "1",
+        // The measured evidence the line carries: which dimension, its packet state and worst
+        // age (and the projector lag where the packet has one). All packet values, verbatim.
+        "data-measure": row.key,
+        "data-state": row.state === undefined || row.state === null ? "unknown" : String(row.state),
+        "data-age-seconds": typeof row.age === "number" ? String(row.age) : "unknown",
+      });
+      if (row.lag !== undefined) {
+        line.setAttribute("data-lag", typeof row.lag === "number" ? String(row.lag) : "unknown");
+      }
+      line.appendChild(element("span", null, { "data-label": "" }, row.label));
+      appendRawValue(line, row.detail === undefined || row.detail === null ? "unknown" : row.detail, null);
       host.appendChild(line);
     });
   }
 
-  /** R3c `ON-G7`: four bounded marginals, each with exactly top/other/unknown buckets. */
+  /** Parse the count a composition bucket states (`sol 5` / `0` / `unknown`), or null. */
+  function bucketCount(text) {
+    var match = /(\d+)\s*$/.exec(String(text === undefined || text === null ? "" : text));
+    return match ? parseInt(match[1], 10) : null;
+  }
+
+  /**
+   * The proportional stacked bar for one marginal's top/other/unknown split.
+   *
+   * `counts` is the parsed bucket counts (or null). The bar is a NON-FIELD affordance: it
+   * derives its proportions ONLY from the packet's own counts and, when any bucket is
+   * unparseable or the total is zero, renders ONE explicit `unknown` segment instead of a
+   * fabricated full bar.
+   */
+  function compositionBar(counts) {
+    var bar = element("span", "marginal-bar",
+      { "data-composition-bar": "", "aria-hidden": "true" });
+    var names = ["top", "other", "unknown"];
+    var total = 0;
+    var complete = true;
+    names.forEach(function (name) {
+      if (counts[name] === null || counts[name] === undefined) complete = false;
+      else total += counts[name];
+    });
+    if (!complete || total <= 0) {
+      bar.setAttribute("data-bar-state", "unknown");
+      bar.setAttribute("title", "composition split unknown");
+      bar.appendChild(element("span", "marginal-seg",
+        { "data-seg": "unknown", "data-bar-state": "unknown" }));
+      return bar;
+    }
+    bar.setAttribute("data-bar-state", "measured");
+    bar.setAttribute("title",
+      "top " + counts.top + " · other " + counts.other + " · unknown " + counts.unknown);
+    names.forEach(function (name) {
+      var segment = element("span", "marginal-seg", { "data-seg": name });
+      segment.style.width = ((counts[name] / total) * 100).toFixed(2) + "%";
+      bar.appendChild(segment);
+    });
+    return bar;
+  }
+
+  /** R3c `ON-G7`: the composition marginals as bounded TOKEN-SPLIT BARS, stated in words.
+   *
+   * Each marginal (`model`/`condition`/`provider`/`lifecycle`) keeps its three explicit, legible
+   * bucket words (never `t`/`o`/`u`) AND adds a proportional stacked bar so the split reads as
+   * shape. The bar is derived from the packet's own counts (see `compositionBar`); a malformed
+   * or absent split degrades to one explicit unknown segment, never a guessed proportion.
+   */
   function renderComposition(glance) {
     var host = document.getElementById("composition");
     clear(host);
     var composition = glance.composition || {};
+    // Compact visible names fit the 64px label track; `data-marginal` keeps the full name.
+    var shortNames = { model: "model", condition: "cond", provider: "prov", lifecycle: "life" };
     ["model", "condition", "provider", "lifecycle"].forEach(function (name) {
       var marginal = element("div", "marginal", {
         "data-marginal": name,
         "data-max-lines": "1",
       });
-      // Compact visible names fit the 64px label track; `data-marginal` keeps the full name.
-      var shortNames = { model: "model", condition: "cond", provider: "prov", lifecycle: "life" };
       marginal.appendChild(element("span", "marginal-name", { title: name },
         shortNames[name] || name));
       var buckets = element("div", "marginal-buckets", null);
       var data = composition[name] || { top: "unknown 0", other: "0", unknown: "0" };
+      var counts = {};
       ["top", "other", "unknown"].forEach(function (bucketName) {
         var bucket = element("span", "marginal-bucket", { "data-bucket": bucketName });
         // Explicit bucket words (top/other/unknown), never t/o/u shorthand a stranger must decode.
         bucket.appendChild(element("span", "bucket-label", null, bucketName));
         var bucketText = String(data[bucketName] === undefined ? "unknown" : data[bucketName]);
+        counts[bucketName] = bucketCount(bucketText);
         if (bucketName === "top") {
           // `data-category` names the modal bucket (the gate requires it on `top`).
           var category = bucketText.split(" ")[0] || "unknown";
@@ -1315,6 +1411,7 @@
         buckets.appendChild(bucket);
       });
       marginal.appendChild(buckets);
+      marginal.appendChild(compositionBar(counts));
       host.appendChild(marginal);
     });
   }

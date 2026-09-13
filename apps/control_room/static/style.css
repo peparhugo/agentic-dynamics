@@ -201,6 +201,11 @@
   /* The phase bar keeps progress legible by SHAPE: a filled done segment vs a dashed pending. */
   .row-phase-seg[data-phase-state="done"] { background: LinkText; border-color: LinkText; }
   .row-phase-seg[data-phase-state="pending"] { background: Canvas; border: 1px dashed CanvasText; }
+  /* The composition split keeps its parts distinguishable by system color + SHAPE (top filled,
+     other highlight, unknown dashed) so the bar never relies on hue alone. */
+  .marginal-seg[data-seg="top"] { background: LinkText; }
+  .marginal-seg[data-seg="other"] { background: Highlight; }
+  .marginal-seg[data-seg="unknown"] { background: Canvas; border: 1px dashed CanvasText; }
 }
 
 * { box-sizing: border-box; }
@@ -950,21 +955,48 @@ body {
 
 /* ── R3a · cost ───────────────────────────────────────────────────────────────────────── */
 
+/* The five ON-G4 values as a RULED LEDGER (synthesis v2 §5.5): one labelled row per value with
+   its own provenance chip, never a grid of KPI tiles. The rules are the same hairline the R3
+   stack uses, so the block reads as an annotation attached to the roster. */
 .cost-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  grid-auto-rows: 32px;
-  gap: 4px 9px;
-  padding: 4px 8px 8px;
-}
-
-.cost-grid .field {
+  display: flex;
   flex-direction: column;
-  gap: 0;
-  min-width: 0;
+  padding: 2px 8px 10px;
+  min-height: 0;
 }
 
-.cost-grid .field [data-value] { font-size: 13px; font-weight: 700; }
+.cost-grid .field.cost-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+  padding: 3px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.cost-grid .field.cost-row:last-of-type { border-bottom: none; }
+
+.cost-grid .field.cost-row [data-label] { flex: 0 0 auto; }
+
+.cost-grid .field.cost-row [data-value] {
+  margin-left: auto;
+  font-size: 13px;
+  font-weight: 700;
+  text-align: right;
+}
+
+/* Per-value provenance chip. It restates the block `#cost-prov` age on the row itself, so a
+   value can be aged without hovering; the full source lives in the row title and in the
+   heading. The chip is deliberately NOT a `[data-value]`: provenance must not widen the exact
+   five-field ON-G4 schema. */
+.cost-grid .cost-prov-row {
+  flex: 0 0 auto;
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--muted);
+  white-space: nowrap;
+}
 
 /* Move 6 — the bounded cap exception's headroom bar. Absolutely anchored so it adds no grid row
    (the §3.2 budget gives R3a two value rows, not three). */
@@ -1024,9 +1056,9 @@ body {
 
 .marginal {
   display: flex;
+  flex-wrap: wrap;
   align-items: baseline;
-  gap: 4px;
-  height: 14px;
+  gap: 1px 4px;
   min-width: 0;
   overflow: hidden;
 }
@@ -1064,6 +1096,26 @@ body {
 .marginal-bucket .bucket-value { white-space: nowrap; }
 .marginal-bucket[data-bucket="unknown"] .bucket-value { color: var(--unknown); }
 .marginal-bucket[data-bucket="other"] .bucket-value { color: var(--muted); }
+
+/* The token-split composition bar: a proportional stacked strip under each marginal's stated
+   buckets. It is the SHAPE of the split; the words beside it remain the authority. A split the
+   packet cannot state draws one full `unknown` segment (data-bar-state="unknown"), never a
+   fabricated proportion. */
+.marginal-bar {
+  display: flex;
+  flex-basis: 100%;
+  width: 100%;
+  height: 3px;
+  border-radius: 2px;
+  overflow: hidden;
+  background: var(--line);
+}
+
+.marginal-seg { display: block; height: 100%; }
+.marginal-seg[data-seg="top"] { background: var(--machine); }
+.marginal-seg[data-seg="other"] { background: var(--muted); }
+.marginal-seg[data-seg="unknown"] { background: var(--unknown); }
+.marginal-bar[data-bar-state="unknown"] .marginal-seg { width: 100%; }
 
 /* ── R4 · selection dock (drill-down) ──────────────────────────────────────────────────── */
 
@@ -1551,11 +1603,15 @@ body {
   }
   .answer-kicker { padding-right: 0; }
 
-  /* R3a mobile budget: 8 pad + 20 heading/exception + 2x32 value rows = 92. */
+  /* R3a mobile budget: 8 pad + 20 heading/exception + 5x13 ledger rows = 92. The per-row
+     provenance chip is dropped (each row keeps data-source/data-age-seconds + its title) and the
+     cap bar is summarised by the quota value, so the ledger still fits the fixed 92px box. */
   .r3a .region-title { height: 20px; padding: 4px 8px 0; }
-  .cost-grid { grid-template-columns: repeat(3, 1fr); grid-auto-rows: 32px; gap: 0 10px;
-               padding: 0 8px 4px; }
-  .cost-grid .field { flex-direction: row; align-items: baseline; gap: 4px; }
+  .cost-grid { flex-direction: column; padding: 0 8px 2px; }
+  .cost-grid .field.cost-row { height: 13px; padding: 0; border-bottom: none; }
+  .cost-grid .field.cost-row [data-value] { font-size: 12px; }
+  .cost-grid .cost-prov-row { display: none; }
+  .cost-budget { display: none; }
 
   /* R3b mobile budget: 8 pad + 18 heading + 2x21 rows = 68. */
   .r3b .region-title { height: 18px; padding: 4px 8px 0; }
@@ -1563,10 +1619,12 @@ body {
   .detail-line [data-value] { font-size: 12px; }
 
   /* R3c mobile budget: 8 pad + 4x13 marginals = 60 (no separate heading).
-     The 1px top+bottom border eats 2px inside border-box, so the inner padding is 3px. */
+     The 1px top+bottom border eats 2px inside border-box, so the inner padding is 3px. The
+     composition bar stays INLINE beside the stated buckets (no extra row) to keep the budget. */
   .r3c .region-title { display: none; }
   .composition { padding: 3px 8px; gap: 0; }
-  .marginal { height: 13px; }
+  .marginal { flex-wrap: nowrap; align-items: center; height: 13px; }
+  .marginal-bar { flex: 0 0 40px; width: 40px; height: 4px; }
   .marginal-bucket { font-size: 12px; }
 
   .selection-dock {
