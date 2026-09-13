@@ -54,6 +54,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
@@ -95,6 +96,36 @@ TABLE_ATTRIBUTES = {
 #: :class:`ResolutionReport` counts ``expected_current``/``resolved`` over.
 TABLE_SOURCE_TYPES = {"story": "story", "review": "review", "finding": "finding"}
 
+#: table name -> the registry ``source_type``(s) whose rows a lab consuming that table
+#: actually depends on. This is the *freshness scope* (l6): the registry-selection identity
+#: a lab embeds must move when a row IT CONSUMES changes (added/superseded/tombstoned), not
+#: when an unrelated registry row does. ``analysis`` maps to ``story`` because an analysis is
+#: a derived join over the current story rows — the story registry decides which analyses
+#: exist. Kept separate from :data:`TABLE_SOURCE_TYPES` (which drives resolution
+#: completeness, where a missing ``analysis`` is deliberately not an unresolved row).
+TABLE_IDENTITY_SOURCES: dict[str, tuple[str, ...]] = {
+    "story": ("story",),
+    "review": ("review",),
+    "finding": ("finding",),
+    "analysis": ("story",),
+}
+
+
+def identity_source_types(tables: Iterable[str]) -> tuple[str, ...]:
+    """The registry ``source_type``s a table slice's freshness identity covers (l6).
+
+    The scope shared by :func:`manifest_identity`'s ``source_types`` and
+    ``lab_contract.validate_contract``: producer and consumer derive it from the same table
+    names, so a scoped identity can never disagree about which rows it covered. Order-stable
+    and deduplicated (``story+analysis`` is just ``story``).
+    """
+    out: list[str] = []
+    for table in tables:
+        for source_type in TABLE_IDENTITY_SOURCES.get(table, ()):
+            if source_type not in out:
+                out.append(source_type)
+    return tuple(out)
+
 
 # ---------------------------------------------------------------------------
 # Identity
@@ -106,10 +137,12 @@ class ManifestIdentity:
     """Who the input dataset *is* — the lineage a lab embeds and build_data re-checks.
 
     ``registry_identity_sha256`` is the projection hash described in the module docstring
-    (``schema_version`` + the ``registry`` array — the registry identity, not the manifest
+    (``schema_version`` + the ``registry`` rows — the registry identity, not the manifest
     file's bytes and not the payload bytes); ``registry_version`` is a human-readable
     version string combining the manifest schema version with the canonical row count, so a
-    mismatch is legible in a log line without diffing hashes.
+    mismatch is legible in a log line without diffing hashes. The identity may be **scoped**
+    to the ``source_type``s a consumer depends on (``manifest_identity(source_types=…)``, l6)
+    — the row count and hash then describe that slice, not the whole registry.
     """
 
     registry_identity_sha256: str
@@ -149,16 +182,30 @@ def read_manifest(manifest_path: Path | None = None) -> dict:
 
 
 def manifest_identity(
-    manifest: dict | None = None, *, manifest_path: Path | None = None
+    manifest: dict | None = None,
+    *,
+    manifest_path: Path | None = None,
+    source_types: Iterable[str] | None = None,
 ) -> ManifestIdentity:
     """Compute the canonical-state identity of a manifest.
 
     Pass either an already-loaded ``manifest`` dict or a path. The hash covers
-    ``schema_version`` + the whole ``registry`` array (see the module docstring for why not
+    ``schema_version`` + the selected ``registry`` rows (see the module docstring for why not
     the raw file bytes).
+
+    ``source_types`` scopes the freshness identity to the registry rows a consumer actually
+    depends on (l6): the digest, ``registry_version``'s row count, and ``n_rows``/``n_current``
+    are all computed over the selected ``source_type``s only, so an unrelated registry
+    addition (a decision, a fact, a lab's own finding for a different table) does not stale a
+    lab's artifact. ``None`` (or an empty sequence) keeps the whole-registry identity — the
+    data.js dataset lineage.
     """
     man = manifest if manifest is not None else read_manifest(manifest_path)
     rows = man.get("registry") or []
+    selected = tuple(source_types or ())
+    if selected:
+        wanted = set(selected)
+        rows = [r for r in rows if r.get("source_type") in wanted]
     if not man or not rows:
         return ManifestIdentity.empty()
 
@@ -175,9 +222,16 @@ def manifest_identity(
     )
 
 
-def current_manifest_identity(manifest_path: Path | None = None) -> ManifestIdentity:
-    """Identity of the manifest on disk right now — build_data's side of the comparison."""
-    return manifest_identity(manifest_path=manifest_path)
+def current_manifest_identity(
+    manifest_path: Path | None = None,
+    *,
+    source_types: Iterable[str] | None = None,
+) -> ManifestIdentity:
+    """Identity of the manifest on disk right now — build_data's side of the comparison.
+
+    ``source_types`` scopes the identity exactly as :func:`manifest_identity` does.
+    """
+    return manifest_identity(manifest_path=manifest_path, source_types=source_types)
 
 
 #: The data-integrity policy version (public-truth review P1/P2). Bumped when the treatment
@@ -906,7 +960,12 @@ def load_canonical_tables(
         raise ValueError(f"unknown canonical table(s) {unknown}; known: {list(_RESOLVERS)}")
 
     manifest = read_manifest(manifest_path)
-    identity = manifest_identity(manifest)
+    # The freshness identity is scoped to the registry rows this slice depends on (l6): a
+    # lab consuming stories is not invalidated by an unrelated decision/fact row. The scope
+    # is derived from the requested table names via the shared mapping, so the consumer
+    # side (lab_contract.validate_contract) computes the exact same slice from the lab's
+    # declared input_sources.
+    identity = manifest_identity(manifest, source_types=identity_source_types(requested) or None)
 
     payloads: dict[str, list[dict]] = {}
     report_issues: list[ResolutionIssue] = []

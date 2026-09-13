@@ -36,6 +36,7 @@ from agentic_dynamics.reporting import canonical_corpus as cc
 from agentic_dynamics.reporting.lab_contract import (
     CONTRACT_KEY,
     EXCLUSION_REASONS,
+    expected_tables,
     validate_contract,
 )
 from agentic_dynamics.reporting.lab_manifest import load_lab_manifest, publication_labs
@@ -205,8 +206,7 @@ def test_published_artifacts_match_the_current_registry():
     breakdown accounting for every excluded record). A lab re-run before the corpus changed
     passes; one left behind fails.
     """
-    identity = cc.current_manifest_identity()
-    if not identity.registry_identity_sha256:  # pragma: no cover - manifest present in CI
+    if not cc.current_manifest_identity().registry_identity_sha256:  # pragma: no cover
         pytest.skip("no data_manifest.json registry in this checkout")
 
     # Derived from the resolver's own table registry, so a newly added table (s4 added
@@ -219,7 +219,14 @@ def test_published_artifacts_match_the_current_registry():
         entry = manifest.get(lab)
         assert entry is not None
         contract = payload[CONTRACT_KEY]
-        reason = validate_contract(payload, manifest_entry=entry, current_identity=identity)
+        # The freshness identity is scoped to this lab's consumed tables (l6).
+        reason = validate_contract(
+            payload,
+            manifest_entry=entry,
+            current_identity=cc.current_manifest_identity(
+                source_types=cc.identity_source_types(expected_tables(entry)) or None
+            ),
+        )
         assert reason is None, reason
 
         # input_dataset_id is "canonical_registry/story+review" — recompute its size.

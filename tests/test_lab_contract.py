@@ -151,6 +151,67 @@ def test_contract_identity_tracks_the_manifest_it_was_built_from(tables_factory)
     assert a["registry_identity_sha256"] == c["registry_identity_sha256"]
 
 
+def test_input_identity_is_scoped_to_the_labs_consumed_tables(tmp_path, monkeypatch, manifest_entry):
+    """The earlier-open lab-freshness item: an unrelated registry row must not stale a lab.
+
+    The registry-selection identity is scoped to the ``source_type``s the lab's declared
+    inputs consume (v8/l6). A story lab is invalidated by a story row change, never by an
+    unrelated ``decision``/``fact`` row; the publication gate agrees.
+    """
+    stories_dir = tmp_path / "stories"
+    stories_dir.mkdir()
+    monkeypatch.setattr(cc, "STORIES_DIR", stories_dir)
+
+    base = _row("story0000001")
+    story_manifest = tmp_path / "story_only.json"
+    story_manifest.write_text(json.dumps(_fake_manifest([base])), encoding="utf-8")
+    grown_manifest = tmp_path / "with_unrelated.json"
+    grown_manifest.write_text(
+        json.dumps(
+            _fake_manifest(
+                [
+                    base,
+                    _row("decision0001", source_type="decision"),
+                    _row("fact00000001", source_type="fact"),
+                ]
+            )
+        ),
+        encoding="utf-8",
+    )
+    changed_manifest = tmp_path / "changed_story.json"
+    changed_manifest.write_text(
+        json.dumps(_fake_manifest([_row("story0000002")])), encoding="utf-8"
+    )
+
+    before = cc.load_canonical_tables("story", manifest_path=story_manifest)
+    grown = cc.load_canonical_tables("story", manifest_path=grown_manifest)
+    changed = cc.load_canonical_tables("story", manifest_path=changed_manifest)
+
+    # An unrelated decision/fact row does not move the story lab's selection identity…
+    assert (
+        before.identity.registry_identity_sha256
+        == grown.identity.registry_identity_sha256
+    )
+    assert before.identity.registry_version == grown.identity.registry_version
+    # …but a change to a consumed row does.
+    assert (
+        before.identity.registry_identity_sha256
+        != changed.identity.registry_identity_sha256
+    )
+
+    # The publication gate agrees: the artifact built before the unrelated rows was added is
+    # still fresh, and the same artifact is stale against a changed story row.
+    payload = {CONTRACT_KEY: _build(before)}
+    assert (
+        validate_contract(payload, manifest_entry=manifest_entry, current_identity=grown.identity)
+        is None
+    )
+    stale = validate_contract(
+        payload, manifest_entry=manifest_entry, current_identity=changed.identity
+    )
+    assert stale is not None and "stale registry_identity_sha256" in stale
+
+
 def test_resolved_input_sha256_varies_with_the_table_slice(tables_factory):
     """The content hash is a function of *which* payloads resolved, not just the registry.
 
@@ -595,8 +656,7 @@ def test_published_lab_artifacts_carry_a_valid_contract():
     from agentic_dynamics.reporting.lab_contract import expected_tables
 
     manifest = load_lab_manifest()
-    identity = cc.current_manifest_identity()
-    if not identity.registry_identity_sha256:  # pragma: no cover - manifest always present
+    if not cc.current_manifest_identity().registry_identity_sha256:  # pragma: no cover
         pytest.skip("no data_manifest.json registry in this checkout")
 
     checked = 0
@@ -611,7 +671,11 @@ def test_published_lab_artifacts_carry_a_valid_contract():
         reason = validate_contract(
             payload,
             manifest_entry=entry,
-            current_identity=identity,
+            # The identity is scoped to this lab's consumed tables (l6), the same scope the
+            # producer embedded — never the whole-registry hash.
+            current_identity=cc.current_manifest_identity(
+                source_types=cc.identity_source_types(expected_tables(entry)) or None
+            ),
             expected_resolved_input_sha256=expected_content,
         )
         assert reason is None, reason

@@ -49,6 +49,7 @@ from agentic_dynamics.reporting.canonical_corpus import (  # noqa: E402
     DEFAULT_WAIVER_PATH,
     NORMALIZATION_VERSION,
     current_manifest_identity,
+    identity_source_types,
     load_canonical_tables,
     load_waivers,
     read_manifest,
@@ -1201,9 +1202,6 @@ def _load_labs() -> dict:
     manifest = load_lab_manifest()
     labs: dict[str, dict] = {}
 
-    # Computed once: the identity every contract is compared against.
-    identity = current_manifest_identity(MANIFEST_PATH)
-
     # --- gate 1: website_key -> LabEntry (quarantined already excluded) -----------------
     for website_key, entry in sorted(publication_labs(manifest).items()):
         if not entry.output:
@@ -1234,7 +1232,12 @@ def _load_labs() -> dict:
         reason = validate_contract(
             payload,
             manifest_entry=entry,
-            current_identity=identity,
+            # l6: the freshness identity is scoped to the registry rows THIS lab consumes;
+            # an unrelated decision/fact row must not stale a story lab's artifact.
+            current_identity=current_manifest_identity(
+                MANIFEST_PATH,
+                source_types=identity_source_types(expected_tables(entry)) or None,
+            ),
             expected_resolved_input_sha256=expected_content,
         )
         if reason is not None:
@@ -2256,7 +2259,10 @@ def build():
         # ── lineage: which registry selection, which resolved payloads, which policy/normal-
         # ── ization versions, which waiver set, and which generator source tree.
         "publication_contract": {
-            "registry_identity": tables.identity.registry_identity_sha256,
+            # The dataset-level lineage is the WHOLE registry selection (not a per-lab table
+            # scope): ``tables.identity`` is scoped to the four resolved tables (l6), so the
+            # global manifest identity is read explicitly here.
+            "registry_identity": current_manifest_identity(MANIFEST_PATH).registry_identity_sha256,
             "resolved_input_identity": tables.resolved_input_sha256,
             "data_integrity_policy_version": DATA_INTEGRITY_POLICY_VERSION,
             "normalization_version": NORMALIZATION_VERSION,

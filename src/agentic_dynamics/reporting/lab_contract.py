@@ -52,8 +52,10 @@ Two identities (review P1 + P2)
 The contract carries *two* hashes, each answering a different question:
 
 * ``registry_identity_sha256`` (was ``input_manifest_sha256``) — the *selection* a lab
-  consumed: ``schema_version`` + the registry array. It changes when records are added,
-  superseded, or tombstoned, and it does **not** change when a payload file's bytes do.
+  consumed: ``schema_version`` + the registry rows **scoped to the ``source_type``s the
+  lab's declared inputs consume** (v8/l6). It changes when a consumed row is added,
+  superseded, or tombstoned — not when an unrelated registry row (a decision, a fact)
+  changes — and it does **not** change when a payload file's bytes do.
 * ``resolved_input_sha256`` — the *content* a lab consumed: a stable sorted sequence of
   ``(table, entity_id, knowledge_id, payload-content digest)`` over every resolved payload.
   It changes precisely when a payload's measured content changes (see
@@ -94,6 +96,7 @@ from .canonical_corpus import (
     CanonicalTables,
     ManifestIdentity,
     current_manifest_identity,
+    identity_source_types,
     payload_content_digest,
 )
 from .lab_manifest import LabEntry, load_lab_manifest
@@ -114,8 +117,13 @@ from .lab_manifest import LabEntry, load_lab_manifest
 #: extended from the lab's own source alone to the lab's own source PLUS its declared
 #: shared-metric source modules (:data:`METRIC_SOURCES`) — an edit to extracted shared metric
 #: code (step 6b moved Grit's primitives into ``reporting.grit_metric``) now invalidates the
-#: artifact, instead of only a glue edit to the lab script doing so.
-CONTRACT_VERSION = "lab-contract/v7"
+#: artifact, instead of only a glue edit to the lab script doing so. Bumped to v8 (l6) when
+#: ``registry_identity_sha256``/``registry_version`` became **scoped** to the registry
+#: ``source_type``s the lab's declared ``input_sources`` consume (see
+#: ``canonical_corpus.identity_source_types``): before, any unrelated registry row
+#: (a decision, a fact, a ``finding`` for another table) invalidated every lab artifact and
+#: forced a re-run. A v7 artifact carries the whole-registry hash and is refused as stale.
+CONTRACT_VERSION = "lab-contract/v8"
 
 #: The key under which the contract is embedded in a lab's output JSON.
 CONTRACT_KEY = "lab_contract"
@@ -753,7 +761,11 @@ def validate_contract(
        ``contract_version`` against this module's constants, and ``input_dataset_id`` against
        the tables ``manifest_entry`` declares;
     5. ``registry_version`` and ``registry_identity_sha256`` against the identity of the
-       manifest on disk **now**;
+       manifest on disk **now** — scoped to the ``source_type``s the lab's declared
+       ``input_sources`` consume (:func:`expected_tables` →
+       ``canonical_corpus.identity_source_types``), exactly the scope
+       :func:`build_contract` embedded (l6). An unrelated registry row cannot stale the
+       artifact; a change to a row the lab consumes can;
     6. ``resolved_input_sha256`` against the caller-recomputed payload-content hash, when the
        caller supplies it (``build_data`` recomputes it by resolving the lab's own tables).
 
@@ -809,7 +821,10 @@ def validate_contract(
     identity = (
         current_identity
         if current_identity is not None
-        else current_manifest_identity(manifest_path)
+        else current_manifest_identity(
+            manifest_path,
+            source_types=identity_source_types(expected_tables(manifest_entry)) or None,
+        )
     )
     if not identity.registry_identity_sha256:
         return (

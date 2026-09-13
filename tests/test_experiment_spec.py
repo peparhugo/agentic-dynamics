@@ -231,6 +231,42 @@ def test_validator_resolves_measurement_produces():
     assert validate_spec(spec) == []
 
 
+def test_validator_is_declarative_while_evaluation_refuses_a_missing_producer():
+    """The producer-capability boundary (earlier-open item), pinned as one contract.
+
+    The validator checks the requires/produces ORDER only: a measurement rule may legitimately
+    be declared before it is implemented (a spec is the proposal), so a control rule consuming
+    its declared output validates. The safety half lives in evaluation —
+    ``compile_experiment.evaluate_rules`` emits an EXPLICIT unknown for the unimplemented
+    producer (``metric=None``, ``state="unimplemented"``, declared outputs named ``None``),
+    never NaN with no outputs. Pinning both halves keeps validation from silently becoming the
+    enforcement point (which would invalidate the committed declarative corpus) or evaluation
+    from silently fabricating an output.
+    """
+    from agentic_dynamics.experiment.compile_experiment import evaluate_rules
+
+    spec = ExperimentSpec(
+        name="x",
+        question="q",
+        version="1",
+        workflow=Workflow("story"),
+        factors=[Factor("model", ["a"])],
+        design="factorial",
+        rules=[
+            RuleSpec("unwritten_probe", plane="measurement", evidence_class="[M]",
+                     produces=["novel_signal"]),
+            RuleSpec("ctrl", plane="control", evidence_class="[H]", requires=["novel_signal"]),
+        ],
+    )
+    assert validate_spec(spec) == []
+
+    (result,) = evaluate_rules(spec, [])
+    assert result.rule == "unwritten_probe"
+    assert result.metric is None
+    assert result.state == "unimplemented"
+    assert result.produces == {"novel_signal": None}
+
+
 def test_validator_flags_comparison_arm_not_a_factor():
     spec = ExperimentSpec(
         name="x",

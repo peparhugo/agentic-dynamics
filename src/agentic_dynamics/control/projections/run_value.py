@@ -12,6 +12,11 @@ Observed-only, by construction:
 
 * ``total_cost`` sums only captured costs (``cost_captured``) — an absent cost leaves the
   ratio ``None`` with the reason ``unmeasured_cost``, never a zero denominator or a $0.00;
+* the ratio requires EVERY row in the group to carry a captured cost. The numerator is the
+  preregistered TOTAL arm cost, so a partially-priced cohort cannot produce it: the ratio is
+  refused (``None`` + ``unmeasured_cost``) while coverage is still rendered. The alternative —
+  dividing by only the covered accepted set — would silently redefine the site KPI's
+  denominator, so this projection REFUSES rather than reports a different metric;
 * zero accepted outcomes in a group yields ``None`` with the reason ``no_accepted_outcomes``
   (a ratio with a zero denominator is unknown, never 0.0 or infinite);
 * **BVI is NOT computed.** It is a declared modeled scenario: its inputs (H human cost, W
@@ -124,9 +129,15 @@ def build_run_value(
         measured = [r for r in group if isinstance(r.get("accepted"), bool)]
         accepted = sum(1 for r in measured if r["accepted"])
         total_cost = round(sum(costs), 6) if costs else None
+        # Full cost coverage is the ratio's precondition: the denominator is the group's
+        # total accepted outcomes and the numerator is its TOTAL arm cost, so a single
+        # unknown cost makes BOTH sides mismatched. Refuse the number rather than divide an
+        # observed sum by a partially-unknown population (never $2 observed / 2 accepted
+        # when one of the two costs is unknown).
+        cost_complete = len(costs) == len(group)
         ratio = (
             round(total_cost / accepted, 6)
-            if (total_cost is not None and accepted > 0)
+            if (cost_complete and total_cost is not None and accepted > 0)
             else None
         )
         block: dict[str, Any] = {
@@ -143,7 +154,10 @@ def build_run_value(
         if ratio is None:
             if accepted == 0:
                 block["cost_per_accepted_reason"] = "no_accepted_outcomes"
-            elif total_cost is None:
+            else:
+                # Either nothing was priced or the cohort is only partially priced; both
+                # leave the preregistered numerator incomplete, so both are the same
+                # named unknown. Coverage (cost_captured_records / cost_coverage) says which.
                 block["cost_per_accepted_reason"] = "unmeasured_cost"
         blocks.append(block)
 
