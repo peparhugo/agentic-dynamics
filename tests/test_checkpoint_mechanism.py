@@ -318,6 +318,68 @@ def test_resume_proceeds_with_signed_artifact_committed_after(tmp_path):
     assert result.ok is True
 
 
+def _named_spec(tmp_path: Path, name: str):
+    """The minimal checkpoint spec under a path-unique name (no stale spec-index entry)."""
+    spec_path = tmp_path / "spec.yaml"
+    spec_path.write_text(
+        MINIMAL_SPEC_YAML.replace("name: checkpoint_test", f"name: {name}")
+    )
+    return load_spec(spec_path)
+
+
+def _committed_approval(wd: Path, spec, *, run_id: str = "", gate_id: str = "") -> None:
+    ck = _git("rev-parse", "HEAD", cwd=wd).stdout.strip()
+    tree = _git("rev-parse", "HEAD^{tree}", cwd=wd).stdout.strip()
+    binding = {
+        "spec": spec.name, "phase": "design", "candidate": ck, "tree": tree,
+    }
+    if run_id:
+        binding["run"] = run_id
+    if gate_id:
+        binding["gate"] = gate_id
+    ap = wd / "approvals" / spec.name
+    ap.mkdir(parents=True, exist_ok=True)
+    (ap / "design_approval.md").write_text(_approval_text(binding=binding))
+    _git("add", "-Af", cwd=wd)
+    _git("commit", "-qm", "operator approval (descendant of the checkpoint)", cwd=wd)
+
+
+def test_resume_refuses_an_approval_naming_a_foreign_run(tmp_path):
+    """The Astra finding, at the engine: the durable identity (the run the continuation
+    resumes + its gate) reaches the checkpoint consumer, so an artifact naming a foreign
+    run/gate refuses and NO phase runs."""
+    spec = _named_spec(tmp_path, f"checkpoint_binding_a_{tmp_path.name}")
+    wd = _completed_checkpoint_wd(tmp_path)
+    _committed_approval(wd, spec, run_id="run-foreign", gate_id="gate-foreign")
+
+    def agent(prompt, *, model, backend, workdir, **kwargs):
+        raise AssertionError("no phase may run past an unsatisfied checkpoint")
+
+    result = run_workflow(spec, goal="g", model="m", workdir=wd, run_agentic_fn=agent,
+                          resume=True, approval_run_id="run-1", approval_gate_id="")
+    assert result.awaiting is True
+    assert result.awaiting_reason == "approval_refused"
+    assert result.phases == []
+
+
+def test_resume_proceeds_with_an_approval_naming_the_durable_run(tmp_path):
+    """The matching identity (run id + the run-level empty gate) passes and the resume runs."""
+    spec = _named_spec(tmp_path, f"checkpoint_binding_b_{tmp_path.name}")
+    wd = _completed_checkpoint_wd(tmp_path)
+    _committed_approval(wd, spec, run_id="run-1")  # gate-less run: expected gate is ''
+
+    def agent(prompt, *, model, backend, workdir, **kwargs):
+        (Path(workdir) / "docs").mkdir(exist_ok=True)
+        (Path(workdir) / "docs" / "impl.md").write_text("implemented")
+        return _fake_agent()
+
+    result = run_workflow(spec, goal="g", model="m", workdir=wd, run_agentic_fn=agent,
+                          resume=True, approval_run_id="run-1", approval_gate_id="")
+    assert result.awaiting is False
+    assert [p.phase for p in result.phases] == ["implement"]
+    assert result.phases[0].status == "ok"
+
+
 def test_resume_refuses_approval_committed_at_checkpoint(tmp_path):
     """(c) an approval committed WITH the checkpoint's work (present at the checkpoint commit —
     the revamp3 exact shape) is refused: the approval must be authored AFTER the checkpoint."""

@@ -398,6 +398,46 @@ def active_run_ref(db: ControlDB, run: RunRecord) -> dict[str, Any]:
     return ref
 
 
+def run_gate_context(
+    db: ControlDB, run: RunRecord, *, pending_only: bool = False
+) -> list[str]:
+    """The run's approval gate context — the distinct gate ids its candidate carries.
+
+    This is the durable identity an approval is bound to: the writer refuses a ``--gate-id``
+    outside it, and the checkpoint/promotion consumers expect the artifact to name it. The
+    derivation mirrors :func:`awaiting_approval_entries` exactly, so the surface that offers
+    the decision and the surfaces that enforce it can never disagree:
+
+    * gate rows exist → their distinct ids (``pending_only`` drops the ones that already carry
+      an approval for this candidate sha — an approval recorded against an earlier tree never
+      clears a gate on a rewritten one);
+    * no gate rows → ``[""]``: the run stopped for approval without a gate naming it, so the
+      run itself is the subject and ``record_approval``'s empty gate is the identity. With
+      ``pending_only`` and a bare approval already recorded, the context is empty — nothing is
+      left to approve.
+
+    The empty list is only reachable with ``pending_only=True``; a consumer resolving the
+    durable identity always gets at least the run-level ``[""]``.
+    """
+    # (gate_id, candidate_sha) pairs already carrying an operator's signature for THIS act.
+    # An approval is typed — one recorded for a different purpose (or an unknown future one)
+    # never clears a checkpoint gate; a legacy '' row predates the vocabulary and is the best
+    # information that exists for it.
+    approved = {
+        (a.gate_id, a.candidate_sha)
+        for a in db.approvals(run.run_id)
+        if a.purpose in ("", PURPOSE_CHECKPOINT)
+    }
+    gates = db.gate_results(run.run_id, candidate_sha=run.candidate_sha)
+    if not gates:
+        if pending_only and ("", run.candidate_sha) in approved:
+            return []
+        return [""]
+    return sorted(
+        {g.gate_id for g in gates if not pending_only or (g.gate_id, g.candidate_sha) not in approved}
+    )
+
+
 def awaiting_approval_entries(db: ControlDB, runs: Sequence[RunRecord]) -> list[dict[str, Any]]:
     """The ``awaiting_approvals`` block: one entry per decision an operator still owes.
 
@@ -406,9 +446,10 @@ def awaiting_approval_entries(db: ControlDB, runs: Sequence[RunRecord]) -> list[
     1. Only runs in :attr:`RunState.AWAITING_APPROVAL` are considered. The state is the *design's*
        stop — a run pauses there on purpose — so it, not a heuristic over attempts, is the signal.
     2. A run's pending gates are its ``gate_results`` **for the run's own candidate sha** that
-       have no matching ``approvals`` row. Filtering on the sha is load-bearing: an approval
-       recorded against an earlier tree must never satisfy a checkpoint on a rewritten one, which
-       is precisely the stale-PASS reuse ``gate_results.candidate_sha`` exists to prevent.
+       have no matching ``approvals`` row — :func:`run_gate_context` with ``pending_only=True``.
+       Filtering on the sha is load-bearing: an approval recorded against an earlier tree must
+       never satisfy a checkpoint on a rewritten one, which is precisely the stale-PASS reuse
+       ``gate_results.candidate_sha`` exists to prevent.
     3. A run in ``awaiting_approval`` with **no** gate rows still yields one entry, with an empty
        ``gate_id``. The operator's decision binds to the candidate sha; ``record_approval``
        accepts an empty ``gate_id`` for exactly this shape. Dropping the run instead would hide a
@@ -423,25 +464,7 @@ def awaiting_approval_entries(db: ControlDB, runs: Sequence[RunRecord]) -> list[
     for run in runs:
         if run.state is not RunState.AWAITING_APPROVAL:
             continue
-        # (gate_id, candidate_sha) pairs already carrying an operator's signature for THIS act.
-        # Step 2: an approval is typed — one recorded for a different purpose (or an unknown
-        # future one) never clears a checkpoint gate; a legacy '' row predates the vocabulary
-        # and is the best information that exists for it.
-        approved = {
-            (a.gate_id, a.candidate_sha)
-            for a in db.approvals(run.run_id)
-            if a.purpose in ("", PURPOSE_CHECKPOINT)
-        }
-        gates = db.gate_results(run.run_id, candidate_sha=run.candidate_sha)
-        pending = sorted(
-            {g.gate_id for g in gates if (g.gate_id, g.candidate_sha) not in approved}
-        )
-        # Rule 3: stopped for approval with no gate row naming it — the run itself is the
-        # subject, so the entry carries an empty gate_id. Skipped when a bare approval
-        # (gate_id "") for this candidate sha has already been recorded.
-        if not gates and ("", run.candidate_sha) not in approved:
-            pending = [""]
-        for gate_id in pending:
+        for gate_id in run_gate_context(db, run, pending_only=True):
             entries.append(
                 {
                     "run_id": run.run_id,
@@ -1038,6 +1061,7 @@ __all__ = [
     "packet_json",
     "read_repo_head_sha",
     "read_worker_heartbeats",
+    "run_gate_context",
     "run_phase_progress",
     "run_ref",
     "unhealthy_workers",

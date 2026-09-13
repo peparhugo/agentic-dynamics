@@ -699,9 +699,10 @@ def _run_promotion(
     if awaiting:
         approval = _load_approval(args, ledger)
         # Wave A4: pass every expectation the caller can prove — the spec, the awaiting
-        # phase, the candidate's immutable tree, and the run identity when the ledger names
-        # it. The approval must match ALL of them.
+        # phase, the candidate's immutable tree, and the run + gate identity when the
+        # ledger/durable record name them. The approval must match ALL of them.
         approval_tree = _git(workdir, "rev-parse", f"{candidate}^{{tree}}", check=False)
+        ledger_run_id = str(ledger.get("run_id") or "")
         _verify_approval(
             approval,
             ledger,
@@ -709,7 +710,8 @@ def _run_promotion(
             spec=args.spec,
             phase=str(ledger.get("awaiting_phase") or ""),
             tree=approval_tree,
-            run_id=str(ledger.get("run_id") or ""),
+            run_id=ledger_run_id,
+            gate_id=_durable_gate_context(ledger_run_id, getattr(args, "db", None)),
         )
 
     # 3 ── the base is present and the promotion is fast-forwardable onto it.
@@ -1061,6 +1063,34 @@ def _load_approval(args: argparse.Namespace, ledger: dict) -> dict:
     return {"path": path, "text": text, "lines": lines}
 
 
+def _durable_gate_context(run_id: str, db_path: str | Path | None = None) -> str | None:
+    """The single gate id the awaiting run binds — ``""`` for run-level, ``None`` unknown.
+
+    The promote path already binds the ledger's run id; the gate half of the identity is
+    resolved from the same durable run: the run's own gate rows for its candidate
+    (:func:`~agentic_dynamics.control.control_status.run_gate_context`). No rows means the
+    run-level ``""`` approval (the writer's shape for a gate-less checkpoint); a single id
+    means that gate; more than one is ambiguous, so no gate expectation is passed. A missing
+    database or run is ``None`` — an unprovable expectation is not a fabricated one.
+    """
+    if not run_id:
+        return None
+    try:
+        from agentic_dynamics.control.control_db import ControlDB
+        from agentic_dynamics.control.control_status import run_gate_context
+
+        with ControlDB.open_read_only(db_path) as db:
+            run = db.get_run(run_id)
+            if run is None:
+                return None
+            context = run_gate_context(db, run)
+    except Exception:  # noqa: BLE001 — an unreadable control db is "not provable", never a crash
+        return None
+    if len(context) == 1:
+        return context[0]
+    return None
+
+
 def _verify_approval(
     approval: dict,
     ledger: dict,
@@ -1070,12 +1100,16 @@ def _verify_approval(
     phase: str = "",
     tree: str = "",
     run_id: str = "",
+    gate_id: str | None = None,
 ) -> None:
     """The approval must bind THIS candidate through the ONE contract (migration step 2).
 
     The old substring checks accepted ``date: nonsense`` and an approval carrying no operator
     at all; the contract parses the artifact and validates the exact binding — candidate,
     purpose (when declared), a real operator, and a real date — returning named failed checks.
+    ``gate_id`` is the durable gate expectation: ``""`` means a run-level approval must carry
+    no gate, a non-empty value must match exactly, and ``None`` skips the gate check (the
+    caller could not prove it).
     """
     decision = dc.parse_approval_decision(approval["text"])
     failed = dc.validate_decision(
@@ -1088,6 +1122,7 @@ def _verify_approval(
         phase=phase or None,
         tree=tree or None,
         run_id=run_id or None,
+        gate_id=gate_id,
     )
     if failed:
         if "candidate_sha" in failed:
