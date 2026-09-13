@@ -287,6 +287,11 @@ def _build_phase_admission(spec: ExperimentSpec, args: argparse.Namespace):
     before the first phase. Without them the scope's already-installed caps apply, and an
     uncapped scope admits nothing — the registry has no default cap on purpose ("an admission
     layer whose unconfigured state is unlimited is not an admission layer").
+
+    **A cap CHANGE records its own decision at the moment of the act (G-26):** both flags are
+    P0 controller acts, so each installed value that differs from the scope's previous cap
+    writes one ``cap_raise`` decision record through the decision-record mechanism
+    (:func:`_record_cap_decision`, best-effort). A no-op re-install records nothing.
     """
     if args.no_admission:
         print("admission: gate NOT injected (--no-admission)", file=sys.stderr)
@@ -314,9 +319,19 @@ def _build_phase_admission(spec: ExperimentSpec, args: argparse.Namespace):
     registry = LeaseRegistry.from_env()
     scope = LeaseScope(ScopeKind.CAMPAIGN, spec.name)
     if args.campaign_budget_usd is not None:
-        registry.set_cap(LeaseKind.BUDGET, scope, float(args.campaign_budget_usd))
+        previous = registry.get_cap(LeaseKind.BUDGET, scope)
+        applied = registry.set_cap(LeaseKind.BUDGET, scope, float(args.campaign_budget_usd))
+        if previous != applied:
+            _record_cap_decision(_cap_change_decision(spec.name, "budget", previous, applied))
     if args.campaign_concurrency is not None:
-        registry.set_cap(LeaseKind.CONCURRENCY, scope, float(args.campaign_concurrency))
+        previous = registry.get_cap(LeaseKind.CONCURRENCY, scope)
+        applied = registry.set_cap(
+            LeaseKind.CONCURRENCY, scope, float(args.campaign_concurrency)
+        )
+        if previous != applied:
+            _record_cap_decision(
+                _cap_change_decision(spec.name, "concurrency", previous, applied)
+            )
 
     print(
         f"admission: ARMED — campaign scope {scope} "
@@ -331,6 +346,59 @@ def _build_phase_admission(spec: ExperimentSpec, args: argparse.Namespace):
         controller=AdmissionController(registry),
         campaign_scope=scope,
     )
+
+
+#: The decision-record category a cap change is filed under (the P11 route's ``cap_raise``
+#: filter, G-26). One category for both cap kinds — the record's ``what`` names which cap.
+CAP_DECISION_CATEGORY = "cap_raise"
+
+
+def _cap_change_decision(
+    spec_name: str, kind: str, previous: float | None, applied: float
+) -> dict[str, Any]:
+    """The decision dict a cap change records at the moment of the act (G-26).
+
+    ``actor`` is the P0 role — the cap install is a controller act executed through this
+    launcher; the operator's NAME is not carried by this CLI, so the role is recorded and no
+    identity is invented (the ``why`` names the exact flag and the previous value).
+    """
+    previous_text = "unset" if previous is None else repr(float(previous))
+    flag = "--campaign-budget-usd" if kind == "budget" else "--campaign-concurrency"
+    return {
+        "what": (
+            f"change {kind} cap for campaign {spec_name}: {previous_text} -> {float(applied)}"
+        ),
+        "why": f"controller act installed at workflow launch via {flag}",
+        "alternatives": [],
+        "category": CAP_DECISION_CATEGORY,
+        "decided_at": datetime.now(timezone.utc).isoformat(),
+        "actor": "operator",
+    }
+
+
+def _record_cap_decision(decision: dict[str, Any]) -> dict[str, Any]:
+    """Best-effort: record ONE cap-change decision via the decision-record mechanism (G-26).
+
+    The durable artifact + pointer event are written by
+    ``decision_ingestion.record_decision`` (its own contract already reports a downed stream as
+    a warning). This wrapper guarantees the cap install never fails on a record failure: the
+    durable act stands, the failure is printed, and the outcome is returned for the caller/test
+    to inspect (the ``scripts/promote.py`` injection pattern).
+    """
+    from agentic_dynamics.knowledge import decision_ingestion as di
+
+    try:
+        result = di.record_decision(decision)
+    except Exception as exc:  # noqa: BLE001 — a record failure never blocks the cap install
+        print(
+            f"cap decision record failed ({type(exc).__name__}: {exc}) — the cap change "
+            "stands; re-run `agentic-dynamics decision record` to record it",
+            file=sys.stderr,
+        )
+        return {"status": "error", "error": str(exc)}
+    for warning in result.warnings:
+        print(f"cap decision record: {warning}", file=sys.stderr)
+    return {"status": result.status, "knowledge_id": result.record.knowledge_id}
 
 
 def _resolve_workdir_head(workdir: str | Path) -> str | None:

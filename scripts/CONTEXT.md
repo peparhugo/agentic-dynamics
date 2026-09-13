@@ -281,10 +281,10 @@ reasoning_divergence, semantic_clusters. Superseded by `semantic_validation.py`.
 
 | File | Purpose |
 |------|---------|
-| `apps/control_room/server.py` | Flask backend — the **Control Room portal**, 46 routes across 10 API categories plus the static shell (below). Serves `apps/control_room/static/`. Port 8000 (`FINOPS_PORT`). |
+| `apps/control_room/server.py` | Flask backend — the **Control Room portal**, 47 routes across 10 API categories plus the static shell (below). Serves `apps/control_room/static/`. Port 8000 (`FINOPS_PORT`). |
 | `apps/control_room/static/` | The one resting screen (facelift a0, parity-restored u4): one run ledger answering `ON-G1..G7` at rest, no navigation. `index.html` + `style.css` + `app.js` hydrate from `GET /api/glance` and follow `GET /api/events`; `parity.js` re-houses the dropped operational surfaces — the R4b per-worker event stream + governed action band, R4d step timings, and the workbench lenses (fleet, attention, money, registry, sessions, queue, routing, docs, audit, health, workforce step timings, plus the step-11 Operations/Surfaces boards and the step-12 batch lane) — each lazy-loading the same endpoint the old room used. |
 
-`apps/control_room/server.py`'s 46 routes, categorized:
+`apps/control_room/server.py`'s 47 routes, categorized:
 - **Legacy telemetry** (8): `/api/matrix`, `/api/status` (SSE), `/api/events/<cell_id>` (SSE), `/api/projections`, `/api/routing`, `/api/subscription-usage`, `POST /api/experiments`, `POST /api/queue/reinterleave`
 - **Supervisor flags** (3): `/api/flags`, `POST /api/flags/<session_id>/steer`, `POST /api/flags/<session_id>/interrupt`
 - **Registry** (2): `/api/registry`, `/api/registry/<entity_id>`
@@ -294,7 +294,7 @@ reasoning_divergence, semantic_clusters. Superseded by `semantic_validation.py`.
 - **Claude background sessions** (9): `/api/claude-agents`, `POST /api/claude-agents`, `/api/claude-agents/<session_id>/logs`, `POST /api/claude-agents/<session_id>/stop`, `POST /api/claude-agents/<session_id>/respawn`, `POST /api/claude-agents/<session_id>/rm`, `POST /api/claude-agents/<session_id>/steer`, `/api/claude-agents/daemon`, `POST /api/claude-agents/daemon/stop`
 - **Docs health** (2): `/api/docs-health`, `POST /api/docs-health/approve` — the docs-drift rail's surface (green/yellow/red + the controller's approve affordance; see `scripts/scan_docs_drift.py` → `docs_drift_watchdog.py` → `docs_proposal_gate.py`)
 - **Operations** (2): `/api/operations`, `/api/runs/<run_id>` — the operational read models (step 5): the packet + attention/triage, and P1/P2 per-run detail over the control records
-- **Analytics** (8): `/api/quality`, `/api/stories/<name>/arc`, `/api/value`, `/api/arms/compare` — the step-6 projections (P3 model quality, P4 story arc, P5 observed-only value, P6 arm comparison); `/api/queue/sla`, `/api/escalations`, `/api/batch`, `/api/energy` — the step-7 rule-4/6/8/9 surfaces (measured where owned, labeled scenarios/unknowns where not)
+- **Analytics** (9): `/api/quality`, `/api/stories/<name>/arc`, `/api/value`, `/api/arms/compare` — the step-6 projections (P3 model quality, P4 story arc, P5 observed-only value, P6 arm comparison); `/api/queue/sla`, `/api/escalations`, `/api/batch`, `/api/energy` — the step-7 rule-4/6/8/9 surfaces (measured where owned, labeled scenarios/unknowns where not); `/api/decisions` — the P11 decision ledger (recorded decisions + P0 acts whose record is missing)
 - **Static shell** (1): `GET /`
 
 Full endpoint reference: `docs/architecture/current/supervisor_design.md`, `docs/architecture/current/spec.md`.

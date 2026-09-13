@@ -775,6 +775,10 @@ def test_composition_root_installs_the_campaign_caps_and_returns_a_gate(
         "agentic_dynamics.control.lease_registry.LeaseRegistry.from_env",
         classmethod(lambda cls, **kw: capped),
     )
+    # The cap-change decision writer (G-26) is a KB/Redis side effect; its own suite
+    # (tests/test_control_room_decisions.py) pins the payload. Here the install must not
+    # touch the real artifact dir.
+    monkeypatch.setattr(rw, "_record_cap_decision", lambda decision: None)
     gate = rw._build_phase_admission(
         load_spec(SPEC), _args(campaign_budget_usd=25.0, campaign_concurrency=3)
     )
