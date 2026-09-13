@@ -82,6 +82,9 @@ def test_prepared_step_is_written_and_passed_to_the_child(tmp_path):
     assert written["schema"] == "prepared-step/v1"
     assert written["prompt"] == "do the thing"
     assert written["prompt_sha256"] == _request().prompt_sha256
+    # The concrete request is stamped with the CHILD-visible workdir (the clone mount), never
+    # the parent's host path — the field the direct-execution worker uses as its cwd.
+    assert written["workdir"] == "/repo"
 
     # the transport never lands in the cell's commits (a local-only exclude entry)
     assert ".fleet/prepared_steps/" in (
