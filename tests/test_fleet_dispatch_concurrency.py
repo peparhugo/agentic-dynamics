@@ -73,6 +73,24 @@ class _FakeCommandsRedis:
             removed += 1
         return removed
 
+    def eval(self, script: str, numkeys: int, *keys_and_args) -> int:
+        """The ONE Lua script the wrapper runs: the atomic processing→commands requeue.
+
+        ``_requeue_claimed`` moves a claimed command back onto the commands lane with
+        ``LREM``+``LPUSH`` in ONE server-side script, so an interruption between the two
+        calls cannot strand the entry in neither lane. The fake mirrors that script exactly
+        (Redis runs it without interleaving; the fake is single-threaded, so sequential is
+        equivalent — and ``LPUSH`` runs unconditionally, as in the script).
+        """
+        keys = [str(item) for item in keys_and_args[:numkeys]]
+        argv = [str(item) for item in keys_and_args[numkeys:]]
+        if "LREM" in script and "LPUSH" in script:
+            raw = argv[0]
+            self.lrem(keys[0], 1, raw)  # LREM KEYS[1] 1 ARGV[1] — 0 matches is not an error
+            self.lpush(keys[1], raw)  # LPUSH KEYS[2] ARGV[1] — unconditional in the script
+            return 1
+        raise AssertionError(f"unexpected eval script: {script!r}")  # pragma: no cover
+
     def lrange(self, key: str, start: int, end: int) -> list[str]:
         lst = self._lists.get(key, [])
         if end == -1:
