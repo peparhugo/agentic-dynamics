@@ -129,7 +129,9 @@ class DockerAgentExecutor(StepExecutor):
             sibling_cmd += ["--backend", self._backend or request.backend]
         # Step 3 (prepared-step transport): the parent readies the EXACT step (prompt + hash +
         # settings + attempt) and the child consumes it — never a re-derivation from the spec.
-        prepared_path = self._write_prepared_step(request)
+        # The transport's workdir is stamped with the CHILD-visible path (``sibling_workdir``),
+        # so the concrete request is valid in the namespace it will execute in, not the parent's.
+        prepared_path = self._write_prepared_step(request, workdir=sibling_workdir)
         sibling_cmd += ["--prepared-step", prepared_path]
 
         admission = current_context()
@@ -174,7 +176,7 @@ class DockerAgentExecutor(StepExecutor):
             timeout_seconds=request.timeout or self._timeout or 0,
         )
 
-    def _write_prepared_step(self, request: StepRequest) -> str:
+    def _write_prepared_step(self, request: StepRequest, *, workdir: str | None = None) -> str:
         """Write the prepared step where the CHILD reads it; return the child-visible path.
 
         The file travels inside the run clone (mounted at ``/repo`` in the sibling), so the
@@ -199,7 +201,7 @@ class DockerAgentExecutor(StepExecutor):
             child_path = str(host_dir / phase_file)
         host_dir.mkdir(parents=True, exist_ok=True)
         (host_dir / phase_file).write_text(
-            json.dumps(request.to_prepared_dict(), indent=2, sort_keys=True),
+            json.dumps(request.to_prepared_dict(workdir=workdir), indent=2, sort_keys=True),
             encoding="utf-8",
         )
         return child_path

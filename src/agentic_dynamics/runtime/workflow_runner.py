@@ -1533,6 +1533,66 @@ def _format_stall_evidence(ev: dict[str, Any]) -> str:
     )
 
 
+def run_concrete_step(
+    request: StepRequest,
+    *,
+    run_agent: Callable[..., Any] | None = None,
+) -> WorkflowRunResult:
+    """Execute ONE deserialized concrete :class:`StepRequest` directly through the adapter.
+
+    Step 3 containment (Astra ae212a0 finding 5): a prepared child is a WORKER. It runs the
+    exact step the parent readied — the concrete model, timeout, prompt and scalar settings
+    come from the request — and reports a one-phase :class:`WorkflowRunResult` so the parent's
+    executor can classify it. It does NOT re-enter the workflow engine, because the engine
+    interprets the SOURCE spec (``model_pool``, per-phase ``run_model``, per-phase ``timeout``)
+    and silently overrides the resolved request. Planning, routing, augmentation, admission,
+    gates, commits, and the ledger stay in the parent's engine.
+
+    ``run_agent`` is injectable so the provider seam can be faked (exactly-once assertions);
+    it defaults to the real adapter (:func:`agentic_dynamics.adapters.backends.run_agentic`).
+    """
+    executor = LocalAgentExecutor(run_agent or run_agentic)
+    step = executor.execute(request)
+    phase = PhaseResult(
+        phase=request.phase_name or "?",
+        kind=request.phase_kind or "agent",
+        status="ok" if step.ok else "failed",
+        model=request.model,
+        error=step.error,
+        tokens={
+            "in": step.prompt_tokens,
+            "out": step.completion_tokens,
+            "reasoning": step.reasoning_tokens,
+            "answer": step.answer_tokens,
+            "explanation": step.explanation_tokens,
+            "total": step.total_tokens,
+        },
+        cost_usd=step.estimated_cost_usd,
+        cost_source=step.cost_source or CostSource.UNKNOWN.value,
+        estimation_method=step.estimation_method,
+        reported_cost_usd=step.reported_cost_usd,
+        cache_read_tokens=step.cache_read_tokens,
+        cache_write_tokens=step.cache_write_tokens,
+        cache_hit_rate=step.cache_hit_rate,
+        session_id=step.session_id,
+        files_created=list(step.files_created or []),
+        files_modified=list(step.files_modified or []),
+        final_response=step.final_response,
+        confidence=step.confidence,
+        test_executed_success=step.test_executed_success,
+        tests_passed=step.tests_passed,
+        tests_total=step.tests_total,
+    )
+    return WorkflowRunResult(
+        spec_name=request.spec_name,
+        model=request.model,
+        workdir=request.workdir,
+        goal=request.goal,
+        phases=[phase],
+        ended_at=_now(),
+    )
+
+
 # ── Deploy gate (cap_runner_hardening p2) ──────────────────────────────────────────────────
 #
 # The measured disease: terra ran ``firebase deploy`` from a non-deploy phase and silently

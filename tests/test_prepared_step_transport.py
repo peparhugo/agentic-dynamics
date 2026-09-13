@@ -69,3 +69,28 @@ def test_child_refuses_a_foreign_document(tmp_path):
     path.write_text(json.dumps({"schema": "something-else"}), encoding="utf-8")
     with pytest.raises(ValueError, match="not a prepared-step/v1"):
         load_prepared_step(path)
+
+
+# ── step 3c: the concrete request the worker executes (Astra ae212a0 finding 5) ───────────────
+
+
+def test_from_prepared_dict_round_trips_the_concrete_request():
+    """The worker rebuilds the request from the payload — and carries NO spec context."""
+    request = _request(attempt=3, timeout=77, thinking_effort="low", backend="opencode")
+    rebuilt = StepRequest.from_prepared_dict(request.to_prepared_dict())
+    assert rebuilt.model == "m"
+    assert rebuilt.prompt == "parent prompt"
+    assert rebuilt.attempt == 3
+    assert rebuilt.timeout == 77
+    assert rebuilt.thinking_effort == "low"
+    assert rebuilt.backend == "opencode"
+    # The one field that lets an engine override the concrete model/timeout is empty: there is
+    # no source-spec context to reach into.
+    assert rebuilt.phase_def == {}
+
+
+def test_from_prepared_dict_refuses_a_changed_prompt():
+    payload = _request().to_prepared_dict()
+    payload["prompt"] = "tampered"
+    with pytest.raises(ValueError, match="hash mismatch"):
+        StepRequest.from_prepared_dict(payload)

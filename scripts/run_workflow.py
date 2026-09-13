@@ -65,12 +65,16 @@ from agentic_dynamics.knowledge.knowledge_ingestion import (  # noqa: E402
     record_to_event,
 )
 from agentic_dynamics.knowledge.record_factory import _now_iso  # noqa: E402
-from agentic_dynamics.runtime.executor import load_prepared_step  # noqa: E402
+from agentic_dynamics.runtime.executor import StepRequest, load_prepared_step  # noqa: E402
 from agentic_dynamics.runtime.run_clone import (  # noqa: E402
     RUN_CLONE_ENV,
     create_run_clone,
 )
-from agentic_dynamics.runtime.workflow_runner import cell_scope, run_workflow  # noqa: E402
+from agentic_dynamics.runtime.workflow_runner import (  # noqa: E402
+    cell_scope,
+    run_concrete_step,
+    run_workflow,
+)
 from workflows.compile_workflow import load_spec_any  # noqa: E402
 
 #: CAP fact auto-emit (docs/architecture/current/cap_fact_auto_emit_design.md §4): the disable-flag
@@ -562,6 +566,24 @@ def main() -> None:
     return _run_workflow_cli(spec, args)
 
 
+def _run_prepared_child(prepared: dict[str, Any], args: argparse.Namespace) -> None:
+    """Execute the parent's CONCRETE prepared request and emit the child envelope.
+
+    Astra ae212a0 finding 5: the worker never enters the workflow engine. It deserializes the
+    verified ``prepared-step/v1`` payload into a :class:`StepRequest` and runs it through the
+    adapter (:func:`run_concrete_step`), so the resolved model/timeout/prompt are the ones that
+    execute — the source spec's ``model_pool`` / per-phase ``run_model`` / per-phase ``timeout``
+    have no path to override them. The one-phase result is printed as the P0-1 envelope and the
+    exit code maps the outcome; the parent engine classifies it, applies its gates, commits the
+    clone, and writes the aggregate ledger.
+    """
+    request = StepRequest.from_prepared_dict(prepared)
+    result = run_concrete_step(request)
+    print(json.dumps(result.to_dict(), indent=2))
+    print(f"cost: ${result.total_cost_usd:.4f}  ok: {result.ok}", file=sys.stderr)
+    raise SystemExit(exit_code_for_result(result))
+
+
 def _run_workflow_cli(
     spec: ExperimentSpec, args: argparse.Namespace, *, step_executor=None, verifier_executor=None
 ) -> None:
@@ -579,22 +601,13 @@ def _run_workflow_cli(
     # phase's true position are carried through so the Control Room publishes "i of N".
     only_phase_total: int | None = None
     only_phase_index: int | None = None
-    # Wave A2: the prepared-child flag is a FUNCTION-scope fact (the routing/signals
-    # composition below consults it on EVERY run, not only the child path).
+    # Step 3: a PREPARED child is not a spec-driven run at all — see the early branch below.
     prepared_child = False
+    prepared: dict[str, Any] | None = None
     if args.only_phase:
-        phases = spec.workflow.params.get("phases") or []
-        names = [str(p.get("name", "")) for p in phases]
-        if args.only_phase not in names:
-            raise SystemExit(
-                f"--only-phase {args.only_phase!r}: no such phase (have {names})"
-            )
-        only_phase_index = names.index(args.only_phase)
-        only_phase_total = len(phases)
-        phase = dict(phases[only_phase_index])
-        # Step 3: the PREPARED step is the authority for this phase's prompt — the child
-        # executes what the parent readied (and may have augmented), never a re-derivation.
-        # The transport file is verified (schema + prompt hash) and must name THIS phase; a
+        # Step 3: the PREPARED step is a self-contained CONCRETE request — the child executes
+        # it directly (see the branch below), never a re-derivation from the spec. The
+        # transport file is verified (schema + prompt hash) and must name THIS phase; a
         # missing/tampered/foreign step refuses before anything executes.
         if args.prepared_step:
             prepared = load_prepared_step(args.prepared_step)
@@ -604,40 +617,34 @@ def _run_workflow_cli(
                     f"{prepared.get('phase_name')!r}, not {args.only_phase!r} — refusing to "
                     f"execute a step prepared for another phase"
                 )
-            # Wave A2 — prepared mode is EXACT: every execution setting comes from the payload
-            # (the parent resolved it), never from this child's flags, spec, or environment.
-            # The parent owns preparation, routing, augmentation and retry policy; the child
-            # executes ONE adapter invocation that matches the prepared request.
             prepared_child = True
-            args.model = str(prepared.get("model") or args.model)
-            if prepared.get("backend"):
-                args.backend = prepared["backend"]
-            args.goal = str(prepared.get("goal") or args.goal)
-            args.thinking_effort = str(prepared.get("thinking_effort") or args.thinking_effort)
-            args.thinking_budget_tokens = int(prepared.get("thinking_budget_tokens") or 0)
-            args.output_token_limit = int(prepared.get("output_token_limit") or 0)
-            args.timeout = int(prepared.get("timeout") or args.timeout)
-            phase["prompt"] = prepared["prompt"]
-            phase["_prepared_step"] = True
-            # Continue the PARENT's attempt numbering (executor namespace + identity).
-            spec.workflow.params["_attempt_base"] = int(prepared.get("attempt") or 1)
-            # The parent alone owns retry policy and augmentation: the child must not rerun an
-            # escalation ladder (the review's two-call reproduction) nor re-augment a prompt
-            # the parent already readied.
-            spec.workflow.params.pop("escalation", None)
-            spec.workflow.params["rag_augment"] = False
-        spec.workflow.params["phases"] = [phase]
+        else:
+            phases = spec.workflow.params.get("phases") or []
+            names = [str(p.get("name", "")) for p in phases]
+            if args.only_phase not in names:
+                raise SystemExit(
+                    f"--only-phase {args.only_phase!r}: no such phase (have {names})"
+                )
+            only_phase_index = names.index(args.only_phase)
+            only_phase_total = len(phases)
+            phase = dict(phases[only_phase_index])
+            spec.workflow.params["phases"] = [phase]
+
+    # Astra ae212a0 finding 5: a prepared child is a WORKER, not a spec-driven run. Execute the
+    # deserialized CONCRETE request directly through the adapter — the request's model, timeout,
+    # prompt and scalar settings win by construction, because no engine ever interprets the
+    # SOURCE spec's model_pool / per-phase run_model / per-phase timeout. Planning, routing,
+    # augmentation, admission, gates, commits, and the ledger stay in the parent's engine.
+    if prepared_child:
+        _run_prepared_child(prepared or {}, args)
+        return
 
     # Signal-store wiring (docs/routing_next_steps.md item 1): when the spec declares routing
     # and no explicit --signals override was supplied, build the store from the measured
     # corpus so the router consumes real data instead of cold-starting. The explicit
     # signals/preferences kwargs on run_workflow remain the override hook.
     signals: dict[str, ModelSignals] | None = None
-    if prepared_child:
-        # The parent owns routing/signals; the payload is the resolved result. (No-op branch:
-        # signals stays None.)
-        pass
-    elif args.signals:
+    if args.signals:
         signals = _load_signals(args.signals)
     elif _spec_declares_routing(spec):
         try:
@@ -647,11 +654,7 @@ def _run_workflow_cli(
             signals = None
 
     router = route_step
-    if prepared_child:
-        # The child executes the prepared step; routing is the parent's decision. No router at
-        # all: the run-level model IS the payload's model, and no routing code path executes.
-        router = None
-    elif bool(spec.workflow.params.get("control_route", False)):
+    if bool(spec.workflow.params.get("control_route", False)):
         # CAP I7 seam (design §9 I7): a PER-SPEC opt-in — only a spec that explicitly sets
         # `workflow.params.control_route: true` ever has the plane's route choice applied, and
         # only when a fresh validate_decision() admits it. OFF by default; no committed spec
@@ -665,7 +668,7 @@ def _run_workflow_cli(
             cell_id=_reducer_cell_id(spec.name, args.model),
             repository_id=cell_scope(args.workdir),
         )
-    elif not prepared_child and args.cap_shadow:
+    elif args.cap_shadow:
         # CAP I6 seam: a drop-in Router that ALSO runs + validates + records the fact-based
         # shadow decision (design §9 I6 row) — a superset of --cap-snapshot. Built here, at the
         # composition root, exactly where `route_step` is injected — `runtime.workflow_runner`
@@ -677,7 +680,7 @@ def _run_workflow_cli(
             cell_id=_reducer_cell_id(spec.name, args.model),
             repository_id=cell_scope(args.workdir),
         )
-    elif not prepared_child and args.cap_snapshot:
+    elif args.cap_snapshot:
         # CAP I4 seam: a drop-in Router that also compiles + records a snapshot (design §9 I4
         # row). Built here, at the composition root, exactly where `route_step` is injected —
         # `runtime.workflow_runner` never imports `control` either way (Debt-2).

@@ -110,12 +110,18 @@ class StepRequest:
         """The immutable identity of the prepared instruction (sha256 of ``prompt``)."""
         return hashlib.sha256(self.prompt.encode("utf-8")).hexdigest()
 
-    def to_prepared_dict(self) -> dict[str, Any]:
+    def to_prepared_dict(self, *, workdir: str | None = None) -> dict[str, Any]:
         """The transport form of this step (``prepared-step/v1``) for a sibling executor.
 
         The child consumes THIS — never a re-derivation from the spec — so the prompt the
         parent readied (and may have augmented) is exactly the prompt that executes, and its
         hash is carried for verification.
+
+        ``workdir`` is the one field whose value is namespace-relative: the parent's engine
+        path and the sibling's mount path differ (``DockerAgentExecutor`` mounts the run clone
+        at ``/repo``). The executor passes the CHILD-visible path here so the request is
+        concrete in the namespace it will execute in; absent an override the request's own
+        ``workdir`` rides through (the in-process shape, where the two are identical).
         """
         return {
             "schema": "prepared-step/v1",
@@ -127,7 +133,7 @@ class StepRequest:
             "backend": self.backend,
             "goal": self.goal,
             "spec_name": self.spec_name,
-            "workdir": self.workdir,
+            "workdir": workdir or self.workdir,
             "language": self.language,
             "thinking_effort": self.thinking_effort,
             "thinking_budget_tokens": self.thinking_budget_tokens,
@@ -137,6 +143,57 @@ class StepRequest:
             "enforce_pytest": self.enforce_pytest,
             "attempt": self.attempt,
         }
+
+    @classmethod
+    def from_prepared_dict(cls, payload: dict[str, Any]) -> StepRequest:
+        """Rebuild the CONCRETE request from a verified ``prepared-step/v1`` document.
+
+        This is the child's half of the transport (mirror of :meth:`to_prepared_dict`) and the
+        load-bearing step of the prepared-child contract: the worker executes the deserialized
+        request DIRECTLY through the adapter. It must never hand the payload's fields back to a
+        spec-driven engine, because the engine would re-interpret the SOURCE spec's
+        ``model_pool`` / per-phase ``run_model`` / per-phase ``timeout`` and silently override
+        the resolved request (the leak this transport exists to close).
+
+        Re-validates the schema/prompt/hash (``load_prepared_step`` already did, but a caller
+        that builds a request from a dict it did not load gets the same refusal). ``phase_def``
+        is deliberately EMPTY: a concrete request carries no routing/spec context — any
+        consumer that reaches into ``phase_def`` for a model/timeout override is reaching past
+        the request.
+        """
+        if not isinstance(payload, dict) or payload.get("schema") != "prepared-step/v1":
+            raise ValueError("not a prepared-step/v1 document")
+        prompt = payload.get("prompt")
+        if not isinstance(prompt, str) or not prompt.strip():
+            raise ValueError("prepared step carries no prompt")
+        if not payload.get("phase_name"):
+            raise ValueError("prepared step carries no phase_name")
+        carried = str(payload.get("prompt_sha256") or "")
+        actual = hashlib.sha256(prompt.encode("utf-8")).hexdigest()
+        if carried != actual:
+            raise ValueError(
+                f"prepared step prompt hash mismatch ({carried[:12] or '<empty>'} != "
+                f"{actual[:12]}): the instruction was changed in transit — refusing to execute"
+            )
+        return cls(
+            phase_name=str(payload.get("phase_name") or ""),
+            phase_kind=str(payload.get("phase_kind") or "agent"),
+            prompt=prompt,
+            model=str(payload.get("model") or ""),
+            goal=str(payload.get("goal") or ""),
+            spec_name=str(payload.get("spec_name") or ""),
+            workdir=str(payload.get("workdir") or ""),
+            language=str(payload.get("language") or ""),
+            backend=payload.get("backend"),
+            thinking_effort=str(payload.get("thinking_effort") or "high"),
+            thinking_budget_tokens=int(payload.get("thinking_budget_tokens") or 0),
+            output_token_limit=int(payload.get("output_token_limit") or 0),
+            timeout=int(payload.get("timeout") or 1800),
+            silent_mode=bool(payload.get("silent_mode", False)),
+            enforce_pytest=bool(payload.get("enforce_pytest", False)),
+            attempt=int(payload.get("attempt") or 1),
+            phase_def={},
+        )
 
 
 def load_prepared_step(path: Path | str) -> dict[str, Any]:
