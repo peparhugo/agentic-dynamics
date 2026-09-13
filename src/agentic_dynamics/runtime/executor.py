@@ -42,6 +42,36 @@ from typing import Any, Protocol
 
 
 @dataclass
+class TestBoundary:
+    """The concrete test-only execution boundary a verifier child runs.
+
+    A verifier is NOT an agent: it runs ONE independent suite against ONE candidate and
+    emits a verdict. This carries exactly that surface — the suite target(s), the candidate
+    workdir, the language, the authorizing scope, and the timeout — and deliberately carries
+    NOTHING from the producing phase (no prompt, no ``test_gate`` marker, no escalation).
+    The verifier executor turns it into the child's execution boundary; the child never
+    reloads or executes the producing phase by name.
+    """
+
+    phase_name: str
+    suite: list[str] = field(default_factory=list)
+    candidate: str = ""
+    language: str = ""
+    scope: str = ""
+    timeout: int = 1800
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "phase_name": self.phase_name,
+            "suite": list(self.suite),
+            "candidate": self.candidate,
+            "language": self.language,
+            "scope": self.scope,
+            "timeout": self.timeout,
+        }
+
+
+@dataclass
 class StepRequest:
     """Everything the engine knows about ONE step, handed to the executor.
 
@@ -69,6 +99,11 @@ class StepRequest:
     #: Step 3: the attempt ordinal within the phase (1-based) — the engine's retry counter, so
     #: executor state is keyed by run/ATTEMPT, never shared across retries of one phase.
     attempt: int = 1
+    #: The concrete test-only execution boundary a ``kind: test`` step runs. Set by the
+    #: engine's native ``test_gate`` (and by an explicit test phase) so the verifier child
+    #: executes the suite against the candidate WITHOUT reloading the producing phase by name.
+    #: ``None`` for an agent step (an agent is not a verifier).
+    test_boundary: TestBoundary | None = None
 
     @property
     def prompt_sha256(self) -> str:

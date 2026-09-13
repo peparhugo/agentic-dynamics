@@ -165,6 +165,7 @@ from agentic_dynamics.runtime.executor import (
     StepExecutor,
     StepRequest,
     StepResult,
+    TestBoundary,
 )
 from agentic_dynamics.runtime.phase_evidence import (
     PhaseEvidence,
@@ -1035,9 +1036,29 @@ def _run_test_gate(
     leaves ``test_executed_success`` at its ``None`` default — null-not-zero.
     """
     if verifier_executor is not None:
+        # The verifier request IS a concrete test-only execution boundary (Astra finding 3):
+        # it names the suite target(s), the candidate workdir, the language, the authorizing
+        # scope and the timeout — and NOTHING from the producing phase. The native ``test_gate``
+        # used to copy the producing agent phase's ``kind=agent`` + ``phase_def`` into the
+        # request, and the DockerVerifierExecutor (which only executes ``kind:test``) refused
+        # it; worse, even a forced ``kind=test`` made the child reload the producing phase by
+        # name and re-run its gates. An agent child must NEVER retain or execute the parent's
+        # gates, so the boundary is built fresh here from the gate declaration.
+        producing_kind = str((phase_def or {}).get("kind", "agent"))
+        base_name = name or pr.phase
+        # An explicit kind:test phase keeps its name; a native gate on a producing agent
+        # phase gets a distinct boundary name so the phase record identifies the verification.
+        boundary_name = base_name if producing_kind == "test" else f"{base_name}__test_gate"
+        suite = [target] if isinstance(target, str) else list(target or [])
+        scope = str((phase_def or {}).get("scope") or "")
+        boundary_phase_def: dict[str, Any] = {"name": boundary_name, "kind": "test"}
+        if suite:
+            boundary_phase_def["tests"] = suite
+        if scope:
+            boundary_phase_def["scope"] = scope
         test_request = StepRequest(
-            phase_name=name or pr.phase,
-            phase_kind=(phase_def or {}).get("kind", "test"),
+            phase_name=boundary_name,
+            phase_kind="test",
             prompt="",
             model=model,
             goal=goal,
@@ -1045,7 +1066,15 @@ def _run_test_gate(
             workdir=str(wd),
             language=language,
             timeout=timeout,
-            phase_def=dict(phase_def or {}),
+            phase_def=boundary_phase_def,
+            test_boundary=TestBoundary(
+                phase_name=boundary_name,
+                suite=suite,
+                candidate=str(wd),
+                language=language,
+                scope=scope,
+                timeout=timeout,
+            ),
         )
         try:
             verdict = verifier_executor.execute(test_request)

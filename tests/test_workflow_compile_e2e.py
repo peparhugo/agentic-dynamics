@@ -109,8 +109,16 @@ def test_authored_workflow_scaffolds_lints_plans_compiles_and_executes(tmp_path)
     # the authored phase executed, with the authored prompt untouched by the compiler
     assert [request.phase_name for request in executor.requests] == ["implement"]
     assert "Implement the requested change" in executor.requests[0].prompt
-    # the compiled gate dispatched to the verifier and its nonempty passing verdict landed
-    assert [r.phase_name for r in verifier.requests] == ["implement"]
+    # the compiled gate dispatched to the verifier as a CONCRETE test-only boundary
+    # (Astra ae212a0 finding 3): kind=test, the gate's own name, and no producing-phase
+    # kind/prompt retained — the producing phase is never re-loaded by name in the verifier.
+    assert [r.phase_name for r in verifier.requests] == ["implement__test_gate"]
+    native = verifier.requests[0]
+    assert native.phase_kind == "test"
+    assert native.phase_def["kind"] == "test"
+    assert "prompt" not in native.phase_def and "test_gate" not in native.phase_def
+    assert native.test_boundary is not None
+    # and its nonempty passing verdict landed
     assert result.phases[0].test_executed_success is True
     assert result.phases[0].tests_total == 1
 
