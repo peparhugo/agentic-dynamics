@@ -96,8 +96,16 @@
          Recomposed from a "trust bar" into a terminal machine rail: a prompt glyph and the
          control plane's name at the left, the two complete answers (`ON-G1` system dimensions,
          `ON-G6` trust verdict) read inline on the rail, and the deliberate lenses at the right.
-         Both answers are rendered here and nowhere else. -->
-    <header class="r0" data-region="R0" role="region" aria-label="Machine and trust">
+         Both answers are rendered here and nowhere else.
+
+         Step 3 adds the persistent SCOPE/TRUTH STRIP (`#truth-strip`): the at-rest summary the
+         operator reads first — the running/blocked/done-unseen run counts, spend against the
+         window cap, the worst projection lag, and the live stream state. Every cell is a
+         packet-emitted value carrying its own source + age provenance, and every cell is a
+         deliberate door: a count is an addressable FILTER over the roster, and every cell links
+         to its lens. A cell whose signal is absent (the `done-unseen` watermark the packet does
+         not yet carry) renders an explicit `unknown` — never a fabricated zero. -->
+    <header class="r0" data-region="R0" role="region" aria-label="Machine, scope and trust">
       <div class="r0-scope">
         <span class="machine-prompt" aria-hidden="true">&#x276F;</span>
         <span class="scope-name" id="scope-name">control-room</span>
@@ -112,6 +120,12 @@
           <span class="answer-kicker">TRUST</span>
           <span class="answer-cells" id="trust-cells" aria-label="Trust verdict"></span>
         </div>
+        <!-- The scope/truth strip. A `role="group"` (never a `data-answer`, never a layout
+             region): the canonical `ON-G1`/`ON-G6` anchors above stay the only answers here.
+             Count cells are buttons — activating one filters the roster; the small lens button
+             on every cell opens the cell's workbench lens. -->
+        <div class="r0-strip" id="truth-strip" role="group"
+             aria-label="Scope and truth strip"></div>
       </div>
       <!-- Grouped so mobile can lift the controls out of the answers' flex width (the 72px bar
            has no room to spare for two 28px buttons beside a wrapping trust row). -->

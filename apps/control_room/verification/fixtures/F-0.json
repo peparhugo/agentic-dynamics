@@ -27,6 +27,15 @@
     "items": []
   },
   "run_counts": {"running": 5, "queued": 1, "failed": 1, "live": 3},
+  "truth": {
+    "counts": {"running": 5, "blocked": 1, "done_unseen": null},
+    "counts_source": "control packet",
+    "counts_age_seconds": 2,
+    "spend": {"value": "$12.40", "cap": "61%", "source": "subscription usage",
+      "age_seconds": 3},
+    "projection_lag": {"value": "current", "lag": 0, "state": "current",
+      "source": "projection watermarks", "age_seconds": 4}
+  },
   "run_defaults": {
     "spec.cell": "task_manager/clean",
     "terminal.target": "wt/control-room",

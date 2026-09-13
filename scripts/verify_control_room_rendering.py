@@ -206,6 +206,12 @@ def _apply_delta(seed: dict[str, Any], fixture_id: str) -> dict[str, Any]:
     delta = FIXTURE_DELTAS.get(fixture_id, {})
     if "run_counts" in delta:
         payload["run_counts"] = delta["run_counts"]
+        # Keep the R0 truth strip's count cells consistent with the forced counts fixture.
+        payload["truth"]["counts"] = {
+            "running": delta["run_counts"]["running"],
+            "blocked": delta["run_counts"]["queued"],
+            "done_unseen": None,
+        }
     if "cost" in delta:
         payload["cost"] = delta["cost"]
     if delta.get("inbox_overflow"):
@@ -232,6 +238,10 @@ def _apply_delta(seed: dict[str, Any], fixture_id: str) -> dict[str, Any]:
         payload["trust"]["worst_age"] = 901
         payload["trust"]["degraded_count"] = 1
         payload["trust"]["stale_count"] = 1
+        payload["truth"]["projection_lag"] = {
+            "value": "stale", "lag": 3, "state": "stale",
+            "source": "projection watermarks", "age_seconds": 901,
+        }
     if delta.get("browser_down"):
         payload["system"]["browser"] = {"state": "down", "age_seconds": 7}
     if delta.get("empty_queues"):

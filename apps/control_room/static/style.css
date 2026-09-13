@@ -356,6 +356,93 @@ body {
   min-width: 0;
 }
 
+/* ── R0 scope/truth strip (build step 3) ───────────────────────────────────────────────────
+   The persistent at-rest summary under the two canonical answers. One compact row of cells;
+   each cell is a label + value + a deliberate lens door, with visible `source · age` provenance.
+   A count value is a FILTER chip (pressed state = the active roster filter); a stale cell tints
+   its value and labels itself. The strip never adds a layout region or an answer anchor. */
+.r0-strip {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 2px 14px;
+  min-width: 0;
+}
+
+.strip-cell {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  min-width: 0;
+  white-space: nowrap;
+}
+
+.strip-label {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.strip-value {
+  font-family: var(--mono);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.strip-cell[data-stale="true"] .strip-value { color: var(--warn); }
+
+/* The count chip IS the filter: pressed = the roster is narrowed to this lifecycle group. */
+.strip-count {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  padding: 0 3px;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.strip-count:hover { border-color: var(--line-strong); }
+.strip-count[aria-pressed="true"] {
+  border-color: var(--operator);
+  background: var(--operator-soft);
+}
+.strip-count[aria-pressed="true"] .strip-value { color: var(--operator); }
+
+.strip-lens {
+  border: none;
+  background: none;
+  padding: 0 1px;
+  color: var(--machine);
+  font-family: var(--mono);
+  font-size: 10px;
+  line-height: 1;
+  cursor: pointer;
+}
+.strip-lens:hover { background: var(--machine-soft); }
+.strip-lens:focus-visible { outline: var(--focus-ring); outline-offset: 1px; }
+
+.strip-prov {
+  font-family: var(--mono);
+  font-size: 9px;
+  color: var(--muted);
+}
+
+.strip-stale {
+  font-family: var(--mono);
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--warn);
+}
+
 /* ── Fields: label + value, exactly one of each (gate §10.2) ───────────────────────────── */
 
 .field {
@@ -1270,6 +1357,12 @@ body {
   .run-row .row-line { height: 23px; }
   .run-row .row-lease { bottom: 3px; height: 4px; }
   .region-title { padding-top: 6px; }
+  /* Narrow R0 truth strip: the 60px bar has no width for the per-cell source+age text, so the
+     visible provenance is dropped to keep the strip a single row; every cell still carries
+     `data-source`/`data-age-seconds` and names both in its title, and the age is visible again
+     at desktop width. */
+  .r0-strip { gap: 1px 9px; }
+  .strip-prov { display: none; }
   /* Narrow trends lens: one step tighter than desktop, still 2 columns. */
   .chart-lens { --chart-body-h: 88px; height: 520px; width: min(660px, 94vw); }
 }
@@ -1367,6 +1460,11 @@ body {
   .r0-actions .icon-button { width: 22px; height: 22px; }
   .r0-scope { min-width: 66px; max-width: 70px; align-self: stretch; padding-top: 3px; }
   .answer-kicker { width: auto; min-width: 30px; font-size: 9px; margin-right: 6px; }
+  /* Mobile is triage mode: the 72px bar is already four micro-rows of the two canonical
+     answers, with no room for a fifth. The strip's truths are not lost — the counts are the
+     R2 header (`ON-G2`), the spend is the R3a ledger (`ON-G4`), the lag the R3b health line,
+     and the stream state is announced on transition — they are simply not restated here. */
+  .r0-strip { display: none; }
 
   /* Mobile trends lens: a full-height inspector with a single-column chart list; it scrolls
      itself, so the resting page still never scrolls. */

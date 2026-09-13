@@ -237,6 +237,227 @@
     });
   }
 
+  // ── R0 scope/truth strip (build step 3) ─────────────────────────────────────────────────
+  //
+  // The persistent strip: the at-rest summary the operator reads first. Every value here is
+  // EMITTED by the glance projection (`glance.truth`) or observed by THIS client (the SSE
+  // stream state) — the client never derives a consequential value from raw rows. Each cell
+  // carries its own source + age, so a stranger can age a value without hovering it; a value
+  // whose signal the packet does not carry (the `done-unseen` acknowledgement watermark, D1)
+  // renders an explicit `unknown`, never a fabricated zero.
+
+  //: A packet value older than this is called out as stale in the strip. [H] 15 min — the same
+  //: order as the run heartbeat/watchdog floor and the row stale floor in the state language.
+  var STRIP_STALE_SECONDS = 900;
+
+  //: The lifecycle groups a count chip filters the roster by: the strip's three count cells map
+  //: to the packet `RunState` enums that belong to each group. A count is a FILTER (direction
+  //: §3.3; v1 counters-as-filters) — activating it narrows the VISIBLE roster; activating it
+  //: again clears the filter. The count itself stays the fleet-wide packet count, never the
+  //: size of the filtered sample (that would be a client-derived consequential value).
+  var COUNT_FILTERS = {
+    running: { running: 1, verifying: 1, projecting: 1 },
+    blocked: { awaiting_approval: 1 },
+    done_unseen: { merged: 1, published: 1 },
+  };
+
+  //: The label, door and accessible title for each count cell. The lens is where the full,
+  //: unbounded view of the same number lives — the strip is the door, the lens is the room.
+  var COUNT_META = {
+    running: { label: "RUN", lens: "fleet", title: "runs executing" },
+    blocked: { label: "BLK", lens: "attention", title: "runs awaiting a decision" },
+    done_unseen: { label: "DONE", lens: "sessions", title: "done runs not yet acknowledged" },
+  };
+
+  /** A compact age label with the unit (`0s` / `12m`), or `unknown` when no age was observed. */
+  function ageLabel(age) {
+    return typeof age === "number" && age >= 0 ? compactAge(age) : "unknown";
+  }
+
+  /** True only when a genuine recorded age crosses the stale floor (an unknown age is not stale). */
+  function isStaleAge(age, threshold) {
+    return typeof age === "number" && age > threshold;
+  }
+
+  /**
+   * One strip cell: the provenance carriers (`data-source`, `data-age-seconds`, `data-stale`)
+   * plus the visible value/lens/provenance its caller appends. `title` makes the full source
+   * available to assistive tech without widening the compact row.
+   */
+  function stripCell(opts) {
+    return element("span", "strip-cell", {
+      "data-cell": opts.key,
+      "data-source": opts.source,
+      "data-age-seconds":
+        opts.age === null || opts.age === undefined ? "unknown" : String(opts.age),
+      "data-stale": opts.stale ? "true" : "false",
+      title: opts.title,
+    });
+  }
+
+  /** The visible source · age provenance every strip cell carries. */
+  function stripProvenance(source, age) {
+    var prov = element("span", "strip-prov", { "aria-hidden": "true" });
+    // The source and the age are separate spans so the narrow breakpoint can drop the whole
+    // provenance line to keep the strip a single row. The source+age are never lost: they stay
+    // on the cell's `data-source`/`data-age-seconds` and in its title, and the visible line
+    // returns at desktop width.
+    prov.appendChild(element("span", "strip-prov-source", null, source));
+    prov.appendChild(element("span", "strip-prov-age", null, "\u00b7 " + ageLabel(age)));
+    return prov;
+  }
+
+  /** The deliberate lens door a strip cell opens (the workbench panel for that value). */
+  function stripLens(lens, what) {
+    var button = element("button", "strip-lens", {
+      type: "button",
+      "data-lens": lens,
+      "aria-label": "Open the " + lens + " lens for " + what,
+      title: "Open the " + lens + " lens",
+    }, "\u25B8");
+    button.addEventListener("click", function () { openLens(lens, button); });
+    return button;
+  }
+
+  /**
+   * R0 truth strip: the three lifecycle counts (filters), spend vs the window cap, the worst
+   * projection lag, and the live stream state. Rebuilt only when the glance payload changes
+   * (the signature covers `truth`); the stream cell is refreshed independently by the stream
+   * health loop, because the stream state is the client's own observation, not the packet's.
+   */
+  function renderTruthStrip(glance) {
+    var host = document.getElementById("truth-strip");
+    if (!host) return;
+    clear(host);
+    var truth = glance.truth || {};
+    var counts = truth.counts || {};
+    var countsAge = truth.counts_age_seconds;
+    var countsSource = truth.counts_source || "unavailable";
+
+    ["running", "blocked", "done_unseen"].forEach(function (key) {
+      var meta = COUNT_META[key];
+      var raw = counts[key];
+      var value = raw === undefined || raw === null ? "unknown" : Number(raw);
+      var stale = isStaleAge(countsAge, STRIP_STALE_SECONDS);
+      var cell = stripCell({
+        key: key,
+        source: countsSource,
+        age: countsAge,
+        stale: stale,
+        title: meta.title + " · source " + countsSource + " · age " + ageLabel(countsAge),
+      });
+      // The count chip IS the filter: activating it narrows the roster to this lifecycle group.
+      var chip = element("button", "strip-count", {
+        type: "button",
+        "data-filter": key,
+        "aria-pressed": AppState.runFilter === key ? "true" : "false",
+        title: "Filter the run roster to " + meta.title,
+      });
+      chip.appendChild(element("span", "strip-label", null, meta.label));
+      chip.appendChild(element("span", "strip-value", { "data-value": "", "data-no-ellipsis": "" }, value));
+      chip.addEventListener("click", function () { setRunFilter(key); });
+      cell.appendChild(chip);
+      cell.appendChild(stripLens(meta.lens, meta.title));
+      if (stale) cell.appendChild(element("span", "strip-stale", null, "stale"));
+      cell.appendChild(stripProvenance(countsSource, countsAge));
+      host.appendChild(cell);
+    });
+
+    // ── spend vs the window cap ──────────────────────────────────────────────────────────
+    var spend = truth.spend || {};
+    var spendAge = spend.age_seconds;
+    var spendCell = stripCell({
+      key: "spend",
+      source: spend.source || "unavailable",
+      age: spendAge,
+      stale: isStaleAge(spendAge, STRIP_STALE_SECONDS),
+      title: "Spend against the subscription window cap",
+    });
+    spendCell.appendChild(element("span", "strip-label", null, "SPEND"));
+    spendCell.appendChild(element("span", "strip-value", { "data-value": "", "data-no-ellipsis": "" },
+      (spend.value || "unknown") + " / " + (spend.cap || "unknown")));
+    spendCell.appendChild(stripLens("money", "spend against the cap"));
+    spendCell.appendChild(stripProvenance(spend.source || "unavailable", spendAge));
+    host.appendChild(spendCell);
+
+    // ── worst projection lag ─────────────────────────────────────────────────────────────
+    var lag = truth.projection_lag || {};
+    var lagState = String(lag.value || "unknown");
+    var lagStale = lagState === "stale" || lagState === "failing";
+    var lagCell = stripCell({
+      key: "projection_lag",
+      source: lag.source || "projection watermarks",
+      age: lag.age_seconds,
+      stale: lagStale,
+      title: "Worst projector state and lag",
+    });
+    lagCell.appendChild(element("span", "strip-label", null, "LAG"));
+    var lagText = lagState + (lag.lag === null || lag.lag === undefined ? "" : " \u00b7 " + lag.lag);
+    lagCell.appendChild(element("span", "strip-value", { "data-value": "", "data-no-ellipsis": "" }, lagText));
+    lagCell.appendChild(stripLens("health", "projection lag"));
+    if (lagStale) lagCell.appendChild(element("span", "strip-stale", null, "stale"));
+    lagCell.appendChild(stripProvenance(lag.source || "projection watermarks", lag.age_seconds));
+    host.appendChild(lagCell);
+
+    // ── the live stream state (the client's own observation) ─────────────────────────────
+    var streamCell = stripCell({
+      key: "stream",
+      source: "events stream",
+      age: null,
+      stale: false,
+      title: "Live event stream state and age",
+    });
+    streamCell.appendChild(element("span", "strip-label", null, "STREAM"));
+    streamCell.appendChild(element("span", "strip-value", { "data-value": "", "data-no-ellipsis": "" }, "unknown"));
+    streamCell.appendChild(stripLens("operations", "stream state"));
+    streamCell.appendChild(stripProvenance("events", null));
+    host.appendChild(streamCell);
+    renderStreamCell();
+  }
+
+  /** Refresh only the stream cell from the client's SSE state (never a glance re-render). */
+  function renderStreamCell() {
+    var cell = document.querySelector('#truth-strip [data-cell="stream"]');
+    if (!cell) return;
+    var state = AppState.streamState || "connecting";
+    var age = AppState.streamAgeSeconds;
+    var stale = state === "stale" || state === "disconnected"
+      || isStaleAge(age, STREAM_STALE_SECONDS);
+    cell.setAttribute("data-source", "events stream");
+    cell.setAttribute("data-age-seconds", age === null || age === undefined ? "unknown" : String(age));
+    cell.setAttribute("data-state", state);
+    cell.setAttribute("data-stale", stale ? "true" : "false");
+    var value = cell.querySelector("[data-value]");
+    if (value) value.textContent = state + (age === null || age === undefined ? "" : " \u00b7 " + compactAge(age));
+    var provAge = cell.querySelector(".strip-prov-age");
+    if (provAge) {
+      provAge.textContent = "\u00b7 " + (age === null || age === undefined ? "unknown" : compactAge(age));
+    }
+  }
+
+  /**
+   * Activate (or clear) the roster's lifecycle filter. The chip's own `aria-pressed` names the
+   * state, so this is not announced as a state transition; the roster re-ranks the filtered set
+   * with the same keyed write-on-change reconciler (no full rebuild).
+   */
+  function setRunFilter(key) {
+    AppState.runFilter = AppState.runFilter === key ? null : key;
+    var chips = document.querySelectorAll("#truth-strip [data-filter]");
+    Array.prototype.forEach.call(chips, function (chip) {
+      chip.setAttribute("aria-pressed",
+        chip.getAttribute("data-filter") === AppState.runFilter ? "true" : "false");
+    });
+    if (AppState.glance) renderRunList(AppState.glance);
+  }
+
+  /** Open a workbench lens (the deliberate door a strip cell / count points at). */
+  function openLens(lens, origin) {
+    if (window.ControlRoomParity && window.ControlRoomParity.openWorkbench) {
+      window.ControlRoomParity.openWorkbench(origin || null);
+      window.ControlRoomParity.openPanel(lens);
+    }
+  }
+
   /** R2 `ON-G2`: the exact running/queued/failed/live counts; a null count is `unknown`. */
   function renderRunCounts(glance) {
     var host = document.getElementById("run-counts");
@@ -575,8 +796,17 @@
    *  unchanged row keeps its identity and focus. */
   function renderRunList(glance) {
     var host = document.getElementById("run-list");
-    var sample = rankRoster(Array.isArray(glance.run_sample) ? glance.run_sample : [])
-      .slice(0, capacities().rows);
+    var sample = Array.isArray(glance.run_sample) ? glance.run_sample : [];
+    // A count chip in the R0 truth strip filters the roster to its lifecycle group. The filter
+    // is presentation only — it never changes a count the projection emitted, and it is applied
+    // before ranking so the visible rows keep the same triage order within the filtered set.
+    var filter = AppState.runFilter && COUNT_FILTERS[AppState.runFilter];
+    if (filter) {
+      sample = sample.filter(function (run) {
+        return filter[String(run["lifecycle.state"] || "")] === 1;
+      });
+    }
+    sample = rankRoster(sample).slice(0, capacities().rows);
     var nodes = sample.map(function (run) {
       var row = renderRunRow(run);
       row.__signature = JSON.stringify(run);
@@ -883,6 +1113,12 @@
     //: of the last observation (the age loop above stops trusting old health past its window).
     streamConnected: false,
     lastFrameAt: null,
+    //: The SSE stream's presentation state + observed age, mirrored from the shell attribute so
+    //: the R0 truth strip's stream cell can render them without a full glance re-render.
+    streamState: "connecting",
+    streamAgeSeconds: null,
+    //: The active R0 count filter over the run roster (a `COUNT_FILTERS` key), or null for all.
+    runFilter: null,
     //: When the age loop last re-read the projection while the stream was stale (throttle).
     lastStaleFetchAt: null,
     //: The last rendered payload's signature. A no-op poll (same signature) performs ZERO
@@ -909,6 +1145,7 @@
       glance.control_epoch,
       glance.system,
       glance.trust,
+      glance.truth,
       glance.attention,
       glance.run_counts,
       glance.run_sample,
@@ -958,6 +1195,7 @@
 
     renderSystem(glance);
     renderTrust(glance);
+    renderTruthStrip(glance);
     renderRunCounts(glance);
     renderRunList(glance);
     renderAttention(glance);
@@ -1070,6 +1308,16 @@
       },
       trust: { epoch: 0, worst_age: 0, projection_state: "unknown", degraded_count: 0,
         stale_count: 0, partial_count: 0, unknown_count: 3 },
+      // The truth strip's own explicit-unknown fallback: every count is null (never 0), the
+      // spend/lag sources are unavailable, and the client appends its own stream state.
+      truth: {
+        counts: { running: null, blocked: null, done_unseen: null },
+        counts_source: "unavailable",
+        counts_age_seconds: null,
+        spend: { value: "unknown", cap: "unknown", source: "unavailable", age_seconds: null },
+        projection_lag: { value: "unknown", lag: null, state: "unknown",
+          source: "unavailable", age_seconds: null },
+      },
       attention: {
         decision: { state: "unknown", target: "unknown", kind: "unknown", epoch: 0,
           authority: "unknown", eligibility: "unknown" },
@@ -1128,8 +1376,11 @@
 
   /** Set `[data-stream-state]` on the glance shell (connecting/open/disconnected/stale). */
   function setStreamState(state) {
+    AppState.streamState = state;
     var root = document.querySelector("[data-glance-shell]");
     if (root) root.setAttribute("data-stream-state", state);
+    // The truth strip shows the same observation to the operator; refresh just that cell.
+    renderStreamCell();
   }
 
   /**
@@ -1143,7 +1394,9 @@
     var age = AppState.lastFrameAt
       ? Math.max(0, Math.floor((Date.now() - AppState.lastFrameAt) / 1000))
       : null;
+    AppState.streamAgeSeconds = age;
     root.setAttribute("data-stream-age-seconds", age === null ? "unknown" : String(age));
+    renderStreamCell();
     if (age === null || age <= STREAM_STALE_SECONDS) return;
     if (AppState.streamConnected) {
       AppState.streamConnected = false;

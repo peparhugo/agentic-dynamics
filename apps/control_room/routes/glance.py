@@ -590,6 +590,9 @@ def _cost_block(services: ControlRoomServices) -> dict[str, Any]:
         "wallet": "unknown",
         "leases": "unknown",
         "money_risk": False,
+        # The snapshot's own age, surfaced so the R0 truth strip can age the spend cell the
+        # same way it ages every other standing value (an unread snapshot is age 0 = unknown).
+        "age_seconds": 0,
     }
     try:
         from apps.control_room.services.subscription_usage import load_or_refresh
@@ -622,6 +625,7 @@ def _cost_block(services: ControlRoomServices) -> dict[str, Any]:
         "wallet": "unknown" if wallet is None else f"${wallet:,.2f}",
         "leases": "unknown" if leases is None else f"${leases:,.2f}",
         "money_risk": risk,
+        "age_seconds": int(_age or 0),
     }
 
 
@@ -675,6 +679,59 @@ def _composition_block(packet: dict[str, Any] | None) -> dict[str, Any]:
     }
 
 
+def _truth_strip(
+    packet: dict[str, Any] | None,
+    trust: dict[str, Any],
+    projections: dict[str, Any],
+    cost: dict[str, Any],
+    system: dict[str, Any],
+) -> dict[str, Any]:
+    """The R0 scope/truth strip (build step 3): at-rest summary values + their provenance.
+
+    Emitted by THIS projection so the client never derives a consequential value. Each cell
+    carries the value and the source/age it was observed at, so a stranger can tell a fresh
+    count from a stale one without hovering anything:
+
+      ``counts``          — lifecycle counts from the control packet. ``running`` is exactly the
+                            packet's executing states (same predicate as ``ON-G2``); ``blocked``
+                            is the packet's own ``awaiting_approvals`` queue; ``done_unseen`` is
+                            ``None`` by design because "done but unseen" needs an acknowledgement
+                            watermark the packet does not carry (the direction defers it behind a
+                            controller decision, D1). An absent signal is never a fabricated 0.
+      ``spend``           — the usage snapshot's spend and the window cap (quota percent).
+      ``projection_lag``  — the worst projector's state + lag (the same verdict ``ON-G6``
+                            carries, named here as the standing dependency it is).
+
+    A missing control plane leaves every count ``None`` and every source ``unavailable`` — the
+    same null-not-zero vocabulary the rest of the projection speaks.
+    """
+    counts = _run_counts(packet)
+    control_age = int((system.get("control") or {}).get("age_seconds", 0) or 0)
+    blocked = None if packet is None else len(packet.get("awaiting_approvals", []) or [])
+    return {
+        "counts": {
+            "running": counts["running"],
+            "blocked": blocked,
+            "done_unseen": None,
+        },
+        "counts_source": "control packet" if packet is not None else "unavailable",
+        "counts_age_seconds": control_age,
+        "spend": {
+            "value": cost.get("spend", "unknown"),
+            "cap": cost.get("quota", "unknown"),
+            "source": "subscription usage" if cost.get("spend") != "unknown" else "unavailable",
+            "age_seconds": int(cost.get("age_seconds", 0) or 0),
+        },
+        "projection_lag": {
+            "value": str(trust.get("projection_state", "unknown")),
+            "lag": projections.get("lag"),
+            "state": str(trust.get("projection_state", "unknown")),
+            "source": "projection watermarks",
+            "age_seconds": int(trust.get("worst_age", 0) or 0),
+        },
+    }
+
+
 def build_glance(services: ControlRoomServices) -> dict[str, Any]:
     """Render the whole glance projection from the authoritative read-only sources.
 
@@ -701,12 +758,14 @@ def build_glance(services: ControlRoomServices) -> dict[str, Any]:
     # Failed runs are part of the roster too, ranked after the active ones.
     sample += _rows(list((packet or {}).get("failed_runs", [])))
     cost = _cost_block(services)
+    truth = _truth_strip(packet, trust, projections, cost, system)
     return {
         "control_epoch": epoch,
         "source": "control_room:/api/glance",
         "observed_at": _utc_now(),
         "system": system,
         "trust": trust,
+        "truth": truth,
         "attention": {
             "decision": _decision(packet),
             "risk": _risk(packet),
