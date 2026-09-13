@@ -1,8 +1,13 @@
 ---
-status: accepted
+status: superseded
+superseded_by: docs/website/control_room_ui/design_determination.md
 ---
 
 # Control Room UI — weighted evaluation, adversarial review, and final determination
+
+> **Superseded as a determination by `design_determination.md` (the single accepted decision).**
+> This document remains the scoring record and the per-criterion reasoning; its §0 winner
+> (4.72) and §6 decisions are folded into — and corrected by — the final determination.
 
 > **Phase:** determination (`wt_ui_determination`). **Question:** which of the three candidate
 > design directions should become the Control Room's next design — decided by process, scored

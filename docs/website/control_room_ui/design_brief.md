@@ -1,7 +1,13 @@
 ---
-status: accepted
+status: superseded
+superseded_by: docs/website/control_room_ui/design_determination.md
 ---
 # Control Room UI — design brief by process: evidence, criteria, candidates, and determination
+
+> **Superseded as a determination by `design_determination.md` (the single accepted decision).**
+> Parts I–III and V remain the evidence pack and are citable; Part IV's 4.48 selection and
+> Part VI's open questions are superseded — the final determination folds in the adversarial
+> findings and carries the corrected score vector.
 
 > **Phase:** determination (`wt_ui_determination`). **Question:** what should the Control Room's
 > next design be, decided by process — evidence, then weighted criteria, then three candidate
