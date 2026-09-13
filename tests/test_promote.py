@@ -271,16 +271,20 @@ _PUSHED = "abcd1234abcd1234abcd1234abcd1234abcd1234"
 
 
 def _noop_emissions() -> dict:
-    """Fakes for every post-push seam: a fake push (returns a squash sha), no-op emissions.
+    """Fakes for every external/control seam: a fake push (returns a squash sha), no-op
+    emissions, and a no-op pre-act claim.
 
     Step 10's command journal joins them: the real tests never touch a control database, and
-    an intent fake returns an untouched row (state ``intent``) so the push proceeds.
+    an intent fake returns an untouched row (state ``intent``) so the push proceeds. The
+    claim fake mirrors the injected-emission pattern for tests whose synthetic run ids have no
+    real control row — the F1 tests below drive the REAL claim against a real ControlDB.
     """
     return {
         "push": lambda workdir, base, subject, candidate: _PUSHED,
         "emit_decision": lambda decision: {"observation_id": "obs-000000000001"},
         "emit_act": lambda decision, causes: None,
         "record_decision": lambda decision: None,
+        "claim_run": lambda run_id, **kwargs: {"claimed": True, "run_id": run_id},
         "journal_intent": lambda args, *, ledger, candidate, run_id: SimpleNamespace(
             command_id="cmd-promote-test", state="intent"
         ),
@@ -848,3 +852,174 @@ def test_replay_through_the_real_journal_refuses_the_duplicate_act(tmp_path):
     with pytest.raises(_PromoteRefusedError, match="already recorded completed"):
         _run_promotion(args, **em)
     assert pushed == []  # the duplicate push never happened
+
+
+# ── astra ae212a0 finding 1: the pre-act claim ────────────────────────────────
+# The review's probe: a genuine successful ledger bound (digest intact) to a promotable run,
+# the run then cancelled through the enforced transition graph, and promotion invoked with
+# unchanged evidence — the push was reached, the journal recorded ``completed``, and the row
+# stayed ``cancelled``. The fix claims the run (``promotable -> promoting``) transactionally
+# BEFORE the push: cancellation, a wrong state, and an unknown identity all refuse before the
+# external act, and the refusal is reconciled onto the journal. These tests use a REAL
+# ControlDB on a temp path + the REAL command journal + a stubbed push callback.
+
+
+def _seed_bound_run(tmp_path: Path, wt: Path, *, state: str = "promotable"):
+    """Write the ledger + a digest-bound runs row; return ``(ledger_path, db_path, run_id)``.
+
+    ``state`` is the row's final state: ``promotable`` (eligible), ``running`` (a valid
+    ledger bound to a run still in flight — the wrong-state probe), or ``cancelled`` (the
+    review's probe: reached from ``promotable`` through the enforced transition graph).
+    """
+    import hashlib
+
+    from agentic_dynamics.control.control_db import ControlDB, RunState
+
+    ledger_data = _ledger(wt)
+    path = tmp_path / "ledgers" / "promote_test" / "20260901T000000Z.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    db_path = tmp_path / "control.db"
+    with ControlDB.open(db_path) as db:
+        run = db.create_run(spec_name="promote_test")
+        ledger_data["run_id"] = run.run_id
+        path.write_text(json.dumps(ledger_data))
+        digest = hashlib.sha256(path.read_bytes()).hexdigest()
+        # The binding rides the queued -> running transition here (any pre-terminal mutable
+        # transition can carry it); a still-running row is done at this point.
+        db.transition_run(
+            run.run_id, RunState.RUNNING, actor="orchestrator",
+            ledger_path=str(path), result_digest=digest,
+        )
+        if state != "running":
+            db.transition_run(run.run_id, RunState.PROMOTABLE, actor="orchestrator")
+        if state == "cancelled":
+            db.transition_run(
+                run.run_id, RunState.CANCELLED, actor="operator", reason="operator cancelled"
+            )
+    return path, db_path, run.run_id
+
+
+def test_f1_cancelled_run_refuses_before_the_push(tmp_path):
+    """The review's probe, pinned: a genuine ledger bound to a run that was then CANCELLED
+    through the enforced graph must never reach the push. The claim refuses on current
+    permission to act; the db stays cancelled, no promoting hop is written, and the journal
+    reconciles the intent as ``refused`` — never ``completed``."""
+    from agentic_dynamics.control.control_db import ControlDB, RunState
+
+    wt = _make_candidate_ahead_of_main(tmp_path)
+    path, db_path, run_id = _seed_bound_run(tmp_path, wt, state="cancelled")
+    pushed = []
+
+    def boom_push(*a, **k):
+        pushed.append(True)
+        raise AssertionError("a cancelled run must never be pushed")
+
+    args = _promote_args(tmp_path, wt, path, dry_run=False, db=str(db_path))
+    with pytest.raises(_PromoteRefusedError, match="cancelled"):
+        _run_promotion(
+            args,
+            push=boom_push,
+            emit_decision=lambda d: {"observation_id": "obs-f1"},
+            emit_act=lambda d, causes: None,
+            record_decision=lambda d: None,
+        )  # real claim + real journal (the real close is never reached)
+
+    assert pushed == []
+    with ControlDB.open_read_only(db_path) as db:
+        run = db.get_run(run_id)
+        assert run is not None and run.state == RunState.CANCELLED
+        assert [t.to_state.value for t in db.transitions(run_id)][-1] == "cancelled"
+        assert [c.state for c in db.commands(run_id=run_id)] == ["refused"]
+
+
+def test_f1_promotable_run_is_claimed_before_the_push_and_closed_to_merged(tmp_path):
+    """The claim transition is durable BEFORE the external act: the push callback observes the
+    row already ``promoting``; after the push the close completes it to ``merged`` with the
+    promotions row, and the journal receipt is ``completed``."""
+    from agentic_dynamics.control.control_db import ControlDB, RunState
+
+    wt = _make_candidate_ahead_of_main(tmp_path)
+    path, db_path, run_id = _seed_bound_run(tmp_path, wt)  # promotable
+    observed = {}
+
+    def push(workdir, base, subject, candidate):
+        with ControlDB.open_read_only(db_path) as db:
+            observed["state_at_push"] = db.get_run(run_id).state
+        return _PUSHED
+
+    args = _promote_args(tmp_path, wt, path, dry_run=False, db=str(db_path))
+    _run_promotion(
+        args,
+        push=push,
+        emit_decision=lambda d: {"observation_id": "obs-f1"},
+        emit_act=lambda d, causes: None,
+        record_decision=lambda d: None,
+    )  # real claim + real journal + real close
+
+    assert observed["state_at_push"] == RunState.PROMOTING
+    with ControlDB.open_read_only(db_path) as db:
+        run = db.get_run(run_id)
+        assert run is not None and run.state == RunState.MERGED
+        hops = [t.to_state.value for t in db.transitions(run_id)]
+        assert hops[-2:] == ["promoting", "merged"]
+        assert len(db.promotions(run_id)) == 1
+        assert [c.state for c in db.commands(run_id=run_id)] == ["completed"]
+
+
+def test_f1_wrong_state_run_refuses_before_the_push(tmp_path):
+    """A digest-valid ledger bound to a run that is not ``promotable`` (still ``running``)
+    refuses at the claim — the enforced graph has no ``running -> promoting`` edge — and the
+    push callback is never reached."""
+    from agentic_dynamics.control.control_db import ControlDB, RunState
+
+    wt = _make_candidate_ahead_of_main(tmp_path)
+    path, db_path, run_id = _seed_bound_run(tmp_path, wt, state="running")
+    pushed = []
+
+    args = _promote_args(tmp_path, wt, path, dry_run=False, db=str(db_path))
+    with pytest.raises(_PromoteRefusedError, match="running, not promotable"):
+        _run_promotion(
+            args,
+            push=lambda *a, **k: pushed.append(True) or _PUSHED,
+            emit_decision=lambda d: {"observation_id": "obs-f1"},
+            emit_act=lambda d, causes: None,
+            record_decision=lambda d: None,
+        )
+
+    assert pushed == []
+    with ControlDB.open_read_only(db_path) as db:
+        run = db.get_run(run_id)
+        assert run is not None and run.state == RunState.RUNNING
+        assert [t.to_state.value for t in db.transitions(run_id)][-1] == "running"
+        assert [c.state for c in db.commands(run_id=run_id)] == ["refused"]
+
+
+def test_f1_unknown_run_identity_refuses_before_the_push(tmp_path):
+    """A ledger naming a run the control db does not know refuses on the managed path: there
+    is no eligible row to claim, so there is no permission to act — the push callback is
+    never reached and the journal reconciles as ``refused``."""
+    from agentic_dynamics.control.control_db import ControlDB
+
+    wt = _make_candidate_ahead_of_main(tmp_path)
+    data = _ledger(wt)
+    data["run_id"] = "run-f1ghost0001"
+    ledger = _write_ledger(tmp_path, data)
+    db_path = tmp_path / "control.db"
+    with ControlDB.open(db_path):
+        pass  # a real, empty control plane — the identity is not there
+    pushed = []
+
+    args = _promote_args(tmp_path, wt, ledger, dry_run=False, db=str(db_path))
+    with pytest.raises(_PromoteRefusedError, match="unknown"):
+        _run_promotion(
+            args,
+            push=lambda *a, **k: pushed.append(True) or _PUSHED,
+            emit_decision=lambda d: {"observation_id": "obs-f1"},
+            emit_act=lambda d, causes: None,
+            record_decision=lambda d: None,
+        )
+
+    assert pushed == []
+    with ControlDB.open_read_only(db_path) as db:
+        assert db.get_run("run-f1ghost0001") is None
+        assert [c.state for c in db.commands()] == ["refused"]
