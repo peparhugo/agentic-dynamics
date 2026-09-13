@@ -311,17 +311,47 @@ def _gate_diag(wd: Path, spec_name: str, ledger: Path) -> str:
     """Diagnose why the relabel gate did not fire (used only in assertion messages).
 
     The gate is silent by design when its (tree, branch) match finds nothing, so a CI-only
-    miss needs the raw comparison values in the failure output (2026-09-13).
+    miss needs the raw comparison values in the failure output (2026-09-13). When the
+    approvals-excluded phase tree still differs from the base commit, the diff names the
+    offending paths outright — the phase tree is compared against ``REVAMP2_ATTEMPT_A``
+    (available in the copy via the shared object store).
     """
+    import subprocess
+
     from agentic_dynamics.runtime.workflow_runner import (
         _git_tree_hash,
         _worktree_branch,
         load_discarded_trees,
     )
 
+    def _ls(rev: str) -> dict[str, tuple[str, str]]:
+        out = subprocess.run(
+            ["git", "ls-tree", "-r", rev], cwd=wd, capture_output=True, text=True,
+        ).stdout
+        entries: dict[str, tuple[str, str]] = {}
+        for line in out.splitlines():
+            if not line:
+                continue
+            meta, path = line.split("\t", 1)
+            mode, _otype, sha = meta.split()
+            entries[path] = (mode, sha)
+        return entries
+
+    try:
+        head, base = _ls("HEAD"), _ls(REVAMP2_ATTEMPT_A)
+        extra = sorted(set(head) - set(base) - {"approvals"})
+        extra = [p for p in extra if not p.startswith("approvals/")][:12]
+        missing = sorted(set(base) - set(head))[:12]
+        changed = sorted(
+            p for p in (set(head) & set(base)) if head[p] != base[p]
+        )[:12]
+        diff = f" extra_paths={extra!r} missing_paths={missing!r} changed_paths={changed!r}"
+    except Exception as exc:  # noqa: BLE001 — diagnosis only
+        diff = f" (path diff unavailable: {exc})"
+
     return (
         f"phase_tree={_git_tree_hash(wd)!r} branch={_worktree_branch(wd)!r} "
-        f"ledger={load_discarded_trees(spec_name, ledger_path=ledger)!r}"
+        f"ledger={load_discarded_trees(spec_name, ledger_path=ledger)!r}{diff}"
     )
 
 
