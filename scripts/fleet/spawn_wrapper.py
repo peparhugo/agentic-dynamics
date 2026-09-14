@@ -108,6 +108,7 @@ if str(_FLEET_DIR) not in sys.path:
 from broker_client import BrokerClient, BrokerError  # noqa: E402
 from broker_contract import (  # noqa: E402
     AUTH_CRED_FILE,
+    FLEET_REDIS_SOCKET_TIMEOUT,
     LAUNCH_NETWORK,
     MOUNT_PROFILES,
     REPO_TARGET,
@@ -972,7 +973,14 @@ def validate_submit_request(
                 path_config=path_config,
             )
             for e in validate_spawn(
-                phase_request, phase_scopes=submit_scopes, path_config=path_config
+                phase_request, phase_scopes=submit_scopes, path_config=path_config,
+                # The submit gate validates the LAUNCH MECHANICS (scope, mounts, network,
+                # write flags) — the lease block is a RUNTIME property the run's own admission
+                # gate mints against the campaign cap when the phase actually executes. Requiring
+                # it here made every admission-armed submit un-submittable (the first-launch
+                # manual-compose workaround was born exactly there); the run fails closed
+                # (ADMISSION_DENIED) on an unleased phase either way.
+                require_lease=False,
             ):
                 errors.append(f"submit: phase {phase.get('name')!r}: {e}")
 
@@ -1017,6 +1025,95 @@ def validate_submit_request(
     # to run subprocess — re-validates the submit and then probes the workdir base against the
     # repo's main tip before the compose call, so the stale-worktree class still refuses, just
     # at the last gate instead of the first.
+
+    # Step 10 — the extended submit identity (AIO remediation 2026-09-14): source/spec
+    # identity, continuation identity, and applicable admission settings must survive every
+    # hop. Type-safety only here (the broker verifies the DIGEST against the bytes it will
+    # execute); a typo'd field would silently drop the very guarantee the hop was built to
+    # carry, so malformed values refuse at the same gate as everything else.
+    spec_sha256 = request.get("spec_sha256")
+    if spec_sha256 is not None:
+        spec_sha256 = str(spec_sha256)
+        if len(spec_sha256) != 64 or not all(c in "0123456789abcdefABCDEF" for c in spec_sha256):
+            errors.append(
+                "submit: spec_sha256 must be a 64-character hex sha256 digest of the spec "
+                f"file (got {spec_sha256!r})"
+            )
+    resume = request.get("resume")
+    if resume is not None and not isinstance(resume, bool):
+        errors.append(f"submit: resume must be a boolean (got {resume!r})")
+    parent_run_id = request.get("parent_run_id")
+    if parent_run_id is not None:
+        parent_run_id = str(parent_run_id)
+        if not parent_run_id.strip():
+            errors.append("submit: parent_run_id must be a non-blank run id")
+        elif not request.get("resume"):
+            errors.append(
+                "submit: parent_run_id declares a continuation — resume must be true"
+            )
+    admission = request.get("admission")
+    if admission is not None:
+        if not isinstance(admission, dict):
+            errors.append(f"submit: admission must be a mapping (got {type(admission).__name__})")
+        else:
+            required = admission.get("required")
+            if not isinstance(required, bool):
+                errors.append(
+                    "submit: admission.required must be a boolean "
+                    f"(got {required!r})"
+                )
+            for field, positive in (("campaign_budget_usd", False), ("campaign_concurrency", True)):
+                value = admission.get(field)
+                if value is None:
+                    continue
+                if isinstance(value, bool) or not isinstance(value, (int, float)) or (
+                    positive and value <= 0
+                ) or value < 0:
+                    errors.append(
+                        f"submit: admission.{field} must be a "
+                        f"{'positive' if positive else 'non-negative'} number "
+                        f"(got {value!r})"
+                    )
+
+    # Step 11 — the execution settings (Astra finding, 2026-09-14): the run's backend,
+    # thinking effort/budget, output limit, phase timeout, and no_commit must either SURVIVE
+    # transport to the orchestrator argv or be explicitly rejected — a tool that accepts them
+    # and drops them delivers "I requested one execution behavior and got another". The
+    # orchestrator + broker carry every field below into flags/env; this gate refuses
+    # malformed values so a typo can never silently become the default.
+    execution = request.get("execution")
+    if execution is not None:
+        if not isinstance(execution, dict):
+            errors.append(
+                f"submit: execution must be a mapping (got {type(execution).__name__})"
+            )
+        else:
+            backend = execution.get("backend")
+            if backend is not None and str(backend) not in ("opencode", "claude_cli"):
+                errors.append(
+                    f"submit: execution.backend must be 'opencode' or 'claude_cli' "
+                    f"(got {backend!r})"
+                )
+            effort = execution.get("thinking_effort")
+            if effort is not None and (not isinstance(effort, str) or not effort.strip()):
+                errors.append(
+                    f"submit: execution.thinking_effort must be a non-blank string "
+                    f"(got {effort!r})"
+                )
+            for field in ("thinking_budget_tokens", "output_token_limit", "timeout_seconds"):
+                value = execution.get(field)
+                if value is None:
+                    continue
+                if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+                    errors.append(
+                        f"submit: execution.{field} must be a non-negative integer "
+                        f"(got {value!r})"
+                    )
+            no_commit = execution.get("no_commit")
+            if no_commit is not None and not isinstance(no_commit, bool):
+                errors.append(
+                    f"submit: execution.no_commit must be a boolean (got {no_commit!r})"
+                )
 
     return errors
 
@@ -1503,6 +1600,10 @@ def _connect_redis() -> Any:
         try:
             client = redis.Redis(
                 host=host, port=port, db=db, decode_responses=True, socket_connect_timeout=5,
+                # The crash-loop fix (see broker_contract.FLEET_REDIS_SOCKET_TIMEOUT): the
+                # socket timeout must outlast the 10s BLMOVE claim or an idle queue kills the
+                # consumer on every cycle.
+                socket_timeout=FLEET_REDIS_SOCKET_TIMEOUT,
             )
             client.ping()
             return client

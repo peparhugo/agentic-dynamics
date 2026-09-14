@@ -23,7 +23,8 @@ import time
 from collections.abc import Callable
 from datetime import datetime, timezone
 
-import redis
+import broker_contract  # noqa: E402  (scripts/fleet/ is this module's dir)
+import redis  # noqa: E402
 
 REDIS_HOST = os.environ.get("FINOPS_REDIS_HOST", "127.0.0.1")
 REDIS_PORT = int(os.environ.get("FINOPS_REDIS_PORT", "6380"))
@@ -116,6 +117,7 @@ class HeartbeatThread(threading.Thread):
         client = self.client or redis.Redis(
             host=REDIS_HOST, port=REDIS_PORT, db=REDIS_DB,
             decode_responses=True, socket_connect_timeout=5,
+            socket_timeout=broker_contract.FLEET_REDIS_SOCKET_TIMEOUT,
         )
         while not self._stop.is_set():
             try:

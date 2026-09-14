@@ -1741,8 +1741,22 @@
         return;
       }
       clear(host);
-      host.appendChild(panelHeader("OPERATIONS", "the one packet · run detail on click"));
+      host.appendChild(panelHeader("OPERATIONS", "the one packet · find a run, open its detail"));
       var actions = element("div", "panel-actions");
+      // The run finder (the slice's "find the requested run"): a keyboard-reachable filter
+      // over the runs table. Filters tr[data-run-id] rows by run id / spec / state text.
+      var finder = element("input", "run-finder", {
+        type: "search", id: "operations-run-finder",
+        "aria-label": "Find a run by id, spec, or state",
+        placeholder: "Find a run (id, spec, state)…",
+      });
+      finder.addEventListener("input", function () {
+        var needle = finder.value.trim().toLowerCase();
+        host.querySelectorAll("tr[data-run-id]").forEach(function (row) {
+          row.hidden = needle && row.textContent.toLowerCase().indexOf(needle) === -1;
+        });
+      });
+      actions.appendChild(finder);
       var refresh = element("button", "wb-action", {
         type: "button", id: "operations-refresh", "data-action": "refresh",
         "data-action-target": "operations", "data-action-authority": "aios",
@@ -1919,9 +1933,46 @@
       identity.appendChild(row);
     });
     content.appendChild(identity);
+
+    // The governed action (the slice's "follow the existing governed action to its observed
+    // result"): DERIVED from the run's recorded state — the action the packet offers, and the
+    // observed result below it (the approvals + command receipts the record already carries).
+    var governedText = "No action currently offered for this run.";
+    if (run.state === "awaiting_approval" || run.state === "awaiting") {
+      governedText = "Awaiting operator approval — approve (or cancel) through the governed path; " +
+        "the run cannot proceed until the approval binds this candidate.";
+    } else if (run.state === "promotable") {
+      governedText = "Promotion candidate — the controller may promote to main through the " +
+        "verified promote command (approval binds the candidate first).";
+    } else if (run.state === "running") {
+      governedText = "In flight — observe; do not duplicate.";
+    } else if (run.state === "failed") {
+      governedText = "Failed — repair the named failure or cancel; never resubmit a duplicate.";
+    }
+    content.appendChild(sectionBlock("GOVERNED ACTION", note(governedText)));
+
+    // Attempts with the blocker/output + step timings (the slice's "inspect its blocker/output
+    // and step timings"): the attempt's error is the blocker, its timestamps are the timings.
     content.appendChild(sectionBlock("ATTEMPTS", objectTable("Attempts", data.attempts || [],
-      ["attempt_number", "phase", "model", "status", "first_pass", "accepted", "retry_reason",
-        "escalation_from", "escalation_to", "cost_usd"])));
+      ["attempt_number", "phase", "model", "status", "error", "cost_usd"])));
+    var attempts = data.attempts || [];
+    if (attempts.length) {
+      var timingRows = attempts.map(function (a) {
+        var started = a.started_at || "";
+        var ended = a.ended_at || "";
+        var duration = "";
+        if (started && ended) {
+          var ms = Date.parse(ended) - Date.parse(started);
+          if (!isNaN(ms)) duration = (ms / 1000).toFixed(1) + "s";
+        }
+        return [a.phase || "—", a.attempt_no || a.attempt_number || "—",
+          started ? ageText(started) : "unknown", ended ? ageText(ended) : "unknown",
+          duration || "unknown"];
+      });
+      content.appendChild(sectionBlock("STEP TIMINGS", table(
+        "Per-attempt step timings (measured/unknown — a gap is a gap, never 0)",
+        ["Phase", "Attempt", "Started", "Ended", "Duration"], timingRows)));
+    }
     content.appendChild(sectionBlock("GATES", objectTable("Gates", data.gates || [],
       ["gate_id", "candidate_sha", "status", "verdict", "created_at"])));
     content.appendChild(sectionBlock("APPROVALS", objectTable("Approvals", data.approvals || [],

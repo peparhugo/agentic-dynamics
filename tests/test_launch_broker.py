@@ -708,3 +708,129 @@ def test_submit_run_fires_the_probe_before_any_compose_call(tmp_path):
     with pytest.raises(launch_broker.LaunchRequestError) as exc:
         launch_broker.submit_run(command, repo_root=repo, compose="docker-compose", dry_run=True)
     assert any("workdir base" in e for e in exc.value.errors)
+
+
+# ── The extended submit contract (AIO remediation 2026-09-14) ────────────────
+#
+# Source/spec identity, continuation identity, and applicable admission settings must
+# survive every hop of the durable submit path — and the last gate must refuse a submit
+# that would arrive disarmed or with a wrong digest.
+
+
+def test_build_submit_argv_carries_the_extended_identity():
+    """The compose argv carries resume/parent-run/admission — nothing is dropped at the hop."""
+    argv = launch_broker.build_submit_argv({
+        "job_id": "abc123",
+        "spec": "workflows/repository/x.yaml",
+        "goal": "g",
+        "model": "deepseek/deepseek-v4-flash",
+        "workdir": "/tmp/wt_x",
+        "resume": True,
+        "parent_run_id": "run-1",
+        "admission": {"required": True, "campaign_budget_usd": 20.0, "campaign_concurrency": 4},
+    }, compose="dc", compose_file="/c.yml")
+    assert "-e" in argv and "FINOPS_CELL_ID=abc123" in argv
+    assert "FINOPS_ADMISSION_REQUIRED=1" in argv, "the armed gate must cross the compose boundary"
+    assert "--resume" in argv and "--parent-run-id" in argv and "run-1" in argv
+    assert "--campaign-budget-usd" in argv and "20.0" in argv
+    assert "--campaign-concurrency" in argv and "4" in argv
+
+
+def test_build_submit_argv_without_admission_does_not_arm():
+    """A submit that declares no admission settings produces NO admission env — the run's
+    own composition root prints its disarmed state, but the submit never fabricates arming."""
+    argv = launch_broker.build_submit_argv({
+        "spec": "workflows/repository/x.yaml", "goal": "g",
+        "model": "deepseek/deepseek-v4-flash", "workdir": "/tmp/wt_x",
+    }, compose="dc", compose_file="/c.yml")
+    assert "FINOPS_ADMISSION_REQUIRED=1" not in argv
+
+
+def test_deployment_probe_verifies_the_declared_spec_digest(tmp_path):
+    """The declared immutable input is verified against the repo's bytes: a mismatch refuses,
+    a match passes (and the stale-workdir rule still applies after it)."""
+    import subprocess
+
+    repo = _git_repo_with_main(tmp_path, "repo")
+    spec_dir = repo / "workflows" / "repository"
+    spec_dir.mkdir(parents=True)
+    spec_path = spec_dir / "s.yaml"
+    spec_path.write_text("name: s\n")
+    wd = tmp_path / "wt"
+    subprocess.run(["git", "-C", str(repo), "worktree", "add", "--detach", str(wd), "main"], check=True)
+
+    import hashlib
+    good = hashlib.sha256(spec_path.read_bytes()).hexdigest()
+    assert launch_broker.deployment_probe(
+        str(wd), repo_root=repo, spec_rel="workflows/repository/s.yaml", spec_sha256=good
+    ) == []
+    errors = launch_broker.deployment_probe(
+        str(wd), repo_root=repo, spec_rel="workflows/repository/s.yaml", spec_sha256="0" * 64
+    )
+    assert any("digest mismatch" in e for e in errors)
+
+
+def test_deployment_probe_resume_skips_the_main_freshness_refusal(tmp_path):
+    """A declared resume is never destroyed by unrelated main advances: the pinned continuation
+    skips the stale-workdir refusal (its lineage is the parent-run linkage, checked by the
+    run's own composition root against the control db)."""
+    import subprocess
+
+    repo = _git_repo_with_main(tmp_path, "repo")
+    wd = tmp_path / "wt_resume"
+    subprocess.run(["git", "-C", str(repo), "worktree", "add", "--detach", str(wd), "main"], check=True)
+    _add_commit(wd, "[workflow] p0a_reanchor_parity — resume work ahead of main")
+    _add_commit(repo, "main moved on after the run started")
+    # fresh submit: refused (stale)
+    assert launch_broker.deployment_probe(str(wd), repo_root=repo) != []
+    # the SAME workdir as a resume: the declared continuation is legitimate
+    assert launch_broker.deployment_probe(str(wd), repo_root=repo, resume=True) == []
+
+
+def test_submit_run_refuses_an_unarmed_command_when_the_host_gate_is_armed(tmp_path, monkeypatch):
+    """The disarmed-submit refusal: admission armed on the host + a command with no admission
+    settings = REFUSED before any compose call (a successful 'gate disarmed' launch is the
+    failure this contract removes)."""
+    import shutil
+    import subprocess
+
+    repo = _git_repo_with_main(tmp_path, "repo")
+    spec_dir = repo / "workflows" / "repository"
+    spec_dir.mkdir(parents=True)
+    shutil.copy(_REPO_ROOT / "workflows" / "repository" / "control_room_facelift_review.yaml",
+                spec_dir / "control_room_facelift_review.yaml")
+    wd = tmp_path / "wt"
+    subprocess.run(["git", "-C", str(repo), "worktree", "add", "--detach", str(wd), "main"], check=True)
+    command = {
+        "spec": "workflows/repository/control_room_facelift_review.yaml",
+        "goal": "g", "model": "deepseek/deepseek-v4-flash", "workdir": str(wd),
+    }
+    monkeypatch.setenv("FINOPS_ADMISSION_REQUIRED", "1")
+    with pytest.raises(launch_broker.LaunchRequestError) as exc:
+        launch_broker.submit_run(command, repo_root=repo, compose="dc", dry_run=True)
+    assert any("never silently disarms" in e for e in exc.value.errors)
+    # the armed command passes the same gate
+    command["admission"] = {"required": True}
+    outcome = launch_broker.submit_run(command, repo_root=repo, compose="dc", dry_run=True)
+    assert outcome.get("ok") is True
+    assert "FINOPS_ADMISSION_REQUIRED=1" in outcome["argv"]
+
+
+def test_build_submit_argv_carries_the_execution_settings():
+    """Astra finding: every accepted execution setting must survive the hop — the run the
+    caller requested IS the run that executes."""
+    argv = launch_broker.build_submit_argv({
+        "spec": "workflows/repository/x.yaml", "goal": "g",
+        "model": "deepseek/deepseek-v4-flash", "workdir": "/tmp/wt_x",
+        "execution": {
+            "backend": "claude_cli", "thinking_effort": "high",
+            "thinking_budget_tokens": 12000, "output_token_limit": 64000,
+            "timeout_seconds": 2400, "no_commit": True,
+        },
+    }, compose="dc", compose_file="/c.yml")
+    assert "--backend" in argv and "claude_cli" in argv
+    assert "--thinking-effort" in argv and "high" in argv
+    assert "--thinking-budget-tokens" in argv and "12000" in argv
+    assert "--output-token-limit" in argv and "64000" in argv
+    assert "--timeout" in argv and "2400" in argv
+    assert "--no-commit" in argv

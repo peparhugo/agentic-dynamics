@@ -223,3 +223,37 @@ def test_submit_cli_dispatches_the_optional_image_flag(monkeypatch):
     assert rc == 0
     queued = [json.loads(raw) for raw in r._lists[fm.COMMANDS_KEY]]
     assert queued[0]["image"] == "fleet/job-example"
+
+
+def test_send_submit_command_carries_the_extended_identity():
+    """The extended submit identity (spec digest, continuation, admission) survives the
+    manager's LPUSH hop — the orchestrator + broker re-validate it at the later gates."""
+    fm = _fleet_manager()
+    r = _FakeRedis()
+    cmd = fm._send_submit_command(
+        r, spec="workflows/repository/fleet_job_submission.yaml", goal="g",
+        model="anthropic/claude-sonnet-5", workdir="/tmp/wt_x",
+        spec_sha256="a" * 64, resume=True, parent_run_id="run-1",
+        admission={"required": True, "campaign_budget_usd": 20.0},
+    )
+    assert cmd["spec_sha256"] == "a" * 64
+    assert cmd["resume"] is True
+    assert cmd["parent_run_id"] == "run-1"
+    assert cmd["admission"] == {"required": True, "campaign_budget_usd": 20.0}
+    queued = [json.loads(raw) for raw in r._lists[fm.COMMANDS_KEY]]
+    assert queued == [cmd]
+
+
+def test_send_submit_command_carries_the_execution_settings():
+    """The manager passes the execution block through unchanged (the orchestrator + broker
+    re-validate it; the manager's job is that it survives the hop)."""
+    fm = _fleet_manager()
+    r = _FakeRedis()
+    execution = {"backend": "opencode", "thinking_effort": "high",
+                 "thinking_budget_tokens": 12000, "output_token_limit": 64000,
+                 "timeout_seconds": 2400, "no_commit": False}
+    cmd = fm._send_submit_command(
+        r, spec="workflows/repository/fleet_job_submission.yaml", goal="g",
+        model="anthropic/claude-sonnet-5", workdir="/tmp/wt_x", execution=execution,
+    )
+    assert cmd["execution"] == execution

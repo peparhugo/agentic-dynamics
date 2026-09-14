@@ -43,6 +43,7 @@ import argparse
 import contextlib
 import copy
 import json
+import subprocess
 import sys
 import threading
 from pathlib import Path
@@ -795,7 +796,9 @@ CHART_PROBE_JS = r"""
     open: Boolean(lens && !lens.hidden),
     lens: lens ? rect(lens) : null,
     charts: charts,
+    innerWidth: window.innerWidth,
     innerHeight: window.innerHeight,
+    scrollWidth: page.scrollWidth,
     scrollHeight: page.scrollHeight,
   };
 }
@@ -1014,7 +1017,9 @@ VISUAL_PROBE_JS = r"""
   out.action = Boolean(document.querySelector('[data-visual-action]'));
   out.dockOpen = Boolean(document.getElementById('selection-dock')
     && !document.getElementById('selection-dock').hidden);
+  out.innerWidth = window.innerWidth;
   out.innerHeight = window.innerHeight;
+  out.scrollWidth = document.scrollingElement.scrollWidth;
   out.scrollHeight = document.scrollingElement.scrollHeight;
   return out;
 }
@@ -1641,6 +1646,355 @@ def run_live_gate(
     return results, errors
 
 
+#: The required acceptance profile's class roster (AIO remediation 2026-09-14). The profile is
+#: the enumerated contract for a candidate's acceptance: every class must be requested, run,
+#: and reported — an omission is a FAIL, named. The INTERACTIONS class is the slice-level proof:
+#: attention activation, run selection by keyboard, below-fold reachability, stale/unknown
+#: honesty, and the governed action→result flow — the behaviors a screenshot count alone can
+#: never establish.
+ACCEPTANCE_PROFILE = "acceptance"
+PROFILE_CLASSES: tuple[str, ...] = (
+    "geometry", "charts", "visuals", "style", "a11y", "parity", "live", "interactions",
+)
+
+
+def _canonical_preview_target(
+    base: str | None, preview: str | None
+) -> tuple[str, str]:
+    """Resolve the ONE target the browser and the identity checks both use.
+
+    Reviewer finding (2026-09-14): the browsers rendered ``--base`` while the identity checks
+    fetched ``--preview``; supplying different URLs produced a PASS claiming
+    ``preview_exercised`` for a target no browser visited. Rules:
+
+    * both given and equal after normalization → the target;
+    * both given and different → a refusal (never silently pick one);
+    * only ``--base`` → the base IS the exercised target (so the identity checks describe
+      what the browser rendered);
+    * only ``--preview`` → the gate serves its own instance; the preview stays UNEXERCISED
+      and is returned for the report's honest label.
+
+    Returns ``(target, error)``; ``error`` non-empty means refuse (exit 2).
+    """
+    def norm(value: str) -> str:
+        return value.rstrip("/")
+
+    base_n = norm(base) if base else ""
+    preview_n = norm(preview) if preview else ""
+    if base_n and preview_n and base_n != preview_n:
+        return "", (
+            f"conflicting targets: --base {base!r} and --preview {preview!r} differ — the "
+            "browser and the identity checks must exercise ONE target (pass --preview equal "
+            "to --base, or omit --preview to bind --base)"
+        )
+    if base_n:
+        return base_n, ""
+    return preview_n, ""
+
+
+def _compare_served_assets(base: str) -> dict[str, bool]:
+    """Hash EVERY served application artifact against its COMMITTED blob at HEAD.
+
+    Reviewer finding (2026-09-14): matching one CSS file proves nothing about the deployed
+    application, and reading the working tree attributes uncommitted bytes to HEAD. This
+    compares the bytes the preview actually serves for index.html and every ``static/*.js`` /
+    ``static/*.css`` with ``git show HEAD:<path>`` — the committed candidate. Returns
+    ``{filename: matched}``; an empty dict means nothing comparable was found (unverifiable).
+    """
+    import hashlib
+
+    listing = subprocess.run(
+        ["git", "ls-tree", "-r", "--name-only", "HEAD", "apps/control_room/static"],
+        capture_output=True, text=True, timeout=15,
+    )
+    if listing.returncode != 0:
+        return {}
+    committed = [
+        line.strip()
+        for line in listing.stdout.splitlines()
+        if line.strip().endswith((".js", ".css", ".html"))
+    ]
+    if not committed:
+        return {}
+
+    def committed_hash(path: str) -> str | None:
+        blob = subprocess.run(
+            ["git", "show", f"HEAD:{path}"], capture_output=True, timeout=15,
+        )
+        if blob.returncode != 0:
+            return None
+        return hashlib.sha256(blob.stdout).hexdigest()
+
+    def served_hash(url: str) -> str | None:
+        try:
+            import urllib.request
+
+            with urllib.request.urlopen(url, timeout=10) as response:
+                return hashlib.sha256(response.read()).hexdigest()
+        except Exception:  # noqa: BLE001 — an unfetchable artifact compares unequal
+            return None
+
+    base = base.rstrip("/")
+    results: dict[str, bool] = {}
+    for path in committed:
+        name = Path(path).name
+        # The shell is served at the root; every other artifact under /static/.
+        url = f"{base}/" if name == "index.html" else f"{base}/static/{name}"
+        results[name] = committed_hash(path) == served_hash(url)
+    return results
+
+
+def _exercise_refresh_action(
+    page: Any, theme: str
+) -> tuple[list[dict[str, Any]], list[str]]:
+    """The governed refresh action — require the control, observe the request, verify the result.
+
+    Reviewer finding (2026-09-14): a missing button was silently skipped and an inert button
+    passed because the awaited finder already existed. Now:
+
+    * a missing control is a NAMED failure (the action path cannot be exercised);
+    * the click must produce an observed ``/api/operations`` request (an inert control fails
+      the wait);
+    * the lens must RE-RENDER: a sentinel typed into the finder beforehand is cleared only if
+      the panel was rebuilt — a no-op click that leaves the sentinel fails.
+
+    ``page`` is the Playwright page (or a test double implementing ``locator`` /
+    ``expect_response`` / ``wait_for_timeout``) so the decision logic is regression-testable
+    without a browser.
+    """
+    results: list[dict[str, Any]] = []
+    errors: list[str] = []
+    refresh = page.locator("#operations-refresh")
+    if not refresh.count():
+        errors.append(
+            "interactions: the governed refresh control is missing — the action path cannot "
+            "be exercised"
+        )
+        return results, errors
+    finder = page.locator("#operations-run-finder")
+    if finder.count():
+        finder.first.fill("sentinel")
+    try:
+        with page.expect_response(lambda r: "/api/operations" in r.url, timeout=20000) as observed:
+            refresh.first.click()
+        status = int(getattr(observed.value, "status", 0) or 0)
+        if status != 200:
+            errors.append(
+                f"interactions: the refresh request answered HTTP {status} — the action did "
+                "not produce a healthy result"
+            )
+            return results, errors
+    except Exception:  # noqa: BLE001 — an inert control never issues the request
+        errors.append(
+            "interactions: clicking refresh produced no /api/operations request — the "
+            "control is inert"
+        )
+        return results, errors
+    # Bounded re-render poll: the sentinel must vanish iff the lens rebuilt itself.
+    for _ in range(20):
+        if finder.count() and finder.first.input_value() == "":
+            break
+        try:
+            page.wait_for_timeout(50)
+        except Exception:  # noqa: BLE001 — a test double need not implement the wait
+            break
+    if finder.count() and finder.first.input_value() != "":
+        errors.append(
+            "interactions: the lens did not re-render after refresh (the sentinel survived) "
+            "— the action did nothing"
+        )
+        return results, errors
+    results.append({"case": "interactions", "viewport": "desktop",
+                    "check": "governed-action-refresh",
+                    "screenshot": "", "theme": theme})
+    return results, errors
+
+
+def run_acceptance_interactions(
+    out: Path, screenshots: bool
+) -> tuple[list[dict[str, Any]], list[str]]:
+    """The interactions class: exercise the room's operational slice, not just its pixels.
+
+    The slice contract (the directive's step-5 path): find the requested run, open it with the
+    KEYBOARD, inspect its blocker/output and step timings, and follow the governed action to
+    its observed result — in a page that scrolls and where below-fold content is reachable.
+    Each check records an OBSERVED result row; a check that cannot be exercised (e.g. no run
+    rows exist at all) is a FAIL for this class — the acceptance profile's whole point is that
+    the slice WORKS, and "there was nothing to click" is the omission this class exists to
+    catch. Below-fold FULL-PAGE captures (dark + light) are the rendered proof the controller
+    reviews, and the capture-file readability check in ``write_report`` verifies them.
+    """
+    from playwright.sync_api import sync_playwright
+
+    url, httpd = _serve()
+    results: list[dict[str, Any]] = []
+    errors: list[str] = []
+    try:
+        with sync_playwright() as playwright:
+            browser = playwright.chromium.launch(args=["--no-sandbox"])
+            for theme in ("dark", "light"):
+                context = browser.new_context(
+                    viewport={"width": 1440, "height": 900}, timezone_id="UTC",
+                    locale="en-US", reduced_motion="reduce", color_scheme=theme,
+                )
+                context.add_init_script(
+                    f"try{{localStorage.setItem('control-room-theme','{theme}')}}catch(e){{}}"
+                )
+                page = context.new_page()
+                page.goto(url, wait_until="domcontentloaded")
+                page.locator('[data-render-state="ready"]').wait_for(timeout=20000)
+
+                # 1. Attention activation: open the workbench, then the operations lens — the
+                # surface carrying the attention/decision rows and the run list.
+                opener = page.locator("button:has-text('Open the workbench')")
+                if not opener.count():
+                    errors.append("interactions: the workbench opener is missing — the "
+                                  "attention/run surface cannot be activated")
+                else:
+                    opener.first.click()
+                    tab = page.locator('#workbench-nav [data-lens-target="operations"]')
+                    tab.wait_for(timeout=20000)
+                    tab.first.click()
+                    page.locator("#operations-run-finder").wait_for(timeout=20000)
+                    results.append({"case": "interactions", "viewport": "desktop",
+                                    "check": "attention-activation",
+                                    "screenshot": "", "theme": theme})
+
+                # 1b. The run FINDER must actually filter (the requested-run path): type a
+                # real run id and assert the visible rows are exactly the matching ones.
+                finder = page.locator("#operations-run-finder")
+                if not finder.count():
+                    errors.append("interactions: the run finder is missing — the requested-run "
+                                  "path cannot be exercised")
+                else:
+                    all_rows = page.locator("tr[data-run-id]")
+                    total = all_rows.count()
+                    if total:
+                        needle = all_rows.first.get_attribute("data-run-id") or ""
+                        finder.fill(needle)
+                        visible = page.locator("tr[data-run-id]:visible")
+                        if visible.count() == 0:
+                            errors.append(
+                                "interactions: the run finder filtered EVERY row out for a "
+                                f"run id that exists ({needle!r})"
+                            )
+                        elif not all(
+                            needle in (visible.nth(i).get_attribute("data-run-id") or "")
+                            for i in range(visible.count())
+                        ):
+                            errors.append(
+                                "interactions: the run finder left a non-matching row visible"
+                            )
+                        else:
+                            results.append({"case": "interactions", "viewport": "desktop",
+                                            "check": "run-finder-filter",
+                                            "screenshot": "", "theme": theme})
+                        finder.fill("")
+                    else:
+                        errors.append("interactions: no run rows to filter — the finder "
+                                      "could not be exercised")
+
+                # 2. Run selection by KEYBOARD: focus the finder, type a filter, focus the first
+                # run row, press Enter — the drawer must open with content.
+                rows = page.locator("tr[data-run-id]")
+                if not rows.count():
+                    errors.append("interactions: no run rows to select — the run-selection "
+                                  "check could not be exercised (a control DB with zero runs "
+                                  "is not an acceptance state for this slice)")
+                else:
+                    first = rows.first
+                    first.focus()
+                    page.keyboard.press("Enter")
+                    drawer = page.locator("#run-detail-drawer")
+                    drawer.wait_for(state="visible", timeout=20000)
+                    page.locator("#run-detail-content").wait_for(timeout=20000)
+                    # The detail fetch is async — wait for the RENDERED surface, not merely
+                    # the drawer element (a "Loading…" drawer is not the slice working).
+                    page.locator("#run-detail-content table").first.wait_for(
+                        state="visible", timeout=20000)
+                    text = page.locator("#run-detail-content").inner_text()
+                    for surface in ("ATTEMPTS", "GOVERNED ACTION", "STEP TIMINGS",
+                                    "APPROVALS", "COMMAND JOURNAL"):
+                        if surface not in text:
+                            errors.append(
+                                f"interactions: the run-detail drawer is missing the "
+                                f"{surface!r} surface — the observed-result chain is incomplete"
+                            )
+                    if "ATTEMPTS" in text and "GOVERNED ACTION" in text:
+                        results.append({"case": "interactions", "viewport": "desktop",
+                                        "check": "receipt-surfaces",
+                                        "screenshot": "", "theme": theme})
+                    results.append({"case": "interactions", "viewport": "desktop",
+                                    "check": "keyboard-run-selection",
+                                    "screenshot": "", "theme": theme})
+                    # Close via the drawer's own close control (Escape also closes the
+                    # workbench — the check below needs it open).
+                    page.locator('button[aria-label="Close run detail"]').first.click()
+
+                    # 2b. The governed refresh action: require the control, observe its
+                    # request, verify its rendered result (reviewer finding 2026-09-14: a
+                    # missing control was skipped and an inert one passed).
+                    refresh_results, refresh_errors = _exercise_refresh_action(page, theme)
+                    results.extend(refresh_results)
+                    errors.extend(refresh_errors)
+
+                # 3. Below-fold reachability: the operational surface must actually scroll —
+                # the workbench's BODY (the deliberate drill-down's scrolling container) carries
+                # content below the fold, and a long run-detail drawer scrolls inside its own
+                # container.
+                page.locator('#workbench').wait_for(state="visible", timeout=20000)
+                wb = page.locator(".wb-body")
+                wb_metrics = wb.evaluate(
+                    "(el) => ({scrollHeight: el.scrollHeight, clientHeight: el.clientHeight})"
+                )
+                wb.evaluate("(el) => { el.scrollTop = el.scrollHeight; }")
+                wb_scrolled = wb.evaluate("(el) => el.scrollTop")
+                if wb_metrics["scrollHeight"] <= wb_metrics["clientHeight"] or wb_scrolled <= 0:
+                    errors.append("interactions: the workbench body does not scroll below the "
+                                  f"fold (scrollHeight {wb_metrics['scrollHeight']}, "
+                                  f"clientHeight {wb_metrics['clientHeight']}, "
+                                  f"scrollTop {wb_scrolled}) — below-fold content is not "
+                                  "reachable")
+                else:
+                    results.append({"case": "interactions", "viewport": "desktop",
+                                    "check": "below-fold-scroll",
+                                    "screenshot": "", "theme": theme})
+
+                # 4. Stale/unknown honesty: the room must render an explicit age/unknown marker
+                # somewhere on the operational surface — a stale value reading as all-clear is
+                # the fabrication class the slice must refuse to hide.
+                honest = page.locator(
+                    '[data-state="unknown"], [data-state="stale"], .age-chip, .state-unknown'
+                )
+                if not honest.count():
+                    results.append({"case": "interactions", "viewport": "desktop",
+                                    "check": "stale-unknown-marker",
+                                    "screenshot": "", "theme": theme,
+                                    "note": "no stale/unknown markers rendered on the "
+                                            "operational surface at this instant"})
+                else:
+                    results.append({"case": "interactions", "viewport": "desktop",
+                                    "check": "stale-unknown-marker",
+                                    "screenshot": "", "theme": theme})
+
+                # 5. The below-fold capture (dark + light) — the rendered proof of the
+                # content a viewport-height shot can never see: the workbench is a fixed
+                # overlay, so the capture is the SCROLLED-TO-BOTTOM body element (the
+                # below-fold content), not the page's initial viewport.
+                if screenshots:
+                    shot = out / f"acceptance_belowfold_bottom_{theme}_1440x900.png"
+                    page.locator(".wb-body").screenshot(path=str(shot))
+                    results.append({"case": "interactions", "viewport": "desktop",
+                                    "check": "below-fold-capture",
+                                    "screenshot": str(shot), "theme": theme})
+                context.close()
+            browser.close()
+    finally:
+        if httpd is not None:
+            httpd.shutdown()
+    return results, errors
+
+
 def load_parity_inventory() -> dict[str, Any]:
     """Load the u2 parity inventory (the enumeration this class checks)."""
     return json.loads(PARITY_INVENTORY.read_text(encoding="utf-8"))
@@ -2221,14 +2575,72 @@ def _check_semantics(
 # ── Report ───────────────────────────────────────────────────────────────────────────────────
 
 
+def _verify_captures(results: list[dict[str, Any]]) -> list[str]:
+    """Capture-file readability: every recorded capture must exist and carry bytes.
+
+    A nonempty screenshot LIST is not acceptance — the files must be real artifacts a
+    controller can open. A missing or empty capture is a named error, never a silent pass.
+    """
+    errors: list[str] = []
+    for result in results:
+        shot = str(result.get("screenshot") or "")
+        if not shot:
+            continue
+        path = Path(shot)
+        if not path.is_file() or path.stat().st_size == 0:
+            errors.append(
+                f"GATE-CAPTURE-UNREADABLE: capture {shot} is missing or empty — a recorded "
+                "screenshot that cannot be read is not evidence"
+            )
+    return errors
+
+
 def write_report(results: list[dict[str, Any]], errors: list[str], report_path: Path,
-                 json_path: Path, check_fixtures_exit: int) -> int:
+                 json_path: Path, check_fixtures_exit: int, *,
+                 requested_classes: list[str] | None = None,
+                 candidate: str = "", candidate_verified: bool = False,
+                 preview: str = "", preview_verified: bool = False,
+                 preview_exercised: bool = False,
+                 preview_serves_candidate: bool = False) -> int:
     """Write the markdown + JSON reports; return the exit code.
 
     The report is the gate's artifact (the website gate's pattern): status, the classes that
     ran, a per-class screenshot rollup, and the full failure list with the offending selector or
     value, so a failure is actionable without re-running the browser.
+
+    The acceptance-profile contract (AIO remediation 2026-09-14): ``requested_classes`` is the
+    ENUMERATED roster this run must execute; every class is reported with its executed/omitted
+    state, an omitted required class is a named FAIL (never a silent skip), and the candidate
+    SHA + preview target are BOUND into both artifacts so the verdict describes exactly what
+    was reviewed.
     """
+    requested = list(requested_classes or ["geometry"])
+    executed: list[str] = []
+    # The per-class evidence keys the runners actually record (the gates' own case/fixture
+    # vocabulary — the executed roster derives from THESE, never from a parallel guess).
+    def _class_of(result: dict[str, Any]) -> str:
+        case = str(result.get("case") or result.get("fixture") or "")
+        if case.startswith("F-"):
+            return "geometry"
+        if case == "live":
+            return "live"
+        if case in ("interactions", "visuals", "style", "a11y"):
+            return case
+        if case in ("history", "empty", "error") or str(case).startswith("chart"):
+            return "charts"
+        if case.startswith("parity"):
+            return "parity"
+        return ""
+    for result in results:
+        klass = _class_of(result)
+        if klass and klass not in executed:
+            executed.append(klass)
+    for klass in requested:
+        if klass not in executed:
+            errors.append(
+                f"PROFILE-OMITTED: required class '{klass}' was requested but produced no "
+                "results — an omission is a FAIL, never a silent skip"
+            )
     status = "PASS" if not errors and check_fixtures_exit == 0 else "FAIL"
     # Zero-captures rejection (remediation closed-loop, decision f987cde9): acceptance is a
     # RENDERED artifact. A gate run that produces no screenshot — the 2026-09-13 failure class
@@ -2251,12 +2663,35 @@ def write_report(results: list[dict[str, Any]], errors: list[str], report_path: 
         f"**Status:** {status}",
         "**Classes:** geometry (IA §10.3 G-1..G-15) · semantics (IA §10 G/B: rendered vs fixture) · "
         "charts (a1) · visuals (a2) · style (a3) · a11y (IA §10.5 A) · live IA-core · "
-        "feature-parity (u5)",
+        "feature-parity (u5) · interactions (the acceptance slice)",
+        f"**Requested classes:** {', '.join(requested)}",
+        f"**Executed classes:** {', '.join(executed) or 'none'}",
+        f"**Omitted classes:** {', '.join(c for c in requested if c not in executed) or 'none'}",
         "**Fixtures:** F-0..F-7 (deterministic; no live Redis/clock/network — waiver W2)",
         f"**Viewports:** {', '.join(f'{k} {w}x{h}' for k, (w, h) in VIEWPORTS.items())}",
         f"**Themes:** {', '.join(THEMES)}",
         "**Primitives:** present/unique · in-viewport · non-zero box · scrollable pages "
         "(vertical) · no horizontal overflow · WCAG-AA contrast · first-paint · console-clean",
+    ]
+    if candidate:
+        label = "verified against the checkout HEAD" if candidate_verified else (
+            "UNVERIFIED (does not match the checkout HEAD)"
+        )
+        lines.append(f"**Candidate:** {candidate} ({label})")
+    if preview:
+        if preview_exercised:
+            label = "exercised (reachable)" if preview_verified else "UNREACHABLE"
+            if preview_verified and candidate:
+                label += (
+                    ", serves the candidate's bytes"
+                    if preview_serves_candidate else
+                    ", SERVES A DIFFERENT TREE (asset hash mismatch)"
+                )
+        else:
+            label = ("NOT exercised — the gate served its own instance "
+                     "(pass --base to target a preview)")
+        lines.append(f"**Preview target:** {preview} ({label})")
+    lines += [
         "",
         f"**Screenshots:** {len(results)} ({rollup})",
         "",
@@ -2278,7 +2713,19 @@ def write_report(results: list[dict[str, Any]], errors: list[str], report_path: 
     report_path.parent.mkdir(parents=True, exist_ok=True)
     report_path.write_text("\n".join(lines), encoding="utf-8")
     json_path.write_text(
-        json.dumps({"status": status, "screenshots": results, "errors": errors}, indent=2),
+        json.dumps({
+            "status": status,
+            "requested_classes": requested,
+            "executed_classes": executed,
+            "candidate": candidate,
+            "candidate_verified": bool(candidate_verified),
+            "preview": preview,
+            "preview_verified": bool(preview_verified),
+            "preview_exercised": bool(preview_exercised),
+            "preview_serves_candidate": bool(preview_serves_candidate),
+            "screenshots": results,
+            "errors": errors,
+        }, indent=2),
         encoding="utf-8",
     )
     print("\n".join(lines))
@@ -2311,6 +2758,17 @@ def main() -> int:
                              "the R4b per-worker event/action + R4d step-timing checks")
     parser.add_argument("--live", action="store_true",
                         help="run the IA-core class against the live /api/* (no fixtures)")
+    parser.add_argument("--profile", choices=[ACCEPTANCE_PROFILE], default=None,
+                        help="the required acceptance profile: all classes (geometry, charts, "
+                             "visuals, style, a11y, parity, live, interactions), all three "
+                             "viewports, dark + light screenshots, below-fold full-page "
+                             "captures, and the interaction checks (keyboard run selection, "
+                             "scrolling, stale/unknown states, action→result) — each required "
+                             "class enumerated in the report; an omission is a named FAIL")
+    parser.add_argument("--candidate", default=None,
+                        help="the candidate SHA under review — bound into the report")
+    parser.add_argument("--preview", default=None,
+                        help="the preview target (URL) under review — bound into the report")
     parser.add_argument("--base", default=None,
                         help="render an already-running portal at this URL instead of starting one")
     args = parser.parse_args()
@@ -2318,6 +2776,25 @@ def main() -> int:
     global _BASE_OVERRIDE
     if args.base:
         _BASE_OVERRIDE = args.base.rstrip("/")
+
+    profile = args.profile
+    if profile == ACCEPTANCE_PROFILE:
+        # The profile is the ENUMERATED contract: every class runs, dark + light screenshots,
+        # and the interactions class executes the slice path. It also requires an IDENTIFIED
+        # candidate (Astra finding): acceptance without a candidate identity is the
+        # overstated-verdict class the profile exists to catch.
+        if not args.candidate:
+            print("the acceptance profile requires --candidate <sha> — an unidentified "
+                  "candidate cannot be accepted", file=sys.stderr)
+            return 2
+        args.charts = True
+        args.visuals = True
+        args.style = True
+        args.a11y = True
+        args.parity = True
+        args.live = True
+        args.no_screenshot = False
+        args.screenshot_themes = "dark,light"
 
     fixtures = [item.strip() for item in args.fixtures.split(",") if item.strip()]
     fixture_rc = check_fixtures()
@@ -2328,6 +2805,24 @@ def main() -> int:
     out.mkdir(parents=True, exist_ok=True)
     report_path = Path(args.report) if args.report else out / "gate_report.md"
     json_path = Path(args.json_path) if args.json_path else out / "gate_report.json"
+
+    # The class roster this run requests — the report enumerates each (executed/omitted), and
+    # the profile treats an omitted required class as a FAIL, never a silent skip.
+    requested_classes: list[str] = ["geometry"]
+    if args.charts:
+        requested_classes.append("charts")
+    if args.visuals:
+        requested_classes.append("visuals")
+    if args.style:
+        requested_classes.append("style")
+    if args.a11y:
+        requested_classes.append("a11y")
+    if args.parity:
+        requested_classes.append("parity")
+    if args.live:
+        requested_classes.append("live")
+    if profile == ACCEPTANCE_PROFILE:
+        requested_classes.append("interactions")
 
     try:
         screenshot_themes = tuple(
@@ -2354,6 +2849,11 @@ def main() -> int:
         if args.live:
             live_results, live_errors = run_live_gate(out, not args.no_screenshot)
             results, errors = results + live_results, errors + live_errors
+        if profile == ACCEPTANCE_PROFILE:
+            interaction_results, interaction_errors = run_acceptance_interactions(
+                out, not args.no_screenshot
+            )
+            results, errors = results + interaction_results, errors + interaction_errors
     except ImportError:
         print("playwright is not installed; run with --check-fixtures for the browser-free check",
               file=sys.stderr)
@@ -2363,7 +2863,87 @@ def main() -> int:
         print("run `python3 -m playwright install --with-deps chromium` in an environment with "
               "the system libraries, or use --check-fixtures", file=sys.stderr)
         return 2
-    return write_report(results, errors, report_path, json_path, fixture_rc)
+
+    # Capture-file readability (the rendered proof must be real, not a filename): every
+    # recorded capture must exist and carry bytes.
+    errors.extend(_verify_captures(results))
+
+    # Identity verification (Astra finding, 2026-09-14): a supplied SHA/URL is a LABEL until it
+    # is checked. The candidate is verified against the checkout the gate runs from; the
+    # preview is verified by actually reaching it (only when the gate was pointed at it via
+    # --base — a self-served run never exercised the preview target and must say so).
+    candidate_verified = False
+    if args.candidate:
+        try:
+            head = subprocess.run(
+                ["git", "rev-parse", "HEAD"], cwd=Path.cwd(),
+                capture_output=True, text=True, timeout=15,
+            ).stdout.strip()
+        except Exception:  # noqa: BLE001 — an unreadable checkout verifies nothing
+            head = ""
+        candidate_verified = bool(head) and (
+            head.startswith(args.candidate) or args.candidate.startswith(head)
+        )
+        if not candidate_verified:
+            errors.append(
+                f"CANDIDATE-UNVERIFIED: --candidate {args.candidate!r} does not match the "
+                f"checkout HEAD {head[:12]!r} — the report cannot claim the reviewed candidate"
+            )
+    preview_verified = False
+    preview_serves_candidate = False
+    # One canonical target (reviewer finding 2026-09-14): the browser renders ``--base`` while
+    # identity checks used ``--preview`` — different URLs could produce a PASS whose
+    # ``preview_exercised`` claim described a target the browser never visited. The target is
+    # resolved ONCE here; a conflict is refused, never silently reconciled.
+    canonical_preview, target_error = _canonical_preview_target(args.base, args.preview)
+    if target_error:
+        print(target_error, file=sys.stderr)
+        return 2
+    preview_exercised = bool(canonical_preview and args.base)
+    if canonical_preview and args.base:
+        try:
+            import urllib.request
+
+            with urllib.request.urlopen(canonical_preview, timeout=10) as response:
+                preview_verified = response.status == 200
+        except Exception:  # noqa: BLE001 — an unreachable preview verifies nothing
+            preview_verified = False
+        if not preview_verified:
+            errors.append(
+                f"PREVIEW-UNREACHABLE: {canonical_preview!r} did not answer 200 — "
+                "the target the report binds was not exercised"
+            )
+        elif args.candidate and preview_verified:
+            # The preview must SERVE the candidate's COMMITTED bytes, not merely answer
+            # (reviewer finding 2026-09-14): every served application artifact (index, JS,
+            # CSS) is hashed over HTTP and compared with its ``git show HEAD:`` blob — the
+            # committed candidate, never the working tree (an uncommitted edit must not be
+            # attributable to HEAD), and never a single asset standing in for the app.
+            served = _compare_served_assets(canonical_preview)
+            if not served:
+                errors.append(
+                    "PREVIEW-SERVES-UNVERIFIED: no comparable committed artifacts were "
+                    "found — the binding is unproven"
+                )
+            else:
+                preview_serves_candidate = all(served.values())
+                mismatched = [name for name, ok in served.items() if not ok]
+                if mismatched:
+                    errors.append(
+                        "PREVIEW-SERVES-OTHER: the preview's served bytes differ from the "
+                        f"committed candidate for {', '.join(sorted(mismatched))} — the "
+                        "preview is not serving this candidate"
+                    )
+    return write_report(
+        results, errors, report_path, json_path, fixture_rc,
+        requested_classes=requested_classes,
+        candidate=args.candidate or "",
+        candidate_verified=candidate_verified,
+        preview=canonical_preview or "",
+        preview_verified=preview_verified,
+        preview_exercised=preview_exercised,
+        preview_serves_candidate=preview_serves_candidate,
+    )
 
 
 if __name__ == "__main__":

@@ -23,7 +23,8 @@ import sys
 import time
 from pathlib import Path
 
-import redis
+import broker_contract  # noqa: E402  (scripts/fleet/ is this module's dir)
+import redis  # noqa: E402
 
 REDIS_HOST = os.environ.get("FINOPS_REDIS_HOST", "127.0.0.1")
 REDIS_PORT = int(os.environ.get("FINOPS_REDIS_PORT", "6380"))
@@ -43,6 +44,7 @@ def _connect() -> redis.Redis:
             client = redis.Redis(
                 host=REDIS_HOST, port=REDIS_PORT, db=REDIS_DB,
                 decode_responses=True, socket_connect_timeout=5,
+                socket_timeout=broker_contract.FLEET_REDIS_SOCKET_TIMEOUT,
             )
             client.ping()
             return client

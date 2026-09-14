@@ -54,6 +54,17 @@ from agentic_dynamics.experiment.experiment_spec import (  # noqa: E402
 #: value is the literal key name, so the two constants can never disagree about the field).
 VERIFIER_MARKER = "verifier"
 
+#: The fleet consumers' Redis SOCKET timeout in seconds (fleet-consumer crash-loop fix,
+#: decision 2026-09-14). redis-py 8 changed the default: when ``socket_timeout`` is not given
+#: it inherits ``socket_connect_timeout``, so the wrapper's ``BLMOVE`` (a 10s SERVER-side
+#: block) timed out at 5s on every idle queue cycle and the consumer crash-looped (538+
+#: restarts). An idle BLMOVE must be able to wait its full block window: the socket timeout
+#: must EXCEED the longest blocking call (the 10s claim) with margin. Under redis-py <8 the
+#: explicit value is a no-op behaviourally (it just makes the guarantee visible). Every fleet
+#: client construction MUST pass this — a new ``redis.Redis(...)`` without it re-introduces
+#: the crash loop on any redis-py 8 host.
+FLEET_REDIS_SOCKET_TIMEOUT = 30.0
+
 #: The mount profiles (fixed — the ladder already defines them): every non-verifier agent cell
 #: mounts the four-mount contract + the D-2 auth set + the per-attempt state namespace, with
 #: ``results_mode`` (ro/rw over the results mount) the ONLY per-scope variation

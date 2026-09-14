@@ -77,6 +77,7 @@ from __future__ import annotations
 
 import argparse
 import contextlib
+import hashlib
 import json
 import os
 import subprocess
@@ -144,6 +145,7 @@ from broker_contract import (  # noqa: E402
     validate_launch_request,
 )
 
+from agentic_dynamics.core.admission_context import admission_required  # noqa: E402
 from agentic_dynamics.core.paths import PathConfig  # noqa: E402
 
 __all__ = [
@@ -360,12 +362,27 @@ def build_submit_argv(
     run --rm workflow-runner python3 scripts/run_workflow.py --spec ... --goal ... --model ...
     --workdir ... --orchestrator``. Lives HERE (the broker owns every docker/compose call); the
     wrapper validates the submit and delegates the call to :func:`submit_run`.
+
+    The extended identity fields (AIO remediation 2026-09-14) ride the SAME argv so they
+    survive the hop to the orchestrator container: ``resume``/``parent_run_id`` (continuation
+    identity) become ``--resume``/``--parent-run-id``; ``admission`` becomes the armed-env
+    ``FINOPS_ADMISSION_REQUIRED=1`` plus the campaign cap flags the run's composition root
+    applies to the lease registry. ``spec_sha256`` is carried in the command for the broker's
+    byte-level verification and deliberately NOT forwarded — the orchestrator pins its own
+    ``workflow_revision_id`` from the bytes it loads.
     """
     compose_file = compose_file or _compose_file_default()
     job_id = str(command.get("job_id", "") or "")
     argv = [compose, "-f", compose_file, "run", "--rm"]
     if job_id:
         argv += ["-e", f"FINOPS_CELL_ID={job_id}"]
+    admission = command.get("admission") or {}
+    if isinstance(admission, dict) and admission.get("required"):
+        # The armed admission gate crosses the compose boundary as the env the composition
+        # root's fail-closed spend gate reads — a submit declaring admission must not silently
+        # arrive disarmed (the 2026-09-14 first-launch defect: "gate disarmed" on a manual
+        # compose launch while the recorded plan said armed).
+        argv += ["-e", "FINOPS_ADMISSION_REQUIRED=1"]
     argv += [
         "workflow-runner",
         "python3", "scripts/run_workflow.py",
@@ -375,6 +392,33 @@ def build_submit_argv(
         "--workdir", str(command.get("workdir", "")),
         "--orchestrator",
     ]
+    if command.get("resume"):
+        argv += ["--resume"]
+    if str(command.get("parent_run_id", "") or ""):
+        argv += ["--parent-run-id", str(command.get("parent_run_id", ""))]
+    if isinstance(admission, dict):
+        if admission.get("campaign_budget_usd") is not None:
+            argv += ["--campaign-budget-usd", str(admission["campaign_budget_usd"])]
+        if admission.get("campaign_concurrency") is not None:
+            argv += ["--campaign-concurrency", str(admission["campaign_concurrency"])]
+    # The execution settings must survive the hop (Astra finding, 2026-09-14): every accepted
+    # field becomes its orchestrator flag, so the run the caller requested IS the run that
+    # executes. A field the orchestrator does not accept here would be a silent drop — the
+    # wrapper's step 11 refuses malformed values before this builder runs.
+    execution = command.get("execution") or {}
+    if isinstance(execution, dict):
+        if execution.get("backend"):
+            argv += ["--backend", str(execution["backend"])]
+        if execution.get("thinking_effort"):
+            argv += ["--thinking-effort", str(execution["thinking_effort"])]
+        if execution.get("thinking_budget_tokens") is not None:
+            argv += ["--thinking-budget-tokens", str(execution["thinking_budget_tokens"])]
+        if execution.get("output_token_limit") is not None:
+            argv += ["--output-token-limit", str(execution["output_token_limit"])]
+        if execution.get("timeout_seconds") is not None:
+            argv += ["--timeout", str(execution["timeout_seconds"])]
+        if execution.get("no_commit"):
+            argv += ["--no-commit"]
     image = command.get("image")
     if image:
         argv += ["--cell-image", str(image)]
@@ -400,6 +444,19 @@ def submit_run(
     """
     import spawn_wrapper  # noqa: PLC0415
 
+    # The disarmed-submit refusal (AIO remediation 2026-09-14) — FIRST, so it is the named
+    # refusal a submitter sees: a durable submit that arrives with NO admission settings while
+    # the broker's own environment has the gate armed would launch a run whose phases run
+    # unleased — "admission: gate disarmed" in a log beside a record that says the run was
+    # armed (the first-launch defect). Refuse at the gate, before any container exists. The
+    # broker reads its OWN environment (the operator's policy), never the command's claim.
+    if admission_required() and not bool((command.get("admission") or {}).get("required")):
+        raise LaunchRequestError([
+            "submit: admission is armed on this host (FINOPS_ADMISSION_REQUIRED=1) but the "
+            "command declares no admission settings — the durable submit path never silently "
+            "disarms the spend gate"
+        ])
+
     errors = spawn_wrapper.validate_submit_request(
         command, repo_root=repo_root, phase_scopes=phase_scopes, path_config=path_config,
     )
@@ -408,10 +465,15 @@ def submit_run(
 
     # The deployment probe (remediation closed-loop, decision f987cde9): the wrapper cannot
     # run git (no-subprocess contract), so the broker — the last gate before the compose call —
-    # probes the workdir base against the repo's main tip. A stale/diverged workdir refuses
-    # here, before any container exists.
+    # probes the workdir base against the repo's main tip AND verifies the declared spec
+    # digest (the extended immutable-input check). A stale/diverged workdir or a digest
+    # mismatch refuses here, before any container exists; a declared resume skips the
+    # main-freshness check (a pinned continuation is never destroyed by unrelated main moves).
     probe_errors = deployment_probe(
         str(command.get("workdir", "") or ""), repo_root=repo_root or _REPO_ROOT,
+        spec_rel=str(command.get("spec", "") or ""),
+        spec_sha256=command.get("spec_sha256"),
+        resume=bool(command.get("resume", False)),
     )
     if probe_errors:
         raise LaunchRequestError(probe_errors)
@@ -444,8 +506,15 @@ def submit_run(
 # ── The deployment probe (remediation closed-loop, decision f987cde9) ─────────
 
 
-def deployment_probe(workdir: str, *, repo_root: Path | str) -> list[str]:
-    """Refuse a submit whose workdir is behind or diverged from the canonical repo's main tip.
+def deployment_probe(
+    workdir: str,
+    *,
+    repo_root: Path | str,
+    spec_rel: str = "",
+    spec_sha256: str | None = None,
+    resume: bool = False,
+) -> list[str]:
+    """Refuse a submit whose declared inputs cannot be the inputs the run will execute.
 
     The run clone pins ``base_sha`` to the WORKDIR HEAD, so a stale worktree silently mints
     runs from a dead tree — the 2026-09-13 fleet failure class (four launches cloned at
@@ -460,9 +529,37 @@ def deployment_probe(workdir: str, *, repo_root: Path | str) -> list[str]:
     behind (stale) or diverged is refused with the fix named. When either side cannot be
     judged (not a git tree, no main ref, git unavailable), the probe says nothing — the clone
     path itself will name those, and a fabricated refusal is worse than none.
+
+    The extended checks (AIO remediation 2026-09-14):
+
+    * ``spec_sha256`` (when declared) is verified against the SPEC FILE'S bytes at the
+      broker's repo — the declared immutable input, not merely "a worktree contains today's
+      main". A mismatch refuses: the caller's identity claim does not describe what the
+      orchestrator will load.
+    * ``resume=True`` SKIPS the main-freshness refusal: a legitimate pinned resume runs on
+      the run's own phase commits, and an unrelated main advance must never destroy it
+      (the stale check would have refused exactly that — the resume's base predates main).
+      Its lineage is the parent-run linkage, which the run's own composition root verifies
+      against the control database (``ParentRunRefused``), not this probe.
     """
+    if spec_rel and spec_sha256:
+        try:
+            spec_bytes = (Path(repo_root) / spec_rel).read_bytes()
+            actual = hashlib.sha256(spec_bytes).hexdigest()
+        except OSError:
+            actual = ""
+        if actual and actual.lower() != str(spec_sha256).lower():
+            return [
+                f"submit: spec {spec_rel} digest mismatch — declared "
+                f"{str(spec_sha256)[:12]}…, the repo's bytes hash to {actual[:12]}…; "
+                "the declared immutable input is not the spec the run would execute"
+            ]
     wd = Path(workdir) if workdir else None
     if not wd or not wd.is_dir():
+        return []
+    if resume:
+        # A continuation resumes the run's own worktree state — main-freshness is not its
+        # contract (see above).
         return []
     if not (wd / ".git").exists() or not (Path(repo_root) / ".git").exists():
         return []

@@ -667,10 +667,39 @@ class AttemptRecord:
         }
 
 
-def _build_phase_prompt(phase: dict[str, Any], goal: str, prior: list[str]) -> str:
+def _build_phase_prompt(
+    phase: dict[str, Any],
+    goal: str,
+    prior: list[str],
+    domain_context: str | None = None,
+) -> str:
+    """Assemble an agent phase's prompt from its template + the run-level domain context.
+
+    The two placeholders (``{goal}`` / ``{prior_phases}``) are substituted as always; a THIRD,
+    ``{domain_context}``, is the transport seam for the spec's ``workflow.params.context.
+    domain_context`` block (the AIO remediation 2026-09-14): the direct runner never assembled
+    that block, so a workflow's canonical-source/policy/verification constraints silently never
+    reached the phases that promised to obey them. When the run declares a ``domain_context``
+    AND the phase template does not already reference ``{domain_context}``, the block is
+    appended as a bounded "SPEC CONTEXT" section — the phase's own VERIFY prose is an
+    instruction to the model; this section is the constraint set itself. A prepared step
+    (``phase_def["_prepared_step"]``) is NEVER re-assembled here — the parent baked the final
+    bytes, and this function is not called on that path.
+    """
     prompt = str(phase.get("prompt", ""))
     prior_summary = "\n".join(f"- {p}" for p in prior) if prior else "(none)"
-    return prompt.replace("{goal}", goal).replace("{prior_phases}", prior_summary)
+    template_refs_context = "{domain_context}" in prompt
+    prompt = (
+        prompt.replace("{goal}", goal)
+        .replace("{prior_phases}", prior_summary)
+        .replace("{domain_context}", str(domain_context or ""))
+    )
+    context = (domain_context or "").strip()
+    if context and not template_refs_context:
+        prompt = f"{prompt}\n\nSPEC CONTEXT (the workflow's declared domain context — " \
+                 f"constraints, canonical sources, and verification contract; follow it):\n" \
+                 f"{context}\n"
+    return prompt
 
 
 def _git_commit_verbose(workdir: Path, phase: str, goal: str) -> tuple[str, str]:
@@ -1076,6 +1105,41 @@ def cell_scope(workdir: str | Path) -> str:
     return f"self-{identity}"
 
 
+def _resolve_rag_params(
+    spec: ExperimentSpec,
+    rag_params: dict[str, Any] | None,
+    *,
+    wd: Path,
+    rag_augment: bool,
+) -> dict[str, Any]:
+    """Resolve the effective retrieval configuration (the AIO remediation 2026-09-14 seam).
+
+    The runner reads ``workflow.params.rag`` — the instrument-build workflow's original
+    ``rag_params`` key was silently ignored and the run fell back to the runner default
+    with nothing saying so. This function is the single, testable resolution point:
+
+    * ``rag_params`` (explicit kwarg) outranks ``workflow.params.rag``;
+    * when augmentation is on and no ``repository_id`` is declared, BOTH ``repository_id``
+      and ``acl_scope`` default to the cell scope (``self-<worktree>``) — the deliberate
+      private-by-construction choice: workers retrieve only their own progressive findings,
+      and the org-wide shared scope (which would expose the AIO's private decision/session
+      records to worker cells) is reached only by an EXPLICIT non-empty ``repository_id``
+      (the documented shared-scope override for coordinated parallel workstreams);
+    * ``workdir`` is threaded so the default constructor's own model call has a real
+      working tree.
+
+    Pure w.r.t. retrieval — no Redis, no Chroma, no constructor built here.
+    """
+    resolved = dict(rag_params or spec.workflow.params.get("rag", {}) or {})
+    if rag_augment and not str(resolved.get("repository_id", "")).strip():
+        scope = cell_scope(wd)
+        resolved["repository_id"] = scope
+        resolved["acl_scope"] = scope
+    if rag_augment:
+        resolved["workdir"] = str(wd)
+    return resolved
+
+
 def _run_test_gate(
     pr: PhaseResult,
     wd: Path,
@@ -1181,6 +1245,16 @@ def _run_test_gate(
             pr.error = suite.get("tail", "")[-400:]
 
     if pr.status == "failed":
+        # The stable verification-failure marker (AIO remediation 2026-09-14): the gate's
+        # own failure — whatever shape produced it (a dispatched suite, the in-process run,
+        # the empty refusal) — must be distinguishable from infrastructure refusals
+        # (VERIFIER_*/ADMISSION_*) so the bounded correction (gate_retry) fires exactly on
+        # "the check ran and failed", never on "the environment refused". Prefix once.
+        error = str(pr.error or "")
+        if not error.startswith(("VERIFIER_", "ADMISSION_", "TEST_GATE:")):
+            pr.error = f"TEST_GATE: {error}" if error else (
+                "TEST_GATE: verification failed"
+            )
         return  # an already-failed verdict keeps its own evidence
     if empty_refuses and int(pr.tests_total or 0) == 0:
         pr.status = "failed"
@@ -1221,6 +1295,142 @@ def _apply_verifier_verdict(pr: PhaseResult, verdict: StepResult) -> None:
         pr.error = str(getattr(verdict, "error", "") or "")[:400] or (
             f"verifier suite failed ({pr.tests_passed}/{pr.tests_total} passed)"
         )
+
+
+# ── The bounded correction attempt (AIO remediation 2026-09-14) ──────────────
+#
+# ``gate_retry: N`` on a phase declares that a failed VERIFICATION tolerates up to N
+# correction re-runs: the producing phase re-executes with the failed check's evidence in
+# its prompt, then the independent check re-runs. This is the executable form of the rule
+# "failed verification returns to a bounded correction attempt and then reruns the
+# independent check" — before it, a spec's "fix failures" prose on a kind:test phase was
+# dead text (test phases execute tests and nothing else), and the only outcome of a failed
+# gate was the run dying.
+
+
+def _declared_gate_retry(phase_def: dict[str, Any]) -> int:
+    """The phase's declared correction budget; 0 (no correction) on any malformed value."""
+    value = phase_def.get("gate_retry", 0)
+    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+        return 0
+    return value
+
+
+def _verification_failure(pr: PhaseResult, kind: str) -> bool:
+    """True when the phase failed BECAUSE ITS VERIFICATION failed (a code/test defect).
+
+    Infrastructure refusals are deliberately excluded: a verifier that could not spawn, an
+    unarmed/refused spend gate, or a refusal to run in a containerized parent is a state to
+    surface, not a defect a producer re-run can correct — retrying the producer would burn
+    budget against an unchanged environment.
+    """
+    if pr.status != "failed":
+        return False
+    error = str(pr.error or "")
+    if error.startswith(("VERIFIER_REFUSED", "VERIFIER_ERROR", "ADMISSION_DENIED")):
+        return False
+    if kind == "test":
+        # The suite itself ran (tests_total observed) and failed — or the required gate ran
+        # nothing (the phantom-target refusal: the producer authored no resolvable suite, and
+        # a correction re-run of the producer is exactly the right response).
+        return pr.tests_total is not None or error.startswith("TEST_GATE:")
+    # An agent phase: its native test_gate flipped it (the gate's own failure marker).
+    return error.startswith("TEST_GATE:")
+
+
+def _correction_phase_def(
+    phase_def: dict[str, Any], *, failed_phase: str, failure: PhaseResult
+) -> dict[str, Any]:
+    """The producing phase's re-run definition: its own prompt plus the failed check's evidence.
+
+    The correction context names the failed check and its evidence tail, and restates the
+    bounded contract (fix the code or the tests — never weaken an assertion). The copy is
+    shallow by design: every other phase field (kind, tests, gates, timeouts) stays identical
+    so the correction re-run is the same phase, not a new one.
+    """
+    copy = dict(phase_def)
+    tail = str(failure.error or "")[-600:]
+    copy["prompt"] = (
+        str(copy.get("prompt", ""))
+        + "\n\nCORRECTION ATTEMPT (bounded by gate_retry): the independent verification of "
+        + f"your previous attempt FAILED ({failed_phase} — {tail}). Fix the code or the "
+        + "tests it names, then re-run the verification before committing. Never weaken an "
+        + "assertion."
+    )
+    return copy
+
+
+def _phase_record_row(
+    record: PhaseResult, attempt_number: int, retry_reason: str
+) -> dict[str, Any]:
+    """One attempt row synthesized from a phase record whose execution is being retained.
+
+    The shape mirrors the escalation rows exactly (``_build_attempt_records`` reads the same
+    keys), so a retained single-attempt execution flows through the ledger's multi-attempt
+    path with its paid call intact: model, cost, tokens, timing, verdict.
+    """
+    return {
+        "attempt_number": attempt_number,
+        "model": record.model,
+        "status": record.status,
+        "cost_usd": float(record.cost_usd or 0.0),
+        "tokens": dict(record.tokens or {}),
+        "leased_at": record.leased_at,
+        "first_token_at": record.first_token_at,
+        "escalation_from": None,
+        "escalation_to": None,
+        "retry_reason": retry_reason,
+    }
+
+
+def _retain_and_remove_phase_record(
+    result: WorkflowRunResult,
+    prior: list[str],
+    prior_invocations: dict[str, list[dict[str, Any]]],
+    execution_count: dict[str, int],
+    phase_name: str,
+    *,
+    retry_reason: str,
+) -> PhaseResult | None:
+    """Remove a phase's record for a correction re-run — AFTER retaining its history.
+
+    The reviewer reproduction (2026-09-14): the correction used to ``pop()`` the failed record,
+    silently discarding a paid invocation's cost/tokens/verdict and letting the repaired phase
+    read as a first-pass success; a producer re-run (test-phase correction) additionally left
+    a DUPLICATE producer record → duplicate attempt ids. This helper is the fix's single
+    removal point:
+
+    * the removed execution's rows (its escalation rows when present, else one synthesized
+      row) are appended to ``prior_invocations[phase_name]`` with a ``correction`` retry
+      reason — every invocation survives into the final record's ``attempts``;
+    * ``execution_count[phase_name]`` increments — the executor's next attempt ordinal for
+      this phase continues past the retained history, so container state dirs and
+      prepared-step filenames never collide;
+    * the matching ``prior`` text entry is dropped so the re-run appends a fresh one.
+    """
+    for idx in range(len(result.phases) - 1, -1, -1):
+        record = result.phases[idx]
+        if record.phase != phase_name:
+            continue
+        result.phases.pop(idx)
+        execution_count[phase_name] = execution_count.get(phase_name, 0) + 1
+        retained = list(prior_invocations.get(phase_name, []))
+        rows = list(getattr(record, "attempts", None) or [])
+        if rows:
+            # Renumber so the retained sequence stays contiguous with any earlier retention.
+            rows = [
+                dict(row, attempt_number=len(retained) + int(row.get("attempt_number") or i + 1))
+                for i, row in enumerate(rows)
+            ]
+        else:
+            rows = [_phase_record_row(record, len(retained) + 1, retry_reason)]
+        prior_invocations[phase_name] = retained + rows
+        for j in range(len(prior) - 1, -1, -1):
+            if prior[j].startswith(f"{phase_name} ("):
+                prior.pop(j)
+                break
+        return record
+    return None
 
 
 def _finding_emit_enabled(rag_params: dict[str, Any], phase_def: dict[str, Any]) -> bool:
@@ -2085,7 +2295,12 @@ def _install_commit_msg_hook(wd: Path, phase_name: str, goal: str) -> None:
         "with open(path, encoding='utf-8') as f:\n"
         "    msg = f.read()\n"
         "first, sep, rest = msg.partition('\\n')\n"
-        "if first == 'Initial' or first.startswith(expected):\n"
+        "# Exemptions (AIO remediation 2026-09-14): 'Initial' (the adapter's seed) and\n"
+        "# '[approval]' (the checkpoint approval artifact — approve_workflow.py's subject\n"
+        "# shape). A rewritten approval subject made the approval commit LOOK like the\n"
+        "# checkpoint phase's own commit: _phase_commit_sha then returned it, and the\n"
+        "# resume's authored_after_checkpoint check refused a correctly signed approval.\n"
+        "if first == 'Initial' or first.startswith(expected) or first.startswith('[approval]'):\n"
         "    sys.exit(0)\n"
         "with open(path, 'w', encoding='utf-8') as f:\n"
         "    f.write(expected + (sep + rest if sep else ''))\n"
@@ -3312,6 +3527,7 @@ def run_workflow(
     retrieve_fn: Callable[..., Any] | None = None,
     construct_fn: Callable[..., Any] | None = None,
     rag_params: dict[str, Any] | None = None,
+    domain_context: str | None = None,
     change_analyzer: ChangeAnalyzer | None = None,
     change_analysis_legs: bool = True,
     phase_admission: PhaseAdmission | None = None,
@@ -3531,21 +3747,15 @@ def run_workflow(
     rag_augment = rag_augment if rag_augment is not None else bool(
         spec.workflow.params.get("rag_augment", False)
     )
-    rag_params = dict(rag_params or spec.workflow.params.get("rag", {}) or {})
-    # Thread the per-cell scope through the retrieval filter: an augmented cell reads
-    # only its own worktree's knowledge. Both repository_id and acl_scope default to
-    # the cell scope BEFORE the retrieve fn is built; an explicitly non-empty
-    # repository_id is the shared-scope override (coordinated parallel workstreams)
-    # and is preserved unchanged — the empty scope never again means "global".
-    if rag_augment and not str(rag_params.get("repository_id", "")).strip():
-        scope = cell_scope(wd)
-        rag_params["repository_id"] = scope
-        rag_params["acl_scope"] = scope
-    # The default constructor's own model call needs a real workdir (its opencode
-    # session is a paid invocation, like the executor's); empty would crash the
-    # adapter's ``_init_git_workdir`` and silently degrade the seam to ``no_rag``.
-    if rag_augment:
-        rag_params["workdir"] = str(wd)
+    rag_params = _resolve_rag_params(spec, rag_params, wd=wd, rag_augment=rag_augment)
+    # The domain-context transport (AIO remediation 2026-09-14) — resolved HERE, by the
+    # engine, so every caller (the CLI parent path, a composition-root test, an embedded
+    # caller) gets the spec's declared constraints transported into the phase prompts. An
+    # explicit kwarg outranks the spec (the CLI passes the same value — one source of truth).
+    if domain_context is None:
+        domain_context = str(
+            ((spec.workflow.params or {}).get("context") or {}).get("domain_context") or ""
+        ) or None
     pinned_policy = str(rag_params.get("pinned_policy", ""))
     inherited_tools = list(rag_params.get("inherited_tools") or DEFAULT_INHERITED_TOOLS)
 
@@ -3573,7 +3783,6 @@ def run_workflow(
         })
 
     prior: list[str] = []
-    start_idx = 0
     completed: set[str] = set()
     if resume_state is not None:
         # Wave F7: the explicit parent snapshot IS the resume. The composition root selected
@@ -3592,16 +3801,21 @@ def run_workflow(
             # in this worktree is the strongest evidence a phase already ran here), and only
             # when it finds nothing — a squashed worktree, a --no-commit run — do we fall
             # back to the derived index's latest run ledger.
+            #
+            # Completion is PER PHASE and evidence-bound (reviewer reproduction 2026-09-14:
+            # a spec whose ONLY commit is the third phase's resumed with phases 1-2 marked
+            # complete — a LATER commit cannot establish that earlier work ran, and an
+            # unexecuted verifier must never be declared satisfied). The old prefix closure
+            # over test phases is gone: a test phase has no commit of its own, so on this
+            # fallback it is never skipped — it re-runs and re-establishes its verdict. The
+            # cost is an idempotent re-verification per resume; the alternative was certifying
+            # work that never happened.
             completed = _completed_phases(wd, phase_names, goal)
             if not completed:
                 completed = _completed_phases_from_index(spec, phase_names, goal)
-        for i, phase_def in enumerate(phases):
-            name = str(phase_def.get("name", "?"))
-            if name in completed:
-                prior.append(f"{name} (ok)")
-                start_idx = i + 1
-            else:
-                break
+        # (Skipping itself happens per phase inside the loop — see the ``resume and name in
+        # completed`` guard there — so a gap in the evidence re-runs exactly the phases
+        # without it, never the whole tail as the old prefix walk did.)
     if resume_state is not None:
         # Stamp the explicit provenance so the ledger says which parent snapshot the resume
         # consumed (and which artifact established it) — auditable, never inferred later.
@@ -3615,7 +3829,6 @@ def run_workflow(
     result.already_complete = bool(
         resume
         and phases
-        and start_idx >= len(phases)
         and {str(p.get("name", "?")) for p in phases} <= completed
     )
 
@@ -3693,9 +3906,35 @@ def run_workflow(
     # advertise "1 of 1").
     total = phase_total if phase_total is not None else len(phases)
     full_phase_index = phase_index if phase_index is not None else None
-    for phase_idx, phase_def in enumerate(phases[start_idx:], start=start_idx):
+    # The phase loop (a while-loop, not a ``for``: the bounded gate_retry correction — AIO
+    # remediation 2026-09-14 — rewinds the index to the producing phase when a declared
+    # verification fails, so the correction attempt is a re-run of the REAL producer, not a
+    # fresh instruction to a phase that never sees one).
+    correction_budget: dict[str, int] = {}
+    # The retained execution history across correction re-runs (reviewer reproduction
+    # 2026-09-14): ``execution_count`` counts how many times a phase has already executed (the
+    # executor's attempt ordinal offset — a corrected re-run must NEVER collide with the
+    # first execution's container state dir / prepared-step filename), and
+    # ``prior_invocations`` keeps every prior invocation's paid row (model/cost/tokens/verdict)
+    # so the final phase record carries the whole history and the repaired phase is never
+    # marked a first-pass success.
+    execution_count: dict[str, int] = {}
+    prior_invocations: dict[str, list[dict[str, Any]]] = {}
+    phase_loop_idx = 0
+    while phase_loop_idx < len(phases):
+        phase_idx = phase_loop_idx
+        phase_def = phases[phase_idx]
+        phase_loop_idx += 1
         name = str(phase_def.get("name", "?"))
         kind = str(phase_def.get("kind", "agent"))
+        if resume and name in completed:
+            # Recorded completion evidence (the phase's own committed phase commit, or the
+            # explicit parent ledger's entry) — skip it. NEVER inferred from a later commit
+            # (reviewer reproduction 2026-09-14), and never invented for a phase without its
+            # own evidence: a phase lands in ``completed`` only through one of those two
+            # recorded sources, so an unexecuted verifier cannot be declared satisfied.
+            prior.append(f"{name} (ok)")
+            continue
         phase_timeout = int(phase_def.get("timeout", timeout))
         pr = PhaseResult(
             phase=name, kind=kind, status="ok", spec_id=spec.spec_id,
@@ -3756,7 +3995,7 @@ def run_workflow(
                     # rewrite it. The hash the parent carried covers exactly these bytes.
                     prompt = str(phase_def.get("prompt", ""))
                 else:
-                    prompt = _build_phase_prompt(phase_def, goal, prior)
+                    prompt = _build_phase_prompt(phase_def, goal, prior, domain_context=domain_context)
                 # Point the agent's built-in publisher at this workflow's cell so the
                 # fine-grained session events stream into the Control Room.
                 prev_cell = os.environ.get("FINOPS_CELL_ID")
@@ -3765,8 +4004,13 @@ def run_workflow(
                 stall: dict[str, Any] | None = None
                 pre_head = ""
                 # Step 9 (G-27): every agent attempt is recorded here (one row by default; one
-                # per ladder step when escalation fires).
-                attempt_rows: list[dict[str, Any]] = []
+                # per ladder step when escalation fires). The seed carries the invocations a
+                # correction re-run is continuing from (reviewer reproduction 2026-09-14) —
+                # their costs/tokens/verdicts are already paid and must reach the final record.
+                attempt_seed: list[dict[str, Any]] = [
+                    dict(row) for row in prior_invocations.get(name, [])
+                ]
+                attempt_rows: list[dict[str, Any]] = list(attempt_seed)
                 # The per-phase spend gate (admission_leases p2). An ExitStack rather
                 # than a nested ``with`` because the leases can only be reserved once
                 # the phase's model is KNOWN (the budget lease's currency follows the
@@ -3896,7 +4140,14 @@ def run_workflow(
                             pr.stall_evidence = None
                         agent_kwargs: dict[str, Any] = {
                             "model": attempt_model,
-                            "attempt": attempt_base + attempt_no - 1,
+                            # The attempt ordinal is UNIQUE ACROSS CORRECTION RE-RUNS (reviewer
+                            # reproduction 2026-09-14): a corrected phase's second execution
+                            # continues past the executions already made — the container state
+                            # dir and prepared-step filename are keyed off this ordinal, so
+                            # restarting at 1 reused both.
+                            "attempt": (
+                                attempt_base + execution_count.get(name, 0) + attempt_no - 1
+                            ),
                             "backend": backend,
                             "workdir": str(wd),
                             "thinking_effort": thinking_effort,
@@ -3962,7 +4213,9 @@ def run_workflow(
                         attempt_failed = stall is not None or not getattr(ar, "ok", True)
                         attempt_rows.append(
                             {
-                                "attempt_number": attempt_no,
+                                # Continues the retained sequence: a corrected re-run's rows
+                                # are numbered after the invocations it is continuing from.
+                                "attempt_number": len(attempt_seed) + attempt_no,
                                 "model": attempt_model,
                                 "status": "failed" if attempt_failed else "ok",
                                 "cost_usd": float(getattr(ar, "estimated_cost_usd", 0.0) or 0.0),
@@ -4145,7 +4398,17 @@ def run_workflow(
         # retrieval p4 lost its background evidence this way (1800.16s in a 1800s window,
         # ok=True), and a clean ok must not mask a wall-burning run.
         pr.timed_out = pr.duration_s >= phase_timeout - 0.5
-        if commit and pr.status == "ok":
+        # Test phases produce NO deliverable — a kind:test gate verifies the candidate, and
+        # its ledger row must BIND to the candidate under review (the AIO remediation
+        # 2026-09-14): ``commit_hash`` records the worktree HEAD the suite verified, so the
+        # promotion gate's "every phase recorded a commit" check holds against the exact
+        # tree the independent verdict describes. A test phase never enters the commit/
+        # adoption machinery — it has nothing to stage, and the pre-fix shape failed every
+        # test phase with COMMIT_SKIPPED (the transcript dirty-check saw the runner's own
+        # ``.instrument/session.jsonl`` as uncommitted work).
+        if kind == "test" and pr.status == "ok":
+            pr.commit_hash = _git_head(git_wd)
+        if commit and pr.status == "ok" and kind != "test":
             pr.commit_hash, commit_reason = _git_commit_verbose(git_wd, name, goal)
             # ``_git_commit_verbose`` returns "" in two very different situations, and this
             # block distinguishes them: (1) the phase's work is committed but the runner had
@@ -4171,7 +4434,9 @@ def run_workflow(
                 tree_dirty = True
                 try:
                     st = subprocess.run(
-                        ["git", "status", "--porcelain"], cwd=git_wd,
+                        ["git", "status", "--porcelain", "--", ".",
+                         ":(exclude).instrument"],
+                        cwd=git_wd,
                         capture_output=True, text=True, timeout=30,
                     )
                     tree_dirty = st.returncode != 0 or bool(st.stdout.strip())
@@ -4324,7 +4589,65 @@ def run_workflow(
                 candidate_sha=pr.commit_hash or _git_head(git_wd),
             )
 
-        if (pr.status == "failed" and stop_on_error) or checkpoint_stop:
+        if checkpoint_stop:
+            break
+        if pr.status == "failed" and stop_on_error:
+            # The bounded correction attempt (AIO remediation 2026-09-14): a phase declaring
+            # ``gate_retry: N`` tolerates up to N correction re-runs when its VERIFICATION
+            # fails — the producer re-runs with the failed check's evidence in its prompt, and
+            # the independent check re-runs after it. Without this, the runner's only answer to
+            # a failed gate was the run dying, and a spec's prose ("fix failures") was dead
+            # text: a kind:test phase executes tests and nothing else, so no repair step
+            # existed anywhere. Infrastructure refusals (VERIFIER_*/ADMISSION_DENIED) are NOT
+            # verification failures and never trigger a correction. The failed record is
+            # REPLACED by the correction re-run, never duplicated (the evidence recorder has
+            # already written the failed attempt's row — that history stays).
+            gate_retry = _declared_gate_retry(phase_def)
+            if gate_retry and _verification_failure(pr, kind):
+                used = correction_budget.get(name, 0)
+                if used >= gate_retry:
+                    break
+                correction_budget[name] = used + 1
+                # For an agent phase the producer IS itself (its own work re-runs with the
+                # failure evidence); for a test phase the producer is the phase immediately
+                # before it. The target must be an agent phase — a test phase has no work to
+                # correct, so rewinding to one is a refusal, not a correction.
+                target_idx = phase_idx if kind != "test" else phase_idx - 1
+                if target_idx < 0:
+                    break
+                target_def = phases[target_idx]
+                if str(target_def.get("kind", "agent")) == "test":
+                    break  # a test phase has no producer worth re-running here
+                # Retain the failing execution BEFORE removing its record (reviewer
+                # reproduction 2026-09-14): the paid invocation's cost/tokens/verdict survive
+                # as attempt rows on the re-run's final record — never popped into silence,
+                # never re-marked as a first-pass success.
+                _retain_and_remove_phase_record(
+                    result, prior, prior_invocations, execution_count, name,
+                    retry_reason=(
+                        f"correction: {str(pr.error or 'verification failed')[:120]}"
+                    ),
+                )
+                if kind == "test":
+                    # The producer re-runs too: its old record must not survive as a duplicate
+                    # (the duplicate-attempt-id reproduction) — retain its history and remove
+                    # it; the re-run's fresh record carries both invocations.
+                    producer_name = str(target_def.get("name", "?"))
+                    _retain_and_remove_phase_record(
+                        result, prior, prior_invocations, execution_count, producer_name,
+                        retry_reason=f"correction: re-run after {name} failed verification",
+                    )
+                phases[target_idx] = _correction_phase_def(
+                    target_def, failed_phase=name, failure=pr,
+                )
+                print(
+                    f"[workflow] correction attempt {used}/{gate_retry}: phase "
+                    f"'{str(target_def.get('name', '?'))}' re-runs to repair the failed "
+                    f"verification of '{name}': {str(pr.error)[-160:]}",
+                    flush=True,
+                )
+                phase_loop_idx = target_idx
+                continue
             break
 
     # ledger_instrumentation p1 — the attempt-level emission. Built from the FINAL phase

@@ -51,6 +51,7 @@ from pathlib import Path
 # scripts/fleet/ -> add scripts/ to the path, then reuse the shared bootstrap.
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+import broker_contract  # noqa: E402  (scripts/fleet/ is this module's dir)
 import dlq  # noqa: E402  (scripts/fleet/ is this module's dir)
 import heartbeat  # noqa: E402
 import redis  # noqa: E402
@@ -96,6 +97,7 @@ def _connect() -> redis.Redis:
             client = redis.Redis(
                 host=REDIS_HOST, port=REDIS_PORT, db=REDIS_DB,
                 decode_responses=True, socket_connect_timeout=5,
+                socket_timeout=broker_contract.FLEET_REDIS_SOCKET_TIMEOUT,
             )
             client.ping()
             return client
@@ -287,7 +289,12 @@ def _send_command(client: redis.Redis, action: str, service: str, count: int | N
 
 
 def _send_submit_command(client: redis.Redis, *, spec: str, goal: str, model: str,
-                         workdir: str, image: str | None = None) -> dict:
+                         workdir: str, image: str | None = None,
+                         spec_sha256: str | None = None,
+                         resume: bool = False,
+                         parent_run_id: str | None = None,
+                         admission: dict | None = None,
+                         execution: dict | None = None) -> dict:
     """LPUSH a submit command onto ``fleet:commands`` and record its "launching" board entry.
 
     The fleet-manager mints the ``job_id`` (the board's join key) but does NOT validate the
@@ -301,6 +308,15 @@ def _send_submit_command(client: redis.Redis, *, spec: str, goal: str, model: st
     cells should run — the fleet-manager passes it through UNCHECKED, same as every other
     field; it is ``validate_submit_request``'s step 8 (``fleet/job-<name>`` only) that decides
     whether it is actually honored.
+
+    The extended identity fields (AIO remediation 2026-09-14) pass through the same
+    UNCHECKED way — ``spec_sha256`` (source/spec identity), ``resume``/``parent_run_id``
+    (continuation identity), ``admission`` (the applicable admission settings), and
+    ``execution`` (the per-run execution settings: backend, thinking effort/budget, output
+    limit, phase timeout, no_commit) — because the orchestrator + broker re-validate them at
+    the two later gates. The manager's job is that they SURVIVE the hop, not that they are
+    already proven. A caller that does not supply ``execution`` receives the orchestrator's
+    own defaults — never a silently different behavior.
     """
     job_id = uuid.uuid4().hex[:12]
     command = {
@@ -315,6 +331,16 @@ def _send_submit_command(client: redis.Redis, *, spec: str, goal: str, model: st
     }
     if image:
         command["image"] = image
+    if spec_sha256:
+        command["spec_sha256"] = spec_sha256
+    if resume:
+        command["resume"] = True
+    if parent_run_id:
+        command["parent_run_id"] = parent_run_id
+    if admission:
+        command["admission"] = dict(admission)
+    if execution:
+        command["execution"] = dict(execution)
     client.lpush(COMMANDS_KEY, json.dumps(command))
     record_job_launch(client, command)
     return command
@@ -345,6 +371,37 @@ def main(argv: list[str] | None = None) -> int:
                           help="optional per-job image for the spec's phase cells "
                                "(fleet/job-<name>, built via scripts/fleet/build.sh job <name> "
                                "— p3_base_image_caching); default: fleet/base")
+    p_submit.add_argument("--spec-sha256", default=None,
+                          help="sha256 of the spec file's bytes (source/spec identity — "
+                               "verified by the broker before the compose call)")
+    p_submit.add_argument("--resume", action="store_true",
+                          help="the submit resumes an existing run (continuation identity — "
+                               "the broker skips the main-freshness refusal)")
+    p_submit.add_argument("--parent-run-id", default=None,
+                          help="the control-db run id this submit continues (requires --resume)")
+    p_submit.add_argument("--admission-required", action="store_true",
+                          help="arm the admission gate in the orchestrator container "
+                               "(FINOPS_ADMISSION_REQUIRED=1 — a submit WITHOUT this flag "
+                               "while the host gate is armed is refused by the broker)")
+    p_submit.add_argument("--campaign-budget-usd", type=float, default=None,
+                          help="the campaign budget ceiling the run applies to the lease "
+                               "registry (distinct from any daily real-cash allowance)")
+    p_submit.add_argument("--campaign-concurrency", type=int, default=None,
+                          help="the campaign concurrency cap the run applies to the lease "
+                               "registry")
+    p_submit.add_argument("--backend", default=None, choices=["opencode", "claude_cli"],
+                          help="the execution backend (pass-through; the orchestrator "
+                               "default is auto-routing)")
+    p_submit.add_argument("--thinking-effort", default=None,
+                          help="the thinking effort level (pass-through)")
+    p_submit.add_argument("--thinking-budget-tokens", type=int, default=None,
+                          help="the thinking token budget (pass-through)")
+    p_submit.add_argument("--output-token-limit", type=int, default=None,
+                          help="the output token limit (pass-through)")
+    p_submit.add_argument("--timeout-seconds", type=int, default=None,
+                          help="the per-phase timeout in seconds (pass-through)")
+    p_submit.add_argument("--no-commit", action="store_true",
+                          help="run phases without runner commits (pass-through)")
 
     parser.add_argument("--interval", type=float, default=DEFAULT_INTERVAL)
     parser.add_argument("--once", action="store_true")
@@ -392,9 +449,37 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     if args.command == "submit":
+        admission: dict | None = None
+        if args.admission_required or args.campaign_budget_usd is not None or (
+            args.campaign_concurrency is not None
+        ):
+            admission = {"required": bool(args.admission_required)}
+            if args.campaign_budget_usd is not None:
+                admission["campaign_budget_usd"] = args.campaign_budget_usd
+            if args.campaign_concurrency is not None:
+                admission["campaign_concurrency"] = args.campaign_concurrency
+        execution: dict | None = None
+        if any(value is not None for value in (
+            args.backend, args.thinking_effort, args.thinking_budget_tokens,
+            args.output_token_limit, args.timeout_seconds,
+        )) or args.no_commit:
+            execution = {}
+            if args.backend is not None:
+                execution["backend"] = args.backend
+            if args.thinking_effort is not None:
+                execution["thinking_effort"] = args.thinking_effort
+            if args.thinking_budget_tokens is not None:
+                execution["thinking_budget_tokens"] = args.thinking_budget_tokens
+            if args.output_token_limit is not None:
+                execution["output_token_limit"] = args.output_token_limit
+            if args.timeout_seconds is not None:
+                execution["timeout_seconds"] = args.timeout_seconds
+            if args.no_commit:
+                execution["no_commit"] = True
         cmd = _send_submit_command(
             client, spec=args.spec, goal=args.goal, model=args.model, workdir=args.workdir,
-            image=args.image,
+            image=args.image, spec_sha256=args.spec_sha256, resume=args.resume,
+            parent_run_id=args.parent_run_id, admission=admission, execution=execution,
         )
         print(f"fleet:commands <- {json.dumps(cmd)}")
         print(f"fleet:jobs[{cmd['job_id']}] <- launching")

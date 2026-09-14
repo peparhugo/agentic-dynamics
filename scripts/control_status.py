@@ -66,9 +66,16 @@ PACKET_READS_DEFAULT = ROOT / "experiments" / "results" / "control" / "packet_re
 def _append_packet_read(*, epoch: object, repo_head_sha: str, db_path: str) -> None:
     """Append one packet-read observation line. Raises on failure — callers catch.
 
-    One line per invocation: ``{ts, schema, epoch, repo_head_sha, db}``. The counter is the
-    packet's own observation of itself (the CLI is ours), so it writes a side file — never the
-    control database, which stays read-only for this command.
+    One line per invocation: ``{ts, schema, epoch, repo_head_sha, db, session_id, actor}``.
+    The counter is the packet's own observation of itself (the CLI is ours), so it writes a
+    side file — never the control database, which stays read-only for this command.
+
+    The session/action identity (AIO remediation 2026-09-14): a GLOBAL count of reads cannot
+    establish that a particular decision consumed a valid packet. ``session_id`` comes from
+    the runtime's explicit identity (``FINOPS_SESSION_ID``) and ``actor`` from ``FINOPS_ACTOR``
+    (default ``aio``) — so a consequential act's decision record can be matched to the packet
+    observation by (session, actor, epoch), never by "there have been N reads in total".
+    Absent identity the fields are ``""`` — recorded as absent, never fabricated.
     """
     from datetime import datetime, timezone
 
@@ -83,6 +90,8 @@ def _append_packet_read(*, epoch: object, repo_head_sha: str, db_path: str) -> N
             "epoch": epoch,
             "repo_head_sha": repo_head_sha,
             "db": db_path,
+            "session_id": os.environ.get("FINOPS_SESSION_ID", "") or "",
+            "actor": os.environ.get("FINOPS_ACTOR", "aio") or "aio",
         },
         ensure_ascii=False,
     )
