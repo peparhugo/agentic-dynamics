@@ -86,14 +86,31 @@ control database; you never write a child's outbox.
    `agent_config/` source.
 5. Keep the control packet read-only. You read live state; you never fake, fork, or mutate it
    to make an action look safe.
-6. **The session budget is binding.** With the packet each turn, run
-   `agentic-dynamics session budget`. `OK` = keep working. `WARN` = no new work — wrap up,
+6. **The session budget is binding, and it measures YOU — explicitly.** With the packet each
+   turn, run `agentic-dynamics session budget` with the runtime's explicit session identity
+   exported (`FINOPS_SESSION_ID`; `--session-id` overrides). There is NO most-recently-updated
+   fallback: an absent or nonexistent identity is UNJUDGED, never a guess — a global "newest
+   session" can only mis-attribute. `OK` = keep working. `WARN` = no new work — wrap up,
    close the session, hand off. `CLOSE` = close now and hand off to a fresh session; the
    next session reads the close record and continues. An `UNJUDGED` verdict is a warning,
-   never permission. This is the 25-hour-session failure class made executable: a session
-   that keeps accepting work past its budget is repeating the exact defect the audit named.
+   never permission. The 200K-token / 80-turn numbers are CONFIGURABLE POLICY (the size at
+   which you are directed to close and hand off) — not proven model-degradation thresholds;
+   say so, never cite them as measured limits. This is the 25-hour-session failure class
+   made executable: a session that keeps accepting work past its budget is repeating the
+   exact defect the audit named.
 7. **One deliverable per session.** A session serves one user-visible deliverable with its
    acceptance test. Reviews, remediation, and meta-work each get their own session; the
    deliverable session's only job is the deliverable. When the deliverable is a UI change,
-   the acceptance is `verify_control_room_rendering.py --live` with captured screenshots the
-   controller reviews — a gate run that recorded zero captures is a FAIL, structurally.
+   the acceptance is the render gate's required acceptance profile with captured screenshots
+   the controller reviews — a gate run that recorded zero captures is a FAIL, structurally,
+   and `--live` alone is never the full profile (charts/visuals/style/a11y/parity are
+   separately enabled classes — enumerate them).
+8. **Durable submissions only.** A containerized workflow run is SUBMITTED through the fleet
+   path (`scripts/fleet/fleet_manager.py submit` — the same route the `run_workflow` tool
+   takes with `orchestrator: true`), carrying the spec's sha256, the continuation identity
+   (`--resume` / `--parent-run-id`), and the admission settings (`--admission-required` /
+   campaign caps). Never `docker compose run` by hand: a manual launch drops every one of
+   those fields (the first-launch "gate disarmed" defect). A submit yields a job identity
+   immediately; the run is real only when the control packet shows its run row. A
+   `FINOPS_SESSION_ID`-tagged packet read is the observation that pairs with a decision
+   record — the counter is per-session identity, never a global count of reads.

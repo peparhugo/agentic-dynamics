@@ -6,24 +6,40 @@ reasoning repeating "context budget is nearly exhausted" for the last six hours 
 accepting new work. The failure class is now a rule, and the rule is now executable: the AIO runs
 this check with the control packet at the start of every decision turn.
 
-    agentic-dynamics session budget            # human verdict: OK / WARN / CLOSE
-    agentic-dynamics session budget --json     # machine surface: session-budget/v1
+    agentic-dynamics session budget                        # human verdict: OK / WARN / CLOSE
+    agentic-dynamics session budget --json                 # machine surface: session-budget/v1
 
-Judgment (context = the last assistant message's input + cache read + cache write — what the
-model would process on the next turn; turns = assistant messages so far):
+Judgment (context = the LAST COMPLETED assistant message's input + cache read + cache write —
+what the model would process on the next turn; turns = assistant messages so far):
 
 * ``OK``    — below 80% of either budget: keep working.
 * ``WARN``  — at or above 80% of either budget: no new work — wrap up, close the session, hand off.
 * ``CLOSE`` — at or above either budget: the session must close NOW and hand off to a fresh one.
-* ``UNJUDGED`` — the session database cannot be read. Exit code 1, deliberately: an unknown
+* ``UNJUDGED`` — the session cannot be measured. Exit code 1, deliberately: an unknown
   budget is never treated as unlimited (the same rule as unknown cost).
 
-Exit codes: 0 = OK, 1 = WARN, 2 = CLOSE. Every judgment appends one line to the session-budget
-journal (append-only; override the path with ``FINOPS_SESSION_BUDGET_JOURNAL`` for tests).
+Identity (the AIO remediation 2026-09-14): the session under judgment is the EXPLICIT one —
+``--session-id``, else ``FINOPS_SESSION_ID`` (the runtime's AIO session identity). There is NO
+most-recently-updated fallback: guessing the newest session measured a CHILD (or the wrong
+conversation) as if it were the AIO, and the defect hid behind the 0-context reading it then
+produced. An absent identity and a nonexistent id are both UNJUDGED (exit 1) with a reason —
+never a silent guess.
+
+Measurement (the zero-overwrite fix): context is derived from a defined COMPLETED usage
+sample. An unfinished assistant message (no tokens block — a streaming turn, an unavailable
+usage read) must never overwrite a valid reading with zero: the reading falls back to the most
+recent COMPLETED sample, and the result carries ``usage_incomplete: true`` so the deviation is
+visible, not silent.
+
+The budgets are CONFIGURABLE POLICY (the sizes at which the AIO is directed to close/hand
+off) — labelled as such, never as proven model-degradation thresholds.
+
+Exit codes: 0 = OK, 1 = WARN/UNJUDGED, 2 = CLOSE. Every judgment appends one line to the
+session-budget journal (append-only; override the path with ``FINOPS_SESSION_BUDGET_JOURNAL``
+for tests).
 
 The verdict is derived from the opencode session database (``~/.local/share/opencode/opencode.db``
-by default; ``FINOPS_OPENCODE_DB`` overrides). The session under judgment is ``--session-id``, or
-the most recently updated session when omitted — which is the AIO's own session while it runs.
+by default; ``FINOPS_OPENCODE_DB`` overrides).
 """
 
 from __future__ import annotations
@@ -43,11 +59,14 @@ except ImportError:
 
 SCHEMA_ID = "session-budget/v1"
 
-#: The re-baselined defaults (decision f987cde9): close at 200K context tokens or 80 assistant
-#: turns — the size at which the prior session's judgment measurably degraded.
+#: The policy budgets (configurable, never measured thresholds): close at 200K context tokens
+#: or 80 assistant turns — the policy the AIO is directed to observe, expressed as numbers.
 DEFAULT_CTX_BUDGET = 200_000
 DEFAULT_TURN_BUDGET = 80
 WARN_FRACTION = 0.8
+
+#: The explicit-session environment (the runtime's AIO session identity).
+SESSION_ID_ENV = "FINOPS_SESSION_ID"
 
 #: The journal each judgment appends to (append-only; a budget observation is never rewritten).
 JOURNAL_DEFAULT = (
@@ -60,23 +79,34 @@ def _default_db() -> Path:
     return Path(os.environ.get("FINOPS_OPENCODE_DB") or Path.home() / ".local/share/opencode/opencode.db")
 
 
-def _select_session(db_path: Path, session_id: str | None) -> str | None:
-    """The session under judgment: ``session_id`` or the most recently updated row."""
+def _resolve_session_id(args_session: str | None, env: dict | None = None) -> str | None:
+    """The EXPLICIT session identity: the flag, then the runtime env. ``None`` = not supplied
+    (a refusal to guess — never "pick the most recently updated row")."""
+    source = os.environ if env is None else env
+    return (args_session or source.get(SESSION_ID_ENV) or "").strip() or None
+
+
+def _session_exists(db_path: Path, session_id: str) -> bool:
+    """True when the named session row exists (a nonexistent id is a refusal, not a fallback)."""
     con = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
     try:
         cur = con.cursor()
-        if session_id:
-            cur.execute("SELECT id FROM session WHERE id=?", (session_id,))
-        else:
-            cur.execute("SELECT id FROM session ORDER BY time_updated DESC LIMIT 1")
-        row = cur.fetchone()
-        return str(row[0]) if row else None
+        cur.execute("SELECT 1 FROM session WHERE id=?", (session_id,))
+        return cur.fetchone() is not None
     finally:
         con.close()
 
 
-def _measure(db_path: Path, session_id: str) -> tuple[int, int]:
-    """(turns, context) for the session — assistant messages and the live context size."""
+def _measure(db_path: Path, session_id: str) -> tuple[int, int, bool]:
+    """``(turns, context, usage_incomplete)`` for the session.
+
+    ``turns`` — the assistant messages recorded so far.
+    ``context`` — the LAST COMPLETED assistant usage sample (input + cache read + cache write).
+    An assistant message whose tokens block is absent/empty is an UNFINISHED sample: it does
+    not overwrite the reading (the zero-overwrite fix) and ``usage_incomplete`` is True.
+    A session with no completed sample reads (0, 0, True) — an honest "nothing measurable",
+    flagged, never a silent zero.
+    """
     con = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
     try:
         cur = con.cursor()
@@ -86,6 +116,7 @@ def _measure(db_path: Path, session_id: str) -> tuple[int, int]:
         )
         turns = 0
         context = 0
+        usage_incomplete = False
         for (blob,) in cur.fetchall():
             try:
                 data = json.loads(blob)
@@ -96,8 +127,16 @@ def _measure(db_path: Path, session_id: str) -> tuple[int, int]:
             turns += 1
             tokens = data.get("tokens") or {}
             cache = tokens.get("cache") or {}
+            has_usage = any(
+                k in tokens for k in ("input", "output", "reasoning")
+            ) or any(k in cache for k in ("read", "write"))
+            if not has_usage:
+                usage_incomplete = True
+                continue
             context = int(tokens.get("input", 0)) + int(cache.get("read", 0)) + int(cache.get("write", 0))
-        return turns, context
+        if turns and context == 0 and usage_incomplete:
+            pass  # an honest empty reading stays flagged
+        return turns, context, usage_incomplete
     finally:
         con.close()
 
@@ -125,9 +164,16 @@ def build_parser() -> argparse.ArgumentParser:
         description="Judge the AIO's session budget: OK / WARN / CLOSE (session-budget/v1).",
     )
     parser.add_argument("--db", default=None, help=f"opencode session db (default: {_default_db()})")
-    parser.add_argument("--session-id", default=None, help="session id to judge (default: most recently updated)")
-    parser.add_argument("--ctx-budget", type=int, default=DEFAULT_CTX_BUDGET, help=f"context-token budget (default {DEFAULT_CTX_BUDGET})")
-    parser.add_argument("--turn-budget", type=int, default=DEFAULT_TURN_BUDGET, help=f"assistant-turn budget (default {DEFAULT_TURN_BUDGET})")
+    parser.add_argument("--session-id", default=None,
+                        help="the session id to judge (default: $FINOPS_SESSION_ID — the "
+                             "runtime's AIO session identity; there is NO most-recently-updated "
+                             "fallback: an absent or nonexistent id is UNJUDGED)")
+    parser.add_argument("--ctx-budget", type=int, default=DEFAULT_CTX_BUDGET,
+                        help="context-token budget POLICY (default %(default)s — configurable, "
+                             "never a measured threshold)")
+    parser.add_argument("--turn-budget", type=int, default=DEFAULT_TURN_BUDGET,
+                        help="assistant-turn budget POLICY (default %(default)s — configurable, "
+                             "never a measured threshold)")
     parser.add_argument("--json", action="store_true", help="emit session-budget/v1 JSON")
     parser.add_argument("--no-journal", action="store_true", help="skip the journal append")
     return parser
@@ -140,15 +186,21 @@ def main(argv: list[str] | None = None) -> int:
     verdict = "UNJUDGED"
     turns = 0
     context = 0
-    session_id = args.session_id or ""
+    usage_incomplete = False
+    session_id = ""
     reason = ""
     try:
         if not db_path.is_file():
             raise FileNotFoundError(f"session db {db_path} not found")
-        session_id = args.session_id or _select_session(db_path, args.session_id)
+        session_id = _resolve_session_id(args.session_id)
         if not session_id:
-            raise LookupError("no session row to judge")
-        turns, context = _measure(db_path, session_id)
+            raise LookupError(
+                "no session identity supplied — pass --session-id or export "
+                f"{SESSION_ID_ENV}; the check never guesses the most recently updated session"
+            )
+        if not _session_exists(db_path, session_id):
+            raise LookupError(f"session {session_id!r} does not exist in {db_path}")
+        turns, context, usage_incomplete = _measure(db_path, session_id)
         verdict = judge(
             turns=turns, context=context,
             ctx_budget=args.ctx_budget, turn_budget=args.turn_budget,
@@ -163,6 +215,7 @@ def main(argv: list[str] | None = None) -> int:
         "session_id": session_id,
         "turns": turns,
         "context_tokens": context,
+        "usage_incomplete": bool(usage_incomplete) and verdict != "UNJUDGED",
         "ctx_budget": args.ctx_budget,
         "turn_budget": args.turn_budget,
         "verdict": verdict,
@@ -179,6 +232,7 @@ def main(argv: list[str] | None = None) -> int:
         print(
             f"session budget: {verdict} — turns {turns}/{args.turn_budget}, "
             f"context {context}/{args.ctx_budget}"
+            + (f" (usage incomplete — last completed sample used)" if result["usage_incomplete"] else "")
             + (f" ({reason})" if reason else "")
         )
     return {"OK": 0, "WARN": 1, "CLOSE": 2}.get(verdict, 1)
