@@ -1904,7 +1904,6 @@ def _check_geometry(
     """
     label = f"{name}/{theme}"
     width = geometry["innerWidth"]
-    height = geometry["innerHeight"]
 
     # G-1 present/unique/in-viewport/non-zero for regions and answers.
     assert set(geometry["regions"]) == set(REGIONS), (

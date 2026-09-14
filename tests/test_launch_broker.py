@@ -604,3 +604,107 @@ def test_broker_cli_dry_run_prints_the_typed_argv(capsys):
     payload = json.loads(captured.out)
     assert payload["ok"] is True
     assert payload["argv"][0] == "docker" and "run" in payload["argv"]
+
+
+# ── the deployment probe (remediation closed-loop, decision f987cde9) ─────────
+
+
+def _git_repo_with_main(tmp_path: Path, name: str) -> Path:
+    """A real git repo with a ``main`` branch and one commit — the probe's judged state."""
+    import subprocess
+
+    repo = tmp_path / name
+    repo.mkdir(parents=True)
+    subprocess.run(["git", "-C", str(repo), "init", "-q", "-b", "main"], check=True)
+    subprocess.run(["git", "-C", str(repo), "config", "user.email", "t@t"], check=True)
+    subprocess.run(["git", "-C", str(repo), "config", "user.name", "t"], check=True)
+    (repo / "f.txt").write_text("one\n", encoding="utf-8")
+    subprocess.run(["git", "-C", str(repo), "add", "f.txt"], check=True)
+    subprocess.run(["git", "-C", str(repo), "commit", "-qm", "c1"], check=True)
+    return repo
+
+
+def _add_commit(repo: Path, text: str) -> None:
+    import subprocess
+
+    (repo / "f.txt").write_text(text, encoding="utf-8")
+    subprocess.run(["git", "-C", str(repo), "add", "f.txt"], check=True)
+    subprocess.run(["git", "-C", str(repo), "commit", "-qm", text[:40]], check=True)
+
+
+def test_deployment_probe_is_silent_when_unjudgeable(tmp_path):
+    """Neither side a git tree → no fabricated refusal (the clone path names those)."""
+    repo = _git_repo_with_main(tmp_path, "repo")
+    assert launch_broker.deployment_probe(str(tmp_path / "no_such_workdir"), repo_root=repo) == []
+    not_a_repo = tmp_path / "plain"
+    not_a_repo.mkdir()
+    assert launch_broker.deployment_probe(str(not_a_repo), repo_root=tmp_path / "no_repo") == []
+
+
+def test_deployment_probe_allows_workdir_at_main(tmp_path):
+    """A worktree exactly at the repo's main tip is the legal base."""
+    import subprocess
+
+    repo = _git_repo_with_main(tmp_path, "repo")
+    wd = tmp_path / "wt_at"
+    subprocess.run(["git", "-C", str(repo), "worktree", "add", "--detach", str(wd), "main"], check=True)
+    assert launch_broker.deployment_probe(str(wd), repo_root=repo) == []
+
+
+def test_deployment_probe_allows_workdir_ahead_of_main(tmp_path):
+    """A resume worktree (phase commits ahead of main) is legal — main is its ancestor."""
+    import subprocess
+
+    repo = _git_repo_with_main(tmp_path, "repo")
+    wd = tmp_path / "wt_ahead"
+    subprocess.run(["git", "-C", str(repo), "worktree", "add", "--detach", str(wd), "main"], check=True)
+    _add_commit(wd, "resume commit ahead of main")
+    assert launch_broker.deployment_probe(str(wd), repo_root=repo) == []
+
+
+def test_deployment_probe_refuses_stale_workdir(tmp_path):
+    """The 2026-09-13 failure class: workdir behind main silently minted dead-tree clones."""
+    import subprocess
+
+    repo = _git_repo_with_main(tmp_path, "repo")
+    wd = tmp_path / "wt_stale"
+    subprocess.run(["git", "-C", str(repo), "worktree", "add", "--detach", str(wd), "main"], check=True)
+    _add_commit(repo, "main moved on")
+    errors = launch_broker.deployment_probe(str(wd), repo_root=repo)
+    assert len(errors) == 1
+    assert "workdir base" in errors[0] and "reset --hard origin/main" in errors[0]
+
+
+def test_deployment_probe_refuses_diverged_workdir(tmp_path):
+    """A worktree on its own lineage is refused the same way — never a stale clone."""
+    import subprocess
+
+    repo = _git_repo_with_main(tmp_path, "repo")
+    wd = tmp_path / "wt_diverged"
+    subprocess.run(["git", "-C", str(repo), "worktree", "add", "--detach", str(wd), "main"], check=True)
+    _add_commit(wd, "other lineage commit")
+    _add_commit(repo, "main moved on while other stayed")
+    errors = launch_broker.deployment_probe(str(wd), repo_root=repo)
+    assert len(errors) == 1 and "workdir base" in errors[0]
+
+
+def test_submit_run_fires_the_probe_before_any_compose_call(tmp_path):
+    """The broker path refuses a stale-workdir submit at the last gate — no compose argv."""
+    import shutil
+    import subprocess
+
+    repo = _git_repo_with_main(tmp_path, "repo")
+    spec_dir = repo / "workflows" / "repository"
+    spec_dir.mkdir(parents=True)
+    shutil.copy(_REPO_ROOT / "workflows" / "repository" / "control_room_facelift_review.yaml",
+                spec_dir / "control_room_facelift_review.yaml")
+    wd = tmp_path / "wt_stale"
+    subprocess.run(["git", "-C", str(repo), "worktree", "add", "--detach", str(wd), "main"], check=True)
+    _add_commit(repo, "main moved on")
+    command = {
+        "spec": "workflows/repository/control_room_facelift_review.yaml",
+        "goal": "g", "model": "deepseek/deepseek-v4-flash", "workdir": str(wd),
+    }
+    with pytest.raises(launch_broker.LaunchRequestError) as exc:
+        launch_broker.submit_run(command, repo_root=repo, compose="docker-compose", dry_run=True)
+    assert any("workdir base" in e for e in exc.value.errors)

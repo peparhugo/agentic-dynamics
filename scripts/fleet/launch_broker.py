@@ -406,6 +406,16 @@ def submit_run(
     if errors:
         raise LaunchRequestError(errors)
 
+    # The deployment probe (remediation closed-loop, decision f987cde9): the wrapper cannot
+    # run git (no-subprocess contract), so the broker — the last gate before the compose call —
+    # probes the workdir base against the repo's main tip. A stale/diverged workdir refuses
+    # here, before any container exists.
+    probe_errors = deployment_probe(
+        str(command.get("workdir", "") or ""), repo_root=repo_root or _REPO_ROOT,
+    )
+    if probe_errors:
+        raise LaunchRequestError(probe_errors)
+
     argv = build_submit_argv(command, compose=compose, compose_file=compose_file)
     if dry_run:
         return {"ok": True, "argv": argv, "returncode": None, "stdout": "", "stderr": ""}
@@ -429,6 +439,77 @@ def submit_run(
         "stdout": proc.stdout or "",
         "stderr": proc.stderr or "",
     }
+
+
+# ── The deployment probe (remediation closed-loop, decision f987cde9) ─────────
+
+
+def deployment_probe(workdir: str, *, repo_root: Path | str) -> list[str]:
+    """Refuse a submit whose workdir is behind or diverged from the canonical repo's main tip.
+
+    The run clone pins ``base_sha`` to the WORKDIR HEAD, so a stale worktree silently mints
+    runs from a dead tree — the 2026-09-13 fleet failure class (four launches cloned at
+    ``b57b84688`` while main was ``0a29f28b4``, each dying at spec load). This lives HERE, not
+    in ``spawn_wrapper``: the probe must run git, and the wrapper's contract bans subprocess
+    entirely (the no-docker/no-subprocess guard) — the broker is the one module allowed to run
+    subprocess, so the probe fires at the last gate before the compose call.
+
+    The probe judges only what it can prove: when both paths are git worktrees and the repo's
+    ``main`` resolves, the workdir HEAD must be AT or AHEAD of main (``merge-base
+    --is-ancestor`` exits 0) — at/ahead is legal (a resume worktree carries phase commits),
+    behind (stale) or diverged is refused with the fix named. When either side cannot be
+    judged (not a git tree, no main ref, git unavailable), the probe says nothing — the clone
+    path itself will name those, and a fabricated refusal is worse than none.
+    """
+    wd = Path(workdir) if workdir else None
+    if not wd or not wd.is_dir():
+        return []
+    if not (wd / ".git").exists() or not (Path(repo_root) / ".git").exists():
+        return []
+    main_sha = _git_probe(str(repo_root), ["rev-parse", "--verify", "main^{commit}"])
+    if not main_sha:
+        return []
+    head_sha = _git_probe(str(wd), ["rev-parse", "--verify", "HEAD^{commit}"])
+    if not head_sha:
+        return [
+            f"submit: workdir {wd} has no HEAD — create the worktree at the repo's main tip first"
+        ]
+    rc = _git_probe_rc(str(wd), ["merge-base", "--is-ancestor", main_sha, head_sha])
+    if rc == 0:
+        return []  # at or ahead of main — the legal base
+    if rc is None or rc >= 128:  # git error (unjudgeable) — never fabricate
+        return []
+    return [
+        f"submit: workdir base {head_sha[:12]} is behind or diverged from the repo main tip "
+        f"{main_sha[:12]} — update the worktree first (git -C {wd} reset --hard origin/main), "
+        "then re-submit; the run clone pins base_sha to the workdir HEAD"
+    ]
+
+
+def _git_probe(workdir: str, args: list[str]) -> str:
+    """One ``git`` call for the deployment probe; ``""`` on any failure (never raises)."""
+    try:
+        proc = subprocess.run(  # noqa: S603 — the broker's probe is the git caller
+            ["git", "-C", str(workdir), *args],
+            capture_output=True, text=True, timeout=10,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return ""
+    if proc.returncode != 0:
+        return ""
+    return proc.stdout.strip()
+
+
+def _git_probe_rc(workdir: str, args: list[str]) -> int | None:
+    """The return code of one ``git`` call; ``None`` when git itself cannot run."""
+    try:
+        proc = subprocess.run(  # noqa: S603
+            ["git", "-C", str(workdir), *args],
+            capture_output=True, text=True, timeout=10,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    return proc.returncode
 
 
 def build_fleet_action_argv(
