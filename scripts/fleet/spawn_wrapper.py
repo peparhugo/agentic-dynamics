@@ -702,8 +702,20 @@ def validate_spawn(
     # infrastructure). The registry-backed check is
     # ``control.admission.AdmissionController.verify``, which the orchestrator may call
     # separately.
+    #
+    # The VERIFIER exemption (admission-armed orchestrator gap, decision 39be8e563d7c): a
+    # VERIFIER-marked request is the DockerVerifierExecutor's read-only pytest cell — it makes
+    # no model call and deliberately stamps no lease block (a $0 budget lease would mint a
+    # meaningless admission record, and there is no honest dollar figure for a suite run). The
+    # armed gate therefore does not require a lease block ON THE VERIFIER. The carve-out cannot
+    # be ridden by an agent cell: a marker-bearing request's mounts are locked to
+    # verifier_readonly (candidate ro, never results/state/auth) with no network by step 3, so
+    # a marked cell cannot reach a model even if it wanted to. A PARTIAL or malformed block is
+    # still refused either way — a verifier that looks budgeted and is not is the same hazard
+    # as any other cell.
+    is_verifier = bool(request.get(VERIFIER_REQUEST_MARKER))
     strict = admission_required() if require_lease is None else bool(require_lease)
-    lease_errors = validate_lease_fields(request, required=strict)
+    lease_errors = validate_lease_fields(request, required=strict and not is_verifier)
     for message in lease_errors:
         errors.append(f"step 6: {message}")
     if not lease_errors and "expires_at" in request:

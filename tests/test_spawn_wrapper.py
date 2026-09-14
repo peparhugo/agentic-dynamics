@@ -1778,3 +1778,66 @@ def test_resolve_spec_path_names_the_root(tmp_path):
     assert path is None and len(errors) == 1
     assert "does not resolve to a file under" in errors[0]
     assert str(tmp_path) in errors[0]
+
+
+# ── the armed verifier lease exemption (admission-armed gap, decision 39be8e563d7c) ──
+
+
+def test_armed_verifier_spawn_needs_no_lease_block(tmp_path, monkeypatch):
+    """The verifier is a read-only pytest cell that spends no model dollars and deliberately
+    stamps no lease block; the armed gate exempts VERIFIER-marked requests. The carve-out is
+    structural — step 3 locks a marked request's mounts to verifier_readonly with no network,
+    so an agent cell cannot ride the marker past the gate."""
+    from scripts.fleet import spawn_wrapper as sw
+
+    _repo, cfg = _make_config_repo(tmp_path)
+    req = build_verifier_request(
+        {"name": "g3_test_gate", "kind": "test", "scope": "implementation",
+         "tests": ["tests/test_spec_x.py"]},
+        goal="g", workdir="/tmp/wt_x", model="deepseek/deepseek-v4-flash",
+        spec_name="spec_x", path_config=cfg,
+    )
+    assert "verifier" in req  # the marker is the exemption's key, not the absence of fields
+    monkeypatch.setattr(sw, "admission_required", lambda: True)
+    errors = validate_spawn(
+        req, phase_scopes={"g3_test_gate": "implementation"}, path_config=cfg,
+    )
+    assert errors == []
+
+
+def test_armed_verifier_with_a_partial_lease_block_still_refuses(tmp_path, monkeypatch):
+    """A verifier that LOOKS budgeted and is not is the same hazard as any cell — the
+    exemption only covers a wholly absent block."""
+    from scripts.fleet import spawn_wrapper as sw
+
+    _repo, cfg = _make_config_repo(tmp_path)
+    req = build_verifier_request(
+        {"name": "g3_test_gate", "kind": "test", "scope": "implementation",
+         "tests": ["tests/test_spec_x.py"]},
+        goal="g", workdir="/tmp/wt_x", model="deepseek/deepseek-v4-flash",
+        spec_name="spec_x", path_config=cfg,
+    )
+    req["reserved_cost_usd"] = 0.6
+    monkeypatch.setattr(sw, "admission_required", lambda: True)
+    errors = validate_spawn(
+        req, phase_scopes={"g3_test_gate": "implementation"}, path_config=cfg,
+    )
+    assert any("partial lease block" in e for e in errors)
+
+
+def test_armed_non_verifier_spawn_still_requires_the_lease_block(tmp_path, monkeypatch):
+    """The carve-out never widens: an ordinary (agent-shaped) spawn without a lease block
+    still refuses at step 6 when the gate is armed."""
+    from scripts.fleet import spawn_wrapper as sw
+
+    _repo, cfg = _make_config_repo(tmp_path)
+    req = build_phase_request(
+        {"name": "p1_slice1_base_supervisor", "scope": "implementation"},
+        goal="g", workdir="/tmp/wt_x", model="deepseek/deepseek-v4-flash",
+        spec_name="spec_x", image="fleet/base", path_config=cfg,
+    )
+    monkeypatch.setattr(sw, "admission_required", lambda: True)
+    errors = validate_spawn(
+        req, phase_scopes={"p1_slice1_base_supervisor": "implementation"}, path_config=cfg,
+    )
+    assert any("lease block missing" in e for e in errors)
