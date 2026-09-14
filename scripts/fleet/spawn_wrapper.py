@@ -1075,6 +1075,46 @@ def validate_submit_request(
                         f"(got {value!r})"
                     )
 
+    # Step 11 — the execution settings (Astra finding, 2026-09-14): the run's backend,
+    # thinking effort/budget, output limit, phase timeout, and no_commit must either SURVIVE
+    # transport to the orchestrator argv or be explicitly rejected — a tool that accepts them
+    # and drops them delivers "I requested one execution behavior and got another". The
+    # orchestrator + broker carry every field below into flags/env; this gate refuses
+    # malformed values so a typo can never silently become the default.
+    execution = request.get("execution")
+    if execution is not None:
+        if not isinstance(execution, dict):
+            errors.append(
+                f"submit: execution must be a mapping (got {type(execution).__name__})"
+            )
+        else:
+            backend = execution.get("backend")
+            if backend is not None and str(backend) not in ("opencode", "claude_cli"):
+                errors.append(
+                    f"submit: execution.backend must be 'opencode' or 'claude_cli' "
+                    f"(got {backend!r})"
+                )
+            effort = execution.get("thinking_effort")
+            if effort is not None and (not isinstance(effort, str) or not effort.strip()):
+                errors.append(
+                    f"submit: execution.thinking_effort must be a non-blank string "
+                    f"(got {effort!r})"
+                )
+            for field in ("thinking_budget_tokens", "output_token_limit", "timeout_seconds"):
+                value = execution.get(field)
+                if value is None:
+                    continue
+                if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+                    errors.append(
+                        f"submit: execution.{field} must be a non-negative integer "
+                        f"(got {value!r})"
+                    )
+            no_commit = execution.get("no_commit")
+            if no_commit is not None and not isinstance(no_commit, bool):
+                errors.append(
+                    f"submit: execution.no_commit must be a boolean (got {no_commit!r})"
+                )
+
     return errors
 
 

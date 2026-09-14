@@ -43,6 +43,7 @@ import argparse
 import contextlib
 import copy
 import json
+import subprocess
 import sys
 import threading
 from pathlib import Path
@@ -1707,6 +1708,40 @@ def run_acceptance_interactions(
                                     "check": "attention-activation",
                                     "screenshot": "", "theme": theme})
 
+                # 1b. The run FINDER must actually filter (the requested-run path): type a
+                # real run id and assert the visible rows are exactly the matching ones.
+                finder = page.locator("#operations-run-finder")
+                if not finder.count():
+                    errors.append("interactions: the run finder is missing — the requested-run "
+                                  "path cannot be exercised")
+                else:
+                    all_rows = page.locator("tr[data-run-id]")
+                    total = all_rows.count()
+                    if total:
+                        needle = all_rows.first.get_attribute("data-run-id") or ""
+                        finder.fill(needle)
+                        visible = page.locator("tr[data-run-id]:visible")
+                        if visible.count() == 0:
+                            errors.append(
+                                "interactions: the run finder filtered EVERY row out for a "
+                                f"run id that exists ({needle!r})"
+                            )
+                        elif not all(
+                            needle in (visible.nth(i).get_attribute("data-run-id") or "")
+                            for i in range(visible.count())
+                        ):
+                            errors.append(
+                                "interactions: the run finder left a non-matching row visible"
+                            )
+                        else:
+                            results.append({"case": "interactions", "viewport": "desktop",
+                                            "check": "run-finder-filter",
+                                            "screenshot": "", "theme": theme})
+                        finder.fill("")
+                    else:
+                        errors.append("interactions: no run rows to filter — the finder "
+                                      "could not be exercised")
+
                 # 2. Run selection by KEYBOARD: focus the finder, type a filter, focus the first
                 # run row, press Enter — the drawer must open with content.
                 rows = page.locator("tr[data-run-id]")
@@ -1726,19 +1761,34 @@ def run_acceptance_interactions(
                     page.locator("#run-detail-content table").first.wait_for(
                         state="visible", timeout=20000)
                     text = page.locator("#run-detail-content").inner_text()
-                    if "ATTEMPTS" not in text or "GOVERNED ACTION" not in text:
-                        errors.append("interactions: the run-detail drawer opened without the "
-                                      "blocker/output + governed-action surface — the slice is "
-                                      "not the path it claims")
-                    if "STEP TIMINGS" not in text:
-                        errors.append("interactions: the run-detail drawer lacks the step-"
-                                      "timings surface — the slice's timings path is missing")
+                    for surface in ("ATTEMPTS", "GOVERNED ACTION", "STEP TIMINGS",
+                                    "APPROVALS", "COMMAND JOURNAL"):
+                        if surface not in text:
+                            errors.append(
+                                f"interactions: the run-detail drawer is missing the "
+                                f"{surface!r} surface — the observed-result chain is incomplete"
+                            )
+                    if "ATTEMPTS" in text and "GOVERNED ACTION" in text:
+                        results.append({"case": "interactions", "viewport": "desktop",
+                                        "check": "receipt-surfaces",
+                                        "screenshot": "", "theme": theme})
                     results.append({"case": "interactions", "viewport": "desktop",
                                     "check": "keyboard-run-selection",
                                     "screenshot": "", "theme": theme})
                     # Close via the drawer's own close control (Escape also closes the
                     # workbench — the check below needs it open).
                     page.locator('button[aria-label="Close run detail"]').first.click()
+
+                    # 2b. The governed refresh action: click it and observe the result (the
+                    # lens re-renders with the finder present — the action's own contract is
+                    # declared on the button: data-action/authority/reversible/confirmation).
+                    refresh = page.locator("#operations-refresh")
+                    if refresh.count():
+                        refresh.first.click()
+                        page.locator("#operations-run-finder").wait_for(timeout=20000)
+                        results.append({"case": "interactions", "viewport": "desktop",
+                                        "check": "governed-action-refresh",
+                                        "screenshot": "", "theme": theme})
 
                 # 3. Below-fold reachability: the operational surface must actually scroll —
                 # the workbench's BODY (the deliberate drill-down's scrolling container) carries
@@ -2400,7 +2450,9 @@ def _verify_captures(results: list[dict[str, Any]]) -> list[str]:
 def write_report(results: list[dict[str, Any]], errors: list[str], report_path: Path,
                  json_path: Path, check_fixtures_exit: int, *,
                  requested_classes: list[str] | None = None,
-                 candidate: str = "", preview: str = "") -> int:
+                 candidate: str = "", candidate_verified: bool = False,
+                 preview: str = "", preview_verified: bool = False,
+                 preview_exercised: bool = False) -> int:
     """Write the markdown + JSON reports; return the exit code.
 
     The report is the gate's artifact (the website gate's pattern): status, the classes that
@@ -2473,9 +2525,17 @@ def write_report(results: list[dict[str, Any]], errors: list[str], report_path: 
         "(vertical) · no horizontal overflow · WCAG-AA contrast · first-paint · console-clean",
     ]
     if candidate:
-        lines.append(f"**Candidate:** {candidate}")
+        label = "verified against the checkout HEAD" if candidate_verified else (
+            "UNVERIFIED (does not match the checkout HEAD)"
+        )
+        lines.append(f"**Candidate:** {candidate} ({label})")
     if preview:
-        lines.append(f"**Preview target:** {preview}")
+        if preview_exercised:
+            label = "exercised (reachable)" if preview_verified else "UNREACHABLE"
+        else:
+            label = ("NOT exercised — the gate served its own instance "
+                     "(pass --base to target a preview)")
+        lines.append(f"**Preview target:** {preview} ({label})")
     lines += [
         "",
         f"**Screenshots:** {len(results)} ({rollup})",
@@ -2503,7 +2563,10 @@ def write_report(results: list[dict[str, Any]], errors: list[str], report_path: 
             "requested_classes": requested,
             "executed_classes": executed,
             "candidate": candidate,
+            "candidate_verified": bool(candidate_verified),
             "preview": preview,
+            "preview_verified": bool(preview_verified),
+            "preview_exercised": bool(preview_exercised),
             "screenshots": results,
             "errors": errors,
         }, indent=2),
@@ -2561,7 +2624,13 @@ def main() -> int:
     profile = args.profile
     if profile == ACCEPTANCE_PROFILE:
         # The profile is the ENUMERATED contract: every class runs, dark + light screenshots,
-        # and the interactions class executes the slice path.
+        # and the interactions class executes the slice path. It also requires an IDENTIFIED
+        # candidate (Astra finding): acceptance without a candidate identity is the
+        # overstated-verdict class the profile exists to catch.
+        if not args.candidate:
+            print("the acceptance profile requires --candidate <sha> — an unidentified "
+                  "candidate cannot be accepted", file=sys.stderr)
+            return 2
         args.charts = True
         args.visuals = True
         args.style = True
@@ -2642,11 +2711,50 @@ def main() -> int:
     # Capture-file readability (the rendered proof must be real, not a filename): every
     # recorded capture must exist and carry bytes.
     errors.extend(_verify_captures(results))
+
+    # Identity verification (Astra finding, 2026-09-14): a supplied SHA/URL is a LABEL until it
+    # is checked. The candidate is verified against the checkout the gate runs from; the
+    # preview is verified by actually reaching it (only when the gate was pointed at it via
+    # --base — a self-served run never exercised the preview target and must say so).
+    candidate_verified = False
+    if args.candidate:
+        try:
+            head = subprocess.run(
+                ["git", "rev-parse", "HEAD"], cwd=Path.cwd(),
+                capture_output=True, text=True, timeout=15,
+            ).stdout.strip()
+        except Exception:  # noqa: BLE001 — an unreadable checkout verifies nothing
+            head = ""
+        candidate_verified = bool(head) and (
+            head.startswith(args.candidate) or args.candidate.startswith(head)
+        )
+        if not candidate_verified:
+            errors.append(
+                f"CANDIDATE-UNVERIFIED: --candidate {args.candidate!r} does not match the "
+                f"checkout HEAD {head[:12]!r} — the report cannot claim the reviewed candidate"
+            )
+    preview_verified = False
+    if args.preview and args.base:
+        try:
+            import urllib.request
+
+            with urllib.request.urlopen(args.preview, timeout=10) as response:
+                preview_verified = response.status == 200
+        except Exception:  # noqa: BLE001 — an unreachable preview verifies nothing
+            preview_verified = False
+        if not preview_verified:
+            errors.append(
+                f"PREVIEW-UNREACHABLE: --preview {args.preview!r} did not answer 200 — "
+                "the target the report binds was not exercised"
+            )
     return write_report(
         results, errors, report_path, json_path, fixture_rc,
         requested_classes=requested_classes,
         candidate=args.candidate or "",
+        candidate_verified=candidate_verified,
         preview=args.preview or "",
+        preview_verified=preview_verified,
+        preview_exercised=bool(args.base and args.preview),
     )
 
 

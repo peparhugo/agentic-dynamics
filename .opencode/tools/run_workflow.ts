@@ -84,6 +84,17 @@ export default tool({
     if (admissionArmed) submitFlags.push("--admission-required")
     if (args.campaign_budget_usd !== undefined) submitFlags.push("--campaign-budget-usd", String(args.campaign_budget_usd))
     if (args.campaign_concurrency !== undefined) submitFlags.push("--campaign-concurrency", String(args.campaign_concurrency))
+    // Every accepted execution setting is FORWARDED through the durable path (Astra finding,
+    // 2026-09-14): the tool's defaults are the requested behavior, and a setting that were
+    // accepted but dropped would deliver "I requested one execution behavior and got another".
+    // The submit contract carries each into the orchestrator argv (wrapper step 11 validates;
+    // the broker composes the flags).
+    if (args.backend) submitFlags.push("--backend", args.backend)
+    if (args.thinking_effort) submitFlags.push("--thinking-effort", args.thinking_effort)
+    if (args.thinking_budget_tokens) submitFlags.push("--thinking-budget-tokens", String(args.thinking_budget_tokens))
+    if (args.output_token_limit) submitFlags.push("--output-token-limit", String(args.output_token_limit))
+    if (args.timeout_min) submitFlags.push("--timeout-seconds", String(args.timeout_min * 60))
+    if (args.no_commit) submitFlags.push("--no-commit")
 
     const submit = await Bun.$`python3 scripts/fleet/fleet_manager.py ${submitFlags}`.cwd(ctx.directory).nothrow()
     const out = submit.stdout.toString().trim()
@@ -106,6 +117,14 @@ export default tool({
         resume: args.resume,
         parent_run_id: args.parent_run_id ?? "",
         admission_required: admissionArmed,
+        execution: {
+          backend: args.backend ?? "auto",
+          thinking_effort: args.thinking_effort,
+          thinking_budget_tokens: args.thinking_budget_tokens,
+          output_token_limit: args.output_token_limit,
+          timeout_seconds: args.timeout_min * 60,
+          no_commit: args.no_commit,
+        },
         timestamp: new Date().toISOString(),
       },
     }

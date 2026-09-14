@@ -401,6 +401,24 @@ def build_submit_argv(
             argv += ["--campaign-budget-usd", str(admission["campaign_budget_usd"])]
         if admission.get("campaign_concurrency") is not None:
             argv += ["--campaign-concurrency", str(admission["campaign_concurrency"])]
+    # The execution settings must survive the hop (Astra finding, 2026-09-14): every accepted
+    # field becomes its orchestrator flag, so the run the caller requested IS the run that
+    # executes. A field the orchestrator does not accept here would be a silent drop — the
+    # wrapper's step 11 refuses malformed values before this builder runs.
+    execution = command.get("execution") or {}
+    if isinstance(execution, dict):
+        if execution.get("backend"):
+            argv += ["--backend", str(execution["backend"])]
+        if execution.get("thinking_effort"):
+            argv += ["--thinking-effort", str(execution["thinking_effort"])]
+        if execution.get("thinking_budget_tokens") is not None:
+            argv += ["--thinking-budget-tokens", str(execution["thinking_budget_tokens"])]
+        if execution.get("output_token_limit") is not None:
+            argv += ["--output-token-limit", str(execution["output_token_limit"])]
+        if execution.get("timeout_seconds") is not None:
+            argv += ["--timeout", str(execution["timeout_seconds"])]
+        if execution.get("no_commit"):
+            argv += ["--no-commit"]
     image = command.get("image")
     if image:
         argv += ["--cell-image", str(image)]

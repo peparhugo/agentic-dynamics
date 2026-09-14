@@ -61,13 +61,24 @@ def _make_session_db(path: Path, *, turns: int, context: int,
     return sid
 
 
-def _add_unfinished_assistant_message(path: Path, sid: str) -> None:
-    """Append a STREAMING assistant message (no tokens block) after the completed samples —
-    the shape an in-flight turn leaves in the db."""
+def _add_unfinished_assistant_message(path: Path, sid: str, *, zero_valued: bool = False) -> None:
+    """Append a STREAMING assistant message after the completed samples.
+
+    ``zero_valued=True`` writes the REAL OpenCode pending shape (Astra finding, 2026-09-14):
+    the usage fields EXIST and are initialized to ZERO before the turn finalizes. The check
+    must treat that exactly like the absent-fields shape — an unfinished sample, never a
+    valid zero reading.
+    """
+    if zero_valued:
+        payload = {"role": "assistant",
+                   "tokens": {"input": 0, "output": 0, "reasoning": 0,
+                              "cache": {"read": 0, "write": 0}}}
+    else:
+        payload = {"role": "assistant"}
     con = sqlite3.connect(path)
     con.execute(
         "INSERT INTO message VALUES (?, ?, ?)",
-        (sid, 9000, json.dumps({"role": "assistant"})),
+        (sid, 9000, json.dumps(payload)),
     )
     con.commit()
     con.close()
@@ -139,6 +150,21 @@ def test_an_unfinished_usage_row_never_overwrites_a_valid_reading(tmp_path: Path
     assert turns == 8  # the in-flight turn is still a turn
     assert context == 42_000  # the completed reading survives
     assert incomplete is True
+
+
+def test_a_pending_zero_valued_message_never_overwrites_a_valid_reading(tmp_path: Path):
+    """Astra's reproduction, verbatim shape: OpenCode initializes a pending message's usage
+    fields to ZERO. Keys-present-but-all-zero is NOT a completed sample — a 240,000 reading
+    followed by a pending zero-valued message must still measure 240,000 (and CLOSE at the
+    200K policy budget), never 0/OK."""
+    db = tmp_path / "opencode.db"
+    sid = _make_session_db(db, turns=7, context=240_000)
+    _add_unfinished_assistant_message(db, sid, zero_valued=True)
+    turns, context, incomplete = _measure(db, sid)
+    assert turns == 8
+    assert context == 240_000, "the pending zero-valued message overwrote the reading"
+    assert incomplete is True
+    assert judge(turns=turns, context=context, ctx_budget=200_000, turn_budget=80) == "CLOSE"
 
 
 def test_no_identity_is_a_refusal_not_a_guess(tmp_path: Path, monkeypatch):

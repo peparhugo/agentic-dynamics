@@ -293,7 +293,8 @@ def _send_submit_command(client: redis.Redis, *, spec: str, goal: str, model: st
                          spec_sha256: str | None = None,
                          resume: bool = False,
                          parent_run_id: str | None = None,
-                         admission: dict | None = None) -> dict:
+                         admission: dict | None = None,
+                         execution: dict | None = None) -> dict:
     """LPUSH a submit command onto ``fleet:commands`` and record its "launching" board entry.
 
     The fleet-manager mints the ``job_id`` (the board's join key) but does NOT validate the
@@ -310,9 +311,12 @@ def _send_submit_command(client: redis.Redis, *, spec: str, goal: str, model: st
 
     The extended identity fields (AIO remediation 2026-09-14) pass through the same
     UNCHECKED way — ``spec_sha256`` (source/spec identity), ``resume``/``parent_run_id``
-    (continuation identity), and ``admission`` (the applicable admission settings) — because
-    the orchestrator + broker re-validate them at the two later gates. The manager's job is
-    that they SURVIVE the hop, not that they are already proven.
+    (continuation identity), ``admission`` (the applicable admission settings), and
+    ``execution`` (the per-run execution settings: backend, thinking effort/budget, output
+    limit, phase timeout, no_commit) — because the orchestrator + broker re-validate them at
+    the two later gates. The manager's job is that they SURVIVE the hop, not that they are
+    already proven. A caller that does not supply ``execution`` receives the orchestrator's
+    own defaults — never a silently different behavior.
     """
     job_id = uuid.uuid4().hex[:12]
     command = {
@@ -335,6 +339,8 @@ def _send_submit_command(client: redis.Redis, *, spec: str, goal: str, model: st
         command["parent_run_id"] = parent_run_id
     if admission:
         command["admission"] = dict(admission)
+    if execution:
+        command["execution"] = dict(execution)
     client.lpush(COMMANDS_KEY, json.dumps(command))
     record_job_launch(client, command)
     return command
@@ -383,6 +389,19 @@ def main(argv: list[str] | None = None) -> int:
     p_submit.add_argument("--campaign-concurrency", type=int, default=None,
                           help="the campaign concurrency cap the run applies to the lease "
                                "registry")
+    p_submit.add_argument("--backend", default=None, choices=["opencode", "claude_cli"],
+                          help="the execution backend (pass-through; the orchestrator "
+                               "default is auto-routing)")
+    p_submit.add_argument("--thinking-effort", default=None,
+                          help="the thinking effort level (pass-through)")
+    p_submit.add_argument("--thinking-budget-tokens", type=int, default=None,
+                          help="the thinking token budget (pass-through)")
+    p_submit.add_argument("--output-token-limit", type=int, default=None,
+                          help="the output token limit (pass-through)")
+    p_submit.add_argument("--timeout-seconds", type=int, default=None,
+                          help="the per-phase timeout in seconds (pass-through)")
+    p_submit.add_argument("--no-commit", action="store_true",
+                          help="run phases without runner commits (pass-through)")
 
     parser.add_argument("--interval", type=float, default=DEFAULT_INTERVAL)
     parser.add_argument("--once", action="store_true")
@@ -439,10 +458,28 @@ def main(argv: list[str] | None = None) -> int:
                 admission["campaign_budget_usd"] = args.campaign_budget_usd
             if args.campaign_concurrency is not None:
                 admission["campaign_concurrency"] = args.campaign_concurrency
+        execution: dict | None = None
+        if any(value is not None for value in (
+            args.backend, args.thinking_effort, args.thinking_budget_tokens,
+            args.output_token_limit, args.timeout_seconds,
+        )) or args.no_commit:
+            execution = {}
+            if args.backend is not None:
+                execution["backend"] = args.backend
+            if args.thinking_effort is not None:
+                execution["thinking_effort"] = args.thinking_effort
+            if args.thinking_budget_tokens is not None:
+                execution["thinking_budget_tokens"] = args.thinking_budget_tokens
+            if args.output_token_limit is not None:
+                execution["output_token_limit"] = args.output_token_limit
+            if args.timeout_seconds is not None:
+                execution["timeout_seconds"] = args.timeout_seconds
+            if args.no_commit:
+                execution["no_commit"] = True
         cmd = _send_submit_command(
             client, spec=args.spec, goal=args.goal, model=args.model, workdir=args.workdir,
             image=args.image, spec_sha256=args.spec_sha256, resume=args.resume,
-            parent_run_id=args.parent_run_id, admission=admission,
+            parent_run_id=args.parent_run_id, admission=admission, execution=execution,
         )
         print(f"fleet:commands <- {json.dumps(cmd)}")
         print(f"fleet:jobs[{cmd['job_id']}] <- launching")

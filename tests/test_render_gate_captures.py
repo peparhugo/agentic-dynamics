@@ -114,3 +114,37 @@ def test_verify_captures_refuses_missing_or_empty_files(tmp_path: Path):
     assert len(errors) == 2
     assert all("GATE-CAPTURE-UNREADABLE" in e for e in errors)
     assert _verify_captures([{"screenshot": str(good)}]) == []
+
+
+def test_write_report_labels_verified_and_unverified_identities(tmp_path: Path):
+    """Astra finding: supplied labels are not verified identities. The report must SAY which
+    it is — verified candidate, unexercised preview."""
+    report, jp = _paths(tmp_path)
+    results = [{"screenshot": "s1.png", "case": "F-0", "viewport": "desktop"}]
+    rc = write_report(results, [], report, jp, check_fixtures_exit=0,
+                      requested_classes=["geometry"],
+                      candidate="deadbeef", candidate_verified=True,
+                      preview="http://127.0.0.1:8123/", preview_verified=False,
+                      preview_exercised=False)
+    assert rc == 0
+    text = report.read_text(encoding="utf-8")
+    assert "**Candidate:** deadbeef (verified against the checkout HEAD)" in text
+    assert "NOT exercised" in text
+    data = json.loads(jp.read_text(encoding="utf-8"))
+    assert data["candidate_verified"] is True
+    assert data["preview_verified"] is False
+    assert data["preview_exercised"] is False
+
+
+def test_write_report_labels_an_unverified_candidate(tmp_path: Path):
+    """A candidate that does not match the checkout is labelled UNVERIFIED — never silently
+    claimed as the reviewed candidate."""
+    report, jp = _paths(tmp_path)
+    results = [{"screenshot": "s1.png", "case": "F-0", "viewport": "desktop"}]
+    rc = write_report(results, [], report, jp, check_fixtures_exit=0,
+                      requested_classes=["geometry"],
+                      candidate="deadbeef", candidate_verified=False)
+    assert rc == 0
+    assert "UNVERIFIED" in report.read_text(encoding="utf-8")
+    data = json.loads(jp.read_text(encoding="utf-8"))
+    assert data["candidate_verified"] is False

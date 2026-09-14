@@ -1871,3 +1871,23 @@ def test_submit_extended_fields_are_type_validated():
     good = dict(base, spec_sha256="a" * 64, resume=True, parent_run_id="run-1",
                 admission={"required": True, "campaign_budget_usd": 20.0})
     assert validate_submit_request(good) == []
+
+
+def test_submit_execution_settings_are_type_validated():
+    """Step 11: an accepted-but-malformed execution setting refuses — a typo can never
+    silently become the orchestrator default (Astra finding)."""
+    base = _valid_submit_request()
+    bad_backend = dict(base, execution={"backend": "gemini"})
+    assert any("execution.backend" in e for e in validate_submit_request(bad_backend))
+    bad_effort = dict(base, execution={"thinking_effort": "  "})
+    assert any("execution.thinking_effort" in e for e in validate_submit_request(bad_effort))
+    bad_budget = dict(base, execution={"thinking_budget_tokens": -1})
+    assert any("execution.thinking_budget_tokens" in e for e in validate_submit_request(bad_budget))
+    bad_nocommit = dict(base, execution={"no_commit": "yes"})
+    assert any("execution.no_commit" in e for e in validate_submit_request(bad_nocommit))
+    good = dict(base, execution={
+        "backend": "opencode", "thinking_effort": "high",
+        "thinking_budget_tokens": 12000, "output_token_limit": 64000,
+        "timeout_seconds": 2400, "no_commit": False,
+    })
+    assert validate_submit_request(good) == []

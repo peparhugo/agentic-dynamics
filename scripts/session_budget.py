@@ -102,10 +102,14 @@ def _measure(db_path: Path, session_id: str) -> tuple[int, int, bool]:
 
     ``turns`` — the assistant messages recorded so far.
     ``context`` — the LAST COMPLETED assistant usage sample (input + cache read + cache write).
-    An assistant message whose tokens block is absent/empty is an UNFINISHED sample: it does
-    not overwrite the reading (the zero-overwrite fix) and ``usage_incomplete`` is True.
-    A session with no completed sample reads (0, 0, True) — an honest "nothing measurable",
-    flagged, never a silent zero.
+    A sample is COMPLETED only when it carries a NON-ZERO value: OpenCode initializes a
+    pending message's usage fields to ZERO before the turn finalizes, so
+    keys-present-but-all-zero is the real pending shape — treating it as completed is exactly
+    the zero-overwrite bug (Astra finding, 2026-09-14: a 240,000 reading followed by a
+    pending zero-valued message measured 0/OK). Both shapes — absent fields and all-zero
+    fields — leave the reading untouched and set ``usage_incomplete``. A session with no
+    completed sample reads (0, 0, True) — an honest "nothing measurable", flagged, never a
+    silent zero.
     """
     con = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
     try:
@@ -127,15 +131,18 @@ def _measure(db_path: Path, session_id: str) -> tuple[int, int, bool]:
             turns += 1
             tokens = data.get("tokens") or {}
             cache = tokens.get("cache") or {}
-            has_usage = any(
-                k in tokens for k in ("input", "output", "reasoning")
-            ) or any(k in cache for k in ("read", "write"))
-            if not has_usage:
+            values = (
+                int(tokens.get("input", 0) or 0),
+                int(tokens.get("output", 0) or 0),
+                int(tokens.get("reasoning", 0) or 0),
+                int(cache.get("read", 0) or 0),
+                int(cache.get("write", 0) or 0),
+            )
+            if not any(value > 0 for value in values):
+                # Absent fields AND all-zero fields are both the unfinished shape.
                 usage_incomplete = True
                 continue
-            context = int(tokens.get("input", 0)) + int(cache.get("read", 0)) + int(cache.get("write", 0))
-        if turns and context == 0 and usage_incomplete:
-            pass  # an honest empty reading stays flagged
+            context = values[0] + values[3] + values[4]  # input + cache read + cache write
         return turns, context, usage_incomplete
     finally:
         con.close()

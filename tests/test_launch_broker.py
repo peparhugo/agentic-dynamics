@@ -814,3 +814,23 @@ def test_submit_run_refuses_an_unarmed_command_when_the_host_gate_is_armed(tmp_p
     outcome = launch_broker.submit_run(command, repo_root=repo, compose="dc", dry_run=True)
     assert outcome.get("ok") is True
     assert "FINOPS_ADMISSION_REQUIRED=1" in outcome["argv"]
+
+
+def test_build_submit_argv_carries_the_execution_settings():
+    """Astra finding: every accepted execution setting must survive the hop — the run the
+    caller requested IS the run that executes."""
+    argv = launch_broker.build_submit_argv({
+        "spec": "workflows/repository/x.yaml", "goal": "g",
+        "model": "deepseek/deepseek-v4-flash", "workdir": "/tmp/wt_x",
+        "execution": {
+            "backend": "claude_cli", "thinking_effort": "high",
+            "thinking_budget_tokens": 12000, "output_token_limit": 64000,
+            "timeout_seconds": 2400, "no_commit": True,
+        },
+    }, compose="dc", compose_file="/c.yml")
+    assert "--backend" in argv and "claude_cli" in argv
+    assert "--thinking-effort" in argv and "high" in argv
+    assert "--thinking-budget-tokens" in argv and "12000" in argv
+    assert "--output-token-limit" in argv and "64000" in argv
+    assert "--timeout" in argv and "2400" in argv
+    assert "--no-commit" in argv
