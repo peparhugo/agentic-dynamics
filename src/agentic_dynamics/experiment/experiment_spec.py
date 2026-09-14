@@ -1133,6 +1133,31 @@ def validate_spec(
                 f'phase "{ph.get("name", "?")}": checkpoint must be a boolean '
                 f"(got {ph.get('checkpoint')!r})"
             )
+        # The supported-combination rule (AIO remediation 2026-09-14): the runner's mechanical
+        # stop applies to AGENT phases only (``workflow_runner``: ``kind != "test"`` guards the
+        # checkpoint flip). A ``checkpoint: true`` on a ``kind: test`` phase never engages — the
+        # run sails straight past the supposed ratification stop (the instrument-build defect:
+        # p1c declared the unsupported combination and a successful compile did not catch it).
+        # Refuse it HERE, at validation, so an authored workflow can never promise a checkpoint
+        # the engine cannot deliver.
+        if ph.get("checkpoint") and ph.get("kind") == "test":
+            errors.append(
+                f'phase "{ph.get("name", "?")}": checkpoint: true on kind: test is '
+                f"unsupported — the runner's checkpoint stop applies to agent phases only "
+                f"(use an agent phase with checkpoint: true + test_gate: true to bind an "
+                f"independent test gate before the stop)"
+            )
+        # ``gate_retry`` (the bounded correction attempt, AIO remediation 2026-09-14): the
+        # declared correction budget for a failed VERIFICATION. Same type-safety rule as the
+        # markers above — a typo'd string would silently read as "no correction" in the runner
+        # while the spec author believes one is declared.
+        if "gate_retry" in ph:
+            value = ph.get("gate_retry")
+            if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+                errors.append(
+                    f'phase "{ph.get("name", "?")}": gate_retry must be a non-negative '
+                    f"integer (got {value!r})"
+                )
 
     # ── Phase-level gate: ``no_emit`` (kb_finding_layer k1) ─────────────
     # Optional per-phase marker, default false. Findings are the DEFAULT for workflow runs

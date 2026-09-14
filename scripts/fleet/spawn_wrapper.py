@@ -108,6 +108,7 @@ if str(_FLEET_DIR) not in sys.path:
 from broker_client import BrokerClient, BrokerError  # noqa: E402
 from broker_contract import (  # noqa: E402
     AUTH_CRED_FILE,
+    FLEET_REDIS_SOCKET_TIMEOUT,
     LAUNCH_NETWORK,
     MOUNT_PROFILES,
     REPO_TARGET,
@@ -1503,6 +1504,10 @@ def _connect_redis() -> Any:
         try:
             client = redis.Redis(
                 host=host, port=port, db=db, decode_responses=True, socket_connect_timeout=5,
+                # The crash-loop fix (see broker_contract.FLEET_REDIS_SOCKET_TIMEOUT): the
+                # socket timeout must outlast the 10s BLMOVE claim or an idle queue kills the
+                # consumer on every cycle.
+                socket_timeout=FLEET_REDIS_SOCKET_TIMEOUT,
             )
             client.ping()
             return client

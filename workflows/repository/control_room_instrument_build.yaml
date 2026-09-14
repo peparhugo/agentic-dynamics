@@ -6,7 +6,7 @@ question: >-
   (Fleet, Money, Workforce, Trends, Boards, Sessions, System) that re-house the old
   dashboard's working set, nine SVG charts, the three-tier workforce view, the parity/truth
   gates, and the controller's acceptance: the live render gate with screenshots.
-version: "0.1"
+version: "0.2"
 artifact_kind: workflow
 intent: mutate
 side_effects:
@@ -17,9 +17,18 @@ workflow:
   kind: agent_task
   params:
     rag_augment: true
-    rag_params:
-      repository_id: "agentic-dynamics"
-      rag_token_limit: 8000
+    # ── Retrieval configuration (AIO remediation 2026-09-14) ─────────────────────────
+    # The runner reads workflow.params.rag (NOT rag_params — the old key was silently
+    # ignored and the run fell back to the runner default). The scope here is DELIBERATE:
+    # NO repository_id is set, so the runner scopes retrieval to the cell itself
+    # (self-<worktree>): workers retrieve only their own progressive findings. The org-wide
+    # scope (repository_id: agentic-dynamics) is refused on purpose — it would expose the
+    # AIO's private decision/session/reflection records to worker cells. The design corpus
+    # reaches the phases through the prompt's domain_context block below, not through
+    # unrestricted retrieval. No token-limit key is declared: the runner's retrieval budget
+    # is the constructor's own default (8000 tokens) — a key the runner does not read would
+    # be inert config, the exact failure class this remediation removes.
+    rag: {}
     language: python
     fork: false
     context:
@@ -50,6 +59,10 @@ workflow:
         kind: agent
         scope: implementation
         timeout: 1800
+        test_gate: true
+        gate_retry: 1
+        tests:
+          - tests/test_control_room_parity.py
         prompt: |
           GOAL: {goal}
           Re-anchor the parity inventory to the DECLARED old dashboard. In
@@ -68,16 +81,22 @@ workflow:
         kind: test
         scope: implementation
         timeout: 900
+        gate_retry: 1
         tests:
           - tests/test_control_room_parity.py
         prompt: |
-          The parity unit is the class-P ground truth. If a test fails, fix the inventory or
-          the builder — never weaken the gate, never touch a UI file.
+          The parity unit is the class-P ground truth. This phase executes the suite only; a
+          failure is repaired mechanically by the bounded correction (gate_retry: 1 re-runs
+          p0a with the failure evidence, then this gate re-runs) — never by weakening a test.
       # ── P1: the contract amendment + gate ────────────────────────────────────
       - name: p1a_ia_amendment
         kind: agent
         scope: implementation
         timeout: 1200
+        test_gate: true
+        gate_retry: 1
+        tests:
+          - tests/test_doc_lifecycle.py
         prompt: |
           GOAL: {goal}
           Amend docs/research/control_room_ia.md §4 and §10 per the determination §2.2: page
@@ -93,6 +112,10 @@ workflow:
         kind: agent
         scope: implementation
         timeout: 1800
+        test_gate: true
+        gate_retry: 1
+        tests:
+          - tests/test_render_gate_captures.py
         prompt: |
           GOAL: {goal}
           Make scripts/verify_control_room_rendering.py enforce the AMENDED contract: add a
@@ -107,23 +130,41 @@ workflow:
           on one that scrolls only below the fold; run green; python3 scripts/
           verify_control_room_rendering.py --check-fixtures exits 0.
       - name: p1c_contract_gate
-        kind: test
+        # The mechanical checkpoint + an INDEPENDENT test gate (AIO remediation 2026-09-14):
+        # checkpoint: true on kind: test is UNSUPPORTED (the runner's stop applies to agent
+        # phases only) and the validator now refuses it — this phase is an agent phase whose
+        # only job is to review the P1 diff and then stop the run for the controller's
+        # ratification, with the independent suite bound by the native test_gate before the
+        # stop. p2a_timings_route cannot dispatch until a correctly bound approval exists:
+        # a --resume past this phase refuses without approvals/<spec>/p1c_contract_gate
+        # _approval.md (real operator signature, committed AFTER this checkpoint's commit).
+        kind: agent
         scope: implementation
         timeout: 900
         checkpoint: true
+        test_gate: true
         tests:
           - tests/test_doc_lifecycle.py
           - tests/test_render_gate_captures.py
           - tests/test_control_room_parity.py
-          - tests/test_fast_path_gate.py
         prompt: |
-          The controller ratifies the P1 amendment at this checkpoint. Fix failures by fixing
-          the docs/gate — never by weakening an assertion.
+          GOAL: {goal}
+          RATIFICATION REVIEW — make NO file changes. Read the git log since the last merge
+          (the P1 amendment and the first-viewport gate hardening) and confirm: the §4/§10
+          amendment matches the determination §2.2, the scoped first-viewport check fires on
+          violations, and the below-fold F-8 fixture exists. Answer with a short confirmation,
+          or flag any mismatch you see. The independent test gate (doc lifecycle, render-gate
+          captures, parity) runs after you, and the run then STOPS for the controller's
+          ratification signature. Do not proceed past this checkpoint.
       # ── P2: the one additive read-only route ─────────────────────────────────
       - name: p2a_timings_route
         kind: agent
         scope: implementation
         timeout: 2400
+        test_gate: true
+        gate_retry: 1
+        tests:
+          - tests/test_control_room_timings_route.py
         prompt: |
           GOAL: {goal}
           Add the ONE additive route the determination permits: GET /api/timings (per-run
@@ -143,15 +184,23 @@ workflow:
         kind: test
         scope: implementation
         timeout: 900
+        gate_retry: 1
         tests:
           - tests/test_control_room_timings_route.py
         prompt: |
-          Fix the route or its tests — never add a mutating verb, never fabricate data.
+          The timings route's independent gate. Failure is repaired by the bounded correction
+          (gate_retry: 1 re-runs p2a with the failure evidence, then this gate re-runs) —
+          never by adding a mutating verb or fabricating data.
       # ── The below-fold shell ─────────────────────────────────────────────────
       - name: b0_band_shell
         kind: agent
         scope: implementation
         timeout: 1800
+        test_gate: true
+        gate_retry: 1
+        tests:
+          - tests/test_render_gate_captures.py
+          - tests/test_admin_frontend.py
         prompt: |
           GOAL: {goal}
           Add the below-fold band container to the room shell (apps/control_room/static/):
@@ -166,6 +215,10 @@ workflow:
         kind: agent
         scope: implementation
         timeout: 1200
+        test_gate: true
+        gate_retry: 1
+        tests:
+          - tests/test_render_gate_captures.py
         prompt: |
           GOAL: {goal}
           Make R0 position: sticky in the room shell so the trust/epoch strip stays visible
@@ -179,6 +232,10 @@ workflow:
         kind: agent
         scope: implementation
         timeout: 1800
+        test_gate: true
+        gate_retry: 1
+        tests:
+          - tests/test_render_gate_captures.py
         prompt: |
           GOAL: {goal}
           Wire the FLEET band: the old #board-fleet capability (full agent-session roster,
@@ -190,6 +247,10 @@ workflow:
         kind: agent
         scope: implementation
         timeout: 1800
+        test_gate: true
+        gate_retry: 1
+        tests:
+          - tests/test_render_gate_captures.py
         prompt: |
           GOAL: {goal}
           Wire the MONEY band: the R3a five values (spend/burn/quota/wallet/leases) plus the
@@ -202,6 +263,10 @@ workflow:
         kind: agent
         scope: implementation
         timeout: 2400
+        test_gate: true
+        gate_retry: 1
+        tests:
+          - tests/test_render_gate_captures.py
         prompt: |
           GOAL: {goal}
           Wire the WORKFORCE band — three tiers per the determination §5: AGENTS (session id,
@@ -218,6 +283,10 @@ workflow:
         kind: agent
         scope: implementation
         timeout: 1200
+        test_gate: true
+        gate_retry: 1
+        tests:
+          - tests/test_render_gate_captures.py
         prompt: |
           GOAL: {goal}
           Build the TRENDS band shell: the band header plus three empty chart slots
@@ -230,6 +299,10 @@ workflow:
         kind: agent
         scope: implementation
         timeout: 2400
+        test_gate: true
+        gate_retry: 1
+        tests:
+          - tests/test_render_gate_captures.py
         prompt: |
           GOAL: {goal}
           Wire the BOARDS band: attention rows (flags, reserved risk + decision rows from
@@ -243,6 +316,10 @@ workflow:
         kind: agent
         scope: implementation
         timeout: 1800
+        test_gate: true
+        gate_retry: 1
+        tests:
+          - tests/test_render_gate_captures.py
         prompt: |
           GOAL: {goal}
           Wire the SESSIONS band: the session list (L-SESSIONS) plus the R4b per-worker event
@@ -254,6 +331,10 @@ workflow:
         kind: agent
         scope: implementation
         timeout: 1800
+        test_gate: true
+        gate_retry: 1
+        tests:
+          - tests/test_render_gate_captures.py
         prompt: |
           GOAL: {goal}
           Wire the SYSTEM band: the system-sheet overflow re-housed — search, registry,
@@ -265,6 +346,10 @@ workflow:
         kind: agent
         scope: implementation
         timeout: 1800
+        test_gate: true
+        gate_retry: 1
+        tests:
+          - tests/test_control_room_charts.py
         prompt: |
           GOAL: {goal}
           Chart #1 (determination §4): step/phase duration, per-model p50/p95 horizontal bars,
@@ -278,6 +363,10 @@ workflow:
         kind: agent
         scope: implementation
         timeout: 1800
+        test_gate: true
+        gate_retry: 1
+        tests:
+          - tests/test_control_room_charts.py
         prompt: |
           GOAL: {goal}
           Chart #2: queue timing (wait vs service) — stacked span bars on one shared time axis
@@ -288,6 +377,10 @@ workflow:
         kind: agent
         scope: implementation
         timeout: 1800
+        test_gate: true
+        gate_retry: 1
+        tests:
+          - tests/test_control_room_charts.py
         prompt: |
           GOAL: {goal}
           Chart #3: first-token latency p50/p95 bars on the SAME scale as #1, in the WORKFORCE
@@ -299,6 +392,10 @@ workflow:
         kind: agent
         scope: implementation
         timeout: 1800
+        test_gate: true
+        gate_retry: 1
+        tests:
+          - tests/test_control_room_charts.py
         prompt: |
           GOAL: {goal}
           Chart #4: cost/burn trend — re-house the existing charts.js spend builder into the
@@ -309,6 +406,10 @@ workflow:
         kind: agent
         scope: implementation
         timeout: 1800
+        test_gate: true
+        gate_retry: 1
+        tests:
+          - tests/test_control_room_charts.py
         prompt: |
           GOAL: {goal}
           Chart #5: throughput — re-house charts.js throughput into the TRENDS band
@@ -319,6 +420,10 @@ workflow:
         kind: agent
         scope: implementation
         timeout: 1800
+        test_gate: true
+        gate_retry: 1
+        tests:
+          - tests/test_control_room_charts.py
         prompt: |
           GOAL: {goal}
           Chart #6: failure accumulation — re-house charts.js failure into the TRENDS band
@@ -329,6 +434,10 @@ workflow:
         kind: agent
         scope: implementation
         timeout: 1800
+        test_gate: true
+        gate_retry: 1
+        tests:
+          - tests/test_control_room_charts.py
         prompt: |
           GOAL: {goal}
           Chart #7: dependency health — re-house charts.js dependency into the TRENDS band
@@ -339,6 +448,10 @@ workflow:
         kind: agent
         scope: implementation
         timeout: 1800
+        test_gate: true
+        gate_retry: 1
+        tests:
+          - tests/test_control_room_charts.py
         prompt: |
           GOAL: {goal}
           Chart #8: provider-window pace — a NEW builder in the MONEY band bound to
@@ -350,6 +463,10 @@ workflow:
         kind: agent
         scope: implementation
         timeout: 1800
+        test_gate: true
+        gate_retry: 1
+        tests:
+          - tests/test_control_room_charts.py
         prompt: |
           GOAL: {goal}
           Chart #9: cost split (inference vs orchestration) — a NEW two-segment proportional
@@ -365,13 +482,22 @@ workflow:
           - tests/test_control_room_charts.py
         prompt: |
           Every chart states the eight §7 fields, obeys the SVG rules, and an under-two-sample
-          series renders an explicit empty state — fix chart builders or tests, never weaken.
+          series renders an explicit empty state. This phase executes the suite only; a
+          cross-chart failure stops the run for the AIO to repair (the per-chart gate_retry
+          corrections already bounded each slice's own fix) — never by weakening an assertion.
       # ── Adversary 1: attack the built shell + bands + charts ─────────────────
       - name: adv1_adversarial_midpoint
         kind: agent
         scope: implementation
         run_model: openai/gpt-6-astra
         timeout: 2400
+        test_gate: true
+        gate_retry: 1
+        tests:
+          - tests/test_control_room_charts.py
+          - tests/test_control_room_parity.py
+          - tests/test_render_gate_captures.py
+          - tests/test_control_room_timings_route.py
         prompt: |
           GOAL: {goal}
           ADVERSARIAL review of the build so far (shell, bands, charts, timings route) into
@@ -384,20 +510,26 @@ workflow:
           acceptance in the build's own phases that is vacuous (passes without measuring)?
           Severity-ranked findings, each with the required correction and the acceptance that
           proves it. Then FIX every finding on the branch yourself (or record it as an
-          accepted limitation with reason). At least 3 findings or a clean sweep with
-          re-verification evidence — a bare PASS is a failed review. Commit the review doc and
-          the fixes.
+          accepted limitation with reason). Findings must be real defects — do not manufacture
+          a count; a clean sweep must carry the re-verification evidence. Commit the review
+          doc and the fixes.
       # ── P4: the R4d inspector grid ───────────────────────────────────────────
       - name: r4d_timings_grid
         kind: agent
         scope: implementation
         timeout: 1800
+        test_gate: true
+        gate_retry: 1
+        tests:
+          - tests/test_control_room_run_detail.py
         prompt: |
           GOAL: {goal}
           Build the R4d per-attempt step-timing grid in the inspector dock from GET
           /api/runs/<id> + GET /api/timings: per-attempt rows (phase, model, started/ended,
           duration, first-token) with measured/unknown chips. The dock opens without moving
-          the page (the lens rules from the determination §4/§5).
+          the page (the lens rules from the determination §4/§5). Author
+          tests/test_control_room_run_detail.py: a run-detail fixture renders the grid rows;
+          a missing-distribution fixture renders unknown chips, never fabricated 0s.
           VERIFY: unit test over a run-detail fixture; the dock-open probe still passes
           (no page jump).
       # ── P5: fidelity + the 57 mutating controls ──────────────────────────────
@@ -405,6 +537,10 @@ workflow:
         kind: agent
         scope: implementation
         timeout: 2400
+        test_gate: true
+        gate_retry: 1
+        tests:
+          - tests/test_control_room_placement.py
         prompt: |
           GOAL: {goal}
           Write docs/website/control_room_ui/control_placement.md: the per-id placement table
@@ -412,20 +548,28 @@ workflow:
           claude-agent-controls 16, cell-panel 11, queue-controls 7, design-controls 12) —
           each id → its band/dock home → its governed action and door (determination §3.5).
           Every door must name an EXISTING route at HEAD; no new mutating route. Irreversible
-          acts keep the typed confirmation and a receipt.
-          VERIFY: the table covers all 57 ids (count them in the doc and assert the count in
-          a test); every route named exists (test greps apps/control_room/routes).
+          acts keep the typed confirmation and a receipt. Author
+          tests/test_control_room_placement.py asserting the table covers all 57 ids and every
+          named route exists in apps/control_room/routes.
+          VERIFY: the table covers all 57 ids (counted in the doc and asserted in the test);
+          every route named exists (test greps apps/control_room/routes).
       - name: p5b_control_doors
         kind: agent
         scope: implementation
         timeout: 2400
+        test_gate: true
+        gate_retry: 1
+        tests:
+          - tests/test_control_room_doors.py
         prompt: |
           GOAL: {goal}
           Wire the doors from p5a's table into the bands: supervisor interrupt behind the
           typed INTERRUPT <session_id> confirmation (POST /api/flags/<id>/interrupt), queue
           enqueue/clear/reinterleave through the idempotent POST /api/experiments boundary,
           the session/design controls through their existing routes — each with confirm +
-          receipt. NO new route, NO route behavior change.
+          receipt. NO new route, NO route behavior change. Author
+          tests/test_control_room_doors.py asserting the wired doors call the existing
+          endpoints with the confirmation/idempotency contract.
           VERIFY: pytest asserts the wired doors call the existing endpoints with the
           confirmation/idempotency contract; nothing else mutated.
       - name: p5c_parity_gate
@@ -436,12 +580,17 @@ workflow:
           - tests/test_control_room_parity.py
         prompt: |
           Class-P: every inventory item present/wired/non-empty (or a documented empty state);
-          routes_dropped_by_facelift: 0. Fix the build, never the inventory's expectations.
+          routes_dropped_by_facelift: 0. This phase executes the suite only; a failure stops
+          the run for the AIO — the inventory's expectations are never weakened by the build.
       # ── P6: visual language + wall guard + acceptance ────────────────────────
       - name: p6a_visual_tokens
         kind: agent
         scope: implementation
         timeout: 1800
+        test_gate: true
+        gate_retry: 1
+        tests:
+          - tests/test_control_room_style.py
         prompt: |
           GOAL: {goal}
           Apply the determination §6 visual language: a semantic token set (surface, line,
@@ -449,13 +598,19 @@ workflow:
           ≥13px desktop / ≥12px mobile / ≥11px labels type floor, light/dark/forced-colors
           via system colors + currentColor, the single brand-orange reserved for
           awaiting_promotion, state = glyph + word + colour (never colour-only), motion
-          transitions-only (~100-240ms, prefers-reduced-motion collapses).
+          transitions-only (~100-240ms, prefers-reduced-motion collapses). Author
+          tests/test_control_room_style.py asserting the token set + type floor + colour-only
+          violations.
           VERIFY: extend the style gate to assert the token set + type floor + colour-only
           violations; run green.
       - name: p6b_provenance
         kind: agent
         scope: implementation
         timeout: 1800
+        test_gate: true
+        gate_retry: 1
+        tests:
+          - tests/test_render_gate_captures.py
         prompt: |
           GOAL: {goal}
           Complete the provenance system: every band header carries name + scope + source +
@@ -468,6 +623,10 @@ workflow:
         kind: agent
         scope: implementation
         timeout: 1800
+        test_gate: true
+        gate_retry: 1
+        tests:
+          - tests/test_control_room_dom_audit.py
         prompt: |
           GOAL: {goal}
           Ship the deterministic DOM audit as pytest (tests/test_control_room_dom_audit.py):
@@ -480,12 +639,17 @@ workflow:
         kind: agent
         scope: implementation
         timeout: 1800
+        test_gate: true
+        gate_retry: 1
+        tests:
+          - tests/test_control_room_a11y.py
         prompt: |
           GOAL: {goal}
           Accessibility pass per §6: band skip links, focus lands on the band heading, one
           transition-only polite live region, semantic table controls, keyboard operation,
           WCAG 2.2 AA contrast, forced-colours safe, aria-hidden decorative. No new
-          dependencies.
+          dependencies. Author tests/test_control_room_a11y.py asserting the structural a11y
+          contract on the committed shell (roles/names/keyboard wiring).
           VERIFY: the a11y gate class passes on the built tree.
       # ── Adversary 2: the full falsification pass before acceptance ──────────
       - name: adv2_adversarial_final
@@ -493,6 +657,18 @@ workflow:
         scope: implementation
         run_model: openai/gpt-6-astra
         timeout: 2400
+        test_gate: true
+        gate_retry: 1
+        tests:
+          - tests/test_render_gate_captures.py
+          - tests/test_control_room_charts.py
+          - tests/test_control_room_parity.py
+          - tests/test_control_room_dom_audit.py
+          - tests/test_control_room_style.py
+          - tests/test_control_room_a11y.py
+          - tests/test_control_room_timings_route.py
+          - tests/test_control_room_placement.py
+          - tests/test_control_room_doors.py
         prompt: |
           GOAL: {goal}
           FINAL adversarial review of the complete build into
@@ -503,27 +679,75 @@ workflow:
           confirmation/idempotency contracts? (c) provenance — can any stale or failed feed
           render as green/all-clear? (d) the render gate — would the live gate pass the build,
           or are the committed fixtures lying (a fixture that passes while the live page
-          violates)? Run the live gate yourself if the environment allows; if not, say exactly
-          what blocks it. (e) the determination's own dispositions A-1..A-13 — any of them
-          under-executed? Severity-ranked, each with the correction + its acceptance. Then FIX
-          every finding on the branch (or record it as an accepted limitation with reason).
-          At least 3 findings or a clean sweep with re-verification evidence — a bare PASS is
-          a failed review. Commit the review doc and the fixes.
-      - name: p6e_final_gate
+          violates)? The live gate itself runs host-side by the AIO at the acceptance
+          checkpoint — assess whether the committed fixture profile would predict a live
+          pass, and say exactly what you could not check and why. (e) the determination's
+          own dispositions A-1..A-13 — any of them under-executed? Severity-ranked, each with
+          the correction + its acceptance. Then FIX every finding on the branch (or record it
+          as an accepted limitation with reason). Findings must be real defects — do not
+          manufacture a count; a clean sweep must carry the re-verification evidence. Commit
+          the review doc and the fixes.
+      # ── Acceptance (independent verification binds the candidate; the controller ratifies)
+      - name: p6e_live_gate
         kind: agent
         scope: implementation
         timeout: 3600
+        test_gate: true
+        tests:
+          - tests/test_render_gate_captures.py
+          - tests/test_control_room_dom_audit.py
+        prompt: |
+          GOAL: {goal}
+          Run the browser-free acceptance profile in-cell and commit its report:
+          python3 scripts/verify_control_room_rendering.py --check-fixtures and the
+          deterministic classes (charts/parity/style/a11y/dom-audit are covered by their own
+          test files — run them all green). Write the acceptance-profile declaration into
+          docs/website/control_room_ui/acceptance_profile.md naming the REQUIRED profile:
+          geometry (three viewports), charts, visuals, style, a11y, parity, live IA-core,
+          dark + light captures, below-fold full-page captures, and the interaction checks
+          (keyboard activation, run selection, scrolling, stale/unknown states, action→result)
+          — each class enumerated with its fixture cases. You do NOT run the live browser
+          gate in this cell (no playwright here): the live gate runs HOST-SIDE by the AIO
+          against this candidate at the acceptance checkpoint, and its report + screenshots
+          are committed by the AIO before the controller's ratification. Your committed
+          report is evidence, not acceptance.
+          VERIFY: --check-fixtures exits 0; the acceptance_profile.md enumerates every
+          required class and fixture case; the deterministic suites run green.
+      - name: p6f_final_gate
+        kind: test
+        scope: implementation
+        timeout: 1800
+        tests:
+          - tests/test_render_gate_captures.py
+          - tests/test_control_room_charts.py
+          - tests/test_control_room_parity.py
+          - tests/test_control_room_dom_audit.py
+          - tests/test_control_room_style.py
+          - tests/test_control_room_a11y.py
+          - tests/test_control_room_timings_route.py
+          - tests/test_control_room_placement.py
+          - tests/test_control_room_doors.py
+        prompt: |
+          The independent final gate: the deterministic acceptance profile executes over the
+          candidate and its verdict (test_executed_success) is what BINDS the candidate —
+          not any phase's self-report. A failure stops the run; the AIO repairs and re-runs.
+      - name: p6g_acceptance
+        kind: agent
+        scope: implementation
+        timeout: 900
         checkpoint: true
         prompt: |
           GOAL: {goal}
-          Run the FULL live render gate: python3 scripts/verify_control_room_rendering.py
-          --live (all classes: geometry, semantics, charts, visuals, style, a11y, live IA-core,
-          feature-parity) at all three viewports and both themes, WITH screenshots. Iterate on
-          every violation until the gate is PASS with captures > 0 (zero captures is now a
-          structural FAIL). Commit the gate report + screenshots. This checkpoint is the
-          controller's screenshot review — do not proceed past it.
-          VERIFY: the committed gate_report.md says Status: PASS with a non-zero screenshot
-          rollup, and the live run's exit code is 0.
+          ACCEPTANCE ASSEMBLY — make NO changes to any UI, test, or gate file. Write
+          docs/website/control_room_ui/acceptance_summary.md that (a) cites the independent
+          final-gate verdict for THIS candidate (the p6f test_executed_success on the run
+          ledger — read it, never re-run or re-interpret it), (b) lists the capture evidence
+          owed for the controller's review: the host-side live-gate report with dark + light,
+          below-fold full-page screenshots, and the interaction-check results — to be
+          committed by the AIO at this checkpoint. Producing this summary does NOT establish
+          acceptance: acceptance is the controller's ratification signature at this
+          checkpoint, over the independently verified candidate + the live captures. Do not
+          proceed past this checkpoint.
 factors:
   - {name: model, levels: [deepseek/deepseek-v4-flash]}
 design: factorial

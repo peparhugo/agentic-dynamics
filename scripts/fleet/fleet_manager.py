@@ -51,6 +51,7 @@ from pathlib import Path
 # scripts/fleet/ -> add scripts/ to the path, then reuse the shared bootstrap.
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+import broker_contract  # noqa: E402  (scripts/fleet/ is this module's dir)
 import dlq  # noqa: E402  (scripts/fleet/ is this module's dir)
 import heartbeat  # noqa: E402
 import redis  # noqa: E402
@@ -96,6 +97,7 @@ def _connect() -> redis.Redis:
             client = redis.Redis(
                 host=REDIS_HOST, port=REDIS_PORT, db=REDIS_DB,
                 decode_responses=True, socket_connect_timeout=5,
+                socket_timeout=broker_contract.FLEET_REDIS_SOCKET_TIMEOUT,
             )
             client.ping()
             return client
