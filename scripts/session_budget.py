@@ -232,7 +232,7 @@ def main(argv: list[str] | None = None) -> int:
         print(
             f"session budget: {verdict} — turns {turns}/{args.turn_budget}, "
             f"context {context}/{args.ctx_budget}"
-            + (f" (usage incomplete — last completed sample used)" if result["usage_incomplete"] else "")
+            + (" (usage incomplete — last completed sample used)" if result["usage_incomplete"] else "")
             + (f" ({reason})" if reason else "")
         )
     return {"OK": 0, "WARN": 1, "CLOSE": 2}.get(verdict, 1)

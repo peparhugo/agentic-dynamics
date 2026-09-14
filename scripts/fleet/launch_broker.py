@@ -145,8 +145,8 @@ from broker_contract import (  # noqa: E402
     validate_launch_request,
 )
 
-from agentic_dynamics.core.paths import PathConfig  # noqa: E402
 from agentic_dynamics.core.admission_context import admission_required  # noqa: E402
+from agentic_dynamics.core.paths import PathConfig  # noqa: E402
 
 __all__ = [
     "AUTH_CRED_FILE",

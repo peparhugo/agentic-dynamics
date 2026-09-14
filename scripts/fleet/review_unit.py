@@ -23,9 +23,8 @@ import sys
 import time
 from pathlib import Path
 
-import redis  # noqa: E402
-
 import broker_contract  # noqa: E402  (scripts/fleet/ is this module's dir)
+import redis  # noqa: E402
 
 REDIS_HOST = os.environ.get("FINOPS_REDIS_HOST", "127.0.0.1")
 REDIS_PORT = int(os.environ.get("FINOPS_REDIS_PORT", "6380"))
