@@ -2452,7 +2452,8 @@ def write_report(results: list[dict[str, Any]], errors: list[str], report_path: 
                  requested_classes: list[str] | None = None,
                  candidate: str = "", candidate_verified: bool = False,
                  preview: str = "", preview_verified: bool = False,
-                 preview_exercised: bool = False) -> int:
+                 preview_exercised: bool = False,
+                 preview_serves_candidate: bool = False) -> int:
     """Write the markdown + JSON reports; return the exit code.
 
     The report is the gate's artifact (the website gate's pattern): status, the classes that
@@ -2532,6 +2533,12 @@ def write_report(results: list[dict[str, Any]], errors: list[str], report_path: 
     if preview:
         if preview_exercised:
             label = "exercised (reachable)" if preview_verified else "UNREACHABLE"
+            if preview_verified and candidate:
+                label += (
+                    ", serves the candidate's bytes"
+                    if preview_serves_candidate else
+                    ", SERVES A DIFFERENT TREE (asset hash mismatch)"
+                )
         else:
             label = ("NOT exercised — the gate served its own instance "
                      "(pass --base to target a preview)")
@@ -2567,6 +2574,7 @@ def write_report(results: list[dict[str, Any]], errors: list[str], report_path: 
             "preview": preview,
             "preview_verified": bool(preview_verified),
             "preview_exercised": bool(preview_exercised),
+            "preview_serves_candidate": bool(preview_serves_candidate),
             "screenshots": results,
             "errors": errors,
         }, indent=2),
@@ -2734,6 +2742,7 @@ def main() -> int:
                 f"checkout HEAD {head[:12]!r} — the report cannot claim the reviewed candidate"
             )
     preview_verified = False
+    preview_serves_candidate = False
     if args.preview and args.base:
         try:
             import urllib.request
@@ -2747,6 +2756,33 @@ def main() -> int:
                 f"PREVIEW-UNREACHABLE: --preview {args.preview!r} did not answer 200 — "
                 "the target the report binds was not exercised"
             )
+        elif args.candidate:
+            # The preview must SERVE the candidate's bytes, not merely answer: hash one
+            # rendered asset over HTTP and compare it with the checkout's file (Astra
+            # finding — a supplied URL is a label until the served artifact is checked).
+            try:
+                import hashlib
+                import urllib.request
+
+                asset = "static/style.css"
+                with urllib.request.urlopen(f"{args.preview.rstrip('/')}/{asset}",
+                                            timeout=10) as response:
+                    served = hashlib.sha256(response.read()).hexdigest()
+                local_path = Path("apps/control_room") / asset
+                local = hashlib.sha256(local_path.read_bytes()).hexdigest()
+                preview_serves_candidate = served == local
+                if not preview_serves_candidate:
+                    errors.append(
+                        "PREVIEW-SERVES-OTHER: the preview's served "
+                        f"{asset} ({served[:12]}…) does not match the checkout's "
+                        f"({local[:12]}…) — the preview is not serving this candidate"
+                    )
+            except Exception:  # noqa: BLE001 — an unreadable asset verifies nothing
+                preview_serves_candidate = False
+                errors.append(
+                    "PREVIEW-SERVES-UNVERIFIED: could not hash the preview's served asset "
+                    "against the checkout — the binding is unproven"
+                )
     return write_report(
         results, errors, report_path, json_path, fixture_rc,
         requested_classes=requested_classes,
@@ -2755,6 +2791,7 @@ def main() -> int:
         preview=args.preview or "",
         preview_verified=preview_verified,
         preview_exercised=bool(args.base and args.preview),
+        preview_serves_candidate=preview_serves_candidate,
     )
 
 
