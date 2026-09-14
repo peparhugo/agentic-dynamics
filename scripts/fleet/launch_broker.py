@@ -377,12 +377,26 @@ def build_submit_argv(
     if job_id:
         argv += ["-e", f"FINOPS_CELL_ID={job_id}"]
     admission = command.get("admission") or {}
+    # Every `-e` lives HERE, before the SERVICE name: ``docker compose run`` takes options
+    # before the service and treats everything after it as the container command — the first
+    # fix (2026-09-14) appended the reserve flags after ``run_workflow.py`` and compose handed
+    # them to the script ("unrecognized arguments: -e FINOPS_RESERVE_USD=…").
     if isinstance(admission, dict) and admission.get("required"):
         # The armed admission gate crosses the compose boundary as the env the composition
         # root's fail-closed spend gate reads — a submit declaring admission must not silently
         # arrive disarmed (the 2026-09-14 first-launch defect: "gate disarmed" on a manual
         # compose launch while the recorded plan said armed).
         argv += ["-e", "FINOPS_ADMISSION_REQUIRED=1"]
+    if isinstance(admission, dict):
+        # The per-phase reservation inputs (2026-09-14): the armed gate's per-token leases read
+        # FINOPS_RESERVE_USD / FINOPS_HARD_CAP_USD from the orchestrator's environment — the
+        # values the previous manual launch exported by hand. Without them the gate DENIES the
+        # first phase (cost_source=unknown) — correct fail-closed behavior, not a runnable
+        # state.
+        if admission.get("reserve_usd") is not None:
+            argv += ["-e", f"FINOPS_RESERVE_USD={admission['reserve_usd']}"]
+        if admission.get("hard_cap_usd") is not None:
+            argv += ["-e", f"FINOPS_HARD_CAP_USD={admission['hard_cap_usd']}"]
     argv += [
         "workflow-runner",
         "python3", "scripts/run_workflow.py",
@@ -401,15 +415,6 @@ def build_submit_argv(
             argv += ["--campaign-budget-usd", str(admission["campaign_budget_usd"])]
         if admission.get("campaign_concurrency") is not None:
             argv += ["--campaign-concurrency", str(admission["campaign_concurrency"])]
-        # The per-phase reservation inputs (2026-09-14): the armed gate's per-token leases read
-        # FINOPS_RESERVE_USD / FINOPS_HARD_CAP_USD from the orchestrator's environment — the
-        # values the previous manual launch exported by hand. They must survive the submit hop
-        # like every other admission setting; without them the gate DENIES the first phase
-        # (cost_source=unknown), which is correct fail-closed behavior but not a runnable state.
-        if admission.get("reserve_usd") is not None:
-            argv += ["-e", f"FINOPS_RESERVE_USD={admission['reserve_usd']}"]
-        if admission.get("hard_cap_usd") is not None:
-            argv += ["-e", f"FINOPS_HARD_CAP_USD={admission['hard_cap_usd']}"]
     # The execution settings must survive the hop (Astra finding, 2026-09-14): every accepted
     # field becomes its orchestrator flag, so the run the caller requested IS the run that
     # executes. A field the orchestrator does not accept here would be a silent drop — the
