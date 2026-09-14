@@ -1841,3 +1841,33 @@ def test_armed_non_verifier_spawn_still_requires_the_lease_block(tmp_path, monke
         req, phase_scopes={"p1_slice1_base_supervisor": "implementation"}, path_config=cfg,
     )
     assert any("lease block missing" in e for e in errors)
+
+
+def test_submit_extended_fields_are_type_validated():
+    """Step 10: the identity fields that must survive every hop are type-checked here — a
+    malformed digest/continuation/admission refuses with the rest of the submit."""
+    base = _valid_submit_request()
+
+    bad_digest = dict(base, spec_sha256="not-hex")
+    assert any("spec_sha256 must be a 64-character hex" in e
+               for e in validate_submit_request(bad_digest))
+
+    bad_resume = dict(base, resume="yes")
+    assert any("resume must be a boolean" in e
+               for e in validate_submit_request(bad_resume))
+
+    orphan_parent = dict(base, parent_run_id="run-1")
+    assert any("resume must be true" in e
+               for e in validate_submit_request(orphan_parent))
+
+    bad_admission = dict(base, admission={"required": "yes"})
+    assert any("admission.required must be a boolean" in e
+               for e in validate_submit_request(bad_admission))
+
+    bad_budget = dict(base, admission={"required": True, "campaign_budget_usd": -1})
+    assert any("campaign_budget_usd" in e
+               for e in validate_submit_request(bad_budget))
+
+    good = dict(base, spec_sha256="a" * 64, resume=True, parent_run_id="run-1",
+                admission={"required": True, "campaign_budget_usd": 20.0})
+    assert validate_submit_request(good) == []

@@ -973,7 +973,14 @@ def validate_submit_request(
                 path_config=path_config,
             )
             for e in validate_spawn(
-                phase_request, phase_scopes=submit_scopes, path_config=path_config
+                phase_request, phase_scopes=submit_scopes, path_config=path_config,
+                # The submit gate validates the LAUNCH MECHANICS (scope, mounts, network,
+                # write flags) — the lease block is a RUNTIME property the run's own admission
+                # gate mints against the campaign cap when the phase actually executes. Requiring
+                # it here made every admission-armed submit un-submittable (the first-launch
+                # manual-compose workaround was born exactly there); the run fails closed
+                # (ADMISSION_DENIED) on an unleased phase either way.
+                require_lease=False,
             ):
                 errors.append(f"submit: phase {phase.get('name')!r}: {e}")
 
@@ -1018,6 +1025,55 @@ def validate_submit_request(
     # to run subprocess — re-validates the submit and then probes the workdir base against the
     # repo's main tip before the compose call, so the stale-worktree class still refuses, just
     # at the last gate instead of the first.
+
+    # Step 10 — the extended submit identity (AIO remediation 2026-09-14): source/spec
+    # identity, continuation identity, and applicable admission settings must survive every
+    # hop. Type-safety only here (the broker verifies the DIGEST against the bytes it will
+    # execute); a typo'd field would silently drop the very guarantee the hop was built to
+    # carry, so malformed values refuse at the same gate as everything else.
+    spec_sha256 = request.get("spec_sha256")
+    if spec_sha256 is not None:
+        spec_sha256 = str(spec_sha256)
+        if len(spec_sha256) != 64 or not all(c in "0123456789abcdefABCDEF" for c in spec_sha256):
+            errors.append(
+                "submit: spec_sha256 must be a 64-character hex sha256 digest of the spec "
+                f"file (got {spec_sha256!r})"
+            )
+    resume = request.get("resume")
+    if resume is not None and not isinstance(resume, bool):
+        errors.append(f"submit: resume must be a boolean (got {resume!r})")
+    parent_run_id = request.get("parent_run_id")
+    if parent_run_id is not None:
+        parent_run_id = str(parent_run_id)
+        if not parent_run_id.strip():
+            errors.append("submit: parent_run_id must be a non-blank run id")
+        elif not request.get("resume"):
+            errors.append(
+                "submit: parent_run_id declares a continuation — resume must be true"
+            )
+    admission = request.get("admission")
+    if admission is not None:
+        if not isinstance(admission, dict):
+            errors.append(f"submit: admission must be a mapping (got {type(admission).__name__})")
+        else:
+            required = admission.get("required")
+            if not isinstance(required, bool):
+                errors.append(
+                    "submit: admission.required must be a boolean "
+                    f"(got {required!r})"
+                )
+            for field, positive in (("campaign_budget_usd", False), ("campaign_concurrency", True)):
+                value = admission.get(field)
+                if value is None:
+                    continue
+                if isinstance(value, bool) or not isinstance(value, (int, float)) or (
+                    positive and value <= 0
+                ) or value < 0:
+                    errors.append(
+                        f"submit: admission.{field} must be a "
+                        f"{'positive' if positive else 'non-negative'} number "
+                        f"(got {value!r})"
+                    )
 
     return errors
 
