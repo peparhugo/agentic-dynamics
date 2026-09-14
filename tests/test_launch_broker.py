@@ -855,3 +855,29 @@ def test_build_submit_argv_carries_the_reserve_and_cap():
     }, compose="dc", compose_file="/c.yml")
     assert not any("FINOPS_RESERVE_USD" in a for a in bare)
     assert not any("FINOPS_HARD_CAP_USD" in a for a in bare)
+
+
+def test_every_env_flag_precedes_the_service_name():
+    """`docker compose run` takes options BEFORE the service; everything after it is the
+    container command. The first reserve fix (2026-09-14) appended `-e FINOPS_RESERVE_USD=…`
+    after ``run_workflow.py`` and compose handed it to the script ("unrecognized arguments").
+    Membership alone missed it — THIS asserts position for every `-e` the builder emits."""
+    argv = launch_broker.build_submit_argv({
+        "job_id": "abc123",
+        "spec": "workflows/repository/x.yaml", "goal": "g",
+        "model": "deepseek/deepseek-v4-flash", "workdir": "/tmp/wt_x",
+        "resume": True, "parent_run_id": "run-1",
+        "execution": {"no_commit": True, "timeout_seconds": 60},
+        "admission": {"required": True, "campaign_budget_usd": 20.0,
+                      "campaign_concurrency": 1, "reserve_usd": 0.6, "hard_cap_usd": 1.0},
+    }, compose="dc", compose_file="/c.yml")
+    service_at = argv.index("workflow-runner")
+    env_positions = [i for i, token in enumerate(argv) if token == "-e"]
+    assert env_positions, "no env flags emitted"
+    for pos in env_positions:
+        assert pos < service_at, f"'-e' at {pos} lands after the service name ({service_at})"
+        value = argv[pos + 1]
+        assert "=" in value and not value.startswith("-"), value
+    # and no stray env-looking token is passed as a container command argument
+    command_part = argv[service_at + 1:]
+    assert not any(token.startswith("FINOPS_") for token in command_part)
