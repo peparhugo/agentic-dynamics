@@ -257,3 +257,17 @@ def test_send_submit_command_carries_the_execution_settings():
         model="anthropic/claude-sonnet-5", workdir="/tmp/wt_x", execution=execution,
     )
     assert cmd["execution"] == execution
+
+
+def test_send_submit_command_carries_reserve_and_cap():
+    """The manager passes the reserve/cap fields through unchanged (the orchestrator's armed
+    gate reads them from the environment; the manager's job is that they survive the hop)."""
+    fm = _fleet_manager()
+    r = _FakeRedis()
+    cmd = fm._send_submit_command(
+        r, spec="workflows/repository/fleet_job_submission.yaml", goal="g",
+        model="deepseek/deepseek-v4-flash", workdir="/tmp/wt_x",
+        admission={"required": True, "reserve_usd": 0.6, "hard_cap_usd": 1.0},
+    )
+    assert cmd["admission"]["reserve_usd"] == 0.6
+    assert cmd["admission"]["hard_cap_usd"] == 1.0

@@ -389,6 +389,13 @@ def main(argv: list[str] | None = None) -> int:
     p_submit.add_argument("--campaign-concurrency", type=int, default=None,
                           help="the campaign concurrency cap the run applies to the lease "
                                "registry")
+    p_submit.add_argument("--reserve-usd", type=float, default=None,
+                          help="per-phase dollar reservation for per-token models "
+                               "(FINOPS_RESERVE_USD — the armed gate DENIES without a stated "
+                               "reserve: an unknown cost is never free)")
+    p_submit.add_argument("--hard-cap-usd", type=float, default=None,
+                          help="per-lease dollar ceiling for per-token models "
+                               "(FINOPS_HARD_CAP_USD)")
     p_submit.add_argument("--backend", default=None, choices=["opencode", "claude_cli"],
                           help="the execution backend (pass-through; the orchestrator "
                                "default is auto-routing)")
@@ -458,6 +465,10 @@ def main(argv: list[str] | None = None) -> int:
                 admission["campaign_budget_usd"] = args.campaign_budget_usd
             if args.campaign_concurrency is not None:
                 admission["campaign_concurrency"] = args.campaign_concurrency
+            if args.reserve_usd is not None:
+                admission["reserve_usd"] = args.reserve_usd
+            if args.hard_cap_usd is not None:
+                admission["hard_cap_usd"] = args.hard_cap_usd
         execution: dict | None = None
         if any(value is not None for value in (
             args.backend, args.thinking_effort, args.thinking_budget_tokens,
