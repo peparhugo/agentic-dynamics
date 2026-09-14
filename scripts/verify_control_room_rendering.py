@@ -1658,6 +1658,158 @@ PROFILE_CLASSES: tuple[str, ...] = (
 )
 
 
+def _canonical_preview_target(
+    base: str | None, preview: str | None
+) -> tuple[str, str]:
+    """Resolve the ONE target the browser and the identity checks both use.
+
+    Reviewer finding (2026-09-14): the browsers rendered ``--base`` while the identity checks
+    fetched ``--preview``; supplying different URLs produced a PASS claiming
+    ``preview_exercised`` for a target no browser visited. Rules:
+
+    * both given and equal after normalization → the target;
+    * both given and different → a refusal (never silently pick one);
+    * only ``--base`` → the base IS the exercised target (so the identity checks describe
+      what the browser rendered);
+    * only ``--preview`` → the gate serves its own instance; the preview stays UNEXERCISED
+      and is returned for the report's honest label.
+
+    Returns ``(target, error)``; ``error`` non-empty means refuse (exit 2).
+    """
+    def norm(value: str) -> str:
+        return value.rstrip("/")
+
+    base_n = norm(base) if base else ""
+    preview_n = norm(preview) if preview else ""
+    if base_n and preview_n and base_n != preview_n:
+        return "", (
+            f"conflicting targets: --base {base!r} and --preview {preview!r} differ — the "
+            "browser and the identity checks must exercise ONE target (pass --preview equal "
+            "to --base, or omit --preview to bind --base)"
+        )
+    if base_n:
+        return base_n, ""
+    return preview_n, ""
+
+
+def _compare_served_assets(base: str) -> dict[str, bool]:
+    """Hash EVERY served application artifact against its COMMITTED blob at HEAD.
+
+    Reviewer finding (2026-09-14): matching one CSS file proves nothing about the deployed
+    application, and reading the working tree attributes uncommitted bytes to HEAD. This
+    compares the bytes the preview actually serves for index.html and every ``static/*.js`` /
+    ``static/*.css`` with ``git show HEAD:<path>`` — the committed candidate. Returns
+    ``{filename: matched}``; an empty dict means nothing comparable was found (unverifiable).
+    """
+    import hashlib
+
+    listing = subprocess.run(
+        ["git", "ls-tree", "-r", "--name-only", "HEAD", "apps/control_room/static"],
+        capture_output=True, text=True, timeout=15,
+    )
+    if listing.returncode != 0:
+        return {}
+    committed = [
+        line.strip()
+        for line in listing.stdout.splitlines()
+        if line.strip().endswith((".js", ".css", ".html"))
+    ]
+    if not committed:
+        return {}
+
+    def committed_hash(path: str) -> str | None:
+        blob = subprocess.run(
+            ["git", "show", f"HEAD:{path}"], capture_output=True, timeout=15,
+        )
+        if blob.returncode != 0:
+            return None
+        return hashlib.sha256(blob.stdout).hexdigest()
+
+    def served_hash(url: str) -> str | None:
+        try:
+            import urllib.request
+
+            with urllib.request.urlopen(url, timeout=10) as response:
+                return hashlib.sha256(response.read()).hexdigest()
+        except Exception:  # noqa: BLE001 — an unfetchable artifact compares unequal
+            return None
+
+    base = base.rstrip("/")
+    results: dict[str, bool] = {}
+    for path in committed:
+        name = Path(path).name
+        # The shell is served at the root; every other artifact under /static/.
+        url = f"{base}/" if name == "index.html" else f"{base}/static/{name}"
+        results[name] = committed_hash(path) == served_hash(url)
+    return results
+
+
+def _exercise_refresh_action(
+    page: Any, theme: str
+) -> tuple[list[dict[str, Any]], list[str]]:
+    """The governed refresh action — require the control, observe the request, verify the result.
+
+    Reviewer finding (2026-09-14): a missing button was silently skipped and an inert button
+    passed because the awaited finder already existed. Now:
+
+    * a missing control is a NAMED failure (the action path cannot be exercised);
+    * the click must produce an observed ``/api/operations`` request (an inert control fails
+      the wait);
+    * the lens must RE-RENDER: a sentinel typed into the finder beforehand is cleared only if
+      the panel was rebuilt — a no-op click that leaves the sentinel fails.
+
+    ``page`` is the Playwright page (or a test double implementing ``locator`` /
+    ``expect_response`` / ``wait_for_timeout``) so the decision logic is regression-testable
+    without a browser.
+    """
+    results: list[dict[str, Any]] = []
+    errors: list[str] = []
+    refresh = page.locator("#operations-refresh")
+    if not refresh.count():
+        errors.append(
+            "interactions: the governed refresh control is missing — the action path cannot "
+            "be exercised"
+        )
+        return results, errors
+    finder = page.locator("#operations-run-finder")
+    if finder.count():
+        finder.first.fill("sentinel")
+    try:
+        with page.expect_response(lambda r: "/api/operations" in r.url, timeout=20000) as observed:
+            refresh.first.click()
+        status = int(getattr(observed.value, "status", 0) or 0)
+        if status != 200:
+            errors.append(
+                f"interactions: the refresh request answered HTTP {status} — the action did "
+                "not produce a healthy result"
+            )
+            return results, errors
+    except Exception:  # noqa: BLE001 — an inert control never issues the request
+        errors.append(
+            "interactions: clicking refresh produced no /api/operations request — the "
+            "control is inert"
+        )
+        return results, errors
+    # Bounded re-render poll: the sentinel must vanish iff the lens rebuilt itself.
+    for _ in range(20):
+        if finder.count() and finder.first.input_value() == "":
+            break
+        try:
+            page.wait_for_timeout(50)
+        except Exception:  # noqa: BLE001 — a test double need not implement the wait
+            break
+    if finder.count() and finder.first.input_value() != "":
+        errors.append(
+            "interactions: the lens did not re-render after refresh (the sentinel survived) "
+            "— the action did nothing"
+        )
+        return results, errors
+    results.append({"case": "interactions", "viewport": "desktop",
+                    "check": "governed-action-refresh",
+                    "screenshot": "", "theme": theme})
+    return results, errors
+
+
 def run_acceptance_interactions(
     out: Path, screenshots: bool
 ) -> tuple[list[dict[str, Any]], list[str]]:
@@ -1779,16 +1931,12 @@ def run_acceptance_interactions(
                     # workbench — the check below needs it open).
                     page.locator('button[aria-label="Close run detail"]').first.click()
 
-                    # 2b. The governed refresh action: click it and observe the result (the
-                    # lens re-renders with the finder present — the action's own contract is
-                    # declared on the button: data-action/authority/reversible/confirmation).
-                    refresh = page.locator("#operations-refresh")
-                    if refresh.count():
-                        refresh.first.click()
-                        page.locator("#operations-run-finder").wait_for(timeout=20000)
-                        results.append({"case": "interactions", "viewport": "desktop",
-                                        "check": "governed-action-refresh",
-                                        "screenshot": "", "theme": theme})
+                    # 2b. The governed refresh action: require the control, observe its
+                    # request, verify its rendered result (reviewer finding 2026-09-14: a
+                    # missing control was skipped and an inert one passed).
+                    refresh_results, refresh_errors = _exercise_refresh_action(page, theme)
+                    results.extend(refresh_results)
+                    errors.extend(refresh_errors)
 
                 # 3. Below-fold reachability: the operational surface must actually scroll —
                 # the workbench's BODY (the deliberate drill-down's scrolling container) carries
@@ -2743,54 +2891,57 @@ def main() -> int:
             )
     preview_verified = False
     preview_serves_candidate = False
-    if args.preview and args.base:
+    # One canonical target (reviewer finding 2026-09-14): the browser renders ``--base`` while
+    # identity checks used ``--preview`` — different URLs could produce a PASS whose
+    # ``preview_exercised`` claim described a target the browser never visited. The target is
+    # resolved ONCE here; a conflict is refused, never silently reconciled.
+    canonical_preview, target_error = _canonical_preview_target(args.base, args.preview)
+    if target_error:
+        print(target_error, file=sys.stderr)
+        return 2
+    preview_exercised = bool(canonical_preview and args.base)
+    if canonical_preview and args.base:
         try:
             import urllib.request
 
-            with urllib.request.urlopen(args.preview, timeout=10) as response:
+            with urllib.request.urlopen(canonical_preview, timeout=10) as response:
                 preview_verified = response.status == 200
         except Exception:  # noqa: BLE001 — an unreachable preview verifies nothing
             preview_verified = False
         if not preview_verified:
             errors.append(
-                f"PREVIEW-UNREACHABLE: --preview {args.preview!r} did not answer 200 — "
+                f"PREVIEW-UNREACHABLE: {canonical_preview!r} did not answer 200 — "
                 "the target the report binds was not exercised"
             )
-        elif args.candidate:
-            # The preview must SERVE the candidate's bytes, not merely answer: hash one
-            # rendered asset over HTTP and compare it with the checkout's file (Astra
-            # finding — a supplied URL is a label until the served artifact is checked).
-            try:
-                import hashlib
-                import urllib.request
-
-                asset = "static/style.css"
-                with urllib.request.urlopen(f"{args.preview.rstrip('/')}/{asset}",
-                                            timeout=10) as response:
-                    served = hashlib.sha256(response.read()).hexdigest()
-                local_path = Path("apps/control_room") / asset
-                local = hashlib.sha256(local_path.read_bytes()).hexdigest()
-                preview_serves_candidate = served == local
-                if not preview_serves_candidate:
-                    errors.append(
-                        "PREVIEW-SERVES-OTHER: the preview's served "
-                        f"{asset} ({served[:12]}…) does not match the checkout's "
-                        f"({local[:12]}…) — the preview is not serving this candidate"
-                    )
-            except Exception:  # noqa: BLE001 — an unreadable asset verifies nothing
-                preview_serves_candidate = False
+        elif args.candidate and preview_verified:
+            # The preview must SERVE the candidate's COMMITTED bytes, not merely answer
+            # (reviewer finding 2026-09-14): every served application artifact (index, JS,
+            # CSS) is hashed over HTTP and compared with its ``git show HEAD:`` blob — the
+            # committed candidate, never the working tree (an uncommitted edit must not be
+            # attributable to HEAD), and never a single asset standing in for the app.
+            served = _compare_served_assets(canonical_preview)
+            if not served:
                 errors.append(
-                    "PREVIEW-SERVES-UNVERIFIED: could not hash the preview's served asset "
-                    "against the checkout — the binding is unproven"
+                    "PREVIEW-SERVES-UNVERIFIED: no comparable committed artifacts were "
+                    "found — the binding is unproven"
                 )
+            else:
+                preview_serves_candidate = all(served.values())
+                mismatched = [name for name, ok in served.items() if not ok]
+                if mismatched:
+                    errors.append(
+                        "PREVIEW-SERVES-OTHER: the preview's served bytes differ from the "
+                        f"committed candidate for {', '.join(sorted(mismatched))} — the "
+                        "preview is not serving this candidate"
+                    )
     return write_report(
         results, errors, report_path, json_path, fixture_rc,
         requested_classes=requested_classes,
         candidate=args.candidate or "",
         candidate_verified=candidate_verified,
-        preview=args.preview or "",
+        preview=canonical_preview or "",
         preview_verified=preview_verified,
-        preview_exercised=bool(args.base and args.preview),
+        preview_exercised=preview_exercised,
         preview_serves_candidate=preview_serves_candidate,
     )
 

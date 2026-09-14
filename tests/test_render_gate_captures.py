@@ -148,3 +148,175 @@ def test_write_report_labels_an_unverified_candidate(tmp_path: Path):
     assert "UNVERIFIED" in report.read_text(encoding="utf-8")
     data = json.loads(jp.read_text(encoding="utf-8"))
     assert data["candidate_verified"] is False
+
+
+# ── Reviewer reproductions (2026-09-14): the acceptance checks must prove their claims ──────
+
+
+def test_canonical_preview_target_refuses_conflicting_urls():
+    """The browser rendered --base while the identity checks fetched --preview: different
+    URLs could produce a PASS claiming a target no browser visited. Conflicting targets are
+    refused; a lone --base IS the exercised target; a lone --preview stays unexercised."""
+    from scripts.verify_control_room_rendering import _canonical_preview_target
+
+    target, error = _canonical_preview_target("http://127.0.0.1:8123/", "http://127.0.0.1:8123")
+    assert target == "http://127.0.0.1:8123" and error == ""  # normalized equal
+
+    target, error = _canonical_preview_target("http://a:1/", "http://b:2/")
+    assert target == "" and "conflicting targets" in error
+
+    target, error = _canonical_preview_target("http://127.0.0.1:8123/", None)
+    assert target == "http://127.0.0.1:8123" and error == ""
+
+    target, error = _canonical_preview_target(None, "http://127.0.0.1:8123/")
+    assert target == "http://127.0.0.1:8123" and error == ""
+
+    target, error = _canonical_preview_target(None, None)
+    assert target == "" and error == ""
+
+
+def test_compare_served_assets_catches_stale_js_and_binds_committed_bytes(tmp_path, monkeypatch):
+    """Reviewer finding: matching CSS alone certified the preview even when the app served
+    stale JS, and the comparison read the working tree. Every committed artifact is compared,
+    against ``git show HEAD:`` (committed bytes)."""
+    import functools
+    import http.server
+    import socketserver
+    import subprocess
+    import threading
+
+    from scripts.verify_control_room_rendering import _compare_served_assets
+
+    repo = tmp_path / "repo"
+    static = repo / "apps" / "control_room" / "static"
+    static.mkdir(parents=True)
+    files = {
+        "index.html": b"<html>shell v2</html>",
+        "app.js": b"console.log('v2')",
+        "style.css": b"body { color: red }",
+    }
+    for name, data in files.items():
+        (static / name).write_bytes(data)
+    subprocess.run(["git", "init", "-q"], cwd=repo, check=True)
+    subprocess.run(["git", "config", "user.email", "t@t"], cwd=repo, check=True)
+    subprocess.run(["git", "config", "user.name", "t"], cwd=repo, check=True)
+    subprocess.run(["git", "add", "-A"], cwd=repo, check=True)
+    subprocess.run(["git", "commit", "-qm", "init"], cwd=repo, check=True)
+    # The working tree diverges AFTER the commit — the committed bytes are the candidate.
+    (static / "style.css").write_bytes(b"body { color: blue }  /* uncommitted edit */")
+
+    served = tmp_path / "served"
+    (served / "static").mkdir(parents=True)
+    (served / "index.html").write_bytes(files["index.html"])
+    (served / "static" / "app.js").write_bytes(files["app.js"])
+    (served / "static" / "style.css").write_bytes(files["style.css"])
+    handler = functools.partial(http.server.SimpleHTTPRequestHandler, directory=str(served))
+    httpd = socketserver.TCPServer(("127.0.0.1", 0), handler)
+    port = httpd.server_address[1]
+    threading.Thread(target=httpd.serve_forever, daemon=True).start()
+    try:
+        monkeypatch.chdir(repo)
+        base = f"http://127.0.0.1:{port}"
+        matched = _compare_served_assets(base)
+        # committed-vs-served matches for ALL artifacts; the uncommitted working-tree edit
+        # must NOT be attributed to HEAD (style.css compares against the committed bytes).
+        assert matched == {"index.html": True, "app.js": True, "style.css": True}
+
+        # The reviewer's stale-JS case: CSS matches, JS is stale → caught, not certified.
+        (served / "static" / "app.js").write_bytes(b"console.log('v1 stale')")
+        matched = _compare_served_assets(base)
+        assert matched["app.js"] is False
+        assert matched["style.css"] is True
+    finally:
+        httpd.shutdown()
+
+
+class _FakeRefreshPage:
+    """A Playwright-page double for ``_exercise_refresh_action`` (missing / inert / no-op /
+    working controls), so the decision logic is regression-testable without a browser."""
+
+    def __init__(self, *, present: bool = True, works: bool = True, re_renders: bool = True):
+        self.present = present
+        self.works = works
+        self.re_renders = re_renders
+        self.finder_value = "sentinel"
+
+    def locator(self, selector: str):
+        page = self
+
+        if selector == "#operations-refresh":
+            class _Refresh:
+                def count(self):
+                    return 1 if page.present else 0
+
+                @property
+                def first(self):
+                    return self
+
+                def click(self):
+                    if page.works and page.re_renders:
+                        page.finder_value = ""  # the rebuild creates a fresh empty input
+            return _Refresh()
+        if selector == "#operations-run-finder":
+            class _Finder:
+                def count(self):
+                    return 1
+
+                @property
+                def first(self):
+                    return self
+
+                def fill(self, value):
+                    page.finder_value = value
+
+                def input_value(self):
+                    return page.finder_value
+            return _Finder()
+        raise AssertionError(f"unexpected selector {selector}")
+
+    def expect_response(self, predicate, timeout=None):
+        page = self
+
+        class _Ctx:
+            value = type("Response", (), {"status": 200})()
+
+            def __enter__(self):
+                if not page.works:
+                    raise TimeoutError("no response")
+                return self
+
+            def __exit__(self, *exc):
+                return False
+        return _Ctx()
+
+    def wait_for_timeout(self, ms):
+        return None
+
+
+def test_refresh_action_requires_the_control():
+    from scripts.verify_control_room_rendering import _exercise_refresh_action
+
+    results, errors = _exercise_refresh_action(_FakeRefreshPage(present=False), "dark")
+    assert results == [] and any("missing" in e for e in errors)
+
+
+def test_refresh_action_fails_on_an_inert_control():
+    from scripts.verify_control_room_rendering import _exercise_refresh_action
+
+    results, errors = _exercise_refresh_action(_FakeRefreshPage(works=False), "dark")
+    assert results == [] and any("inert" in e for e in errors)
+
+
+def test_refresh_action_fails_when_nothing_re_renders():
+    from scripts.verify_control_room_rendering import _exercise_refresh_action
+
+    results, errors = _exercise_refresh_action(_FakeRefreshPage(re_renders=False), "dark")
+    assert results == [] and any("did not re-render" in e for e in errors)
+
+
+def test_refresh_action_passes_on_a_working_control():
+    from scripts.verify_control_room_rendering import _exercise_refresh_action
+
+    results, errors = _exercise_refresh_action(_FakeRefreshPage(), "dark")
+    assert errors == []
+    assert [r["check"] for r in results] == ["governed-action-refresh"]

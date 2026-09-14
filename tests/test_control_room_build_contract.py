@@ -504,3 +504,247 @@ def test_verifier_infra_failure_never_triggers_a_correction(tmp_path, monkeypatc
     assert agent.calls == ["build"]  # exactly one attempt — no correction
     assert result.phases[0].status == "failed"
     assert result.phases[0].error.startswith("VERIFIER_ERROR:")
+
+
+# ── Reviewer reproductions (2026-09-14): the correction history + resume inference ──────────
+
+GATE_RETRY_TEST_PHASE_YAML = """\
+name: gate_retry_test_phase_fixture
+question: gate retry via a separate test phase
+version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: false
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    phases:
+      - name: build
+        kind: agent
+        timeout: 120
+        test_gate: true
+        tests:
+          - tests/test_thing.py
+        prompt: |
+          {goal}
+      - name: verify
+        kind: test
+        timeout: 120
+        gate_retry: 1
+        tests:
+          - tests/test_thing.py
+        prompt: |
+          {goal}
+factors:
+  - {name: model, levels: [deepseek/deepseek-v4-flash]}
+design: factorial
+rules: []
+metrics: []
+comparison: null
+"""
+
+THREE_PHASE_YAML = """\
+name: three_phase_fixture
+question: resume inference fixture
+version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: false
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    phases:
+      - name: alpha
+        kind: agent
+        timeout: 120
+        test_gate: true
+        tests:
+          - tests/test_thing.py
+        prompt: |
+          {goal}
+      - name: beta
+        kind: agent
+        timeout: 120
+        test_gate: true
+        tests:
+          - tests/test_thing.py
+        prompt: |
+          {goal}
+      - name: gamma
+        kind: agent
+        timeout: 120
+        test_gate: true
+        tests:
+          - tests/test_thing.py
+        prompt: |
+          {goal}
+factors:
+  - {name: model, levels: [deepseek/deepseek-v4-flash]}
+design: factorial
+rules: []
+metrics: []
+comparison: null
+"""
+
+
+class _CostingAgentExecutor:
+    """A fake executor that returns a fixed per-call cost and records each request's ordinal."""
+
+    def __init__(self, cost: float = 0.001):
+        self.calls: list[str] = []
+        self.attempts: list[int] = []
+        self.cost = cost
+
+    def execute(self, request: StepRequest) -> StepResult:
+        self.calls.append(request.phase_name)
+        self.attempts.append(request.attempt)
+        target = Path(request.workdir) / "work" / f"{request.phase_name}_{request.attempt}.txt"
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text("x")
+        return StepResult(
+            ok=True, state="ok", exit_code=0,
+            prompt_tokens=10, completion_tokens=20, total_tokens=30,
+            estimated_cost_usd=self.cost,
+        )
+
+
+def test_correction_retains_costs_and_increments_attempt_identity(tmp_path, monkeypatch):
+    """The reviewer reproduction: three calls cost $0.003 but the ledger showed $0.002 and the
+    repaired phase read as a first-pass success; the container also received attempt 1 again.
+    Now: the failed invocation's cost/tokens/verdict survive as attempt rows, attempt identity
+    increments, and ONE final phase outcome carries the history."""
+    monkeypatch.setenv("FINOPS_EMIT_SELF", "0")
+    spec_path = tmp_path / "spec.yaml"
+    spec_path.write_text(GATE_RETRY_SPEC_YAML)
+    spec = load_spec(spec_path)
+    wd = tmp_path / "wd"
+    wd.mkdir()
+    _git_init(wd)
+    agent = _CostingAgentExecutor(cost=0.001)
+    verifier = _OnceFailingVerifier("build__test_gate")
+
+    result = run_workflow(
+        spec, goal="g", model=MODEL, workdir=wd,
+        step_executor=agent, verifier_executor=verifier,
+        publish=False, commit=True,
+    )
+    assert result.ok is True
+    # the executor's attempt ordinal continued past the retained execution (never reused)
+    assert agent.calls == ["build", "build", "next"]
+    assert agent.attempts[:2] == [1, 2], "the correction re-run reused attempt identity 1"
+    # ONE final phase outcome per phase (no duplicates), with the paid calls retained
+    assert [p.phase for p in result.phases] == ["build", "next"]
+    build = result.phases[0]
+    assert build.status == "ok"
+    assert len(build.attempts) == 2, "the failed invocation's history was discarded"
+    # phase-level cost includes BOTH paid calls (the old shape recorded only the last)
+    assert round(build.cost_usd, 6) == 0.002
+    # the ledger's attempt records: a1 = the failed invocation (cost + verdict retained),
+    # a2 = the final attempt; the repaired phase is NOT a first-pass success.
+    records = [r for r in result.attempts if r.phase == "build"]
+    assert [r.attempt_number for r in records] == [1, 2]
+    assert len({r.attempt_id for r in records}) == 2
+    assert records[0].status == "failed" and records[0].cost_usd == 0.001
+    assert records[0].first_pass is False and records[0].retry_reason.startswith("correction")
+    assert records[1].accepted is True and records[1].first_pass is None
+    assert records[1].cost_usd == 0.001
+
+
+def test_test_phase_correction_does_not_duplicate_producer_records(tmp_path, monkeypatch):
+    """The duplicate-attempt-id reproduction: a separate test phase failing must re-run its
+    producer ONCE — the producer's stale record is retired into history, not duplicated."""
+    monkeypatch.setenv("FINOPS_EMIT_SELF", "0")
+    spec_path = tmp_path / "spec.yaml"
+    spec_path.write_text(GATE_RETRY_TEST_PHASE_YAML)
+    spec = load_spec(spec_path)
+    wd = tmp_path / "wd"
+    wd.mkdir()
+    _git_init(wd)
+    agent = _CostingAgentExecutor(cost=0.001)
+    verifier = _OnceFailingVerifier("verify")
+
+    result = run_workflow(
+        spec, goal="g", model=MODEL, workdir=wd,
+        step_executor=agent, verifier_executor=verifier,
+        publish=False, commit=True,
+    )
+    assert result.ok is True
+    assert agent.calls == ["build", "build"]  # producer re-ran exactly once
+    assert [p.phase for p in result.phases] == ["build", "verify"], "duplicate producer record"
+    build = result.phases[0]
+    assert len(build.attempts) == 2  # both paid invocations retained
+    assert round(build.cost_usd, 6) == 0.002
+    records = [r for r in result.attempts if r.phase == "build"]
+    assert len({r.attempt_id for r in records}) == 2, "duplicate attempt ids"
+    assert agent.attempts[:2] == [1, 2]
+
+
+def _commit_phase_marker(wd: Path, phase: str, goal: str) -> str:
+    """Commit a marker whose subject matches the runner's phase-commit contract exactly."""
+    path = wd / "work" / f"{phase}.txt"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(phase)
+    _git("add", "-A", cwd=wd)
+    _git("commit", "-qm", f"[workflow] {phase} — {goal[:40]}", cwd=wd)
+    return _git("rev-parse", "HEAD", cwd=wd).stdout.strip()
+
+
+def test_resume_never_infers_unexecuted_phases_from_a_later_commit(tmp_path, monkeypatch):
+    """The reviewer reproduction: a worktree whose ONLY commit belongs to the third phase
+    resumed with phases 1-2 declared complete and succeeded without running them. A later
+    commit cannot establish that earlier work ran: without its own evidence each phase
+    executes (or re-verifies) on resume."""
+    monkeypatch.setenv("FINOPS_EMIT_SELF", "0")
+    spec_path = tmp_path / "spec.yaml"
+    spec_path.write_text(THREE_PHASE_YAML)
+    spec = load_spec(spec_path)
+    wd = tmp_path / "wd"
+    wd.mkdir()
+    _git_init(wd)
+    goal = "g"
+    _commit_phase_marker(wd, "gamma", goal)  # ONLY the third phase's commit exists
+
+    agent = _FakeAgentExecutor()
+    verifier = _FakeVerifierExecutor()
+    result = run_workflow(
+        spec, goal=goal, model=MODEL, workdir=wd,
+        step_executor=agent, verifier_executor=verifier,
+        publish=False, commit=True, resume=True,
+    )
+    assert result.ok is True
+    # the unexecuted phases RAN (their own evidence was required); gamma had its own commit
+    assert agent.calls == ["alpha", "beta"]
+    assert result.already_complete is False, (
+        "resume declared unexecuted work complete from a later commit"
+    )
+
+
+def test_resume_all_phases_with_their_own_commits_skips_everything(tmp_path, monkeypatch):
+    """The legitimate logical-completion case stays: every phase has its OWN commit → the
+    resume executes nothing and records already_complete (never a manufactured failure)."""
+    monkeypatch.setenv("FINOPS_EMIT_SELF", "0")
+    spec_path = tmp_path / "spec.yaml"
+    spec_path.write_text(THREE_PHASE_YAML)
+    spec = load_spec(spec_path)
+    wd = tmp_path / "wd"
+    wd.mkdir()
+    _git_init(wd)
+    goal = "g"
+    for phase in ("alpha", "beta", "gamma"):
+        _commit_phase_marker(wd, phase, goal)
+
+    agent = _FakeAgentExecutor()
+    result = run_workflow(
+        spec, goal=goal, model=MODEL, workdir=wd,
+        step_executor=agent, verifier_executor=_FakeVerifierExecutor(),
+        publish=False, commit=True, resume=True,
+    )
+    assert agent.calls == []
+    assert result.already_complete is True
+    assert result.phases == []
