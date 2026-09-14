@@ -491,7 +491,15 @@ body {
   flex-direction: column;
   gap: 4px;
   min-height: 0;
-  overflow: hidden;
+  /* The region never overflows the page horizontally (the live gate's ia-region-h-scroll
+     refusal): a narrow viewport scrolls the ROSTER inside R2 instead of pushing the row bands
+     past the region edge. ``min-width: 0`` forces the flex child to the container width so
+     its own overflow-x scrolls (a flex child's default min-width would otherwise grow it to
+     the row content and re-overflow the region). */
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
 }
 
 /* The run OBJECT. Not a service row: a left status rail, a monospace session identity band, a
@@ -1572,4 +1580,9 @@ body {
   display: flex;
   flex-direction: column;
   gap: var(--cr-space-2);
+  /* The slice's below-fold reachability: a long run detail scrolls INSIDE the drawer, so its
+     blocker/output, step timings, and the governed action→result chain stay reachable without
+     hunting through the page (the acceptance interaction class asserts this container). */
+  max-height: 60vh;
+  overflow-y: auto;
 }
