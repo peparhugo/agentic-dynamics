@@ -1094,3 +1094,35 @@ class TestRecordingProbe:
             sc._recording_lines({"status": "measured", "gap_days": [], "phantom_close_claims": []})
             == []
         )
+
+
+# ── close-sequence repair (2026-09-13 mixed-artifact-dir regression) ──────────
+
+
+def test_close_sequence_number_counts_peers_across_a_mixed_artifact_dir(tmp_path):
+    """The KB dir holds EVERY producer's artifacts. A non-session artifact classifies to a
+    ``None`` payload — the unguarded ``payload.get`` used to raise there, the outer ``except``
+    returned 1, and every same-day close got ``close_seq = 1`` with ordering falling back to
+    the lexicographic slug (the live 2026-09-13 bug). The repair: the guard lives inside the
+    per-artifact try, so foreign artifacts skip and session peers still count.
+    """
+    first = si.derive_session_record(_session(slug="slot_a"))
+    (tmp_path / f"{first.knowledge_id}.json").write_bytes(record_to_artifact(first))
+    # A foreign artifact in the middle of the filename-ordered scan — the killer case.
+    (tmp_path / "00_foreign_decision.json").write_text(
+        json.dumps({"source_type": "decision", "extractor_version": "decision/v1"}),
+        encoding="utf-8",
+    )
+    second = si.derive_session_record(_session(slug="slot_b"))
+    (tmp_path / f"{second.knowledge_id}.json").write_bytes(record_to_artifact(second))
+    # Two same-date peers with different slugs, despite the foreign artifact between them.
+    assert si._close_sequence_number("2026-09-03", "slot_c", tmp_path) == 3
+
+
+def test_close_sequence_number_with_only_foreign_artifacts_is_one(tmp_path):
+    """A dir with only non-session artifacts yields close_seq 1 — no peers, no crash."""
+    (tmp_path / "00_foreign_decision.json").write_text(
+        json.dumps({"source_type": "decision", "extractor_version": "decision/v1"}),
+        encoding="utf-8",
+    )
+    assert si._close_sequence_number("2026-09-03", "slot_c", tmp_path) == 1

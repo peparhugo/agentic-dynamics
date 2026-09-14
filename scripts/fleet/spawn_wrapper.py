@@ -998,6 +998,14 @@ def validate_submit_request(
                 f"fleet/base, fleet/orchestrator, fleet/supervisor, or a third-party image)"
             )
 
+    # Step 9 — the deployment probe (remediation closed-loop, decision f987cde9) lives in the
+    # BROKER's submit path (its ``deployment_probe``), not here: the probe must run git, and
+    # this module's contract bans subprocess entirely (the no-docker/no-subprocess guard,
+    # test_spawn_wrapper_contains_no_docker_invocation). The broker — the only module allowed
+    # to run subprocess — re-validates the submit and then probes the workdir base against the
+    # repo's main tip before the compose call, so the stale-worktree class still refuses, just
+    # at the last gate instead of the first.
+
     return errors
 
 
