@@ -1,0 +1,533 @@
+name: control_room_instrument_build
+question: >-
+  BUILD the Control Room per the accepted design determination
+  (docs/website/control_room_ui/design_determination.md, "The Scroll-Synthesized Instrument"):
+  the canonical first-viewport glance (ON-G1..G7, sticky R0) above seven below-fold bands
+  (Fleet, Money, Workforce, Trends, Boards, Sessions, System) that re-house the old
+  dashboard's working set, nine SVG charts, the three-tier workforce view, the parity/truth
+  gates, and the controller's acceptance: the live render gate with screenshots.
+version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: false
+repeatable: false
+workflow:
+  kind: agent_task
+  params:
+    rag_augment: true
+    rag_params:
+      repository_id: "agentic-dynamics"
+      rag_token_limit: 8000
+    language: python
+    fork: false
+    context:
+      domain_context: >-
+        canonical_sources: [docs/website/control_room_ui/design_determination.md (THE spec —
+        winner, dispositions A-1..A-13, board/band inventory §3, chart spec §4, workforce §5,
+        visual language §6, migration order §7 with per-gate acceptances; every phase below
+        implements one slice of it), docs/research/control_room_ia.md §4/§10 (the glance
+        contract + gate assertions, as amended by p1a), docs/research/control_room_direction.md
+        (data/truth contracts ONLY), experiments/research/control_room/parity_inventory.json
+        (235 items, surface palette — the class-P unit), apps/control_room/static/ (current
+        shell: index.html/app.js/shell.js/charts.js), apps/control_room/routes/ (available
+        data carriers), scripts/verify_control_room_rendering.py (the render gate),
+        src/agentic_dynamics/control/control_db.py + runtime/queue_timings.py (timing carriers)]
+        policies: [the determination is the design — do not re-decide it; vanilla JS + Flask
+        shell, NO build step, NO chart runtime (SVG+CSS micro-marks only), NO new mutating
+        route, NO density switch, NO per-card sparkline, NO decorative motion; the first
+        viewport stays the canonical glance; the old dashboard's capabilities re-house as
+        bands, never as DOM copies; truth contract: packet-emitted values only, missing is
+        unknown+reason never 0, per-value provenance; every chart states §7's eight fields;
+        one arrangement per breakpoint; phases are small and each leaves the tree green]
+        verification: [tests/test_doc_lifecycle.py, tests/test_fast_path_gate.py,
+        tests/test_render_gate_captures.py, tests/test_control_room_parity.py,
+        tests/test_admin_frontend.py]
+    phases:
+      # ── P0: parity ground truth ──────────────────────────────────────────────
+      - name: p0a_reanchor_parity
+        kind: agent
+        scope: implementation
+        timeout: 1800
+        prompt: |
+          GOAL: {goal}
+          Re-anchor the parity inventory to the DECLARED old dashboard. In
+          experiments/research/control_room/parity_inventory.json the inputs.old_index.sha256
+          is e26d36a3… (git 349f06753) but the prose pins 1457b9299. Fix the BUILDER (the
+          script named in the inventory's generated_by field, or the script that regenerates
+          it): point it at 1457b9299, add the missing operations and surfaces boards (12 ids
+          the 349f06753 anchor omits), and make sum(summary.surface_counts) == len(items)
+          (it is 269 vs 235 today). Regenerate the inventory, commit it AND the builder fix.
+          Do not touch any UI file in this phase.
+          VERIFY (both directions): re-run the builder and show the regenerated inventory
+          (a) pins sha256 == sha256(git show 1457b9299:apps/control_room/static/index.html),
+          (b) counts the same ids as that commit, (c) sums surface_counts == len(items);
+          extend tests/test_control_room_parity.py to assert all three and run it green.
+      - name: p0b_parity_gate
+        kind: test
+        scope: implementation
+        timeout: 900
+        tests:
+          - tests/test_control_room_parity.py
+        prompt: |
+          The parity unit is the class-P ground truth. If a test fails, fix the inventory or
+          the builder — never weaken the gate, never touch a UI file.
+      # ── P1: the contract amendment + gate ────────────────────────────────────
+      - name: p1a_ia_amendment
+        kind: agent
+        scope: implementation
+        timeout: 1200
+        prompt: |
+          GOAL: {goal}
+          Amend docs/research/control_room_ia.md §4 and §10 per the determination §2.2: page
+          scroll becomes a FIRST-VIEWPORT property — all seven ON-G1..G7 answers fully inside
+          the initial viewport with zero page/region scroll THERE; below the fold the page
+          scrolls; R0 is sticky. Edit the exact sentences that fix "the page does not scroll"
+          and the §10 mechanical checks that match; keep every other §4/§10 assertion intact.
+          Cite the re-baseline decision 9f357fce and the determination §2.2 in the amendment.
+          Commit ONLY the doc diff.
+          VERIFY: python3 -m pytest tests/test_doc_lifecycle.py -q green; the amended §4 still
+          names all seven ON-G1..G7 with their canonical regions.
+      - name: p1b_gate_first_viewport
+        kind: agent
+        scope: implementation
+        timeout: 1800
+        prompt: |
+          GOAL: {goal}
+          Make scripts/verify_control_room_rendering.py enforce the AMENDED contract: add a
+          scoped first-viewport assertion (all seven answers fully inside the initial viewport
+          with zero page and region scroll at 1440x900/1024x768/390x844) as a new check id,
+          and add a below-fold band fixture (F-8) asserting the seven band sections exist and
+          render non-empty below the fold. Keep the re-baseline: vertical page scroll below
+          the fold is ALLOWED; horizontal overflow is refused (do not re-ban page scroll).
+          Update the primitives line to state the scoped contract. Do not touch the app.
+          VERIFY: extend tests/test_render_gate_captures.py (or a new gate unit test) to prove
+          the scoped check fires on a probe dict that violates the first viewport and passes
+          on one that scrolls only below the fold; run green; python3 scripts/
+          verify_control_room_rendering.py --check-fixtures exits 0.
+      - name: p1c_contract_gate
+        kind: test
+        scope: implementation
+        timeout: 900
+        checkpoint: true
+        tests:
+          - tests/test_doc_lifecycle.py
+          - tests/test_render_gate_captures.py
+          - tests/test_control_room_parity.py
+          - tests/test_fast_path_gate.py
+        prompt: |
+          The controller ratifies the P1 amendment at this checkpoint. Fix failures by fixing
+          the docs/gate — never by weakening an assertion.
+      # ── P2: the one additive read-only route ─────────────────────────────────
+      - name: p2a_timings_route
+        kind: agent
+        scope: implementation
+        timeout: 2400
+        prompt: |
+          GOAL: {goal}
+          Add the ONE additive route the determination permits: GET /api/timings (per-run
+          ?run=<run_id> and aggregate) serving ONLY first_token_at and the
+          cost_inference/cost_orchestration split from the run ledgers
+          (experiments/results/workflows/<spec>/<ts>_<run_id>.json, the run_id mapping per
+          the determination §2.3). It is GET-only and writes NOTHING; it does NOT touch the
+          control DB schema. An absent experiments/results/queue_timings.jsonl renders an
+          honest empty population (explicit empty state), never an error or a zero; a field
+          the ledger lacks renders null/unknown with a reason. Register it in
+          apps/control_room/routes/ (the analytics or telemetry module).
+          VERIFY (both directions): add pytest tests — the route is GET-only (POST/PUT/DELETE
+          refuse), a real-ledger fixture returns measured first_token/cost split, an absent
+          queue_timings.jsonl renders the empty population, and the control DB schema is
+          unchanged (byte-compare the DDL). Run green.
+      - name: p2b_timings_gate
+        kind: test
+        scope: implementation
+        timeout: 900
+        tests:
+          - tests/test_control_room_timings_route.py
+        prompt: |
+          Fix the route or its tests — never add a mutating verb, never fabricate data.
+      # ── The below-fold shell ─────────────────────────────────────────────────
+      - name: b0_band_shell
+        kind: agent
+        scope: implementation
+        timeout: 1800
+        prompt: |
+          GOAL: {goal}
+          Add the below-fold band container to the room shell (apps/control_room/static/):
+          one <main> with seven <section data-band="..."> placeholders — fleet, money,
+          workforce, trends, boards, sessions, system — in the determination §3.1 band order,
+          plus a band anchor nav and skip links. Each band begins with its header line
+          (name + scope + source + age placeholders for p6b). No data wiring yet; the glance
+          (R0-R3) stays exactly as it is. No chart, no router, no framework.
+          VERIFY: the F-8 fixture from p1b sees seven band sections below the fold; the
+          existing glance tests still pass (python3 -m pytest tests/test_admin_frontend.py -q).
+      - name: p1d_sticky_masthead
+        kind: agent
+        scope: implementation
+        timeout: 1200
+        prompt: |
+          GOAL: {goal}
+          Make R0 position: sticky in the room shell so the trust/epoch strip stays visible
+          while the page scrolls through the bands. One CSS change plus whatever minimal
+          z-index/offset the layout needs. No other visual change.
+          VERIFY: add/extend a gate probe (verify_control_room_rendering.py live class or a
+          unit probe) asserting R0 remains in-viewport after a below-fold scroll; run the
+          probe green; the first-viewport assertions from p1b still pass.
+      # ── The seven bands, one phase each ──────────────────────────────────────
+      - name: b1_fleet_band
+        kind: agent
+        scope: implementation
+        timeout: 1800
+        prompt: |
+          GOAL: {goal}
+          Wire the FLEET band: the old #board-fleet capability (full agent-session roster,
+          run states, live state) rendered dense and banded from GET /api/matrix. Present,
+          non-empty, provenance per the truth contract. No chart here.
+          VERIFY: the band renders non-empty rows from a committed fixture; extend the
+          band fixture check to assert it.
+      - name: b2_money_band
+        kind: agent
+        scope: implementation
+        timeout: 1800
+        prompt: |
+          GOAL: {goal}
+          Wire the MONEY band: the R3a five values (spend/burn/quota/wallet/leases) plus the
+          old #board-status capability — reported cost, history-capped, settlement status,
+          subscription usage (GET /api/matrix, /api/subscription-usage). Values carry
+          source/age chips; missing is unknown+reason, never 0.
+          VERIFY: band renders the five values non-empty from a committed fixture; the R3a
+          glance answer stays as it is (the band is detail, not a duplicate answer).
+      - name: b3_workforce_tiers
+        kind: agent
+        scope: implementation
+        timeout: 2400
+        prompt: |
+          GOAL: {goal}
+          Wire the WORKFORCE band — three tiers per the determination §5: AGENTS (session id,
+          model, workdir, phase, attempt, per-attempt step duration from GET /api/runs/<id>,
+          first-token from /api/timings, tokens by answer/explanation, cost provenance),
+          WORKERS (unhealthy_workers, occupancy, leases, queue depth, p50/p95 queue-wait and
+          service-time from GET /api/queue/sla), OPERATORS (awaiting_approvals, promotable
+          runs, live grants, decision records from the control packet / /api/decisions /
+          /api/docs-health). Honesty rules from §5: unknown + reason, sample counts, and
+          last-success age on a failed fetch.
+          VERIFY: band renders all three tiers non-empty from committed fixtures; a
+          missing-distribution fixture renders n_with_queue_wait counts, not a fabricated 0.
+      - name: b4_trends_band
+        kind: agent
+        scope: implementation
+        timeout: 1200
+        prompt: |
+          GOAL: {goal}
+          Build the TRENDS band shell: the band header plus three empty chart slots
+          (throughput, failure, dependency) in the determination §4 layout. Slots are <div
+          data-chart="..."> placeholders — the chart steps fill them. No data wiring beyond
+          the slots.
+          VERIFY: the three slots exist with the data-chart ids the chart steps name;
+          band renders in the F-8 fixture.
+      - name: b5_boards_band
+        kind: agent
+        scope: implementation
+        timeout: 2400
+        prompt: |
+          GOAL: {goal}
+          Wire the BOARDS band: attention rows (flags, reserved risk + decision rows from
+          GET /api/flags and the control packet), the routing composition surface (GET
+          /api/routing if served), and the re-housed surfaces: registry (L-REGISTRY), docs
+          (L-COMPOSITION/DOCS), queue (QUEUE), audit (AUDIT). Replace-with-reason is fine
+          where the determination §3.1 says so — document the reason in the band.
+          VERIFY: every sub-surface the band claims renders present/non-empty (or a
+          documented empty state) from committed fixtures.
+      - name: b6_sessions_band
+        kind: agent
+        scope: implementation
+        timeout: 1800
+        prompt: |
+          GOAL: {goal}
+          Wire the SESSIONS band: the session list (L-SESSIONS) plus the R4b per-worker event
+          stream and action band, re-housed from the old #board-sessions. No mutating
+          controls yet (p5b wires the doors).
+          VERIFY: band renders non-empty from a committed fixture; the event stream shows
+          structurally legal rows.
+      - name: b7_system_band
+        kind: agent
+        scope: implementation
+        timeout: 1800
+        prompt: |
+          GOAL: {goal}
+          Wire the SYSTEM band: the system-sheet overflow re-housed — search, registry,
+          queue, system state (SYSTEM surface), health detail (L-HEALTH/R3b as detail, not
+          an answer). Queue controls render read-only here (doors land in p5b).
+          VERIFY: band renders non-empty from a committed fixture.
+      # ── P3: the nine charts, one phase each ──────────────────────────────────
+      - name: c1_step_duration_chart
+        kind: agent
+        scope: implementation
+        timeout: 1800
+        prompt: |
+          GOAL: {goal}
+          Chart #1 (determination §4): step/phase duration, per-model p50/p95 horizontal bars,
+          LOG scale, explicit UNKNOWN height, in the WORKFORCE band, from GET /api/runs/<id>
+          attempts (started_at/ended_at). SVG+CSS micro-marks only (viewBox, currentColor,
+          real <text>, <title>/role); states the eight §7 fields; fewer than two samples =
+          explicit empty state; a gap is a gap, never 0.
+          VERIFY: a unit test exercises the builder with a known attempts payload and asserts
+          p50/p95 marks + UNKNOWN handling; the chart renders in the band fixture.
+      - name: c2_queue_timing_chart
+        kind: agent
+        scope: implementation
+        timeout: 1800
+        prompt: |
+          GOAL: {goal}
+          Chart #2: queue timing (wait vs service) — stacked span bars on one shared time axis
+          from GET /api/queue/sla recent_completions, in the WORKFORCE band, with the textual
+          table alongside. Same SVG + eight-fields + empty-state rules as c1.
+          VERIFY: unit test over a known timings payload asserts the spans; renders in fixture.
+      - name: c3_first_token_chart
+        kind: agent
+        scope: implementation
+        timeout: 1800
+        prompt: |
+          GOAL: {goal}
+          Chart #3: first-token latency p50/p95 bars on the SAME scale as #1, in the WORKFORCE
+          band, from GET /api/timings. unknown renders as an explicit UNKNOWN bar, not 0.
+          Same SVG + eight-fields + empty-state rules.
+          VERIFY: unit test over a ledger fixture (measured and unknown fields) asserts both
+          bars; renders in fixture.
+      - name: c4_spend_chart
+        kind: agent
+        scope: implementation
+        timeout: 1800
+        prompt: |
+          GOAL: {goal}
+          Chart #4: cost/burn trend — re-house the existing charts.js spend builder into the
+          MONEY band, bound to GET /api/matrix reported_cost/history_capped; the cap is a
+          bounded quantity + progress, not a free-floating mark. States the eight §7 fields.
+          VERIFY: unit test over a history fixture; the cap renders as a bound.
+      - name: c5_throughput_chart
+        kind: agent
+        scope: implementation
+        timeout: 1800
+        prompt: |
+          GOAL: {goal}
+          Chart #5: throughput — re-house charts.js throughput into the TRENDS band
+          (throughput slot), bound to the browser-session ring or GET /api/queue/sla when
+          served, with a scope label stating which. Eight §7 fields.
+          VERIFY: unit test over a ring fixture; the scope label renders.
+      - name: c6_failure_chart
+        kind: agent
+        scope: implementation
+        timeout: 1800
+        prompt: |
+          GOAL: {goal}
+          Chart #6: failure accumulation — re-house charts.js failure into the TRENDS band
+          (failure slot), bound to /api/matrix and /api/glance failed counts, zero baseline;
+          fallback is the ON-G3 risk answer. Eight §7 fields.
+          VERIFY: unit test over a failed-counts fixture; zero-baseline asserted.
+      - name: c7_dependency_chart
+        kind: agent
+        scope: implementation
+        timeout: 1800
+        prompt: |
+          GOAL: {goal}
+          Chart #7: dependency health — re-house charts.js dependency into the TRENDS band
+          (dependency slot), bound to /api/projections and /api/flags; gauge ONLY because a
+          maximum (lag 0) exists. Eight §7 fields.
+          VERIFY: unit test over a projections fixture; gauge bounds asserted.
+      - name: c8_provider_window_chart
+        kind: agent
+        scope: implementation
+        timeout: 1800
+        prompt: |
+          GOAL: {goal}
+          Chart #8: provider-window pace — a NEW builder in the MONEY band bound to
+          /api/subscription-usage (5h/7d window usage): bounded quantity + progress (v2 Y2
+          ADAPT, direction §7 priority 4). Eight §7 fields; an unreadable window is
+          unknown+reason.
+          VERIFY: unit test over a usage fixture; unknown window renders honestly.
+      - name: c9_cost_split_chart
+        kind: agent
+        scope: implementation
+        timeout: 1800
+        prompt: |
+          GOAL: {goal}
+          Chart #9: cost split (inference vs orchestration) — a NEW two-segment proportional
+          bar in the MONEY band from GET /api/timings; an absent component renders an
+          unknown segment. Eight §7 fields.
+          VERIFY: unit test over a split fixture (both, one, neither) asserts all three
+          renderings.
+      - name: cA_charts_gate
+        kind: test
+        scope: implementation
+        timeout: 900
+        tests:
+          - tests/test_control_room_charts.py
+        prompt: |
+          Every chart states the eight §7 fields, obeys the SVG rules, and an under-two-sample
+          series renders an explicit empty state — fix chart builders or tests, never weaken.
+      # ── Adversary 1: attack the built shell + bands + charts ─────────────────
+      - name: adv1_adversarial_midpoint
+        kind: agent
+        scope: implementation
+        run_model: openai/gpt-6-astra
+        timeout: 2400
+        prompt: |
+          GOAL: {goal}
+          ADVERSARIAL review of the build so far (shell, bands, charts, timings route) into
+          docs/reviews/control_room_instrument_build_adversarial_1.md. Attack, do not praise:
+          (a) fidelity — does each band actually re-house its old board's capability, or is it
+          a renamed stub? (b) truthfulness — any value that can render fabricated/0/stale as
+          green, any missing provenance chip? (c) the charts — do they state all eight §7
+          fields, do gaps render as gaps, does any chart violate the no-first-viewport rule?
+          (d) the route — can /api/timings leak, write, or fabricate? (e) the gate — any
+          acceptance in the build's own phases that is vacuous (passes without measuring)?
+          Severity-ranked findings, each with the required correction and the acceptance that
+          proves it. Then FIX every finding on the branch yourself (or record it as an
+          accepted limitation with reason). At least 3 findings or a clean sweep with
+          re-verification evidence — a bare PASS is a failed review. Commit the review doc and
+          the fixes.
+      # ── P4: the R4d inspector grid ───────────────────────────────────────────
+      - name: r4d_timings_grid
+        kind: agent
+        scope: implementation
+        timeout: 1800
+        prompt: |
+          GOAL: {goal}
+          Build the R4d per-attempt step-timing grid in the inspector dock from GET
+          /api/runs/<id> + GET /api/timings: per-attempt rows (phase, model, started/ended,
+          duration, first-token) with measured/unknown chips. The dock opens without moving
+          the page (the lens rules from the determination §4/§5).
+          VERIFY: unit test over a run-detail fixture; the dock-open probe still passes
+          (no page jump).
+      # ── P5: fidelity + the 57 mutating controls ──────────────────────────────
+      - name: p5a_control_placement
+        kind: agent
+        scope: implementation
+        timeout: 2400
+        prompt: |
+          GOAL: {goal}
+          Write docs/website/control_room_ui/control_placement.md: the per-id placement table
+          for ALL 57 mutating-control ids (five families: supervisor-controls 11,
+          claude-agent-controls 16, cell-panel 11, queue-controls 7, design-controls 12) —
+          each id → its band/dock home → its governed action and door (determination §3.5).
+          Every door must name an EXISTING route at HEAD; no new mutating route. Irreversible
+          acts keep the typed confirmation and a receipt.
+          VERIFY: the table covers all 57 ids (count them in the doc and assert the count in
+          a test); every route named exists (test greps apps/control_room/routes).
+      - name: p5b_control_doors
+        kind: agent
+        scope: implementation
+        timeout: 2400
+        prompt: |
+          GOAL: {goal}
+          Wire the doors from p5a's table into the bands: supervisor interrupt behind the
+          typed INTERRUPT <session_id> confirmation (POST /api/flags/<id>/interrupt), queue
+          enqueue/clear/reinterleave through the idempotent POST /api/experiments boundary,
+          the session/design controls through their existing routes — each with confirm +
+          receipt. NO new route, NO route behavior change.
+          VERIFY: pytest asserts the wired doors call the existing endpoints with the
+          confirmation/idempotency contract; nothing else mutated.
+      - name: p5c_parity_gate
+        kind: test
+        scope: implementation
+        timeout: 1200
+        tests:
+          - tests/test_control_room_parity.py
+        prompt: |
+          Class-P: every inventory item present/wired/non-empty (or a documented empty state);
+          routes_dropped_by_facelift: 0. Fix the build, never the inventory's expectations.
+      # ── P6: visual language + wall guard + acceptance ────────────────────────
+      - name: p6a_visual_tokens
+        kind: agent
+        scope: implementation
+        timeout: 1800
+        prompt: |
+          GOAL: {goal}
+          Apply the determination §6 visual language: a semantic token set (surface, line,
+          text-primary, text-muted + status set), monospace for identity and numerics,
+          ≥13px desktop / ≥12px mobile / ≥11px labels type floor, light/dark/forced-colors
+          via system colors + currentColor, the single brand-orange reserved for
+          awaiting_promotion, state = glyph + word + colour (never colour-only), motion
+          transitions-only (~100-240ms, prefers-reduced-motion collapses).
+          VERIFY: extend the style gate to assert the token set + type floor + colour-only
+          violations; run green.
+      - name: p6b_provenance
+        kind: agent
+        scope: implementation
+        timeout: 1800
+        prompt: |
+          GOAL: {goal}
+          Complete the provenance system: every band header carries name + scope + source +
+          observation age; every consequential value carries a source/age chip
+          (measured/estimated/unknown); a failed fetch shows last-success age, never a blank;
+          stale never reads as all-clear. Reuse charts.js's null-not-zero parsing.
+          VERIFY: the stale-fixture gate case shows ages + explicit unknown, never
+          green-over-stale; run the relevant gate class green.
+      - name: p6c_dom_audit
+        kind: agent
+        scope: implementation
+        timeout: 1800
+        prompt: |
+          GOAL: {goal}
+          Ship the deterministic DOM audit as pytest (tests/test_control_room_dom_audit.py):
+          no .kpi selector anywhere; every band carries its header line; every chart carries
+          the eight §7 fields; the whole-page thesis-failure A/B (the determination §2 C2
+          restraint). Deterministic — the audit reads the committed shell fixtures, never
+          live Redis/network.
+          VERIFY: the audit passes on the built tree.
+      - name: p6d_a11y
+        kind: agent
+        scope: implementation
+        timeout: 1800
+        prompt: |
+          GOAL: {goal}
+          Accessibility pass per §6: band skip links, focus lands on the band heading, one
+          transition-only polite live region, semantic table controls, keyboard operation,
+          WCAG 2.2 AA contrast, forced-colours safe, aria-hidden decorative. No new
+          dependencies.
+          VERIFY: the a11y gate class passes on the built tree.
+      # ── Adversary 2: the full falsification pass before acceptance ──────────
+      - name: adv2_adversarial_final
+        kind: agent
+        scope: implementation
+        run_model: openai/gpt-6-astra
+        timeout: 2400
+        prompt: |
+          GOAL: {goal}
+          FINAL adversarial review of the complete build into
+          docs/reviews/control_room_instrument_build_adversarial_2.md. Try to FALSIFY the
+          acceptance claim itself: (a) class-P — is every parity item genuinely present/wired/
+          non-empty, or is the gate satisfied by an empty-state shell? (b) the 57 mutating
+          controls — does every id have a real home and door, and do the doors obey the
+          confirmation/idempotency contracts? (c) provenance — can any stale or failed feed
+          render as green/all-clear? (d) the render gate — would the live gate pass the build,
+          or are the committed fixtures lying (a fixture that passes while the live page
+          violates)? Run the live gate yourself if the environment allows; if not, say exactly
+          what blocks it. (e) the determination's own dispositions A-1..A-13 — any of them
+          under-executed? Severity-ranked, each with the correction + its acceptance. Then FIX
+          every finding on the branch (or record it as an accepted limitation with reason).
+          At least 3 findings or a clean sweep with re-verification evidence — a bare PASS is
+          a failed review. Commit the review doc and the fixes.
+      - name: p6e_final_gate
+        kind: agent
+        scope: implementation
+        timeout: 3600
+        checkpoint: true
+        prompt: |
+          GOAL: {goal}
+          Run the FULL live render gate: python3 scripts/verify_control_room_rendering.py
+          --live (all classes: geometry, semantics, charts, visuals, style, a11y, live IA-core,
+          feature-parity) at all three viewports and both themes, WITH screenshots. Iterate on
+          every violation until the gate is PASS with captures > 0 (zero captures is now a
+          structural FAIL). Commit the gate report + screenshots. This checkpoint is the
+          controller's screenshot review — do not proceed past it.
+          VERIFY: the committed gate_report.md says Status: PASS with a non-zero screenshot
+          rollup, and the live run's exit code is 0.
+factors:
+  - {name: model, levels: [deepseek/deepseek-v4-flash]}
+design: factorial
+rules: []
+metrics: []
+writeup: {format: lab_book, sections: [question]}
+stop: {budget_usd: 20.0, max_attempts: 1}
