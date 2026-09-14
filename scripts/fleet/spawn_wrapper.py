@@ -1062,7 +1062,16 @@ def validate_submit_request(
                     "submit: admission.required must be a boolean "
                     f"(got {required!r})"
                 )
-            for field, positive in (("campaign_budget_usd", False), ("campaign_concurrency", True)):
+            for field, positive in (
+                ("campaign_budget_usd", False), ("campaign_concurrency", True),
+                # The per-phase reservation the armed gate's per-token leases need (2026-09-14:
+                # the armed resubmission was denied with `cost_source=unknown` because the
+                # submit contract never carried the reserve the previous manual launch set by
+                # hand — the gate held, the rail lacked the field). `reserve_usd` must be
+                # POSITIVE: a per-token phase cannot reserve nothing (an unknown cost is never
+                # free); `hard_cap_usd` is the dollar ceiling the lease is checked against.
+                ("reserve_usd", True), ("hard_cap_usd", False),
+            ):
                 value = admission.get(field)
                 if value is None:
                     continue

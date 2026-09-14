@@ -834,3 +834,24 @@ def test_build_submit_argv_carries_the_execution_settings():
     assert "--output-token-limit" in argv and "64000" in argv
     assert "--timeout" in argv and "2400" in argv
     assert "--no-commit" in argv
+
+
+def test_build_submit_argv_carries_the_reserve_and_cap():
+    """The armed gate's per-token leases DENY without a stated reserve (2026-09-14: the armed
+    resubmission died with `cost_source=unknown`). The reserve/cap values must survive the hop
+    exactly like the other admission settings."""
+    argv = launch_broker.build_submit_argv({
+        "spec": "workflows/repository/x.yaml", "goal": "g",
+        "model": "deepseek/deepseek-v4-flash", "workdir": "/tmp/wt_x",
+        "admission": {"required": True, "campaign_budget_usd": 20.0,
+                      "reserve_usd": 0.6, "hard_cap_usd": 1.0},
+    }, compose="dc", compose_file="/c.yml")
+    assert "FINOPS_RESERVE_USD=0.6" in argv
+    assert "FINOPS_HARD_CAP_USD=1.0" in argv
+    # absent fields stay absent — never a fabricated zero
+    bare = launch_broker.build_submit_argv({
+        "spec": "workflows/repository/x.yaml", "goal": "g",
+        "model": "deepseek/deepseek-v4-flash", "workdir": "/tmp/wt_x",
+    }, compose="dc", compose_file="/c.yml")
+    assert not any("FINOPS_RESERVE_USD" in a for a in bare)
+    assert not any("FINOPS_HARD_CAP_USD" in a for a in bare)

@@ -1891,3 +1891,16 @@ def test_submit_execution_settings_are_type_validated():
         "timeout_seconds": 2400, "no_commit": False,
     })
     assert validate_submit_request(good) == []
+
+
+def test_submit_admission_reserve_and_cap_are_type_validated():
+    """A malformed reserve/cap refuses with the rest of the submit; a positive reserve passes."""
+    base = _valid_submit_request()
+    bad_reserve = dict(base, admission={"required": True, "reserve_usd": 0})
+    assert any("reserve_usd must be a positive number" in e
+               for e in validate_submit_request(bad_reserve))
+    bad_cap = dict(base, admission={"required": True, "hard_cap_usd": -1})
+    assert any("hard_cap_usd must be a non-negative number" in e
+               for e in validate_submit_request(bad_cap))
+    good = dict(base, admission={"required": True, "reserve_usd": 0.6, "hard_cap_usd": 1.0})
+    assert validate_submit_request(good) == []

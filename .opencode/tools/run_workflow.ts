@@ -27,6 +27,12 @@ export default tool({
     campaign_concurrency: tool.schema.number().optional().describe(
       "The campaign concurrency cap the run applies to the lease registry.",
     ),
+    admission_reserve_usd: tool.schema.number().optional().describe(
+      "Per-phase dollar reservation for per-token models (the armed gate denies without a stated reserve).",
+    ),
+    admission_hard_cap_usd: tool.schema.number().optional().describe(
+      "Per-lease dollar ceiling for per-token models.",
+    ),
     orchestrator: tool.schema.boolean().optional().default(true).describe(
       "Run through the durable containerized path (fleet submit) — the DEFAULT per the project rules. Pass false only for an explicitly requested deterministic local run.",
     ),
@@ -84,6 +90,10 @@ export default tool({
     if (admissionArmed) submitFlags.push("--admission-required")
     if (args.campaign_budget_usd !== undefined) submitFlags.push("--campaign-budget-usd", String(args.campaign_budget_usd))
     if (args.campaign_concurrency !== undefined) submitFlags.push("--campaign-concurrency", String(args.campaign_concurrency))
+    // The armed gate's per-token leases DENY without a stated reserve (an unknown cost is
+    // never free); these values must survive the hop exactly like the other admission settings.
+    if (args.admission_reserve_usd !== undefined) submitFlags.push("--reserve-usd", String(args.admission_reserve_usd))
+    if (args.admission_hard_cap_usd !== undefined) submitFlags.push("--hard-cap-usd", String(args.admission_hard_cap_usd))
     // Every accepted execution setting is FORWARDED through the durable path (Astra finding,
     // 2026-09-14): the tool's defaults are the requested behavior, and a setting that were
     // accepted but dropped would deliver "I requested one execution behavior and got another".
