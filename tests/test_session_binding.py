@@ -290,6 +290,13 @@ class TestCapsuleComposition:
         rendered = self._capsule(tmp_path, _binding(), budget=at_boundary)["text"]
         assert "session budget: COMPACT" in rendered
 
+        # The post-compaction state renders explicitly: the stale pre-compaction reading is
+        # labeled, never presented as the current context.
+        compacted = dict(budget, post_compaction=True, remaining_tokens=None)
+        capsule_after = self._capsule(tmp_path, _binding(), budget=compacted)
+        assert capsule_after["session_budget"]["post_compaction"] is True
+        assert "post-compaction (pre-compaction reading 189594" in capsule_after["text"]
+
     def test_next_action_precedence(self, tmp_path):
         _close("bound-predecessor", date="2026-09-10", artifact_dir=tmp_path)
         explicit = self._capsule(tmp_path, _binding(next_action="ship it"))

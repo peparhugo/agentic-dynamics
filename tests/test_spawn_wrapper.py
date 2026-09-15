@@ -2102,6 +2102,8 @@ def _capacity_env(tmp_path, monkeypatch) -> None:
     cache = tmp_path / "models.json"
     cache.write_text(_json.dumps(_CAPACITY_CATALOG), encoding="utf-8")
     monkeypatch.setenv("FINOPS_OPENCODE_MODELS_CACHE", str(cache))
+    # Deterministic limits: the fixture catalog, never the host runtime CLI.
+    monkeypatch.setenv("FINOPS_SESSION_CAPACITY_SOURCE", "catalog")
     (tmp_path / "config-home").mkdir(exist_ok=True)
     monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "config-home"))
 
@@ -2195,7 +2197,8 @@ def test_the_budget_is_measured_for_real_against_the_canonical_db(tmp_path, monk
 
 def test_the_gate_consumes_the_shared_override(tmp_path, monkeypatch):
     """The SAME resolution the CLI and capsule consume: FINOPS_SESSION_CTX_LIMIT moves the
-    gate's verdict (below the override → allowed; above → the COMPACT boundary blocks)."""
+    gate's verdict. A policy cap below the native boundary is a LOCAL POLICY close (never a
+    claimed native compaction — reviewer finding)."""
     _capacity_env(tmp_path, monkeypatch)
     db = tmp_path / "override.db"
     _canonical_session_db(db, turns=10, context=120_000)
@@ -2204,7 +2207,38 @@ def test_the_gate_consumes_the_shared_override(tmp_path, monkeypatch):
     assert validate_submit_request(request) == []  # 120K < 968K usable
     monkeypatch.setenv("FINOPS_SESSION_CTX_LIMIT", "100000")
     errors = validate_submit_request(request)
-    assert any("budget verdict is COMPACT" in e for e in errors)
+    assert any("budget verdict is CLOSE" in e for e in errors), errors
+    assert any("LOCAL POLICY" in e for e in errors), errors
+
+
+def test_a_completed_compaction_allows_the_resumed_submission(tmp_path, monkeypatch):
+    """Reviewer reproduction at the gate: after a successful compaction (summary + pending
+    resumed turn) the stale 975K reading must not block the first resumed submit."""
+    import json as _json
+    import sqlite3 as _sqlite3
+
+    _capacity_env(tmp_path, monkeypatch)
+    db = tmp_path / "compacted.db"
+    _canonical_session_db(db, turns=60, context=975_000)
+    request, _ = _valid_bound_request(tmp_path, monkeypatch, db_name=None)
+    monkeypatch.setenv("FINOPS_OPENCODE_DB", str(db))
+    errors = validate_submit_request(request)
+    assert any("budget verdict is COMPACT" in e for e in errors), errors
+
+    con = _sqlite3.connect(db)
+    con.execute(
+        "INSERT INTO message VALUES ('ses_aio', 99000, ?)",
+        (_json.dumps({"role": "assistant", "summary": True, "mode": "compaction",
+                      "finish": "stop",
+                      "tokens": {"total": 975_000, "input": 975_000}}),),
+    )
+    con.execute(
+        "INSERT INTO message VALUES ('ses_aio', 99500, ?)",
+        (_json.dumps({"role": "assistant", "tokens": {"total": 0, "input": 0}}),),
+    )
+    con.commit()
+    con.close()
+    assert validate_submit_request(request) == []
 
 
 def test_a_pending_only_session_has_no_usable_measurement(tmp_path, monkeypatch):

@@ -918,6 +918,7 @@ def _healthy_opencode_db(path, monkeypatch) -> None:
         "deepseek": {"models": {"deepseek-v4-flash": {"limit": {"context": 1_000_000, "output": 384_000}}}}
     }), encoding="utf-8")
     monkeypatch.setenv("FINOPS_OPENCODE_MODELS_CACHE", str(catalog))
+    monkeypatch.setenv("FINOPS_SESSION_CAPACITY_SOURCE", "catalog")
     (path.parent / "config-home").mkdir(exist_ok=True)
     monkeypatch.setenv("XDG_CONFIG_HOME", str(path.parent / "config-home"))
     con = sqlite3.connect(path)
