@@ -1,4 +1,4 @@
-"""session_open.py — the session OPEN command (``agentic-dynamics session open``).
+"""session_open.py — the session OPEN command + the native binding/capsule modes (Unit C).
 
 The s1c deliverable of the ``self_knowledge_layer`` wave (design
 ``docs/designs/proposed/self_knowledge_layer.md``): opens a session by retrieving the LAST
@@ -8,28 +8,43 @@ of the session spine: every session the AIO ends is closed (s1b ``session close`
 session opens with its predecessor's posterior instead of a fresh prior. No prior close
 renders a clear first-session bootstrap message.
 
-The command is a thin CLI shell over :func:`session_ingestion.open_session` — the direct read
-seam over the durable KB artifacts (the same store the close writes, filtered to the AIO's
-org-root ``session/v1`` family). This script owns only argument parsing and the human/machine
-report; the retrieval semantics (org-scoped direct read, deterministic "last" resolution) live
-in the module's docstrings.
+Four modes share this shell (the first is the historical one; the rest are Unit C's native
+binding, the mechanism the AIO capsule plugin calls):
 
-    agentic-dynamics session open                 # the last session's close as opening context
-    agentic-dynamics session open --slug wt_selfk_s1b_close_writer   # one named session slot
+    agentic-dynamics session open [--slug S] [--json]           # the last (or named) close
+    session_open.py --binding --native-session-id ID [--json]    # READ the session's binding
+    session_open.py --bind --native-session-id ID --agent A --request-file - [...]
+                                                                 # CREATE-or-read the binding
+    session_open.py --capsule --native-session-id ID [--json]    # COMPOSE the capsule
 
-``--slug`` is optional — the default read resolves the LAST session closed; naming a slug
-resolves that session slot's most recent close instead. ``--json`` emits the machine
-``session-open/v1`` report (status ``opened`` with the full record, or ``bootstrap``).
+The binding modes are the durable half of the native session binding: the binding is written
+once (first substantive message) and read by every later request — including after a
+coordinator restart and after compaction. ``--bind`` never overwrites an existing binding (the
+original request is immutable); ``--binding`` distinguishes a MISSING store (unavailable) from
+a missing binding (bootstrap); ``--capsule`` composes the bounded capsule from the binding +
+the explicitly selected predecessor/records + the control packet + the measured session
+budget. Knowledge must not import control: the composition lives HERE (scripts may import
+control), and this shell never mutates control state — the packet is read-only.
 
-Exit codes: 0 on every completed open — the bootstrap state (no prior close) is the correct
-first-session answer, never an error. 2 on a usage error.
+Identity resolution (the path trap): ``--artifact-dir`` (or ``FINOPS_KB_ARTIFACT_DIR``)
+names the durable knowledge root explicitly — a feature worktree's empty
+``experiments/results`` is NOT a first-session bootstrap; it is a store-missing state. The
+default remains the repo's canonical ``KB_ARTIFACT_DIR``.
+
+Exit codes: 0 on every completed read/compose — bootstrap, store-missing, and capsule-unbound
+are machine-readable statuses, never usage errors. 2 on a usage error (missing required
+arguments for a mode).
 """
 
 from __future__ import annotations
 
 import argparse
 import json
+import os
+import subprocess
 import sys
+from datetime import datetime, timezone
+from pathlib import Path
 
 try:
     import _bootstrap  # noqa: E402  # direct run: scripts/ is sys.path[0]
@@ -38,13 +53,471 @@ except ImportError:  # imported as scripts.<name> — repo root is on sys.path
 
 from agentic_dynamics.knowledge import session_ingestion as si  # noqa: E402
 
+#: The script directory — sibling scripts (control_status/session_budget) are invoked from here
+#: so the mode works from any cwd.
+SCRIPTS_DIR = Path(__file__).resolve().parent
+
+#: The capsule report schema.
+CAPSULE_SCHEMA = "session-capsule/v1"
+
+#: The binding report schema.
+BINDING_SCHEMA = "session-binding/v1"
+
+#: Default capsule bounds (overridable via ``--max-chars`` / ``--max-records`` / ``--timeout``).
+DEFAULT_MAX_CAPSULE_CHARS = 8000
+DEFAULT_MAX_RECORDS = 6
+DEFAULT_COMMAND_TIMEOUT_S = 20
+RECORD_EXCERPT_CHARS = 1000
+REQUEST_EXCERPT_CHARS = 2000
+CLOSE_LIST_ITEMS = 3
+SELF_NOTES_CHARS = 500
+CLOSE_ITEM_CHARS = 400
+PACKET_APPROVALS = 5
+PACKET_SAFE_ACTIONS = 8
+
+
+def _now_utc() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
+def _truncate(text: str, limit: int) -> tuple[str, int]:
+    """Cut ``text`` to ``limit`` chars, returning ``(text, omitted_chars)``.
+
+    The omitted count is explicit so every bound application can carry a marker — no quiet
+    omission, especially never of a controlling constraint (acceptance text, original request).
+    """
+    text = str(text or "")
+    if len(text) <= limit:
+        return text, 0
+    return text[:limit], len(text) - limit
+
+
+def _resolve_artifact_dir(args: argparse.Namespace) -> Path:
+    """The durable knowledge root: explicit flag/env first, else the canonical checkout path."""
+    from agentic_dynamics.core.paths import KB_ARTIFACT_DIR
+
+    explicit = str(getattr(args, "artifact_dir", "") or os.environ.get("FINOPS_KB_ARTIFACT_DIR", ""))
+    return Path(explicit).expanduser() if explicit else KB_ARTIFACT_DIR
+
+
+# ── external reads (bounded, injectable for tests) ─────────────────────────────
+
+
+def _run_json_command(cmd: list[str], timeout: float) -> dict:
+    """Run a read-only companion script and parse its JSON stdout.
+
+    Never raises. A nonzero exit is NOT automatically a failure: ``session_budget.py`` exits
+    1/2 while still emitting a legitimate machine verdict (WARN/UNJUDGED/CLOSE) — so stdout is
+    parsed whenever it is a JSON object, and the exit code rides along. Only a timeout, an OS
+    error, or unparseable output produces the explicit ``unavailable`` envelope.
+    """
+    try:
+        proc = subprocess.run(
+            cmd, capture_output=True, text=True, timeout=timeout, stdin=subprocess.DEVNULL
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        return {"status": "unavailable", "reason": f"{type(exc).__name__}: {exc}"}
+    payload = None
+    if (proc.stdout or "").strip():
+        try:
+            parsed = json.loads(proc.stdout)
+            if isinstance(parsed, dict):
+                payload = parsed
+        except ValueError:
+            payload = None
+    if payload is None:
+        return {
+            "status": "unavailable",
+            "reason": f"{Path(cmd[1]).name} exited {proc.returncode}: "
+                      f"{(proc.stderr or '').strip()[:300] or 'no parsable JSON'}"
+        }
+    return {"status": "observed", "payload": payload, "exit_code": proc.returncode}
+
+
+def read_control_packet(*, timeout: float = DEFAULT_COMMAND_TIMEOUT_S) -> dict:
+    """Read the ONE control packet (read-only) for the capsule's packet section."""
+    result = _run_json_command(
+        [sys.executable, str(SCRIPTS_DIR / "control_status.py"), "--json"], timeout
+    )
+    if result["status"] != "observed":
+        return result
+    payload = result["payload"]
+    if payload.get("schema") == "control-status/v1":
+        return result
+    # Exit 3 renders an error envelope (no control database) — an explicit state, not a packet.
+    return {
+        "status": "no_control_database" if "control database" in json.dumps(payload) else "unavailable",
+        "reason": str(payload.get("error") or "not a control-status/v1 packet")[:300],
+    }
+
+
+def measure_budget(native_session_id: str, *, timeout: float = DEFAULT_COMMAND_TIMEOUT_S) -> dict:
+    """Measure ``session_budget.py --session-id`` with the NATIVE identity.
+
+    An absent identity or unreadable DB stays UNJUDGED (the script's own contract) — the
+    capsule carries the verdict and its reason, never an invented OK.
+    """
+    result = _run_json_command(
+        [
+            sys.executable,
+            str(SCRIPTS_DIR / "session_budget.py"),
+            "--session-id",
+            native_session_id,
+            "--json",
+            "--no-journal",
+        ],
+        timeout,
+    )
+    if result["status"] != "observed":
+        return {"verdict": "UNJUDGED", "reason": result.get("reason", "measurement unavailable")}
+    payload = result["payload"]
+    return {
+        "verdict": str(payload.get("verdict") or "UNJUDGED"),
+        "turns": payload.get("turns"),
+        "context_tokens": payload.get("context_tokens"),
+        "usage_incomplete": bool(payload.get("usage_incomplete")),
+        "reason": str(payload.get("reason") or ""),
+        "session_id": str(payload.get("session_id") or ""),
+    }
+
+
+# ── capsule composition (knowledge + control composed HERE) ────────────────────
+
+
+def _read_record_excerpt(artifact_dir: Path, knowledge_id: str) -> dict:
+    """Read ONE referenced record's artifact → a bounded excerpt + its provenance fields."""
+    artifact = artifact_dir / f"{knowledge_id}.json"
+    entry: dict = {"knowledge_id": knowledge_id, "status": "found"}
+    if not artifact.is_file():
+        entry["status"] = "unavailable"
+        entry["warning"] = f"artifact {knowledge_id}.json is absent under {artifact_dir}"
+        return entry
+    try:
+        record = json.loads(artifact.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        entry["status"] = "unavailable"
+        entry["warning"] = f"artifact {knowledge_id}.json is unreadable ({exc})"
+        return entry
+    if not isinstance(record, dict):
+        entry["status"] = "unavailable"
+        entry["warning"] = "artifact is not a JSON object"
+        return entry
+    text = str(record.get("text") or "")
+    if " || json: " in text:
+        text = text.split(" || json: ", 1)[0]
+    excerpt, omitted = _truncate(text, RECORD_EXCERPT_CHARS)
+    entry.update(
+        {
+            "source_type": record.get("source_type"),
+            "extractor_version": record.get("extractor_version"),
+            "authority": record.get("authority"),
+            "evidence_class": record.get("evidence_class"),
+            "excerpt": excerpt,
+            "truncated": omitted > 0,
+            "omitted_chars": omitted,
+        }
+    )
+    return entry
+
+
+def _bounded_items(items: list, limit: int = CLOSE_ITEM_CHARS) -> list[str]:
+    """Bound each list item independently, marking every truncated entry (never a quiet cut)."""
+    bounded: list[str] = []
+    for item in items:
+        text, omitted = _truncate(str(item), limit)
+        bounded.append(text + (f" [truncated: {omitted} chars omitted]" if omitted else ""))
+    return bounded
+
+
+def resolve_predecessor(
+    binding_payload: dict, *, artifact_dir: Path, max_records: int = DEFAULT_MAX_RECORDS
+) -> dict:
+    """Resolve the binding's EXPLICITLY selected origin: predecessor close + referenced records.
+
+    The predecessor is the slug the binding names — never "the latest close": an unrelated
+    newer close is invisible here by construction. Each explicitly selected ``knowledge_id``
+    resolves to a bounded excerpt with its source id; ids beyond the record bound are named in
+    ``omitted`` (never silently dropped).
+    """
+    predecessor = binding_payload.get("predecessor") or None
+    if not predecessor:
+        return {"status": "none", "note": "no predecessor was bound to this task"}
+
+    resolved: dict = {
+        "status": "resolved",
+        "slug": predecessor.get("slug"),
+        "knowledge_ids": list(predecessor.get("knowledge_ids") or []),
+    }
+    close = si.open_session(slug=str(predecessor.get("slug")), artifact_dir=artifact_dir)
+    if close.status != "opened" or close.payload is None:
+        resolved["close"] = {
+            "status": "not_found",
+            "requested_slug": predecessor.get("slug"),
+            "note": "the bound predecessor has no close in this store",
+        }
+    else:
+        payload = close.payload
+        resolved["close"] = {
+            "status": "found",
+            "slug": payload.get("slug"),
+            "session_date": payload.get("session_date"),
+            "knowledge_id": close.knowledge_id,
+            "open_threads": _bounded_items(
+                list(payload.get("open_threads") or [])[:CLOSE_LIST_ITEMS]
+            ),
+            "parked": _bounded_items(list(payload.get("parked") or [])[:CLOSE_LIST_ITEMS]),
+            "self_notes": _truncate(str(payload.get("self_notes") or ""), SELF_NOTES_CHARS)[0],
+        }
+
+    records: list[dict] = []
+    omitted: list[str] = []
+    for knowledge_id in resolved["knowledge_ids"]:
+        if len(records) >= max_records:
+            omitted.append(knowledge_id)
+            continue
+        records.append(_read_record_excerpt(artifact_dir, knowledge_id))
+    resolved["records"] = records
+    if omitted:
+        resolved["omitted"] = omitted
+    return resolved
+
+
+def compose_capsule(
+    binding_payload: dict,
+    *,
+    artifact_dir: Path,
+    packet: dict,
+    budget: dict,
+    observed_at: str | None = None,
+    max_chars: int = DEFAULT_MAX_CAPSULE_CHARS,
+    max_records: int = DEFAULT_MAX_RECORDS,
+) -> dict:
+    """Compose the capsule (schema ``session-capsule/v1``) — bounded, explicit, no quiet cuts.
+
+    Sections: (1) native identity + original task + acceptance + work unit; (2) the explicitly
+    selected predecessor and records with source ids; (3) the control packet's facts + degraded/
+    unknown states; (4) the measured session-budget verdict; (5) one next action + the blocker.
+    """
+    request, request_omitted = _truncate(str(binding_payload.get("original_request") or ""), REQUEST_EXCERPT_CHARS)
+    accepted = binding_payload.get("acceptance") or None
+    if accepted is not None:
+        accepted_text, accepted_omitted = _truncate(str(accepted.get("text") or ""), REQUEST_EXCERPT_CHARS)
+        acceptance = {**accepted, "text": accepted_text, "truncated": accepted_omitted > 0,
+                      "omitted_chars": accepted_omitted}
+    else:
+        acceptance = {"status": "not_stated", "note": "the binding carries no acceptance criteria"}
+
+    predecessor = resolve_predecessor(
+        binding_payload, artifact_dir=artifact_dir, max_records=max_records
+    )
+
+    packet_section: dict
+    if packet.get("status") == "observed":
+        payload = packet["payload"]
+        projection_lag = payload.get("projection_lag") or {}
+        unknowns = [name for name, value in projection_lag.items() if value is None]
+        packet_section = {
+            "status": "observed",
+            "observed_at": observed_at or _now_utc(),
+            "control_epoch": payload.get("control_epoch"),
+            "repo_head_sha": payload.get("repo_head_sha"),
+            "active_runs": len(payload.get("active_runs") or []),
+            "awaiting_approvals": [
+                {"run_id": a.get("run_id"), "spec": a.get("spec_name") or a.get("spec"),
+                 "gate_id": a.get("gate_id")}
+                for a in (payload.get("awaiting_approvals") or [])[:PACKET_APPROVALS]
+            ],
+            "safe_actions": (payload.get("safe_actions") or [])[:PACKET_SAFE_ACTIONS],
+            "degraded": [d.get("surface") if isinstance(d, dict) else d
+                         for d in (payload.get("degraded") or [])],
+            "unknowns": {
+                "projection_lag_null": unknowns,
+                "note": "null/absent values are LOWER BOUNDS or unknown — never read as zero",
+            } if unknowns else {},
+        }
+    else:
+        packet_section = {
+            "status": packet.get("status", "unavailable"),
+            "observed_at": observed_at or _now_utc(),
+            "reason": packet.get("reason", ""),
+            "note": "the packet is unavailable — do not substitute memory for it",
+        }
+
+    next_action = str(binding_payload.get("next_action") or "").strip()
+    if next_action:
+        next_section = {"text": next_action, "source": "binding"}
+    else:
+        close = predecessor.get("close") or {}
+        threads = close.get("open_threads") if isinstance(close, dict) else None
+        if threads:
+            next_section = {"text": str(threads[0]), "source": "predecessor-open-thread"}
+        else:
+            next_section = {
+                "text": "",
+                "source": "unavailable",
+                "note": "no explicit next action on the binding and no predecessor thread",
+            }
+    blocker = str(binding_payload.get("blocker") or "").strip()
+    blocker_section = (
+        {"text": blocker, "source": "binding"} if blocker
+        else {"text": "", "source": "none-stated", "note": "no blocker stated on the binding"}
+    )
+
+    capsule = {
+        "schema": CAPSULE_SCHEMA,
+        "observed_at": observed_at or _now_utc(),
+        "identity": {
+            "native_session_id": binding_payload.get("native_session_id"),
+            "resolved_agent": binding_payload.get("resolved_agent"),
+            "initiating_message_id": binding_payload.get("initiating_message_id"),
+            "task_identity": binding_payload.get("task_identity"),
+            "task_identity_source": binding_payload.get("task_identity_source"),
+            "project": binding_payload.get("project"),
+            "source_revision": binding_payload.get("source_revision"),
+        },
+        "original_request": {
+            "text": request,
+            "sha256": binding_payload.get("original_request_sha256"),
+            "truncated": request_omitted > 0,
+            "omitted_chars": request_omitted,
+        },
+        "acceptance": acceptance,
+        "work_unit": str(binding_payload.get("work_unit") or ""),
+        "predecessor": predecessor,
+        "control_packet": packet_section,
+        "session_budget": {
+            "verdict": str(budget.get("verdict") or "UNJUDGED"),
+            "turns": budget.get("turns"),
+            "context_tokens": budget.get("context_tokens"),
+            "usage_incomplete": bool(budget.get("usage_incomplete")),
+            "reason": str(budget.get("reason") or ""),
+        },
+        "next_action": next_section,
+        "blocker": blocker_section,
+        "bounds": {"max_chars": max_chars, "max_records": max_records},
+    }
+    text = render_capsule(capsule)
+    if len(text) > max_chars:
+        omitted = len(text) - max_chars
+        text = text[:max_chars] + f"\n[capsule truncated: {omitted} chars omitted — bounds.max_chars]"
+        capsule["bounds"]["truncated"] = True
+        capsule["bounds"]["omitted_chars"] = omitted
+    else:
+        capsule["bounds"]["truncated"] = False
+        capsule["bounds"]["omitted_chars"] = 0
+    capsule["text"] = text
+    return capsule
+
+
+def render_capsule(capsule: dict) -> str:
+    """Render the capsule as the text the plugin appends to the system prompt.
+
+    Every section keeps its source ids; every truncation keeps its marker (applied by
+    :func:`compose_capsule`); an unavailable dependency is rendered as unavailable, never
+    silently absent.
+    """
+    identity = capsule["identity"]
+    lines = [
+        f"[AIO capsule — observed {capsule['observed_at']}]",
+        f"identity: session {identity['native_session_id']} · agent {identity['resolved_agent']} "
+        f"· task {identity['task_identity']} ({identity['task_identity_source']}) "
+        f"· message {identity['initiating_message_id'] or '—'} "
+        f"· revision {identity['source_revision'] or '—'}",
+    ]
+    request = capsule["original_request"]
+    marker = f" [truncated: {request['omitted_chars']} chars omitted]" if request["truncated"] else ""
+    lines.append(f"original request (sha256 {str(request['sha256'])[:12]}): \"{request['text']}\"{marker}")
+    acceptance = capsule["acceptance"]
+    if acceptance.get("status") == "not_stated":
+        lines.append("acceptance: not stated")
+    else:
+        prov = f" [provenance: {acceptance['provenance']}]" if acceptance.get("provenance") else ""
+        trust = " [interpretation — subordinate to the raw request]" if acceptance.get("source") == "interpretation" else ""
+        lines.append(
+            f"acceptance (v{acceptance.get('version')}, {acceptance.get('source')}): "
+            f"\"{acceptance.get('text')}\"{prov}{trust}"
+        )
+    lines.append(f"work unit: {capsule['work_unit'] or '—'}")
+
+    pred = capsule["predecessor"]
+    if pred.get("status") == "none":
+        lines.append("predecessor: none bound (explicit origin absent — bootstrap/unavailable)")
+    else:
+        close = pred.get("close") or {}
+        if close.get("status") == "found":
+            lines.append(
+                f"predecessor: {pred.get('slug')} close {str(close.get('knowledge_id') or '')[:12]} "
+                f"({close.get('session_date')})"
+            )
+            if close.get("open_threads"):
+                lines.append(f"  open threads: {'; '.join(str(t) for t in close['open_threads'])}")
+            if close.get("parked"):
+                lines.append(f"  parked: {'; '.join(str(p) for p in close['parked'])}")
+            if close.get("self_notes"):
+                lines.append(f"  self-notes: {close['self_notes']}")
+        else:
+            lines.append(
+                f"predecessor: {pred.get('slug')} — close NOT FOUND in this store "
+                f"(bootstrap/unavailable, never treated as permission to pick another)"
+            )
+        for record in pred.get("records") or []:
+            if record.get("status") == "found":
+                marker = " [truncated]" if record.get("truncated") else ""
+                lines.append(
+                    f"  record {str(record.get('knowledge_id'))[:12]} "
+                    f"({record.get('source_type')} {record.get('extractor_version')} "
+                    f"{record.get('authority')}{record.get('evidence_class')}): "
+                    f"\"{record.get('excerpt')}\"{marker}"
+                )
+            else:
+                lines.append(
+                    f"  record {str(record.get('knowledge_id'))[:12]}: UNAVAILABLE "
+                    f"({record.get('warning')})"
+                )
+        if pred.get("omitted"):
+            lines.append(f"  omitted (record bound): {', '.join(str(i) for i in pred['omitted'])}")
+
+    packet = capsule["control_packet"]
+    if packet["status"] == "observed":
+        lines.append(
+            f"control packet ({packet.get('observed_at')}): epoch {packet.get('control_epoch')} · "
+            f"active {packet.get('active_runs')} · awaiting {len(packet.get('awaiting_approvals') or [])} "
+            f"· degraded {packet.get('degraded') or '—'}"
+        )
+        for approval in packet.get("awaiting_approvals") or []:
+            lines.append(
+                f"  awaiting: {approval.get('run_id')} ({approval.get('spec')}) gate {approval.get('gate_id')}"
+            )
+        if packet.get("safe_actions"):
+            lines.append(f"  safe actions: {json.dumps(packet['safe_actions'], ensure_ascii=False)}")
+        if packet.get("unknowns"):
+            lines.append(
+                f"  unknowns: projection lag null for {packet['unknowns'].get('projection_lag_null')}"
+            )
+    else:
+        lines.append(f"control packet: UNAVAILABLE ({packet.get('reason')})")
+
+    budget = capsule["session_budget"]
+    lines.append(
+        f"session budget: {budget['verdict']} (turns {budget.get('turns')}, "
+        f"context {budget.get('context_tokens')})"
+        + (f" — {budget['reason']}" if budget.get("reason") else "")
+    )
+    lines.append(f"next action: {capsule['next_action']['text'] or '—'} ({capsule['next_action']['source']})")
+    lines.append(f"blocker: {capsule['blocker']['text'] or '—'} ({capsule['blocker']['source']})")
+    return "\n".join(lines)
+
+
+# ── CLI ────────────────────────────────────────────────────────────────────────
+
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="agentic-dynamics session open",
         description="Open a session: retrieve the last session's close record (decisions, "
         "open threads, parked items, self-notes) as this session's opening context. No prior "
-        "close renders a clear first-session bootstrap message.",
+        "close renders a clear first-session bootstrap message. --binding/--bind/--capsule are "
+        "the native session-binding modes the AIO capsule plugin calls.",
     )
     parser.add_argument(
         "--slug",
@@ -58,14 +531,68 @@ def build_parser() -> argparse.ArgumentParser:
         help=f"repository identity the org-root read filters on (default: {si.REPOSITORY_ID!r})",
     )
     parser.add_argument(
+        "--artifact-dir",
+        default="",
+        help="the durable knowledge root (bindings + artifacts). Default: FINOPS_KB_ARTIFACT_DIR, "
+        "else the canonical checkout's KB_ARTIFACT_DIR. A worktree-local empty dir is NOT a "
+        "bootstrap — a missing root is reported as store_missing.",
+    )
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument("--binding", action="store_true", help="READ the session's binding")
+    mode.add_argument("--bind", action="store_true", help="CREATE-or-read the session binding")
+    mode.add_argument("--capsule", action="store_true", help="COMPOSE the session capsule")
+    parser.add_argument("--native-session-id", default="", help="native opencode session id")
+    parser.add_argument("--agent", default="", help="resolved agent (output.message.agent)")
+    parser.add_argument("--message-id", default="", help="initiating native user-message id")
+    parser.add_argument("--request", default="", help="the initiating request text")
+    parser.add_argument(
+        "--request-file",
+        default="",
+        help="read the initiating request from this file ('-' = stdin); keeps long requests "
+        "off argv",
+    )
+    parser.add_argument("--task", default="", help="stable task identity (explicit)")
+    parser.add_argument("--project", default="", help="native project identity")
+    parser.add_argument("--source-revision", default="", help="source/config revision")
+    parser.add_argument("--predecessor-slug", default="", help="the EXPLICIT predecessor slug")
+    parser.add_argument(
+        "--knowledge-id",
+        action="append",
+        default=[],
+        help="an explicitly selected knowledge id to carry in the capsule (repeatable)",
+    )
+    parser.add_argument("--acceptance", default="", help="acceptance criteria text")
+    parser.add_argument(
+        "--acceptance-source",
+        default="raw",
+        choices=list(si.BINDING_ACCEPTANCE_SOURCES),
+        help="raw = as stated by the operator; interpretation = extracted by a model "
+        "(requires --acceptance-provenance and stays subordinate to the raw request)",
+    )
+    parser.add_argument("--acceptance-provenance", default="", help="who extracted it, from what")
+    parser.add_argument("--work-unit", default="", help="current work unit")
+    parser.add_argument("--next-action", default="", help="the one next action for the capsule")
+    parser.add_argument("--blocker", default="", help="the actual blocker, if any")
+    parser.add_argument(
+        "--max-chars", type=int, default=DEFAULT_MAX_CAPSULE_CHARS, help="capsule size bound"
+    )
+    parser.add_argument(
+        "--max-records", type=int, default=DEFAULT_MAX_RECORDS, help="capsule record bound"
+    )
+    parser.add_argument(
+        "--timeout", type=float, default=DEFAULT_COMMAND_TIMEOUT_S,
+        help="per-command time bound for the packet/budget reads",
+    )
+    parser.add_argument(
         "--json",
         action="store_true",
-        help="emit the machine-readable session-open/v1 report instead of the human context",
+        help="emit the machine-readable report (session-open/v1, session-binding/v1, or "
+        "session-capsule/v1)",
     )
     return parser
 
 
-def _report(result: si.SessionOpenResult) -> dict:
+def _open_report(result: si.SessionOpenResult) -> dict:
     """The machine report: what the open resolved, plus the record's durable identity."""
     payload = result.payload or {}
     return {
@@ -89,12 +616,122 @@ def _report(result: si.SessionOpenResult) -> dict:
     }
 
 
+def _binding_report(result: si.BindingResult) -> dict:
+    return {
+        "schema": BINDING_SCHEMA,
+        "status": result.status,
+        "native_session_id": (result.binding or {}).get("native_session_id", ""),
+        "binding": result.binding,
+        "path": str(result.path) if result.path else None,
+        "knowledge_id": result.knowledge_id,
+        "warnings": list(result.warnings),
+    }
+
+
+def _request_from_args(args: argparse.Namespace) -> str:
+    if args.request_file:
+        if args.request_file == "-":
+            return sys.stdin.read()
+        return Path(args.request_file).read_text(encoding="utf-8")
+    return args.request
+
+
+def _binding_from_args(args: argparse.Namespace, artifact_dir: Path) -> dict:
+    request = _request_from_args(args)
+    task = str(args.task or "").strip() or f"session:{args.native_session_id}"
+    predecessor = None
+    if str(args.predecessor_slug or "").strip():
+        predecessor = {
+            "slug": str(args.predecessor_slug).strip(),
+            "knowledge_ids": list(args.knowledge_id or []),
+        }
+    acceptance = None
+    if str(args.acceptance or "").strip():
+        acceptance = {
+            "text": args.acceptance,
+            "version": 1,
+            "source": args.acceptance_source,
+            "provenance": args.acceptance_provenance,
+        }
+    return {
+        "native_session_id": args.native_session_id,
+        "resolved_agent": args.agent,
+        "initiating_message_id": args.message_id,
+        "task_identity": task,
+        "task_identity_source": "explicit" if str(args.task or "").strip() else "session-fallback",
+        "project": args.project,
+        "original_request": request,
+        "source_revision": args.source_revision,
+        "acceptance": acceptance,
+        "predecessor": predecessor,
+        "work_unit": args.work_unit,
+        "next_action": args.next_action,
+        "blocker": args.blocker,
+    }
+
+
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
-    result = si.open_session(slug=args.slug, repository_id=args.repository_id)
+    artifact_dir = _resolve_artifact_dir(args)
 
+    if args.bind or args.binding or args.capsule:
+        if not str(args.native_session_id or "").strip():
+            print("[session-open] --native-session-id is required for binding modes", file=sys.stderr)
+            return 2
+        if args.bind:
+            binding = _binding_from_args(args, artifact_dir)
+            try:
+                result = si.write_binding(
+                    binding, repository_id=args.repository_id, artifact_dir=artifact_dir
+                )
+            except ValueError as exc:
+                print(f"[session-open] binding refused: {exc}", file=sys.stderr)
+                return 2
+            report = _binding_report(result)
+            # The bind report also echoes how to read it back — the durable contract.
+            report["read_with"] = f"--binding --native-session-id {args.native_session_id}"
+        else:
+            result = si.read_binding(
+                args.native_session_id, repository_id=args.repository_id, artifact_dir=artifact_dir
+            )
+            report = _binding_report(result)
+            if args.capsule:
+                if result.status != si.BINDING_STATUS_FOUND or result.binding is None:
+                    report["capsule"] = None
+                    report["capsule_status"] = result.status
+                else:
+                    capsule = compose_capsule(
+                        result.binding,
+                        artifact_dir=artifact_dir,
+                        packet=read_control_packet(timeout=args.timeout),
+                        budget=measure_budget(args.native_session_id, timeout=args.timeout),
+                        max_chars=args.max_chars,
+                        max_records=args.max_records,
+                    )
+                    report["capsule"] = capsule
+                    report["capsule_status"] = "composed"
+        if args.json:
+            print(json.dumps(report, indent=2, ensure_ascii=False, default=str))
+        else:
+            print(
+                f"[session-open] binding {report['status']}: "
+                f"{report.get('native_session_id') or args.native_session_id}"
+                + (f" ({report['knowledge_id'][:12]})" if report.get("knowledge_id") else "")
+            )
+            for warning in report.get("warnings") or []:
+                print(f"[session-open] warning: {warning}", file=sys.stderr)
+            capsule = report.get("capsule")
+            if capsule:
+                print(capsule["text"])
+            elif report.get("capsule_status"):
+                print(f"[session-open] no capsule ({report['capsule_status']})")
+        return 0
+
+    result = si.open_session(
+        slug=args.slug, repository_id=args.repository_id, artifact_dir=artifact_dir
+    )
     if args.json:
-        print(json.dumps(_report(result), indent=2))
+        print(json.dumps(_open_report(result), indent=2))
     else:
         print(si.render_opening_context(result))
     for warning in result.warnings:

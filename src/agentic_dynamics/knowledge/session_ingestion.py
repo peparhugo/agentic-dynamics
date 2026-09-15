@@ -46,6 +46,7 @@ round-trips through ``extract_record`` like every other producer's.
 
 from __future__ import annotations
 
+import hashlib
 import json
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -777,3 +778,414 @@ def render_opening_context(result: SessionOpenResult) -> str:
     notes = str(payload.get("self_notes") or "").strip()
     lines.append(f"  self-notes: {notes if notes else '(none)'}")
     return "\n".join(lines)
+
+
+# ── Session bindings (aio-session-binding/v1 — Unit C native binding) ──────────
+#
+# The binding is the durable answer to "which task is THIS native opencode session running,
+# from which origin, under which acceptance" — written once, on the session's first substantive
+# message, and read by every later capsule request (including after a coordinator restart and
+# after compaction). It is NOT a session close: the spine's ``session/v1`` family stays the
+# AIO's posterior, and this family is identity/binding state, deliberately distinct — a
+# different ``extractor_version``, a different URI family, and a dedicated slot directory so a
+# binding can never be mistaken for a close by any reader (``session open`` scans the top-level
+# artifact dir and filters on ``session/v1``; bindings live under ``<kb>/aio-bindings/``).
+#
+# Durability model (the "a process-local map is a cache, not the durable source" rule):
+#   * the SLOT file (``<kb>/aio-bindings/<slot_id>.json``) is the operational pointer — its
+#     name is a pure function of (family, repository, native session id), so lookup is one
+#     deterministic read, never a 19k-artifact scan and never "the newest binding";
+#   * the FULL record is the content-addressed KB artifact (``<kb>/<knowledge_id>.json``) built
+#     through the shared factory, so the binding carries the standard identity/authority
+#     surface and can be cited by ``knowledge_id`` like every other record. A pointer event is
+#     published best-effort (same contract as :func:`close_session`: a downed stream is a
+#     warning, never a lost binding).
+# The two never drift: the slot stores the knowledge_id it points at and a read verifies the
+# pointed-at artifact's payload native_session_id matches the slot identity.
+
+#: The binding family's extractor generation. Distinct from ``session/v1`` so no reader —
+#: including :func:`open_session`'s scanner — can confuse a binding with a session close.
+BINDING_EXTRACTOR_VERSION = "aio-session-binding/v1"
+
+#: Subdirectory of the durable KB artifact dir that holds the binding slots.
+BINDING_DIR_NAME = "aio-bindings"
+
+#: The slot-pointer schema id.
+BINDING_SLOT_SCHEMA = "aio-session-binding-slot/v1"
+
+#: The binding statuses :class:`BindingResult` may carry.
+BINDING_STATUS_FOUND = "found"
+BINDING_STATUS_MISSING = "missing"          # the store is present; no binding for this session
+BINDING_STATUS_STORE_MISSING = "store_missing"  # the durable root itself is absent
+BINDING_STATUS_CREATED = "created"
+BINDING_STATUS_EXISTING = "existing"
+BINDING_STATUS_CORRUPT = "corrupt"          # a slot exists but does not resolve to a binding
+
+#: Acceptance sources. A model-extracted acceptance is ``interpretation`` and MUST carry
+#: provenance — it is never promoted to the raw request's standing.
+BINDING_ACCEPTANCE_SOURCES = ("raw", "interpretation")
+
+
+def binding_slot_id(native_session_id: str, *, repository_id: str = REPOSITORY_ID) -> str:
+    """The deterministic slot id for one native session's binding.
+
+    Pure function of (family, repository, native session id) — never wall-clock, never the
+    task text — so the durable lookup is one read and a replayed call resolves the same slot.
+    """
+    key = f"{BINDING_EXTRACTOR_VERSION}\0{repository_id}\0{str(native_session_id).strip()}"
+    return hashlib.sha256(key.encode("utf-8")).hexdigest()
+
+
+def binding_slot_path(
+    native_session_id: str, *, artifact_dir: Path | None = None, repository_id: str = REPOSITORY_ID
+) -> Path:
+    """The slot file path for one native session's binding (does not touch the filesystem)."""
+    from agentic_dynamics.core.paths import KB_ARTIFACT_DIR
+
+    artifact_dir = artifact_dir or KB_ARTIFACT_DIR
+    return artifact_dir / BINDING_DIR_NAME / f"{binding_slot_id(native_session_id, repository_id=repository_id)}.json"
+
+
+def _binding_text(value: Any, *, default: str = "") -> str:
+    return str(value if value is not None else default).strip()
+
+
+def binding_payload(
+    binding: dict[str, Any], *, repository_id: str = REPOSITORY_ID
+) -> dict[str, Any]:
+    """Return the canonical content payload for ONE session binding.
+
+    Raises ``ValueError`` when the binding carries no ``native_session_id`` (its durable key),
+    no ``resolved_agent`` (whose session this is), no ``task_identity`` (what it is doing), or
+    no ``original_request`` (the fact later "continue" messages must never replace).
+    """
+    native_session_id = _content_value(binding, "native_session_id")
+    resolved_agent = _content_value(binding, "resolved_agent")
+    task_identity = _content_value(binding, "task_identity")
+    original_request = _content_value(binding, "original_request")
+
+    raw_acceptance = binding.get("acceptance")
+    acceptance: dict[str, Any] | None = None
+    if isinstance(raw_acceptance, dict) and _binding_text(raw_acceptance.get("text")):
+        source = _binding_text(raw_acceptance.get("source")) or "raw"
+        if source not in BINDING_ACCEPTANCE_SOURCES:
+            raise ValueError(
+                f"acceptance source {source!r} is not one of {BINDING_ACCEPTANCE_SOURCES}"
+            )
+        provenance = _binding_text(raw_acceptance.get("provenance"))
+        if source == "interpretation" and not provenance:
+            raise ValueError(
+                "an acceptance extracted by a model is an interpretation and must carry "
+                "provenance (who extracted it, from what) — never promoted to the raw request"
+            )
+        acceptance = {
+            "text": _binding_text(raw_acceptance["text"]),
+            "version": int(raw_acceptance.get("version") or 1),
+            "source": source,
+            "provenance": provenance,
+        }
+
+    raw_predecessor = binding.get("predecessor")
+    predecessor: dict[str, Any] | None = None
+    if isinstance(raw_predecessor, dict) and _binding_text(raw_predecessor.get("slug")):
+        ids = raw_predecessor.get("knowledge_ids") or []
+        if isinstance(ids, str):
+            ids = [ids]
+        predecessor = {
+            "slug": _binding_text(raw_predecessor["slug"]),
+            "knowledge_ids": [str(i).strip() for i in ids if str(i).strip()],
+        }
+
+    payload: dict[str, Any] = {
+        "native_session_id": native_session_id,
+        "resolved_agent": resolved_agent,
+        "initiating_message_id": _binding_text(binding.get("initiating_message_id")),
+        "task_identity": task_identity,
+        "task_identity_source": _binding_text(binding.get("task_identity_source")) or "explicit",
+        "project": _binding_text(binding.get("project")),
+        "original_request": original_request,
+        "original_request_sha256": _binding_text(binding.get("original_request_sha256"))
+        or hashlib.sha256(original_request.encode("utf-8")).hexdigest(),
+        "source_revision": _binding_text(binding.get("source_revision")),
+        "acceptance": acceptance,
+        "predecessor": predecessor,
+        # Capsule inputs (optional): the current work unit and the one next action / known
+        # blocker the capsule renders. They ride on the binding so every capsule request reads
+        # them from the durable record rather than from whichever message is in flight.
+        "work_unit": _binding_text(binding.get("work_unit")),
+        "next_action": _binding_text(binding.get("next_action")),
+        "blocker": _binding_text(binding.get("blocker")),
+        "created_at": _binding_text(binding.get("created_at")),
+        "actor": ACTOR,
+        "scope": aio_acl_scope(repository_id),
+    }
+    return payload
+
+
+def _binding_prose_summary(payload: dict[str, Any]) -> str:
+    """A retrieval-facing prose lead for a binding record (mirrors the spine's F3 shape)."""
+    request = str(payload.get("original_request") or "")
+    predecessor = payload.get("predecessor") or {}
+    parts = [
+        f"session binding for native session {payload['native_session_id']} "
+        f"(agent {payload['resolved_agent']}, task {payload['task_identity']}): "
+        f"original request: {request[:300]}"
+    ]
+    if predecessor:
+        parts.append(f"predecessor {predecessor.get('slug')}")
+    return " ".join(parts) + " || json: " + json.dumps(payload, sort_keys=True)
+
+
+def build_binding_record(
+    binding: dict[str, Any],
+    *,
+    repository_id: str = REPOSITORY_ID,
+    now: datetime | None = None,
+) -> KnowledgeRecord:
+    """Derive ONE ``meta_session``-enveloped binding record (family ``aio-session-binding/v1``).
+
+    Authority is ADVISORY / ``[H]`` — like the spine: identity/binding state is the AIO's own
+    account of the session, never an independent measurement. The record is not bound to one
+    commit (``REVISION_FALLBACK`` + ``commit_sha=""``), so a close/bind re-run is rerun-safe.
+    """
+    payload = binding_payload(binding, repository_id=repository_id)
+    native_session_id = payload["native_session_id"]
+    scope = aio_acl_scope(repository_id)
+
+    return build_record_from_parts(
+        source_type=SOURCE_TYPE,
+        source_uri=f"session-binding:{native_session_id}",
+        logical_locator=native_session_id,
+        repository_id=repository_id,
+        revision=REVISION_FALLBACK,
+        authority=Authority.ADVISORY,
+        evidence_class="[H]",
+        text=_binding_prose_summary(payload),
+        extra_fields={
+            "commit_sha": "",
+            "extractor_version": BINDING_EXTRACTOR_VERSION,
+            "acl_scope": scope,
+            "observed_at": payload.get("created_at") or "",
+        },
+        now=now,
+    )
+
+
+@dataclass
+class BindingResult:
+    """What one binding read/write resolved.
+
+    ``status`` is one of the ``BINDING_STATUS_*`` constants. ``binding`` is the canonical
+    payload when one resolves (``found``/``existing``/``created``); ``path`` is the slot file;
+    ``knowledge_id`` the full record's KB identity ("" until built). ``warnings`` carries
+    every swallowed producer/read failure (a degraded publish, a corrupt slot) — never silent.
+    """
+
+    status: str
+    binding: dict[str, Any] | None = None
+    path: Path | None = None
+    knowledge_id: str = ""
+    entry_id: str = ""
+    warnings: list[str] = _dataclass_field(default_factory=list)
+
+
+def _binding_store_status(artifact_dir: Path) -> str:
+    """``present`` when the durable root exists, else ``missing`` — the explicit store state.
+
+    This is the distinction the path trap turns on: a read against an ABSENT root is
+    "store missing" (unavailable), never the bootstrap answer "no predecessor yet".
+    """
+    return "present" if artifact_dir.is_dir() else "missing"
+
+
+def _read_binding_slot(
+    slot_path: Path, *, repository_id: str = REPOSITORY_ID
+) -> tuple[dict[str, Any] | None, list[str]]:
+    """Read + verify one slot file → its canonical binding payload (or None + warnings)."""
+    warnings: list[str] = []
+    try:
+        slot = json.loads(slot_path.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        return None, [f"binding slot {slot_path.name} is unreadable ({exc})"]
+    if not isinstance(slot, dict) or slot.get("schema") != BINDING_SLOT_SCHEMA:
+        return None, [f"binding slot {slot_path.name} is not a {BINDING_SLOT_SCHEMA} pointer"]
+    knowledge_id = _binding_text(slot.get("knowledge_id"))
+    native_session_id = _binding_text(slot.get("native_session_id"))
+    if not knowledge_id or not native_session_id:
+        return None, [f"binding slot {slot_path.name} names no record/session"]
+    artifact = slot_path.parent.parent / f"{knowledge_id}.json"
+    if not artifact.is_file():
+        return None, [
+            f"binding slot {slot_path.name} points at {knowledge_id[:12]} whose durable "
+            "artifact is absent — the binding cannot be resolved"
+        ]
+    try:
+        record = json.loads(artifact.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        return None, [f"binding artifact {artifact.name} is unreadable ({exc})"]
+    if not isinstance(record, dict) or record.get("extractor_version") != BINDING_EXTRACTOR_VERSION:
+        return None, [f"binding artifact {artifact.name} is not a {BINDING_EXTRACTOR_VERSION} record"]
+    if record.get("repository_id") != repository_id:
+        return None, [
+            f"binding artifact {artifact.name} belongs to repository "
+            f"{record.get('repository_id')!r}, not {repository_id!r}"
+        ]
+    text = str(record.get("text") or "")
+    if " || json: " in text:
+        text = text.split(" || json: ", 1)[1]
+    try:
+        payload = json.loads(text)
+    except ValueError:
+        return None, [f"binding artifact {artifact.name} carries an unreadable payload"]
+    if not isinstance(payload, dict):
+        return None, [f"binding artifact {artifact.name} does not carry a binding payload"]
+    if str(payload.get("native_session_id") or "") != native_session_id:
+        return None, [
+            f"binding slot {slot_path.name} and its artifact disagree on the native session id"
+        ]
+    return payload, warnings
+
+
+def read_binding(
+    native_session_id: str,
+    *,
+    repository_id: str = REPOSITORY_ID,
+    artifact_dir: Path | None = None,
+) -> BindingResult:
+    """Read the binding for ONE native session, from the durable store only.
+
+    Statuses: ``store_missing`` (the durable root itself is absent — unavailable, NOT the
+    bootstrap "no predecessor" state), ``missing`` (the store is present but this session has
+    no binding), ``found`` (the verified payload), ``corrupt`` (a slot exists but does not
+    resolve — warnings name why). Never creates directories, never guesses a neighbour.
+    """
+    from agentic_dynamics.core.paths import KB_ARTIFACT_DIR
+
+    artifact_dir = artifact_dir or KB_ARTIFACT_DIR
+    if _binding_store_status(artifact_dir) == "missing":
+        return BindingResult(
+            status=BINDING_STATUS_STORE_MISSING,
+            warnings=[
+                f"the durable knowledge root {artifact_dir} is absent — the binding store is "
+                "unavailable (this is NOT first-session bootstrap)"
+            ],
+        )
+    slot_path = binding_slot_path(
+        native_session_id, artifact_dir=artifact_dir, repository_id=repository_id
+    )
+    if not slot_path.is_file():
+        return BindingResult(status=BINDING_STATUS_MISSING, path=slot_path)
+    payload, warnings = _read_binding_slot(slot_path, repository_id=repository_id)
+    if payload is None:
+        return BindingResult(status=BINDING_STATUS_CORRUPT, path=slot_path, warnings=warnings)
+    knowledge_id = ""
+    try:
+        slot = json.loads(slot_path.read_text(encoding="utf-8"))
+        knowledge_id = _binding_text(slot.get("knowledge_id"))
+    except (OSError, ValueError):
+        pass
+    return BindingResult(
+        status=BINDING_STATUS_FOUND, binding=payload, path=slot_path,
+        knowledge_id=knowledge_id, warnings=warnings,
+    )
+
+
+def write_binding(
+    binding: dict[str, Any],
+    *,
+    repository_id: str = REPOSITORY_ID,
+    artifact_dir: Path | None = None,
+    connect_fn: Callable[..., Any] | None = None,
+    now: datetime | None = None,
+) -> BindingResult:
+    """Create ONE session binding — durable artifact first, then slot pointer, then best-effort
+    pointer event. An EXISTING binding is returned unchanged (status ``existing``): the original
+    request is immutable, so a later call can never silently replace it.
+
+    Producer failures follow :func:`close_session`'s contract: a downed stream is a warning and
+    the durable record still lands. Raises ``ValueError`` for a genuinely invalid binding
+    (missing identity/request — the caller's error, not a store condition).
+    """
+    from agentic_dynamics.core.paths import KB_ARTIFACT_DIR
+    from agentic_dynamics.knowledge import knowledge_stream as ks
+    from agentic_dynamics.knowledge.knowledge_ingestion import (
+        record_to_artifact,
+        record_to_event,
+    )
+
+    artifact_dir = artifact_dir or KB_ARTIFACT_DIR
+    native_session_id = _content_value(binding, "native_session_id")
+    slot_path = binding_slot_path(
+        native_session_id, artifact_dir=artifact_dir, repository_id=repository_id
+    )
+    existing = read_binding(
+        native_session_id, repository_id=repository_id, artifact_dir=artifact_dir
+    )
+    if existing.status == BINDING_STATUS_FOUND:
+        return BindingResult(
+            status=BINDING_STATUS_EXISTING,
+            binding=existing.binding,
+            path=slot_path,
+            knowledge_id=existing.knowledge_id,
+            warnings=existing.warnings,
+        )
+    if existing.status == BINDING_STATUS_CORRUPT:
+        raise ValueError(
+            f"a binding slot for {native_session_id!r} exists but does not resolve "
+            f"({'; '.join(existing.warnings)}) — repair or remove it explicitly, never overwrite"
+        )
+
+    binding = dict(binding)
+    binding.setdefault("created_at", (now or datetime.now()).astimezone().isoformat())
+    record = build_binding_record(binding, repository_id=repository_id, now=now)
+    artifact_path = artifact_dir / f"{record.knowledge_id}.json"
+    artifact_bytes = record_to_artifact(record)
+    warnings: list[str] = []
+    artifact_dir.mkdir(parents=True, exist_ok=True)
+    (artifact_dir / BINDING_DIR_NAME).mkdir(parents=True, exist_ok=True)
+    if not artifact_path.is_file() or artifact_path.read_bytes() != artifact_bytes:
+        artifact_path.write_bytes(artifact_bytes)
+    slot = {
+        "schema": BINDING_SLOT_SCHEMA,
+        "family": BINDING_EXTRACTOR_VERSION,
+        "repository_id": repository_id,
+        "native_session_id": native_session_id,
+        "knowledge_id": record.knowledge_id,
+        "created_at": binding["created_at"],
+    }
+    slot_path.write_text(json.dumps(slot, sort_keys=True, indent=2), encoding="utf-8")
+
+    connect = connect_fn or ks.connect
+    entry_id = ""
+    try:
+        r = connect()
+    except Exception as exc:  # noqa: BLE001 — a producer failure is a warning by contract
+        warnings.append(
+            f"knowledge stream unreachable ({type(exc).__name__}: {exc}); the durable binding "
+            "is written but its pointer event was not published"
+        )
+        r = None
+    if r is not None:
+        try:
+            if r.hget(ks.CHECKPOINT_KEY, record.knowledge_id) is None:
+                entry_id = ks.publish_event(
+                    r,
+                    record_to_event(record),
+                    authorized=True,
+                    source_type=record.source_type,
+                )
+                r.hset(ks.CHECKPOINT_KEY, record.knowledge_id, record.indexed_at)
+        except Exception as exc:  # noqa: BLE001 — a producer failure is a warning by contract
+            warnings.append(
+                f"binding pointer publish failed for {record.knowledge_id} "
+                f"({type(exc).__name__}: {exc})"
+            )
+    payload = binding_payload(binding, repository_id=repository_id)
+    return BindingResult(
+        status=BINDING_STATUS_CREATED,
+        binding=payload,
+        path=slot_path,
+        knowledge_id=record.knowledge_id,
+        entry_id=entry_id,
+        warnings=warnings,
+    )
