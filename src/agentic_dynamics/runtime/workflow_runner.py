@@ -468,6 +468,14 @@ class WorkflowRunResult:
     #: a legacy ``resume=True`` inference run; old ledgers lack the keys.
     resumed_from_run_id: str = ""
     resumed_from_ledger: str = ""
+    #: The checkpoint-continuation repair (2026-09-15) — the ancestor completions this run
+    #: SKIPPED because the selected parent's snapshot (and its inherited provenance) already
+    #: covered them. Additive key: each entry is a dict with ``phase`` / ``from_run_id`` /
+    #: ``ledger_path`` / ``status`` (``completed`` or ``checkpoint_approved``). It exists so a
+    #: second continuation reading only this ledger does not forget the family's completion;
+    #: it carries NO cost (historical execution evidence stays separate from current-run
+    #: spend). A fresh run (or a legacy inference resume) carries an empty list.
+    inherited_phases: list[dict[str, str]] = field(default_factory=list)
     #: Step 2 (2026-09-11): a RESUME whose completion set already covered every declared phase
     #: (the final-checkpoint approval is the canonical case) executes nothing — that is LOGICAL
     #: COMPLETION, never a cancelled run. Additive key; pre-2d ledgers lack it and parse False.
@@ -567,6 +575,11 @@ class WorkflowRunResult:
             # provenance. Old ledgers lack them; consumers read them via ``.get(...)``.
             "resumed_from_run_id": self.resumed_from_run_id,
             "resumed_from_ledger": self.resumed_from_ledger,
+            # ADDED key (checkpoint-continuation repair 2026-09-15 — never renames an
+            # existing key): the ancestor completions this run inherited (with provenance),
+            # so the next continuation reads them from THIS ledger. Old ledgers lack the
+            # key; consumers read it via ``.get("inherited_phases", [])``.
+            "inherited_phases": [dict(entry) for entry in self.inherited_phases],
         }
 
 
@@ -577,9 +590,21 @@ class ResumeState:
     Built by the composition root (``scripts/run_workflow.py``) from the parent control-db
     run's OWN ledger — located by the run id embedded in its name, never by recency and
     never by the current worktree's git log. ``completed_phases`` is exactly the set of
-    phases that ledger recorded ``ok``; the engine skips THESE and infers nothing else.
-    ``ledger_path`` + ``parent_run_id`` are carried for provenance (stamped onto the result
-    ledger as ``resumed_from_run_id`` / ``resumed_from_ledger``).
+    phases that ledger recorded ``ok`` (plus any ancestor completions the parent's own ledger
+    inherited); the engine skips THESE and infers nothing else. ``ledger_path`` +
+    ``parent_run_id`` are carried for provenance (stamped onto the result ledger as
+    ``resumed_from_run_id`` / ``resumed_from_ledger``).
+
+    ``reached_checkpoints`` (the checkpoint-continuation repair, 2026-09-15) carries the
+    checkpoint phases the parent REACHED and stopped awaiting — NOT completion. The engine
+    validates each one's approval contract through the completed-checkpoint path BEFORE
+    treating it as skippable; without a valid approval the resume refuses without re-running
+    the checkpoint (the old loader omitted these from ``completed_phases``, so the reached
+    checkpoint was never validated, re-ran, and stopped there again).
+
+    ``inherited_phases`` carries the ancestor completions the parent's ledger recorded as
+    INHERITED (phase, from_run_id, ledger_path, status) — so a second continuation does not
+    forget what the family already paid for when it reads only the immediate parent.
 
     A correct family link (``parent_run_id`` on the control-db row) establishes lineage,
     not the parent's execution state — this object is what actually makes the selected
@@ -589,6 +614,11 @@ class ResumeState:
     parent_run_id: str
     ledger_path: str
     completed_phases: frozenset[str] = frozenset()
+    #: Reached-but-awaiting checkpoint phases (validated, not assumed skippable).
+    reached_checkpoints: frozenset[str] = frozenset()
+    #: Carried-over ancestor completions with provenance: one dict per phase with the
+    #: ``phase`` / ``from_run_id`` / ``ledger_path`` / ``status`` keys the child ledger records.
+    inherited_phases: tuple[dict[str, str], ...] = ()
 
 
 @dataclass
@@ -1383,6 +1413,28 @@ def _phase_record_row(
     }
 
 
+def _inherited_entry(
+    resume_state: ResumeState, phase_name: str, reached: set[str] | frozenset[str]
+) -> dict[str, str]:
+    """The inherited-completion entry for a phase this run skipped.
+
+    Provenance is preserved: an entry the parent's own ledger already carried (an ancestor's
+    completion, possibly a checkpoint approved by an EARLIER lineage run) rides through with
+    its ORIGINAL ``from_run_id``/``ledger_path``; a phase the selected parent itself executed
+    is attributed to the parent. No cost fields: historical execution evidence stays separate
+    from current-run spend.
+    """
+    for entry in resume_state.inherited_phases:
+        if entry.get("phase") == phase_name:
+            return dict(entry)
+    return {
+        "phase": phase_name,
+        "from_run_id": resume_state.parent_run_id,
+        "ledger_path": resume_state.ledger_path,
+        "status": "checkpoint_approved" if phase_name in reached else "completed",
+    }
+
+
 def _retain_and_remove_phase_record(
     result: WorkflowRunResult,
     prior: list[str],
@@ -1400,12 +1452,16 @@ def _retain_and_remove_phase_record(
     a DUPLICATE producer record → duplicate attempt ids. This helper is the fix's single
     removal point:
 
-    * the removed execution's rows (its escalation rows when present, else one synthesized
-      row) are appended to ``prior_invocations[phase_name]`` with a ``correction`` retry
-      reason — every invocation survives into the final record's ``attempts``;
-    * ``execution_count[phase_name]`` increments — the executor's next attempt ordinal for
-      this phase continues past the retained history, so container state dirs and
-      prepared-step filenames never collide;
+    * the removed record's rows are the CUMULATIVE sequence — they were seeded from
+      ``prior_invocations[phase_name]`` when the record began (``attempt_seed``) and continued
+      by this execution, so they are retained as-is, renumbered contiguously. The old
+      ``retained + rows`` shape re-appended history the record had already been seeded with:
+      a SECOND correction duplicated earlier paid invocations and overcounted cost (reviewer
+      reproduction 2026-09-15);
+    * ``execution_count[phase_name]`` derives from the retained sequence LENGTH — the next
+      execution's attempt ordinal advances past every prior invocation. Counting phase-loop
+      rewinds instead collided after an escalation: two ladder rows in one execution advanced
+      the identity by one, and the correction reused the escalated ordinal (same reproduction);
     * the matching ``prior`` text entry is dropped so the re-run appends a fresh one.
     """
     for idx in range(len(result.phases) - 1, -1, -1):
@@ -1413,18 +1469,16 @@ def _retain_and_remove_phase_record(
         if record.phase != phase_name:
             continue
         result.phases.pop(idx)
-        execution_count[phase_name] = execution_count.get(phase_name, 0) + 1
-        retained = list(prior_invocations.get(phase_name, []))
+        previous = list(prior_invocations.get(phase_name, []))
         rows = list(getattr(record, "attempts", None) or [])
         if rows:
-            # Renumber so the retained sequence stays contiguous with any earlier retention.
-            rows = [
-                dict(row, attempt_number=len(retained) + int(row.get("attempt_number") or i + 1))
-                for i, row in enumerate(rows)
-            ]
+            # The record's rows already CONTAIN the seeded history; renumber them contiguous
+            # (1..n) so the cumulative sequence stays exact under repeated corrections.
+            rows = [dict(row, attempt_number=i + 1) for i, row in enumerate(rows)]
         else:
-            rows = [_phase_record_row(record, len(retained) + 1, retry_reason)]
-        prior_invocations[phase_name] = retained + rows
+            rows = [_phase_record_row(record, len(previous) + 1, retry_reason)]
+        prior_invocations[phase_name] = rows
+        execution_count[phase_name] = len(rows)
         for j in range(len(prior) - 1, -1, -1):
             if prior[j].startswith(f"{phase_name} ("):
                 prior.pop(j)
@@ -3037,6 +3091,11 @@ FINDING_EMIT_ENV = "FINOPS_EMIT_SELF"
 #: The status value recorded when the run stops at (or refuses past) a checkpoint — a designed
 #: stop, never an error; the operator's tools read "waiting", not "failed".
 AWAITING_STATUS = "awaiting"
+#: The statuses a ``WorkflowRunResult.inherited_phases`` entry may carry (the continuation
+#: repair, 2026-09-15): ``completed`` — an ancestor phase the family finished; and
+#: ``checkpoint_approved`` — a checkpoint whose approval contract validated. The loader
+#: refuses any other value rather than guessing what a foreign status means.
+INHERITED_PHASE_STATUSES = ("completed", "checkpoint_approved")
 
 # ── I10 — typed checkpoint vocabulary ────────────────────────────────────────────────────────
 #
@@ -3310,16 +3369,23 @@ def _checkpoint_contract_decisions(
     *,
     run_id: str | None = None,
     gate_id: str | None = None,
+    reached: set[str] | frozenset[str] | None = None,
 ) -> tuple[list[tuple[str, bool, dict[str, Any]]], tuple[str, dict[str, Any]] | None]:
-    """Evaluate every completed checkpoint phase's approval contract, in phase order.
+    """Evaluate every tracked checkpoint phase's approval contract, in phase order.
 
     Returns ``(decisions, first_unsatisfied)``. ``decisions`` is one ``(phase_name, valid,
-    evidence)`` triple per completed ``checkpoint: true`` phase — the I10 typed-capture
+    evidence)`` triple per tracked ``checkpoint: true`` phase — the I10 typed-capture
     input for the resume-decided path, which mints an approved/rejected record for every
     contract read whether or not the run then stops. ``first_unsatisfied`` is the first
     ``(phase_name, evidence)`` whose contract failed (in phase order), or ``None`` when
     every contract holds — the resume gate's refusal point. Identical semantics to the
     pre-I10 ``_first_unsatisfied_checkpoint``, which now delegates here.
+
+    TRACKED = ``completed`` ∪ ``reached``. ``completed`` alone missed the fleet's actual
+    continuation: a checkpoint the parent REACHED is recorded ``awaiting`` (not ``ok``), so
+    ``reached`` carries those phases explicitly — they are validated here like any other
+    completed checkpoint, and only a VALID contract makes them skippable. Treating every
+    ``awaiting`` status as unconditional success would be the opposite defect.
 
     ``run_id``/``gate_id`` are the durable approval identity of the run this continuation
     resumes (resolved by the composition root from the control db). They are applied to the
@@ -3331,11 +3397,12 @@ def _checkpoint_contract_decisions(
     """
     decisions: list[tuple[str, bool, dict[str, Any]]] = []
     first_unsatisfied: tuple[str, dict[str, Any]] | None = None
+    tracked = set(completed) | set(reached or ())
     for phase_def in phases:
         if not phase_def.get(CHECKPOINT_MARKER):
             continue
         name = str(phase_def.get("name", "?"))
-        if name not in completed:
+        if name not in tracked:
             continue
         commit_sha = _phase_commit_sha(wd, name, goal)
         expected_run, expected_gate = run_id, gate_id
@@ -3363,18 +3430,19 @@ def _first_unsatisfied_checkpoint(
     *,
     run_id: str | None = None,
     gate_id: str | None = None,
+    reached: set[str] | frozenset[str] | None = None,
 ) -> tuple[str, dict[str, Any]] | None:
-    """The first completed checkpoint phase whose approval contract is unsatisfied, or ``None``.
+    """The first tracked checkpoint phase whose approval contract is unsatisfied, or ``None``.
 
-    Used by the resume gate: every completed ``checkpoint: true`` phase must carry a valid
-    operator approval BEFORE the run proceeds past it. Returns ``(phase_name, evidence)`` for
-    the first violation (in phase order), so a resume stops at the earliest unsatisfied
-    checkpoint — the revamp3 "ran p3-p6 past an unsigned template" shape is refused up front.
-    Delegates to :func:`_checkpoint_contract_decisions` (I10) so the typed-capture and the
-    gate read the contracts exactly once each.
+    Used by the resume gate: every tracked checkpoint phase (completed OR reached-and-awaiting)
+    must carry a valid operator approval BEFORE the run proceeds past it. Returns
+    ``(phase_name, evidence)`` for the first violation (in phase order), so a resume stops at
+    the earliest unsatisfied checkpoint — the revamp3 "ran p3-p6 past an unsigned template"
+    shape is refused up front. Delegates to :func:`_checkpoint_contract_decisions` (I10) so
+    the typed-capture and the gate read the contracts exactly once each.
     """
     _, unsatisfied = _checkpoint_contract_decisions(
-        wd, spec, phases, completed, goal, run_id=run_id, gate_id=gate_id
+        wd, spec, phases, completed, goal, run_id=run_id, gate_id=gate_id, reached=reached
     )
     return unsatisfied
 
@@ -3784,6 +3852,10 @@ def run_workflow(
 
     prior: list[str] = []
     completed: set[str] = set()
+    #: Reached-but-awaiting checkpoint phases from the selected parent snapshot — carried
+    #: separately from ``completed`` so a checkpoint is treated as skippable only AFTER its
+    #: approval contract validates (never as unconditional success).
+    reached_checkpoints: set[str] = set()
     if resume_state is not None:
         # Wave F7: the explicit parent snapshot IS the resume. The composition root selected
         # the parent run by identity and loaded its OWN ledger; that ledger's ok phases are
@@ -3795,6 +3867,9 @@ def run_workflow(
         phase_names = [str(p.get("name", "?")) for p in phases]
         if resume_state is not None:
             completed = {name for name in resume_state.completed_phases if name in phase_names}
+            reached_checkpoints = {
+                name for name in resume_state.reached_checkpoints if name in phase_names
+            }
         else:
             # The historical inference for direct callers without a control-plane parent:
             # the git-log path stays primary and unchanged (a ``[workflow] <phase>`` commit
@@ -3822,23 +3897,15 @@ def run_workflow(
         result.resumed_from_run_id = resume_state.parent_run_id
         result.resumed_from_ledger = resume_state.ledger_path
 
-    # Step 2: a resume that skipped EVERY phase because its completion set already covered
-    # them executed no work — that is logical completion (the final-checkpoint approval is the
-    # canonical case), never a cancelled run. The flag travels on the ledger so the
-    # spec-status family union reads succeeded instead of manufacturing a failure.
-    result.already_complete = bool(
-        resume
-        and phases
-        and {str(p.get("name", "?")) for p in phases} <= completed
-    )
-
     # Mechanical human checkpoint (cap_runner_hardening2 §Gap 3) — resume gating. BEFORE any
-    # further phase runs, every completed checkpoint phase's approval contract must be valid;
-    # an unsatisfied checkpoint stops the resume with ``awaiting_operator_approval`` (refuses
-    # to proceed). The revamp3 violation — p3-p6 ran past an unsigned approval template — is
-    # refused here up front, deterministically.
+    # further phase runs, every TRACKED checkpoint phase's approval contract must be valid —
+    # completed phases AND the checkpoint phases the selected parent REACHED and stopped
+    # awaiting (``reached_checkpoints``); an unsatisfied checkpoint stops the resume with
+    # ``awaiting_operator_approval`` (refuses to proceed, dispatching nothing). The revamp3
+    # violation — p3-p6 ran past an unsigned approval template — is refused here up front,
+    # deterministically.
     if resume:
-        # I10 — typed checkpoint capture, the resume-decided path. Every completed checkpoint
+        # I10 — typed checkpoint capture, the resume-decided path. Every tracked checkpoint
         # phase whose contract this run re-reads mints an ``approval_required`` record with
         # decision ``approved``/``rejected`` + the contract evidence, BEFORE the gate acts on
         # the first refusal — so the resume machinery (and the spec index / checkpoint/v1
@@ -3848,6 +3915,7 @@ def run_workflow(
         decisions, unsatisfied = _checkpoint_contract_decisions(
             wd, spec, phases, completed, goal,
             run_id=approval_run_id, gate_id=approval_gate_id,
+            reached=reached_checkpoints,
         )
         for cphase, valid, evidence in decisions:
             prev = _previous_checkpoint_state(spec, cphase)
@@ -3881,6 +3949,22 @@ def run_workflow(
             if publisher is not None and publisher.enabled:
                 publisher.set_status("awaiting")
             return result
+        # A REACHED checkpoint whose contract just validated is now skippable — the approval
+        # is the evidence that turns a stop into completion. (Invalid contracts returned
+        # above; a reached checkpoint is never skippable on its ``awaiting`` status alone.)
+        completed |= {cphase for cphase, valid, _ in decisions if valid}
+
+    # Step 2: a resume that skipped EVERY phase because its completion set already covered
+    # them executed no work — that is logical completion (the final-checkpoint approval is the
+    # canonical case), never a cancelled run. The flag travels on the ledger so the
+    # spec-status family union reads succeeded instead of manufacturing a failure. Computed
+    # AFTER the checkpoint fold above: a final checkpoint approved by this resume completes
+    # the phase set and must read as logical completion, not as a run that still has work.
+    result.already_complete = bool(
+        resume
+        and phases
+        and {str(p.get("name", "?")) for p in phases} <= completed
+    )
 
     fork_enabled = fork if fork is not None else bool(spec.workflow.params.get("fork", False))
 
@@ -3933,6 +4017,16 @@ def run_workflow(
             # (reviewer reproduction 2026-09-14), and never invented for a phase without its
             # own evidence: a phase lands in ``completed`` only through one of those two
             # recorded sources, so an unexecuted verifier cannot be declared satisfied.
+            #
+            # The checkpoint-continuation repair (2026-09-15): an explicit-snapshot resume
+            # records each skipped phase as INHERITED completion with provenance, so the next
+            # continuation reading only this ledger does not replay what the family already
+            # paid for. Recorded at skip time so a later correction that invalidates this
+            # phase can drop the entry in the same breath (see the correction block).
+            if resume_state is not None:
+                result.inherited_phases.append(
+                    _inherited_entry(resume_state, name, reached_checkpoints)
+                )
             prior.append(f"{name} (ok)")
             continue
         phase_timeout = int(phase_def.get("timeout", timeout))
@@ -4618,6 +4712,20 @@ def run_workflow(
                 target_def = phases[target_idx]
                 if str(target_def.get("kind", "agent")) == "test":
                     break  # a test phase has no producer worth re-running here
+                # A resumed run can carry the producer — and its downstream — in the selected
+                # parent's completion set. The failed verification invalidates that result:
+                # the correction must make the producer ELIGIBLE to execute again, and any
+                # inherited completion downstream of it (a verdict recorded against the
+                # parent's candidate) must be re-established, not carried across the change as
+                # if it still applied (reviewer reproduction 2026-09-15: the skip guard bounced
+                # the producer and only the verifier re-ran against the unchanged candidate).
+                invalidated = {str(p.get("name", "?")) for p in phases[target_idx:]}
+                completed -= invalidated
+                if result.inherited_phases:
+                    result.inherited_phases = [
+                        entry for entry in result.inherited_phases
+                        if entry.get("phase") not in invalidated
+                    ]
                 # Retain the failing execution BEFORE removing its record (reviewer
                 # reproduction 2026-09-14): the paid invocation's cost/tokens/verdict survive
                 # as attempt rows on the re-run's final record — never popped into silence,

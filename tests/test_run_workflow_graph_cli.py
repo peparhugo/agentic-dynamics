@@ -602,6 +602,72 @@ def test_load_resume_state_refuses_when_the_selected_parent_has_no_ledger(tmp_pa
         module._load_resume_state("demo", "run-parent")
 
 
+def test_load_resume_state_carries_reached_checkpoints_separately_from_completion(
+    tmp_path, monkeypatch
+):
+    """A checkpoint phase the parent recorded ``awaiting`` is NOT completion — it is a
+    REACHED stop. The loader must carry it separately so the engine can validate its
+    approval contract before treating it as skippable (the fleet's p1c defect: ``ok``-only
+    completion left the reached checkpoint unvalidated and re-run)."""
+    module = _load_module()
+    monkeypatch.setattr(module, "ROOT", tmp_path)
+    _write_parent_ledger(tmp_path, "demo", "20260912T164142123456Z_run-parent.json", {
+        "run_id": "run-parent",
+        "phases": [
+            {"phase": "scope", "status": "ok"},
+            {"phase": "gate", "status": "awaiting"},
+            {"phase": "broken", "status": "failed"},
+        ],
+    })
+
+    state = module._load_resume_state("demo", "run-parent")
+    assert state.completed_phases == frozenset({"scope"})
+    assert state.reached_checkpoints == frozenset({"gate"})
+    assert state.inherited_phases == ()
+
+
+def test_load_resume_state_unions_inherited_completion_with_provenance(tmp_path, monkeypatch):
+    """A continuation's OWN ledger records the ancestor completions it inherited (phases it
+    skipped). The next loader must read them as completion WITH their provenance — otherwise
+    a second continuation forgets them and replays producers the family already paid for."""
+    module = _load_module()
+    monkeypatch.setattr(module, "ROOT", tmp_path)
+    _write_parent_ledger(tmp_path, "demo", "20260912T164142123456Z_run-child.json", {
+        "run_id": "run-child",
+        "phases": [{"phase": "implement", "status": "ok"}],
+        "inherited_phases": [
+            {"phase": "scope", "from_run_id": "run-root",
+             "ledger_path": "/ledgers/run-root.json", "status": "completed"},
+            {"phase": "gate", "from_run_id": "run-root",
+             "ledger_path": "/ledgers/run-root.json", "status": "checkpoint_approved"},
+        ],
+    })
+
+    state = module._load_resume_state("demo", "run-child")
+    assert state.completed_phases == frozenset({"implement", "scope", "gate"})
+    assert state.reached_checkpoints == frozenset()
+    assert {e["phase"]: e["from_run_id"] for e in state.inherited_phases} == {
+        "scope": "run-root", "gate": "run-root",
+    }
+
+
+def test_load_resume_state_refuses_malformed_inherited_lineage(tmp_path, monkeypatch):
+    """Missing or corrupt inherited lineage is a NAMED refusal — never a silent completion
+    and never a guess at the origin run."""
+    module = _load_module()
+    monkeypatch.setattr(module, "ROOT", tmp_path)
+    for bad in (
+        {"phase": "scope", "status": "completed"},                              # no origin
+        {"from_run_id": "run-root", "status": "completed"},                     # no phase
+        {"phase": "scope", "from_run_id": "run-root", "status": "maybe"},       # unknown status
+    ):
+        _write_parent_ledger(tmp_path, "demo", "20260912T000000000000Z_run-parent.json", {
+            "run_id": "run-parent", "phases": [], "inherited_phases": [bad],
+        })
+        with pytest.raises(module.ParentRunRefused):
+            module._load_resume_state("demo", "run-parent")
+
+
 def test_main_passes_the_parent_snapshot_to_the_engine(tmp_path, monkeypatch):
     """The composition root wires the selected parent's ledger into the engine: a --resume
     with a linked parent calls run_workflow with the explicit ResumeState (not just a
