@@ -471,6 +471,9 @@ def submit_run(
             "disarms the spend gate"
         ])
 
+    # The shared gate INCLUDES Unit D's AIO binding step: an ``aio`` submit is re-resolved
+    # from the durable store here (its claimed binding id is never proof), so even a submit
+    # that bypassed the wrapper cannot ride a string to the launch effect.
     errors = spawn_wrapper.validate_submit_request(
         command, repo_root=repo_root, phase_scopes=phase_scopes, path_config=path_config,
     )

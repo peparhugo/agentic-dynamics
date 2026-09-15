@@ -186,6 +186,35 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def measure_verdict(
+    session_id: str | None,
+    *,
+    db_path: Path | None = None,
+    ctx_budget: int = DEFAULT_CTX_BUDGET,
+    turn_budget: int = DEFAULT_TURN_BUDGET,
+) -> tuple[str, str]:
+    """The measurement seam for programmatic callers (the AIO exec-boundary gate).
+
+    Returns ``(verdict, reason)`` with the SAME judgment as the CLI: an absent identity, an
+    absent session, or an unreadable db is ``UNJUDGED`` with a reason — never a silent OK
+    (an unknown budget is never unlimited). The judged session is the EXPLICIT identity;
+    there is no most-recently-updated fallback.
+    """
+    try:
+        path = Path(db_path) if db_path else _default_db()
+        if not path.is_file():
+            raise FileNotFoundError(f"session db {path} not found")
+        sid = (session_id or "").strip()
+        if not sid:
+            raise LookupError(f"no session identity supplied (--session-id or {SESSION_ID_ENV})")
+        if not _session_exists(path, sid):
+            raise LookupError(f"session {sid!r} does not exist in {path}")
+        turns, context, _incomplete = _measure(path, sid)
+        return judge(turns=turns, context=context, ctx_budget=ctx_budget, turn_budget=turn_budget), ""
+    except Exception as exc:  # noqa: BLE001 — an unreadable budget is UNJUDGED, never OK
+        return "UNJUDGED", f"{type(exc).__name__}: {exc}"
+
+
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     db_path = Path(args.db) if args.db else _default_db()

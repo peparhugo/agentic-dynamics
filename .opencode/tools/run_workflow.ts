@@ -1,5 +1,61 @@
 import { tool } from "@opencode-ai/plugin"
 
+/**
+ * The AIO identity flags for a durable submit.
+ *
+ * PURE and exported for the argv-level regression: the identity comes from the NATIVE tool
+ * context (`ctx.sessionID` / `ctx.agent`) plus a durable binding read — never from a
+ * model-supplied arg. The backend re-resolves the binding independently before any launch;
+ * this helper only refuses early when the tool itself cannot supply a bound identity.
+ */
+export function aioSubmitFlags(
+  nativeSessionID: string,
+  agent: string,
+  bindingReport: {
+    status?: unknown
+    knowledge_id?: unknown
+    binding?: { context_version?: unknown } | null
+  } | null,
+): { flags: string[]; refuse: string } {
+  const sessionID = String(nativeSessionID ?? "").trim()
+  if (!sessionID) {
+    return {
+      flags: [],
+      refuse:
+        "no native session identity in the tool context — refusing to submit unbound " +
+        "(the durable path requires a bound AIO session)",
+    }
+  }
+  if (!bindingReport || bindingReport.status !== "found") {
+    const status = bindingReport?.status ?? "unreadable"
+    return {
+      flags: [],
+      refuse:
+        `no durable AIO binding for session ${sessionID} (status ${status}) — the plugin ` +
+        "binds the session on its first substantive message; refusing to submit unbound.",
+    }
+  }
+  const bindingID = String(bindingReport.knowledge_id ?? "").trim()
+  const revision = Number(bindingReport.binding?.context_version ?? 0)
+  if (!bindingID || !Number.isInteger(revision) || revision < 1) {
+    return {
+      flags: [],
+      refuse:
+        `the AIO binding for session ${sessionID} carries no record id / task revision — ` +
+        "refusing to submit unbound.",
+    }
+  }
+  return {
+    flags: [
+      "--aio-session-id", sessionID,
+      "--aio-agent", String(agent ?? ""),
+      "--binding-id", bindingID,
+      "--task-revision", String(revision),
+    ],
+    refuse: "",
+  }
+}
+
 export default tool({
   description:
     "Run an agent_task workflow (the execute phase of the spec/compiler DAG) against a goal inside a git worktree, committing + ledgering each phase. With orchestrator=true (the DEFAULT), the run is SUBMITTED through the durable fleet path (fleet:commands → spawn-wrapper consumer → host-side launch broker → docker compose), carrying source/spec identity (spec_sha256), continuation identity (resume/parent_run_id), and the admission settings — a submit immediately yields a durable job identity, and the same identity supports observation (fleet:jobs board, control packet) and continuation. With orchestrator=false the run executes in-process (an explicitly requested deterministic local run).",
@@ -76,6 +132,26 @@ export default tool({
       return { output: `spec identity unavailable for ${args.spec} (got "${specSha}") — refusing to submit without the source digest`, metadata: { exit_code: 2 } }
     }
 
+    // The AIO binding (Unit D): the identity is the NATIVE tool context, never a model-
+    // supplied field. The durable read happens here so the tool can explain an early refusal;
+    // the wrapper AND the broker re-resolve the same binding before any launch effect.
+    const bindingRead = await Bun.$`python3 scripts/session_open.py --binding --native-session-id ${String(ctx.sessionID ?? "")} --json`
+      .cwd(ctx.directory).nothrow()
+    let bindingReport: Record<string, unknown> | null = null
+    try {
+      const parsed = JSON.parse(bindingRead.stdout.toString().trim())
+      bindingReport = parsed && typeof parsed === "object" ? parsed : null
+    } catch {
+      bindingReport = null
+    }
+    const aio = aioSubmitFlags(String(ctx.sessionID ?? ""), String(ctx.agent ?? ""), bindingReport)
+    if (aio.refuse) {
+      return {
+        output: aio.refuse,
+        metadata: { exit_code: 2, aio_session_id: String(ctx.sessionID ?? "") },
+      }
+    }
+
     const admissionArmed = args.admission_required ?? (process.env.FINOPS_ADMISSION_REQUIRED === "1")
     const submitFlags: string[] = [
       "submit",
@@ -85,6 +161,7 @@ export default tool({
       "--workdir", args.workdir,
       "--spec-sha256", specSha,
     ]
+    submitFlags.push(...aio.flags)
     if (args.resume) submitFlags.push("--resume")
     if (args.parent_run_id) submitFlags.push("--parent-run-id", args.parent_run_id)
     if (admissionArmed) submitFlags.push("--admission-required")
@@ -126,6 +203,8 @@ export default tool({
         workdir: args.workdir,
         resume: args.resume,
         parent_run_id: args.parent_run_id ?? "",
+        aio_session_id: String(ctx.sessionID ?? ""),
+        aio_binding_id: aio.flags[aio.flags.indexOf("--binding-id") + 1] ?? "",
         admission_required: admissionArmed,
         execution: {
           backend: args.backend ?? "auto",

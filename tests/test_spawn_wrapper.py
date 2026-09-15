@@ -1904,3 +1904,158 @@ def test_submit_admission_reserve_and_cap_are_type_validated():
                for e in validate_submit_request(bad_cap))
     good = dict(base, admission={"required": True, "reserve_usd": 0.6, "hard_cap_usd": 1.0})
     assert validate_submit_request(good) == []
+
+
+# ── The AIO binding gate (Unit D) ─────────────────────────────────────────────
+#
+# A submit carrying an ``aio`` block declares the AIO actor: the wrapper (and, independently,
+# the broker) resolves the binding from the durable store BY IDENTITY — the request's own
+# claims are never proof — and the AIO session's measured budget must allow new consequential
+# work. A submit with no ``aio`` block keeps its existing contract.
+
+
+def _aio_block(**overrides) -> dict:
+    block = {
+        "native_session_id": "ses_aio",
+        "agent": "aio-control",
+        "binding_id": "",
+        "task_revision": 1,
+    }
+    block.update(overrides)
+    return block
+
+
+def _bound_store(store) -> str:
+    """A tmp binding store with ONE real binding; returns its durable record id."""
+    from agentic_dynamics.knowledge import session_ingestion as si
+
+    si.init_binding_store(store)
+    result = si.write_binding(
+        {
+            "native_session_id": "ses_aio",
+            "resolved_agent": "aio-control",
+            "task_identity": "unit-d",
+            "original_request": "enforce the binding at the exec boundary",
+        },
+        artifact_dir=store,
+        publish=False,
+    )
+    assert result.status == si.BINDING_STATUS_CREATED
+    return result.knowledge_id
+
+
+@pytest.fixture
+def aio_env(tmp_path, monkeypatch):
+    """Point the gate at a tmp store; stub the budget measurement to OK unless overridden."""
+    from scripts.fleet import spawn_wrapper as sw
+
+    monkeypatch.setenv("FINOPS_KB_ARTIFACT_DIR", str(tmp_path))
+    monkeypatch.setattr(sw, "_aio_budget_verdict", lambda session_id: ("OK", ""))
+    return tmp_path
+
+
+def test_a_bound_aio_submit_passes_the_binding_gate(aio_env):
+    binding_id = _bound_store(aio_env)
+    errors = validate_submit_request(
+        _valid_submit_request(aio=_aio_block(binding_id=binding_id))
+    )
+    assert errors == []
+
+
+def test_an_aio_submit_without_a_store_is_refused(tmp_path, monkeypatch):
+    from scripts.fleet import spawn_wrapper as sw
+
+    monkeypatch.setenv("FINOPS_KB_ARTIFACT_DIR", str(tmp_path / "absent"))
+    monkeypatch.setattr(sw, "_aio_budget_verdict", lambda session_id: ("OK", ""))
+    errors = validate_submit_request(_valid_submit_request(aio=_aio_block(binding_id="0" * 64)))
+    assert any("binding store is unavailable" in e for e in errors)
+
+
+def test_an_aio_submit_without_a_binding_is_refused(aio_env):
+    errors = validate_submit_request(_valid_submit_request(aio=_aio_block(binding_id="0" * 64)))
+    assert any("no durable AIO binding" in e for e in errors)
+
+
+def test_a_foreign_binding_id_is_refused(aio_env):
+    _bound_store(aio_env)
+    errors = validate_submit_request(_valid_submit_request(aio=_aio_block(binding_id="f" * 64)))
+    assert any("does not match the durable binding record" in e for e in errors)
+
+
+def test_a_mismatched_agent_is_refused(aio_env):
+    binding_id = _bound_store(aio_env)
+    errors = validate_submit_request(
+        _valid_submit_request(aio=_aio_block(binding_id=binding_id, agent="build"))
+    )
+    assert any("resolved agent" in e for e in errors)
+
+
+def test_a_stale_task_revision_is_refused_and_the_current_one_passes(aio_env):
+    from agentic_dynamics.knowledge import session_ingestion as si
+
+    _bound_store(aio_env)
+    updated = si.update_binding_context(
+        "ses_aio", context={"work_unit": "v2"}, expected_version=1,
+        artifact_dir=aio_env, publish=False,
+    )
+    stale = validate_submit_request(
+        _valid_submit_request(aio=_aio_block(binding_id=updated.knowledge_id, task_revision=1))
+    )
+    assert any("stale task revision" in e for e in stale)
+    current = validate_submit_request(
+        _valid_submit_request(aio=_aio_block(binding_id=updated.knowledge_id, task_revision=2))
+    )
+    assert current == []
+
+
+def test_a_warn_or_close_budget_blocks_new_consequential_work(aio_env, monkeypatch):
+    from scripts.fleet import spawn_wrapper as sw
+
+    binding_id = _bound_store(aio_env)
+    for verdict in ("WARN", "CLOSE", "UNJUDGED"):
+        monkeypatch.setattr(
+            sw, "_aio_budget_verdict", lambda session_id, v=verdict: (v, "measured reason")
+        )
+        errors = validate_submit_request(
+            _valid_submit_request(aio=_aio_block(binding_id=binding_id))
+        )
+        assert any(f"budget verdict is {verdict}" in e for e in errors), verdict
+
+
+def test_the_budget_verdict_is_measured_from_the_explicit_session(tmp_path, monkeypatch):
+    """The gate measures the binding's OWN session; an unknown session is UNJUDGED."""
+    import json as _json
+    import sqlite3
+
+    from scripts.fleet import spawn_wrapper as sw
+
+    db = tmp_path / "opencode.db"
+    con = sqlite3.connect(db)
+    con.execute("CREATE TABLE session (id TEXT, time_updated INTEGER)")
+    con.execute("CREATE TABLE message (session_id TEXT, time_created INTEGER, data TEXT)")
+    con.execute("INSERT INTO session VALUES ('ses_aio', 200)")
+    con.execute(
+        "INSERT INTO message VALUES ('ses_aio', 1, ?)",
+        (_json.dumps({"role": "assistant", "tokens": {"input": 10, "cache": {"read": 10, "write": 0}}}),),
+    )
+    con.commit()
+    con.close()
+    monkeypatch.setenv("FINOPS_OPENCODE_DB", str(db))
+    assert sw._aio_budget_verdict("ses_aio") == ("OK", "")
+    verdict, reason = sw._aio_budget_verdict("ses_unknown")
+    assert verdict == "UNJUDGED" and "does not exist" in reason
+
+
+def test_a_malformed_aio_block_is_refused():
+    errors = validate_submit_request(_valid_submit_request(aio={}))
+    assert any("native_session_id is required" in e for e in errors)
+    assert any("aio.agent is required" in e for e in errors)
+    assert any("binding_id is required" in e for e in errors)
+    assert any("task_revision must be a positive integer" in e for e in errors)
+
+
+def test_a_non_aio_submit_needs_no_binding_and_keeps_its_contract(tmp_path, monkeypatch):
+    """Valid non-AIO automation (workers, campaign scripts) never impersonates the AIO — and
+    a missing binding store does not touch it."""
+    monkeypatch.setenv("FINOPS_KB_ARTIFACT_DIR", str(tmp_path / "absent"))
+    assert validate_submit_request(_valid_submit_request()) == []

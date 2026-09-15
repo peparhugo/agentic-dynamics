@@ -868,6 +868,107 @@ def _is_worktree_scoped_workdir(
     return errors
 
 
+def _aio_binding_artifact_dir() -> Path:
+    """The durable knowledge root the AIO binding store is resolved against.
+
+    EXPLICIT resolution, never a worktree-local guess: ``FINOPS_KB_ARTIFACT_DIR`` when set
+    (the operator's canonical pointer), else the repo checkout's ``KB_ARTIFACT_DIR``.
+    """
+    from agentic_dynamics.core.paths import KB_ARTIFACT_DIR
+
+    explicit = os.environ.get("FINOPS_KB_ARTIFACT_DIR", "").strip()
+    return Path(explicit).expanduser() if explicit else KB_ARTIFACT_DIR
+
+
+def _aio_budget_verdict(native_session_id: str) -> tuple[str, str]:
+    """The AIO session's measured budget verdict, via the budget module's public seam.
+
+    The session under judgment is the EXPLICIT native identity carried by the binding — never
+    a most-recently-updated guess. An unmeasurable budget returns UNJUDGED with a reason, and
+    the boundary fails closed: an unknown budget is never treated as unlimited.
+    """
+    try:
+        from scripts import session_budget as budget  # repo root on sys.path
+    except ImportError:
+        try:
+            import session_budget as budget  # direct run: scripts/ is sys.path[0]
+        except ImportError as exc:
+            return "UNJUDGED", f"the budget module is unavailable ({exc})"
+    return budget.measure_verdict(native_session_id)
+
+
+def _validate_aio_binding(aio: Any) -> list[str]:
+    """The AIO actor's binding gate: resolve + validate the binding BY IDENTITY.
+
+    The request's own claims are never proof: the binding is re-read from the durable store
+    by the native session id, and the claimed binding id / agent / task revision must MATCH
+    what the store resolves. Refusals (each named): malformed identity fields, an unavailable
+    store, no binding, an agent mismatch, a stale or foreign binding id, a stale task
+    revision, and a session-budget verdict that blocks new consequential work (WARN / CLOSE /
+    UNJUDGED — the exec boundary fails closed).
+    """
+    if not isinstance(aio, dict):
+        return [f"submit: aio must be a mapping (got {type(aio).__name__})"]
+    errors: list[str] = []
+    native_session_id = str(aio.get("native_session_id") or "").strip()
+    if not native_session_id:
+        errors.append(
+            "submit: aio.native_session_id is required — the native session identity is what "
+            "the binding is resolved by (a model-supplied field is not an identity)"
+        )
+    agent = str(aio.get("agent") or "").strip()
+    if not agent:
+        errors.append("submit: aio.agent is required (the resolved native agent)")
+    binding_id = str(aio.get("binding_id") or "").strip()
+    if not binding_id:
+        errors.append("submit: aio.binding_id is required (the durable binding record id)")
+    revision = aio.get("task_revision")
+    if isinstance(revision, bool) or not isinstance(revision, int) or revision < 1:
+        errors.append(
+            f"submit: aio.task_revision must be a positive integer (got {revision!r})"
+        )
+    if errors:
+        return errors
+
+    from agentic_dynamics.knowledge import session_ingestion as si
+
+    result = si.read_binding(native_session_id, artifact_dir=_aio_binding_artifact_dir())
+    if result.status == si.BINDING_STATUS_STORE_MISSING:
+        return [
+            "submit: the AIO binding store is unavailable (store_missing) — the exec boundary "
+            "refuses a submit whose binding cannot be resolved"
+        ]
+    if result.status != si.BINDING_STATUS_FOUND or result.binding is None:
+        return [
+            f"submit: no durable AIO binding for session {native_session_id!r} "
+            f"(status {result.status}) — an unbound AIO submit is refused"
+        ]
+    binding = result.binding
+    if str(binding.get("resolved_agent") or "") != agent:
+        errors.append(
+            f"submit: aio.agent {agent!r} does not match the binding's resolved agent "
+            f"{binding.get('resolved_agent')!r}"
+        )
+    if result.knowledge_id != binding_id:
+        errors.append(
+            f"submit: aio.binding_id {binding_id[:12]}… does not match the durable binding "
+            f"record {result.knowledge_id[:12]}… — a claimed id is not proof of binding"
+        )
+    current_version = int(binding.get("context_version") or 0)
+    if current_version != int(revision):
+        errors.append(
+            f"submit: stale task revision: the request cites {revision}, the binding's "
+            f"current context version is {current_version} — re-read the binding"
+        )
+    verdict, reason = _aio_budget_verdict(native_session_id)
+    if verdict != "OK":
+        errors.append(
+            f"submit: AIO session budget verdict is {verdict} — new consequential work is "
+            f"blocked ({reason or 'session at its budget'})"
+        )
+    return errors
+
+
 def validate_submit_request(
     request: dict[str, Any],
     *,
@@ -877,9 +978,10 @@ def validate_submit_request(
 ) -> list[str]:
     """Validate a ``submit`` request. Empty list = valid; the socket is reached only then.
 
-    Eight checks (p1_submit_contract's SHAPE + p3_base_image_caching's image check, in order —
-    later checks still run even after an earlier one fails, so a caller sees every problem in
-    one pass rather than iterating):
+    The checks below (p1_submit_contract's SHAPE, p3_base_image_caching's image check, the
+    extended identity steps, and Unit D's AIO binding gate) run in order — later checks still
+    run even after an earlier one fails, so a caller sees every problem in one pass rather
+    than iterating:
 
     1. ``spec`` resolves to a file inside the repo's declared spec directories AND
        compile-validates (:func:`compile_spec` — the requires/produces gate).
@@ -1123,6 +1225,15 @@ def validate_submit_request(
                 errors.append(
                     f"submit: execution.no_commit must be a boolean (got {no_commit!r})"
                 )
+
+    # Step 12 — the AIO binding gate (Unit D). A submit carrying an ``aio`` block declares the
+    # AIO actor: its binding is resolved + validated BY IDENTITY from the durable store (the
+    # request's own fields are never proof), and the AIO session's measured budget verdict must
+    # allow new consequential work. A submit with NO ``aio`` block keeps its existing contract —
+    # valid non-AIO automation (experiment workers, campaign scripts) is not asked to
+    # impersonate the coordinator. The broker re-runs this same gate before the launch effect.
+    if request.get("aio") is not None:
+        errors.extend(_validate_aio_binding(request.get("aio")))
 
     return errors
 
