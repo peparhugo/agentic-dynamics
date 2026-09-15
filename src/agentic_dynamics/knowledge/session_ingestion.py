@@ -46,9 +46,11 @@ round-trips through ``extract_record`` like every other producer's.
 
 from __future__ import annotations
 
+import contextlib
 import hashlib
 import json
 import os
+import tempfile
 from collections.abc import Callable
 from dataclasses import dataclass
 from dataclasses import field as _dataclass_field
@@ -1192,20 +1194,35 @@ def read_binding(
     )
 
 
-def _create_slot_exclusive(slot_path: Path, slot: dict[str, Any]) -> bool:
-    """Create the slot atomically across processes (``O_CREAT|O_EXCL``); False if it exists."""
+def _write_slot_temp(slot_path: Path, slot: dict[str, Any]) -> str:
+    """Write the slot JSON to a UNIQUE temp file beside the slot; return its path."""
     slot_path.parent.mkdir(parents=True, exist_ok=True)
-    data = json.dumps(slot, sort_keys=True, indent=2).encode("utf-8")
+    fd, tmp_name = tempfile.mkstemp(dir=slot_path.parent, prefix=f"{slot_path.name}.tmp.")
+    with os.fdopen(fd, "wb") as handle:
+        handle.write(json.dumps(slot, sort_keys=True, indent=2).encode("utf-8"))
+    return tmp_name
+
+
+def _create_slot_exclusive(slot_path: Path, slot: dict[str, Any]) -> bool:
+    """Create the slot atomically across processes; False when another writer won.
+
+    Content-atomic, not just name-atomic: the full JSON is written to a unique temp file and
+    then ``os.link``-ed into place — the link either fails (the slot exists) or publishes the
+    COMPLETE slot in one step. ``O_CREAT|O_EXCL`` alone guarantees only that one writer lands
+    the NAME; a concurrent reader could observe an empty/partial file mid-write (the CI
+    concurrency flake this replaces). The artifact is written before the link, so a reader
+    that sees the slot always sees a resolvable binding. ``mkstemp`` keeps the temp name
+    unique across THREADS as well as processes.
+    """
+    tmp_name = _write_slot_temp(slot_path, slot)
     try:
-        fd = os.open(slot_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o644)
+        os.link(tmp_name, slot_path)
+        return True
     except FileExistsError:
         return False
-    try:
-        os.write(fd, data)
-        os.fsync(fd)
     finally:
-        os.close(fd)
-    return True
+        with contextlib.suppress(FileNotFoundError):
+            os.unlink(tmp_name)
 
 
 def binding_publish_enabled() -> bool:
@@ -1424,9 +1441,8 @@ def update_binding_context(
         "knowledge_id": record.knowledge_id,
         "created_at": payload.get("created_at", ""),
     }
-    tmp = slot_path.with_name(f"{slot_path.name}.tmp.{os.getpid()}")
-    tmp.write_text(json.dumps(slot, sort_keys=True, indent=2), encoding="utf-8")
-    os.replace(tmp, slot_path)
+    tmp_name = _write_slot_temp(slot_path, slot)
+    os.replace(tmp_name, slot_path)
 
     warnings: list[str] = []
     entry_id = ""
