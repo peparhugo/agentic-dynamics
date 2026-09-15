@@ -964,72 +964,93 @@ def _normalize_project(value: str) -> str:
     return text
 
 
-def _checkout_project_identities(checkout: Path) -> set[str]:
-    """The candidate project identities of ONE checkout (origin URL + directory names).
-
-    Filesystem-only (no subprocess): the common git dir's ``origin`` URL is a content
-    identity that survives the host/container path views; the directory names are fallbacks.
-    """
+def _checkout_identity(checkout: Path) -> dict | None:
+    """``{name, origin, common_dir, is_git}`` for ONE checkout, or None when unresolvable."""
     if checkout is None or not str(checkout).strip() or not checkout.is_dir():
-        # A non-existent (or unreadable) path has NO project identity — an unresolvable side
-        # is not a claim, so it can never manufacture a false cross-project refusal.
-        return set()
-    identities = {_normalize_project(checkout.name)}
+        return None
     common = _git_common_dir(checkout)
-    if common is not None:
-        if common.name == ".git":
-            identities.add(_normalize_project(common.parent.name))
-        url = _origin_url(common)
-        if url:
-            identities.add(_normalize_project(url))
-    return {identity for identity in identities if identity}
+    origin = _origin_url(common) if common is not None else ""
+    return {
+        "name": _normalize_project(checkout.name),
+        "origin": _normalize_project(origin),
+        "common_dir": str(common) if common is not None else "",
+        "is_git": common is not None,
+    }
 
 
 def _project_agreement(repo_root: Path, workdir: str) -> tuple[set[str], list[str]]:
     """Establish the spec repository's and the worktree's identities INDEPENDENTLY and require
-    agreement: ``(agreed_identities, errors)``.
+    agreement through the CANONICAL ORIGIN or the COMMON GIT DIRECTORY: ``(agreed, errors)``.
 
-    The reviewer repair (2026-09-15): a UNION let a foreign worktree pass whenever the binding
-    matched either side. Both sides must resolve to the same project (a shared identity — a
-    legitimate linked worktree shares the common git dir and its origin URL/name). When one
-    side is unresolvable (a missing workdir, a non-git path), the other side's identities
-    stand alone; when BOTH resolve and disagree, the submit is refused as cross-project.
+    The reviewer repair (2026-09-15, second round): a shared DIRECTORY NAME must never
+    override conflicting origins — two unrelated repositories both named ``review-pr76``
+    otherwise agreed on the name alone. When both sides are git checkouts, agreement requires
+    an equal origin or an equal common git dir; directory names join the agreed set only when
+    the strong identities already agree. When one side is not a git checkout, the available
+    identities stand alone (the broker's deployment probe refuses a non-git workdir before
+    the launch effect).
     """
-    repo_ids = _checkout_project_identities(Path(repo_root))
-    work_ids = (
-        _checkout_project_identities(Path(workdir))
-        if str(workdir or "").strip()
-        else set()
-    )
-    if repo_ids and work_ids and not (repo_ids & work_ids):
-        return set(), [
-            f"submit: the worktree identifies as {sorted(work_ids)} — a DIFFERENT project than "
-            f"the spec repository ({sorted(repo_ids)}); a submit may not cross projects"
-        ]
-    if repo_ids and work_ids:
-        return repo_ids & work_ids, []
-    return (repo_ids or work_ids), []
+    repo = _checkout_identity(Path(repo_root))
+    work = _checkout_identity(Path(workdir)) if str(workdir or "").strip() else None
+
+    if repo and work and repo["is_git"] and work["is_git"]:
+        shared = ""
+        if repo["origin"] and work["origin"] and repo["origin"] == work["origin"]:
+            shared = repo["origin"]
+        elif (
+            repo["common_dir"]
+            and work["common_dir"]
+            and repo["common_dir"] == work["common_dir"]
+        ):
+            shared = f"git-dir:{repo['common_dir']}"
+        if not shared:
+            return set(), [
+                "submit: the worktree belongs to a DIFFERENT project than the spec repository "
+                f"(origins {work['origin'] or work['common_dir'] or work['name']} vs "
+                f"{repo['origin'] or repo['common_dir'] or repo['name']}) — a submit may not "
+                "cross projects (a shared directory name is not shared identity)"
+            ]
+        agreed = {shared}
+        if repo["name"] and repo["name"] == work["name"]:
+            agreed.add(repo["name"])
+        return agreed, []
+
+    identities: set[str] = set()
+    for side in (repo, work):
+        if side is None:
+            continue
+        identities.add(side["name"])
+        if side["origin"]:
+            identities.add(side["origin"])
+        if side["common_dir"]:
+            identities.add(side["common_dir"])
+    return {identity for identity in identities if identity}, []
 
 
 def _deterministic_phase_errors(spec: Any) -> list[str]:
-    """The AIO local-execution exception: every phase must be a deterministic step.
+    """The AIO local-execution exception: only phases the runner executes deterministically.
 
-    ``kind: agent`` phases are consequential model turns — they belong on the durable path,
-    where scope + budget enforcement apply. A spec whose phases are all non-agent is a
-    VERIFIED deterministic workflow, the only shape an AIO in-process run may execute.
+    The runner's dispatch is ``if kind == "test": <test branch> else: <AGENT branch>`` — an
+    OMITTED kind defaults to agent, and every other value (including a typo) takes the agent
+    branch. So the ONE deterministic kind is ``test``; anything else is consequential agent
+    work and belongs on the durable path. The reviewer reproduction: a spec with
+    ``kind: task`` passed this check while the real runner made an agent call.
     """
     if spec is None:
         return []
-    agent_phases = [
-        str(phase.get("name") or "?")
-        for phase in (spec.workflow.params.get("phases") or [])
-        if isinstance(phase, dict) and str(phase.get("kind") or "") == "agent"
-    ]
-    if not agent_phases:
+    offenders: list[str] = []
+    for phase in (spec.workflow.params.get("phases") or []):
+        if not isinstance(phase, dict):
+            continue
+        kind = str(phase.get("kind") or "agent")  # the runner's default
+        if kind != "test":
+            offenders.append(f"{phase.get('name') or '?'} (kind: {kind})")
+    if not offenders:
         return []
     return [
-        "submit: an AIO in-process run must be a verified deterministic workflow — phase(s) "
-        f"{agent_phases} are agent phases; consequential agent work uses the durable path"
+        "submit: an AIO in-process run must be a verified deterministic workflow — only "
+        "`kind: test` phases are deterministic (the runner executes every other or omitted "
+        f"kind through its AGENT branch); refusing: {offenders}"
     ]
 
 

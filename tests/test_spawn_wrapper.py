@@ -17,9 +17,11 @@ import pytest
 from agentic_dynamics.core.paths import PathConfig
 from agentic_dynamics.experiment.experiment_spec import (
     SCOPE_VOCABULARY,
+    load_spec,
     phase_scope,
     validate_spec,
 )
+from agentic_dynamics.runtime.executor import StepResult
 from scripts.fleet.launch_broker import (
     build_launch_argv,
     build_submit_argv,
@@ -2279,7 +2281,7 @@ def test_a_correct_project_binding_passes_the_agreement(aio_env, tmp_path):
 
 DETERMINISTIC_SPEC_YAML = """\
 name: deterministic_fixture
-question: a deterministic step, no agent phase
+question: a deterministic test step, no agent phase
 version: "0.1"
 artifact_kind: workflow
 intent: mutate
@@ -2290,10 +2292,62 @@ workflow:
   kind: agent_task
   params:
     phases:
-      - name: step_one
-        kind: task
+      - name: deterministic_check
+        kind: test
+        timeout: 120
+        tests:
+          - tests/test_something.py
         prompt: |
-          do the deterministic step
+          {goal}
+factors: []
+design: factorial
+rules: []
+metrics: []
+comparison: null
+"""
+
+KIND_TASK_SPEC_YAML = """\
+name: kind_task_fixture
+question: a kind-task phase (the runner's AGENT branch)
+version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: false
+  external_services: false
+workflow:
+  kind: agent_task
+  params:
+    phases:
+      - name: deterministic_check
+        kind: task
+        timeout: 120
+        prompt: |
+          {goal}
+factors: []
+design: factorial
+rules: []
+metrics: []
+comparison: null
+"""
+
+OMITTED_KIND_SPEC_YAML = """\
+name: omitted_kind_fixture
+question: a phase with no kind (the runner defaults to agent)
+version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: false
+  external_services: false
+workflow:
+  kind: agent_task
+  params:
+    phases:
+      - name: deterministic_check
+        timeout: 120
+        prompt: |
+          {goal}
 factors: []
 design: factorial
 rules: []
@@ -2302,24 +2356,99 @@ comparison: null
 """
 
 
-def test_only_agent_phase_specs_are_refused_by_the_deterministic_check(tmp_path):
+class _RecordingAgentExecutor:
+    """Records every AGENT-branch invocation (the consequential call the check must prevent)."""
+
+    def __init__(self):
+        self.calls: list[str] = []
+
+    def execute(self, request):
+        self.calls.append(request.phase_name)
+        target = Path(request.workdir) / "work" / f"{request.phase_name}.txt"
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text("x")
+        return StepResult(ok=True, state="ok", exit_code=0)
+
+
+class _RecordingVerifierExecutor:
+    def __init__(self):
+        self.calls: list[str] = []
+
+    def execute(self, request):
+        self.calls.append(request.phase_name)
+        return StepResult(
+            ok=True, state="ok", exit_code=0, tests_passed=1, tests_total=1,
+            test_executed_success=True,
+        )
+
+
+def _load_spec_yaml(tmp_path, name: str, text: str):
     from agentic_dynamics.experiment.experiment_spec import load_spec
+
+    path = tmp_path / name
+    path.write_text(text)
+    return load_spec(path)
+
+
+def test_only_test_kinds_are_deterministic_matching_the_runner(tmp_path):
+    """The reviewer repair: the runner dispatches EVERY non-test kind to its AGENT branch
+    (omitted kind included), so the deterministic check allows only `kind: test`."""
     from scripts.fleet import spawn_wrapper as sw
 
-    deterministic = tmp_path / "det.yaml"
-    deterministic.write_text(DETERMINISTIC_SPEC_YAML)
-    assert sw._deterministic_phase_errors(load_spec(deterministic)) == []
+    deterministic = _load_spec_yaml(tmp_path, "det.yaml", DETERMINISTIC_SPEC_YAML)
+    assert sw._deterministic_phase_errors(deterministic) == []
+
+    for name, text in (("task.yaml", KIND_TASK_SPEC_YAML), ("none.yaml", OMITTED_KIND_SPEC_YAML)):
+        spec = _load_spec_yaml(tmp_path, name, text)
+        errors = sw._deterministic_phase_errors(spec)
+        assert errors and "AGENT branch" in errors[0], name
 
     agentic = load_spec(_REPO_ROOT / _SUBMIT_SPEC)
     errors = sw._deterministic_phase_errors(agentic)
-    assert errors and "agent phases" in errors[0]
+    assert errors and "agent phases" not in errors[0]  # named offender + the branch rule
 
 
-def test_require_deterministic_refuses_the_agent_workflow():
-    errors = validate_submit_request(
-        _valid_submit_request(), require_deterministic=True
+def test_the_validator_and_the_runner_agree_on_the_deterministic_fixture(tmp_path):
+    """Together, through the REAL runner with recording executors: the validator admits the
+    `kind: test` fixture AND the runner makes ZERO agent calls executing it."""
+    from agentic_dynamics.runtime.executor import StepResult  # noqa: F401  (import check)
+    from agentic_dynamics.runtime.workflow_runner import run_workflow
+    from scripts.fleet import spawn_wrapper as sw
+
+    spec = _load_spec_yaml(tmp_path, "det.yaml", DETERMINISTIC_SPEC_YAML)
+    assert sw._deterministic_phase_errors(spec) == []
+
+    agent = _RecordingAgentExecutor()
+    verifier = _RecordingVerifierExecutor()
+    workdir = tmp_path / "wd"
+    workdir.mkdir()
+    result = run_workflow(
+        spec, goal="g", model="deepseek/deepseek-v4-flash", workdir=workdir,
+        step_executor=agent, verifier_executor=verifier, commit=False, publish=False,
     )
-    assert any("verified deterministic workflow" in e for e in errors)
+    assert result.ok is True
+    assert agent.calls == [], "the deterministic path made an agent call"
+    assert verifier.calls == ["deterministic_check"]
+
+
+def test_a_kind_task_spec_would_take_the_agents_branch(tmp_path):
+    """The reviewer reproduction, inverted: `kind: task` is AGENT work — the runner calls the
+    agent executor, which is exactly why the deterministic check refuses it."""
+    from agentic_dynamics.runtime.workflow_runner import run_workflow
+    from scripts.fleet import spawn_wrapper as sw
+
+    spec = _load_spec_yaml(tmp_path, "task.yaml", KIND_TASK_SPEC_YAML)
+    assert sw._deterministic_phase_errors(spec)  # refused BEFORE any execution
+
+    agent = _RecordingAgentExecutor()
+    verifier = _RecordingVerifierExecutor()
+    workdir = tmp_path / "wd"
+    workdir.mkdir()
+    run_workflow(
+        spec, goal="g", model="deepseek/deepseek-v4-flash", workdir=workdir,
+        step_executor=agent, verifier_executor=verifier, commit=False, publish=False,
+    )
+    assert agent.calls == ["deterministic_check"], "kind: task must reach the agent branch"
 
 
 def test_the_validate_submit_cli_reports_errors_as_json(monkeypatch, capsys):
@@ -2338,3 +2467,32 @@ def test_the_validate_submit_cli_reports_errors_as_json(monkeypatch, capsys):
     assert sw.main(["validate-submit"]) == 2
     bad = _json.loads(capsys.readouterr().out)
     assert bad["ok"] is False and bad["errors"]
+
+
+def test_a_shared_directory_name_never_overrides_conflicting_origins(tmp_path):
+    """The reviewer repair: two unrelated repositories both named ``review-pr76`` must not
+    agree on the name — agreement is the canonical origin or the common git dir."""
+    from scripts.fleet import spawn_wrapper as sw
+
+    (tmp_path / "a").mkdir()
+    (tmp_path / "b").mkdir()
+    repo_a = _git_project(tmp_path / "a", "review-pr76", "git@github.com:org-a/review-pr76.git")
+    repo_b = _git_project(tmp_path / "b", "review-pr76", "git@github.com:org-b/review-pr76.git")
+    agreed, errors = sw._project_agreement(repo_a, str(repo_b))
+    assert agreed == set()
+    assert errors and "DIFFERENT project" in errors[0]
+    assert "a shared directory name is not shared identity" in errors[0]
+
+
+def test_a_binding_cannot_ride_the_shared_name_across_projects(aio_env, tmp_path):
+    from scripts.fleet import spawn_wrapper as sw
+
+    (tmp_path / "a").mkdir()
+    (tmp_path / "b").mkdir()
+    repo_a = _git_project(tmp_path / "a", "review-pr76", "git@github.com:org-a/review-pr76.git")
+    repo_b = _git_project(tmp_path / "b", "review-pr76", "git@github.com:org-b/review-pr76.git")
+    binding_id = _bound_store(aio_env, project="review-pr76")  # the shared NAME
+    errors = sw._validate_aio_binding(
+        _aio_block(binding_id=binding_id), repo_root=repo_a, workdir=str(repo_b),
+    )
+    assert any("DIFFERENT project" in e for e in errors)
