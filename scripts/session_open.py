@@ -170,12 +170,20 @@ def read_control_packet(*, timeout: float = DEFAULT_COMMAND_TIMEOUT_S) -> dict:
     if result["status"] != "observed":
         return result
     payload = result["payload"]
-    if payload.get("schema") == "control-status/v1":
+    # A real packet carries the full control-status/v1 body (control_epoch included). The
+    # CLI's exit-3 error envelope REUSES the schema id, so a schema-only check would render
+    # "no database" as an observed empty packet (epoch None, active 0) — the exact conflation
+    # the contract forbids. An envelope with ``error`` (or without ``control_epoch``) is not a
+    # packet; it is the explicit no-control-database/unavailable state.
+    if (
+        payload.get("schema") == "control-status/v1"
+        and "error" not in payload
+        and "control_epoch" in payload
+    ):
         return result
-    # Exit 3 renders an error envelope (no control database) — an explicit state, not a packet.
     return {
         "status": "no_control_database" if "control database" in json.dumps(payload) else "unavailable",
-        "reason": str(payload.get("error") or "not a control-status/v1 packet")[:300],
+        "reason": str(payload.get("detail") or payload.get("error") or "not a control-status/v1 packet")[:300],
     }
 
 

@@ -150,6 +150,35 @@ class TestBindingStore:
         assert ok.binding["acceptance"]["provenance"].startswith("extracted by model X")
 
 
+class TestReadControlPacket:
+    def test_an_exit_three_error_envelope_is_not_a_packet(self):
+        """The CLI's exit-3 envelope REUSES the control-status/v1 schema id. Treating it as an
+        observed packet would render "no database" as epoch None / active 0 — the empty-vs-
+        missing conflation the contract forbids. It must be the explicit unavailable state."""
+        module = _load_session_open("session_open_packet_test")
+        envelope = {
+            "schema": "control-status/v1",
+            "error": "control_db_unavailable",
+            "detail": "control_db: no control database at /tmp/x — a reader never creates one",
+            "control_db": "",
+        }
+        module._run_json_command = lambda cmd, timeout: {
+            "status": "observed", "payload": envelope, "exit_code": 3,
+        }
+        result = module.read_control_packet()
+        assert result["status"] == "no_control_database"
+        assert "no control database" in result["reason"]
+
+    def test_a_real_packet_passes_through(self):
+        module = _load_session_open("session_open_packet_ok_test")
+        packet = {"schema": "control-status/v1", "control_epoch": 771, "active_runs": []}
+        module._run_json_command = lambda cmd, timeout: {
+            "status": "observed", "payload": packet, "exit_code": 0,
+        }
+        result = module.read_control_packet()
+        assert result["status"] == "observed" and result["payload"] is packet
+
+
 class TestCapsuleComposition:
     def _capsule(self, tmp_path, binding, **kwargs):
         module = _load_session_open()
