@@ -881,10 +881,13 @@ def _aio_binding_artifact_dir() -> Path:
 
 
 def _aio_budget_verdict(native_session_id: str) -> tuple[str, str, bool]:
-    """The AIO session's measured budget verdict: ``(verdict, reason, backend_available)``.
+    """The AIO session's measured capacity verdict: ``(verdict, reason, backend_available)``.
 
-    The session under judgment is the EXPLICIT native identity carried by the binding — never
-    a most-recently-updated guess. ``backend_available=False`` means this gate cannot reach
+    The judgment is the SHARED one — ``session_budget.measure_verdict`` resolves the ACTIVE
+    session model's capacity through ``agentic_dynamics.core.session_capacity`` (the ported
+    opencode calculation), the same resolution the CLI and the capsule consume. The session
+    under judgment is the EXPLICIT native identity carried by the binding — never a
+    most-recently-updated guess. ``backend_available=False`` means this gate cannot reach
     the session database (the containerized orchestrator has no host DB mounted): a gate that
     cannot measure DEFERS to the host-side gate, which owns the canonical database — it must
     not fabricate UNJUDGED and block a valid job (reviewer finding, 2026-09-15). When the
@@ -1082,9 +1085,10 @@ def _validate_aio_binding(
     project identities (the reviewer finding: a binding naming an unrelated git project must
     not ride an Agentic Dynamics workflow). Refusals (each named): malformed identity fields,
     an unavailable store, no binding, an agent mismatch, a foreign/stale binding id, a stale
-    task revision, a project mismatch, and a session-budget verdict that blocks new
-    consequential work (WARN / CLOSE / UNJUDGED — where measurable; ``strict_budget`` gates
-    that cannot reach the session database refuse instead of deferring).
+    task revision, a project mismatch, and a session-capacity verdict that blocks new
+    consequential work (COMPACT / CLOSE / UNJUDGED — where measurable; WARN is ADVISORY and
+    never blocks, per the 2026-09-15 context-policy; ``strict_budget`` gates that cannot
+    reach the session database refuse instead of deferring).
     """
     if not isinstance(aio, dict):
         return [f"submit: aio must be a mapping (got {type(aio).__name__})"]
@@ -1150,10 +1154,15 @@ def _validate_aio_binding(
         )
     verdict, reason, measured_here = _aio_budget_verdict(native_session_id)
     if measured_here:
-        if verdict != "OK":
+        # The 2026-09-15 capacity policy: WARN is ADVISORY (a session near its effective
+        # limit may still start new work); COMPACT is the native-compaction boundary (let the
+        # runtime reduce the context, then re-submit — the session/task binding continues);
+        # CLOSE is the hard model limit (next request cannot be processed); UNJUDGED is no
+        # measurement — never permission.
+        if verdict in ("COMPACT", "CLOSE", "UNJUDGED"):
             errors.append(
                 f"submit: AIO session budget verdict is {verdict} — new consequential work is "
-                f"blocked ({reason or 'session at its budget'})"
+                f"blocked ({reason or 'session at its capacity boundary'})"
             )
     elif strict_budget:
         errors.append(

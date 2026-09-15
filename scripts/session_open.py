@@ -199,6 +199,8 @@ def measure_budget(native_session_id: str, *, timeout: float = DEFAULT_COMMAND_T
     if result["status"] != "observed":
         return {"verdict": "UNJUDGED", "reason": result.get("reason", "measurement unavailable")}
     payload = result["payload"]
+    # v2: the resolved model + capacity + provenance ride through so the capsule reports
+    # what the judgment was made AGAINST (effective limit, headroom) and where it came from.
     return {
         "verdict": str(payload.get("verdict") or "UNJUDGED"),
         "turns": payload.get("turns"),
@@ -206,6 +208,10 @@ def measure_budget(native_session_id: str, *, timeout: float = DEFAULT_COMMAND_T
         "usage_incomplete": bool(payload.get("usage_incomplete")),
         "reason": str(payload.get("reason") or ""),
         "session_id": str(payload.get("session_id") or ""),
+        "model": payload.get("model"),
+        "capacity": payload.get("capacity"),
+        "remaining_tokens": payload.get("remaining_tokens"),
+        "provenance": payload.get("provenance"),
     }
 
 
@@ -423,6 +429,13 @@ def compose_capsule(
             "context_tokens": budget.get("context_tokens"),
             "usage_incomplete": bool(budget.get("usage_incomplete")),
             "reason": str(budget.get("reason") or ""),
+            # Capacity-derived judgment (2026-09-15): the capsule carries the resolved model,
+            # the effective/hard limits, the response/compaction headroom, the remaining
+            # tokens, and the measurement provenance — never only a bare verdict.
+            "model": budget.get("model"),
+            "capacity": budget.get("capacity"),
+            "remaining_tokens": budget.get("remaining_tokens"),
+            "provenance": budget.get("provenance"),
         },
         "next_action": next_section,
         "blocker": blocker_section,
@@ -468,10 +481,26 @@ def _render_tail(capsule: dict) -> str:
     next_marker = f" [truncated: {next_omitted} chars omitted]" if next_omitted else ""
     blocker_text, blocker_omitted = _truncate(str(capsule["blocker"]["text"] or ""), field_limit)
     blocker_marker = f" [truncated: {blocker_omitted} chars omitted]" if blocker_omitted else ""
-    budget_reason = _truncate(str(budget.get("reason") or ""), 200)[0]
+    budget_reason = _truncate(str(budget.get("reason") or ""), 240)[0]
+    model = budget.get("model") or {}
+    capacity = budget.get("capacity") or {}
+    model_text = (
+        f"{model.get('provider_id')}/{model.get('model_id')}"
+        if model.get("provider_id") else "model unresolved"
+    )
+    if capacity.get("effective_limit"):
+        capacity_text = (
+            f"context {budget.get('context_tokens')}/{capacity.get('effective_limit')} "
+            f"(hard {capacity.get('hard_limit')}, "
+            f"headroom {capacity.get('response_headroom_tokens')}"
+            + (f", remaining {budget.get('remaining_tokens')}" if budget.get("remaining_tokens") is not None else "")
+            + ")"
+        )
+    else:
+        capacity_text = f"context {budget.get('context_tokens')} (capacity unresolved)"
     lines = [
-        f"session budget: {budget['verdict']} (turns {budget.get('turns')}, "
-        f"context {budget.get('context_tokens')})"
+        f"session budget: {budget['verdict']} — {model_text} · {capacity_text} · "
+        f"turns {budget.get('turns')} (telemetry)"
         + (f" — {budget_reason}" if budget_reason else ""),
         f"next action: {next_text or '—'} ({capsule['next_action']['source']}){next_marker}",
         f"blocker: {blocker_text or '—'} ({capsule['blocker']['source']}){blocker_marker}",
