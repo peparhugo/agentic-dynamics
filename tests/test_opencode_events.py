@@ -4,12 +4,15 @@ Verifies that normalize_opencode_event correctly handles both v1 (historical)
 and v2 (current) opencode event formats, producing a canonical representation.
 """
 
+import json
 import logging
 import subprocess
 from pathlib import Path
 
 from agentic_dynamics.adapters.opencode import (
+    WORKER_AGENT,
     SnapshotSkipped,
+    _build_opencode_cmd,
     _capture_git_baseline,
     _diff_workdir,
     _init_git_workdir,
@@ -465,3 +468,27 @@ def test_git_baseline_handles_initial_dirty_and_untracked_state(tmp_path, monkey
     assert "untouched_untracked.py" not in diff.created + diff.modified
     # Untouched pre-existing untracked DIRECTORY contents: also not this attempt's work.
     assert "pre_existing_dir/inside.py" not in diff.created + diff.modified
+
+
+# ── Worker agent pinning (Unit B) ─────────────────────────────────────────────
+
+
+def test_worker_argv_selects_build_even_with_an_aio_project_default():
+    """The project default is the AIO coordinator (``opencode.json``'s ``default_agent``);
+    an ordinary worker call must still select the build profile EXPLICITLY — a default alone
+    would silently turn every worker cell into a coordinator."""
+    config = json.loads((Path(__file__).resolve().parent.parent / "opencode.json").read_text())
+    assert config.get("default_agent") == "aio-control", "the project default this pin beats"
+    assert WORKER_AGENT == "build"
+
+    cmd = _build_opencode_cmd(model="deepseek/deepseek-v4-flash", workdir="/tmp/wd")
+    assert cmd[cmd.index("--agent") + 1] == "build"
+    # EVERY ordinary invocation carries the pin, not only the bare flag combination
+    full = _build_opencode_cmd(
+        model="m", workdir="/tmp/wd", prompt="p", thinking_effort="high",
+        session_name="s", session_id="ses_x", fork=True,
+    )
+    assert full[full.index("--agent") + 1] == "build"
+    # a caller-selected specialized profile is preserved
+    specialized = _build_opencode_cmd(model="m", workdir="/tmp/wd", agent="instrument-dev")
+    assert specialized[specialized.index("--agent") + 1] == "instrument-dev"

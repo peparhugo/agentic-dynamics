@@ -1,0 +1,18 @@
+# `.opencode/plugins/` — hand-authored, outside the generator
+
+This directory holds OpenCode project plugins. Like `.opencode/tools/`, it is **hand-authored
+and deliberately outside the generated-surface set**: the generator
+(`scripts/_gen_instructions.py`, `agent_config/` → `.opencode/` + `.claude/` + the root files)
+does not own it, and its freshness check does not cover it. Edit plugin files directly; keep
+their tests outside auto-loaded directories (e.g. `tests/opencode/`).
+
+The approved AIO capsule plugin (`aio-context.ts` — automatic identity binding + capsule
+injection) lands here; the controller approved its scope on 2026-09-14.
+
+**Enforcement status.** The plugin's `tool.execute.before` refusal is a convenience and an
+early warning only — it is not the safety property. The REQUIRED enforcement — refusing an
+unbound consequential submit at the backend itself (submit contract, admission, promote
+gate), with or without the plugin loaded) — is **Unit D behavior and is NOT implemented yet**.
+Until Unit D lands, an absent or failed plugin degrades to thinner context, and there is NO
+backend binding refusal to fall back on. Do not describe the plugin as authority, and do not
+claim enforcement that is not present.

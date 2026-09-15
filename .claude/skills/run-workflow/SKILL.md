@@ -109,10 +109,18 @@ p1/p2):
                               step for MIN minutes is SIGTERM'd and fails STALLED + evidence.
                               Default FINOPS_PHASE_WATCHDOG_MIN env, else 20; 0 disables.
 --no-commit                   flag — do not commit after each phase
---resume                      flag — skip phases that already have a "[workflow] <phase>"
-                              commit; when the worktree has NO such commits, fall back to the
-                              phases the derived spec index (experiments/specs/index.json)
-                              shows as ok for this goal
+--resume                      flag — resume the run named by --parent-run-id (the fleet
+                              continuation path): the selected parent's OWN ledger is the
+                              completion input; a reached checkpoint is validated first and
+                              is skipped only with a valid approval. WITHOUT --parent-run-id
+                              (a direct in-process run) the legacy inference applies: skip
+                              phases with an existing "[workflow] <phase>" commit, else the
+                              derived spec index's ok phases. Never use the inference for a
+                              fleet continuation.
+--parent-run-id RUN_ID        the control-db run id this resume CONTINUES — required for the
+                              fleet path; the composition root verifies the lineage
+                              (unknown / foreign / non-continuable ids refuse before any run
+                              row exists).
 --signals PATH                optional — JSON signals override {model: {field: value}}
 --cap-snapshot                CAP I4 — compile + best-effort record a route_next_job/v1
                               ControlContext snapshot beside every routing decision (read-only
@@ -135,11 +143,14 @@ p1/p2):
                               delta-only facts with graph_status (unavailable) — never a crash.
 --orchestrator                run each agent phase as a SIBLING cell container with its scope
                               config (scripts/fleet/spawn_wrapper.py) instead of in-process.
-                              OPT-IN. The containerized orchestrator emits each launch as a
-                              TYPED request over the unix-socket seam to the HOST-side launch
-                              broker (the docker socket's only home; the broker performs the
-                              docker call). No container mounts the docker socket. A phase
-                              whose scope fails validation refuses BEFORE the request is emitted.
+                              OPT-IN at the CLI; in the FLEET this mode is reached by
+                              SUBMITTING (see Ordering step 3) — never by composing the
+                              container by hand. The containerized orchestrator emits each
+                              launch as a TYPED request over the unix-socket seam to the
+                              HOST-side launch broker (the docker socket's only home; the
+                              broker performs the docker call). No container mounts the
+                              docker socket. A phase whose scope fails validation refuses
+                              BEFORE the request is emitted.
 --only-phase NAME             run a SINGLE phase only — the sibling-cell entrypoint that
                               --orchestrator mode spawns per phase; the spec's phase list is
                               filtered to this name before the run.
@@ -174,34 +185,46 @@ not a hard prerequisite the script itself checks for.
   discarded tree re-presented fails `RELABEL` unless an operator-signed
   `approvals/<spec>/<phase>_tree_reuse.md` authorizes it.
 - Checkpoint phases — a phase declaring `checkpoint: true` that succeeds stops the run with
-  `awaiting_operator_approval`; `--resume` refuses to proceed past an unsatisfied checkpoint
-  unless `approvals/<spec>/<phase>_approval.md` is committed with a real operator signature.
+  `awaiting_operator_approval`; a resume validates the checkpoint's approval contract and
+  refuses to proceed past an unsatisfied one. `approvals/<spec>/<phase>_approval.md` must be
+  committed AFTER the checkpoint commit with a real operator signature, and it BINDS the run,
+  gate, candidate, spec, and phase (prepare it with `scripts/approve_workflow.py`; a foreign
+  or stale binding refuses with zero dispatch).
 
 ### Ordering
 
 1. (Optional, fast-fail) Run the `compile_experiment` `validate` snippet against the spec. Fix
    any `requires` gap (instrument the missing information) before proceeding.
 2. Create/choose a git worktree at `--workdir`.
-3. **Default execution path: the orchestrator.** Spec workflows with declared phase scopes
-   (or any workflow whose isolation matters) run containerized:
-   `docker-compose -f infrastructure/docker-compose.ladder.yml run --rm workflow-runner
-   python3 scripts/run_workflow.py --orchestrator --spec <spec> --goal "<goal>"
-   --model <model> --workdir <path>` — each phase spawns as a validated sibling cell
-   (scope ∈ the vocabulary, phase-authorized, mount contract, network, write flags — all
-   checked BEFORE the typed launch request is emitted). The container never holds the docker
-   socket: the orchestrator emits each launch over the host broker's unix-socket seam, and the
-   broker (the socket's only home, the ONLY Docker API caller) performs the docker call — no
-   in-container code calls docker. The fleet runs one orchestrator at a time: a submission
-   while one runs QUEUES on the same isolation path — occupancy means waiting, never a
-   different execution shape, and never starting a second orchestrator by hand.
+3. **Default execution path: SUBMIT through the fleet — never compose by hand.** The AIO
+   submits a spec workflow with the `run_workflow` tool (`orchestrator: true` — its default)
+   or `scripts/fleet/fleet_manager.py submit`. The submit carries the spec's sha256
+   (`--spec-sha256`), the continuation identity (`--resume --parent-run-id`), and the
+   admission settings (`--admission-required`, `--campaign-budget-usd`,
+   `--campaign-concurrency`, `--reserve-usd`, `--hard-cap-usd`). The HOST-side launch broker
+   owns `docker compose`: it validates the request and performs the launch — no in-container
+   code calls docker, and a manual `docker compose run` is never the fleet path (it drops the
+   identity and admission fields — the first-launch "gate disarmed" defect).
+   No container mounts the docker socket: the orchestrator emits each launch as a typed
+   request over the host broker's unix-socket seam, and the broker (the docker socket's only
+   home, the ONLY Docker API caller) performs the docker call. Each phase then   spawns as a validated sibling cell (scope ∈ the vocabulary, phase-authorized, mount
+   contract, network, write flags — all checked BEFORE the typed launch request is emitted).
+   The fleet runs one orchestrator at a time: a submission while one runs QUEUES on the same
+   isolation path — occupancy means waiting, never a different execution shape, and never
+   starting a second orchestrator by hand.
 4. In-process (`python3 scripts/run_workflow.py` without `--orchestrator`) is a **separate,
    explicitly requested mode** for trivial deterministic runs (e.g. a lab execution) —
    never the default and never the fallback for a busy fleet. In-process phases are
    documented scopes, not enforced ones.
 5. Each phase commits to the worktree (`"[workflow] <phase>"`) unless `--no-commit` is set.
-6. Use `--resume` to re-run after an interrupted workflow — it skips phases whose commit
-   already exists (falling back to the spec index's ok phases when the worktree has none)
-   rather than re-running them.
+6. **Continue a stopped run EXPLICITLY.** Submit with `--resume --parent-run-id <run-id>`: the
+   selected parent's OWN ledger is the completion input (never git history), a reached
+   checkpoint is validated before it may be skipped (it is not re-run just to stop again),
+   and an unapproved checkpoint refuses the resume with zero dispatch. The approval artifact
+   is prepared with `scripts/approve_workflow.py` (`--run-id --gate-id --candidate-sha
+   --spec --phase --operator --reason --workdir`; `--dry-run` first) and committed AFTER the
+   checkpoint commit. A plain `--resume` without `--parent-run-id` is the legacy in-process
+   inference only — never a fleet continuation.
 7. After the run, `python scripts/spec_status.py` refreshes the spec lifecycle index
    (best-effort, `run_workflow.py` also refreshes it at the end of every run).
 
@@ -215,6 +238,9 @@ not a hard prerequisite the script itself checks for.
   hooks (`--cap-snapshot`/`--cap-shadow`), and the orchestrator (`--orchestrator`/`--only-phase`)
   are the only CLI knobs; the deploy gate, commit-prefix, relabel, and checkpoint gates are
   **spec markers**, not flags.
+- Never hand-run `docker compose` for a workflow run — the fleet path is a SUBMIT through the
+  `run_workflow` tool or `scripts/fleet/fleet_manager.py submit`, and the host launch broker
+  owns the compose call.
 - A spec whose control-rule `requires` aren't yet produced by a measurement rule in the ledger
   fails `validate_rules` — instrument that information first (see `agent_config/mental-model.md`'s
   load-bearing rule), don't work around the gate.

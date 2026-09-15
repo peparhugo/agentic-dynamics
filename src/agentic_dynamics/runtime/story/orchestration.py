@@ -257,6 +257,31 @@ def _count_tests(worktree: Path) -> tuple[int, int, int]:
     return test_count, test_lines, code_lines
 
 
+def _continuation_cmd(opencode_bin: str, session_id: str, worktree: Path, model: str) -> list[str]:
+    """The argv for the timeout continuation (a fork of the timed-out session).
+
+    An ordinary worker call: the build profile is selected EXPLICITLY so the project's
+    ``default_agent`` (the AIO coordinator) cannot turn a continuation into a coordinator.
+    """
+    return [
+        opencode_bin,
+        "run",
+        "--agent",
+        "build",
+        "--session",
+        session_id,
+        "--fork",
+        "--dir",
+        str(worktree),
+        "--model",
+        model,
+        "--format",
+        "json",
+        "--auto",
+        "Continue. Complete the task. Run tests and finish.",
+    ]
+
+
 def _run_session(
     spec: SessionSpec,
     worktree: Path,
@@ -334,21 +359,7 @@ def _run_session(
         )
         try:
             cont_result = subprocess.run(
-                [
-                    opencode_bin,
-                    "run",
-                    "--session",
-                    primary_session_id,
-                    "--fork",
-                    "--dir",
-                    str(worktree),
-                    "--model",
-                    model,
-                    "--format",
-                    "json",
-                    "--auto",
-                    "Continue. Complete the task. Run tests and finish.",
-                ],
+                _continuation_cmd(opencode_bin, primary_session_id, worktree, model),
                 capture_output=True,
                 text=True,
                 timeout=timeout * 2,

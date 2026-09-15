@@ -480,7 +480,10 @@ def _call_agent(prompt: str, model: str, timeout: int) -> str | None:
 
     try:
         result = subprocess.run(
-            [opencode_bin, "run", prompt, "--model", model, "--format", "json", "--auto"],
+            # The build profile is selected EXPLICITLY (Unit B): the project's default agent
+            # is the AIO coordinator, and a review call is an ordinary worker call.
+            [opencode_bin, "run", "--agent", "build", prompt,
+             "--model", model, "--format", "json", "--auto"],
             capture_output=True,
             text=True,
             timeout=timeout + 30,
