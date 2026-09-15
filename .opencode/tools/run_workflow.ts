@@ -8,15 +8,44 @@ import { tool } from "@opencode-ai/plugin"
  * model-supplied arg. The backend re-resolves the binding independently before any launch;
  * this helper only refuses early when the tool itself cannot supply a bound identity.
  */
+export const AIO_AGENT = "aio-control"
+
+/** Parse one ``session_open.py --binding`` stdout and gate it (malformed output refuses). */
+export function toolBindingGate(
+  agent: string,
+  sessionID: string,
+  bindingStdout: string,
+): { flags: string[]; refuse: string } {
+  let report: Record<string, unknown> | null = null
+  try {
+    const parsed = JSON.parse(String(bindingStdout ?? "").trim())
+    report = parsed && typeof parsed === "object" ? parsed : null
+  } catch {
+    report = null
+  }
+  return aioSubmitFlags(sessionID, agent, report)
+}
+
+/** Whether the RESOLVED native agent is the AIO coordinator (never a model-supplied field). */
+export function isAioAgent(agent: string): boolean {
+  return String(agent ?? "").trim() === AIO_AGENT
+}
+
 export function aioSubmitFlags(
   nativeSessionID: string,
   agent: string,
   bindingReport: {
     status?: unknown
     knowledge_id?: unknown
-    binding?: { context_version?: unknown } | null
+    binding?: { context_version?: unknown; project?: unknown } | null
   } | null,
 ): { flags: string[]; refuse: string } {
+  // The binding gate applies to the AIO actor. A worker / specialized profile keeps the
+  // existing authority contract and is never asked to impersonate the coordinator
+  // (reviewer finding: an unconditional check refused legitimate Build calls).
+  if (!isAioAgent(agent)) {
+    return { flags: [], refuse: "" }
+  }
   const sessionID = String(nativeSessionID ?? "").trim()
   if (!sessionID) {
     return {
@@ -45,15 +74,17 @@ export function aioSubmitFlags(
         "refusing to submit unbound.",
     }
   }
-  return {
-    flags: [
-      "--aio-session-id", sessionID,
-      "--aio-agent", String(agent ?? ""),
-      "--binding-id", bindingID,
-      "--task-revision", String(revision),
-    ],
-    refuse: "",
-  }
+  const project = String(bindingReport.binding?.project ?? "").trim()
+  const flags = [
+    "--aio-session-id", sessionID,
+    "--aio-agent", String(agent ?? ""),
+    "--binding-id", bindingID,
+    "--task-revision", String(revision),
+  ]
+  // The binding's project association rides along when the binding carries one; the backend
+  // validates it against the submitted spec/worktree (a foreign project refuses there).
+  if (project) flags.push("--project", project)
+  return { flags, refuse: "" }
 }
 
 export default tool({
@@ -94,6 +125,30 @@ export default tool({
     ),
   },
   async execute(args, ctx) {
+    // The AIO boundary applies to EVERY execution mode (reviewer finding: with the plugin
+    // absent, orchestrator=false was an unbound escape into run_workflow.py). The gate runs
+    // first; the native identity comes from the tool context. Non-AIO sessions skip it and
+    // keep the existing authority contract.
+    let aioFlags: string[] = []
+    if (isAioAgent(String(ctx.agent ?? ""))) {
+      const bindingRead = await Bun.$`python3 scripts/session_open.py --binding --native-session-id ${String(ctx.sessionID ?? "")} --json`
+        .cwd(ctx.directory).nothrow()
+      const aio = toolBindingGate(
+        String(ctx.agent ?? ""), String(ctx.sessionID ?? ""), bindingRead.stdout.toString(),
+      )
+      if (aio.refuse) {
+        return {
+          output: aio.refuse,
+          metadata: {
+            exit_code: 2,
+            aio_session_id: String(ctx.sessionID ?? ""),
+            execution_mode: args.orchestrator ? "durable" : "in-process",
+          },
+        }
+      }
+      aioFlags = aio.flags
+    }
+
     if (!args.orchestrator) {
       // The explicitly requested in-process mode (a lab execution, a deterministic replay).
       const flags: string[] = [
@@ -132,26 +187,6 @@ export default tool({
       return { output: `spec identity unavailable for ${args.spec} (got "${specSha}") — refusing to submit without the source digest`, metadata: { exit_code: 2 } }
     }
 
-    // The AIO binding (Unit D): the identity is the NATIVE tool context, never a model-
-    // supplied field. The durable read happens here so the tool can explain an early refusal;
-    // the wrapper AND the broker re-resolve the same binding before any launch effect.
-    const bindingRead = await Bun.$`python3 scripts/session_open.py --binding --native-session-id ${String(ctx.sessionID ?? "")} --json`
-      .cwd(ctx.directory).nothrow()
-    let bindingReport: Record<string, unknown> | null = null
-    try {
-      const parsed = JSON.parse(bindingRead.stdout.toString().trim())
-      bindingReport = parsed && typeof parsed === "object" ? parsed : null
-    } catch {
-      bindingReport = null
-    }
-    const aio = aioSubmitFlags(String(ctx.sessionID ?? ""), String(ctx.agent ?? ""), bindingReport)
-    if (aio.refuse) {
-      return {
-        output: aio.refuse,
-        metadata: { exit_code: 2, aio_session_id: String(ctx.sessionID ?? "") },
-      }
-    }
-
     const admissionArmed = args.admission_required ?? (process.env.FINOPS_ADMISSION_REQUIRED === "1")
     const submitFlags: string[] = [
       "submit",
@@ -161,7 +196,7 @@ export default tool({
       "--workdir", args.workdir,
       "--spec-sha256", specSha,
     ]
-    submitFlags.push(...aio.flags)
+    submitFlags.push(...aioFlags)
     if (args.resume) submitFlags.push("--resume")
     if (args.parent_run_id) submitFlags.push("--parent-run-id", args.parent_run_id)
     if (admissionArmed) submitFlags.push("--admission-required")
@@ -204,7 +239,7 @@ export default tool({
         resume: args.resume,
         parent_run_id: args.parent_run_id ?? "",
         aio_session_id: String(ctx.sessionID ?? ""),
-        aio_binding_id: aio.flags[aio.flags.indexOf("--binding-id") + 1] ?? "",
+        aio_binding_id: aioFlags[aioFlags.indexOf("--binding-id") + 1] ?? "",
         admission_required: admissionArmed,
         execution: {
           backend: args.backend ?? "auto",

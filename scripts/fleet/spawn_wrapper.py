@@ -880,12 +880,15 @@ def _aio_binding_artifact_dir() -> Path:
     return Path(explicit).expanduser() if explicit else KB_ARTIFACT_DIR
 
 
-def _aio_budget_verdict(native_session_id: str) -> tuple[str, str]:
-    """The AIO session's measured budget verdict, via the budget module's public seam.
+def _aio_budget_verdict(native_session_id: str) -> tuple[str, str, bool]:
+    """The AIO session's measured budget verdict: ``(verdict, reason, backend_available)``.
 
     The session under judgment is the EXPLICIT native identity carried by the binding — never
-    a most-recently-updated guess. An unmeasurable budget returns UNJUDGED with a reason, and
-    the boundary fails closed: an unknown budget is never treated as unlimited.
+    a most-recently-updated guess. ``backend_available=False`` means this gate cannot reach
+    the session database (the containerized orchestrator has no host DB mounted): a gate that
+    cannot measure DEFERS to the host-side gate, which owns the canonical database — it must
+    not fabricate UNJUDGED and block a valid job (reviewer finding, 2026-09-15). When the
+    backend IS available, an unknown verdict refuses (an unknown budget is never unlimited).
     """
     try:
         from scripts import session_budget as budget  # repo root on sys.path
@@ -893,19 +896,108 @@ def _aio_budget_verdict(native_session_id: str) -> tuple[str, str]:
         try:
             import session_budget as budget  # direct run: scripts/ is sys.path[0]
         except ImportError as exc:
-            return "UNJUDGED", f"the budget module is unavailable ({exc})"
+            return "UNJUDGED", f"the budget module is unavailable ({exc})", False
     return budget.measure_verdict(native_session_id)
 
 
-def _validate_aio_binding(aio: Any) -> list[str]:
+# The project-association identity (Unit D): a binding may only ride a submit whose spec /
+# worktree belong to the SAME project. The identity is derived filesystem-only (no
+# subprocess) from the git common dir: the origin URL when one exists (a content identity
+# that is stable across host/container path views), plus the repo/worktree directory names as
+# a fallback. The binding's ``project`` (when set) must normalize to one of them.
+_ORIGIN_URL_RE = re.compile(r"^\s*url\s*=\s*(.+?)\s*$", re.MULTILINE)
+_REMOTE_ORIGIN_RE = re.compile(r'\[remote\s+"origin"\]')
+
+
+def _git_common_dir(checkout: Path) -> Path | None:
+    """Resolve ``checkout``'s common git dir (handles a linked worktree's ``.git`` FILE)."""
+    git_path = checkout / ".git"
+    if git_path.is_dir():
+        return git_path
+    if not git_path.is_file():
+        return None
+    try:
+        text = git_path.read_text(encoding="utf-8").strip()
+    except OSError:
+        return None
+    if not text.startswith("gitdir:"):
+        return None
+    git_dir = Path(text.split(":", 1)[1].strip())
+    if not git_dir.is_absolute():
+        git_dir = (checkout / git_dir).resolve()
+    commondir = git_dir / "commondir"
+    if commondir.is_file():
+        try:
+            common = Path(commondir.read_text(encoding="utf-8").strip())
+        except OSError:
+            return git_dir
+        if not common.is_absolute():
+            common = (git_dir / common).resolve()
+        return common
+    return git_dir
+
+
+def _origin_url(git_dir: Path) -> str:
+    """The ``origin`` remote URL recorded in the common git dir's config (or "")."""
+    try:
+        config = (git_dir / "config").read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return ""
+    match = _REMOTE_ORIGIN_RE.search(config)
+    if not match:
+        return ""
+    url_match = _ORIGIN_URL_RE.search(config, match.end())
+    return url_match.group(1).strip() if url_match else ""
+
+
+def _normalize_project(value: str) -> str:
+    """Normalize a project identity for comparison: host/path form, no scheme/.git/case."""
+    text = str(value or "").strip().lower().rstrip("/")
+    if text.startswith("git@"):
+        text = text[4:].replace(":", "/", 1)
+    for prefix in ("ssh://git@", "ssh://", "https://", "http://", "git://"):
+        if text.startswith(prefix):
+            text = text[len(prefix):]
+            break
+    if text.endswith(".git"):
+        text = text[:-4]
+    return text
+
+
+def _submit_project_identities(repo_root: Path, workdir: str) -> set[str]:
+    """The candidate project identities of the SUBMITTED work (spec repo + worktree)."""
+    identities: set[str] = set()
+    for checkout in (Path(repo_root), Path(workdir) if workdir else None):
+        if checkout is None:
+            continue
+        identities.add(_normalize_project(checkout.name))
+        common = _git_common_dir(checkout) if checkout.is_dir() else None
+        if common is not None:
+            # The main worktree's directory name (the common git dir's parent for a linked
+            # worktree checkout) + the origin URL — a content identity that survives the
+            # host/container path views.
+            if common.name == ".git":
+                identities.add(_normalize_project(common.parent.name))
+            url = _origin_url(common)
+            if url:
+                identities.add(_normalize_project(url))
+    return {identity for identity in identities if identity}
+
+
+def _validate_aio_binding(
+    aio: Any, *, repo_root: Path, workdir: str, strict_budget: bool = False
+) -> list[str]:
     """The AIO actor's binding gate: resolve + validate the binding BY IDENTITY.
 
     The request's own claims are never proof: the binding is re-read from the durable store
     by the native session id, and the claimed binding id / agent / task revision must MATCH
-    what the store resolves. Refusals (each named): malformed identity fields, an unavailable
-    store, no binding, an agent mismatch, a stale or foreign binding id, a stale task
-    revision, and a session-budget verdict that blocks new consequential work (WARN / CLOSE /
-    UNJUDGED — the exec boundary fails closed).
+    what the store resolves — plus the binding's PROJECT must be one of the submitted work's
+    project identities (the reviewer finding: a binding naming an unrelated git project must
+    not ride an Agentic Dynamics workflow). Refusals (each named): malformed identity fields,
+    an unavailable store, no binding, an agent mismatch, a foreign/stale binding id, a stale
+    task revision, a project mismatch, and a session-budget verdict that blocks new
+    consequential work (WARN / CLOSE / UNJUDGED — where measurable; ``strict_budget`` gates
+    that cannot reach the session database refuse instead of deferring).
     """
     if not isinstance(aio, dict):
         return [f"submit: aio must be a mapping (got {type(aio).__name__})"]
@@ -960,11 +1052,27 @@ def _validate_aio_binding(aio: Any) -> list[str]:
             f"submit: stale task revision: the request cites {revision}, the binding's "
             f"current context version is {current_version} — re-read the binding"
         )
-    verdict, reason = _aio_budget_verdict(native_session_id)
-    if verdict != "OK":
+    binding_project = str(binding.get("project") or "").strip()
+    if binding_project:
+        candidates = _submit_project_identities(repo_root, workdir)
+        if _normalize_project(binding_project) not in candidates:
+            errors.append(
+                f"submit: the binding's project {binding_project!r} does not match the "
+                f"submitted project ({sorted(candidates) or 'unresolvable'}) — a binding may "
+                "only ride work from its own project"
+            )
+    verdict, reason, measured_here = _aio_budget_verdict(native_session_id)
+    if measured_here:
+        if verdict != "OK":
+            errors.append(
+                f"submit: AIO session budget verdict is {verdict} — new consequential work is "
+                f"blocked ({reason or 'session at its budget'})"
+            )
+    elif strict_budget:
         errors.append(
-            f"submit: AIO session budget verdict is {verdict} — new consequential work is "
-            f"blocked ({reason or 'session at its budget'})"
+            "submit: the AIO session budget cannot be measured at this gate "
+            f"({reason or 'session database unavailable'}) — the host gate must measure it "
+            "before the launch effect"
         )
     return errors
 
@@ -975,6 +1083,7 @@ def validate_submit_request(
     repo_root: Path | str | None = None,
     phase_scopes: dict[str, str] | None = None,
     path_config: PathConfig | None = None,
+    strict_aio_budget: bool = False,
 ) -> list[str]:
     """Validate a ``submit`` request. Empty list = valid; the socket is reached only then.
 
@@ -1226,14 +1335,32 @@ def validate_submit_request(
                     f"submit: execution.no_commit must be a boolean (got {no_commit!r})"
                 )
 
-    # Step 12 — the AIO binding gate (Unit D). A submit carrying an ``aio`` block declares the
-    # AIO actor: its binding is resolved + validated BY IDENTITY from the durable store (the
-    # request's own fields are never proof), and the AIO session's measured budget verdict must
-    # allow new consequential work. A submit with NO ``aio`` block keeps its existing contract —
-    # valid non-AIO automation (experiment workers, campaign scripts) is not asked to
-    # impersonate the coordinator. The broker re-runs this same gate before the launch effect.
-    if request.get("aio") is not None:
-        errors.extend(_validate_aio_binding(request.get("aio")))
+    # Step 12 — the AIO binding gate (Unit D). The actor declaration and the aio block must be
+    # CONSISTENT: actor=aio demands a complete block (a missing/null block is not a binding),
+    # and a block supplied without the actor is an inconsistent declaration. The binding is
+    # then resolved + validated BY IDENTITY — including that its project matches the submitted
+    # spec/worktree and (where measurable) that the session budget allows new work. A submit
+    # with NO actor/aio declarations keeps its existing contract: valid non-AIO automation is
+    # never asked to impersonate the coordinator. The broker re-runs this same gate (strictly)
+    # before the launch effect.
+    actor = str(request.get("actor") or "").strip()
+    aio = request.get("aio")
+    if actor == "aio" and not isinstance(aio, dict):
+        errors.append(
+            "submit: actor=aio requires a complete aio binding block — a missing/null block "
+            "is not a binding"
+        )
+    elif isinstance(aio, dict):
+        if actor != "aio":
+            errors.append(
+                f"submit: an aio binding block was supplied with actor {actor!r} — an "
+                "inconsistent declaration (the block declares the AIO actor)"
+            )
+        errors.extend(
+            _validate_aio_binding(
+                aio, repo_root=repo_root, workdir=workdir, strict_budget=strict_aio_budget
+            )
+        )
 
     return errors
 

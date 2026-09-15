@@ -24,7 +24,7 @@ mock.module("@opencode-ai/plugin", () => ({
   tool: Object.assign((definition: unknown) => definition, { schema: schemaStub }),
 }))
 
-const { aioSubmitFlags } = await import("../../.opencode/tools/run_workflow")
+const { aioSubmitFlags, isAioAgent, toolBindingGate } = await import("../../.opencode/tools/run_workflow")
 
 const BINDING_ID = "a".repeat(64)
 
@@ -70,4 +70,38 @@ test("a binding without a record id or a positive revision refuses", () => {
     status: "found", knowledge_id: BINDING_ID, binding: { context_version: 0 },
   })
   expect(noRevision.refuse).toContain("no record id / task revision")
+})
+
+
+test("a worker agent keeps its contract: no gate, no stamps", () => {
+  expect(isAioAgent("build")).toBe(false)
+  expect(isAioAgent("")).toBe(false)
+  expect(isAioAgent("aio-control")).toBe(true)
+  const result = aioSubmitFlags("ses_w", "build", null)
+  expect(result.refuse).toBe("")
+  expect(result.flags).toEqual([])
+  // even with a found binding, a non-AIO agent is not stamped with the AIO identity
+  const withBinding = aioSubmitFlags("ses_w", "build", {
+    status: "found", knowledge_id: BINDING_ID, binding: { context_version: 1 },
+  })
+  expect(withBinding.flags).toEqual([])
+})
+
+test("the coordinator gate parses the durable read and stamps the project association", () => {
+  const refused = toolBindingGate("aio-control", "ses_a", "not json")
+  expect(refused.refuse).toContain("no durable AIO binding")
+  const bound = toolBindingGate(
+    "aio-control",
+    "ses_a",
+    JSON.stringify({
+      status: "found",
+      knowledge_id: BINDING_ID,
+      binding: { context_version: 2, project: "github.com/peparhugo/agentic-dynamics" },
+    }),
+  )
+  expect(bound.refuse).toBe("")
+  expect(bound.flags).toContain("--project")
+  expect(bound.flags[bound.flags.indexOf("--project") + 1]).toBe(
+    "github.com/peparhugo/agentic-dynamics",
+  )
 })

@@ -896,6 +896,7 @@ def _aio_command(**overrides) -> dict:
         "goal": "g",
         "model": "anthropic/claude-sonnet-5",
         "workdir": "/tmp/wt_aio_broker_check",
+        "actor": "aio",
         "aio": {
             "native_session_id": "ses_aio",
             "agent": "aio-control",
@@ -994,3 +995,103 @@ def test_a_bound_aio_submit_still_reaches_the_compose_call(tmp_path, monkeypatch
     assert outcome["ok"] is True
     assert len(calls) == 1
     assert "workflow-runner" in " ".join(calls[0])
+
+
+# ── The actor declaration at the broker (reviewer repair) ─────────────────────
+
+
+def test_actor_aio_without_a_block_never_reaches_the_launch_effect(monkeypatch):
+    monkeypatch.setattr(launch_broker, "admission_required", lambda: False)
+    calls: list = []
+
+    def _forbidden(*args, **kwargs):
+        calls.append(args)
+        raise AssertionError("the launch effect ran for an inconsistent AIO declaration")
+
+    monkeypatch.setattr(launch_broker.subprocess, "run", _forbidden)
+    for command in (
+        {**_aio_command(), "aio": None},
+        {key: value for key, value in _aio_command().items() if key != "aio"},
+    ):
+        with pytest.raises(launch_broker.LaunchRequestError) as exc:
+            launch_broker.submit_run(command, repo_root=launch_broker._REPO_ROOT, compose="dc")
+        assert any("binding block" in e for e in exc.value.errors)
+    assert calls == []
+
+
+def test_the_complete_submission_path_host_shape(tmp_path, monkeypatch):
+    """The production arrangement, host side: the manager's envelope → the broker's strict
+    gate (REAL budget measurement against the canonical-shaped DB) → ONE compose call."""
+    import importlib
+    import sys
+
+    from agentic_dynamics.knowledge import session_ingestion as si
+
+    fleet_dir = str(launch_broker._REPO_ROOT / "scripts" / "fleet")
+    if fleet_dir not in sys.path:
+        sys.path.insert(0, fleet_dir)
+    fleet_manager = importlib.import_module("fleet_manager")
+
+    class _FakeRedis:
+        def __init__(self):
+            self._lists: dict[str, list[str]] = {}
+
+        def lpush(self, key, value):
+            self._lists.setdefault(key, []).insert(0, value)
+
+        def hset(self, key, mapping=None, **_kw):
+            pass
+
+        def hvals(self, key):
+            return []
+
+    store = tmp_path / "kb"
+    si.init_binding_store(store)
+    written = si.write_binding(
+        {
+            "native_session_id": "ses_aio",
+            "resolved_agent": "aio-control",
+            "task_identity": "unit-d",
+            "original_request": "walk the complete submission path",
+        },
+        artifact_dir=store,
+        publish=False,
+    )
+    monkeypatch.setenv("FINOPS_KB_ARTIFACT_DIR", str(store))
+    _healthy_opencode_db(tmp_path / "opencode.db")
+    monkeypatch.setenv("FINOPS_OPENCODE_DB", str(tmp_path / "opencode.db"))
+    monkeypatch.setattr(launch_broker, "admission_required", lambda: False)
+    monkeypatch.setattr(launch_broker, "deployment_probe", lambda *a, **k: [])
+
+    # 1) the manager mints the job envelope with the AIO identity, exactly as the tool
+    #    stamps it (the block + the actor travel together).
+    queued = fleet_manager._send_submit_command(
+        _FakeRedis(),
+        spec="workflows/repository/fleet_job_submission.yaml",
+        goal="g",
+        model="anthropic/claude-sonnet-5",
+        workdir="/tmp/wt_complete_path",
+        aio={
+            "native_session_id": "ses_aio",
+            "agent": "aio-control",
+            "binding_id": written.knowledge_id,
+            "task_revision": 1,
+        },
+    )
+    assert queued["actor"] == "aio"
+
+    calls: list = []
+
+    class _Proc:
+        returncode = 0
+        stdout = ""
+        stderr = ""
+
+    monkeypatch.setattr(
+        launch_broker.subprocess, "run", lambda argv, **kw: calls.append(argv) or _Proc()
+    )
+    outcome = launch_broker.submit_run(
+        queued, repo_root=launch_broker._REPO_ROOT, compose="docker-compose"
+    )
+    assert outcome["ok"] is True
+    assert len(calls) == 1 and "workflow-runner" in " ".join(calls[0])

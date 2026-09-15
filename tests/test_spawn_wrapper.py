@@ -1914,6 +1914,11 @@ def test_submit_admission_reserve_and_cap_are_type_validated():
 # work. A submit with no ``aio`` block keeps its existing contract.
 
 
+def _aio_request(*, aio: dict) -> dict:
+    """A manager-shaped AIO submit: actor + block together (the consistent declaration)."""
+    return _valid_submit_request(actor="aio", aio=aio)
+
+
 def _aio_block(**overrides) -> dict:
     block = {
         "native_session_id": "ses_aio",
@@ -1925,7 +1930,7 @@ def _aio_block(**overrides) -> dict:
     return block
 
 
-def _bound_store(store) -> str:
+def _bound_store(store, *, project: str = "") -> str:
     """A tmp binding store with ONE real binding; returns its durable record id."""
     from agentic_dynamics.knowledge import session_ingestion as si
 
@@ -1936,6 +1941,7 @@ def _bound_store(store) -> str:
             "resolved_agent": "aio-control",
             "task_identity": "unit-d",
             "original_request": "enforce the binding at the exec boundary",
+            "project": project,
         },
         artifact_dir=store,
         publish=False,
@@ -1950,14 +1956,14 @@ def aio_env(tmp_path, monkeypatch):
     from scripts.fleet import spawn_wrapper as sw
 
     monkeypatch.setenv("FINOPS_KB_ARTIFACT_DIR", str(tmp_path))
-    monkeypatch.setattr(sw, "_aio_budget_verdict", lambda session_id: ("OK", ""))
+    monkeypatch.setattr(sw, "_aio_budget_verdict", lambda session_id: ("OK", "", True))
     return tmp_path
 
 
 def test_a_bound_aio_submit_passes_the_binding_gate(aio_env):
     binding_id = _bound_store(aio_env)
     errors = validate_submit_request(
-        _valid_submit_request(aio=_aio_block(binding_id=binding_id))
+        _aio_request(aio=_aio_block(binding_id=binding_id))
     )
     assert errors == []
 
@@ -1967,25 +1973,25 @@ def test_an_aio_submit_without_a_store_is_refused(tmp_path, monkeypatch):
 
     monkeypatch.setenv("FINOPS_KB_ARTIFACT_DIR", str(tmp_path / "absent"))
     monkeypatch.setattr(sw, "_aio_budget_verdict", lambda session_id: ("OK", ""))
-    errors = validate_submit_request(_valid_submit_request(aio=_aio_block(binding_id="0" * 64)))
+    errors = validate_submit_request(_aio_request(aio=_aio_block(binding_id="0" * 64)))
     assert any("binding store is unavailable" in e for e in errors)
 
 
 def test_an_aio_submit_without_a_binding_is_refused(aio_env):
-    errors = validate_submit_request(_valid_submit_request(aio=_aio_block(binding_id="0" * 64)))
+    errors = validate_submit_request(_aio_request(aio=_aio_block(binding_id="0" * 64)))
     assert any("no durable AIO binding" in e for e in errors)
 
 
 def test_a_foreign_binding_id_is_refused(aio_env):
     _bound_store(aio_env)
-    errors = validate_submit_request(_valid_submit_request(aio=_aio_block(binding_id="f" * 64)))
+    errors = validate_submit_request(_aio_request(aio=_aio_block(binding_id="f" * 64)))
     assert any("does not match the durable binding record" in e for e in errors)
 
 
 def test_a_mismatched_agent_is_refused(aio_env):
     binding_id = _bound_store(aio_env)
     errors = validate_submit_request(
-        _valid_submit_request(aio=_aio_block(binding_id=binding_id, agent="build"))
+        _aio_request(aio=_aio_block(binding_id=binding_id, agent="build"))
     )
     assert any("resolved agent" in e for e in errors)
 
@@ -1999,11 +2005,11 @@ def test_a_stale_task_revision_is_refused_and_the_current_one_passes(aio_env):
         artifact_dir=aio_env, publish=False,
     )
     stale = validate_submit_request(
-        _valid_submit_request(aio=_aio_block(binding_id=updated.knowledge_id, task_revision=1))
+        _aio_request(aio=_aio_block(binding_id=updated.knowledge_id, task_revision=1))
     )
     assert any("stale task revision" in e for e in stale)
     current = validate_submit_request(
-        _valid_submit_request(aio=_aio_block(binding_id=updated.knowledge_id, task_revision=2))
+        _aio_request(aio=_aio_block(binding_id=updated.knowledge_id, task_revision=2))
     )
     assert current == []
 
@@ -2014,10 +2020,10 @@ def test_a_warn_or_close_budget_blocks_new_consequential_work(aio_env, monkeypat
     binding_id = _bound_store(aio_env)
     for verdict in ("WARN", "CLOSE", "UNJUDGED"):
         monkeypatch.setattr(
-            sw, "_aio_budget_verdict", lambda session_id, v=verdict: (v, "measured reason")
+            sw, "_aio_budget_verdict", lambda session_id, v=verdict: (v, "measured reason", True)
         )
         errors = validate_submit_request(
-            _valid_submit_request(aio=_aio_block(binding_id=binding_id))
+            _aio_request(aio=_aio_block(binding_id=binding_id))
         )
         assert any(f"budget verdict is {verdict}" in e for e in errors), verdict
 
@@ -2041,13 +2047,13 @@ def test_the_budget_verdict_is_measured_from_the_explicit_session(tmp_path, monk
     con.commit()
     con.close()
     monkeypatch.setenv("FINOPS_OPENCODE_DB", str(db))
-    assert sw._aio_budget_verdict("ses_aio") == ("OK", "")
-    verdict, reason = sw._aio_budget_verdict("ses_unknown")
-    assert verdict == "UNJUDGED" and "does not exist" in reason
+    assert sw._aio_budget_verdict("ses_aio") == ("OK", "", True)
+    verdict, reason, measured = sw._aio_budget_verdict("ses_unknown")
+    assert verdict == "UNJUDGED" and "does not exist" in reason and measured is True
 
 
 def test_a_malformed_aio_block_is_refused():
-    errors = validate_submit_request(_valid_submit_request(aio={}))
+    errors = validate_submit_request(_valid_submit_request(actor="aio", aio={}))
     assert any("native_session_id is required" in e for e in errors)
     assert any("aio.agent is required" in e for e in errors)
     assert any("binding_id is required" in e for e in errors)
@@ -2059,3 +2065,155 @@ def test_a_non_aio_submit_needs_no_binding_and_keeps_its_contract(tmp_path, monk
     a missing binding store does not touch it."""
     monkeypatch.setenv("FINOPS_KB_ARTIFACT_DIR", str(tmp_path / "absent"))
     assert validate_submit_request(_valid_submit_request()) == []
+
+
+# ── The budget at the Docker boundary (reviewer repair, 2026-09-15) ───────────
+#
+# The containerized orchestrator has no host session database mounted: a gate that cannot
+# measure must DEFER to the host gate (which owns the canonical DB), never fabricate
+# UNJUDGED and block a valid job. The host gate (the broker) measures strictly.
+
+
+def _canonical_session_db(path, *, sid: str = "ses_aio", turns: int = 1, context: int = 10,
+                          pending_only: bool = False) -> None:
+    """A real opencode-shaped session db (the production schema), not a mocked verdict."""
+    import json as _json
+    import sqlite3
+
+    con = sqlite3.connect(path)
+    con.execute("CREATE TABLE session (id TEXT, time_updated INTEGER)")
+    con.execute("CREATE TABLE message (session_id TEXT, time_created INTEGER, data TEXT)")
+    con.execute("INSERT INTO session VALUES (?, 200)", (sid,))
+    if pending_only:
+        con.execute(
+            "INSERT INTO message VALUES (?, 1, ?)",
+            (sid, _json.dumps({"role": "assistant", "tokens": {"input": 0, "output": 0}})),
+        )
+    else:
+        for i in range(turns - 1):
+            con.execute(
+                "INSERT INTO message VALUES (?, ?, ?)",
+                (sid, i, _json.dumps(
+                    {"role": "assistant", "tokens": {"input": 10, "cache": {"read": 10, "write": 0}}}
+                )),
+            )
+        con.execute(
+            "INSERT INTO message VALUES (?, ?, ?)",
+            (sid, turns, _json.dumps(
+                {"role": "assistant", "tokens": {"input": context, "cache": {"read": 0, "write": 0}}}
+            )),
+        )
+    con.commit()
+    con.close()
+
+
+def _valid_bound_request(tmp_path, monkeypatch, *, db_name: str | None, **store_kwargs) -> tuple[dict, str]:
+    from agentic_dynamics.knowledge import session_ingestion as si
+
+    store = tmp_path / "kb"
+    si.init_binding_store(store)
+    binding_id = _bound_store(store, **store_kwargs)
+    monkeypatch.setenv("FINOPS_KB_ARTIFACT_DIR", str(store))
+    if db_name is not None:
+        _canonical_session_db(tmp_path / db_name)
+        monkeypatch.setenv("FINOPS_OPENCODE_DB", str(tmp_path / db_name))
+    return _aio_request(aio=_aio_block(binding_id=binding_id)), binding_id
+
+
+def test_a_gate_without_the_session_db_defers_a_valid_binding(tmp_path, monkeypatch):
+    """THE Docker-shape proof: the containerized wrapper has no host DB — a valid binding
+    passes (the budget is deferred), instead of being refused as UNJUDGED."""
+    request, _ = _valid_bound_request(tmp_path, monkeypatch, db_name=None)
+    monkeypatch.setenv("FINOPS_OPENCODE_DB", str(tmp_path / "absent.db"))
+    assert validate_submit_request(request) == []
+
+
+def test_a_strict_gate_refuses_when_the_db_is_missing(tmp_path, monkeypatch):
+    """The host gate (strict) must measure: a missing DB is itself a refusal there."""
+    request, _ = _valid_bound_request(tmp_path, monkeypatch, db_name=None)
+    monkeypatch.setenv("FINOPS_OPENCODE_DB", str(tmp_path / "absent.db"))
+    errors = validate_submit_request(request, strict_aio_budget=True)
+    assert any("cannot be measured at this gate" in e for e in errors)
+
+
+def test_the_budget_is_measured_for_real_against_the_canonical_db(tmp_path, monkeypatch):
+    """No verdict mocking: a real opencode-shaped DB decides admission and refusal."""
+    request, _ = _valid_bound_request(tmp_path, monkeypatch, db_name="ok.db")
+    assert validate_submit_request(request) == []
+
+    busy = tmp_path / "busy.db"
+    _canonical_session_db(busy, turns=80, context=1000)
+    monkeypatch.setenv("FINOPS_OPENCODE_DB", str(busy))
+    errors = validate_submit_request(request)
+    assert any("budget verdict is CLOSE" in e for e in errors)
+
+
+def test_a_pending_only_session_has_no_usable_measurement(tmp_path, monkeypatch):
+    """Reviewer finding: a pending, zero-valued sample must NOT read as measured/OK."""
+    from scripts.fleet import spawn_wrapper as sw
+
+    db = tmp_path / "pending.db"
+    _canonical_session_db(db, pending_only=True)
+    monkeypatch.setenv("FINOPS_OPENCODE_DB", str(db))
+    verdict, reason, measured = sw._aio_budget_verdict("ses_aio")
+    assert verdict == "UNJUDGED"
+    assert "no usable measurement" in reason
+    assert measured is True
+
+
+def test_an_initial_session_is_the_explicit_exception(tmp_path, monkeypatch):
+    """A session with no assistant message yet is OK — named as the initial-session case."""
+    import sqlite3
+
+    from scripts.fleet import spawn_wrapper as sw
+
+    db = tmp_path / "fresh.db"
+    con = sqlite3.connect(db)
+    con.execute("CREATE TABLE session (id TEXT, time_updated INTEGER)")
+    con.execute("CREATE TABLE message (session_id TEXT, time_created INTEGER, data TEXT)")
+    con.execute("INSERT INTO session VALUES ('ses_aio', 200)")
+    con.commit()
+    con.close()
+    monkeypatch.setenv("FINOPS_OPENCODE_DB", str(db))
+    verdict, reason, measured = sw._aio_budget_verdict("ses_aio")
+    assert (verdict, measured) == ("OK", True)
+    assert "initial session" in reason
+
+
+# ── The actor declaration must be consistent (reviewer repair) ────────────────
+
+
+def test_actor_aio_without_a_block_is_refused():
+    for extra in ({"actor": "aio"}, {"actor": "aio", "aio": None}):
+        errors = validate_submit_request(_valid_submit_request(**extra))
+        assert any("requires a complete aio binding block" in e for e in errors), extra
+
+
+def test_an_aio_block_without_the_actor_is_an_inconsistent_declaration():
+    errors = validate_submit_request(
+        _valid_submit_request(aio=_aio_block(binding_id="0" * 64))
+    )
+    assert any("inconsistent declaration" in e for e in errors)
+
+
+# ── The binding must apply to the submitted work (reviewer repair) ────────────
+
+
+def test_a_binding_naming_a_foreign_project_is_refused(aio_env):
+    binding_id = _bound_store(aio_env, project="some-unrelated-git-project")
+    errors = validate_submit_request(_aio_request(aio=_aio_block(binding_id=binding_id)))
+    assert any("does not match the submitted project" in e for e in errors)
+
+
+def test_a_binding_of_the_correct_project_passes(aio_env):
+    from scripts.fleet import spawn_wrapper as sw
+
+    identities = sw._submit_project_identities(_REPO_ROOT, "/tmp/wt_test_submit_job")
+    assert identities, "the test repo must resolve at least one project identity"
+    for identity in sorted(identities):
+        binding_id = _bound_store(aio_env, project=identity)
+        errors = validate_submit_request(_aio_request(aio=_aio_block(binding_id=binding_id)))
+        assert errors == [], identity
+        # reset the slot for the next identity (one binding per session)
+        for slot in (aio_env / "aio-bindings").glob("*.json"):
+            slot.unlink()
