@@ -759,6 +759,69 @@ def test_fully_bound_final_continuation_validates_from_recorded_lineage_not_the_
         assert decisions.get("p6g_acceptance") == "approved", variant
 
 
+def test_explicit_resume_never_relaxes_run_gate_binding_to_the_global_index(
+    build_spec, tmp_path, monkeypatch
+):
+    """Reviewer reproduction (Astra, 2026-09-15): a checkpoint's FIRST explicit continuation
+    has no inherited origin yet — the empty origin map is NOT legacy. The expected run/gate
+    binding must stand, so an approval naming the correct candidate but a FOREIGN run/gate is
+    refused with ZERO dispatch even when the global index currently reports an approved entry
+    (pre-fix, that combination executed p2a)."""
+    monkeypatch.setenv("FINOPS_EMIT_SELF", "0")
+    spec = build_spec
+    module = _load_run_workflow_module()
+    for index_state, records in {
+        # the pre-fix bypass: an unrelated approved entry stripped the binding
+        "approved": {"p1c_contract_gate": {
+            "decision": "approved", "reached_at": "2026-09-14T00:00:00+00:00",
+        }},
+        "rejected": {"p1c_contract_gate": {"decision": "rejected"}},
+        "absent": {},
+    }.items():
+        wd = tmp_path / f"wd-{index_state}"
+        wd.mkdir()
+        _git_init(wd)
+        parent = _run_to_p1c(spec, wd)
+        run_id = f"run-parent-{index_state}"
+        _write_run_ledger(tmp_path, spec.name, run_id, parent)
+        monkeypatch.setattr(module, "ROOT", tmp_path)
+        state = module._load_resume_state(spec.name, run_id)
+        assert state.inherited_phases == (), "the first explicit continuation has no origins"
+        assert state.reached_checkpoints == frozenset({"p1c_contract_gate"})
+
+        # The approval names the correct candidate/tree, but a FOREIGN run and gate.
+        ck = _git("rev-parse", "HEAD", cwd=wd).stdout.strip()
+        tree = _git("rev-parse", "HEAD^{tree}", cwd=wd).stdout.strip()
+        _commit_approval(wd, spec.name, "p1c_contract_gate", text=_approval_text(binding={
+            "spec": spec.name, "phase": "p1c_contract_gate", "candidate": ck, "tree": tree,
+            "run": "run-foreign", "gate": "gate-foreign",
+        }))
+
+        monkeypatch.setattr(
+            runner_module,
+            "_previous_checkpoint_state",
+            lambda spec, phase, _records=records: _records.get(phase),
+        )
+        agent2 = _FakeAgentExecutor()
+        verifier2 = _FakeVerifierExecutor()
+        second = run_workflow(
+            spec, goal=GOAL, model=MODEL, workdir=wd,
+            step_executor=agent2, verifier_executor=verifier2,
+            retrieve_fn=_deterministic_retrieve_fn(), publish=False, commit=True,
+            resume=True, resume_state=state,
+            approval_run_id=run_id, approval_gate_id="gate-p1c",
+        )
+        assert second.awaiting is True, index_state
+        assert second.awaiting_phase == "p1c_contract_gate", index_state
+        assert second.awaiting_reason == "approval_refused", index_state
+        assert agent2.calls == [], f"{index_state}: execution began past a foreign approval"
+        assert verifier2.calls == [], index_state
+        rejected = [c for c in second.checkpoints if c.phase == "p1c_contract_gate"][-1]
+        assert rejected.decision == "rejected", index_state
+        failed = (rejected.approval_evidence or {}).get("failed_checks", [])
+        assert "run_id" in failed and "gate_id" in failed, (index_state, failed)
+
+
 # ── The bounded correction attempt ────────────────────────────────────────────
 
 GATE_RETRY_SPEC_YAML = """\

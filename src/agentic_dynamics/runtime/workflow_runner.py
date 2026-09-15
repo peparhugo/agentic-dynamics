@@ -3416,8 +3416,11 @@ def _checkpoint_contract_decisions(
     bound approvals validated against a current index but refused against a stale/unrelated one.
     A checkpoint with NO recorded origin is validated against ``run_id``/``gate_id`` — the
     durable approval identity of the run this continuation resumes, resolved by the composition
-    root from the control db — with the historical spec-index relaxation kept ONLY for
-    provenance-less legacy ledgers (an artifact naming an older lineage run).
+    root from the control db. ``inherited_origins is None`` marks a LEGACY inference resume
+    (no selected parent), where the historical spec-index relaxation is kept for provenance-less
+    ledgers; an EXPLICIT selected-parent resume (a mapping — even an EMPTY one, the checkpoint's
+    first continuation) NEVER relaxes the binding, so an unrelated approved index entry cannot
+    let a foreign-run/gate approval through.
     """
     decisions: list[tuple[str, bool, dict[str, Any]]] = []
     first_unsatisfied: tuple[str, dict[str, Any]] | None = None
@@ -3435,7 +3438,17 @@ def _checkpoint_contract_decisions(
             # the decision artifact itself names — never to the global index's current target.
             expected_run = str(origin.get("from_run_id") or "") or None
             expected_gate = str(origin.get("gate_id") or "") or None
+        elif inherited_origins is not None:
+            # An EXPLICIT selected-parent resume (the caller passed a mapping, possibly empty
+            # on the checkpoint's FIRST continuation): the expected run/gate binding STANDS.
+            # The relaxing branch below is for genuine legacy inference resumes only — an
+            # unrelated approved index entry must never strip this run's binding and let a
+            # foreign-run/gate approval through (reviewer reproduction 2026-09-15).
+            expected_run, expected_gate = run_id, gate_id
         else:
+            # LEGACY inference resume (no selected parent; the caller passed None): keep the
+            # historical relaxation for provenance-less ledgers — an approved entry in the
+            # index means an earlier lineage run already decided this checkpoint.
             expected_run, expected_gate = run_id, gate_id
             if run_id is not None or gate_id is not None:
                 previous = _previous_checkpoint_state(spec, name)
@@ -3950,6 +3963,10 @@ def run_workflow(
             wd, spec, phases, completed, goal,
             run_id=approval_run_id, gate_id=approval_gate_id,
             reached=reached_checkpoints,
+            # The caller distinguishes the resume KIND: None = a legacy inference resume
+            # (``resume=True`` with no selected parent); a mapping (even empty — the
+            # checkpoint's first explicit continuation) = an explicit selected-parent resume,
+            # whose expected run/gate binding must never be relaxed by the global index.
             inherited_origins=(
                 {entry["phase"]: entry for entry in resume_state.inherited_phases}
                 if resume_state is not None else None
