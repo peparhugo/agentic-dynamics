@@ -1,13 +1,15 @@
 """Core — the foundation shared by every plane (tier 0 of the dependency spine).
 
 Ownership: language profiling (``language``), filesystem/registry paths (``paths``),
-session/task vocabulary (``session_types``), shared subprocess streaming (``streaming``), and the
+session/task vocabulary (``session_types``), shared subprocess streaming (``streaming``), the
 admission-context vocabulary (``admission_context`` — the portable proof that a paid invocation
 was admitted, kept in tier 0 so ``adapters`` can run the bypass guard without importing
-``control``; see that module's docstring), and the cost-provenance vocabulary
+``control``; see that module's docstring), the cost-provenance vocabulary
 (``cost_provenance`` — ``CostSource``/``ProviderClass`` and the resolver that decides what a
 missing cost means, in tier 0 because ``adapters`` emit it, ``experiment``'s ledger carries it,
-and ``control.lease_registry`` re-exports it to enforce it).
+and ``control.lease_registry`` re-exports it to enforce it), and the session-capacity
+resolution (``session_capacity`` — the installed runtime's own overflow calculation, shared by
+the AIO budget CLI, the capsule, and the fleet exec-boundary gate).
 
 ``core`` imports only the standard library (plus core siblings) — nothing from tier ≥ 1 of
 the spine ``core ← experiment/measurement/runtime/knowledge ← control ← applications``.
@@ -31,5 +33,5 @@ from . import (
 
 __all__ = [
     'admission_context', 'constants', 'cost_provenance', 'decision_contract', 'language', 'paths',
-    'session_types', 'streaming',
+    'session_capacity', 'session_types', 'streaming',
 ]
