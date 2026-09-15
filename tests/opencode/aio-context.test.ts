@@ -554,3 +554,147 @@ describe("aio-context plugin — full native path (real CLI, temporary knowledge
     }
   }, 60_000)
 })
+
+describe("aio-context plugin — handoff selection by session (reviewer repair)", () => {
+  test("two sessions in the same project never exchange handoffs across interleaved updates", async () => {
+    const project = tmpDir("aio-two-")
+    try {
+      // A's own attachment.
+      writeTaskContext(project, {
+        native_session_id: "ses_A", task: "task-A", predecessor_slug: "pred-A",
+        acceptance: "A acceptance", context_version: 1,
+      })
+      const bound = new Set<string>()
+      const { runner, calls } = fakeRunner((mode, args) => {
+        const session = sessionOf(args)
+        if (mode === "bind") {
+          bound.add(session)
+          return {
+            schema: "session-binding/v1", status: "created",
+            binding: {
+              native_session_id: session, context_version: 1,
+              task_identity: session === "ses_B" ? "task-B" : "task-A", project: "",
+            },
+          }
+        }
+        if (mode === "binding") {
+          return bound.has(session)
+            ? { schema: "session-binding/v1", status: "found", binding: { native_session_id: session } }
+            : { schema: "session-binding/v1", status: "missing" }
+        }
+        if (mode === "capsule") {
+          return { schema: "session-capsule/v1", capsule_status: "composed", capsule: { text: `CAPSULE:${session}` } }
+        }
+        if (mode === "update-context") {
+          return {
+            schema: "session-binding/v1", status: "updated",
+            binding: { native_session_id: session, context_version: 2, task_identity: "task-B", project: "" },
+          }
+        }
+        return undefined
+      })
+      const hooks = await makePluginAt(runner, project)
+
+      await hooks["chat.message"](...Object.values(message("ses_A", "aio-control", "start A")))
+      const aBind = calls.find((c) => modeOf(c.args) === "bind")!
+      expect(flagOf(aBind.args, "--predecessor-slug")).toBe("pred-A")
+
+      // B's attachment replaces the SAME file path (one file, two sessions in one project).
+      writeTaskContext(project, {
+        native_session_id: "ses_B", task: "task-B", predecessor_slug: "pred-B",
+        acceptance: "B acceptance", context_version: 1,
+      })
+      await hooks["chat.message"](...Object.values(message("ses_B", "aio-control", "start B")))
+      const bBind = calls.filter((c) => modeOf(c.args) === "bind").find((c) => sessionOf(c.args) === "ses_B")!
+      expect(flagOf(bBind.args, "--predecessor-slug")).toBe("pred-B")
+
+      // B's context updates to v2 while A continues.
+      writeTaskContext(project, {
+        native_session_id: "ses_B", task: "task-B", work_unit: "B v2", context_version: 2,
+      })
+      await hooks["chat.message"](...Object.values(message("ses_A", "aio-control", "continue A")))
+      const updatesForA = calls.filter(
+        (c) => modeOf(c.args) === "update-context" && sessionOf(c.args) === "ses_A",
+      )
+      expect(updatesForA.length).toBe(0) // B's update never reaches A
+
+      await hooks["chat.message"](...Object.values(message("ses_B", "aio-control", "continue B")))
+      const updatesForB = calls.filter(
+        (c) => modeOf(c.args) === "update-context" && sessionOf(c.args) === "ses_B",
+      )
+      expect(updatesForB.length).toBe(1)
+      expect(flagOf(updatesForB[0].args, "--expected-version")).toBe("1")
+    } finally {
+      rmSync(project, { recursive: true, force: true })
+    }
+  })
+
+  test("a rejected context update is surfaced alongside the retained capsule, then cleared", async () => {
+    const project = tmpDir("aio-reject-")
+    let updateShouldFail = true
+    try {
+      writeTaskContext(project, {
+        native_session_id: "ses_r", task: "t", work_unit: "v1", context_version: 1,
+      })
+      const { runner } = fakeRunner((mode, args) => {
+        if (mode === "bind") {
+          return {
+            schema: "session-binding/v1", status: "created",
+            binding: { native_session_id: sessionOf(args), context_version: 1, task_identity: "t", project: "" },
+          }
+        }
+        if (mode === "capsule") {
+          return { schema: "session-capsule/v1", capsule_status: "composed", capsule: { text: "CAPSULE" } }
+        }
+        if (mode === "update-context") {
+          if (updateShouldFail) return undefined // the CLI refused (e.g. bad acceptance)
+          return {
+            schema: "session-binding/v1", status: "updated",
+            binding: { native_session_id: sessionOf(args), context_version: 2, task_identity: "t", project: "" },
+          }
+        }
+        return undefined
+      })
+      const hooks = await makePluginAt(runner, project)
+      await hooks["chat.message"](...Object.values(message("ses_r", "aio-control", "start")))
+
+      writeTaskContext(project, {
+        native_session_id: "ses_r", task: "t", work_unit: "v2", context_version: 2,
+      })
+      await hooks["chat.message"](...Object.values(message("ses_r", "aio-control", "continue")))
+      const failed = { system: [] as string[] }
+      await hooks["experimental.chat.system.transform"]({ sessionID: "ses_r" }, failed)
+      expect(failed.system.join()).toContain("CAPSULE")
+      expect(failed.system.join()).toContain("context update failed")
+      expect(failed.system.join()).toContain("context version 1 remains active")
+
+      // Reconciliation: the same update now succeeds — the notice clears.
+      updateShouldFail = false
+      await hooks["chat.message"](...Object.values(message("ses_r", "aio-control", "continue again")))
+      const recovered = { system: [] as string[] }
+      await hooks["experimental.chat.system.transform"]({ sessionID: "ses_r" }, recovered)
+      expect(recovered.system.join()).toContain("CAPSULE")
+      expect(recovered.system.join()).not.toContain("context update failed")
+    } finally {
+      rmSync(project, { recursive: true, force: true })
+    }
+  })
+
+  test("an unvalidatable attachment is not applied and says so", async () => {
+    const project = tmpDir("aio-unref-")
+    try {
+      writeTaskContext(project, { acceptance: "orphan acceptance", context_version: 1 })
+      const bound = new Set<string>()
+      const { runner, calls } = fakeRunner(happyResponder(bound))
+      const hooks = await makePluginAt(runner, project)
+      await hooks["chat.message"](...Object.values(message("ses_u", "aio-control", "start")))
+      const bind = calls.find((c) => modeOf(c.args) === "bind")!
+      expect(bind.args).not.toContain("--acceptance") // never silently mixed in
+      const out = { system: [] as string[] }
+      await hooks["experimental.chat.system.transform"]({ sessionID: "ses_u" }, out)
+      expect(out.system.join()).toContain("no session/task/project reference to validate")
+    } finally {
+      rmSync(project, { recursive: true, force: true })
+    }
+  })
+})

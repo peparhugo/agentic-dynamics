@@ -306,6 +306,40 @@ class TestStoreHardening:
         created = si.write_binding(_binding(), artifact_dir=absent, connect_fn=_FakeRedis)
         assert created.status == si.BINDING_STATUS_CREATED
 
+    def test_concurrent_updates_serialize_on_the_version(self, tmp_path):
+        """The reviewer race: two updaters both accepted version 1. The slot lock makes the
+        read-check-write one critical section — exactly one upgrade, one named conflict."""
+        import threading
+
+        si.write_binding(_binding(), artifact_dir=tmp_path, connect_fn=_FakeRedis)
+        outcomes: list[str] = []
+        barrier = threading.Barrier(2)
+
+        def updater(name: str) -> None:
+            barrier.wait()
+            try:
+                outcome = si.update_binding_context(
+                    "ses_test_1",
+                    context={"work_unit": name},
+                    expected_version=1,
+                    artifact_dir=tmp_path,
+                    publish=False,
+                )
+                outcomes.append(outcome.status)
+            except ValueError:
+                outcomes.append("conflict")
+
+        threads = [threading.Thread(target=updater, args=(f"work-{i}",)) for i in range(2)]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join()
+
+        assert sorted(outcomes) == ["conflict", si.BINDING_STATUS_UPDATED], outcomes
+        final = si.read_binding("ses_test_1", artifact_dir=tmp_path)
+        assert final.binding["context_version"] == 2
+        assert final.knowledge_id  # payload + artifact id come from one verified snapshot
+
     def test_concurrent_first_writes_claim_the_slot_exactly_once(self, tmp_path):
         """O_CREAT|O_EXCL: exactly one `created`; the loser returns the winner's binding."""
         import threading
@@ -442,6 +476,18 @@ class TestConstraintPreservation:
         assert "NEVER DEPLOY on Fridays." in capsule["text"]
         assert "chars omitted" in capsule["text"]
         assert capsule["acceptance"]["truncated"] is True
+
+    def test_an_oversized_next_action_cannot_evict_the_blocker(self, tmp_path):
+        """Each protected tail field is bounded independently: an oversized next action must
+        not push the blocker out while the text claims it was preserved."""
+        capsule = self._capsule(
+            tmp_path,
+            _binding(next_action="N" * 4000, blocker="the real blocker"),
+            max_chars=8000,
+        )
+        assert "the real blocker" in capsule["text"]
+        assert "N" * 305 not in capsule["text"]  # the next action was bounded with a marker
+        assert "next action:" in capsule["text"] and "[truncated:" in capsule["text"]
 
     def test_the_controlling_tail_survives_the_size_bound(self, tmp_path):
         capsule = self._capsule(

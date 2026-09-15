@@ -1066,7 +1066,7 @@ def _decode_binding_text(text: str) -> dict[str, Any] | None:
 
 def _read_binding_slot(
     slot_path: Path, *, repository_id: str = REPOSITORY_ID
-) -> tuple[dict[str, Any] | None, list[str]]:
+) -> tuple[dict[str, Any] | None, str, list[str]]:
     """Read + FULLY VERIFY one slot file → its canonical binding payload (or warnings).
 
     Verification chain (every link must hold; any failure is ``corrupt`` with a named reason):
@@ -1087,25 +1087,25 @@ def _read_binding_slot(
     try:
         raw = slot_path.read_bytes()
     except OSError as exc:
-        return None, [f"binding slot {slot_path.name} is unreadable ({exc})"]
+        return None, "", [f"binding slot {slot_path.name} is unreadable ({exc})"]
     try:
         slot = json.loads(raw.decode("utf-8"))
     except (UnicodeDecodeError, ValueError):
-        return None, [f"binding slot {slot_path.name} is unreadable (bad JSON)"]
+        return None, "", [f"binding slot {slot_path.name} is unreadable (bad JSON)"]
     if not isinstance(slot, dict) or slot.get("schema") != BINDING_SLOT_SCHEMA:
-        return None, [f"binding slot {slot_path.name} is not a {BINDING_SLOT_SCHEMA} pointer"]
+        return None, "", [f"binding slot {slot_path.name} is not a {BINDING_SLOT_SCHEMA} pointer"]
     knowledge_id = _binding_text(slot.get("knowledge_id"))
     claimed = _binding_text(slot.get("native_session_id"))
     if not knowledge_id or not claimed:
-        return None, [f"binding slot {slot_path.name} names no record/session"]
+        return None, "", [f"binding slot {slot_path.name} names no record/session"]
     if binding_slot_id(claimed, repository_id=repository_id) != slot_path.stem:
-        return None, [
+        return None, "", [
             f"binding slot {slot_path.name} claims session {claimed!r} whose slot id does not "
             "match this file's name — a copied or misplaced pointer"
         ]
     artifact = slot_path.parent.parent / f"{knowledge_id}.json"
     if not artifact.is_file():
-        return None, [
+        return None, "", [
             f"binding slot {slot_path.name} points at {knowledge_id[:12]} whose durable "
             "artifact is absent — the binding cannot be resolved"
         ]
@@ -1113,11 +1113,11 @@ def _read_binding_slot(
         artifact_bytes = artifact.read_bytes()
         record = json.loads(artifact_bytes.decode("utf-8"))
     except (OSError, UnicodeDecodeError, ValueError) as exc:
-        return None, [f"binding artifact {artifact.name} is unreadable ({exc})"]
+        return None, "", [f"binding artifact {artifact.name} is unreadable ({exc})"]
     if not isinstance(record, dict) or record.get("extractor_version") != BINDING_EXTRACTOR_VERSION:
-        return None, [f"binding artifact {artifact.name} is not a {BINDING_EXTRACTOR_VERSION} record"]
+        return None, "", [f"binding artifact {artifact.name} is not a {BINDING_EXTRACTOR_VERSION} record"]
     if record.get("repository_id") != repository_id:
-        return None, [
+        return None, "", [
             f"binding artifact {artifact.name} belongs to repository "
             f"{record.get('repository_id')!r}, not {repository_id!r}"
         ]
@@ -1127,27 +1127,27 @@ def _read_binding_slot(
         entity_id, REVISION_FALLBACK, content_hash, BINDING_EXTRACTOR_VERSION
     )
     if recomputed != knowledge_id or artifact.stem != knowledge_id:
-        return None, [
+        return None, "", [
             f"binding artifact {artifact.name} does not recompute to the slot's knowledge_id "
             "— the record or the pointer was modified"
         ]
     if record.get("entity_id") != entity_id:
-        return None, [f"binding artifact {artifact.name} carries a mismatched entity_id"]
+        return None, "", [f"binding artifact {artifact.name} carries a mismatched entity_id"]
     payload = _decode_binding_text(str(record.get("text") or ""))
     if payload is None:
-        return None, [f"binding artifact {artifact.name} carries an unreadable payload"]
+        return None, "", [f"binding artifact {artifact.name} carries an unreadable payload"]
     if str(payload.get("native_session_id") or "") != claimed:
-        return None, [
+        return None, "", [
             f"binding slot {slot_path.name} and its artifact disagree on the native session id"
         ]
     request = str(payload.get("original_request") or "")
     recorded_hash = str(payload.get("original_request_sha256") or "")
     if not recorded_hash or hashlib.sha256(request.encode("utf-8")).hexdigest() != recorded_hash:
-        return None, [
+        return None, "", [
             f"binding artifact {artifact.name} carries request text that does not hash to its "
             "recorded original_request_sha256 — the request was modified"
         ]
-    return payload, warnings
+    return payload, knowledge_id, warnings
 
 
 def read_binding(
@@ -1179,15 +1179,11 @@ def read_binding(
     )
     if not slot_path.is_file():
         return BindingResult(status=BINDING_STATUS_MISSING, path=slot_path)
-    payload, warnings = _read_binding_slot(slot_path, repository_id=repository_id)
+    payload, knowledge_id, warnings = _read_binding_slot(slot_path, repository_id=repository_id)
     if payload is None:
         return BindingResult(status=BINDING_STATUS_CORRUPT, path=slot_path, warnings=warnings)
-    knowledge_id = ""
-    try:
-        slot = json.loads(slot_path.read_text(encoding="utf-8"))
-        knowledge_id = _binding_text(slot.get("knowledge_id"))
-    except (OSError, ValueError):
-        pass
+    # The payload and its knowledge_id come from the SAME slot snapshot — a concurrent update
+    # cannot pair an old payload with a newer artifact id (reviewer repair 2026-09-15).
     return BindingResult(
         status=BINDING_STATUS_FOUND, binding=payload, path=slot_path,
         knowledge_id=knowledge_id, warnings=warnings,
@@ -1383,6 +1379,7 @@ def update_binding_context(
     artifact_dir: Path | None = None,
     connect_fn: Any = None,
     now: datetime | None = None,
+    publish: bool | None = None,
 ) -> BindingResult:
     """Apply an EXPLICIT, VERSIONED task-context update to an existing binding.
 
@@ -1392,13 +1389,49 @@ def update_binding_context(
     new record is content-addressed; the slot is replaced atomically (temp + ``os.replace``),
     so a reader sees either the old or the new binding, never a torn one.
     """
+    import fcntl
+
     from agentic_dynamics.core.paths import KB_ARTIFACT_DIR
-    from agentic_dynamics.knowledge.knowledge_ingestion import record_to_artifact
 
     artifact_dir = artifact_dir or KB_ARTIFACT_DIR
-    current = read_binding(
-        native_session_id, repository_id=repository_id, artifact_dir=artifact_dir
+    slot_path_locked = binding_slot_path(
+        native_session_id, artifact_dir=artifact_dir, repository_id=repository_id
     )
+    slot_path_locked.parent.mkdir(parents=True, exist_ok=True)
+    # Serialize the read-check-write across PROCESSES (the reviewer race: two updaters both
+    # accepted version 1 and overwrote each other). An exclusive flock on a sidecar lock file
+    # makes the version check and the slot replacement one critical section.
+    lock_path = slot_path_locked.with_name(f"{slot_path_locked.name}.lock")
+    with open(lock_path, "a+", encoding="utf-8") as lock_handle:
+        fcntl.flock(lock_handle.fileno(), fcntl.LOCK_EX)
+        try:
+            current = read_binding(
+                native_session_id, repository_id=repository_id, artifact_dir=artifact_dir
+            )
+            return _apply_context_update(
+                current, native_session_id=native_session_id, context=context,
+                expected_version=expected_version, repository_id=repository_id,
+                artifact_dir=artifact_dir, connect_fn=connect_fn, now=now, publish=publish,
+            )
+        finally:
+            fcntl.flock(lock_handle.fileno(), fcntl.LOCK_UN)
+
+
+def _apply_context_update(
+    current: BindingResult,
+    *,
+    native_session_id: str,
+    context: dict[str, Any],
+    expected_version: int,
+    repository_id: str,
+    artifact_dir: Path,
+    connect_fn: Any,
+    now: datetime | None,
+    publish: bool | None = None,
+) -> BindingResult:
+    """The critical section of :func:`update_binding_context` (caller holds the slot lock)."""
+    from agentic_dynamics.knowledge.knowledge_ingestion import record_to_artifact
+
     if current.status != BINDING_STATUS_FOUND or current.binding is None:
         raise ValueError(
             f"no binding for {native_session_id!r} to update (status {current.status})"
@@ -1446,7 +1479,7 @@ def update_binding_context(
 
     warnings: list[str] = []
     entry_id = ""
-    if binding_publish_enabled():
+    if (binding_publish_enabled() if publish is None else publish):
         entry_id = _publish_binding(record, connect_fn, warnings)
     return BindingResult(
         status=BINDING_STATUS_UPDATED,

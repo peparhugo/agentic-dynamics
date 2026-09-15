@@ -158,6 +158,10 @@ export const AioContextPlugin: Plugin = async (ctx, options) => {
   const bound = new Set<string>()
   /** The task-context version last applied per session (for versioned updates). */
   const contextVersions = new Map<string, number>()
+  /** The binding's task identity per session — the reference a handoff update must match. */
+  const taskIdentities = new Map<string, string>()
+  /** The binding's project identity per session — validated before any update applies. */
+  const projects = new Map<string, string>()
   /** The last dependency failure per session — surfaced, never swallowed. */
   const failures = new Map<string, string>()
   /** Per-session composed capsule (or a negative result + notice) with a TTL. */
@@ -211,6 +215,54 @@ export const AioContextPlugin: Plugin = async (ctx, options) => {
     }
   }
 
+  /** Whether an attachment applies to THIS session (reviewer repair: the shared file must
+   *  not mix different sessions' tasks). Selection is by native session id, or by an
+   *  explicitly validated task/project reference — never "whoever reads it next". */
+  function contextAppliesTo(
+    context: Record<string, unknown> | null,
+    sessionID: string,
+    boundTask: string | undefined,
+    boundProject: string | undefined,
+  ): { applies: boolean; reason: string; surface: boolean } {
+    if (!context) return { applies: false, reason: "no task-context attachment", surface: false }
+    const contextSession = String(context.native_session_id ?? "").trim()
+    if (contextSession && contextSession !== sessionID) {
+      // Another session's attachment: simply not ours. Silence, not noise.
+      return { applies: false, reason: `attachment names session ${contextSession}`, surface: false }
+    }
+    const contextTask = String(context.task ?? "").trim()
+    const contextProject = String(context.project ?? "").trim()
+    if (boundTask && contextTask && contextTask !== boundTask) {
+      // A different task's attachment: also not ours (a task-scoped file for another task).
+      return {
+        applies: false,
+        reason: `attachment task ${contextTask} does not match the bound task ${boundTask}`,
+        surface: false,
+      }
+    }
+    if (boundProject && contextProject && contextProject !== boundProject) {
+      // It CLAIMS to apply (session/task matched) yet conflicts on project — surface it.
+      return {
+        applies: false,
+        reason: `attachment project ${contextProject} does not match the bound project ${boundProject}`,
+        surface: true,
+      }
+    }
+    if (!contextSession && !contextTask && !contextProject) {
+      // No way to validate: a configuration error worth surfacing, never a silent mix-in.
+      return { applies: false, reason: "no session/task/project reference to validate", surface: true }
+    }
+    return { applies: true, reason: "", surface: false }
+  }
+
+  function rememberIdentity(sessionID: string, binding: Record<string, unknown> | undefined) {
+    if (!binding) return
+    const task = String(binding.task_identity ?? "").trim()
+    const project = String(binding.project ?? "").trim()
+    if (task) taskIdentities.set(sessionID, task)
+    if (project) projects.set(sessionID, project)
+  }
+
   /** The task-context flags shared by --bind and --update-context. */
   function taskContextFlags(context: Record<string, unknown> | null): string[] {
     if (!context) return []
@@ -260,6 +312,7 @@ export const AioContextPlugin: Plugin = async (ctx, options) => {
     if (status === "created" || status === "existing") {
       const binding = report?.binding as Record<string, unknown> | undefined
       contextVersions.set(sessionID, Number(binding?.context_version ?? 1))
+      rememberIdentity(sessionID, binding)
       failures.delete(sessionID)
       return true
     }
@@ -285,6 +338,8 @@ export const AioContextPlugin: Plugin = async (ctx, options) => {
     if (report?.status === "updated") {
       const binding = report?.binding as Record<string, unknown> | undefined
       contextVersions.set(sessionID, Number(binding?.context_version ?? currentVersion + 1))
+      rememberIdentity(sessionID, binding)
+      failures.delete(sessionID) // reconciled: the notice clears
       return true
     }
     failures.set(sessionID, `context update failed: ${error || String(report?.status ?? "")}`)
@@ -328,12 +383,19 @@ export const AioContextPlugin: Plugin = async (ctx, options) => {
       // Workers and special profiles are never bound to the AIO spine.
       if (agent !== aioAgent) return
       const context = await readTaskContext()
+      const applicable = contextAppliesTo(
+        context, sessionID, taskIdentities.get(sessionID), projects.get(sessionID),
+      )
       if (bound.has(sessionID)) {
+        if (context && !applicable.applies && applicable.surface) {
+          failures.set(sessionID, `task-context not applied: ${applicable.reason}`)
+        }
         // A later message never rebuilds the binding; it can only apply an EXPLICIT,
-        // versioned task-context update (a higher context_version in the attachment).
+        // versioned task-context update — and only when the attachment validates against
+        // THIS session's task/project identity.
         const fileVersion = Number(context?.context_version ?? 0)
         const current = contextVersions.get(sessionID) ?? 0
-        if (fileVersion > current && current > 0) {
+        if (applicable.applies && fileVersion > current && current > 0) {
           await updateSessionContext(sessionID, current, context)
         }
         capsules.delete(sessionID)
@@ -347,8 +409,16 @@ export const AioContextPlugin: Plugin = async (ctx, options) => {
         .trim()
       if (!request) return
       const messageID = String(output?.message?.id ?? input.messageID ?? "")
-      if (await bindSession(sessionID, agent, messageID, request, context)) {
-        bound.add(sessionID)
+      // The attachment is attached only if it applies to THIS session (or carries a
+      // task reference on a first bind); otherwise the request alone is bound and the
+      // mismatch is surfaced, never silently mixed in.
+      const bindOk = await bindSession(
+        sessionID, agent, messageID, request, applicable.applies ? context : null,
+      )
+      if (bindOk) bound.add(sessionID)
+      if (bindOk && context && !applicable.applies && applicable.surface) {
+        // The bind itself succeeded; the ATTACHMENT is what could not be applied — say so.
+        failures.set(sessionID, `task-context not applied: ${applicable.reason}`)
       }
       capsules.delete(sessionID)
     },
@@ -374,6 +444,14 @@ export const AioContextPlugin: Plugin = async (ctx, options) => {
       capsules.set(sessionID, { text, notice: effectiveNotice, at: Date.now() })
       if (text) {
         output.system.push(text)
+        const failure = failures.get(sessionID)
+        if (failure) {
+          const active = contextVersions.get(sessionID)
+          output.system.push(
+            `[aio-context] context update failed: ${failure} — context version ` +
+              `${active ?? "unknown"} remains active`,
+          )
+        }
       } else if (knownAgent === aioAgent) {
         // Dependency failures must not disappear: a known AIO session gets an explicit,
         // short unavailable notice instead of an empty system prompt.

@@ -74,6 +74,10 @@ SELF_NOTES_CHARS = 500
 CLOSE_ITEM_CHARS = 400
 PACKET_APPROVALS = 5
 PACKET_SAFE_ACTIONS = 8
+#: Each PROTECTED tail field gets its own bound so the tail can never outgrow the capsule
+#: bound and lose the fields below it (reviewer reproduction: an oversized next action pushed
+#: the blocker out while the text still claimed it was preserved).
+TAIL_FIELD_CHARS = 300
 
 
 def _now_utc() -> str:
@@ -451,12 +455,17 @@ def _render_tail(capsule: dict) -> str:
     survive regardless of how long the request/acceptance/records are).
     """
     budget = capsule["session_budget"]
+    next_text, next_omitted = _truncate(str(capsule["next_action"]["text"] or ""), TAIL_FIELD_CHARS)
+    next_marker = f" [truncated: {next_omitted} chars omitted]" if next_omitted else ""
+    blocker_text, blocker_omitted = _truncate(str(capsule["blocker"]["text"] or ""), TAIL_FIELD_CHARS)
+    blocker_marker = f" [truncated: {blocker_omitted} chars omitted]" if blocker_omitted else ""
+    budget_reason = _truncate(str(budget.get("reason") or ""), 200)[0]
     lines = [
         f"session budget: {budget['verdict']} (turns {budget.get('turns')}, "
         f"context {budget.get('context_tokens')})"
-        + (f" — {budget['reason']}" if budget.get("reason") else ""),
-        f"next action: {capsule['next_action']['text'] or '—'} ({capsule['next_action']['source']})",
-        f"blocker: {capsule['blocker']['text'] or '—'} ({capsule['blocker']['source']})",
+        + (f" — {budget_reason}" if budget_reason else ""),
+        f"next action: {next_text or '—'} ({capsule['next_action']['source']}){next_marker}",
+        f"blocker: {blocker_text or '—'} ({capsule['blocker']['source']}){blocker_marker}",
     ]
     return "\n".join(lines)
 
