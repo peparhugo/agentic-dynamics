@@ -26,14 +26,18 @@ browser. NOT ``fast``-marked (real git worktrees).
 
 from __future__ import annotations
 
+import importlib.util
+import json
 import subprocess
 from pathlib import Path
 
 import pytest
 
 from agentic_dynamics.experiment.experiment_spec import load_spec, validate_spec
+from agentic_dynamics.runtime import workflow_runner as runner_module
 from agentic_dynamics.runtime.executor import StepRequest, StepResult
 from agentic_dynamics.runtime.workflow_runner import (
+    ResumeState,
     _build_phase_prompt,
     _resolve_rag_params,
     run_workflow,
@@ -285,19 +289,27 @@ def _approval_text(*, operator: str = "jane@example.com", date: str = "2026-09-1
     return "".join(lines)
 
 
-def _commit_approval(wd: Path, spec_name: str, phase: str) -> None:
+def _commit_approval(wd: Path, spec_name: str, phase: str, *, run_id: str | None = None,
+                     gate_id: str | None = None, text: str | None = None) -> None:
     """Commit the approval the OFFICIAL way (approve_workflow.py's shape): an ``[approval]``
     subject — which the runner's phase-prefix commit-msg hook exempts — descending from the
     checkpoint commit. A raw `git commit -m "operator approval"` would be REWRITTEN by the
     hook into a second ``[workflow] <phase>`` commit and the resume would misread it as the
-    checkpoint commit itself (the defect this test reproduces)."""
+    checkpoint commit itself (the defect this test reproduces).
+
+    ``run_id``/``gate_id`` add the durable binding fields the fleet resume supplies; ``text``
+    overrides the whole artifact (the wrong-binding reproductions)."""
     ck = _git("rev-parse", "HEAD", cwd=wd).stdout.strip()
     tree = _git("rev-parse", "HEAD^{tree}", cwd=wd).stdout.strip()
+    binding = {"spec": spec_name, "phase": phase, "candidate": ck, "tree": tree}
+    if run_id is not None:
+        binding["run"] = run_id
+    if gate_id is not None:
+        binding["gate"] = gate_id
     ap = wd / "approvals" / spec_name
     ap.mkdir(parents=True, exist_ok=True)
     (ap / f"{phase}_approval.md").write_text(
-        _approval_text(binding={"spec": spec_name, "phase": phase,
-                                "candidate": ck, "tree": tree})
+        text if text is not None else _approval_text(binding=binding)
     )
     _git("add", "-Af", cwd=wd)
     _git("commit", "-qm", f"[approval] {spec_name}/{phase} — approved by jane@example.com",
@@ -362,6 +374,452 @@ def test_real_workflow_stops_at_p1c_and_p2a_cannot_dispatch_without_approval(
     assert result3.awaiting_reason == "checkpoint"
     assert result3.phases[-1].phase == "p6g_acceptance"
     assert result3.phases[-1].status == "awaiting"
+
+
+# ── The explicit (selected-parent) checkpoint continuation ────────────────────
+# The fleet defect (reviewer reproduction 2026-09-14): the explicit resume path takes its
+# completion set from the selected parent's ledger — which recorded ``ok`` phases only — so
+# a REACHED-but-awaiting checkpoint was never validated through the completed-checkpoint
+# path, re-ran, and stopped there again. These tests drive the REAL ``_load_resume_state``
+# (the loader the fleet's ``--resume --parent-run-id`` path uses) and the authored workflow
+# through the runner.
+
+
+def _load_run_workflow_module(name: str = "run_workflow_under_test_continuation"):
+    """Load ``scripts/run_workflow.py`` (not a package) so the tests call the REAL selected-
+    parent loader the fleet resume path performs — a hand-built ``ResumeState`` would miss
+    the loader defect entirely."""
+    spec = importlib.util.spec_from_file_location(name, REPO / "scripts" / "run_workflow.py")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def _write_run_ledger(root: Path, spec_name: str, run_id: str, result) -> Path:
+    """Write a finished run's ledger under the identity-carrying name the loader selects."""
+    ledger_dir = root / "experiments" / "results" / "workflows" / spec_name
+    ledger_dir.mkdir(parents=True, exist_ok=True)
+    payload = result.to_dict()
+    payload["run_id"] = run_id
+    path = ledger_dir / f"20260914T000000000000Z_{run_id}.json"
+    path.write_text(json.dumps(payload))
+    return path
+
+
+def _run_to_p1c(spec, wd):
+    """Drive the authored workflow to its designed p1c stop with controlled executors."""
+    result = run_workflow(
+        spec, goal=GOAL, model=MODEL, workdir=wd,
+        step_executor=_FakeAgentExecutor(), verifier_executor=_FakeVerifierExecutor(),
+        retrieve_fn=_deterministic_retrieve_fn(), publish=False, commit=True,
+    )
+    assert result.awaiting is True
+    assert result.awaiting_phase == "p1c_contract_gate"
+    return result
+
+
+def test_explicit_resume_validates_the_reached_checkpoint_and_refuses_without_approval(
+    build_spec, tmp_path, monkeypatch
+):
+    """Case 1 — parent reaches p1c; no approval: the resume remains awaiting WITHOUT
+    re-running the checkpoint or dispatching any producer/verifier beyond the stop."""
+    monkeypatch.setenv("FINOPS_EMIT_SELF", "0")
+    spec = build_spec
+    wd = tmp_path / "wd"
+    wd.mkdir()
+    _git_init(wd)
+    parent = _run_to_p1c(spec, wd)
+    _write_run_ledger(tmp_path, spec.name, "run-parent-1", parent)
+
+    module = _load_run_workflow_module()
+    monkeypatch.setattr(module, "ROOT", tmp_path)
+    state = module._load_resume_state(spec.name, "run-parent-1")
+    assert state.completed_phases == frozenset({
+        "p0a_reanchor_parity", "p0b_parity_gate", "p1a_ia_amendment",
+        "p1b_gate_first_viewport",
+    })
+    assert state.reached_checkpoints == frozenset({"p1c_contract_gate"})
+
+    agent2 = _FakeAgentExecutor()
+    verifier2 = _FakeVerifierExecutor()
+    second = run_workflow(
+        spec, goal=GOAL, model=MODEL, workdir=wd,
+        step_executor=agent2, verifier_executor=verifier2,
+        retrieve_fn=_deterministic_retrieve_fn(), publish=False, commit=True,
+        resume=True, resume_state=state,
+        approval_run_id="run-parent-1", approval_gate_id="gate-p1c",
+    )
+    assert second.awaiting is True
+    assert second.awaiting_phase == "p1c_contract_gate"
+    assert second.awaiting_reason == "approval_refused"
+    assert agent2.calls == [], "the reached checkpoint was re-run instead of validated"
+    assert verifier2.calls == [], "a verifier dispatched past the stopped checkpoint"
+    # the typed decision trace records the rejected contract read (the I10 capture)
+    rejected = [c for c in second.checkpoints if c.phase == "p1c_contract_gate"]
+    assert rejected and rejected[-1].decision == "rejected"
+    assert "no_artifact" in (rejected[-1].approval_evidence or {}).get("failed_checks", [])
+
+
+def test_explicit_resume_skips_the_approved_checkpoint_and_dispatches_p2a(
+    build_spec, tmp_path, monkeypatch
+):
+    """Case 2 — same parent, correctly bound committed approval: p1c is skipped (validated,
+    never re-run) and the next dispatch is p2a_timings_route; the skipped work is recorded
+    as inherited completion with provenance."""
+    monkeypatch.setenv("FINOPS_EMIT_SELF", "0")
+    spec = build_spec
+    wd = tmp_path / "wd"
+    wd.mkdir()
+    _git_init(wd)
+    parent = _run_to_p1c(spec, wd)
+    _write_run_ledger(tmp_path, spec.name, "run-parent-2", parent)
+
+    module = _load_run_workflow_module()
+    monkeypatch.setattr(module, "ROOT", tmp_path)
+    state = module._load_resume_state(spec.name, "run-parent-2")
+    _commit_approval(wd, spec.name, "p1c_contract_gate",
+                     run_id="run-parent-2", gate_id="gate-p1c")
+
+    agent2 = _FakeAgentExecutor()
+    verifier2 = _FakeVerifierExecutor()
+    second = run_workflow(
+        spec, goal=GOAL, model=MODEL, workdir=wd,
+        step_executor=agent2, verifier_executor=verifier2,
+        retrieve_fn=_deterministic_retrieve_fn(), publish=False, commit=True,
+        resume=True, resume_state=state,
+        approval_run_id="run-parent-2", approval_gate_id="gate-p1c",
+    )
+    assert "p1c_contract_gate" not in agent2.calls, "the approved checkpoint re-ran"
+    assert agent2.calls[0] == "p2a_timings_route"
+    # the run continues to its final designed stop (the controller's acceptance checkpoint)
+    assert second.awaiting is True
+    assert second.awaiting_phase == "p6g_acceptance"
+    approved = [c for c in second.checkpoints if c.phase == "p1c_contract_gate"]
+    assert approved and approved[-1].decision == "approved"
+    # inherited completion is recorded with provenance, not re-attributed silently
+    inherited = {e["phase"]: e for e in second.inherited_phases}
+    assert set(inherited) == {
+        "p0a_reanchor_parity", "p0b_parity_gate", "p1a_ia_amendment",
+        "p1b_gate_first_viewport", "p1c_contract_gate",
+    }
+    assert inherited["p1c_contract_gate"]["from_run_id"] == "run-parent-2"
+    assert inherited["p1c_contract_gate"]["status"] == "checkpoint_approved"
+
+
+def test_explicit_resume_refuses_wrongly_bound_approvals_before_execution(
+    build_spec, tmp_path, monkeypatch
+):
+    """Case 3 — wrong run, gate, candidate, or invalid approval: refused BEFORE execution
+    with the named failed check — never a partial dispatch."""
+    monkeypatch.setenv("FINOPS_EMIT_SELF", "0")
+    spec = build_spec
+    module = _load_run_workflow_module()
+    variants = (
+        ("run_id", {"run": "run-foreign"}),
+        ("gate_id", {"gate": "gate-foreign"}),
+        ("candidate_sha", {"candidate": "deadbeef9"}),
+        ("operator", None),
+    )
+    for index, (expected_failed, override) in enumerate(variants):
+        wd = tmp_path / f"wd{index}"
+        wd.mkdir()
+        _git_init(wd)
+        parent = _run_to_p1c(spec, wd)
+        run_id = f"run-parent-3{index}"
+        _write_run_ledger(tmp_path, spec.name, run_id, parent)
+        monkeypatch.setattr(module, "ROOT", tmp_path)
+        state = module._load_resume_state(spec.name, run_id)
+        ck = _git("rev-parse", "HEAD", cwd=wd).stdout.strip()
+        tree = _git("rev-parse", "HEAD^{tree}", cwd=wd).stdout.strip()
+        binding = {"spec": spec.name, "phase": "p1c_contract_gate", "candidate": ck,
+                   "tree": tree, "run": run_id, "gate": "gate-p1c"}
+        if override is None:
+            text = _approval_text(operator="tbd", binding=binding)
+        else:
+            binding.update(override)
+            text = _approval_text(binding=binding)
+        _commit_approval(wd, spec.name, "p1c_contract_gate", text=text)
+
+        agent2 = _FakeAgentExecutor()
+        verifier2 = _FakeVerifierExecutor()
+        second = run_workflow(
+            spec, goal=GOAL, model=MODEL, workdir=wd,
+            step_executor=agent2, verifier_executor=verifier2,
+            retrieve_fn=_deterministic_retrieve_fn(), publish=False, commit=True,
+            resume=True, resume_state=state,
+            approval_run_id=run_id, approval_gate_id="gate-p1c",
+        )
+        assert second.awaiting is True, expected_failed
+        assert second.awaiting_reason == "approval_refused"
+        assert agent2.calls == [], f"{expected_failed}: execution began past a refusal"
+        rejected = [c for c in second.checkpoints if c.phase == "p1c_contract_gate"][-1]
+        assert rejected.decision == "rejected"
+        assert expected_failed in (rejected.approval_evidence or {}).get("failed_checks", [])
+
+
+def test_chained_resume_preserves_inherited_completion_across_both_parents(
+    build_spec, tmp_path, monkeypatch
+):
+    """Case 4 — initial run → approved first checkpoint → second checkpoint → approved final
+    continuation: the third continuation inherits BOTH parents' completion, replays no
+    earlier producer, and reaches logical completion with zero additional producer calls
+    and zero additional spend."""
+    monkeypatch.setenv("FINOPS_EMIT_SELF", "0")
+    spec = build_spec
+    all_names = [p["name"] for p in spec.workflow.params["phases"]]
+    wd = tmp_path / "wd"
+    wd.mkdir()
+    _git_init(wd)
+
+    parent = _run_to_p1c(spec, wd)
+    _write_run_ledger(tmp_path, spec.name, "run-root", parent)
+    module = _load_run_workflow_module()
+    monkeypatch.setattr(module, "ROOT", tmp_path)
+    state1 = module._load_resume_state(spec.name, "run-root")
+    assert state1.reached_checkpoints == frozenset({"p1c_contract_gate"})
+
+    _commit_approval(wd, spec.name, "p1c_contract_gate",
+                     run_id="run-root", gate_id="gate-p1c")
+    agent2 = _FakeAgentExecutor()
+    second = run_workflow(
+        spec, goal=GOAL, model=MODEL, workdir=wd,
+        step_executor=agent2, verifier_executor=_FakeVerifierExecutor(),
+        retrieve_fn=_deterministic_retrieve_fn(), publish=False, commit=True,
+        resume=True, resume_state=state1,
+        approval_run_id="run-root", approval_gate_id="gate-p1c",
+    )
+    assert second.awaiting is True
+    assert second.awaiting_phase == "p6g_acceptance"
+    assert agent2.calls[0] == "p2a_timings_route"
+    assert "p0a_reanchor_parity" not in agent2.calls, "the second run replayed an ancestor"
+    _write_run_ledger(tmp_path, spec.name, "run-mid", second)
+
+    state2 = module._load_resume_state(spec.name, "run-mid")
+    assert state2.completed_phases == frozenset(all_names) - {"p6g_acceptance"}
+    assert state2.reached_checkpoints == frozenset({"p6g_acceptance"})
+    carried = {e["phase"]: e for e in state2.inherited_phases}
+    assert carried["p1c_contract_gate"]["from_run_id"] == "run-root", (
+        "the approved checkpoint lost its original provenance"
+    )
+    assert carried["p0a_reanchor_parity"]["from_run_id"] == "run-root"
+    assert "p2a_timings_route" not in carried  # run-mid executed it; it is run-mid's own
+
+    _commit_approval(wd, spec.name, "p6g_acceptance",
+                     run_id="run-mid", gate_id="gate-p6g")
+    agent3 = _FakeAgentExecutor()
+    third = run_workflow(
+        spec, goal=GOAL, model=MODEL, workdir=wd,
+        step_executor=agent3, verifier_executor=_FakeVerifierExecutor(),
+        retrieve_fn=_deterministic_retrieve_fn(), publish=False, commit=True,
+        resume=True, resume_state=state2,
+        approval_run_id="run-mid", approval_gate_id="gate-p6g",
+    )
+    assert agent3.calls == [], "an earlier producer replayed on the final continuation"
+    assert third.already_complete is True
+    assert third.total_cost_usd == 0.0, "inherited invocations were charged again"
+    final_decisions = {c.phase: c.decision for c in third.checkpoints}
+    assert final_decisions.get("p6g_acceptance") == "approved"
+    inherited3 = {e["phase"]: e for e in third.inherited_phases}
+    assert inherited3["p1c_contract_gate"]["from_run_id"] == "run-root"
+    assert inherited3["p2a_timings_route"]["from_run_id"] == "run-mid"
+
+
+def test_refused_resume_preserves_inherited_completion_and_the_unresolved_checkpoint(
+    build_spec, tmp_path, monkeypatch
+):
+    """Reviewer reproduction (Astra, 2026-09-15): reach p1c → an unsigned resume REFUSES →
+    approve that refused child → resume it. A refusal executes nothing, so its ledger must
+    still carry (a) the completion it inherited and (b) the checkpoint it left unresolved —
+    otherwise the next continuation forgets both, replays producers, and stops at p1c again."""
+    monkeypatch.setenv("FINOPS_EMIT_SELF", "0")
+    spec = build_spec
+    wd = tmp_path / "wd"
+    wd.mkdir()
+    _git_init(wd)
+
+    parent = _run_to_p1c(spec, wd)
+    _write_run_ledger(tmp_path, spec.name, "run-root", parent)
+    module = _load_run_workflow_module()
+    monkeypatch.setattr(module, "ROOT", tmp_path)
+    state1 = module._load_resume_state(spec.name, "run-root")
+    assert state1.reached_checkpoints == frozenset({"p1c_contract_gate"})
+
+    # Run 2: the unsigned resume refuses — no approval artifact exists.
+    refusing_agent = _FakeAgentExecutor()
+    refused = run_workflow(
+        spec, goal=GOAL, model=MODEL, workdir=wd,
+        step_executor=refusing_agent, verifier_executor=_FakeVerifierExecutor(),
+        retrieve_fn=_deterministic_retrieve_fn(), publish=False, commit=True,
+        resume=True, resume_state=state1,
+        approval_run_id="run-root", approval_gate_id="gate-p1c",
+    )
+    assert refused.awaiting is True and refused.awaiting_reason == "approval_refused"
+    assert refusing_agent.calls == []
+    _write_run_ledger(tmp_path, spec.name, "run-refused", refused)
+
+    # The refused child's ledger still carries the family's continuation state...
+    state2 = module._load_resume_state(spec.name, "run-refused")
+    assert state2.completed_phases == frozenset({
+        "p0a_reanchor_parity", "p0b_parity_gate", "p1a_ia_amendment",
+        "p1b_gate_first_viewport",
+    }), "the refusal dropped the completion it inherited"
+    assert state2.reached_checkpoints == frozenset({"p1c_contract_gate"}), (
+        "the refusal dropped the unresolved checkpoint identity"
+    )
+
+    # ...so approving THAT CHILD and resuming it proceeds past p1c without replay.
+    _commit_approval(wd, spec.name, "p1c_contract_gate",
+                     run_id="run-refused", gate_id="gate-p1c")
+    agent3 = _FakeAgentExecutor()
+    third = run_workflow(
+        spec, goal=GOAL, model=MODEL, workdir=wd,
+        step_executor=agent3, verifier_executor=_FakeVerifierExecutor(),
+        retrieve_fn=_deterministic_retrieve_fn(), publish=False, commit=True,
+        resume=True, resume_state=state2,
+        approval_run_id="run-refused", approval_gate_id="gate-p1c",
+    )
+    assert "p1c_contract_gate" not in agent3.calls, "the approved checkpoint re-ran"
+    assert agent3.calls[0] == "p2a_timings_route"
+    assert "p0a_reanchor_parity" not in agent3.calls, (
+        "the refusal's child replayed producers the family already paid for"
+    )
+    # the continuation reached its own designed stop — the final acceptance checkpoint
+    assert third.awaiting is True and third.awaiting_phase == "p6g_acceptance"
+    approved = [c for c in third.checkpoints if c.phase == "p1c_contract_gate"]
+    assert approved and approved[-1].decision == "approved"
+
+
+def test_fully_bound_final_continuation_validates_from_recorded_lineage_not_the_index(
+    build_spec, tmp_path, monkeypatch
+):
+    """Reviewer reproduction (Astra, 2026-09-15): with identical parent ledgers and correctly
+    bound approvals, the final continuation must validate p1c from its RECORDED ORIGIN — not
+    from whichever run the global spec index currently points at. Pre-fix, the same chain
+    succeeded with a current index entry and refused with a stale/unrelated one."""
+    monkeypatch.setenv("FINOPS_EMIT_SELF", "0")
+    spec = build_spec
+    module = _load_run_workflow_module()
+
+    index_variants = {
+        # the index points at the selected parent (the pre-fix happy path)
+        "current": {"p1c_contract_gate": {
+            "decision": "approved", "reached_at": "2026-09-14T00:00:00+00:00",
+        }},
+        # no usable index record (the pre-fix refusal path)
+        "stale": {},
+        # an unrelated run's decision (the pre-fix refusal path)
+        "unrelated": {"p1c_contract_gate": {"decision": "rejected"}},
+    }
+    for variant, records in index_variants.items():
+        wd = tmp_path / variant
+        wd.mkdir()
+        _git_init(wd)
+        parent = _run_to_p1c(spec, wd)
+        run_root = f"run-root-{variant}"
+        _write_run_ledger(tmp_path, spec.name, run_root, parent)
+        monkeypatch.setattr(module, "ROOT", tmp_path)
+        state1 = module._load_resume_state(spec.name, run_root)
+
+        _commit_approval(wd, spec.name, "p1c_contract_gate",
+                         run_id=run_root, gate_id="gate-p1c")
+        agent2 = _FakeAgentExecutor()
+        second = run_workflow(
+            spec, goal=GOAL, model=MODEL, workdir=wd,
+            step_executor=agent2, verifier_executor=_FakeVerifierExecutor(),
+            retrieve_fn=_deterministic_retrieve_fn(), publish=False, commit=True,
+            resume=True, resume_state=state1,
+            approval_run_id=run_root, approval_gate_id="gate-p1c",
+        )
+        assert second.awaiting is True and second.awaiting_phase == "p6g_acceptance", variant
+        run_mid = f"run-mid-{variant}"
+        _write_run_ledger(tmp_path, spec.name, run_mid, second)
+        state2 = module._load_resume_state(spec.name, run_mid)
+
+        # The global index now points wherever the variant says; validation must not care.
+        monkeypatch.setattr(
+            runner_module,
+            "_previous_checkpoint_state",
+            lambda spec, phase, _records=records: _records.get(phase),
+        )
+        _commit_approval(wd, spec.name, "p6g_acceptance",
+                         run_id=run_mid, gate_id="gate-p6g")
+        agent3 = _FakeAgentExecutor()
+        third = run_workflow(
+            spec, goal=GOAL, model=MODEL, workdir=wd,
+            step_executor=agent3, verifier_executor=_FakeVerifierExecutor(),
+            retrieve_fn=_deterministic_retrieve_fn(), publish=False, commit=True,
+            resume=True, resume_state=state2,
+            approval_run_id=run_mid, approval_gate_id="gate-p6g",
+        )
+        assert third.awaiting is False, f"{variant}: the final continuation refused"
+        assert third.already_complete is True, variant
+        assert agent3.calls == [], variant
+        decisions = {c.phase: c.decision for c in third.checkpoints}
+        assert decisions.get("p1c_contract_gate") == "approved", variant
+        assert decisions.get("p6g_acceptance") == "approved", variant
+
+
+def test_explicit_resume_never_relaxes_run_gate_binding_to_the_global_index(
+    build_spec, tmp_path, monkeypatch
+):
+    """Reviewer reproduction (Astra, 2026-09-15): a checkpoint's FIRST explicit continuation
+    has no inherited origin yet — the empty origin map is NOT legacy. The expected run/gate
+    binding must stand, so an approval naming the correct candidate but a FOREIGN run/gate is
+    refused with ZERO dispatch even when the global index currently reports an approved entry
+    (pre-fix, that combination executed p2a)."""
+    monkeypatch.setenv("FINOPS_EMIT_SELF", "0")
+    spec = build_spec
+    module = _load_run_workflow_module()
+    for index_state, records in {
+        # the pre-fix bypass: an unrelated approved entry stripped the binding
+        "approved": {"p1c_contract_gate": {
+            "decision": "approved", "reached_at": "2026-09-14T00:00:00+00:00",
+        }},
+        "rejected": {"p1c_contract_gate": {"decision": "rejected"}},
+        "absent": {},
+    }.items():
+        wd = tmp_path / f"wd-{index_state}"
+        wd.mkdir()
+        _git_init(wd)
+        parent = _run_to_p1c(spec, wd)
+        run_id = f"run-parent-{index_state}"
+        _write_run_ledger(tmp_path, spec.name, run_id, parent)
+        monkeypatch.setattr(module, "ROOT", tmp_path)
+        state = module._load_resume_state(spec.name, run_id)
+        assert state.inherited_phases == (), "the first explicit continuation has no origins"
+        assert state.reached_checkpoints == frozenset({"p1c_contract_gate"})
+
+        # The approval names the correct candidate/tree, but a FOREIGN run and gate.
+        ck = _git("rev-parse", "HEAD", cwd=wd).stdout.strip()
+        tree = _git("rev-parse", "HEAD^{tree}", cwd=wd).stdout.strip()
+        _commit_approval(wd, spec.name, "p1c_contract_gate", text=_approval_text(binding={
+            "spec": spec.name, "phase": "p1c_contract_gate", "candidate": ck, "tree": tree,
+            "run": "run-foreign", "gate": "gate-foreign",
+        }))
+
+        monkeypatch.setattr(
+            runner_module,
+            "_previous_checkpoint_state",
+            lambda spec, phase, _records=records: _records.get(phase),
+        )
+        agent2 = _FakeAgentExecutor()
+        verifier2 = _FakeVerifierExecutor()
+        second = run_workflow(
+            spec, goal=GOAL, model=MODEL, workdir=wd,
+            step_executor=agent2, verifier_executor=verifier2,
+            retrieve_fn=_deterministic_retrieve_fn(), publish=False, commit=True,
+            resume=True, resume_state=state,
+            approval_run_id=run_id, approval_gate_id="gate-p1c",
+        )
+        assert second.awaiting is True, index_state
+        assert second.awaiting_phase == "p1c_contract_gate", index_state
+        assert second.awaiting_reason == "approval_refused", index_state
+        assert agent2.calls == [], f"{index_state}: execution began past a foreign approval"
+        assert verifier2.calls == [], index_state
+        rejected = [c for c in second.checkpoints if c.phase == "p1c_contract_gate"][-1]
+        assert rejected.decision == "rejected", index_state
+        failed = (rejected.approval_evidence or {}).get("failed_checks", [])
+        assert "run_id" in failed and "gate_id" in failed, (index_state, failed)
 
 
 # ── The bounded correction attempt ────────────────────────────────────────────
@@ -599,11 +1057,13 @@ class _CostingAgentExecutor:
     def __init__(self, cost: float = 0.001):
         self.calls: list[str] = []
         self.attempts: list[int] = []
+        self.prompts: dict[str, str] = {}
         self.cost = cost
 
     def execute(self, request: StepRequest) -> StepResult:
         self.calls.append(request.phase_name)
         self.attempts.append(request.attempt)
+        self.prompts[request.phase_name] = request.prompt
         target = Path(request.workdir) / "work" / f"{request.phase_name}_{request.attempt}.txt"
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text("x")
@@ -612,6 +1072,30 @@ class _CostingAgentExecutor:
             prompt_tokens=10, completion_tokens=20, total_tokens=30,
             estimated_cost_usd=self.cost,
         )
+
+
+class _FailOnceThenOkExecutor(_CostingAgentExecutor):
+    """Fails the named phase's FIRST attempt (escalation fires), then succeeds with cost."""
+
+    def __init__(self, fail_first: str, cost: float = 0.001):
+        super().__init__(cost=cost)
+        self.fail_first = fail_first
+        self.failures = 0
+
+    def execute(self, request: StepRequest) -> StepResult:
+        if request.phase_name == self.fail_first and self.failures == 0:
+            self.failures += 1
+            self.calls.append(request.phase_name)
+            self.attempts.append(request.attempt)
+            self.prompts[request.phase_name] = request.prompt
+            # A FAILED attempt is still a PAID invocation — the fake reports its cost so the
+            # cumulative-spend assertions are meaningful.
+            return StepResult(
+                ok=False, state="failed", error="agent failed", exit_code=1,
+                prompt_tokens=10, completion_tokens=20, total_tokens=30,
+                estimated_cost_usd=self.cost,
+            )
+        return super().execute(request)
 
 
 def test_correction_retains_costs_and_increments_attempt_identity(tmp_path, monkeypatch):
@@ -683,6 +1167,207 @@ def test_test_phase_correction_does_not_duplicate_producer_records(tmp_path, mon
     records = [r for r in result.attempts if r.phase == "build"]
     assert len({r.attempt_id for r in records}) == 2, "duplicate attempt ids"
     assert agent.attempts[:2] == [1, 2]
+
+
+TWO_CORRECTION_YAML = """\
+name: two_correction_fixture
+question: a native gate failure followed by a downstream test failure
+version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: false
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    phases:
+      - name: build
+        kind: agent
+        timeout: 120
+        test_gate: true
+        gate_retry: 1
+        tests:
+          - tests/test_thing.py
+        prompt: |
+          {goal}
+      - name: verify
+        kind: test
+        timeout: 120
+        gate_retry: 1
+        tests:
+          - tests/test_thing.py
+        prompt: |
+          {goal}
+factors:
+  - {name: model, levels: [deepseek/deepseek-v4-flash]}
+design: factorial
+rules: []
+metrics: []
+comparison: null
+"""
+
+ESCALATION_CORRECTION_YAML = """\
+name: escalation_correction_fixture
+question: an escalating agent followed by a bounded correction
+version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: true
+  external_services: false
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    escalation:
+      ladder:
+        - deepseek/deepseek-v4-flash
+        - deepseek/deepseek-v4-pro
+      max_attempts: 2
+    phases:
+      - name: build
+        kind: agent
+        timeout: 120
+        test_gate: true
+        tests:
+          - tests/test_thing.py
+        prompt: |
+          {goal}
+      - name: verify
+        kind: test
+        timeout: 120
+        gate_retry: 1
+        tests:
+          - tests/test_thing.py
+        prompt: |
+          {goal}
+factors:
+  - {name: model, levels: [deepseek/deepseek-v4-flash]}
+design: factorial
+rules: []
+metrics: []
+comparison: null
+"""
+
+
+class _ScriptedFailures:
+    """Fails each named verification a scripted number of times, then passes."""
+
+    def __init__(self, failures: dict[str, int]):
+        self.remaining = dict(failures)
+        self.calls: list[str] = []
+
+    def execute(self, request: StepRequest) -> StepResult:
+        self.calls.append(request.phase_name)
+        remaining = self.remaining.get(request.phase_name, 0)
+        if remaining > 0:
+            self.remaining[request.phase_name] = remaining - 1
+            return StepResult(
+                ok=False, state="failed", error="suite failed (1/3 passed)",
+                tests_passed=1, tests_total=3, test_executed_success=False,
+            )
+        return StepResult(
+            ok=True, state="ok", exit_code=0,
+            tests_passed=3, tests_total=3, test_executed_success=True,
+        )
+
+
+def test_resume_correction_reruns_the_producer_marked_complete(tmp_path, monkeypatch):
+    """Corrective resume: the producer sits in the parent's completion set, but a failing
+    verification invalidates its result — the correction must make the producer ELIGIBLE to
+    execute again, not merely re-run the verifier against the unchanged candidate."""
+    monkeypatch.setenv("FINOPS_EMIT_SELF", "0")
+    spec_path = tmp_path / "spec.yaml"
+    spec_path.write_text(GATE_RETRY_TEST_PHASE_YAML)
+    spec = load_spec(spec_path)
+    wd = tmp_path / "wd"
+    wd.mkdir()
+    _git_init(wd)
+    agent = _CostingAgentExecutor(cost=0.001)
+    verifier = _OnceFailingVerifier("verify")
+    state = ResumeState(
+        parent_run_id="run-parent",
+        ledger_path="/ledgers/run-parent.json",
+        completed_phases=frozenset({"build"}),
+    )
+
+    result = run_workflow(
+        spec, goal="g", model=MODEL, workdir=wd,
+        step_executor=agent, verifier_executor=verifier,
+        publish=False, commit=True, resume=True, resume_state=state,
+    )
+    assert result.ok is True
+    assert agent.calls == ["build"], "the producer was skipped and only the verifier re-ran"
+    assert "CORRECTION ATTEMPT" in agent.prompts["build"]
+    assert [p.phase for p in result.phases] == ["build", "verify"]
+
+
+def test_repeated_correction_retains_each_paid_invocation_once(tmp_path, monkeypatch):
+    """A native gate failure followed by a downstream test failure: three paid $0.001
+    invocations must read as exactly $0.003, with three unique attempt identities and ONE
+    cumulative sequence — the old helper re-appended history the record already seeded."""
+    monkeypatch.setenv("FINOPS_EMIT_SELF", "0")
+    spec_path = tmp_path / "spec.yaml"
+    spec_path.write_text(TWO_CORRECTION_YAML)
+    spec = load_spec(spec_path)
+    wd = tmp_path / "wd"
+    wd.mkdir()
+    _git_init(wd)
+    agent = _CostingAgentExecutor(cost=0.001)
+    verifier = _ScriptedFailures({"build__test_gate": 1, "verify": 1})
+
+    result = run_workflow(
+        spec, goal="g", model=MODEL, workdir=wd,
+        step_executor=agent, verifier_executor=verifier,
+        publish=False, commit=True,
+    )
+    assert result.ok is True
+    assert agent.calls == ["build", "build", "build"]
+    assert agent.attempts == [1, 2, 3]
+    build = next(p for p in result.phases if p.phase == "build")
+    assert len(build.attempts) == 3, "a paid invocation was duplicated or discarded"
+    assert [row["attempt_number"] for row in build.attempts] == [1, 2, 3]
+    assert round(build.cost_usd, 6) == 0.003, "duplicated history overcounted the spend"
+    records = [r for r in result.attempts if r.phase == "build"]
+    assert len(records) == 3
+    assert len({r.attempt_id for r in records}) == 3, "duplicate attempt ids"
+    assert records[0].status == "failed" and records[0].first_pass is False
+    assert records[0].retry_reason.startswith("correction")
+    assert records[2].accepted is True
+
+
+def test_escalation_then_correction_advances_past_all_prior_invocations(tmp_path, monkeypatch):
+    """An escalation (two paid invocations in ONE phase execution) followed by a correction:
+    the next executor identity must advance past ALL prior invocations — both ladder rows —
+    not merely count phase-loop rewinds (which would collide at ordinal 2)."""
+    monkeypatch.setenv("FINOPS_EMIT_SELF", "0")
+    spec_path = tmp_path / "spec.yaml"
+    spec_path.write_text(ESCALATION_CORRECTION_YAML)
+    spec = load_spec(spec_path)
+    wd = tmp_path / "wd"
+    wd.mkdir()
+    _git_init(wd)
+    agent = _FailOnceThenOkExecutor("build", cost=0.001)
+    verifier = _OnceFailingVerifier("verify")
+
+    result = run_workflow(
+        spec, goal="g", model=MODEL, workdir=wd,
+        step_executor=agent, verifier_executor=verifier,
+        publish=False, commit=True,
+    )
+    assert result.ok is True
+    assert agent.calls == ["build", "build", "build"]
+    assert agent.attempts == [1, 2, 3], "the correction reused an escalated attempt ordinal"
+    build = next(p for p in result.phases if p.phase == "build")
+    assert [row["attempt_number"] for row in build.attempts] == [1, 2, 3]
+    assert len(build.attempts) == 3
+    assert round(build.cost_usd, 6) == 0.003
+    records = [r for r in result.attempts if r.phase == "build"]
+    assert len({r.attempt_id for r in records}) == 3
+    assert records[1].escalation_from == MODEL
+    assert records[0].escalation_to is None
 
 
 def _commit_phase_marker(wd: Path, phase: str, goal: str) -> str:

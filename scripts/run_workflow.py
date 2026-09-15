@@ -71,6 +71,8 @@ from agentic_dynamics.runtime.run_clone import (  # noqa: E402
     create_run_clone,
 )
 from agentic_dynamics.runtime.workflow_runner import (  # noqa: E402
+    AWAITING_STATUS,
+    INHERITED_PHASE_STATUSES,
     ResumeState,
     cell_scope,
     run_concrete_step,
@@ -1397,12 +1399,19 @@ def _load_resume_state(spec_name: str, parent_run_id: str) -> ResumeState:
     Identity selection, no inference: only files whose NAME carries exactly this run id
     (``_ledger_out_path``'s ``<ts>_<run-id>.json`` shape, collisions included), and only a
     payload whose own ``run_id`` field (when present) matches. Never the newest sibling,
-    never the spec index. ``completed_phases`` is exactly the phases the parent recorded
-    ``ok`` — a failed/awaiting phase is re-entered.
+    never the spec index. ``completed_phases`` is the phases the parent recorded ``ok`` PLUS
+    the ancestor completions its own ledger inherited (``inherited_phases``, provenance
+    preserved); ``reached_checkpoints`` carries the checkpoint phases the parent REACHED and
+    stopped awaiting — PLUS the checkpoints a REFUSED parent left unresolved
+    (``unresolved_checkpoints``) — NOT completion (the engine validates their approval before
+    skipping).
 
     Raises :class:`ParentRunRefused` when the selected parent's snapshot cannot be found
-    or read: a resume cannot be established from a ledger that is gone, and guessing would
-    resurrect exactly the mis-association this identity selection removes.
+    or read — a resume cannot be established from a ledger that is gone, and guessing would
+    resurrect exactly the mis-association this identity selection removes. A malformed
+    ``inherited_phases`` or ``unresolved_checkpoints`` entry (no phase, no origin run, an
+    unknown status) is the same named refusal: a corrupt lineage is never silently dropped
+    to "not completed".
     """
     ledger_dir = ROOT / "experiments" / "results" / "workflows" / spec_name
     matches = [
@@ -1429,15 +1438,57 @@ def _load_resume_state(spec_name: str, parent_run_id: str) -> ResumeState:
             f"--resume parent ledger {path.name} records run_id {recorded!r}, "
             f"not {parent_run_id!r}"
         )
-    completed = frozenset(
-        str(phase.get("phase"))
-        for phase in (payload.get("phases") or [])
-        if isinstance(phase, dict) and phase.get("phase") and phase.get("status") == "ok"
-    )
+    completed: set[str] = set()
+    reached: set[str] = set()
+    for phase in (payload.get("phases") or []):
+        if not (isinstance(phase, dict) and phase.get("phase")):
+            continue
+        name = str(phase["phase"])
+        status = str(phase.get("status") or "")
+        if status == "ok":
+            completed.add(name)
+        elif status == AWAITING_STATUS:
+            # The ONLY producer of this status is the mechanical checkpoint stop, so it is
+            # carried as REACHED — separately, so an approval is validated before skipping.
+            reached.add(name)
+    inherited: list[dict[str, str]] = []
+    for entry in (payload.get("inherited_phases") or []):
+        if not isinstance(entry, dict):
+            raise ParentRunRefused(
+                f"--resume parent ledger {path.name} carries a malformed inherited "
+                f"completion entry ({entry!r}) — the lineage cannot be established"
+            )
+        name = str(entry.get("phase") or "")
+        origin = str(entry.get("from_run_id") or "")
+        status = str(entry.get("status") or "")
+        if not name or not origin or status not in INHERITED_PHASE_STATUSES:
+            raise ParentRunRefused(
+                f"--resume parent ledger {path.name} carries an inherited completion entry "
+                f"without a phase/from_run_id/known status ({entry!r}) — refusing to guess "
+                f"the lineage"
+            )
+        inherited.append({
+            "phase": name,
+            "from_run_id": origin,
+            "gate_id": str(entry.get("gate_id") or ""),
+            "ledger_path": str(entry.get("ledger_path") or ""),
+            "status": status,
+        })
+        completed.add(name)
+    for entry in (payload.get("unresolved_checkpoints") or []):
+        if not isinstance(entry, dict) or not entry.get("phase"):
+            raise ParentRunRefused(
+                f"--resume parent ledger {path.name} carries an unresolved checkpoint entry "
+                f"without a phase identity ({entry!r}) — refusing to guess which checkpoint "
+                f"stays unresolved"
+            )
+        reached.add(str(entry["phase"]))
     return ResumeState(
         parent_run_id=parent_run_id,
         ledger_path=str(path),
-        completed_phases=completed,
+        completed_phases=frozenset(completed),
+        reached_checkpoints=frozenset(reached),
+        inherited_phases=tuple(inherited),
     )
 
 
