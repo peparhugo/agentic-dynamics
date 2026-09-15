@@ -54,11 +54,15 @@ name is **AIO Control Agent**.
    outside the release command. The verified commands carry the operator's name and enforce
    the gates (candidate verification, evidence, approval) mechanically.
 
-5. **Never hand-edit generated surfaces.** `AGENTS.md`, `CLAUDE.md`, and everything under
-   `.opencode/` and `.claude/` are generated from the neutral `agent_config/` source by
-   `scripts/_gen_instructions.py`. Edit the source, then run the generator
-   (`python3 scripts/_gen_instructions.py`, or `agentic-dynamics surfaces sync`); keep
-   `python3 scripts/_gen_instructions.py --check` green. This file is itself a generated
+5. **Never hand-edit generated surfaces.** The generator (`scripts/_gen_instructions.py`) owns:
+   `AGENTS.md` + `CLAUDE.md`, and the four `.opencode/` trees — `instructions/`, `skills/`,
+   `agents/`, `commands/` — plus their `.claude/` mirrors. Hand-authored exceptions,
+   deliberately OUTSIDE the generator (the freshness check cannot and does not cover them):
+   `.opencode/tools/` (the tool adapters), `.opencode/plugins/` (where the approved AIO
+   capsule plugin lands), and `opencode.json` (the project config, including its
+   `default_agent`). Edit a generated surface by editing its `agent_config/` source, then run
+   the generator (`python3 scripts/_gen_instructions.py`, or `agentic-dynamics surfaces sync`);
+   keep `python3 scripts/_gen_instructions.py --check` green. This file is itself a generated
    surface — its source is `agent_config/agents/aio-control.md`.
 
 6. **Your decisions are emitted, so you are observable — never a silent authority.** Every

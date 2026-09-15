@@ -410,6 +410,53 @@ THINKING_VARIANTS = {
     "default": "default",
 }
 
+#: The opencode agent ordinary worker calls run as (Unit B, 2026-09-15). The project default
+#: is the AIO coordinator (``opencode.json``'s ``default_agent``), so a worker that rode the
+#: default would silently BE a coordinator — every ordinary call selects this profile
+#: EXPLICITLY. Callers that select a specialized profile pass ``agent=`` and keep it.
+WORKER_AGENT = "build"
+
+
+def _build_opencode_cmd(
+    *,
+    model: str,
+    workdir: str,
+    prompt: str = "",
+    thinking_effort: str | None = None,
+    session_name: str = "",
+    session_id: str | None = None,
+    fork: bool = False,
+    agent: str = WORKER_AGENT,
+) -> list[str]:
+    """The argv for ONE ``opencode run`` invocation (pure — no process, no I/O).
+
+    ``--agent`` is ALWAYS explicit: the pin is what keeps an ordinary worker on the build
+    profile regardless of the project's ``default_agent`` (AIO coordinator). An explicitly
+    selected specialized profile rides through unchanged.
+    """
+    cmd = [
+        OPENCODE_BIN,
+        "run",
+        "--agent",
+        agent,
+        "--model",
+        model,
+        "--format",
+        "json",
+        "--auto",
+        "--dir",
+        workdir,
+    ]
+    if thinking_effort and thinking_effort in THINKING_VARIANTS:
+        cmd.extend(["--variant", THINKING_VARIANTS[thinking_effort]])
+    if session_name:
+        cmd.extend(["--title", session_name])
+    if fork and session_id:
+        cmd.extend(["--session", session_id, "--fork"])
+    if prompt:
+        cmd.append(prompt)
+    return cmd
+
 
 def run_opencode_agentic(
     prompt: str,
@@ -429,6 +476,7 @@ def run_opencode_agentic(
     transcript_path: str | None = None,
     session_id: str | None = None,
     fork: bool = False,
+    agent: str = WORKER_AGENT,
     watchdog: dict | None = None,
 ) -> AgenticResult:
     """Spawn an opencode agentic session in an isolated worktree.
@@ -460,6 +508,10 @@ def run_opencode_agentic(
             forking the given session (``--session <id> --fork``), so the shared
             context prefix is served as provider cache reads.
         fork: Fork from ``session_id`` to reuse its context prefix (cache reads).
+        agent: The opencode agent profile (``--agent``). Defaults to the worker profile
+            (``WORKER_AGENT`` = "build") — an ordinary call must NOT ride the project's
+            ``default_agent`` (the AIO coordinator). Pass a specialized profile explicitly
+            to select it.
         watchdog: Optional kill seam (cap_runner_hardening p1). When given, the
             transcript is ALSO appended live, one event line per step, so an external
             monitor can read the session's last-step age from the file's mtime; and
@@ -505,25 +557,16 @@ def run_opencode_agentic(
     files_before = _list_files(workdir)
     git_baseline = _capture_git_baseline(workdir)
 
-    cmd = [
-        OPENCODE_BIN,
-        "run",
-        "--model",
-        model,
-        "--format",
-        "json",
-        "--auto",
-        "--dir",
-        workdir,
-    ]
-    if thinking_effort and thinking_effort in THINKING_VARIANTS:
-        cmd.extend(["--variant", THINKING_VARIANTS[thinking_effort]])
-    if session_name:
-        cmd.extend(["--title", session_name])
-    if fork and session_id:
-        cmd.extend(["--session", session_id, "--fork"])
-    if prompt:
-        cmd.append(prompt)
+    cmd = _build_opencode_cmd(
+        model=model,
+        workdir=workdir,
+        prompt=prompt,
+        thinking_effort=thinking_effort,
+        session_name=session_name,
+        session_id=session_id,
+        fork=fork,
+        agent=agent,
+    )
 
     publisher = make_publisher() if on_event is None else None
 

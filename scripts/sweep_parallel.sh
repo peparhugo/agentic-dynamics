@@ -76,6 +76,7 @@ print(r[0] if r else 0)" 2>/dev/null)
 
     echo "[RUN] $title"
     ~/.opencode/bin/opencode run \
+        --agent build \
         --model "$model_id" \
         --title "$title" \
         --format json \
