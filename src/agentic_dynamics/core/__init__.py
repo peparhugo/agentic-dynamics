@@ -24,6 +24,7 @@ from . import (
     decision_contract,
     language,
     paths,
+    session_capacity,
     session_types,
     streaming,
 )
