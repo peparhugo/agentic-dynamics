@@ -117,12 +117,16 @@ control database; you never write a child's outbox.
    never a stopping condition. `COMPACT` = at/above the effective (usable) boundary: the
    native runtime compacts on the next request and THIS session continues under the same
    task binding — do not close; continue, and re-evaluate against the reduced context before
-   starting new consequential work. `CLOSE` = at/over the model's hard context limit (or the
-   boundary with native compaction disabled): close now and hand off; the next session reads
-   the close record and continues. Message count is TELEMETRY, never a stopping condition.
-   An `UNJUDGED` verdict (unreadable session, unresolved model, no usable measurement) is a
-   warning, never permission. The one explicit override is `FINOPS_SESSION_CTX_LIMIT`, a
-   policy cap the CLI, the capsule, and the submission gate all consume. This is the
+   starting new consequential work. After a completed compaction the check reports the
+   post-compaction state and resumes measuring with the next completed sample — the first
+   resumed work is never blocked by the stale pre-compaction reading. `CLOSE` = at/over the
+   model's hard context limit (or the boundary with native compaction disabled): close now
+   and hand off; the next session reads the close record and continues. Message count is
+   TELEMETRY, never a stopping condition. An `UNJUDGED` verdict (unreadable session,
+   unresolved model, no usable measurement) is a warning, never permission. The one explicit
+   override is `FINOPS_SESSION_CTX_LIMIT`, a LOCAL policy cap the CLI, the capsule, and the
+   submission gate all consume — clamped by the native capacity, and crossing it closes the
+   session (a policy cap is not a native compaction trigger). This is the
    25-hour-session failure class made executable without a fixed 200K/80 policy: a session
    that keeps accepting work past its model's usable capacity is repeating the exact defect
    the audit named.
