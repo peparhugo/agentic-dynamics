@@ -214,6 +214,7 @@ def measure_budget(native_session_id: str, *, timeout: float = DEFAULT_COMMAND_T
         "turns": payload.get("turns"),
         "context_tokens": payload.get("context_tokens"),
         "usage_incomplete": bool(payload.get("usage_incomplete")),
+        "post_compaction": bool(payload.get("post_compaction")),
         "reason": str(payload.get("reason") or ""),
         "session_id": str(payload.get("session_id") or ""),
         "model": payload.get("model"),
@@ -436,6 +437,7 @@ def compose_capsule(
             "turns": budget.get("turns"),
             "context_tokens": budget.get("context_tokens"),
             "usage_incomplete": bool(budget.get("usage_incomplete")),
+            "post_compaction": bool(budget.get("post_compaction")),
             "reason": str(budget.get("reason") or ""),
             # Capacity-derived judgment (2026-09-15): the capsule carries the resolved model,
             # the effective/hard limits, the response/compaction headroom, the remaining
@@ -496,11 +498,17 @@ def _render_tail(capsule: dict) -> str:
         f"{model.get('provider_id')}/{model.get('model_id')}"
         if model.get("provider_id") else "model unresolved"
     )
-    if capacity.get("effective_limit"):
+    if budget.get("post_compaction"):
+        capacity_text = (
+            f"post-compaction (pre-compaction reading {budget.get('context_tokens')}; "
+            f"measurement resumes with the next completed sample)"
+        )
+    elif capacity.get("effective_limit"):
         capacity_text = (
             f"context {budget.get('context_tokens')}/{capacity.get('effective_limit')} "
             f"(hard {capacity.get('hard_limit')}, "
             f"headroom {capacity.get('response_headroom_tokens')}"
+            + (f", policy {capacity.get('policy_limit')}" if capacity.get("policy_limit") else "")
             + (f", remaining {budget.get('remaining_tokens')}" if budget.get("remaining_tokens") is not None else "")
             + ")"
         )

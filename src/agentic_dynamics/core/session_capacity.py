@@ -2,9 +2,23 @@
 
 The AIO's context policy is CAPACITY-DERIVED, never a universal constant: the session is
 judged against the usable context of its ACTIVE resolved model, using the same calculation
-the installed opencode runtime itself uses to decide when to compact. The constants and the
-formula below are a faithful port of opencode **1.18.15** (extracted 2026-09-15 from the
-installed binary's bundled source):
+the installed opencode runtime itself uses to decide when to compact.
+
+Sources of truth, in order:
+
+1. **The runtime's own CLI resolution** (preferred): ``opencode models <provider> --verbose``
+   emits the RESOLVED models with their limits, after opencode's full config load
+   (global config dir → ``OPENCODE_CONFIG`` → project config, which is the runtime's own
+   order). The helper consumes that output rather than re-deriving it; a model the runtime
+   does not resolve falls back to (2).
+2. **Catalog + config overlay** (documented fallback when the runtime CLI is unavailable,
+   e.g. in a container without the binary): the installed catalog cache (``models.json``)
+   overlaid with the ``provider.<id>.models.<model>.limit`` fields from the runtime config
+   files, merged FILE-BY-FILE and FIELD-BY-FIELD in the runtime's order (global → explicit →
+   project), with JSONC comments and trailing commas tolerated.
+
+The formula and constants are a faithful port of opencode **1.18.15** (extracted 2026-09-15
+from the installed binary's bundled source):
 
     OUTPUT_TOKEN_MAX = 32000                         # be.OUTPUT_TOKEN_MAX
     maxOutputTokens(model, outputTokenMax) = min(model.limit.output, outputTokenMax ?? 32000) || 32000
@@ -14,30 +28,29 @@ installed binary's bundled source):
                                  : max(0, context - maxOutputTokens(...))
     overflow = (tokens.total || input + output + cache.read + cache.write) >= usable
 
-(``SessionCompaction.isOverflow`` / ``SessionCompaction.select`` — see
-``docs/designs/current/...`` and ``scripts/session_budget.py``'s docstring for the property
-this serves. Re-derive these constants when the installed opencode version changes; the
-session row's ``version`` is carried in the provenance so a mismatch is visible.)
+The token measure deliberately EXCLUDES ``reasoning`` in the missing-``total`` case — the
+runtime's expression does; adding it over-counts (a reproduced 955K-native vs 975K-local
+divergence) and would demand compaction the runtime will not trigger.
 
-Sources of truth, in order:
-* the ACTIVE model identity — the session row's ``model`` JSON (opencode updates it when the
-  model is switched), falling back to the newest assistant message's ``providerID``/``modelID``;
-  the repository default and any child workflow model are deliberately IGNORED;
-* the model metadata — the installed opencode catalog cache (``models.json``) overlaid with
-  the runtime config's ``provider.<id>.models.<model>.limit`` overrides and the
-  ``compaction`` block (global XDG config + the session directory's project config +
-  ``OPENCODE_CONFIG``);
-* the response/compaction headroom — the runtime's own ``maxOutputTokens``/reserved formula.
+The operator override ``FINOPS_SESSION_CTX_LIMIT`` is a LOCAL POLICY cap, not a native
+trigger: it is clamped to the native usable limit (it can only move the boundary EARLIER),
+it never claims that compaction will engage, and crossing it is a policy close — native
+compaction still starts at its own threshold. (Returning ``COMPACT`` would not initiate
+compaction; only the runtime does that, at its native boundary.)
 
-Nothing here is a fallback constant: an unresolvable model or missing catalog metadata is
-``UNJUDGED`` (never a fabricated capacity, never ``OK``).
+An unresolvable model or missing metadata is ``UNJUDGED`` (never a fabricated capacity,
+never ``OK``). The post-compaction boundary is handled by the budget check
+(``scripts/session_budget.py``): the runtime skips its overflow check when the last assistant
+message is a compaction summary, and so does the check.
 """
 
 from __future__ import annotations
 
 import json
 import os
+import shutil
 import sqlite3
+import subprocess
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
@@ -54,25 +67,43 @@ OUTPUT_TOKEN_MAX_DEFAULT = 32000
 #: input limit.
 COMPACTION_RESERVED_CAP = 20000
 
-#: The advisory fraction: at/above this share of the effective limit the verdict is WARN —
+#: The advisory fraction: at/above this share of the operative limit the verdict is WARN —
 #: advisory only, never a stopping condition (the operator's 2026-09-15 context-policy change).
 WARN_FRACTION = 0.8
 
-#: Explicit, cross-surface effective-limit override (policy cap). Read by the CLI, the capsule,
-#: and the exec-boundary gate alike, so all three judge identically when it is set.
+#: Explicit, cross-surface LOCAL POLICY cap. Read by the shared resolver, so the CLI, the
+#: capsule, and the exec-boundary gate judge identically. Clamped to the native usable limit;
+#: a policy cap never masquerades as native compaction.
 EFFECTIVE_LIMIT_ENV = "FINOPS_SESSION_CTX_LIMIT"
 
 #: The runtime's response-token-ceiling override (opencode ``OPENCODE_EXPERIMENTAL_OUTPUT_TOKEN_MAX``).
 OUTPUT_TOKEN_MAX_ENV = "OPENCODE_EXPERIMENTAL_OUTPUT_TOKEN_MAX"
 
-#: The installed catalog cache override (tests point this at a fixture).
+#: The installed catalog cache override (the fallback source; tests point this at a fixture).
 MODELS_CACHE_ENV = "FINOPS_OPENCODE_MODELS_CACHE"
 
 #: The runtime config location override (opencode's own ``OPENCODE_CONFIG``).
 OPENCODE_CONFIG_ENV = "OPENCODE_CONFIG"
 
+#: The runtime binary override for the preferred limit resolution. An explicit EMPTY value
+#: disables the CLI path (the fallback then applies); unset searches PATH and ~/.opencode/bin.
+RUNTIME_BIN_ENV = "FINOPS_OPENCODE_BIN"
+
+#: The limit-source selector: ``auto`` (default — runtime CLI, then catalog fallback) or
+#: ``catalog`` (skip the CLI; deterministic for tests/hermetic environments).
+CAPACITY_SOURCE_ENV = "FINOPS_SESSION_CAPACITY_SOURCE"
+
+#: The runtime's project-config disable switch (opencode ``OPENCODE_DISABLE_PROJECT_CONFIG``).
+DISABLE_PROJECT_CONFIG_ENV = "OPENCODE_DISABLE_PROJECT_CONFIG"
+
+#: Bound on the runtime CLI call and its output (a hung/babbling child never hangs the check).
+RUNTIME_CLI_TIMEOUT_S = 15.0
+RUNTIME_CLI_MAX_OUTPUT_BYTES = 8_000_000
+
 #: The verdict vocabulary the CLI/capsule/gate share.
 VERDICTS = ("OK", "WARN", "COMPACT", "CLOSE", "UNJUDGED")
+
+_TRUTHY = {"1", "true", "True", "yes", "on"}
 
 
 @dataclass(frozen=True)
@@ -87,7 +118,12 @@ class ModelRef:
 
 @dataclass(frozen=True)
 class SessionCapacity:
-    """The resolved capacity of one session's active model."""
+    """The resolved capacity of one session's active model.
+
+    ``native_effective_limit`` is the runtime's own usable boundary (where ITS compaction
+    starts). ``effective_limit`` is the OPERATIVE boundary the judgment uses: the native limit,
+    or the operator's policy cap when one is set and lower. ``policy_limit`` names the cap.
+    """
 
     model: ModelRef
     context_limit: int | None
@@ -95,8 +131,10 @@ class SessionCapacity:
     output_limit: int | None
     response_headroom_tokens: int
     compaction_reserved_tokens: int
+    native_effective_limit: int
     effective_limit: int
     hard_limit: int
+    policy_limit: int | None = None
     warn_fraction: float = WARN_FRACTION
     compaction_enabled: bool = True
     provenance: dict[str, Any] = field(default_factory=dict)
@@ -105,6 +143,8 @@ class SessionCapacity:
         """The machine shape embedded in the budget report and the capsule."""
         return {
             "effective_limit": self.effective_limit,
+            "native_effective_limit": self.native_effective_limit,
+            "policy_limit": self.policy_limit,
             "hard_limit": self.hard_limit,
             "context_limit": self.context_limit,
             "input_limit": self.input_limit,
@@ -165,15 +205,16 @@ def effective_limit(
 def usage_context_tokens(tokens: dict[str, Any] | None) -> int | None:
     """The runtime's overflow measure for one usage sample: ``total``, else the component sum.
 
-    Returns ``None`` when the sample carries no non-zero value at all — the pending/unfinished
-    shape (keys present and zeroed, or absent), which must never read as a measured zero.
+    ``Dl``'s expression verbatim: ``tokens.total || input + output + cache.read + cache.write``
+    — ``reasoning`` is NOT in the sum (adding it over-counts; the runtime would not compact
+    where the local check would). Returns ``None`` when the sample carries no non-zero value —
+    the pending/unfinished shape, which must never read as a measured zero.
     """
     tokens = tokens or {}
     cache = tokens.get("cache") or {}
     values = (
         tokens.get("input", 0) or 0,
         tokens.get("output", 0) or 0,
-        tokens.get("reasoning", 0) or 0,
         cache.get("read", 0) or 0,
         cache.get("write", 0) or 0,
     )
@@ -187,24 +228,27 @@ def usage_context_tokens(tokens: dict[str, Any] | None) -> int | None:
         return None
     if has_total:
         return int(total)
-    return values[0] + values[1] + values[2] + values[3] + values[4]
+    return values[0] + values[1] + values[2] + values[3]
 
 
 def classify(context_tokens: int, capacity: SessionCapacity) -> str:
     """The verdict for a measured context against a resolved capacity.
 
-    * ``CLOSE``   — at/over the model's HARD context limit: the next request cannot be
-      processed; hand off to a fresh session. Also the verdict at/over the effective boundary
-      when native compaction is disabled (there is no mechanism to reduce the context).
-    * ``COMPACT`` — at/over the effective (usable) boundary: the installed runtime compacts
-      natively on the next request and the SAME session/task continues; re-evaluate after.
-    * ``WARN``    — at/over ``warn_fraction`` of the effective limit: ADVISORY only.
+    * ``CLOSE``   — at/over the model's HARD context limit (the next request cannot be
+      processed), at/over the native boundary when compaction is disabled, or at/over a LOCAL
+      POLICY cap below the native boundary (a policy cap is not a native trigger — nothing
+      will reduce the context there, so the session closes and hands off).
+    * ``COMPACT`` — at/over the NATIVE usable boundary: the installed runtime compacts on the
+      next request and the SAME session/task continues; re-evaluate after.
+    * ``WARN``    — at/over ``warn_fraction`` of the operative limit: ADVISORY only.
     * ``OK``      — below the advisory fraction.
     """
     if context_tokens >= capacity.hard_limit:
         return "CLOSE"
-    if context_tokens >= capacity.effective_limit:
+    if context_tokens >= capacity.native_effective_limit:
         return "COMPACT" if capacity.compaction_enabled else "CLOSE"
+    if capacity.policy_limit is not None and context_tokens >= capacity.policy_limit:
+        return "CLOSE"
     if context_tokens >= capacity.warn_fraction * capacity.effective_limit:
         return "WARN"
     return "OK"
@@ -311,7 +355,89 @@ def resolve_session_model(
     return None, f"session {sid!r} carries no resolved model (session.model and messages are silent)", runtime_version
 
 
-# ── metadata: the installed catalog + runtime config overlays ───────────────────
+def _session_directory(db_path: Path, session_id: str) -> str | None:
+    """The session's project directory (for the project config lookup) — best effort."""
+    try:
+        row = _read_session_row(db_path, session_id)
+    except Exception:  # noqa: BLE001 — the lookup is optional metadata
+        return None
+    directory = str((row or {}).get("directory") or "").strip()
+    return directory or None
+
+
+# ── source 1: the runtime's own resolved model metadata (preferred) ─────────────
+
+
+def _opencode_binary(env: dict[str, str]) -> str | None:
+    """The installed runtime binary: explicit env, PATH, then the conventional home install.
+
+    An explicit EMPTY ``FINOPS_OPENCODE_BIN`` disables the CLI source (the caller falls back
+    to the catalog) — the seam hermetic tests and container shapes use.
+    """
+    if RUNTIME_BIN_ENV in env:
+        explicit = str(env.get(RUNTIME_BIN_ENV) or "").strip()
+        return explicit or None
+    found = shutil.which("opencode")
+    if found:
+        return found
+    candidate = Path.home() / ".opencode" / "bin" / "opencode"
+    return str(candidate) if candidate.is_file() else None
+
+
+def _parse_models_verbose(text: str) -> dict[tuple[str, str], dict[str, Any]]:
+    """Parse ``opencode models --verbose`` output: every JSON body with a provider/model/limit."""
+    limits: dict[tuple[str, str], dict[str, Any]] = {}
+    decoder = json.JSONDecoder()
+    index = 0
+    while True:
+        start = text.find("{", index)
+        if start == -1:
+            return limits
+        try:
+            payload, end = decoder.raw_decode(text, start)
+        except ValueError:
+            index = start + 1
+            continue
+        index = end
+        if (
+            isinstance(payload, dict)
+            and payload.get("providerID")
+            and payload.get("id")
+            and isinstance(payload.get("limit"), dict)
+        ):
+            limits[(str(payload["providerID"]), str(payload["id"]))] = payload["limit"]
+    return limits
+
+
+def _run_models_verbose(
+    binary: str, provider_id: str, env: dict[str, str]
+) -> dict[tuple[str, str], dict[str, Any]] | None:
+    """The runtime's resolved models for one provider. Failure of ANY kind returns ``None``.
+
+    The child inherits the caller's environment (the runtime must see its own config/auth
+    env), with the caller's mapping overlaid. Bounded by a timeout and an output cap — a
+    hung or babbling runtime never hangs the budget check.
+    """
+    child_env = {**os.environ, **{k: str(v) for k, v in env.items() if v is not None}}
+    try:
+        proc = subprocess.run(
+            [binary, "models", provider_id, "--verbose"],
+            capture_output=True,
+            text=True,
+            timeout=RUNTIME_CLI_TIMEOUT_S,
+            env=child_env,
+        )
+    except (OSError, subprocess.SubprocessError, ValueError):
+        return None
+    if proc.returncode != 0:
+        return None
+    stdout = proc.stdout or ""
+    if len(stdout) > RUNTIME_CLI_MAX_OUTPUT_BYTES:
+        return None
+    return _parse_models_verbose(stdout)
+
+
+# ── source 2: the catalog + config overlay fallback ─────────────────────────────
 
 
 def default_models_cache(env: dict[str, str] | None = None) -> Path:
@@ -326,7 +452,7 @@ def default_models_cache(env: dict[str, str] | None = None) -> Path:
 
 
 def _strip_jsonc(text: str) -> str:
-    """Drop ``//`` and ``/* */`` comments outside strings (a .jsonc config's only extension)."""
+    """Drop ``//`` / ``/* */`` comments and trailing commas outside strings (JSONC)."""
     out: list[str] = []
     i = 0
     in_string = False
@@ -356,6 +482,15 @@ def _strip_jsonc(text: str) -> str:
             end = text.find("*/", i + 2)
             i = len(text) if end == -1 else end + 2
             continue
+        if ch == ",":
+            # A trailing comma (next non-whitespace is } or ]) is legal JSONC, invalid JSON —
+            # the runtime's parser accepts it, so the fallback must too (reviewer finding).
+            j = i + 1
+            while j < len(text) and text[j] in " \t\r\n":
+                j += 1
+            if j < len(text) and text[j] in "}]":
+                i += 1
+                continue
         out.append(ch)
         i += 1
     return "".join(out)
@@ -374,18 +509,25 @@ def _load_json_config(path: Path) -> dict[str, Any]:
 
 
 def _config_candidates(directory: str | None, env: dict[str, str]) -> list[Path]:
-    """The config files opencode merges, lowest precedence first (pragmatic subset)."""
+    """The config files opencode merges, in ITS order: global dir → explicit → project.
+
+    opencode 1.18.15's loader (``Config.loadInstanceState``) merges the global config dir
+    first, then ``OPENCODE_CONFIG`` (tagged global), then the project config — so a project
+    setting WINS over the explicit file (reviewer finding; the previous order had it
+    backwards). ``OPENCODE_DISABLE_PROJECT_CONFIG`` is honored.
+    """
     candidates: list[Path] = []
     xdg = str(env.get("XDG_CONFIG_HOME") or "").strip()
     config_home = Path(xdg).expanduser() if xdg else Path.home() / ".config"
-    for name in ("opencode.json", "opencode.jsonc"):
+    for name in ("config.json", "opencode.json", "opencode.jsonc"):
         candidates.append(config_home / "opencode" / name)
-    if directory:
-        for name in ("opencode.json", "opencode.jsonc"):
-            candidates.append(Path(directory) / name)
     explicit = str(env.get(OPENCODE_CONFIG_ENV) or "").strip()
     if explicit:
         candidates.append(Path(explicit).expanduser())
+    disabled = str(env.get(DISABLE_PROJECT_CONFIG_ENV) or "") in _TRUTHY
+    if directory and not disabled:
+        for name in ("opencode.json", "opencode.jsonc"):
+            candidates.append(Path(directory) / name)
     return candidates
 
 
@@ -395,8 +537,10 @@ def load_runtime_config(
     """The merged config subset that shapes capacity: per-model ``limit`` + ``compaction``.
 
     Returns ``{"limits": {(provider, model): {context, input, output}}, "compaction": {...},
-    "sources": [...]}``. Only the keys the formula consumes are merged; the authoritative
-    resolver remains the installed runtime's own.
+    "sources": [...]}``. Files merge in the runtime's order and limits merge FIELD-BY-FIELD
+    across files (a project file overriding only ``output`` keeps the inherited ``context`` —
+    reviewer finding). Only the keys the formula consumes are merged; the authoritative
+    resolver remains the runtime's own CLI (source 1).
     """
     source = os.environ if env is None else env
     limits: dict[tuple[str, str], dict[str, Any]] = {}
@@ -417,12 +561,13 @@ def load_runtime_config(
                     continue
                 for model_id, model in models.items():
                     limit = (model or {}).get("limit") if isinstance(model, dict) else None
-                    if isinstance(limit, dict):
-                        limits[(str(provider_id), str(model_id))] = {
-                            key: limit[key]
-                            for key in ("context", "input", "output")
-                            if isinstance(limit.get(key), (int, float))
-                        }
+                    if not isinstance(limit, dict):
+                        continue
+                    entry = limits.setdefault((str(provider_id), str(model_id)), {})
+                    for key in ("context", "input", "output"):
+                        value = limit.get(key)
+                        if isinstance(value, (int, float)) and not isinstance(value, bool):
+                            entry[key] = value
         block = payload.get("compaction")
         if isinstance(block, dict):
             compaction.update(block)
@@ -467,6 +612,19 @@ def _positive_int(value: Any) -> int | None:
     return value if value > 0 else None
 
 
+def _merge_limits(*layers: dict[str, Any] | None) -> dict[str, Any]:
+    """Field-by-field merge (later layers win per field, never wholesale)."""
+    merged: dict[str, Any] = {}
+    for layer in layers:
+        if not layer:
+            continue
+        for key in ("context", "input", "output"):
+            value = layer.get(key)
+            if isinstance(value, (int, float)) and not isinstance(value, bool):
+                merged[key] = value
+    return merged
+
+
 def resolve_capacity(
     db_path: Path | str,
     session_id: str,
@@ -477,9 +635,10 @@ def resolve_capacity(
     """Resolve the session's usable capacity. ``(capacity, reason, model)``.
 
     ``capacity is None`` means UNJUDGED (with ``reason`` naming the gap): an unresolvable
-    model identity, a catalog with no metadata for it, or a model whose context limit is
-    zero (the runtime disables its overflow check there — capacity is unknown, never
-    infinite). The model is returned even on failure so the report can name what it saw.
+    model identity, no metadata from the runtime CLI or the catalog+config fallback, or a
+    model whose context limit is zero (the runtime disables its overflow check there —
+    capacity is unknown, never infinite). The model is returned even on failure so the
+    report can name what it saw.
     """
     source = os.environ if env is None else env
     path = Path(db_path)
@@ -487,21 +646,34 @@ def resolve_capacity(
     if model is None:
         return None, model_reason, None
 
-    config = load_runtime_config(directory=_session_directory(path, session_id), env=source)
+    directory = _session_directory(path, session_id)
+    config = load_runtime_config(directory=directory, env=source)
+
+    # Source 1: the runtime's own resolved metadata (preferred). Source 2: the documented
+    # catalog + config fallback. Limits merge FIELD-BY-FIELD across both when both exist.
+    limit_source = "catalog+config"
+    runtime_limits: dict[str, Any] | None = None
+    if str(source.get(CAPACITY_SOURCE_ENV) or "auto").strip().lower() != "catalog":
+        binary = _opencode_binary(source)
+        if binary:
+            resolved = _run_models_verbose(binary, model.provider_id, source)
+            if resolved is not None:
+                runtime_limits = resolved.get((model.provider_id, model.model_id))
+                if runtime_limits:
+                    limit_source = f"opencode-cli:{binary}"
+
     catalog_path = Path(cache_path) if cache_path else default_models_cache(source)
     catalog = load_models_cache(catalog_path) if catalog_path else None
-
-    catalog_limit = _catalog_limit(catalog, model) if catalog else None
+    catalog_limits = _catalog_limit(catalog, model) if catalog else None
     overlay = config["limits"].get((model.provider_id, model.model_id)) or {}
-    merged: dict[str, Any] = dict(catalog_limit or {})
-    merged.update({k: v for k, v in overlay.items() if v is not None})
+    merged = _merge_limits(catalog_limits, overlay, runtime_limits)
     context_limit = _positive_int(merged.get("context"))
     if context_limit is None:
         return (
             None,
-            f"no installed metadata for {model.provider_id}/{model.model_id} "
-            f"(catalog {catalog_path} + runtime config carry no context limit) — capacity "
-            f"cannot be resolved",
+            f"no installed metadata for {model.provider_id}/{model.model_id} (runtime CLI "
+            f"unavailable or silent; catalog {catalog_path} + runtime config carry no context "
+            f"limit) — capacity cannot be resolved",
             model,
         )
 
@@ -519,7 +691,7 @@ def resolve_capacity(
     )
     compaction_enabled = compaction_block.get("auto") is not False
 
-    computed = effective_limit(
+    native = effective_limit(
         context_limit=context_limit,
         input_limit=input_limit,
         output_limit=output_limit,
@@ -527,7 +699,8 @@ def resolve_capacity(
         reserved=reserved,
     )
     override = _positive_int(source.get(EFFECTIVE_LIMIT_ENV))
-    effective = override if override is not None else computed
+    policy = min(override, native) if override is not None else None
+    effective = policy if policy is not None else native
     if effective <= 0:
         return (
             None,
@@ -542,13 +715,14 @@ def resolve_capacity(
         "runtime_version": runtime_version or None,
         "version_match": bool(runtime_version) and runtime_version == FORMULA_VERSION,
         "model_source": model.source,
+        "limits_source": limit_source,
         "catalog_source": str(catalog_path) if catalog_path else None,
         "config_sources": config["sources"],
         "output_token_max_source": (
             f"{OUTPUT_TOKEN_MAX_ENV}" if output_token_max is not None else f"default:{OUTPUT_TOKEN_MAX_DEFAULT}"
         ),
         "effective_limit_source": (
-            f"{EFFECTIVE_LIMIT_ENV}" if override is not None else "resolved-model-capacity"
+            f"{EFFECTIVE_LIMIT_ENV}(policy)" if policy is not None else "resolved-model-capacity"
         ),
         "compaction": {
             "auto": compaction_enabled,
@@ -565,22 +739,14 @@ def resolve_capacity(
         compaction_reserved_tokens=(
             reserved if reserved is not None else min(COMPACTION_RESERVED_CAP, headroom)
         ),
+        native_effective_limit=native,
         effective_limit=effective,
         hard_limit=context_limit,
+        policy_limit=policy,
         compaction_enabled=compaction_enabled,
         provenance=provenance,
     )
     return capacity, "", model
-
-
-def _session_directory(db_path: Path, session_id: str) -> str | None:
-    """The session's project directory (for the project config lookup) — best effort."""
-    try:
-        row = _read_session_row(db_path, session_id)
-    except Exception:  # noqa: BLE001 — the lookup is optional metadata
-        return None
-    directory = str((row or {}).get("directory") or "").strip()
-    return directory or None
 
 
 def utc_now() -> str:
@@ -588,6 +754,7 @@ def utc_now() -> str:
 
 
 __all__ = [
+    "CAPACITY_SOURCE_ENV",
     "COMPACTION_RESERVED_CAP",
     "EFFECTIVE_LIMIT_ENV",
     "FORMULA_VERSION",
@@ -595,6 +762,7 @@ __all__ = [
     "ModelRef",
     "OUTPUT_TOKEN_MAX_DEFAULT",
     "OUTPUT_TOKEN_MAX_ENV",
+    "RUNTIME_BIN_ENV",
     "SessionCapacity",
     "VERDICTS",
     "WARN_FRACTION",

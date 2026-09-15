@@ -9,32 +9,36 @@ that constant with the ACTIVE session model's resolved capacity:
     agentic-dynamics session budget                        # human verdict
     agentic-dynamics session budget --json                 # machine surface: session-budget/v2
 
-Judgment (context = the installed runtime's own overflow measure on the LAST COMPLETED
+Judgment (context = the installed runtime's OWN overflow measure on the LAST COMPLETED
 assistant usage sample — ``tokens.total``, else ``input + output + cache read + cache write``;
-turns = assistant messages so far, TELEMETRY ONLY — message count is never a stopping
-condition):
+``reasoning`` is NOT in the sum, matching the runtime exactly; turns = assistant messages so
+far, TELEMETRY ONLY — message count is never a stopping condition):
 
-* ``OK``      — below the advisory fraction of the effective limit: keep working.
-* ``WARN``    — at/above 80% of the effective limit: ADVISORY. Informational; not a stopping
+* ``OK``      — below the advisory fraction of the operative limit: keep working. Also the
+  named POST-COMPACTION state: when the last assistant message is a completed compaction
+  summary, the runtime skips its overflow check and continues from the compacted context —
+  the pre-compaction reading is stale and must not block the first resumed work; the check
+  mirrors the runtime and re-measures with the next completed sample.
+* ``WARN``    — at/above 80% of the operative limit: ADVISORY. Informational; not a stopping
   condition; never a reason to refuse new work.
-* ``COMPACT`` — at/above the effective (usable) boundary: the installed runtime compacts
-  natively on the next request and the SAME session/task continues. Do not close; re-evaluate
-  against the reduced context afterward. (When the runtime's native compaction is disabled,
-  no mechanism can reduce the context and the verdict is CLOSE instead.)
-* ``CLOSE``   — at/over the model's HARD context limit: the next request cannot be processed;
-  close and hand off to a fresh session.
+* ``COMPACT`` — at/above the NATIVE usable boundary: the installed runtime compacts natively
+  on the next request and the SAME session/task continues. Do not close; re-evaluate against
+  the reduced context afterward. (When the runtime's native compaction is disabled, no
+  mechanism can reduce the context and the verdict is CLOSE instead.)
+* ``CLOSE``   — at/over the model's HARD context limit (the next request cannot be processed),
+  or at/over a LOCAL POLICY cap below the native boundary (``FINOPS_SESSION_CTX_LIMIT`` —
+  a policy cap is not a native trigger, so nothing will reduce the context; close and hand
+  off).
 * ``UNJUDGED`` — the session/model/capacity cannot be measured. Exit code 1, deliberately: an
   unknown budget is never treated as unlimited (the same rule as unknown cost) — and never as
   a fabricated OK.
 
-Capacity is resolved by ``agentic_dynamics.core.session_capacity`` — the ported
-opencode-1.18.15 calculation (the runtime's own ``maxOutputTokens``/compaction-reserve
-formula), fed by the ACTIVE model recorded on the session row (the repository default and any
-child workflow model are deliberately ignored), the installed catalog cache, and the runtime
-config overlays. That module is shared by this CLI, the capsule (``session_open.py``), and the
-fleet exec-boundary gate (``scripts/fleet/spawn_wrapper.py``), so all three return the SAME
-resolution and judgment. The explicit operator override ``FINOPS_SESSION_CTX_LIMIT`` is read
-by the same module, so an override is consistent across all three surfaces.
+Capacity is resolved by ``agentic_dynamics.core.session_capacity``: the installed runtime's
+own CLI resolution first (``opencode models --verbose``), the catalog+config fallback second —
+the same resolution the capsule (``session_open.py``) and the fleet exec-boundary gate
+(``scripts/fleet/spawn_wrapper.py``) consume, so all three return the SAME judgment. The
+operator override ``FINOPS_SESSION_CTX_LIMIT`` is a clamped LOCAL POLICY cap read by the same
+resolver.
 
 Identity (unchanged): the session under judgment is the EXPLICIT one — ``--session-id``, else
 ``FINOPS_SESSION_ID``. There is NO most-recently-updated fallback; an absent identity and a
@@ -43,6 +47,9 @@ nonexistent id are both UNJUDGED (exit 1) with a reason.
 Measurement (the zero-overwrite fix, unchanged): an unfinished assistant message (no tokens
 block, or the pending all-zero shape) must never overwrite a valid reading with zero — the
 reading falls back to the most recent COMPLETED sample and carries ``usage_incomplete: true``.
+A completed COMPACTION SUMMARY is never a context sample (its usage describes the summary
+generation call over the old conversation, not the new context); it marks the post-compaction
+state instead.
 
 Exit codes: 0 = OK, 1 = WARN (advisory) / UNJUDGED, 2 = COMPACT (native compaction expected;
 re-evaluate after), 3 = CLOSE (close now). Every judgment appends one line to the session-budget
@@ -106,18 +113,26 @@ def _session_exists(db_path: Path, session_id: str) -> bool:
         con.close()
 
 
-def _measure(db_path: Path, session_id: str) -> tuple[int, int, bool]:
-    """``(turns, context, usage_incomplete)`` for the session.
+def _measure(db_path: Path, session_id: str) -> tuple[int, int, bool, bool]:
+    """``(turns, context, usage_incomplete, post_compaction)`` for the session.
 
-    ``context`` — the installed runtime's overflow measure on the LAST COMPLETED assistant
-    usage sample (``tokens.total``, else ``input + output + cache read + cache write``). A
-    sample is COMPLETED only when it carries a NON-ZERO value: OpenCode initializes a pending
-    message's usage fields to ZERO before the turn finalizes, so keys-present-but-all-zero is
-    the real pending shape — treating it as completed is exactly the zero-overwrite bug (Astra
-    finding, 2026-09-14: a 240,000 reading followed by a pending zero-valued message measured
-    0/OK). Both shapes — absent fields and all-zero fields — leave the reading untouched and
-    set ``usage_incomplete``. A session with no completed sample reads (0, 0, True) — an
-    honest "nothing measurable", flagged, never a silent zero.
+    ``context`` — the installed runtime's overflow measure on the LAST COMPLETED non-summary
+    assistant usage sample (``tokens.total``, else ``input + output + cache read + cache
+    write``; ``reasoning`` excluded, matching the runtime). A sample is COMPLETED only when it
+    carries a NON-ZERO value: OpenCode initializes a pending message's usage fields to ZERO
+    before the turn finalizes, so keys-present-but-all-zero is the real pending shape —
+    treating it as completed is exactly the zero-overwrite bug (Astra finding, 2026-09-14).
+    Both shapes — absent fields and all-zero fields — leave the reading untouched and set
+    ``usage_incomplete``.
+
+    ``post_compaction`` — the LAST assistant message is a COMPLETED compaction summary
+    (``summary: true`` plus non-zero usage or a finish; the runtime's pairing marks:
+    ``summary && finish && !error``). The runtime SKIPS its overflow check for that message
+    (its run loop guards ``he.summary !== true``) and continues from the compacted context;
+    the summary's own usage describes the summary GENERATION call over the old conversation,
+    so it must never be read as the new context — and the stale pre-compaction reading must
+    not resurrect and block the first resumed turn (reviewer reproduction, 2026-09-15). A
+    completed non-summary sample CLEARS the state; a pending turn does not.
     """
     con = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
     try:
@@ -129,6 +144,7 @@ def _measure(db_path: Path, session_id: str) -> tuple[int, int, bool]:
         turns = 0
         context = 0
         usage_incomplete = False
+        compaction_done = False
         for (blob,) in cur.fetchall():
             try:
                 data = json.loads(blob)
@@ -138,11 +154,21 @@ def _measure(db_path: Path, session_id: str) -> tuple[int, int, bool]:
                 continue
             turns += 1
             measured = sc.usage_context_tokens(data.get("tokens"))
+            if data.get("summary") is True:
+                # A compaction summary is NEVER a context sample. Completed (non-zero usage
+                # or a finish) marks the post-compaction boundary; the pending all-zero shape
+                # (opencode creates it that way, then fills it) marks the in-flight boundary.
+                if measured is not None or data.get("finish"):
+                    compaction_done = True
+                else:
+                    usage_incomplete = True
+                continue
             if measured is None:
                 usage_incomplete = True
-                continue
+                continue  # a pending turn never clears the post-compaction state
             context = measured
-        return turns, context, usage_incomplete
+            compaction_done = False  # a fresh completed sample is the current context
+        return turns, context, usage_incomplete, compaction_done
     finally:
         con.close()
 
@@ -154,8 +180,9 @@ def _resolve(
 
     ``status`` is one of ``"measured"`` (context + capacity available), ``"initial"`` (no
     assistant message yet — the named exception), ``"unmeasured"`` (a session whose every
-    sample is pending), or ``"unresolved"`` (identity/capacity gaps). The caller decides the
-    verdict shape, so the CLI and the gate can never disagree about WHAT was measured.
+    sample is pending), or ``"unresolved"`` (identity/capacity gaps, INCLUDING an unreadable
+    database — the whole body is inside the shared error boundary, so a corrupt database
+    yields a structured UNJUDGED, never a crash: reviewer finding 2026-09-15).
     """
     source = os.environ if env is None else env
     result: dict = {
@@ -164,49 +191,56 @@ def _resolve(
         "turns": 0,
         "context_tokens": 0,
         "usage_incomplete": False,
+        "post_compaction": False,
         "capacity": None,
         "model": None,
         "reason": "",
     }
-    path = Path(db_path)
-    if not path.is_file():
-        result["reason"] = f"session db {path} not found"
-        return result
-    sid = (session_id or "").strip()
-    if not sid:
-        result["reason"] = f"no session identity supplied (--session-id or {SESSION_ID_ENV})"
-        return result
-    if not _session_exists(path, sid):
-        result["reason"] = f"session {sid!r} does not exist in {path}"
-        return result
     try:
-        turns, context, incomplete = _measure(path, sid)
-    except Exception as exc:  # noqa: BLE001 — an unreadable measurement is never OK
+        path = Path(db_path)
+        if not path.is_file():
+            result["reason"] = f"session db {path} not found"
+            return result
+        sid = (session_id or "").strip()
+        if not sid:
+            result["reason"] = f"no session identity supplied (--session-id or {SESSION_ID_ENV})"
+            return result
+        if not _session_exists(path, sid):
+            result["reason"] = f"session {sid!r} does not exist in {path}"
+            return result
+        turns, context, incomplete, post_compaction = _measure(path, sid)
+        result.update({
+            "turns": turns,
+            "context_tokens": context,
+            "usage_incomplete": bool(incomplete),
+            "post_compaction": bool(post_compaction),
+        })
+        if turns == 0:
+            result["status"] = "initial"
+            result["reason"] = "initial session: no usage recorded yet"
+            return result
+        if incomplete and context == 0 and not post_compaction:
+            result["status"] = "unmeasured"
+            result["reason"] = "no usable measurement: every recorded usage sample is pending/incomplete"
+            return result
+        capacity, capacity_reason, model = sc.resolve_capacity(path, sid, env=source)
+        if model is not None:
+            result["model"] = {
+                "provider_id": model.provider_id,
+                "model_id": model.model_id,
+                "variant": model.variant,
+                "source": model.source,
+            }
+        if capacity is None:
+            result["reason"] = capacity_reason
+            return result
+        result["status"] = "measured"
+        result["capacity"] = capacity
+        return result
+    except Exception as exc:  # noqa: BLE001 — an unreadable budget is UNJUDGED, never OK
+        result["status"] = "unresolved"
         result["reason"] = f"{type(exc).__name__}: {exc}"
         return result
-    result.update({"turns": turns, "context_tokens": context, "usage_incomplete": bool(incomplete)})
-    if turns == 0:
-        result["status"] = "initial"
-        result["reason"] = "initial session: no usage recorded yet"
-        return result
-    if incomplete and context == 0:
-        result["status"] = "unmeasured"
-        result["reason"] = "no usable measurement: every recorded usage sample is pending/incomplete"
-        return result
-    capacity, capacity_reason, model = sc.resolve_capacity(path, sid, env=source)
-    if model is not None:
-        result["model"] = {
-            "provider_id": model.provider_id,
-            "model_id": model.model_id,
-            "variant": model.variant,
-            "source": model.source,
-        }
-    if capacity is None:
-        result["reason"] = capacity_reason
-        return result
-    result["status"] = "measured"
-    result["capacity"] = capacity
-    return result
 
 
 def _verdict_for(resolved: dict) -> tuple[str, str, dict]:
@@ -214,38 +248,56 @@ def _verdict_for(resolved: dict) -> tuple[str, str, dict]:
     status = resolved.get("status")
     if status == "initial":
         return "OK", str(resolved.get("reason") or ""), {}
-    if status == "unmeasured":
-        return "UNJUDGED", str(resolved.get("reason") or ""), {}
     if status != "measured":
         return "UNJUDGED", str(resolved.get("reason") or "capacity unresolved"), {}
     capacity = resolved["capacity"]
+    if resolved.get("post_compaction"):
+        # Mirrors the runtime: the overflow check is skipped for a completed compaction
+        # summary; the session continues from the replaced context and re-measures.
+        return (
+            "OK",
+            "post-compaction: the completed compaction summary replaced the native context; "
+            "the runtime skips its overflow check for the summary and the session continues — "
+            "the pre-compaction reading is not the current context; measurement resumes with "
+            "the next completed sample",
+            capacity.as_dict(),
+        )
     context = int(resolved["context_tokens"])
     verdict = sc.classify(context, capacity)
     reason = ""
     if verdict == "WARN":
         reason = (
-            f"advisory: context {context:,} >= {capacity.warn_fraction:.0%} of effective limit "
-            f"{capacity.effective_limit:,} — informational, not a stopping condition"
+            f"advisory: context {context:,} >= {capacity.warn_fraction:.0%} of the operative "
+            f"limit {capacity.effective_limit:,} — informational, not a stopping condition"
         )
     elif verdict == "COMPACT":
         reason = (
-            f"at the native compaction boundary: context {context:,} >= effective limit "
-            f"{capacity.effective_limit:,} (hard {capacity.hard_limit:,}) — the installed "
-            f"runtime compacts natively on the next request and this session continues; "
-            f"re-evaluate against the reduced context"
-        )
-    elif verdict == "CLOSE" and not capacity.compaction_enabled:
-        reason = (
-            f"context {context:,} >= effective limit {capacity.effective_limit:,} and native "
-            f"compaction is disabled (compaction.auto=false) — no mechanism reduces the "
-            f"context; close and hand off"
+            f"at the native compaction boundary: context {context:,} >= native usable "
+            f"{capacity.native_effective_limit:,} (hard {capacity.hard_limit:,}) — the "
+            f"installed runtime compacts natively on the next request and this session "
+            f"continues; re-evaluate against the reduced context"
         )
     elif verdict == "CLOSE":
-        reason = (
-            f"context {context:,} >= the model's hard context limit {capacity.hard_limit:,} — "
-            f"the next request cannot be processed; close and hand off to a fresh session"
-        )
-    if resolved.get("usage_incomplete"):
+        if context >= capacity.hard_limit:
+            reason = (
+                f"context {context:,} >= the model's hard context limit "
+                f"{capacity.hard_limit:,} — the next request cannot be processed; close and "
+                f"hand off to a fresh session"
+            )
+        elif not capacity.compaction_enabled:
+            reason = (
+                f"context {context:,} >= native usable {capacity.native_effective_limit:,} and "
+                f"native compaction is disabled (compaction.auto=false) — no mechanism reduces "
+                f"the context; close and hand off"
+            )
+        else:
+            reason = (
+                f"context {context:,} >= the LOCAL POLICY limit "
+                f"{capacity.policy_limit:,} ({sc.EFFECTIVE_LIMIT_ENV}; native compaction "
+                f"starts at {capacity.native_effective_limit:,}) — a policy limit is not a "
+                f"native trigger, so nothing reduces the context there; close and hand off"
+            )
+    if resolved.get("usage_incomplete") and not resolved.get("post_compaction"):
         suffix = "usage incomplete — last completed sample used"
         reason = f"{reason}; {suffix}" if reason else suffix
     return verdict, reason, capacity.as_dict()
@@ -272,6 +324,9 @@ def measure_verdict(
       measurement: ``UNJUDGED`` with a named reason — never a silent 0/OK.
     * a session whose active model or capacity cannot be resolved is ``UNJUDGED`` — never a
       fabricated capacity, never OK.
+    * a session whose last assistant message is a completed compaction summary is ``OK`` with
+      the named post-compaction reason (mirroring the runtime, which skips its overflow check
+      there) — the first resumed work is not blocked by the stale pre-compaction reading.
     * otherwise the shared capacity judgment.
 
     The judged session is the EXPLICIT identity; there is no most-recently-updated fallback.
@@ -326,10 +381,11 @@ def main(argv: list[str] | None = None) -> int:
                     "reason": f"session db {db_path} not found" if not db_path.is_file()
                     else f"no session identity supplied — pass --session-id or export {SESSION_ID_ENV}",
                     "turns": 0, "context_tokens": 0, "usage_incomplete": False,
-                    "capacity": None, "model": None}
+                    "post_compaction": False, "capacity": None, "model": None}
     verdict, reason, capacity_block = _verdict_for(resolved)
     capacity_obj = resolved.get("capacity")
     capacity_valid = capacity_obj is not None
+    post_compaction = bool(resolved.get("post_compaction")) and verdict == "OK"
 
     now = sc.utc_now()
     result: dict = {
@@ -339,12 +395,14 @@ def main(argv: list[str] | None = None) -> int:
         "turns": int(resolved.get("turns") or 0),
         "context_tokens": int(resolved.get("context_tokens") or 0),
         "usage_incomplete": bool(resolved.get("usage_incomplete")) and verdict != "UNJUDGED",
+        "post_compaction": post_compaction,
         "verdict": verdict,
         "reason": reason,
         "model": resolved.get("model"),
         "capacity": capacity_block or None,
         "remaining_tokens": (
-            max(0, capacity_obj.effective_limit - int(resolved["context_tokens"]))
+            None if post_compaction
+            else max(0, capacity_obj.effective_limit - int(resolved["context_tokens"]))
             if capacity_valid else None
         ),
         "provenance": capacity_obj.provenance if capacity_valid else {},
@@ -367,12 +425,19 @@ def _render_human(result: dict) -> str:
     identity = (
         f"{model.get('provider_id')}/{model.get('model_id')}" if model.get("provider_id") else "model unresolved"
     )
-    if capacity.get("effective_limit"):
+    if result.get("post_compaction"):
+        budget = (
+            f"post-compaction (pre-compaction reading {result['context_tokens']:,}; "
+            f"measurement resumes with the next completed sample)"
+        )
+    elif capacity.get("effective_limit"):
         budget = (
             f"context {result['context_tokens']:,}/{capacity['effective_limit']:,} "
             f"(hard {capacity['hard_limit']:,}; response headroom "
             f"{capacity['response_headroom_tokens']:,}; compaction reserve "
-            f"{capacity['compaction_reserved_tokens']:,})"
+            f"{capacity['compaction_reserved_tokens']:,}"
+            + (f"; policy {capacity['policy_limit']:,}" if capacity.get("policy_limit") else "")
+            + ")"
         )
     else:
         budget = f"context {result['context_tokens']:,} (capacity unresolved)"
