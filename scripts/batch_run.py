@@ -51,6 +51,18 @@ def cell_done(title):
     db.close()
     return r is not None
 
+def _opencode_cmd(title, workdir, prompt) -> list[str]:
+    """The argv for one batch cell — the build profile is selected EXPLICITLY (Unit B): the
+    project's default agent is the AIO coordinator, and a cell is an ordinary worker."""
+    return [
+        OPENCODE_BIN, "run",
+        "--agent", "build",
+        "--model", MODEL, "--title", title,
+        "--format", "json", "--auto",
+        "--dir", workdir, prompt,
+    ]
+
+
 def run_experiment(config_name, operator="baseline", silent=None):
     """Run one experiment cell via opencode subprocess."""
     task, constraints, exp_name = get_task(config_name)
@@ -76,12 +88,10 @@ def run_experiment(config_name, operator="baseline", silent=None):
     os.makedirs(workdir, exist_ok=True)
 
     t0 = time.monotonic()
-    r = subprocess.run([
-        OPENCODE_BIN, "run",
-        "--model", MODEL, "--title", title,
-        "--format", "json", "--auto",
-        "--dir", workdir, prompt,
-    ], capture_output=True, text=True, timeout=TIMEOUT, stdin=subprocess.DEVNULL)
+    r = subprocess.run(
+        _opencode_cmd(title, workdir, prompt),
+        capture_output=True, text=True, timeout=TIMEOUT, stdin=subprocess.DEVNULL,
+    )
     elapsed = time.monotonic() - t0
 
     db = sqlite3.connect(str(OPENSCODE_DB))
@@ -106,37 +116,42 @@ CONFIGS = [
     "factorial_compound.yaml", "fastapi_maintenance.yaml",
 ]
 
-print("=== BATCH DEEPSEEK EXPERIMENTS ===")
-print(f"Model: {MODEL}")
-print(f"Configs: {len(CONFIGS)}")
-print("Launching in parallel (max 3 concurrent)...")
-print()
+def main() -> None:
+    print("=== BATCH DEEPSEEK EXPERIMENTS ===")
+    print(f"Model: {MODEL}")
+    print(f"Configs: {len(CONFIGS)}")
+    print("Launching in parallel (max 3 concurrent)...")
+    print()
 
-results = []
-with ThreadPoolExecutor(max_workers=3) as ex:
-    futures = {ex.submit(run_experiment, c): c for c in CONFIGS}
-    for f in as_completed(futures):
-        r = f.result()
-        c = futures[f]
-        icon = "✓" if r["status"] == "ok" else "⊘" if r["status"] == "skip" else "✗"
-        cost_str = f"${r.get('cost',0):.4f}" if r["status"] == "ok" else "-"
-        tok_str = f"{r.get('tok',0):,}tok" if r["status"] == "ok" else "-"
-        print(f"  {icon} {c[:30]:<30} {cost_str:>10} {tok_str:>10} ({r['dur']:.0f}s) {r['status']}")
-        results.append(r)
+    results = []
+    with ThreadPoolExecutor(max_workers=3) as ex:
+        futures = {ex.submit(run_experiment, c): c for c in CONFIGS}
+        for f in as_completed(futures):
+            r = f.result()
+            c = futures[f]
+            icon = "✓" if r["status"] == "ok" else "⊘" if r["status"] == "skip" else "✗"
+            cost_str = f"${r.get('cost',0):.4f}" if r["status"] == "ok" else "-"
+            tok_str = f"{r.get('tok',0):,}tok" if r["status"] == "ok" else "-"
+            print(f"  {icon} {c[:30]:<30} {cost_str:>10} {tok_str:>10} ({r['dur']:.0f}s) {r['status']}")
+            results.append(r)
 
-# Summary
-ok = sum(1 for r in results if r["status"] == "ok")
-skipped = sum(1 for r in results if r["status"] == "skip")
-failed = sum(1 for r in results if r["status"] != "ok" and r["status"] != "skip")
-total_cost = sum(r.get("cost",0) for r in results if r["status"] == "ok")
+    # Summary
+    ok = sum(1 for r in results if r["status"] == "ok")
+    skipped = sum(1 for r in results if r["status"] == "skip")
+    failed = sum(1 for r in results if r["status"] != "ok" and r["status"] != "skip")
+    total_cost = sum(r.get("cost",0) for r in results if r["status"] == "ok")
 
-print(f"\nDone: {ok} ok, {skipped} skipped, {failed} failed")
-print(f"Total cost: ${total_cost:.4f}")
+    print(f"\nDone: {ok} ok, {skipped} skipped, {failed} failed")
+    print(f"Total cost: ${total_cost:.4f}")
 
-# Save results
-import json
+    # Save results
+    import json
 
-out_path = "/tmp/batch_deepseek_results.json"
-with open(out_path, "w") as f:
-    json.dump(results, f, indent=2, default=str)
-print(f"Results: {out_path}")
+    out_path = "/tmp/batch_deepseek_results.json"
+    with open(out_path, "w") as f:
+        json.dump(results, f, indent=2, default=str)
+    print(f"Results: {out_path}")
+
+
+if __name__ == "__main__":
+    main()

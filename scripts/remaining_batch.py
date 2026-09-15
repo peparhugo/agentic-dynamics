@@ -51,6 +51,18 @@ def get_session(title):
     conn.close()
     return r
 
+def _opencode_cmd(model_id, title, workdir, prompt) -> list[str]:
+    """The argv for one batch cell — the build profile is selected EXPLICITLY (Unit B): the
+    project's default agent is the AIO coordinator, and a cell is an ordinary worker."""
+    return [
+        OPENCODE_BIN, "run",
+        "--agent", "build",
+        "--model", model_id, "--title", title,
+        "--format", "json", "--auto", "--dir", workdir,
+        prompt,
+    ]
+
+
 def run_cell(model_id, title, config_file, timeout=400):
     if cell_done(title):
         print(f"SKIP: {title}")
@@ -64,12 +76,10 @@ def run_cell(model_id, title, config_file, timeout=400):
     print(f"RUN: {title}", flush=True)
     t0 = time.monotonic()
     try:
-        subprocess.run([
-            OPENCODE_BIN, "run",
-            "--model", model_id, "--title", title,
-            "--format", "json", "--auto", "--dir", workdir,
-            prompt,
-        ], capture_output=True, text=True, timeout=timeout, stdin=subprocess.DEVNULL)
+        subprocess.run(
+            _opencode_cmd(model_id, title, workdir, prompt),
+            capture_output=True, text=True, timeout=timeout, stdin=subprocess.DEVNULL,
+        )
     except subprocess.TimeoutExpired:
         print(f"  TIMEOUT after {timeout}s")
         return
@@ -91,10 +101,6 @@ BATCH1 = [
     ("openai/gpt-5-mini", "[batch:task_manager:baseline] gpt_5_mini", "task_manager.yaml", 600),
 ]
 
-print("=== BATCH 1: GPT-5.6 + GPT-5-mini cross-domain ===")
-for model, title, cfg, timeout in BATCH1:
-    run_cell(model, title, cfg, timeout)
-
 # Batch 2: Claude cross-domain (3 key configs)
 BATCH2 = [
     ("anthropic/claude-fable-5", "[batch:task_manager:baseline] claude_fable_5", "task_manager.yaml", 600),
@@ -102,8 +108,18 @@ BATCH2 = [
     ("anthropic/claude-fable-5", "[batch:collaborative_editor:baseline] claude_fable_5", "collaborative_editor.yaml", 400),
 ]
 
-print("\n=== BATCH 2: Claude cross-domain ===")
-for model, title, cfg, timeout in BATCH2:
-    run_cell(model, title, cfg, timeout)
 
-print("\n=== ALL DONE ===")
+def main() -> None:
+    print("=== BATCH 1: GPT-5.6 + GPT-5-mini cross-domain ===")
+    for model, title, cfg, timeout in BATCH1:
+        run_cell(model, title, cfg, timeout)
+
+    print("\n=== BATCH 2: Claude cross-domain ===")
+    for model, title, cfg, timeout in BATCH2:
+        run_cell(model, title, cfg, timeout)
+
+    print("\n=== ALL DONE ===")
+
+
+if __name__ == "__main__":
+    main()

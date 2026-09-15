@@ -12,21 +12,42 @@
  *   output = json.loads(result.stdout)
  */
 
-import { fileURLToPath } from "node:url"
+import { fileURLToPath, pathToFileURL } from "node:url"
 import path from "node:path"
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const projectRoot = path.resolve(__dirname, "..")
 
-// Resolve SDK from .opencode/node_modules (where opencode installs it)
-const sdkEntry = path.join(
-  projectRoot,
-  ".opencode", "node_modules", "@opencode-ai", "sdk",
-  "dist", "v2", "index.js",
-)
-const { createOpencode } = await import(sdkEntry)
+// The SDK is resolved and imported INSIDE main(): importing this module (tests, tooling)
+// must not require a checkout with `.opencode/node_modules` installed.
+
+/**
+ * The prompt request for one bridge call. `agent` is ALWAYS explicit (Unit B): the project
+ * default is the AIO coordinator, and a bridge call is an ordinary worker — `input.agent`
+ * may select a specialized profile, otherwise the build profile is pinned.
+ */
+export function buildPromptParams({ sessionID, providerID, modelID, prompt, schema, agent }) {
+  const params = {
+    sessionID,
+    agent: agent || "build",
+    model: { providerID, modelID },
+    parts: [{ type: "text", text: prompt }],
+  }
+  if (schema) {
+    params.format = { type: "json_schema", schema }
+  }
+  return params
+}
 
 async function main() {
+  // Resolve + import the SDK from .opencode/node_modules (where opencode installs it).
+  const sdkEntry = path.join(
+    projectRoot,
+    ".opencode", "node_modules", "@opencode-ai", "sdk",
+    "dist", "v2", "index.js",
+  )
+  const { createOpencode } = await import(sdkEntry)
+
   let input
   try {
     const chunks = []
@@ -39,7 +60,7 @@ async function main() {
     process.exit(1)
   }
 
-  const { prompt, model, schema, timeout: timeoutSec } = input
+  const { prompt, model, schema, timeout: timeoutSec, agent } = input
   if (!prompt || !model) {
     process.stderr.write(JSON.stringify({ ok: false, error: "prompt and model are required" }))
     process.exit(1)
@@ -66,14 +87,14 @@ async function main() {
       body: { title: `bridge-${Date.now()}` },
     })
 
-    const promptParams = {
+    const promptParams = buildPromptParams({
       sessionID: session.data.id,
-      model: { providerID, modelID },
-      parts: [{ type: "text", text: prompt }],
-    }
-    if (schema) {
-      promptParams.format = { type: "json_schema", schema }
-    }
+      providerID,
+      modelID,
+      prompt,
+      schema,
+      agent,
+    })
 
     const result = await client.session.prompt(promptParams)
 
@@ -112,7 +133,12 @@ async function main() {
   }
 }
 
-main().catch((err) => {
-  process.stderr.write(JSON.stringify({ ok: false, error: err.message }))
-  process.exit(1)
-})
+const isMain = Boolean(process.argv[1])
+  && pathToFileURL(path.resolve(process.argv[1])).href === import.meta.url
+
+if (isMain) {
+  main().catch((err) => {
+    process.stderr.write(JSON.stringify({ ok: false, error: err.message }))
+    process.exit(1)
+  })
+}

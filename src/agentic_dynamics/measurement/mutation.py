@@ -350,6 +350,9 @@ def _call_opencode(
 
     args = [
         opencode_bin, "run",
+        # The build profile is selected EXPLICITLY (Unit B): the project's default agent is
+        # the AIO coordinator, and mutation generation is an ordinary worker call.
+        "--agent", "build",
         prompt,
         "--model", model,
         "--auto",

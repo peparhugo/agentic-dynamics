@@ -49,6 +49,21 @@ def cell_done(title):
     except Exception:
         return False
 
+def _opencode_cmd(model_id, title, workdir, prompt) -> list[str]:
+    """The argv for one sweep cell — the build profile is selected EXPLICITLY (Unit B): the
+    project's default agent is the AIO coordinator, and a sweep cell is an ordinary worker."""
+    return [
+        OPENCODE_BIN, "run",
+        "--agent", "build",
+        "--model", model_id,
+        "--title", title,
+        "--format", "json",
+        "--auto",
+        "--dir", workdir,
+        prompt,
+    ]
+
+
 def run_cell(model_id, silent_mode, operator, label_slug, timeout=200):
     ensure_model_allowed(model_id)
     title = f"[silent_sweep:{operator}:{silent_mode}] {label_slug}"
@@ -60,15 +75,7 @@ def run_cell(model_id, silent_mode, operator, label_slug, timeout=200):
     Path(workdir).mkdir(parents=True, exist_ok=True)
 
     prompt = build_prompt(silent_mode, operator)
-    cmd = [
-        OPENCODE_BIN, "run",
-        "--model", model_id,
-        "--title", title,
-        "--format", "json",
-        "--auto",
-        "--dir", workdir,
-        prompt,
-    ]
+    cmd = _opencode_cmd(model_id, title, workdir, prompt)
 
     t0 = time.monotonic()
     try:
