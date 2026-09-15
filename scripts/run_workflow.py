@@ -1402,13 +1402,16 @@ def _load_resume_state(spec_name: str, parent_run_id: str) -> ResumeState:
     never the spec index. ``completed_phases`` is the phases the parent recorded ``ok`` PLUS
     the ancestor completions its own ledger inherited (``inherited_phases``, provenance
     preserved); ``reached_checkpoints`` carries the checkpoint phases the parent REACHED and
-    stopped awaiting — NOT completion (the engine validates their approval before skipping).
+    stopped awaiting — PLUS the checkpoints a REFUSED parent left unresolved
+    (``unresolved_checkpoints``) — NOT completion (the engine validates their approval before
+    skipping).
 
     Raises :class:`ParentRunRefused` when the selected parent's snapshot cannot be found
     or read — a resume cannot be established from a ledger that is gone, and guessing would
     resurrect exactly the mis-association this identity selection removes. A malformed
-    ``inherited_phases`` entry (no phase, no origin run, an unknown status) is the same named
-    refusal: a corrupt lineage is never silently dropped to "not completed".
+    ``inherited_phases`` or ``unresolved_checkpoints`` entry (no phase, no origin run, an
+    unknown status) is the same named refusal: a corrupt lineage is never silently dropped
+    to "not completed".
     """
     ledger_dir = ROOT / "experiments" / "results" / "workflows" / spec_name
     matches = [
@@ -1467,10 +1470,19 @@ def _load_resume_state(spec_name: str, parent_run_id: str) -> ResumeState:
         inherited.append({
             "phase": name,
             "from_run_id": origin,
+            "gate_id": str(entry.get("gate_id") or ""),
             "ledger_path": str(entry.get("ledger_path") or ""),
             "status": status,
         })
         completed.add(name)
+    for entry in (payload.get("unresolved_checkpoints") or []):
+        if not isinstance(entry, dict) or not entry.get("phase"):
+            raise ParentRunRefused(
+                f"--resume parent ledger {path.name} carries an unresolved checkpoint entry "
+                f"without a phase identity ({entry!r}) — refusing to guess which checkpoint "
+                f"stays unresolved"
+            )
+        reached.add(str(entry["phase"]))
     return ResumeState(
         parent_run_id=parent_run_id,
         ledger_path=str(path),

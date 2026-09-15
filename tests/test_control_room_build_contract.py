@@ -34,6 +34,7 @@ from pathlib import Path
 import pytest
 
 from agentic_dynamics.experiment.experiment_spec import load_spec, validate_spec
+from agentic_dynamics.runtime import workflow_runner as runner_module
 from agentic_dynamics.runtime.executor import StepRequest, StepResult
 from agentic_dynamics.runtime.workflow_runner import (
     ResumeState,
@@ -603,13 +604,15 @@ def test_chained_resume_preserves_inherited_completion_across_both_parents(
     assert carried["p0a_reanchor_parity"]["from_run_id"] == "run-root"
     assert "p2a_timings_route" not in carried  # run-mid executed it; it is run-mid's own
 
-    _commit_approval(wd, spec.name, "p6g_acceptance")
+    _commit_approval(wd, spec.name, "p6g_acceptance",
+                     run_id="run-mid", gate_id="gate-p6g")
     agent3 = _FakeAgentExecutor()
     third = run_workflow(
         spec, goal=GOAL, model=MODEL, workdir=wd,
         step_executor=agent3, verifier_executor=_FakeVerifierExecutor(),
         retrieve_fn=_deterministic_retrieve_fn(), publish=False, commit=True,
         resume=True, resume_state=state2,
+        approval_run_id="run-mid", approval_gate_id="gate-p6g",
     )
     assert agent3.calls == [], "an earlier producer replayed on the final continuation"
     assert third.already_complete is True
@@ -619,6 +622,141 @@ def test_chained_resume_preserves_inherited_completion_across_both_parents(
     inherited3 = {e["phase"]: e for e in third.inherited_phases}
     assert inherited3["p1c_contract_gate"]["from_run_id"] == "run-root"
     assert inherited3["p2a_timings_route"]["from_run_id"] == "run-mid"
+
+
+def test_refused_resume_preserves_inherited_completion_and_the_unresolved_checkpoint(
+    build_spec, tmp_path, monkeypatch
+):
+    """Reviewer reproduction (Astra, 2026-09-15): reach p1c → an unsigned resume REFUSES →
+    approve that refused child → resume it. A refusal executes nothing, so its ledger must
+    still carry (a) the completion it inherited and (b) the checkpoint it left unresolved —
+    otherwise the next continuation forgets both, replays producers, and stops at p1c again."""
+    monkeypatch.setenv("FINOPS_EMIT_SELF", "0")
+    spec = build_spec
+    wd = tmp_path / "wd"
+    wd.mkdir()
+    _git_init(wd)
+
+    parent = _run_to_p1c(spec, wd)
+    _write_run_ledger(tmp_path, spec.name, "run-root", parent)
+    module = _load_run_workflow_module()
+    monkeypatch.setattr(module, "ROOT", tmp_path)
+    state1 = module._load_resume_state(spec.name, "run-root")
+    assert state1.reached_checkpoints == frozenset({"p1c_contract_gate"})
+
+    # Run 2: the unsigned resume refuses — no approval artifact exists.
+    refusing_agent = _FakeAgentExecutor()
+    refused = run_workflow(
+        spec, goal=GOAL, model=MODEL, workdir=wd,
+        step_executor=refusing_agent, verifier_executor=_FakeVerifierExecutor(),
+        retrieve_fn=_deterministic_retrieve_fn(), publish=False, commit=True,
+        resume=True, resume_state=state1,
+        approval_run_id="run-root", approval_gate_id="gate-p1c",
+    )
+    assert refused.awaiting is True and refused.awaiting_reason == "approval_refused"
+    assert refusing_agent.calls == []
+    _write_run_ledger(tmp_path, spec.name, "run-refused", refused)
+
+    # The refused child's ledger still carries the family's continuation state...
+    state2 = module._load_resume_state(spec.name, "run-refused")
+    assert state2.completed_phases == frozenset({
+        "p0a_reanchor_parity", "p0b_parity_gate", "p1a_ia_amendment",
+        "p1b_gate_first_viewport",
+    }), "the refusal dropped the completion it inherited"
+    assert state2.reached_checkpoints == frozenset({"p1c_contract_gate"}), (
+        "the refusal dropped the unresolved checkpoint identity"
+    )
+
+    # ...so approving THAT CHILD and resuming it proceeds past p1c without replay.
+    _commit_approval(wd, spec.name, "p1c_contract_gate",
+                     run_id="run-refused", gate_id="gate-p1c")
+    agent3 = _FakeAgentExecutor()
+    third = run_workflow(
+        spec, goal=GOAL, model=MODEL, workdir=wd,
+        step_executor=agent3, verifier_executor=_FakeVerifierExecutor(),
+        retrieve_fn=_deterministic_retrieve_fn(), publish=False, commit=True,
+        resume=True, resume_state=state2,
+        approval_run_id="run-refused", approval_gate_id="gate-p1c",
+    )
+    assert "p1c_contract_gate" not in agent3.calls, "the approved checkpoint re-ran"
+    assert agent3.calls[0] == "p2a_timings_route"
+    assert "p0a_reanchor_parity" not in agent3.calls, (
+        "the refusal's child replayed producers the family already paid for"
+    )
+    # the continuation reached its own designed stop — the final acceptance checkpoint
+    assert third.awaiting is True and third.awaiting_phase == "p6g_acceptance"
+    approved = [c for c in third.checkpoints if c.phase == "p1c_contract_gate"]
+    assert approved and approved[-1].decision == "approved"
+
+
+def test_fully_bound_final_continuation_validates_from_recorded_lineage_not_the_index(
+    build_spec, tmp_path, monkeypatch
+):
+    """Reviewer reproduction (Astra, 2026-09-15): with identical parent ledgers and correctly
+    bound approvals, the final continuation must validate p1c from its RECORDED ORIGIN — not
+    from whichever run the global spec index currently points at. Pre-fix, the same chain
+    succeeded with a current index entry and refused with a stale/unrelated one."""
+    monkeypatch.setenv("FINOPS_EMIT_SELF", "0")
+    spec = build_spec
+    module = _load_run_workflow_module()
+
+    index_variants = {
+        # the index points at the selected parent (the pre-fix happy path)
+        "current": {"p1c_contract_gate": {
+            "decision": "approved", "reached_at": "2026-09-14T00:00:00+00:00",
+        }},
+        # no usable index record (the pre-fix refusal path)
+        "stale": {},
+        # an unrelated run's decision (the pre-fix refusal path)
+        "unrelated": {"p1c_contract_gate": {"decision": "rejected"}},
+    }
+    for variant, records in index_variants.items():
+        wd = tmp_path / variant
+        wd.mkdir()
+        _git_init(wd)
+        parent = _run_to_p1c(spec, wd)
+        run_root = f"run-root-{variant}"
+        _write_run_ledger(tmp_path, spec.name, run_root, parent)
+        monkeypatch.setattr(module, "ROOT", tmp_path)
+        state1 = module._load_resume_state(spec.name, run_root)
+
+        _commit_approval(wd, spec.name, "p1c_contract_gate",
+                         run_id=run_root, gate_id="gate-p1c")
+        agent2 = _FakeAgentExecutor()
+        second = run_workflow(
+            spec, goal=GOAL, model=MODEL, workdir=wd,
+            step_executor=agent2, verifier_executor=_FakeVerifierExecutor(),
+            retrieve_fn=_deterministic_retrieve_fn(), publish=False, commit=True,
+            resume=True, resume_state=state1,
+            approval_run_id=run_root, approval_gate_id="gate-p1c",
+        )
+        assert second.awaiting is True and second.awaiting_phase == "p6g_acceptance", variant
+        run_mid = f"run-mid-{variant}"
+        _write_run_ledger(tmp_path, spec.name, run_mid, second)
+        state2 = module._load_resume_state(spec.name, run_mid)
+
+        # The global index now points wherever the variant says; validation must not care.
+        monkeypatch.setattr(
+            runner_module,
+            "_previous_checkpoint_state",
+            lambda spec, phase, _records=records: _records.get(phase),
+        )
+        _commit_approval(wd, spec.name, "p6g_acceptance",
+                         run_id=run_mid, gate_id="gate-p6g")
+        agent3 = _FakeAgentExecutor()
+        third = run_workflow(
+            spec, goal=GOAL, model=MODEL, workdir=wd,
+            step_executor=agent3, verifier_executor=_FakeVerifierExecutor(),
+            retrieve_fn=_deterministic_retrieve_fn(), publish=False, commit=True,
+            resume=True, resume_state=state2,
+            approval_run_id=run_mid, approval_gate_id="gate-p6g",
+        )
+        assert third.awaiting is False, f"{variant}: the final continuation refused"
+        assert third.already_complete is True, variant
+        assert agent3.calls == [], variant
+        decisions = {c.phase: c.decision for c in third.checkpoints}
+        assert decisions.get("p1c_contract_gate") == "approved", variant
+        assert decisions.get("p6g_acceptance") == "approved", variant
 
 
 # ── The bounded correction attempt ────────────────────────────────────────────

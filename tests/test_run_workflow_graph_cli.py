@@ -639,7 +639,8 @@ def test_load_resume_state_unions_inherited_completion_with_provenance(tmp_path,
             {"phase": "scope", "from_run_id": "run-root",
              "ledger_path": "/ledgers/run-root.json", "status": "completed"},
             {"phase": "gate", "from_run_id": "run-root",
-             "ledger_path": "/ledgers/run-root.json", "status": "checkpoint_approved"},
+             "ledger_path": "/ledgers/run-root.json", "status": "checkpoint_approved",
+             "gate_id": "gate-1"},
         ],
     })
 
@@ -649,6 +650,38 @@ def test_load_resume_state_unions_inherited_completion_with_provenance(tmp_path,
     assert {e["phase"]: e["from_run_id"] for e in state.inherited_phases} == {
         "scope": "run-root", "gate": "run-root",
     }
+    carried = {e["phase"]: e for e in state.inherited_phases}
+    assert carried["gate"]["gate_id"] == "gate-1", (
+        "the recorded approval gate identity was dropped — lineage validation would fall "
+        "back to the global index"
+    )
+
+
+def test_load_resume_state_carries_unresolved_checkpoints_as_reached(tmp_path, monkeypatch):
+    """A refused continuation records the checkpoint it left UNRESOLVED; the next loader must
+    carry it as REACHED (not completion, not absent) so its approval is validated again.
+    Malformed entries are the same named refusal as malformed lineage."""
+    module = _load_module()
+    monkeypatch.setattr(module, "ROOT", tmp_path)
+    _write_parent_ledger(tmp_path, "demo", "20260912T000000000000Z_run-refused.json", {
+        "run_id": "run-refused",
+        "phases": [],
+        "inherited_phases": [
+            {"phase": "scope", "from_run_id": "run-root",
+             "ledger_path": "/ledgers/run-root.json", "status": "completed"},
+        ],
+        "unresolved_checkpoints": [{"phase": "gate"}],
+    })
+    state = module._load_resume_state("demo", "run-refused")
+    assert state.completed_phases == frozenset({"scope"})
+    assert state.reached_checkpoints == frozenset({"gate"})
+
+    for bad in ({"no_phase": True}, "gate", []):
+        _write_parent_ledger(tmp_path, "demo", "20260912T000000000000Z_run-refused.json", {
+            "run_id": "run-refused", "phases": [], "unresolved_checkpoints": [bad],
+        })
+        with pytest.raises(module.ParentRunRefused):
+            module._load_resume_state("demo", "run-refused")
 
 
 def test_load_resume_state_refuses_malformed_inherited_lineage(tmp_path, monkeypatch):
