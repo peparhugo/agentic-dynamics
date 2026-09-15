@@ -2,7 +2,9 @@
 
 The project default (``opencode.json``'s ``default_agent``) is the AIO coordinator; a call
 that rides the default silently becomes a coordinator. These tests capture the ACTUAL
-subprocess argv / SDK request with execution mocked — no model calls, no opencode process.
+subprocess argv / SDK request with execution mocked — no model calls, no opencode process
+(the SDK-request capture runs ``node`` on the bridge's pure request builder, so this module
+is deliberately NOT ``fast``-marked: it is not dependency-free).
 """
 
 from __future__ import annotations
@@ -18,8 +20,6 @@ from types import SimpleNamespace
 import pytest
 
 ROOT = Path(__file__).resolve().parent.parent
-
-pytestmark = pytest.mark.fast
 
 
 def _load_script(name: str):
