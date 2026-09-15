@@ -92,6 +92,25 @@ def _truncate(text: str, limit: int) -> tuple[str, int]:
     return text[:limit], len(text) - limit
 
 
+def _truncate_middle(text: str, limit: int) -> tuple[str, int]:
+    """Cut the MIDDLE of ``text``, keeping both ends — controlling constraints live at the ends.
+
+    The reviewer reproduction (2026-09-15): a long acceptance criterion ending in
+    ``NEVER DEPLOY`` was rendered head-only, so the constraint vanished without a marker. A
+    middle cut keeps the closing constraint; the inline marker names the omitted count.
+    """
+    text = str(text or "")
+    if len(text) <= limit:
+        return text, 0
+    keep_head = max(1, int(limit * 0.6))
+    keep_tail = max(1, limit - keep_head)
+    omitted = len(text) - keep_head - keep_tail
+    return (
+        text[:keep_head] + f"\n[... {omitted} chars omitted ...]\n" + text[-keep_tail:],
+        omitted,
+    )
+
+
 def _resolve_artifact_dir(args: argparse.Namespace) -> Path:
     """The durable knowledge root: explicit flag/env first, else the canonical checkout path."""
     from agentic_dynamics.core.paths import KB_ARTIFACT_DIR
@@ -298,10 +317,14 @@ def compose_capsule(
     selected predecessor and records with source ids; (3) the control packet's facts + degraded/
     unknown states; (4) the measured session-budget verdict; (5) one next action + the blocker.
     """
-    request, request_omitted = _truncate(str(binding_payload.get("original_request") or ""), REQUEST_EXCERPT_CHARS)
+    request, request_omitted = _truncate_middle(
+        str(binding_payload.get("original_request") or ""), REQUEST_EXCERPT_CHARS
+    )
     accepted = binding_payload.get("acceptance") or None
     if accepted is not None:
-        accepted_text, accepted_omitted = _truncate(str(accepted.get("text") or ""), REQUEST_EXCERPT_CHARS)
+        accepted_text, accepted_omitted = _truncate_middle(
+            str(accepted.get("text") or ""), REQUEST_EXCERPT_CHARS
+        )
         acceptance = {**accepted, "text": accepted_text, "truncated": accepted_omitted > 0,
                       "omitted_chars": accepted_omitted}
     else:
@@ -396,21 +419,50 @@ def compose_capsule(
         "blocker": blocker_section,
         "bounds": {"max_chars": max_chars, "max_records": max_records},
     }
-    text = render_capsule(capsule)
-    if len(text) > max_chars:
-        omitted = len(text) - max_chars
-        text = text[:max_chars] + f"\n[capsule truncated: {omitted} chars omitted — bounds.max_chars]"
+    head, tail = _render_head(capsule), _render_tail(capsule)
+    if len(head) + 1 + len(tail) > max_chars:
+        reserve = len(tail) + 130  # the tail + the omission marker
+        allowed = max(0, max_chars - reserve)
+        omitted = max(0, len(head) - allowed)
+        head = head[:allowed] + (
+            f"\n[capsule head truncated: {omitted} chars omitted — budget/next action/"
+            "blocker preserved below]"
+        )
         capsule["bounds"]["truncated"] = True
         capsule["bounds"]["omitted_chars"] = omitted
     else:
         capsule["bounds"]["truncated"] = False
         capsule["bounds"]["omitted_chars"] = 0
-    capsule["text"] = text
+    capsule["text"] = head + "\n" + tail
     return capsule
 
 
 def render_capsule(capsule: dict) -> str:
-    """Render the capsule as the text the plugin appends to the system prompt.
+    """Render the capsule as the text the plugin appends to the system prompt."""
+    head, tail = _render_head(capsule), _render_tail(capsule)
+    return head + "\n" + tail
+
+
+def _render_tail(capsule: dict) -> str:
+    """The controlling tail — budget verdict, next action, blocker.
+
+    Kept OUT of the head-truncation path so a capsule that hits its size bound can never lose
+    the budget verdict, the one next action, or the blocker (the reviewer repair: those must
+    survive regardless of how long the request/acceptance/records are).
+    """
+    budget = capsule["session_budget"]
+    lines = [
+        f"session budget: {budget['verdict']} (turns {budget.get('turns')}, "
+        f"context {budget.get('context_tokens')})"
+        + (f" — {budget['reason']}" if budget.get("reason") else ""),
+        f"next action: {capsule['next_action']['text'] or '—'} ({capsule['next_action']['source']})",
+        f"blocker: {capsule['blocker']['text'] or '—'} ({capsule['blocker']['source']})",
+    ]
+    return "\n".join(lines)
+
+
+def _render_head(capsule: dict) -> str:
+    """The head sections — identity, request, acceptance, work unit, predecessor, packet.
 
     Every section keeps its source ids; every truncation keeps its marker (applied by
     :func:`compose_capsule`); an unavailable dependency is rendered as unavailable, never
@@ -433,9 +485,15 @@ def render_capsule(capsule: dict) -> str:
     else:
         prov = f" [provenance: {acceptance['provenance']}]" if acceptance.get("provenance") else ""
         trust = " [interpretation — subordinate to the raw request]" if acceptance.get("source") == "interpretation" else ""
+        # The omission marker is IN THE TEXT the model receives — not only in JSON metadata
+        # the plugin discards (reviewer reproduction 2026-09-15).
+        cut = (
+            f" [acceptance truncated: {acceptance['omitted_chars']} chars omitted]"
+            if acceptance.get("truncated") else ""
+        )
         lines.append(
             f"acceptance (v{acceptance.get('version')}, {acceptance.get('source')}): "
-            f"\"{acceptance.get('text')}\"{prov}{trust}"
+            f"\"{acceptance.get('text')}\"{cut}{prov}{trust}"
         )
     lines.append(f"work unit: {capsule['work_unit'] or '—'}")
 
@@ -497,14 +555,6 @@ def render_capsule(capsule: dict) -> str:
     else:
         lines.append(f"control packet: UNAVAILABLE ({packet.get('reason')})")
 
-    budget = capsule["session_budget"]
-    lines.append(
-        f"session budget: {budget['verdict']} (turns {budget.get('turns')}, "
-        f"context {budget.get('context_tokens')})"
-        + (f" — {budget['reason']}" if budget.get("reason") else "")
-    )
-    lines.append(f"next action: {capsule['next_action']['text'] or '—'} ({capsule['next_action']['source']})")
-    lines.append(f"blocker: {capsule['blocker']['text'] or '—'} ({capsule['blocker']['source']})")
     return "\n".join(lines)
 
 
@@ -541,6 +591,16 @@ def build_parser() -> argparse.ArgumentParser:
     mode.add_argument("--binding", action="store_true", help="READ the session's binding")
     mode.add_argument("--bind", action="store_true", help="CREATE-or-read the session binding")
     mode.add_argument("--capsule", action="store_true", help="COMPOSE the session capsule")
+    mode.add_argument(
+        "--update-context", action="store_true",
+        help="apply an EXPLICIT, VERSIONED task-context update (the original request is "
+             "immutable; --expected-version must match the binding's current version)",
+    )
+    mode.add_argument(
+        "--init-store", action="store_true",
+        help="EXPLICITLY initialize the binding store at --artifact-dir (the only operation "
+             "that creates the durable root; native binds never do)",
+    )
     parser.add_argument("--native-session-id", default="", help="native opencode session id")
     parser.add_argument("--agent", default="", help="resolved agent (output.message.agent)")
     parser.add_argument("--message-id", default="", help="initiating native user-message id")
@@ -575,6 +635,13 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--blocker", default="", help="the actual blocker, if any")
     parser.add_argument(
         "--max-chars", type=int, default=DEFAULT_MAX_CAPSULE_CHARS, help="capsule size bound"
+    )
+    parser.add_argument(
+        "--expected-version", type=int, default=0,
+        help="the binding's current context_version (required for --update-context)",
+    )
+    parser.add_argument(
+        "--context-version", type=int, default=1, help="the task-context version to record on --bind"
     )
     parser.add_argument(
         "--max-records", type=int, default=DEFAULT_MAX_RECORDS, help="capsule record bound"
@@ -667,18 +734,78 @@ def _binding_from_args(args: argparse.Namespace, artifact_dir: Path) -> dict:
         "work_unit": args.work_unit,
         "next_action": args.next_action,
         "blocker": args.blocker,
+        "context_version": int(args.context_version or 1),
     }
+
+
+def _context_from_args(args: argparse.Namespace) -> dict:
+    """The task-context fields an update may change (never the original request)."""
+    context: dict = {
+        "project": args.project,
+        "source_revision": args.source_revision,
+        "work_unit": args.work_unit,
+        "next_action": args.next_action,
+        "blocker": args.blocker,
+    }
+    if str(args.predecessor_slug or "").strip() or args.knowledge_id:
+        context["predecessor"] = {
+            "slug": str(args.predecessor_slug or "").strip(),
+            "knowledge_ids": list(args.knowledge_id or []),
+        }
+    if str(args.acceptance or "").strip():
+        context["acceptance"] = {
+            "text": args.acceptance,
+            "version": 1,
+            "source": args.acceptance_source,
+            "provenance": args.acceptance_provenance,
+        }
+    return context
 
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     artifact_dir = _resolve_artifact_dir(args)
 
-    if args.bind or args.binding or args.capsule:
+    if args.init_store:
+        existed = artifact_dir.is_dir()
+        si.init_binding_store(artifact_dir)
+        report = {
+            "schema": "session-binding-store/v1",
+            "status": "initialized",
+            "root": str(artifact_dir),
+            "created": not existed,
+        }
+        print(json.dumps(report, indent=2) if args.json else f"[session-open] binding store initialized at {artifact_dir} (created={not existed})")
+        return 0
+
+    if args.bind or args.binding or args.capsule or args.update_context:
         if not str(args.native_session_id or "").strip():
             print("[session-open] --native-session-id is required for binding modes", file=sys.stderr)
             return 2
-        if args.bind:
+        if args.update_context:
+            if str(args.request or "").strip() or str(args.request_file or "").strip():
+                print(
+                    "[session-open] --update-context never changes the original request — "
+                    "create a new binding for a new task instead",
+                    file=sys.stderr,
+                )
+                return 2
+            if int(args.expected_version or 0) < 1:
+                print("[session-open] --update-context requires --expected-version", file=sys.stderr)
+                return 2
+            try:
+                result = si.update_binding_context(
+                    args.native_session_id,
+                    context=_context_from_args(args),
+                    expected_version=int(args.expected_version),
+                    repository_id=args.repository_id,
+                    artifact_dir=artifact_dir,
+                )
+            except ValueError as exc:
+                print(f"[session-open] context update refused: {exc}", file=sys.stderr)
+                return 2
+            report = _binding_report(result)
+        elif args.bind:
             binding = _binding_from_args(args, artifact_dir)
             try:
                 result = si.write_binding(

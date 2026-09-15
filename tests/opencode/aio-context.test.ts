@@ -23,6 +23,8 @@ function sessionOf(args: string[]): string {
 }
 
 function modeOf(args: string[]): string {
+  if (args.includes("--update-context")) return "update-context"
+  if (args.includes("--init-store")) return "init-store"
   if (args.includes("--bind")) return "bind"
   if (args.includes("--binding")) return "binding"
   if (args.includes("--capsule")) return "capsule"
@@ -289,4 +291,266 @@ describe("aio-context plugin", () => {
     expect(out.system).toEqual([])
     expect(calls.length).toBe(0)
   })
+})
+
+// ── Unit C repairs: handoff attachment, versioned updates, explicit unavailability ──────────
+
+import { execFileSync } from "node:child_process"
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
+import { tmpdir } from "node:os"
+import path from "node:path"
+
+const REPO = path.resolve(import.meta.dir, "..", "..")
+
+function tmpDir(prefix: string): string {
+  return mkdtempSync(path.join(tmpdir(), prefix))
+}
+
+function writeTaskContext(projectDir: string, context: Record<string, unknown>) {
+  mkdirSync(path.join(projectDir, ".opencode"), { recursive: true })
+  writeFileSync(
+    path.join(projectDir, ".opencode", "aio-task-context.json"),
+    JSON.stringify(context),
+  )
+}
+
+function makePluginAt(runner: unknown, projectDir: string, options: Record<string, unknown> = {}) {
+  return (AioContextPlugin as unknown as (ctx: unknown, opts: unknown) => Promise<any>)(
+    { directory: projectDir, worktree: projectDir },
+    { commandRunner: runner, capsuleTtlMs: 60_000, ...options },
+  )
+}
+
+function flagOf(args: string[], flag: string): string | undefined {
+  const index = args.indexOf(flag)
+  return index >= 0 ? args[index + 1] : undefined
+}
+
+describe("aio-context plugin — handoff attachment and versioned context", () => {
+  test("the task-context attachment reaches the binding call (predecessor, findings, acceptance, work unit)", async () => {
+    const project = tmpDir("aio-project-")
+    try {
+      writeTaskContext(project, {
+        task: "unit-c-integration",
+        predecessor_slug: "bound-handoff",
+        knowledge_ids: ["f".repeat(64)],
+        acceptance: "tests green; PR merged",
+        acceptance_source: "raw",
+        project: "integration-project",
+        source_revision: "deadbeef",
+        work_unit: "attach the handoff",
+        next_action: "verify the capsule",
+        context_version: 1,
+      })
+      const bound = new Set<string>()
+      const { runner, calls } = fakeRunner(happyResponder(bound))
+      const hooks = await makePluginAt(runner, project)
+
+      await hooks["chat.message"](...Object.values(message("ses_ctx", "aio-control", "run the unit")))
+
+      const bind = calls.find((c) => modeOf(c.args) === "bind")
+      expect(bind).toBeDefined()
+      expect(flagOf(bind!.args, "--task")).toBe("unit-c-integration")
+      expect(flagOf(bind!.args, "--predecessor-slug")).toBe("bound-handoff")
+      expect(flagOf(bind!.args, "--knowledge-id")).toBe("f".repeat(64))
+      expect(flagOf(bind!.args, "--acceptance")).toBe("tests green; PR merged")
+      expect(flagOf(bind!.args, "--project")).toBe("integration-project")
+      expect(flagOf(bind!.args, "--source-revision")).toBe("deadbeef")
+      expect(flagOf(bind!.args, "--work-unit")).toBe("attach the handoff")
+      expect(flagOf(bind!.args, "--context-version")).toBe("1")
+    } finally {
+      rmSync(project, { recursive: true, force: true })
+    }
+  })
+
+  test("a higher context_version triggers an explicit versioned update", async () => {
+    const project = tmpDir("aio-project-")
+    try {
+      writeTaskContext(project, { task: "t", context_version: 1, work_unit: "v1 work" })
+      const { runner, calls } = fakeRunner((mode, args) => {
+        if (mode === "bind") {
+          return {
+            schema: "session-binding/v1", status: "created",
+            binding: { native_session_id: sessionOf(args), context_version: 1 },
+          }
+        }
+        if (mode === "capsule") {
+          return { schema: "session-capsule/v1", capsule_status: "composed", capsule: { text: "CAP" } }
+        }
+        if (mode === "binding") {
+          return { schema: "session-binding/v1", status: "found", binding: { native_session_id: sessionOf(args) } }
+        }
+        return undefined
+      })
+      const hooks = await makePluginAt(runner, project)
+      await hooks["chat.message"](...Object.values(message("ses_up", "aio-control", "start")))
+
+      writeTaskContext(project, { task: "t", context_version: 2, work_unit: "v2 work" })
+      await hooks["chat.message"](...Object.values(message("ses_up", "aio-control", "continue")))
+
+      const update = calls.find((c) => modeOf(c.args) === "update-context")
+      expect(update).toBeDefined()
+      expect(flagOf(update!.args, "--expected-version")).toBe("1")
+      expect(flagOf(update!.args, "--work-unit")).toBe("v2 work")
+      // The original request is never in an update call.
+      expect(update!.args).not.toContain("--request-file")
+      expect(update!.args).not.toContain("--request")
+    } finally {
+      rmSync(project, { recursive: true, force: true })
+    }
+  })
+
+  test("a dependency failure injects an explicit unavailable notice for the AIO session", async () => {
+    const { runner } = fakeRunner((mode, args) => {
+      if (mode === "bind") {
+        return { schema: "session-binding/v1", status: "store_missing", warnings: ["root absent"] }
+      }
+      if (mode === "capsule") {
+        return { schema: "session-capsule/v1", capsule_status: "store_missing", warnings: ["root absent"] }
+      }
+      return undefined
+    })
+    const hooks = await makePlugin(runner)
+    const context = message("ses_fail", "aio-control", "do it")
+    await hooks["chat.message"](...Object.values(context))
+    const out = { system: [] as string[] }
+    await hooks["experimental.chat.system.transform"]({ sessionID: "ses_fail" }, out)
+    expect(out.system.join()).toContain("[aio-context] capsule unavailable:")
+    expect(out.system.join()).toContain("store_missing")
+
+    // A worker session gets no such notice (it is not the AIO boundary).
+    await hooks["chat.message"](...Object.values(message("ses_worker2", "build", "task")))
+    const workerOut = { system: [] as string[] }
+    await hooks["experimental.chat.system.transform"]({ sessionID: "ses_worker2" }, workerOut)
+    expect(workerOut.system).toEqual([])
+  })
+
+  test("the REAL runner enforces its deadline and surfaces the timeout", async () => {
+    const dir = tmpDir("aio-hang-")
+    try {
+      const hang = path.join(dir, "hang.sh")
+      writeFileSync(hang, "#!/bin/bash\nsleep 30\n")
+      const hooks = await (AioContextPlugin as unknown as (ctx: unknown, opts: unknown) => Promise<any>)(
+        { directory: dir, worktree: dir },
+        { python: "bash", sessionOpen: hang, commandTimeoutMs: 300, capsuleTtlMs: 0 },
+      )
+      await hooks["chat.message"](...Object.values(message("ses_hang", "aio-control", "task")))
+      const out = { system: [] as string[] }
+      await hooks["experimental.chat.system.transform"]({ sessionID: "ses_hang" }, out)
+      expect(out.system.join()).toContain("[aio-context] capsule unavailable:")
+      expect(out.system.join()).toContain("timed out after 300ms")
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+})
+
+describe("aio-context plugin — full native path (real CLI, temporary knowledge store)", () => {
+  test("a selected finding and predecessor reach the injected system text", async () => {
+    const root = tmpDir("aio-integration-")
+    const store = path.join(root, "kb")
+    const project = path.join(root, "project")
+    const findingId = "a".repeat(64)
+    const python = "python3"
+    let previousPublish: string | undefined
+    try {
+      mkdirSync(store, { recursive: true })
+      mkdirSync(project, { recursive: true })
+      previousPublish = process.env.FINOPS_AIO_BINDING_PUBLISH
+      // The scratch store must not publish synthetic binding events to the live KB stream.
+      process.env.FINOPS_AIO_BINDING_PUBLISH = "0"
+
+      // Seed the predecessor close through the REAL writer (isolated store, fake stream).
+      const seed = [
+        "import sys",
+        `sys.path.insert(0, ${JSON.stringify(path.join(REPO, "src"))})`,
+        "from agentic_dynamics.knowledge import session_ingestion as si",
+        "class R:",
+        "    def __init__(self):",
+        "        self.h = {}",
+        "        self.n = 0",
+        "    def hset(self, key, field, value):",
+        "        self.h[field] = value",
+        "    def hget(self, key, field):",
+        "        return self.h.get(field)",
+        "    def xadd(self, stream, payload):",
+        "        self.n += 1",
+        "        return f'1-{self.n}'",
+        "r = R()",
+        "res = si.close_session({",
+        "    'session_date': '2026-09-14',",
+        "    'slug': 'c-seeded-predecessor',",
+        "    'waves_run': ['seeded wave'],",
+        "    'merged': [],",
+        "    'parked': [],",
+        "    'open_threads': ['seeded open thread'],",
+        "    'self_notes': 'seeded notes',",
+        `}, artifact_dir=__import__('pathlib').Path(${JSON.stringify(store)}), connect_fn=lambda: r)`,
+        "print(res.status)",
+      ].join("\n")
+      const seeded = execFileSync(python, ["-c", seed], { encoding: "utf-8" })
+      expect(seeded.trim()).toBe("closed")
+
+      // Seed the selected FINDING record (its actual constraint is what must arrive).
+      writeFileSync(
+        path.join(store, `${findingId}.json`),
+        JSON.stringify({
+          text: "CONSTRAINT-FROM-FINDING: never deploy on Fridays",
+          source_type: "finding",
+          extractor_version: "measured-finding/v1",
+          authority: "measured",
+          evidence_class: "[M]",
+        }),
+      )
+
+      // The explicit handoff attachment: predecessor + finding + acceptance ending in a
+      // controlling constraint (the reviewer's NEVER DEPLOY shape).
+      writeTaskContext(project, {
+        task: "unit-c-integration",
+        predecessor_slug: "c-seeded-predecessor",
+        knowledge_ids: [findingId],
+        acceptance:
+          "Requirement: keep the system stable. ".repeat(120) +
+          "Finally: NEVER DEPLOY IN PRODUCTION on Fridays.",
+        acceptance_source: "raw",
+        project: "integration-project",
+        source_revision: "deadbeef",
+        work_unit: "hook → CLI → store integration",
+        next_action: "assert the injected constraint",
+        context_version: 1,
+      })
+
+      // The REAL path: the plugin's production runner spawns the REAL CLI against the
+      // temporary store — no mocks anywhere between the hook and the injected text.
+      const hooks = await (AioContextPlugin as unknown as (ctx: unknown, opts: unknown) => Promise<any>)(
+        { directory: project, worktree: project },
+        {
+          python,
+          sessionOpen: path.join(REPO, "scripts", "session_open.py"),
+          artifactDir: store,
+          commandTimeoutMs: 30_000,
+          capsuleTtlMs: 0,
+        },
+      )
+      await hooks["chat.message"](
+        ...Object.values(message("ses_integration", "aio-control", "Execute Unit C repairs.")),
+      )
+      const out = { system: [] as string[] }
+      await hooks["experimental.chat.system.transform"]({ sessionID: "ses_integration" }, out)
+      const injected = out.system.join("\n")
+
+      expect(injected).toContain("CONSTRAINT-FROM-FINDING: never deploy on Fridays")
+      expect(injected).toContain("NEVER DEPLOY IN PRODUCTION")
+      expect(injected).toContain("c-seeded-predecessor")
+      expect(injected).toContain("seeded open thread")
+      expect(injected).toContain("unit-c-integration")
+      expect(injected).toContain("work unit: hook → CLI → store integration")
+      expect(injected).toContain("session budget:")
+      expect(injected).toContain("next action: assert the injected constraint")
+    } finally {
+      if (previousPublish === undefined) delete process.env.FINOPS_AIO_BINDING_PUBLISH
+      else process.env.FINOPS_AIO_BINDING_PUBLISH = previousPublish
+      rmSync(root, { recursive: true, force: true })
+    }
+  }, 60_000)
 })

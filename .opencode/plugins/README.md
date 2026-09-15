@@ -11,6 +11,14 @@ The approved AIO capsule plugin **lives here** (`aio-context.ts` — automatic i
 this directory (opencode ≥1.18 supports both `.opencode/plugin/` and `.opencode/plugins/` as
 loader locations).
 
+**The explicit handoff attachment.** When `.opencode/aio-task-context.json` exists in the
+project, the plugin attaches it to the session's binding on the first substantive message:
+`task` (stable identity), `predecessor_slug` + `knowledge_ids` (the explicitly selected
+origin and findings), `acceptance` (+ `acceptance_source`/`acceptance_provenance`),
+`project`, `source_revision`, `work_unit`, `next_action`, `blocker`, and `context_version`.
+The file is the EXPLICIT selection — the plugin never invents one. Raise `context_version`
+to apply an update; the original request is immutable and no update can replace it.
+
 **Enforcement status.** The plugin's `tool.execute.before` refusal is a convenience and an
 early warning only — it is not the safety property. The REQUIRED enforcement — refusing an
 unbound consequential submit at the backend itself (submit contract, admission, promote

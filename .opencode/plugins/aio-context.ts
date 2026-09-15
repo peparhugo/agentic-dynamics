@@ -11,16 +11,20 @@
  *  - `chat.message` — observe the native `sessionID` and the RESOLVED `output.message.agent`
  *    (`input.agent` may be absent). A coordinator session's first substantive message binds
  *    the session durably (original request + hash + initiating message id) through
- *    `session_open.py --bind`. Later messages — continues, compacted summaries — NEVER
- *    rebind; a restart re-binds through the durable read (status `existing`). Worker sessions
- *    are observed honestly and never bound.
+ *    `session_open.py --bind`, ATTACHING the explicitly selected handoff from
+ *    `.opencode/aio-task-context.json` when present (task identity, predecessor slug, finding
+ *    ids, acceptance + provenance, project, source revision, work unit, next action, blocker).
+ *    Later messages never rebind; a task-context file with a HIGHER `context_version` triggers
+ *    an explicit, versioned `--update-context` (the original request is never replaced).
+ *    Worker sessions are observed honestly and never bound.
  *
  *  - `experimental.chat.system.transform` — receives an optional `sessionID` (no agent).
  *    With identity and a durable binding, compose the capsule (`session_open.py --capsule`)
  *    and append it to `output.system`. Auxiliary calls without identity are skipped, and a
  *    known worker session is skipped without a store read. The hook runs on every request, so
- *    a post-compaction request re-appends the capsule from the durable binding — a bounded
- *    TTL cache only avoids re-spawning the composer.
+ *    a post-compaction request re-appends the capsule from the durable binding. For a known
+ *    AIO session whose capsule cannot be composed, a short explicit UNAVAILABLE notice is
+ *    injected instead of silence (a dependency failure must not disappear).
  *
  *  - `tool.execute.before` — the early consequential-submit check: an AIO session with no
  *    binding refuses `run_workflow` with an explicit message. Convenience + early warning
@@ -30,7 +34,8 @@
  * sets a process-global session id in the multi-session server, and workers, special profiles,
  * and auxiliary calls get no private coordinator capsule.
  *
- * Test seam: `options.commandRunner` (tests inject a fake; production uses node:child_process).
+ * Test seams: `options.commandRunner` (tests inject a fake; production uses
+ * node:child_process with a hard timeout + an output cap).
  */
 import type { Plugin } from "@opencode-ai/plugin"
 
@@ -40,17 +45,33 @@ const AIO_AGENT = "aio-control"
 /** Tools whose invocation is a consequential submit for the AIO boundary (early check only). */
 const CONSEQUENTIAL_TOOLS = ["run_workflow"]
 
+/** The explicit handoff attachment: written by the controller/AIO, read by this plugin. */
+const TASK_CONTEXT_FILE = ".opencode/aio-task-context.json"
+
 /** Default capsule cache TTL: the capsule is rebuilt from durable state when it expires. */
 const CAPSULE_TTL_MS = 30_000
 
 /** Default capsule size bound (the composer's bound is authoritative; this is the last resort). */
 const CAPSULE_MAX_CHARS = 16_000
 
-type CommandResult = { code: number; stdout: string; stderr: string }
+/** Hard deadline for ONE companion command (a hung child must not hang the session). */
+const COMMAND_TIMEOUT_MS = 15_000
+
+/** Output cap for ONE companion command; a truncated JSON payload is treated as a failure. */
+const MAX_OUTPUT_BYTES = 262_144
+
+type CommandResult = {
+  code: number
+  stdout: string
+  stderr: string
+  timedOut?: boolean
+}
 type CommandRunner = (
   cmd: string[],
   stdin?: string,
   env?: Record<string, string>,
+  timeoutMs?: number,
+  maxOutputBytes?: number,
 ) => Promise<CommandResult>
 
 type AioContextOptions = {
@@ -61,27 +82,60 @@ type AioContextOptions = {
   aioAgent?: string
   capsuleTtlMs?: number
   capsuleMaxChars?: number
+  commandTimeoutMs?: number
+  maxOutputBytes?: number
   commandRunner?: CommandRunner
 }
 
-/** The production runner: one child process, bounded, never inherited stdio. */
+/** The production runner: one bounded child process, killed at the deadline, output-capped. */
 async function defaultCommandRunner(
   cmd: string[],
   stdin?: string,
   env?: Record<string, string>,
+  timeoutMs: number = COMMAND_TIMEOUT_MS,
+  maxOutputBytes: number = MAX_OUTPUT_BYTES,
 ): Promise<CommandResult> {
   const { spawn } = await import("node:child_process")
   return await new Promise<CommandResult>((resolve) => {
     const child = spawn(cmd[0], cmd.slice(1), {
       stdio: ["pipe", "pipe", "pipe"],
       env: env ? { ...process.env, ...env } : process.env,
+      // Own process group: a hung child's grandchildren cannot outlive the deadline.
+      detached: true,
     })
     let stdout = ""
     let stderr = ""
-    child.stdout.on("data", (chunk) => (stdout += String(chunk)))
-    child.stderr.on("data", (chunk) => (stderr += String(chunk)))
-    child.on("error", (err) => resolve({ code: -1, stdout, stderr: String(err) }))
-    child.on("close", (code) => resolve({ code: code ?? -1, stdout, stderr }))
+    let timedOut = false
+    let settled = false
+    const finish = (result: CommandResult) => {
+      if (settled) return
+      settled = true
+      clearTimeout(timer)
+      resolve(result)
+    }
+    const timer = setTimeout(() => {
+      timedOut = true
+      try {
+        process.kill(-(child.pid as number), "SIGKILL") // the whole group
+      } catch {
+        child.kill("SIGKILL")
+      }
+      // Settle at the deadline: an orphaned grandchild holding the stdio pipes must never
+      // keep the promise (and therefore the session's turn) hanging.
+      finish({ code: -1, stdout, stderr, timedOut: true })
+    }, timeoutMs)
+    child.stdout.on("data", (chunk) => {
+      if (stdout.length < maxOutputBytes) stdout += String(chunk)
+    })
+    child.stderr.on("data", (chunk) => {
+      if (stderr.length < maxOutputBytes) stderr += String(chunk)
+    })
+    child.on("error", (err) => {
+      finish({ code: -1, stdout, stderr: String(err), timedOut })
+    })
+    child.on("close", (code) => {
+      finish({ code: code ?? -1, stdout, stderr, timedOut })
+    })
     if (stdin !== undefined) child.stdin.write(stdin)
     child.stdin.end()
   })
@@ -94,14 +148,20 @@ export const AioContextPlugin: Plugin = async (ctx, options) => {
   const aioAgent = opts.aioAgent ?? AIO_AGENT
   const ttlMs = opts.capsuleTtlMs ?? CAPSULE_TTL_MS
   const maxChars = opts.capsuleMaxChars ?? CAPSULE_MAX_CHARS
+  const timeoutMs = opts.commandTimeoutMs ?? COMMAND_TIMEOUT_MS
+  const maxOutputBytes = opts.maxOutputBytes ?? MAX_OUTPUT_BYTES
   const run: CommandRunner = opts.commandRunner ?? defaultCommandRunner
 
   /** Per-session resolved agent, as observed at chat.message (never a process-global id). */
   const agents = new Map<string, string>()
   /** Sessions whose durable binding this process has ensured (a cache, never the source). */
   const bound = new Set<string>()
-  /** Per-session composed capsule (or a negative result) with a TTL. */
-  const capsules = new Map<string, { text: string | null; at: number }>()
+  /** The task-context version last applied per session (for versioned updates). */
+  const contextVersions = new Map<string, number>()
+  /** The last dependency failure per session — surfaced, never swallowed. */
+  const failures = new Map<string, string>()
+  /** Per-session composed capsule (or a negative result + notice) with a TTL. */
+  const capsules = new Map<string, { text: string | null; notice: string | null; at: number }>()
 
   function baseArgs(): string[] {
     const args = [python, sessionOpen]
@@ -112,27 +172,68 @@ export const AioContextPlugin: Plugin = async (ctx, options) => {
   async function sessionOpenCall(
     args: string[],
     stdin?: string,
-  ): Promise<Record<string, unknown> | null> {
+  ): Promise<{ report: Record<string, unknown> | null; error: string }> {
     const env = opts.controlDb ? { FINOPS_CONTROL_DB: opts.controlDb } : undefined
     let result: CommandResult
     try {
-      result = await run([...baseArgs(), ...args], stdin, env)
-    } catch {
-      return null // a failed dependency is "no capsule", never a crashed session
+      result = await run([...baseArgs(), ...args], stdin, env, timeoutMs, maxOutputBytes)
+    } catch (err) {
+      return { report: null, error: `runner error: ${String(err)}` }
     }
-    if (result.code !== 0 || !result.stdout.trim()) return null
+    if (result.timedOut) return { report: null, error: `timed out after ${timeoutMs}ms` }
+    if (result.code !== 0) {
+      return {
+        report: null,
+        error: `exit ${result.code}: ${(result.stderr || "").trim().slice(0, 200) || "no stderr"}`,
+      }
+    }
+    if (!result.stdout.trim()) return { report: null, error: "empty output" }
     try {
       const parsed = JSON.parse(result.stdout)
+      if (parsed && typeof parsed === "object") {
+        return { report: parsed as Record<string, unknown>, error: "" }
+      }
+      return { report: null, error: "output is not an object" }
+    } catch {
+      return { report: null, error: "unparseable output" }
+    }
+  }
+
+  /** Read the explicit handoff attachment (absent/unreadable is simply "no context"). */
+  async function readTaskContext(): Promise<Record<string, unknown> | null> {
+    try {
+      const { readFileSync } = await import("node:fs")
+      const path = `${ctx.worktree ?? ctx.directory}/${TASK_CONTEXT_FILE}`
+      const parsed = JSON.parse(readFileSync(path, "utf8"))
       return parsed && typeof parsed === "object" ? (parsed as Record<string, unknown>) : null
     } catch {
       return null
     }
   }
 
-  async function readBinding(sessionID: string): Promise<Record<string, unknown> | null> {
-    const report = await sessionOpenCall(["--binding", "--native-session-id", sessionID, "--json"])
-    if (!report || report.status !== "found" || !report.binding) return null
-    return report.binding as Record<string, unknown>
+  /** The task-context flags shared by --bind and --update-context. */
+  function taskContextFlags(context: Record<string, unknown> | null): string[] {
+    if (!context) return []
+    const flags: string[] = []
+    const push = (flag: string, value: unknown) => {
+      if (value !== undefined && value !== null && String(value).trim()) {
+        flags.push(flag, String(value))
+      }
+    }
+    push("--task", context.task)
+    push("--predecessor-slug", context.predecessor_slug)
+    for (const id of (context.knowledge_ids as unknown[]) ?? []) {
+      push("--knowledge-id", id)
+    }
+    push("--acceptance", context.acceptance)
+    push("--acceptance-source", context.acceptance_source)
+    push("--acceptance-provenance", context.acceptance_provenance)
+    push("--project", context.project)
+    push("--source-revision", context.source_revision)
+    push("--work-unit", context.work_unit)
+    push("--next-action", context.next_action)
+    push("--blocker", context.blocker)
+    return flags
   }
 
   async function bindSession(
@@ -140,41 +241,82 @@ export const AioContextPlugin: Plugin = async (ctx, options) => {
     agent: string,
     messageID: string,
     request: string,
+    context: Record<string, unknown> | null,
   ): Promise<boolean> {
-    const report = await sessionOpenCall(
+    const { report, error } = await sessionOpenCall(
       [
         "--bind",
         "--native-session-id", sessionID,
         "--agent", agent,
         "--message-id", messageID,
         "--request-file", "-",
+        ...taskContextFlags(context),
+        "--context-version", String(context?.context_version ?? 1),
         "--json",
       ],
       request,
     )
     const status = report?.status
-    // `existing` is the durable read answering a restart — the original request stands.
-    return status === "created" || status === "existing"
+    if (status === "created" || status === "existing") {
+      const binding = report?.binding as Record<string, unknown> | undefined
+      contextVersions.set(sessionID, Number(binding?.context_version ?? 1))
+      failures.delete(sessionID)
+      return true
+    }
+    failures.set(
+      sessionID,
+      `binding ${status ?? "failed"}: ${error || (report?.warnings as string[] | undefined)?.[0] || "no detail"}`,
+    )
+    return false
   }
 
-  async function composeCapsuleText(sessionID: string): Promise<string | null> {
-    const report = await sessionOpenCall([
+  async function updateSessionContext(
+    sessionID: string,
+    currentVersion: number,
+    context: Record<string, unknown> | null,
+  ): Promise<boolean> {
+    const { report, error } = await sessionOpenCall([
+      "--update-context",
+      "--native-session-id", sessionID,
+      "--expected-version", String(currentVersion),
+      ...taskContextFlags(context),
+      "--json",
+    ])
+    if (report?.status === "updated") {
+      const binding = report?.binding as Record<string, unknown> | undefined
+      contextVersions.set(sessionID, Number(binding?.context_version ?? currentVersion + 1))
+      return true
+    }
+    failures.set(sessionID, `context update failed: ${error || String(report?.status ?? "")}`)
+    return false
+  }
+
+  async function composeCapsuleText(
+    sessionID: string,
+  ): Promise<{ text: string | null; notice: string | null }> {
+    const { report, error } = await sessionOpenCall([
       "--capsule",
       "--native-session-id", sessionID,
       "--json",
       "--max-chars", String(maxChars),
     ])
-    if (!report || report.capsule_status !== "composed") return null
+    if (!report) return { text: null, notice: error }
+    if (report.capsule_status !== "composed") {
+      const detail = (report.warnings as string[] | undefined)?.[0]
+      return { text: null, notice: `capsule ${report.capsule_status}${detail ? `: ${detail}` : ""}` }
+    }
     const capsule = report.capsule as { text?: unknown } | undefined
     const text = typeof capsule?.text === "string" ? capsule.text : null
-    if (!text) return null
+    if (!text) return { text: null, notice: "capsule composed but empty" }
     if (text.length > maxChars) {
-      return (
-        text.slice(0, maxChars) +
-        `\n[capsule truncated by the plugin: ${text.length - maxChars} chars omitted]`
-      )
+      return {
+        text:
+          text.slice(0, maxChars) +
+          `\n[capsule truncated by the plugin: ${text.length - maxChars} chars omitted]`,
+        notice: null,
+      }
     }
-    return text
+    return { text, notice: null }
   }
 
   return {
@@ -185,9 +327,15 @@ export const AioContextPlugin: Plugin = async (ctx, options) => {
       agents.set(sessionID, agent)
       // Workers and special profiles are never bound to the AIO spine.
       if (agent !== aioAgent) return
+      const context = await readTaskContext()
       if (bound.has(sessionID)) {
-        // A later message never rebuilds the binding (continue/compacted summaries must not
-        // replace the original request) — but it does invalidate the capsule cache.
+        // A later message never rebuilds the binding; it can only apply an EXPLICIT,
+        // versioned task-context update (a higher context_version in the attachment).
+        const fileVersion = Number(context?.context_version ?? 0)
+        const current = contextVersions.get(sessionID) ?? 0
+        if (fileVersion > current && current > 0) {
+          await updateSessionContext(sessionID, current, context)
+        }
         capsules.delete(sessionID)
         return
       }
@@ -199,7 +347,9 @@ export const AioContextPlugin: Plugin = async (ctx, options) => {
         .trim()
       if (!request) return
       const messageID = String(output?.message?.id ?? input.messageID ?? "")
-      if (await bindSession(sessionID, agent, messageID, request)) bound.add(sessionID)
+      if (await bindSession(sessionID, agent, messageID, request, context)) {
+        bound.add(sessionID)
+      }
       capsules.delete(sessionID)
     },
 
@@ -213,12 +363,24 @@ export const AioContextPlugin: Plugin = async (ctx, options) => {
       const cached = capsules.get(sessionID)
       if (cached && Date.now() - cached.at < ttlMs) {
         if (cached.text) output.system.push(cached.text)
+        else if (cached.notice && knownAgent === aioAgent) {
+          output.system.push(`[aio-context] capsule unavailable: ${cached.notice}`)
+        }
         return
       }
-      const text = await composeCapsuleText(sessionID)
-      capsules.set(sessionID, { text, at: Date.now() })
-      if (text) output.system.push(text)
-      // No capsule: an unbound/unknown session receives nothing — never another session's.
+      const { text, notice } = await composeCapsuleText(sessionID)
+      const failure = failures.get(sessionID)
+      const effectiveNotice = notice || failure || null
+      capsules.set(sessionID, { text, notice: effectiveNotice, at: Date.now() })
+      if (text) {
+        output.system.push(text)
+      } else if (knownAgent === aioAgent) {
+        // Dependency failures must not disappear: a known AIO session gets an explicit,
+        // short unavailable notice instead of an empty system prompt.
+        output.system.push(
+          `[aio-context] capsule unavailable: ${effectiveNotice ?? "no durable binding for this session"}`,
+        )
+      }
     },
 
     "tool.execute.before": async (input) => {
@@ -228,11 +390,17 @@ export const AioContextPlugin: Plugin = async (ctx, options) => {
       // Only the COORDINATOR boundary is checked: a known worker (or an unattributed session)
       // is not the AIO, and valid non-AIO automation keeps its existing contract.
       if (agents.get(sessionID) !== aioAgent) return
-      if (await readBinding(sessionID)) return
+      const { report } = await sessionOpenCall([
+        "--binding",
+        "--native-session-id", sessionID,
+        "--json",
+      ])
+      if (report?.status === "found") return
       throw new Error(
         "[aio-context] refusing a consequential submit from an unbound AIO session " +
-          `(${input.tool}): no durable session binding resolved for ${sessionID}. ` +
-          "This early check is convenience only — backend enforcement is Unit D behavior " +
+          `(${input.tool}): no durable session binding resolved for ${sessionID}` +
+          (report?.status ? ` (status ${String(report.status)})` : "") +
+          ". This early check is convenience only — backend enforcement is Unit D behavior " +
           "and is not implemented yet.",
       )
     },

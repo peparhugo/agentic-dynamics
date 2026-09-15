@@ -196,12 +196,13 @@ class TestCapsuleComposition:
         long_request = "R" * 5000
         capsule = self._capsule(tmp_path, _binding(original_request=long_request))
         assert capsule["original_request"]["truncated"] is True
-        assert capsule["original_request"]["omitted_chars"] == 5000 - len(capsule["original_request"]["text"])
+        assert capsule["original_request"]["omitted_chars"] > 0
+        assert "[... " in capsule["original_request"]["text"]  # the middle-cut marker
         assert "[truncated:" in capsule["text"]
 
         tiny = self._capsule(tmp_path, _binding(), max_chars=200)
         assert tiny["bounds"]["truncated"] is True
-        assert "[capsule truncated:" in tiny["text"]
+        assert "capsule head truncated" in tiny["text"]
 
     def test_capsule_packet_and_budget_states_are_explicit(self, tmp_path):
         capsule = self._capsule(
@@ -289,3 +290,172 @@ class TestCliModes:
         report = json.loads(capsys.readouterr().out)
         assert report["capsule"] is None
         assert report["capsule_status"] == "missing"
+
+
+class TestStoreHardening:
+    def test_write_requires_an_existing_store(self, tmp_path):
+        """The reviewer repair: a native bind must NEVER create the durable root implicitly."""
+        absent = tmp_path / "wrong-worktree" / "kb"
+        result = si.write_binding(_binding(), artifact_dir=absent, connect_fn=_FakeRedis)
+        assert result.status == si.BINDING_STATUS_STORE_MISSING
+        assert not absent.exists(), "the writer created a private store"
+        assert any("refusing to create" in w for w in result.warnings)
+
+        # Initialization is the EXPLICIT operation — only then does a bind succeed.
+        si.init_binding_store(absent)
+        created = si.write_binding(_binding(), artifact_dir=absent, connect_fn=_FakeRedis)
+        assert created.status == si.BINDING_STATUS_CREATED
+
+    def test_concurrent_first_writes_claim_the_slot_exactly_once(self, tmp_path):
+        """O_CREAT|O_EXCL: exactly one `created`; the loser returns the winner's binding."""
+        import threading
+
+        results: list[str] = []
+        barrier = threading.Barrier(2)
+
+        def writer(request: str) -> None:
+            barrier.wait()
+            try:
+                outcome = si.write_binding(
+                    _binding(original_request=request),
+                    artifact_dir=tmp_path,
+                    connect_fn=_FakeRedis,
+                )
+                results.append(outcome.status)
+            except Exception as exc:  # pragma: no cover - failure detail for the assert
+                results.append(f"error: {exc}")
+
+        threads = [
+            threading.Thread(target=writer, args=(f"request-{i}",)) for i in range(2)
+        ]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join()
+
+        assert sorted(results) == [si.BINDING_STATUS_CREATED, si.BINDING_STATUS_EXISTING], results
+        found = si.read_binding("ses_test_1", artifact_dir=tmp_path)
+        assert found.status == si.BINDING_STATUS_FOUND
+        assert found.binding["original_request"] in ("request-0", "request-1")
+
+    def test_a_copied_slot_is_refused(self, tmp_path):
+        si.write_binding(_binding(), artifact_dir=tmp_path, connect_fn=_FakeRedis)
+        slot_a = si.binding_slot_path("ses_test_1", artifact_dir=tmp_path)
+        slot_b = si.binding_slot_path("ses_other", artifact_dir=tmp_path)
+        slot_b.write_bytes(slot_a.read_bytes())  # the foreign-session pointer copy
+        result = si.read_binding("ses_other", artifact_dir=tmp_path)
+        assert result.status == si.BINDING_STATUS_CORRUPT
+        assert any("copied or misplaced" in w for w in result.warnings)
+
+    def test_a_modified_request_is_refused(self, tmp_path):
+        written = si.write_binding(_binding(), artifact_dir=tmp_path, connect_fn=_FakeRedis)
+        artifact = tmp_path / f"{written.knowledge_id}.json"
+        record = json.loads(artifact.read_text())
+        payload = json.loads(record["text"])
+        payload["original_request"] = "MALICIOUSLY REPLACED"
+        # Keep the recorded hash stale — the request-hash check must catch it (the artifact
+        # bytes also changed, so the identity recompute is a second guard).
+        record["text"] = json.dumps(payload, sort_keys=True)
+        artifact.write_text(json.dumps(record, sort_keys=True))
+        result = si.read_binding("ses_test_1", artifact_dir=tmp_path)
+        assert result.status == si.BINDING_STATUS_CORRUPT
+        assert any("modified" in w or "recompute" in w for w in result.warnings)
+
+    def test_legacy_separator_in_the_request_round_trips(self, tmp_path):
+        tricky = 'Do the thing || json: {"tricky": true} — and keep it'
+        si.write_binding(
+            _binding(original_request=tricky), artifact_dir=tmp_path, connect_fn=_FakeRedis
+        )
+        result = si.read_binding("ses_test_1", artifact_dir=tmp_path)
+        assert result.status == si.BINDING_STATUS_FOUND
+        assert result.binding["original_request"] == tricky
+
+
+class TestVersionedContext:
+    def test_updates_are_versioned_and_preserve_the_request(self, tmp_path):
+        si.write_binding(
+            _binding(original_request="ORIGINAL REQUEST"),
+            artifact_dir=tmp_path,
+            connect_fn=_FakeRedis,
+        )
+        with pytest.raises(ValueError):
+            si.update_binding_context(
+                "ses_test_1", context={"work_unit": "x"}, expected_version=7, artifact_dir=tmp_path
+            )
+        updated = si.update_binding_context(
+            "ses_test_1",
+            context={
+                "work_unit": "repaired unit C",
+                "acceptance": {"text": "tests green", "source": "raw"},
+                "next_action": "review the PR",
+            },
+            expected_version=1,
+            artifact_dir=tmp_path,
+            connect_fn=_FakeRedis,
+        )
+        assert updated.status == si.BINDING_STATUS_UPDATED
+        assert updated.binding["context_version"] == 2
+        assert updated.binding["original_request"] == "ORIGINAL REQUEST"
+        assert updated.binding["work_unit"] == "repaired unit C"
+        assert updated.binding["context_history"][0]["version"] == 1
+        # The durable read resolves the NEW version through the atomically replaced slot.
+        again = si.read_binding("ses_test_1", artifact_dir=tmp_path)
+        assert again.binding["context_version"] == 2
+        assert again.binding["original_request"] == "ORIGINAL REQUEST"
+
+    def test_capsule_reflects_the_updated_context(self, tmp_path):
+        si.write_binding(_binding(), artifact_dir=tmp_path, connect_fn=_FakeRedis)
+        si.update_binding_context(
+            "ses_test_1",
+            context={"acceptance": {"text": "v2 acceptance", "source": "raw"}},
+            expected_version=1,
+            artifact_dir=tmp_path,
+            connect_fn=_FakeRedis,
+        )
+        module = _load_session_open("session_open_context_test")
+        capsule = module.compose_capsule(
+            si.read_binding("ses_test_1", artifact_dir=tmp_path).binding,
+            artifact_dir=tmp_path,
+            packet={"status": "unavailable", "reason": "test"},
+            budget={"verdict": "OK"},
+        )
+        assert "v2 acceptance" in capsule["text"]
+
+
+class TestConstraintPreservation:
+    def _capsule(self, tmp_path, binding, **kwargs):
+        module = _load_session_open("session_open_constraint_test")
+        return module.compose_capsule(
+            binding,
+            artifact_dir=tmp_path,
+            packet={"status": "unavailable", "reason": "test"},
+            budget={"verdict": "OK"},
+            **kwargs,
+        )
+
+    def test_acceptance_tail_constraint_survives_with_a_marker(self, tmp_path):
+        """The reviewer reproduction: a long criterion ending in NEVER DEPLOY must survive."""
+        criterion = ("Requirement: keep the system stable. " * 80) + "NEVER DEPLOY on Fridays."
+        capsule = self._capsule(
+            tmp_path, _binding(acceptance={"text": criterion, "source": "raw"})
+        )
+        assert "NEVER DEPLOY on Fridays." in capsule["text"]
+        assert "chars omitted" in capsule["text"]
+        assert capsule["acceptance"]["truncated"] is True
+
+    def test_the_controlling_tail_survives_the_size_bound(self, tmp_path):
+        capsule = self._capsule(
+            tmp_path,
+            _binding(
+                original_request="R" * 4000,
+                acceptance={"text": "A" * 4000, "source": "raw"},
+                next_action="ship the repair",
+                blocker="waiting on review",
+            ),
+            max_chars=600,
+        )
+        assert capsule["bounds"]["truncated"] is True
+        assert "session budget:" in capsule["text"]
+        assert "next action: ship the repair" in capsule["text"]
+        assert "blocker: waiting on review" in capsule["text"]
+        assert "capsule head truncated" in capsule["text"]
