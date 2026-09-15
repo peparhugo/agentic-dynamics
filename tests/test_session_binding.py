@@ -200,7 +200,7 @@ class TestCapsuleComposition:
         assert "[... " in capsule["original_request"]["text"]  # the middle-cut marker
         assert "[truncated:" in capsule["text"]
 
-        tiny = self._capsule(tmp_path, _binding(), max_chars=200)
+        tiny = self._capsule(tmp_path, _binding(original_request="R" * 4000), max_chars=650)
         assert tiny["bounds"]["truncated"] is True
         assert "capsule head truncated" in tiny["text"]
 
@@ -293,6 +293,20 @@ class TestCliModes:
 
 
 class TestStoreHardening:
+    def test_a_rejected_update_cannot_create_the_store(self, tmp_path):
+        """The reviewer repair: the lock setup must not mkdir before the store check — a
+        rejected update left `aio-bindings/` behind, letting a later bind silently succeed."""
+        absent = tmp_path / "wrong-worktree" / "kb"
+        with pytest.raises(ValueError):
+            si.update_binding_context(
+                "ses_x", context={"work_unit": "x"}, expected_version=1, artifact_dir=absent
+            )
+        assert not absent.exists(), "the rejected update created store directories"
+        result = si.write_binding(
+            _binding(native_session_id="ses_x"), artifact_dir=absent, publish=False
+        )
+        assert result.status == si.BINDING_STATUS_STORE_MISSING
+
     def test_write_requires_an_existing_store(self, tmp_path):
         """The reviewer repair: a native bind must NEVER create the durable root implicitly."""
         absent = tmp_path / "wrong-worktree" / "kb"
@@ -476,6 +490,19 @@ class TestConstraintPreservation:
         assert "NEVER DEPLOY on Fridays." in capsule["text"]
         assert "chars omitted" in capsule["text"]
         assert capsule["acceptance"]["truncated"] is True
+
+    def test_a_tiny_bound_still_carries_the_blocker(self, tmp_path):
+        """Below the floor, the tail cannot fit — so the composer budgets against the floor
+        and records the requested bound separately (reviewer: nonblocking edge)."""
+        capsule = self._capsule(
+            tmp_path,
+            _binding(next_action="N" * 4000, blocker="the real blocker"),
+            max_chars=200,
+        )
+        assert capsule["bounds"]["requested_max_chars"] == 200
+        assert capsule["bounds"]["max_chars"] == 600
+        assert "the real blocker" in capsule["text"]
+        assert "session budget:" in capsule["text"]
 
     def test_an_oversized_next_action_cannot_evict_the_blocker(self, tmp_path):
         """Each protected tail field is bounded independently: an oversized next action must

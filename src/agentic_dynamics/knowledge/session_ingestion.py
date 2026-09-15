@@ -1394,10 +1394,22 @@ def update_binding_context(
     from agentic_dynamics.core.paths import KB_ARTIFACT_DIR
 
     artifact_dir = artifact_dir or KB_ARTIFACT_DIR
+    # The reviewer repair: check the store BEFORE creating anything (the lock directory
+    # included). Creating `aio-bindings/` for a rejected update would make the ROOT appear
+    # present and let a later ordinary bind succeed without explicit initialization.
+    if _binding_store_status(artifact_dir) == "missing":
+        raise ValueError(
+            f"no binding store at {artifact_dir} to update (store_missing) — refusing to "
+            "create it implicitly; initialize explicitly (session_open.py --init-store)"
+        )
     slot_path_locked = binding_slot_path(
         native_session_id, artifact_dir=artifact_dir, repository_id=repository_id
     )
-    slot_path_locked.parent.mkdir(parents=True, exist_ok=True)
+    if not slot_path_locked.parent.is_dir():
+        raise ValueError(
+            f"the binding store at {slot_path_locked.parent} is absent — initialize it "
+            "explicitly (session_open.py --init-store)"
+        )
     # Serialize the read-check-write across PROCESSES (the reviewer race: two updaters both
     # accepted version 1 and overwrote each other). An exclusive flock on a sidecar lock file
     # makes the version check and the slot replacement one critical section.

@@ -54,6 +54,11 @@ const CAPSULE_TTL_MS = 30_000
 /** Default capsule size bound (the composer's bound is authoritative; this is the last resort). */
 const CAPSULE_MAX_CHARS = 16_000
 
+/** The capsule floor (mirrors the composer's MIN_CAPSULE_CHARS): below it the protected tail
+ *  cannot fit, and a slice against the raw request would cut the blocker while claiming
+ *  preservation. Small custom limits are raised to the floor. */
+const MIN_CAPSULE_CHARS = 600
+
 /** Hard deadline for ONE companion command (a hung child must not hang the session). */
 const COMMAND_TIMEOUT_MS = 15_000
 
@@ -147,7 +152,7 @@ export const AioContextPlugin: Plugin = async (ctx, options) => {
   const sessionOpen = opts.sessionOpen ?? `${ctx.worktree ?? ctx.directory}/scripts/session_open.py`
   const aioAgent = opts.aioAgent ?? AIO_AGENT
   const ttlMs = opts.capsuleTtlMs ?? CAPSULE_TTL_MS
-  const maxChars = opts.capsuleMaxChars ?? CAPSULE_MAX_CHARS
+  const maxChars = Math.max(opts.capsuleMaxChars ?? CAPSULE_MAX_CHARS, MIN_CAPSULE_CHARS)
   const timeoutMs = opts.commandTimeoutMs ?? COMMAND_TIMEOUT_MS
   const maxOutputBytes = opts.maxOutputBytes ?? MAX_OUTPUT_BYTES
   const run: CommandRunner = opts.commandRunner ?? defaultCommandRunner
@@ -232,6 +237,18 @@ export const AioContextPlugin: Plugin = async (ctx, options) => {
     }
     const contextTask = String(context.task ?? "").trim()
     const contextProject = String(context.project ?? "").trim()
+    if (!boundTask && !boundProject && !contextSession) {
+      // Reviewer repair: an INITIAL handoff must name the native session id. A task/project
+      // reference alone cannot be validated against a fresh session's identity — accepting it
+      // let an unrelated fresh session inherit another session's task, predecessor and
+      // acceptance. Task/project references remain valid for UPDATES, where the bound
+      // identity is there to compare against.
+      return {
+        applies: false,
+        reason: "an initial handoff must name the native session id (native_session_id)",
+        surface: true,
+      }
+    }
     if (boundTask && contextTask && contextTask !== boundTask) {
       // A different task's attachment: also not ours (a task-scoped file for another task).
       return {
@@ -430,35 +447,37 @@ export const AioContextPlugin: Plugin = async (ctx, options) => {
       // A session already observed as a worker gets no coordinator capsule, no store read.
       const knownAgent = agents.get(sessionID)
       if (knownAgent && knownAgent !== aioAgent) return
+      const emit = (text: string | null, notice: string | null) => {
+        if (text) {
+          output.system.push(text)
+          // The failure notice rides BOTH the fresh and the cached paths, until a
+          // reconciliation succeeds (reviewer repair: a cached request dropped the warning).
+          const failure = failures.get(sessionID)
+          if (failure) {
+            const active = contextVersions.get(sessionID)
+            output.system.push(
+              `[aio-context] context update failed: ${failure} — context version ` +
+                `${active ?? "unknown"} remains active`,
+            )
+          }
+        } else if (knownAgent === aioAgent) {
+          // Dependency failures must not disappear: a known AIO session gets an explicit,
+          // short unavailable notice instead of an empty system prompt.
+          output.system.push(
+            `[aio-context] capsule unavailable: ${notice ?? "no durable binding for this session"}`,
+          )
+        }
+      }
       const cached = capsules.get(sessionID)
       if (cached && Date.now() - cached.at < ttlMs) {
-        if (cached.text) output.system.push(cached.text)
-        else if (cached.notice && knownAgent === aioAgent) {
-          output.system.push(`[aio-context] capsule unavailable: ${cached.notice}`)
-        }
+        emit(cached.text, cached.notice)
         return
       }
       const { text, notice } = await composeCapsuleText(sessionID)
       const failure = failures.get(sessionID)
       const effectiveNotice = notice || failure || null
       capsules.set(sessionID, { text, notice: effectiveNotice, at: Date.now() })
-      if (text) {
-        output.system.push(text)
-        const failure = failures.get(sessionID)
-        if (failure) {
-          const active = contextVersions.get(sessionID)
-          output.system.push(
-            `[aio-context] context update failed: ${failure} — context version ` +
-              `${active ?? "unknown"} remains active`,
-          )
-        }
-      } else if (knownAgent === aioAgent) {
-        // Dependency failures must not disappear: a known AIO session gets an explicit,
-        // short unavailable notice instead of an empty system prompt.
-        output.system.push(
-          `[aio-context] capsule unavailable: ${effectiveNotice ?? "no durable binding for this session"}`,
-        )
-      }
+      emit(text, effectiveNotice)
     },
 
     "tool.execute.before": async (input) => {

@@ -13,9 +13,12 @@ loader locations).
 
 **The explicit handoff attachment.** When `.opencode/aio-task-context.json` exists in the
 project, the plugin attaches it to the session's binding on the first substantive message:
-`task` (stable identity), `predecessor_slug` + `knowledge_ids` (the explicitly selected
-origin and findings), `acceptance` (+ `acceptance_source`/`acceptance_provenance`),
-`project`, `source_revision`, `work_unit`, `next_action`, `blocker`, and `context_version`.
+`native_session_id` (REQUIRED for an initial handoff — a fresh session cannot validate a
+task reference against an identity it does not have yet), `task` (stable identity),
+`predecessor_slug` + `knowledge_ids` (the explicitly selected origin and findings),
+`acceptance` (+ `acceptance_source`/`acceptance_provenance`), `project`, `source_revision`,
+`work_unit`, `next_action`, `blocker`, and `context_version`. Task/project references remain
+valid for UPDATES, where the session's bound identity is there to compare against.
 The file is the EXPLICIT selection — the plugin never invents one. Raise `context_version`
 to apply an update; the original request is immutable and no update can replace it.
 

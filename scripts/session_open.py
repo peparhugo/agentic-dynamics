@@ -78,6 +78,11 @@ PACKET_SAFE_ACTIONS = 8
 #: bound and lose the fields below it (reviewer reproduction: an oversized next action pushed
 #: the blocker out while the text still claimed it was preserved).
 TAIL_FIELD_CHARS = 300
+#: The floor for the capsule bound: below this the protected tail cannot fit, and a slice
+#: applied against the raw request would cut the blocker while claiming preservation. The
+#: composer budgets against the floor and records the requested value separately; the plugin
+#: mirrors the same floor for its defensive slice.
+MIN_CAPSULE_CHARS = 600
 
 
 def _now_utc() -> str:
@@ -423,10 +428,13 @@ def compose_capsule(
         "blocker": blocker_section,
         "bounds": {"max_chars": max_chars, "max_records": max_records},
     }
+    effective_max = max(int(max_chars), MIN_CAPSULE_CHARS)
+    capsule["bounds"]["requested_max_chars"] = int(max_chars)
+    capsule["bounds"]["max_chars"] = effective_max
     head, tail = _render_head(capsule), _render_tail(capsule)
-    if len(head) + 1 + len(tail) > max_chars:
+    if len(head) + 1 + len(tail) > effective_max:
         reserve = len(tail) + 130  # the tail + the omission marker
-        allowed = max(0, max_chars - reserve)
+        allowed = max(0, effective_max - reserve)
         omitted = max(0, len(head) - allowed)
         head = head[:allowed] + (
             f"\n[capsule head truncated: {omitted} chars omitted — budget/next action/"
@@ -455,9 +463,10 @@ def _render_tail(capsule: dict) -> str:
     survive regardless of how long the request/acceptance/records are).
     """
     budget = capsule["session_budget"]
-    next_text, next_omitted = _truncate(str(capsule["next_action"]["text"] or ""), TAIL_FIELD_CHARS)
+    field_limit = min(TAIL_FIELD_CHARS, max(60, int(capsule["bounds"].get("max_chars") or MIN_CAPSULE_CHARS) // 4))
+    next_text, next_omitted = _truncate(str(capsule["next_action"]["text"] or ""), field_limit)
     next_marker = f" [truncated: {next_omitted} chars omitted]" if next_omitted else ""
-    blocker_text, blocker_omitted = _truncate(str(capsule["blocker"]["text"] or ""), TAIL_FIELD_CHARS)
+    blocker_text, blocker_omitted = _truncate(str(capsule["blocker"]["text"] or ""), field_limit)
     blocker_marker = f" [truncated: {blocker_omitted} chars omitted]" if blocker_omitted else ""
     budget_reason = _truncate(str(budget.get("reason") or ""), 200)[0]
     lines = [

@@ -228,7 +228,10 @@ describe("aio-context plugin", () => {
     await hooks["experimental.chat.system.transform"]({ sessionID: "ses_big" }, out)
 
     const injected = out.system.join()
-    expect(injected.length).toBeLessThan(200)
+    // The plugin floors a tiny custom limit at MIN_CAPSULE_CHARS (600) so the protected
+    // tail can never be cut; the oversized capsule is still truncated explicitly.
+    expect(injected.length).toBeLessThan(750)
+    expect(injected.length).toBeGreaterThan(600)
     expect(injected).toContain("[capsule truncated by the plugin:")
   })
 
@@ -331,6 +334,7 @@ describe("aio-context plugin — handoff attachment and versioned context", () =
     const project = tmpDir("aio-project-")
     try {
       writeTaskContext(project, {
+        native_session_id: "ses_ctx",
         task: "unit-c-integration",
         predecessor_slug: "bound-handoff",
         knowledge_ids: ["f".repeat(64)],
@@ -366,7 +370,9 @@ describe("aio-context plugin — handoff attachment and versioned context", () =
   test("a higher context_version triggers an explicit versioned update", async () => {
     const project = tmpDir("aio-project-")
     try {
-      writeTaskContext(project, { task: "t", context_version: 1, work_unit: "v1 work" })
+      writeTaskContext(project, {
+        native_session_id: "ses_up", task: "t", context_version: 1, work_unit: "v1 work",
+      })
       const { runner, calls } = fakeRunner((mode, args) => {
         if (mode === "bind") {
           return {
@@ -385,7 +391,9 @@ describe("aio-context plugin — handoff attachment and versioned context", () =
       const hooks = await makePluginAt(runner, project)
       await hooks["chat.message"](...Object.values(message("ses_up", "aio-control", "start")))
 
-      writeTaskContext(project, { task: "t", context_version: 2, work_unit: "v2 work" })
+      writeTaskContext(project, {
+        native_session_id: "ses_up", task: "t", context_version: 2, work_unit: "v2 work",
+      })
       await hooks["chat.message"](...Object.values(message("ses_up", "aio-control", "continue")))
 
       const update = calls.find((c) => modeOf(c.args) === "update-context")
@@ -506,6 +514,7 @@ describe("aio-context plugin — full native path (real CLI, temporary knowledge
       // The explicit handoff attachment: predecessor + finding + acceptance ending in a
       // controlling constraint (the reviewer's NEVER DEPLOY shape).
       writeTaskContext(project, {
+        native_session_id: "ses_integration",
         task: "unit-c-integration",
         predecessor_slug: "c-seeded-predecessor",
         knowledge_ids: [findingId],
@@ -668,6 +677,12 @@ describe("aio-context plugin — handoff selection by session (reviewer repair)"
       expect(failed.system.join()).toContain("context update failed")
       expect(failed.system.join()).toContain("context version 1 remains active")
 
+      // A second request within the cache lifetime must warn TOO (reviewer repair).
+      const cachedRequest = { system: [] as string[] }
+      await hooks["experimental.chat.system.transform"]({ sessionID: "ses_r" }, cachedRequest)
+      expect(cachedRequest.system.join()).toContain("CAPSULE")
+      expect(cachedRequest.system.join()).toContain("context version 1 remains active")
+
       // Reconciliation: the same update now succeeds — the notice clears.
       updateShouldFail = false
       await hooks["chat.message"](...Object.values(message("ses_r", "aio-control", "continue again")))
@@ -680,19 +695,30 @@ describe("aio-context plugin — handoff selection by session (reviewer repair)"
     }
   })
 
-  test("an unvalidatable attachment is not applied and says so", async () => {
+  test("two fresh sessions reading the same untargeted file inherit nothing", async () => {
     const project = tmpDir("aio-unref-")
     try {
-      writeTaskContext(project, { acceptance: "orphan acceptance", context_version: 1 })
+      // No native_session_id, no bound identity to compare a task reference against: an
+      // initial handoff cannot be validated, so NEITHER fresh session adopts it.
+      writeTaskContext(project, {
+        task: "task-of-elsewhere",
+        predecessor_slug: "pred-of-elsewhere",
+        acceptance: "orphan acceptance",
+        context_version: 1,
+      })
       const bound = new Set<string>()
       const { runner, calls } = fakeRunner(happyResponder(bound))
       const hooks = await makePluginAt(runner, project)
-      await hooks["chat.message"](...Object.values(message("ses_u", "aio-control", "start")))
-      const bind = calls.find((c) => modeOf(c.args) === "bind")!
-      expect(bind.args).not.toContain("--acceptance") // never silently mixed in
-      const out = { system: [] as string[] }
-      await hooks["experimental.chat.system.transform"]({ sessionID: "ses_u" }, out)
-      expect(out.system.join()).toContain("no session/task/project reference to validate")
+
+      for (const session of ["ses_u1", "ses_u2"]) {
+        await hooks["chat.message"](...Object.values(message(session, "aio-control", "start")))
+        const bind = calls.filter((c) => modeOf(c.args) === "bind").find((c) => sessionOf(c.args) === session)!
+        expect(bind.args).not.toContain("--acceptance")
+        expect(bind.args).not.toContain("--predecessor-slug")
+        const out = { system: [] as string[] }
+        await hooks["experimental.chat.system.transform"]({ sessionID: session }, out)
+        expect(out.system.join()).toContain("an initial handoff must name the native session id")
+      }
     } finally {
       rmSync(project, { recursive: true, force: true })
     }
