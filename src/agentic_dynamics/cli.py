@@ -147,10 +147,11 @@ _COMMANDS: dict[tuple[str, ...], str] = {
     # a clear first-session bootstrap when no close exists.
     ("session", "close"): "session_close.py",
     ("session", "open"): "session_open.py",
-    # `session budget` (remediation closed-loop, decision f987cde9): the AIO runs it with the
-    # control packet every turn — OK / WARN / CLOSE over the live session's context size and
-    # turn count, journaled append-only. WARN = no new work, wrap and close; CLOSE = close NOW
-    # and hand off. An unreadable budget is UNJUDGED (exit 1), never OK.
+    # `session budget` (capacity-derived, 2026-09-15 policy; remediation closed-loop, decision
+    # f987cde9): the AIO runs it with the control packet every turn — the verdict is resolved
+    # against the ACTIVE session model's capacity (shared with the capsule + the fleet gate),
+    # journaled append-only. WARN = advisory; COMPACT = native compaction (session continues);
+    # CLOSE = the hard model limit (hand off); UNJUDGED (exit 1) is never OK.
     ("session", "budget"): "session_budget.py",
     # decision (the self-knowledge layer — loop 2). `decision record` (s2a) records a decision
     # at the moment of decision — what was decided, why, the alternatives weighed — through the

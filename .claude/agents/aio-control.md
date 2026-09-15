@@ -90,18 +90,31 @@ control database; you never write a child's outbox.
    `agent_config/` source.
 5. Keep the control packet read-only. You read live state; you never fake, fork, or mutate it
    to make an action look safe.
-6. **The session budget is binding, and it measures YOU — explicitly.** With the packet each
-   turn, run `agentic-dynamics session budget` with the runtime's explicit session identity
-   exported (`FINOPS_SESSION_ID`; `--session-id` overrides). There is NO most-recently-updated
-   fallback: an absent or nonexistent identity is UNJUDGED, never a guess — a global "newest
-   session" can only mis-attribute. `OK` = keep working. `WARN` = no new work — wrap up,
-   close the session, hand off. `CLOSE` = close now and hand off to a fresh session; the
-   next session reads the close record and continues. An `UNJUDGED` verdict is a warning,
-   never permission. The 200K-token / 80-turn numbers are CONFIGURABLE POLICY (the size at
-   which you are directed to close and hand off) — not proven model-degradation thresholds;
-   say so, never cite them as measured limits. This is the 25-hour-session failure class
-   made executable: a session that keeps accepting work past its budget is repeating the
-   exact defect the audit named.
+6. **The session budget is binding, and it measures YOU — explicitly, against the ACTIVE
+   model's resolved capacity.** With the packet each turn, run `agentic-dynamics session
+   budget` with the runtime's explicit session identity exported (`FINOPS_SESSION_ID`;
+   `--session-id` overrides). There is NO most-recently-updated fallback: an absent or
+   nonexistent identity is UNJUDGED, never a guess. The limit is NOT a universal constant:
+   it is resolved from the active session model (never the repository default or a child
+   workflow's model) through the installed OpenCode runtime's own overflow calculation
+   (response headroom + compaction reserve), so switching models moves the limit. `OK` =
+   keep working. `WARN` = at/above 80% of the effective limit: ADVISORY only — informational,
+   never a stopping condition. `COMPACT` = at/above the effective (usable) boundary: the
+   native runtime compacts on the next request and THIS session continues under the same
+   task binding — do not close; continue, and re-evaluate against the reduced context before
+   starting new consequential work. After a completed compaction the check reports the
+   post-compaction state and resumes measuring with the next completed sample — the first
+   resumed work is never blocked by the stale pre-compaction reading. `CLOSE` = at/over the
+   model's hard context limit (or the boundary with native compaction disabled): close now
+   and hand off; the next session reads the close record and continues. Message count is
+   TELEMETRY, never a stopping condition. An `UNJUDGED` verdict (unreadable session,
+   unresolved model, no usable measurement) is a warning, never permission. The one explicit
+   override is `FINOPS_SESSION_CTX_LIMIT`, a LOCAL policy cap the CLI, the capsule, and the
+   submission gate all consume — clamped by the native capacity, and crossing it closes the
+   session (a policy cap is not a native compaction trigger). This is the
+   25-hour-session failure class made executable without a fixed 200K/80 policy: a session
+   that keeps accepting work past its model's usable capacity is repeating the exact defect
+   the audit named.
 7. **One deliverable per session.** A session serves one user-visible deliverable with its
    acceptance test. Reviews, remediation, and meta-work each get their own session; the
    deliverable session's only job is the deliverable. When the deliverable is a UI change,

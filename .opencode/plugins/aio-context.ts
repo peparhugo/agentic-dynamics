@@ -28,7 +28,9 @@
  *
  *  - `tool.execute.before` — the early consequential-submit check: an AIO session with no
  *    binding refuses `run_workflow` with an explicit message. Convenience + early warning
- *    ONLY; backend enforcement is Unit D behavior and is NOT implemented yet.
+ *    ONLY; the backend enforcement is the fleet exec boundary (Unit D,
+ *    scripts/fleet/spawn_wrapper.py `_validate_aio_binding`, re-run strictly by the host
+ *    launch broker before the launch effect) — never a substitute for it.
  *
  * Identity is per call (`input.sessionID` / `output.message.agent` / `ctx`): the plugin never
  * sets a process-global session id in the multi-session server, and workers, special profiles,
@@ -497,8 +499,9 @@ export const AioContextPlugin: Plugin = async (ctx, options) => {
         "[aio-context] refusing a consequential submit from an unbound AIO session " +
           `(${input.tool}): no durable session binding resolved for ${sessionID}` +
           (report?.status ? ` (status ${String(report.status)})` : "") +
-          ". This early check is convenience only — backend enforcement is Unit D behavior " +
-          "and is not implemented yet.",
+          ". This early check is convenience only — the fleet exec boundary (the spawn " +
+          "wrapper / host launch broker) re-validates the binding and the session capacity " +
+          "before the launch effect.",
       )
     },
   }

@@ -2016,18 +2016,24 @@ def test_a_stale_task_revision_is_refused_and_the_current_one_passes(aio_env):
     assert current == []
 
 
-def test_a_warn_or_close_budget_blocks_new_consequential_work(aio_env, monkeypatch):
+def test_warn_is_advisory_and_boundary_verdicts_block(aio_env, monkeypatch):
+    """The 2026-09-15 capacity policy at the gate: WARN is ADVISORY (a session near its
+    effective limit may still start new work); COMPACT (native compaction boundary), CLOSE
+    (hard model limit) and UNJUDGED (no measurement) block new consequential work."""
     from scripts.fleet import spawn_wrapper as sw
 
     binding_id = _bound_store(aio_env)
-    for verdict in ("WARN", "CLOSE", "UNJUDGED"):
+    for verdict, blocked in (("WARN", False), ("COMPACT", True), ("CLOSE", True), ("UNJUDGED", True)):
         monkeypatch.setattr(
             sw, "_aio_budget_verdict", lambda session_id, v=verdict: (v, "measured reason", True)
         )
         errors = validate_submit_request(
             _aio_request(aio=_aio_block(binding_id=binding_id))
         )
-        assert any(f"budget verdict is {verdict}" in e for e in errors), verdict
+        if blocked:
+            assert any(f"budget verdict is {verdict}" in e for e in errors), verdict
+        else:
+            assert errors == [], f"WARN must not block: {errors}"
 
 
 def test_the_budget_verdict_is_measured_from_the_explicit_session(tmp_path, monkeypatch):
@@ -2037,14 +2043,20 @@ def test_the_budget_verdict_is_measured_from_the_explicit_session(tmp_path, monk
 
     from scripts.fleet import spawn_wrapper as sw
 
+    _capacity_env(tmp_path, monkeypatch)
     db = tmp_path / "opencode.db"
     con = sqlite3.connect(db)
-    con.execute("CREATE TABLE session (id TEXT, time_updated INTEGER)")
+    con.execute(
+        "CREATE TABLE session (id TEXT, time_updated INTEGER, model TEXT, version TEXT, directory TEXT)"
+    )
     con.execute("CREATE TABLE message (session_id TEXT, time_created INTEGER, data TEXT)")
-    con.execute("INSERT INTO session VALUES ('ses_aio', 200)")
+    con.execute(
+        "INSERT INTO session VALUES ('ses_aio', 200, ?, '1.18.15', '/nonexistent/project')",
+        (_json.dumps({"providerID": "deepseek", "id": "deepseek-v4-flash"}),),
+    )
     con.execute(
         "INSERT INTO message VALUES ('ses_aio', 1, ?)",
-        (_json.dumps({"role": "assistant", "tokens": {"input": 10, "cache": {"read": 10, "write": 0}}}),),
+        (_json.dumps({"role": "assistant", "tokens": {"total": 20, "input": 10}}),),
     )
     con.commit()
     con.close()
@@ -2076,33 +2088,56 @@ def test_a_non_aio_submit_needs_no_binding_and_keeps_its_contract(tmp_path, monk
 # UNJUDGED and block a valid job. The host gate (the broker) measures strictly.
 
 
+_CAPACITY_CATALOG = {
+    "deepseek": {
+        "models": {"deepseek-v4-flash": {"limit": {"context": 1_000_000, "output": 384_000}}}
+    }
+}
+
+
+def _capacity_env(tmp_path, monkeypatch) -> None:
+    """Hermetic capacity resolution: a tmp catalog + tmp config roots (no host config)."""
+    import json as _json
+
+    cache = tmp_path / "models.json"
+    cache.write_text(_json.dumps(_CAPACITY_CATALOG), encoding="utf-8")
+    monkeypatch.setenv("FINOPS_OPENCODE_MODELS_CACHE", str(cache))
+    # Deterministic limits: the fixture catalog, never the host runtime CLI.
+    monkeypatch.setenv("FINOPS_SESSION_CAPACITY_SOURCE", "catalog")
+    (tmp_path / "config-home").mkdir(exist_ok=True)
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "config-home"))
+
+
 def _canonical_session_db(path, *, sid: str = "ses_aio", turns: int = 1, context: int = 10,
-                          pending_only: bool = False) -> None:
-    """A real opencode-shaped session db (the production schema), not a mocked verdict."""
+                          pending_only: bool = False, model: str = "deepseek-v4-flash") -> None:
+    """A real opencode-shaped session db (production schema + the ACTIVE model), not a mock."""
     import json as _json
     import sqlite3
 
     con = sqlite3.connect(path)
-    con.execute("CREATE TABLE session (id TEXT, time_updated INTEGER)")
+    con.execute(
+        "CREATE TABLE session (id TEXT, time_updated INTEGER, model TEXT, version TEXT, directory TEXT)"
+    )
     con.execute("CREATE TABLE message (session_id TEXT, time_created INTEGER, data TEXT)")
-    con.execute("INSERT INTO session VALUES (?, 200)", (sid,))
+    con.execute(
+        "INSERT INTO session VALUES (?, 200, ?, '1.18.15', ?)",
+        (sid, _json.dumps({"providerID": "deepseek", "id": model}), "/nonexistent/project"),
+    )
     if pending_only:
         con.execute(
             "INSERT INTO message VALUES (?, 1, ?)",
-            (sid, _json.dumps({"role": "assistant", "tokens": {"input": 0, "output": 0}})),
+            (sid, _json.dumps({"role": "assistant", "tokens": {"total": 0, "input": 0, "output": 0}})),
         )
     else:
         for i in range(turns - 1):
             con.execute(
                 "INSERT INTO message VALUES (?, ?, ?)",
-                (sid, i, _json.dumps(
-                    {"role": "assistant", "tokens": {"input": 10, "cache": {"read": 10, "write": 0}}}
-                )),
+                (sid, i, _json.dumps({"role": "assistant", "tokens": {"total": 10, "input": 10}})),
             )
         con.execute(
             "INSERT INTO message VALUES (?, ?, ?)",
             (sid, turns, _json.dumps(
-                {"role": "assistant", "tokens": {"input": context, "cache": {"read": 0, "write": 0}}}
+                {"role": "assistant", "tokens": {"total": context, "input": context}}
             )),
         )
     con.commit()
@@ -2140,14 +2175,70 @@ def test_a_strict_gate_refuses_when_the_db_is_missing(tmp_path, monkeypatch):
 
 def test_the_budget_is_measured_for_real_against_the_canonical_db(tmp_path, monkeypatch):
     """No verdict mocking: a real opencode-shaped DB decides admission and refusal."""
+    _capacity_env(tmp_path, monkeypatch)
     request, _ = _valid_bound_request(tmp_path, monkeypatch, db_name="ok.db")
     assert validate_submit_request(request) == []
 
+    # Message count is TELEMETRY: 120 low-context messages do NOT block (the removed
+    # 80-message stopping condition).
     busy = tmp_path / "busy.db"
-    _canonical_session_db(busy, turns=80, context=1000)
+    _canonical_session_db(busy, turns=120, context=1000)
     monkeypatch.setenv("FINOPS_OPENCODE_DB", str(busy))
+    assert validate_submit_request(request) == []
+
+    # The native compaction boundary DOES block new consequential work until the reduced
+    # context is observed (same session/task binding continues).
+    boundary = tmp_path / "boundary.db"
+    _canonical_session_db(boundary, turns=60, context=970_000)
+    monkeypatch.setenv("FINOPS_OPENCODE_DB", str(boundary))
     errors = validate_submit_request(request)
-    assert any("budget verdict is CLOSE" in e for e in errors)
+    assert any("budget verdict is COMPACT" in e for e in errors)
+
+
+def test_the_gate_consumes_the_shared_override(tmp_path, monkeypatch):
+    """The SAME resolution the CLI and capsule consume: FINOPS_SESSION_CTX_LIMIT moves the
+    gate's verdict. A policy cap below the native boundary is a LOCAL POLICY close (never a
+    claimed native compaction — reviewer finding)."""
+    _capacity_env(tmp_path, monkeypatch)
+    db = tmp_path / "override.db"
+    _canonical_session_db(db, turns=10, context=120_000)
+    request, _ = _valid_bound_request(tmp_path, monkeypatch, db_name=None)
+    monkeypatch.setenv("FINOPS_OPENCODE_DB", str(db))
+    assert validate_submit_request(request) == []  # 120K < 968K usable
+    monkeypatch.setenv("FINOPS_SESSION_CTX_LIMIT", "100000")
+    errors = validate_submit_request(request)
+    assert any("budget verdict is CLOSE" in e for e in errors), errors
+    assert any("LOCAL POLICY" in e for e in errors), errors
+
+
+def test_a_completed_compaction_allows_the_resumed_submission(tmp_path, monkeypatch):
+    """Reviewer reproduction at the gate: after a successful compaction (summary + pending
+    resumed turn) the stale 975K reading must not block the first resumed submit."""
+    import json as _json
+    import sqlite3 as _sqlite3
+
+    _capacity_env(tmp_path, monkeypatch)
+    db = tmp_path / "compacted.db"
+    _canonical_session_db(db, turns=60, context=975_000)
+    request, _ = _valid_bound_request(tmp_path, monkeypatch, db_name=None)
+    monkeypatch.setenv("FINOPS_OPENCODE_DB", str(db))
+    errors = validate_submit_request(request)
+    assert any("budget verdict is COMPACT" in e for e in errors), errors
+
+    con = _sqlite3.connect(db)
+    con.execute(
+        "INSERT INTO message VALUES ('ses_aio', 99000, ?)",
+        (_json.dumps({"role": "assistant", "summary": True, "mode": "compaction",
+                      "finish": "stop",
+                      "tokens": {"total": 975_000, "input": 975_000}}),),
+    )
+    con.execute(
+        "INSERT INTO message VALUES ('ses_aio', 99500, ?)",
+        (_json.dumps({"role": "assistant", "tokens": {"total": 0, "input": 0}}),),
+    )
+    con.commit()
+    con.close()
+    assert validate_submit_request(request) == []
 
 
 def test_a_pending_only_session_has_no_usable_measurement(tmp_path, monkeypatch):
