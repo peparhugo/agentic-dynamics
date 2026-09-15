@@ -2266,18 +2266,36 @@ def test_both_cross_project_binding_cases_are_refused_before_launch(aio_env, tmp
             slot.unlink()
 
 
-def test_a_correct_project_binding_passes_the_agreement(aio_env, tmp_path):
+def test_a_linked_worktree_accepts_origin_and_canonical_name_bindings(aio_env, tmp_path):
+    """The reviewer repair: after agreement is PROVEN via origin/common git dir, the
+    established project's aliases stay valid — including its canonical checkout name —
+    regardless of the linked worktree's differing directory name."""
+    import subprocess
+
     from scripts.fleet import spawn_wrapper as sw
 
     proj_a = _git_project(tmp_path, "proj-a", "git@github.com:org/proj-a.git")
-    binding_id = _bound_store(aio_env, project="github.com/org/proj-a")
-    errors = sw._validate_aio_binding(
-        _aio_block(binding_id=binding_id), repo_root=proj_a, workdir=str(proj_a),
+    worktree = tmp_path / "wt-a"
+    subprocess.run(
+        ["git", "-C", str(proj_a), "worktree", "add", "-q", str(worktree), "-b", "wt-a"],
+        check=True,
     )
-    assert errors == []
+    for project in ("github.com/org/proj-a", "proj-a"):
+        binding_id = _bound_store(aio_env, project=project)
+        errors = sw._validate_aio_binding(
+            _aio_block(binding_id=binding_id), repo_root=proj_a, workdir=str(worktree),
+        )
+        assert errors == [], project
+        for slot in (aio_env / "aio-bindings").glob("*.json"):
+            slot.unlink()
 
+    # A foreign project name still refuses on the same linked worktree.
+    binding_id = _bound_store(aio_env, project="some-unrelated-project")
+    errors = sw._validate_aio_binding(
+        _aio_block(binding_id=binding_id), repo_root=proj_a, workdir=str(worktree),
+    )
+    assert any("does not match the submitted project" in e for e in errors)
 
-# ── The AIO in-process exception: verified deterministic workflows (Unit D repair) ─────────
 
 DETERMINISTIC_SPEC_YAML = """\
 name: deterministic_fixture
@@ -2411,7 +2429,6 @@ def test_only_test_kinds_are_deterministic_matching_the_runner(tmp_path):
 def test_the_validator_and_the_runner_agree_on_the_deterministic_fixture(tmp_path):
     """Together, through the REAL runner with recording executors: the validator admits the
     `kind: test` fixture AND the runner makes ZERO agent calls executing it."""
-    from agentic_dynamics.runtime.executor import StepResult  # noqa: F401  (import check)
     from agentic_dynamics.runtime.workflow_runner import run_workflow
     from scripts.fleet import spawn_wrapper as sw
 

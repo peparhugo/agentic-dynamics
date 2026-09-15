@@ -965,13 +965,22 @@ def _normalize_project(value: str) -> str:
 
 
 def _checkout_identity(checkout: Path) -> dict | None:
-    """``{name, origin, common_dir, is_git}`` for ONE checkout, or None when unresolvable."""
+    """``{name, canonical_name, origin, common_dir, is_git}`` for ONE checkout (or None).
+
+    ``canonical_name`` is the repository's MAIN checkout name (the common git dir's parent) —
+    the established project's canonical alias, which a linked worktree shares even though its
+    own directory name differs.
+    """
     if checkout is None or not str(checkout).strip() or not checkout.is_dir():
         return None
     common = _git_common_dir(checkout)
     origin = _origin_url(common) if common is not None else ""
+    canonical = ""
+    if common is not None and common.name == ".git":
+        canonical = _normalize_project(common.parent.name)
     return {
         "name": _normalize_project(checkout.name),
+        "canonical_name": canonical,
         "origin": _normalize_project(origin),
         "common_dir": str(common) if common is not None else "",
         "is_git": common is not None,
@@ -1010,9 +1019,15 @@ def _project_agreement(repo_root: Path, workdir: str) -> tuple[set[str], list[st
                 f"{repo['origin'] or repo['common_dir'] or repo['name']}) — a submit may not "
                 "cross projects (a shared directory name is not shared identity)"
             ]
+        # Agreement is PROVEN (origin or common git dir). Retention of the established
+        # project's name aliases must NOT depend on the linked worktree sharing the main
+        # repository's directory name (reviewer repair: normal worktrees have other names and
+        # a binding using the canonical checkout name was wrongly refused).
         agreed = {shared}
-        if repo["name"] and repo["name"] == work["name"]:
-            agreed.add(repo["name"])
+        for side in (repo, work):
+            for alias in (side["name"], side["canonical_name"]):
+                if alias:
+                    agreed.add(alias)
         return agreed, []
 
     identities: set[str] = set()
@@ -1020,6 +1035,8 @@ def _project_agreement(repo_root: Path, workdir: str) -> tuple[set[str], list[st
         if side is None:
             continue
         identities.add(side["name"])
+        if side["canonical_name"]:
+            identities.add(side["canonical_name"])
         if side["origin"]:
             identities.add(side["origin"])
         if side["common_dir"]:
