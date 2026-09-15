@@ -17,9 +17,11 @@ import pytest
 from agentic_dynamics.core.paths import PathConfig
 from agentic_dynamics.experiment.experiment_spec import (
     SCOPE_VOCABULARY,
+    load_spec,
     phase_scope,
     validate_spec,
 )
+from agentic_dynamics.runtime.executor import StepResult
 from scripts.fleet.launch_broker import (
     build_launch_argv,
     build_submit_argv,
@@ -1904,3 +1906,610 @@ def test_submit_admission_reserve_and_cap_are_type_validated():
                for e in validate_submit_request(bad_cap))
     good = dict(base, admission={"required": True, "reserve_usd": 0.6, "hard_cap_usd": 1.0})
     assert validate_submit_request(good) == []
+
+
+# ── The AIO binding gate (Unit D) ─────────────────────────────────────────────
+#
+# A submit carrying an ``aio`` block declares the AIO actor: the wrapper (and, independently,
+# the broker) resolves the binding from the durable store BY IDENTITY — the request's own
+# claims are never proof — and the AIO session's measured budget must allow new consequential
+# work. A submit with no ``aio`` block keeps its existing contract.
+
+
+def _aio_request(*, aio: dict) -> dict:
+    """A manager-shaped AIO submit: actor + block together (the consistent declaration)."""
+    return _valid_submit_request(actor="aio", aio=aio)
+
+
+def _aio_block(**overrides) -> dict:
+    block = {
+        "native_session_id": "ses_aio",
+        "agent": "aio-control",
+        "binding_id": "",
+        "task_revision": 1,
+    }
+    block.update(overrides)
+    return block
+
+
+def _bound_store(store, *, project: str = "") -> str:
+    """A tmp binding store with ONE real binding; returns its durable record id."""
+    from agentic_dynamics.knowledge import session_ingestion as si
+
+    si.init_binding_store(store)
+    result = si.write_binding(
+        {
+            "native_session_id": "ses_aio",
+            "resolved_agent": "aio-control",
+            "task_identity": "unit-d",
+            "original_request": "enforce the binding at the exec boundary",
+            "project": project,
+        },
+        artifact_dir=store,
+        publish=False,
+    )
+    assert result.status == si.BINDING_STATUS_CREATED
+    return result.knowledge_id
+
+
+@pytest.fixture
+def aio_env(tmp_path, monkeypatch):
+    """Point the gate at a tmp store; stub the budget measurement to OK unless overridden."""
+    from scripts.fleet import spawn_wrapper as sw
+
+    monkeypatch.setenv("FINOPS_KB_ARTIFACT_DIR", str(tmp_path))
+    monkeypatch.setattr(sw, "_aio_budget_verdict", lambda session_id: ("OK", "", True))
+    return tmp_path
+
+
+def test_a_bound_aio_submit_passes_the_binding_gate(aio_env):
+    binding_id = _bound_store(aio_env)
+    errors = validate_submit_request(
+        _aio_request(aio=_aio_block(binding_id=binding_id))
+    )
+    assert errors == []
+
+
+def test_an_aio_submit_without_a_store_is_refused(tmp_path, monkeypatch):
+    from scripts.fleet import spawn_wrapper as sw
+
+    monkeypatch.setenv("FINOPS_KB_ARTIFACT_DIR", str(tmp_path / "absent"))
+    monkeypatch.setattr(sw, "_aio_budget_verdict", lambda session_id: ("OK", ""))
+    errors = validate_submit_request(_aio_request(aio=_aio_block(binding_id="0" * 64)))
+    assert any("binding store is unavailable" in e for e in errors)
+
+
+def test_an_aio_submit_without_a_binding_is_refused(aio_env):
+    errors = validate_submit_request(_aio_request(aio=_aio_block(binding_id="0" * 64)))
+    assert any("no durable AIO binding" in e for e in errors)
+
+
+def test_a_foreign_binding_id_is_refused(aio_env):
+    _bound_store(aio_env)
+    errors = validate_submit_request(_aio_request(aio=_aio_block(binding_id="f" * 64)))
+    assert any("does not match the durable binding record" in e for e in errors)
+
+
+def test_a_mismatched_agent_is_refused(aio_env):
+    binding_id = _bound_store(aio_env)
+    errors = validate_submit_request(
+        _aio_request(aio=_aio_block(binding_id=binding_id, agent="build"))
+    )
+    assert any("resolved agent" in e for e in errors)
+
+
+def test_a_stale_task_revision_is_refused_and_the_current_one_passes(aio_env):
+    from agentic_dynamics.knowledge import session_ingestion as si
+
+    _bound_store(aio_env)
+    updated = si.update_binding_context(
+        "ses_aio", context={"work_unit": "v2"}, expected_version=1,
+        artifact_dir=aio_env, publish=False,
+    )
+    stale = validate_submit_request(
+        _aio_request(aio=_aio_block(binding_id=updated.knowledge_id, task_revision=1))
+    )
+    assert any("stale task revision" in e for e in stale)
+    current = validate_submit_request(
+        _aio_request(aio=_aio_block(binding_id=updated.knowledge_id, task_revision=2))
+    )
+    assert current == []
+
+
+def test_a_warn_or_close_budget_blocks_new_consequential_work(aio_env, monkeypatch):
+    from scripts.fleet import spawn_wrapper as sw
+
+    binding_id = _bound_store(aio_env)
+    for verdict in ("WARN", "CLOSE", "UNJUDGED"):
+        monkeypatch.setattr(
+            sw, "_aio_budget_verdict", lambda session_id, v=verdict: (v, "measured reason", True)
+        )
+        errors = validate_submit_request(
+            _aio_request(aio=_aio_block(binding_id=binding_id))
+        )
+        assert any(f"budget verdict is {verdict}" in e for e in errors), verdict
+
+
+def test_the_budget_verdict_is_measured_from_the_explicit_session(tmp_path, monkeypatch):
+    """The gate measures the binding's OWN session; an unknown session is UNJUDGED."""
+    import json as _json
+    import sqlite3
+
+    from scripts.fleet import spawn_wrapper as sw
+
+    db = tmp_path / "opencode.db"
+    con = sqlite3.connect(db)
+    con.execute("CREATE TABLE session (id TEXT, time_updated INTEGER)")
+    con.execute("CREATE TABLE message (session_id TEXT, time_created INTEGER, data TEXT)")
+    con.execute("INSERT INTO session VALUES ('ses_aio', 200)")
+    con.execute(
+        "INSERT INTO message VALUES ('ses_aio', 1, ?)",
+        (_json.dumps({"role": "assistant", "tokens": {"input": 10, "cache": {"read": 10, "write": 0}}}),),
+    )
+    con.commit()
+    con.close()
+    monkeypatch.setenv("FINOPS_OPENCODE_DB", str(db))
+    assert sw._aio_budget_verdict("ses_aio") == ("OK", "", True)
+    verdict, reason, measured = sw._aio_budget_verdict("ses_unknown")
+    assert verdict == "UNJUDGED" and "does not exist" in reason and measured is True
+
+
+def test_a_malformed_aio_block_is_refused():
+    errors = validate_submit_request(_valid_submit_request(actor="aio", aio={}))
+    assert any("native_session_id is required" in e for e in errors)
+    assert any("aio.agent is required" in e for e in errors)
+    assert any("binding_id is required" in e for e in errors)
+    assert any("task_revision must be a positive integer" in e for e in errors)
+
+
+def test_a_non_aio_submit_needs_no_binding_and_keeps_its_contract(tmp_path, monkeypatch):
+    """Valid non-AIO automation (workers, campaign scripts) never impersonates the AIO — and
+    a missing binding store does not touch it."""
+    monkeypatch.setenv("FINOPS_KB_ARTIFACT_DIR", str(tmp_path / "absent"))
+    assert validate_submit_request(_valid_submit_request()) == []
+
+
+# ── The budget at the Docker boundary (reviewer repair, 2026-09-15) ───────────
+#
+# The containerized orchestrator has no host session database mounted: a gate that cannot
+# measure must DEFER to the host gate (which owns the canonical DB), never fabricate
+# UNJUDGED and block a valid job. The host gate (the broker) measures strictly.
+
+
+def _canonical_session_db(path, *, sid: str = "ses_aio", turns: int = 1, context: int = 10,
+                          pending_only: bool = False) -> None:
+    """A real opencode-shaped session db (the production schema), not a mocked verdict."""
+    import json as _json
+    import sqlite3
+
+    con = sqlite3.connect(path)
+    con.execute("CREATE TABLE session (id TEXT, time_updated INTEGER)")
+    con.execute("CREATE TABLE message (session_id TEXT, time_created INTEGER, data TEXT)")
+    con.execute("INSERT INTO session VALUES (?, 200)", (sid,))
+    if pending_only:
+        con.execute(
+            "INSERT INTO message VALUES (?, 1, ?)",
+            (sid, _json.dumps({"role": "assistant", "tokens": {"input": 0, "output": 0}})),
+        )
+    else:
+        for i in range(turns - 1):
+            con.execute(
+                "INSERT INTO message VALUES (?, ?, ?)",
+                (sid, i, _json.dumps(
+                    {"role": "assistant", "tokens": {"input": 10, "cache": {"read": 10, "write": 0}}}
+                )),
+            )
+        con.execute(
+            "INSERT INTO message VALUES (?, ?, ?)",
+            (sid, turns, _json.dumps(
+                {"role": "assistant", "tokens": {"input": context, "cache": {"read": 0, "write": 0}}}
+            )),
+        )
+    con.commit()
+    con.close()
+
+
+def _valid_bound_request(tmp_path, monkeypatch, *, db_name: str | None, **store_kwargs) -> tuple[dict, str]:
+    from agentic_dynamics.knowledge import session_ingestion as si
+
+    store = tmp_path / "kb"
+    si.init_binding_store(store)
+    binding_id = _bound_store(store, **store_kwargs)
+    monkeypatch.setenv("FINOPS_KB_ARTIFACT_DIR", str(store))
+    if db_name is not None:
+        _canonical_session_db(tmp_path / db_name)
+        monkeypatch.setenv("FINOPS_OPENCODE_DB", str(tmp_path / db_name))
+    return _aio_request(aio=_aio_block(binding_id=binding_id)), binding_id
+
+
+def test_a_gate_without_the_session_db_defers_a_valid_binding(tmp_path, monkeypatch):
+    """THE Docker-shape proof: the containerized wrapper has no host DB — a valid binding
+    passes (the budget is deferred), instead of being refused as UNJUDGED."""
+    request, _ = _valid_bound_request(tmp_path, monkeypatch, db_name=None)
+    monkeypatch.setenv("FINOPS_OPENCODE_DB", str(tmp_path / "absent.db"))
+    assert validate_submit_request(request) == []
+
+
+def test_a_strict_gate_refuses_when_the_db_is_missing(tmp_path, monkeypatch):
+    """The host gate (strict) must measure: a missing DB is itself a refusal there."""
+    request, _ = _valid_bound_request(tmp_path, monkeypatch, db_name=None)
+    monkeypatch.setenv("FINOPS_OPENCODE_DB", str(tmp_path / "absent.db"))
+    errors = validate_submit_request(request, strict_aio_budget=True)
+    assert any("cannot be measured at this gate" in e for e in errors)
+
+
+def test_the_budget_is_measured_for_real_against_the_canonical_db(tmp_path, monkeypatch):
+    """No verdict mocking: a real opencode-shaped DB decides admission and refusal."""
+    request, _ = _valid_bound_request(tmp_path, monkeypatch, db_name="ok.db")
+    assert validate_submit_request(request) == []
+
+    busy = tmp_path / "busy.db"
+    _canonical_session_db(busy, turns=80, context=1000)
+    monkeypatch.setenv("FINOPS_OPENCODE_DB", str(busy))
+    errors = validate_submit_request(request)
+    assert any("budget verdict is CLOSE" in e for e in errors)
+
+
+def test_a_pending_only_session_has_no_usable_measurement(tmp_path, monkeypatch):
+    """Reviewer finding: a pending, zero-valued sample must NOT read as measured/OK."""
+    from scripts.fleet import spawn_wrapper as sw
+
+    db = tmp_path / "pending.db"
+    _canonical_session_db(db, pending_only=True)
+    monkeypatch.setenv("FINOPS_OPENCODE_DB", str(db))
+    verdict, reason, measured = sw._aio_budget_verdict("ses_aio")
+    assert verdict == "UNJUDGED"
+    assert "no usable measurement" in reason
+    assert measured is True
+
+
+def test_an_initial_session_is_the_explicit_exception(tmp_path, monkeypatch):
+    """A session with no assistant message yet is OK — named as the initial-session case."""
+    import sqlite3
+
+    from scripts.fleet import spawn_wrapper as sw
+
+    db = tmp_path / "fresh.db"
+    con = sqlite3.connect(db)
+    con.execute("CREATE TABLE session (id TEXT, time_updated INTEGER)")
+    con.execute("CREATE TABLE message (session_id TEXT, time_created INTEGER, data TEXT)")
+    con.execute("INSERT INTO session VALUES ('ses_aio', 200)")
+    con.commit()
+    con.close()
+    monkeypatch.setenv("FINOPS_OPENCODE_DB", str(db))
+    verdict, reason, measured = sw._aio_budget_verdict("ses_aio")
+    assert (verdict, measured) == ("OK", True)
+    assert "initial session" in reason
+
+
+# ── The actor declaration must be consistent (reviewer repair) ────────────────
+
+
+def test_actor_aio_without_a_block_is_refused():
+    for extra in ({"actor": "aio"}, {"actor": "aio", "aio": None}):
+        errors = validate_submit_request(_valid_submit_request(**extra))
+        assert any("requires a complete aio binding block" in e for e in errors), extra
+
+
+def test_an_aio_block_without_the_actor_is_an_inconsistent_declaration():
+    errors = validate_submit_request(
+        _valid_submit_request(aio=_aio_block(binding_id="0" * 64))
+    )
+    assert any("inconsistent declaration" in e for e in errors)
+
+
+# ── The binding must apply to the submitted work (reviewer repair) ────────────
+
+
+def test_a_binding_naming_a_foreign_project_is_refused(aio_env):
+    binding_id = _bound_store(aio_env, project="some-unrelated-git-project")
+    errors = validate_submit_request(_aio_request(aio=_aio_block(binding_id=binding_id)))
+    assert any("does not match the submitted project" in e for e in errors)
+
+
+def _git_project(tmp_path, name: str, origin: str):
+    import subprocess
+
+    root = tmp_path / name
+    root.mkdir()
+    subprocess.run(["git", "init", "-q", str(root)], check=True)
+    subprocess.run(["git", "-C", str(root), "remote", "add", "origin", origin], check=True)
+    (root / "README.md").write_text("x")
+    git = ["git", "-C", str(root), "-c", "user.email=t@t", "-c", "user.name=t"]
+    subprocess.run([*git, "add", "-A"], check=True)
+    subprocess.run([*git, "commit", "-qm", "init"], check=True)
+    return root
+
+
+def test_the_two_project_identities_must_agree(tmp_path):
+    """The reviewer repair: a union let a foreign worktree pass when the binding matched
+    EITHER side. Both sides are established independently and must share an identity."""
+    from scripts.fleet import spawn_wrapper as sw
+
+    proj_a = _git_project(tmp_path, "proj-a", "git@github.com:org/proj-a.git")
+    proj_b = _git_project(tmp_path, "proj-b", "git@github.com:org/proj-b.git")
+    agreed, errors = sw._project_agreement(proj_a, str(proj_b))
+    assert agreed == set()
+    assert errors and "DIFFERENT project" in errors[0]
+
+
+def test_a_linked_worktree_of_the_same_project_agrees(tmp_path):
+    """Legitimate linked worktrees are preserved: they share the common git dir identity."""
+    import subprocess
+
+    from scripts.fleet import spawn_wrapper as sw
+
+    proj_a = _git_project(tmp_path, "proj-a", "git@github.com:org/proj-a.git")
+    worktree = tmp_path / "wt-a"
+    subprocess.run(
+        ["git", "-C", str(proj_a), "worktree", "add", "-q", str(worktree), "-b", "wt-a"],
+        check=True,
+    )
+    agreed, errors = sw._project_agreement(proj_a, str(worktree))
+    assert errors == []
+    assert "github.com/org/proj-a" in agreed
+
+
+def test_both_cross_project_binding_cases_are_refused_before_launch(aio_env, tmp_path):
+    """A binding matching EITHER side of two disagreeing repositories must refuse."""
+    from scripts.fleet import spawn_wrapper as sw
+
+    proj_a = _git_project(tmp_path, "proj-a", "git@github.com:org/proj-a.git")
+    proj_b = _git_project(tmp_path, "proj-b", "git@github.com:org/proj-b.git")
+    for project in ("github.com/org/proj-a", "github.com/org/proj-b"):
+        binding_id = _bound_store(aio_env, project=project)
+        errors = sw._validate_aio_binding(
+            _aio_block(binding_id=binding_id), repo_root=proj_a, workdir=str(proj_b),
+        )
+        assert any("DIFFERENT project" in e for e in errors), project
+        for slot in (aio_env / "aio-bindings").glob("*.json"):
+            slot.unlink()
+
+
+def test_a_linked_worktree_accepts_origin_and_canonical_name_bindings(aio_env, tmp_path):
+    """The reviewer repair: after agreement is PROVEN via origin/common git dir, the
+    established project's aliases stay valid — including its canonical checkout name —
+    regardless of the linked worktree's differing directory name."""
+    import subprocess
+
+    from scripts.fleet import spawn_wrapper as sw
+
+    proj_a = _git_project(tmp_path, "proj-a", "git@github.com:org/proj-a.git")
+    worktree = tmp_path / "wt-a"
+    subprocess.run(
+        ["git", "-C", str(proj_a), "worktree", "add", "-q", str(worktree), "-b", "wt-a"],
+        check=True,
+    )
+    for project in ("github.com/org/proj-a", "proj-a"):
+        binding_id = _bound_store(aio_env, project=project)
+        errors = sw._validate_aio_binding(
+            _aio_block(binding_id=binding_id), repo_root=proj_a, workdir=str(worktree),
+        )
+        assert errors == [], project
+        for slot in (aio_env / "aio-bindings").glob("*.json"):
+            slot.unlink()
+
+    # A foreign project name still refuses on the same linked worktree.
+    binding_id = _bound_store(aio_env, project="some-unrelated-project")
+    errors = sw._validate_aio_binding(
+        _aio_block(binding_id=binding_id), repo_root=proj_a, workdir=str(worktree),
+    )
+    assert any("does not match the submitted project" in e for e in errors)
+
+
+DETERMINISTIC_SPEC_YAML = """\
+name: deterministic_fixture
+question: a deterministic test step, no agent phase
+version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: false
+  external_services: false
+workflow:
+  kind: agent_task
+  params:
+    phases:
+      - name: deterministic_check
+        kind: test
+        timeout: 120
+        tests:
+          - tests/test_something.py
+        prompt: |
+          {goal}
+factors: []
+design: factorial
+rules: []
+metrics: []
+comparison: null
+"""
+
+KIND_TASK_SPEC_YAML = """\
+name: kind_task_fixture
+question: a kind-task phase (the runner's AGENT branch)
+version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: false
+  external_services: false
+workflow:
+  kind: agent_task
+  params:
+    phases:
+      - name: deterministic_check
+        kind: task
+        timeout: 120
+        prompt: |
+          {goal}
+factors: []
+design: factorial
+rules: []
+metrics: []
+comparison: null
+"""
+
+OMITTED_KIND_SPEC_YAML = """\
+name: omitted_kind_fixture
+question: a phase with no kind (the runner defaults to agent)
+version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: false
+  external_services: false
+workflow:
+  kind: agent_task
+  params:
+    phases:
+      - name: deterministic_check
+        timeout: 120
+        prompt: |
+          {goal}
+factors: []
+design: factorial
+rules: []
+metrics: []
+comparison: null
+"""
+
+
+class _RecordingAgentExecutor:
+    """Records every AGENT-branch invocation (the consequential call the check must prevent)."""
+
+    def __init__(self):
+        self.calls: list[str] = []
+
+    def execute(self, request):
+        self.calls.append(request.phase_name)
+        target = Path(request.workdir) / "work" / f"{request.phase_name}.txt"
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text("x")
+        return StepResult(ok=True, state="ok", exit_code=0)
+
+
+class _RecordingVerifierExecutor:
+    def __init__(self):
+        self.calls: list[str] = []
+
+    def execute(self, request):
+        self.calls.append(request.phase_name)
+        return StepResult(
+            ok=True, state="ok", exit_code=0, tests_passed=1, tests_total=1,
+            test_executed_success=True,
+        )
+
+
+def _load_spec_yaml(tmp_path, name: str, text: str):
+    from agentic_dynamics.experiment.experiment_spec import load_spec
+
+    path = tmp_path / name
+    path.write_text(text)
+    return load_spec(path)
+
+
+def test_only_test_kinds_are_deterministic_matching_the_runner(tmp_path):
+    """The reviewer repair: the runner dispatches EVERY non-test kind to its AGENT branch
+    (omitted kind included), so the deterministic check allows only `kind: test`."""
+    from scripts.fleet import spawn_wrapper as sw
+
+    deterministic = _load_spec_yaml(tmp_path, "det.yaml", DETERMINISTIC_SPEC_YAML)
+    assert sw._deterministic_phase_errors(deterministic) == []
+
+    for name, text in (("task.yaml", KIND_TASK_SPEC_YAML), ("none.yaml", OMITTED_KIND_SPEC_YAML)):
+        spec = _load_spec_yaml(tmp_path, name, text)
+        errors = sw._deterministic_phase_errors(spec)
+        assert errors and "AGENT branch" in errors[0], name
+
+    agentic = load_spec(_REPO_ROOT / _SUBMIT_SPEC)
+    errors = sw._deterministic_phase_errors(agentic)
+    assert errors and "agent phases" not in errors[0]  # named offender + the branch rule
+
+
+def test_the_validator_and_the_runner_agree_on_the_deterministic_fixture(tmp_path):
+    """Together, through the REAL runner with recording executors: the validator admits the
+    `kind: test` fixture AND the runner makes ZERO agent calls executing it."""
+    from agentic_dynamics.runtime.workflow_runner import run_workflow
+    from scripts.fleet import spawn_wrapper as sw
+
+    spec = _load_spec_yaml(tmp_path, "det.yaml", DETERMINISTIC_SPEC_YAML)
+    assert sw._deterministic_phase_errors(spec) == []
+
+    agent = _RecordingAgentExecutor()
+    verifier = _RecordingVerifierExecutor()
+    workdir = tmp_path / "wd"
+    workdir.mkdir()
+    result = run_workflow(
+        spec, goal="g", model="deepseek/deepseek-v4-flash", workdir=workdir,
+        step_executor=agent, verifier_executor=verifier, commit=False, publish=False,
+    )
+    assert result.ok is True
+    assert agent.calls == [], "the deterministic path made an agent call"
+    assert verifier.calls == ["deterministic_check"]
+
+
+def test_a_kind_task_spec_would_take_the_agents_branch(tmp_path):
+    """The reviewer reproduction, inverted: `kind: task` is AGENT work — the runner calls the
+    agent executor, which is exactly why the deterministic check refuses it."""
+    from agentic_dynamics.runtime.workflow_runner import run_workflow
+    from scripts.fleet import spawn_wrapper as sw
+
+    spec = _load_spec_yaml(tmp_path, "task.yaml", KIND_TASK_SPEC_YAML)
+    assert sw._deterministic_phase_errors(spec)  # refused BEFORE any execution
+
+    agent = _RecordingAgentExecutor()
+    verifier = _RecordingVerifierExecutor()
+    workdir = tmp_path / "wd"
+    workdir.mkdir()
+    run_workflow(
+        spec, goal="g", model="deepseek/deepseek-v4-flash", workdir=workdir,
+        step_executor=agent, verifier_executor=verifier, commit=False, publish=False,
+    )
+    assert agent.calls == ["deterministic_check"], "kind: task must reach the agent branch"
+
+
+def test_the_validate_submit_cli_reports_errors_as_json(monkeypatch, capsys):
+    """The tool's local-mode gate calls exactly this CLI (stdin request → JSON verdict)."""
+    import io
+    import json as _json
+
+    from scripts.fleet import spawn_wrapper as sw
+
+    monkeypatch.setattr("sys.stdin", io.StringIO(_json.dumps(_valid_submit_request())))
+    assert sw.main(["validate-submit"]) == 0
+    ok = _json.loads(capsys.readouterr().out)
+    assert ok == {"ok": True, "errors": []}
+
+    monkeypatch.setattr("sys.stdin", io.StringIO(_json.dumps({"spec": "nope.yaml"})))
+    assert sw.main(["validate-submit"]) == 2
+    bad = _json.loads(capsys.readouterr().out)
+    assert bad["ok"] is False and bad["errors"]
+
+
+def test_a_shared_directory_name_never_overrides_conflicting_origins(tmp_path):
+    """The reviewer repair: two unrelated repositories both named ``review-pr76`` must not
+    agree on the name — agreement is the canonical origin or the common git dir."""
+    from scripts.fleet import spawn_wrapper as sw
+
+    (tmp_path / "a").mkdir()
+    (tmp_path / "b").mkdir()
+    repo_a = _git_project(tmp_path / "a", "review-pr76", "git@github.com:org-a/review-pr76.git")
+    repo_b = _git_project(tmp_path / "b", "review-pr76", "git@github.com:org-b/review-pr76.git")
+    agreed, errors = sw._project_agreement(repo_a, str(repo_b))
+    assert agreed == set()
+    assert errors and "DIFFERENT project" in errors[0]
+    assert "a shared directory name is not shared identity" in errors[0]
+
+
+def test_a_binding_cannot_ride_the_shared_name_across_projects(aio_env, tmp_path):
+    from scripts.fleet import spawn_wrapper as sw
+
+    (tmp_path / "a").mkdir()
+    (tmp_path / "b").mkdir()
+    repo_a = _git_project(tmp_path / "a", "review-pr76", "git@github.com:org-a/review-pr76.git")
+    repo_b = _git_project(tmp_path / "b", "review-pr76", "git@github.com:org-b/review-pr76.git")
+    binding_id = _bound_store(aio_env, project="review-pr76")  # the shared NAME
+    errors = sw._validate_aio_binding(
+        _aio_block(binding_id=binding_id), repo_root=repo_a, workdir=str(repo_b),
+    )
+    assert any("DIFFERENT project" in e for e in errors)

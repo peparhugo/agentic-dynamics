@@ -271,3 +271,61 @@ def test_send_submit_command_carries_reserve_and_cap():
     )
     assert cmd["admission"]["reserve_usd"] == 0.6
     assert cmd["admission"]["hard_cap_usd"] == 1.0
+
+
+# ── The AIO binding identity in the submit envelope (Unit D) ──────────────────
+
+
+def test_send_submit_command_carries_the_aio_binding_identity():
+    """The manager's job is that the identity SURVIVES the hop, unchecked — the wrapper and
+    the broker each resolve the binding by identity before any launch."""
+    import json
+
+    fm = _fleet_manager()
+    r = _FakeRedis()
+    aio = {
+        "native_session_id": "ses_aio",
+        "agent": "aio-control",
+        "binding_id": "a" * 64,
+        "task_revision": 2,
+    }
+    cmd = fm._send_submit_command(
+        r, spec="s", goal="g", model="m", workdir="/tmp/w", aio=aio
+    )
+    assert cmd["actor"] == "aio"
+    assert cmd["aio"] == aio
+    queued = [json.loads(raw) for raw in r._lists[fm.COMMANDS_KEY]]
+    assert queued[0]["aio"]["native_session_id"] == "ses_aio"
+    assert queued[0]["actor"] == "aio"
+
+
+def test_send_submit_command_without_aio_carries_no_actor(monkeypatch):
+    fm = _fleet_manager()
+    r = _FakeRedis()
+    cmd = fm._send_submit_command(r, spec="s", goal="g", model="m", workdir="/tmp/w")
+    assert "aio" not in cmd and "actor" not in cmd
+
+
+def test_submit_cli_dispatches_the_aio_identity_flags(monkeypatch):
+    """The tool's flags reach the envelope verbatim: tool → manager metadata path."""
+    import json
+
+    fm = _fleet_manager()
+    r = _FakeRedis()
+    monkeypatch.setattr(fm, "_connect", lambda: r)
+    rc = fm.main([
+        "submit",
+        "--spec", "workflows/repository/fleet_job_submission.yaml",
+        "--goal", "g", "--model", "anthropic/claude-sonnet-5", "--workdir", "/tmp/wt_cli_aio",
+        "--aio-session-id", "ses_cli", "--aio-agent", "aio-control",
+        "--binding-id", "b" * 64, "--task-revision", "5",
+    ])
+    assert rc == 0
+    queued = [json.loads(raw) for raw in r._lists[fm.COMMANDS_KEY]]
+    assert queued[0]["actor"] == "aio"
+    assert queued[0]["aio"] == {
+        "native_session_id": "ses_cli",
+        "agent": "aio-control",
+        "binding_id": "b" * 64,
+        "task_revision": 5,
+    }

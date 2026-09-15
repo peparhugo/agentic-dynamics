@@ -294,7 +294,8 @@ def _send_submit_command(client: redis.Redis, *, spec: str, goal: str, model: st
                          resume: bool = False,
                          parent_run_id: str | None = None,
                          admission: dict | None = None,
-                         execution: dict | None = None) -> dict:
+                         execution: dict | None = None,
+                         aio: dict | None = None) -> dict:
     """LPUSH a submit command onto ``fleet:commands`` and record its "launching" board entry.
 
     The fleet-manager mints the ``job_id`` (the board's join key) but does NOT validate the
@@ -341,6 +342,12 @@ def _send_submit_command(client: redis.Redis, *, spec: str, goal: str, model: st
         command["admission"] = dict(admission)
     if execution:
         command["execution"] = dict(execution)
+    # The AIO binding identity (Unit D) survives the hop in the SAME unchecked way: the
+    # manager never validates it — the wrapper and the broker each resolve the binding from
+    # the durable store by identity and refuse what does not match.
+    if aio:
+        command["actor"] = "aio"
+        command["aio"] = dict(aio)
     client.lpush(COMMANDS_KEY, json.dumps(command))
     record_job_launch(client, command)
     return command
@@ -409,6 +416,20 @@ def main(argv: list[str] | None = None) -> int:
                           help="the per-phase timeout in seconds (pass-through)")
     p_submit.add_argument("--no-commit", action="store_true",
                           help="run phases without runner commits (pass-through)")
+    # The AIO binding identity (Unit D). The tool derives these from the NATIVE context
+    # (ctx.sessionID / ctx.agent) plus the durable binding read — never from model-supplied
+    # fields. Presence of --aio-session-id marks the submit as the AIO actor; the orchestrator
+    # and the broker then resolve + validate the binding by identity before any launch.
+    p_submit.add_argument("--aio-session-id", default=None,
+                          help="the native opencode session id the AIO submit runs as "
+                               "(presence marks the AIO actor)")
+    p_submit.add_argument("--aio-agent", default=None,
+                          help="the resolved native agent (must match the binding)")
+    p_submit.add_argument("--binding-id", default=None,
+                          help="the durable AIO binding record id (validated against the store)")
+    p_submit.add_argument("--task-revision", type=int, default=None,
+                          help="the binding's task/acceptance context version (stale revisions "
+                               "are refused)")
 
     parser.add_argument("--interval", type=float, default=DEFAULT_INTERVAL)
     parser.add_argument("--once", action="store_true")
@@ -487,10 +508,19 @@ def main(argv: list[str] | None = None) -> int:
                 execution["timeout_seconds"] = args.timeout_seconds
             if args.no_commit:
                 execution["no_commit"] = True
+        aio: dict | None = None
+        if args.aio_session_id:
+            aio = {
+                "native_session_id": args.aio_session_id,
+                "agent": args.aio_agent or "",
+                "binding_id": args.binding_id or "",
+                "task_revision": args.task_revision,
+            }
         cmd = _send_submit_command(
             client, spec=args.spec, goal=args.goal, model=args.model, workdir=args.workdir,
             image=args.image, spec_sha256=args.spec_sha256, resume=args.resume,
             parent_run_id=args.parent_run_id, admission=admission, execution=execution,
+            aio=aio,
         )
         print(f"fleet:commands <- {json.dumps(cmd)}")
         print(f"fleet:jobs[{cmd['job_id']}] <- launching")

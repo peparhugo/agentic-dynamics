@@ -186,6 +186,58 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def measure_verdict(
+    session_id: str | None,
+    *,
+    db_path: Path | None = None,
+    ctx_budget: int = DEFAULT_CTX_BUDGET,
+    turn_budget: int = DEFAULT_TURN_BUDGET,
+) -> tuple[str, str, bool]:
+    """The measurement seam for programmatic callers (the AIO exec-boundary gate).
+
+    Returns ``(verdict, reason, backend_available)``:
+
+    * ``backend_available=False`` — the session DATABASE is not present at this location
+      (the containerized gate has no host DB mounted). The caller must NOT read this as a
+      verdict: a gate that cannot measure defers, and the host-side gate (the broker) —
+      which owns the canonical database — measures before the launch effect.
+    * a genuinely INITIAL session (no assistant message recorded yet) is ``OK`` with the
+      explicit reason ``"initial session: no usage recorded yet"`` — the one defined
+      exception, named rather than silently zero.
+    * a session whose every recorded usage sample is pending/incomplete has NO usable
+      measurement: ``UNJUDGED`` with a named reason — never a silent 0/OK (the reviewer
+      reproduction: a pending, zero-valued sample must not read as measured).
+    * otherwise the CLI's judgment, with ``"; usage incomplete — last completed sample used"``
+      appended to the reason when a valid completed reading was carried forward.
+
+    The judged session is the EXPLICIT identity; there is no most-recently-updated fallback.
+    """
+    try:
+        path = Path(db_path) if db_path else _default_db()
+        if not path.is_file():
+            return "UNJUDGED", f"session db {path} not found", False
+        sid = (session_id or "").strip()
+        if not sid:
+            raise LookupError(f"no session identity supplied (--session-id or {SESSION_ID_ENV})")
+        if not _session_exists(path, sid):
+            raise LookupError(f"session {sid!r} does not exist in {path}")
+        turns, context, incomplete = _measure(path, sid)
+        if turns == 0:
+            return "OK", "initial session: no usage recorded yet", True
+        if incomplete and context == 0:
+            return (
+                "UNJUDGED",
+                "no usable measurement: every recorded usage sample is pending/incomplete",
+                True,
+            )
+        reason = "usage incomplete — last completed sample used" if incomplete else ""
+        return judge(
+            turns=turns, context=context, ctx_budget=ctx_budget, turn_budget=turn_budget
+        ), reason, True
+    except Exception as exc:  # noqa: BLE001 — an unreadable budget is UNJUDGED, never OK
+        return "UNJUDGED", f"{type(exc).__name__}: {exc}", True
+
+
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     db_path = Path(args.db) if args.db else _default_db()
