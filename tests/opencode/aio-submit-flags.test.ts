@@ -87,7 +87,7 @@ test("a worker agent keeps its contract: no gate, no stamps", () => {
   expect(withBinding.flags).toEqual([])
 })
 
-test("the coordinator gate parses the durable read and stamps the project association", () => {
+test("the coordinator gate parses the durable read; the project is never a tool flag", () => {
   const refused = toolBindingGate("aio-control", "ses_a", "not json")
   expect(refused.refuse).toContain("no durable AIO binding")
   const bound = toolBindingGate(
@@ -100,8 +100,56 @@ test("the coordinator gate parses the durable read and stamps the project associ
     }),
   )
   expect(bound.refuse).toBe("")
-  expect(bound.flags).toContain("--project")
-  expect(bound.flags[bound.flags.indexOf("--project") + 1]).toBe(
-    "github.com/peparhugo/agentic-dynamics",
-  )
+  // Reviewer repair: the manager's parser never accepted --project; the backend resolves the
+  // project from the durable binding. The tool must not emit an unparseable flag.
+  expect(bound.flags).not.toContain("--project")
+})
+
+test("the native tool's emitted flags parse in the REAL CLI", () => {
+  // THE connection the helper tests missed: the tool's argv → the actual fleet_manager parser,
+  // with the manager's Redis connection faked inside the snippet.
+  const { execFileSync } = require("node:child_process")
+  const path = require("node:path")
+  const repo = path.resolve(import.meta.dir, "..", "..")
+  const snippet = [
+    "import json, sys",
+    "sys.path.insert(0, 'scripts/fleet')",
+    "import fleet_manager as fm",
+    "class R:",
+    "    def __init__(self):",
+    "        self.lists = {}",
+    "        self.hashes = {}",
+    "    def lpush(self, k, v):",
+    "        self.lists.setdefault(k, []).insert(0, v)",
+    "    def hset(self, k, mapping=None, **kw):",
+    "        self.hashes.setdefault(k, {}).update(mapping or {})",
+    "    def hget(self, k, f):",
+    "        return self.hashes.get(k, {}).get(f)",
+    "    def hvals(self, k):",
+    "        return list(self.hashes.get(k, {}).values())",
+    "r = R()",
+    "fm._connect = lambda: r",
+    "rc = fm.main(sys.argv[1:])",
+    "queued = [json.loads(x) for x in r.lists.get(fm.COMMANDS_KEY, [])]",
+    "print(json.dumps({'rc': rc, 'queued': queued}))",
+  ].join("\n")
+  const emitted = aioSubmitFlags("ses_a", "aio-control", {
+    status: "found", knowledge_id: BINDING_ID, binding: { context_version: 2 },
+  })
+  expect(emitted.refuse).toBe("")
+  const argv = [
+    "-c", snippet,
+    "submit",
+    "--spec", "workflows/repository/fleet_job_submission.yaml",
+    "--goal", "g", "--model", "anthropic/claude-sonnet-5",
+    "--workdir", "/tmp/wt_tool_cli_regression",
+    ...emitted.flags,
+  ]
+  const out = execFileSync("python3", argv, { cwd: repo, encoding: "utf8" })
+  const parsed = JSON.parse(out.trim().split("\n").pop() as string)
+  expect(parsed.rc).toBe(0)
+  expect(parsed.queued[0].actor).toBe("aio")
+  expect(parsed.queued[0].aio.native_session_id).toBe("ses_a")
+  expect(parsed.queued[0].aio.binding_id).toBe(BINDING_ID)
+  expect(parsed.queued[0].aio.task_revision).toBe(2)
 })

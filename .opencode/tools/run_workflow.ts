@@ -10,6 +10,28 @@ import { tool } from "@opencode-ai/plugin"
  */
 export const AIO_AGENT = "aio-control"
 
+export type CommandResult = { stdout: string; stderr: string; exitCode: number }
+export type CommandRunner = (args: string[], cwd: string, stdin?: string) => Promise<CommandResult>
+
+async function defaultCommandRunner(args: string[], cwd: string, stdin?: string): Promise<CommandResult> {
+  const proc = Bun.spawn(args, { cwd, stdout: "pipe", stderr: "pipe", stdin: "pipe" })
+  if (stdin !== undefined) proc.stdin.write(stdin)
+  proc.stdin.end()
+  const [stdout, stderr, exitCode] = await Promise.all([
+    new Response(proc.stdout).text(),
+    new Response(proc.stderr).text(),
+    proc.exited,
+  ])
+  return { stdout, stderr, exitCode }
+}
+
+let commandRunner: CommandRunner = defaultCommandRunner
+
+/** Test seam: drive the tool's REAL entry point with an injected shell. */
+export function setCommandRunner(runner: CommandRunner | null): void {
+  commandRunner = runner ?? defaultCommandRunner
+}
+
 /** Parse one ``session_open.py --binding`` stdout and gate it (malformed output refuses). */
 export function toolBindingGate(
   agent: string,
@@ -74,17 +96,19 @@ export function aioSubmitFlags(
         "refusing to submit unbound.",
     }
   }
-  const project = String(bindingReport.binding?.project ?? "").trim()
-  const flags = [
-    "--aio-session-id", sessionID,
-    "--aio-agent", String(agent ?? ""),
-    "--binding-id", bindingID,
-    "--task-revision", String(revision),
-  ]
-  // The binding's project association rides along when the binding carries one; the backend
-  // validates it against the submitted spec/worktree (a foreign project refuses there).
-  if (project) flags.push("--project", project)
-  return { flags, refuse: "" }
+  // The project association is NOT a tool flag (reviewer repair: the manager's parser never
+  // accepted --project, and a tool-emitted flag the CLI rejects is a broken connection). The
+  // backend resolves the project from the durable binding and validates it against the
+  // submitted spec/worktree — the flag would be redundant and unparseable.
+  return {
+    flags: [
+      "--aio-session-id", sessionID,
+      "--aio-agent", String(agent ?? ""),
+      "--binding-id", bindingID,
+      "--task-revision", String(revision),
+    ],
+    refuse: "",
+  }
 }
 
 export default tool({
@@ -131,10 +155,13 @@ export default tool({
     // keep the existing authority contract.
     let aioFlags: string[] = []
     if (isAioAgent(String(ctx.agent ?? ""))) {
-      const bindingRead = await Bun.$`python3 scripts/session_open.py --binding --native-session-id ${String(ctx.sessionID ?? "")} --json`
-        .cwd(ctx.directory).nothrow()
+      const bindingRead = await commandRunner(
+        ["python3", "scripts/session_open.py", "--binding",
+         "--native-session-id", String(ctx.sessionID ?? ""), "--json"],
+        ctx.directory,
+      )
       const aio = toolBindingGate(
-        String(ctx.agent ?? ""), String(ctx.sessionID ?? ""), bindingRead.stdout.toString(),
+        String(ctx.agent ?? ""), String(ctx.sessionID ?? ""), bindingRead.stdout,
       )
       if (aio.refuse) {
         return {
@@ -150,6 +177,47 @@ export default tool({
     }
 
     if (!args.orchestrator) {
+      if (isAioAgent(String(ctx.agent ?? ""))) {
+        // The AIO local exception (Unit D repair): an in-process run is permitted only for a
+        // VERIFIED DETERMINISTIC workflow AND only when the same budget/scope gate the durable
+        // path uses passes — checked through the REAL validator, so a CLOSE session (or an
+        // agent workflow) refuses BEFORE any local execution.
+        const checkRequest = {
+          spec: args.spec,
+          goal: args.goal,
+          model: args.model,
+          workdir: args.workdir,
+          actor: "aio",
+          aio: {
+            native_session_id: String(ctx.sessionID ?? ""),
+            agent: String(ctx.agent ?? ""),
+            binding_id: aioFlags[aioFlags.indexOf("--binding-id") + 1] ?? "",
+            task_revision: Number(aioFlags[aioFlags.indexOf("--task-revision") + 1] ?? 0),
+          },
+        }
+        const validation = await commandRunner(
+          ["python3", "scripts/fleet/spawn_wrapper.py", "validate-submit",
+           "--strict-aio-budget", "--require-deterministic"],
+          ctx.directory,
+          JSON.stringify(checkRequest),
+        )
+        let verdict: { ok?: boolean; errors?: string[] } | null = null
+        try {
+          const parsed = JSON.parse(validation.stdout.trim())
+          verdict = parsed && typeof parsed === "object" ? parsed : null
+        } catch {
+          verdict = null
+        }
+        if (!verdict || verdict.ok !== true) {
+          return {
+            output:
+              "AIO in-process run refused: " +
+              ((verdict?.errors ?? []).join("; ") ||
+                `the deterministic/budget validator is unavailable (exit ${validation.exitCode})`),
+            metadata: { exit_code: 2, execution_mode: "in-process" },
+          }
+        }
+      }
       // The explicitly requested in-process mode (a lab execution, a deterministic replay).
       const flags: string[] = [
         "--spec", args.spec,
@@ -164,9 +232,9 @@ export default tool({
       if (args.backend) flags.push("--backend", args.backend)
       if (args.no_commit) flags.push("--no-commit")
       if (args.resume) flags.push("--resume")
-      const result = await Bun.$`python3 scripts/run_workflow.py ${flags}`.cwd(ctx.directory).nothrow()
-      const output = result.stdout.toString().trim()
-      const err = result.stderr.toString().trim()
+      const result = await commandRunner(["python3", "scripts/run_workflow.py", ...flags], ctx.directory)
+      const output = result.stdout.trim()
+      const err = result.stderr.trim()
       if (result.exitCode !== 0) {
         return { output: output || err || `run_workflow failed (exit ${result.exitCode})`, metadata: { exit_code: result.exitCode } }
       }
@@ -180,9 +248,13 @@ export default tool({
     // checkout) so the broker can verify the declared immutable input is what the
     // orchestrator will load. Continuation identity + admission settings ride the same
     // command and survive every hop to the compose argv.
-    const digest = await Bun.$`python3 -c "import hashlib,sys;print(hashlib.sha256(open(sys.argv[1],'rb').read()).hexdigest())" ${args.spec}`
-      .cwd(ctx.directory).nothrow()
-    const specSha = digest.stdout.toString().trim()
+    const digest = await commandRunner(
+      ["python3", "-c",
+       "import hashlib,sys;print(hashlib.sha256(open(sys.argv[1],'rb').read()).hexdigest())",
+       args.spec],
+      ctx.directory,
+    )
+    const specSha = digest.stdout.trim()
     if (specSha.length !== 64) {
       return { output: `spec identity unavailable for ${args.spec} (got "${specSha}") — refusing to submit without the source digest`, metadata: { exit_code: 2 } }
     }
@@ -218,9 +290,11 @@ export default tool({
     if (args.timeout_min) submitFlags.push("--timeout-seconds", String(args.timeout_min * 60))
     if (args.no_commit) submitFlags.push("--no-commit")
 
-    const submit = await Bun.$`python3 scripts/fleet/fleet_manager.py ${submitFlags}`.cwd(ctx.directory).nothrow()
-    const out = submit.stdout.toString().trim()
-    const err = submit.stderr.toString().trim()
+    const submit = await commandRunner(
+      ["python3", "scripts/fleet/fleet_manager.py", ...submitFlags], ctx.directory,
+    )
+    const out = submit.stdout.trim()
+    const err = submit.stderr.trim()
     if (submit.exitCode !== 0) {
       return { output: out || err || `fleet submit failed (exit ${submit.exitCode})`, metadata: { exit_code: submit.exitCode } }
     }

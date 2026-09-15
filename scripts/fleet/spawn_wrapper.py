@@ -964,24 +964,73 @@ def _normalize_project(value: str) -> str:
     return text
 
 
-def _submit_project_identities(repo_root: Path, workdir: str) -> set[str]:
-    """The candidate project identities of the SUBMITTED work (spec repo + worktree)."""
-    identities: set[str] = set()
-    for checkout in (Path(repo_root), Path(workdir) if workdir else None):
-        if checkout is None:
-            continue
-        identities.add(_normalize_project(checkout.name))
-        common = _git_common_dir(checkout) if checkout.is_dir() else None
-        if common is not None:
-            # The main worktree's directory name (the common git dir's parent for a linked
-            # worktree checkout) + the origin URL — a content identity that survives the
-            # host/container path views.
-            if common.name == ".git":
-                identities.add(_normalize_project(common.parent.name))
-            url = _origin_url(common)
-            if url:
-                identities.add(_normalize_project(url))
+def _checkout_project_identities(checkout: Path) -> set[str]:
+    """The candidate project identities of ONE checkout (origin URL + directory names).
+
+    Filesystem-only (no subprocess): the common git dir's ``origin`` URL is a content
+    identity that survives the host/container path views; the directory names are fallbacks.
+    """
+    if checkout is None or not str(checkout).strip() or not checkout.is_dir():
+        # A non-existent (or unreadable) path has NO project identity — an unresolvable side
+        # is not a claim, so it can never manufacture a false cross-project refusal.
+        return set()
+    identities = {_normalize_project(checkout.name)}
+    common = _git_common_dir(checkout)
+    if common is not None:
+        if common.name == ".git":
+            identities.add(_normalize_project(common.parent.name))
+        url = _origin_url(common)
+        if url:
+            identities.add(_normalize_project(url))
     return {identity for identity in identities if identity}
+
+
+def _project_agreement(repo_root: Path, workdir: str) -> tuple[set[str], list[str]]:
+    """Establish the spec repository's and the worktree's identities INDEPENDENTLY and require
+    agreement: ``(agreed_identities, errors)``.
+
+    The reviewer repair (2026-09-15): a UNION let a foreign worktree pass whenever the binding
+    matched either side. Both sides must resolve to the same project (a shared identity — a
+    legitimate linked worktree shares the common git dir and its origin URL/name). When one
+    side is unresolvable (a missing workdir, a non-git path), the other side's identities
+    stand alone; when BOTH resolve and disagree, the submit is refused as cross-project.
+    """
+    repo_ids = _checkout_project_identities(Path(repo_root))
+    work_ids = (
+        _checkout_project_identities(Path(workdir))
+        if str(workdir or "").strip()
+        else set()
+    )
+    if repo_ids and work_ids and not (repo_ids & work_ids):
+        return set(), [
+            f"submit: the worktree identifies as {sorted(work_ids)} — a DIFFERENT project than "
+            f"the spec repository ({sorted(repo_ids)}); a submit may not cross projects"
+        ]
+    if repo_ids and work_ids:
+        return repo_ids & work_ids, []
+    return (repo_ids or work_ids), []
+
+
+def _deterministic_phase_errors(spec: Any) -> list[str]:
+    """The AIO local-execution exception: every phase must be a deterministic step.
+
+    ``kind: agent`` phases are consequential model turns — they belong on the durable path,
+    where scope + budget enforcement apply. A spec whose phases are all non-agent is a
+    VERIFIED deterministic workflow, the only shape an AIO in-process run may execute.
+    """
+    if spec is None:
+        return []
+    agent_phases = [
+        str(phase.get("name") or "?")
+        for phase in (spec.workflow.params.get("phases") or [])
+        if isinstance(phase, dict) and str(phase.get("kind") or "") == "agent"
+    ]
+    if not agent_phases:
+        return []
+    return [
+        "submit: an AIO in-process run must be a verified deterministic workflow — phase(s) "
+        f"{agent_phases} are agent phases; consequential agent work uses the durable path"
+    ]
 
 
 def _validate_aio_binding(
@@ -1052,15 +1101,15 @@ def _validate_aio_binding(
             f"submit: stale task revision: the request cites {revision}, the binding's "
             f"current context version is {current_version} — re-read the binding"
         )
+    agreed, agreement_errors = _project_agreement(repo_root, workdir)
+    errors.extend(agreement_errors)
     binding_project = str(binding.get("project") or "").strip()
-    if binding_project:
-        candidates = _submit_project_identities(repo_root, workdir)
-        if _normalize_project(binding_project) not in candidates:
-            errors.append(
-                f"submit: the binding's project {binding_project!r} does not match the "
-                f"submitted project ({sorted(candidates) or 'unresolvable'}) — a binding may "
-                "only ride work from its own project"
-            )
+    if binding_project and not agreement_errors and _normalize_project(binding_project) not in agreed:
+        errors.append(
+            f"submit: the binding's project {binding_project!r} does not match the "
+            f"submitted project ({sorted(agreed) or 'unresolvable'}) — a binding may only "
+            "ride work from its own project"
+        )
     verdict, reason, measured_here = _aio_budget_verdict(native_session_id)
     if measured_here:
         if verdict != "OK":
@@ -1084,6 +1133,7 @@ def validate_submit_request(
     phase_scopes: dict[str, str] | None = None,
     path_config: PathConfig | None = None,
     strict_aio_budget: bool = False,
+    require_deterministic: bool = False,
 ) -> list[str]:
     """Validate a ``submit`` request. Empty list = valid; the socket is reached only then.
 
@@ -1334,6 +1384,12 @@ def validate_submit_request(
                 errors.append(
                     f"submit: execution.no_commit must be a boolean (got {no_commit!r})"
                 )
+
+    # Step 12a — the AIO local-execution exception (Unit D repair): an AIO in-process run is
+    # permitted only for a VERIFIED DETERMINISTIC workflow (no agent phases), so the local
+    # mode can never dispatch a consequential agent turn around the durable budget/scope gates.
+    if require_deterministic:
+        errors.extend(_deterministic_phase_errors(spec))
 
     # Step 12 — the AIO binding gate (Unit D). The actor declaration and the aio block must be
     # CONSISTENT: actor=aio demands a complete block (a missing/null block is not a binding),
@@ -2319,6 +2375,18 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="The sibling-spawn wrapper (D-14/D-16).")
     sub = parser.add_subparsers(dest="command", required=True)
     sub.add_parser("validate", help="validate a spawn request (JSON on stdin)")
+    p_validate_submit = sub.add_parser(
+        "validate-submit",
+        help="validate a submit request (JSON on stdin), including the AIO binding gate",
+    )
+    p_validate_submit.add_argument(
+        "--strict-aio-budget", action="store_true",
+        help="refuse when the AIO session budget cannot be measured at this gate",
+    )
+    p_validate_submit.add_argument(
+        "--require-deterministic", action="store_true",
+        help="refuse a spec containing agent phases (the AIO in-process exception)",
+    )
     p_consume = sub.add_parser("consume", help="claim fleet:commands and dispatch")
     p_consume.add_argument("--once", action="store_true")
     p_consume.add_argument("--dry-run", action="store_true")
@@ -2332,6 +2400,16 @@ def main(argv: list[str] | None = None) -> int:
             return 2
         print("spawn valid")
         return 0
+
+    if args.command == "validate-submit":
+        request = json.loads(sys.stdin.read())
+        errors = validate_submit_request(
+            request,
+            strict_aio_budget=args.strict_aio_budget,
+            require_deterministic=args.require_deterministic,
+        )
+        print(json.dumps({"ok": not errors, "errors": errors}))
+        return 0 if not errors else 2
 
     consume_fleet_commands(dry_run=args.dry_run, once=args.once)
     return 0

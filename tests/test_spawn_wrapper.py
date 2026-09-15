@@ -2205,15 +2205,136 @@ def test_a_binding_naming_a_foreign_project_is_refused(aio_env):
     assert any("does not match the submitted project" in e for e in errors)
 
 
-def test_a_binding_of_the_correct_project_passes(aio_env):
+def _git_project(tmp_path, name: str, origin: str):
+    import subprocess
+
+    root = tmp_path / name
+    root.mkdir()
+    subprocess.run(["git", "init", "-q", str(root)], check=True)
+    subprocess.run(["git", "-C", str(root), "remote", "add", "origin", origin], check=True)
+    (root / "README.md").write_text("x")
+    git = ["git", "-C", str(root), "-c", "user.email=t@t", "-c", "user.name=t"]
+    subprocess.run([*git, "add", "-A"], check=True)
+    subprocess.run([*git, "commit", "-qm", "init"], check=True)
+    return root
+
+
+def test_the_two_project_identities_must_agree(tmp_path):
+    """The reviewer repair: a union let a foreign worktree pass when the binding matched
+    EITHER side. Both sides are established independently and must share an identity."""
     from scripts.fleet import spawn_wrapper as sw
 
-    identities = sw._submit_project_identities(_REPO_ROOT, "/tmp/wt_test_submit_job")
-    assert identities, "the test repo must resolve at least one project identity"
-    for identity in sorted(identities):
-        binding_id = _bound_store(aio_env, project=identity)
-        errors = validate_submit_request(_aio_request(aio=_aio_block(binding_id=binding_id)))
-        assert errors == [], identity
-        # reset the slot for the next identity (one binding per session)
+    proj_a = _git_project(tmp_path, "proj-a", "git@github.com:org/proj-a.git")
+    proj_b = _git_project(tmp_path, "proj-b", "git@github.com:org/proj-b.git")
+    agreed, errors = sw._project_agreement(proj_a, str(proj_b))
+    assert agreed == set()
+    assert errors and "DIFFERENT project" in errors[0]
+
+
+def test_a_linked_worktree_of_the_same_project_agrees(tmp_path):
+    """Legitimate linked worktrees are preserved: they share the common git dir identity."""
+    import subprocess
+
+    from scripts.fleet import spawn_wrapper as sw
+
+    proj_a = _git_project(tmp_path, "proj-a", "git@github.com:org/proj-a.git")
+    worktree = tmp_path / "wt-a"
+    subprocess.run(
+        ["git", "-C", str(proj_a), "worktree", "add", "-q", str(worktree), "-b", "wt-a"],
+        check=True,
+    )
+    agreed, errors = sw._project_agreement(proj_a, str(worktree))
+    assert errors == []
+    assert "github.com/org/proj-a" in agreed
+
+
+def test_both_cross_project_binding_cases_are_refused_before_launch(aio_env, tmp_path):
+    """A binding matching EITHER side of two disagreeing repositories must refuse."""
+    from scripts.fleet import spawn_wrapper as sw
+
+    proj_a = _git_project(tmp_path, "proj-a", "git@github.com:org/proj-a.git")
+    proj_b = _git_project(tmp_path, "proj-b", "git@github.com:org/proj-b.git")
+    for project in ("github.com/org/proj-a", "github.com/org/proj-b"):
+        binding_id = _bound_store(aio_env, project=project)
+        errors = sw._validate_aio_binding(
+            _aio_block(binding_id=binding_id), repo_root=proj_a, workdir=str(proj_b),
+        )
+        assert any("DIFFERENT project" in e for e in errors), project
         for slot in (aio_env / "aio-bindings").glob("*.json"):
             slot.unlink()
+
+
+def test_a_correct_project_binding_passes_the_agreement(aio_env, tmp_path):
+    from scripts.fleet import spawn_wrapper as sw
+
+    proj_a = _git_project(tmp_path, "proj-a", "git@github.com:org/proj-a.git")
+    binding_id = _bound_store(aio_env, project="github.com/org/proj-a")
+    errors = sw._validate_aio_binding(
+        _aio_block(binding_id=binding_id), repo_root=proj_a, workdir=str(proj_a),
+    )
+    assert errors == []
+
+
+# ── The AIO in-process exception: verified deterministic workflows (Unit D repair) ─────────
+
+DETERMINISTIC_SPEC_YAML = """\
+name: deterministic_fixture
+question: a deterministic step, no agent phase
+version: "0.1"
+artifact_kind: workflow
+intent: mutate
+side_effects:
+  repository: false
+  external_services: false
+workflow:
+  kind: agent_task
+  params:
+    phases:
+      - name: step_one
+        kind: task
+        prompt: |
+          do the deterministic step
+factors: []
+design: factorial
+rules: []
+metrics: []
+comparison: null
+"""
+
+
+def test_only_agent_phase_specs_are_refused_by_the_deterministic_check(tmp_path):
+    from agentic_dynamics.experiment.experiment_spec import load_spec
+    from scripts.fleet import spawn_wrapper as sw
+
+    deterministic = tmp_path / "det.yaml"
+    deterministic.write_text(DETERMINISTIC_SPEC_YAML)
+    assert sw._deterministic_phase_errors(load_spec(deterministic)) == []
+
+    agentic = load_spec(_REPO_ROOT / _SUBMIT_SPEC)
+    errors = sw._deterministic_phase_errors(agentic)
+    assert errors and "agent phases" in errors[0]
+
+
+def test_require_deterministic_refuses_the_agent_workflow():
+    errors = validate_submit_request(
+        _valid_submit_request(), require_deterministic=True
+    )
+    assert any("verified deterministic workflow" in e for e in errors)
+
+
+def test_the_validate_submit_cli_reports_errors_as_json(monkeypatch, capsys):
+    """The tool's local-mode gate calls exactly this CLI (stdin request → JSON verdict)."""
+    import io
+    import json as _json
+
+    from scripts.fleet import spawn_wrapper as sw
+
+    monkeypatch.setattr("sys.stdin", io.StringIO(_json.dumps(_valid_submit_request())))
+    assert sw.main(["validate-submit"]) == 0
+    ok = _json.loads(capsys.readouterr().out)
+    assert ok == {"ok": True, "errors": []}
+
+    monkeypatch.setattr("sys.stdin", io.StringIO(_json.dumps({"spec": "nope.yaml"})))
+    assert sw.main(["validate-submit"]) == 2
+    bad = _json.loads(capsys.readouterr().out)
+    assert bad["ok"] is False and bad["errors"]
